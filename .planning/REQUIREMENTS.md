@@ -1,0 +1,123 @@
+# Requirements: WorshipPlanner
+
+**Defined:** 2026-03-03
+**Core Value:** Smart weekly service planning that follows the Vertical Worship methodology (1→2→3 song progression) while rotating through the full song stable and respecting team configurations.
+
+## v1 Requirements
+
+Requirements for initial release. Each maps to roadmap phases.
+
+### Song Library
+
+- [ ] **SONG-01**: User can import song stable from CSV (Planning Center export format with multiple arrangements per song)
+- [ ] **SONG-02**: User can add, edit, and delete songs with title, CCLI number, themes, and notes
+- [ ] **SONG-03**: User can search and filter songs by title, key, tempo, category, and team tags
+- [ ] **SONG-04**: User can manage multiple arrangements per song (key, BPM, length, chord chart, notes)
+- [ ] **SONG-05**: User can categorize each song as Vertical Worship type 1 (Call to Worship), 2 (Intimate), or 3 (Ascription)
+- [ ] **SONG-06**: User can tag songs with team compatibility (choir, orchestra, standard band, etc.)
+
+### Service Planning
+
+- [ ] **PLAN-01**: User can create a weekly service plan following the standard order (Song, Scripture, Song, Prayer, Scripture, Song, Song, Message, Sending Song)
+- [ ] **PLAN-02**: User can select a 4-song progression pattern (1-2-2-3 or 1-2-3-3) for each service
+- [ ] **PLAN-03**: Service song slots enforce Vertical Worship type constraints based on chosen progression
+- [ ] **PLAN-04**: User can specify which teams are participating per service (choir, orchestra, special service)
+- [ ] **PLAN-05**: Available songs are automatically filtered by team configuration for each service
+- [ ] **PLAN-06**: App suggests songs for each slot based on category type, rotation recency, and team configuration
+- [ ] **PLAN-07**: User can override suggestions and manually pick any song from the stable
+- [ ] **PLAN-08**: Song usage history is tracked automatically when songs are placed in service plans
+- [ ] **PLAN-09**: Songs used in the last 2 weeks are deprioritized in suggestions (rotation enforcement)
+
+### Scripture & Sermon
+
+- [ ] **SCRI-01**: User can add scripture passages to the service order (multiple reading slots)
+- [ ] **SCRI-02**: User can enter the pastor's sermon passage to prevent duplication in readings
+- [ ] **SCRI-03**: App links to or displays ESV Bible text for selected scripture passages
+- [ ] **SCRI-04**: App suggests Psalms when user is selecting scripture readings
+
+### Output & Sharing
+
+- [ ] **OUT-01**: User can print a formatted order of service for rehearsal and Sunday
+- [ ] **OUT-02**: User can share a read-only service plan link (mobile-friendly)
+- [ ] **OUT-03**: User can export structured service plan data for Planning Center entry
+
+### Auth & Collaboration
+
+- [ ] **AUTH-01**: User can sign in with Google OAuth
+- [ ] **AUTH-02**: User can sign in with email and password
+- [ ] **AUTH-03**: User can invite team members by email to collaborate on planning
+- [ ] **AUTH-04**: Invited users can access shared service plans and song stable
+
+### Calendar & Overview
+
+- [ ] **CAL-01**: User can view and manage services week-by-week with upcoming and recent weeks
+- [ ] **CAL-02**: User can view a seasonal/quarterly overview of planned services
+- [ ] **CAL-03**: Seasonal view shows song usage patterns across weeks to spot rotation issues
+
+### Task Management
+
+- [ ] **TASK-01**: User can create recurring tasks with church-specific categories (Administrative, Communication, Rehearsal, Technical, Physical Setup, etc.)
+- [ ] **TASK-02**: User can assign tasks to team members with due dates relative to service date
+- [ ] **TASK-03**: User can check off completed tasks per service week
+
+### Special Events
+
+- [ ] **EVNT-01**: User can create special event services (Christmas Eve, Easter, Good Friday, etc.) distinct from weekly services
+- [ ] **EVNT-02**: Special events appear on the calendar with advance lead time for planning
+- [ ] **EVNT-03**: User can view past special event plans as reference
+- [ ] **EVNT-04**: User can duplicate a past special event plan to a new date
+
+## v2 Requirements
+
+Deferred to future release. Tracked but not in current roadmap.
+
+### Analytics & Reporting
+
+- **ANLYT-01**: Song frequency charts and category balance over time
+- **ANLYT-02**: CCLI usage reporting data export
+- **ANLYT-03**: Team participation history
+
+### Advanced Collaboration
+
+- **COLLAB-01**: Role-based permissions (admin, planner, viewer)
+- **COLLAB-02**: Musician/tech read-only view with their assignments
+- **COLLAB-03**: In-app notifications for plan changes
+
+### Offline & Mobile
+
+- **MOBILE-01**: Progressive Web App with offline service plan viewing
+- **MOBILE-02**: Push notifications for upcoming tasks and deadlines
+
+## Out of Scope
+
+Explicitly excluded. Documented to prevent scope creep.
+
+| Feature | Reason |
+|---------|--------|
+| Planning Center API sync | API complexity too high for v1; CSV import + manual transfer sufficient |
+| ProPresenter integration | Requires native OS access; web app cannot drive it |
+| Real-time collaborative editing | CRDT/OT complexity unjustified for 2-3 planners who take turns |
+| Mobile native app (iOS/Android) | Responsive web + PWA (v2) covers mobile needs |
+| CCLI auto-reporting | Requires licensing agreement with CCLI |
+| Musician scheduling | Planning Center's core feature; not worth duplicating |
+| Full CCLI/SongSelect song search | Requires API licensing partnerships |
+| Sermon series/thematic planning | Highly subjective; manual tagging is sufficient |
+| Click track/multitracks management | Handled outside this app |
+| Video/media management | Storage/bandwidth costs; out of domain |
+
+## Traceability
+
+Which phases cover which requirements. Updated during roadmap creation.
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| (populated during roadmap creation) | | |
+
+**Coverage:**
+- v1 requirements: 29 total
+- Mapped to phases: 0
+- Unmapped: 29 ⚠️
+
+---
+*Requirements defined: 2026-03-03*
+*Last updated: 2026-03-03 after initial definition*
