@@ -111,13 +111,48 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (populated during roadmap creation) | | |
+| AUTH-01 | Phase 1 | Pending |
+| AUTH-02 | Phase 1 | Pending |
+| SONG-01 | Phase 2 | Pending |
+| SONG-02 | Phase 2 | Pending |
+| SONG-03 | Phase 2 | Pending |
+| SONG-04 | Phase 2 | Pending |
+| SONG-05 | Phase 2 | Pending |
+| SONG-06 | Phase 2 | Pending |
+| PLAN-01 | Phase 3 | Pending |
+| PLAN-02 | Phase 3 | Pending |
+| PLAN-03 | Phase 3 | Pending |
+| PLAN-04 | Phase 3 | Pending |
+| PLAN-05 | Phase 3 | Pending |
+| PLAN-06 | Phase 3 | Pending |
+| PLAN-07 | Phase 3 | Pending |
+| PLAN-08 | Phase 3 | Pending |
+| PLAN-09 | Phase 3 | Pending |
+| SCRI-01 | Phase 3 | Pending |
+| SCRI-02 | Phase 3 | Pending |
+| SCRI-03 | Phase 3 | Pending |
+| SCRI-04 | Phase 3 | Pending |
+| CAL-01 | Phase 3 | Pending |
+| CAL-02 | Phase 3 | Pending |
+| CAL-03 | Phase 3 | Pending |
+| OUT-01 | Phase 4 | Pending |
+| OUT-02 | Phase 4 | Pending |
+| OUT-03 | Phase 4 | Pending |
+| AUTH-03 | Phase 5 | Pending |
+| AUTH-04 | Phase 5 | Pending |
+| TASK-01 | Phase 5 | Pending |
+| TASK-02 | Phase 5 | Pending |
+| TASK-03 | Phase 5 | Pending |
+| EVNT-01 | Phase 5 | Pending |
+| EVNT-02 | Phase 5 | Pending |
+| EVNT-03 | Phase 5 | Pending |
+| EVNT-04 | Phase 5 | Pending |
 
 **Coverage:**
 - v1 requirements: 29 total
-- Mapped to phases: 0
-- Unmapped: 29 ⚠️
+- Mapped to phases: 29
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-03*
-*Last updated: 2026-03-03 after initial definition*
+*Last updated: 2026-03-03 after roadmap creation*
