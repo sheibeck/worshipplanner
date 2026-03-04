@@ -145,6 +145,14 @@ function nextSunday(): string {
   return `${y}-${m}-${d}`
 }
 
+/** Returns which Sunday of the month (1-5) a date falls on, or 0 if not a Sunday */
+function sundayOrdinal(dateStr: string): number {
+  const [year, month, day] = dateStr.split('-').map(Number)
+  const d = new Date(year, month - 1, day)
+  if (d.getDay() !== 0) return 0 // not a Sunday
+  return Math.ceil(day / 7)
+}
+
 interface FormState {
   date: string
   name: string
@@ -152,11 +160,12 @@ interface FormState {
 }
 
 function defaultForm(): FormState {
-  return {
-    date: nextSunday(),
-    name: '',
-    teams: [],
-  }
+  const date = nextSunday()
+  const ordinal = sundayOrdinal(date)
+  let teams: string[] = []
+  if (ordinal === 1) teams = ['Orchestra']
+  else if (ordinal === 3) teams = ['Choir']
+  return { date, name: '', teams }
 }
 
 const form = ref<FormState>(defaultForm())
@@ -167,6 +176,21 @@ watch(
   (isOpen) => {
     if (isOpen) {
       form.value = defaultForm()
+    }
+  },
+)
+
+// Apply Sunday-based team defaults when date changes
+watch(
+  () => form.value.date,
+  (newDate) => {
+    const ordinal = sundayOrdinal(newDate)
+    if (ordinal === 1) {
+      form.value.teams = ['Orchestra']
+    } else if (ordinal === 3) {
+      form.value.teams = ['Choir']
+    } else {
+      form.value.teams = []
     }
   },
 )
