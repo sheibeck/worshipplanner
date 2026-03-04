@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { defineStore } from 'pinia'
 import {
   GoogleAuthProvider,
@@ -17,18 +17,98 @@ import {
   writeBatch,
   collection,
   serverTimestamp,
+  onSnapshot,
+  updateDoc,
+  type Unsubscribe,
 } from 'firebase/firestore'
 import { auth, db } from '@/firebase'
+
+let memberUnsub: Unsubscribe | null = null
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
   const isReady = ref(false)
 
+  const orgId = ref<string | null>(null)
+  const orgName = ref<string | null>(null)
+  const userRole = ref<'editor' | 'viewer' | null>(null)
+
   const isAuthenticated = computed(() => user.value !== null)
+  const isEditor = computed(() => userRole.value === 'editor')
+
+  function waitForRole(): Promise<void> {
+    return new Promise((resolve) => {
+      if (userRole.value !== null || !isAuthenticated.value) {
+        resolve()
+        return
+      }
+      const unwatch = watch(userRole, (val) => {
+        if (val !== null) {
+          unwatch()
+          resolve()
+        }
+      })
+    })
+  }
+
+  async function loadOrgContext(uid: string): Promise<void> {
+    const userRef = doc(db, 'users', uid)
+    const userSnap = await getDoc(userRef)
+    const userData = userSnap.exists() ? userSnap.data() : null
+    const ids: string[] = userData?.orgIds ?? []
+
+    if (ids.length === 0) {
+      orgId.value = null
+      orgName.value = null
+      userRole.value = null
+      return
+    }
+
+    orgId.value = ids[0]
+
+    const orgRef = doc(db, 'organizations', ids[0])
+    const orgSnap = await getDoc(orgRef)
+    if (orgSnap.exists()) {
+      orgName.value = (orgSnap.data().name as string) ?? null
+    }
+
+    // Unsubscribe from previous listener if any
+    memberUnsub?.()
+    memberUnsub = onSnapshot(
+      doc(db, 'organizations', ids[0], 'members', uid),
+      async (snap) => {
+        if (!snap.exists()) {
+          userRole.value = null
+          return
+        }
+        const data = snap.data()
+        const role = data.role as string
+
+        // Lazy admin-to-editor migration
+        if (role === 'admin') {
+          await updateDoc(snap.ref, { role: 'editor' })
+          // The next snapshot event will set userRole to 'editor'
+          return
+        }
+
+        userRole.value = role as 'editor' | 'viewer'
+      },
+    )
+  }
 
   // Listen for auth state changes
-  onAuthStateChanged(auth, (firebaseUser) => {
+  onAuthStateChanged(auth, async (firebaseUser) => {
     user.value = firebaseUser
+    if (firebaseUser) {
+      await ensureUserDocument(firebaseUser)
+      await loadOrgContext(firebaseUser.uid)
+    } else {
+      orgId.value = null
+      orgName.value = null
+      userRole.value = null
+      memberUnsub?.()
+      memberUnsub = null
+    }
     isReady.value = true
   })
 
@@ -53,10 +133,48 @@ export const useAuthStore = defineStore('auth', () => {
     const hasOrg = userData?.orgIds && userData.orgIds.length > 0
 
     if (!hasOrg) {
+      // Check for pending invite before auto-creating org
+      const email = firebaseUser.email?.toLowerCase()
+      if (email) {
+        const lookupRef = doc(db, 'inviteLookup', email)
+        const lookupSnap = await getDoc(lookupRef)
+
+        if (lookupSnap.exists()) {
+          const inviteData = lookupSnap.data()
+          const inviteOrgId = inviteData.orgId as string
+          const role = inviteData.role as 'editor' | 'viewer'
+
+          const batch = writeBatch(db)
+
+          // Delete inviteLookup entry
+          batch.delete(lookupRef)
+
+          // Delete the invite doc in the org's invites subcollection
+          const inviteRef = doc(db, 'organizations', inviteOrgId, 'invites', email)
+          batch.delete(inviteRef)
+
+          // Add user as member with invited role
+          const memberRef = doc(db, 'organizations', inviteOrgId, 'members', firebaseUser.uid)
+          batch.set(memberRef, {
+            role,
+            joinedAt: serverTimestamp(),
+            displayName: firebaseUser.displayName ?? '',
+            email: firebaseUser.email ?? '',
+          })
+
+          // Link org to user profile
+          batch.update(userRef, { orgIds: [inviteOrgId] })
+
+          await batch.commit()
+          return
+        }
+      }
+
+      // No invite found — auto-create new org for this user
       const batch = writeBatch(db)
 
       const orgRef = doc(collection(db, 'organizations'))
-      const orgId = orgRef.id
+      const newOrgId = orgRef.id
 
       batch.set(orgRef, {
         name: `${firebaseUser.displayName || 'My'}'s Church`,
@@ -64,14 +182,16 @@ export const useAuthStore = defineStore('auth', () => {
         createdBy: firebaseUser.uid,
       })
 
-      const memberRef = doc(db, 'organizations', orgId, 'members', firebaseUser.uid)
+      const memberRef = doc(db, 'organizations', newOrgId, 'members', firebaseUser.uid)
       batch.set(memberRef, {
-        role: 'admin',
+        role: 'editor',
         joinedAt: serverTimestamp(),
+        displayName: firebaseUser.displayName ?? '',
+        email: firebaseUser.email ?? '',
       })
 
       batch.update(userRef, {
-        orgIds: [orgId],
+        orgIds: [newOrgId],
       })
 
       await batch.commit()
@@ -124,6 +244,11 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout(): Promise<void> {
+    orgId.value = null
+    orgName.value = null
+    userRole.value = null
+    memberUnsub?.()
+    memberUnsub = null
     await signOut(auth)
   }
 
@@ -131,6 +256,11 @@ export const useAuthStore = defineStore('auth', () => {
     user,
     isReady,
     isAuthenticated,
+    orgId,
+    orgName,
+    userRole,
+    isEditor,
+    waitForRole,
     loginWithGoogle,
     loginWithEmail,
     registerWithEmail,
