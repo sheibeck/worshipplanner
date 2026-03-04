@@ -163,40 +163,6 @@
             </div>
           </div>
 
-          <!-- Arrangements section -->
-          <div>
-            <div class="flex items-center justify-between mb-3">
-              <label class="text-xs font-semibold text-gray-300 uppercase tracking-wider">
-                Arrangements
-              </label>
-              <button
-                type="button"
-                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-gray-800 border border-gray-700 text-xs font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"
-                @click="addArrangement"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-                </svg>
-                Add Arrangement
-              </button>
-            </div>
-
-            <div v-if="form.arrangements.length === 0" class="text-sm text-gray-500 py-4 text-center border border-dashed border-gray-700 rounded-lg">
-              No arrangements yet. Click "Add Arrangement" to create one.
-            </div>
-
-            <div class="space-y-2">
-              <ArrangementAccordion
-                v-for="arr in form.arrangements"
-                :key="arr.id"
-                :arrangement="arr"
-                :availableTags="availableTags"
-                @update="updateArrangement(arr.id, $event)"
-                @remove="removeArrangement(arr.id)"
-              />
-            </div>
-          </div>
-
           <!-- Delete button (edit mode only) -->
           <div v-if="!isCreateMode" class="pt-2 border-t border-gray-800">
             <div v-if="!showDeleteConfirm">
@@ -243,7 +209,6 @@
 import { ref, computed, watch } from 'vue'
 import { useSongStore } from '@/stores/songs'
 import type { Song, Arrangement, VWType } from '@/types/song'
-import ArrangementAccordion from '@/components/ArrangementAccordion.vue'
 
 const props = defineProps<{
   open: boolean
@@ -381,32 +346,6 @@ function toggleSongTag(tag: string) {
   } else {
     form.value.teamTags.push(tag)
   }
-}
-
-// ── Arrangements ──────────────────────────────────────────────────────────────
-
-function addArrangement() {
-  form.value.arrangements.push({
-    id: crypto.randomUUID(),
-    name: '',
-    key: '',
-    bpm: null,
-    lengthSeconds: null,
-    chordChartUrl: '',
-    notes: '',
-    teamTags: [],
-  })
-}
-
-function updateArrangement(id: string, updated: Arrangement) {
-  const idx = form.value.arrangements.findIndex((a) => a.id === id)
-  if (idx >= 0) {
-    form.value.arrangements[idx] = updated
-  }
-}
-
-function removeArrangement(id: string) {
-  form.value.arrangements = form.value.arrangements.filter((a) => a.id !== id)
 }
 
 // ── Save / Cancel / Delete ────────────────────────────────────────────────────

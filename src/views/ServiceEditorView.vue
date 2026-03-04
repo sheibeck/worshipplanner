@@ -1,7 +1,7 @@
 <template>
   <div class="print:hidden">
   <AppShell>
-    <div class="px-6 py-8">
+    <div class="px-6 py-4">
 
       <!-- Loading skeleton -->
       <div v-if="serviceStore.isLoading" class="animate-pulse space-y-4">
@@ -26,7 +26,7 @@
         <!-- Back link -->
         <router-link
           to="/services"
-          class="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-gray-200 transition-colors mb-5"
+          class="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-gray-200 transition-colors mb-3"
         >
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
@@ -35,7 +35,7 @@
         </router-link>
 
         <!-- Header -->
-        <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
+        <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-3">
           <div>
             <h1 class="text-xl font-semibold text-gray-100">{{ formattedDate }}</h1>
             <input
@@ -127,8 +127,8 @@
         </div>
 
         <!-- Team configuration -->
-        <div class="mb-6 rounded-lg bg-gray-900 border border-gray-800 p-4">
-          <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Team Configuration</h2>
+        <div class="mb-3 rounded-lg bg-gray-900 border border-gray-800 p-3">
+          <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Team Configuration</h2>
           <div class="flex flex-wrap gap-4">
             <label
               v-for="team in AVAILABLE_TEAMS"
@@ -147,7 +147,7 @@
         </div>
 
         <!-- Sermon Passage -->
-        <div class="mb-6 rounded-lg bg-gray-900 border border-gray-800 p-4">
+        <div class="mb-3 rounded-lg bg-gray-900 border border-gray-800 p-3">
           <h2 class="text-sm font-semibold text-gray-200 mb-1">Sermon Passage</h2>
           <p class="text-xs text-gray-500 mb-3">Enter the pastor's teaching passage</p>
           <ScriptureInput
@@ -160,15 +160,15 @@
         </div>
 
         <!-- 9-Slot Service Template -->
-        <div class="space-y-3">
+        <div class="space-y-1.5">
           <div
             v-for="slot in localService.slots"
             :key="slot.position"
-            class="rounded-lg bg-gray-900 border border-gray-800 p-4"
+            class="rounded-lg bg-gray-900 border border-gray-800 p-3"
           >
             <!-- SONG slot -->
             <template v-if="slot.kind === 'SONG'">
-              <div class="flex items-start justify-between gap-3 mb-2">
+              <div class="flex items-start justify-between gap-3 mb-1">
                 <div>
                   <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">
                     {{ SLOT_LABELS[slot.position] }}
@@ -184,7 +184,19 @@
               <div v-if="slot.songId" class="flex items-center justify-between gap-3 rounded-md bg-gray-800 border border-gray-700 px-3 py-2">
                 <div>
                   <p class="text-sm font-medium text-gray-100">{{ slot.songTitle }}</p>
-                  <p class="text-xs text-gray-500">Key: {{ slot.songKey }}</p>
+                  <p class="text-xs text-gray-500">
+                    Key: {{ slot.songKey }}
+                    <template v-if="getCcliNumber(slot.songId)">
+                      <span class="text-gray-700 mx-1">|</span>
+                      <a
+                        :href="`https://songselect.ccli.com/songs/${getCcliNumber(slot.songId)}`"
+                        target="_blank"
+                        rel="noopener"
+                        class="text-indigo-400 hover:text-indigo-300 hover:underline"
+                        @click.stop
+                      >CCLI {{ getCcliNumber(slot.songId) }}</a>
+                    </template>
+                  </p>
                 </div>
                 <button
                   type="button"
@@ -245,7 +257,7 @@
         </div>
 
         <!-- Bottom save -->
-        <div class="mt-6 flex justify-end">
+        <div class="mt-3 flex justify-end">
           <span v-if="isDirty" class="text-xs text-amber-400 self-center mr-3">Unsaved changes</span>
           <button
             type="button"
@@ -392,6 +404,12 @@ onMounted(async () => {
 onUnmounted(() => {
   // Don't unsubscribe serviceStore here — DashboardView may still be using it
 })
+
+// ── CCLI helper ────────────────────────────────────────────────────────────────
+
+function getCcliNumber(songId: string): string | null {
+  return songStore.songs.find((s) => s.id === songId)?.ccliNumber || null
+}
 
 // ── Team toggle ────────────────────────────────────────────────────────────────
 
