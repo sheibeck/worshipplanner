@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed quick-3 QoL improvements (CCLI column, past filter, lock icon, status toggle)
-last_updated: "2026-03-04T16:13:00Z"
-last_activity: 2026-03-04 — Quick-3 complete — CCLI column, past service filter (5 max), lock icon on planned badge, status toggle, compact prayer/message slots
+stopped_at: Completed quick-6 rotation 8-week window and Song Rotation tab rename
+last_updated: "2026-03-04T16:32:00.594Z"
+last_activity: 2026-03-04 — Plan 01-01 complete — Vue 3 + Firebase foundation, auth store, router guard, Firestore rules
 progress:
   total_phases: 5
   completed_phases: 4
@@ -116,6 +116,7 @@ Recent decisions affecting current work:
 - [Quick-3]: CCLI column replaces BPM in SongTable — low-value BPM swapped for one-click SongSelect link
 - [Quick-3]: displayedPastServices slices to 5 but toggle button retains full count
 - [Quick-3]: Status badge is a button element for semantic correctness and keyboard accessibility
+- [Phase quick-6]: 8-week window computed in ServicesView as rotationServices prop — keeps RotationTable a pure display component
 
 ### Pending Todos
 
@@ -129,6 +130,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T16:13:00Z
-Stopped at: Completed quick-3 QoL improvements (CCLI column, past filter, lock icon, status toggle)
+Last session: 2026-03-04T16:31:56.452Z
+Stopped at: Completed quick-6 rotation 8-week window and Song Rotation tab rename
 Resume file: None
