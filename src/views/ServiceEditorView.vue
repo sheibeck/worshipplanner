@@ -37,15 +37,8 @@
         <!-- Header -->
         <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-3">
           <div>
-            <h1 class="text-xl font-semibold text-gray-100">{{ formattedDate }}</h1>
-            <input
-              v-if="localService.teams.includes('Special Service')"
-              v-model="localService.name"
-              type="text"
-              placeholder="Service name (e.g. Good Friday, Easter)"
-              class="mt-1 w-full max-w-sm rounded-md bg-gray-800 border border-gray-700 text-indigo-300 text-sm px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500"
-            />
-            <div class="flex items-center gap-2 mt-2">
+            <div class="flex items-center gap-3">
+              <h1 class="text-xl font-semibold text-gray-100">{{ formattedDate }}</h1>
               <!-- Status badge (clickable toggle) -->
               <button
                 type="button"
@@ -131,11 +124,11 @@
           </div>
         </div>
 
-        <!-- Team configuration -->
+        <!-- Service type configuration -->
         <div class="mb-3 rounded-lg bg-gray-900 border border-gray-800 p-3">
           <div class="flex items-center gap-4">
-          <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">Teams</h2>
-          <div class="flex flex-wrap gap-4">
+          <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">Service Type</h2>
+          <div class="flex flex-wrap items-center gap-4">
             <label
               v-for="team in AVAILABLE_TEAMS"
               :key="team"
@@ -149,6 +142,13 @@
               />
               <span class="text-sm text-gray-200">{{ team }}</span>
             </label>
+            <input
+              v-if="localService.teams.includes('Special Service')"
+              v-model="localService.name"
+              type="text"
+              placeholder="e.g. Good Friday, Easter"
+              class="rounded-md bg-gray-800 border border-gray-700 text-indigo-300 text-sm px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500 w-48"
+            />
           </div>
           </div>
         </div>
