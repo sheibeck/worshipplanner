@@ -213,7 +213,7 @@ export async function getSongSuggestions(
     ].join('\n')
 
     const response = await getClient().messages.create({
-      model: 'claude-haiku-3-5-20241022',
+      model: 'claude-3-5-haiku-20241022',
       max_tokens: 512,
       system: SONG_SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userMessage }],
@@ -285,7 +285,7 @@ export async function getScriptureSuggestions(
     const userMessage = contextParts.join('\n')
 
     const response = await getClient().messages.create({
-      model: 'claude-haiku-3-5-20241022',
+      model: 'claude-3-5-haiku-20241022',
       max_tokens: 512,
       system: SCRIPTURE_SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userMessage }],
