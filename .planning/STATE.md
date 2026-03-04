@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "Checkpoint 01-02 Task 2: awaiting human verification of auth UI"
-last_updated: "2026-03-04T02:19:20.025Z"
+stopped_at: Completed 01-02-PLAN.md — Phase 1 foundation complete
+last_updated: "2026-03-04T02:59:22.952Z"
 last_activity: 2026-03-04 — Plan 01-01 complete — Vue 3 + Firebase foundation, auth store, router guard, Firestore rules
 progress:
   total_phases: 5
@@ -52,6 +52,7 @@ Progress: [█████░░░░░] 50%
 *Updated after each plan completion*
 | Phase 01-foundation P01 | 47 | 3 tasks | 30 files |
 | Phase 01 P02 | 5 | 1 tasks | 6 files |
+| Phase 01-foundation P02 | 60 | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -71,6 +72,8 @@ Recent decisions affecting current work:
 - [Phase 01-02]: AppShell wrapper pattern: DashboardView wraps in AppShell directly in its own template — simpler than App.vue layout switching
 - [Phase 01-02]: Inline SVG icons for all UI (Google G, heroicons-style nav, checkmarks) — no icon library dependency
 - [Phase 01-02]: GettingStarted step completion hardcoded for Phase 1 — dynamic tracking deferred until features exist
+- [Phase 01-02]: Dark mode is the application visual theme — gray-950 body, gray-900 cards/sidebar, gray-800 inputs; established as canonical palette for all future phases
+- [Phase 01-02]: AppShell wrapper pattern: DashboardView wraps in AppShell directly in its own template — simpler than App.vue layout switching
 
 ### Pending Todos
 
@@ -84,6 +87,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T02:19:00.150Z
-Stopped at: Checkpoint 01-02 Task 2: awaiting human verification of auth UI
+Last session: 2026-03-04T02:59:22.947Z
+Stopped at: Completed 01-02-PLAN.md — Phase 1 foundation complete
 Resume file: None
