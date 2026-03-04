@@ -39,8 +39,9 @@
           <div>
             <div class="flex items-center gap-3">
               <h1 class="text-xl font-semibold text-gray-100">{{ formattedDate }}</h1>
-              <!-- Status badge (clickable toggle) -->
+              <!-- Status badge: editor gets clickable toggle, viewer gets static badge -->
               <button
+                v-if="authStore.isEditor"
                 type="button"
                 class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border cursor-pointer hover:opacity-80 transition-opacity"
                 :class="statusBadgeClasses[localService.status]"
@@ -51,34 +52,43 @@
                 </svg>
                 {{ localService.status === 'planned' ? 'Planned' : 'Draft' }}
               </button>
+              <span
+                v-else
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border"
+                :class="statusBadgeClasses[localService.status]"
+              >
+                {{ localService.status === 'planned' ? 'Planned' : 'Draft' }}
+              </span>
             </div>
           </div>
 
           <!-- Save area -->
           <div class="flex items-center gap-3">
-            <!-- Autosave status indicator -->
-            <span
-              v-if="autosaveStatus === 'pending' || autosaveStatus === 'saving'"
-              class="text-xs text-gray-400 italic"
-            >
-              {{ autosaveStatus === 'saving' ? 'Saving...' : 'Saving soon...' }}
-            </span>
-            <span
-              v-else-if="autosaveStatus === 'saved'"
-              class="text-xs text-green-400"
-            >
-              Saved
-            </span>
-            <span
-              v-else-if="isDirty"
-              class="text-xs text-amber-400"
-            >
-              Unsaved changes
-            </span>
+            <!-- Autosave status indicator: editor only -->
+            <template v-if="authStore.isEditor">
+              <span
+                v-if="autosaveStatus === 'pending' || autosaveStatus === 'saving'"
+                class="text-xs text-gray-400 italic"
+              >
+                {{ autosaveStatus === 'saving' ? 'Saving...' : 'Saving soon...' }}
+              </span>
+              <span
+                v-else-if="autosaveStatus === 'saved'"
+                class="text-xs text-green-400"
+              >
+                Saved
+              </span>
+              <span
+                v-else-if="isDirty"
+                class="text-xs text-amber-400"
+              >
+                Unsaved changes
+              </span>
+            </template>
 
-            <!-- Undo button (only visible when a previous snapshot exists) -->
+            <!-- Undo button (editor only, only visible when a previous snapshot exists) -->
             <button
-              v-if="previousService"
+              v-if="authStore.isEditor && previousService"
               type="button"
               @click="onUndo"
               title="Undo last save (Ctrl+Z)"
@@ -90,8 +100,9 @@
               Undo
             </button>
 
-            <!-- Delete button -->
+            <!-- Delete button: editor only -->
             <button
+              v-if="authStore.isEditor"
               type="button"
               @click="showDeleteConfirm = true"
               class="print:hidden inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-red-400 bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700"
@@ -102,8 +113,9 @@
               Delete
             </button>
 
-            <!-- Suggest All Songs button -->
+            <!-- Suggest All Songs button: editor only -->
             <button
+              v-if="authStore.isEditor"
               type="button"
               @click="suggestAllSongs"
               :disabled="!hasSermonContext || aiSuggestingAll"
@@ -163,7 +175,9 @@
               {{ isSharing ? 'Sharing...' : shareCopied ? 'Link Copied!' : shareError ? shareError : 'Share' }}
             </button>
 
+            <!-- Save button: editor only -->
             <button
+              v-if="authStore.isEditor"
               type="button"
               @click="onSave"
               :disabled="!isDirty || isSaving"
@@ -205,11 +219,12 @@
           </div>
         </Teleport>
 
-        <!-- Service type configuration -->
+        <!-- Teams configuration -->
         <div class="mb-3 rounded-lg bg-gray-900 border border-gray-800 p-3">
           <div class="flex items-center gap-4">
           <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">Teams</h2>
-          <div class="flex flex-wrap items-center gap-4">
+          <!-- Editor: checkboxes -->
+          <div v-if="authStore.isEditor" class="flex flex-wrap items-center gap-4">
             <label
               v-for="team in AVAILABLE_TEAMS"
               :key="team"
@@ -231,6 +246,15 @@
               class="rounded-md bg-gray-800 border border-gray-700 text-indigo-300 text-sm px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500 w-48"
             />
           </div>
+          <!-- Viewer: read-only text list -->
+          <div v-else class="flex flex-wrap items-center gap-2">
+            <span
+              v-for="team in localService.teams"
+              :key="team"
+              class="text-sm text-gray-200"
+            >{{ team }}</span>
+            <span v-if="localService.teams.length === 0" class="text-sm text-gray-500 italic">None</span>
+          </div>
           </div>
         </div>
 
@@ -241,22 +265,35 @@
             <div class="flex-1 space-y-3">
               <div>
                 <p class="text-xs text-gray-500 mb-1">Sermon Topic</p>
+                <!-- Editor: editable input -->
                 <input
+                  v-if="authStore.isEditor"
                   v-model="localService.sermonTopic"
                   type="text"
                   placeholder="e.g. Grace and forgiveness, The prodigal son"
                   class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 />
+                <!-- Viewer: read-only text -->
+                <p v-else class="text-sm text-gray-200">{{ localService.sermonTopic || '—' }}</p>
               </div>
               <div>
                 <p class="text-xs text-gray-500 mb-1">Sermon Passage</p>
+                <!-- Editor: ScriptureInput -->
                 <ScriptureInput
+                  v-if="authStore.isEditor"
                   :modelValue="localService.sermonPassage"
                   :sermonPassage="null"
                   :showOverlapWarning="false"
                   label="Sermon Passage"
                   @update:modelValue="onSermonPassageChange"
                 />
+                <!-- Viewer: read-only text -->
+                <p v-else class="text-sm text-gray-200">
+                  {{ localService.sermonPassage
+                    ? `${localService.sermonPassage.book} ${localService.sermonPassage.chapter}:${localService.sermonPassage.verseStart}${localService.sermonPassage.verseEnd ? '-' + localService.sermonPassage.verseEnd : ''}`
+                    : '—'
+                  }}
+                </p>
               </div>
             </div>
           </div>
@@ -269,8 +306,8 @@
             :key="slot.position + '-' + slot.kind + '-' + index"
             class="rounded-lg bg-gray-900 border border-gray-800 p-3 flex items-start gap-2"
           >
-            <!-- Drag handle -->
-            <div class="cursor-grab active:cursor-grabbing text-gray-600 hover:text-gray-400 drag-handle flex-shrink-0 mt-0.5">
+            <!-- Drag handle: editor only -->
+            <div v-if="authStore.isEditor" class="cursor-grab active:cursor-grabbing text-gray-600 hover:text-gray-400 drag-handle flex-shrink-0 mt-0.5">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M7 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/>
               </svg>
@@ -305,6 +342,7 @@
                     </template>
                   </div>
                   <button
+                    v-if="authStore.isEditor"
                     type="button"
                     @click="onClearSong(index)"
                     class="text-gray-500 hover:text-gray-300 transition-colors flex-shrink-0"
@@ -316,9 +354,9 @@
                   </button>
                 </div>
 
-                <!-- AI draft song display (appears when AI suggests a song for this slot) -->
+                <!-- AI draft song display: editor only -->
                 <div
-                  v-if="aiDraftSongs.has(index)"
+                  v-if="authStore.isEditor && aiDraftSongs.has(index)"
                   class="flex items-center justify-between gap-3 rounded-md bg-indigo-950/50 border border-indigo-800/60 px-3 py-2 mb-1"
                 >
                   <div class="flex-1 min-w-0">
@@ -351,8 +389,9 @@
                   </div>
                 </div>
 
-                <!-- Song picker (empty slot or change) -->
+                <!-- Song picker: editor only -->
                 <SongSlotPicker
+                  v-if="authStore.isEditor"
                   :requiredVwType="slot.requiredVwType"
                   :serviceTeams="localService.teams"
                   :currentSongId="slot.songId"
@@ -365,6 +404,8 @@
                   @clear="onClearSong(index)"
                   @requestAiSuggestions="fetchAiForSlot(index)"
                 />
+                <!-- Viewer: show empty slot label if no song assigned -->
+                <p v-else-if="!slot.songId" class="text-sm text-gray-500 italic">Song — Empty</p>
               </template>
 
               <!-- SCRIPTURE slot -->
@@ -372,7 +413,9 @@
                 <div class="flex items-center gap-4">
                   <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">Scripture Reading</p>
                   <div class="flex-1">
+                    <!-- Editor: ScriptureInput -->
                     <ScriptureInput
+                      v-if="authStore.isEditor"
                       :modelValue="slotToScriptureRef(slot)"
                       :sermonPassage="localService.sermonPassage"
                       :showOverlapWarning="true"
@@ -382,6 +425,13 @@
                       label="Scripture Reading"
                       @update:modelValue="(ref) => onScriptureChange(index, ref)"
                     />
+                    <!-- Viewer: read-only text -->
+                    <p v-else class="text-sm text-gray-200">
+                      {{ slotToScriptureRef(slot)
+                        ? `${slotToScriptureRef(slot)?.book} ${slotToScriptureRef(slot)?.chapter}:${slotToScriptureRef(slot)?.verseStart}${slotToScriptureRef(slot)?.verseEnd ? '-' + slotToScriptureRef(slot)?.verseEnd : ''}`
+                        : 'Scripture — Empty'
+                      }}
+                    </p>
                   </div>
                 </div>
               </template>
@@ -392,8 +442,8 @@
                   <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Prayer</p>
                   <span class="text-xs text-gray-600 italic">No assignment needed</span>
                 </div>
-                <!-- Optional link -->
-                <div class="flex items-center gap-2 mt-1">
+                <!-- Editor: editable link fields -->
+                <div v-if="authStore.isEditor" class="flex items-center gap-2 mt-1">
                   <input
                     :value="(slot as NonAssignableSlot).linkLabel"
                     @input="(slot as NonAssignableSlot).linkLabel = ($event.target as HTMLInputElement).value"
@@ -421,6 +471,15 @@
                       <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                     </svg>
                   </a>
+                </div>
+                <!-- Viewer: read-only link -->
+                <div v-else-if="(slot as NonAssignableSlot).linkUrl" class="flex items-center gap-2 mt-1">
+                  <a
+                    :href="(slot as NonAssignableSlot).linkUrl"
+                    target="_blank"
+                    rel="noopener"
+                    class="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+                  >{{ (slot as NonAssignableSlot).linkLabel || (slot as NonAssignableSlot).linkUrl }}</a>
                 </div>
               </template>
 
@@ -430,8 +489,8 @@
                   <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Message</p>
                   <span class="text-xs text-gray-600 italic">No assignment needed</span>
                 </div>
-                <!-- Optional link -->
-                <div class="flex items-center gap-2 mt-1">
+                <!-- Editor: editable link fields -->
+                <div v-if="authStore.isEditor" class="flex items-center gap-2 mt-1">
                   <input
                     :value="(slot as NonAssignableSlot).linkLabel"
                     @input="(slot as NonAssignableSlot).linkLabel = ($event.target as HTMLInputElement).value"
@@ -460,11 +519,21 @@
                     </svg>
                   </a>
                 </div>
+                <!-- Viewer: read-only link -->
+                <div v-else-if="(slot as NonAssignableSlot).linkUrl" class="flex items-center gap-2 mt-1">
+                  <a
+                    :href="(slot as NonAssignableSlot).linkUrl"
+                    target="_blank"
+                    rel="noopener"
+                    class="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+                  >{{ (slot as NonAssignableSlot).linkLabel || (slot as NonAssignableSlot).linkUrl }}</a>
+                </div>
               </template>
             </div>
 
-            <!-- Remove button -->
+            <!-- Remove button: editor only -->
             <button
+              v-if="authStore.isEditor"
               type="button"
               @click="removeSlot(index)"
               class="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0 mt-0.5"
@@ -477,8 +546,8 @@
           </div>
         </div>
 
-        <!-- Add Element button -->
-        <div class="mt-2 relative">
+        <!-- Add Element button: editor only -->
+        <div v-if="authStore.isEditor" class="mt-2 relative">
           <button
             type="button"
             @click="showAddMenu = !showAddMenu"
@@ -509,8 +578,8 @@
           </div>
         </div>
 
-        <!-- Bottom save -->
-        <div class="mt-3 flex justify-end">
+        <!-- Bottom save: editor only -->
+        <div v-if="authStore.isEditor" class="mt-3 flex justify-end">
           <span v-if="isDirty" class="text-xs text-amber-400 self-center mr-3">Unsaved changes</span>
           <button
             type="button"
@@ -540,8 +609,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { doc, getDoc } from 'firebase/firestore'
-import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { useServiceStore } from '@/stores/services'
 import { useSongStore } from '@/stores/songs'
@@ -757,6 +824,8 @@ watch(
   () => {
     // Skip: not loaded yet, or no actual change
     if (!localService.value || !originalService.value) return
+    // Viewers cannot autosave
+    if (!authStore.isEditor) return
     // Suppress the trigger that fires when service first loads from the store
     if (!autosaveInitialized) {
       autosaveInitialized = true
@@ -788,23 +857,19 @@ watch(
 
 // ── Init ───────────────────────────────────────────────────────────────────────
 
-async function initStores() {
-  const user = authStore.user
-  if (!user) return
-  const userSnap = await getDoc(doc(db, 'users', user.uid))
-  const orgIds: string[] = userSnap.data()?.orgIds ?? []
-  if (orgIds[0]) {
-    if (!serviceStore.orgId) {
-      serviceStore.subscribe(orgIds[0])
-    }
-    if (!songStore.orgId) {
-      songStore.subscribe(orgIds[0])
-    }
+function initStores() {
+  const orgId = authStore.orgId
+  if (!orgId) return
+  if (!serviceStore.orgId) {
+    serviceStore.subscribe(orgId)
+  }
+  if (!songStore.orgId) {
+    songStore.subscribe(orgId)
   }
 }
 
-onMounted(async () => {
-  await initStores()
+onMounted(() => {
+  initStores()
 
   // Ctrl+Z / Cmd+Z undo shortcut
   function handleUndoKey(e: KeyboardEvent) {

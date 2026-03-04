@@ -95,8 +95,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { doc, getDoc } from 'firebase/firestore'
-import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { useSongStore } from '@/stores/songs'
 import type { Song } from '@/types/song'
@@ -147,19 +145,14 @@ const availableTags = computed(() => {
 })
 
 // Subscribe to Firestore songs collection once orgId is resolved
-async function initStore() {
-  const user = authStore.user
-  if (!user) return
-
-  const userSnap = await getDoc(doc(db, 'users', user.uid))
-  const orgIds: string[] = userSnap.data()?.orgIds ?? []
-  if (orgIds[0]) {
-    songStore.subscribe(orgIds[0])
-  }
+function initStore() {
+  const orgId = authStore.orgId
+  if (!orgId) return
+  songStore.subscribe(orgId)
 }
 
 onMounted(async () => {
-  await initStore()
+  initStore()
 
   // Check for ?import=true query param — auto-open import modal
   if (route.query.import === 'true') {

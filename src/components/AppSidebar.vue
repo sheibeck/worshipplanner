@@ -13,6 +13,11 @@
       <span class="text-sm font-semibold text-gray-100 tracking-tight">Worship Planner</span>
     </div>
 
+    <!-- Org name -->
+    <div v-if="authStore.orgName" class="px-5 py-2 border-b border-gray-800">
+      <p class="text-xs text-gray-500 truncate">{{ authStore.orgName }}</p>
+    </div>
+
     <!-- Nav -->
     <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-0.5">
       <router-link
@@ -73,36 +78,50 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 
-const navItems = [
-  {
-    label: 'Dashboard',
-    to: '/',
-    icon: `<svg xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-      <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-    </svg>`,
-  },
-  {
-    label: 'Songs',
-    to: '/songs',
-    icon: `<svg xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-      <path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-    </svg>`,
-  },
-  {
+const navItems = computed(() => {
+  const items = []
+
+  if (authStore.isEditor) {
+    items.push({
+      label: 'Dashboard',
+      to: '/',
+      icon: `<svg xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+      </svg>`,
+    })
+  }
+
+  if (authStore.isEditor) {
+    items.push({
+      label: 'Songs',
+      to: '/songs',
+      icon: `<svg xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+      </svg>`,
+    })
+  }
+
+  // Services: visible for all roles
+  items.push({
     label: 'Services',
     to: '/services',
     icon: `<svg xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
       <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
     </svg>`,
-  },
-  {
-    label: 'Tasks',
-    to: '/tasks',
-    icon: `<svg xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-      <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-    </svg>`,
-  },
-]
+  })
+
+  if (authStore.isEditor) {
+    items.push({
+      label: 'Team',
+      to: '/team',
+      icon: `<svg xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+      </svg>`,
+    })
+  }
+
+  return items
+})
 
 function isActive(path: string): boolean {
   if (path === '/') {

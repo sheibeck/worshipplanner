@@ -15,6 +15,7 @@
           Services
         </button>
         <button
+          v-if="authStore.isEditor"
           type="button"
           class="px-4 py-2 text-sm font-medium rounded-t-md transition-colors -mb-px border-b-2"
           :class="activeTab === 'rotation'
@@ -25,6 +26,7 @@
           Song Rotation
         </button>
         <button
+          v-if="authStore.isEditor"
           type="button"
           class="px-4 py-2 text-sm font-medium rounded-t-md transition-colors -mb-px border-b-2"
           :class="activeTab === 'scripture-rotation'
@@ -35,8 +37,9 @@
           Scripture Rotation
         </button>
         <div class="flex-1" />
-        <!-- New Service button (always visible) -->
+        <!-- New Service button: editor only -->
         <button
+          v-if="authStore.isEditor"
           type="button"
           class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 transition-colors mb-1"
           @click="dialogOpen = true"
@@ -66,6 +69,7 @@
             <div v-if="upcomingServices.length === 0" class="rounded-lg border border-dashed border-gray-700 py-10 text-center">
               <p class="text-sm text-gray-400 mb-3">No upcoming services. Create your first service to get started.</p>
               <button
+                v-if="authStore.isEditor"
                 type="button"
                 class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 transition-colors"
                 @click="dialogOpen = true"
@@ -158,8 +162,9 @@
       </template>
     </div>
 
-    <!-- New Service Dialog -->
+    <!-- New Service Dialog: editor only -->
     <NewServiceDialog
+      v-if="authStore.isEditor"
       :open="dialogOpen"
       @close="dialogOpen = false"
       @create="onCreateService"
@@ -170,8 +175,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { doc, getDoc } from 'firebase/firestore'
-import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { useServiceStore } from '@/stores/services'
 import AppShell from '@/components/AppShell.vue'
@@ -329,19 +332,14 @@ function onYearChange(event: Event) {
 }
 
 // Subscribe to Firestore services collection once orgId is resolved
-async function initStore() {
-  const user = authStore.user
-  if (!user) return
-
-  const userSnap = await getDoc(doc(db, 'users', user.uid))
-  const orgIds: string[] = userSnap.data()?.orgIds ?? []
-  if (orgIds[0]) {
-    serviceStore.subscribe(orgIds[0])
-  }
+function initStore() {
+  const orgId = authStore.orgId
+  if (!orgId) return
+  serviceStore.subscribe(orgId)
 }
 
-onMounted(async () => {
-  await initStore()
+onMounted(() => {
+  initStore()
 })
 
 onUnmounted(() => {

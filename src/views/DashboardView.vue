@@ -9,16 +9,14 @@
         </p>
       </div>
 
-      <!-- Getting started checklist -->
-      <GettingStarted />
+      <!-- Getting started checklist: editor only -->
+      <GettingStarted v-if="authStore.isEditor" />
     </div>
   </AppShell>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
-import { doc, getDoc } from 'firebase/firestore'
-import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { useSongStore } from '@/stores/songs'
 import { useServiceStore } from '@/stores/services'
@@ -35,19 +33,14 @@ const displayName = computed(() => {
 
 // Subscribe to songs and services on dashboard so GettingStarted steps 2 and 3 are reactive
 // Guard: if already subscribed (orgId already set), skip to avoid double-subscription
-onMounted(async () => {
-  const user = authStore.user
-  if (!user) return
-
-  const userSnap = await getDoc(doc(db, 'users', user.uid))
-  const orgIds: string[] = userSnap.data()?.orgIds ?? []
-  if (orgIds[0]) {
-    if (!songStore.orgId) {
-      songStore.subscribe(orgIds[0])
-    }
-    if (!serviceStore.orgId) {
-      serviceStore.subscribe(orgIds[0])
-    }
+onMounted(() => {
+  const orgId = authStore.orgId
+  if (!orgId) return
+  if (!songStore.orgId) {
+    songStore.subscribe(orgId)
+  }
+  if (!serviceStore.orgId) {
+    serviceStore.subscribe(orgId)
   }
 })
 </script>
