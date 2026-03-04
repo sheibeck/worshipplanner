@@ -1,5 +1,5 @@
 <template>
-  <div class="rounded-lg border border-gray-800 overflow-hidden">
+  <div class="rounded-lg border border-gray-800 overflow-hidden flex flex-col">
     <!-- Loading state -->
     <div v-if="loading" class="flex items-center justify-center py-16">
       <div class="flex items-center gap-3 text-gray-400">
@@ -121,7 +121,7 @@
       </thead>
       <tbody class="divide-y divide-gray-800">
         <tr
-          v-for="song in sortedSongs"
+          v-for="song in visibleSongs"
           :key="song.id"
           class="cursor-pointer hover:bg-gray-800/50 transition-colors"
           @click="$emit('select', song)"
@@ -174,11 +174,16 @@
         </tr>
       </tbody>
     </table>
+    <div ref="sentinelRef" class="h-1" />
+    <div v-if="!loading && songs.length > 0" class="px-4 py-2 text-xs text-gray-500 text-center border-t border-gray-800">
+      Showing {{ visibleSongs.length }} of {{ sortedSongs.length }} songs
+      <span v-if="hasMore"> &mdash; scroll for more</span>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import type { Song } from '@/types/song'
 import type { Timestamp } from 'firebase/firestore'
 import SongBadge from '@/components/SongBadge.vue'
@@ -216,6 +221,45 @@ const sortedSongs = computed(() => {
     const cmp = aVal.localeCompare(bVal)
     return sortDir.value === 'asc' ? cmp : -cmp
   })
+})
+
+// Progressive rendering
+const BATCH_SIZE = 50
+const visibleCount = ref(BATCH_SIZE)
+
+const visibleSongs = computed(() => sortedSongs.value.slice(0, visibleCount.value))
+
+const hasMore = computed(() => visibleCount.value < sortedSongs.value.length)
+
+function loadMore() {
+  visibleCount.value = Math.min(visibleCount.value + BATCH_SIZE, sortedSongs.value.length)
+}
+
+// Reset visible count when search/filter changes the input songs
+watch(() => props.songs, () => {
+  visibleCount.value = BATCH_SIZE
+})
+
+// IntersectionObserver sentinel for scroll-based load-more
+const sentinelRef = ref<HTMLElement | null>(null)
+let observer: IntersectionObserver | null = null
+
+onMounted(() => {
+  observer = new IntersectionObserver(
+    (entries) => {
+      if (entries[0]?.isIntersecting && hasMore.value) {
+        loadMore()
+      }
+    },
+    { rootMargin: '200px' }
+  )
+  if (sentinelRef.value) {
+    observer.observe(sentinelRef.value)
+  }
+})
+
+onUnmounted(() => {
+  observer?.disconnect()
 })
 
 function formatDate(ts: Timestamp | null): string {
