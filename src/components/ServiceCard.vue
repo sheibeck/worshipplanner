@@ -8,7 +8,12 @@
           <p class="text-sm font-semibold text-gray-100">{{ formattedDate }}</p>
           <span v-if="isCommunion" class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-900/50 text-amber-300 border border-amber-800">Communion</span>
         </div>
-        <span class="inline-block px-2 py-0.5 rounded text-[10px] font-semibold shrink-0" :class="statusClass">{{ service.status }}</span>
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold shrink-0" :class="statusClass">
+          <svg v-if="service.status === 'planned'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3">
+            <path fill-rule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clip-rule="evenodd" />
+          </svg>
+          {{ service.status }}
+        </span>
       </div>
       <p v-if="service.name" class="text-xs font-medium text-indigo-300 mb-1.5 truncate">{{ service.name }}</p>
 

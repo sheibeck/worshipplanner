@@ -46,13 +46,18 @@
               class="mt-1 w-full max-w-sm rounded-md bg-gray-800 border border-gray-700 text-indigo-300 text-sm px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500"
             />
             <div class="flex items-center gap-2 mt-2">
-              <!-- Status badge -->
-              <span
-                class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border"
+              <!-- Status badge (clickable toggle) -->
+              <button
+                type="button"
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border cursor-pointer hover:opacity-80 transition-opacity"
                 :class="statusBadgeClasses[localService.status]"
+                @click="toggleStatus"
               >
+                <svg v-if="localService.status === 'planned'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3">
+                  <path fill-rule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clip-rule="evenodd" />
+                </svg>
                 {{ localService.status === 'planned' ? 'Planned' : 'Draft' }}
-              </span>
+              </button>
               <!-- Communion badge -->
               <span
                 v-if="isCommunion"
@@ -267,14 +272,18 @@
 
               <!-- PRAYER slot -->
               <template v-else-if="slot.kind === 'PRAYER'">
-                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Prayer</p>
-                <p class="text-sm text-gray-600 italic">No assignment needed</p>
+                <div class="flex items-center gap-2">
+                  <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Prayer</p>
+                  <span class="text-xs text-gray-600 italic">No assignment needed</span>
+                </div>
               </template>
 
               <!-- MESSAGE slot -->
               <template v-else-if="slot.kind === 'MESSAGE'">
-                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Message</p>
-                <p class="text-sm text-gray-600 italic">No assignment needed</p>
+                <div class="flex items-center gap-2">
+                  <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Message</p>
+                  <span class="text-xs text-gray-600 italic">No assignment needed</span>
+                </div>
               </template>
             </div>
 
@@ -513,6 +522,13 @@ onUnmounted(() => {
 
 function getCcliNumber(songId: string): string | null {
   return songStore.songs.find((s) => s.id === songId)?.ccliNumber || null
+}
+
+// ── Status toggle ──────────────────────────────────────────────────────────────
+
+function toggleStatus() {
+  if (!localService.value) return
+  localService.value.status = localService.value.status === 'draft' ? 'planned' : 'draft'
 }
 
 // ── Team toggle ────────────────────────────────────────────────────────────────
