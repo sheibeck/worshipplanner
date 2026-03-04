@@ -271,7 +271,7 @@
 
                 <!-- AI draft song display (appears when AI suggests a song for this slot) -->
                 <div
-                  v-if="aiDraftSongs.has(index) && !slot.songId"
+                  v-if="aiDraftSongs.has(index)"
                   class="flex items-center justify-between gap-3 rounded-md bg-indigo-950/50 border border-indigo-800/60 px-3 py-2 mb-1"
                 >
                   <div class="flex-1 min-w-0">
@@ -756,6 +756,7 @@ async function suggestAllSongs() {
     const songLibrary = songStore.songs.map((s) => ({
       id: s.id,
       title: s.title,
+      ccliNumber: s.ccliNumber,
       vwType: s.vwType,
       themes: s.themes,
       lastUsedAt: s.lastUsedAt,
@@ -769,7 +770,6 @@ async function suggestAllSongs() {
       const slot = localService.value.slots[i]
       if (!slot || slot.kind !== 'SONG') continue
       const songSlot = slot as SongSlot
-      if (songSlot.songId) continue // skip already-filled slots
 
       // Collect already-selected song IDs from non-empty slots
       const alreadySelectedIds: string[] = []
@@ -795,7 +795,8 @@ async function suggestAllSongs() {
 
       if (!result || result.length === 0) continue
 
-      const suggestion = result[0]
+      // Filter out songs already selected or drafted for other slots
+      const suggestion = result.find((s) => !alreadySelectedIds.includes(s.songId) && !batchAcceptedIds.includes(s.songId))
       if (!suggestion) continue
 
       const song = songStore.songs.find((s) => s.id === suggestion.songId)
@@ -864,6 +865,7 @@ async function fetchAiForSlot(slotIndex: number) {
       songLibrary: songStore.songs.map((s) => ({
         id: s.id,
         title: s.title,
+        ccliNumber: s.ccliNumber,
         vwType: s.vwType,
         themes: s.themes,
         lastUsedAt: s.lastUsedAt,

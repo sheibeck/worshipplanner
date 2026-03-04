@@ -30,11 +30,14 @@ VW song types:
 
 Your task: suggest songs from the provided library that match the current slot's VW type and the sermon context.
 
+When a song has vwType "unset", use the song title and CCLI number to identify the song from your knowledge. Based on the song's lyrics and character, infer which VW type it best fits. Strongly prefer songs whose VW type (assigned or inferred) matches the slot's required type.
+
 Rules:
 - Respond ONLY with a valid JSON array. No markdown, no code fences, no prose.
 - Return EXACTLY 3 items in this format: [{"songId":"<id>","reason":"<5-10 word reason>"}]
 - songId MUST be an exact ID from the provided song library — do not invent IDs
 - Prefer songs thematically connected to the sermon topic/passage
+- Strongly prefer songs matching the required VW type for this slot
 - Deprioritize songs used in the last 2 weeks (listed as recent)
 - Consider already-selected songs to build a cohesive service flow
 - If fewer than 3 suitable songs exist, return however many are available`
@@ -47,6 +50,7 @@ Rules:
 - Respond ONLY with a valid JSON array. No markdown, no code fences, no prose.
 - Return 3-5 items in this format: [{"book":"<name>","chapter":<n>,"verseStart":<n>,"verseEnd":<n>,"reason":"<5-10 words>","recentlyUsed":<bool>,"weeksAgoUsed":<n|null>}]
 - Book names MUST match the Protestant canon exactly (e.g., "Psalms" not "Psalm", "1 Corinthians" not "First Corinthians")
+- Aim for passages around 10 verses long — not too short (under 5) or too long (over 15)
 - Prefer passages with specific verse ranges, not entire chapters
 - Note if a passage appears in the recently used list by setting recentlyUsed:true and weeksAgoUsed to the number of weeks
 - Suggest thematically strong passages even if recently used — let the planner decide`
@@ -59,6 +63,7 @@ function getClient(): Anthropic {
   if (!_client) {
     _client = new Anthropic({
       apiKey: import.meta.env.VITE_CLAUDE_API_KEY,
+      baseURL: `${window.location.origin}/api/anthropic`,
       dangerouslyAllowBrowser: true,
     })
   }
@@ -127,7 +132,7 @@ export interface GetSongSuggestionsParams {
   sermonPassage: ScriptureRef | null
   slotVwType: number | null
   alreadySelectedSongIds: string[]
-  songLibrary: Pick<Song, 'id' | 'title' | 'vwType' | 'themes' | 'lastUsedAt'>[]
+  songLibrary: Pick<Song, 'id' | 'title' | 'ccliNumber' | 'vwType' | 'themes' | 'lastUsedAt'>[]
   recentServiceSongIds: string[]
 }
 
@@ -194,6 +199,9 @@ export async function getSongSuggestions(
     // Build song library context (id/title/vwType/themes/lastUsedAt only)
     const libraryEntries = songLibrary.map((song) => {
       const parts = [`id: ${song.id}`, `title: "${song.title}"`, `vwType: ${song.vwType ?? 'unset'}`]
+      if (song.ccliNumber) {
+        parts.push(`ccli: ${song.ccliNumber}`)
+      }
       if (song.themes.length > 0) {
         parts.push(`themes: ${song.themes.join(', ')}`)
       }
@@ -213,7 +221,7 @@ export async function getSongSuggestions(
     ].join('\n')
 
     const response = await getClient().messages.create({
-      model: 'claude-3-5-haiku-20241022',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 512,
       system: SONG_SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userMessage }],
@@ -229,7 +237,8 @@ export async function getSongSuggestions(
     if (validated.length === 0) return null
 
     return validated
-  } catch {
+  } catch (err) {
+    console.error('[claudeApi] getSongSuggestions failed:', err)
     return null
   }
 }
@@ -285,7 +294,7 @@ export async function getScriptureSuggestions(
     const userMessage = contextParts.join('\n')
 
     const response = await getClient().messages.create({
-      model: 'claude-3-5-haiku-20241022',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 512,
       system: SCRIPTURE_SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userMessage }],
@@ -301,7 +310,8 @@ export async function getScriptureSuggestions(
     if (validated.length === 0) return null
 
     return validated
-  } catch {
+  } catch (err) {
+    console.error('[claudeApi] getScriptureSuggestions failed:', err)
     return null
   }
 }

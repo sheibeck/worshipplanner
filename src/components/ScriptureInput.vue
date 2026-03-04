@@ -53,30 +53,63 @@
 
       <!-- AI Results list -->
       <div v-if="aiResults.length > 0" class="space-y-1">
-        <button
+        <div
           v-for="(result, ri) in aiResults"
           :key="ri"
-          type="button"
-          @click="onSelectAiScripture(result)"
-          class="w-full text-left rounded-md px-3 py-2 text-sm transition-colors hover:bg-gray-800/80 border border-transparent hover:border-gray-700"
+          class="rounded-md text-sm border transition-colors"
+          :class="expandedPreview === ri
+            ? 'bg-gray-800/80 border-gray-700'
+            : 'border-transparent hover:bg-gray-800/80 hover:border-gray-700'"
         >
-          <div class="flex items-center justify-between gap-2">
-            <span class="font-medium text-gray-100">
-              {{ result.book }} {{ result.chapter }}:{{ result.verseStart }}-{{ result.verseEnd }}
-            </span>
-            <span v-if="result.recentlyUsed" class="text-xs text-amber-400 shrink-0">
-              Used {{ result.weeksAgoUsed }}w ago
-            </span>
-          </div>
-          <p class="text-xs text-indigo-400/80 mt-0.5">{{ result.reason }}</p>
-          <!-- Overlap warning -->
-          <p
-            v-if="aiResultOverlapsSermon(result)"
-            class="text-xs text-amber-400 mt-0.5"
+          <button
+            type="button"
+            @click="togglePreview(ri)"
+            class="w-full text-left px-3 py-2"
           >
-            Overlaps with sermon passage
-          </p>
-        </button>
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-medium text-gray-100">
+                {{ result.book }} {{ result.chapter }}:{{ result.verseStart }}-{{ result.verseEnd }}
+              </span>
+              <span v-if="result.recentlyUsed" class="text-xs text-amber-400 shrink-0">
+                Used {{ result.weeksAgoUsed }}w ago
+              </span>
+            </div>
+            <p class="text-xs text-indigo-400/80 mt-0.5">{{ result.reason }}</p>
+            <p
+              v-if="aiResultOverlapsSermon(result)"
+              class="text-xs text-amber-400 mt-0.5"
+            >
+              Overlaps with sermon passage
+            </p>
+          </button>
+
+          <!-- Expanded preview -->
+          <div v-if="expandedPreview === ri" class="px-3 pb-3 space-y-2">
+            <div v-if="aiPreviewLoading" class="flex items-center gap-2 text-xs text-gray-400">
+              <svg class="h-3 w-3 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+              </svg>
+              Loading passage...
+            </div>
+            <div
+              v-else-if="aiPreviewText"
+              class="text-sm text-gray-300 bg-gray-900/50 border border-gray-700/50 rounded px-3 py-2 whitespace-pre-line leading-relaxed max-h-48 overflow-y-auto"
+            >
+              {{ aiPreviewText }}
+            </div>
+            <div v-else-if="aiPreviewError" class="text-xs text-red-400">
+              Could not load preview.
+            </div>
+            <button
+              type="button"
+              @click="onSelectAiScripture(result)"
+              class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors"
+            >
+              Select this passage
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -228,6 +261,10 @@ const aiQuery = ref('')
 const aiLoading = ref(false)
 const aiError = ref(false)
 const aiResults = ref<AiScriptureSuggestion[]>([])
+const expandedPreview = ref<number | null>(null)
+const aiPreviewText = ref('')
+const aiPreviewLoading = ref(false)
+const aiPreviewError = ref(false)
 
 // ── Computed ───────────────────────────────────────────────────────────────────
 
@@ -341,6 +378,28 @@ function onAiRetry() {
   onAiSearch()
 }
 
+async function togglePreview(index: number) {
+  if (expandedPreview.value === index) {
+    expandedPreview.value = null
+    return
+  }
+  expandedPreview.value = index
+  aiPreviewText.value = ''
+  aiPreviewError.value = false
+  aiPreviewLoading.value = true
+  try {
+    const r = aiResults.value[index]
+    if (!r) return
+    const query = `${r.book} ${r.chapter}:${r.verseStart}-${r.verseEnd}`
+    const text = await fetchPassageText(query)
+    aiPreviewText.value = text || 'No passage text found.'
+  } catch {
+    aiPreviewError.value = true
+  } finally {
+    aiPreviewLoading.value = false
+  }
+}
+
 function onSelectAiScripture(result: AiScriptureSuggestion) {
   localBook.value = result.book
   localChapter.value = result.chapter
@@ -349,6 +408,8 @@ function onSelectAiScripture(result: AiScriptureSuggestion) {
   onFieldChange()
   aiResults.value = []
   aiQuery.value = ''
+  expandedPreview.value = null
+  aiPreviewText.value = ''
 }
 
 function aiResultOverlapsSermon(result: AiScriptureSuggestion): boolean {
