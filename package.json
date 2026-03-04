@@ -17,6 +17,7 @@
     "format": "prettier --write --experimental-cli src/"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
     "firebase": "^12.0.0",
     "papaparse": "^5.5.3",
     "pinia": "^3.0.4",

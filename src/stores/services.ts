@@ -68,6 +68,7 @@ export const useServiceStore = defineStore('services', () => {
       status: 'draft',
       notes: '',
       sermonPassage: null,
+      sermonTopic: '',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     })

@@ -46,6 +46,7 @@ export interface Service {
   status: ServiceStatus
   slots: ServiceSlot[]
   sermonPassage: ScriptureRef | null
+  sermonTopic?: string
   notes: string
   createdAt: Timestamp
   updatedAt: Timestamp
