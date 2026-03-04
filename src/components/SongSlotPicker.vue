@@ -1,0 +1,196 @@
+<template>
+  <!-- Trigger area — visible when no song assigned (or always for "Change" mode) -->
+  <div ref="triggerRef">
+    <button
+      v-if="!currentSongId"
+      type="button"
+      @click="openDropdown"
+      class="w-full flex items-center gap-2 rounded-md border border-dashed border-gray-700 px-3 py-2 text-sm text-gray-500 hover:border-gray-500 hover:text-gray-400 transition-colors"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+      </svg>
+      Click to select a song
+    </button>
+    <button
+      v-else
+      type="button"
+      @click="openDropdown"
+      class="mt-1 text-xs text-gray-500 hover:text-gray-300 transition-colors"
+    >
+      Change song
+    </button>
+  </div>
+
+  <!-- Teleported dropdown -->
+  <Teleport to="body">
+    <template v-if="isOpen">
+      <!-- Transparent backdrop to close on outside click -->
+      <div
+        class="fixed inset-0 z-30"
+        @click="closeDropdown"
+      ></div>
+
+      <!-- Dropdown panel -->
+      <div
+        class="fixed z-40 bg-gray-800 border border-gray-700 rounded-lg shadow-xl max-h-80 overflow-y-auto"
+        :style="dropdownStyle"
+      >
+        <!-- Search bar -->
+        <div class="sticky top-0 bg-gray-800 border-b border-gray-700 p-2">
+          <input
+            ref="searchInputRef"
+            v-model="searchQuery"
+            type="text"
+            placeholder="Search songs..."
+            class="w-full rounded-md bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          />
+        </div>
+
+        <!-- Suggestions section (top 5) -->
+        <div v-if="!searchQuery">
+          <div v-if="suggestions.length > 0">
+            <p class="px-3 pt-2 pb-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">Suggestions</p>
+            <button
+              v-for="result in suggestions"
+              :key="result.song.id"
+              type="button"
+              @click="onSelect(result.song)"
+              class="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-gray-900 transition-colors"
+            >
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm text-gray-100 truncate">{{ result.song.title }}</span>
+                  <span v-if="result.isRecent" class="text-xs text-amber-400 shrink-0">Recent</span>
+                </div>
+                <div class="flex items-center gap-2 mt-0.5">
+                  <span class="text-xs text-gray-400">{{ preferredKey(result.song) }}</span>
+                  <span class="text-gray-700">·</span>
+                  <span class="text-xs text-gray-500">
+                    {{ result.weeksAgo !== null ? `Last used ${result.weeksAgo}w ago` : 'Never used' }}
+                  </span>
+                </div>
+              </div>
+              <SongBadge :type="result.song.vwType" />
+            </button>
+          </div>
+
+          <!-- Empty state: no songs match this VW type -->
+          <div v-else class="px-4 py-6 text-center">
+            <p class="text-sm text-gray-400 mb-2">No songs with this category.</p>
+            <p class="text-xs text-gray-500">
+              Add songs to your library first.
+              <router-link to="/songs" class="text-indigo-400 hover:text-indigo-300" @click.stop>Go to Songs</router-link>
+            </p>
+          </div>
+        </div>
+
+        <!-- Search results -->
+        <div v-else>
+          <p class="px-3 pt-2 pb-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">Search Results</p>
+          <div v-if="searchResults.length > 0">
+            <button
+              v-for="song in searchResults"
+              :key="song.id"
+              type="button"
+              @click="onSelect(song)"
+              class="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-gray-900 transition-colors"
+            >
+              <div class="flex-1 min-w-0">
+                <span class="text-sm text-gray-100 truncate block">{{ song.title }}</span>
+                <span class="text-xs text-gray-400">{{ preferredKey(song) }}</span>
+              </div>
+              <SongBadge :type="song.vwType" />
+            </button>
+          </div>
+          <div v-else class="px-4 py-4 text-center">
+            <p class="text-sm text-gray-400">No songs found matching "{{ searchQuery }}"</p>
+          </div>
+        </div>
+      </div>
+    </template>
+  </Teleport>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, nextTick } from 'vue'
+import { rankSongsForSlot } from '@/utils/suggestions'
+import type { Song, VWType } from '@/types/song'
+import type { SuggestionResult } from '@/utils/suggestions'
+import SongBadge from '@/components/SongBadge.vue'
+
+const props = defineProps<{
+  requiredVwType: VWType
+  serviceTeams: string[]
+  currentSongId: string | null
+  songs: Song[]
+}>()
+
+const emit = defineEmits<{
+  select: [song: { id: string; title: string; key: string }]
+  clear: []
+}>()
+
+// ── State ──────────────────────────────────────────────────────────────────────
+
+const isOpen = ref(false)
+const searchQuery = ref('')
+const triggerRef = ref<HTMLElement | null>(null)
+const searchInputRef = ref<HTMLInputElement | null>(null)
+const dropdownStyle = ref<Record<string, string>>({})
+
+// ── Computed ───────────────────────────────────────────────────────────────────
+
+const suggestions = computed<SuggestionResult[]>(() => {
+  const results = rankSongsForSlot(props.songs, props.requiredVwType, props.serviceTeams)
+  return results.slice(0, 5)
+})
+
+const searchResults = computed<Song[]>(() => {
+  if (!searchQuery.value) return []
+  const q = searchQuery.value.toLowerCase()
+  return props.songs
+    .filter((s) => s.vwType === props.requiredVwType)
+    .filter((s) => s.title.toLowerCase().includes(q))
+})
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+function preferredKey(song: Song): string {
+  const first = song.arrangements[0]
+  return first?.key ? first.key : '—'
+}
+
+// ── Dropdown open/close ────────────────────────────────────────────────────────
+
+function openDropdown() {
+  if (!triggerRef.value) return
+
+  const rect = triggerRef.value.getBoundingClientRect()
+  dropdownStyle.value = {
+    top: `${rect.bottom + 4}px`,
+    left: `${rect.left}px`,
+    width: `${Math.max(rect.width, 280)}px`,
+  }
+  isOpen.value = true
+  searchQuery.value = ''
+
+  // Focus search input after DOM update
+  nextTick(() => {
+    searchInputRef.value?.focus()
+  })
+}
+
+function closeDropdown() {
+  isOpen.value = false
+  searchQuery.value = ''
+}
+
+// ── Selection ──────────────────────────────────────────────────────────────────
+
+function onSelect(song: Song) {
+  const key = song.arrangements[0]?.key ?? ''
+  emit('select', { id: song.id, title: song.title, key })
+  closeDropdown()
+}
+</script>
