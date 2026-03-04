@@ -135,6 +135,7 @@ None yet.
 | 6 | Limit rotation to 8-week window and rename tab to Song Rotation | 2026-03-04 | 238ac1e | [6-limit-rotation-to-8-week-window-and-rena](./quick/6-limit-rotation-to-8-week-window-and-rena/) |
 | 7 | Service card team badges, song/scripture label prefixes, Sunday team defaults | 2026-03-04 | f1154f9 | [7-service-card-team-badges-song-slot-label](./quick/7-service-card-team-badges-song-slot-label/) |
 | 8 | Song picker shows all songs with VW type priority (soft +100 bonus, no hard filter) | 2026-03-04 | 54106ae | [8-song-picker-shows-all-songs-with-type-pr](./quick/8-song-picker-shows-all-songs-with-type-pr/) |
+| 9 | Allow scripture preview with book and chapter only (canPreview, conditional passageQuery) | 2026-03-04 | 2ba8775 | [9-allow-scripture-preview-with-book-and-ch](./quick/9-allow-scripture-preview-with-book-and-ch/) |
 
 ### Blockers/Concerns
 
@@ -144,6 +145,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T16:51:00.000Z
-Stopped at: Completed quick-8 song picker shows all songs with VW type priority
+Last session: 2026-03-04T17:05:00.000Z
+Stopped at: Completed quick-9 allow scripture preview with book and chapter only
 Resume file: None
