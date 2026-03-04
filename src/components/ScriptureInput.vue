@@ -117,12 +117,7 @@ const isComplete = computed(() => {
 
 const esvUrl = computed(() => {
   if (!isComplete.value) return ''
-  return esvLink(
-    localBook.value as string,
-    localChapter.value as number,
-    localVerseStart.value as number,
-    localVerseEnd.value as number,
-  )
+  return esvLink(localBook.value as string, localChapter.value as number)
 })
 
 const currentRef = computed<ScriptureRef | null>(() => {

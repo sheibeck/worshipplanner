@@ -25,24 +25,24 @@ describe('BIBLE_BOOKS', () => {
 })
 
 describe('esvLink', () => {
-  it('generates correct URL for Psalm 23:1-6', () => {
-    expect(esvLink('Psalm', 23, 1, 6)).toBe('https://www.esv.org/Psalm+23%3A1-6/')
+  it('generates correct URL for Psalm 23', () => {
+    expect(esvLink('Psalm', 23)).toBe('https://www.esv.org/Psalm+23')
   })
 
-  it('generates correct URL for 1 John 3:16-18 (spaces become +)', () => {
-    expect(esvLink('1 John', 3, 16, 18)).toBe('https://www.esv.org/1+John+3%3A16-18/')
+  it('generates correct URL for 1 John 3 (spaces become +)', () => {
+    expect(esvLink('1 John', 3)).toBe('https://www.esv.org/1+John+3')
   })
 
-  it('generates correct URL for John 3:16-17', () => {
-    expect(esvLink('John', 3, 16, 17)).toBe('https://www.esv.org/John+3%3A16-17/')
+  it('generates correct URL for John 3', () => {
+    expect(esvLink('John', 3)).toBe('https://www.esv.org/John+3')
   })
 
   it('handles single-word book names', () => {
-    expect(esvLink('Romans', 8, 1, 4)).toBe('https://www.esv.org/Romans+8%3A1-4/')
+    expect(esvLink('Romans', 8)).toBe('https://www.esv.org/Romans+8')
   })
 
   it('handles books with numbers (e.g., 2 Corinthians)', () => {
-    expect(esvLink('2 Corinthians', 5, 17, 21)).toBe('https://www.esv.org/2+Corinthians+5%3A17-21/')
+    expect(esvLink('2 Corinthians', 5)).toBe('https://www.esv.org/2+Corinthians+5')
   })
 })
 

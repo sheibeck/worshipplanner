@@ -71,14 +71,9 @@ export const BIBLE_BOOKS: readonly string[] = [
   'Revelation',
 ] as const
 
-export function esvLink(
-  book: string,
-  chapter: number,
-  verseStart: number,
-  verseEnd: number,
-): string {
+export function esvLink(book: string, chapter: number): string {
   const bookSlug = book.replace(/\s+/g, '+')
-  return `https://www.esv.org/${bookSlug}+${chapter}%3A${verseStart}-${verseEnd}/`
+  return `https://www.esv.org/${bookSlug}+${chapter}`
 }
 
 export function scripturesOverlap(reading: ScriptureRef, sermon: ScriptureRef): boolean {
