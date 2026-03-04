@@ -51,11 +51,6 @@
                 </svg>
                 {{ localService.status === 'planned' ? 'Planned' : 'Draft' }}
               </button>
-              <!-- Communion badge -->
-              <span
-                v-if="isCommunion"
-                class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-900/50 text-amber-300 border border-amber-800"
-              >Communion</span>
             </div>
           </div>
 
@@ -553,6 +548,12 @@ const localService = ref<Service | null>(null)
 const originalService = ref<Service | null>(null)
 const isSaving = ref(false)
 const pcCopied = ref(false)
+
+// ── Autosave state ─────────────────────────────────────────────────────────────
+const previousService = ref<Service | null>(null)   // snapshot before last autosave (for undo)
+const autosaveStatus = ref<'idle' | 'pending' | 'saving' | 'saved'>('idle')
+let autosaveTimer: ReturnType<typeof setTimeout> | null = null
+let autosaveInitialized = false                     // suppress first-load trigger
 const isSharing = ref(false)
 const shareCopied = ref(false)
 const shareError = ref<string | null>(null)
@@ -694,6 +695,10 @@ watch(
           localService.value.teams.push('Communion')
           originalService.value = JSON.parse(JSON.stringify(localService.value))
         }
+        // Reset autosave state when service first loads (or re-loads)
+        autosaveInitialized = false
+        previousService.value = null
+        autosaveStatus.value = 'idle'
       }
     }
   },
@@ -709,6 +714,42 @@ watch(
     aiPerSlotResults.value.clear()
     aiPerSlotError.value.clear()
     aiPerSlotLoading.value.clear()
+  },
+  { deep: true },
+)
+
+// ── Autosave watcher ────────────────────────────────────────────────────────────
+
+watch(
+  localService,
+  () => {
+    // Skip: not loaded yet, or no actual change
+    if (!localService.value || !originalService.value) return
+    // Suppress the trigger that fires when service first loads from the store
+    if (!autosaveInitialized) {
+      autosaveInitialized = true
+      return
+    }
+    if (!isDirty.value) return
+
+    autosaveStatus.value = 'pending'
+
+    if (autosaveTimer) clearTimeout(autosaveTimer)
+    autosaveTimer = setTimeout(async () => {
+      if (!isDirty.value) {
+        autosaveStatus.value = 'idle'
+        return
+      }
+      // Snapshot current state before saving (enables undo)
+      previousService.value = JSON.parse(JSON.stringify(localService.value))
+      autosaveStatus.value = 'saving'
+      await onSave()
+      autosaveStatus.value = 'saved'
+      // Fade "Saved" indicator after 3 seconds
+      setTimeout(() => {
+        if (autosaveStatus.value === 'saved') autosaveStatus.value = 'idle'
+      }, 3000)
+    }, 1500)
   },
   { deep: true },
 )
@@ -732,11 +773,26 @@ async function initStores() {
 
 onMounted(async () => {
   await initStores()
+
+  // Ctrl+Z / Cmd+Z undo shortcut
+  function handleUndoKey(e: KeyboardEvent) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+      // Only intercept if undo is available (not inside a text input where browser undo should apply)
+      const tag = (e.target as HTMLElement).tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      if (!previousService.value) return
+      e.preventDefault()
+      onUndo()
+    }
+  }
+  document.addEventListener('keydown', handleUndoKey)
+  onUnmounted(() => document.removeEventListener('keydown', handleUndoKey))
 })
 
 onUnmounted(() => {
   sortableInstance?.destroy()
   sortableInstance = null
+  if (autosaveTimer) clearTimeout(autosaveTimer)
   // Don't unsubscribe serviceStore here — DashboardView may still be using it
 })
 
@@ -1143,6 +1199,20 @@ async function onSave() {
     }
   } finally {
     isSaving.value = false
+  }
+}
+
+// ── Undo (restore previous autosave snapshot) ───────────────────────────────────
+
+function onUndo() {
+  if (!previousService.value) return
+  // Restore previous snapshot — this will trigger another autosave after 1.5s
+  localService.value = JSON.parse(JSON.stringify(previousService.value))
+  previousService.value = null
+  autosaveStatus.value = 'idle'
+  if (autosaveTimer) {
+    clearTimeout(autosaveTimer)
+    autosaveTimer = null
   }
 }
 </script>
