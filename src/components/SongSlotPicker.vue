@@ -47,10 +47,62 @@
           />
         </div>
 
-        <!-- Suggestions section (top 5) -->
+        <!-- Non-search content (AI Picks + Rotation suggestions) -->
         <div v-if="!searchQuery">
+
+          <!-- AI Picks section -->
+          <div v-if="hasSermonContext !== false">
+            <!-- Loading shimmer -->
+            <div v-if="aiLoading" class="px-3 py-2">
+              <p class="px-0 pt-1 pb-1 text-xs font-semibold text-indigo-400 uppercase tracking-wider">AI Picks</p>
+              <div class="space-y-1.5">
+                <div class="h-8 bg-gray-700/60 rounded animate-pulse"></div>
+                <div class="h-8 bg-gray-700/60 rounded animate-pulse w-5/6"></div>
+                <div class="h-8 bg-gray-700/60 rounded animate-pulse w-4/6"></div>
+              </div>
+            </div>
+
+            <!-- Error state -->
+            <div v-else-if="aiError" class="px-3 py-2">
+              <p class="text-xs font-semibold text-indigo-400 uppercase tracking-wider mb-1">AI Picks</p>
+              <p class="text-xs text-gray-500">
+                Suggestions unavailable.
+                <button @click="emit('requestAiSuggestions')" class="text-indigo-400 hover:text-indigo-300 ml-1">Retry</button>
+              </p>
+            </div>
+
+            <!-- AI Results -->
+            <div v-else-if="resolvedAiSuggestions.length > 0">
+              <p class="px-3 pt-2 pb-1 text-xs font-semibold text-indigo-400 uppercase tracking-wider">AI Picks</p>
+              <button
+                v-for="item in resolvedAiSuggestions"
+                :key="item.song.id"
+                type="button"
+                @click="onSelect(item.song)"
+                class="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-gray-900 transition-colors"
+              >
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm text-gray-100 truncate">{{ item.song.title }}</span>
+                  </div>
+                  <p class="text-xs text-indigo-400/80 mt-0.5">{{ item.reason }}</p>
+                </div>
+                <SongBadge :type="item.song.vwType" />
+              </button>
+            </div>
+
+            <!-- No sermon context placeholder -->
+            <div v-else-if="!hasSermonContext" class="px-3 py-2">
+              <p class="text-xs text-gray-500 italic">Add a sermon topic or passage for AI suggestions</p>
+            </div>
+
+            <!-- Divider between AI and rotation sections -->
+            <div v-if="resolvedAiSuggestions.length > 0 || aiLoading || aiError" class="border-t border-gray-700 my-1"></div>
+          </div>
+
+          <!-- By Rotation section -->
           <div v-if="suggestions.length > 0">
-            <p class="px-3 pt-2 pb-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">Suggestions</p>
+            <p class="px-3 pt-2 pb-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">By Rotation</p>
             <button
               v-for="result in suggestions"
               :key="result.song.id"
@@ -117,6 +169,7 @@ import { ref, computed, nextTick } from 'vue'
 import { rankSongsForSlot } from '@/utils/suggestions'
 import type { Song, VWType } from '@/types/song'
 import type { SuggestionResult } from '@/utils/suggestions'
+import type { AiSongSuggestion } from '@/utils/claudeApi'
 import SongBadge from '@/components/SongBadge.vue'
 
 const props = defineProps<{
@@ -124,11 +177,17 @@ const props = defineProps<{
   serviceTeams: string[]
   currentSongId: string | null
   songs: Song[]
+  // AI optional props
+  aiSuggestions?: AiSongSuggestion[]
+  aiLoading?: boolean
+  aiError?: boolean
+  hasSermonContext?: boolean
 }>()
 
 const emit = defineEmits<{
   select: [song: { id: string; title: string; key: string }]
   clear: []
+  requestAiSuggestions: []
 }>()
 
 // ── State ──────────────────────────────────────────────────────────────────────
@@ -156,6 +215,16 @@ const searchResults = computed<Song[]>(() => {
       const bMatch = b.vwType === props.requiredVwType ? 1 : 0
       return bMatch - aMatch
     })
+})
+
+const resolvedAiSuggestions = computed<{ song: Song; reason: string }[]>(() => {
+  if (!props.aiSuggestions) return []
+  return props.aiSuggestions
+    .map((ai) => {
+      const song = props.songs.find((s) => s.id === ai.songId)
+      return song ? { song, reason: ai.reason } : null
+    })
+    .filter((item): item is { song: Song; reason: string } => item !== null)
 })
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -202,6 +271,11 @@ function openDropdown() {
 
   isOpen.value = true
   searchQuery.value = ''
+
+  // Request AI suggestions on open if context exists but suggestions not yet fetched
+  if (props.hasSermonContext && !props.aiSuggestions && !props.aiLoading) {
+    emit('requestAiSuggestions')
+  }
 
   // Focus search input after DOM update
   nextTick(() => {
