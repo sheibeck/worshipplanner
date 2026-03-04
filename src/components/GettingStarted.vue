@@ -62,8 +62,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useSongStore } from '@/stores/songs'
+import { useServiceStore } from '@/stores/services'
 
 const songStore = useSongStore()
+const serviceStore = useServiceStore()
 
 const steps = computed(() => [
   {
@@ -81,7 +83,7 @@ const steps = computed(() => [
   {
     title: 'Plan your first service',
     description: 'Create a service plan with the Vertical Worship methodology.',
-    done: false,
+    done: serviceStore.services.length > 0,
     to: '/services',
   },
   {

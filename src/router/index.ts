@@ -31,6 +31,18 @@ const router = createRouter({
       component: () => import('../views/SongsView.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/services',
+      name: 'services',
+      component: () => import('../views/ServicesView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/services/:id',
+      name: 'service-editor',
+      component: () => import('../views/ServiceEditorView.vue'),
+      meta: { requiresAuth: true },
+    },
   ],
 })
 

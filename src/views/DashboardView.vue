@@ -21,28 +21,33 @@ import { doc, getDoc } from 'firebase/firestore'
 import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { useSongStore } from '@/stores/songs'
+import { useServiceStore } from '@/stores/services'
 import AppShell from '@/components/AppShell.vue'
 import GettingStarted from '@/components/GettingStarted.vue'
 
 const authStore = useAuthStore()
 const songStore = useSongStore()
+const serviceStore = useServiceStore()
 
 const displayName = computed(() => {
   return authStore.user?.displayName || authStore.user?.email?.split('@')[0] || ''
 })
 
-// Subscribe to songs on dashboard so GettingStarted step 2 is reactive
-// Guard: if SongsView already subscribed (orgId already set), this is a no-op
+// Subscribe to songs and services on dashboard so GettingStarted steps 2 and 3 are reactive
+// Guard: if already subscribed (orgId already set), skip to avoid double-subscription
 onMounted(async () => {
-  if (songStore.orgId) return // already subscribed by SongsView
-
   const user = authStore.user
   if (!user) return
 
   const userSnap = await getDoc(doc(db, 'users', user.uid))
   const orgIds: string[] = userSnap.data()?.orgIds ?? []
   if (orgIds[0]) {
-    songStore.subscribe(orgIds[0])
+    if (!songStore.orgId) {
+      songStore.subscribe(orgIds[0])
+    }
+    if (!serviceStore.orgId) {
+      serviceStore.subscribe(orgIds[0])
+    }
   }
 })
 </script>
