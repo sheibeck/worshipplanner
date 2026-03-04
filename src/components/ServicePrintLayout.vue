@@ -9,7 +9,6 @@
       <p class="text-xs text-gray-600">
         Teams: {{ props.service.teams.length > 0 ? props.service.teams.join(' / ') : 'Standard Band' }}
       </p>
-      <p class="text-xs text-gray-600">Progression: {{ props.service.progression }}</p>
     </div>
 
     <!-- Slot rows -->

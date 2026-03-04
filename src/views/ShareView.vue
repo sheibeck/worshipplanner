@@ -19,7 +19,7 @@
       <div class="mb-6">
         <h1 class="text-xl font-bold text-gray-900">{{ formattedDate }}</h1>
         <p v-if="serviceSnapshot.name" class="text-base text-gray-700 mt-0.5">{{ serviceSnapshot.name }}</p>
-        <p class="text-sm text-gray-600 mt-1">{{ teamsDisplay }} &middot; {{ serviceSnapshot.progression }}</p>
+        <p class="text-sm text-gray-600 mt-1">{{ teamsDisplay }}</p>
       </div>
 
       <div class="border-b border-gray-200 mb-4"></div>
