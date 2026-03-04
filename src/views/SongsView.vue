@@ -1,0 +1,131 @@
+<template>
+  <AppShell>
+    <div class="px-6 py-8">
+      <!-- Page header -->
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <h1 class="text-xl font-semibold text-gray-100">Songs</h1>
+          <p class="text-sm text-gray-400 mt-1">
+            {{ songStore.isLoading ? 'Loading...' : `${songStore.songs.length} song${songStore.songs.length !== 1 ? 's' : ''}` }}
+          </p>
+        </div>
+        <div class="flex items-center gap-3">
+          <button
+            @click="onImportSongs"
+            class="inline-flex items-center gap-2 rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm font-medium text-gray-200 hover:bg-gray-700 hover:text-white transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            Import Songs
+          </button>
+          <button
+            @click="onAddSong"
+            class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            Add Song
+          </button>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="mb-4">
+        <SongFilters
+          v-model:searchQuery="songStore.searchQuery"
+          v-model:filterVwType="songStore.filterVwType"
+          v-model:filterKey="songStore.filterKey"
+          v-model:filterTag="songStore.filterTag"
+          :availableKeys="availableKeys"
+          :availableTags="availableTags"
+        />
+      </div>
+
+      <!-- Song table -->
+      <SongTable
+        :songs="songStore.filteredSongs"
+        :loading="songStore.isLoading"
+        @select="onSelectSong"
+        @add="onAddSong"
+      />
+    </div>
+  </AppShell>
+</template>
+
+<script setup lang="ts">
+import { computed, onMounted, onUnmounted } from 'vue'
+import { useRoute } from 'vue-router'
+import { doc, getDoc } from 'firebase/firestore'
+import { db } from '@/firebase'
+import { useAuthStore } from '@/stores/auth'
+import { useSongStore } from '@/stores/songs'
+import type { Song } from '@/types/song'
+import AppShell from '@/components/AppShell.vue'
+import SongFilters from '@/components/SongFilters.vue'
+import SongTable from '@/components/SongTable.vue'
+
+const authStore = useAuthStore()
+const songStore = useSongStore()
+const route = useRoute()
+
+// Derived filter options from current songs
+const availableKeys = computed(() => {
+  const keys = new Set<string>()
+  songStore.songs.forEach((song) => {
+    song.arrangements.forEach((arr) => {
+      if (arr.key) keys.add(arr.key)
+    })
+  })
+  return Array.from(keys).sort()
+})
+
+const availableTags = computed(() => {
+  const tags = new Set<string>()
+  songStore.songs.forEach((song) => {
+    song.teamTags.forEach((tag) => tags.add(tag))
+  })
+  return Array.from(tags).sort()
+})
+
+// Subscribe to Firestore songs collection once orgId is resolved
+async function initStore() {
+  const user = authStore.user
+  if (!user) return
+
+  const userSnap = await getDoc(doc(db, 'users', user.uid))
+  const orgIds: string[] = userSnap.data()?.orgIds ?? []
+  if (orgIds[0]) {
+    songStore.subscribe(orgIds[0])
+  }
+}
+
+onMounted(async () => {
+  await initStore()
+
+  // Check for ?import=true query param to pre-trigger import flow (consumed by Plan 03)
+  if (route.query.import === 'true') {
+    console.log('[SongsView] import=true detected — import flow will be triggered by Plan 03')
+  }
+})
+
+onUnmounted(() => {
+  songStore.unsubscribeAll()
+})
+
+function onSelectSong(song: Song) {
+  // Plan 02 (slide-over) will wire up full implementation
+  console.log('[SongsView] song selected:', song.id, song.title)
+}
+
+function onAddSong() {
+  // Plan 02 (slide-over) will wire up full implementation
+  console.log('[SongsView] add song triggered')
+}
+
+function onImportSongs() {
+  // Plan 03 (CSV import) will wire up full implementation
+  console.log('[SongsView] import songs triggered')
+}
+</script>
