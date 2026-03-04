@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 03-04-PLAN.md
-last_updated: "2026-03-04T11:02:02.381Z"
+stopped_at: Completed 03-03-PLAN.md
+last_updated: "2026-03-04T11:05:00.311Z"
 last_activity: 2026-03-04 — Plan 01-01 complete — Vue 3 + Firebase foundation, auth store, router guard, Firestore rules
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 10
-  completed_plans: 8
+  completed_plans: 9
   percent: 50
 ---
 
@@ -59,6 +59,7 @@ Progress: [█████░░░░░] 50%
 | Phase 03-service-planning P02 | 4 | 2 tasks | 7 files |
 | Phase 03-service-planning P01 | 5 | 2 tasks | 9 files |
 | Phase 03-service-planning P04 | 3 | 2 tasks | 5 files |
+| Phase 03-service-planning P03 | 5 | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -97,6 +98,9 @@ Recent decisions affecting current work:
 - [Phase 03-service-planning]: ServiceCard uses static class lookup (progressionClasses/statusClasses) to prevent Tailwind v4 purge of dynamic badge color classes
 - [Phase 03-service-planning]: ServicesView uses local activeTab ref for Services/Rotation tab toggle — no router-based tabs needed
 - [Phase 03-service-planning]: RotationTable consecutive repeat detection uses sortedDates index comparison — checks if sortedDates[i-1] also has the song
+- [Phase 03-service-planning]: ServiceEditorView uses JSON.stringify for isDirty detection on nested slot arrays
+- [Phase 03-service-planning]: SongSlotPicker Teleport to body with getBoundingClientRect() fixed positioning for AppShell overflow escape
+- [Phase 03-service-planning]: ScriptureInput showOverlapWarning=false on sermon passage input, true on reading slots
 
 ### Pending Todos
 
@@ -110,6 +114,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T11:02:02.375Z
-Stopped at: Completed 03-04-PLAN.md
+Last session: 2026-03-04T11:05:00.305Z
+Stopped at: Completed 03-03-PLAN.md
 Resume file: None

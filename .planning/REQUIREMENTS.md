@@ -24,16 +24,16 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **PLAN-04**: User can specify which teams are participating per service (choir, orchestra, special service)
 - [x] **PLAN-05**: Available songs are automatically filtered by team configuration for each service
 - [x] **PLAN-06**: App suggests songs for each slot based on category type, rotation recency, and team configuration
-- [ ] **PLAN-07**: User can override suggestions and manually pick any song from the stable
+- [x] **PLAN-07**: User can override suggestions and manually pick any song from the stable
 - [x] **PLAN-08**: Song usage history is tracked automatically when songs are placed in service plans
 - [x] **PLAN-09**: Songs used in the last 2 weeks are deprioritized in suggestions (rotation enforcement)
 
 ### Scripture & Sermon
 
-- [ ] **SCRI-01**: User can add scripture passages to the service order (multiple reading slots)
-- [ ] **SCRI-02**: User can enter the pastor's sermon passage to prevent duplication in readings
+- [x] **SCRI-01**: User can add scripture passages to the service order (multiple reading slots)
+- [x] **SCRI-02**: User can enter the pastor's sermon passage to prevent duplication in readings
 - [x] **SCRI-03**: App links to or displays ESV Bible text for selected scripture passages
-- [ ] **SCRI-04**: App suggests Psalms when user is selecting scripture readings
+- [x] **SCRI-04**: App suggests Psalms when user is selecting scripture readings
 
 ### Output & Sharing
 
@@ -125,13 +125,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PLAN-04 | Phase 3 | Complete |
 | PLAN-05 | Phase 3 | Complete |
 | PLAN-06 | Phase 3 | Complete |
-| PLAN-07 | Phase 3 | Pending |
+| PLAN-07 | Phase 3 | Complete |
 | PLAN-08 | Phase 3 | Complete |
 | PLAN-09 | Phase 3 | Complete |
-| SCRI-01 | Phase 3 | Pending |
-| SCRI-02 | Phase 3 | Pending |
+| SCRI-01 | Phase 3 | Complete |
+| SCRI-02 | Phase 3 | Complete |
 | SCRI-03 | Phase 3 | Complete |
-| SCRI-04 | Phase 3 | Pending |
+| SCRI-04 | Phase 3 | Complete |
 | CAL-01 | Phase 3 | Complete |
 | CAL-02 | Phase 3 | Complete |
 | CAL-03 | Phase 3 | Complete |
