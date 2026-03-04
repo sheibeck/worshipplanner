@@ -56,7 +56,39 @@
 
           <!-- Save area -->
           <div class="flex items-center gap-3">
-            <span v-if="isDirty" class="text-xs text-amber-400">Unsaved changes</span>
+            <!-- Autosave status indicator -->
+            <span
+              v-if="autosaveStatus === 'pending' || autosaveStatus === 'saving'"
+              class="text-xs text-gray-400 italic"
+            >
+              {{ autosaveStatus === 'saving' ? 'Saving...' : 'Saving soon...' }}
+            </span>
+            <span
+              v-else-if="autosaveStatus === 'saved'"
+              class="text-xs text-green-400"
+            >
+              Saved
+            </span>
+            <span
+              v-else-if="isDirty"
+              class="text-xs text-amber-400"
+            >
+              Unsaved changes
+            </span>
+
+            <!-- Undo button (only visible when a previous snapshot exists) -->
+            <button
+              v-if="previousService"
+              type="button"
+              @click="onUndo"
+              title="Undo last save (Ctrl+Z)"
+              class="print:hidden inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+              </svg>
+              Undo
+            </button>
 
             <!-- Delete button -->
             <button
