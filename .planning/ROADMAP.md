@@ -97,7 +97,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -107,6 +107,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | 4. Output | 2/2 | Complete   | 2026-03-04 |
 | 5. Collaboration, Tasks & Events | 0/TBD | Not started | - |
 | 6. AI Assisted Service Suggesting | 4/4 | Complete   | 2026-03-04 |
+| 7. Invite & RBAC | 0/2 | Not started | - |
 
 ### Phase 6: AI assisted service suggesting and scripture searching
 
@@ -127,3 +128,22 @@ Plans:
 - [ ] 06-02-PLAN.md — Sermon topic field, AI song picks in SongSlotPicker, "Suggest All Songs" bulk flow in ServiceEditorView
 - [ ] 06-03-PLAN.md — AI scripture discovery with natural language search and per-slot suggest button in ScriptureInput
 - [ ] 06-04-PLAN.md — Human verification of complete AI-assisted service planning workflow
+
+### Phase 7: Invite users, manage members with editor/viewer roles, and enforce role-based access control
+
+**Goal:** Editors can invite team members by email, invited users auto-join the organization on sign-in, and role-based access control is enforced at the Firestore rules layer, router guard layer, and UI layer -- editors get full CRUD, viewers get read-only access to services only
+**Requirements**: AUTH-03, AUTH-04
+**Depends on:** Phase 6
+**Success Criteria** (what must be TRUE):
+  1. An editor can invite a team member by email with a chosen role (editor or viewer)
+  2. When the invited person signs in, they auto-join the org with the assigned role -- no accept/decline prompt
+  3. A viewer can only see the Services list and view individual service details (read-only, no edit controls)
+  4. A viewer cannot access Dashboard, Songs, Team, or any mutation actions
+  5. Firestore security rules enforce RBAC -- viewers cannot write data or read songs
+  6. An editor can manage team members: change roles and remove members
+  7. Organization name is displayed in the sidebar for all roles
+**Plans:** 2 plans
+
+Plans:
+- [ ] 07-01-PLAN.md — Auth store enrichment with orgId/role/invite-matching, Firestore rules RBAC rewrite, role-aware router guards
+- [ ] 07-02-PLAN.md — Team management page (invite form + member table), role-conditional sidebar/views, centralized orgId access
