@@ -10,7 +10,10 @@
   >
     <!-- Brand -->
     <div class="flex items-center h-14 px-5 border-b border-gray-800 shrink-0">
-      <span class="text-sm font-semibold text-gray-100 tracking-tight">Worship Planner</span>
+      <div>
+        <span class="text-sm font-semibold text-gray-100 tracking-tight">Worship Planner</span>
+        <p class="text-[10px] text-gray-600 leading-none">v{{ appVersion }}</p>
+      </div>
     </div>
 
     <!-- Org name -->
@@ -76,6 +79,9 @@ defineEmits<{
 
 const route = useRoute()
 const router = useRouter()
+declare const __APP_VERSION__: string
+const appVersion = __APP_VERSION__
+
 const authStore = useAuthStore()
 
 const navItems = computed(() => {
