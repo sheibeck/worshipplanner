@@ -26,7 +26,32 @@
             class="text-xs truncate"
             :class="slotTextClass(slot)"
           >
-            {{ slotLabel(slot) }}
+            <!-- Scripture slots link to ESV -->
+            <a
+              v-if="slot.kind === 'SCRIPTURE' && slot.book"
+              :href="esvLink(slot.book, slot.chapter!)"
+              target="_blank"
+              rel="noopener"
+              class="text-indigo-400 hover:text-indigo-300 hover:underline"
+              @click.stop
+            >
+              {{ slot.book }} {{ slot.chapter }}:{{ slot.verseStart }}-{{ slot.verseEnd }}
+            </a>
+            <span v-else>{{ slotLabel(slot) }}</span>
+
+            <!-- Sermon passage after Message slot -->
+            <template v-if="slot.kind === 'MESSAGE' && service.sermonPassage">
+              <span class="text-gray-600 mx-1">—</span>
+              <a
+                :href="esvLink(service.sermonPassage.book, service.sermonPassage.chapter)"
+                target="_blank"
+                rel="noopener"
+                class="text-indigo-400 hover:text-indigo-300 hover:underline"
+                @click.stop
+              >
+                {{ service.sermonPassage.book }} {{ service.sermonPassage.chapter }}:{{ service.sermonPassage.verseStart }}-{{ service.sermonPassage.verseEnd }}
+              </a>
+            </template>
           </li>
         </ul>
       </div>
@@ -47,6 +72,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { Service, ServiceSlot } from '@/types/service'
+import { esvLink } from '@/utils/scripture'
 
 const props = defineProps<{
   service: Service
