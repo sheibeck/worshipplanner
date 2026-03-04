@@ -15,7 +15,7 @@ service cloud.firestore {
 
     function isOrgEditor(orgId) {
       return isSignedIn() &&
-        get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.role == 'editor';
+        get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.role in ['editor', 'admin'];
     }
 
     // User profiles - only the owner can read/write their own profile
