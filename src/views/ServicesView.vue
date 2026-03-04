@@ -64,7 +64,7 @@
               </button>
             </div>
 
-            <div v-else class="space-y-2">
+            <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <ServiceCard
                 v-for="service in upcomingServices"
                 :key="service.id"
@@ -94,7 +94,7 @@
               Past Services ({{ pastServices.length }})
             </button>
 
-            <div v-if="showPast" class="space-y-2">
+            <div v-if="showPast" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <ServiceCard
                 v-for="service in pastServices"
                 :key="service.id"
