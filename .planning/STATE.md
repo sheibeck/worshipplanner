@@ -159,6 +159,7 @@ Recent decisions affecting current work:
 - [Quick-16]: toggleTeam uses filter/spread immutable update — new array reference guarantees Vue 3 deep watcher fires on team checkbox changes
 - [Quick-16]: Autosave debounce reduced from 1500ms to 500ms for more responsive save feedback
 - [Quick-16]: Communion badge removed from ServiceCard — TeamTagPill already shows Communion from service.teams (data-driven, not date-derived)
+- [Quick-17]: Static amber Tailwind classes for Special Service badge — all class strings literal, not computed, maintaining Tailwind v4 purge safety (matches statusClasses pattern)
 
 ### Roadmap Evolution
 
@@ -182,6 +183,7 @@ None yet.
 | 13 | Song rotation dot bg-sky-300 visibility fix + Scripture Rotation tab with passage grid | 2026-03-04 | 464c8b2 | [13-fix-song-rotation-dot-visibility-on-dark](./quick/13-fix-song-rotation-dot-visibility-on-dark/) |
 | 14 | Autosave to service editor with 1.5s debounce, one-step undo, and status indicator | 2026-03-04 | 6a5f861 | [14-add-autosave-to-service-editor-with-one-](./quick/14-add-autosave-to-service-editor-with-one-/) |
 | 16 | Remove date-derived Communion badge; fix team checkbox autosave via immutable array update; 500ms debounce | 2026-03-04 | dbb25a0 | [16-fix-communion-badge-display-communion-ch](./quick/16-fix-communion-badge-display-communion-ch/) |
+| 17 | Remove progression from print/share headers; amber Special Service badge in ServiceCard | 2026-03-04 | 4e783fb | [17-remove-progression-from-print-share-head](./quick/17-remove-progression-from-print-share-head/) |
 
 ### Blockers/Concerns
 
@@ -191,6 +193,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T22:17:08Z
-Stopped at: Completed Quick-16
+Last session: 2026-03-04T22:26:58Z
+Stopped at: Completed Quick-17
 Resume file: None
