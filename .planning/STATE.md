@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed quick-2 dynamic service flow (add/remove/reorder slots)
-last_updated: "2026-03-04T16:04:16Z"
-last_activity: 2026-03-04 — Quick-2 complete — Dynamic slot add/remove/reorder with sortablejs, VW type selector, kind-based labels
+stopped_at: Completed quick-3 QoL improvements (CCLI column, past filter, lock icon, status toggle)
+last_updated: "2026-03-04T16:13:00Z"
+last_activity: 2026-03-04 — Quick-3 complete — CCLI column, past service filter (5 max), lock icon on planned badge, status toggle, compact prayer/message slots
 progress:
   total_phases: 5
   completed_phases: 4
@@ -62,6 +62,7 @@ Progress: [█████░░░░░] 50%
 | Phase 03-service-planning P03 | 5 | 3 tasks | 4 files |
 | Phase 04-output P01 | 5 | 2 tasks | 6 files |
 | Phase 04-output P02 | 6 | 2 tasks | 7 files |
+| Quick-3 QoL | 3 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -112,6 +113,9 @@ Recent decisions affecting current work:
 - [Quick-2]: Sortable onEnd updates reactive array then lets Vue reconcile (no manual DOM sync needed)
 - [Quick-2]: onSave uses global songId set comparison for lastUsedAt tracking after reorder (position-independent)
 - [Quick-2]: planningCenterExport sequential Song 1/2/3 numbering (position-agnostic)
+- [Quick-3]: CCLI column replaces BPM in SongTable — low-value BPM swapped for one-click SongSelect link
+- [Quick-3]: displayedPastServices slices to 5 but toggle button retains full count
+- [Quick-3]: Status badge is a button element for semantic correctness and keyboard accessibility
 
 ### Pending Todos
 
@@ -125,6 +129,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T16:04:16Z
-Stopped at: Completed quick-2 dynamic service flow (add/remove/reorder slots)
+Last session: 2026-03-04T16:13:00Z
+Stopped at: Completed quick-3 QoL improvements (CCLI column, past filter, lock icon, status toggle)
 Resume file: None
