@@ -47,10 +47,10 @@ created: 2026-03-03
 | 03-02-04 | 02 | 1 | PLAN-08 | unit (store) | `npx vitest run src/stores/__tests__/services.test.ts -t "lastUsedAt"` | ❌ W0 | ⬜ pending |
 | 03-02-05 | 02 | 1 | PLAN-09 | unit (util) | `npx vitest run src/utils/suggestions.test.ts -t "recency penalty"` | ❌ W0 | ⬜ pending |
 | 03-03-01 | 03 | 1 | SCRI-01, SCRI-02 | unit (store) | `npx vitest run src/stores/__tests__/services.test.ts -t "scripture"` | ❌ W0 | ⬜ pending |
-| 03-03-02 | 03 | 1 | SCRI-03 | unit (util) | `npx vitest run src/utils/esv.test.ts` | ❌ W0 | ⬜ pending |
-| 03-03-03 | 03 | 1 | SCRI-04 | component | `npx vitest run src/components/__tests__/ScriptureSlot.test.ts` | ❌ W0 | ⬜ pending |
-| 03-04-01 | 04 | 2 | CAL-01 | component | `npx vitest run src/components/__tests__/ServiceCard.test.ts` | ❌ W0 | ⬜ pending |
-| 03-04-02 | 04 | 2 | CAL-02, CAL-03 | unit (computed) | `npx vitest run src/utils/rotationTable.test.ts` | ❌ W0 | ⬜ pending |
+| 03-03-02 | 03 | 1 | SCRI-03 | unit (util) | `npx vitest run src/utils/__tests__/scripture.test.ts -t "esvLink"` | ❌ W0 | ⬜ pending |
+| 03-03-03 | 03 | 2 | SCRI-04 | component | `npx vitest run src/components/__tests__/ScriptureInput.test.ts` | ❌ Plan 03-03 Task 3 | ⬜ pending |
+| 03-04-01 | 04 | 2 | CAL-01 | component | `npx vitest run src/components/__tests__/ServiceCard.test.ts` | ❌ Plan 03-04 Task 1 | ⬜ pending |
+| 03-04-02 | 04 | 2 | CAL-02, CAL-03 | unit (computed) | `npx vitest run src/utils/__tests__/rotationTable.test.ts` | ❌ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -60,10 +60,10 @@ created: 2026-03-03
 
 - [ ] `src/stores/__tests__/services.test.ts` — stubs for PLAN-01, PLAN-02, PLAN-04, PLAN-08, SCRI-01, SCRI-02
 - [ ] `src/utils/suggestions.test.ts` — stubs for PLAN-03, PLAN-05, PLAN-06, PLAN-07, PLAN-09
-- [ ] `src/utils/esv.test.ts` — stubs for SCRI-03
-- [ ] `src/components/__tests__/ServiceCard.test.ts` — stubs for CAL-01
-- [ ] `src/utils/rotationTable.test.ts` — stubs for CAL-02, CAL-03
-- [ ] `src/components/__tests__/ScriptureSlot.test.ts` — stubs for SCRI-04
+- [ ] `src/utils/__tests__/scripture.test.ts` — covers SCRI-03 (esvLink tests created by Plan 03-01 Task 1)
+- [ ] `src/utils/__tests__/rotationTable.test.ts` — covers CAL-02, CAL-03 (created by Plan 03-01 Task 2)
+- [ ] `src/components/__tests__/ScriptureInput.test.ts` — covers SCRI-04 (created by Plan 03-03 Task 3, TDD)
+- [ ] `src/components/__tests__/ServiceCard.test.ts` — covers CAL-01 (created by Plan 03-04 Task 1, TDD)
 - [ ] Framework install: none required — Vitest + jsdom + @vue/test-utils already installed
 
 *Existing infrastructure covers framework requirements.*
