@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Foundation** - Auth, Firebase setup, Firestore data model, and security rules (completed 2026-03-04)
 - [x] **Phase 2: Song Library** - Full song stable management with CSV import and Vertical Worship categorization (completed 2026-03-04)
 - [ ] **Phase 3: Service Planning** - Weekly service builder, smart song suggestions, scripture, and calendar
-- [ ] **Phase 4: Output** - Print, share, and export service plans
+- [x] **Phase 4: Output** - Print, share, and export service plans (completed 2026-03-04)
 - [ ] **Phase 5: Collaboration, Tasks & Events** - Team invites, recurring tasks, and special event services
 
 ## Phase Details
@@ -78,7 +78,7 @@ Plans:
   1. User can print a formatted order of service that renders correctly on paper (no cut-off text, correct page breaks)
   2. A team member opening a shareable link on a phone can read the full service plan without logging in
   3. User can export a service plan in a structured format that lists all fields needed for manual Planning Center entry
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 Plans:
 - [ ] 04-01-PLAN.md — Print layout component, Planning Center text export formatter, Print and Copy for PC buttons in service editor
 - [ ] 04-02-PLAN.md — Shareable link with Firestore token, public ShareView page, Share button in service editor
@@ -104,5 +104,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 1. Foundation | 2/2 | Complete   | 2026-03-04 |
 | 2. Song Library | 3/3 | Complete   | 2026-03-04 |
 | 3. Service Planning | 4/5 | In Progress|  |
-| 4. Output | 1/2 | In Progress|  |
+| 4. Output | 2/2 | Complete   | 2026-03-04 |
 | 5. Collaboration, Tasks & Events | 0/TBD | Not started | - |
