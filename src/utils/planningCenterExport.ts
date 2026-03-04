@@ -6,7 +6,10 @@ import type { ScriptureRef } from '@/types/service'
  * Format a ScriptureRef as "Book Chapter:VerseStart-VerseEnd"
  */
 export function formatScriptureRef(ref: ScriptureRef): string {
-  return `${ref.book} ${ref.chapter}:${ref.verseStart}-${ref.verseEnd}`
+  if (ref.verseStart && ref.verseEnd) {
+    return `${ref.book} ${ref.chapter}:${ref.verseStart}-${ref.verseEnd}`
+  }
+  return `${ref.book} ${ref.chapter}`
 }
 
 /**
@@ -71,8 +74,9 @@ export function formatForPlanningCenter(service: Service, songs: Song[]): string
       if (!slot.book) {
         lines.push(`${label} -- [empty]`)
       } else {
+        const verseRange = slot.verseStart && slot.verseEnd ? `:${slot.verseStart}-${slot.verseEnd}` : ''
         lines.push(
-          `${label} -- ${slot.book} ${slot.chapter}:${slot.verseStart}-${slot.verseEnd}`,
+          `${label} -- ${slot.book} ${slot.chapter}${verseRange}`,
         )
       }
     } else if (slot.kind === 'PRAYER') {

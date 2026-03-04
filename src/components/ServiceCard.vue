@@ -113,7 +113,10 @@ function slotLabel(slot: ServiceSlot): string {
     case 'SONG':
       return slot.songTitle ? `Song — ${slot.songTitle}` : 'Song — Empty'
     case 'SCRIPTURE':
-      return slot.book ? `Scripture — ${slot.book} ${slot.chapter}:${slot.verseStart}-${slot.verseEnd}` : 'Scripture — Empty'
+      if (!slot.book) return 'Scripture — Empty'
+      return slot.verseStart && slot.verseEnd
+        ? `Scripture — ${slot.book} ${slot.chapter}:${slot.verseStart}-${slot.verseEnd}`
+        : `Scripture — ${slot.book} ${slot.chapter}`
     case 'PRAYER':
       return '--- Prayer ---'
     case 'MESSAGE':

@@ -78,5 +78,6 @@ export function esvLink(book: string, chapter: number): string {
 
 export function scripturesOverlap(reading: ScriptureRef, sermon: ScriptureRef): boolean {
   if (reading.book !== sermon.book || reading.chapter !== sermon.chapter) return false
+  if (!reading.verseStart || !reading.verseEnd || !sermon.verseStart || !sermon.verseEnd) return true
   return reading.verseStart <= sermon.verseEnd && reading.verseEnd >= sermon.verseStart
 }

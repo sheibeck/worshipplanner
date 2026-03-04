@@ -159,13 +159,14 @@ const esvUrl = computed(() => {
 })
 
 const currentRef = computed<ScriptureRef | null>(() => {
-  if (!isComplete.value) return null
-  return {
+  if (!canPreview.value) return null
+  const ref: ScriptureRef = {
     book: localBook.value as string,
     chapter: localChapter.value as number,
-    verseStart: localVerseStart.value as number,
-    verseEnd: localVerseEnd.value as number,
   }
+  if (localVerseStart.value) ref.verseStart = localVerseStart.value as number
+  if (localVerseEnd.value) ref.verseEnd = localVerseEnd.value as number
+  return ref
 })
 
 const hasOverlap = computed(() => {

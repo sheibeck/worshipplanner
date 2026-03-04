@@ -33,8 +33,8 @@ export type ServiceSlot = SongSlot | ScriptureSlot | NonAssignableSlot
 export interface ScriptureRef {
   book: string
   chapter: number
-  verseStart: number
-  verseEnd: number
+  verseStart?: number
+  verseEnd?: number
 }
 
 export interface Service {
