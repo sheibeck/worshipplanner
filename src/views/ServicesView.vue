@@ -22,7 +22,7 @@
             : 'text-gray-400 border-transparent hover:text-gray-200 hover:border-gray-600'"
           @click="activeTab = 'rotation'"
         >
-          Rotation
+          Song Rotation
         </button>
         <div class="flex-1" />
         <!-- New Service button (always visible) -->
@@ -139,7 +139,7 @@
 
       <!-- Rotation Tab -->
       <template v-else-if="activeTab === 'rotation'">
-        <RotationTable :services="serviceStore.services" />
+        <RotationTable :services="rotationServices" />
       </template>
     </div>
 
@@ -203,6 +203,24 @@ const pastServices = computed(() =>
     .filter((s) => s.date < todayStr.value)
     .sort((a, b) => b.date.localeCompare(a.date)),
 )
+
+// Rotation window: services within 4 weeks past and 4 weeks ahead of today
+const rotationServices = computed(() => {
+  const today = new Date()
+  const windowStart = new Date(today)
+  windowStart.setDate(today.getDate() - 28)
+  const windowEnd = new Date(today)
+  windowEnd.setDate(today.getDate() + 28)
+  const fmt = (d: Date) => {
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+  }
+  const start = fmt(windowStart)
+  const end = fmt(windowEnd)
+  return serviceStore.services.filter((s) => s.date >= start && s.date <= end)
+})
 
 // Unique month/year pairs from pastServices, sorted descending (most recent first)
 const availableMonths = computed<{ month: number; year: number; monthName: string }[]>(() => {

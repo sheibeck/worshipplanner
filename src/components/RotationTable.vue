@@ -11,6 +11,11 @@
     </div>
 
     <template v-else>
+      <!-- Window subtitle -->
+      <p class="text-xs text-gray-500 mb-3">
+        Showing {{ sortedDates.length }} week{{ sortedDates.length !== 1 ? 's' : '' }} of song rotation
+      </p>
+
       <!-- Filter input (shown when more than 30 songs) -->
       <div v-if="rotationEntries.length > 30" class="mb-4">
         <input
