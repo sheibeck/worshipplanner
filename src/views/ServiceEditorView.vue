@@ -850,7 +850,7 @@ watch(
       setTimeout(() => {
         if (autosaveStatus.value === 'saved') autosaveStatus.value = 'idle'
       }, 3000)
-    }, 1500)
+    }, 500)
   },
   { deep: true },
 )
@@ -910,11 +910,12 @@ function toggleStatus() {
 
 function toggleTeam(team: string) {
   if (!localService.value) return
-  const idx = localService.value.teams.indexOf(team)
+  const teams = localService.value.teams
+  const idx = teams.indexOf(team)
   if (idx >= 0) {
-    localService.value.teams.splice(idx, 1)
+    localService.value.teams = teams.filter((_, i) => i !== idx)
   } else {
-    localService.value.teams.push(team)
+    localService.value.teams = [...teams, team]
   }
 }
 
@@ -1303,7 +1304,7 @@ async function onSave() {
 
 function onUndo() {
   if (!previousService.value) return
-  // Restore previous snapshot — this will trigger another autosave after 1.5s
+  // Restore previous snapshot — this will trigger another autosave after 0.5s
   localService.value = JSON.parse(JSON.stringify(previousService.value))
   previousService.value = null
   autosaveStatus.value = 'idle'
