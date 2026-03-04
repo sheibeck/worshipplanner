@@ -8,25 +8,33 @@
         <p class="text-sm font-semibold text-gray-100">{{ formattedDate }}</p>
       </div>
 
-      <!-- Center: Progression + Songs -->
+      <!-- Center: Order of service -->
       <div class="flex-1 min-w-0">
-        <!-- Progression badge -->
-        <span
-          class="inline-block px-2 py-0.5 rounded text-xs font-semibold mb-1.5"
-          :class="progressionClass"
-        >
-          {{ service.progression }}
-        </span>
+        <!-- Message + sermon passage as headline -->
+        <p class="text-sm font-medium text-gray-100 truncate mb-1">
+          <span>Message</span>
+          <template v-if="service.sermonPassage">
+            <span class="text-gray-600 mx-1">—</span>
+            <a
+              :href="esvLink(service.sermonPassage.book, service.sermonPassage.chapter)"
+              target="_blank"
+              rel="noopener"
+              class="text-indigo-400 hover:text-indigo-300 hover:underline"
+              @click.stop
+            >
+              {{ service.sermonPassage.book }} {{ service.sermonPassage.chapter }}:{{ service.sermonPassage.verseStart }}-{{ service.sermonPassage.verseEnd }}
+            </a>
+          </template>
+        </p>
 
-        <!-- Order of service -->
+        <!-- Remaining slots (skip MESSAGE) -->
         <ul class="space-y-0.5">
           <li
-            v-for="slot in service.slots"
+            v-for="slot in nonMessageSlots"
             :key="slot.position"
             class="text-xs truncate"
             :class="slotTextClass(slot)"
           >
-            <!-- Scripture slots link to ESV -->
             <a
               v-if="slot.kind === 'SCRIPTURE' && slot.book"
               :href="esvLink(slot.book, slot.chapter!)"
@@ -38,20 +46,6 @@
               {{ slot.book }} {{ slot.chapter }}:{{ slot.verseStart }}-{{ slot.verseEnd }}
             </a>
             <span v-else>{{ slotLabel(slot) }}</span>
-
-            <!-- Sermon passage after Message slot -->
-            <template v-if="slot.kind === 'MESSAGE' && service.sermonPassage">
-              <span class="text-gray-600 mx-1">—</span>
-              <a
-                :href="esvLink(service.sermonPassage.book, service.sermonPassage.chapter)"
-                target="_blank"
-                rel="noopener"
-                class="text-indigo-400 hover:text-indigo-300 hover:underline"
-                @click.stop
-              >
-                {{ service.sermonPassage.book }} {{ service.sermonPassage.chapter }}:{{ service.sermonPassage.verseStart }}-{{ service.sermonPassage.verseEnd }}
-              </a>
-            </template>
           </li>
         </ul>
       </div>
@@ -96,6 +90,10 @@ const formattedDate = computed(() => {
   return d.toLocaleDateString('en-US', options)
 })
 
+const nonMessageSlots = computed(() =>
+  props.service.slots.filter((s) => s.kind !== 'MESSAGE'),
+)
+
 function slotLabel(slot: ServiceSlot): string {
   switch (slot.kind) {
     case 'SONG':
@@ -114,15 +112,6 @@ function slotTextClass(slot: ServiceSlot): string {
   if (slot.kind === 'SCRIPTURE') return slot.book ? 'text-gray-400' : 'text-gray-500 italic'
   return 'text-gray-500'
 }
-
-// Static progression class lookup (Tailwind v4 purge safety)
-const progressionClasses: Record<string, string> = {
-  '1-2-2-3': 'bg-indigo-900/50 text-indigo-300 border border-indigo-800',
-  '1-2-3-3': 'bg-violet-900/50 text-violet-300 border border-violet-800',
-}
-const progressionClass = computed(
-  () => progressionClasses[props.service.progression] ?? 'bg-gray-800 text-gray-400',
-)
 
 // Static status class lookup (Tailwind v4 purge safety)
 const statusClasses: Record<string, string> = {

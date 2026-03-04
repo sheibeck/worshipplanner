@@ -63,12 +63,12 @@ describe('ServiceCard', () => {
     expect(wrapper.text()).toContain('8')
   })
 
-  it('renders progression text', () => {
+  it('renders Message headline', () => {
     const wrapper = mount(ServiceCard, {
       props: { service: mockService },
       global: { stubs: globalStubs },
     })
-    expect(wrapper.text()).toContain('1-2-2-3')
+    expect(wrapper.text()).toContain('Message')
   })
 
   it('renders song titles from filled song slots', () => {
