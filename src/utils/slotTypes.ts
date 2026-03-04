@@ -1,4 +1,4 @@
-import type { Progression, ServiceSlot, SongSlot, ScriptureSlot, NonAssignableSlot, SlotKind } from '@/types/service'
+import type { Progression, ServiceSlot, SongSlot, ScriptureSlot, NonAssignableSlot, HymnSlot, SlotKind } from '@/types/service'
 import type { VWType } from '@/types/song'
 
 export const PROGRESSION_SLOT_TYPES: Record<Progression, Record<number, VWType>> = {
@@ -32,6 +32,8 @@ export function slotLabel(slot: ServiceSlot, _index?: number | string): string {
       return 'Prayer'
     case 'MESSAGE':
       return 'Message'
+    case 'HYMN':
+      return 'Hymn'
   }
 }
 
@@ -63,6 +65,8 @@ export function createSlot(kind: SlotKind, vwType?: VWType): ServiceSlot {
       return { kind: 'PRAYER', position: 0 } as NonAssignableSlot
     case 'MESSAGE':
       return { kind: 'MESSAGE', position: 0 } as NonAssignableSlot
+    case 'HYMN':
+      return { kind: 'HYMN', position: 0, hymnName: '', hymnNumber: '', verses: '' } as HymnSlot
   }
 }
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { PROGRESSION_SLOT_TYPES, buildSlots, createSlot, reindexSlots, slotLabel } from '@/utils/slotTypes'
-import type { SongSlot, ScriptureSlot, NonAssignableSlot } from '@/types/service'
+import type { SongSlot, ScriptureSlot, NonAssignableSlot, HymnSlot } from '@/types/service'
 
 describe('PROGRESSION_SLOT_TYPES', () => {
   it('maps 1-2-2-3 progression correctly', () => {
@@ -237,5 +237,21 @@ describe('slotLabel', () => {
   it('returns "Message" for a MESSAGE slot', () => {
     const slot: NonAssignableSlot = { kind: 'MESSAGE', position: 7 }
     expect(slotLabel(slot, 7)).toBe('Message')
+  })
+
+  it('returns "Hymn" for a HYMN slot', () => {
+    const slot: HymnSlot = { kind: 'HYMN', position: 4, hymnName: '', hymnNumber: '', verses: '' }
+    expect(slotLabel(slot, 4)).toBe('Hymn')
+  })
+})
+
+describe('createSlot - HYMN', () => {
+  it('creates a HYMN slot with empty string fields', () => {
+    const slot = createSlot('HYMN') as HymnSlot
+    expect(slot.kind).toBe('HYMN')
+    expect(slot.position).toBe(0)
+    expect(slot.hymnName).toBe('')
+    expect(slot.hymnNumber).toBe('')
+    expect(slot.verses).toBe('')
   })
 })

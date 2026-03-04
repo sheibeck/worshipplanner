@@ -3,7 +3,7 @@ import type { VWType } from './song'
 
 export type Progression = '1-2-2-3' | '1-2-3-3'
 export type ServiceStatus = 'draft' | 'planned'
-export type SlotKind = 'SONG' | 'SCRIPTURE' | 'PRAYER' | 'MESSAGE'
+export type SlotKind = 'SONG' | 'SCRIPTURE' | 'PRAYER' | 'MESSAGE' | 'HYMN'
 
 export interface SongSlot {
   kind: 'SONG'
@@ -30,7 +30,15 @@ export interface NonAssignableSlot {
   linkLabel?: string
 }
 
-export type ServiceSlot = SongSlot | ScriptureSlot | NonAssignableSlot
+export interface HymnSlot {
+  kind: 'HYMN'
+  position: number
+  hymnName: string
+  hymnNumber: string
+  verses: string
+}
+
+export type ServiceSlot = SongSlot | ScriptureSlot | NonAssignableSlot | HymnSlot
 
 export interface ScriptureRef {
   book: string
