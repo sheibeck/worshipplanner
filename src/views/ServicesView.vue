@@ -183,7 +183,7 @@ onUnmounted(() => {
   serviceStore.unsubscribeAll()
 })
 
-async function onCreateService(data: { date: string; teams: string[] }) {
+async function onCreateService(data: { date: string; name: string; teams: string[] }) {
   dialogOpen.value = false
   const id = await serviceStore.createService(data)
   await router.push(`/services/${id}`)

@@ -60,6 +60,17 @@
               />
             </div>
 
+            <!-- Service Name (shown when Special Service is checked) -->
+            <div v-if="form.teams.includes('Special Service')">
+              <label class="block text-xs font-medium text-gray-400 mb-1">Service Name</label>
+              <input
+                v-model="form.name"
+                type="text"
+                placeholder="e.g. Good Friday, Easter, Christmas Eve"
+                class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors placeholder-gray-500"
+              />
+            </div>
+
             <!-- Teams -->
             <div>
               <label class="block text-xs font-medium text-gray-400 mb-2">Teams</label>
@@ -116,7 +127,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: []
-  create: [data: { date: string; teams: string[] }]
+  create: [data: { date: string; name: string; teams: string[] }]
 }>()
 
 const availableTeams = ['Choir', 'Orchestra', 'Special Service']
@@ -136,12 +147,14 @@ function nextSunday(): string {
 
 interface FormState {
   date: string
+  name: string
   teams: string[]
 }
 
 function defaultForm(): FormState {
   return {
     date: nextSunday(),
+    name: '',
     teams: [],
   }
 }
@@ -165,6 +178,7 @@ function onCancel() {
 function onCreate() {
   emit('create', {
     date: form.value.date,
+    name: form.value.name,
     teams: form.value.teams,
   })
 }

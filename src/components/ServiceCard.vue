@@ -3,9 +3,10 @@
     <div
       class="flex items-start gap-4 px-4 py-3 rounded-lg bg-gray-900 border border-gray-800 hover:bg-gray-800/50 transition-colors cursor-pointer"
     >
-      <!-- Left: Date + Communion badge -->
+      <!-- Left: Date + badges -->
       <div class="shrink-0 min-w-[80px] text-center">
         <p class="text-sm font-semibold text-gray-100">{{ formattedDate }}</p>
+        <p v-if="service.name" class="text-xs font-medium text-indigo-300 mt-0.5 truncate">{{ service.name }}</p>
         <span
           v-if="isCommunion"
           class="inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-900/50 text-amber-300 border border-amber-800"

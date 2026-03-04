@@ -37,6 +37,13 @@
         <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
           <div>
             <h1 class="text-xl font-semibold text-gray-100">{{ formattedDate }}</h1>
+            <input
+              v-if="localService.teams.includes('Special Service')"
+              v-model="localService.name"
+              type="text"
+              placeholder="Service name (e.g. Good Friday, Easter)"
+              class="mt-1 w-full max-w-sm rounded-md bg-gray-800 border border-gray-700 text-indigo-300 text-sm px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500"
+            />
             <div class="flex items-center gap-2 mt-2">
               <!-- Status badge -->
               <span

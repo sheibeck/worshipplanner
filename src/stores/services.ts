@@ -19,6 +19,7 @@ import type { Service } from '@/types/service'
 
 type CreateServiceInput = {
   date: string
+  name: string
   teams: string[]
 }
 

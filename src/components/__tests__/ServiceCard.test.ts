@@ -9,6 +9,7 @@ const mockTimestamp = { toDate: () => new Date('2026-03-04') } as unknown as Tim
 const mockService: Service = {
   id: 'svc-001',
   date: '2026-03-08',
+  name: '',
   progression: '1-2-2-3',
   teams: ['Choir'],
   status: 'draft',

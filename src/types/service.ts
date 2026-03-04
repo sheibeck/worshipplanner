@@ -40,6 +40,7 @@ export interface ScriptureRef {
 export interface Service {
   id: string
   date: string
+  name: string
   progression: Progression
   teams: string[]
   status: ServiceStatus

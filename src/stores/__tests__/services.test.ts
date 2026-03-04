@@ -159,6 +159,7 @@ describe('useServiceStore', () => {
 
       await store.createService({
         date: '2026-03-08',
+        name: '',
         teams: [],
       })
 
@@ -180,6 +181,7 @@ describe('useServiceStore', () => {
 
       await store.createService({
         date: '2026-03-08',
+        name: '',
         teams: [],
       })
 
@@ -197,6 +199,7 @@ describe('useServiceStore', () => {
 
       await store.createService({
         date: '2026-03-08',
+        name: '',
         teams: [],
       })
 
@@ -221,6 +224,7 @@ describe('useServiceStore', () => {
 
       await store.createService({
         date: '2026-03-15',
+        name: '',
         teams: [],
       })
 
@@ -244,6 +248,7 @@ describe('useServiceStore', () => {
 
       await store.createService({
         date: '2026-03-08',
+        name: '',
         teams: [],
       })
 
@@ -259,6 +264,7 @@ describe('useServiceStore', () => {
 
       const id = await store.createService({
         date: '2026-03-08',
+        name: '',
         teams: [],
       })
 
