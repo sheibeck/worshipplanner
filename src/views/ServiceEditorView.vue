@@ -1327,14 +1327,8 @@ async function onSave() {
       slots: reindexSlots(data.slots),
     })
 
-    // Sync local state with store
-    const updated = serviceStore.services.find((s) => s.id === id)
-    if (updated) {
-      localService.value = JSON.parse(JSON.stringify(updated))
-      originalService.value = JSON.parse(JSON.stringify(updated))
-    } else {
-      originalService.value = JSON.parse(JSON.stringify(localService.value))
-    }
+    // Mark current local state as clean (don't overwrite localService — user may still be typing)
+    originalService.value = JSON.parse(JSON.stringify(localService.value))
   } finally {
     isSaving.value = false
   }
