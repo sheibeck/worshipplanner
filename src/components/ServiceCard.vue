@@ -6,6 +6,7 @@
       <div class="flex items-center justify-between gap-2 mb-1.5">
         <div class="flex items-center gap-2 min-w-0">
           <p class="text-sm font-semibold text-gray-100">{{ formattedDate }}</p>
+          <span v-if="sermonPassageLabel" class="text-[10px] text-gray-400 truncate">{{ sermonPassageLabel }}</span>
           <span v-if="isCommunion" class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-900/50 text-amber-300 border border-amber-800">Communion</span>
         </div>
         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold shrink-0" :class="statusClass">
@@ -26,7 +27,7 @@
         <template v-for="slot in openingSlots" :key="slot.position">
           <p class="truncate" :class="slotTextClass(slot)">{{ slotLabel(slot) }}</p>
         </template>
-        <p class="text-gray-600 text-[10px] my-0.5">--- Message{{ service.sermonPassage ? ` — ${service.sermonPassage.book} ${service.sermonPassage.chapter}` : '' }} ---</p>
+        <p class="text-gray-600 text-[10px] my-0.5">--- Message ---</p>
         <template v-for="slot in sendingSlots" :key="slot.position">
           <p class="truncate" :class="slotTextClass(slot)">{{ slotLabel(slot) }}</p>
         </template>
@@ -94,6 +95,13 @@ const formattedDate = computed(() => {
 const isCommunion = computed(() => {
   const d = parsedDate.value
   return d.getDay() === 0 && d.getDate() <= 7
+})
+
+const sermonPassageLabel = computed(() => {
+  const sp = props.service.sermonPassage
+  if (!sp) return ''
+  if (sp.verseStart && sp.verseEnd) return `${sp.book} ${sp.chapter}:${sp.verseStart}-${sp.verseEnd}`
+  return `${sp.book} ${sp.chapter}`
 })
 
 const messageIndex = computed(() =>
