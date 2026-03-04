@@ -13,9 +13,9 @@ service cloud.firestore {
         exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid));
     }
 
-    function isOrgAdmin(orgId) {
+    function isOrgEditor(orgId) {
       return isSignedIn() &&
-        get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.role == 'admin';
+        get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.role == 'editor';
     }
 
     // User profiles - only the owner can read/write their own profile
@@ -25,25 +25,50 @@ service cloud.firestore {
 
     // Organizations
     match /organizations/{orgId} {
-      // Members can read; admins can write
+      // Members can read; editors can write
       allow read: if isOrgMember(orgId);
-      // Admins can update/delete existing orgs
-      allow write: if isOrgAdmin(orgId);
+      // Editors can update/delete existing orgs
+      allow write: if isOrgEditor(orgId);
       // Allow authenticated users to create a new org if they are the creator
       allow create: if isSignedIn() && request.resource.data.createdBy == request.auth.uid;
 
       // Members subcollection
       match /members/{uid} {
         allow read: if isOrgMember(orgId);
-        allow write: if isOrgAdmin(orgId);
-        // Allow creator to write their own admin membership when creating an org
+        allow write: if isOrgEditor(orgId);
+        // Allow creator to write their own membership when creating an org or accepting an invite
         allow create: if isSignedIn() && request.auth.uid == uid;
       }
 
-      // All nested collections (songs, services, tasks, events, etc.)
-      match /{collection}/{docId} {
-        allow read, write: if isOrgMember(orgId);
+      // Invites subcollection
+      match /invites/{email} {
+        allow read: if isOrgEditor(orgId);
+        allow write: if isOrgEditor(orgId);
+        allow delete: if isOrgEditor(orgId) || (isSignedIn() && request.auth.token.email.lower() == email);
       }
+
+      // Services — viewers can read, only editors write
+      match /services/{docId} {
+        allow read: if isOrgMember(orgId);
+        allow write: if isOrgEditor(orgId);
+      }
+
+      // Songs — editors only (viewers cannot read songs)
+      match /songs/{docId} {
+        allow read, write: if isOrgEditor(orgId);
+      }
+
+      // All other nested collections — editors only
+      match /{collection}/{docId} {
+        allow read, write: if isOrgEditor(orgId);
+      }
+    }
+
+    // inviteLookup — stores pending invite records keyed by normalized email
+    match /inviteLookup/{email} {
+      allow read: if isSignedIn() && request.auth.token.email.lower() == email;
+      allow create: if isSignedIn();
+      allow delete: if isSignedIn() && request.auth.token.email.lower() == email;
     }
 
     // Share tokens: public read (anyone with token URL), authenticated create only

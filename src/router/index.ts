@@ -2,6 +2,13 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { onAuthStateChanged } from 'firebase/auth'
 import { auth } from '@/firebase'
 
+declare module 'vue-router' {
+  interface RouteMeta {
+    requiresAuth?: boolean
+    requiresEditor?: boolean
+  }
+}
+
 export function getCurrentUser() {
   return new Promise<import('firebase/auth').User | null>((resolve) => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -23,13 +30,13 @@ const router = createRouter({
       path: '/',
       name: 'dashboard',
       component: () => import('../views/DashboardView.vue'),
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, requiresEditor: true },
     },
     {
       path: '/songs',
       name: 'songs',
       component: () => import('../views/SongsView.vue'),
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, requiresEditor: true },
     },
     {
       path: '/services',
@@ -42,6 +49,12 @@ const router = createRouter({
       name: 'service-editor',
       component: () => import('../views/ServiceEditorView.vue'),
       meta: { requiresAuth: true },
+    },
+    {
+      path: '/team',
+      name: 'team',
+      component: () => import('../views/TeamView.vue'),
+      meta: { requiresAuth: true, requiresEditor: true },
     },
     {
       path: '/share/:token',
@@ -59,10 +72,23 @@ router.beforeEach(async (to) => {
       return { name: 'login' }
     }
   }
+
+  if (to.meta.requiresEditor) {
+    const { useAuthStore } = await import('../stores/auth')
+    const authStore = useAuthStore()
+    await authStore.waitForRole()
+    if (!authStore.isEditor) {
+      return { name: 'services' }
+    }
+  }
+
   if (to.name === 'login') {
     const user = await getCurrentUser()
     if (user) {
-      return { name: 'dashboard' }
+      const { useAuthStore } = await import('../stores/auth')
+      const authStore = useAuthStore()
+      await authStore.waitForRole()
+      return { name: authStore.isEditor ? 'dashboard' : 'services' }
     }
   }
 })
