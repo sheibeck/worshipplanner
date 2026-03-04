@@ -60,8 +60,8 @@
               />
             </div>
 
-            <!-- Service Name (shown when Special Service is checked) -->
-            <div v-if="form.teams.includes('Special Service')">
+            <!-- Service Name (shown when Special is checked) -->
+            <div v-if="form.teams.includes('Special')">
               <label class="block text-xs font-medium text-gray-400 mb-1">Service Name</label>
               <input
                 v-model="form.name"
@@ -130,7 +130,7 @@ const emit = defineEmits<{
   create: [data: { date: string; name: string; teams: string[] }]
 }>()
 
-const availableTeams = ['Choir', 'Orchestra', 'Communion', 'Special Service']
+const availableTeams = ['Choir', 'Orchestra', 'Communion', 'Special']
 
 // Compute next Sunday
 function nextSunday(): string {

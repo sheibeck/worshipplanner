@@ -58,8 +58,8 @@
           <tbody class="divide-y divide-gray-800">
             <!-- Active members -->
             <tr v-for="member in members" :key="member.uid" class="hover:bg-gray-800/20 transition-colors">
-              <td class="px-4 py-3 text-gray-200">{{ member.displayName || member.email.split('@')[0] }}</td>
-              <td class="px-4 py-3 text-gray-400">{{ member.email }}</td>
+              <td class="px-4 py-3 text-gray-200">{{ member.displayName || (member.email ? member.email.split('@')[0] : 'Unknown') }}</td>
+              <td class="px-4 py-3 text-gray-400">{{ member.email || '' }}</td>
               <td class="px-4 py-3">
                 <span
                   class="px-1.5 py-0.5 text-xs rounded"
@@ -173,8 +173,8 @@ interface Member {
   uid: string
   role: 'editor' | 'viewer'
   joinedAt: { toDate?: () => Date } | null
-  displayName: string
-  email: string
+  displayName?: string
+  email?: string
 }
 
 interface PendingInvite {
@@ -240,12 +240,12 @@ async function onInvite() {
 
   const normalized = normalizeEmail(email)
 
-  if (members.value.some((m) => m.email.toLowerCase() === normalized)) {
+  if (members.value.some((m) => m.email?.toLowerCase() === normalized)) {
     inviteError.value = 'This person is already a member'
     return
   }
 
-  if (pendingInvites.value.some((i) => i.email.toLowerCase() === normalized)) {
+  if (pendingInvites.value.some((i) => i.email?.toLowerCase() === normalized)) {
     inviteError.value = 'An invite has already been sent to this email'
     return
   }

@@ -239,7 +239,7 @@
               <span class="text-sm text-gray-200">{{ team }}</span>
             </label>
             <input
-              v-if="localService.teams.includes('Special Service')"
+              v-if="localService.teams.includes('Special')"
               v-model="localService.name"
               type="text"
               placeholder="e.g. Good Friday, Easter"
@@ -674,7 +674,7 @@ const songStore = useSongStore()
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const AVAILABLE_TEAMS = ['Choir', 'Orchestra', 'Communion', 'Special Service']
+const AVAILABLE_TEAMS = ['Choir', 'Orchestra', 'Communion', 'Special']
 
 const statusBadgeClasses: Record<string, string> = {
   planned: 'bg-green-900/50 text-green-300 border-green-800',

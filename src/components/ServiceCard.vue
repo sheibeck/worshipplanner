@@ -16,9 +16,8 @@
       </div>
       <!-- Team badges -->
       <div v-if="service.teams.length" class="flex flex-wrap gap-1 mb-1">
-        <TeamTagPill v-for="team in service.teams" :key="team" :tag="team" />
+        <TeamTagPill v-for="team in displayTeams" :key="team" :tag="team" />
       </div>
-      <span v-if="service.name" class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-900/40 text-amber-300 border border-amber-800 mb-1.5">Special Service: {{ service.name }}</span>
 
       <!-- Compact slot summary -->
       <div class="text-xs space-y-0.5">
@@ -77,6 +76,15 @@ const songStore = useSongStore()
 const isSharing = ref(false)
 const shareCopied = ref(false)
 
+const displayTeams = computed(() => {
+  return props.service.teams.map(team => {
+    if (team === 'Special' && props.service.name) {
+      return `Special: ${props.service.name}`
+    }
+    return team
+  })
+})
+
 const parsedDate = computed(() => {
   const [year, month, day] = props.service.date.split('-').map(Number)
   return new Date(year, month - 1, day)
@@ -134,17 +142,21 @@ function slotLabel(slot: ServiceSlot): string {
       return '--- Prayer ---'
     case 'MESSAGE':
       return 'Message'
+    case 'HYMN':
+      return slot.hymnName ? `Hymn — ${slot.hymnName}${slot.hymnNumber ? ` #${slot.hymnNumber}` : ''}` : 'Hymn — Empty'
   }
 }
 
 function slotPrefix(slot: ServiceSlot): string {
   if (slot.kind === 'SONG') return 'Song — '
   if (slot.kind === 'SCRIPTURE') return 'Scripture — '
+  if (slot.kind === 'HYMN') return 'Hymn — '
   return ''
 }
 
 function slotName(slot: ServiceSlot): string {
   if (slot.kind === 'SONG') return slot.songTitle ?? 'Empty'
+  if (slot.kind === 'HYMN') return slot.hymnName ? `${slot.hymnName}${slot.hymnNumber ? ` #${slot.hymnNumber}` : ''}` : 'Empty'
   if (slot.kind === 'SCRIPTURE' && slot.book) {
     return slot.verseStart && slot.verseEnd
       ? `${slot.book} ${slot.chapter}:${slot.verseStart}-${slot.verseEnd}`
@@ -156,6 +168,7 @@ function slotName(slot: ServiceSlot): string {
 function slotHasContent(slot: ServiceSlot): boolean {
   if (slot.kind === 'SONG') return !!slot.songTitle
   if (slot.kind === 'SCRIPTURE') return !!slot.book
+  if (slot.kind === 'HYMN') return !!slot.hymnName
   return false
 }
 
