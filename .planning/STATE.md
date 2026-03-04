@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 6 context gathered
-last_updated: "2026-03-04T18:30:32.378Z"
+stopped_at: Completed 06-01-PLAN.md
+last_updated: "2026-03-04T19:06:17.989Z"
 last_activity: 2026-03-04 — Plan 01-01 complete — Vue 3 + Firebase foundation, auth store, router guard, Firestore rules
 progress:
   total_phases: 6
   completed_phases: 4
-  total_plans: 12
-  completed_plans: 12
+  total_plans: 16
+  completed_plans: 13
   percent: 50
 ---
 
@@ -63,6 +63,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04-output P01 | 5 | 2 tasks | 6 files |
 | Phase 04-output P02 | 6 | 2 tasks | 7 files |
 | Quick-3 QoL | 3 | 2 tasks | 4 files |
+| Phase 06 P01 | 9 | 1 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -123,6 +124,9 @@ Recent decisions affecting current work:
 - [Quick-7]: ServiceEditorView 'Service Type' heading renamed to 'Teams' per user preference
 - [Quick-8]: typeBonus of +100 applied after base score in rankSongsForSlot — VW type is now a priority signal, not a gate
 - [Quick-8]: Team filtering (AND logic) now operates on full song list so non-matching VW type songs are still subject to team constraints
+- [Phase 06-01]: Use claude-haiku-3-5-20241022 model for AI suggestions (cost-efficient, max_tokens: 512)
+- [Phase 06-01]: AI functions return null on any error (never throw) — UI callers check for null to show fallback
+- [Phase 06-01]: Hallucination filtering: validateSongSuggestions checks against real song IDs, validateScriptureSuggestions checks against BIBLE_BOOKS
 
 ### Roadmap Evolution
 
@@ -150,6 +154,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T18:30:32.371Z
-Stopped at: Phase 6 context gathered
-Resume file: .planning/phases/06-ai-assisted-service-suggesting-and-scripture-searching/06-CONTEXT.md
+Last session: 2026-03-04T19:06:17.983Z
+Stopped at: Completed 06-01-PLAN.md
+Resume file: None
