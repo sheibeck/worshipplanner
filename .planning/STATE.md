@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed quick-13 PLAN.md
-last_updated: "2026-03-04T20:31:16Z"
+stopped_at: Completed quick-14 PLAN.md
+last_updated: "2026-03-04T20:40:13.561Z"
 last_activity: 2026-03-04 — Plan 01-01 complete — Vue 3 + Firebase foundation, auth store, router guard, Firestore rules
 progress:
   total_phases: 6
@@ -144,6 +144,9 @@ Recent decisions affecting current work:
 - [Quick-13]: ScriptureRotationTable uses bg-sky-900/40 cell bg (distinct from song rotation bg-indigo-900/50)
 - [Quick-13]: Scripture passage key format: 'Book Chapter:verseStart-verseEnd' / 'Book Chapter:verseStart' / 'Book Chapter'
 - [Quick-13]: Scripture Rotation reuses rotationServices 8-week window from ServicesView — no separate window computation
+- [Quick-14]: autosaveInitialized flag suppresses first-load watch trigger to prevent spurious save on mount
+- [Quick-14]: previousService snapshot taken before each autosave (not after) so undo can restore the pre-save state
+- [Quick-14]: Ctrl+Z skips INPUT/TEXTAREA targets so browser text-level undo is unaffected
 
 ### Roadmap Evolution
 
@@ -164,6 +167,7 @@ None yet.
 | 10 | Song — Empty, --- Prayer ---, optional verses for sermon passage | 2026-03-04 | 8272736 | [10-song-empty-label-and-prayer-slot-display](./quick/10-song-empty-label-and-prayer-slot-display/) |
 | 12 | Communion checkbox + 1st-Sunday auto-default, PRAYER/MESSAGE links, compact song row, remove VW type buttons | 2026-03-04 | d04ec94 | [12-service-editor-ux-improvements-communion](./quick/12-service-editor-ux-improvements-communion/) |
 | 13 | Song rotation dot bg-sky-300 visibility fix + Scripture Rotation tab with passage grid | 2026-03-04 | 464c8b2 | [13-fix-song-rotation-dot-visibility-on-dark](./quick/13-fix-song-rotation-dot-visibility-on-dark/) |
+| 14 | Autosave to service editor with 1.5s debounce, one-step undo, and status indicator | 2026-03-04 | 6a5f861 | [14-add-autosave-to-service-editor-with-one-](./quick/14-add-autosave-to-service-editor-with-one-/) |
 
 ### Blockers/Concerns
 
@@ -173,6 +177,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T20:31:16Z
-Stopped at: Completed quick-13 PLAN.md
+Last session: 2026-03-04T20:40:13.553Z
+Stopped at: Completed quick-14 PLAN.md
 Resume file: None
