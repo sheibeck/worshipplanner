@@ -18,15 +18,15 @@
           {{ service.progression }}
         </span>
 
-        <!-- Song list -->
+        <!-- Order of service -->
         <ul class="space-y-0.5">
           <li
-            v-for="slot in songSlots"
+            v-for="slot in service.slots"
             :key="slot.position"
             class="text-xs truncate"
-            :class="slot.songTitle ? 'text-gray-400' : 'text-gray-500 italic'"
+            :class="slotTextClass(slot)"
           >
-            {{ slot.songTitle ?? 'Empty' }}
+            {{ slotLabel(slot) }}
           </li>
         </ul>
       </div>
@@ -46,7 +46,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { Service, SongSlot } from '@/types/service'
+import type { Service, ServiceSlot } from '@/types/service'
 
 const props = defineProps<{
   service: Service
@@ -70,10 +70,24 @@ const formattedDate = computed(() => {
   return d.toLocaleDateString('en-US', options)
 })
 
-// Only show SONG slots
-const songSlots = computed(() =>
-  props.service.slots.filter((s): s is SongSlot => s.kind === 'SONG'),
-)
+function slotLabel(slot: ServiceSlot): string {
+  switch (slot.kind) {
+    case 'SONG':
+      return slot.songTitle ?? 'Empty'
+    case 'SCRIPTURE':
+      return slot.book ? `${slot.book} ${slot.chapter}:${slot.verseStart}-${slot.verseEnd}` : 'Scripture — Empty'
+    case 'PRAYER':
+      return 'Prayer'
+    case 'MESSAGE':
+      return 'Message'
+  }
+}
+
+function slotTextClass(slot: ServiceSlot): string {
+  if (slot.kind === 'SONG') return slot.songTitle ? 'text-gray-400' : 'text-gray-500 italic'
+  if (slot.kind === 'SCRIPTURE') return slot.book ? 'text-gray-400' : 'text-gray-500 italic'
+  return 'text-gray-500'
+}
 
 // Static progression class lookup (Tailwind v4 purge safety)
 const progressionClasses: Record<string, string> = {
