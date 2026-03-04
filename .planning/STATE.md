@@ -158,6 +158,7 @@ None yet.
 | 8 | Song picker shows all songs with VW type priority (soft +100 bonus, no hard filter) | 2026-03-04 | 54106ae | [8-song-picker-shows-all-songs-with-type-pr](./quick/8-song-picker-shows-all-songs-with-type-pr/) |
 | 9 | Allow scripture preview with book and chapter only (canPreview, conditional passageQuery) | 2026-03-04 | 2ba8775 | [9-allow-scripture-preview-with-book-and-ch](./quick/9-allow-scripture-preview-with-book-and-ch/) |
 | 10 | Song — Empty, --- Prayer ---, optional verses for sermon passage | 2026-03-04 | 8272736 | [10-song-empty-label-and-prayer-slot-display](./quick/10-song-empty-label-and-prayer-slot-display/) |
+| 12 | Communion checkbox + 1st-Sunday auto-default, PRAYER/MESSAGE links, compact song row, remove VW type buttons | 2026-03-04 | d04ec94 | [12-service-editor-ux-improvements-communion](./quick/12-service-editor-ux-improvements-communion/) |
 
 ### Blockers/Concerns
 
@@ -167,6 +168,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T20:12:23.776Z
-Stopped at: Completed quick-11 PLAN.md
+Last session: 2026-03-04T20:30:00.000Z
+Stopped at: Completed quick-12 PLAN.md
 Resume file: None
