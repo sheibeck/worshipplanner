@@ -772,8 +772,8 @@ watch(
         autosaveStatus.value = 'idle'
         return
       }
-      // Snapshot current state before saving (enables undo)
-      previousService.value = JSON.parse(JSON.stringify(localService.value))
+      // Snapshot pre-change state before saving (enables undo)
+      previousService.value = JSON.parse(JSON.stringify(originalService.value))
       autosaveStatus.value = 'saving'
       await onSave()
       autosaveStatus.value = 'saved'
