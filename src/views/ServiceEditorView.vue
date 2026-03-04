@@ -500,7 +500,7 @@ const songStore = useSongStore()
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const AVAILABLE_TEAMS = ['Choir', 'Orchestra', 'Special Service']
+const AVAILABLE_TEAMS = ['Choir', 'Orchestra', 'Communion', 'Special Service']
 
 // Static class lookup — prevent Tailwind v4 purge
 const vwTypeLabels: Record<1 | 2 | 3, string> = {
@@ -656,6 +656,11 @@ watch(
       if (found) {
         localService.value = JSON.parse(JSON.stringify(found))
         originalService.value = JSON.parse(JSON.stringify(found))
+        // Auto-add Communion on 1st Sunday if not already in teams
+        if (isCommunion.value && localService.value && !localService.value.teams.includes('Communion')) {
+          localService.value.teams.push('Communion')
+          originalService.value = JSON.parse(JSON.stringify(localService.value))
+        }
       }
     }
   },

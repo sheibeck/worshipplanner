@@ -130,7 +130,7 @@ const emit = defineEmits<{
   create: [data: { date: string; name: string; teams: string[] }]
 }>()
 
-const availableTeams = ['Choir', 'Orchestra', 'Special Service']
+const availableTeams = ['Choir', 'Orchestra', 'Communion', 'Special Service']
 
 // Compute next Sunday
 function nextSunday(): string {
@@ -163,7 +163,7 @@ function defaultForm(): FormState {
   const date = nextSunday()
   const ordinal = sundayOrdinal(date)
   let teams: string[] = []
-  if (ordinal === 1) teams = ['Orchestra']
+  if (ordinal === 1) teams = ['Orchestra', 'Communion']
   else if (ordinal === 3) teams = ['Choir']
   return { date, name: '', teams }
 }
@@ -186,7 +186,7 @@ watch(
   (newDate) => {
     const ordinal = sundayOrdinal(newDate)
     if (ordinal === 1) {
-      form.value.teams = ['Orchestra']
+      form.value.teams = ['Orchestra', 'Communion']
     } else if (ordinal === 3) {
       form.value.teams = ['Choir']
     } else {
