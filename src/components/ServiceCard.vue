@@ -25,11 +25,13 @@
       <div class="text-xs space-y-0.5">
         <template v-for="slot in openingSlots" :key="slot.position">
           <p v-if="slotUrl(slot)" class="truncate text-gray-400">{{ slotPrefix(slot) }}<a :href="slotUrl(slot)!" target="_blank" rel="noopener" @click.stop class="text-indigo-400 hover:text-indigo-300 transition-colors">{{ slotName(slot) }}</a></p>
+          <p v-else-if="slotHasContent(slot)" class="truncate text-gray-400">{{ slotPrefix(slot) }}<span class="text-indigo-400">{{ slotName(slot) }}</span></p>
           <p v-else class="truncate" :class="slotTextClass(slot)">{{ slotLabel(slot) }}</p>
         </template>
         <p class="text-gray-600 text-xs my-0.5">--- Message ---</p>
         <template v-for="slot in sendingSlots" :key="slot.position">
           <p v-if="slotUrl(slot)" class="truncate text-gray-400">{{ slotPrefix(slot) }}<a :href="slotUrl(slot)!" target="_blank" rel="noopener" @click.stop class="text-indigo-400 hover:text-indigo-300 transition-colors">{{ slotName(slot) }}</a></p>
+          <p v-else-if="slotHasContent(slot)" class="truncate text-gray-400">{{ slotPrefix(slot) }}<span class="text-indigo-400">{{ slotName(slot) }}</span></p>
           <p v-else class="truncate" :class="slotTextClass(slot)">{{ slotLabel(slot) }}</p>
         </template>
       </div>
@@ -156,6 +158,12 @@ function slotName(slot: ServiceSlot): string {
       : `${slot.book} ${slot.chapter}`
   }
   return ''
+}
+
+function slotHasContent(slot: ServiceSlot): boolean {
+  if (slot.kind === 'SONG') return !!slot.songTitle
+  if (slot.kind === 'SCRIPTURE') return !!slot.book
+  return false
 }
 
 function slotUrl(slot: ServiceSlot): string | null {
