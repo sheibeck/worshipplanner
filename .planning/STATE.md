@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed quick-7 service card team badges and song slot label
-last_updated: "2026-03-04T11:41:00.000Z"
-last_activity: 2026-03-04 - Completed quick task 7: Service card team badges, song/scripture slot label prefixes, Sunday-ordinal team defaults
+stopped_at: Completed quick-8 song picker shows all songs with VW type priority
+last_updated: "2026-03-04T16:51:00.000Z"
+last_activity: 2026-03-04 - Completed quick task 8: Song picker shows all songs with VW type priority scoring
 progress:
   total_phases: 5
   completed_phases: 4
@@ -121,6 +121,8 @@ Recent decisions affecting current work:
 - [Quick-7]: Team badge row uses v-if guard so ServiceCard layout is unaffected for services with no teams
 - [Quick-7]: Song/Scripture labels use em dash (—) matching existing 'Scripture — Empty' pattern
 - [Quick-7]: ServiceEditorView 'Service Type' heading renamed to 'Teams' per user preference
+- [Quick-8]: typeBonus of +100 applied after base score in rankSongsForSlot — VW type is now a priority signal, not a gate
+- [Quick-8]: Team filtering (AND logic) now operates on full song list so non-matching VW type songs are still subject to team constraints
 
 ### Pending Todos
 
@@ -132,6 +134,7 @@ None yet.
 |---|-------------|------|--------|-----------|
 | 6 | Limit rotation to 8-week window and rename tab to Song Rotation | 2026-03-04 | 238ac1e | [6-limit-rotation-to-8-week-window-and-rena](./quick/6-limit-rotation-to-8-week-window-and-rena/) |
 | 7 | Service card team badges, song/scripture label prefixes, Sunday team defaults | 2026-03-04 | f1154f9 | [7-service-card-team-badges-song-slot-label](./quick/7-service-card-team-badges-song-slot-label/) |
+| 8 | Song picker shows all songs with VW type priority (soft +100 bonus, no hard filter) | 2026-03-04 | 54106ae | [8-song-picker-shows-all-songs-with-type-pr](./quick/8-song-picker-shows-all-songs-with-type-pr/) |
 
 ### Blockers/Concerns
 
@@ -141,6 +144,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T11:41:00.000Z
-Stopped at: Completed quick-7 service card team badges and song slot label
+Last session: 2026-03-04T16:51:00.000Z
+Stopped at: Completed quick-8 song picker shows all songs with VW type priority
 Resume file: None
