@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 06-01-PLAN.md
-last_updated: "2026-03-04T19:06:17.989Z"
+stopped_at: Completed 06-03-PLAN.md
+last_updated: "2026-03-04T19:13:59.843Z"
 last_activity: 2026-03-04 — Plan 01-01 complete — Vue 3 + Firebase foundation, auth store, router guard, Firestore rules
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 16
-  completed_plans: 13
+  completed_plans: 14
   percent: 50
 ---
 
@@ -64,6 +64,7 @@ Progress: [█████░░░░░] 50%
 | Phase 04-output P02 | 6 | 2 tasks | 7 files |
 | Quick-3 QoL | 3 | 2 tasks | 4 files |
 | Phase 06 P01 | 9 | 1 tasks | 6 files |
+| Phase 06-ai-assisted P03 | 4 | 1 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -127,6 +128,8 @@ Recent decisions affecting current work:
 - [Phase 06-01]: Use claude-haiku-3-5-20241022 model for AI suggestions (cost-efficient, max_tokens: 512)
 - [Phase 06-01]: AI functions return null on any error (never throw) — UI callers check for null to show fallback
 - [Phase 06-01]: Hallucination filtering: validateSongSuggestions checks against real song IDs, validateScriptureSuggestions checks against BIBLE_BOOKS
+- [Phase 06-03]: showAiSuggest prop (not showOverlapWarning) controls AI visibility — orthogonal concerns, separate props
+- [Phase 06-03]: recentScriptures uses ScriptureRef[] type matching actual claudeApi.ts signature
 
 ### Roadmap Evolution
 
@@ -154,6 +157,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T19:06:17.983Z
-Stopped at: Completed 06-01-PLAN.md
+Last session: 2026-03-04T19:13:59.836Z
+Stopped at: Completed 06-03-PLAN.md
 Resume file: None

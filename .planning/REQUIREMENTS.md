@@ -72,7 +72,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **AI-01**: AI uses sermon context (topic and/or passage) to suggest thematically relevant songs for each slot
 - [ ] **AI-02**: AI song suggestions shown as "AI Picks" section in SongSlotPicker dropdown (top 3 per slot)
 - [ ] **AI-03**: Planner can click "Suggest All Songs" to fill all empty song slots with AI drafts featuring accept/reject actions
-- [ ] **AI-04**: Planner can search for scripture using natural language and get 3-5 specific references with reasons
+- [x] **AI-04**: Planner can search for scripture using natural language and get 3-5 specific references with reasons
 - [x] **AI-05**: AI respects song rotation (2-week deprioritization) and notes recently used scriptures
 - [x] **AI-06**: Service editor works fully without AI — all AI features degrade gracefully on error or missing API key
 
@@ -159,7 +159,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AI-01 | Phase 6 | Complete |
 | AI-02 | Phase 6 | Pending |
 | AI-03 | Phase 6 | Pending |
-| AI-04 | Phase 6 | Pending |
+| AI-04 | Phase 6 | Complete |
 | AI-05 | Phase 6 | Complete |
 | AI-06 | Phase 6 | Complete |
 

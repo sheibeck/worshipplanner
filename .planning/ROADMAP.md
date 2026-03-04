@@ -106,7 +106,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | 3. Service Planning | 4/5 | In Progress|  |
 | 4. Output | 2/2 | Complete   | 2026-03-04 |
 | 5. Collaboration, Tasks & Events | 0/TBD | Not started | - |
-| 6. AI Assisted Service Suggesting | 1/4 | In Progress|  |
+| 6. AI Assisted Service Suggesting | 2/4 | In Progress|  |
 
 ### Phase 6: AI assisted service suggesting and scripture searching
 
@@ -120,7 +120,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
   4. Planner can search for scripture using natural language (e.g., "passages about forgiveness") and get 3-5 specific references with reasons
   5. AI respects song rotation (2-week deprioritization) and notes recently used scriptures
   6. Service editor works fully without AI — all AI features degrade gracefully on error or missing API key
-**Plans:** 1/4 plans executed
+**Plans:** 2/4 plans executed
 
 Plans:
 - [ ] 06-01-PLAN.md — Install Anthropic SDK, extend Service type with sermonTopic, create claudeApi.ts utility with tests
