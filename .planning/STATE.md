@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: planning
-stopped_at: Completed 01-01-PLAN.md - Foundation infrastructure done
-last_updated: "2026-03-04T02:11:52.375Z"
-last_activity: 2026-03-03 — Roadmap created, all 29 v1 requirements mapped to 5 phases
+status: executing
+stopped_at: "Checkpoint 01-02 Task 2: awaiting human verification of auth UI"
+last_updated: "2026-03-04T02:19:20.025Z"
+last_activity: 2026-03-04 — Plan 01-01 complete — Vue 3 + Firebase foundation, auth store, router guard, Firestore rules
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
+  completed_plans: 2
   percent: 50
 ---
 
@@ -51,6 +51,7 @@ Progress: [█████░░░░░] 50%
 
 *Updated after each plan completion*
 | Phase 01-foundation P01 | 47 | 3 tasks | 30 files |
+| Phase 01 P02 | 5 | 1 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -67,6 +68,9 @@ Recent decisions affecting current work:
 - [Phase 01-01]: Firebase v12 used for compatibility with @firebase/rules-unit-testing v5
 - [Phase 01-01]: loginWithEmail auto-creates account on both auth/user-not-found and auth/invalid-credential (Firebase 9+ behavior)
 - [Phase 01-01]: vitest.rules.config.ts created separately for emulator tests to avoid exclusion conflict with vite.config.ts
+- [Phase 01-02]: AppShell wrapper pattern: DashboardView wraps in AppShell directly in its own template — simpler than App.vue layout switching
+- [Phase 01-02]: Inline SVG icons for all UI (Google G, heroicons-style nav, checkmarks) — no icon library dependency
+- [Phase 01-02]: GettingStarted step completion hardcoded for Phase 1 — dynamic tracking deferred until features exist
 
 ### Pending Todos
 
@@ -80,6 +84,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T02:11:52.369Z
-Stopped at: Completed 01-01-PLAN.md - Foundation infrastructure done
+Last session: 2026-03-04T02:19:00.150Z
+Stopped at: Checkpoint 01-02 Task 2: awaiting human verification of auth UI
 Resume file: None

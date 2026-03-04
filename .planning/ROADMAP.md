@@ -12,7 +12,7 @@ Five phases deliver a complete worship planning app: authentication and project 
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Foundation** - Auth, Firebase setup, Firestore data model, and security rules
+- [x] **Phase 1: Foundation** - Auth, Firebase setup, Firestore data model, and security rules (completed 2026-03-04)
 - [ ] **Phase 2: Song Library** - Full song stable management with CSV import and Vertical Worship categorization
 - [ ] **Phase 3: Service Planning** - Weekly service builder, smart song suggestions, scripture, and calendar
 - [ ] **Phase 4: Output** - Print, share, and export service plans
@@ -30,7 +30,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. A signed-in user stays signed in across page refreshes without bouncing to the login screen
   4. An unauthenticated user cannot access any protected route; they are redirected to login
   5. Firestore data is inaccessible to unauthenticated callers (security rules block it)
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 Plans:
 - [ ] 01-01-PLAN.md — Scaffold Vue 3 project, Firebase infra, auth store, router guards, and Firestore security rules
 - [ ] 01-02-PLAN.md — Build login page, app shell with sidebar, dashboard with getting started checklist
@@ -88,7 +88,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 1/2 | In Progress|  |
+| 1. Foundation | 2/2 | Complete   | 2026-03-04 |
 | 2. Song Library | 0/TBD | Not started | - |
 | 3. Service Planning | 0/TBD | Not started | - |
 | 4. Output | 0/TBD | Not started | - |
