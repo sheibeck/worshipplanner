@@ -1,0 +1,54 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOrgMember(orgId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid));
+    }
+
+    function isOrgAdmin(orgId) {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // User profiles - only the owner can read/write their own profile
+    match /users/{uid} {
+      allow read, write: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    // Organizations
+    match /organizations/{orgId} {
+      // Members can read; admins can write
+      allow read: if isOrgMember(orgId);
+      // Admins can update/delete existing orgs
+      allow write: if isOrgAdmin(orgId);
+      // Allow authenticated users to create a new org if they are the creator
+      allow create: if isSignedIn() && request.resource.data.createdBy == request.auth.uid;
+
+      // Members subcollection
+      match /members/{uid} {
+        allow read: if isOrgMember(orgId);
+        allow write: if isOrgAdmin(orgId);
+        // Allow creator to write their own admin membership when creating an org
+        allow create: if isSignedIn() && request.auth.uid == uid;
+      }
+
+      // All nested collections (songs, services, tasks, events, etc.)
+      match /{collection}/{docId} {
+        allow read, write: if isOrgMember(orgId);
+      }
+    }
+
+    // Catch-all: deny everything else
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
