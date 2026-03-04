@@ -96,7 +96,7 @@
 
             <div v-if="showPast" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <ServiceCard
-                v-for="service in pastServices"
+                v-for="service in displayedPastServices"
                 :key="service.id"
                 :service="service"
               />
@@ -162,6 +162,9 @@ const pastServices = computed(() =>
     .filter((s) => s.date < todayStr.value)
     .sort((a, b) => b.date.localeCompare(a.date)),
 )
+
+// Show at most 5 most recent past services when expanded
+const displayedPastServices = computed(() => pastServices.value.slice(0, 5))
 
 // Subscribe to Firestore services collection once orgId is resolved
 async function initStore() {

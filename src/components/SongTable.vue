@@ -109,7 +109,7 @@
             Key
           </th>
           <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-            BPM
+            CCLI
           </th>
           <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
             Last Used
@@ -142,9 +142,17 @@
             {{ song.arrangements[0]?.key || '&mdash;' }}
           </td>
 
-          <!-- BPM (from first arrangement) -->
+          <!-- CCLI -->
           <td class="px-4 py-3 text-gray-300">
-            {{ song.arrangements[0]?.bpm ?? '&mdash;' }}
+            <a
+              v-if="song.ccliNumber"
+              :href="`https://songselect.ccli.com/songs/${song.ccliNumber}`"
+              target="_blank"
+              rel="noopener"
+              class="text-indigo-400 hover:text-indigo-300 hover:underline"
+              @click.stop
+            >{{ song.ccliNumber }}</a>
+            <span v-else>&mdash;</span>
           </td>
 
           <!-- Last Used -->
