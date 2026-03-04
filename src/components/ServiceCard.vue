@@ -8,29 +8,12 @@
         <p class="text-sm font-semibold text-gray-100">{{ formattedDate }}</p>
       </div>
 
-      <!-- Center: Order of service -->
+      <!-- Center: Order of service in 3 sections -->
       <div class="flex-1 min-w-0">
-        <!-- Message + sermon passage as headline -->
-        <p class="text-sm font-medium text-gray-100 truncate mb-1">
-          <span>Message</span>
-          <template v-if="service.sermonPassage">
-            <span class="text-gray-600 mx-1">—</span>
-            <a
-              :href="esvLink(service.sermonPassage.book, service.sermonPassage.chapter)"
-              target="_blank"
-              rel="noopener"
-              class="text-indigo-400 hover:text-indigo-300 hover:underline"
-              @click.stop
-            >
-              {{ service.sermonPassage.book }} {{ service.sermonPassage.chapter }}:{{ service.sermonPassage.verseStart }}-{{ service.sermonPassage.verseEnd }}
-            </a>
-          </template>
-        </p>
-
-        <!-- Remaining slots (skip MESSAGE) -->
+        <!-- Opening worship (before MESSAGE) -->
         <ul class="space-y-0.5">
           <li
-            v-for="slot in nonMessageSlots"
+            v-for="slot in openingSlots"
             :key="slot.position"
             class="text-xs truncate"
             :class="slotTextClass(slot)"
@@ -42,10 +25,37 @@
               rel="noopener"
               class="text-indigo-400 hover:text-indigo-300 hover:underline"
               @click.stop
-            >
-              {{ slot.book }} {{ slot.chapter }}:{{ slot.verseStart }}-{{ slot.verseEnd }}
-            </a>
+            >{{ slot.book }} {{ slot.chapter }}:{{ slot.verseStart }}-{{ slot.verseEnd }}</a>
             <span v-else>{{ slotLabel(slot) }}</span>
+          </li>
+        </ul>
+
+        <!-- Divider + Message -->
+        <div class="border-t border-gray-700/50 my-1.5"></div>
+        <p class="text-xs truncate text-gray-300 font-medium">
+          <span>Message</span>
+          <template v-if="service.sermonPassage">
+            <span class="text-gray-600 mx-1">—</span>
+            <a
+              :href="esvLink(service.sermonPassage.book, service.sermonPassage.chapter)"
+              target="_blank"
+              rel="noopener"
+              class="text-indigo-400 hover:text-indigo-300 hover:underline"
+              @click.stop
+            >{{ service.sermonPassage.book }} {{ service.sermonPassage.chapter }}:{{ service.sermonPassage.verseStart }}-{{ service.sermonPassage.verseEnd }}</a>
+          </template>
+        </p>
+
+        <!-- Divider + Sending song -->
+        <div class="border-t border-gray-700/50 my-1.5"></div>
+        <ul class="space-y-0.5">
+          <li
+            v-for="slot in sendingSlots"
+            :key="slot.position"
+            class="text-xs truncate"
+            :class="slotTextClass(slot)"
+          >
+            <span>{{ slotLabel(slot) }}</span>
           </li>
         </ul>
       </div>
@@ -90,8 +100,16 @@ const formattedDate = computed(() => {
   return d.toLocaleDateString('en-US', options)
 })
 
-const nonMessageSlots = computed(() =>
-  props.service.slots.filter((s) => s.kind !== 'MESSAGE'),
+const messageIndex = computed(() =>
+  props.service.slots.findIndex((s) => s.kind === 'MESSAGE'),
+)
+
+const openingSlots = computed(() =>
+  props.service.slots.slice(0, messageIndex.value),
+)
+
+const sendingSlots = computed(() =>
+  props.service.slots.slice(messageIndex.value + 1),
 )
 
 function slotLabel(slot: ServiceSlot): string {
