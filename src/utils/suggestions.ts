@@ -11,11 +11,12 @@ export interface SuggestionResult {
 }
 
 /**
- * Returns songs ranked for a given slot, filtered by VW type and team.
- * Pure function — no side effects, easily testable.
+ * Returns songs ranked for a given slot, prioritized by VW type and filtered by team.
+ * All songs are returned (no hard VW type filter) — matching-type songs receive a +100
+ * score bonus so they appear first. Pure function — no side effects, easily testable.
  *
  * @param songs - All songs from the song store
- * @param requiredVwType - The VW type constraint for this slot
+ * @param requiredVwType - The VW type constraint for this slot (soft priority, not hard filter)
  * @param serviceTeams - Active teams for this service (AND logic: song must support ALL)
  * @param nowMs - Current time in ms (defaults to Date.now(), injectable for testing)
  */
@@ -27,24 +28,21 @@ export function rankSongsForSlot(
 ): SuggestionResult[] {
   const twoWeeksAgo = nowMs - RECENT_WEEKS * MS_PER_WEEK
 
-  // 1. Filter: correct VW type
-  const eligible = songs.filter((s) => s.vwType === requiredVwType)
-
-  // 2. Filter: team compatibility
+  // 1. Filter: team compatibility (applied to ALL songs regardless of VW type)
   // If serviceTeams is empty, no team filtering applies.
   // If serviceTeams is non-empty, song must either:
   //   (a) have no teamTags (universal — works for all configurations), OR
   //   (b) include ALL active teams (AND logic)
   const teamFiltered =
     serviceTeams.length === 0
-      ? eligible
-      : eligible.filter(
+      ? songs
+      : songs.filter(
           (s) =>
             s.teamTags.length === 0 ||
             serviceTeams.every((team) => s.teamTags.includes(team)),
         )
 
-  // 3. Score each song
+  // 2. Score each song
   return teamFiltered
     .map((song) => {
       const lastUsedMs = song.lastUsedAt ? song.lastUsedAt.toMillis() : null
@@ -64,6 +62,10 @@ export function rankSongsForSlot(
       } else {
         score = 200 + Math.min((weeksAgo ?? 0) * 15, 300)
       }
+
+      // Type bonus: matching VW type gets +100 (soft priority, not a hard filter)
+      const typeBonus = song.vwType === requiredVwType ? 100 : 0
+      score += typeBonus
 
       return { song, score, weeksAgo, isRecent }
     })
