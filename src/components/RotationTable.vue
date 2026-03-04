@@ -70,7 +70,7 @@
                 <span
                   v-if="entry.dates.includes(date)"
                   class="inline-block w-2.5 h-2.5 rounded-full"
-                  :class="isConsecutiveRepeat(entry.songId, date) ? 'bg-amber-400' : 'bg-indigo-400'"
+                  :class="isConsecutiveRepeat(entry.songId, date) ? 'bg-amber-400' : 'bg-sky-300'"
                 ></span>
               </td>
             </tr>
@@ -81,7 +81,7 @@
       <!-- Legend -->
       <div class="flex items-center gap-4 mt-3 text-xs text-gray-500">
         <div class="flex items-center gap-1.5">
-          <span class="inline-block w-2.5 h-2.5 rounded-full bg-indigo-400"></span>
+          <span class="inline-block w-2.5 h-2.5 rounded-full bg-sky-300"></span>
           Song used
         </div>
         <div class="flex items-center gap-1.5">
