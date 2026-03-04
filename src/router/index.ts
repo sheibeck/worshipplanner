@@ -57,6 +57,12 @@ const router = createRouter({
       meta: { requiresAuth: true, requiresEditor: true },
     },
     {
+      path: '/settings',
+      name: 'settings',
+      component: () => import('../views/SettingsView.vue'),
+      meta: { requiresAuth: true, requiresEditor: true },
+    },
+    {
       path: '/share/:token',
       name: 'share',
       component: () => import('../views/ShareView.vue'),
