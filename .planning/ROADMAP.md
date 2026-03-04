@@ -78,7 +78,7 @@ Plans:
   1. User can print a formatted order of service that renders correctly on paper (no cut-off text, correct page breaks)
   2. A team member opening a shareable link on a phone can read the full service plan without logging in
   3. User can export a service plan in a structured format that lists all fields needed for manual Planning Center entry
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 Plans:
 - [ ] 04-01-PLAN.md — Print layout component, Planning Center text export formatter, Print and Copy for PC buttons in service editor
 - [ ] 04-02-PLAN.md — Shareable link with Firestore token, public ShareView page, Share button in service editor
@@ -104,5 +104,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 1. Foundation | 2/2 | Complete   | 2026-03-04 |
 | 2. Song Library | 3/3 | Complete   | 2026-03-04 |
 | 3. Service Planning | 4/5 | In Progress|  |
-| 4. Output | 0/2 | Not started | - |
+| 4. Output | 1/2 | In Progress|  |
 | 5. Collaboration, Tasks & Events | 0/TBD | Not started | - |

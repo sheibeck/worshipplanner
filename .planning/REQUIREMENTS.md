@@ -37,9 +37,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Output & Sharing
 
-- [ ] **OUT-01**: User can print a formatted order of service for rehearsal and Sunday
+- [x] **OUT-01**: User can print a formatted order of service for rehearsal and Sunday
 - [ ] **OUT-02**: User can share a read-only service plan link (mobile-friendly)
-- [ ] **OUT-03**: User can export structured service plan data for Planning Center entry
+- [x] **OUT-03**: User can export structured service plan data for Planning Center entry
 
 ### Auth & Collaboration
 
@@ -135,9 +135,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CAL-01 | Phase 3 | Complete |
 | CAL-02 | Phase 3 | Complete |
 | CAL-03 | Phase 3 | Complete |
-| OUT-01 | Phase 4 | Pending |
+| OUT-01 | Phase 4 | Complete |
 | OUT-02 | Phase 4 | Pending |
-| OUT-03 | Phase 4 | Pending |
+| OUT-03 | Phase 4 | Complete |
 | AUTH-03 | Phase 5 | Pending |
 | AUTH-04 | Phase 5 | Pending |
 | TASK-01 | Phase 5 | Pending |
