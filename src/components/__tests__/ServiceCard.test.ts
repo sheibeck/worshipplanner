@@ -125,4 +125,24 @@ describe('ServiceCard', () => {
     expect(link.exists()).toBe(true)
     expect(link.attributes('href')).toBe('/services/svc-001')
   })
+
+  it('uses flex-col layout with pinned footer', () => {
+    const wrapper = mount(ServiceCard, {
+      props: { service: mockService },
+      global: { stubs: globalStubs },
+    })
+    // Root element uses flex column layout
+    const root = wrapper.element as HTMLElement
+    expect(root.className).toContain('flex')
+    expect(root.className).toContain('flex-col')
+    expect(root.className).toContain('h-full')
+
+    // Body area grows to fill space
+    const body = wrapper.find('a')
+    expect(body.classes()).toContain('flex-1')
+
+    // Footer does not shrink
+    const footer = wrapper.find('[title="Share"]').element.closest('div')!
+    expect(footer.className).toContain('shrink-0')
+  })
 })
