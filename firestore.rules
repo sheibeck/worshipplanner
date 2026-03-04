@@ -46,6 +46,13 @@ service cloud.firestore {
       }
     }
 
+    // Share tokens: public read (anyone with token URL), authenticated create only
+    match /shareTokens/{token} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if false;
+    }
+
     // Catch-all: deny everything else
     match /{document=**} {
       allow read, write: if false;

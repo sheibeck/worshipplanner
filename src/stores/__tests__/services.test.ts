@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 
+// Mock crypto.getRandomValues for deterministic token generation
+vi.stubGlobal('crypto', {
+  getRandomValues: vi.fn((arr: Uint8Array) => {
+    for (let i = 0; i < arr.length; i++) arr[i] = i + 1
+    return arr
+  }),
+})
+
 // Track onSnapshot callbacks and unsubscribe fns
 let snapshotCallback: ((snap: { docs: { id: string; data: () => Record<string, unknown> }[] }) => void) | null = null
 const mockUnsubscribe = vi.fn()
@@ -18,6 +26,7 @@ vi.mock('firebase/firestore', () => {
     addDoc: vi.fn(() => Promise.resolve({ id: 'new-service-id' })),
     updateDoc: vi.fn(() => Promise.resolve()),
     deleteDoc: vi.fn(() => Promise.resolve()),
+    setDoc: vi.fn(() => Promise.resolve()),
     query: vi.fn((ref) => ref),
     orderBy: vi.fn(),
     serverTimestamp: vi.fn(() => ({ seconds: 1000000, nanoseconds: 0 })),
@@ -35,6 +44,17 @@ const mockUpdateSong = vi.fn(() => Promise.resolve())
 vi.mock('@/stores/songs', () => ({
   useSongStore: vi.fn(() => ({
     updateSong: mockUpdateSong,
+    songs: [
+      {
+        id: 'song-abc',
+        title: 'Amazing Grace',
+        ccliNumber: '12345',
+        arrangements: [
+          { key: 'G', bpm: 120 },
+          { key: 'C', bpm: 110 },
+        ],
+      },
+    ],
   })),
 }))
 
@@ -385,6 +405,62 @@ describe('useServiceStore', () => {
       expect(slot0?.songId).toBeNull()
       expect(slot0?.songTitle).toBeNull()
       expect(slot0?.songKey).toBeNull()
+    })
+  })
+
+  describe('createShareToken', () => {
+    it('createShareToken returns a 36-character hex string', async () => {
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+
+      const service = makeService()
+      const token = await store.createShareToken(service, 'org-1')
+
+      expect(token).toHaveLength(36)
+      expect(token).toMatch(/^[0-9a-f]{36}$/)
+    })
+
+    it('createShareToken calls setDoc with token as document ID', async () => {
+      const { setDoc, doc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+
+      const service = makeService()
+      const token = await store.createShareToken(service, 'org-1')
+
+      expect(setDoc).toHaveBeenCalledOnce()
+      const [docRef, data] = vi.mocked(setDoc).mock.calls[0]
+      expect((docRef as { id: string }).id).toBe(token)
+      const writeData = data as Record<string, unknown>
+      expect(writeData.serviceId).toBe(service.id)
+      expect(writeData.orgId).toBe('org-1')
+      expect(writeData.serviceSnapshot).toBeDefined()
+      const snapshot = writeData.serviceSnapshot as Record<string, unknown>
+      expect(snapshot.date).toBe(service.date)
+      expect(snapshot.notes).toBe(service.notes)
+    })
+
+    it('createShareToken embeds BPM from song store into song slots', async () => {
+      const { setDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+
+      const slots = [
+        { kind: 'SONG', position: 0, requiredVwType: 1, songId: 'song-abc', songTitle: 'Amazing Grace', songKey: 'G' },
+      ]
+      const service = makeService({ slots })
+      await store.createShareToken(service, 'org-1')
+
+      expect(setDoc).toHaveBeenCalledOnce()
+      const [, data] = vi.mocked(setDoc).mock.calls[0]
+      const writeData = data as Record<string, unknown>
+      const snapshot = writeData.serviceSnapshot as Record<string, unknown>
+      const snapshotSlots = snapshot.slots as Array<{ kind: string; position: number; bpm?: number | null }>
+      const songSlot = snapshotSlots.find((s) => s.position === 0)
+      expect(songSlot?.bpm).toBe(120)
     })
   })
 })

@@ -7,6 +7,7 @@ import {
   updateDoc,
   deleteDoc,
   doc,
+  setDoc,
   serverTimestamp,
   query,
   orderBy,
@@ -16,6 +17,7 @@ import { db } from '@/firebase'
 import { useSongStore } from '@/stores/songs'
 import { buildSlots } from '@/utils/slotTypes'
 import type { Service } from '@/types/service'
+import type { SongSlot } from '@/types/service'
 
 type CreateServiceInput = {
   date: string
@@ -128,6 +130,47 @@ export const useServiceStore = defineStore('services', () => {
     await updateService(serviceId, { slots: updatedSlots })
   }
 
+  async function createShareToken(service: Service, orgIdValue: string): Promise<string> {
+    // Generate cryptographically random 36-char hex token
+    const array = new Uint8Array(18)
+    crypto.getRandomValues(array)
+    const token = Array.from(array, (b) => b.toString(16).padStart(2, '0')).join('')
+
+    // Resolve BPM for each song slot from song store
+    const songStore = useSongStore()
+    const slotsWithBpm = service.slots.map((slot) => {
+      if (slot.kind === 'SONG' && (slot as SongSlot).songId) {
+        const songSlot = slot as SongSlot
+        const song = songStore.songs.find((s) => s.id === songSlot.songId)
+        let bpm: number | null = null
+        if (song) {
+          const matchingArr = song.arrangements.find((a) => a.key === songSlot.songKey)
+          bpm = matchingArr?.bpm ?? song.arrangements[0]?.bpm ?? null
+        }
+        return { ...slot, bpm }
+      }
+      return slot
+    })
+
+    await setDoc(doc(db, 'shareTokens', token), {
+      serviceId: service.id,
+      orgId: orgIdValue,
+      serviceSnapshot: {
+        date: service.date,
+        name: service.name,
+        progression: service.progression,
+        teams: service.teams,
+        slots: slotsWithBpm,
+        sermonPassage: service.sermonPassage,
+        notes: service.notes,
+        status: service.status,
+      },
+      createdAt: serverTimestamp(),
+    })
+
+    return token
+  }
+
   return {
     services,
     isLoading,
@@ -139,5 +182,6 @@ export const useServiceStore = defineStore('services', () => {
     deleteService,
     assignSongToSlot,
     clearSongFromSlot,
+    createShareToken,
   }
 })
