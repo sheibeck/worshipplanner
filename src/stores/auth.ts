@@ -133,49 +133,48 @@ export const useAuthStore = defineStore('auth', () => {
       { merge: true },
     )
 
-    // Auto-create org if user doesn't have one yet
+    // Always check for pending invite (even if user already has an org)
     const userData = userSnap.exists() ? userSnap.data() : null
     const hasOrg = userData?.orgIds && userData.orgIds.length > 0
+    const email = firebaseUser.email?.toLowerCase()
+
+    if (email) {
+      const lookupRef = doc(db, 'inviteLookup', email)
+      const lookupSnap = await getDoc(lookupRef)
+
+      if (lookupSnap.exists()) {
+        const inviteData = lookupSnap.data()
+        const inviteOrgId = inviteData.orgId as string
+        const role = inviteData.role as 'editor' | 'viewer'
+
+        const batch = writeBatch(db)
+
+        // Delete inviteLookup entry
+        batch.delete(lookupRef)
+
+        // Delete the invite doc in the org's invites subcollection
+        const inviteRef = doc(db, 'organizations', inviteOrgId, 'invites', email)
+        batch.delete(inviteRef)
+
+        // Add user as member with invited role
+        const memberRef = doc(db, 'organizations', inviteOrgId, 'members', firebaseUser.uid)
+        batch.set(memberRef, {
+          role,
+          joinedAt: serverTimestamp(),
+          displayName: firebaseUser.displayName ?? '',
+          email: firebaseUser.email ?? '',
+        })
+
+        // Switch user to the invited org
+        batch.update(userRef, { orgIds: [inviteOrgId] })
+
+        await batch.commit()
+        return
+      }
+    }
 
     if (!hasOrg) {
-      // Check for pending invite before auto-creating org
-      const email = firebaseUser.email?.toLowerCase()
-      if (email) {
-        const lookupRef = doc(db, 'inviteLookup', email)
-        const lookupSnap = await getDoc(lookupRef)
-
-        if (lookupSnap.exists()) {
-          const inviteData = lookupSnap.data()
-          const inviteOrgId = inviteData.orgId as string
-          const role = inviteData.role as 'editor' | 'viewer'
-
-          const batch = writeBatch(db)
-
-          // Delete inviteLookup entry
-          batch.delete(lookupRef)
-
-          // Delete the invite doc in the org's invites subcollection
-          const inviteRef = doc(db, 'organizations', inviteOrgId, 'invites', email)
-          batch.delete(inviteRef)
-
-          // Add user as member with invited role
-          const memberRef = doc(db, 'organizations', inviteOrgId, 'members', firebaseUser.uid)
-          batch.set(memberRef, {
-            role,
-            joinedAt: serverTimestamp(),
-            displayName: firebaseUser.displayName ?? '',
-            email: firebaseUser.email ?? '',
-          })
-
-          // Link org to user profile
-          batch.update(userRef, { orgIds: [inviteOrgId] })
-
-          await batch.commit()
-          return
-        }
-      }
-
-      // No invite found — auto-create new org for this user
+      // No invite found and no org — auto-create new org for this user
       const batch = writeBatch(db)
 
       const orgRef = doc(collection(db, 'organizations'))
