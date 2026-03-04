@@ -156,6 +156,9 @@ Recent decisions affecting current work:
 - [Phase 07]: navItems computed for reactive role-conditional sidebar filtering — Dashboard/Songs/Team editor-only, Services visible to all
 - [Phase 07]: ServiceEditorView autosave watcher returns early if !authStore.isEditor — viewers cannot trigger autosave
 - [Phase 07]: All 4 views (Dashboard/Songs/Services/ServiceEditor) use authStore.orgId — zero ad-hoc getDoc(users/{uid}) calls remain
+- [Quick-16]: toggleTeam uses filter/spread immutable update — new array reference guarantees Vue 3 deep watcher fires on team checkbox changes
+- [Quick-16]: Autosave debounce reduced from 1500ms to 500ms for more responsive save feedback
+- [Quick-16]: Communion badge removed from ServiceCard — TeamTagPill already shows Communion from service.teams (data-driven, not date-derived)
 
 ### Roadmap Evolution
 
@@ -178,6 +181,7 @@ None yet.
 | 12 | Communion checkbox + 1st-Sunday auto-default, PRAYER/MESSAGE links, compact song row, remove VW type buttons | 2026-03-04 | d04ec94 | [12-service-editor-ux-improvements-communion](./quick/12-service-editor-ux-improvements-communion/) |
 | 13 | Song rotation dot bg-sky-300 visibility fix + Scripture Rotation tab with passage grid | 2026-03-04 | 464c8b2 | [13-fix-song-rotation-dot-visibility-on-dark](./quick/13-fix-song-rotation-dot-visibility-on-dark/) |
 | 14 | Autosave to service editor with 1.5s debounce, one-step undo, and status indicator | 2026-03-04 | 6a5f861 | [14-add-autosave-to-service-editor-with-one-](./quick/14-add-autosave-to-service-editor-with-one-/) |
+| 16 | Remove date-derived Communion badge; fix team checkbox autosave via immutable array update; 500ms debounce | 2026-03-04 | dbb25a0 | [16-fix-communion-badge-display-communion-ch](./quick/16-fix-communion-badge-display-communion-ch/) |
 
 ### Blockers/Concerns
 
@@ -187,6 +191,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T22:04:38.537Z
-Stopped at: Completed 07-02-PLAN.md
+Last session: 2026-03-04T22:17:08Z
+Stopped at: Completed Quick-16 (awaiting human verify checkpoint)
 Resume file: None
