@@ -50,7 +50,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Calendar & Overview
 
-- [ ] **CAL-01**: User can view and manage services week-by-week with upcoming and recent weeks
+- [x] **CAL-01**: User can view and manage services week-by-week with upcoming and recent weeks
 - [x] **CAL-02**: User can view a seasonal/quarterly overview of planned services
 - [x] **CAL-03**: Seasonal view shows song usage patterns across weeks to spot rotation issues
 
@@ -132,7 +132,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SCRI-02 | Phase 3 | Pending |
 | SCRI-03 | Phase 3 | Complete |
 | SCRI-04 | Phase 3 | Pending |
-| CAL-01 | Phase 3 | Pending |
+| CAL-01 | Phase 3 | Complete |
 | CAL-02 | Phase 3 | Complete |
 | CAL-03 | Phase 3 | Complete |
 | OUT-01 | Phase 4 | Pending |
