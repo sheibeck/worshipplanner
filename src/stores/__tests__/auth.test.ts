@@ -5,9 +5,13 @@ import { setActivePinia, createPinia } from 'pinia'
 vi.mock('firebase/auth', () => {
   const mockOnAuthStateChangedCallbacks: ((user: unknown) => void)[] = []
 
+  class MockGoogleAuthProvider {
+    providerId = 'google.com'
+  }
+
   return {
     getAuth: vi.fn(() => ({})),
-    GoogleAuthProvider: vi.fn().mockImplementation(() => ({})),
+    GoogleAuthProvider: MockGoogleAuthProvider,
     signInWithPopup: vi.fn(),
     signInWithEmailAndPassword: vi.fn(),
     createUserWithEmailAndPassword: vi.fn(),
