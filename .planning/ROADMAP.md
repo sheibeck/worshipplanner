@@ -32,8 +32,8 @@ Decimal phases appear between their surrounding integers in numeric order.
   5. Firestore data is inaccessible to unauthenticated callers (security rules block it)
 **Plans:** 2/2 plans complete
 Plans:
-- [ ] 01-01-PLAN.md — Scaffold Vue 3 project, Firebase infra, auth store, router guards, and Firestore security rules
-- [ ] 01-02-PLAN.md — Build login page, app shell with sidebar, dashboard with getting started checklist
+- [x] 01-01-PLAN.md — Scaffold Vue 3 project, Firebase infra, auth store, router guards, and Firestore security rules
+- [x] 01-02-PLAN.md — Build login page, app shell with sidebar, dashboard with getting started checklist
 
 ### Phase 2: Song Library
 **Goal**: Planners have a complete, searchable song stable with Vertical Worship categories and arrangement data, seeded from a Planning Center CSV export
@@ -45,7 +45,11 @@ Plans:
   3. User can categorize a song as Vertical Worship type 1, 2, or 3
   4. User can tag songs with team compatibility (choir, orchestra, standard band)
   5. User can search and filter the song list by title, key, tempo, category, and team tag and see only matching results
-**Plans**: TBD
+**Plans:** 3 plans
+Plans:
+- [ ] 02-01-PLAN.md — Song types, Pinia store with Firestore subscription + filtering, song table UI with search/filter/badges
+- [ ] 02-02-PLAN.md — Slide-over panel for song create/edit/delete, arrangement accordion, batch VW type assign, GettingStarted update
+- [ ] 02-03-PLAN.md — CSV import pipeline with PapaParse, preview table, duplicate detection, batched Firestore write
 
 ### Phase 3: Service Planning
 **Goal**: Planners can build a complete weekly service order — selecting a 4-song progression, getting smart song suggestions filtered by category and team, adding scripture, and viewing all planned weeks on a calendar
@@ -84,12 +88,12 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 2/2 | Complete   | 2026-03-04 |
-| 2. Song Library | 0/TBD | Not started | - |
+| 2. Song Library | 0/3 | Planning complete | - |
 | 3. Service Planning | 0/TBD | Not started | - |
 | 4. Output | 0/TBD | Not started | - |
 | 5. Collaboration, Tasks & Events | 0/TBD | Not started | - |

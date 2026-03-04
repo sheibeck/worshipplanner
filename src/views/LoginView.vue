@@ -3,7 +3,7 @@
     <div class="w-full max-w-sm">
       <!-- Brand -->
       <div class="text-center mb-8">
-        <h1 class="text-2xl font-semibold text-white tracking-tight">WorshipPlanner</h1>
+        <h1 class="text-2xl font-semibold text-white tracking-tight">Worship Planner</h1>
         <p class="text-sm text-gray-400 mt-1">Sign in to continue</p>
       </div>
 

@@ -10,7 +10,7 @@
   >
     <!-- Brand -->
     <div class="flex items-center h-14 px-5 border-b border-gray-800 shrink-0">
-      <span class="text-sm font-semibold text-gray-100 tracking-tight">WorshipPlanner</span>
+      <span class="text-sm font-semibold text-gray-100 tracking-tight">Worship Planner</span>
     </div>
 
     <!-- Nav -->
