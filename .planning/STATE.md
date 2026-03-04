@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed Quick-20
-last_updated: "2026-03-04T23:54:27.623Z"
+stopped_at: Completed Quick-21
+last_updated: "2026-03-04T18:57:45Z"
 last_activity: 2026-03-04 — Plan 01-01 complete — Vue 3 + Firebase foundation, auth store, router guard, Firestore rules
 progress:
   total_phases: 7
@@ -187,6 +187,7 @@ None yet.
 | 17 | Remove progression from print/share headers; amber Special Service badge in ServiceCard | 2026-03-04 | 4e783fb | [17-remove-progression-from-print-share-head](./quick/17-remove-progression-from-print-share-head/) |
 | 18 | Add Hymn slot type with hymnName, hymnNumber, verses fields across editor, print, share, and PC export | 2026-03-04 | 0c8e511 | [18-add-hymn-slot-type-to-services-with-free](./quick/18-add-hymn-slot-type-to-services-with-free/) |
 | 19 | Add Settings screen to edit org name; gear icon in sidebar for editors; /settings route with requiresEditor guard | 2026-03-04 | b626044 | [19-add-settings-screen-to-edit-org-name-ins](./quick/19-add-settings-screen-to-edit-org-name-ins/) |
+| 21 | Fix ServiceCard footer pinned to bottom with flex-col h-full layout (CSS-only) | 2026-03-04 | b51d273 | [21-fix-servicecard-footer-fixed-height-pinn](./quick/21-fix-servicecard-footer-fixed-height-pinn/) |
 
 ### Blockers/Concerns
 
@@ -196,6 +197,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T23:54:22.940Z
-Stopped at: Completed Quick-20
+Last session: 2026-03-04T18:57:45Z
+Stopped at: Completed Quick-21
 Resume file: None
