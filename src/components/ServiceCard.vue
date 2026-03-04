@@ -6,7 +6,6 @@
       <div class="flex items-center justify-between gap-2 mb-1.5">
         <div class="flex items-center gap-2 min-w-0">
           <p class="text-sm font-semibold text-gray-100">{{ formattedDate }}<template v-if="sermonPassageLabel">: <a :href="sermonPassageUrl" target="_blank" rel="noopener" @click.stop class="text-indigo-400 hover:text-indigo-300 transition-colors">{{ sermonPassageLabel }}</a></template></p>
-          <span v-if="isCommunion" class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-900/50 text-amber-300 border border-amber-800">Communion</span>
         </div>
         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold shrink-0" :class="statusClass">
           <svg v-if="service.status === 'planned'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3">
@@ -95,12 +94,6 @@ const formattedDate = computed(() => {
     options.year = 'numeric'
   }
   return d.toLocaleDateString('en-US', options)
-})
-
-// First Sunday of the month = Communion Sunday
-const isCommunion = computed(() => {
-  const d = parsedDate.value
-  return d.getDay() === 0 && d.getDate() <= 7
 })
 
 const sermonPassageLabel = computed(() => {
