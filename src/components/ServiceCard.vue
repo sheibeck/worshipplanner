@@ -18,7 +18,7 @@
       <div v-if="service.teams.length" class="flex flex-wrap gap-1 mb-1">
         <TeamTagPill v-for="team in service.teams" :key="team" :tag="team" />
       </div>
-      <p v-if="service.name" class="text-xs font-medium text-indigo-300 mb-1.5 truncate">{{ service.name }}</p>
+      <span v-if="service.name" class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-900/40 text-amber-300 border border-amber-800 mb-1.5">Special Service: {{ service.name }}</span>
 
       <!-- Compact slot summary -->
       <div class="text-xs space-y-0.5">
