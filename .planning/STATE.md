@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed quick-1 UX tweaks (compact editor, CCLI links, grid list)
-last_updated: "2026-03-04T15:39:12.273Z"
-last_activity: 2026-03-04 — Plan 01-01 complete — Vue 3 + Firebase foundation, auth store, router guard, Firestore rules
+stopped_at: Completed quick-2 dynamic service flow (add/remove/reorder slots)
+last_updated: "2026-03-04T16:04:16Z"
+last_activity: 2026-03-04 — Quick-2 complete — Dynamic slot add/remove/reorder with sortablejs, VW type selector, kind-based labels
 progress:
   total_phases: 5
   completed_phases: 4
@@ -107,6 +107,11 @@ Recent decisions affecting current work:
 - [Phase 04-output]: Print CSS pattern: AppShell wrapped in print:hidden div, ServicePrintLayout rendered as sibling with hidden print:block
 - [Phase 04-output]: shareTokens embed pattern: write full denormalized serviceSnapshot to public shareTokens/{token} collection at creation time — zero reads of protected org collections by unauthenticated viewers
 - [Phase 04-output]: ShareView is standalone: uses getDoc directly (not store subscription), no AppShell, no auth stores — completely independent of app shell
+- [Quick-2]: slotLabel() replaces SLOT_LABELS — kind-based labels work for variable-length slot arrays
+- [Quick-2]: createSlot() factory defaults Song vwType to 2; reindexSlots() normalizes positions after every mutation
+- [Quick-2]: Sortable onEnd updates reactive array then lets Vue reconcile (no manual DOM sync needed)
+- [Quick-2]: onSave uses global songId set comparison for lastUsedAt tracking after reorder (position-independent)
+- [Quick-2]: planningCenterExport sequential Song 1/2/3 numbering (position-agnostic)
 
 ### Pending Todos
 
@@ -120,6 +125,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T15:39:12.267Z
-Stopped at: Completed quick-1 UX tweaks (compact editor, CCLI links, grid list)
+Last session: 2026-03-04T16:04:16Z
+Stopped at: Completed quick-2 dynamic service flow (add/remove/reorder slots)
 Resume file: None
