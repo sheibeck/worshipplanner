@@ -26,7 +26,7 @@
         <template v-for="slot in openingSlots" :key="slot.position">
           <p class="truncate" :class="slotTextClass(slot)">{{ slotLabel(slot) }}</p>
         </template>
-        <p class="text-gray-600 text-[10px] my-0.5">--- Message ---</p>
+        <p class="text-gray-600 text-xs my-0.5">--- Message ---</p>
         <template v-for="slot in sendingSlots" :key="slot.position">
           <p class="truncate" :class="slotTextClass(slot)">{{ slotLabel(slot) }}</p>
         </template>
@@ -141,7 +141,7 @@ function slotLabel(slot: ServiceSlot): string {
 function slotTextClass(slot: ServiceSlot): string {
   if (slot.kind === 'SONG') return slot.songTitle ? 'text-gray-400' : 'text-gray-500 italic'
   if (slot.kind === 'SCRIPTURE') return slot.book ? 'text-gray-400' : 'text-gray-500 italic'
-  if (slot.kind === 'PRAYER') return 'text-gray-600 text-[10px]'
+  if (slot.kind === 'PRAYER') return 'text-gray-600'
   return 'text-gray-500'
 }
 
