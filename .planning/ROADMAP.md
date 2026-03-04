@@ -107,7 +107,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 4. Output | 2/2 | Complete   | 2026-03-04 |
 | 5. Collaboration, Tasks & Events | 0/TBD | Not started | - |
 | 6. AI Assisted Service Suggesting | 4/4 | Complete   | 2026-03-04 |
-| 7. Invite & RBAC | 0/2 | Not started | - |
+| 7. Invite & RBAC | 1/2 | In Progress|  |
 
 ### Phase 6: AI assisted service suggesting and scripture searching
 
@@ -142,7 +142,7 @@ Plans:
   5. Firestore security rules enforce RBAC -- viewers cannot write data or read songs
   6. An editor can manage team members: change roles and remove members
   7. Organization name is displayed in the sidebar for all roles
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 07-01-PLAN.md — Auth store enrichment with orgId/role/invite-matching, Firestore rules RBAC rewrite, role-aware router guards

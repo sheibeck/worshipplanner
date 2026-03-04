@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 7 context gathered
-last_updated: "2026-03-04T21:11:55.434Z"
+stopped_at: Completed 07-01-PLAN.md
+last_updated: "2026-03-04T21:50:54.333Z"
 last_activity: 2026-03-04 — Plan 01-01 complete — Vue 3 + Firebase foundation, auth store, router guard, Firestore rules
 progress:
   total_phases: 7
   completed_phases: 5
-  total_plans: 16
-  completed_plans: 16
+  total_plans: 18
+  completed_plans: 17
   percent: 50
 ---
 
@@ -67,6 +67,7 @@ Progress: [█████░░░░░] 50%
 | Phase 06-ai-assisted P03 | 4 | 1 tasks | 3 files |
 | Phase 06-ai-assisted P02 | 7 | 2 tasks | 2 files |
 | Phase 06 P04 | 0 | 1 tasks | 4 files |
+| Phase 07-invite-users-manage-members-with-admin-viewer-roles-and-enforce-role-based-access-control P01 | 8 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -147,6 +148,10 @@ Recent decisions affecting current work:
 - [Quick-14]: autosaveInitialized flag suppresses first-load watch trigger to prevent spurious save on mount
 - [Quick-14]: previousService snapshot taken before each autosave (not after) so undo can restore the pre-save state
 - [Quick-14]: Ctrl+Z skips INPUT/TEXTAREA targets so browser text-level undo is unaffected
+- [Phase 07]: orgId/userRole/isEditor/orgName all live in auth store via loadOrgContext() — centralized so no view does ad-hoc Firestore reads
+- [Phase 07]: waitForRole() uses Vue watch on userRole ref — resolves immediately if role already loaded or user unauthenticated
+- [Phase 07]: inviteLookup/{normalizedEmail} keyed by lowercase email enables O(1) lookup without scanning subcollections
+- [Phase 07]: Firestore: services match /services/{docId} before wildcard catch-all — Firestore uses most-specific rule first
 
 ### Roadmap Evolution
 
@@ -178,6 +183,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T21:11:55.428Z
-Stopped at: Phase 7 context gathered
-Resume file: .planning/phases/07-invite-users-manage-members-with-admin-viewer-roles-and-enforce-role-based-access-control/07-CONTEXT.md
+Last session: 2026-03-04T21:50:54.326Z
+Stopped at: Completed 07-01-PLAN.md
+Resume file: None
