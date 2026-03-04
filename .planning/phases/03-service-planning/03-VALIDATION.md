@@ -40,12 +40,12 @@ created: 2026-03-03
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
 | 03-01-01 | 01 | 1 | PLAN-01 | unit (store) | `npx vitest run src/stores/__tests__/services.test.ts -t "createService"` | ❌ W0 | ⬜ pending |
 | 03-01-02 | 01 | 1 | PLAN-02 | unit (store) | `npx vitest run src/stores/__tests__/services.test.ts -t "progression"` | ❌ W0 | ⬜ pending |
-| 03-01-03 | 01 | 1 | PLAN-03 | unit (util) | `npx vitest run src/utils/suggestions.test.ts -t "slotTypes"` | ❌ W0 | ⬜ pending |
-| 03-02-01 | 02 | 1 | PLAN-04, PLAN-05 | unit (util) | `npx vitest run src/utils/suggestions.test.ts -t "team filter"` | ❌ W0 | ⬜ pending |
-| 03-02-02 | 02 | 1 | PLAN-06 | unit (util) | `npx vitest run src/utils/suggestions.test.ts -t "ranking"` | ❌ W0 | ⬜ pending |
-| 03-02-03 | 02 | 1 | PLAN-07 | unit (util) | `npx vitest run src/utils/suggestions.test.ts -t "manual override"` | ❌ W0 | ⬜ pending |
+| 03-01-03 | 01 | 1 | PLAN-03 | unit (util) | `npx vitest run src/utils/__tests__/suggestions.test.ts -t "slotTypes"` | ❌ W0 | ⬜ pending |
+| 03-02-01 | 02 | 1 | PLAN-04, PLAN-05 | unit (util) | `npx vitest run src/utils/__tests__/suggestions.test.ts -t "team filter"` | ❌ W0 | ⬜ pending |
+| 03-02-02 | 02 | 1 | PLAN-06 | unit (util) | `npx vitest run src/utils/__tests__/suggestions.test.ts -t "ranking"` | ❌ W0 | ⬜ pending |
+| 03-02-03 | 02 | 1 | PLAN-07 | unit (util) | `npx vitest run src/utils/__tests__/suggestions.test.ts -t "manual override"` | ❌ W0 | ⬜ pending |
 | 03-02-04 | 02 | 1 | PLAN-08 | unit (store) | `npx vitest run src/stores/__tests__/services.test.ts -t "lastUsedAt"` | ❌ W0 | ⬜ pending |
-| 03-02-05 | 02 | 1 | PLAN-09 | unit (util) | `npx vitest run src/utils/suggestions.test.ts -t "recency penalty"` | ❌ W0 | ⬜ pending |
+| 03-02-05 | 02 | 1 | PLAN-09 | unit (util) | `npx vitest run src/utils/__tests__/suggestions.test.ts -t "recency penalty"` | ❌ W0 | ⬜ pending |
 | 03-03-01 | 03 | 1 | SCRI-01, SCRI-02 | unit (store) | `npx vitest run src/stores/__tests__/services.test.ts -t "scripture"` | ❌ W0 | ⬜ pending |
 | 03-03-02 | 03 | 1 | SCRI-03 | unit (util) | `npx vitest run src/utils/__tests__/scripture.test.ts -t "esvLink"` | ❌ W0 | ⬜ pending |
 | 03-03-03 | 03 | 2 | SCRI-04 | component | `npx vitest run src/components/__tests__/ScriptureInput.test.ts` | ❌ Plan 03-03 Task 3 | ⬜ pending |
@@ -59,7 +59,7 @@ created: 2026-03-03
 ## Wave 0 Requirements
 
 - [ ] `src/stores/__tests__/services.test.ts` — stubs for PLAN-01, PLAN-02, PLAN-04, PLAN-08, SCRI-01, SCRI-02
-- [ ] `src/utils/suggestions.test.ts` — stubs for PLAN-03, PLAN-05, PLAN-06, PLAN-07, PLAN-09
+- [ ] `src/utils/__tests__/suggestions.test.ts` — stubs for PLAN-03, PLAN-05, PLAN-06, PLAN-07, PLAN-09
 - [ ] `src/utils/__tests__/scripture.test.ts` — covers SCRI-03 (esvLink tests created by Plan 03-01 Task 1)
 - [ ] `src/utils/__tests__/rotationTable.test.ts` — covers CAL-02, CAL-03 (created by Plan 03-01 Task 2)
 - [ ] `src/components/__tests__/ScriptureInput.test.ts` — covers SCRI-04 (created by Plan 03-03 Task 3, TDD)
