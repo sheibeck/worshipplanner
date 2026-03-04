@@ -97,7 +97,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -106,3 +106,24 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 3. Service Planning | 4/5 | In Progress|  |
 | 4. Output | 2/2 | Complete   | 2026-03-04 |
 | 5. Collaboration, Tasks & Events | 0/TBD | Not started | - |
+| 6. AI Assisted Service Suggesting | 0/4 | Not started | - |
+
+### Phase 6: AI assisted service suggesting and scripture searching
+
+**Goal:** Enhance the service planning workflow with AI-powered song suggestions and scripture discovery using sermon context (topic and passage), augmenting the existing rotation-based algorithm without replacing it
+**Requirements**: AI-01, AI-02, AI-03, AI-04, AI-05, AI-06
+**Depends on:** Phase 4
+**Success Criteria** (what must be TRUE):
+  1. Planner can enter a sermon topic and the AI uses it (along with existing sermon passage) to suggest thematically relevant songs for each slot
+  2. SongSlotPicker shows an "AI Picks" section above rotation-based suggestions with top 3 picks per slot
+  3. Planner can click "Suggest All Songs" to fill all empty song slots with AI drafts that have accept/reject actions
+  4. Planner can search for scripture using natural language (e.g., "passages about forgiveness") and get 3-5 specific references with reasons
+  5. AI respects song rotation (2-week deprioritization) and notes recently used scriptures
+  6. Service editor works fully without AI — all AI features degrade gracefully on error or missing API key
+**Plans:** 4 plans
+
+Plans:
+- [ ] 06-01-PLAN.md — Install Anthropic SDK, extend Service type with sermonTopic, create claudeApi.ts utility with tests
+- [ ] 06-02-PLAN.md — Sermon topic field, AI song picks in SongSlotPicker, "Suggest All Songs" bulk flow in ServiceEditorView
+- [ ] 06-03-PLAN.md — AI scripture discovery with natural language search and per-slot suggest button in ScriptureInput
+- [ ] 06-04-PLAN.md — Human verification of complete AI-assisted service planning workflow

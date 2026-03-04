@@ -1,7 +1,7 @@
 # Requirements: WorshipPlanner
 
 **Defined:** 2026-03-03
-**Core Value:** Smart weekly service planning that follows the Vertical Worship methodology (1→2→3 song progression) while rotating through the full song stable and respecting team configurations.
+**Core Value:** Smart weekly service planning that follows the Vertical Worship methodology (1->2->3 song progression) while rotating through the full song stable and respecting team configurations.
 
 ## v1 Requirements
 
@@ -66,6 +66,15 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **EVNT-02**: Special events appear on the calendar with advance lead time for planning
 - [ ] **EVNT-03**: User can view past special event plans as reference
 - [ ] **EVNT-04**: User can duplicate a past special event plan to a new date
+
+### AI Assisted Planning
+
+- [ ] **AI-01**: AI uses sermon context (topic and/or passage) to suggest thematically relevant songs for each slot
+- [ ] **AI-02**: AI song suggestions shown as "AI Picks" section in SongSlotPicker dropdown (top 3 per slot)
+- [ ] **AI-03**: Planner can click "Suggest All Songs" to fill all empty song slots with AI drafts featuring accept/reject actions
+- [ ] **AI-04**: Planner can search for scripture using natural language and get 3-5 specific references with reasons
+- [ ] **AI-05**: AI respects song rotation (2-week deprioritization) and notes recently used scriptures
+- [ ] **AI-06**: Service editor works fully without AI — all AI features degrade gracefully on error or missing API key
 
 ## v2 Requirements
 
@@ -147,12 +156,18 @@ Which phases cover which requirements. Updated during roadmap creation.
 | EVNT-02 | Phase 5 | Pending |
 | EVNT-03 | Phase 5 | Pending |
 | EVNT-04 | Phase 5 | Pending |
+| AI-01 | Phase 6 | Pending |
+| AI-02 | Phase 6 | Pending |
+| AI-03 | Phase 6 | Pending |
+| AI-04 | Phase 6 | Pending |
+| AI-05 | Phase 6 | Pending |
+| AI-06 | Phase 6 | Pending |
 
 **Coverage:**
-- v1 requirements: 29 total
-- Mapped to phases: 29
+- v1 requirements: 35 total
+- Mapped to phases: 35
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-03*
-*Last updated: 2026-03-03 after roadmap creation*
+*Last updated: 2026-03-04 after Phase 6 planning*
