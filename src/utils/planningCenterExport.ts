@@ -87,6 +87,14 @@ export function formatForPlanningCenter(service: Service, songs: Song[]): string
       } else {
         lines.push('Message')
       }
+    } else if (slot.kind === 'HYMN') {
+      if (!slot.hymnName) {
+        lines.push('Hymn -- [empty]')
+      } else {
+        const numPart = slot.hymnNumber ? ` #${slot.hymnNumber}` : ''
+        const versesPart = slot.verses ? ` (vv. ${slot.verses})` : ''
+        lines.push(`Hymn -- ${slot.hymnName}${numPart}${versesPart}`)
+      }
     }
   }
 

@@ -529,6 +529,45 @@
                   >{{ (slot as NonAssignableSlot).linkLabel || (slot as NonAssignableSlot).linkUrl }}</a>
                 </div>
               </template>
+
+              <!-- HYMN slot -->
+              <template v-else-if="slot.kind === 'HYMN'">
+                <div class="mb-1">
+                  <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Hymn</p>
+                </div>
+                <!-- Editor: editable fields -->
+                <div v-if="authStore.isEditor" class="flex flex-wrap items-center gap-2 mt-1">
+                  <input
+                    :value="(slot as HymnSlot).hymnName"
+                    @input="(slot as HymnSlot).hymnName = ($event.target as HTMLInputElement).value"
+                    type="text"
+                    placeholder="Hymn Name"
+                    class="rounded-md bg-gray-800 border border-gray-700 text-gray-200 text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500 flex-1 min-w-32"
+                  />
+                  <input
+                    :value="(slot as HymnSlot).hymnNumber"
+                    @input="(slot as HymnSlot).hymnNumber = ($event.target as HTMLInputElement).value"
+                    type="text"
+                    placeholder="# (e.g. 337)"
+                    class="rounded-md bg-gray-800 border border-gray-700 text-gray-200 text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500 w-24"
+                  />
+                  <input
+                    :value="(slot as HymnSlot).verses"
+                    @input="(slot as HymnSlot).verses = ($event.target as HTMLInputElement).value"
+                    type="text"
+                    placeholder="Verses (e.g. 1, 3, 4)"
+                    class="rounded-md bg-gray-800 border border-gray-700 text-gray-200 text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500 w-36"
+                  />
+                </div>
+                <!-- Viewer: read-only display -->
+                <div v-else class="mt-1">
+                  <template v-if="(slot as HymnSlot).hymnName">
+                    <p class="text-sm text-gray-200">{{ (slot as HymnSlot).hymnName }}<template v-if="(slot as HymnSlot).hymnNumber"> #{{ (slot as HymnSlot).hymnNumber }}</template></p>
+                    <p v-if="(slot as HymnSlot).verses" class="text-xs text-gray-400">vv. {{ (slot as HymnSlot).verses }}</p>
+                  </template>
+                  <p v-else class="text-sm text-gray-400 italic">Hymn — Empty</p>
+                </div>
+              </template>
             </div>
 
             <!-- Remove button: editor only -->
@@ -575,6 +614,7 @@
             <button type="button" @click="addSlot('SCRIPTURE')" class="px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 w-full text-left transition-colors">Scripture Reading</button>
             <button type="button" @click="addSlot('PRAYER')" class="px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 w-full text-left transition-colors">Prayer</button>
             <button type="button" @click="addSlot('MESSAGE')" class="px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 w-full text-left transition-colors">Message</button>
+            <button type="button" @click="addSlot('HYMN')" class="px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 w-full text-left transition-colors">Hymn</button>
           </div>
         </div>
 
@@ -614,7 +654,7 @@ import { useServiceStore } from '@/stores/services'
 import { useSongStore } from '@/stores/songs'
 import { slotLabel, createSlot, reindexSlots } from '@/utils/slotTypes'
 import { scripturesOverlap } from '@/utils/scripture'
-import type { Service, SongSlot, ScriptureSlot, NonAssignableSlot, ScriptureRef, SlotKind } from '@/types/service'
+import type { Service, SongSlot, ScriptureSlot, NonAssignableSlot, HymnSlot, ScriptureRef, SlotKind } from '@/types/service'
 import type { VWType } from '@/types/song'
 import AppShell from '@/components/AppShell.vue'
 import SongBadge from '@/components/SongBadge.vue'

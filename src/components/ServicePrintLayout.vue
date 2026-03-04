@@ -62,6 +62,25 @@
             <span class="text-gray-900">{{ formatScriptureRef(props.service.sermonPassage) }}</span>
           </template>
         </template>
+
+        <!-- HYMN slot -->
+        <template v-else-if="slot.kind === 'HYMN'">
+          <span class="font-semibold text-gray-700">Hymn</span>
+          <template v-if="(slot as HymnSlot).hymnName">
+            <span class="text-gray-500"> -- </span>
+            <span class="text-gray-900">{{ (slot as HymnSlot).hymnName }}</span>
+            <template v-if="(slot as HymnSlot).hymnNumber">
+              <span class="text-gray-500"> #{{ (slot as HymnSlot).hymnNumber }}</span>
+            </template>
+            <template v-if="(slot as HymnSlot).verses">
+              <span class="text-gray-600">  |  vv. {{ (slot as HymnSlot).verses }}</span>
+            </template>
+          </template>
+          <template v-else>
+            <span class="text-gray-500"> -- </span>
+            <span class="text-gray-400 italic">[not assigned]</span>
+          </template>
+        </template>
       </div>
     </div>
 
@@ -80,7 +99,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { Service, SongSlot, ScriptureRef } from '@/types/service'
+import type { Service, SongSlot, HymnSlot, ScriptureRef } from '@/types/service'
 import type { Song } from '@/types/song'
 import { slotLabel } from '@/utils/slotTypes'
 import { formatScriptureRef } from '@/utils/planningCenterExport'

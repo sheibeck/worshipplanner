@@ -62,6 +62,16 @@
               {{ formatScriptureRef(serviceSnapshot.sermonPassage) }}
             </p>
           </template>
+
+          <!-- HYMN slot -->
+          <template v-else-if="slot.kind === 'HYMN'">
+            <p class="text-xs text-gray-500 uppercase tracking-wider mb-0.5">Hymn</p>
+            <template v-if="slot.hymnName">
+              <p class="text-base font-medium text-gray-900">{{ slot.hymnName }}<template v-if="slot.hymnNumber"> #{{ slot.hymnNumber }}</template></p>
+              <p v-if="slot.verses" class="text-sm text-gray-500">vv. {{ slot.verses }}</p>
+            </template>
+            <p v-else class="text-gray-400 italic text-sm">[not assigned]</p>
+          </template>
         </div>
       </div>
 

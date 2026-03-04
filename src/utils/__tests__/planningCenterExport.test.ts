@@ -222,6 +222,30 @@ describe('formatForPlanningCenter', () => {
   })
 })
 
+describe('formatForPlanningCenter - HYMN slots', () => {
+  it('formats a filled HYMN slot as "Hymn -- {name} #{number} (vv. {verses})"', () => {
+    const serviceWithHymn: Service = {
+      ...mockService,
+      slots: [
+        { kind: 'HYMN', position: 0, hymnName: 'Amazing Grace', hymnNumber: '337', verses: '1, 3, 4' },
+      ],
+    }
+    const result = formatForPlanningCenter(serviceWithHymn, mockSongs)
+    expect(result).toContain('Hymn -- Amazing Grace #337 (vv. 1, 3, 4)')
+  })
+
+  it('formats a HYMN slot with empty hymnName as "Hymn -- [empty]"', () => {
+    const serviceWithEmptyHymn: Service = {
+      ...mockService,
+      slots: [
+        { kind: 'HYMN', position: 0, hymnName: '', hymnNumber: '', verses: '' },
+      ],
+    }
+    const result = formatForPlanningCenter(serviceWithEmptyHymn, mockSongs)
+    expect(result).toContain('Hymn -- [empty]')
+  })
+})
+
 describe('formatScriptureRef', () => {
   it('formats a scripture reference correctly', () => {
     const ref = { book: 'Romans', chapter: 8, verseStart: 1, verseEnd: 11 }
