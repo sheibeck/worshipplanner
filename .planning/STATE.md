@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 06-02-PLAN.md
-last_updated: "2026-03-04T19:16:46.609Z"
+stopped_at: Completed 06-04-PLAN.md
+last_updated: "2026-03-04T19:55:04.796Z"
 last_activity: 2026-03-04 — Plan 01-01 complete — Vue 3 + Firebase foundation, auth store, router guard, Firestore rules
 progress:
   total_phases: 6
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 16
-  completed_plans: 15
+  completed_plans: 16
   percent: 50
 ---
 
@@ -66,6 +66,7 @@ Progress: [█████░░░░░] 50%
 | Phase 06 P01 | 9 | 1 tasks | 6 files |
 | Phase 06-ai-assisted P03 | 4 | 1 tasks | 3 files |
 | Phase 06-ai-assisted P02 | 7 | 2 tasks | 2 files |
+| Phase 06 P04 | 0 | 1 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -134,6 +135,11 @@ Recent decisions affecting current work:
 - [Phase 06-02]: SongSlotPicker stays as display component — parent handles API calls, caching; child only renders via props
 - [Phase 06-02]: Map reactivity: replace Map ref (new Map(existing)) rather than mutate to trigger Vue 3 reactive tracking
 - [Phase 06-02]: suggestAllSongs accumulates batchAcceptedIds across slots to prevent duplicate song picks in same bulk operation
+- [Phase 06]: Proxy Anthropic API through Vite dev server (/api/anthropic) to avoid CORS without a backend
+- [Phase 06]: Model corrected to claude-haiku-4-5-20251001 — previous IDs returned 404 from Anthropic API
+- [Phase 06]: Scripture preview expands inline before selection — user sees passage text before committing
+- [Phase 06]: Suggest All Songs removes filled-slot guard so planners can re-run to refresh picks
+- [Phase 06]: CCLI included in song library AI prompt for VW type inference on untyped songs
 
 ### Roadmap Evolution
 
@@ -161,6 +167,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T19:16:46.596Z
-Stopped at: Completed 06-02-PLAN.md
+Last session: 2026-03-04T19:55:04.788Z
+Stopped at: Completed 06-04-PLAN.md
 Resume file: None
