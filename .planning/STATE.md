@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 07-02-PLAN.md
-last_updated: "2026-03-04T22:05:35.586Z"
+stopped_at: Completed Quick-20
+last_updated: "2026-03-04T23:54:27.623Z"
 last_activity: 2026-03-04 — Plan 01-01 complete — Vue 3 + Firebase foundation, auth store, router guard, Firestore rules
 progress:
   total_phases: 7
@@ -160,6 +160,7 @@ Recent decisions affecting current work:
 - [Quick-16]: Autosave debounce reduced from 1500ms to 500ms for more responsive save feedback
 - [Quick-16]: Communion badge removed from ServiceCard — TeamTagPill already shows Communion from service.teams (data-driven, not date-derived)
 - [Quick-17]: Static amber Tailwind classes for Special Service badge — all class strings literal, not computed, maintaining Tailwind v4 purge safety (matches statusClasses pattern)
+- [Phase quick-20]: IntersectionObserver with rootMargin=200px for pre-emptive scroll-based song load-more in SongTable; visibleCount resets on props.songs change for filter/search awareness
 
 ### Roadmap Evolution
 
@@ -195,6 +196,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T23:39:19Z
-Stopped at: Completed Quick-19
+Last session: 2026-03-04T23:54:22.940Z
+Stopped at: Completed Quick-20
 Resume file: None
