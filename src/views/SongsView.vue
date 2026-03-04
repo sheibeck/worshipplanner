@@ -32,7 +32,7 @@
               Batch Assign ({{ uncategorizedSongs.length }})
             </button>
             <button
-              @click="onImportSongs"
+              @click="importModalOpen = true"
               class="inline-flex items-center gap-2 rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm font-medium text-gray-200 hover:bg-gray-700 hover:text-white transition-colors"
             >
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -82,12 +82,19 @@
       @saved="slideOverOpen = false"
       @deleted="slideOverOpen = false"
     />
+
+    <!-- CSV import modal -->
+    <CsvImportModal
+      :open="importModalOpen"
+      @close="importModalOpen = false"
+      @imported="onImported"
+    />
   </AppShell>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { doc, getDoc } from 'firebase/firestore'
 import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
@@ -98,14 +105,19 @@ import SongFilters from '@/components/SongFilters.vue'
 import SongTable from '@/components/SongTable.vue'
 import SongSlideOver from '@/components/SongSlideOver.vue'
 import BatchQuickAssign from '@/components/BatchQuickAssign.vue'
+import CsvImportModal from '@/components/CsvImportModal.vue'
 
 const authStore = useAuthStore()
 const songStore = useSongStore()
 const route = useRoute()
+const router = useRouter()
 
 // Slide-over state
 const selectedSong = ref<Song | null>(null)
 const slideOverOpen = ref(false)
+
+// Import modal state
+const importModalOpen = ref(false)
 
 // Batch quick-assign mode
 const batchMode = ref(false)
@@ -149,9 +161,11 @@ async function initStore() {
 onMounted(async () => {
   await initStore()
 
-  // Check for ?import=true query param to pre-trigger import flow (consumed by Plan 03)
+  // Check for ?import=true query param — auto-open import modal
   if (route.query.import === 'true') {
-    console.log('[SongsView] import=true detected — import flow will be triggered by Plan 03')
+    importModalOpen.value = true
+    // Clear query param without navigation
+    router.replace({ query: { ...route.query, import: undefined } })
   }
 })
 
@@ -169,8 +183,8 @@ function onAddSong() {
   slideOverOpen.value = true
 }
 
-function onImportSongs() {
-  // Plan 03 (CSV import) will wire up full implementation
-  console.log('[SongsView] import songs triggered')
+function onImported(count: number) {
+  importModalOpen.value = false
+  console.log(`[SongsView] imported ${count} songs`)
 }
 </script>
