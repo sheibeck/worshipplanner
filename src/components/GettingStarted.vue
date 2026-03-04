@@ -60,7 +60,12 @@
 </template>
 
 <script setup lang="ts">
-const steps = [
+import { computed } from 'vue'
+import { useSongStore } from '@/stores/songs'
+
+const songStore = useSongStore()
+
+const steps = computed(() => [
   {
     title: 'Sign in to your account',
     description: 'You\'re signed in and ready to go.',
@@ -70,7 +75,7 @@ const steps = [
   {
     title: 'Import your song library',
     description: 'Import songs from Planning Center CSV or add them manually.',
-    done: false,
+    done: songStore.songs.length > 0,
     to: '/songs',
   },
   {
@@ -85,5 +90,5 @@ const steps = [
     done: false,
     to: null,
   },
-]
+])
 </script>
