@@ -38,10 +38,6 @@
           <div>
             <h1 class="text-xl font-semibold text-gray-100">{{ formattedDate }}</h1>
             <div class="flex items-center gap-2 mt-2">
-              <!-- Progression badge -->
-              <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-900/50 text-indigo-300 border border-indigo-800">
-                {{ localService.progression }}
-              </span>
               <!-- Status badge -->
               <span
                 class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border"

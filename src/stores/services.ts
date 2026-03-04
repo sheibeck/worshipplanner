@@ -15,11 +15,10 @@ import {
 import { db } from '@/firebase'
 import { useSongStore } from '@/stores/songs'
 import { buildSlots } from '@/utils/slotTypes'
-import type { Service, Progression } from '@/types/service'
+import type { Service } from '@/types/service'
 
 type CreateServiceInput = {
   date: string
-  progression: Progression
   teams: string[]
 }
 
@@ -55,9 +54,10 @@ export const useServiceStore = defineStore('services', () => {
 
   async function createService(data: CreateServiceInput): Promise<string> {
     if (!orgId.value) throw new Error('No orgId set — call subscribe() first')
-    const slots = buildSlots(data.progression)
+    const slots = buildSlots('1-2-2-3')
     const ref = await addDoc(collection(db, 'organizations', orgId.value, 'services'), {
       ...data,
+      progression: '1-2-2-3',
       slots,
       status: 'draft',
       notes: '',

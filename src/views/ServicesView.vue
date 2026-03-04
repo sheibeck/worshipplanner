@@ -127,7 +127,6 @@ import { doc, getDoc } from 'firebase/firestore'
 import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { useServiceStore } from '@/stores/services'
-import type { Progression } from '@/types/service'
 import AppShell from '@/components/AppShell.vue'
 import ServiceCard from '@/components/ServiceCard.vue'
 import NewServiceDialog from '@/components/NewServiceDialog.vue'
@@ -184,7 +183,7 @@ onUnmounted(() => {
   serviceStore.unsubscribeAll()
 })
 
-async function onCreateService(data: { date: string; progression: Progression; teams: string[] }) {
+async function onCreateService(data: { date: string; teams: string[] }) {
   dialogOpen.value = false
   const id = await serviceStore.createService(data)
   await router.push(`/services/${id}`)

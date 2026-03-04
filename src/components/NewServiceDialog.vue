@@ -60,32 +60,6 @@
               />
             </div>
 
-            <!-- Progression -->
-            <div>
-              <label class="block text-xs font-medium text-gray-400 mb-2">Progression</label>
-              <div class="space-y-2">
-                <label
-                  v-for="option in progressionOptions"
-                  :key="option.value"
-                  class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors"
-                  :class="form.progression === option.value
-                    ? 'border-indigo-600 bg-indigo-900/20'
-                    : 'border-gray-700 bg-gray-800/50 hover:border-gray-600'"
-                >
-                  <input
-                    type="radio"
-                    :value="option.value"
-                    v-model="form.progression"
-                    class="mt-0.5 accent-indigo-500"
-                  />
-                  <div>
-                    <p class="text-sm font-semibold text-gray-100">{{ option.value }}</p>
-                    <p class="text-xs text-gray-400 mt-0.5">{{ option.description }}</p>
-                  </div>
-                </label>
-              </div>
-            </div>
-
             <!-- Teams -->
             <div>
               <label class="block text-xs font-medium text-gray-400 mb-2">Teams</label>
@@ -135,7 +109,6 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import type { Progression } from '@/types/service'
 
 const props = defineProps<{
   open: boolean
@@ -143,21 +116,10 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: []
-  create: [data: { date: string; progression: Progression; teams: string[] }]
+  create: [data: { date: string; teams: string[] }]
 }>()
 
 const availableTeams = ['Choir', 'Orchestra', 'Special Service']
-
-const progressionOptions: Array<{ value: Progression; description: string }> = [
-  {
-    value: '1-2-2-3',
-    description: 'Call to Worship, Intimate, Intimate, Ascription',
-  },
-  {
-    value: '1-2-3-3',
-    description: 'Call to Worship, Intimate, Ascription, Ascription',
-  },
-]
 
 // Compute next Sunday
 function nextSunday(): string {
@@ -174,14 +136,12 @@ function nextSunday(): string {
 
 interface FormState {
   date: string
-  progression: Progression
   teams: string[]
 }
 
 function defaultForm(): FormState {
   return {
     date: nextSunday(),
-    progression: '1-2-2-3',
     teams: [],
   }
 }
@@ -205,7 +165,6 @@ function onCancel() {
 function onCreate() {
   emit('create', {
     date: form.value.date,
-    progression: form.value.progression,
     teams: form.value.teams,
   })
 }

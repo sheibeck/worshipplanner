@@ -159,7 +159,6 @@ describe('useServiceStore', () => {
 
       await store.createService({
         date: '2026-03-08',
-        progression: '1-2-2-3',
         teams: [],
       })
 
@@ -181,7 +180,6 @@ describe('useServiceStore', () => {
 
       await store.createService({
         date: '2026-03-08',
-        progression: '1-2-2-3',
         teams: [],
       })
 
@@ -199,7 +197,6 @@ describe('useServiceStore', () => {
 
       await store.createService({
         date: '2026-03-08',
-        progression: '1-2-2-3',
         teams: [],
       })
 
@@ -224,7 +221,6 @@ describe('useServiceStore', () => {
 
       await store.createService({
         date: '2026-03-15',
-        progression: '1-2-3-3',
         teams: [],
       })
 
@@ -235,7 +231,7 @@ describe('useServiceStore', () => {
       const songSlots = slots.filter((s) => s.kind === 'SONG')
       expect(songSlots[0].requiredVwType).toBe(1)
       expect(songSlots[1].requiredVwType).toBe(2)
-      expect(songSlots[2].requiredVwType).toBe(3)
+      expect(songSlots[2].requiredVwType).toBe(2)
       expect(songSlots[3].requiredVwType).toBe(3)
       expect(songSlots[4].requiredVwType).toBe(3)
     })
@@ -248,7 +244,6 @@ describe('useServiceStore', () => {
 
       await store.createService({
         date: '2026-03-08',
-        progression: '1-2-2-3',
         teams: [],
       })
 
@@ -264,7 +259,6 @@ describe('useServiceStore', () => {
 
       const id = await store.createService({
         date: '2026-03-08',
-        progression: '1-2-2-3',
         teams: [],
       })
 
