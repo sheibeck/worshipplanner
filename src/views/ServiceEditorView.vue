@@ -63,6 +63,20 @@
           <div class="flex items-center gap-3">
             <span v-if="isDirty" class="text-xs text-amber-400">Unsaved changes</span>
 
+            <!-- Suggest All Songs button -->
+            <button
+              type="button"
+              @click="suggestAllSongs"
+              :disabled="!hasSermonContext || aiSuggestingAll"
+              :title="!hasSermonContext ? 'Add a sermon topic or passage for AI suggestions' : undefined"
+              class="print:hidden inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-gray-200 bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-indigo-400" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2l1.5 4.5L18 8l-4.5 1.5L12 14l-1.5-4.5L6 8l4.5-1.5L12 2zM5 16l1 3 3 1-3 1-1 3-1-3-3-1 3-1 1-3zM19 15l.75 2.25L22 18l-2.25.75L19 21l-.75-2.25L16 18l2.25-.75L19 15z"/>
+              </svg>
+              {{ aiSuggestingAll ? 'Suggesting...' : 'Suggest All Songs' }}
+            </button>
+
             <!-- Print button -->
             <button
               type="button"
@@ -153,18 +167,30 @@
           </div>
         </div>
 
-        <!-- Sermon Passage -->
+        <!-- Sermon Context (topic + passage) -->
         <div class="mb-3 rounded-lg bg-gray-900 border border-gray-800 p-3">
-          <div class="flex items-center gap-4">
-            <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">Sermon Passage</h2>
-            <div class="flex-1">
-              <ScriptureInput
-                :modelValue="localService.sermonPassage"
-                :sermonPassage="null"
-                :showOverlapWarning="false"
-                label="Sermon Passage"
-                @update:modelValue="onSermonPassageChange"
-              />
+          <div class="flex items-start gap-4">
+            <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap mt-1">Sermon Context</h2>
+            <div class="flex-1 space-y-3">
+              <div>
+                <p class="text-xs text-gray-500 mb-1">Sermon Topic</p>
+                <input
+                  v-model="localService.sermonTopic"
+                  type="text"
+                  placeholder="e.g. Grace and forgiveness, The prodigal son"
+                  class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+              <div>
+                <p class="text-xs text-gray-500 mb-1">Sermon Passage</p>
+                <ScriptureInput
+                  :modelValue="localService.sermonPassage"
+                  :sermonPassage="null"
+                  :showOverlapWarning="false"
+                  label="Sermon Passage"
+                  @update:modelValue="onSermonPassageChange"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -243,14 +269,54 @@
                   </button>
                 </div>
 
+                <!-- AI draft song display (appears when AI suggests a song for this slot) -->
+                <div
+                  v-if="aiDraftSongs.has(index) && !slot.songId"
+                  class="flex items-center justify-between gap-3 rounded-md bg-indigo-950/50 border border-indigo-800/60 px-3 py-2 mb-1"
+                >
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-gray-300">{{ aiDraftSongs.get(index)?.songTitle }}</p>
+                    <p class="text-xs text-indigo-400 mt-0.5">{{ aiDraftSongs.get(index)?.reason }}</p>
+                  </div>
+                  <div class="flex items-center gap-1 flex-shrink-0">
+                    <!-- Accept button -->
+                    <button
+                      type="button"
+                      @click="acceptAiSong(index)"
+                      class="p-1 rounded text-green-400 hover:text-green-300 hover:bg-green-900/30 transition-colors"
+                      title="Accept AI suggestion"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </button>
+                    <!-- Reject button -->
+                    <button
+                      type="button"
+                      @click="rejectAiSong(index)"
+                      class="p-1 rounded text-gray-500 hover:text-gray-300 hover:bg-gray-700/50 transition-colors"
+                      title="Reject AI suggestion"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
                 <!-- Song picker (empty slot or change) -->
                 <SongSlotPicker
                   :requiredVwType="slot.requiredVwType"
                   :serviceTeams="localService.teams"
                   :currentSongId="slot.songId"
                   :songs="songStore.songs"
+                  :aiSuggestions="aiPerSlotResults.get(index)"
+                  :aiLoading="aiPerSlotLoading.get(index) ?? false"
+                  :aiError="aiPerSlotError.get(index) ?? false"
+                  :hasSermonContext="hasSermonContext"
                   @select="(song) => onSelectSong(index, song)"
                   @clear="onClearSong(index)"
+                  @requestAiSuggestions="fetchAiForSlot(index)"
                 />
               </template>
 
@@ -263,6 +329,9 @@
                       :modelValue="slotToScriptureRef(slot)"
                       :sermonPassage="localService.sermonPassage"
                       :showOverlapWarning="true"
+                      :showAiSuggest="true"
+                      :sermonTopic="localService.sermonTopic ?? ''"
+                      :recentScriptures="recentScriptureRefs"
                       label="Scripture Reading"
                       @update:modelValue="(ref) => onScriptureChange(index, ref)"
                     />
@@ -380,6 +449,8 @@ import ScriptureInput from '@/components/ScriptureInput.vue'
 import ServicePrintLayout from '@/components/ServicePrintLayout.vue'
 import { formatForPlanningCenter } from '@/utils/planningCenterExport'
 import Sortable from 'sortablejs'
+import { getSongSuggestions } from '@/utils/claudeApi'
+import type { AiSongSuggestion } from '@/utils/claudeApi'
 
 const route = useRoute()
 const authStore = useAuthStore()
@@ -412,6 +483,21 @@ const isSharing = ref(false)
 const shareCopied = ref(false)
 const shareError = ref<string | null>(null)
 const showAddMenu = ref(false)
+
+// ── AI state ───────────────────────────────────────────────────────────────────
+
+// Keyed by slot index — AI-drafted songs awaiting accept/reject
+const aiDraftSongs = ref<Map<number, { songId: string; songTitle: string; songKey: string; reason: string }>>(new Map())
+// Loading state for "Suggest All" bulk flow
+const aiSuggestingAll = ref(false)
+// Session cache keyed by sermon context + slot VW type (JSON.stringify)
+const aiSongCache = ref(new Map<string, AiSongSuggestion[]>())
+// Per-slot loading state for individual dropdown AI picks
+const aiPerSlotLoading = ref(new Map<number, boolean>())
+// Per-slot AI results for dropdown display
+const aiPerSlotResults = ref(new Map<number, AiSongSuggestion[]>())
+// Per-slot error state for dropdown display
+const aiPerSlotError = ref(new Map<number, boolean>())
 
 // ── Sortable ───────────────────────────────────────────────────────────────────
 
@@ -474,6 +560,48 @@ const isDirty = computed(() => {
   return JSON.stringify(localService.value) !== JSON.stringify(originalService.value)
 })
 
+const hasSermonContext = computed(
+  () => !!(localService.value?.sermonTopic?.trim() || localService.value?.sermonPassage),
+)
+
+const recentServiceSongIds = computed<string[]>(() => {
+  const eightWeeksAgo = Date.now() - 8 * 7 * 24 * 60 * 60 * 1000
+  const cutoff = new Date(eightWeeksAgo).toISOString().slice(0, 10) // YYYY-MM-DD
+  const ids = new Set<string>()
+  for (const service of serviceStore.services) {
+    // services are ordered by date desc; skip current service
+    if (service.id === serviceId.value) continue
+    if (service.date < cutoff) break
+    for (const slot of service.slots) {
+      if (slot.kind === 'SONG') {
+        const songId = (slot as SongSlot).songId
+        if (songId) ids.add(songId)
+      }
+    }
+  }
+  return Array.from(ids)
+})
+
+const recentScriptureRefs = computed<ScriptureRef[]>(() => {
+  const eightWeeksAgo = Date.now() - 8 * 7 * 24 * 60 * 60 * 1000
+  const cutoff = new Date(eightWeeksAgo).toISOString().slice(0, 10) // YYYY-MM-DD
+  const refs: ScriptureRef[] = []
+  for (const service of serviceStore.services) {
+    // services are ordered by date desc; skip current service
+    if (service.id === serviceId.value) continue
+    if (service.date < cutoff) break
+    for (const slot of service.slots) {
+      if (slot.kind === 'SCRIPTURE') {
+        const s = slot as ScriptureSlot
+        if (s.book && s.chapter && s.verseStart && s.verseEnd) {
+          refs.push({ book: s.book, chapter: s.chapter, verseStart: s.verseStart, verseEnd: s.verseEnd })
+        }
+      }
+    }
+  }
+  return refs
+})
+
 // ── Watch for service store changes ───────────────────────────────────────────
 
 watch(
@@ -489,6 +617,19 @@ watch(
     }
   },
   { immediate: true, deep: true },
+)
+
+// ── AI sermon context watcher — clear caches on context change ─────────────────
+
+watch(
+  () => [localService.value?.sermonTopic, localService.value?.sermonPassage],
+  () => {
+    aiSongCache.value.clear()
+    aiPerSlotResults.value.clear()
+    aiPerSlotError.value.clear()
+    aiPerSlotLoading.value.clear()
+  },
+  { deep: true },
 )
 
 // ── Init ───────────────────────────────────────────────────────────────────────
@@ -591,6 +732,186 @@ function onClearSong(index: number) {
     const updated: SongSlot = { ...slot, songId: null, songTitle: null, songKey: null }
     localService.value.slots[index] = updated
   }
+}
+
+// ── AI cache key ───────────────────────────────────────────────────────────────
+
+function aiCacheKey(slotVwType: number): string {
+  return JSON.stringify({
+    topic: localService.value?.sermonTopic ?? '',
+    passage: localService.value?.sermonPassage ?? null,
+    slotVwType,
+  })
+}
+
+// ── Suggest All Songs ──────────────────────────────────────────────────────────
+
+async function suggestAllSongs() {
+  if (!localService.value || !hasSermonContext.value) return
+  aiSuggestingAll.value = true
+
+  try {
+    const sermonTopic = localService.value.sermonTopic ?? null
+    const sermonPassage = localService.value.sermonPassage ?? null
+    const songLibrary = songStore.songs.map((s) => ({
+      id: s.id,
+      title: s.title,
+      vwType: s.vwType,
+      themes: s.themes,
+      lastUsedAt: s.lastUsedAt,
+    }))
+    const recentIds = recentServiceSongIds.value
+
+    // Accumulate accepted IDs across the batch so each call is aware of previous picks
+    const batchAcceptedIds: string[] = []
+
+    for (let i = 0; i < localService.value.slots.length; i++) {
+      const slot = localService.value.slots[i]
+      if (!slot || slot.kind !== 'SONG') continue
+      const songSlot = slot as SongSlot
+      if (songSlot.songId) continue // skip already-filled slots
+
+      // Collect already-selected song IDs from non-empty slots
+      const alreadySelectedIds: string[] = []
+      for (const s of localService.value.slots) {
+        if (s.kind === 'SONG') {
+          const id = (s as SongSlot).songId
+          if (id) alreadySelectedIds.push(id)
+        }
+      }
+      // Include batch picks so far
+      for (const id of batchAcceptedIds) {
+        if (!alreadySelectedIds.includes(id)) alreadySelectedIds.push(id)
+      }
+
+      const result = await getSongSuggestions({
+        sermonTopic,
+        sermonPassage,
+        slotVwType: songSlot.requiredVwType,
+        alreadySelectedSongIds: alreadySelectedIds,
+        songLibrary,
+        recentServiceSongIds: recentIds,
+      })
+
+      if (!result || result.length === 0) continue
+
+      const suggestion = result[0]
+      if (!suggestion) continue
+
+      const song = songStore.songs.find((s) => s.id === suggestion.songId)
+      if (!song) continue
+
+      const key = song.arrangements[0]?.key ?? ''
+      const newMap = new Map(aiDraftSongs.value)
+      newMap.set(i, {
+        songId: song.id,
+        songTitle: song.title,
+        songKey: key,
+        reason: suggestion.reason,
+      })
+      aiDraftSongs.value = newMap
+
+      // Track this ID for subsequent calls in the batch
+      batchAcceptedIds.push(song.id)
+    }
+  } finally {
+    aiSuggestingAll.value = false
+  }
+}
+
+// ── Fetch AI suggestions for a single slot (called by SongSlotPicker emit) ──────
+
+async function fetchAiForSlot(slotIndex: number) {
+  if (!localService.value) return
+  const slot = localService.value.slots[slotIndex]
+  if (!slot || slot.kind !== 'SONG') return
+  const songSlot = slot as SongSlot
+
+  const cacheKey = aiCacheKey(songSlot.requiredVwType)
+
+  // Check cache first
+  if (aiSongCache.value.has(cacheKey)) {
+    const cached = aiSongCache.value.get(cacheKey)!
+    const newResults = new Map(aiPerSlotResults.value)
+    newResults.set(slotIndex, cached)
+    aiPerSlotResults.value = newResults
+    return
+  }
+
+  // Set loading, clear any previous error
+  const newLoading = new Map(aiPerSlotLoading.value)
+  newLoading.set(slotIndex, true)
+  aiPerSlotLoading.value = newLoading
+
+  const newErrors = new Map(aiPerSlotError.value)
+  newErrors.delete(slotIndex)
+  aiPerSlotError.value = newErrors
+
+  try {
+    const alreadySelectedIds: string[] = []
+    for (const s of localService.value.slots) {
+      if (s.kind === 'SONG') {
+        const id = (s as SongSlot).songId
+        if (id) alreadySelectedIds.push(id)
+      }
+    }
+
+    const result = await getSongSuggestions({
+      sermonTopic: localService.value.sermonTopic ?? null,
+      sermonPassage: localService.value.sermonPassage ?? null,
+      slotVwType: songSlot.requiredVwType,
+      alreadySelectedSongIds: alreadySelectedIds,
+      songLibrary: songStore.songs.map((s) => ({
+        id: s.id,
+        title: s.title,
+        vwType: s.vwType,
+        themes: s.themes,
+        lastUsedAt: s.lastUsedAt,
+      })),
+      recentServiceSongIds: recentServiceSongIds.value,
+    })
+
+    if (result) {
+      // Cache and store results
+      const newCache = new Map(aiSongCache.value)
+      newCache.set(cacheKey, result)
+      aiSongCache.value = newCache
+
+      const newResultsMap = new Map(aiPerSlotResults.value)
+      newResultsMap.set(slotIndex, result)
+      aiPerSlotResults.value = newResultsMap
+    } else {
+      // null result means error/no suggestions
+      const errMap = new Map(aiPerSlotError.value)
+      errMap.set(slotIndex, true)
+      aiPerSlotError.value = errMap
+    }
+  } catch {
+    const errMap = new Map(aiPerSlotError.value)
+    errMap.set(slotIndex, true)
+    aiPerSlotError.value = errMap
+  } finally {
+    const loadingMap = new Map(aiPerSlotLoading.value)
+    loadingMap.delete(slotIndex)
+    aiPerSlotLoading.value = loadingMap
+  }
+}
+
+// ── Accept / Reject AI draft songs ─────────────────────────────────────────────
+
+function acceptAiSong(index: number) {
+  const draft = aiDraftSongs.value.get(index)
+  if (!draft) return
+  onSelectSong(index, { id: draft.songId, title: draft.songTitle, key: draft.songKey })
+  const newMap = new Map(aiDraftSongs.value)
+  newMap.delete(index)
+  aiDraftSongs.value = newMap
+}
+
+function rejectAiSong(index: number) {
+  const newMap = new Map(aiDraftSongs.value)
+  newMap.delete(index)
+  aiDraftSongs.value = newMap
 }
 
 // ── Scripture ──────────────────────────────────────────────────────────────────
@@ -718,6 +1039,7 @@ async function onSave() {
       name: data.name,
       teams: data.teams,
       sermonPassage: data.sermonPassage,
+      sermonTopic: data.sermonTopic ?? '',
       notes: data.notes,
       status: data.status,
       slots: reindexSlots(data.slots),

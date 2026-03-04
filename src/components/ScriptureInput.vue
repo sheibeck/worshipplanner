@@ -1,5 +1,85 @@
 <template>
   <div class="space-y-2">
+    <!-- AI Scripture Search (only for reading slots) -->
+    <div v-if="showAiSuggest" class="space-y-2">
+      <div class="flex gap-2">
+        <input
+          v-model="aiQuery"
+          type="text"
+          placeholder="Search passages... e.g. 'comfort in suffering'"
+          class="flex-1 rounded-md bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          @keydown.enter.prevent="onAiSearch"
+        />
+        <button
+          type="button"
+          @click="onAiSearch"
+          :disabled="!canAiSearch || aiLoading"
+          class="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors border"
+          :class="canAiSearch && !aiLoading
+            ? 'text-indigo-400 bg-gray-800 border-gray-700 hover:bg-gray-700'
+            : 'text-gray-600 bg-gray-900 border-gray-800 cursor-not-allowed'"
+        >
+          <!-- Spinner when loading -->
+          <svg v-if="aiLoading" class="h-3.5 w-3.5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
+          <!-- Search icon when idle -->
+          <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          {{ aiLoading ? 'Searching...' : 'Search' }}
+        </button>
+      </div>
+
+      <!-- "Suggest Scripture" button (when no query typed but sermon context exists) -->
+      <button
+        v-if="!aiQuery && hasSermonContext && aiResults.length === 0 && !aiLoading"
+        type="button"
+        @click="onAiSuggest"
+        class="inline-flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+        </svg>
+        Suggest scripture based on sermon
+      </button>
+
+      <!-- AI Error state -->
+      <div v-if="aiError" class="text-xs text-gray-500">
+        Suggestions unavailable.
+        <button @click="onAiRetry" class="text-indigo-400 hover:text-indigo-300 ml-1">Retry</button>
+      </div>
+
+      <!-- AI Results list -->
+      <div v-if="aiResults.length > 0" class="space-y-1">
+        <button
+          v-for="(result, ri) in aiResults"
+          :key="ri"
+          type="button"
+          @click="onSelectAiScripture(result)"
+          class="w-full text-left rounded-md px-3 py-2 text-sm transition-colors hover:bg-gray-800/80 border border-transparent hover:border-gray-700"
+        >
+          <div class="flex items-center justify-between gap-2">
+            <span class="font-medium text-gray-100">
+              {{ result.book }} {{ result.chapter }}:{{ result.verseStart }}-{{ result.verseEnd }}
+            </span>
+            <span v-if="result.recentlyUsed" class="text-xs text-amber-400 shrink-0">
+              Used {{ result.weeksAgoUsed }}w ago
+            </span>
+          </div>
+          <p class="text-xs text-indigo-400/80 mt-0.5">{{ result.reason }}</p>
+          <!-- Overlap warning -->
+          <p
+            v-if="aiResultOverlapsSermon(result)"
+            class="text-xs text-amber-400 mt-0.5"
+          >
+            Overlaps with sermon passage
+          </p>
+        </button>
+      </div>
+    </div>
+
     <!-- 4 fields in a row -->
     <div class="flex gap-2">
       <!-- Book dropdown -->
@@ -107,12 +187,16 @@
 import { ref, computed, watch } from 'vue'
 import { BIBLE_BOOKS, esvLink, scripturesOverlap } from '@/utils/scripture'
 import { fetchPassageText } from '@/utils/esvApi'
+import { getScriptureSuggestions, type AiScriptureSuggestion } from '@/utils/claudeApi'
 import type { ScriptureRef } from '@/types/service'
 
 const props = defineProps<{
   modelValue: ScriptureRef | null
   sermonPassage: ScriptureRef | null
   showOverlapWarning?: boolean
+  showAiSuggest?: boolean
+  sermonTopic?: string
+  recentScriptures?: ScriptureRef[]
   label: string
 }>()
 
@@ -137,6 +221,13 @@ watch(
     localVerseEnd.value = val?.verseEnd ?? ''
   },
 )
+
+// ── AI state ──────────────────────────────────────────────────────────────────
+
+const aiQuery = ref('')
+const aiLoading = ref(false)
+const aiError = ref(false)
+const aiResults = ref<AiScriptureSuggestion[]>([])
 
 // ── Computed ───────────────────────────────────────────────────────────────────
 
@@ -174,6 +265,14 @@ const hasOverlap = computed(() => {
   return scripturesOverlap(currentRef.value, props.sermonPassage)
 })
 
+const hasSermonContext = computed(() => {
+  return !!(props.sermonTopic?.trim() || props.sermonPassage)
+})
+
+const canAiSearch = computed(() => {
+  return !!(aiQuery.value.trim() || hasSermonContext.value)
+})
+
 // ── Preview state ──────────────────────────────────────────────────────────────
 
 const previewText = ref<string>('')
@@ -209,6 +308,60 @@ async function fetchPreview() {
   }
 }
 
+// ── AI functions ───────────────────────────────────────────────────────────────
+
+async function onAiSearch() {
+  aiLoading.value = true
+  aiError.value = false
+  aiResults.value = []
+  try {
+    const result = await getScriptureSuggestions({
+      sermonTopic: props.sermonTopic ?? null,
+      sermonPassage: props.sermonPassage,
+      query: aiQuery.value,
+      recentScriptures: props.recentScriptures ?? [],
+    })
+    if (result !== null) {
+      aiResults.value = result
+    } else {
+      aiError.value = true
+    }
+  } finally {
+    aiLoading.value = false
+  }
+}
+
+function onAiSuggest() {
+  aiQuery.value = ''
+  onAiSearch()
+}
+
+function onAiRetry() {
+  aiError.value = false
+  onAiSearch()
+}
+
+function onSelectAiScripture(result: AiScriptureSuggestion) {
+  localBook.value = result.book
+  localChapter.value = result.chapter
+  localVerseStart.value = result.verseStart
+  localVerseEnd.value = result.verseEnd
+  onFieldChange()
+  aiResults.value = []
+  aiQuery.value = ''
+}
+
+function aiResultOverlapsSermon(result: AiScriptureSuggestion): boolean {
+  if (!props.sermonPassage) return false
+  const ref: ScriptureRef = {
+    book: result.book,
+    chapter: result.chapter,
+    verseStart: result.verseStart,
+    verseEnd: result.verseEnd,
+  }
+  return scripturesOverlap(ref, props.sermonPassage)
+}
+
 // ── Emit on field change ───────────────────────────────────────────────────────
 
 function onFieldChange() {
@@ -219,4 +372,7 @@ function onFieldChange() {
     previewError.value = ''
   }
 }
+
+// Suppress unused warning for isComplete — available for future template use
+void isComplete
 </script>

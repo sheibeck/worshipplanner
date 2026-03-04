@@ -32,6 +32,10 @@ vi.mock('@/utils/esvApi', () => ({
   fetchPassageText: vi.fn(() => Promise.resolve('Mocked passage text')),
 }))
 
+vi.mock('@/utils/claudeApi', () => ({
+  getScriptureSuggestions: vi.fn(() => Promise.resolve(null)),
+}))
+
 describe('ScriptureInput', () => {
   const defaultProps = {
     modelValue: null,
