@@ -53,6 +53,12 @@ function createTestRouter() {
         name: 'public',
         component: { template: '<div>Public</div>' },
       },
+      {
+        path: '/share/:token',
+        name: 'share',
+        component: { template: '<div>Share</div>' },
+        // No meta.requiresAuth — matches production router
+      },
     ],
   })
 
@@ -124,6 +130,16 @@ describe('Router guard', () => {
       const router = createTestRouter()
       await router.push('/public')
       expect(router.currentRoute.value.name).toBe('public')
+    })
+  })
+
+  describe('share route', () => {
+    it('allows unauthenticated users to access /share/:token without redirect', async () => {
+      mockGetCurrentUser.mockResolvedValue(null)
+      const router = createTestRouter()
+      await router.push('/share/abc123')
+      expect(router.currentRoute.value.name).toBe('share')
+      expect(router.currentRoute.value.params.token).toBe('abc123')
     })
   })
 })

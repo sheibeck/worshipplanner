@@ -43,6 +43,12 @@ const router = createRouter({
       component: () => import('../views/ServiceEditorView.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/share/:token',
+      name: 'share',
+      component: () => import('../views/ShareView.vue'),
+      // Intentionally no meta.requiresAuth — public route for unauthenticated viewers
+    },
   ],
 })
 

@@ -96,7 +96,21 @@
               {{ pcCopied ? 'Copied!' : 'Copy for PC' }}
             </button>
 
-            <!-- Share button added in Plan 02 -->
+            <!-- Share button -->
+            <button
+              type="button"
+              @click="onShare"
+              :disabled="!localService || isSharing"
+              class="print:hidden inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-gray-200 bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700"
+            >
+              <svg v-if="!shareCopied" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+              </svg>
+              <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              {{ isSharing ? 'Sharing...' : shareCopied ? 'Link Copied!' : 'Share' }}
+            </button>
 
             <button
               type="button"
@@ -303,6 +317,8 @@ const localService = ref<Service | null>(null)
 const originalService = ref<Service | null>(null)
 const isSaving = ref(false)
 const pcCopied = ref(false)
+const isSharing = ref(false)
+const shareCopied = ref(false)
 
 // ── Computed ───────────────────────────────────────────────────────────────────
 
@@ -479,6 +495,24 @@ async function onCopyForPC() {
   setTimeout(() => {
     pcCopied.value = false
   }, 2000)
+}
+
+async function onShare() {
+  if (!localService.value || !serviceStore.orgId) return
+  isSharing.value = true
+  try {
+    const token = await serviceStore.createShareToken(localService.value, serviceStore.orgId)
+    const url = `${window.location.origin}/share/${token}`
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(url)
+    }
+    shareCopied.value = true
+    setTimeout(() => {
+      shareCopied.value = false
+    }, 2000)
+  } finally {
+    isSharing.value = false
+  }
 }
 
 // ── Save ───────────────────────────────────────────────────────────────────────
