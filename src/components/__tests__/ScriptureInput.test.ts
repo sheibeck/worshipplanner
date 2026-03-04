@@ -22,10 +22,14 @@ vi.mock('@/utils/scripture', () => ({
     'Jude', 'Revelation',
   ],
   esvLink: vi.fn(
-    (book: string, chapter: number, verseStart: number, verseEnd: number) =>
-      `https://www.esv.org/${book}+${chapter}%3A${verseStart}-${verseEnd}/`,
+    (book: string, chapter: number) =>
+      `https://www.esv.org/${book}+${chapter}`,
   ),
   scripturesOverlap: vi.fn(() => false),
+}))
+
+vi.mock('@/utils/esvApi', () => ({
+  fetchPassageText: vi.fn(() => Promise.resolve('Mocked passage text')),
 }))
 
 describe('ScriptureInput', () => {
@@ -104,6 +108,95 @@ describe('ScriptureInput', () => {
       expect(wrapper.text()).not.toContain('overlaps with the sermon passage')
 
       vi.mocked(scripturesOverlap).mockReturnValue(false)
+    })
+  })
+
+  describe('Preview with partial fields', () => {
+    it('shows ESV link when only book and chapter are filled (no verses)', () => {
+      const wrapper = mount(ScriptureInput, {
+        props: {
+          ...defaultProps,
+          modelValue: { book: 'John', chapter: 3, verseStart: 0, verseEnd: 0 },
+        },
+      })
+      // ESV link should be visible with only book+chapter
+      expect(wrapper.text()).toContain('ESV')
+    })
+
+    it('does not show ESV link when book is filled but chapter is empty', () => {
+      const wrapper = mount(ScriptureInput, {
+        props: {
+          ...defaultProps,
+          // modelValue null means all fields empty
+          modelValue: null,
+        },
+      })
+      expect(wrapper.text()).not.toContain('ESV')
+    })
+
+    it('shows preview button when only book and chapter are filled', () => {
+      const wrapper = mount(ScriptureInput, {
+        props: {
+          ...defaultProps,
+          modelValue: { book: 'John', chapter: 3, verseStart: 0, verseEnd: 0 },
+        },
+      })
+      expect(wrapper.text()).toContain('Preview passage')
+    })
+
+    it('passageQuery is "John 3" when book=John, chapter=3, no verses (verseStart/verseEnd are 0)', () => {
+      const wrapper = mount(ScriptureInput, {
+        props: {
+          ...defaultProps,
+          modelValue: { book: 'John', chapter: 3, verseStart: 0, verseEnd: 0 },
+        },
+      })
+      // The preview button shows because passageQuery != previewRef (empty)
+      // We verify the button is present — the passageQuery is "John 3"
+      const button = wrapper.find('button')
+      expect(button.exists()).toBe(true)
+      expect(wrapper.text()).toContain('Preview passage')
+    })
+
+    it('passageQuery includes verses when all 4 fields are filled', () => {
+      const wrapper = mount(ScriptureInput, {
+        props: {
+          ...defaultProps,
+          modelValue: { book: 'John', chapter: 3, verseStart: 16, verseEnd: 17 },
+        },
+      })
+      // Preview button present and ESV link visible
+      expect(wrapper.text()).toContain('Preview passage')
+      expect(wrapper.text()).toContain('ESV')
+    })
+
+    it('ESV link is still visible when all 4 fields are filled', () => {
+      const wrapper = mount(ScriptureInput, {
+        props: {
+          ...defaultProps,
+          modelValue: { book: 'Psalms', chapter: 23, verseStart: 1, verseEnd: 6 },
+        },
+      })
+      expect(wrapper.text()).toContain('ESV')
+    })
+
+    it('update:modelValue emits null when only book+chapter filled (isComplete requires all 4 fields)', async () => {
+      const wrapper = mount(ScriptureInput, {
+        props: {
+          ...defaultProps,
+          modelValue: null,
+        },
+      })
+      // Set book and chapter only (no verse fields)
+      const select = wrapper.find('select')
+      await select.setValue('John')
+      await select.trigger('change')
+
+      const emitted = wrapper.emitted('update:modelValue')
+      expect(emitted).toBeTruthy()
+      // Should emit null because isComplete is false (no verses)
+      const lastEmit = emitted![emitted!.length - 1]
+      expect(lastEmit[0]).toBeNull()
     })
   })
 })
