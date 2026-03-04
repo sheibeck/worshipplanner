@@ -49,6 +49,11 @@
               >
                 {{ localService.status === 'planned' ? 'Planned' : 'Draft' }}
               </span>
+              <!-- Communion badge -->
+              <span
+                v-if="isCommunion"
+                class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-900/50 text-amber-300 border border-amber-800"
+              >Communion</span>
             </div>
           </div>
 
@@ -254,16 +259,25 @@ const isSaving = ref(false)
 
 const serviceId = computed(() => route.params.id as string)
 
-const formattedDate = computed(() => {
-  if (!localService.value?.date) return ''
+const parsedDate = computed(() => {
+  if (!localService.value?.date) return null
   const [year, month, day] = localService.value.date.split('-').map(Number)
-  const d = new Date(year, month - 1, day)
-  return d.toLocaleDateString('en-US', {
+  return new Date(year, month - 1, day)
+})
+
+const formattedDate = computed(() => {
+  if (!parsedDate.value) return ''
+  return parsedDate.value.toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'long',
     day: 'numeric',
     year: 'numeric',
   })
+})
+
+const isCommunion = computed(() => {
+  if (!parsedDate.value) return false
+  return parsedDate.value.getDay() === 0 && parsedDate.value.getDate() <= 7
 })
 
 const isDirty = computed(() => {

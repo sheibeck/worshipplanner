@@ -3,9 +3,13 @@
     <div
       class="flex items-start gap-4 px-4 py-3 rounded-lg bg-gray-900 border border-gray-800 hover:bg-gray-800/50 transition-colors cursor-pointer"
     >
-      <!-- Left: Date -->
+      <!-- Left: Date + Communion badge -->
       <div class="shrink-0 min-w-[80px] text-center">
         <p class="text-sm font-semibold text-gray-100">{{ formattedDate }}</p>
+        <span
+          v-if="isCommunion"
+          class="inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-900/50 text-amber-300 border border-amber-800"
+        >Communion</span>
       </div>
 
       <!-- Center: Order of service in 3 sections -->
@@ -82,22 +86,29 @@ const props = defineProps<{
   service: Service
 }>()
 
+const parsedDate = computed(() => {
+  const [year, month, day] = props.service.date.split('-').map(Number)
+  return new Date(year, month - 1, day)
+})
+
 // Date formatting: "Sun, Mar 8" (with year if not current year)
 const formattedDate = computed(() => {
-  const [year, month, day] = props.service.date.split('-').map(Number)
-  const d = new Date(year, month - 1, day)
-  const currentYear = new Date().getFullYear()
-
+  const d = parsedDate.value
   const options: Intl.DateTimeFormatOptions = {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
   }
-  if (year !== currentYear) {
+  if (d.getFullYear() !== new Date().getFullYear()) {
     options.year = 'numeric'
   }
-
   return d.toLocaleDateString('en-US', options)
+})
+
+// First Sunday of the month = Communion Sunday
+const isCommunion = computed(() => {
+  const d = parsedDate.value
+  return d.getDay() === 0 && d.getDate() <= 7
 })
 
 const messageIndex = computed(() =>
