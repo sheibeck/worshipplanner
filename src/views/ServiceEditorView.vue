@@ -451,6 +451,7 @@ async function onSave() {
 
     // Update all non-slot fields
     await serviceStore.updateService(id, {
+      name: data.name,
       teams: data.teams,
       sermonPassage: data.sermonPassage,
       notes: data.notes,
