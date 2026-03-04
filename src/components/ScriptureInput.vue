@@ -43,9 +43,9 @@
       />
     </div>
 
-    <!-- ESV link (shown when all fields are filled) -->
+    <!-- ESV link (shown when book and chapter are filled) -->
     <a
-      v-if="isComplete"
+      v-if="canPreview"
       :href="esvUrl"
       target="_blank"
       rel="noopener"
@@ -149,8 +149,12 @@ const isComplete = computed(() => {
   )
 })
 
+const canPreview = computed(() => {
+  return !!localBook.value && !!localChapter.value
+})
+
 const esvUrl = computed(() => {
-  if (!isComplete.value) return ''
+  if (!canPreview.value) return ''
   return esvLink(localBook.value as string, localChapter.value as number)
 })
 
@@ -177,11 +181,15 @@ const previewError = ref<string>('')
 const previewRef = ref<string>('')
 
 const passageQuery = computed(() => {
-  if (!isComplete.value) return ''
-  return `${localBook.value} ${localChapter.value}:${localVerseStart.value}-${localVerseEnd.value}`
+  if (!canPreview.value) return ''
+  const base = `${localBook.value} ${localChapter.value}`
+  if (localVerseStart.value && localVerseEnd.value) {
+    return `${base}:${localVerseStart.value}-${localVerseEnd.value}`
+  }
+  return base
 })
 
-const showPreviewButton = computed(() => isComplete.value && passageQuery.value !== previewRef.value)
+const showPreviewButton = computed(() => canPreview.value && passageQuery.value !== previewRef.value)
 
 async function fetchPreview() {
   const query = passageQuery.value
