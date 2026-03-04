@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-03-03)
 Phase: 1 of 5 (Foundation)
 Plan: 1 of 2 in current phase (01-01 complete, 01-02 next)
 Status: In progress
-Last activity: 2026-03-04 — Plan 01-01 complete — Vue 3 + Firebase foundation, auth store, router guard, Firestore rules
+Last activity: 2026-03-04 — Completed quick tasks 20 (infinite scroll) and 21 (ServiceCard footer fix)
 
 Progress: [█████░░░░░] 50%
 
@@ -187,6 +187,7 @@ None yet.
 | 17 | Remove progression from print/share headers; amber Special Service badge in ServiceCard | 2026-03-04 | 4e783fb | [17-remove-progression-from-print-share-head](./quick/17-remove-progression-from-print-share-head/) |
 | 18 | Add Hymn slot type with hymnName, hymnNumber, verses fields across editor, print, share, and PC export | 2026-03-04 | 0c8e511 | [18-add-hymn-slot-type-to-services-with-free](./quick/18-add-hymn-slot-type-to-services-with-free/) |
 | 19 | Add Settings screen to edit org name; gear icon in sidebar for editors; /settings route with requiresEditor guard | 2026-03-04 | b626044 | [19-add-settings-screen-to-edit-org-name-ins](./quick/19-add-settings-screen-to-edit-org-name-ins/) |
+| 20 | Infinite scroll for song list — progressive rendering with IntersectionObserver, 50-item batches | 2026-03-04 | 9313fc2 | [20-infinite-scroll-for-song-list-with-searc](./quick/20-infinite-scroll-for-song-list-with-searc/) |
 | 21 | Fix ServiceCard footer pinned to bottom with flex-col h-full layout (CSS-only) | 2026-03-04 | b51d273 | [21-fix-servicecard-footer-fixed-height-pinn](./quick/21-fix-servicecard-footer-fixed-height-pinn/) |
 
 ### Blockers/Concerns
