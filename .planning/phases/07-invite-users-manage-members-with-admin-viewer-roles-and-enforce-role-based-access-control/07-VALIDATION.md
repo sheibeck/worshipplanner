@@ -2,7 +2,7 @@
 phase: 7
 slug: invite-users-manage-members-with-admin-viewer-roles-and-enforce-role-based-access-control
 status: draft
-nyquist_compliant: false
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-03-04
 ---
@@ -38,25 +38,21 @@ created: 2026-03-04
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 07-01-01 | 01 | 1 | RBAC-04 | unit | `npx vitest run src/stores/__tests__/auth.test.ts` | ✅ extend | ⬜ pending |
-| 07-01-02 | 01 | 1 | AUTH-04 | unit | `npx vitest run src/stores/__tests__/auth.test.ts` | ✅ extend | ⬜ pending |
-| 07-02-01 | 02 | 1 | RBAC-02 | emulator | `npm run test:rules` | ✅ extend | ⬜ pending |
-| 07-02-02 | 02 | 1 | RBAC-03 | emulator | `npm run test:rules` | ✅ extend | ⬜ pending |
-| 07-03-01 | 03 | 2 | AUTH-03 | unit | `npx vitest run src/views/__tests__/TeamView.test.ts` | ❌ W0 | ⬜ pending |
-| 07-03-02 | 03 | 2 | RBAC-05 | unit | `npx vitest run src/views/__tests__/TeamView.test.ts` | ❌ W0 | ⬜ pending |
-| 07-03-03 | 03 | 2 | RBAC-06 | unit | `npx vitest run src/views/__tests__/TeamView.test.ts` | ❌ W0 | ⬜ pending |
-| 07-04-01 | 04 | 2 | RBAC-01 | unit | `npx vitest run src/router/__tests__/router.test.ts` | ✅ extend | ⬜ pending |
+| 07-01-T1 | 01 | 1 | AUTH-04, RBAC-04 | unit | `npx vitest run src/stores/__tests__/auth.test.ts -x` | Exists (extend) | pending |
+| 07-01-T2 | 01 | 1 | RBAC-02, RBAC-03, AUTH-04 | emulator | `npm run test:rules` | Exists (extend) | pending |
+| 07-02-T0 | 02 | 2 | AUTH-03, RBAC-05, RBAC-06 | unit | `npx vitest run src/views/__tests__/TeamView.test.ts -x` | Wave 0 (created by this task) | pending |
+| 07-02-T1 | 02 | 2 | AUTH-03, RBAC-05, RBAC-06 | unit | `npx vitest run src/views/__tests__/TeamView.test.ts -x` | Created in T0 | pending |
+| 07-02-T2 | 02 | 2 | RBAC-01 | unit | `npx vitest run --reporter=verbose` | Existing tests | pending |
 
-*Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
+*Status: pending -- green -- red -- flaky*
 
 ---
 
 ## Wave 0 Requirements
 
-- [ ] `src/views/__tests__/TeamView.test.ts` — stubs for AUTH-03, RBAC-05, RBAC-06 invite logic
-- [ ] `src/rules.test.ts` — extend with viewer read/write scenarios for new role model
-- [ ] `src/router/__tests__/router.test.ts` — extend with `requiresEditor` guard tests
-- [ ] `src/stores/__tests__/auth.test.ts` — extend with orgId/userRole/isEditor initialization tests
+- [ ] `src/views/__tests__/TeamView.test.ts` — stubs for AUTH-03, RBAC-05, RBAC-06 invite logic (created by Plan 02 Task 0)
+- [ ] `src/rules.test.ts` — extend with viewer read/write scenarios for new role model (extended by Plan 01 Task 2)
+- [ ] `src/stores/__tests__/auth.test.ts` — extend with orgId/userRole/isEditor initialization tests (extended by Plan 01 Task 1)
 
 ---
 
@@ -67,14 +63,15 @@ created: 2026-03-04
 | Viewer sidebar shows only Services link | RBAC-01 | Visual UI verification | Sign in as viewer, verify only Services nav link visible |
 | Org name displays in sidebar | UX | Visual branding check | Sign in as any role, verify org name at top of sidebar |
 | Pending invite shows in member table | AUTH-03 | Visual UI verification | Create invite, verify "Pending" badge in table |
+| GettingStarted not shown to viewers | UX | Visual UI verification | Sign in as viewer, verify GettingStarted component not rendered |
 
 ---
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
 - [ ] No watch-mode flags
 - [ ] Feedback latency < 30s
 - [ ] `nyquist_compliant: true` set in frontmatter
