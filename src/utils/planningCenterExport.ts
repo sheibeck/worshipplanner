@@ -2,19 +2,6 @@ import type { Service } from '@/types/service'
 import type { Song } from '@/types/song'
 import type { ScriptureRef } from '@/types/service'
 
-// Human-readable labels for each of the 9 service slots
-const SLOT_EXPORT_LABELS: Record<number, string> = {
-  0: 'Song 1 (Call to Worship)',
-  1: 'Scripture',
-  2: 'Song 2',
-  3: 'Prayer',
-  4: 'Scripture',
-  5: 'Song 3',
-  6: 'Song 4',
-  7: 'Message',
-  8: 'Sending Song',
-}
-
 /**
  * Format a ScriptureRef as "Book Chapter:VerseStart-VerseEnd"
  */
@@ -56,11 +43,14 @@ export function formatForPlanningCenter(service: Service, songs: Song[]): string
   lines.push(`Progression: ${service.progression}`)
   lines.push('')
 
+  // Track song count for sequential labeling
+  let songCount = 0
+
   // Slots
   for (const slot of service.slots) {
-    const label = SLOT_EXPORT_LABELS[slot.position] ?? `Slot ${slot.position}`
-
     if (slot.kind === 'SONG') {
+      songCount++
+      const label = `Song ${songCount}`
       if (!slot.songId) {
         lines.push(`${label} -- [empty]`)
       } else {
@@ -74,6 +64,7 @@ export function formatForPlanningCenter(service: Service, songs: Song[]): string
         }
       }
     } else if (slot.kind === 'SCRIPTURE') {
+      const label = 'Scripture'
       if (!slot.book) {
         lines.push(`${label} -- [empty]`)
       } else {

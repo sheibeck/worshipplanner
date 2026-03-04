@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { PROGRESSION_SLOT_TYPES, buildSlots, SLOT_LABELS } from '@/utils/slotTypes'
+import { PROGRESSION_SLOT_TYPES, buildSlots, createSlot, reindexSlots, slotLabel } from '@/utils/slotTypes'
 import type { SongSlot, ScriptureSlot, NonAssignableSlot } from '@/types/service'
 
 describe('PROGRESSION_SLOT_TYPES', () => {
@@ -139,24 +139,103 @@ describe('buildSlots', () => {
   })
 })
 
-describe('SLOT_LABELS', () => {
-  it('maps position 0 to "Worship Song"', () => {
-    expect(SLOT_LABELS[0]).toBe('Worship Song')
+describe('createSlot', () => {
+  it('creates a SONG slot with default vwType 2', () => {
+    const slot = createSlot('SONG') as SongSlot
+    expect(slot.kind).toBe('SONG')
+    expect(slot.requiredVwType).toBe(2)
+    expect(slot.position).toBe(0)
+    expect(slot.songId).toBeNull()
+    expect(slot.songTitle).toBeNull()
+    expect(slot.songKey).toBeNull()
   })
 
-  it('maps position 1 to "Scripture Reading"', () => {
-    expect(SLOT_LABELS[1]).toBe('Scripture Reading')
+  it('creates a SONG slot with specified vwType 1', () => {
+    const slot = createSlot('SONG', 1) as SongSlot
+    expect(slot.kind).toBe('SONG')
+    expect(slot.requiredVwType).toBe(1)
   })
 
-  it('maps position 3 to "Prayer"', () => {
-    expect(SLOT_LABELS[3]).toBe('Prayer')
+  it('creates a SONG slot with specified vwType 3', () => {
+    const slot = createSlot('SONG', 3) as SongSlot
+    expect(slot.kind).toBe('SONG')
+    expect(slot.requiredVwType).toBe(3)
   })
 
-  it('maps position 7 to "Message"', () => {
-    expect(SLOT_LABELS[7]).toBe('Message')
+  it('creates a SCRIPTURE slot with null fields', () => {
+    const slot = createSlot('SCRIPTURE') as ScriptureSlot
+    expect(slot.kind).toBe('SCRIPTURE')
+    expect(slot.position).toBe(0)
+    expect(slot.book).toBeNull()
+    expect(slot.chapter).toBeNull()
+    expect(slot.verseStart).toBeNull()
+    expect(slot.verseEnd).toBeNull()
   })
 
-  it('maps position 8 to "Sending Song"', () => {
-    expect(SLOT_LABELS[8]).toBe('Sending Song')
+  it('creates a PRAYER slot', () => {
+    const slot = createSlot('PRAYER') as NonAssignableSlot
+    expect(slot.kind).toBe('PRAYER')
+    expect(slot.position).toBe(0)
+  })
+
+  it('creates a MESSAGE slot', () => {
+    const slot = createSlot('MESSAGE') as NonAssignableSlot
+    expect(slot.kind).toBe('MESSAGE')
+    expect(slot.position).toBe(0)
+  })
+})
+
+describe('reindexSlots', () => {
+  it('normalizes positions to match array index', () => {
+    const slots = [
+      { kind: 'SONG' as const, position: 5, requiredVwType: 1 as const, songId: null, songTitle: null, songKey: null },
+      { kind: 'PRAYER' as const, position: 2 },
+      { kind: 'MESSAGE' as const, position: 8 },
+    ]
+    const reindexed = reindexSlots(slots)
+    expect(reindexed[0].position).toBe(0)
+    expect(reindexed[1].position).toBe(1)
+    expect(reindexed[2].position).toBe(2)
+  })
+
+  it('preserves slot data when reindexing', () => {
+    const slots = [
+      { kind: 'SONG' as const, position: 99, requiredVwType: 2 as const, songId: 'abc', songTitle: 'Test', songKey: 'G' },
+    ]
+    const reindexed = reindexSlots(slots)
+    const slot = reindexed[0] as SongSlot
+    expect(slot.position).toBe(0)
+    expect(slot.songId).toBe('abc')
+    expect(slot.songTitle).toBe('Test')
+    expect(slot.songKey).toBe('G')
+  })
+
+  it('returns a new array (does not mutate original)', () => {
+    const slots = [{ kind: 'PRAYER' as const, position: 5 }]
+    const reindexed = reindexSlots(slots)
+    expect(reindexed).not.toBe(slots)
+    expect(slots[0].position).toBe(5) // original unchanged
+  })
+})
+
+describe('slotLabel', () => {
+  it('returns "Song" for a SONG slot', () => {
+    const slot: SongSlot = { kind: 'SONG', position: 0, requiredVwType: 1, songId: null, songTitle: null, songKey: null }
+    expect(slotLabel(slot, 0)).toBe('Song')
+  })
+
+  it('returns "Scripture Reading" for a SCRIPTURE slot', () => {
+    const slot: ScriptureSlot = { kind: 'SCRIPTURE', position: 1, book: null, chapter: null, verseStart: null, verseEnd: null }
+    expect(slotLabel(slot, 1)).toBe('Scripture Reading')
+  })
+
+  it('returns "Prayer" for a PRAYER slot', () => {
+    const slot: NonAssignableSlot = { kind: 'PRAYER', position: 3 }
+    expect(slotLabel(slot, 3)).toBe('Prayer')
+  })
+
+  it('returns "Message" for a MESSAGE slot', () => {
+    const slot: NonAssignableSlot = { kind: 'MESSAGE', position: 7 }
+    expect(slotLabel(slot, 7)).toBe('Message')
   })
 })

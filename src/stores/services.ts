@@ -89,14 +89,14 @@ export const useServiceStore = defineStore('services', () => {
 
   async function assignSongToSlot(
     serviceId: string,
-    slotPosition: number,
+    slotIndex: number,
     song: { id: string; title: string; key: string },
   ) {
     const service = services.value.find((s) => s.id === serviceId)
     if (!service) return
 
-    const updatedSlots = service.slots.map((slot) => {
-      if (slot.position === slotPosition && slot.kind === 'SONG') {
+    const updatedSlots = service.slots.map((slot, idx) => {
+      if (idx === slotIndex && slot.kind === 'SONG') {
         return {
           ...slot,
           songId: song.id,
@@ -114,12 +114,12 @@ export const useServiceStore = defineStore('services', () => {
     await songStore.updateSong(song.id, { lastUsedAt: serverTimestamp() as never })
   }
 
-  async function clearSongFromSlot(serviceId: string, slotPosition: number) {
+  async function clearSongFromSlot(serviceId: string, slotIndex: number) {
     const service = services.value.find((s) => s.id === serviceId)
     if (!service) return
 
-    const updatedSlots = service.slots.map((slot) => {
-      if (slot.position === slotPosition && slot.kind === 'SONG') {
+    const updatedSlots = service.slots.map((slot, idx) => {
+      if (idx === slotIndex && slot.kind === 'SONG') {
         return {
           ...slot,
           songId: null,
