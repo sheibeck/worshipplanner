@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed quick-6 rotation 8-week window and Song Rotation tab rename
-last_updated: "2026-03-04T16:32:00.594Z"
-last_activity: 2026-03-04 - Completed quick task 6: Limit rotation to 8-week window and rename tab to Song Rotation
+stopped_at: Completed quick-7 service card team badges and song slot label
+last_updated: "2026-03-04T11:41:00.000Z"
+last_activity: 2026-03-04 - Completed quick task 7: Service card team badges, song/scripture slot label prefixes, Sunday-ordinal team defaults
 progress:
   total_phases: 5
   completed_phases: 4
@@ -117,6 +117,10 @@ Recent decisions affecting current work:
 - [Quick-3]: displayedPastServices slices to 5 but toggle button retains full count
 - [Quick-3]: Status badge is a button element for semantic correctness and keyboard accessibility
 - [Phase quick-6]: 8-week window computed in ServicesView as rotationServices prop — keeps RotationTable a pure display component
+- [Quick-7]: sundayOrdinal() uses Math.ceil(day/7) — robust for any month length without hardcoding date ranges
+- [Quick-7]: Team badge row uses v-if guard so ServiceCard layout is unaffected for services with no teams
+- [Quick-7]: Song/Scripture labels use em dash (—) matching existing 'Scripture — Empty' pattern
+- [Quick-7]: ServiceEditorView 'Service Type' heading renamed to 'Teams' per user preference
 
 ### Pending Todos
 
@@ -127,6 +131,7 @@ None yet.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 6 | Limit rotation to 8-week window and rename tab to Song Rotation | 2026-03-04 | 238ac1e | [6-limit-rotation-to-8-week-window-and-rena](./quick/6-limit-rotation-to-8-week-window-and-rena/) |
+| 7 | Service card team badges, song/scripture label prefixes, Sunday team defaults | 2026-03-04 | f1154f9 | [7-service-card-team-badges-song-slot-label](./quick/7-service-card-team-badges-song-slot-label/) |
 
 ### Blockers/Concerns
 
@@ -136,6 +141,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T16:31:56.452Z
-Stopped at: Completed quick-6 rotation 8-week window and Song Rotation tab rename
+Last session: 2026-03-04T11:41:00.000Z
+Stopped at: Completed quick-7 service card team badges and song slot label
 Resume file: None
