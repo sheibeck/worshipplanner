@@ -65,12 +65,12 @@ const isSaveDisabled = computed(() => {
   )
 })
 
-// ── Sync editName if orgName changes externally ────────────────────────────────
+// ── Sync editName if orgName changes externally (skip during save) ────────────
 
 watch(
   () => authStore.orgName,
   (newName) => {
-    if (newName !== null) {
+    if (newName !== null && !isSaving.value) {
       editName.value = newName
     }
   },
