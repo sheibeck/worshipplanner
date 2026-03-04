@@ -167,11 +167,35 @@ function openDropdown() {
   if (!triggerRef.value) return
 
   const rect = triggerRef.value.getBoundingClientRect()
-  dropdownStyle.value = {
-    top: `${rect.bottom + 4}px`,
-    left: `${rect.left}px`,
-    width: `${Math.max(rect.width, 280)}px`,
+  const maxH = 320 // matches max-h-80 (20rem)
+  const gap = 4
+  const spaceBelow = window.innerHeight - rect.bottom - gap
+  const spaceAbove = rect.top - gap
+  const fitsBelow = spaceBelow >= maxH
+
+  const w = `${Math.max(rect.width, 280)}px`
+
+  if (fitsBelow) {
+    dropdownStyle.value = { top: `${rect.bottom + gap}px`, left: `${rect.left}px`, width: w }
+  } else if (spaceAbove > spaceBelow) {
+    // Flip above, cap height to available space
+    const h = Math.min(maxH, spaceAbove)
+    dropdownStyle.value = {
+      bottom: `${window.innerHeight - rect.top + gap}px`,
+      left: `${rect.left}px`,
+      width: w,
+      maxHeight: `${h}px`,
+    }
+  } else {
+    // Not enough room above either — show below but cap height
+    dropdownStyle.value = {
+      top: `${rect.bottom + gap}px`,
+      left: `${rect.left}px`,
+      width: w,
+      maxHeight: `${spaceBelow}px`,
+    }
   }
+
   isOpen.value = true
   searchQuery.value = ''
 
