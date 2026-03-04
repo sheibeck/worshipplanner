@@ -109,7 +109,7 @@
               <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
               </svg>
-              {{ isSharing ? 'Sharing...' : shareCopied ? 'Link Copied!' : 'Share' }}
+              {{ isSharing ? 'Sharing...' : shareCopied ? 'Link Copied!' : shareError ? shareError : 'Share' }}
             </button>
 
             <button
@@ -319,6 +319,7 @@ const isSaving = ref(false)
 const pcCopied = ref(false)
 const isSharing = ref(false)
 const shareCopied = ref(false)
+const shareError = ref<string | null>(null)
 
 // ── Computed ───────────────────────────────────────────────────────────────────
 
@@ -503,13 +504,17 @@ async function onShare() {
   try {
     const token = await serviceStore.createShareToken(localService.value, serviceStore.orgId)
     const url = `${window.location.origin}/share/${token}`
-    if (navigator.clipboard) {
-      await navigator.clipboard.writeText(url)
-    }
+    await navigator.clipboard.writeText(url)
     shareCopied.value = true
     setTimeout(() => {
       shareCopied.value = false
     }, 2000)
+  } catch (err) {
+    console.error('Share failed:', err)
+    shareError.value = 'Failed to create share link'
+    setTimeout(() => {
+      shareError.value = null
+    }, 3000)
   } finally {
     isSharing.value = false
   }

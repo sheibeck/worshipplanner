@@ -42,7 +42,10 @@ export const useServiceStore = defineStore('services', () => {
       orderBy('date', 'desc'),
     )
     unsubscribeFn = onSnapshot(q, (snap) => {
-      services.value = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Service)
+      services.value = snap.docs.map((d) => {
+        const data = d.data()
+        return { id: d.id, name: '', notes: '', ...data } as Service
+      })
       isLoading.value = false
     })
   }
