@@ -5,8 +5,7 @@
       <!-- Top row: date + status -->
       <div class="flex items-center justify-between gap-2 mb-1.5">
         <div class="flex items-center gap-2 min-w-0">
-          <p class="text-sm font-semibold text-gray-100">{{ formattedDate }}</p>
-          <span v-if="sermonPassageLabel" class="text-[10px] text-gray-400 truncate">{{ sermonPassageLabel }}</span>
+          <p class="text-sm font-semibold text-gray-100">{{ formattedDate }}<template v-if="sermonPassageLabel">: <a :href="sermonPassageUrl" target="_blank" rel="noopener" @click.stop class="text-indigo-400 hover:text-indigo-300 transition-colors">{{ sermonPassageLabel }}</a></template></p>
           <span v-if="isCommunion" class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-900/50 text-amber-300 border border-amber-800">Communion</span>
         </div>
         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold shrink-0" :class="statusClass">
@@ -61,6 +60,7 @@ import { useRouter } from 'vue-router'
 import type { Service, ServiceSlot } from '@/types/service'
 import { useServiceStore } from '@/stores/services'
 import TeamTagPill from '@/components/TeamTagPill.vue'
+import { esvLink } from '@/utils/scripture'
 
 const props = defineProps<{
   service: Service
@@ -102,6 +102,12 @@ const sermonPassageLabel = computed(() => {
   if (!sp) return ''
   if (sp.verseStart && sp.verseEnd) return `${sp.book} ${sp.chapter}:${sp.verseStart}-${sp.verseEnd}`
   return `${sp.book} ${sp.chapter}`
+})
+
+const sermonPassageUrl = computed(() => {
+  const sp = props.service.sermonPassage
+  if (!sp) return ''
+  return esvLink(sp.book, sp.chapter)
 })
 
 const messageIndex = computed(() =>
