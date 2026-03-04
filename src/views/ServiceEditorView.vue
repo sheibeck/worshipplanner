@@ -254,53 +254,33 @@
               <!-- SONG slot -->
               <template v-if="slot.kind === 'SONG'">
                 <div class="flex items-center justify-between gap-3 mb-1">
-                  <div class="flex items-center gap-2">
-                    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                      {{ slotLabel(slot, index) }}
-                    </p>
-                    <span class="text-xs text-gray-600">&middot;</span>
-                    <p class="text-xs text-gray-500">
-                      {{ vwTypeLabels[slot.requiredVwType] }}
-                    </p>
-                    <!-- VW type selector buttons -->
-                    <div class="flex items-center gap-1 ml-1">
-                      <button
-                        v-for="vt in ([1, 2, 3] as VWType[])"
-                        :key="vt"
-                        type="button"
-                        @click="changeVwType(index, vt)"
-                        class="px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors"
-                        :class="slot.requiredVwType === vt
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-gray-800 text-gray-400 hover:bg-gray-700'"
-                      >{{ vt }}</button>
-                    </div>
-                  </div>
+                  <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                    {{ slotLabel(slot, index) }}
+                  </p>
                   <SongBadge :type="slot.requiredVwType" />
                 </div>
 
                 <!-- Assigned song display -->
                 <div v-if="slot.songId" class="flex items-center justify-between gap-3 rounded-md bg-gray-800 border border-gray-700 px-3 py-2">
-                  <div>
-                    <p class="text-sm font-medium text-gray-100">{{ slot.songTitle }}</p>
-                    <p class="text-xs text-gray-500">
-                      Key: {{ slot.songKey }}
-                      <template v-if="getCcliNumber(slot.songId)">
-                        <span class="text-gray-700 mx-1">|</span>
-                        <a
-                          :href="`https://songselect.ccli.com/songs/${getCcliNumber(slot.songId)}`"
-                          target="_blank"
-                          rel="noopener"
-                          class="text-indigo-400 hover:text-indigo-300 hover:underline"
-                          @click.stop
-                        >CCLI {{ getCcliNumber(slot.songId) }}</a>
-                      </template>
-                    </p>
+                  <div class="flex items-center gap-2 min-w-0 flex-1">
+                    <p class="text-sm font-medium text-gray-100 truncate">{{ slot.songTitle }}</p>
+                    <span class="text-gray-600 flex-shrink-0">&middot;</span>
+                    <span class="text-xs text-gray-400 flex-shrink-0">{{ slot.songKey || '—' }}</span>
+                    <template v-if="getCcliNumber(slot.songId)">
+                      <span class="text-gray-700 flex-shrink-0">|</span>
+                      <a
+                        :href="`https://songselect.ccli.com/songs/${getCcliNumber(slot.songId)}`"
+                        target="_blank"
+                        rel="noopener"
+                        class="text-xs text-indigo-400 hover:text-indigo-300 hover:underline flex-shrink-0"
+                        @click.stop
+                      >CCLI {{ getCcliNumber(slot.songId) }}</a>
+                    </template>
                   </div>
                   <button
                     type="button"
                     @click="onClearSong(index)"
-                    class="text-gray-500 hover:text-gray-300 transition-colors"
+                    class="text-gray-500 hover:text-gray-300 transition-colors flex-shrink-0"
                     title="Remove song"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -562,13 +542,6 @@ const songStore = useSongStore()
 
 const AVAILABLE_TEAMS = ['Choir', 'Orchestra', 'Communion', 'Special Service']
 
-// Static class lookup — prevent Tailwind v4 purge
-const vwTypeLabels: Record<1 | 2 | 3, string> = {
-  1: 'Type 1: Call to Worship',
-  2: 'Type 2: Intimate',
-  3: 'Type 3: Ascription',
-}
-
 const statusBadgeClasses: Record<string, string> = {
   planned: 'bg-green-900/50 text-green-300 border-green-800',
   draft: 'bg-gray-800 text-gray-400 border-gray-700',
@@ -806,15 +779,6 @@ function removeSlot(index: number) {
   if (!localService.value) return
   localService.value.slots.splice(index, 1)
   localService.value.slots = reindexSlots(localService.value.slots)
-}
-
-function changeVwType(index: number, vwType: VWType) {
-  if (!localService.value) return
-  const slot = localService.value.slots[index]
-  if (!slot) return
-  if (slot.kind === 'SONG') {
-    ;(localService.value.slots[index] as SongSlot).requiredVwType = vwType
-  }
 }
 
 // ── Song assignment ────────────────────────────────────────────────────────────
