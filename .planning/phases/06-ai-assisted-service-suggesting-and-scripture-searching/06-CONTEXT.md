@@ -34,6 +34,11 @@ Enhance the existing service planning workflow with AI-powered song suggestions 
 - Results show reference + AI's brief reason for suggesting it (e.g., "Themes of grace and redemption") — no passage text preview in results. Planner uses existing ESV preview button to read text
 - Overlap with sermon passage: AI shows all suggestions but marks overlapping ones with a warning — planner decides if overlap is intentional
 
+### Rotation & overuse prevention
+- Song rotation: AI respects the existing 2-week deprioritization window from `rankSongsForSlot()` — recently used songs are ranked lower but not excluded
+- Scripture rotation: AI notes if a passage was used recently (e.g., "Used 3 weeks ago") but still suggests it if thematically strong — planner decides. Encourages breadth without blocking seasonal staples
+- AI must receive recent service history (songs and scriptures used in past weeks) as context to make informed rotation decisions
+
 ### AI response presentation
 - Each AI suggestion includes a short 5-10 word reason (e.g., "Themes of redemption match Romans 8", "Complements the opening hymn")
 - "Suggest All Songs" fills empty song slots directly inline in the service editor — each slot shows the AI pick with accept/reject actions. Feels like a draft the planner refines
