@@ -381,17 +381,77 @@
 
               <!-- PRAYER slot -->
               <template v-else-if="slot.kind === 'PRAYER'">
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 mb-1">
                   <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Prayer</p>
                   <span class="text-xs text-gray-600 italic">No assignment needed</span>
+                </div>
+                <!-- Optional link -->
+                <div class="flex items-center gap-2 mt-1">
+                  <input
+                    :value="(slot as NonAssignableSlot).linkLabel"
+                    @input="(slot as NonAssignableSlot).linkLabel = ($event.target as HTMLInputElement).value"
+                    type="text"
+                    placeholder="Link label (optional)"
+                    class="rounded-md bg-gray-800 border border-gray-700 text-gray-200 text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500 w-36"
+                  />
+                  <input
+                    :value="(slot as NonAssignableSlot).linkUrl"
+                    @input="(slot as NonAssignableSlot).linkUrl = ($event.target as HTMLInputElement).value"
+                    type="url"
+                    placeholder="https://..."
+                    class="rounded-md bg-gray-800 border border-gray-700 text-gray-200 text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500 flex-1"
+                  />
+                  <a
+                    v-if="(slot as NonAssignableSlot).linkUrl"
+                    :href="(slot as NonAssignableSlot).linkUrl"
+                    target="_blank"
+                    rel="noopener"
+                    class="text-indigo-400 hover:text-indigo-300 transition-colors flex-shrink-0"
+                    title="Open link"
+                    @click.stop
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
                 </div>
               </template>
 
               <!-- MESSAGE slot -->
               <template v-else-if="slot.kind === 'MESSAGE'">
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 mb-1">
                   <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Message</p>
                   <span class="text-xs text-gray-600 italic">No assignment needed</span>
+                </div>
+                <!-- Optional link -->
+                <div class="flex items-center gap-2 mt-1">
+                  <input
+                    :value="(slot as NonAssignableSlot).linkLabel"
+                    @input="(slot as NonAssignableSlot).linkLabel = ($event.target as HTMLInputElement).value"
+                    type="text"
+                    placeholder="Link label (optional)"
+                    class="rounded-md bg-gray-800 border border-gray-700 text-gray-200 text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500 w-36"
+                  />
+                  <input
+                    :value="(slot as NonAssignableSlot).linkUrl"
+                    @input="(slot as NonAssignableSlot).linkUrl = ($event.target as HTMLInputElement).value"
+                    type="url"
+                    placeholder="https://..."
+                    class="rounded-md bg-gray-800 border border-gray-700 text-gray-200 text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500 flex-1"
+                  />
+                  <a
+                    v-if="(slot as NonAssignableSlot).linkUrl"
+                    :href="(slot as NonAssignableSlot).linkUrl"
+                    target="_blank"
+                    rel="noopener"
+                    class="text-indigo-400 hover:text-indigo-300 transition-colors flex-shrink-0"
+                    title="Open link"
+                    @click.stop
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
                 </div>
               </template>
             </div>
@@ -480,7 +540,7 @@ import { useServiceStore } from '@/stores/services'
 import { useSongStore } from '@/stores/songs'
 import { slotLabel, createSlot, reindexSlots } from '@/utils/slotTypes'
 import { scripturesOverlap } from '@/utils/scripture'
-import type { Service, SongSlot, ScriptureSlot, ScriptureRef, SlotKind } from '@/types/service'
+import type { Service, SongSlot, ScriptureSlot, NonAssignableSlot, ScriptureRef, SlotKind } from '@/types/service'
 import type { VWType } from '@/types/song'
 import AppShell from '@/components/AppShell.vue'
 import SongBadge from '@/components/SongBadge.vue'

@@ -26,6 +26,8 @@ export interface ScriptureSlot {
 export interface NonAssignableSlot {
   kind: 'PRAYER' | 'MESSAGE'
   position: number
+  linkUrl?: string
+  linkLabel?: string
 }
 
 export type ServiceSlot = SongSlot | ScriptureSlot | NonAssignableSlot
