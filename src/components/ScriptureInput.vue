@@ -57,6 +57,41 @@
       View on ESV.org
     </a>
 
+    <!-- Preview passage button -->
+    <button
+      v-if="showPreviewButton || previewLoading"
+      @click="fetchPreview"
+      :disabled="previewLoading"
+      type="button"
+      class="inline-flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 transition-colors disabled:opacity-50 disabled:cursor-wait"
+    >
+      <svg v-if="!previewLoading" xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+      </svg>
+      <svg v-else class="h-3 w-3 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+      </svg>
+      {{ previewLoading ? 'Loading...' : 'Preview passage' }}
+    </button>
+
+    <!-- Passage text panel -->
+    <div
+      v-if="previewText"
+      class="text-sm text-gray-300 bg-gray-800/50 border border-gray-700 rounded-md px-3 py-2 whitespace-pre-line leading-relaxed max-h-48 overflow-y-auto"
+    >
+      {{ previewText }}
+    </div>
+
+    <!-- Preview error -->
+    <div
+      v-if="previewError"
+      class="text-xs text-red-400 bg-red-950/50 border border-red-800/50 rounded px-2 py-1"
+    >
+      {{ previewError }}
+    </div>
+
     <!-- Overlap warning -->
     <div
       v-if="showOverlapWarning && hasOverlap"
@@ -71,6 +106,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { BIBLE_BOOKS, esvLink, scripturesOverlap } from '@/utils/scripture'
+import { fetchPassageText } from '@/utils/esvApi'
 import type { ScriptureRef } from '@/types/service'
 
 const props = defineProps<{
@@ -133,9 +169,45 @@ const hasOverlap = computed(() => {
   return scripturesOverlap(currentRef.value, props.sermonPassage)
 })
 
+// ── Preview state ──────────────────────────────────────────────────────────────
+
+const previewText = ref<string>('')
+const previewLoading = ref(false)
+const previewError = ref<string>('')
+const previewRef = ref<string>('')
+
+const passageQuery = computed(() => {
+  if (!isComplete.value) return ''
+  return `${localBook.value} ${localChapter.value}:${localVerseStart.value}-${localVerseEnd.value}`
+})
+
+const showPreviewButton = computed(() => isComplete.value && passageQuery.value !== previewRef.value)
+
+async function fetchPreview() {
+  const query = passageQuery.value
+  if (!query) return
+  previewLoading.value = true
+  previewError.value = ''
+  previewText.value = ''
+  try {
+    const text = await fetchPassageText(query)
+    previewText.value = text || 'No passage text found for this reference.'
+    previewRef.value = query
+  } catch {
+    previewError.value = 'Could not load passage. Check your connection and try again.'
+  } finally {
+    previewLoading.value = false
+  }
+}
+
 // ── Emit on field change ───────────────────────────────────────────────────────
 
 function onFieldChange() {
   emit('update:modelValue', currentRef.value)
+  if (passageQuery.value !== previewRef.value) {
+    previewText.value = ''
+    previewRef.value = ''
+    previewError.value = ''
+  }
 }
 </script>
