@@ -100,7 +100,7 @@
         <!-- Sermon Passage -->
         <div class="mb-6 rounded-lg bg-gray-900 border border-gray-800 p-4">
           <h2 class="text-sm font-semibold text-gray-200 mb-1">Sermon Passage</h2>
-          <p class="text-xs text-gray-500 mb-3">Enter the pastor's teaching passage to avoid duplication in readings</p>
+          <p class="text-xs text-gray-500 mb-3">Enter the pastor's teaching passage</p>
           <ScriptureInput
             :modelValue="localService.sermonPassage"
             :sermonPassage="null"
