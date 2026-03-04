@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 3 context gathered
-last_updated: "2026-03-04T04:08:44.665Z"
+stopped_at: Completed 03-01-PLAN.md
+last_updated: "2026-03-04T10:55:20.059Z"
 last_activity: 2026-03-04 — Plan 01-01 complete — Vue 3 + Firebase foundation, auth store, router guard, Firestore rules
 progress:
   total_phases: 5
   completed_phases: 2
-  total_plans: 5
-  completed_plans: 5
+  total_plans: 10
+  completed_plans: 7
   percent: 50
 ---
 
@@ -56,6 +56,8 @@ Progress: [█████░░░░░] 50%
 | Phase 02-song-library P01 | 4 | 2 tasks | 10 files |
 | Phase 02-song-library P02 | 5 | 2 tasks | 6 files |
 | Phase 02-song-library P03 | 6 | 2 tasks | 5 files |
+| Phase 03-service-planning P02 | 4 | 2 tasks | 7 files |
+| Phase 03-service-planning P01 | 5 | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -85,6 +87,12 @@ Recent decisions affecting current work:
 - [Phase 02-song-library]: DashboardView subscribes to songs with orgId guard to enable GettingStarted step 2 reactivity without double-subscription
 - [Phase 02-song-library]: PapaParse used with header:true mode — row objects keyed by column header strings for robust Planning Center CSV mapping
 - [Phase 02-song-library]: Duplicate detection: CCLI match primary (when both have CCLI), case-insensitive title match fallback for no-CCLI songs
+- [Phase 03-service-planning]: serviceStore reads current slots from in-memory services.value before slot updates to avoid extra Firestore reads
+- [Phase 03-service-planning]: DashboardView uses per-store orgId guard to avoid double-subscription when ServiceEditorView also subscribes
+- [Phase 03-service-planning]: Placeholder ServicesView.vue and ServiceEditorView.vue created to unblock router registration and build while Plan 03/04 pending
+- [Phase 03-service-planning]: Sending Song (position 8) defaults to VW Type 3 for both progressions
+- [Phase 03-service-planning]: Team filtering uses AND logic — song must support ALL active service teams or have empty teamTags
+- [Phase 03-service-planning]: rankSongsForSlot accepts nowMs injectable parameter for deterministic time-dependent testing
 
 ### Pending Todos
 
@@ -98,6 +106,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T04:08:44.659Z
-Stopped at: Phase 3 context gathered
-Resume file: .planning/phases/03-service-planning/03-CONTEXT.md
+Last session: 2026-03-04T10:55:20.053Z
+Stopped at: Completed 03-01-PLAN.md
+Resume file: None

@@ -62,7 +62,7 @@ Plans:
   4. User can override any suggestion and manually pick any eligible song
   5. User can add scripture passages and record the pastor's sermon passage to prevent duplication in readings
   6. User can view all planned and recent services week-by-week and see a seasonal overview that reveals song rotation patterns
-**Plans:** 5 plans
+**Plans:** 2/5 plans executed
 Plans:
 - [ ] 03-01-PLAN.md — Service types, slot type utilities, scripture utilities, suggestion algorithm, and rotation table (pure TypeScript)
 - [ ] 03-02-PLAN.md — Service Pinia store with Firestore subscription and CRUD, route registration, GettingStarted step 3
@@ -100,6 +100,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 |-------|----------------|--------|-----------|
 | 1. Foundation | 2/2 | Complete   | 2026-03-04 |
 | 2. Song Library | 3/3 | Complete   | 2026-03-04 |
-| 3. Service Planning | 0/5 | Planned | - |
+| 3. Service Planning | 2/5 | In Progress|  |
 | 4. Output | 0/TBD | Not started | - |
 | 5. Collaboration, Tasks & Events | 0/TBD | Not started | - |

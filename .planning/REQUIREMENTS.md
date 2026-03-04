@@ -18,21 +18,21 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Service Planning
 
-- [ ] **PLAN-01**: User can create a weekly service plan following the standard order (Song, Scripture, Song, Prayer, Scripture, Song, Song, Message, Sending Song)
-- [ ] **PLAN-02**: User can select a 4-song progression pattern (1-2-2-3 or 1-2-3-3) for each service
-- [ ] **PLAN-03**: Service song slots enforce Vertical Worship type constraints based on chosen progression
-- [ ] **PLAN-04**: User can specify which teams are participating per service (choir, orchestra, special service)
-- [ ] **PLAN-05**: Available songs are automatically filtered by team configuration for each service
-- [ ] **PLAN-06**: App suggests songs for each slot based on category type, rotation recency, and team configuration
+- [x] **PLAN-01**: User can create a weekly service plan following the standard order (Song, Scripture, Song, Prayer, Scripture, Song, Song, Message, Sending Song)
+- [x] **PLAN-02**: User can select a 4-song progression pattern (1-2-2-3 or 1-2-3-3) for each service
+- [x] **PLAN-03**: Service song slots enforce Vertical Worship type constraints based on chosen progression
+- [x] **PLAN-04**: User can specify which teams are participating per service (choir, orchestra, special service)
+- [x] **PLAN-05**: Available songs are automatically filtered by team configuration for each service
+- [x] **PLAN-06**: App suggests songs for each slot based on category type, rotation recency, and team configuration
 - [ ] **PLAN-07**: User can override suggestions and manually pick any song from the stable
-- [ ] **PLAN-08**: Song usage history is tracked automatically when songs are placed in service plans
-- [ ] **PLAN-09**: Songs used in the last 2 weeks are deprioritized in suggestions (rotation enforcement)
+- [x] **PLAN-08**: Song usage history is tracked automatically when songs are placed in service plans
+- [x] **PLAN-09**: Songs used in the last 2 weeks are deprioritized in suggestions (rotation enforcement)
 
 ### Scripture & Sermon
 
 - [ ] **SCRI-01**: User can add scripture passages to the service order (multiple reading slots)
 - [ ] **SCRI-02**: User can enter the pastor's sermon passage to prevent duplication in readings
-- [ ] **SCRI-03**: App links to or displays ESV Bible text for selected scripture passages
+- [x] **SCRI-03**: App links to or displays ESV Bible text for selected scripture passages
 - [ ] **SCRI-04**: App suggests Psalms when user is selecting scripture readings
 
 ### Output & Sharing
@@ -51,8 +51,8 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Calendar & Overview
 
 - [ ] **CAL-01**: User can view and manage services week-by-week with upcoming and recent weeks
-- [ ] **CAL-02**: User can view a seasonal/quarterly overview of planned services
-- [ ] **CAL-03**: Seasonal view shows song usage patterns across weeks to spot rotation issues
+- [x] **CAL-02**: User can view a seasonal/quarterly overview of planned services
+- [x] **CAL-03**: Seasonal view shows song usage patterns across weeks to spot rotation issues
 
 ### Task Management
 
@@ -119,22 +119,22 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SONG-04 | Phase 2 | Complete |
 | SONG-05 | Phase 2 | Complete |
 | SONG-06 | Phase 2 | Complete |
-| PLAN-01 | Phase 3 | Pending |
-| PLAN-02 | Phase 3 | Pending |
-| PLAN-03 | Phase 3 | Pending |
-| PLAN-04 | Phase 3 | Pending |
-| PLAN-05 | Phase 3 | Pending |
-| PLAN-06 | Phase 3 | Pending |
+| PLAN-01 | Phase 3 | Complete |
+| PLAN-02 | Phase 3 | Complete |
+| PLAN-03 | Phase 3 | Complete |
+| PLAN-04 | Phase 3 | Complete |
+| PLAN-05 | Phase 3 | Complete |
+| PLAN-06 | Phase 3 | Complete |
 | PLAN-07 | Phase 3 | Pending |
-| PLAN-08 | Phase 3 | Pending |
-| PLAN-09 | Phase 3 | Pending |
+| PLAN-08 | Phase 3 | Complete |
+| PLAN-09 | Phase 3 | Complete |
 | SCRI-01 | Phase 3 | Pending |
 | SCRI-02 | Phase 3 | Pending |
-| SCRI-03 | Phase 3 | Pending |
+| SCRI-03 | Phase 3 | Complete |
 | SCRI-04 | Phase 3 | Pending |
 | CAL-01 | Phase 3 | Pending |
-| CAL-02 | Phase 3 | Pending |
-| CAL-03 | Phase 3 | Pending |
+| CAL-02 | Phase 3 | Complete |
+| CAL-03 | Phase 3 | Complete |
 | OUT-01 | Phase 4 | Pending |
 | OUT-02 | Phase 4 | Pending |
 | OUT-03 | Phase 4 | Pending |
