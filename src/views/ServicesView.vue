@@ -91,16 +91,48 @@
               >
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
               </svg>
-              Past Services ({{ pastServices.length }})
+              Past Services
             </button>
 
-            <div v-if="showPast" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <ServiceCard
-                v-for="service in displayedPastServices"
-                :key="service.id"
-                :service="service"
-              />
-            </div>
+            <template v-if="showPast">
+              <!-- Month/Year picker -->
+              <div class="flex items-center gap-2 mb-3">
+                <select
+                  :value="activeMonth"
+                  class="bg-gray-800 border border-gray-700 text-gray-200 text-sm rounded-md px-2 py-1 focus:ring-indigo-500 focus:border-indigo-500"
+                  @change="onMonthChange"
+                >
+                  <option
+                    v-for="entry in monthsForActiveYear"
+                    :key="entry.month"
+                    :value="entry.month"
+                  >
+                    {{ entry.monthName }}
+                  </option>
+                </select>
+                <select
+                  :value="activeYear"
+                  class="bg-gray-800 border border-gray-700 text-gray-200 text-sm rounded-md px-2 py-1 focus:ring-indigo-500 focus:border-indigo-500"
+                  @change="onYearChange"
+                >
+                  <option
+                    v-for="year in availableYears"
+                    :key="year"
+                    :value="year"
+                  >
+                    {{ year }}
+                  </option>
+                </select>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <ServiceCard
+                  v-for="service in displayedPastServices"
+                  :key="service.id"
+                  :service="service"
+                />
+              </div>
+            </template>
           </section>
         </template>
       </template>
@@ -132,6 +164,11 @@ import ServiceCard from '@/components/ServiceCard.vue'
 import NewServiceDialog from '@/components/NewServiceDialog.vue'
 import RotationTable from '@/components/RotationTable.vue'
 
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
+
 const router = useRouter()
 const authStore = useAuthStore()
 const serviceStore = useServiceStore()
@@ -139,6 +176,10 @@ const serviceStore = useServiceStore()
 const activeTab = ref<'services' | 'rotation'>('services')
 const dialogOpen = ref(false)
 const showPast = ref(false)
+
+// User-selected month (0-11) and year — null means "use smart default"
+const selectedMonth = ref<number | null>(null)
+const selectedYear = ref<number | null>(null)
 
 // Compute today's ISO date string for comparison
 const todayStr = computed(() => {
@@ -163,8 +204,95 @@ const pastServices = computed(() =>
     .sort((a, b) => b.date.localeCompare(a.date)),
 )
 
-// Show at most 5 most recent past services when expanded
-const displayedPastServices = computed(() => pastServices.value.slice(0, 5))
+// Unique month/year pairs from pastServices, sorted descending (most recent first)
+const availableMonths = computed<{ month: number; year: number; monthName: string }[]>(() => {
+  const seen = new Set<string>()
+  const result: { month: number; year: number; monthName: string }[] = []
+  for (const s of pastServices.value) {
+    const d = new Date(s.date + 'T00:00:00')
+    const month = d.getMonth()
+    const year = d.getFullYear()
+    const key = `${year}-${month}`
+    if (!seen.has(key)) {
+      seen.add(key)
+      result.push({ month, year, monthName: MONTH_NAMES[month] })
+    }
+  }
+  // Already sorted descending because pastServices is sorted descending
+  return result
+})
+
+// Unique years from pastServices, sorted descending
+const availableYears = computed<number[]>(() => {
+  const years = new Set<number>()
+  for (const entry of availableMonths.value) {
+    years.add(entry.year)
+  }
+  return Array.from(years).sort((a, b) => b - a)
+})
+
+// Smart default: current month if it has past services, otherwise most recent month
+const smartDefault = computed<{ month: number; year: number } | null>(() => {
+  if (availableMonths.value.length === 0) return null
+  const now = new Date()
+  const curMonth = now.getMonth()
+  const curYear = now.getFullYear()
+  const hasCurrentMonth = availableMonths.value.some(
+    (e) => e.month === curMonth && e.year === curYear,
+  )
+  if (hasCurrentMonth) return { month: curMonth, year: curYear }
+  return { month: availableMonths.value[0].month, year: availableMonths.value[0].year }
+})
+
+// Active year: user selection or smart default
+const activeYear = computed<number | null>(() => {
+  if (selectedYear.value !== null) return selectedYear.value
+  return smartDefault.value?.year ?? null
+})
+
+// Months available for the active year
+const monthsForActiveYear = computed<{ month: number; year: number; monthName: string }[]>(() => {
+  if (activeYear.value === null) return []
+  return availableMonths.value.filter((e) => e.year === activeYear.value)
+})
+
+// Active month: user selection (if valid for active year) or smart default month for active year
+const activeMonth = computed<number | null>(() => {
+  if (activeYear.value === null) return null
+  if (selectedMonth.value !== null) {
+    // Validate the selected month exists in the active year
+    const valid = monthsForActiveYear.value.some((e) => e.month === selectedMonth.value)
+    if (valid) return selectedMonth.value
+  }
+  // Fall back: use smart default month if it matches this year, else first available month in year
+  if (
+    smartDefault.value !== null &&
+    smartDefault.value.year === activeYear.value
+  ) {
+    return smartDefault.value.month
+  }
+  return monthsForActiveYear.value[0]?.month ?? null
+})
+
+// Services displayed in the past section — ALL services from active month/year
+const displayedPastServices = computed(() => {
+  if (activeMonth.value === null || activeYear.value === null) return []
+  return pastServices.value.filter((s) => {
+    const d = new Date(s.date + 'T00:00:00')
+    return d.getMonth() === activeMonth.value && d.getFullYear() === activeYear.value
+  })
+})
+
+function onMonthChange(event: Event) {
+  selectedMonth.value = Number((event.target as HTMLSelectElement).value)
+}
+
+function onYearChange(event: Event) {
+  const newYear = Number((event.target as HTMLSelectElement).value)
+  selectedYear.value = newYear
+  // Reset month selection — activeMonth computed will pick the best default for the new year
+  selectedMonth.value = null
+}
 
 // Subscribe to Firestore services collection once orgId is resolved
 async function initStore() {
