@@ -68,7 +68,10 @@ service cloud.firestore {
     match /inviteLookup/{email} {
       allow read: if isSignedIn() && request.auth.token.email.lower() == email;
       allow create: if isSignedIn();
-      allow delete: if isSignedIn() && request.auth.token.email.lower() == email;
+      allow delete: if isSignedIn() && (
+        request.auth.token.email.lower() == email ||
+        isOrgEditor(resource.data.orgId)
+      );
     }
 
     // Share tokens: public read (anyone with token URL), authenticated create only
