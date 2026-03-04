@@ -45,7 +45,7 @@ Plans:
   3. User can categorize a song as Vertical Worship type 1, 2, or 3
   4. User can tag songs with team compatibility (choir, orchestra, standard band)
   5. User can search and filter the song list by title, key, tempo, category, and team tag and see only matching results
-**Plans:** 3 plans
+**Plans:** 1/3 plans executed
 Plans:
 - [ ] 02-01-PLAN.md — Song types, Pinia store with Firestore subscription + filtering, song table UI with search/filter/badges
 - [ ] 02-02-PLAN.md — Slide-over panel for song create/edit/delete, arrangement accordion, batch VW type assign, GettingStarted update
@@ -93,7 +93,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 2/2 | Complete   | 2026-03-04 |
-| 2. Song Library | 0/3 | Planning complete | - |
+| 2. Song Library | 1/3 | In Progress|  |
 | 3. Service Planning | 0/TBD | Not started | - |
 | 4. Output | 0/TBD | Not started | - |
 | 5. Collaboration, Tasks & Events | 0/TBD | Not started | - |
