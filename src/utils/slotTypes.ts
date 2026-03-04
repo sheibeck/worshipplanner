@@ -22,7 +22,7 @@ export const PROGRESSION_SLOT_TYPES: Record<Progression, Record<number, VWType>>
  * Returns a human-readable label for a slot based on its kind.
  * Replaces the old SLOT_LABELS position-keyed map.
  */
-export function slotLabel(slot: ServiceSlot, _index: number): string {
+export function slotLabel(slot: ServiceSlot, _index?: number | string): string {
   switch (slot.kind) {
     case 'SONG':
       return 'Song'
@@ -80,7 +80,7 @@ export function buildSlots(progression: Progression): ServiceSlot[] {
   const songSlot = (position: number): SongSlot => ({
     kind: 'SONG',
     position,
-    requiredVwType: songTypeMap[position],
+    requiredVwType: songTypeMap[position] as VWType,
     songId: null,
     songTitle: null,
     songKey: null,

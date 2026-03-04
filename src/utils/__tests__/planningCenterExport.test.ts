@@ -154,7 +154,7 @@ describe('formatForPlanningCenter', () => {
 
   it('formats song slots with title, key, and CCLI number', () => {
     const result = formatForPlanningCenter(mockService, mockSongs)
-    expect(result).toContain('Song 1 (Call to Worship) -- Come Thou Fount (Key: G | CCLI #22025)')
+    expect(result).toContain('Song 1 -- Come Thou Fount (Key: G | CCLI #22025)')
   })
 
   it('omits CCLI when song has no CCLI number', () => {
@@ -194,7 +194,7 @@ describe('formatForPlanningCenter', () => {
       ),
     }
     const result = formatForPlanningCenter(serviceEmptySlot, mockSongs)
-    expect(result).toContain('Song 1 (Call to Worship) -- [empty]')
+    expect(result).toContain('Song 1 -- [empty]')
   })
 
   it('includes notes section when notes are non-empty', () => {

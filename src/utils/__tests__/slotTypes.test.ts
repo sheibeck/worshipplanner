@@ -193,9 +193,9 @@ describe('reindexSlots', () => {
       { kind: 'MESSAGE' as const, position: 8 },
     ]
     const reindexed = reindexSlots(slots)
-    expect(reindexed[0].position).toBe(0)
-    expect(reindexed[1].position).toBe(1)
-    expect(reindexed[2].position).toBe(2)
+    expect(reindexed[0]!.position).toBe(0)
+    expect(reindexed[1]!.position).toBe(1)
+    expect(reindexed[2]!.position).toBe(2)
   })
 
   it('preserves slot data when reindexing', () => {
@@ -203,7 +203,7 @@ describe('reindexSlots', () => {
       { kind: 'SONG' as const, position: 99, requiredVwType: 2 as const, songId: 'abc', songTitle: 'Test', songKey: 'G' },
     ]
     const reindexed = reindexSlots(slots)
-    const slot = reindexed[0] as SongSlot
+    const slot = reindexed[0]! as SongSlot
     expect(slot.position).toBe(0)
     expect(slot.songId).toBe('abc')
     expect(slot.songTitle).toBe('Test')
@@ -214,7 +214,7 @@ describe('reindexSlots', () => {
     const slots = [{ kind: 'PRAYER' as const, position: 5 }]
     const reindexed = reindexSlots(slots)
     expect(reindexed).not.toBe(slots)
-    expect(slots[0].position).toBe(5) // original unchanged
+    expect(slots[0]!.position).toBe(5) // original unchanged
   })
 })
 

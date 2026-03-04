@@ -23,17 +23,15 @@ vi.mock('@/utils/planningCenterExport', () => ({
 
 // Mock @/utils/slotTypes
 vi.mock('@/utils/slotTypes', () => ({
-  SLOT_LABELS: {
-    0: 'Worship Song',
-    1: 'Scripture Reading',
-    2: 'Worship Song',
-    3: 'Prayer',
-    4: 'Scripture Reading',
-    5: 'Worship Song',
-    6: 'Worship Song',
-    7: 'Message',
-    8: 'Sending Song',
-  },
+  slotLabel: vi.fn((slot: { kind: string }) => {
+    switch (slot.kind) {
+      case 'SONG': return 'Song'
+      case 'SCRIPTURE': return 'Scripture Reading'
+      case 'PRAYER': return 'Prayer'
+      case 'MESSAGE': return 'Message'
+      default: return slot.kind
+    }
+  }),
 }))
 
 // Mock firebase/firestore — getDoc is controlled per test

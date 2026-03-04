@@ -14,7 +14,10 @@ export function formatScriptureRef(ref: ScriptureRef): string {
  * e.g., "2026-03-08" => "March 8, 2026"
  */
 function formatDate(dateStr: string): string {
-  const [year, month, day] = dateStr.split('-').map(Number)
+  const parts = dateStr.split('-').map(Number)
+  const year = parts[0] ?? 0
+  const month = parts[1] ?? 1
+  const day = parts[2] ?? 1
   return new Date(year, month - 1, day).toLocaleDateString('en-US', {
     month: 'long',
     day: 'numeric',

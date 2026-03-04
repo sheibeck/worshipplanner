@@ -27,13 +27,13 @@
       <!-- Slot list -->
       <div>
         <div
-          v-for="slot in serviceSnapshot.slots"
-          :key="slot.position"
+          v-for="(slot, index) in serviceSnapshot.slots"
+          :key="slot.position + '-' + slot.kind + '-' + index"
           class="py-2.5 border-b border-gray-100"
         >
           <!-- SONG slot -->
           <template v-if="slot.kind === 'SONG'">
-            <p class="text-xs text-gray-500 uppercase tracking-wider mb-0.5">{{ SLOT_LABELS[slot.position] }}</p>
+            <p class="text-xs text-gray-500 uppercase tracking-wider mb-0.5">{{ slotLabel(slot, index) }}</p>
             <template v-if="slot.songId">
               <p class="text-base font-medium text-gray-900">{{ slot.songTitle }}</p>
               <p class="text-sm text-gray-500">Key: {{ slot.songKey }} | BPM: {{ slot.bpm || '--' }}</p>
@@ -84,7 +84,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { doc, getDoc } from 'firebase/firestore'
 import { db } from '@/firebase'
-import { SLOT_LABELS } from '@/utils/slotTypes'
+import { slotLabel } from '@/utils/slotTypes'
 import { formatScriptureRef } from '@/utils/planningCenterExport'
 import type { ScriptureRef } from '@/types/service'
 

@@ -164,96 +164,166 @@
           </div>
         </div>
 
-        <!-- 9-Slot Service Template -->
-        <div class="space-y-1.5">
+        <!-- Dynamic Service Flow -->
+        <div ref="slotContainerRef" class="space-y-1.5">
           <div
-            v-for="slot in localService.slots"
-            :key="slot.position"
-            class="rounded-lg bg-gray-900 border border-gray-800 p-3"
+            v-for="(slot, index) in localService.slots"
+            :key="slot.position + '-' + slot.kind + '-' + index"
+            class="rounded-lg bg-gray-900 border border-gray-800 p-3 flex items-start gap-2"
           >
-            <!-- SONG slot -->
-            <template v-if="slot.kind === 'SONG'">
-              <div class="flex items-center justify-between gap-3 mb-1">
-                <div class="flex items-center gap-2">
-                  <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                    {{ SLOT_LABELS[slot.position] }}
-                  </p>
-                  <span class="text-xs text-gray-600">&middot;</span>
-                  <p class="text-xs text-gray-500">
-                    {{ vwTypeLabels[slot.requiredVwType] }}
-                  </p>
+            <!-- Drag handle -->
+            <div class="cursor-grab active:cursor-grabbing text-gray-600 hover:text-gray-400 drag-handle flex-shrink-0 mt-0.5">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M7 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/>
+              </svg>
+            </div>
+
+            <!-- Slot content -->
+            <div class="flex-1 min-w-0">
+              <!-- SONG slot -->
+              <template v-if="slot.kind === 'SONG'">
+                <div class="flex items-center justify-between gap-3 mb-1">
+                  <div class="flex items-center gap-2">
+                    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                      {{ slotLabel(slot, index) }}
+                    </p>
+                    <span class="text-xs text-gray-600">&middot;</span>
+                    <p class="text-xs text-gray-500">
+                      {{ vwTypeLabels[slot.requiredVwType] }}
+                    </p>
+                    <!-- VW type selector buttons -->
+                    <div class="flex items-center gap-1 ml-1">
+                      <button
+                        v-for="vt in ([1, 2, 3] as VWType[])"
+                        :key="vt"
+                        type="button"
+                        @click="changeVwType(index, vt)"
+                        class="px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors"
+                        :class="slot.requiredVwType === vt
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-gray-800 text-gray-400 hover:bg-gray-700'"
+                      >{{ vt }}</button>
+                    </div>
+                  </div>
+                  <SongBadge :type="slot.requiredVwType" />
                 </div>
-                <SongBadge :type="slot.requiredVwType" />
-              </div>
 
-              <!-- Assigned song display -->
-              <div v-if="slot.songId" class="flex items-center justify-between gap-3 rounded-md bg-gray-800 border border-gray-700 px-3 py-2">
-                <div>
-                  <p class="text-sm font-medium text-gray-100">{{ slot.songTitle }}</p>
-                  <p class="text-xs text-gray-500">
-                    Key: {{ slot.songKey }}
-                    <template v-if="getCcliNumber(slot.songId)">
-                      <span class="text-gray-700 mx-1">|</span>
-                      <a
-                        :href="`https://songselect.ccli.com/songs/${getCcliNumber(slot.songId)}`"
-                        target="_blank"
-                        rel="noopener"
-                        class="text-indigo-400 hover:text-indigo-300 hover:underline"
-                        @click.stop
-                      >CCLI {{ getCcliNumber(slot.songId) }}</a>
-                    </template>
-                  </p>
+                <!-- Assigned song display -->
+                <div v-if="slot.songId" class="flex items-center justify-between gap-3 rounded-md bg-gray-800 border border-gray-700 px-3 py-2">
+                  <div>
+                    <p class="text-sm font-medium text-gray-100">{{ slot.songTitle }}</p>
+                    <p class="text-xs text-gray-500">
+                      Key: {{ slot.songKey }}
+                      <template v-if="getCcliNumber(slot.songId)">
+                        <span class="text-gray-700 mx-1">|</span>
+                        <a
+                          :href="`https://songselect.ccli.com/songs/${getCcliNumber(slot.songId)}`"
+                          target="_blank"
+                          rel="noopener"
+                          class="text-indigo-400 hover:text-indigo-300 hover:underline"
+                          @click.stop
+                        >CCLI {{ getCcliNumber(slot.songId) }}</a>
+                      </template>
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    @click="onClearSong(index)"
+                    class="text-gray-500 hover:text-gray-300 transition-colors"
+                    title="Remove song"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  @click="onClearSong(slot)"
-                  class="text-gray-500 hover:text-gray-300 transition-colors"
-                  title="Remove song"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
 
-              <!-- Song picker (empty slot or change) -->
-              <SongSlotPicker
-                :requiredVwType="slot.requiredVwType"
-                :serviceTeams="localService.teams"
-                :currentSongId="slot.songId"
-                :songs="songStore.songs"
-                @select="(song) => onSelectSong(slot, song)"
-                @clear="onClearSong(slot)"
-              />
-            </template>
+                <!-- Song picker (empty slot or change) -->
+                <SongSlotPicker
+                  :requiredVwType="slot.requiredVwType"
+                  :serviceTeams="localService.teams"
+                  :currentSongId="slot.songId"
+                  :songs="songStore.songs"
+                  @select="(song) => onSelectSong(index, song)"
+                  @clear="onClearSong(index)"
+                />
+              </template>
 
-            <!-- SCRIPTURE slot -->
-            <template v-else-if="slot.kind === 'SCRIPTURE'">
-              <div class="flex items-center gap-4">
-                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">Scripture Reading</p>
-                <div class="flex-1">
-                  <ScriptureInput
-                    :modelValue="slotToScriptureRef(slot)"
-                    :sermonPassage="localService.sermonPassage"
-                    :showOverlapWarning="true"
-                    label="Scripture Reading"
-                    @update:modelValue="(ref) => onScriptureChange(slot, ref)"
-                  />
+              <!-- SCRIPTURE slot -->
+              <template v-else-if="slot.kind === 'SCRIPTURE'">
+                <div class="flex items-center gap-4">
+                  <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">Scripture Reading</p>
+                  <div class="flex-1">
+                    <ScriptureInput
+                      :modelValue="slotToScriptureRef(slot)"
+                      :sermonPassage="localService.sermonPassage"
+                      :showOverlapWarning="true"
+                      label="Scripture Reading"
+                      @update:modelValue="(ref) => onScriptureChange(index, ref)"
+                    />
+                  </div>
                 </div>
-              </div>
-            </template>
+              </template>
 
-            <!-- PRAYER slot -->
-            <template v-else-if="slot.kind === 'PRAYER'">
-              <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Prayer</p>
-              <p class="text-sm text-gray-600 italic">No assignment needed</p>
-            </template>
+              <!-- PRAYER slot -->
+              <template v-else-if="slot.kind === 'PRAYER'">
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Prayer</p>
+                <p class="text-sm text-gray-600 italic">No assignment needed</p>
+              </template>
 
-            <!-- MESSAGE slot -->
-            <template v-else-if="slot.kind === 'MESSAGE'">
-              <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Message</p>
-              <p class="text-sm text-gray-600 italic">No assignment needed</p>
-            </template>
+              <!-- MESSAGE slot -->
+              <template v-else-if="slot.kind === 'MESSAGE'">
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Message</p>
+                <p class="text-sm text-gray-600 italic">No assignment needed</p>
+              </template>
+            </div>
+
+            <!-- Remove button -->
+            <button
+              type="button"
+              @click="removeSlot(index)"
+              class="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0 mt-0.5"
+              title="Remove element"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Add Element button -->
+        <div class="mt-2 relative">
+          <button
+            type="button"
+            @click="showAddMenu = !showAddMenu"
+            class="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-gray-300 bg-gray-900 hover:bg-gray-800 transition-colors border border-gray-700 border-dashed"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            Add Element
+          </button>
+
+          <!-- Click-away backdrop -->
+          <div
+            v-if="showAddMenu"
+            class="fixed inset-0 z-10"
+            @click="showAddMenu = false"
+          ></div>
+
+          <!-- Dropdown menu -->
+          <div
+            v-if="showAddMenu"
+            class="absolute left-0 mt-1 w-52 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-20 overflow-hidden"
+          >
+            <button type="button" @click="addSlot('SONG', 1)" class="px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 w-full text-left transition-colors">Song (Type 1: Call to Worship)</button>
+            <button type="button" @click="addSlot('SONG', 2)" class="px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 w-full text-left transition-colors">Song (Type 2: Intimate)</button>
+            <button type="button" @click="addSlot('SONG', 3)" class="px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 w-full text-left transition-colors">Song (Type 3: Ascription)</button>
+            <div class="border-t border-gray-700"></div>
+            <button type="button" @click="addSlot('SCRIPTURE')" class="px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 w-full text-left transition-colors">Scripture Reading</button>
+            <button type="button" @click="addSlot('PRAYER')" class="px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 w-full text-left transition-colors">Prayer</button>
+            <button type="button" @click="addSlot('MESSAGE')" class="px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 w-full text-left transition-colors">Message</button>
           </div>
         </div>
 
@@ -286,22 +356,24 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { doc, getDoc } from 'firebase/firestore'
 import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import { useServiceStore } from '@/stores/services'
 import { useSongStore } from '@/stores/songs'
-import { SLOT_LABELS } from '@/utils/slotTypes'
+import { slotLabel, createSlot, reindexSlots } from '@/utils/slotTypes'
 import { scripturesOverlap } from '@/utils/scripture'
-import type { Service, SongSlot, ScriptureSlot, ScriptureRef } from '@/types/service'
+import type { Service, SongSlot, ScriptureSlot, ScriptureRef, SlotKind } from '@/types/service'
+import type { VWType } from '@/types/song'
 import AppShell from '@/components/AppShell.vue'
 import SongBadge from '@/components/SongBadge.vue'
 import SongSlotPicker from '@/components/SongSlotPicker.vue'
 import ScriptureInput from '@/components/ScriptureInput.vue'
 import ServicePrintLayout from '@/components/ServicePrintLayout.vue'
 import { formatForPlanningCenter } from '@/utils/planningCenterExport'
+import Sortable from 'sortablejs'
 
 const route = useRoute()
 const authStore = useAuthStore()
@@ -333,6 +405,35 @@ const pcCopied = ref(false)
 const isSharing = ref(false)
 const shareCopied = ref(false)
 const shareError = ref<string | null>(null)
+const showAddMenu = ref(false)
+
+// ── Sortable ───────────────────────────────────────────────────────────────────
+
+const slotContainerRef = ref<HTMLElement | null>(null)
+let sortableInstance: Sortable | null = null
+
+watch(slotContainerRef, (el) => {
+  if (el && !sortableInstance) {
+    sortableInstance = Sortable.create(el, {
+      handle: '.drag-handle',
+      animation: 150,
+      ghostClass: 'opacity-30',
+      onEnd(evt) {
+        if (!localService.value || evt.oldIndex == null || evt.newIndex == null) return
+        if (evt.oldIndex === evt.newIndex) return
+        const slots = [...localService.value.slots]
+        const moved = slots.splice(evt.oldIndex, 1)[0]
+        if (!moved) return
+        slots.splice(evt.newIndex, 0, moved)
+        localService.value.slots = reindexSlots(slots)
+        // Force Vue to re-render in sync with our data
+        nextTick(() => {
+          // After Vue re-renders, Sortable DOM will be correct
+        })
+      },
+    })
+  }
+}, { flush: 'post' })
 
 // ── Computed ───────────────────────────────────────────────────────────────────
 
@@ -340,7 +441,10 @@ const serviceId = computed(() => route.params.id as string)
 
 const parsedDate = computed(() => {
   if (!localService.value?.date) return null
-  const [year, month, day] = localService.value.date.split('-').map(Number)
+  const parts = localService.value.date.split('-').map(Number)
+  const year = parts[0] ?? 0
+  const month = parts[1] ?? 1
+  const day = parts[2] ?? 1
   return new Date(year, month - 1, day)
 })
 
@@ -403,6 +507,8 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  sortableInstance?.destroy()
+  sortableInstance = null
   // Don't unsubscribe serviceStore here — DashboardView may still be using it
 })
 
@@ -424,38 +530,53 @@ function toggleTeam(team: string) {
   }
 }
 
-// ── Song assignment ────────────────────────────────────────────────────────────
+// ── Dynamic slot add/remove ────────────────────────────────────────────────────
 
-function onSelectSong(
-  slot: SongSlot,
-  song: { id: string; title: string; key: string },
-) {
+function addSlot(kind: SlotKind, vwType?: VWType) {
   if (!localService.value) return
-  const slotIdx = localService.value.slots.findIndex(
-    (s) => s.position === slot.position,
-  )
-  if (slotIdx >= 0) {
-    localService.value.slots[slotIdx] = {
-      ...localService.value.slots[slotIdx],
-      songId: song.id,
-      songTitle: song.title,
-      songKey: song.key,
-    } as SongSlot
+  const newSlot = createSlot(kind, vwType)
+  localService.value.slots.push(newSlot)
+  localService.value.slots = reindexSlots(localService.value.slots)
+  showAddMenu.value = false
+}
+
+function removeSlot(index: number) {
+  if (!localService.value) return
+  localService.value.slots.splice(index, 1)
+  localService.value.slots = reindexSlots(localService.value.slots)
+}
+
+function changeVwType(index: number, vwType: VWType) {
+  if (!localService.value) return
+  const slot = localService.value.slots[index]
+  if (!slot) return
+  if (slot.kind === 'SONG') {
+    ;(localService.value.slots[index] as SongSlot).requiredVwType = vwType
   }
 }
 
-function onClearSong(slot: SongSlot) {
+// ── Song assignment ────────────────────────────────────────────────────────────
+
+function onSelectSong(
+  index: number,
+  song: { id: string; title: string; key: string },
+) {
   if (!localService.value) return
-  const slotIdx = localService.value.slots.findIndex(
-    (s) => s.position === slot.position,
-  )
-  if (slotIdx >= 0) {
-    localService.value.slots[slotIdx] = {
-      ...localService.value.slots[slotIdx],
-      songId: null,
-      songTitle: null,
-      songKey: null,
-    } as SongSlot
+  const slot = localService.value.slots[index]
+  if (!slot) return
+  if (slot.kind === 'SONG') {
+    const updated: SongSlot = { ...slot, songId: song.id, songTitle: song.title, songKey: song.key }
+    localService.value.slots[index] = updated
+  }
+}
+
+function onClearSong(index: number) {
+  if (!localService.value) return
+  const slot = localService.value.slots[index]
+  if (!slot) return
+  if (slot.kind === 'SONG') {
+    const updated: SongSlot = { ...slot, songId: null, songTitle: null, songKey: null }
+    localService.value.slots[index] = updated
   }
 }
 
@@ -471,14 +592,13 @@ function slotToScriptureRef(slot: ScriptureSlot): ScriptureRef | null {
   }
 }
 
-function onScriptureChange(slot: ScriptureSlot, ref: ScriptureRef | null) {
+function onScriptureChange(index: number, ref: ScriptureRef | null) {
   if (!localService.value) return
-  const slotIdx = localService.value.slots.findIndex(
-    (s) => s.position === slot.position,
-  )
-  if (slotIdx >= 0) {
-    localService.value.slots[slotIdx] = {
-      ...localService.value.slots[slotIdx],
+  const slot = localService.value.slots[index]
+  if (!slot) return
+  if (slot.kind === 'SCRIPTURE') {
+    localService.value.slots[index] = {
+      ...slot,
       book: ref?.book ?? null,
       chapter: ref?.chapter ?? null,
       verseStart: ref?.verseStart ?? null,
@@ -492,12 +612,16 @@ function onSermonPassageChange(ref: ScriptureRef | null) {
   localService.value.sermonPassage = ref
 }
 
+// Keep for use in ScriptureInput overlap detection (via the component itself)
 function checkScriptureOverlap(slot: ScriptureSlot): boolean {
   const reading = slotToScriptureRef(slot)
   const sermon = localService.value?.sermonPassage ?? null
   if (!reading || !sermon) return false
   return scripturesOverlap(reading, sermon)
 }
+
+// Suppress unused warning — this function is available for future template use
+void checkScriptureOverlap
 
 // ── Print & Copy for PC ────────────────────────────────────────────────────────
 
@@ -547,38 +671,43 @@ async function onSave() {
   try {
     const { id, createdAt, updatedAt, ...data } = localService.value
 
-    // Find changed song slots and call assignSongToSlot for them
-    // This handles the cross-store lastUsedAt write
+    // Compare song IDs globally to update lastUsedAt for newly assigned songs
     if (originalService.value) {
       const original = originalService.value
-      for (const slot of localService.value.slots) {
-        if (slot.kind === 'SONG') {
-          const origSlot = original.slots.find(
-            (s) => s.position === slot.position && s.kind === 'SONG',
-          ) as SongSlot | undefined
-          if (slot.songId && slot.songId !== origSlot?.songId) {
-            // Song was assigned or changed — use assignSongToSlot for lastUsedAt write
-            await serviceStore.assignSongToSlot(id, slot.position, {
-              id: slot.songId,
-              title: slot.songTitle!,
-              key: slot.songKey!,
-            })
-          } else if (!slot.songId && origSlot?.songId) {
-            // Song was cleared
-            await serviceStore.clearSongFromSlot(id, slot.position)
-          }
+      const newSongIds = new Set(
+        localService.value.slots
+          .filter((s) => s.kind === 'SONG' && (s as SongSlot).songId)
+          .map((s) => (s as SongSlot).songId!),
+      )
+      const oldSongIds = new Set(
+        original.slots
+          .filter((s) => s.kind === 'SONG' && (s as SongSlot).songId)
+          .map((s) => (s as SongSlot).songId!),
+      )
+
+      // Update lastUsedAt for newly added songs
+      for (const songId of newSongIds) {
+        if (!oldSongIds.has(songId)) {
+          const songSlot = localService.value.slots.find(
+            (s) => s.kind === 'SONG' && (s as SongSlot).songId === songId,
+          ) as SongSlot
+          await serviceStore.assignSongToSlot(id, localService.value.slots.indexOf(songSlot), {
+            id: songId,
+            title: songSlot.songTitle!,
+            key: songSlot.songKey!,
+          })
         }
       }
     }
 
-    // Update all non-slot fields
+    // Persist the full slot array (reindexed) and other fields
     await serviceStore.updateService(id, {
       name: data.name,
       teams: data.teams,
       sermonPassage: data.sermonPassage,
       notes: data.notes,
       status: data.status,
-      slots: data.slots,
+      slots: reindexSlots(data.slots),
     })
 
     // Sync local state with store

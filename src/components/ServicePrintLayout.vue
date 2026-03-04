@@ -15,14 +15,14 @@
     <!-- Slot rows -->
     <div>
       <div
-        v-for="slot in props.service.slots"
-        :key="slot.position"
+        v-for="(slot, index) in props.service.slots"
+        :key="slot.position + '-' + slot.kind + '-' + index"
         data-slot-row
         class="py-1.5 border-b border-gray-100 break-inside-avoid"
       >
         <!-- SONG slot -->
         <template v-if="slot.kind === 'SONG'">
-          <span class="font-semibold text-gray-700">{{ SLOT_LABELS[slot.position] }}</span>
+          <span class="font-semibold text-gray-700">{{ slotLabel(slot, index) }}</span>
           <template v-if="slot.songId">
             <span class="text-gray-500"> -- </span>
             <span class="text-gray-900">{{ slot.songTitle }}</span>
@@ -83,7 +83,7 @@
 import { computed } from 'vue'
 import type { Service, SongSlot, ScriptureRef } from '@/types/service'
 import type { Song } from '@/types/song'
-import { SLOT_LABELS } from '@/utils/slotTypes'
+import { slotLabel } from '@/utils/slotTypes'
 import { formatScriptureRef } from '@/utils/planningCenterExport'
 
 const props = defineProps<{
@@ -109,7 +109,10 @@ function getBpmForSlot(slot: SongSlot): number | null {
 // ── Computed ──────────────────────────────────────────────────────────────────
 
 const formattedDate = computed(() => {
-  const [year, month, day] = props.service.date.split('-').map(Number)
+  const parts = props.service.date.split('-').map(Number)
+  const year = parts[0] ?? 0
+  const month = parts[1] ?? 1
+  const day = parts[2] ?? 1
   return new Date(year, month - 1, day).toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'long',
