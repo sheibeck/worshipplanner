@@ -63,6 +63,18 @@
           <div class="flex items-center gap-3">
             <span v-if="isDirty" class="text-xs text-amber-400">Unsaved changes</span>
 
+            <!-- Delete button -->
+            <button
+              type="button"
+              @click="showDeleteConfirm = true"
+              class="print:hidden inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-red-400 bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Delete
+            </button>
+
             <!-- Suggest All Songs button -->
             <button
               type="button"
@@ -137,6 +149,34 @@
             </button>
           </div>
         </div>
+
+        <!-- Delete confirmation dialog -->
+        <Teleport to="body">
+          <div v-if="showDeleteConfirm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+            <div class="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl p-6 w-full max-w-sm mx-4">
+              <h2 class="text-base font-semibold text-gray-100 mb-2">Delete service?</h2>
+              <p class="text-sm text-gray-400 mb-6">This will permanently delete the service for <span class="text-gray-200">{{ formattedDate }}</span>. This cannot be undone.</p>
+              <div class="flex justify-end gap-3">
+                <button
+                  type="button"
+                  @click="showDeleteConfirm = false"
+                  :disabled="isDeleting"
+                  class="rounded-md px-4 py-2 text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  @click="onDelete"
+                  :disabled="isDeleting"
+                  class="rounded-md px-4 py-2 text-sm font-medium text-white bg-red-700 hover:bg-red-600 transition-colors disabled:opacity-50"
+                >
+                  {{ isDeleting ? 'Deleting...' : 'Delete' }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </Teleport>
 
         <!-- Service type configuration -->
         <div class="mb-3 rounded-lg bg-gray-900 border border-gray-800 p-3">
@@ -432,7 +472,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { doc, getDoc } from 'firebase/firestore'
 import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
@@ -453,6 +493,7 @@ import { getSongSuggestions } from '@/utils/claudeApi'
 import type { AiSongSuggestion } from '@/utils/claudeApi'
 
 const route = useRoute()
+const router = useRouter()
 const authStore = useAuthStore()
 const serviceStore = useServiceStore()
 const songStore = useSongStore()
@@ -483,6 +524,8 @@ const isSharing = ref(false)
 const shareCopied = ref(false)
 const shareError = ref<string | null>(null)
 const showAddMenu = ref(false)
+const showDeleteConfirm = ref(false)
+const isDeleting = ref(false)
 
 // ── AI state ───────────────────────────────────────────────────────────────────
 
@@ -996,6 +1039,20 @@ async function onShare() {
     }, 3000)
   } finally {
     isSharing.value = false
+  }
+}
+
+// ── Delete ─────────────────────────────────────────────────────────────────────
+
+async function onDelete() {
+  if (!localService.value) return
+  isDeleting.value = true
+  try {
+    await serviceStore.deleteService(serviceId.value)
+    router.push('/services')
+  } finally {
+    isDeleting.value = false
+    showDeleteConfirm.value = false
   }
 }
 
