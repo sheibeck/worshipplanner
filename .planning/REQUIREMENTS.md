@@ -10,9 +10,9 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Song Library
 
 - [ ] **SONG-01**: User can import song stable from CSV (Planning Center export format with multiple arrangements per song)
-- [ ] **SONG-02**: User can add, edit, and delete songs with title, CCLI number, themes, and notes
+- [x] **SONG-02**: User can add, edit, and delete songs with title, CCLI number, themes, and notes
 - [x] **SONG-03**: User can search and filter songs by title, key, tempo, category, and team tags
-- [ ] **SONG-04**: User can manage multiple arrangements per song (key, BPM, length, chord chart, notes)
+- [x] **SONG-04**: User can manage multiple arrangements per song (key, BPM, length, chord chart, notes)
 - [x] **SONG-05**: User can categorize each song as Vertical Worship type 1 (Call to Worship), 2 (Intimate), or 3 (Ascription)
 - [x] **SONG-06**: User can tag songs with team compatibility (choir, orchestra, standard band, etc.)
 
@@ -114,9 +114,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AUTH-01 | Phase 1 | Complete |
 | AUTH-02 | Phase 1 | Complete |
 | SONG-01 | Phase 2 | Pending |
-| SONG-02 | Phase 2 | Pending |
+| SONG-02 | Phase 2 | Complete |
 | SONG-03 | Phase 2 | Complete |
-| SONG-04 | Phase 2 | Pending |
+| SONG-04 | Phase 2 | Complete |
 | SONG-05 | Phase 2 | Complete |
 | SONG-06 | Phase 2 | Complete |
 | PLAN-01 | Phase 3 | Pending |
