@@ -30,7 +30,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. A signed-in user stays signed in across page refreshes without bouncing to the login screen
   4. An unauthenticated user cannot access any protected route; they are redirected to login
   5. Firestore data is inaccessible to unauthenticated callers (security rules block it)
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 Plans:
 - [ ] 01-01-PLAN.md — Scaffold Vue 3 project, Firebase infra, auth store, router guards, and Firestore security rules
 - [ ] 01-02-PLAN.md — Build login page, app shell with sidebar, dashboard with getting started checklist
@@ -88,7 +88,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/2 | Planning complete | - |
+| 1. Foundation | 1/2 | In Progress|  |
 | 2. Song Library | 0/TBD | Not started | - |
 | 3. Service Planning | 0/TBD | Not started | - |
 | 4. Output | 0/TBD | Not started | - |

@@ -43,8 +43,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Auth & Collaboration
 
-- [ ] **AUTH-01**: User can sign in with Google OAuth
-- [ ] **AUTH-02**: User can sign in with email and password
+- [x] **AUTH-01**: User can sign in with Google OAuth
+- [x] **AUTH-02**: User can sign in with email and password
 - [ ] **AUTH-03**: User can invite team members by email to collaborate on planning
 - [ ] **AUTH-04**: Invited users can access shared service plans and song stable
 
@@ -111,8 +111,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AUTH-01 | Phase 1 | Pending |
-| AUTH-02 | Phase 1 | Pending |
+| AUTH-01 | Phase 1 | Complete |
+| AUTH-02 | Phase 1 | Complete |
 | SONG-01 | Phase 2 | Pending |
 | SONG-02 | Phase 2 | Pending |
 | SONG-03 | Phase 2 | Pending |

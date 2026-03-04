@@ -1,3 +1,19 @@
+---
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: milestone
+status: planning
+stopped_at: Completed 01-01-PLAN.md - Foundation infrastructure done
+last_updated: "2026-03-04T02:11:52.375Z"
+last_activity: 2026-03-03 — Roadmap created, all 29 v1 requirements mapped to 5 phases
+progress:
+  total_phases: 5
+  completed_phases: 0
+  total_plans: 2
+  completed_plans: 1
+  percent: 50
+---
+
 # Project State
 
 ## Project Reference
@@ -10,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-03-03)
 ## Current Position
 
 Phase: 1 of 5 (Foundation)
-Plan: 0 of TBD in current phase
-Status: Ready to plan
-Last activity: 2026-03-03 — Roadmap created, all 29 v1 requirements mapped to 5 phases
+Plan: 1 of 2 in current phase (01-01 complete, 01-02 next)
+Status: In progress
+Last activity: 2026-03-04 — Plan 01-01 complete — Vue 3 + Firebase foundation, auth store, router guard, Firestore rules
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 
@@ -34,6 +50,7 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: -
 
 *Updated after each plan completion*
+| Phase 01-foundation P01 | 47 | 3 tasks | 30 files |
 
 ## Accumulated Context
 
@@ -47,6 +64,9 @@ Recent decisions affecting current work:
 - [Init]: `signInWithPopup` preferred over `signInWithRedirect` (broken in Chrome M115+, Firefox 109+, Safari 16.1+)
 - [Init]: Denormalize song snapshots into service slot documents; avoid N+1 reads
 - [Init]: Use `onSnapshot` directly in Pinia stores; do not use VueFire composables in stores
+- [Phase 01-01]: Firebase v12 used for compatibility with @firebase/rules-unit-testing v5
+- [Phase 01-01]: loginWithEmail auto-creates account on both auth/user-not-found and auth/invalid-credential (Firebase 9+ behavior)
+- [Phase 01-01]: vitest.rules.config.ts created separately for emulator tests to avoid exclusion conflict with vite.config.ts
 
 ### Pending Todos
 
@@ -60,6 +80,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-03
-Stopped at: Roadmap created — ready to plan Phase 1
+Last session: 2026-03-04T02:11:52.369Z
+Stopped at: Completed 01-01-PLAN.md - Foundation infrastructure done
 Resume file: None
