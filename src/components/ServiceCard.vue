@@ -24,11 +24,13 @@
       <!-- Compact slot summary -->
       <div class="text-xs space-y-0.5">
         <template v-for="slot in openingSlots" :key="slot.position">
-          <p class="truncate" :class="slotTextClass(slot)">{{ slotLabel(slot) }}</p>
+          <p v-if="slotUrl(slot)" class="truncate text-gray-400">{{ slotPrefix(slot) }}<a :href="slotUrl(slot)!" target="_blank" rel="noopener" @click.stop class="text-indigo-400 hover:text-indigo-300 transition-colors">{{ slotName(slot) }}</a></p>
+          <p v-else class="truncate" :class="slotTextClass(slot)">{{ slotLabel(slot) }}</p>
         </template>
         <p class="text-gray-600 text-xs my-0.5">--- Message ---</p>
         <template v-for="slot in sendingSlots" :key="slot.position">
-          <p class="truncate" :class="slotTextClass(slot)">{{ slotLabel(slot) }}</p>
+          <p v-if="slotUrl(slot)" class="truncate text-gray-400">{{ slotPrefix(slot) }}<a :href="slotUrl(slot)!" target="_blank" rel="noopener" @click.stop class="text-indigo-400 hover:text-indigo-300 transition-colors">{{ slotName(slot) }}</a></p>
+          <p v-else class="truncate" :class="slotTextClass(slot)">{{ slotLabel(slot) }}</p>
         </template>
       </div>
     </router-link>
@@ -59,6 +61,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import type { Service, ServiceSlot } from '@/types/service'
 import { useServiceStore } from '@/stores/services'
+import { useSongStore } from '@/stores/songs'
 import TeamTagPill from '@/components/TeamTagPill.vue'
 import { esvLink } from '@/utils/scripture'
 
@@ -68,6 +71,7 @@ const props = defineProps<{
 
 const router = useRouter()
 const serviceStore = useServiceStore()
+const songStore = useSongStore()
 
 const isSharing = ref(false)
 const shareCopied = ref(false)
@@ -136,6 +140,33 @@ function slotLabel(slot: ServiceSlot): string {
     case 'MESSAGE':
       return 'Message'
   }
+}
+
+function slotPrefix(slot: ServiceSlot): string {
+  if (slot.kind === 'SONG') return 'Song — '
+  if (slot.kind === 'SCRIPTURE') return 'Scripture — '
+  return ''
+}
+
+function slotName(slot: ServiceSlot): string {
+  if (slot.kind === 'SONG') return slot.songTitle ?? 'Empty'
+  if (slot.kind === 'SCRIPTURE' && slot.book) {
+    return slot.verseStart && slot.verseEnd
+      ? `${slot.book} ${slot.chapter}:${slot.verseStart}-${slot.verseEnd}`
+      : `${slot.book} ${slot.chapter}`
+  }
+  return ''
+}
+
+function slotUrl(slot: ServiceSlot): string | null {
+  if (slot.kind === 'SONG' && slot.songId) {
+    const ccli = songStore.songs.find((s) => s.id === slot.songId)?.ccliNumber
+    if (ccli) return `https://songselect.ccli.com/songs/${ccli}`
+  }
+  if (slot.kind === 'SCRIPTURE' && slot.book && slot.chapter) {
+    return esvLink(slot.book, slot.chapter)
+  }
+  return null
 }
 
 function slotTextClass(slot: ServiceSlot): string {

@@ -17,6 +17,12 @@ vi.mock('@/stores/services', () => ({
   }),
 }))
 
+vi.mock('@/stores/songs', () => ({
+  useSongStore: () => ({
+    songs: [],
+  }),
+}))
+
 const mockTimestamp = { toDate: () => new Date('2026-03-04') } as unknown as Timestamp
 
 const mockService: Service = {
