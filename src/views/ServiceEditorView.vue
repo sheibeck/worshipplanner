@@ -1,4 +1,5 @@
 <template>
+  <div class="print:hidden">
   <AppShell>
     <div class="px-6 py-8">
 
@@ -63,6 +64,40 @@
           <!-- Save area -->
           <div class="flex items-center gap-3">
             <span v-if="isDirty" class="text-xs text-amber-400">Unsaved changes</span>
+
+            <!-- Print button -->
+            <button
+              type="button"
+              data-testid="print-btn"
+              @click="onPrint"
+              :disabled="!localService"
+              class="print:hidden inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-gray-200 bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+              </svg>
+              Print
+            </button>
+
+            <!-- Copy for PC button (with inline "Copied!" feedback) -->
+            <button
+              type="button"
+              data-testid="copy-pc-btn"
+              @click="onCopyForPC"
+              :disabled="!localService"
+              class="print:hidden inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-gray-200 bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700"
+            >
+              <svg v-if="!pcCopied" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+              <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              {{ pcCopied ? 'Copied!' : 'Copy for PC' }}
+            </button>
+
+            <!-- Share button added in Plan 02 -->
+
             <button
               type="button"
               @click="onSave"
@@ -213,6 +248,14 @@
       </template>
     </div>
   </AppShell>
+  </div>
+
+  <!-- Print layout: hidden on screen, visible when printing -->
+  <ServicePrintLayout
+    v-if="localService"
+    :service="localService"
+    :songs="songStore.songs"
+  />
 </template>
 
 <script setup lang="ts">
@@ -230,6 +273,8 @@ import AppShell from '@/components/AppShell.vue'
 import SongBadge from '@/components/SongBadge.vue'
 import SongSlotPicker from '@/components/SongSlotPicker.vue'
 import ScriptureInput from '@/components/ScriptureInput.vue'
+import ServicePrintLayout from '@/components/ServicePrintLayout.vue'
+import { formatForPlanningCenter } from '@/utils/planningCenterExport'
 
 const route = useRoute()
 const authStore = useAuthStore()
@@ -257,6 +302,7 @@ const statusBadgeClasses: Record<string, string> = {
 const localService = ref<Service | null>(null)
 const originalService = ref<Service | null>(null)
 const isSaving = ref(false)
+const pcCopied = ref(false)
 
 // ── Computed ───────────────────────────────────────────────────────────────────
 
@@ -415,6 +461,24 @@ function checkScriptureOverlap(slot: ScriptureSlot): boolean {
   const sermon = localService.value?.sermonPassage ?? null
   if (!reading || !sermon) return false
   return scripturesOverlap(reading, sermon)
+}
+
+// ── Print & Copy for PC ────────────────────────────────────────────────────────
+
+function onPrint() {
+  window.print()
+}
+
+async function onCopyForPC() {
+  if (!localService.value) return
+  const text = formatForPlanningCenter(localService.value, songStore.songs)
+  if (navigator.clipboard) {
+    await navigator.clipboard.writeText(text)
+  }
+  pcCopied.value = true
+  setTimeout(() => {
+    pcCopied.value = false
+  }, 2000)
 }
 
 // ── Save ───────────────────────────────────────────────────────────────────────
