@@ -1,5 +1,5 @@
 <template>
-  <div class="bg-gray-900 border border-gray-800 rounded-xl shadow-xl overflow-hidden">
+  <div v-if="!allDone" class="bg-gray-900 border border-gray-800 rounded-xl shadow-xl overflow-hidden">
     <div class="px-6 py-4 border-b border-gray-800">
       <h2 class="text-sm font-semibold text-gray-100">Getting Started</h2>
       <p class="text-xs text-gray-500 mt-0.5">Get set up in a few quick steps</p>
@@ -60,12 +60,31 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { collection, onSnapshot, type Unsubscribe } from 'firebase/firestore'
+import { db } from '@/firebase'
+import { useAuthStore } from '@/stores/auth'
 import { useSongStore } from '@/stores/songs'
 import { useServiceStore } from '@/stores/services'
 
+const authStore = useAuthStore()
 const songStore = useSongStore()
 const serviceStore = useServiceStore()
+
+const memberCount = ref(0)
+let unsub: Unsubscribe | null = null
+
+onMounted(() => {
+  const orgId = authStore.orgId
+  if (!orgId) return
+  unsub = onSnapshot(collection(db, 'organizations', orgId, 'members'), (snap) => {
+    memberCount.value = snap.size
+  })
+})
+
+onUnmounted(() => {
+  unsub?.()
+})
 
 const steps = computed(() => [
   {
@@ -89,8 +108,12 @@ const steps = computed(() => [
   {
     title: 'Share with your team',
     description: 'Invite team members to collaborate.',
-    done: false,
+    done: memberCount.value > 1,
     to: '/team',
   },
 ])
+
+const allDone = computed(() => steps.value.every((s) => s.done))
+
+defineExpose({ allDone })
 </script>
