@@ -111,11 +111,11 @@ const sendingSlots = computed(() =>
 function slotLabel(slot: ServiceSlot): string {
   switch (slot.kind) {
     case 'SONG':
-      return slot.songTitle ? `Song — ${slot.songTitle}` : 'Empty'
+      return slot.songTitle ? `Song — ${slot.songTitle}` : 'Song — Empty'
     case 'SCRIPTURE':
       return slot.book ? `Scripture — ${slot.book} ${slot.chapter}:${slot.verseStart}-${slot.verseEnd}` : 'Scripture — Empty'
     case 'PRAYER':
-      return 'Prayer'
+      return '--- Prayer ---'
     case 'MESSAGE':
       return 'Message'
   }
@@ -124,6 +124,7 @@ function slotLabel(slot: ServiceSlot): string {
 function slotTextClass(slot: ServiceSlot): string {
   if (slot.kind === 'SONG') return slot.songTitle ? 'text-gray-400' : 'text-gray-500 italic'
   if (slot.kind === 'SCRIPTURE') return slot.book ? 'text-gray-400' : 'text-gray-500 italic'
+  if (slot.kind === 'PRAYER') return 'text-gray-600 text-[10px]'
   return 'text-gray-500'
 }
 
