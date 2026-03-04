@@ -127,7 +127,7 @@
         <!-- Service type configuration -->
         <div class="mb-3 rounded-lg bg-gray-900 border border-gray-800 p-3">
           <div class="flex items-center gap-4">
-          <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">Service Type</h2>
+          <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">Teams</h2>
           <div class="flex flex-wrap items-center gap-4">
             <label
               v-for="team in AVAILABLE_TEAMS"

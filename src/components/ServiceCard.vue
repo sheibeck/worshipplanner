@@ -15,6 +15,10 @@
           {{ service.status }}
         </span>
       </div>
+      <!-- Team badges -->
+      <div v-if="service.teams.length" class="flex flex-wrap gap-1 mb-1">
+        <TeamTagPill v-for="team in service.teams" :key="team" :tag="team" />
+      </div>
       <p v-if="service.name" class="text-xs font-medium text-indigo-300 mb-1.5 truncate">{{ service.name }}</p>
 
       <!-- Compact slot summary -->
@@ -55,6 +59,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import type { Service, ServiceSlot } from '@/types/service'
 import { useServiceStore } from '@/stores/services'
+import TeamTagPill from '@/components/TeamTagPill.vue'
 
 const props = defineProps<{
   service: Service
@@ -106,9 +111,9 @@ const sendingSlots = computed(() =>
 function slotLabel(slot: ServiceSlot): string {
   switch (slot.kind) {
     case 'SONG':
-      return slot.songTitle ?? 'Empty'
+      return slot.songTitle ? `Song — ${slot.songTitle}` : 'Empty'
     case 'SCRIPTURE':
-      return slot.book ? `${slot.book} ${slot.chapter}:${slot.verseStart}-${slot.verseEnd}` : 'Scripture — Empty'
+      return slot.book ? `Scripture — ${slot.book} ${slot.chapter}:${slot.verseStart}-${slot.verseEnd}` : 'Scripture — Empty'
     case 'PRAYER':
       return 'Prayer'
     case 'MESSAGE':
