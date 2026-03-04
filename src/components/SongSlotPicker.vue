@@ -75,9 +75,9 @@
             </button>
           </div>
 
-          <!-- Empty state: no songs match this VW type -->
+          <!-- Empty state: no songs in library -->
           <div v-else class="px-4 py-6 text-center">
-            <p class="text-sm text-gray-400 mb-2">No songs with this category.</p>
+            <p class="text-sm text-gray-400 mb-2">No songs in your library.</p>
             <p class="text-xs text-gray-500">
               Add songs to your library first.
               <router-link to="/songs" class="text-indigo-400 hover:text-indigo-300" @click.stop>Go to Songs</router-link>
@@ -150,8 +150,12 @@ const searchResults = computed<Song[]>(() => {
   if (!searchQuery.value) return []
   const q = searchQuery.value.toLowerCase()
   return props.songs
-    .filter((s) => s.vwType === props.requiredVwType)
     .filter((s) => s.title.toLowerCase().includes(q))
+    .sort((a, b) => {
+      const aMatch = a.vwType === props.requiredVwType ? 1 : 0
+      const bMatch = b.vwType === props.requiredVwType ? 1 : 0
+      return bMatch - aMatch
+    })
 })
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
