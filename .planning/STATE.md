@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed quick-9 scripture preview with book and chapter only
-last_updated: "2026-03-04T18:05:00.000Z"
-last_activity: 2026-03-04 - Completed quick task 9: Allow scripture preview with book and chapter only
+stopped_at: Completed quick-10 song empty label and prayer slot display
+last_updated: "2026-03-04T18:06:00.000Z"
+last_activity: 2026-03-04 - Completed quick task 10: Song — Empty and --- Prayer --- in ServiceCard
 progress:
   total_phases: 5
   completed_phases: 4
@@ -136,6 +136,7 @@ None yet.
 | 7 | Service card team badges, song/scripture label prefixes, Sunday team defaults | 2026-03-04 | f1154f9 | [7-service-card-team-badges-song-slot-label](./quick/7-service-card-team-badges-song-slot-label/) |
 | 8 | Song picker shows all songs with VW type priority (soft +100 bonus, no hard filter) | 2026-03-04 | 54106ae | [8-song-picker-shows-all-songs-with-type-pr](./quick/8-song-picker-shows-all-songs-with-type-pr/) |
 | 9 | Allow scripture preview with book and chapter only (canPreview, conditional passageQuery) | 2026-03-04 | 2ba8775 | [9-allow-scripture-preview-with-book-and-ch](./quick/9-allow-scripture-preview-with-book-and-ch/) |
+| 10 | Song — Empty for unassigned songs, --- Prayer --- divider in service list | 2026-03-04 | 888f5c5 | [10-song-empty-label-and-prayer-slot-display](./quick/10-song-empty-label-and-prayer-slot-display/) |
 
 ### Blockers/Concerns
 
