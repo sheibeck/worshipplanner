@@ -1,10 +1,10 @@
 <template>
-  <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-    <div class="px-6 py-4 border-b border-slate-200">
-      <h2 class="text-sm font-semibold text-slate-900">Getting Started</h2>
-      <p class="text-xs text-slate-500 mt-0.5">Get set up in a few quick steps</p>
+  <div class="bg-gray-900 border border-gray-800 rounded-xl shadow-xl overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-800">
+      <h2 class="text-sm font-semibold text-gray-100">Getting Started</h2>
+      <p class="text-xs text-gray-500 mt-0.5">Get set up in a few quick steps</p>
     </div>
-    <ul class="divide-y divide-slate-100">
+    <ul class="divide-y divide-gray-800">
       <li
         v-for="(step, index) in steps"
         :key="index"
@@ -14,15 +14,15 @@
         <div class="shrink-0 mt-0.5">
           <div
             v-if="step.done"
-            class="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center"
+            class="w-5 h-5 rounded-full bg-green-900/50 flex items-center justify-center"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
               <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
             </svg>
           </div>
           <div
             v-else
-            class="w-5 h-5 rounded-full border-2 border-slate-300"
+            class="w-5 h-5 rounded-full border-2 border-gray-700"
           ></div>
         </div>
 
@@ -31,7 +31,7 @@
           <div class="flex items-center justify-between gap-2">
             <p
               class="text-sm font-medium"
-              :class="step.done ? 'text-slate-400 line-through' : 'text-slate-900'"
+              :class="step.done ? 'text-gray-600 line-through' : 'text-gray-200'"
             >
               {{ step.title }}
             </p>
@@ -39,7 +39,7 @@
             <router-link
               v-if="step.to && !step.done"
               :to="step.to"
-              class="shrink-0 text-indigo-600 hover:text-indigo-700 transition-colors"
+              class="shrink-0 text-indigo-400 hover:text-indigo-300 transition-colors"
               aria-label="Go to step"
             >
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -49,7 +49,7 @@
           </div>
           <p
             class="text-xs mt-0.5"
-            :class="step.done ? 'text-slate-300' : 'text-slate-500'"
+            :class="step.done ? 'text-gray-700' : 'text-gray-500'"
           >
             {{ step.description }}
           </p>

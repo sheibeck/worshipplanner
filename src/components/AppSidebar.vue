@@ -2,15 +2,15 @@
   <!-- Sidebar: overlay on mobile, fixed on desktop -->
   <aside
     :class="[
-      'fixed inset-y-0 left-0 z-30 flex flex-col bg-white border-r border-slate-200 transition-transform duration-200',
+      'fixed inset-y-0 left-0 z-30 flex flex-col bg-gray-900 border-r border-gray-800 transition-transform duration-200',
       'w-64',
       'lg:translate-x-0 lg:static lg:z-auto lg:flex lg:w-64 lg:shrink-0',
       sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
     ]"
   >
     <!-- Brand -->
-    <div class="flex items-center h-14 px-5 border-b border-slate-200 shrink-0">
-      <span class="text-sm font-semibold text-slate-900 tracking-tight">WorshipPlanner</span>
+    <div class="flex items-center h-14 px-5 border-b border-gray-800 shrink-0">
+      <span class="text-sm font-semibold text-gray-100 tracking-tight">WorshipPlanner</span>
     </div>
 
     <!-- Nav -->
@@ -22,29 +22,29 @@
         @click="$emit('close')"
         class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors group"
         :class="isActive(item.to)
-          ? 'bg-indigo-50 text-indigo-700'
-          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'"
+          ? 'bg-indigo-600/20 text-indigo-300'
+          : 'text-gray-400 hover:bg-gray-800 hover:text-gray-100'"
       >
-        <span class="shrink-0" :class="isActive(item.to) ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-500'" v-html="item.icon"></span>
+        <span class="shrink-0" :class="isActive(item.to) ? 'text-indigo-400' : 'text-gray-500 group-hover:text-gray-300'" v-html="item.icon"></span>
         {{ item.label }}
       </router-link>
     </nav>
 
     <!-- User + Sign out -->
-    <div class="border-t border-slate-200 p-3 shrink-0">
+    <div class="border-t border-gray-800 p-3 shrink-0">
       <div class="flex items-center gap-3 px-2 py-2 mb-1">
         <!-- Avatar with initials -->
-        <div class="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
-          <span class="text-xs font-semibold text-indigo-700 uppercase">{{ userInitials }}</span>
+        <div class="w-7 h-7 rounded-full bg-indigo-600/30 flex items-center justify-center shrink-0">
+          <span class="text-xs font-semibold text-indigo-300 uppercase">{{ userInitials }}</span>
         </div>
         <div class="flex-1 min-w-0">
-          <p class="text-xs font-medium text-slate-900 truncate">{{ displayName }}</p>
-          <p class="text-xs text-slate-400 truncate">{{ userEmail }}</p>
+          <p class="text-xs font-medium text-gray-200 truncate">{{ displayName }}</p>
+          <p class="text-xs text-gray-500 truncate">{{ userEmail }}</p>
         </div>
       </div>
       <button
         @click="handleSignOut"
-        class="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+        class="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-500 hover:bg-gray-800 hover:text-gray-300 transition-colors"
       >
         <!-- Sign out icon -->
         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">

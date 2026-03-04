@@ -1,9 +1,9 @@
 <template>
-  <div class="flex h-screen bg-slate-50 overflow-hidden">
+  <div class="flex h-screen bg-gray-950 overflow-hidden">
     <!-- Mobile sidebar overlay backdrop -->
     <div
       v-if="sidebarOpen"
-      class="fixed inset-0 z-20 bg-black/30 lg:hidden"
+      class="fixed inset-0 z-20 bg-black/50 lg:hidden"
       @click="sidebarOpen = false"
     ></div>
 
@@ -16,10 +16,10 @@
     <!-- Main content area -->
     <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
       <!-- Mobile header with hamburger -->
-      <div class="lg:hidden flex items-center h-14 px-4 bg-white border-b border-slate-200 shrink-0">
+      <div class="lg:hidden flex items-center h-14 px-4 bg-gray-900 border-b border-gray-800 shrink-0">
         <button
           @click="sidebarOpen = true"
-          class="p-1.5 rounded-md text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+          class="p-1.5 rounded-md text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
           aria-label="Open sidebar"
         >
           <!-- Hamburger icon -->
@@ -27,7 +27,7 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-        <span class="ml-3 text-sm font-semibold text-slate-900">WorshipPlanner</span>
+        <span class="ml-3 text-sm font-semibold text-gray-100">WorshipPlanner</span>
       </div>
 
       <!-- Page content -->

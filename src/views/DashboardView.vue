@@ -3,8 +3,8 @@
     <div class="px-6 py-8 max-w-3xl">
       <!-- Page header -->
       <div class="mb-6">
-        <h1 class="text-xl font-semibold text-slate-900">Dashboard</h1>
-        <p class="text-sm text-slate-500 mt-1">
+        <h1 class="text-xl font-semibold text-gray-100">Dashboard</h1>
+        <p class="text-sm text-gray-400 mt-1">
           Welcome{{ displayName ? `, ${displayName}` : '' }}
         </p>
       </div>

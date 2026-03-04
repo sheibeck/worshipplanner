@@ -1,1 +1,10 @@
 @import "tailwindcss";
+
+/* Global dark mode base */
+html,
+body,
+#app {
+  background-color: #030712; /* gray-950 equivalent */
+  color: #f3f4f6; /* gray-100 */
+  height: 100%;
+}

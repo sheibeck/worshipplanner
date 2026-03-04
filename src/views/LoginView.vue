@@ -1,20 +1,20 @@
 <template>
-  <div class="min-h-screen bg-slate-50 flex items-center justify-center px-4">
+  <div class="min-h-screen bg-gray-950 flex items-center justify-center px-4">
     <div class="w-full max-w-sm">
       <!-- Brand -->
       <div class="text-center mb-8">
-        <h1 class="text-2xl font-semibold text-slate-900 tracking-tight">WorshipPlanner</h1>
-        <p class="text-sm text-slate-500 mt-1">Sign in to continue</p>
+        <h1 class="text-2xl font-semibold text-white tracking-tight">WorshipPlanner</h1>
+        <p class="text-sm text-gray-400 mt-1">Sign in to continue</p>
       </div>
 
-      <div class="bg-white border border-slate-200 rounded-xl shadow-sm p-6 space-y-5">
+      <div class="bg-gray-900 border border-gray-800 rounded-xl shadow-xl p-6 space-y-5">
 
         <!-- Google Sign-In -->
         <div v-if="!showForgotPassword">
           <button
             @click="handleGoogleSignIn"
             :disabled="isLoading"
-            class="w-full flex items-center justify-center gap-3 px-4 py-2.5 bg-white border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+            class="w-full flex items-center justify-center gap-3 px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-sm font-medium text-gray-100 hover:bg-gray-700 hover:border-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
           >
             <!-- Google G icon -->
             <svg
@@ -29,7 +29,7 @@
               <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
               <path fill="none" d="M0 0h48v48H0z"/>
             </svg>
-            <svg v-else class="w-5 h-5 animate-spin text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <svg v-else class="w-5 h-5 animate-spin text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
             </svg>
@@ -39,10 +39,10 @@
           <!-- Divider -->
           <div class="relative my-5">
             <div class="absolute inset-0 flex items-center">
-              <div class="w-full border-t border-slate-200"></div>
+              <div class="w-full border-t border-gray-800"></div>
             </div>
             <div class="relative flex justify-center text-xs">
-              <span class="px-2 bg-white text-slate-400">or</span>
+              <span class="px-2 bg-gray-900 text-gray-500">or</span>
             </div>
           </div>
 
@@ -57,7 +57,7 @@
                 autocomplete="email"
                 required
                 placeholder="Email address"
-                class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg placeholder-slate-400 text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                class="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-lg placeholder-gray-500 text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
               />
             </div>
             <div>
@@ -69,19 +69,19 @@
                 autocomplete="current-password"
                 required
                 placeholder="Password"
-                class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg placeholder-slate-400 text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                class="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-lg placeholder-gray-500 text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
               />
             </div>
 
             <!-- Error message -->
-            <p v-if="errorMessage" class="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            <p v-if="errorMessage" class="text-sm text-red-400 bg-red-950 border border-red-800 rounded-lg px-3 py-2">
               {{ errorMessage }}
             </p>
 
             <button
               type="submit"
               :disabled="isLoading"
-              class="w-full px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              class="w-full px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {{ loadingMethod === 'email' && isLoading ? 'Signing in...' : 'Sign in' }}
             </button>
@@ -90,7 +90,7 @@
               <button
                 type="button"
                 @click="showForgotPassword = true; errorMessage = ''"
-                class="text-xs text-indigo-600 hover:text-indigo-700 hover:underline"
+                class="text-xs text-indigo-400 hover:text-indigo-300 hover:underline"
               >
                 Forgot password?
               </button>
@@ -103,16 +103,16 @@
           <div class="flex items-center gap-2 mb-4">
             <button
               @click="showForgotPassword = false; resetEmail = ''; resetMessage = ''; errorMessage = ''"
-              class="text-slate-400 hover:text-slate-600 transition-colors"
+              class="text-gray-500 hover:text-gray-300 transition-colors"
             >
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            <h2 class="text-sm font-medium text-slate-900">Reset your password</h2>
+            <h2 class="text-sm font-medium text-gray-100">Reset your password</h2>
           </div>
 
-          <p class="text-sm text-slate-500 mb-4">
+          <p class="text-sm text-gray-400 mb-4">
             Enter your email and we'll send you a link to reset your password.
           </p>
 
@@ -122,17 +122,17 @@
               type="email"
               required
               placeholder="Email address"
-              class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg placeholder-slate-400 text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+              class="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-lg placeholder-gray-500 text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
             />
 
-            <p v-if="errorMessage" class="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            <p v-if="errorMessage" class="text-sm text-red-400 bg-red-950 border border-red-800 rounded-lg px-3 py-2">
               {{ errorMessage }}
             </p>
 
             <button
               type="submit"
               :disabled="isLoading"
-              class="w-full px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              class="w-full px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {{ isLoading ? 'Sending...' : 'Send reset link' }}
             </button>
@@ -140,15 +140,15 @@
 
           <!-- Success state -->
           <div v-else class="text-center space-y-3">
-            <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center mx-auto">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <div class="w-10 h-10 rounded-full bg-green-900 flex items-center justify-center mx-auto">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <p class="text-sm text-slate-700">{{ resetMessage }}</p>
+            <p class="text-sm text-gray-300">{{ resetMessage }}</p>
             <button
               @click="showForgotPassword = false; resetEmail = ''; resetMessage = ''"
-              class="text-xs text-indigo-600 hover:underline"
+              class="text-xs text-indigo-400 hover:underline"
             >
               Back to sign in
             </button>
