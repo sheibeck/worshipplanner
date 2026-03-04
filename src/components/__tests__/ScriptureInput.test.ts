@@ -51,23 +51,6 @@ describe('ScriptureInput', () => {
     })
   })
 
-  describe('Psalms hint text', () => {
-    it('renders "Tip: Psalms work well for responsive readings" hint text', () => {
-      const wrapper = mount(ScriptureInput, { props: defaultProps })
-      expect(wrapper.text()).toContain('Tip: Psalms work well for responsive readings')
-    })
-
-    it('hint text is always visible regardless of field state', () => {
-      const wrapper = mount(ScriptureInput, {
-        props: {
-          ...defaultProps,
-          modelValue: { book: 'Psalms', chapter: 23, verseStart: 1, verseEnd: 6 },
-        },
-      })
-      expect(wrapper.text()).toContain('Tip: Psalms work well for responsive readings')
-    })
-  })
-
   describe('ESV link', () => {
     it('does not show ESV link when fields are incomplete', () => {
       const wrapper = mount(ScriptureInput, { props: defaultProps })

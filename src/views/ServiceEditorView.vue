@@ -128,7 +128,8 @@
 
         <!-- Team configuration -->
         <div class="mb-3 rounded-lg bg-gray-900 border border-gray-800 p-3">
-          <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Team Configuration</h2>
+          <div class="flex items-center gap-4">
+          <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">Teams</h2>
           <div class="flex flex-wrap gap-4">
             <label
               v-for="team in AVAILABLE_TEAMS"
@@ -144,19 +145,23 @@
               <span class="text-sm text-gray-200">{{ team }}</span>
             </label>
           </div>
+          </div>
         </div>
 
         <!-- Sermon Passage -->
         <div class="mb-3 rounded-lg bg-gray-900 border border-gray-800 p-3">
-          <h2 class="text-sm font-semibold text-gray-200 mb-1">Sermon Passage</h2>
-          <p class="text-xs text-gray-500 mb-3">Enter the pastor's teaching passage</p>
-          <ScriptureInput
-            :modelValue="localService.sermonPassage"
-            :sermonPassage="null"
-            :showOverlapWarning="false"
-            label="Sermon Passage"
-            @update:modelValue="onSermonPassageChange"
-          />
+          <div class="flex items-center gap-4">
+            <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">Sermon Passage</h2>
+            <div class="flex-1">
+              <ScriptureInput
+                :modelValue="localService.sermonPassage"
+                :sermonPassage="null"
+                :showOverlapWarning="false"
+                label="Sermon Passage"
+                @update:modelValue="onSermonPassageChange"
+              />
+            </div>
+          </div>
         </div>
 
         <!-- 9-Slot Service Template -->
@@ -168,12 +173,13 @@
           >
             <!-- SONG slot -->
             <template v-if="slot.kind === 'SONG'">
-              <div class="flex items-start justify-between gap-3 mb-1">
-                <div>
+              <div class="flex items-center justify-between gap-3 mb-1">
+                <div class="flex items-center gap-2">
                   <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">
                     {{ SLOT_LABELS[slot.position] }}
                   </p>
-                  <p class="text-xs text-gray-500 mt-0.5">
+                  <span class="text-xs text-gray-600">&middot;</span>
+                  <p class="text-xs text-gray-500">
                     {{ vwTypeLabels[slot.requiredVwType] }}
                   </p>
                 </div>
@@ -223,23 +229,18 @@
 
             <!-- SCRIPTURE slot -->
             <template v-else-if="slot.kind === 'SCRIPTURE'">
-              <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Scripture Reading</p>
-
-              <!-- Overlap warning -->
-              <div
-                v-if="localService.sermonPassage && slot.book && slot.chapter && slot.verseStart && slot.verseEnd && checkScriptureOverlap(slot)"
-                class="text-xs text-amber-400 bg-amber-950/50 border border-amber-800/50 rounded px-2 py-1 mb-2"
-              >
-                This passage overlaps with the sermon passage
+              <div class="flex items-center gap-4">
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">Scripture Reading</p>
+                <div class="flex-1">
+                  <ScriptureInput
+                    :modelValue="slotToScriptureRef(slot)"
+                    :sermonPassage="localService.sermonPassage"
+                    :showOverlapWarning="true"
+                    label="Scripture Reading"
+                    @update:modelValue="(ref) => onScriptureChange(slot, ref)"
+                  />
+                </div>
               </div>
-
-              <ScriptureInput
-                :modelValue="slotToScriptureRef(slot)"
-                :sermonPassage="localService.sermonPassage"
-                :showOverlapWarning="true"
-                label="Scripture Reading"
-                @update:modelValue="(ref) => onScriptureChange(slot, ref)"
-              />
             </template>
 
             <!-- PRAYER slot -->

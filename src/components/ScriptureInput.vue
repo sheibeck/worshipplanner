@@ -65,8 +65,6 @@
       This passage overlaps with the sermon passage
     </div>
 
-    <!-- Psalms hint (always visible) -->
-    <p class="text-xs text-gray-600 mt-1 italic">Tip: Psalms work well for responsive readings</p>
   </div>
 </template>
 

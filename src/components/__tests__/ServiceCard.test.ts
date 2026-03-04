@@ -1,8 +1,21 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import ServiceCard from '../ServiceCard.vue'
 import type { Service } from '@/types/service'
 import type { Timestamp } from 'firebase/firestore'
+
+vi.mock('vue-router', () => ({
+  useRouter: () => ({
+    push: vi.fn(() => Promise.resolve()),
+  }),
+}))
+
+vi.mock('@/stores/services', () => ({
+  useServiceStore: () => ({
+    orgId: 'org-1',
+    createShareToken: vi.fn(() => Promise.resolve('mock-token')),
+  }),
+}))
 
 const mockTimestamp = { toDate: () => new Date('2026-03-04') } as unknown as Timestamp
 
@@ -64,7 +77,7 @@ describe('ServiceCard', () => {
     expect(wrapper.text()).toContain('8')
   })
 
-  it('renders Message headline', () => {
+  it('renders Message in slot summary', () => {
     const wrapper = mount(ServiceCard, {
       props: { service: mockService },
       global: { stubs: globalStubs },
