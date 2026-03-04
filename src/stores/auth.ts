@@ -84,16 +84,19 @@ export const useAuthStore = defineStore('auth', () => {
         const data = snap.data()
         const role = data.role as string
 
-        // Backfill denormalized fields on old member docs
-        const needsBackfill = !data.email && user.value?.email
-        if (needsBackfill) {
-          await updateDoc(snap.ref, {
-            email: user.value!.email ?? '',
-            displayName: user.value!.displayName ?? '',
-          })
+        // One-time migration: admin → editor + backfill missing fields
+        const patch: Record<string, unknown> = {}
+        if (role === 'admin') patch.role = 'editor'
+        if (!data.email && user.value?.email) {
+          patch.email = user.value!.email ?? ''
+          patch.displayName = user.value!.displayName ?? ''
+        }
+        if (Object.keys(patch).length > 0) {
+          await updateDoc(snap.ref, patch)
+          if (role === 'admin') return // next snapshot sets userRole
         }
 
-        userRole.value = role as 'editor' | 'viewer'
+        userRole.value = (role === 'admin' ? 'editor' : role) as 'editor' | 'viewer'
       },
     )
   }
