@@ -185,6 +185,7 @@ None yet.
 | 16 | Remove date-derived Communion badge; fix team checkbox autosave via immutable array update; 500ms debounce | 2026-03-04 | dbb25a0 | [16-fix-communion-badge-display-communion-ch](./quick/16-fix-communion-badge-display-communion-ch/) |
 | 17 | Remove progression from print/share headers; amber Special Service badge in ServiceCard | 2026-03-04 | 4e783fb | [17-remove-progression-from-print-share-head](./quick/17-remove-progression-from-print-share-head/) |
 | 18 | Add Hymn slot type with hymnName, hymnNumber, verses fields across editor, print, share, and PC export | 2026-03-04 | 0c8e511 | [18-add-hymn-slot-type-to-services-with-free](./quick/18-add-hymn-slot-type-to-services-with-free/) |
+| 19 | Add Settings screen to edit org name; gear icon in sidebar for editors; /settings route with requiresEditor guard | 2026-03-04 | b626044 | [19-add-settings-screen-to-edit-org-name-ins](./quick/19-add-settings-screen-to-edit-org-name-ins/) |
 
 ### Blockers/Concerns
 
@@ -194,6 +195,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T22:42:00Z
-Stopped at: Completed Quick-18
+Last session: 2026-03-04T23:39:19Z
+Stopped at: Completed Quick-19
 Resume file: None
