@@ -13,7 +13,7 @@
       <GettingStarted v-if="authStore.isEditor" class="mb-6" />
 
       <!-- Quick stats -->
-      <div class="grid grid-cols-3 gap-3 mb-6">
+      <div class="grid grid-cols-3 gap-3">
         <router-link
           to="/songs"
           class="bg-gray-900 border border-gray-800 rounded-lg px-4 py-3 hover:bg-gray-800/50 transition-colors"
@@ -36,37 +36,6 @@
           <p class="text-xs text-gray-500">Uncategorized songs</p>
         </router-link>
       </div>
-
-      <!-- Upcoming services -->
-      <div>
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="text-sm font-semibold text-gray-100">Upcoming Services</h2>
-          <router-link
-            v-if="upcomingServices.length > 0"
-            to="/services"
-            class="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
-          >
-            View all
-          </router-link>
-        </div>
-        <div v-if="upcomingServices.length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          <ServiceCard
-            v-for="service in upcomingServices.slice(0, 6)"
-            :key="service.id"
-            :service="service"
-          />
-        </div>
-        <div v-else class="bg-gray-900 border border-gray-800 rounded-lg px-6 py-8 text-center">
-          <p class="text-sm text-gray-400 mb-3">No upcoming services planned.</p>
-          <router-link
-            v-if="authStore.isEditor"
-            to="/services"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-500 transition-colors"
-          >
-            Create a service
-          </router-link>
-        </div>
-      </div>
     </div>
   </AppShell>
 </template>
@@ -78,7 +47,6 @@ import { useSongStore } from '@/stores/songs'
 import { useServiceStore } from '@/stores/services'
 import AppShell from '@/components/AppShell.vue'
 import GettingStarted from '@/components/GettingStarted.vue'
-import ServiceCard from '@/components/ServiceCard.vue'
 
 const authStore = useAuthStore()
 const songStore = useSongStore()
