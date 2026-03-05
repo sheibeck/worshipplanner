@@ -335,7 +335,7 @@ export async function createItem(
   planId: string,
   params: {
     title: string
-    itemType: 'song_arrangement' | 'regular' | 'header'
+    itemType: 'song' | 'song_arrangement' | 'regular' | 'header'
     description?: string
     sequence?: number
     length?: number
@@ -397,7 +397,7 @@ export async function updateItem(
   itemId: string,
   params: {
     title?: string
-    itemType?: 'song_arrangement' | 'regular' | 'header'
+    itemType?: 'song' | 'song_arrangement' | 'regular' | 'header'
     description?: string
     length?: number
   },
@@ -439,6 +439,113 @@ export async function updateItem(
   if (!response.ok) {
     const text = await response.text()
     throw new Error(`Failed to update item: ${response.status} ${text}`)
+  }
+}
+
+/**
+ * Search Planning Center for a song by CCLI number.
+ * Returns {id, title} of the first match, or null if not found.
+ * Non-critical lookup — returns null on any error.
+ */
+export async function searchSongByCcli(
+  appId: string,
+  secret: string,
+  ccliNumber: string,
+): Promise<{ id: string; title: string } | null> {
+  try {
+    const response = await fetch(
+      `${PC_BASE_URL}/songs?where[ccli_number]=${ccliNumber}`,
+      {
+        headers: {
+          Authorization: basicAuthHeader(appId, secret),
+          Accept: 'application/json',
+        },
+      },
+    )
+
+    if (!response.ok) return null
+
+    const json = (await response.json()) as {
+      data: Array<{ id: string; attributes: { title: string } }>
+    }
+
+    if (json.data.length === 0) return null
+
+    return { id: json.data[0].id, title: json.data[0].attributes.title }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Fetch arrangements for a Planning Center song.
+ * Returns array of {id, name}. Returns empty array on error.
+ */
+export async function fetchSongArrangements(
+  appId: string,
+  secret: string,
+  pcSongId: string,
+): Promise<Array<{ id: string; name: string }>> {
+  try {
+    const response = await fetch(
+      `${PC_BASE_URL}/songs/${pcSongId}/arrangements?per_page=25`,
+      {
+        headers: {
+          Authorization: basicAuthHeader(appId, secret),
+          Accept: 'application/json',
+        },
+      },
+    )
+
+    if (!response.ok) return []
+
+    const json = (await response.json()) as {
+      data: Array<{ id: string; attributes: { name: string } }>
+    }
+
+    return json.data.map((a) => ({ id: a.id, name: a.attributes.name }))
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Assign an arrangement to an existing item in a Planning Center plan.
+ * Best-effort — silently returns on any error.
+ */
+export async function assignArrangementToItem(
+  appId: string,
+  secret: string,
+  serviceTypeId: string,
+  planId: string,
+  itemId: string,
+  arrangementId: string,
+): Promise<void> {
+  try {
+    await fetch(
+      `${PC_BASE_URL}/service_types/${serviceTypeId}/plans/${planId}/items/${itemId}`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: basicAuthHeader(appId, secret),
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          data: {
+            type: 'Item',
+            id: itemId,
+            relationships: {
+              arrangement: {
+                data: { type: 'Arrangement', id: arrangementId },
+              },
+            },
+          },
+        }),
+      },
+    )
+  } catch {
+    // silently ignore — arrangement linking is best-effort
   }
 }
 
