@@ -5,7 +5,7 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
 
-const gitHash = execSync('git rev-parse --short HEAD').toString().trim()
+const gitHash = execSync('git log -1 --format=%h -- src/').toString().trim()
 
 // https://vite.dev/config/
 export default defineConfig({
