@@ -36,7 +36,6 @@ export const useAuthStore = defineStore('auth', () => {
   // Planning Center credential state
   const pcAppId = ref<string | null>(null)
   const pcSecret = ref<string | null>(null)
-  const pcServiceTypeId = ref<string | null>(null)
 
   const isAuthenticated = computed(() => user.value !== null)
   const isEditor = computed(() => userRole.value === 'editor')
@@ -54,7 +53,6 @@ export const useAuthStore = defineStore('auth', () => {
     return {
       appId: pcAppId.value!,
       secret: pcSecret.value!,
-      serviceTypeId: pcServiceTypeId.value ?? '',
     }
   })
 
@@ -85,7 +83,6 @@ export const useAuthStore = defineStore('auth', () => {
       userRole.value = null
       pcAppId.value = null
       pcSecret.value = null
-      pcServiceTypeId.value = null
       return
     }
 
@@ -98,7 +95,6 @@ export const useAuthStore = defineStore('auth', () => {
       orgName.value = (orgData.name as string) ?? null
       pcAppId.value = (orgData.pcAppId as string) ?? null
       pcSecret.value = (orgData.pcSecret as string) ?? null
-      pcServiceTypeId.value = (orgData.pcServiceTypeId as string) ?? null
     }
 
     // Unsubscribe from previous listener if any
@@ -282,7 +278,6 @@ export const useAuthStore = defineStore('auth', () => {
     userRole.value = null
     pcAppId.value = null
     pcSecret.value = null
-    pcServiceTypeId.value = null
     memberUnsub?.()
     memberUnsub = null
     await signOut(auth)
@@ -291,11 +286,9 @@ export const useAuthStore = defineStore('auth', () => {
   function setPcCredentials(
     appId: string | null,
     secret: string | null,
-    serviceTypeId: string | null,
   ) {
     pcAppId.value = appId
     pcSecret.value = secret
-    pcServiceTypeId.value = serviceTypeId
   }
 
   return {
@@ -315,7 +308,6 @@ export const useAuthStore = defineStore('auth', () => {
     ensureUserDocument,
     pcAppId,
     pcSecret,
-    pcServiceTypeId,
     hasPcCredentials,
     pcCredentials,
     setPcCredentials,

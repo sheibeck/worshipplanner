@@ -12,6 +12,8 @@ import { fetchPassageText } from '@/utils/esvApi'
 import {
   validatePcCredentials,
   fetchServiceTypes,
+  fetchTemplates,
+  updatePlanDate,
   createPlan,
   createItem,
   addSlotAsItem,
@@ -139,6 +141,65 @@ describe('fetchServiceTypes', () => {
   })
 })
 
+describe('fetchTemplates', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  it('returns array of {id, name} from JSON:API response at /service_types/{id}/plan_templates', async () => {
+    const mockResponse = {
+      data: [
+        { id: 'tmpl-1', attributes: { name: 'Standard Template' } },
+        { id: 'tmpl-2', attributes: { name: 'Holiday Template' } },
+      ],
+    }
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(mockResponse), { status: 200 }))
+    const result = await fetchTemplates('app-id', 'secret', 'svc-type-1')
+    expect(result).toEqual([
+      { id: 'tmpl-1', name: 'Standard Template' },
+      { id: 'tmpl-2', name: 'Holiday Template' },
+    ])
+    const [url] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toContain('/service_types/svc-type-1/plan_templates')
+  })
+
+  it('throws on non-ok response', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('Bad Request', { status: 400 }))
+    await expect(fetchTemplates('app-id', 'secret', 'svc-type-1')).rejects.toThrow('Failed to fetch templates: 400')
+  })
+})
+
+describe('updatePlanDate', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  it('sends PATCH to correct URL with sort_date attribute and returns true on success', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('{}', { status: 200 }))
+    const result = await updatePlanDate('app-id', 'secret', 'svc-type-1', 'plan-123', '2026-03-08')
+    expect(result).toBe(true)
+    const [url, options] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toContain('/service_types/svc-type-1/plans/plan-123')
+    expect(options?.method).toBe('PATCH')
+    const body = JSON.parse(options?.body as string)
+    expect(body.data.attributes.sort_date).toBe('2026-03-08')
+    expect(body.data.id).toBe('plan-123')
+    expect(body.data.type).toBe('Plan')
+  })
+
+  it('returns false on non-ok response', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('Bad Request', { status: 400 }))
+    const result = await updatePlanDate('app-id', 'secret', 'svc-type-1', 'plan-123', '2026-03-08')
+    expect(result).toBe(false)
+  })
+
+  it('returns false on network error', async () => {
+    vi.mocked(fetch).mockRejectedValueOnce(new Error('Network failure'))
+    const result = await updatePlanDate('app-id', 'secret', 'svc-type-1', 'plan-123', '2026-03-08')
+    expect(result).toBe(false)
+  })
+})
+
 describe('createPlan', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn())
@@ -157,14 +218,8 @@ describe('createPlan', () => {
     expect(options?.method).toBe('POST')
 
     const body = JSON.parse(options?.body as string)
-    expect(body).toEqual({
-      data: {
-        type: 'Plan',
-        attributes: {
-          title: 'Romans 8:1-11',
-        },
-      },
-    })
+    expect(body.data.type).toBe('Plan')
+    expect(body.data.attributes.title).toBe('Romans 8:1-11')
   })
 
   it('sends only title in attributes (no date fields)', async () => {
@@ -176,6 +231,30 @@ describe('createPlan', () => {
     const [, options] = vi.mocked(fetch).mock.calls[0]!
     const body = JSON.parse(options?.body as string)
     expect(body.data.attributes).toEqual({ title: 'Easter' })
+  })
+
+  it('includes relationships.plan_template when templateId is provided', async () => {
+    const mockResponse = { data: { id: 'plan-789' } }
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(mockResponse), { status: 201 }))
+
+    await createPlan('app-id', 'secret', 'svc-type-1', 'Sunday Service', 'tmpl-42')
+
+    const [, options] = vi.mocked(fetch).mock.calls[0]!
+    const body = JSON.parse(options?.body as string)
+    expect(body.data.relationships).toEqual({
+      plan_template: { data: { type: 'PlanTemplate', id: 'tmpl-42' } },
+    })
+  })
+
+  it('does not include relationships when templateId is not provided', async () => {
+    const mockResponse = { data: { id: 'plan-111' } }
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(mockResponse), { status: 201 }))
+
+    await createPlan('app-id', 'secret', 'svc-type-1', 'Sunday Service')
+
+    const [, options] = vi.mocked(fetch).mock.calls[0]!
+    const body = JSON.parse(options?.body as string)
+    expect(body.data.relationships).toBeUndefined()
   })
 
   it('throws on non-ok response', async () => {

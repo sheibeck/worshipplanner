@@ -2,7 +2,7 @@ import type { Timestamp } from 'firebase/firestore'
 import type { VWType } from './song'
 
 export type Progression = '1-2-2-3' | '1-2-3-3'
-export type ServiceStatus = 'draft' | 'planned'
+export type ServiceStatus = 'draft' | 'planned' | 'exported'
 export type SlotKind = 'SONG' | 'SCRIPTURE' | 'PRAYER' | 'MESSAGE' | 'HYMN'
 
 export interface SongSlot {

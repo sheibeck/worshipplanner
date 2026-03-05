@@ -72,6 +72,69 @@ export async function fetchServiceTypes(
 }
 
 /**
+ * Fetch plan templates for a service type from Planning Center.
+ * Returns an array of {id, name} objects.
+ */
+export async function fetchTemplates(
+  appId: string,
+  secret: string,
+  serviceTypeId: string,
+): Promise<Array<{ id: string; name: string }>> {
+  const response = await fetch(
+    `${PC_BASE_URL}/service_types/${serviceTypeId}/plan_templates?per_page=100`,
+    {
+      headers: {
+        Authorization: basicAuthHeader(appId, secret),
+        Accept: 'application/json',
+      },
+    },
+  )
+  if (!response.ok) {
+    throw new Error(`Failed to fetch templates: ${response.status}`)
+  }
+  const json = (await response.json()) as {
+    data: Array<{ id: string; attributes: { name: string } }>
+  }
+  return json.data.map((t) => ({ id: t.id, name: t.attributes.name }))
+}
+
+/**
+ * PATCH the sort_date on an existing Planning Center plan.
+ * Returns true on success, false on failure (fail-silent).
+ */
+export async function updatePlanDate(
+  appId: string,
+  secret: string,
+  serviceTypeId: string,
+  planId: string,
+  date: string,
+): Promise<boolean> {
+  try {
+    const response = await fetch(
+      `${PC_BASE_URL}/service_types/${serviceTypeId}/plans/${planId}`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: basicAuthHeader(appId, secret),
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          data: {
+            type: 'Plan',
+            id: planId,
+            attributes: { sort_date: date },
+          },
+        }),
+      },
+    )
+    return response.ok
+  } catch {
+    return false
+  }
+}
+
+/**
  * Create a new plan in Planning Center.
  * Returns the plan ID.
  */
@@ -80,8 +143,17 @@ export async function createPlan(
   secret: string,
   serviceTypeId: string,
   title: string,
+  templateId?: string,
 ): Promise<string> {
   const attributes: Record<string, string> = { title }
+  const body: Record<string, unknown> = {
+    data: { type: 'Plan', attributes },
+  }
+  if (templateId) {
+    ;(body.data as Record<string, unknown>).relationships = {
+      plan_template: { data: { type: 'PlanTemplate', id: templateId } },
+    }
+  }
 
   const response = await fetch(`${PC_BASE_URL}/service_types/${serviceTypeId}/plans`, {
     method: 'POST',
@@ -90,12 +162,7 @@ export async function createPlan(
       Accept: 'application/json',
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      data: {
-        type: 'Plan',
-        attributes,
-      },
-    }),
+    body: JSON.stringify(body),
   })
 
   if (!response.ok) {
