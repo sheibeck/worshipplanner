@@ -24,7 +24,7 @@ Full details: milestones/v1.0-ROADMAP.md
 ### 📋 v1.1 (Planned)
 
 - [ ] Phase 5: Collaboration, Tasks & Events (TBD plans)
-- [ ] Phase 8: Planning Center API Export (TBD plans)
+- [ ] Phase 8: Planning Center API Export (3 plans)
 
 ## Phase Details
 
@@ -37,7 +37,7 @@ Full details: milestones/v1.0-ROADMAP.md
 ### Phase 8: Planning Center API Export
 **Goal:** Export published (locked) service plans to Planning Center via the Services API — creating a plan with sermon scripture as title, adding songs/hymns as Song items and scriptures as Item entries
 **Depends on**: Phase 4
-**Requirements**: TBD
+**Requirements**: PC-SC1, PC-SC2, PC-SC3, PC-SC4, PC-SC5, PC-SC6
 **Success Criteria** (what must be TRUE):
   1. When a service plan is published/locked, an "Export to Planning Center" button replaces the "Copy for PC" button
   2. Clicking export creates a new Plan in Planning Center for the service date with the sermon scripture reference as the plan title, appending special info in parens (e.g., "Revelation 12 (Choir)")
@@ -45,10 +45,12 @@ Full details: milestones/v1.0-ROADMAP.md
   4. Each scripture slot is added as an Item with the scripture text in the item description
   5. User sees success/failure feedback after export completes
   6. Planning Center API credentials (App ID + Secret) are configured in app settings
-**Plans:** 0 plans
+**Plans:** 3 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 8 to break down)
+- [ ] 08-01-PLAN.md — PC API client utility, Service type extension, Vite dev proxy
+- [ ] 08-02-PLAN.md — Settings UI for PC credentials and service type selection
+- [ ] 08-03-PLAN.md — Export flow in ServiceEditorView with button, feedback, and exported state
 
 ## Progress
 
@@ -61,4 +63,4 @@ Plans:
 | 6. AI Assisted Service Suggesting | v1.0 | 4/4 | Complete | 2026-03-04 |
 | 7. Invite & RBAC | v1.0 | 2/2 | Complete | 2026-03-04 |
 | 5. Collaboration, Tasks & Events | v1.1 | 0/TBD | Not started | - |
-| 8. Planning Center API Export | v1.1 | 0/TBD | Not started | - |
+| 8. Planning Center API Export | v1.1 | 0/3 | Planned | - |
