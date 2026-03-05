@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Between milestones
-stopped_at: Completed 08-03-PLAN.md (awaiting human verify checkpoint)
-last_updated: "2026-03-05T12:18:06.256Z"
+stopped_at: Completed 08-03-PLAN.md (human-verify APPROVED — Phase 08 complete)
+last_updated: "2026-03-05T12:35:00.000Z"
 progress:
   total_phases: 2
   completed_phases: 1
@@ -58,7 +58,7 @@ Status: Between milestones
 | Phase 07 P02 | 11 | 3 tasks | 8 files |
 | Phase 08 P01 | 5 | 2 tasks | 4 files |
 | Phase 08 P02 | 8 | 2 tasks | 2 files |
-| Phase 08 P03 | 8 | 1 tasks | 1 files |
+| Phase 08 P03 | 8 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -69,9 +69,11 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase 08]: pcExportedAt and pcPlanId added as optional fields to Service interface for backward compatibility
 - [Phase 08]: Credentials never pre-filled in edit inputs — user must re-enter to change (security)
 - [Phase 08]: hasPcCredentials checks both non-null AND non-empty to handle Firestore null vs empty string
-- [Phase 08]: Export to PC button hidden (not disabled) for draft services — only shown for planned services with credentials
+- [Phase 08]: Export to PC button shown for all statuses when credentials configured, disabled (not hidden) for non-planned services
 - [Phase 08]: sermonPassage passed to addSlotAsItem so MESSAGE slots include sermon passage reference in PC item description
 - [Phase 08]: Partial failure tolerance: individual slot failures tracked and reported without rolling back the PC plan
+- [Phase 08]: PC API rejects all date fields on createPlan — date parameter omitted entirely from API call
+- [Phase 08]: Human verified end-to-end export flow against real Planning Center account — APPROVED 2026-03-05
 
 ### Roadmap Evolution
 
@@ -91,6 +93,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 
 ## Session Continuity
 
-Last session: 2026-03-05T12:17:54.742Z
-Stopped at: Completed 08-03-PLAN.md (awaiting human verify checkpoint)
+Last session: 2026-03-05T12:35:00.000Z
+Stopped at: Completed 08-03-PLAN.md (Phase 08 fully complete — human-verify APPROVED)
 Resume file: None
