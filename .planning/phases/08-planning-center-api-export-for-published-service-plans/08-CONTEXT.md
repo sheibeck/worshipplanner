@@ -40,6 +40,12 @@ Export published (planned) service plans to Planning Center via the Services API
 - Error: red inline banner with error message — stays until dismissed
 - Consistent with existing "Copied!" feedback pattern in ServiceEditorView
 
+### PC Service Type Selection
+- Planning Center has multiple service types (e.g., "Sunday Gathering", etc.)
+- Fetch available service types from the PC API after credentials are validated
+- User selects which PC service type to export into — default is "Sunday Gathering"
+- Service type selection should be part of Settings (alongside credentials) or a one-time prompt on first export
+
 ### Export Eligibility
 - Service status "planned" = exportable (no new "locked" status needed)
 - Conditional button replacement: show "Export to PC" when PC credentials are configured, fall back to "Copy for PC" when no credentials
