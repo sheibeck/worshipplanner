@@ -25,6 +25,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/anthropic/, ''),
       },
+      '/api/planningcenter': {
+        target: 'https://api.planningcenteronline.com',
+        changeOrigin: true,
+        rewrite: (path: string) => path.replace(/^\/api\/planningcenter/, ''),
+      },
     },
   },
   test: {

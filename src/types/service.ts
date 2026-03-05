@@ -60,6 +60,8 @@ export interface Service {
   notes: string
   createdAt: Timestamp
   updatedAt: Timestamp
+  pcExportedAt?: Timestamp | null
+  pcPlanId?: string | null
 }
 
 export type ServiceInput = Omit<Service, 'id' | 'createdAt' | 'updatedAt'>
