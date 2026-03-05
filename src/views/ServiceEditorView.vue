@@ -59,6 +59,13 @@
               >
                 {{ localService.status === 'planned' ? 'Planned' : 'Draft' }}
               </span>
+              <!-- Exported to PC badge -->
+              <span v-if="localService.pcExportedAt" class="inline-flex items-center gap-1 rounded-full bg-green-900/30 border border-green-800 px-2.5 py-0.5 text-xs font-medium text-green-400">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+                Exported
+              </span>
             </div>
           </div>
 
@@ -142,8 +149,39 @@
               Print
             </button>
 
-            <!-- Copy for PC button (with inline "Copied!" feedback) -->
+            <!-- Export to PC button: shown when credentials configured AND service is planned -->
             <button
+              v-if="authStore.hasPcCredentials && localService.status === 'planned'"
+              type="button"
+              data-testid="export-pc-btn"
+              @click="onExportToPC"
+              :disabled="isExporting || !!localService.pcExportedAt"
+              class="print:hidden inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors border"
+              :class="localService.pcExportedAt
+                ? 'text-gray-500 bg-gray-800/50 border-gray-700 cursor-not-allowed'
+                : isExporting
+                  ? 'text-gray-400 bg-gray-800 border-gray-700 cursor-wait'
+                  : 'text-gray-200 bg-gray-800 hover:bg-gray-700 border-gray-700'"
+            >
+              <!-- Spinner during export -->
+              <svg v-if="isExporting" class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <!-- Check icon when already exported -->
+              <svg v-else-if="localService.pcExportedAt" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              <!-- Upload icon default -->
+              <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              {{ isExporting ? 'Exporting...' : localService.pcExportedAt ? 'Exported to PC' : 'Export to PC' }}
+            </button>
+
+            <!-- Copy for PC button: shown when NO credentials OR service is draft -->
+            <button
+              v-else
               type="button"
               data-testid="copy-pc-btn"
               @click="onCopyForPC"
@@ -218,6 +256,29 @@
             </div>
           </div>
         </Teleport>
+
+        <!-- Export success toast -->
+        <div v-if="pcExported" class="mb-3 rounded-md bg-green-900/30 border border-green-800 px-4 py-2 text-sm text-green-400 flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+          Exported to Planning Center
+        </div>
+
+        <!-- Export error banner -->
+        <div v-if="exportError" class="mb-3 rounded-md bg-red-900/30 border border-red-800 px-4 py-2 text-sm text-red-400 flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+            <span>{{ exportError }}</span>
+          </div>
+          <button @click="exportError = null" class="text-red-400 hover:text-red-300">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
 
         <!-- Teams configuration -->
         <div class="mb-3 rounded-lg bg-gray-900 border border-gray-800 p-3">
@@ -662,6 +723,8 @@ import SongSlotPicker from '@/components/SongSlotPicker.vue'
 import ScriptureInput from '@/components/ScriptureInput.vue'
 import ServicePrintLayout from '@/components/ServicePrintLayout.vue'
 import { formatForPlanningCenter } from '@/utils/planningCenterExport'
+import { createPlan, addSlotAsItem, buildPlanTitle } from '@/utils/planningCenterApi'
+import { serverTimestamp } from 'firebase/firestore'
 import Sortable from 'sortablejs'
 import { getSongSuggestions } from '@/utils/claudeApi'
 import type { AiSongSuggestion } from '@/utils/claudeApi'
@@ -699,6 +762,12 @@ const shareError = ref<string | null>(null)
 const showAddMenu = ref(false)
 const showDeleteConfirm = ref(false)
 const isDeleting = ref(false)
+
+// ── Export to PC state ─────────────────────────────────────────────────────────
+
+const isExporting = ref(false)
+const pcExported = ref(false)       // green toast after success
+const exportError = ref<string | null>(null)  // red banner on error
 
 // ── AI state ───────────────────────────────────────────────────────────────────
 
@@ -1241,6 +1310,70 @@ async function onCopyForPC() {
   setTimeout(() => {
     pcCopied.value = false
   }, 2000)
+}
+
+async function onExportToPC() {
+  if (!localService.value || localService.value.status !== 'planned') return
+  if (!authStore.hasPcCredentials || !authStore.pcCredentials) return
+
+  isExporting.value = true
+  exportError.value = null
+
+  try {
+    const { appId, secret, serviceTypeId } = authStore.pcCredentials
+
+    if (!serviceTypeId) {
+      exportError.value = 'No Planning Center service type selected. Go to Settings to configure.'
+      return
+    }
+
+    // 1. Build plan title
+    const title = buildPlanTitle(localService.value)
+
+    // 2. Create the plan in PC
+    const planId = await createPlan(appId, secret, serviceTypeId, title, localService.value.date)
+
+    // 3. Add items sequentially, track failures
+    // IMPORTANT: Pass localService.value.sermonPassage to addSlotAsItem
+    // so MESSAGE slots get the sermon passage reference in their description
+    // (per locked decision: "MESSAGE slots -> PC Item entries with sermon passage reference in description")
+    const failures: string[] = []
+    let sequence = 1
+    for (const slot of localService.value.slots) {
+      try {
+        await addSlotAsItem(appId, secret, serviceTypeId, planId, slot, sequence, songStore.songs, localService.value.sermonPassage)
+        sequence++
+      } catch (e) {
+        const label = slot.kind === 'SONG' ? (slot as any).songTitle ?? 'Song'
+          : slot.kind === 'HYMN' ? (slot as any).hymnName ?? 'Hymn'
+          : slot.kind === 'SCRIPTURE' ? 'Scripture'
+          : slot.kind
+        failures.push(label)
+      }
+    }
+
+    // 4. Mark service as exported in Firestore
+    await serviceStore.updateService(localService.value.id, {
+      pcExportedAt: serverTimestamp(),
+      pcPlanId: planId,
+    })
+
+    // 5. Update local state to reflect export
+    localService.value.pcExportedAt = new Date() as any // triggers UI update
+    localService.value.pcPlanId = planId
+
+    // 6. Show feedback
+    if (failures.length > 0) {
+      exportError.value = `Plan created but ${failures.length} item(s) failed: ${failures.join(', ')}`
+    } else {
+      pcExported.value = true
+      setTimeout(() => { pcExported.value = false }, 3000)
+    }
+  } catch (e) {
+    exportError.value = e instanceof Error ? e.message : 'Export failed'
+  } finally {
+    isExporting.value = false
+  }
 }
 
 async function onShare() {
