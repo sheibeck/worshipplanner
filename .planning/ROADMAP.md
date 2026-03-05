@@ -45,7 +45,7 @@ Full details: milestones/v1.0-ROADMAP.md
   4. Each scripture slot is added as an Item with the scripture text in the item description
   5. User sees success/failure feedback after export completes
   6. Planning Center API credentials (App ID + Secret) are configured in app settings
-**Plans:** 3 plans
+**Plans:** 1/3 plans executed
 
 Plans:
 - [ ] 08-01-PLAN.md — PC API client utility, Service type extension, Vite dev proxy
@@ -63,4 +63,4 @@ Plans:
 | 6. AI Assisted Service Suggesting | v1.0 | 4/4 | Complete | 2026-03-04 |
 | 7. Invite & RBAC | v1.0 | 2/2 | Complete | 2026-03-04 |
 | 5. Collaboration, Tasks & Events | v1.1 | 0/TBD | Not started | - |
-| 8. Planning Center API Export | v1.1 | 0/3 | Planned | - |
+| 8. Planning Center API Export | 1/3 | In Progress|  | - |
