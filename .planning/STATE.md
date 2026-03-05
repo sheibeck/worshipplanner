@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Between milestones
-stopped_at: Completed 08-03-PLAN.md (Phase 08 fully complete — human-verify APPROVED)
-last_updated: "2026-03-05T12:37:12.673Z"
+stopped_at: Completed quick-2-PLAN.md (PC song type and CCLI arrangement linking)
+last_updated: "2026-03-05T23:20:04.000Z"
 progress:
   total_phases: 2
   completed_phases: 1
@@ -74,6 +74,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase 08]: Partial failure tolerance: individual slot failures tracked and reported without rolling back the PC plan
 - [Phase 08]: PC API rejects all date fields on createPlan — date parameter omitted entirely from API call
 - [Phase 08]: Human verified end-to-end export flow against real Planning Center account — APPROVED 2026-03-05
+- [Quick-2]: SONG slots use item_type 'song' (not 'song_arrangement') for proper PC song linking
+- [Quick-2]: CCLI-based arrangement linking is best-effort -- errors never cause export failure
+- [Quick-2]: First arrangement from PC auto-linked (most songs have one default arrangement)
 
 ### Roadmap Evolution
 
@@ -84,6 +87,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ### Quick Tasks Completed
 
 14 quick-task UX improvements shipped during v1.0 (tasks 6-21). See milestones/v1.0-ROADMAP.md for full list.
+- [Quick-1]: PC export dialog refactored with template-based item matching, existing plan detection, plan times
+- [Quick-2]: SONG slots use item_type 'song' with CCLI-based arrangement auto-linking
 
 ### Blockers/Concerns
 
@@ -93,6 +98,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 
 ## Session Continuity
 
-Last session: 2026-03-05T12:35:00.000Z
-Stopped at: Completed 08-03-PLAN.md (Phase 08 fully complete — human-verify APPROVED)
+Last session: 2026-03-05T23:20:04.000Z
+Stopped at: Completed quick-2-PLAN.md (PC song type and CCLI arrangement linking)
 Resume file: None
