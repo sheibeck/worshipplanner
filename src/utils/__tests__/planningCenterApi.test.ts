@@ -505,7 +505,7 @@ describe('addSlotAsItem', () => {
   const defaultFetchResponse = () =>
     vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ data: { id: 'item-99' } }), { status: 201 }))
 
-  it('maps SONG slot to song_arrangement with "Title (Key: X)" format', async () => {
+  it('maps SONG slot to item_type "song" with "Title (Key: X)" format', async () => {
     defaultFetchResponse()
     const slot: SongSlot = {
       kind: 'SONG',
@@ -520,8 +520,180 @@ describe('addSlotAsItem', () => {
 
     const [, options] = vi.mocked(fetch).mock.calls[0]!
     const body = JSON.parse(options?.body as string)
-    expect(body.data.attributes.item_type).toBe('song_arrangement')
+    expect(body.data.attributes.item_type).toBe('song')
     expect(body.data.attributes.title).toBe('Come Thou Fount (Key: G)')
+  })
+
+  it('searches PC by CCLI number after creating SONG item when song has ccliNumber', async () => {
+    const mockTimestampLocal = { toDate: () => new Date('2026-03-08') } as unknown as Timestamp
+    const songs = [{
+      id: 'song-1',
+      title: 'Come Thou Fount',
+      ccliNumber: '1234567',
+      author: 'Robert Robinson',
+      themes: [],
+      notes: '',
+      vwType: 1 as const,
+      teamTags: [],
+      arrangements: [],
+      lastUsedAt: null,
+      createdAt: mockTimestampLocal,
+      updatedAt: mockTimestampLocal,
+    }]
+    const slot: SongSlot = {
+      kind: 'SONG',
+      position: 0,
+      requiredVwType: 1,
+      songId: 'song-1',
+      songTitle: 'Come Thou Fount',
+      songKey: 'G',
+    }
+
+    // Mock: createItem response, then searchSongByCcli (found), fetchSongArrangements, assignArrangementToItem
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { id: 'item-99' } }), { status: 201 })) // createItem
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ id: 'pc-song-42', attributes: { title: 'Come Thou Fount' } }] }), { status: 200 })) // searchSongByCcli
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ id: 'arr-1', attributes: { name: 'Default' } }] }), { status: 200 })) // fetchSongArrangements
+      .mockResolvedValueOnce(new Response('{}', { status: 200 })) // assignArrangementToItem
+
+    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 0, songs)
+
+    // Verify: 4 fetch calls total
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(4)
+    // 2nd call is searchSongByCcli
+    const [searchUrl] = vi.mocked(fetch).mock.calls[1]!
+    expect(searchUrl).toContain('/songs?where[ccli_number]=1234567')
+    // 3rd call is fetchSongArrangements
+    const [arrUrl] = vi.mocked(fetch).mock.calls[2]!
+    expect(arrUrl).toContain('/songs/pc-song-42/arrangements')
+    // 4th call is assignArrangementToItem
+    const [assignUrl, assignOpts] = vi.mocked(fetch).mock.calls[3]!
+    expect(assignUrl).toContain('/service_types/svc-type-1/plans/plan-1/items/item-99')
+    const assignBody = JSON.parse(assignOpts?.body as string)
+    expect(assignBody.data.relationships.arrangement.data.id).toBe('arr-1')
+  })
+
+  it('does not search PC when song has empty ccliNumber', async () => {
+    const mockTimestampLocal = { toDate: () => new Date('2026-03-08') } as unknown as Timestamp
+    const songs = [{
+      id: 'song-1',
+      title: 'Custom Song',
+      ccliNumber: '',
+      author: '',
+      themes: [],
+      notes: '',
+      vwType: 1 as const,
+      teamTags: [],
+      arrangements: [],
+      lastUsedAt: null,
+      createdAt: mockTimestampLocal,
+      updatedAt: mockTimestampLocal,
+    }]
+    const slot: SongSlot = {
+      kind: 'SONG',
+      position: 0,
+      requiredVwType: 1,
+      songId: 'song-1',
+      songTitle: 'Custom Song',
+      songKey: 'C',
+    }
+
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { id: 'item-99' } }), { status: 201 }))
+
+    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 0, songs)
+
+    // Only 1 fetch call (createItem), no search
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1)
+  })
+
+  it('creates item successfully even when searchSongByCcli returns null', async () => {
+    const mockTimestampLocal = { toDate: () => new Date('2026-03-08') } as unknown as Timestamp
+    const songs = [{
+      id: 'song-1',
+      title: 'New Song',
+      ccliNumber: '9999999',
+      author: '',
+      themes: [],
+      notes: '',
+      vwType: 1 as const,
+      teamTags: [],
+      arrangements: [],
+      lastUsedAt: null,
+      createdAt: mockTimestampLocal,
+      updatedAt: mockTimestampLocal,
+    }]
+    const slot: SongSlot = {
+      kind: 'SONG',
+      position: 0,
+      requiredVwType: 1,
+      songId: 'song-1',
+      songTitle: 'New Song',
+      songKey: 'D',
+    }
+
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { id: 'item-99' } }), { status: 201 })) // createItem
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 })) // searchSongByCcli returns empty
+
+    const result = await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 0, songs)
+
+    expect(result).toBe('item-99')
+    // Only 2 fetch calls (createItem + search), no arrangement fetch
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not call assignArrangementToItem when fetchSongArrangements returns empty array', async () => {
+    const mockTimestampLocal = { toDate: () => new Date('2026-03-08') } as unknown as Timestamp
+    const songs = [{
+      id: 'song-1',
+      title: 'Song',
+      ccliNumber: '1234567',
+      author: '',
+      themes: [],
+      notes: '',
+      vwType: 1 as const,
+      teamTags: [],
+      arrangements: [],
+      lastUsedAt: null,
+      createdAt: mockTimestampLocal,
+      updatedAt: mockTimestampLocal,
+    }]
+    const slot: SongSlot = {
+      kind: 'SONG',
+      position: 0,
+      requiredVwType: 1,
+      songId: 'song-1',
+      songTitle: 'Song',
+      songKey: 'E',
+    }
+
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { id: 'item-99' } }), { status: 201 })) // createItem
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ id: 'pc-song-42', attributes: { title: 'Song' } }] }), { status: 200 })) // searchSongByCcli
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 })) // fetchSongArrangements returns empty
+
+    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 0, songs)
+
+    // 3 fetch calls (createItem + search + arrangements), no assignment
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(3)
+  })
+
+  it('HYMN slot still uses item_type "song_arrangement"', async () => {
+    defaultFetchResponse()
+    const slot: HymnSlot = {
+      kind: 'HYMN',
+      position: 1,
+      hymnName: 'Be Thou My Vision',
+      hymnNumber: '382',
+      verses: '',
+    }
+
+    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 1, [])
+
+    const [, options] = vi.mocked(fetch).mock.calls[0]!
+    const body = JSON.parse(options?.body as string)
+    expect(body.data.attributes.item_type).toBe('song_arrangement')
   })
 
   it('maps HYMN slot to song_arrangement with "Name #Number" format', async () => {
