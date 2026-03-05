@@ -593,12 +593,32 @@ export async function addSlotAsItem(
     const title = slot.songTitle
       ? `${slot.songTitle} (Key: ${slot.songKey ?? ''})`
       : '[Empty Song]'
-    return createItem(appId, secret, serviceTypeId, planId, {
+    const itemId = await createItem(appId, secret, serviceTypeId, planId, {
       title,
-      itemType: 'song_arrangement',
+      itemType: 'song',
       sequence,
       length,
     })
+
+    // Best-effort: search PC for matching song by CCLI number and link arrangement
+    try {
+      const song = songs.find((s) => s.id === slot.songId)
+      if (song && song.ccliNumber) {
+        const pcSong = await searchSongByCcli(appId, secret, song.ccliNumber)
+        if (pcSong) {
+          const arrangements = await fetchSongArrangements(appId, secret, pcSong.id)
+          if (arrangements.length > 0) {
+            await assignArrangementToItem(
+              appId, secret, serviceTypeId, planId, itemId, arrangements[0].id,
+            )
+          }
+        }
+      }
+    } catch {
+      // Non-fatal: arrangement linking is best-effort
+    }
+
+    return itemId
   }
 
   if (slot.kind === 'HYMN') {
