@@ -28,8 +28,10 @@ Export published (planned) service plans to Planning Center via the Services API
 - MESSAGE slots → PC **Item** entries with sermon passage reference in description
 
 ### Export Behavior
+- **One-way, one-and-done:** After export, the service is marked as "exported" — all further editing happens in Planning Center, not in WorshipPlanner. No sync back.
 - Re-export: warn then allow — confirmation dialog if service was already exported ("This service was already exported on [date]. Export again?")
 - Track export status on the service document (exported timestamp, PC plan ID)
+- Exported services should visually indicate their exported state (e.g., badge, dimmed editing, or read-only indicator) so users know to work in PC from this point
 - Partial failure: report partial success ("Plan created but 2 items failed to add") — don't roll back the plan
 - Loading state: spinner on button with "Exporting..." text, button disabled during export
 
@@ -58,6 +60,7 @@ Export published (planned) service plans to Planning Center via the Services API
 - Songs and hymns should use PC's Song item type (not generic Item) because it's better for the manual setup work done afterward in Planning Center
 - Plan title format from success criteria: sermon scripture reference + special info in parens (e.g., "Revelation 12 (Choir)")
 - The existing `planningCenterExport.ts` utility already formats services as plain text — the new API export builds alongside it, not replacing the format logic
+- **Intent: once exported, the service "lives" in Planning Center.** WorshipPlanner is the planning brain; PC is the execution platform. No round-trip sync — this milestone is one-and-done export.
 
 </specifics>
 
