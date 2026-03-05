@@ -99,62 +99,17 @@ export async function fetchTemplates(
 }
 
 /**
- * PATCH the sort_date on an existing Planning Center plan.
- * Returns true on success, false on failure (fail-silent).
- */
-export async function updatePlanDate(
-  appId: string,
-  secret: string,
-  serviceTypeId: string,
-  planId: string,
-  date: string,
-): Promise<boolean> {
-  try {
-    const response = await fetch(
-      `${PC_BASE_URL}/service_types/${serviceTypeId}/plans/${planId}`,
-      {
-        method: 'PATCH',
-        headers: {
-          Authorization: basicAuthHeader(appId, secret),
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          data: {
-            type: 'Plan',
-            id: planId,
-            attributes: { sort_date: date },
-          },
-        }),
-      },
-    )
-    return response.ok
-  } catch {
-    return false
-  }
-}
-
-/**
  * Create a new plan in Planning Center.
  * Returns the plan ID.
+ * Note: PC API only allows title, public, series_title, reminders_disabled on creation.
+ * Dates and templates must be handled separately.
  */
 export async function createPlan(
   appId: string,
   secret: string,
   serviceTypeId: string,
   title: string,
-  templateId?: string,
 ): Promise<string> {
-  const attributes: Record<string, string> = { title }
-  const body: Record<string, unknown> = {
-    data: { type: 'Plan', attributes },
-  }
-  if (templateId) {
-    ;(body.data as Record<string, unknown>).relationships = {
-      plan_template: { data: { type: 'PlanTemplate', id: templateId } },
-    }
-  }
-
   const response = await fetch(`${PC_BASE_URL}/service_types/${serviceTypeId}/plans`, {
     method: 'POST',
     headers: {
@@ -162,7 +117,12 @@ export async function createPlan(
       Accept: 'application/json',
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      data: {
+        type: 'Plan',
+        attributes: { title },
+      },
+    }),
   })
 
   if (!response.ok) {
@@ -172,6 +132,42 @@ export async function createPlan(
 
   const json = (await response.json()) as { data: { id: string } }
   return json.data.id
+}
+
+/**
+ * Apply a template to an existing plan via the import_template action.
+ * POST /service_types/{id}/plans/{planId}/import_template
+ * Returns true on success, false on failure (fail-silent).
+ */
+export async function applyTemplate(
+  appId: string,
+  secret: string,
+  serviceTypeId: string,
+  planId: string,
+  templateId: string,
+): Promise<boolean> {
+  try {
+    const response = await fetch(
+      `${PC_BASE_URL}/service_types/${serviceTypeId}/plans/${planId}/import_template`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: basicAuthHeader(appId, secret),
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          data: {
+            type: 'PlanTemplate',
+            id: templateId,
+          },
+        }),
+      },
+    )
+    return response.ok
+  } catch {
+    return false
+  }
 }
 
 /**

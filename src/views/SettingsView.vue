@@ -51,13 +51,6 @@
               <span class="text-xs text-gray-400">Secret: </span>
               <span class="font-mono text-sm text-gray-400">............</span>
             </div>
-            <div v-if="authStore.pcServiceTypeId">
-              <span class="text-xs text-gray-400">Service Type: </span>
-              <span class="text-sm text-gray-300">{{
-                pcServiceTypes.find((t) => t.id === authStore.pcServiceTypeId)?.name ??
-                authStore.pcServiceTypeId
-              }}</span>
-            </div>
           </div>
 
           <!-- Success feedback after saving -->
@@ -78,30 +71,6 @@
             >
               Clear Credentials
             </button>
-          </div>
-
-          <!-- Service type dropdown -->
-          <div v-if="pcServiceTypes.length > 0" class="mt-4">
-            <label class="block text-xs text-gray-400 mb-1">Service Type</label>
-            <select
-              v-model="pcSelectedServiceTypeId"
-              class="w-full sm:w-80 bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            >
-              <option value="">Select a service type...</option>
-              <option v-for="st in pcServiceTypes" :key="st.id" :value="st.id">
-                {{ st.name }}
-              </option>
-            </select>
-            <div class="mt-2 flex items-center gap-3">
-              <button
-                type="button"
-                @click="onSaveServiceType"
-                :disabled="pcServiceTypeSaving || pcSelectedServiceTypeId === authStore.pcServiceTypeId"
-                class="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white rounded-md px-4 py-2 text-sm font-medium transition-colors"
-              >
-                {{ pcServiceTypeSaving ? 'Saving...' : pcServiceTypeSaved ? 'Saved!' : 'Save Service Type' }}
-              </button>
-            </div>
           </div>
         </template>
 
@@ -159,30 +128,6 @@
               Cancel
             </button>
           </div>
-
-          <!-- Service type dropdown after validation success -->
-          <div v-if="pcServiceTypes.length > 0" class="mt-4">
-            <label class="block text-xs text-gray-400 mb-1">Service Type</label>
-            <select
-              v-model="pcSelectedServiceTypeId"
-              class="w-full sm:w-80 bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            >
-              <option value="">Select a service type...</option>
-              <option v-for="st in pcServiceTypes" :key="st.id" :value="st.id">
-                {{ st.name }}
-              </option>
-            </select>
-            <div class="mt-2">
-              <button
-                type="button"
-                @click="onSaveServiceType"
-                :disabled="pcServiceTypeSaving || !pcSelectedServiceTypeId || pcSelectedServiceTypeId === authStore.pcServiceTypeId"
-                class="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white rounded-md px-4 py-2 text-sm font-medium transition-colors"
-              >
-                {{ pcServiceTypeSaving ? 'Saving...' : pcServiceTypeSaved ? 'Saved!' : 'Save Service Type' }}
-              </button>
-            </div>
-          </div>
         </template>
       </div>
     </div>
@@ -190,12 +135,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { doc, updateDoc } from 'firebase/firestore'
 import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import AppShell from '@/components/AppShell.vue'
-import { validatePcCredentials, fetchServiceTypes } from '@/utils/planningCenterApi'
+import { validatePcCredentials } from '@/utils/planningCenterApi'
 
 const authStore = useAuthStore()
 
@@ -214,10 +159,6 @@ const pcSecretInput = ref('')
 const pcValidating = ref(false)
 const pcValidationError = ref<string | null>(null)
 const pcSaveSuccess = ref(false)
-const pcServiceTypes = ref<Array<{ id: string; name: string }>>([])
-const pcSelectedServiceTypeId = ref(authStore.pcServiceTypeId ?? '')
-const pcServiceTypeSaving = ref(false)
-const pcServiceTypeSaved = ref(false)
 
 // ── Computed ───────────────────────────────────────────────────────────────────
 
@@ -239,33 +180,6 @@ watch(
     }
   },
 )
-
-// ── Sync pcSelectedServiceTypeId if pcServiceTypeId changes externally ────────
-
-watch(
-  () => authStore.pcServiceTypeId,
-  (newVal) => {
-    if (newVal !== null) {
-      pcSelectedServiceTypeId.value = newVal
-    }
-  },
-)
-
-// ── On mount: if credentials exist, fetch service types ───────────────────────
-
-onMounted(async () => {
-  if (authStore.hasPcCredentials && pcServiceTypes.value.length === 0) {
-    try {
-      const creds = authStore.pcCredentials!
-      pcServiceTypes.value = await fetchServiceTypes(creds.appId, creds.secret)
-      if (authStore.pcServiceTypeId) {
-        pcSelectedServiceTypeId.value = authStore.pcServiceTypeId
-      }
-    } catch {
-      // silently ignore — user can still edit credentials
-    }
-  }
-})
 
 // ── Save action (Org name) ─────────────────────────────────────────────────────
 

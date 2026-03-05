@@ -802,7 +802,7 @@ import SongSlotPicker from '@/components/SongSlotPicker.vue'
 import ScriptureInput from '@/components/ScriptureInput.vue'
 import ServicePrintLayout from '@/components/ServicePrintLayout.vue'
 import { formatForPlanningCenter } from '@/utils/planningCenterExport'
-import { fetchServiceTypes, fetchTemplates, updatePlanDate, createPlan, addSlotAsItem, buildPlanTitle } from '@/utils/planningCenterApi'
+import { fetchServiceTypes, fetchTemplates, createPlan, applyTemplate, addSlotAsItem, buildPlanTitle } from '@/utils/planningCenterApi'
 import { serverTimestamp } from 'firebase/firestore'
 import Sortable from 'sortablejs'
 import { getSongSuggestions } from '@/utils/claudeApi'
@@ -1469,14 +1469,20 @@ async function onConfirmExport() {
     const serviceTypeId = exportSelectedServiceTypeId.value
     const templateId = exportSelectedTemplateId.value || undefined
 
-    // 1. Build plan title
-    const title = buildPlanTitle(localService.value)
+    // 1. Build plan title (include date since PC API doesn't support setting dates directly)
+    const dateStr = localService.value.date
+      ? new Date(localService.value.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      : ''
+    const baseTitle = buildPlanTitle(localService.value)
+    const title = dateStr ? `${baseTitle} — ${dateStr}` : baseTitle
 
-    // 2. Create the plan in PC (with optional template)
-    const planId = await createPlan(appId, secret, serviceTypeId, title, templateId)
+    // 2. Create the plan in PC
+    const planId = await createPlan(appId, secret, serviceTypeId, title)
 
-    // 3. Attempt to set the date via PATCH
-    await updatePlanDate(appId, secret, serviceTypeId, planId, localService.value.date)
+    // 3. Apply template if selected (separate action — PC API doesn't support on creation)
+    if (templateId) {
+      await applyTemplate(appId, secret, serviceTypeId, planId, templateId)
+    }
 
     // 4. Add items sequentially, track failures
     const failures: string[] = []
