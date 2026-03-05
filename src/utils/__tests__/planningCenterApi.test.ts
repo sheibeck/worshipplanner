@@ -14,8 +14,9 @@ import {
   fetchServiceTypes,
   fetchTemplates,
   createPlan,
-  applyTemplate,
+  fetchTemplateItems,
   createItem,
+  updateItem,
   addSlotAsItem,
   buildPlanTitle,
 } from '@/utils/planningCenterApi'
@@ -169,33 +170,36 @@ describe('fetchTemplates', () => {
   })
 })
 
-describe('applyTemplate', () => {
+describe('fetchTemplateItems', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn())
   })
 
-  it('sends POST to import_template endpoint and returns true on success', async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(new Response('{}', { status: 200 }))
-    const result = await applyTemplate('app-id', 'secret', 'svc-type-1', 'plan-123', 'tmpl-42')
-    expect(result).toBe(true)
-    const [url, options] = vi.mocked(fetch).mock.calls[0]!
-    expect(url).toContain('/service_types/svc-type-1/plans/plan-123/import_template')
-    expect(options?.method).toBe('POST')
-    const body = JSON.parse(options?.body as string)
-    expect(body.data.type).toBe('PlanTemplate')
-    expect(body.data.id).toBe('tmpl-42')
+  it('fetches items from template endpoint and returns mapped array', async () => {
+    const mockResponse = {
+      data: [
+        { id: '1', attributes: { title: 'Worship Song', item_type: 'song', sequence: 1 } },
+        { id: '2', attributes: { title: 'Prayer', item_type: 'regular', sequence: 2 } },
+        { id: '3', attributes: { title: 'Scripture Reading', item_type: 'regular', sequence: 3, html_details: '<p>Read aloud</p>' } },
+      ],
+    }
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(mockResponse), { status: 200 }))
+
+    const result = await fetchTemplateItems('app-id', 'secret', 'svc-type-1', 'tmpl-42')
+
+    expect(result).toEqual([
+      { title: 'Worship Song', itemType: 'song', sequence: 1, description: undefined },
+      { title: 'Prayer', itemType: 'regular', sequence: 2, description: undefined },
+      { title: 'Scripture Reading', itemType: 'regular', sequence: 3, description: '<p>Read aloud</p>' },
+    ])
+
+    const [url] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toContain('/service_types/svc-type-1/plan_templates/tmpl-42/items')
   })
 
-  it('returns false on non-ok response', async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(new Response('Bad Request', { status: 400 }))
-    const result = await applyTemplate('app-id', 'secret', 'svc-type-1', 'plan-123', 'tmpl-42')
-    expect(result).toBe(false)
-  })
-
-  it('returns false on network error', async () => {
-    vi.mocked(fetch).mockRejectedValueOnce(new Error('Network failure'))
-    const result = await applyTemplate('app-id', 'secret', 'svc-type-1', 'plan-123', 'tmpl-42')
-    expect(result).toBe(false)
+  it('throws on non-ok response', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('Not Found', { status: 404 }))
+    await expect(fetchTemplateItems('app-id', 'secret', 'svc-type-1', 'tmpl-42')).rejects.toThrow('Failed to fetch template items: 404')
   })
 })
 
@@ -314,6 +318,50 @@ describe('createItem', () => {
   })
 })
 
+describe('updateItem', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  it('sends PATCH to /service_types/{id}/plans/{planId}/items/{itemId}', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('{}', { status: 200 }))
+
+    await updateItem('app-id', 'secret', 'svc-type-1', 'plan-1', 'item-5', {
+      title: 'Come Thou Fount (Key: G)',
+      itemType: 'song_arrangement',
+    })
+
+    const [url, options] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toContain('/service_types/svc-type-1/plans/plan-1/items/item-5')
+    expect(options?.method).toBe('PATCH')
+
+    const body = JSON.parse(options?.body as string)
+    expect(body.data.type).toBe('Item')
+    expect(body.data.id).toBe('item-5')
+    expect(body.data.attributes.title).toBe('Come Thou Fount (Key: G)')
+    expect(body.data.attributes.item_type).toBe('song_arrangement')
+  })
+
+  it('only includes provided attributes', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('{}', { status: 200 }))
+
+    await updateItem('app-id', 'secret', 'svc-type-1', 'plan-1', 'item-5', {
+      title: 'Updated Title',
+    })
+
+    const [, options] = vi.mocked(fetch).mock.calls[0]!
+    const body = JSON.parse(options?.body as string)
+    expect(body.data.attributes).toEqual({ title: 'Updated Title' })
+  })
+
+  it('throws on non-ok response', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('Forbidden', { status: 403 }))
+    await expect(
+      updateItem('app-id', 'secret', 'svc-type-1', 'plan-1', 'item-5', { title: 'X' }),
+    ).rejects.toThrow('Failed to update item: 403')
+  })
+})
+
 describe('addSlotAsItem', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn())
@@ -357,7 +405,7 @@ describe('addSlotAsItem', () => {
     const [, options] = vi.mocked(fetch).mock.calls[0]!
     const body = JSON.parse(options?.body as string)
     expect(body.data.attributes.item_type).toBe('song_arrangement')
-    expect(body.data.attributes.title).toBe('Amazing Grace #337')
+    expect(body.data.attributes.title).toBe('Amazing Grace #337 (vv. 1, 3, 4)')
   })
 
   it('maps HYMN slot without number using just name', async () => {

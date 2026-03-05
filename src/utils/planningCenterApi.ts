@@ -99,6 +99,97 @@ export async function fetchTemplates(
 }
 
 /**
+ * Fetch plans for a service type, optionally filtered to a date range.
+ * Returns array of {id, title, sortDate, dates}.
+ */
+export async function fetchPlans(
+  appId: string,
+  secret: string,
+  serviceTypeId: string,
+  filter?: { after: string; before: string },
+): Promise<Array<{ id: string; title: string; sortDate: string; dates: string }>> {
+  const fmtDate = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+  let url = `${PC_BASE_URL}/service_types/${serviceTypeId}/plans?order=sort_date&per_page=25`
+  if (filter) {
+    // PC filters are exclusive, so widen the range by 1 day on each side
+    const afterDate = new Date(filter.after + 'T00:00:00')
+    afterDate.setDate(afterDate.getDate() - 1)
+    const beforeDate = new Date(filter.before + 'T00:00:00')
+    beforeDate.setDate(beforeDate.getDate() + 1)
+    url += `&filter=after,before&after=${fmtDate(afterDate)}&before=${fmtDate(beforeDate)}`
+  }
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: basicAuthHeader(appId, secret),
+      Accept: 'application/json',
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch plans: ${response.status}`)
+  }
+
+  const json = (await response.json()) as {
+    data: Array<{
+      id: string
+      attributes: {
+        title: string
+        sort_date: string
+        dates: string
+      }
+    }>
+  }
+
+  return json.data.map((p) => ({
+    id: p.id,
+    title: p.attributes.title,
+    sortDate: p.attributes.sort_date,
+    dates: p.attributes.dates,
+  }))
+}
+
+/**
+ * Fetch existing items from a plan.
+ * Returns the max sequence number so we can append after existing items.
+ */
+export async function fetchPlanItems(
+  appId: string,
+  secret: string,
+  serviceTypeId: string,
+  planId: string,
+): Promise<Array<{ id: string; title: string; sequence: number }>> {
+  const response = await fetch(
+    `${PC_BASE_URL}/service_types/${serviceTypeId}/plans/${planId}/items?per_page=100`,
+    {
+      headers: {
+        Authorization: basicAuthHeader(appId, secret),
+        Accept: 'application/json',
+      },
+    },
+  )
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch plan items: ${response.status}`)
+  }
+
+  const json = (await response.json()) as {
+    data: Array<{
+      id: string
+      attributes: { title: string; sequence: number }
+    }>
+  }
+
+  return json.data.map((item) => ({
+    id: item.id,
+    title: item.attributes.title,
+    sequence: item.attributes.sequence,
+  }))
+}
+
+/**
  * Create a new plan in Planning Center.
  * Returns the plan ID.
  * Note: PC API only allows title, public, series_title, reminders_disabled on creation.
@@ -135,39 +226,102 @@ export async function createPlan(
 }
 
 /**
- * Apply a template to an existing plan via the import_template action.
- * POST /service_types/{id}/plans/{planId}/import_template
- * Returns true on success, false on failure (fail-silent).
+ * Fetch items from a plan template.
+ * GET /service_types/{id}/plan_templates/{templateId}/items
  */
-export async function applyTemplate(
+export async function fetchTemplateItems(
+  appId: string,
+  secret: string,
+  serviceTypeId: string,
+  templateId: string,
+): Promise<Array<{ title: string; itemType: string; sequence: number; description?: string; length?: number }>> {
+  const response = await fetch(
+    `${PC_BASE_URL}/service_types/${serviceTypeId}/plan_templates/${templateId}/items?per_page=100`,
+    {
+      headers: {
+        Authorization: basicAuthHeader(appId, secret),
+        Accept: 'application/json',
+      },
+    },
+  )
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch template items: ${response.status}`)
+  }
+
+  const json = (await response.json()) as {
+    data: Array<{
+      id: string
+      attributes: {
+        title: string
+        item_type: string
+        sequence: number
+        length?: number
+        description?: string
+        html_details?: string
+      }
+    }>
+  }
+
+  return json.data.map((item) => ({
+    title: item.attributes.title,
+    itemType: item.attributes.item_type,
+    sequence: item.attributes.sequence,
+    length: item.attributes.length,
+    description: item.attributes.html_details || item.attributes.description,
+  }))
+}
+
+/**
+ * Create a plan time (service time or rehearsal) on a Planning Center plan.
+ * POST /service_types/{id}/plans/{planId}/plan_times
+ */
+export async function createPlanTime(
   appId: string,
   secret: string,
   serviceTypeId: string,
   planId: string,
-  templateId: string,
-): Promise<boolean> {
-  try {
-    const response = await fetch(
-      `${PC_BASE_URL}/service_types/${serviceTypeId}/plans/${planId}/import_template`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: basicAuthHeader(appId, secret),
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          data: {
-            type: 'PlanTemplate',
-            id: templateId,
-          },
-        }),
-      },
-    )
-    return response.ok
-  } catch {
-    return false
+  params: {
+    startsAt: string // ISO 8601
+    endsAt: string   // ISO 8601
+    timeType: 'service' | 'rehearsal' | 'other'
+    name?: string
+  },
+): Promise<string> {
+  const attributes: Record<string, unknown> = {
+    starts_at: params.startsAt,
+    ends_at: params.endsAt,
+    time_type: params.timeType,
   }
+  if (params.name) {
+    attributes.name = params.name
+  }
+
+  const response = await fetch(
+    `${PC_BASE_URL}/service_types/${serviceTypeId}/plans/${planId}/plan_times`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: basicAuthHeader(appId, secret),
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        data: {
+          type: 'PlanTime',
+          attributes,
+        },
+      }),
+    },
+  )
+
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(`Failed to create plan time: ${response.status} ${text}`)
+  }
+
+  const json = (await response.json()) as { data: { id: string } }
+  return json.data.id
 }
 
 /**
@@ -181,9 +335,10 @@ export async function createItem(
   planId: string,
   params: {
     title: string
-    itemType: 'song_arrangement' | 'regular'
+    itemType: 'song_arrangement' | 'regular' | 'header'
     description?: string
     sequence?: number
+    length?: number
   },
 ): Promise<string> {
   const attributes: Record<string, unknown> = {
@@ -197,6 +352,10 @@ export async function createItem(
 
   if (params.sequence !== undefined) {
     attributes.sequence = params.sequence
+  }
+
+  if (params.length !== undefined) {
+    attributes.length = params.length
   }
 
   const response = await fetch(
@@ -224,6 +383,63 @@ export async function createItem(
 
   const json = (await response.json()) as { data: { id: string } }
   return json.data.id
+}
+
+/**
+ * Update an existing item in a Planning Center plan.
+ * PATCH /service_types/{id}/plans/{planId}/items/{itemId}
+ */
+export async function updateItem(
+  appId: string,
+  secret: string,
+  serviceTypeId: string,
+  planId: string,
+  itemId: string,
+  params: {
+    title?: string
+    itemType?: 'song_arrangement' | 'regular' | 'header'
+    description?: string
+    length?: number
+  },
+): Promise<void> {
+  const attributes: Record<string, unknown> = {}
+
+  if (params.title !== undefined) {
+    attributes.title = params.title
+  }
+  if (params.itemType !== undefined) {
+    attributes.item_type = params.itemType
+  }
+  if (params.description !== undefined) {
+    attributes.html_details = params.description
+  }
+  if (params.length !== undefined) {
+    attributes.length = params.length
+  }
+
+  const response = await fetch(
+    `${PC_BASE_URL}/service_types/${serviceTypeId}/plans/${planId}/items/${itemId}`,
+    {
+      method: 'PATCH',
+      headers: {
+        Authorization: basicAuthHeader(appId, secret),
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        data: {
+          type: 'Item',
+          id: itemId,
+          attributes,
+        },
+      }),
+    },
+  )
+
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(`Failed to update item: ${response.status} ${text}`)
+  }
 }
 
 /**
@@ -260,6 +476,7 @@ export async function addSlotAsItem(
   sequence: number,
   songs: Song[],
   sermonPassage?: ScriptureRef | null,
+  length?: number,
 ): Promise<string> {
   if (slot.kind === 'SONG') {
     // Skip empty song slots (no songId assigned)
@@ -273,16 +490,19 @@ export async function addSlotAsItem(
       title,
       itemType: 'song_arrangement',
       sequence,
+      length,
     })
   }
 
   if (slot.kind === 'HYMN') {
     const numPart = slot.hymnNumber ? ` #${slot.hymnNumber}` : ''
-    const title = `${slot.hymnName}${numPart}`
+    const versesPart = slot.verses ? ` (vv. ${slot.verses})` : ''
+    const title = `${slot.hymnName}${numPart}${versesPart}`
     return createItem(appId, secret, serviceTypeId, planId, {
       title,
       itemType: 'song_arrangement',
       sequence,
+      length,
     })
   }
 
@@ -303,6 +523,7 @@ export async function addSlotAsItem(
       itemType: 'regular',
       description,
       sequence,
+      length,
     })
   }
 

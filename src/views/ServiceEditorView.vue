@@ -38,7 +38,21 @@
         <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-3">
           <div>
             <div class="flex items-center gap-3">
-              <h1 class="text-xl font-semibold text-gray-100">{{ formattedDate }}</h1>
+              <h1 v-if="!authStore.isEditor" class="text-xl font-semibold text-gray-100">{{ formattedDate }}</h1>
+              <div v-else class="relative">
+                <button
+                  type="button"
+                  class="text-xl font-semibold text-gray-100 hover:text-indigo-300 transition-colors cursor-pointer"
+                  @click="($refs.dateInput as HTMLInputElement).showPicker()"
+                >{{ formattedDate }}</button>
+                <input
+                  ref="dateInput"
+                  type="date"
+                  :value="localService.date"
+                  class="absolute inset-0 opacity-0 w-0 h-0 pointer-events-none"
+                  @change="onDateChange(($event.target as HTMLInputElement).value)"
+                />
+              </div>
               <!-- Status badge: editor gets clickable toggle, viewer gets static badge -->
               <button
                 v-if="authStore.isEditor"
@@ -278,8 +292,31 @@
                   </select>
                 </div>
 
-                <!-- Template -->
-                <div class="mb-3">
+                <!-- Existing plan found -->
+                <div v-if="existingPlan" class="mb-3 rounded-md bg-amber-900/20 border border-amber-800 px-3 py-2">
+                  <p class="text-sm text-amber-300 mb-2">A plan already exists for this date: <span class="font-medium text-amber-200">{{ existingPlan.dates }}</span></p>
+                  <div class="flex gap-2">
+                    <button
+                      type="button"
+                      @click="exportMode = 'existing'"
+                      class="px-3 py-1 rounded text-xs font-medium transition-colors"
+                      :class="exportMode === 'existing'
+                        ? 'bg-amber-700 text-amber-100 border border-amber-600'
+                        : 'bg-gray-800 text-gray-400 border border-gray-700 hover:border-gray-600'"
+                    >Add to existing plan</button>
+                    <button
+                      type="button"
+                      @click="exportMode = 'new'"
+                      class="px-3 py-1 rounded text-xs font-medium transition-colors"
+                      :class="exportMode === 'new'
+                        ? 'bg-indigo-700 text-indigo-100 border border-indigo-600'
+                        : 'bg-gray-800 text-gray-400 border border-gray-700 hover:border-gray-600'"
+                    >Create new plan</button>
+                  </div>
+                </div>
+
+                <!-- Template (only for new plans) -->
+                <div v-if="exportMode === 'new'" class="mb-3">
                   <label class="block text-xs text-gray-400 mb-1">Template</label>
                   <select
                     v-model="exportSelectedTemplateId"
@@ -289,6 +326,9 @@
                     <option v-for="t in exportTemplates" :key="t.id" :value="t.id">{{ t.name }}</option>
                   </select>
                 </div>
+
+                <!-- Info for existing plan mode -->
+                <p v-if="exportMode === 'existing'" class="text-xs text-gray-500 mb-3">Songs replace "Worship Song" items and scriptures replace "Scripture Reading" items in the plan. Any extras are appended at the end.</p>
 
                 <!-- Service Date (read-only) -->
                 <div class="mb-4">
@@ -312,7 +352,7 @@
                     @click="onConfirmExport"
                     :disabled="isExporting || !exportSelectedServiceTypeId"
                     class="rounded-md px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors disabled:opacity-50"
-                  >{{ isExporting ? 'Exporting...' : 'Export' }}</button>
+                  >{{ isExporting ? 'Exporting...' : exportMode === 'existing' ? 'Add to Plan' : 'Export' }}</button>
                 </div>
               </template>
             </div>
@@ -802,7 +842,7 @@ import SongSlotPicker from '@/components/SongSlotPicker.vue'
 import ScriptureInput from '@/components/ScriptureInput.vue'
 import ServicePrintLayout from '@/components/ServicePrintLayout.vue'
 import { formatForPlanningCenter } from '@/utils/planningCenterExport'
-import { fetchServiceTypes, fetchTemplates, createPlan, applyTemplate, addSlotAsItem, buildPlanTitle } from '@/utils/planningCenterApi'
+import { fetchServiceTypes, fetchTemplates, fetchPlans, fetchPlanItems, createPlan, fetchTemplateItems, addSlotAsItem, buildPlanTitle, createItem, updateItem, createPlanTime } from '@/utils/planningCenterApi'
 import { serverTimestamp } from 'firebase/firestore'
 import Sortable from 'sortablejs'
 import { getSongSuggestions } from '@/utils/claudeApi'
@@ -856,6 +896,8 @@ const exportTemplates = ref<Array<{ id: string; name: string }>>([])
 const exportSelectedServiceTypeId = ref('')
 const exportSelectedTemplateId = ref('')
 const exportLoading = ref(false)
+const existingPlan = ref<{ id: string; title: string; dates: string } | null>(null)
+const exportMode = ref<'new' | 'existing'>('new')
 
 // ── Computed: editing guard ─────────────────────────────────────────────────────
 
@@ -929,10 +971,10 @@ const formattedDate = computed(() => {
   })
 })
 
-const isCommunion = computed(() => {
-  if (!parsedDate.value) return false
-  return parsedDate.value.getDay() === 0 && parsedDate.value.getDate() <= 7
-})
+function onDateChange(newDate: string) {
+  if (!localService.value || !newDate) return
+  localService.value.date = newDate
+}
 
 const isDirty = computed(() => {
   if (!localService.value || !originalService.value) return false
@@ -992,11 +1034,6 @@ watch(
       if (found) {
         localService.value = JSON.parse(JSON.stringify(found))
         originalService.value = JSON.parse(JSON.stringify(found))
-        // Auto-add Communion on 1st Sunday if not already in teams
-        if (isCommunion.value && localService.value && !localService.value.teams.includes('Communion')) {
-          localService.value.teams.push('Communion')
-          originalService.value = JSON.parse(JSON.stringify(localService.value))
-        }
         // Reset autosave state when service first loads (or re-loads)
         autosaveInitialized = false
         previousService.value = null
@@ -1414,6 +1451,27 @@ async function onCopyForPC() {
   }, 2000)
 }
 
+async function checkForExistingPlan() {
+  if (!authStore.pcCredentials || !exportSelectedServiceTypeId.value || !localService.value?.date) {
+    existingPlan.value = null
+    return
+  }
+  const { appId, secret } = authStore.pcCredentials
+  try {
+    const plans = await fetchPlans(appId, secret, exportSelectedServiceTypeId.value, {
+      after: localService.value.date,
+      before: localService.value.date,
+    })
+    // sortDate is a full ISO datetime — match just the date portion
+    const targetDate = localService.value.date
+    const match = plans.find(p => p.sortDate?.startsWith(targetDate))
+    existingPlan.value = match ?? null
+    exportMode.value = existingPlan.value ? 'existing' : 'new'
+  } catch {
+    existingPlan.value = null
+  }
+}
+
 async function onExportToPC() {
   if (!localService.value) return
   if (!authStore.hasPcCredentials || !authStore.pcCredentials) return
@@ -1421,6 +1479,8 @@ async function onExportToPC() {
   showExportDialog.value = true
   exportError.value = null
   exportLoading.value = true
+  existingPlan.value = null
+  exportMode.value = 'new'
 
   try {
     const { appId, secret } = authStore.pcCredentials
@@ -1436,6 +1496,9 @@ async function onExportToPC() {
     if (exportSelectedServiceTypeId.value) {
       exportTemplates.value = await fetchTemplates(appId, secret, exportSelectedServiceTypeId.value)
       exportSelectedTemplateId.value = exportTemplates.value[0]?.id ?? ''
+
+      // Check if a plan already exists for this date
+      await checkForExistingPlan()
     }
   } catch (e) {
     exportError.value = e instanceof Error ? e.message : 'Failed to load export options'
@@ -1449,9 +1512,12 @@ async function onServiceTypeChange() {
   const { appId, secret } = authStore.pcCredentials
   exportTemplates.value = []
   exportSelectedTemplateId.value = ''
+  existingPlan.value = null
+  exportMode.value = 'new'
   try {
     exportTemplates.value = await fetchTemplates(appId, secret, exportSelectedServiceTypeId.value)
     exportSelectedTemplateId.value = exportTemplates.value[0]?.id ?? ''
+    await checkForExistingPlan()
   } catch {
     // silently ignore — user can still export without template
   }
@@ -1467,56 +1533,196 @@ async function onConfirmExport() {
   try {
     const { appId, secret } = authStore.pcCredentials
     const serviceTypeId = exportSelectedServiceTypeId.value
-    const templateId = exportSelectedTemplateId.value || undefined
-
-    // 1. Build plan title (include date since PC API doesn't support setting dates directly)
-    const dateStr = localService.value.date
-      ? new Date(localService.value.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-      : ''
-    const baseTitle = buildPlanTitle(localService.value)
-    const title = dateStr ? `${baseTitle} — ${dateStr}` : baseTitle
-
-    // 2. Create the plan in PC
-    const planId = await createPlan(appId, secret, serviceTypeId, title)
-
-    // 3. Apply template if selected (separate action — PC API doesn't support on creation)
-    if (templateId) {
-      await applyTemplate(appId, secret, serviceTypeId, planId, templateId)
-    }
-
-    // 4. Add items sequentially, track failures
     const failures: string[] = []
-    let sequence = 1
-    for (const slot of localService.value.slots) {
-      try {
-        await addSlotAsItem(appId, secret, serviceTypeId, planId, slot, sequence, songStore.songs, localService.value.sermonPassage)
-        sequence++
-      } catch (e) {
-        const label = slot.kind === 'SONG' ? (slot as any).songTitle ?? 'Song'
-          : slot.kind === 'HYMN' ? (slot as any).hymnName ?? 'Hymn'
-          : slot.kind === 'SCRIPTURE' ? 'Scripture'
-          : slot.kind
-        failures.push(label)
+    let planId: string
+
+    // Collect our songs (SONG + HYMN) and scriptures from service slots
+    const songSlots = localService.value.slots.filter(s => s.kind === 'SONG' || s.kind === 'HYMN')
+    const scriptureSlots = localService.value.slots.filter(s => s.kind === 'SCRIPTURE')
+
+    if (exportMode.value === 'existing' && existingPlan.value) {
+      // ── Add to existing plan: replace placeholders, then append leftovers ──
+      planId = existingPlan.value.id
+
+      const existingItems = await fetchPlanItems(appId, secret, serviceTypeId, planId)
+      let songIndex = 0
+      let scriptureIndex = 0
+
+      // First pass: scan existing items for "Worship Song" / "Scripture Reading" placeholders
+      for (const item of existingItems) {
+        const titleLower = item.title.toLowerCase()
+        const isSongPlaceholder = titleLower.includes('worship song')
+        const isScripturePlaceholder = titleLower.includes('scripture reading')
+
+        if (isSongPlaceholder && songIndex < songSlots.length) {
+          const slot = songSlots[songIndex]
+          try {
+            await addSlotAsItem(appId, secret, serviceTypeId, planId, slot, item.sequence, songStore.songs, localService.value.sermonPassage)
+            songIndex++
+          } catch {
+            const label = slot.kind === 'SONG' ? ((slot as any).songTitle ?? 'Song') : ((slot as any).hymnName ?? 'Hymn')
+            failures.push(label)
+          }
+        } else if (isScripturePlaceholder && scriptureIndex < scriptureSlots.length) {
+          const slot = scriptureSlots[scriptureIndex]
+          try {
+            await addSlotAsItem(appId, secret, serviceTypeId, planId, slot, item.sequence, songStore.songs, localService.value.sermonPassage)
+            scriptureIndex++
+          } catch {
+            failures.push('Scripture')
+          }
+        }
+      }
+
+      // Second pass: append any remaining songs/scriptures after existing items
+      let sequence = existingItems.length > 0
+        ? Math.max(...existingItems.map(i => i.sequence)) + 1
+        : 1
+
+      for (let i = songIndex; i < songSlots.length; i++) {
+        try {
+          await addSlotAsItem(appId, secret, serviceTypeId, planId, songSlots[i], sequence, songStore.songs, localService.value.sermonPassage)
+          sequence++
+        } catch {
+          const slot = songSlots[i]
+          failures.push(slot.kind === 'SONG' ? ((slot as any).songTitle ?? 'Song') : ((slot as any).hymnName ?? 'Hymn'))
+        }
+      }
+
+      for (let i = scriptureIndex; i < scriptureSlots.length; i++) {
+        try {
+          await addSlotAsItem(appId, secret, serviceTypeId, planId, scriptureSlots[i], sequence, songStore.songs, localService.value.sermonPassage)
+          sequence++
+        } catch {
+          failures.push('Scripture')
+        }
+      }
+    } else {
+      // ── Create new plan ──
+      const templateId = exportSelectedTemplateId.value || undefined
+      const baseTitle = buildPlanTitle(localService.value)
+      planId = await createPlan(appId, secret, serviceTypeId, baseTitle)
+
+      // Add plan times (service date determines sort_date)
+      // PC treats times as UTC, so convert local times to UTC ISO strings
+      if (localService.value.date) {
+        const serviceDate = localService.value.date // YYYY-MM-DD
+
+        // Helper: create a local Date for a given date string + hour/minute, return UTC ISO
+        const toUtc = (dateStr: string, hours: number, minutes: number) =>
+          new Date(new Date(dateStr + 'T00:00:00').setHours(hours, minutes, 0, 0))
+
+        // Previous Wednesday
+        const wed = new Date(serviceDate + 'T00:00:00')
+        wed.setDate(wed.getDate() - ((wed.getDay() + 4) % 7))
+        const wedStr = `${wed.getFullYear()}-${String(wed.getMonth() + 1).padStart(2, '0')}-${String(wed.getDate()).padStart(2, '0')}`
+
+        await createPlanTime(appId, secret, serviceTypeId, planId, {
+          startsAt: toUtc(wedStr, 18, 30).toISOString(),
+          endsAt: toUtc(wedStr, 20, 30).toISOString(),
+          timeType: 'rehearsal',
+          name: 'Wednesday Rehearsal',
+        }).catch(() => {})
+
+        await createPlanTime(appId, secret, serviceTypeId, planId, {
+          startsAt: toUtc(serviceDate, 8, 15).toISOString(),
+          endsAt: toUtc(serviceDate, 10, 15).toISOString(),
+          timeType: 'rehearsal',
+          name: 'Sunday Rehearsal',
+        }).catch(() => {})
+
+        await createPlanTime(appId, secret, serviceTypeId, planId, {
+          startsAt: toUtc(serviceDate, 10, 30).toISOString(),
+          endsAt: toUtc(serviceDate, 12, 0).toISOString(),
+          timeType: 'service',
+        }).catch(() => {})
+      }
+
+      // Build items from template or slots directly
+      let sequence = 1
+      let songIndex = 0
+      let scriptureIndex = 0
+
+      if (templateId) {
+        const templateItems = await fetchTemplateItems(appId, secret, serviceTypeId, templateId)
+        templateItems.sort((a, b) => a.sequence - b.sequence)
+
+        for (const tItem of templateItems) {
+          const titleLower = tItem.title.toLowerCase()
+          const isSongItem = titleLower.includes('worship song')
+          const isScriptureItem = titleLower.includes('scripture reading')
+
+          try {
+            if (isSongItem && songIndex < songSlots.length) {
+              await addSlotAsItem(appId, secret, serviceTypeId, planId, songSlots[songIndex], sequence, songStore.songs, localService.value.sermonPassage, tItem.length)
+              songIndex++
+            } else if (isScriptureItem && scriptureIndex < scriptureSlots.length) {
+              await addSlotAsItem(appId, secret, serviceTypeId, planId, scriptureSlots[scriptureIndex], sequence, songStore.songs, localService.value.sermonPassage, tItem.length)
+              scriptureIndex++
+            } else if (!isSongItem && !isScriptureItem) {
+              await createItem(appId, secret, serviceTypeId, planId, {
+                title: tItem.title,
+                itemType: tItem.itemType === 'header' ? 'header' : 'regular',
+                description: tItem.description,
+                sequence,
+                length: tItem.length,
+              })
+            }
+            sequence++
+          } catch (e) {
+            failures.push(tItem.title)
+          }
+        }
+
+        for (let i = songIndex; i < songSlots.length; i++) {
+          try {
+            await addSlotAsItem(appId, secret, serviceTypeId, planId, songSlots[i], sequence, songStore.songs, localService.value.sermonPassage)
+            sequence++
+          } catch {
+            const slot = songSlots[i]
+            failures.push(slot.kind === 'SONG' ? ((slot as any).songTitle ?? 'Song') : ((slot as any).hymnName ?? 'Hymn'))
+          }
+        }
+
+        for (let i = scriptureIndex; i < scriptureSlots.length; i++) {
+          try {
+            await addSlotAsItem(appId, secret, serviceTypeId, planId, scriptureSlots[i], sequence, songStore.songs, localService.value.sermonPassage)
+            sequence++
+          } catch {
+            failures.push('Scripture')
+          }
+        }
+      } else {
+        for (const slot of localService.value.slots) {
+          try {
+            await addSlotAsItem(appId, secret, serviceTypeId, planId, slot, sequence, songStore.songs, localService.value.sermonPassage)
+            sequence++
+          } catch {
+            const label = slot.kind === 'SONG' ? (slot as any).songTitle ?? 'Song'
+              : slot.kind === 'HYMN' ? (slot as any).hymnName ?? 'Hymn'
+              : slot.kind === 'SCRIPTURE' ? 'Scripture'
+              : slot.kind
+            failures.push(label)
+          }
+        }
       }
     }
 
-    // 5. Mark service as exported in Firestore — set status to 'exported'
+    // Mark service as exported in Firestore
     await serviceStore.updateService(localService.value.id, {
       pcExportedAt: serverTimestamp(),
       pcPlanId: planId,
       status: 'exported',
     })
 
-    // 6. Update local state
     localService.value.pcExportedAt = new Date() as any
     localService.value.pcPlanId = planId
     localService.value.status = 'exported'
 
-    // 7. Close dialog and show feedback
     showExportDialog.value = false
 
     if (failures.length > 0) {
-      exportError.value = `Plan created but ${failures.length} item(s) failed: ${failures.join(', ')}`
+      exportError.value = `Plan ${exportMode.value === 'existing' ? 'updated' : 'created'} but ${failures.length} item(s) failed: ${failures.join(', ')}`
     } else {
       pcExported.value = true
       setTimeout(() => { pcExported.value = false }, 3000)
