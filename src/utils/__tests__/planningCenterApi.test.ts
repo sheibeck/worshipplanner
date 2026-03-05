@@ -19,6 +19,9 @@ import {
   updateItem,
   addSlotAsItem,
   buildPlanTitle,
+  searchSongByCcli,
+  fetchSongArrangements,
+  assignArrangementToItem,
 } from '@/utils/planningCenterApi'
 
 const mockTimestamp = { toDate: () => new Date('2026-03-08') } as unknown as Timestamp
@@ -359,6 +362,137 @@ describe('updateItem', () => {
     await expect(
       updateItem('app-id', 'secret', 'svc-type-1', 'plan-1', 'item-5', { title: 'X' }),
     ).rejects.toThrow('Failed to update item: 403')
+  })
+})
+
+describe('searchSongByCcli', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  it('calls GET /songs?where[ccli_number]=<ccli> and returns {id, title} on match', async () => {
+    const mockResponse = {
+      data: [
+        { id: 'pc-song-42', attributes: { title: 'Great Is Thy Faithfulness' } },
+      ],
+    }
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(mockResponse), { status: 200 }))
+
+    const result = await searchSongByCcli('app-id', 'secret', '1234567')
+
+    expect(result).toEqual({ id: 'pc-song-42', title: 'Great Is Thy Faithfulness' })
+    const [url] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toContain('/songs?where[ccli_number]=1234567')
+  })
+
+  it('returns null when PC returns empty data array', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ data: [] }), { status: 200 }),
+    )
+
+    const result = await searchSongByCcli('app-id', 'secret', '9999999')
+    expect(result).toBeNull()
+  })
+
+  it('returns null (does not throw) on network/API errors', async () => {
+    vi.mocked(fetch).mockRejectedValueOnce(new Error('Network failure'))
+
+    const result = await searchSongByCcli('app-id', 'secret', '1234567')
+    expect(result).toBeNull()
+  })
+})
+
+describe('fetchSongArrangements', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  it('calls GET /songs/{songId}/arrangements and returns array of {id, name}', async () => {
+    const mockResponse = {
+      data: [
+        { id: 'arr-1', attributes: { name: 'Default Arrangement' } },
+        { id: 'arr-2', attributes: { name: 'Acoustic' } },
+      ],
+    }
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(mockResponse), { status: 200 }))
+
+    const result = await fetchSongArrangements('app-id', 'secret', 'pc-song-42')
+
+    expect(result).toEqual([
+      { id: 'arr-1', name: 'Default Arrangement' },
+      { id: 'arr-2', name: 'Acoustic' },
+    ])
+    const [url] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toContain('/songs/pc-song-42/arrangements')
+  })
+
+  it('returns empty array on error (does not throw)', async () => {
+    vi.mocked(fetch).mockRejectedValueOnce(new Error('Network failure'))
+
+    const result = await fetchSongArrangements('app-id', 'secret', 'pc-song-42')
+    expect(result).toEqual([])
+  })
+})
+
+describe('assignArrangementToItem', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  it('sends PATCH to update item with arrangement relationship data', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('{}', { status: 200 }))
+
+    await assignArrangementToItem('app-id', 'secret', 'svc-type-1', 'plan-1', 'item-5', 'arr-1')
+
+    const [url, options] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toContain('/service_types/svc-type-1/plans/plan-1/items/item-5')
+    expect(options?.method).toBe('PATCH')
+    const body = JSON.parse(options?.body as string)
+    expect(body.data.relationships.arrangement.data).toEqual({
+      type: 'Arrangement',
+      id: 'arr-1',
+    })
+  })
+
+  it('does not throw on failure (logs silently)', async () => {
+    vi.mocked(fetch).mockRejectedValueOnce(new Error('Network failure'))
+
+    await expect(
+      assignArrangementToItem('app-id', 'secret', 'svc-type-1', 'plan-1', 'item-5', 'arr-1'),
+    ).resolves.not.toThrow()
+  })
+})
+
+describe('createItem type union', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  it('accepts "song" as a valid itemType for createItem', async () => {
+    const mockResponse = { data: { id: 'item-song-1' } }
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(mockResponse), { status: 201 }))
+
+    const result = await createItem('app-id', 'secret', 'svc-type-1', 'plan-1', {
+      title: 'Test Song',
+      itemType: 'song',
+    })
+
+    expect(result).toBe('item-song-1')
+    const [, options] = vi.mocked(fetch).mock.calls[0]!
+    const body = JSON.parse(options?.body as string)
+    expect(body.data.attributes.item_type).toBe('song')
+  })
+
+  it('accepts "song" as a valid itemType for updateItem', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('{}', { status: 200 }))
+
+    await updateItem('app-id', 'secret', 'svc-type-1', 'plan-1', 'item-5', {
+      itemType: 'song',
+    })
+
+    const [, options] = vi.mocked(fetch).mock.calls[0]!
+    const body = JSON.parse(options?.body as string)
+    expect(body.data.attributes.item_type).toBe('song')
   })
 })
 
