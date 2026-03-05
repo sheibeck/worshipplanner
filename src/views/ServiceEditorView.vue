@@ -149,19 +149,22 @@
               Print
             </button>
 
-            <!-- Export to PC button: shown when credentials configured AND service is planned -->
+            <!-- Export to PC button: shown when credentials configured, enabled only for planned services -->
             <button
-              v-if="authStore.hasPcCredentials && localService.status === 'planned'"
+              v-if="authStore.hasPcCredentials"
               type="button"
               data-testid="export-pc-btn"
               @click="onExportToPC"
-              :disabled="isExporting || !!localService.pcExportedAt"
+              :disabled="isExporting || !!localService.pcExportedAt || localService.status !== 'planned'"
+              :title="localService.status !== 'planned' ? 'Mark service as Planned to export' : undefined"
               class="print:hidden inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors border"
               :class="localService.pcExportedAt
                 ? 'text-gray-500 bg-gray-800/50 border-gray-700 cursor-not-allowed'
-                : isExporting
-                  ? 'text-gray-400 bg-gray-800 border-gray-700 cursor-wait'
-                  : 'text-gray-200 bg-gray-800 hover:bg-gray-700 border-gray-700'"
+                : localService.status !== 'planned'
+                  ? 'text-gray-500 bg-gray-800/50 border-gray-700 cursor-not-allowed'
+                  : isExporting
+                    ? 'text-gray-400 bg-gray-800 border-gray-700 cursor-wait'
+                    : 'text-gray-200 bg-gray-800 hover:bg-gray-700 border-gray-700'"
             >
               <!-- Spinner during export -->
               <svg v-if="isExporting" class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

@@ -80,10 +80,10 @@ export async function createPlan(
   secret: string,
   serviceTypeId: string,
   title: string,
-  dates?: string,
+  sortDate?: string,
 ): Promise<string> {
   const attributes: Record<string, string> = { title }
-  if (dates) attributes.dates = dates
+  if (sortDate) attributes.sort_date = sortDate
 
   const response = await fetch(`${PC_BASE_URL}/service_types/${serviceTypeId}/plans`, {
     method: 'POST',

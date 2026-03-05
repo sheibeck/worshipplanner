@@ -167,7 +167,7 @@ describe('createPlan', () => {
     })
   })
 
-  it('includes dates in body when provided', async () => {
+  it('includes sort_date in body when provided', async () => {
     const mockResponse = { data: { id: 'plan-456' } }
     vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(mockResponse), { status: 201 }))
 
@@ -175,7 +175,7 @@ describe('createPlan', () => {
 
     const [, options] = vi.mocked(fetch).mock.calls[0]!
     const body = JSON.parse(options?.body as string)
-    expect(body.data.attributes.dates).toBe('2026-04-05')
+    expect(body.data.attributes.sort_date).toBe('2026-04-05')
   })
 
   it('throws on non-ok response', async () => {
