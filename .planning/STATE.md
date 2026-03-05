@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Between milestones
-stopped_at: Completed 08-02-PLAN.md
-last_updated: "2026-03-05T12:12:16.910Z"
+stopped_at: Completed 08-03-PLAN.md (awaiting human verify checkpoint)
+last_updated: "2026-03-05T12:18:06.256Z"
 progress:
   total_phases: 2
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 2
+  completed_plans: 3
 ---
 
 # Project State
@@ -58,6 +58,7 @@ Status: Between milestones
 | Phase 07 P02 | 11 | 3 tasks | 8 files |
 | Phase 08 P01 | 5 | 2 tasks | 4 files |
 | Phase 08 P02 | 8 | 2 tasks | 2 files |
+| Phase 08 P03 | 8 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -68,6 +69,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase 08]: pcExportedAt and pcPlanId added as optional fields to Service interface for backward compatibility
 - [Phase 08]: Credentials never pre-filled in edit inputs — user must re-enter to change (security)
 - [Phase 08]: hasPcCredentials checks both non-null AND non-empty to handle Firestore null vs empty string
+- [Phase 08]: Export to PC button hidden (not disabled) for draft services — only shown for planned services with credentials
+- [Phase 08]: sermonPassage passed to addSlotAsItem so MESSAGE slots include sermon passage reference in PC item description
+- [Phase 08]: Partial failure tolerance: individual slot failures tracked and reported without rolling back the PC plan
 
 ### Roadmap Evolution
 
@@ -87,6 +91,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 
 ## Session Continuity
 
-Last session: 2026-03-05T12:12:16.904Z
-Stopped at: Completed 08-02-PLAN.md
+Last session: 2026-03-05T12:17:54.742Z
+Stopped at: Completed 08-03-PLAN.md (awaiting human verify checkpoint)
 Resume file: None
