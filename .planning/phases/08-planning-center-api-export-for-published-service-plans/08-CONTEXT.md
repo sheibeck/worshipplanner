@@ -28,9 +28,9 @@ Export published (planned) service plans to Planning Center via the Services API
 - MESSAGE slots → PC **Item** entries with sermon passage reference in description
 
 ### Export Behavior
-- **One-way, one-and-done:** After export, the service is marked as "exported" — all further editing happens in Planning Center, not in WorshipPlanner. No sync back.
-- Re-export: warn then allow — confirmation dialog if service was already exported ("This service was already exported on [date]. Export again?")
-- Track export status on the service document (exported timestamp, PC plan ID)
+- **One-way, one-and-done:** After export, the service is marked as "exported" — all further editing happens in Planning Center, not in WorshipPlanner. No sync back, no updating the PC plan.
+- **Re-export path:** User can revert service to draft, make changes, mark as planned again, and re-export — but this always creates a **brand new** PC plan, never updates the previous one
+- Track export status on the service document (exported timestamp, PC plan ID) for UI indication
 - Exported services should visually indicate their exported state (e.g., badge, dimmed editing, or read-only indicator) so users know to work in PC from this point
 - Partial failure: report partial success ("Plan created but 2 items failed to add") — don't roll back the plan
 - Loading state: spinner on button with "Exporting..." text, button disabled during export
