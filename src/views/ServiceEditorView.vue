@@ -50,21 +50,17 @@
                 <svg v-if="localService.status === 'planned'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3">
                   <path fill-rule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clip-rule="evenodd" />
                 </svg>
-                {{ localService.status === 'planned' ? 'Planned' : 'Draft' }}
+                <svg v-else-if="localService.status === 'exported'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3">
+                  <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                </svg>
+                {{ localService.status === 'exported' ? 'Exported' : localService.status === 'planned' ? 'Planned' : 'Draft' }}
               </button>
               <span
                 v-else
                 class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border"
                 :class="statusBadgeClasses[localService.status]"
               >
-                {{ localService.status === 'planned' ? 'Planned' : 'Draft' }}
-              </span>
-              <!-- Exported to PC badge -->
-              <span v-if="localService.pcExportedAt" class="inline-flex items-center gap-1 rounded-full bg-green-900/30 border border-green-800 px-2.5 py-0.5 text-xs font-medium text-green-400">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-                Exported
+                {{ localService.status === 'exported' ? 'Exported' : localService.status === 'planned' ? 'Planned' : 'Draft' }}
               </span>
             </div>
           </div>
@@ -125,8 +121,8 @@
               v-if="authStore.isEditor"
               type="button"
               @click="suggestAllSongs"
-              :disabled="!hasSermonContext || aiSuggestingAll"
-              :title="!hasSermonContext ? 'Add a sermon topic or passage for AI suggestions' : undefined"
+              :disabled="!hasSermonContext || aiSuggestingAll || isExportedLocked"
+              :title="isExportedLocked ? 'Service is exported — cycle badge back to Draft to edit' : !hasSermonContext ? 'Add a sermon topic or passage for AI suggestions' : undefined"
               class="print:hidden inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-gray-200 bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-indigo-400" viewBox="0 0 24 24" fill="currentColor">
@@ -155,10 +151,10 @@
               type="button"
               data-testid="export-pc-btn"
               @click="onExportToPC"
-              :disabled="isExporting || !!localService.pcExportedAt || localService.status !== 'planned'"
-              :title="localService.status !== 'planned' ? 'Mark service as Planned to export' : undefined"
+              :disabled="isExporting || localService.status !== 'planned'"
+              :title="localService.status === 'draft' ? 'Mark service as Planned to export' : localService.status === 'exported' ? 'Already exported to Planning Center' : undefined"
               class="print:hidden inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors border"
-              :class="localService.pcExportedAt
+              :class="localService.status === 'exported'
                 ? 'text-gray-500 bg-gray-800/50 border-gray-700 cursor-not-allowed'
                 : localService.status !== 'planned'
                   ? 'text-gray-500 bg-gray-800/50 border-gray-700 cursor-not-allowed'
@@ -172,14 +168,14 @@
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
               <!-- Check icon when already exported -->
-              <svg v-else-if="localService.pcExportedAt" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <svg v-else-if="localService.status === 'exported'" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
               </svg>
               <!-- Upload icon default -->
               <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
               </svg>
-              {{ isExporting ? 'Exporting...' : localService.pcExportedAt ? 'Exported to PC' : 'Export to PC' }}
+              {{ isExporting ? 'Exporting...' : localService.status === 'exported' ? 'Exported' : 'Export to PC' }}
             </button>
 
             <!-- Copy for PC button: shown when NO credentials OR service is draft -->
@@ -260,6 +256,69 @@
           </div>
         </Teleport>
 
+        <!-- Export dialog -->
+        <Teleport to="body">
+          <div v-if="showExportDialog" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+            <div class="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl p-6 w-full max-w-md mx-4">
+              <h2 class="text-base font-semibold text-gray-100 mb-4">Export to Planning Center</h2>
+
+              <!-- Loading state -->
+              <div v-if="exportLoading" class="text-sm text-gray-400 py-4 text-center">Loading options...</div>
+
+              <template v-else>
+                <!-- Service Type -->
+                <div class="mb-3">
+                  <label class="block text-xs text-gray-400 mb-1">Service Type</label>
+                  <select
+                    v-model="exportSelectedServiceTypeId"
+                    @change="onServiceTypeChange"
+                    class="w-full bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  >
+                    <option v-for="st in exportServiceTypes" :key="st.id" :value="st.id">{{ st.name }}</option>
+                  </select>
+                </div>
+
+                <!-- Template -->
+                <div class="mb-3">
+                  <label class="block text-xs text-gray-400 mb-1">Template</label>
+                  <select
+                    v-model="exportSelectedTemplateId"
+                    class="w-full bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  >
+                    <option value="">No template (blank plan)</option>
+                    <option v-for="t in exportTemplates" :key="t.id" :value="t.id">{{ t.name }}</option>
+                  </select>
+                </div>
+
+                <!-- Service Date (read-only) -->
+                <div class="mb-4">
+                  <label class="block text-xs text-gray-400 mb-1">Service Date</label>
+                  <p class="text-sm text-gray-200">{{ formattedDate }}</p>
+                </div>
+
+                <!-- Error inside dialog -->
+                <p v-if="exportError" class="text-red-400 text-sm mb-3">{{ exportError }}</p>
+
+                <!-- Actions -->
+                <div class="flex justify-end gap-3">
+                  <button
+                    type="button"
+                    @click="showExportDialog = false; exportError = null"
+                    :disabled="isExporting"
+                    class="rounded-md px-4 py-2 text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700 disabled:opacity-50"
+                  >Cancel</button>
+                  <button
+                    type="button"
+                    @click="onConfirmExport"
+                    :disabled="isExporting || !exportSelectedServiceTypeId"
+                    class="rounded-md px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors disabled:opacity-50"
+                  >{{ isExporting ? 'Exporting...' : 'Export' }}</button>
+                </div>
+              </template>
+            </div>
+          </div>
+        </Teleport>
+
         <!-- Export success toast -->
         <div v-if="pcExported" class="mb-3 rounded-md bg-green-900/30 border border-green-800 px-4 py-2 text-sm text-green-400 flex items-center gap-2">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -298,7 +357,8 @@
                 type="checkbox"
                 :checked="localService.teams.includes(team)"
                 @change="toggleTeam(team)"
-                class="h-4 w-4 rounded border-gray-600 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-gray-900"
+                :disabled="isExportedLocked"
+                class="h-4 w-4 rounded border-gray-600 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-gray-900 disabled:opacity-50"
               />
               <span class="text-sm text-gray-200">{{ team }}</span>
             </label>
@@ -307,7 +367,8 @@
               v-model="localService.name"
               type="text"
               placeholder="e.g. Good Friday, Easter"
-              class="rounded-md bg-gray-800 border border-gray-700 text-indigo-300 text-sm px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500 w-48"
+              :disabled="isExportedLocked"
+              class="rounded-md bg-gray-800 border border-gray-700 text-indigo-300 text-sm px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500 w-48 disabled:opacity-50"
             />
           </div>
           <!-- Viewer: read-only text list -->
@@ -335,7 +396,8 @@
                   v-model="localService.sermonTopic"
                   type="text"
                   placeholder="e.g. Grace and forgiveness, The prodigal son"
-                  class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  :disabled="isExportedLocked"
+                  class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
                 />
                 <!-- Viewer: read-only text -->
                 <p v-else class="text-sm text-gray-200">{{ localService.sermonTopic || '—' }}</p>
@@ -344,13 +406,20 @@
                 <p class="text-xs text-gray-500 mb-1">Sermon Passage</p>
                 <!-- Editor: ScriptureInput -->
                 <ScriptureInput
-                  v-if="authStore.isEditor"
+                  v-if="authStore.isEditor && !isExportedLocked"
                   :modelValue="localService.sermonPassage"
                   :sermonPassage="null"
                   :showOverlapWarning="false"
                   label="Sermon Passage"
                   @update:modelValue="onSermonPassageChange"
                 />
+                <!-- Exported lock: read-only passage -->
+                <p v-else-if="authStore.isEditor && isExportedLocked" class="text-sm text-gray-200">
+                  {{ localService.sermonPassage
+                    ? `${localService.sermonPassage.book} ${localService.sermonPassage.chapter}:${localService.sermonPassage.verseStart}${localService.sermonPassage.verseEnd ? '-' + localService.sermonPassage.verseEnd : ''}`
+                    : '—'
+                  }}
+                </p>
                 <!-- Viewer: read-only text -->
                 <p v-else class="text-sm text-gray-200">
                   {{ localService.sermonPassage
@@ -406,7 +475,7 @@
                     </template>
                   </div>
                   <button
-                    v-if="authStore.isEditor"
+                    v-if="authStore.isEditor && !isExportedLocked"
                     type="button"
                     @click="onClearSong(index)"
                     class="text-gray-500 hover:text-gray-300 transition-colors flex-shrink-0"
@@ -453,9 +522,9 @@
                   </div>
                 </div>
 
-                <!-- Song picker: editor only -->
+                <!-- Song picker: editor only, hidden when exported -->
                 <SongSlotPicker
-                  v-if="authStore.isEditor"
+                  v-if="authStore.isEditor && !isExportedLocked"
                   :requiredVwType="slot.requiredVwType"
                   :serviceTeams="localService.teams"
                   :currentSongId="slot.songId"
@@ -479,7 +548,7 @@
                   <div class="flex-1">
                     <!-- Editor: ScriptureInput -->
                     <ScriptureInput
-                      v-if="authStore.isEditor"
+                      v-if="authStore.isEditor && !isExportedLocked"
                       :modelValue="slotToScriptureRef(slot)"
                       :sermonPassage="localService.sermonPassage"
                       :showOverlapWarning="true"
@@ -489,6 +558,13 @@
                       label="Scripture Reading"
                       @update:modelValue="(ref) => onScriptureChange(index, ref)"
                     />
+                    <!-- Exported lock: read-only -->
+                    <p v-else-if="authStore.isEditor && isExportedLocked" class="text-sm text-gray-200">
+                      {{ slotToScriptureRef(slot as ScriptureSlot)
+                        ? `${slotToScriptureRef(slot as ScriptureSlot)?.book} ${slotToScriptureRef(slot as ScriptureSlot)?.chapter}:${slotToScriptureRef(slot as ScriptureSlot)?.verseStart}${slotToScriptureRef(slot as ScriptureSlot)?.verseEnd ? '-' + slotToScriptureRef(slot as ScriptureSlot)?.verseEnd : ''}`
+                        : 'Scripture — Empty'
+                      }}
+                    </p>
                     <!-- Viewer: read-only text -->
                     <p v-else class="text-sm text-gray-200">
                       {{ slotToScriptureRef(slot)
@@ -507,7 +583,7 @@
                   <span class="text-xs text-gray-600 italic">No assignment needed</span>
                 </div>
                 <!-- Editor: editable link fields -->
-                <div v-if="authStore.isEditor" class="flex items-center gap-2 mt-1">
+                <div v-if="authStore.isEditor && !isExportedLocked" class="flex items-center gap-2 mt-1">
                   <input
                     :value="(slot as NonAssignableSlot).linkLabel"
                     @input="(slot as NonAssignableSlot).linkLabel = ($event.target as HTMLInputElement).value"
@@ -554,7 +630,7 @@
                   <span class="text-xs text-gray-600 italic">No assignment needed</span>
                 </div>
                 <!-- Editor: editable link fields -->
-                <div v-if="authStore.isEditor" class="flex items-center gap-2 mt-1">
+                <div v-if="authStore.isEditor && !isExportedLocked" class="flex items-center gap-2 mt-1">
                   <input
                     :value="(slot as NonAssignableSlot).linkLabel"
                     @input="(slot as NonAssignableSlot).linkLabel = ($event.target as HTMLInputElement).value"
@@ -600,7 +676,7 @@
                   <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Hymn</p>
                 </div>
                 <!-- Editor: editable fields -->
-                <div v-if="authStore.isEditor" class="flex flex-wrap items-center gap-2 mt-1">
+                <div v-if="authStore.isEditor && !isExportedLocked" class="flex flex-wrap items-center gap-2 mt-1">
                   <input
                     :value="(slot as HymnSlot).hymnName"
                     @input="(slot as HymnSlot).hymnName = ($event.target as HTMLInputElement).value"
@@ -634,9 +710,9 @@
               </template>
             </div>
 
-            <!-- Remove button: editor only -->
+            <!-- Remove button: editor only, hidden when exported -->
             <button
-              v-if="authStore.isEditor"
+              v-if="authStore.isEditor && !isExportedLocked"
               type="button"
               @click="removeSlot(index)"
               class="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0 mt-0.5"
@@ -649,8 +725,8 @@
           </div>
         </div>
 
-        <!-- Add Element button: editor only -->
-        <div v-if="authStore.isEditor" class="mt-2 relative">
+        <!-- Add Element button: editor only, hidden when exported -->
+        <div v-if="authStore.isEditor && !isExportedLocked" class="mt-2 relative">
           <button
             type="button"
             @click="showAddMenu = !showAddMenu"
@@ -726,7 +802,7 @@ import SongSlotPicker from '@/components/SongSlotPicker.vue'
 import ScriptureInput from '@/components/ScriptureInput.vue'
 import ServicePrintLayout from '@/components/ServicePrintLayout.vue'
 import { formatForPlanningCenter } from '@/utils/planningCenterExport'
-import { createPlan, addSlotAsItem, buildPlanTitle } from '@/utils/planningCenterApi'
+import { fetchServiceTypes, fetchTemplates, updatePlanDate, createPlan, addSlotAsItem, buildPlanTitle } from '@/utils/planningCenterApi'
 import { serverTimestamp } from 'firebase/firestore'
 import Sortable from 'sortablejs'
 import { getSongSuggestions } from '@/utils/claudeApi'
@@ -743,8 +819,9 @@ const songStore = useSongStore()
 const AVAILABLE_TEAMS = ['Choir', 'Orchestra', 'Communion', 'Special']
 
 const statusBadgeClasses: Record<string, string> = {
-  planned: 'bg-green-900/50 text-green-300 border-green-800',
   draft: 'bg-gray-800 text-gray-400 border-gray-700',
+  planned: 'bg-green-900/50 text-green-300 border-green-800',
+  exported: 'bg-green-900/50 text-green-300 border-green-800',
 }
 
 // ── Local state ────────────────────────────────────────────────────────────────
@@ -771,6 +848,20 @@ const isDeleting = ref(false)
 const isExporting = ref(false)
 const pcExported = ref(false)       // green toast after success
 const exportError = ref<string | null>(null)  // red banner on error
+
+// Export dialog state
+const showExportDialog = ref(false)
+const exportServiceTypes = ref<Array<{ id: string; name: string }>>([])
+const exportTemplates = ref<Array<{ id: string; name: string }>>([])
+const exportSelectedServiceTypeId = ref('')
+const exportSelectedTemplateId = ref('')
+const exportLoading = ref(false)
+
+// ── Computed: editing guard ─────────────────────────────────────────────────────
+
+const isExportedLocked = computed(() =>
+  localService.value?.status === 'exported'
+)
 
 // ── AI state ───────────────────────────────────────────────────────────────────
 
@@ -1015,7 +1106,15 @@ function getCcliNumber(songId: string): string | null {
 
 function toggleStatus() {
   if (!localService.value) return
-  localService.value.status = localService.value.status === 'draft' ? 'planned' : 'draft'
+  const current = localService.value.status
+  if (current === 'draft') {
+    localService.value.status = 'planned'
+  } else if (current === 'planned') {
+    localService.value.status = 'exported'
+  } else {
+    // exported -> draft
+    localService.value.status = 'draft'
+  }
 }
 
 // ── Team toggle ────────────────────────────────────────────────────────────────
@@ -1316,30 +1415,70 @@ async function onCopyForPC() {
 }
 
 async function onExportToPC() {
-  if (!localService.value || localService.value.status !== 'planned') return
+  if (!localService.value) return
   if (!authStore.hasPcCredentials || !authStore.pcCredentials) return
+
+  showExportDialog.value = true
+  exportError.value = null
+  exportLoading.value = true
+
+  try {
+    const { appId, secret } = authStore.pcCredentials
+    exportServiceTypes.value = await fetchServiceTypes(appId, secret)
+
+    // Default to service type whose name contains "Sunday", else first
+    const sundayType = exportServiceTypes.value.find(t =>
+      t.name.toLowerCase().includes('sunday')
+    )
+    exportSelectedServiceTypeId.value = sundayType?.id ?? exportServiceTypes.value[0]?.id ?? ''
+
+    // Fetch templates for selected service type
+    if (exportSelectedServiceTypeId.value) {
+      exportTemplates.value = await fetchTemplates(appId, secret, exportSelectedServiceTypeId.value)
+      exportSelectedTemplateId.value = exportTemplates.value[0]?.id ?? ''
+    }
+  } catch (e) {
+    exportError.value = e instanceof Error ? e.message : 'Failed to load export options'
+  } finally {
+    exportLoading.value = false
+  }
+}
+
+async function onServiceTypeChange() {
+  if (!authStore.pcCredentials || !exportSelectedServiceTypeId.value) return
+  const { appId, secret } = authStore.pcCredentials
+  exportTemplates.value = []
+  exportSelectedTemplateId.value = ''
+  try {
+    exportTemplates.value = await fetchTemplates(appId, secret, exportSelectedServiceTypeId.value)
+    exportSelectedTemplateId.value = exportTemplates.value[0]?.id ?? ''
+  } catch {
+    // silently ignore — user can still export without template
+  }
+}
+
+async function onConfirmExport() {
+  if (!localService.value) return
+  if (!authStore.pcCredentials || !exportSelectedServiceTypeId.value) return
 
   isExporting.value = true
   exportError.value = null
 
   try {
-    const { appId, secret, serviceTypeId } = authStore.pcCredentials
-
-    if (!serviceTypeId) {
-      exportError.value = 'No Planning Center service type selected. Go to Settings to configure.'
-      return
-    }
+    const { appId, secret } = authStore.pcCredentials
+    const serviceTypeId = exportSelectedServiceTypeId.value
+    const templateId = exportSelectedTemplateId.value || undefined
 
     // 1. Build plan title
     const title = buildPlanTitle(localService.value)
 
-    // 2. Create the plan in PC
-    const planId = await createPlan(appId, secret, serviceTypeId, title)
+    // 2. Create the plan in PC (with optional template)
+    const planId = await createPlan(appId, secret, serviceTypeId, title, templateId)
 
-    // 3. Add items sequentially, track failures
-    // IMPORTANT: Pass localService.value.sermonPassage to addSlotAsItem
-    // so MESSAGE slots get the sermon passage reference in their description
-    // (per locked decision: "MESSAGE slots -> PC Item entries with sermon passage reference in description")
+    // 3. Attempt to set the date via PATCH
+    await updatePlanDate(appId, secret, serviceTypeId, planId, localService.value.date)
+
+    // 4. Add items sequentially, track failures
     const failures: string[] = []
     let sequence = 1
     for (const slot of localService.value.slots) {
@@ -1355,17 +1494,21 @@ async function onExportToPC() {
       }
     }
 
-    // 4. Mark service as exported in Firestore
+    // 5. Mark service as exported in Firestore — set status to 'exported'
     await serviceStore.updateService(localService.value.id, {
       pcExportedAt: serverTimestamp(),
       pcPlanId: planId,
+      status: 'exported',
     })
 
-    // 5. Update local state to reflect export
-    localService.value.pcExportedAt = new Date() as any // triggers UI update
+    // 6. Update local state
+    localService.value.pcExportedAt = new Date() as any
     localService.value.pcPlanId = planId
+    localService.value.status = 'exported'
 
-    // 6. Show feedback
+    // 7. Close dialog and show feedback
+    showExportDialog.value = false
+
     if (failures.length > 0) {
       exportError.value = `Plan created but ${failures.length} item(s) failed: ${failures.join(', ')}`
     } else {
