@@ -33,8 +33,30 @@ export const useAuthStore = defineStore('auth', () => {
   const orgName = ref<string | null>(null)
   const userRole = ref<'editor' | 'viewer' | null>(null)
 
+  // Planning Center credential state
+  const pcAppId = ref<string | null>(null)
+  const pcSecret = ref<string | null>(null)
+  const pcServiceTypeId = ref<string | null>(null)
+
   const isAuthenticated = computed(() => user.value !== null)
   const isEditor = computed(() => userRole.value === 'editor')
+
+  const hasPcCredentials = computed(
+    () =>
+      pcAppId.value !== null &&
+      pcSecret.value !== null &&
+      pcAppId.value !== '' &&
+      pcSecret.value !== '',
+  )
+
+  const pcCredentials = computed(() => {
+    if (!hasPcCredentials.value) return null
+    return {
+      appId: pcAppId.value!,
+      secret: pcSecret.value!,
+      serviceTypeId: pcServiceTypeId.value ?? '',
+    }
+  })
 
   function waitForRole(): Promise<void> {
     return new Promise((resolve) => {
@@ -61,6 +83,9 @@ export const useAuthStore = defineStore('auth', () => {
       orgId.value = null
       orgName.value = null
       userRole.value = null
+      pcAppId.value = null
+      pcSecret.value = null
+      pcServiceTypeId.value = null
       return
     }
 
@@ -69,7 +94,11 @@ export const useAuthStore = defineStore('auth', () => {
     const orgRef = doc(db, 'organizations', ids[0])
     const orgSnap = await getDoc(orgRef)
     if (orgSnap.exists()) {
-      orgName.value = (orgSnap.data().name as string) ?? null
+      const orgData = orgSnap.data()
+      orgName.value = (orgData.name as string) ?? null
+      pcAppId.value = (orgData.pcAppId as string) ?? null
+      pcSecret.value = (orgData.pcSecret as string) ?? null
+      pcServiceTypeId.value = (orgData.pcServiceTypeId as string) ?? null
     }
 
     // Unsubscribe from previous listener if any
@@ -251,9 +280,22 @@ export const useAuthStore = defineStore('auth', () => {
     orgId.value = null
     orgName.value = null
     userRole.value = null
+    pcAppId.value = null
+    pcSecret.value = null
+    pcServiceTypeId.value = null
     memberUnsub?.()
     memberUnsub = null
     await signOut(auth)
+  }
+
+  function setPcCredentials(
+    appId: string | null,
+    secret: string | null,
+    serviceTypeId: string | null,
+  ) {
+    pcAppId.value = appId
+    pcSecret.value = secret
+    pcServiceTypeId.value = serviceTypeId
   }
 
   return {
@@ -271,5 +313,11 @@ export const useAuthStore = defineStore('auth', () => {
     resetPassword,
     logout,
     ensureUserDocument,
+    pcAppId,
+    pcSecret,
+    pcServiceTypeId,
+    hasPcCredentials,
+    pcCredentials,
+    setPcCredentials,
   }
 })
