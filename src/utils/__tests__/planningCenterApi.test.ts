@@ -167,15 +167,15 @@ describe('createPlan', () => {
     })
   })
 
-  it('includes sort_date in body when provided', async () => {
+  it('sends only title in attributes (no date fields)', async () => {
     const mockResponse = { data: { id: 'plan-456' } }
     vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(mockResponse), { status: 201 }))
 
-    await createPlan('app-id', 'secret', 'svc-type-1', 'Easter', '2026-04-05')
+    await createPlan('app-id', 'secret', 'svc-type-1', 'Easter')
 
     const [, options] = vi.mocked(fetch).mock.calls[0]!
     const body = JSON.parse(options?.body as string)
-    expect(body.data.attributes.sort_date).toBe('2026-04-05')
+    expect(body.data.attributes).toEqual({ title: 'Easter' })
   })
 
   it('throws on non-ok response', async () => {

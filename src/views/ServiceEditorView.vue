@@ -1334,7 +1334,7 @@ async function onExportToPC() {
     const title = buildPlanTitle(localService.value)
 
     // 2. Create the plan in PC
-    const planId = await createPlan(appId, secret, serviceTypeId, title, localService.value.date)
+    const planId = await createPlan(appId, secret, serviceTypeId, title)
 
     // 3. Add items sequentially, track failures
     // IMPORTANT: Pass localService.value.sermonPassage to addSlotAsItem
