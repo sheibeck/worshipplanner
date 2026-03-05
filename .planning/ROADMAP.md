@@ -3,7 +3,7 @@
 ## Milestones
 
 - ✅ **v1.0 MVP** — Phases 1-4, 6-7 (shipped 2026-03-05)
-- 📋 **v1.1 Tasks & Events** — Phase 5 (planned)
+- 📋 **v1.1** — Phases 5, 8 (planned)
 
 ## Phases
 
@@ -21,13 +21,34 @@ Full details: milestones/v1.0-ROADMAP.md
 
 </details>
 
-### 📋 v1.1 Tasks & Events (Planned)
+### 📋 v1.1 (Planned)
 
 - [ ] Phase 5: Collaboration, Tasks & Events (TBD plans)
+- [ ] Phase 8: Planning Center API Export (TBD plans)
 
+## Phase Details
+
+### Phase 5: Collaboration, Tasks & Events
 **Goal**: Recurring task checklists with church-specific categories, task assignment with relative due dates, and special event services (Christmas Eve, Easter, etc.) with calendar integration and duplication.
-
+**Depends on**: Phase 4
 **Requirements**: TASK-01, TASK-02, TASK-03, EVNT-01, EVNT-02, EVNT-03, EVNT-04
+**Plans:** 0/TBD plans
+
+### Phase 8: Planning Center API Export
+**Goal:** Export published (locked) service plans to Planning Center via the Services API — creating a plan with sermon scripture as title, adding songs/hymns as Song items and scriptures as Item entries
+**Depends on**: Phase 4
+**Requirements**: TBD
+**Success Criteria** (what must be TRUE):
+  1. When a service plan is published/locked, an "Export to Planning Center" button replaces the "Copy for PC" button
+  2. Clicking export creates a new Plan in Planning Center for the service date with the sermon scripture reference as the plan title, appending special info in parens (e.g., "Revelation 12 (Choir)")
+  3. Each song/hymn slot is added as a Song item in the Planning Center plan
+  4. Each scripture slot is added as an Item with the scripture text in the item description
+  5. User sees success/failure feedback after export completes
+  6. Planning Center API credentials (App ID + Secret) are configured in app settings
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 8 to break down)
 
 ## Progress
 
@@ -40,3 +61,4 @@ Full details: milestones/v1.0-ROADMAP.md
 | 6. AI Assisted Service Suggesting | v1.0 | 4/4 | Complete | 2026-03-04 |
 | 7. Invite & RBAC | v1.0 | 2/2 | Complete | 2026-03-04 |
 | 5. Collaboration, Tasks & Events | v1.1 | 0/TBD | Not started | - |
+| 8. Planning Center API Export | v1.1 | 0/TBD | Not started | - |
