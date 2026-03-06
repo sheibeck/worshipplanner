@@ -668,6 +668,8 @@ export async function addSlotAsItem(
     // Look up PC song and arrangement BEFORE creating the item so we can include them in the POST
     let pcSongId: string | undefined
     let arrangementId: string | undefined
+    let lastItemNotes: Array<{ categoryId: string; content: string }> = []
+    let effectiveLength = length
     try {
       const song = songs.find((s) => s.id === slot.songId)
       if (song && song.ccliNumber) {
@@ -678,20 +680,39 @@ export async function addSlotAsItem(
           if (arrangements.length > 0) {
             arrangementId = arrangements[0].id
           }
+          // Fetch last scheduled item to carry forward length and notes
+          const lastItem = await fetchLastScheduledItem(appId, secret, pcSong.id)
+          if (lastItem) {
+            if (lastItem.length !== null) {
+              effectiveLength = lastItem.length
+            }
+            lastItemNotes = lastItem.notes
+          }
         }
       }
     } catch {
       // Non-fatal: fall through and create item without song link
     }
 
-    return createItem(appId, secret, serviceTypeId, planId, {
+    const newItemId = await createItem(appId, secret, serviceTypeId, planId, {
       title,
       itemType: pcSongId ? 'song' : 'song_arrangement',
       sequence,
-      length,
+      length: effectiveLength,
       songId: pcSongId,
       arrangementId,
     })
+
+    // Copy item notes from last scheduled item (best-effort)
+    for (const note of lastItemNotes) {
+      try {
+        await createItemNote(appId, secret, serviceTypeId, planId, newItemId, note.categoryId, note.content)
+      } catch {
+        // Non-fatal: skip this note
+      }
+    }
+
+    return newItemId
   }
 
   if (slot.kind === 'HYMN') {
