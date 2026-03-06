@@ -77,6 +77,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Quick-2]: SONG slots use item_type 'song' (not 'song_arrangement') for proper PC song linking
 - [Quick-2]: CCLI-based arrangement linking is best-effort -- errors never cause export failure
 - [Quick-2]: First arrangement from PC auto-linked (most songs have one default arrangement)
+- [Quick-3]: Song relationship included alongside arrangement in createItem POST body
+- [Quick-3]: item_type 'song' keyed on pcSongId (not arrangementId) — CCLI match always yields 'song' type
+- [Quick-3]: Last scheduled item metadata copy is best-effort — per-note failures swallowed individually
 
 ### Roadmap Evolution
 
@@ -89,6 +92,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 14 quick-task UX improvements shipped during v1.0 (tasks 6-21). See milestones/v1.0-ROADMAP.md for full list.
 - [Quick-1]: PC export dialog refactored with template-based item matching, existing plan detection, plan times
 - [Quick-2]: SONG slots use item_type 'song' with CCLI-based arrangement auto-linking
+- [Quick-3]: Auto-populate PC item metadata (length, notes) from song's last scheduled item
 
 ### Blockers/Concerns
 
@@ -98,7 +102,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 
 ## Session Continuity
 
-Last activity: 2026-03-05 - Completed quick task 2: Use song item_type and link PC songs by CCLI number
+Last activity: 2026-03-06 - Completed quick task 3: Auto-populate PC item metadata from last scheduled item
 Last session: 2026-03-05T23:22:00.000Z
 Stopped at: Completed quick task 2
 Resume file: None
