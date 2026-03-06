@@ -327,6 +327,9 @@ export async function createPlanTime(
 /**
  * Create an item in a Planning Center plan.
  * Returns the item ID.
+ *
+ * When `arrangementId` is provided, the arrangement relationship is included
+ * in the POST body so PC creates a proper song item linked to that arrangement.
  */
 export async function createItem(
   appId: string,
@@ -339,6 +342,7 @@ export async function createItem(
     description?: string
     sequence?: number
     length?: number
+    arrangementId?: string
   },
 ): Promise<string> {
   const attributes: Record<string, unknown> = {
@@ -358,6 +362,19 @@ export async function createItem(
     attributes.length = params.length
   }
 
+  const data: Record<string, unknown> = {
+    type: 'Item',
+    attributes,
+  }
+
+  if (params.arrangementId) {
+    data.relationships = {
+      arrangement: {
+        data: { type: 'Arrangement', id: params.arrangementId },
+      },
+    }
+  }
+
   const response = await fetch(
     `${PC_BASE_URL}/service_types/${serviceTypeId}/plans/${planId}/items`,
     {
@@ -367,12 +384,7 @@ export async function createItem(
         Accept: 'application/json',
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        data: {
-          type: 'Item',
-          attributes,
-        },
-      }),
+      body: JSON.stringify({ data }),
     },
   )
 
@@ -510,46 +522,6 @@ export async function fetchSongArrangements(
 }
 
 /**
- * Assign an arrangement to an existing item in a Planning Center plan.
- * Best-effort — silently returns on any error.
- */
-export async function assignArrangementToItem(
-  appId: string,
-  secret: string,
-  serviceTypeId: string,
-  planId: string,
-  itemId: string,
-  arrangementId: string,
-): Promise<void> {
-  try {
-    await fetch(
-      `${PC_BASE_URL}/service_types/${serviceTypeId}/plans/${planId}/items/${itemId}`,
-      {
-        method: 'PATCH',
-        headers: {
-          Authorization: basicAuthHeader(appId, secret),
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          data: {
-            type: 'Item',
-            id: itemId,
-            relationships: {
-              arrangement: {
-                data: { type: 'Arrangement', id: arrangementId },
-              },
-            },
-          },
-        }),
-      },
-    )
-  } catch {
-    // silently ignore — arrangement linking is best-effort
-  }
-}
-
-/**
  * Build a plan title from a service.
  * Format: "Sermon Scripture (Teams)" or "Service Name" or "Service" as fallback.
  */
@@ -593,14 +565,9 @@ export async function addSlotAsItem(
     const title = slot.songTitle
       ? `${slot.songTitle} (Key: ${slot.songKey ?? ''})`
       : '[Empty Song]'
-    const itemId = await createItem(appId, secret, serviceTypeId, planId, {
-      title,
-      itemType: 'song',
-      sequence,
-      length,
-    })
 
-    // Best-effort: search PC for matching song by CCLI number and link arrangement
+    // Look up arrangement BEFORE creating the item so we can include it in the POST
+    let arrangementId: string | undefined
     try {
       const song = songs.find((s) => s.id === slot.songId)
       if (song && song.ccliNumber) {
@@ -608,17 +575,21 @@ export async function addSlotAsItem(
         if (pcSong) {
           const arrangements = await fetchSongArrangements(appId, secret, pcSong.id)
           if (arrangements.length > 0) {
-            await assignArrangementToItem(
-              appId, secret, serviceTypeId, planId, itemId, arrangements[0].id,
-            )
+            arrangementId = arrangements[0].id
           }
         }
       }
     } catch {
-      // Non-fatal: arrangement linking is best-effort
+      // Non-fatal: fall through and create item without arrangement
     }
 
-    return itemId
+    return createItem(appId, secret, serviceTypeId, planId, {
+      title,
+      itemType: arrangementId ? 'song' : 'song_arrangement',
+      sequence,
+      length,
+      arrangementId,
+    })
   }
 
   if (slot.kind === 'HYMN') {

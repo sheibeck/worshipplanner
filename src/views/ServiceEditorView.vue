@@ -117,19 +117,6 @@
               Undo
             </button>
 
-            <!-- Delete button: editor only -->
-            <button
-              v-if="authStore.isEditor"
-              type="button"
-              @click="showDeleteConfirm = true"
-              class="print:hidden inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-red-400 bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-              Delete
-            </button>
-
             <!-- Suggest All Songs button: editor only -->
             <button
               v-if="authStore.isEditor"
@@ -143,20 +130,6 @@
                 <path d="M12 2l1.5 4.5L18 8l-4.5 1.5L12 14l-1.5-4.5L6 8l4.5-1.5L12 2zM5 16l1 3 3 1-3 1-1 3-1-3-3-1 3-1 1-3zM19 15l.75 2.25L22 18l-2.25.75L19 21l-.75-2.25L16 18l2.25-.75L19 15z"/>
               </svg>
               {{ aiSuggestingAll ? 'Suggesting...' : 'Suggest All Songs' }}
-            </button>
-
-            <!-- Print button -->
-            <button
-              type="button"
-              data-testid="print-btn"
-              @click="onPrint"
-              :disabled="!localService"
-              class="print:hidden inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-gray-200 bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-              </svg>
-              Print
             </button>
 
             <!-- Export to PC button: shown when credentials configured, enabled only for planned services -->
@@ -208,22 +181,6 @@
                 <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
               </svg>
               {{ pcCopied ? 'Copied!' : 'Copy for PC' }}
-            </button>
-
-            <!-- Share button -->
-            <button
-              type="button"
-              @click="onShare"
-              :disabled="!localService || isSharing"
-              class="print:hidden inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-gray-200 bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700"
-            >
-              <svg v-if="!shareCopied" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-              </svg>
-              <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-              {{ isSharing ? 'Sharing...' : shareCopied ? 'Link Copied!' : shareError ? shareError : 'Share' }}
             </button>
 
             <!-- Save button: editor only -->
@@ -798,19 +755,51 @@
           </div>
         </div>
 
-        <!-- Bottom save: editor only -->
-        <div v-if="authStore.isEditor" class="mt-3 flex justify-end">
-          <span v-if="isDirty" class="text-xs text-amber-400 self-center mr-3">Unsaved changes</span>
+        <!-- Bottom actions: Print, Share, Delete -->
+        <div class="mt-6 pt-4 border-t border-gray-800 flex flex-wrap items-center gap-2 print:hidden">
+          <!-- Print button -->
           <button
             type="button"
-            @click="onSave"
-            :disabled="!isDirty || isSaving"
-            class="inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white transition-colors"
-            :class="isDirty && !isSaving
-              ? 'bg-indigo-600 hover:bg-indigo-500'
-              : 'bg-indigo-600/40 cursor-not-allowed text-white/50'"
+            data-testid="print-btn"
+            @click="onPrint"
+            :disabled="!localService"
+            class="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-gray-200 bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700"
           >
-            {{ isSaving ? 'Saving...' : 'Save' }}
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            Print
+          </button>
+
+          <!-- Share button -->
+          <button
+            type="button"
+            @click="onShare"
+            :disabled="!localService || isSharing"
+            class="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-gray-200 bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700"
+          >
+            <svg v-if="!shareCopied" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+            </svg>
+            <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+            {{ isSharing ? 'Sharing...' : shareCopied ? 'Link Copied!' : shareError ? shareError : 'Share' }}
+          </button>
+
+          <div class="flex-1" />
+
+          <!-- Delete button: editor only -->
+          <button
+            v-if="authStore.isEditor"
+            type="button"
+            @click="showDeleteConfirm = true"
+            class="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-red-400 bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            Delete
           </button>
         </div>
       </template>
@@ -860,7 +849,7 @@ const AVAILABLE_TEAMS = ['Choir', 'Orchestra', 'Communion', 'Special']
 
 const statusBadgeClasses: Record<string, string> = {
   draft: 'bg-gray-800 text-gray-400 border-gray-700',
-  planned: 'bg-green-900/50 text-green-300 border-green-800',
+  planned: 'bg-yellow-900/50 text-yellow-300 border-yellow-800',
   exported: 'bg-green-900/50 text-green-300 border-green-800',
 }
 

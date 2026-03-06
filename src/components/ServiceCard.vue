@@ -8,7 +8,10 @@
           <p class="text-sm font-semibold text-gray-100">{{ formattedDate }}<template v-if="sermonPassageLabel">: <a :href="sermonPassageUrl" target="_blank" rel="noopener" @click.stop class="text-indigo-400 hover:text-indigo-300 transition-colors">{{ sermonPassageLabel }}</a></template></p>
         </div>
         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold shrink-0" :class="statusClass">
-          <svg v-if="service.status === 'planned'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3">
+          <svg v-if="service.status === 'exported'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3">
+            <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+          </svg>
+          <svg v-else-if="service.status === 'planned'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3">
             <path fill-rule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clip-rule="evenodd" />
           </svg>
           {{ service.status }}
@@ -192,8 +195,9 @@ function slotTextClass(slot: ServiceSlot): string {
 
 // Static status class lookup (Tailwind v4 purge safety)
 const statusClasses: Record<string, string> = {
-  planned: 'bg-green-900/50 text-green-300 border border-green-800',
   draft: 'bg-gray-800 text-gray-400 border border-gray-700',
+  planned: 'bg-yellow-900/50 text-yellow-300 border border-yellow-800',
+  exported: 'bg-green-900/50 text-green-300 border border-green-800',
 }
 const statusClass = computed(
   () => statusClasses[props.service.status] ?? 'bg-gray-800 text-gray-400',
