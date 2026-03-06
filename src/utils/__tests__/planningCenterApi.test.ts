@@ -21,6 +21,8 @@ import {
   buildPlanTitle,
   searchSongByCcli,
   fetchSongArrangements,
+  fetchLastScheduledItem,
+  createItemNote,
 } from '@/utils/planningCenterApi'
 
 const mockTimestamp = { toDate: () => new Date('2026-03-08') } as unknown as Timestamp
@@ -575,11 +577,12 @@ describe('addSlotAsItem', () => {
     // 2nd call is fetchSongArrangements
     const [arrUrl] = vi.mocked(fetch).mock.calls[1]!
     expect(arrUrl).toContain('/songs/pc-song-42/arrangements')
-    // 3rd call is createItem with arrangement relationship
+    // 3rd call is createItem with song + arrangement relationships
     const [, createOpts] = vi.mocked(fetch).mock.calls[2]!
     const createBody = JSON.parse(createOpts?.body as string)
     expect(createBody.data.attributes.item_type).toBe('song')
-    expect(createBody.data.relationships.arrangement.data.id).toBe('arr-1')
+    expect(createBody.data.relationships.song.data).toEqual({ type: 'Song', id: 'pc-song-42' })
+    expect(createBody.data.relationships.arrangement.data).toEqual({ type: 'Arrangement', id: 'arr-1' })
   })
 
   it('does not search PC when song has empty ccliNumber', async () => {
@@ -656,7 +659,7 @@ describe('addSlotAsItem', () => {
     expect(body.data.relationships).toBeUndefined()
   })
 
-  it('creates item as song_arrangement when fetchSongArrangements returns empty array', async () => {
+  it('creates item as song with song relationship when CCLI matches but no arrangements', async () => {
     const mockTimestampLocal = { toDate: () => new Date('2026-03-08') } as unknown as Timestamp
     const songs = [{
       id: 'song-1',
@@ -688,11 +691,13 @@ describe('addSlotAsItem', () => {
 
     await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 0, songs)
 
-    // 3 fetch calls: search + arrangements (empty) + createItem (as song_arrangement)
+    // 3 fetch calls: search + arrangements (empty) + createItem (as song with song relationship)
     expect(vi.mocked(fetch)).toHaveBeenCalledTimes(3)
     const [, createOpts] = vi.mocked(fetch).mock.calls[2]!
     const body = JSON.parse(createOpts?.body as string)
-    expect(body.data.attributes.item_type).toBe('song_arrangement')
+    expect(body.data.attributes.item_type).toBe('song')
+    expect(body.data.relationships.song.data).toEqual({ type: 'Song', id: 'pc-song-42' })
+    expect(body.data.relationships.arrangement).toBeUndefined()
   })
 
   it('HYMN slot still uses item_type "song_arrangement"', async () => {
@@ -838,5 +843,171 @@ describe('addSlotAsItem', () => {
     await expect(
       addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 2, []),
     ).resolves.not.toThrow()
+  })
+})
+
+describe('fetchLastScheduledItem', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  it('returns { length, notes } on success when song has been scheduled before', async () => {
+    const mockResponse = {
+      data: {
+        id: 'item-last-1',
+        attributes: { length: 240 },
+      },
+      included: [
+        {
+          type: 'ItemNote',
+          id: 'note-1',
+          attributes: { content: 'John Smith' },
+          relationships: {
+            item_note_category: { data: { type: 'ItemNoteCategory', id: 'cat-person' } },
+          },
+        },
+        {
+          type: 'ItemNote',
+          id: 'note-2',
+          attributes: { content: 'Lead vocals' },
+          relationships: {
+            item_note_category: { data: { type: 'ItemNoteCategory', id: 'cat-vocals' } },
+          },
+        },
+      ],
+    }
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(mockResponse), { status: 200 }))
+
+    const result = await fetchLastScheduledItem('app-id', 'secret', 'pc-song-42')
+
+    expect(result).toEqual({
+      length: 240,
+      notes: [
+        { categoryId: 'cat-person', content: 'John Smith' },
+        { categoryId: 'cat-vocals', content: 'Lead vocals' },
+      ],
+    })
+    const [url] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toContain('/songs/pc-song-42/last_scheduled_item?include=item_notes')
+  })
+
+  it('returns { length: null, notes: [] } when length is absent and no item notes', async () => {
+    const mockResponse = {
+      data: {
+        id: 'item-last-1',
+        attributes: {},
+      },
+      included: [],
+    }
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(mockResponse), { status: 200 }))
+
+    const result = await fetchLastScheduledItem('app-id', 'secret', 'pc-song-42')
+
+    expect(result).toEqual({ length: null, notes: [] })
+  })
+
+  it('returns null when data is null (song never scheduled)', async () => {
+    const mockResponse = { data: null, included: [] }
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(mockResponse), { status: 200 }))
+
+    const result = await fetchLastScheduledItem('app-id', 'secret', 'pc-song-42')
+
+    expect(result).toBeNull()
+  })
+
+  it('returns null when response is not ok', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('Not Found', { status: 404 }))
+
+    const result = await fetchLastScheduledItem('app-id', 'secret', 'pc-song-42')
+
+    expect(result).toBeNull()
+  })
+
+  it('returns null (does not throw) on network error', async () => {
+    vi.mocked(fetch).mockRejectedValueOnce(new Error('Network failure'))
+
+    const result = await fetchLastScheduledItem('app-id', 'secret', 'pc-song-42')
+
+    expect(result).toBeNull()
+  })
+
+  it('ignores included items that are not ItemNote type', async () => {
+    const mockResponse = {
+      data: { id: 'item-1', attributes: { length: 180 } },
+      included: [
+        {
+          type: 'Song',
+          id: 'song-1',
+          attributes: { content: 'Should be ignored' },
+          relationships: {
+            item_note_category: { data: { type: 'ItemNoteCategory', id: 'cat-1' } },
+          },
+        },
+        {
+          type: 'ItemNote',
+          id: 'note-1',
+          attributes: { content: 'Actual note' },
+          relationships: {
+            item_note_category: { data: { type: 'ItemNoteCategory', id: 'cat-2' } },
+          },
+        },
+      ],
+    }
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(mockResponse), { status: 200 }))
+
+    const result = await fetchLastScheduledItem('app-id', 'secret', 'pc-song-42')
+
+    expect(result).toEqual({
+      length: 180,
+      notes: [{ categoryId: 'cat-2', content: 'Actual note' }],
+    })
+  })
+})
+
+describe('createItemNote', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  it('sends POST to /service_types/{stId}/plans/{planId}/items/{itemId}/item_notes with correct body', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('{}', { status: 201 }))
+
+    await createItemNote('app-id', 'secret', 'svc-type-1', 'plan-1', 'item-99', 'cat-person', 'John Smith')
+
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1)
+    const [url, options] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toContain('/service_types/svc-type-1/plans/plan-1/items/item-99/item_notes')
+    expect(options?.method).toBe('POST')
+
+    const body = JSON.parse(options?.body as string)
+    expect(body.data.type).toBe('ItemNote')
+    expect(body.data.attributes.item_note_category_id).toBe('cat-person')
+    expect(body.data.attributes.content).toBe('John Smith')
+  })
+
+  it('resolves void on success (2xx response)', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('{}', { status: 201 }))
+
+    const result = await createItemNote('app-id', 'secret', 'svc-type-1', 'plan-1', 'item-99', 'cat-1', 'Note content')
+
+    expect(result).toBeUndefined()
+  })
+
+  it('throws on non-ok response', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('Bad Request', { status: 400 }))
+
+    await expect(
+      createItemNote('app-id', 'secret', 'svc-type-1', 'plan-1', 'item-99', 'cat-1', 'content'),
+    ).rejects.toThrow('Failed to create item note: 400')
+  })
+
+  it('sends Authorization header with Basic auth', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('{}', { status: 201 }))
+
+    await createItemNote('myapp', 'mysecret', 'st-1', 'pl-1', 'it-1', 'cat-1', 'content')
+
+    const [, options] = vi.mocked(fetch).mock.calls[0]!
+    const headers = options?.headers as Record<string, string>
+    expect(headers?.Authorization).toBe('Basic ' + btoa('myapp:mysecret'))
   })
 })

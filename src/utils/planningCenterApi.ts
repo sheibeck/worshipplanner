@@ -342,6 +342,7 @@ export async function createItem(
     description?: string
     sequence?: number
     length?: number
+    songId?: string
     arrangementId?: string
   },
 ): Promise<string> {
@@ -367,12 +368,22 @@ export async function createItem(
     attributes,
   }
 
-  if (params.arrangementId) {
-    data.relationships = {
-      arrangement: {
-        data: { type: 'Arrangement', id: params.arrangementId },
-      },
+  const relationships: Record<string, unknown> = {}
+
+  if (params.songId) {
+    relationships.song = {
+      data: { type: 'Song', id: params.songId },
     }
+  }
+
+  if (params.arrangementId) {
+    relationships.arrangement = {
+      data: { type: 'Arrangement', id: params.arrangementId },
+    }
+  }
+
+  if (Object.keys(relationships).length > 0) {
+    data.relationships = relationships
   }
 
   const response = await fetch(
@@ -522,6 +533,94 @@ export async function fetchSongArrangements(
 }
 
 /**
+ * Fetch the last scheduled item for a PC song, including its item_notes.
+ * Used to carry forward length and note content when creating a new item.
+ * Returns null when the song has no prior schedule history or on any error.
+ */
+export async function fetchLastScheduledItem(
+  appId: string,
+  secret: string,
+  pcSongId: string,
+): Promise<{ length: number | null; notes: Array<{ categoryId: string; content: string }> } | null> {
+  try {
+    const response = await fetch(
+      `${PC_BASE_URL}/songs/${pcSongId}/last_scheduled_item?include=item_notes`,
+      {
+        headers: {
+          Authorization: basicAuthHeader(appId, secret),
+          Accept: 'application/json',
+        },
+      },
+    )
+
+    if (!response.ok) return null
+
+    const json = (await response.json()) as {
+      data: { attributes: { length?: number | null } } | null
+      included?: Array<{
+        type: string
+        attributes: { content: string }
+        relationships: { item_note_category: { data: { id: string } } }
+      }>
+    }
+
+    if (!json.data) return null
+
+    const length = json.data.attributes.length ?? null
+    const notes = (json.included ?? [])
+      .filter((inc) => inc.type === 'ItemNote')
+      .map((inc) => ({
+        categoryId: inc.relationships.item_note_category.data.id,
+        content: inc.attributes.content,
+      }))
+
+    return { length, notes }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Create an item note on a Planning Center plan item.
+ * POST /service_types/{stId}/plans/{planId}/items/{itemId}/item_notes
+ */
+export async function createItemNote(
+  appId: string,
+  secret: string,
+  serviceTypeId: string,
+  planId: string,
+  itemId: string,
+  categoryId: string,
+  content: string,
+): Promise<void> {
+  const response = await fetch(
+    `${PC_BASE_URL}/service_types/${serviceTypeId}/plans/${planId}/items/${itemId}/item_notes`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: basicAuthHeader(appId, secret),
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        data: {
+          type: 'ItemNote',
+          attributes: {
+            item_note_category_id: categoryId,
+            content,
+          },
+        },
+      }),
+    },
+  )
+
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(`Failed to create item note: ${response.status} ${text}`)
+  }
+}
+
+/**
  * Build a plan title from a service.
  * Format: "Sermon Scripture (Teams)" or "Service Name" or "Service" as fallback.
  */
@@ -566,13 +665,15 @@ export async function addSlotAsItem(
       ? `${slot.songTitle} (Key: ${slot.songKey ?? ''})`
       : '[Empty Song]'
 
-    // Look up arrangement BEFORE creating the item so we can include it in the POST
+    // Look up PC song and arrangement BEFORE creating the item so we can include them in the POST
+    let pcSongId: string | undefined
     let arrangementId: string | undefined
     try {
       const song = songs.find((s) => s.id === slot.songId)
       if (song && song.ccliNumber) {
         const pcSong = await searchSongByCcli(appId, secret, song.ccliNumber)
         if (pcSong) {
+          pcSongId = pcSong.id
           const arrangements = await fetchSongArrangements(appId, secret, pcSong.id)
           if (arrangements.length > 0) {
             arrangementId = arrangements[0].id
@@ -580,14 +681,15 @@ export async function addSlotAsItem(
         }
       }
     } catch {
-      // Non-fatal: fall through and create item without arrangement
+      // Non-fatal: fall through and create item without song link
     }
 
     return createItem(appId, secret, serviceTypeId, planId, {
       title,
-      itemType: arrangementId ? 'song' : 'song_arrangement',
+      itemType: pcSongId ? 'song' : 'song_arrangement',
       sequence,
       length,
+      songId: pcSongId,
       arrangementId,
     })
   }
