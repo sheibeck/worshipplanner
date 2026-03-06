@@ -10,6 +10,7 @@ dist/
 
 # Firebase
 .firebase/
+functions/lib/
 
 # Editor directories and files
 .vscode/*

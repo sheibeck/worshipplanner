@@ -5,11 +5,11 @@ import { fetchPassageText } from '@/utils/esvApi'
 
 /**
  * Base URL for Planning Center API calls.
- * Uses a dev proxy in development to avoid CORS issues.
+ * Always uses the /api/planningcenter proxy path.
+ * In dev: Vite proxy forwards to the real API.
+ * In prod: Firebase Hosting rewrite forwards to a Cloud Function proxy.
  */
-export const PC_BASE_URL = import.meta.env.DEV
-  ? '/api/planningcenter/services/v2'
-  : 'https://api.planningcenteronline.com/services/v2'
+export const PC_BASE_URL = '/api/planningcenter/services/v2'
 
 /**
  * Generate a Basic Auth header from App ID and Secret.
@@ -492,9 +492,10 @@ export async function searchSongByCcli(
       data: Array<{ id: string; attributes: { title: string } }>
     }
 
-    if (json.data.length === 0) return null
+    const first = json.data[0]
+    if (!first) return null
 
-    return { id: json.data[0].id, title: json.data[0].attributes.title }
+    return { id: first.id, title: first.attributes.title }
   } catch {
     return null
   }
@@ -566,9 +567,9 @@ export async function fetchLastScheduledItem(
       }>
     }
 
-    if (scheduleJson.data.length === 0) return null
-
     const schedule = scheduleJson.data[0]
+    if (!schedule) return null
+
     const itemId = schedule.relationships.item.data.id
     const planId = schedule.relationships.plan.data.id
     const serviceTypeId = schedule.relationships.service_type.data.id
@@ -704,7 +705,7 @@ export async function addSlotAsItem(
         if (pcSong) {
           pcSongId = pcSong.id
           const arrangements = await fetchSongArrangements(appId, secret, pcSong.id)
-          if (arrangements.length > 0) {
+          if (arrangements.length > 0 && arrangements[0]) {
             arrangementId = arrangements[0].id
           }
           // Fetch last scheduled item to carry forward item note categories
