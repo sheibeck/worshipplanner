@@ -534,7 +534,7 @@ export async function fetchSongArrangements(
 
 /**
  * Fetch the last scheduled item for a PC song, including its item_notes.
- * Used to carry forward length and note content when creating a new item.
+ * Uses song_schedules to find the most recent usage, then fetches that item.
  * Returns null when the song has no prior schedule history or on any error.
  */
 export async function fetchLastScheduledItem(
@@ -543,8 +543,9 @@ export async function fetchLastScheduledItem(
   pcSongId: string,
 ): Promise<{ length: number | null; notes: Array<{ categoryId: string; content: string }> } | null> {
   try {
-    const response = await fetch(
-      `${PC_BASE_URL}/songs/${pcSongId}/last_scheduled_item?include=item_notes`,
+    // Step 1: Get the most recent song schedule to find item/plan/service_type IDs
+    const scheduleResponse = await fetch(
+      `${PC_BASE_URL}/songs/${pcSongId}/song_schedules?order=-plan_sort_date&per_page=1`,
       {
         headers: {
           Authorization: basicAuthHeader(appId, secret),
@@ -553,10 +554,41 @@ export async function fetchLastScheduledItem(
       },
     )
 
-    if (!response.ok) return null
+    if (!scheduleResponse.ok) return null
 
-    const json = (await response.json()) as {
-      data: { attributes: { length?: number | null } } | null
+    const scheduleJson = (await scheduleResponse.json()) as {
+      data: Array<{
+        id: string
+        relationships: {
+          item: { data: { id: string } }
+          plan: { data: { id: string } }
+          service_type: { data: { id: string } }
+        }
+      }>
+    }
+
+    if (scheduleJson.data.length === 0) return null
+
+    const schedule = scheduleJson.data[0]
+    const itemId = schedule.relationships.item.data.id
+    const planId = schedule.relationships.plan.data.id
+    const serviceTypeId = schedule.relationships.service_type.data.id
+
+    // Step 2: Fetch that item with its notes included
+    const itemResponse = await fetch(
+      `${PC_BASE_URL}/service_types/${serviceTypeId}/plans/${planId}/items/${itemId}?include=item_notes`,
+      {
+        headers: {
+          Authorization: basicAuthHeader(appId, secret),
+          Accept: 'application/json',
+        },
+      },
+    )
+
+    if (!itemResponse.ok) return null
+
+    const itemJson = (await itemResponse.json()) as {
+      data: { attributes: { length?: number | null } }
       included?: Array<{
         type: string
         attributes: { content: string }
@@ -564,10 +596,8 @@ export async function fetchLastScheduledItem(
       }>
     }
 
-    if (!json.data) return null
-
-    const length = json.data.attributes.length ?? null
-    const notes = (json.included ?? [])
+    const length = itemJson.data.attributes.length ?? null
+    const notes = (itemJson.included ?? [])
       .filter((inc) => inc.type === 'ItemNote')
       .map((inc) => ({
         categoryId: inc.relationships.item_note_category.data.id,

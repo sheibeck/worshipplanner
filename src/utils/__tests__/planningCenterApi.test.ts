@@ -561,16 +561,16 @@ describe('addSlotAsItem', () => {
       songKey: 'G',
     }
 
-    // Mock: searchSongByCcli (found), fetchSongArrangements, fetchLastScheduledItem (null), then createItem
+    // Mock: searchSongByCcli (found), fetchSongArrangements, song_schedules (empty = no history), then createItem
     vi.mocked(fetch)
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ id: 'pc-song-42', attributes: { title: 'Come Thou Fount' } }] }), { status: 200 })) // searchSongByCcli
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ id: 'arr-1', attributes: { name: 'Default' } }] }), { status: 200 })) // fetchSongArrangements
-      .mockResolvedValueOnce(new Response(JSON.stringify({ data: null }), { status: 200 })) // fetchLastScheduledItem (no history)
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 })) // song_schedules (no history)
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: { id: 'item-99' } }), { status: 201 })) // createItem
 
     await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 0, songs)
 
-    // 4 fetch calls: search, arrangements, lastScheduledItem, createItem
+    // 4 fetch calls: search, arrangements, song_schedules, createItem
     expect(vi.mocked(fetch)).toHaveBeenCalledTimes(4)
     // 1st call is searchSongByCcli
     const [searchUrl] = vi.mocked(fetch).mock.calls[0]!
@@ -578,9 +578,9 @@ describe('addSlotAsItem', () => {
     // 2nd call is fetchSongArrangements
     const [arrUrl] = vi.mocked(fetch).mock.calls[1]!
     expect(arrUrl).toContain('/songs/pc-song-42/arrangements')
-    // 3rd call is fetchLastScheduledItem
-    const [lastItemUrl] = vi.mocked(fetch).mock.calls[2]!
-    expect(lastItemUrl).toContain('/songs/pc-song-42/last_scheduled_item')
+    // 3rd call is song_schedules
+    const [schedUrl] = vi.mocked(fetch).mock.calls[2]!
+    expect(schedUrl).toContain('/songs/pc-song-42/song_schedules')
     // 4th call is createItem with song + arrangement relationships
     const [, createOpts] = vi.mocked(fetch).mock.calls[3]!
     const createBody = JSON.parse(createOpts?.body as string)
@@ -691,12 +691,12 @@ describe('addSlotAsItem', () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ id: 'pc-song-42', attributes: { title: 'Song' } }] }), { status: 200 })) // searchSongByCcli
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 })) // fetchSongArrangements returns empty
-      .mockResolvedValueOnce(new Response(JSON.stringify({ data: null }), { status: 200 })) // fetchLastScheduledItem (no history)
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 })) // song_schedules (no history)
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: { id: 'item-99' } }), { status: 201 })) // createItem
 
     await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 0, songs)
 
-    // 4 fetch calls: search + arrangements (empty) + lastScheduledItem + createItem (as song with song relationship)
+    // 4 fetch calls: search + arrangements (empty) + song_schedules + createItem (as song with song relationship)
     expect(vi.mocked(fetch)).toHaveBeenCalledTimes(4)
     const [, createOpts] = vi.mocked(fetch).mock.calls[3]!
     const body = JSON.parse(createOpts?.body as string)
@@ -875,8 +875,18 @@ describe('addSlotAsItem', () => {
       songKey: 'G',
     }
 
+    const scheduleResponse = {
+      data: [{
+        id: 'sched-1',
+        relationships: {
+          item: { data: { id: 'last-item-1' } },
+          plan: { data: { id: 'plan-prev' } },
+          service_type: { data: { id: 'st-prev' } },
+        },
+      }],
+    }
     const lastItemResponse = {
-      data: { id: 'last-item-1', attributes: { length: 300 } },
+      data: { attributes: { length: 300 } },
       included: [
         {
           type: 'ItemNote',
@@ -896,7 +906,8 @@ describe('addSlotAsItem', () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ id: 'pc-song-42', attributes: { title: 'Come Thou Fount' } }] }), { status: 200 })) // searchSongByCcli
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ id: 'arr-1', attributes: { name: 'Default' } }] }), { status: 200 })) // fetchSongArrangements
-      .mockResolvedValueOnce(new Response(JSON.stringify(lastItemResponse), { status: 200 })) // fetchLastScheduledItem
+      .mockResolvedValueOnce(new Response(JSON.stringify(scheduleResponse), { status: 200 })) // song_schedules
+      .mockResolvedValueOnce(new Response(JSON.stringify(lastItemResponse), { status: 200 })) // fetch last item with notes
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: { id: 'item-99' } }), { status: 201 })) // createItem
       .mockResolvedValueOnce(new Response('{}', { status: 201 })) // createItemNote for note-1
       .mockResolvedValueOnce(new Response('{}', { status: 201 })) // createItemNote for note-2
@@ -904,22 +915,22 @@ describe('addSlotAsItem', () => {
     const result = await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 0, songs)
 
     expect(result).toBe('item-99')
-    // 6 fetch calls: search + arrangements + lastItem + createItem + 2 note POSTs
-    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(6)
+    // 7 fetch calls: search + arrangements + song_schedules + lastItem + createItem + 2 note POSTs
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(7)
 
     // createItem call should use length from last item (300), not original undefined
-    const [, createOpts] = vi.mocked(fetch).mock.calls[3]!
+    const [, createOpts] = vi.mocked(fetch).mock.calls[4]!
     const createBody = JSON.parse(createOpts?.body as string)
     expect(createBody.data.attributes.length).toBe(300)
 
     // Note POSTs
-    const [noteUrl1, noteOpts1] = vi.mocked(fetch).mock.calls[4]!
+    const [noteUrl1, noteOpts1] = vi.mocked(fetch).mock.calls[5]!
     expect(noteUrl1).toContain('/items/item-99/item_notes')
     const noteBody1 = JSON.parse(noteOpts1?.body as string)
     expect(noteBody1.data.attributes.item_note_category_id).toBe('cat-person')
     expect(noteBody1.data.attributes.content).toBe('John Smith')
 
-    const [noteUrl2, noteOpts2] = vi.mocked(fetch).mock.calls[5]!
+    const [noteUrl2, noteOpts2] = vi.mocked(fetch).mock.calls[6]!
     expect(noteUrl2).toContain('/items/item-99/item_notes')
     const noteBody2 = JSON.parse(noteOpts2?.body as string)
     expect(noteBody2.data.attributes.item_note_category_id).toBe('cat-vocals')
@@ -954,13 +965,13 @@ describe('addSlotAsItem', () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ id: 'pc-song-42', attributes: { title: 'Come Thou Fount' } }] }), { status: 200 })) // searchSongByCcli
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ id: 'arr-1', attributes: { name: 'Default' } }] }), { status: 200 })) // fetchSongArrangements
-      .mockResolvedValueOnce(new Response(JSON.stringify({ data: null }), { status: 200 })) // fetchLastScheduledItem returns null data
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 })) // song_schedules (no history)
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: { id: 'item-99' } }), { status: 201 })) // createItem
 
     const result = await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 0, songs, null, 180)
 
     expect(result).toBe('item-99')
-    // 4 fetch calls: search + arrangements + lastItem + createItem (no note POSTs)
+    // 4 fetch calls: search + arrangements + song_schedules + createItem (no note POSTs)
     expect(vi.mocked(fetch)).toHaveBeenCalledTimes(4)
 
     // createItem should use original length (180)
@@ -994,8 +1005,18 @@ describe('addSlotAsItem', () => {
       songKey: 'G',
     }
 
+    const scheduleResponse = {
+      data: [{
+        id: 'sched-1',
+        relationships: {
+          item: { data: { id: 'last-item-1' } },
+          plan: { data: { id: 'plan-prev' } },
+          service_type: { data: { id: 'st-prev' } },
+        },
+      }],
+    }
     const lastItemResponse = {
-      data: { id: 'last-item-1', attributes: { length: 240 } },
+      data: { attributes: { length: 240 } },
       included: [
         {
           type: 'ItemNote',
@@ -1009,7 +1030,8 @@ describe('addSlotAsItem', () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ id: 'pc-song-42', attributes: { title: 'Come Thou Fount' } }] }), { status: 200 })) // searchSongByCcli
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ id: 'arr-1', attributes: { name: 'Default' } }] }), { status: 200 })) // fetchSongArrangements
-      .mockResolvedValueOnce(new Response(JSON.stringify(lastItemResponse), { status: 200 })) // fetchLastScheduledItem
+      .mockResolvedValueOnce(new Response(JSON.stringify(scheduleResponse), { status: 200 })) // song_schedules
+      .mockResolvedValueOnce(new Response(JSON.stringify(lastItemResponse), { status: 200 })) // fetch last item
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: { id: 'item-99' } }), { status: 201 })) // createItem
       .mockResolvedValueOnce(new Response('Internal Server Error', { status: 500 })) // createItemNote fails
 
@@ -1025,32 +1047,34 @@ describe('fetchLastScheduledItem', () => {
     vi.stubGlobal('fetch', vi.fn())
   })
 
-  it('returns { length, notes } on success when song has been scheduled before', async () => {
-    const mockResponse = {
-      data: {
-        id: 'item-last-1',
-        attributes: { length: 240 },
+  const mockScheduleResponse = (itemId = 'item-last-1', planId = 'plan-prev', stId = 'st-1') => ({
+    data: [{
+      id: 'sched-1',
+      relationships: {
+        item: { data: { id: itemId } },
+        plan: { data: { id: planId } },
+        service_type: { data: { id: stId } },
       },
-      included: [
-        {
-          type: 'ItemNote',
-          id: 'note-1',
-          attributes: { content: 'John Smith' },
-          relationships: {
-            item_note_category: { data: { type: 'ItemNoteCategory', id: 'cat-person' } },
-          },
-        },
-        {
-          type: 'ItemNote',
-          id: 'note-2',
-          attributes: { content: 'Lead vocals' },
-          relationships: {
-            item_note_category: { data: { type: 'ItemNoteCategory', id: 'cat-vocals' } },
-          },
-        },
-      ],
-    }
-    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(mockResponse), { status: 200 }))
+    }],
+  })
+
+  const mockItemResponse = (length: number | null, notes: Array<{ id: string; content: string; catId: string }> = []) => ({
+    data: { attributes: { length } },
+    included: notes.map((n) => ({
+      type: 'ItemNote',
+      id: n.id,
+      attributes: { content: n.content },
+      relationships: { item_note_category: { data: { type: 'ItemNoteCategory', id: n.catId } } },
+    })),
+  })
+
+  it('returns { length, notes } on success when song has been scheduled before', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(JSON.stringify(mockScheduleResponse()), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(mockItemResponse(240, [
+        { id: 'note-1', content: 'John Smith', catId: 'cat-person' },
+        { id: 'note-2', content: 'Lead vocals', catId: 'cat-vocals' },
+      ])), { status: 200 }))
 
     const result = await fetchLastScheduledItem('app-id', 'secret', 'pc-song-42')
 
@@ -1061,36 +1085,46 @@ describe('fetchLastScheduledItem', () => {
         { categoryId: 'cat-vocals', content: 'Lead vocals' },
       ],
     })
-    const [url] = vi.mocked(fetch).mock.calls[0]!
-    expect(url).toContain('/songs/pc-song-42/last_scheduled_item?include=item_notes')
+    // 1st call: song_schedules
+    const [schedUrl] = vi.mocked(fetch).mock.calls[0]!
+    expect(schedUrl).toContain('/songs/pc-song-42/song_schedules')
+    // 2nd call: item with notes
+    const [itemUrl] = vi.mocked(fetch).mock.calls[1]!
+    expect(itemUrl).toContain('/service_types/st-1/plans/plan-prev/items/item-last-1?include=item_notes')
   })
 
   it('returns { length: null, notes: [] } when length is absent and no item notes', async () => {
-    const mockResponse = {
-      data: {
-        id: 'item-last-1',
-        attributes: {},
-      },
-      included: [],
-    }
-    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(mockResponse), { status: 200 }))
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(JSON.stringify(mockScheduleResponse()), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(mockItemResponse(null)), { status: 200 }))
 
     const result = await fetchLastScheduledItem('app-id', 'secret', 'pc-song-42')
 
     expect(result).toEqual({ length: null, notes: [] })
   })
 
-  it('returns null when data is null (song never scheduled)', async () => {
-    const mockResponse = { data: null, included: [] }
-    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(mockResponse), { status: 200 }))
+  it('returns null when song_schedules returns empty array (song never scheduled)', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 }))
+
+    const result = await fetchLastScheduledItem('app-id', 'secret', 'pc-song-42')
+
+    expect(result).toBeNull()
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns null when song_schedules response is not ok', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('Not Found', { status: 404 }))
 
     const result = await fetchLastScheduledItem('app-id', 'secret', 'pc-song-42')
 
     expect(result).toBeNull()
   })
 
-  it('returns null when response is not ok', async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(new Response('Not Found', { status: 404 }))
+  it('returns null when item fetch response is not ok', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(JSON.stringify(mockScheduleResponse()), { status: 200 }))
+      .mockResolvedValueOnce(new Response('Not Found', { status: 404 }))
 
     const result = await fetchLastScheduledItem('app-id', 'secret', 'pc-song-42')
 
@@ -1106,28 +1140,26 @@ describe('fetchLastScheduledItem', () => {
   })
 
   it('ignores included items that are not ItemNote type', async () => {
-    const mockResponse = {
-      data: { id: 'item-1', attributes: { length: 180 } },
+    const itemResponse = {
+      data: { attributes: { length: 180 } },
       included: [
         {
           type: 'Song',
           id: 'song-1',
           attributes: { content: 'Should be ignored' },
-          relationships: {
-            item_note_category: { data: { type: 'ItemNoteCategory', id: 'cat-1' } },
-          },
+          relationships: { item_note_category: { data: { type: 'ItemNoteCategory', id: 'cat-1' } } },
         },
         {
           type: 'ItemNote',
           id: 'note-1',
           attributes: { content: 'Actual note' },
-          relationships: {
-            item_note_category: { data: { type: 'ItemNoteCategory', id: 'cat-2' } },
-          },
+          relationships: { item_note_category: { data: { type: 'ItemNoteCategory', id: 'cat-2' } } },
         },
       ],
     }
-    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(mockResponse), { status: 200 }))
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(JSON.stringify(mockScheduleResponse()), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(itemResponse), { status: 200 }))
 
     const result = await fetchLastScheduledItem('app-id', 'secret', 'pc-song-42')
 
