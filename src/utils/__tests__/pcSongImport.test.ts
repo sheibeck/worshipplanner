@@ -32,7 +32,8 @@ function makePcSong(overrides: {
     id: overrides.id ?? 'pc-song-1',
     attributes: {
       title: overrides.title ?? 'Amazing Grace',
-      ccli_number: overrides.ccli_number ?? '12345',
+      // Use explicit 'ccli_number' in overrides, fallback only when undefined (not when null)
+      ccli_number: 'ccli_number' in overrides ? overrides.ccli_number ?? null : '12345',
       author: overrides.author ?? 'John Newton',
       last_scheduled_at: overrides.last_scheduled_at ?? null,
       themes: overrides.themes ?? '',
