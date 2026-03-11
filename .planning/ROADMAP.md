@@ -65,14 +65,14 @@ Plans:
 | 7. Invite & RBAC | v1.0 | 2/2 | Complete | 2026-03-04 |
 | 5. Collaboration, Tasks & Events | v1.1 | 0/TBD | Not started | - |
 | 8. Planning Center API Export | 3/3 | Complete   | 2026-03-05 | - |
-| 9. PC Song Import & Tag Management | v1.1 | 0/3 | Not started | - |
+| 9. PC Song Import & Tag Management | 2/3 | In Progress|  | - |
 
 ### Phase 9: PC Song Import & Tag Management
 
 **Goal:** Replace CSV song import with Planning Center API import — fetch songs with tags, map arrangement titles (Orchestra→tag), support soft-delete (hide/unhide songs), map PC Categories 1-3 to Types 1-3, import Last Scheduled dates, and preserve existing song catalog on first import
 **Requirements**: soft-delete, hidden-exclusion, re-import-safe, upsert-store, pc-api-fetch, tag-import, category-to-type-mapping, last-scheduled-mapping, orchestra-tag, replace-csv-import, import-preview, view-restore-hidden, no-pc-credentials-guard
 **Depends on:** Phase 8
-**Plans:** 3 plans
+**Plans:** 2/3 plans executed
 
 Plans:
 - [ ] 09-01-PLAN.md — Song type + store: pcSongId/hidden fields, soft-delete, restoreSong, upsertSongs
