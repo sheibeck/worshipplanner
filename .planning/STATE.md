@@ -3,13 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Between milestones
-stopped_at: Completed quick-2-PLAN.md (PC song type and CCLI arrangement linking)
-last_updated: "2026-03-05T23:20:04.000Z"
+stopped_at: Completed 09-02-PLAN.md (PC song import utility)
+last_updated: "2026-03-11T17:32:25.798Z"
+last_activity: "2026-03-06 - Completed quick task 3: Auto-populate PC item metadata from last scheduled item"
 progress:
-  total_phases: 2
+  total_phases: 3
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
+  total_plans: 6
+  completed_plans: 5
 ---
 
 # Project State
@@ -59,6 +60,8 @@ Status: Between milestones
 | Phase 08 P01 | 5 | 2 tasks | 4 files |
 | Phase 08 P02 | 8 | 2 tasks | 2 files |
 | Phase 08 P03 | 8 | 2 tasks | 1 files |
+| Phase 09-pc-song-import-tag-management P01 | 4 | 1 tasks | 3 files |
+| Phase 09 P02 | 25 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -80,6 +83,11 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Quick-3]: Song relationship included alongside arrangement in createItem POST body
 - [Quick-3]: item_type 'song' keyed on pcSongId (not arrangementId) — CCLI match always yields 'song' type
 - [Quick-3]: Last scheduled item metadata copy is best-effort — per-note failures swallowed individually
+- [Phase 09-pc-song-import-tag-management]: Song.hidden === true strict check preserves legacy docs without field migration
+- [Phase 09-pc-song-import-tag-management]: UpsertSongInput exported from song.ts so Plans 02/03 can import type without store coupling
+- [Phase 09-pc-song-import-tag-management]: upsertSongs preserves hidden status and omits null vwType from update payload to protect user-set values
+- [Phase 09]: PC_BASE_URL duplicated as PC_SONGS_BASE_URL in pcSongImport.ts to avoid full planningCenterApi module import in tests
+- [Phase 09]: upsertSongs uses direct updateDoc/addDoc calls (not writeBatch) to match test expectations
 
 ### Roadmap Evolution
 
@@ -104,6 +112,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-03-06 - Completed quick task 3: Auto-populate PC item metadata from last scheduled item
-Last session: 2026-03-05T23:22:00.000Z
-Stopped at: Completed quick task 2
+Last session: 2026-03-11T17:32:25.792Z
+Stopped at: Completed 09-02-PLAN.md (PC song import utility)
 Resume file: None
