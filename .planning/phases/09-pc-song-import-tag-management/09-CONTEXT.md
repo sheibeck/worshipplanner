@@ -18,7 +18,11 @@ Replace the existing CSV song import with a Planning Center API-based import. So
 - Replace CSV import with Planning Center API import (using existing PC API client from Phase 8)
 - Import should fetch all songs from the connected PC service type
 - Re-running import picks up any new songs added in PC since last import
-- Songs already imported (match by CCLI or PC song ID) should be skipped/updated, not duplicated
+- Songs already imported (match by CCLI or PC song ID) should be updated with new metadata, not duplicated
+- CRITICAL: Import is additive/upsert only — NEVER deletes or clears existing songs
+- Existing production song catalog must be preserved on first PC import run
+- Import can be run unlimited times safely — adds new songs, updates metadata on existing ones
+- This changes the import mechanism (CSV → PC API) but must not disrupt existing data
 
 ### Tag Import
 - Import tags from PC songs
@@ -31,6 +35,7 @@ Replace the existing CSV song import with a Planning Center API-based import. So
 
 ### Last Scheduled → Last Used
 - PC "Last Scheduled" date maps to `lastUsedAt` field on import
+- This is a direct mapping: PC last_scheduled_at → Song.lastUsedAt
 
 ### Soft Delete (Hide/Unhide)
 - Deleting a song from WorshipPlanner should NOT truly delete it — just hide it
