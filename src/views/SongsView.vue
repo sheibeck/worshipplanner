@@ -83,8 +83,8 @@
       @deleted="slideOverOpen = false"
     />
 
-    <!-- CSV import modal -->
-    <CsvImportModal
+    <!-- PC import modal -->
+    <PcImportModal
       :open="importModalOpen"
       @close="importModalOpen = false"
       @imported="onImported"
@@ -103,7 +103,7 @@ import SongFilters from '@/components/SongFilters.vue'
 import SongTable from '@/components/SongTable.vue'
 import SongSlideOver from '@/components/SongSlideOver.vue'
 import BatchQuickAssign from '@/components/BatchQuickAssign.vue'
-import CsvImportModal from '@/components/CsvImportModal.vue'
+import PcImportModal from '@/components/PcImportModal.vue'
 
 const authStore = useAuthStore()
 const songStore = useSongStore()
