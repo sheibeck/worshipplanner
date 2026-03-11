@@ -31,6 +31,14 @@
               </svg>
               Batch Assign ({{ uncategorizedSongs.length }})
             </button>
+            <!-- Show Hidden toggle — only visible when there are hidden songs or panel is open -->
+            <button
+              v-if="hiddenSongs.length > 0 || showHidden"
+              @click="showHidden = !showHidden"
+              class="inline-flex items-center gap-2 rounded-md border border-gray-700 bg-gray-800/50 px-3 py-2 text-sm font-medium text-gray-400 hover:bg-gray-700 hover:text-gray-200 transition-colors"
+            >
+              {{ showHidden ? 'Hide Hidden' : `Hidden (${hiddenSongs.length})` }}
+            </button>
             <button
               @click="importModalOpen = true"
               class="inline-flex items-center gap-2 rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm font-medium text-gray-200 hover:bg-gray-700 hover:text-white transition-colors"
@@ -71,6 +79,35 @@
           @select="onSelectSong"
           @add="onAddSong"
         />
+
+        <!-- Hidden songs panel -->
+        <div v-if="showHidden" class="mt-8 border border-gray-700 rounded-xl overflow-hidden">
+          <div class="px-4 py-3 bg-gray-800 border-b border-gray-700">
+            <h2 class="text-sm font-medium text-gray-300">Hidden Songs ({{ hiddenSongs.length }})</h2>
+            <p class="text-xs text-gray-500 mt-0.5">Hidden from the song list and AI planning. Restore to make them visible again.</p>
+          </div>
+          <div v-if="hiddenSongs.length === 0" class="px-4 py-6 text-center text-sm text-gray-500">
+            No hidden songs
+          </div>
+          <div v-else class="divide-y divide-gray-800">
+            <div
+              v-for="song in hiddenSongs"
+              :key="song.id"
+              class="flex items-center justify-between px-4 py-3 hover:bg-gray-800/40"
+            >
+              <div>
+                <p class="text-sm text-gray-400 line-through">{{ song.title }}</p>
+                <p class="text-xs text-gray-600">{{ song.author || 'Unknown' }}</p>
+              </div>
+              <button
+                @click="onRestoreSong(song)"
+                class="text-xs px-3 py-1.5 rounded-md border border-indigo-700 text-indigo-300 hover:bg-indigo-900/30 transition-colors"
+              >
+                Restore
+              </button>
+            </div>
+          </div>
+        </div>
       </template>
     </div>
 
@@ -119,6 +156,14 @@ const importModalOpen = ref(false)
 
 // Batch quick-assign mode
 const batchMode = ref(false)
+
+// Hidden songs toggle + computed
+const showHidden = ref(false)
+const hiddenSongs = computed(() => songStore.songs.filter((s) => s.hidden === true))
+
+async function onRestoreSong(song: Song) {
+  await songStore.restoreSong(song.id)
+}
 
 // Uncategorized songs (for batch assign)
 const uncategorizedSongs = computed(() =>
