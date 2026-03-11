@@ -86,6 +86,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - Phase 6 added: AI assisted service suggesting and scripture searching
 - Phase 7 added: Invite users, manage members with admin/viewer roles, and enforce role-based access control
 - Phase 8 added: Planning Center API export for published service plans
+- Phase 9 added: PC Song Import & Tag Management
 
 ### Quick Tasks Completed
 

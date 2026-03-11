@@ -3,7 +3,7 @@
 ## Milestones
 
 - ✅ **v1.0 MVP** — Phases 1-4, 6-7 (shipped 2026-03-05)
-- 📋 **v1.1** — Phases 5, 8 (planned)
+- 📋 **v1.1** — Phases 5, 8, 9 (planned)
 
 ## Phases
 
@@ -25,6 +25,7 @@ Full details: milestones/v1.0-ROADMAP.md
 
 - [ ] Phase 5: Collaboration, Tasks & Events (TBD plans)
 - [x] Phase 8: Planning Center API Export (3 plans) (completed 2026-03-05)
+- [ ] Phase 9: PC Song Import & Tag Management (TBD plans)
 
 ## Phase Details
 
@@ -64,3 +65,14 @@ Plans:
 | 7. Invite & RBAC | v1.0 | 2/2 | Complete | 2026-03-04 |
 | 5. Collaboration, Tasks & Events | v1.1 | 0/TBD | Not started | - |
 | 8. Planning Center API Export | 3/3 | Complete   | 2026-03-05 | - |
+| 9. PC Song Import & Tag Management | v1.1 | 0/TBD | Not started | - |
+
+### Phase 9: PC Song Import & Tag Management
+
+**Goal:** Replace CSV song import with Planning Center API import — fetch songs with tags, map arrangement titles (Orchestra→tag), support soft-delete (hide/unhide songs), map PC Categories 1-3 to Types 1-3, import Last Scheduled dates, and provide custom tag management within WorshipPlanner
+**Requirements**: TBD
+**Depends on:** Phase 8
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 9 to break down)
