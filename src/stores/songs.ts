@@ -5,7 +5,6 @@ import {
   onSnapshot,
   addDoc,
   updateDoc,
-  deleteDoc,
   doc,
   serverTimestamp,
   writeBatch,
@@ -14,7 +13,7 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore'
 import { db } from '@/firebase'
-import type { Song } from '@/types/song'
+import type { Song, UpsertSongInput } from '@/types/song'
 
 type SongInput = Omit<Song, 'id' | 'createdAt' | 'updatedAt'>
 
@@ -33,6 +32,8 @@ export const useSongStore = defineStore('songs', () => {
 
   const filteredSongs = computed(() => {
     return songs.value.filter((song) => {
+      // Exclude hidden songs (treat undefined as false for legacy docs)
+      if (song.hidden === true) return false
       const matchesSearch =
         !searchQuery.value ||
         song.title.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
@@ -97,7 +98,70 @@ export const useSongStore = defineStore('songs', () => {
 
   async function deleteSong(id: string) {
     if (!orgId.value) return
-    await deleteDoc(doc(db, 'organizations', orgId.value, 'songs', id))
+    await updateDoc(doc(db, 'organizations', orgId.value, 'songs', id), {
+      hidden: true,
+      updatedAt: serverTimestamp(),
+    })
+  }
+
+  async function restoreSong(id: string) {
+    if (!orgId.value) return
+    await updateDoc(doc(db, 'organizations', orgId.value, 'songs', id), {
+      hidden: false,
+      updatedAt: serverTimestamp(),
+    })
+  }
+
+  async function upsertSongs(songsData: UpsertSongInput[]) {
+    if (!orgId.value) return
+
+    // Build lookup maps for O(1) matching
+    const byPcSongId = new Map<string, Song>()
+    const byCcliNumber = new Map<string, Song>()
+    const byTitle = new Map<string, Song>()
+
+    for (const song of songs.value) {
+      if (song.pcSongId) byPcSongId.set(song.pcSongId, song)
+      if (song.ccliNumber) byCcliNumber.set(song.ccliNumber, song)
+      byTitle.set(song.title.toLowerCase(), song)
+    }
+
+    for (const incoming of songsData) {
+      // Find existing match: pcSongId → ccliNumber → title (case-insensitive)
+      let existing: Song | undefined
+      if (incoming.pcSongId) {
+        existing = byPcSongId.get(incoming.pcSongId)
+      }
+      if (!existing && incoming.ccliNumber) {
+        existing = byCcliNumber.get(incoming.ccliNumber)
+      }
+      if (!existing) {
+        existing = byTitle.get(incoming.title.toLowerCase())
+      }
+
+      if (existing) {
+        // Update existing: preserve hidden status, only set vwType when incoming is non-null
+        const { vwType: incomingVwType, ...restIncoming } = incoming
+        const updateData: Record<string, unknown> = {
+          ...restIncoming,
+          hidden: existing.hidden,
+          updatedAt: serverTimestamp(),
+        }
+        // Only include vwType if incoming value is non-null
+        if (incomingVwType !== null) {
+          updateData.vwType = incomingVwType
+        }
+        await updateDoc(doc(db, 'organizations', orgId.value!, 'songs', existing.id), updateData)
+      } else {
+        // Create new doc
+        await addDoc(collection(db, 'organizations', orgId.value!, 'songs'), {
+          ...incoming,
+          hidden: false,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        })
+      }
+    }
   }
 
   async function importSongs(songsData: SongInput[]) {
@@ -131,6 +195,8 @@ export const useSongStore = defineStore('songs', () => {
     addSong,
     updateSong,
     deleteSong,
+    restoreSong,
     importSongs,
+    upsertSongs,
   }
 })

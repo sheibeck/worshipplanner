@@ -5,10 +5,14 @@ import { setActivePinia, createPinia } from 'pinia'
 let snapshotCallback: ((snap: { docs: { id: string; data: () => Record<string, unknown> }[] }) => void) | null = null
 const mockUnsubscribe = vi.fn()
 
+// Track batch operations for upsertSongs tests
+let mockBatchOps: { type: 'set' | 'update'; ref: unknown; data: Record<string, unknown> }[] = []
+
 // Mock firebase/firestore module
 vi.mock('firebase/firestore', () => {
   const mockBatch = {
-    set: vi.fn(),
+    set: vi.fn((ref, data) => { mockBatchOps.push({ type: 'set', ref, data }) }),
+    update: vi.fn((ref, data) => { mockBatchOps.push({ type: 'update', ref, data }) }),
     commit: vi.fn(() => Promise.resolve()),
   }
 
@@ -49,6 +53,8 @@ function makeSong(overrides: Partial<{
   lastUsedAt: null
   createdAt: { seconds: number; nanoseconds: number }
   updatedAt: { seconds: number; nanoseconds: number }
+  pcSongId: string | null
+  hidden: boolean
 }> = {}) {
   return {
     id: 'song-1',
@@ -74,6 +80,8 @@ function makeSong(overrides: Partial<{
     lastUsedAt: null,
     createdAt: { seconds: 1000000, nanoseconds: 0 },
     updatedAt: { seconds: 1000000, nanoseconds: 0 },
+    pcSongId: null,
+    hidden: false,
     ...overrides,
   }
 }
@@ -97,6 +105,7 @@ describe('useSongStore', () => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
     snapshotCallback = null
+    mockBatchOps = []
   })
 
   describe('initial state', () => {
@@ -166,6 +175,62 @@ describe('useSongStore', () => {
       store.subscribe('org-1')
       store.subscribe('org-2')
       expect(mockUnsubscribe).toHaveBeenCalledOnce()
+    })
+  })
+
+  describe('filteredSongs — hidden songs', () => {
+    it('excludes songs where hidden is true', async () => {
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'song-1', title: 'Visible Song', hidden: false }),
+        makeSong({ id: 'song-2', title: 'Hidden Song', hidden: true }),
+      ])
+      expect(store.filteredSongs).toHaveLength(1)
+      expect(store.filteredSongs[0].title).toBe('Visible Song')
+    })
+
+    it('includes songs where hidden is false', async () => {
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'song-1', title: 'Visible Song', hidden: false }),
+      ])
+      expect(store.filteredSongs).toHaveLength(1)
+    })
+
+    it('includes songs where hidden is undefined (legacy docs)', async () => {
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      // Simulate a legacy song doc without hidden field
+      if (snapshotCallback) {
+        snapshotCallback({
+          docs: [
+            {
+              id: 'legacy-song',
+              data: () => ({
+                title: 'Legacy Song',
+                ccliNumber: '99999',
+                author: 'Old Author',
+                vwType: null,
+                teamTags: [],
+                arrangements: [],
+                themes: [],
+                notes: '',
+                lastUsedAt: null,
+                createdAt: { seconds: 1000000, nanoseconds: 0 },
+                updatedAt: { seconds: 1000000, nanoseconds: 0 },
+                // hidden field intentionally omitted to simulate legacy doc
+              }),
+            },
+          ],
+        })
+      }
+      expect(store.filteredSongs).toHaveLength(1)
+      expect(store.filteredSongs[0].title).toBe('Legacy Song')
     })
   })
 
@@ -342,6 +407,8 @@ describe('useSongStore', () => {
         teamTags: [],
         arrangements: [],
         lastUsedAt: null,
+        pcSongId: null,
+        hidden: false,
       })
 
       expect(addDoc).toHaveBeenCalledOnce()
@@ -373,15 +440,196 @@ describe('useSongStore', () => {
   })
 
   describe('deleteSong', () => {
-    it('calls deleteDoc with the correct doc reference', async () => {
-      const { deleteDoc } = await import('firebase/firestore')
+    it('calls updateDoc with hidden:true, not deleteDoc', async () => {
+      const { updateDoc, deleteDoc } = await import('firebase/firestore')
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       store.subscribe('org-1')
 
       await store.deleteSong('song-1')
 
-      expect(deleteDoc).toHaveBeenCalledOnce()
+      expect(deleteDoc).not.toHaveBeenCalled()
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]
+      const data = callArgs[1] as Record<string, unknown>
+      expect(data.hidden).toBe(true)
+      expect(data.updatedAt).toBeDefined()
+    })
+  })
+
+  describe('restoreSong', () => {
+    it('calls updateDoc with hidden:false', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+
+      await store.restoreSong('song-1')
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]
+      const data = callArgs[1] as Record<string, unknown>
+      expect(data.hidden).toBe(false)
+      expect(data.updatedAt).toBeDefined()
+    })
+  })
+
+  describe('upsertSongs', () => {
+    it('creates new doc via addDoc when no match found', async () => {
+      const { addDoc } = await import('firebase/firestore')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([])
+
+      await store.upsertSongs([
+        {
+          title: 'Brand New Song',
+          ccliNumber: '99999',
+          author: 'New Author',
+          themes: [],
+          notes: '',
+          vwType: null,
+          teamTags: [],
+          arrangements: [],
+          lastUsedAt: null,
+          pcSongId: 'pc-new-1',
+          hidden: false,
+        },
+      ])
+
+      expect(addDoc).toHaveBeenCalledOnce()
+      const callArgs = vi.mocked(addDoc).mock.calls[0]
+      const data = callArgs[1] as Record<string, unknown>
+      expect(data.title).toBe('Brand New Song')
+      expect(data.hidden).toBe(false)
+      expect(data.createdAt).toBeDefined()
+      expect(data.updatedAt).toBeDefined()
+    })
+
+    it('updates existing doc via updateDoc when pcSongId matches', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'existing-song', title: 'Old Title', pcSongId: 'pc-123', ccliNumber: '11111', hidden: false }),
+      ])
+
+      await store.upsertSongs([
+        {
+          title: 'Updated Title',
+          ccliNumber: '11111',
+          author: 'Author',
+          themes: [],
+          notes: '',
+          vwType: 1,
+          teamTags: [],
+          arrangements: [],
+          lastUsedAt: null,
+          pcSongId: 'pc-123',
+          hidden: false,
+        },
+      ])
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]
+      const data = callArgs[1] as Record<string, unknown>
+      expect(data.title).toBe('Updated Title')
+    })
+
+    it('updates existing doc when ccliNumber matches (no pcSongId)', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'existing-song', title: 'Old Title', pcSongId: null, ccliNumber: '55555', hidden: false }),
+      ])
+
+      await store.upsertSongs([
+        {
+          title: 'Updated Via CCLI',
+          ccliNumber: '55555',
+          author: 'Author',
+          themes: [],
+          notes: '',
+          vwType: null,
+          teamTags: [],
+          arrangements: [],
+          lastUsedAt: null,
+          pcSongId: null,
+          hidden: false,
+        },
+      ])
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]
+      const data = callArgs[1] as Record<string, unknown>
+      expect(data.title).toBe('Updated Via CCLI')
+    })
+
+    it('preserves hidden:true when updating existing song', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'hidden-song', title: 'Hidden Song', pcSongId: 'pc-hidden', ccliNumber: '77777', hidden: true }),
+      ])
+
+      await store.upsertSongs([
+        {
+          title: 'Hidden Song Updated',
+          ccliNumber: '77777',
+          author: 'Author',
+          themes: [],
+          notes: '',
+          vwType: null,
+          teamTags: [],
+          arrangements: [],
+          lastUsedAt: null,
+          pcSongId: 'pc-hidden',
+          hidden: false, // incoming says not hidden, but existing is hidden — preserve hidden
+        },
+      ])
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]
+      const data = callArgs[1] as Record<string, unknown>
+      expect(data.hidden).toBe(true) // preserved from existing song
+    })
+
+    it('only sets vwType when incoming vwType is non-null', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'song-with-type', title: 'Typed Song', pcSongId: 'pc-typed', ccliNumber: '88888', vwType: 2, hidden: false }),
+      ])
+
+      await store.upsertSongs([
+        {
+          title: 'Typed Song',
+          ccliNumber: '88888',
+          author: 'Author',
+          themes: [],
+          notes: '',
+          vwType: null, // incoming vwType is null — should preserve existing
+          teamTags: [],
+          arrangements: [],
+          lastUsedAt: null,
+          pcSongId: 'pc-typed',
+          hidden: false,
+        },
+      ])
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]
+      const data = callArgs[1] as Record<string, unknown>
+      // vwType should NOT be in the update data (preserving the existing value)
+      expect(data.vwType).toBeUndefined()
     })
   })
 

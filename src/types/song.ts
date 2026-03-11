@@ -26,4 +26,12 @@ export interface Song {
   lastUsedAt: Timestamp | null
   createdAt: Timestamp
   updatedAt: Timestamp
+  pcSongId: string | null
+  hidden: boolean
 }
+
+/**
+ * Input type for upsert operations.
+ * Same shape as Song minus auto-managed fields (id, createdAt, updatedAt).
+ */
+export type UpsertSongInput = Omit<Song, 'id' | 'createdAt' | 'updatedAt'>
