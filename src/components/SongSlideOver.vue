@@ -144,9 +144,9 @@
             ></textarea>
           </div>
 
-          <!-- Song-level Team Tags -->
+          <!-- Song-level Tags -->
           <div>
-            <label class="block text-xs font-medium text-gray-400 mb-2">Team Tags</label>
+            <label class="block text-xs font-medium text-gray-400 mb-2">Tags</label>
             <div class="flex flex-wrap gap-2">
               <button
                 v-for="tag in songLevelTags"
@@ -294,7 +294,7 @@ const isCreateMode = computed(() => props.song === null)
 // ── Available tags ─────────────────────────────────────────────────────────────
 
 // Predefined song-level tags + any tags found in the store
-const PREDEFINED_TAGS = ['Choir', 'Orchestra', 'Band']
+const PREDEFINED_TAGS = ['Choir', 'Orchestra', 'Hymn']
 
 const availableTags = computed(() => {
   const tags = new Set<string>(PREDEFINED_TAGS)

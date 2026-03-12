@@ -510,27 +510,34 @@ export async function fetchSongArrangements(
   secret: string,
   pcSongId: string,
 ): Promise<Array<{ id: string; name: string }>> {
-  try {
-    const response = await fetch(
-      `${PC_BASE_URL}/songs/${pcSongId}/arrangements?per_page=25`,
-      {
-        headers: {
-          Authorization: basicAuthHeader(appId, secret),
-          Accept: 'application/json',
-        },
-      },
-    )
-
-    if (!response.ok) return []
-
-    const json = (await response.json()) as {
-      data: Array<{ id: string; attributes: { name: string } }>
-    }
-
-    return json.data.map((a) => ({ id: a.id, name: a.attributes.name }))
-  } catch {
-    return []
+  const headers = {
+    Authorization: basicAuthHeader(appId, secret),
+    Accept: 'application/json',
   }
+  const url = `${PC_BASE_URL}/songs/${pcSongId}/arrangements?per_page=25`
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      const response = await fetch(url, { headers })
+      if (response.status === 429) {
+        const retryAfter = response.headers.get('Retry-After')
+        const waitMs = retryAfter ? parseFloat(retryAfter) * 1000 : 60_000
+        await new Promise((r) => setTimeout(r, waitMs))
+        continue
+      }
+      if (!response.ok) return []
+      const json = (await response.json()) as {
+        data: Array<{ id: string; attributes: { name: string; chord_chart_key: string | null } }>
+      }
+      return json.data.map((a) => ({
+        id: a.id,
+        name: a.attributes.name,
+        key: a.attributes.chord_chart_key ?? '',
+      }))
+    } catch {
+      return []
+    }
+  }
+  return []
 }
 
 /**

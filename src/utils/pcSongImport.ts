@@ -52,7 +52,7 @@ function isCategoryTag(name: string): boolean {
 export function mapPcSongToUpsert(
   pcSong: PcSongData,
   tags: Array<{ id: string; name: string }>,
-  arrangements: Array<{ id: string; name: string }>,
+  arrangements: Array<{ id: string; name: string; key: string }>,
 ): UpsertSongInput {
   const { attributes } = pcSong
 
@@ -99,7 +99,7 @@ export function mapPcSongToUpsert(
   const mappedArrangements = arrangements.map((arr) => ({
     id: arr.id,
     name: arr.name,
-    key: '',
+    key: arr.key,
     bpm: null,
     lengthSeconds: null,
     chordChartUrl: '',
@@ -142,15 +142,20 @@ export async function fetchAllPcSongs(
   const tagMap = new Map<string, string>() // id → name
 
   while (url) {
-    const response = await fetch(url, {
-      headers: {
-        Authorization: authHeader,
-        Accept: 'application/json',
-      },
-    })
+    let response: Response
+    // Retry on 429 respecting Retry-After
+    for (let attempt = 0; ; attempt++) {
+      response = await fetch(url, {
+        headers: { Authorization: authHeader, Accept: 'application/json' },
+      })
+      if (response.status !== 429 || attempt >= 3) break
+      const retryAfter = response.headers.get('Retry-After')
+      const waitMs = retryAfter ? parseFloat(retryAfter) * 1000 : 60_000
+      await new Promise((r) => setTimeout(r, waitMs))
+    }
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch PC songs: ${response.status}`)
+    if (!response!.ok) {
+      throw new Error(`Failed to fetch PC songs: ${response!.status}`)
     }
 
     const json = (await response.json()) as {
@@ -170,13 +175,20 @@ export async function fetchAllPcSongs(
       }
     }
 
-    // Follow pagination
-    url = json.links.next
+    // Follow pagination — rewrite absolute PC URL to local proxy path
+    if (json.links.next) {
+      url = json.links.next.replace(
+        'https://api.planningcenteronline.com/services/v2',
+        PC_SONGS_BASE_URL,
+      )
+    } else {
+      url = undefined
+    }
   }
 
   // Resolve tags per song using the accumulated tagMap
   return allSongs.map((song) => {
-    const tags = song.relationships.tags.data
+    const tags = song.relationships?.tags?.data ?? []
       .map((ref) => {
         const name = tagMap.get(ref.id)
         return name ? { id: ref.id, name } : null
@@ -203,8 +215,8 @@ export async function fetchAndMapPcSongs(
 ): Promise<UpsertSongInput[]> {
   const allSongData = await fetchAllPcSongs(appId, secret)
 
-  // Fetch arrangements in batches of 10 to avoid rate limits
-  const BATCH_SIZE = 10
+  // Fetch arrangements in batches of 3 to stay under PC rate limits
+  const BATCH_SIZE = 3
   const results: UpsertSongInput[] = []
 
   for (let i = 0; i < allSongData.length; i += BATCH_SIZE) {

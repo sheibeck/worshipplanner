@@ -115,7 +115,7 @@
             Last Used
           </th>
           <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-            Team Tags
+            Tags
           </th>
         </tr>
       </thead>
@@ -235,8 +235,11 @@ function loadMore() {
   visibleCount.value = Math.min(visibleCount.value + BATCH_SIZE, sortedSongs.value.length)
 }
 
-// Reset visible count when search/filter changes the input songs
-watch(() => props.songs, () => {
+// Reset visible count when sort changes (new sort = fresh ordering)
+watch(sortField, () => {
+  visibleCount.value = BATCH_SIZE
+})
+watch(sortDir, () => {
   visibleCount.value = BATCH_SIZE
 })
 

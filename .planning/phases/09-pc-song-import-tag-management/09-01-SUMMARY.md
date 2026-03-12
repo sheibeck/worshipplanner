@@ -112,6 +112,16 @@ None - no external service configuration required.
 - Plan 02 (PC API fetch and upsert) can now call `store.upsertSongs(mappedSongs)` with `UpsertSongInput[]`
 - Plan 03 (UI for hidden songs / restore) can call `store.deleteSong(id)` and `store.restoreSong(id)` and read `songs.value` for all songs vs `filteredSongs` for visible
 
+## Self-Check: PASSED
+
+- src/types/song.ts: FOUND
+- src/stores/songs.ts: FOUND
+- src/stores/__tests__/songs.test.ts: FOUND
+- 09-01-SUMMARY.md: FOUND
+- Commit d29db8c: FOUND
+- 34/34 tests passing
+- TypeScript: no errors
+
 ---
 *Phase: 09-pc-song-import-tag-management*
 *Completed: 2026-03-11*

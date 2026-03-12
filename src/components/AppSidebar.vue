@@ -1,12 +1,8 @@
 <template>
   <!-- Sidebar: overlay on mobile, fixed on desktop -->
   <aside
-    :class="[
-      'fixed inset-y-0 left-0 z-30 flex flex-col bg-gray-900 border-r border-gray-800 transition-transform duration-200',
-      'w-64',
-      'lg:translate-x-0 lg:static lg:z-auto lg:flex lg:w-64 lg:shrink-0',
-      sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
-    ]"
+    class="fixed inset-y-0 left-0 z-30 flex flex-col bg-gray-900 border-r border-gray-800 transition-transform duration-200 w-64 lg:static lg:z-auto lg:flex lg:w-64 lg:shrink-0"
+    :class="sidebarOpen ? 'translate-x-0' : 'max-lg:-translate-x-full'"
   >
     <!-- Brand -->
     <div class="flex items-center h-14 px-5 border-b border-gray-800 shrink-0">

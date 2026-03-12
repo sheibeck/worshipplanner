@@ -141,10 +141,10 @@ export const useSongStore = defineStore('songs', () => {
 
       if (existing) {
         // Update existing: preserve hidden status, only set vwType when incoming is non-null
-        const { vwType: incomingVwType, ...restIncoming } = incoming
+        const { vwType: incomingVwType, hidden: _hidden, ...restIncoming } = incoming
         const updateData: Record<string, unknown> = {
           ...restIncoming,
-          hidden: existing.hidden,
+          hidden: existing.hidden ?? false,
           updatedAt: serverTimestamp(),
         }
         // Only include vwType if incoming value is non-null
