@@ -697,9 +697,7 @@ export async function addSlotAsItem(
     if (!slot.songId) {
       return ''
     }
-    const title = slot.songTitle
-      ? `${slot.songTitle} (Key: ${slot.songKey ?? ''})`
-      : '[Empty Song]'
+    const title = slot.songTitle ?? '[Empty Song]'
 
     // Look up PC song and arrangement BEFORE creating the item so we can include them in the POST
     let pcSongId: string | undefined
