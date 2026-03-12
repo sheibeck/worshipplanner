@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { BIBLE_BOOKS, esvLink, scripturesOverlap } from '@/utils/scripture'
+import { BIBLE_BOOKS, esvLink, scripturesOverlap, parseScriptureInput } from '@/utils/scripture'
 import type { ScriptureRef } from '@/types/service'
 
 describe('BIBLE_BOOKS', () => {
@@ -88,5 +88,98 @@ describe('scripturesOverlap', () => {
     const reading: ScriptureRef = { book: 'Psalm', chapter: 23, verseStart: 1, verseEnd: 4 }
     const sermon: ScriptureRef = { book: 'Psalm', chapter: 23, verseStart: 4, verseEnd: 8 }
     expect(scripturesOverlap(reading, sermon)).toBe(true)
+  })
+})
+
+describe('parseScriptureInput', () => {
+  it('returns null for empty string', () => {
+    expect(parseScriptureInput('')).toBeNull()
+  })
+
+  it('returns null for whitespace-only string', () => {
+    expect(parseScriptureInput('   ')).toBeNull()
+  })
+
+  it('returns null for book only (no chapter)', () => {
+    expect(parseScriptureInput('John')).toBeNull()
+  })
+
+  it('returns null for partial/unrecognized book name', () => {
+    expect(parseScriptureInput('joh 3:16')).toBeNull()
+  })
+
+  it('parses "Isaiah 53:1-6" correctly', () => {
+    expect(parseScriptureInput('Isaiah 53:1-6')).toEqual({
+      book: 'Isaiah',
+      chapter: 53,
+      verseStart: 1,
+      verseEnd: 6,
+    })
+  })
+
+  it('parses "Psalm 23" (chapter only, no verses)', () => {
+    expect(parseScriptureInput('Psalm 23')).toEqual({
+      book: 'Psalms',
+      chapter: 23,
+    })
+  })
+
+  it('parses "Romans 8:28" (single verse, no verseEnd)', () => {
+    expect(parseScriptureInput('Romans 8:28')).toEqual({
+      book: 'Romans',
+      chapter: 8,
+      verseStart: 28,
+    })
+  })
+
+  it('parses "John 1:1-10,15-20" (multi-range: outer range)', () => {
+    expect(parseScriptureInput('John 1:1-10,15-20')).toEqual({
+      book: 'John',
+      chapter: 1,
+      verseStart: 1,
+      verseEnd: 20,
+    })
+  })
+
+  it('parses "1 Corinthians 13:4-7" (numbered book)', () => {
+    expect(parseScriptureInput('1 Corinthians 13:4-7')).toEqual({
+      book: '1 Corinthians',
+      chapter: 13,
+      verseStart: 4,
+      verseEnd: 7,
+    })
+  })
+
+  it('parses "Song of Solomon 2:1" (multi-word book)', () => {
+    expect(parseScriptureInput('Song of Solomon 2:1')).toEqual({
+      book: 'Song of Solomon',
+      chapter: 2,
+      verseStart: 1,
+    })
+  })
+
+  it('exact match wins: "John 3:16" resolves to John not 1/2/3 John', () => {
+    const result = parseScriptureInput('John 3:16')
+    expect(result?.book).toBe('John')
+  })
+
+  it('"1 john 4:8" resolves to "1 John" (case-insensitive)', () => {
+    const result = parseScriptureInput('1 john 4:8')
+    expect(result?.book).toBe('1 John')
+  })
+
+  it('case-insensitive exact match: "psalms 23" resolves to Psalms', () => {
+    const result = parseScriptureInput('psalms 23')
+    expect(result?.book).toBe('Psalms')
+  })
+
+  it('returns null for ambiguous prefix with multiple matches (no exact match)', () => {
+    // 'Samuel' is ambiguous: matches '1 Samuel' and '2 Samuel' by prefix, no exact match
+    expect(parseScriptureInput('Samuel 1:1')).toBeNull()
+  })
+
+  it('returns the canonical book casing', () => {
+    const result = parseScriptureInput('isaiah 53:1')
+    expect(result?.book).toBe('Isaiah')
   })
 })
