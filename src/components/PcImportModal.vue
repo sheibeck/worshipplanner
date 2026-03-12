@@ -12,7 +12,6 @@
       <div
         v-if="open"
         class="fixed inset-0 z-40 bg-black/60"
-        @click="onClose"
       ></div>
     </Transition>
 
@@ -28,7 +27,6 @@
       <div
         v-if="open"
         class="fixed inset-0 z-50 flex items-center justify-center p-4"
-        @click.self="onClose"
       >
         <div class="w-full max-w-lg max-h-[90vh] bg-gray-900 rounded-xl border border-gray-700 shadow-2xl flex flex-col">
 
