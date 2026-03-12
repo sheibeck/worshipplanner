@@ -868,6 +868,7 @@ const previousService = ref<Service | null>(null)   // snapshot before last auto
 const autosaveStatus = ref<'idle' | 'pending' | 'saving' | 'saved'>('idle')
 let autosaveTimer: ReturnType<typeof setTimeout> | null = null
 let autosaveInitialized = false                     // suppress first-load trigger
+let autosaveSaving = false                          // inflight guard — prevents concurrent saves
 const isSharing = ref(false)
 const shareCopied = ref(false)
 const shareError = ref<string | null>(null)
@@ -1068,21 +1069,34 @@ watch(
     autosaveStatus.value = 'pending'
 
     if (autosaveTimer) clearTimeout(autosaveTimer)
-    autosaveTimer = setTimeout(async () => {
-      if (!isDirty.value) {
-        autosaveStatus.value = 'idle'
-        return
-      }
-      // Snapshot pre-change state before saving (enables undo)
-      previousService.value = JSON.parse(JSON.stringify(originalService.value))
-      autosaveStatus.value = 'saving'
-      await onSave()
-      autosaveStatus.value = 'saved'
-      // Fade "Saved" indicator after 3 seconds
-      setTimeout(() => {
-        if (autosaveStatus.value === 'saved') autosaveStatus.value = 'idle'
-      }, 3000)
-    }, 500)
+    const scheduleAutosave = () => {
+      autosaveTimer = setTimeout(async () => {
+        if (!isDirty.value) {
+          autosaveStatus.value = 'idle'
+          return
+        }
+        // A save is already in flight — reschedule so this slot state gets saved
+        if (autosaveSaving) {
+          scheduleAutosave()
+          return
+        }
+        // Snapshot pre-change state before saving (enables undo)
+        previousService.value = JSON.parse(JSON.stringify(originalService.value))
+        autosaveSaving = true
+        autosaveStatus.value = 'saving'
+        try {
+          await onSave()
+          autosaveStatus.value = 'saved'
+          // Fade "Saved" indicator after 3 seconds
+          setTimeout(() => {
+            if (autosaveStatus.value === 'saved') autosaveStatus.value = 'idle'
+          }, 3000)
+        } finally {
+          autosaveSaving = false
+        }
+      }, 800)
+    }
+    scheduleAutosave()
   },
   { deep: true },
 )
@@ -1122,6 +1136,7 @@ onUnmounted(() => {
   sortableInstance?.destroy()
   sortableInstance = null
   if (autosaveTimer) clearTimeout(autosaveTimer)
+  autosaveSaving = false
   // Don't unsubscribe serviceStore here — DashboardView may still be using it
 })
 
