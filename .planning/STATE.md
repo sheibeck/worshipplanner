@@ -107,6 +107,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Quick-2]: SONG slots use item_type 'song' with CCLI-based arrangement auto-linking
 - [Quick-3]: Auto-populate PC item metadata (length, notes) from song's last scheduled item
 - [Quick-4]: Import dialog requires explicit button click to close — backdrop/wrapper click-to-dismiss removed
+- [Quick-5]: Songs support multiple VW types (vwTypes: VWType[]); PC import captures all category tags; service slot shows selected song's actual types
 
 ### Blockers/Concerns
 
@@ -116,7 +117,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 
 ## Session Continuity
 
-Last activity: 2026-03-12 - Completed quick task 4: prevent accidental dismissal of import dialog — require explicit button click to close
-Last session: 2026-03-12T16:04:23.038Z
-Stopped at: Completed 09-03-PLAN.md (PC Import UI and soft-delete flow)
+Last activity: 2026-03-12 - Completed quick task 5: support multiple VW types per song and show song types in service editor slots
+Last session: 2026-03-12T16:26:00.000Z
+Stopped at: Completed quick-5 (multi-type song support)
 Resume file: None
