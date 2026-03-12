@@ -327,7 +327,7 @@ describe('ScriptureInput', () => {
         },
       })
       const input = wrapper.find('input[type="text"]')
-      expect(input.element.value).toBe('Isaiah 53:1-6')
+      expect((input.element as HTMLInputElement).value).toBe('Isaiah 53:1-6')
     })
 
     it('populates text input with chapter only when no verses in modelValue', () => {
@@ -338,7 +338,7 @@ describe('ScriptureInput', () => {
         },
       })
       const input = wrapper.find('input[type="text"]')
-      expect(input.element.value).toBe('John 3')
+      expect((input.element as HTMLInputElement).value).toBe('John 3')
     })
 
     it('populates text input with single verse when only verseStart set', () => {
@@ -349,7 +349,7 @@ describe('ScriptureInput', () => {
         },
       })
       const input = wrapper.find('input[type="text"]')
-      expect(input.element.value).toBe('Romans 8:28')
+      expect((input.element as HTMLInputElement).value).toBe('Romans 8:28')
     })
 
     it('clears text input when modelValue becomes null externally', async () => {
@@ -361,7 +361,7 @@ describe('ScriptureInput', () => {
       })
       await wrapper.setProps({ modelValue: null })
       const input = wrapper.find('input[type="text"]')
-      expect(input.element.value).toBe('')
+      expect((input.element as HTMLInputElement).value).toBe('')
     })
   })
 })
