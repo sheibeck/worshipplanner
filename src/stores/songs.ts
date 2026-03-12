@@ -37,7 +37,7 @@ export const useSongStore = defineStore('songs', () => {
       const matchesSearch =
         !searchQuery.value ||
         song.title.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-        song.ccliNumber.includes(searchQuery.value)
+        String(song.ccliNumber).includes(searchQuery.value)
 
       const matchesVwType =
         filterVwType.value === null ||
