@@ -108,6 +108,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Quick-3]: Auto-populate PC item metadata (length, notes) from song's last scheduled item
 - [Quick-4]: Import dialog requires explicit button click to close — backdrop/wrapper click-to-dismiss removed
 - [Quick-5]: Songs support multiple VW types (vwTypes: VWType[]); PC import captures all category tags; service slot shows selected song's actual types
+- [Quick-6]: autosaveSaving boolean guard serialises concurrent onSave() calls; reschedules at 200ms if inflight; debounce increased to 800ms for drag sequences
 
 ### Blockers/Concerns
 
@@ -117,7 +118,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 
 ## Session Continuity
 
-Last activity: 2026-03-12 - Completed quick task 5: support multiple VW types per song and show song types in service editor slots
-Last session: 2026-03-12T16:26:00.000Z
-Stopped at: Completed quick-5 (multi-type song support)
+Last activity: 2026-03-12 - Completed quick task 6: fix service editor autosave race condition with inflight guard
+Last session: 2026-03-12T16:35:00.000Z
+Stopped at: Completed quick-6 (autosave inflight guard + 800ms debounce)
 Resume file: None
