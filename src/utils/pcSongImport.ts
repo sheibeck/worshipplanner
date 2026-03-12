@@ -1,6 +1,6 @@
 import { Timestamp } from 'firebase/firestore'
 import { fetchSongArrangements } from '@/utils/planningCenterApi'
-import type { UpsertSongInput } from '@/types/song'
+import type { UpsertSongInput, VWType } from '@/types/song'
 
 /**
  * Base URL for Planning Center API — same as PC_BASE_URL in planningCenterApi.ts.
@@ -56,19 +56,12 @@ export function mapPcSongToUpsert(
 ): UpsertSongInput {
   const { attributes } = pcSong
 
-  // Determine vwType from category tags
-  let vwType: 1 | 2 | 3 | null = null
+  // Determine vwTypes from category tags (collect ALL matching categories)
+  const vwTypes: VWType[] = []
   for (const tag of tags) {
-    if (CATEGORY_1_RE.test(tag.name)) {
-      vwType = 1
-      break
-    } else if (CATEGORY_2_RE.test(tag.name)) {
-      vwType = 2
-      break
-    } else if (CATEGORY_3_RE.test(tag.name)) {
-      vwType = 3
-      break
-    }
+    if (CATEGORY_1_RE.test(tag.name)) vwTypes.push(1)
+    else if (CATEGORY_2_RE.test(tag.name)) vwTypes.push(2)
+    else if (CATEGORY_3_RE.test(tag.name)) vwTypes.push(3)
   }
 
   // teamTags = non-category tag names + "Orchestra" if any arrangement matches
@@ -113,7 +106,7 @@ export function mapPcSongToUpsert(
     author: attributes.author ?? '',
     themes,
     notes: '',
-    vwType,
+    vwTypes,
     teamTags,
     arrangements: mappedArrangements,
     lastUsedAt,
@@ -188,7 +181,8 @@ export async function fetchAllPcSongs(
 
   // Resolve tags per song using the accumulated tagMap
   return allSongs.map((song) => {
-    const tags = song.relationships?.tags?.data ?? []
+    const tagRefs = song.relationships?.tags?.data ?? []
+    const tags = tagRefs
       .map((ref) => {
         const name = tagMap.get(ref.id)
         return name ? { id: ref.id, name } : null

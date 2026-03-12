@@ -52,45 +52,70 @@ function makeTag(id: string, name: string) {
 }
 
 // Helper to build arrangement objects
-function makeArrangement(id: string, name: string) {
-  return { id, name }
+function makeArrangement(id: string, name: string, key: string = '') {
+  return { id, name, key }
 }
 
 describe('mapPcSongToUpsert', () => {
-  describe('vwType mapping from category tags', () => {
-    it('maps "Category 1" tag to vwType: 1', () => {
+  describe('vwTypes mapping from category tags', () => {
+    it('maps "Category 1" tag to vwTypes: [1]', () => {
       const pcSong = makePcSong({ tagIds: ['tag-cat1'] })
       const tags = [makeTag('tag-cat1', 'Category 1')]
       const result = mapPcSongToUpsert(pcSong, tags, [])
-      expect(result.vwType).toBe(1)
+      expect(result.vwTypes).toEqual([1])
     })
 
-    it('maps "Category 2" tag to vwType: 2', () => {
+    it('maps "Category 2" tag to vwTypes: [2]', () => {
       const pcSong = makePcSong({ tagIds: ['tag-cat2'] })
       const tags = [makeTag('tag-cat2', 'Category 2')]
       const result = mapPcSongToUpsert(pcSong, tags, [])
-      expect(result.vwType).toBe(2)
+      expect(result.vwTypes).toEqual([2])
     })
 
-    it('maps "Category 3" tag to vwType: 3', () => {
+    it('maps "Category 3" tag to vwTypes: [3]', () => {
       const pcSong = makePcSong({ tagIds: ['tag-cat3'] })
       const tags = [makeTag('tag-cat3', 'Category 3')]
       const result = mapPcSongToUpsert(pcSong, tags, [])
-      expect(result.vwType).toBe(3)
+      expect(result.vwTypes).toEqual([3])
     })
 
-    it('sets vwType to null when no category tag exists', () => {
+    it('sets vwTypes to [] when no category tag exists', () => {
       const pcSong = makePcSong({ tagIds: ['tag-ballad'] })
       const tags = [makeTag('tag-ballad', 'Ballad')]
       const result = mapPcSongToUpsert(pcSong, tags, [])
-      expect(result.vwType).toBeNull()
+      expect(result.vwTypes).toEqual([])
     })
 
-    it('maps "category 1" (lowercase) to vwType: 1 (case-insensitive)', () => {
+    it('maps "category 1" (lowercase) to vwTypes: [1] (case-insensitive)', () => {
       const pcSong = makePcSong({ tagIds: ['tag-lower-cat1'] })
       const tags = [makeTag('tag-lower-cat1', 'category 1')]
       const result = mapPcSongToUpsert(pcSong, tags, [])
-      expect(result.vwType).toBe(1)
+      expect(result.vwTypes).toEqual([1])
+    })
+
+    it('maps Category 1 AND Category 2 tags to vwTypes: [1, 2]', () => {
+      const pcSong = makePcSong({ tagIds: ['tag-cat1', 'tag-cat2'] })
+      const tags = [makeTag('tag-cat1', 'Category 1'), makeTag('tag-cat2', 'Category 2')]
+      const result = mapPcSongToUpsert(pcSong, tags, [])
+      expect(result.vwTypes).toEqual([1, 2])
+    })
+
+    it('maps Category 1 AND Category 3 tags to vwTypes: [1, 3]', () => {
+      const pcSong = makePcSong({ tagIds: ['tag-cat1', 'tag-cat3'] })
+      const tags = [makeTag('tag-cat1', 'Category 1'), makeTag('tag-cat3', 'Category 3')]
+      const result = mapPcSongToUpsert(pcSong, tags, [])
+      expect(result.vwTypes).toEqual([1, 3])
+    })
+
+    it('maps all three category tags to vwTypes: [1, 2, 3]', () => {
+      const pcSong = makePcSong({ tagIds: ['tag-cat1', 'tag-cat2', 'tag-cat3'] })
+      const tags = [
+        makeTag('tag-cat1', 'Category 1'),
+        makeTag('tag-cat2', 'Category 2'),
+        makeTag('tag-cat3', 'Category 3'),
+      ]
+      const result = mapPcSongToUpsert(pcSong, tags, [])
+      expect(result.vwTypes).toEqual([1, 2, 3])
     })
   })
 
@@ -368,7 +393,7 @@ describe('fetchAndMapPcSongs', () => {
     expect(song.pcSongId).toBe('pc-song-abc')
     expect(song.title).toBe('How Great Thou Art')
     expect(song.ccliNumber).toBe('78890')
-    expect(song.vwType).toBe(2)
+    expect(song.vwTypes).toEqual([2])
     expect(song.teamTags).toContain('Orchestra')
     expect(song.lastUsedAt).not.toBeNull()
     expect(song.hidden).toBe(false)

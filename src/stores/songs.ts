@@ -13,7 +13,7 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore'
 import { db } from '@/firebase'
-import type { Song, UpsertSongInput } from '@/types/song'
+import type { Song, UpsertSongInput, VWType } from '@/types/song'
 
 type SongInput = Omit<Song, 'id' | 'createdAt' | 'updatedAt'>
 
@@ -42,8 +42,8 @@ export const useSongStore = defineStore('songs', () => {
       const matchesVwType =
         filterVwType.value === null ||
         (filterVwType.value === 'uncategorized'
-          ? song.vwType === null
-          : song.vwType === filterVwType.value)
+          ? song.vwTypes.length === 0
+          : song.vwTypes.includes(filterVwType.value as VWType))
 
       const matchesKey =
         !filterKey.value ||
@@ -66,7 +66,14 @@ export const useSongStore = defineStore('songs', () => {
       orderBy('title'),
     )
     unsubscribeFn = onSnapshot(q, (snap) => {
-      songs.value = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Song)
+      songs.value = snap.docs.map((d) => {
+        const data = d.data() as Record<string, unknown>
+        // Normalize legacy vwType scalar field to vwTypes array
+        if (!Array.isArray(data.vwTypes)) {
+          data.vwTypes = data.vwType != null ? [data.vwType] : []
+        }
+        return { id: d.id, ...data } as Song
+      })
       isLoading.value = false
     })
   }
@@ -140,16 +147,16 @@ export const useSongStore = defineStore('songs', () => {
       }
 
       if (existing) {
-        // Update existing: preserve hidden status, only set vwType when incoming is non-null
-        const { vwType: incomingVwType, hidden: _hidden, ...restIncoming } = incoming
+        // Update existing: preserve hidden status, only set vwTypes when incoming is non-empty
+        const { vwTypes: incomingVwTypes, hidden: _hidden, ...restIncoming } = incoming
         const updateData: Record<string, unknown> = {
           ...restIncoming,
           hidden: existing.hidden ?? false,
           updatedAt: serverTimestamp(),
         }
-        // Only include vwType if incoming value is non-null
-        if (incomingVwType !== null) {
-          updateData.vwType = incomingVwType
+        // Only include vwTypes if incoming array is non-empty (preserve user-set types if incoming is empty)
+        if (incomingVwTypes.length > 0) {
+          updateData.vwTypes = incomingVwTypes
         }
         await updateDoc(doc(db, 'organizations', orgId.value!, 'songs', existing.id), updateData)
       } else {

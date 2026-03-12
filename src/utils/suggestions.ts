@@ -64,7 +64,7 @@ export function rankSongsForSlot(
       }
 
       // Type bonus: matching VW type gets +100 (soft priority, not a hard filter)
-      const typeBonus = song.vwType === requiredVwType ? 100 : 0
+      const typeBonus = song.vwTypes.includes(requiredVwType) ? 100 : 0
       score += typeBonus
 
       return { song, score, weeksAgo, isRecent }

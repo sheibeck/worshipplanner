@@ -20,7 +20,7 @@ export interface Song {
   author: string
   themes: string[]
   notes: string
-  vwType: VWType | null
+  vwTypes: VWType[]
   teamTags: string[]
   arrangements: Arrangement[]
   lastUsedAt: Timestamp | null
