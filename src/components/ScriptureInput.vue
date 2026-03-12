@@ -160,9 +160,19 @@
     <!-- Passage text panel -->
     <div
       v-if="previewText"
-      class="text-sm text-gray-300 bg-gray-800/50 border border-gray-700 rounded-md px-3 py-2 whitespace-pre-line leading-relaxed max-h-48 overflow-y-auto"
+      class="flex items-start gap-2 bg-gray-800/50 border border-gray-700 rounded-md px-3 py-2"
     >
-      {{ previewText }}
+      <div class="flex-1 text-sm text-gray-300 whitespace-pre-line leading-relaxed max-h-48 overflow-y-auto">
+        {{ previewText }}
+      </div>
+      <button
+        type="button"
+        @click="dismissPreview"
+        aria-label="Close preview"
+        class="shrink-0 text-gray-500 hover:text-gray-300 transition-colors text-xs leading-none mt-0.5"
+      >
+        &times;
+      </button>
     </div>
 
     <!-- Preview error -->
@@ -319,6 +329,12 @@ const passageQuery = computed(() => {
 })
 
 const showPreviewButton = computed(() => canPreview.value && passageQuery.value !== previewRef.value)
+
+function dismissPreview() {
+  previewText.value = ''
+  previewRef.value = ''
+  previewError.value = ''
+}
 
 async function fetchPreview() {
   const query = passageQuery.value
