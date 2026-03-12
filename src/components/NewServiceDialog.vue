@@ -147,7 +147,7 @@ function nextSunday(): string {
 
 /** Returns which Sunday of the month (1-5) a date falls on, or 0 if not a Sunday */
 function sundayOrdinal(dateStr: string): number {
-  const [year, month, day] = dateStr.split('-').map(Number)
+  const [year, month, day] = dateStr.split('-').map(Number) as [number, number, number]
   const d = new Date(year, month - 1, day)
   if (d.getDay() !== 0) return 0 // not a Sunday
   return Math.ceil(day / 7)

@@ -383,7 +383,7 @@ describe('fetchAndMapPcSongs', () => {
     global.fetch = mockFetch
 
     vi.mocked(fetchSongArrangements).mockResolvedValueOnce([
-      { id: 'arr-orchestra', name: 'Orchestra' },
+      { id: 'arr-orchestra', name: 'Orchestra', key: '' },
     ])
 
     const result = await fetchAndMapPcSongs('app-id', 'secret')
@@ -426,8 +426,8 @@ describe('fetchAndMapPcSongs', () => {
     global.fetch = mockFetch
 
     vi.mocked(fetchSongArrangements)
-      .mockResolvedValueOnce([{ id: 'arr-1', name: 'Standard' }])
-      .mockResolvedValueOnce([{ id: 'arr-2', name: 'Orchestra' }])
+      .mockResolvedValueOnce([{ id: 'arr-1', name: 'Standard', key: '' }])
+      .mockResolvedValueOnce([{ id: 'arr-2', name: 'Orchestra', key: '' }])
 
     const result = await fetchAndMapPcSongs('app-id', 'secret')
 

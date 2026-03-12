@@ -503,13 +503,13 @@ export async function searchSongByCcli(
 
 /**
  * Fetch arrangements for a Planning Center song.
- * Returns array of {id, name}. Returns empty array on error.
+ * Returns array of {id, name, key}. Returns empty array on error.
  */
 export async function fetchSongArrangements(
   appId: string,
   secret: string,
   pcSongId: string,
-): Promise<Array<{ id: string; name: string }>> {
+): Promise<Array<{ id: string; name: string; key: string }>> {
   const headers = {
     Authorization: basicAuthHeader(appId, secret),
     Accept: 'application/json',

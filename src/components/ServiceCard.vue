@@ -89,7 +89,7 @@ const displayTeams = computed(() => {
 })
 
 const parsedDate = computed(() => {
-  const [year, month, day] = props.service.date.split('-').map(Number)
+  const [year, month, day] = props.service.date.split('-').map(Number) as [number, number, number]
   return new Date(year, month - 1, day)
 })
 

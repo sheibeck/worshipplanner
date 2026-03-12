@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { Service, ServiceSlot, SongSlot, ScriptureSlot, NonAssignableSlot, HymnSlot, ScriptureRef } from '@/types/service'
 import type { Timestamp } from 'firebase/firestore'
+import type { VWType } from '@/types/song'
 
 // Mock esvApi before importing planningCenterApi
 vi.mock('@/utils/esvApi', () => ({
@@ -545,10 +546,12 @@ describe('addSlotAsItem', () => {
       author: 'Robert Robinson',
       themes: [],
       notes: '',
-      vwType: 1 as const,
+      vwTypes: [1 as VWType],
       teamTags: [],
       arrangements: [],
       lastUsedAt: null,
+      hidden: false,
+      pcSongId: null,
       createdAt: mockTimestampLocal,
       updatedAt: mockTimestampLocal,
     }]
@@ -598,10 +601,12 @@ describe('addSlotAsItem', () => {
       author: '',
       themes: [],
       notes: '',
-      vwType: 1 as const,
+      vwTypes: [1 as VWType],
       teamTags: [],
       arrangements: [],
       lastUsedAt: null,
+      hidden: false,
+      pcSongId: null,
       createdAt: mockTimestampLocal,
       updatedAt: mockTimestampLocal,
     }]
@@ -632,10 +637,12 @@ describe('addSlotAsItem', () => {
       author: '',
       themes: [],
       notes: '',
-      vwType: 1 as const,
+      vwTypes: [1 as VWType],
       teamTags: [],
       arrangements: [],
       lastUsedAt: null,
+      hidden: false,
+      pcSongId: null,
       createdAt: mockTimestampLocal,
       updatedAt: mockTimestampLocal,
     }]
@@ -672,10 +679,12 @@ describe('addSlotAsItem', () => {
       author: '',
       themes: [],
       notes: '',
-      vwType: 1 as const,
+      vwTypes: [1 as VWType],
       teamTags: [],
       arrangements: [],
       lastUsedAt: null,
+      hidden: false,
+      pcSongId: null,
       createdAt: mockTimestampLocal,
       updatedAt: mockTimestampLocal,
     }]
@@ -859,10 +868,12 @@ describe('addSlotAsItem', () => {
       author: 'Robert Robinson',
       themes: [],
       notes: '',
-      vwType: 1 as const,
+      vwTypes: [1 as VWType],
       teamTags: [],
       arrangements: [],
       lastUsedAt: null,
+      hidden: false,
+      pcSongId: null,
       createdAt: mockTimestampLocal,
       updatedAt: mockTimestampLocal,
     }]
@@ -941,10 +952,12 @@ describe('addSlotAsItem', () => {
       author: '',
       themes: [],
       notes: '',
-      vwType: 1 as const,
+      vwTypes: [1 as VWType],
       teamTags: [],
       arrangements: [],
       lastUsedAt: null,
+      hidden: false,
+      pcSongId: null,
       createdAt: mockTimestampLocal,
       updatedAt: mockTimestampLocal,
     }]

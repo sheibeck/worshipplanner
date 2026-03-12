@@ -146,8 +146,8 @@ describe('useSongStore', () => {
       const song = makeSong()
       triggerSnapshot([song])
       expect(store.songs).toHaveLength(1)
-      expect(store.songs[0].id).toBe('song-1')
-      expect(store.songs[0].title).toBe('Amazing Grace')
+      expect(store.songs[0]!.id).toBe('song-1')
+      expect(store.songs[0]!.title).toBe('Amazing Grace')
     })
 
     it('sets isLoading to false after first snapshot', async () => {
@@ -209,7 +209,7 @@ describe('useSongStore', () => {
           ],
         })
       }
-      expect(store.songs[0].vwTypes).toEqual([2])
+      expect(store.songs[0]!.vwTypes).toEqual([2])
     })
 
     it('normalizes legacy vwType null to empty vwTypes array', async () => {
@@ -239,7 +239,7 @@ describe('useSongStore', () => {
           ],
         })
       }
-      expect(store.songs[0].vwTypes).toEqual([])
+      expect(store.songs[0]!.vwTypes).toEqual([])
     })
 
     it('preserves vwTypes array from doc if already present', async () => {
@@ -269,7 +269,7 @@ describe('useSongStore', () => {
           ],
         })
       }
-      expect(store.songs[0].vwTypes).toEqual([1, 3])
+      expect(store.songs[0]!.vwTypes).toEqual([1, 3])
     })
   })
 
@@ -283,7 +283,7 @@ describe('useSongStore', () => {
         makeSong({ id: 'song-2', title: 'Hidden Song', hidden: true }),
       ])
       expect(store.filteredSongs).toHaveLength(1)
-      expect(store.filteredSongs[0].title).toBe('Visible Song')
+      expect(store.filteredSongs[0]!.title).toBe('Visible Song')
     })
 
     it('includes songs where hidden is false', async () => {
@@ -325,7 +325,7 @@ describe('useSongStore', () => {
         })
       }
       expect(store.filteredSongs).toHaveLength(1)
-      expect(store.filteredSongs[0].title).toBe('Legacy Song')
+      expect(store.filteredSongs[0]!.title).toBe('Legacy Song')
     })
   })
 
@@ -345,7 +345,7 @@ describe('useSongStore', () => {
       triggerSnapshot([makeSong({ id: 'song-1', title: 'Amazing Grace' }), makeSong({ id: 'song-2', title: 'How Great Thou Art' })])
       store.searchQuery = 'amazing'
       expect(store.filteredSongs).toHaveLength(1)
-      expect(store.filteredSongs[0].title).toBe('Amazing Grace')
+      expect(store.filteredSongs[0]!.title).toBe('Amazing Grace')
     })
 
     it('filters by CCLI number', async () => {
@@ -358,7 +358,7 @@ describe('useSongStore', () => {
       ])
       store.searchQuery = '11111'
       expect(store.filteredSongs).toHaveLength(1)
-      expect(store.filteredSongs[0].ccliNumber).toBe('11111')
+      expect(store.filteredSongs[0]!.ccliNumber).toBe('11111')
     })
 
     it('returns empty when no title or CCLI matches', async () => {
@@ -383,7 +383,7 @@ describe('useSongStore', () => {
       ])
       store.filterVwType = 1
       expect(store.filteredSongs).toHaveLength(1)
-      expect(store.filteredSongs[0].vwTypes).toContain(1)
+      expect(store.filteredSongs[0]!.vwTypes).toContain(1)
     })
 
     it('shows multi-type songs when filter matches one of their types', async () => {
@@ -396,7 +396,7 @@ describe('useSongStore', () => {
       ])
       store.filterVwType = 1
       expect(store.filteredSongs).toHaveLength(1)
-      expect(store.filteredSongs[0].title).toBe('Type1 and 2 Song')
+      expect(store.filteredSongs[0]!.title).toBe('Type1 and 2 Song')
     })
 
     it('filters uncategorized songs when filterVwType is "uncategorized"', async () => {
@@ -409,7 +409,7 @@ describe('useSongStore', () => {
       ])
       store.filterVwType = 'uncategorized'
       expect(store.filteredSongs).toHaveLength(1)
-      expect(store.filteredSongs[0].title).toBe('Uncategorized')
+      expect(store.filteredSongs[0]!.title).toBe('Uncategorized')
     })
 
     it('returns all songs when filterVwType is null', async () => {
@@ -436,7 +436,7 @@ describe('useSongStore', () => {
       ])
       store.filterKey = 'G'
       expect(store.filteredSongs).toHaveLength(1)
-      expect(store.filteredSongs[0].title).toBe('Song in G')
+      expect(store.filteredSongs[0]!.title).toBe('Song in G')
     })
 
     it('returns no results when key does not match any arrangement', async () => {
@@ -462,7 +462,7 @@ describe('useSongStore', () => {
       ])
       store.filterTag = 'Choir'
       expect(store.filteredSongs).toHaveLength(1)
-      expect(store.filteredSongs[0].title).toBe('Choir Song')
+      expect(store.filteredSongs[0]!.title).toBe('Choir Song')
     })
   })
 
@@ -479,7 +479,7 @@ describe('useSongStore', () => {
       store.searchQuery = 'amazing'
       store.filterVwType = 1
       expect(store.filteredSongs).toHaveLength(1)
-      expect(store.filteredSongs[0].title).toBe('Amazing Grace')
+      expect(store.filteredSongs[0]!.title).toBe('Amazing Grace')
     })
 
     it('combines key + tag filter', async () => {
@@ -494,7 +494,7 @@ describe('useSongStore', () => {
       store.filterKey = 'G'
       store.filterTag = 'Choir'
       expect(store.filteredSongs).toHaveLength(1)
-      expect(store.filteredSongs[0].title).toBe('Match')
+      expect(store.filteredSongs[0]!.title).toBe('Match')
     })
   })
 
@@ -520,7 +520,7 @@ describe('useSongStore', () => {
       })
 
       expect(addDoc).toHaveBeenCalledOnce()
-      const callArgs = vi.mocked(addDoc).mock.calls[0]
+      const callArgs = vi.mocked(addDoc).mock.calls[0]!
       const data = callArgs[1] as Record<string, unknown>
       expect(data.title).toBe('New Song')
       expect(data.createdAt).toBeDefined()
@@ -539,8 +539,8 @@ describe('useSongStore', () => {
       await store.updateSong('song-1', { title: 'Updated Title' })
 
       expect(updateDoc).toHaveBeenCalledOnce()
-      const callArgs = vi.mocked(updateDoc).mock.calls[0]
-      const data = callArgs[1] as Record<string, unknown>
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const data = callArgs[1] as unknown as Record<string, unknown>
       expect(data.title).toBe('Updated Title')
       expect(data.updatedAt).toBeDefined()
       expect(serverTimestamp).toHaveBeenCalled()
@@ -558,8 +558,8 @@ describe('useSongStore', () => {
 
       expect(deleteDoc).not.toHaveBeenCalled()
       expect(updateDoc).toHaveBeenCalledOnce()
-      const callArgs = vi.mocked(updateDoc).mock.calls[0]
-      const data = callArgs[1] as Record<string, unknown>
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const data = callArgs[1] as unknown as Record<string, unknown>
       expect(data.hidden).toBe(true)
       expect(data.updatedAt).toBeDefined()
     })
@@ -575,8 +575,8 @@ describe('useSongStore', () => {
       await store.restoreSong('song-1')
 
       expect(updateDoc).toHaveBeenCalledOnce()
-      const callArgs = vi.mocked(updateDoc).mock.calls[0]
-      const data = callArgs[1] as Record<string, unknown>
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const data = callArgs[1] as unknown as Record<string, unknown>
       expect(data.hidden).toBe(false)
       expect(data.updatedAt).toBeDefined()
     })
@@ -607,7 +607,7 @@ describe('useSongStore', () => {
       ])
 
       expect(addDoc).toHaveBeenCalledOnce()
-      const callArgs = vi.mocked(addDoc).mock.calls[0]
+      const callArgs = vi.mocked(addDoc).mock.calls[0]!
       const data = callArgs[1] as Record<string, unknown>
       expect(data.title).toBe('Brand New Song')
       expect(data.hidden).toBe(false)
@@ -641,8 +641,8 @@ describe('useSongStore', () => {
       ])
 
       expect(updateDoc).toHaveBeenCalledOnce()
-      const callArgs = vi.mocked(updateDoc).mock.calls[0]
-      const data = callArgs[1] as Record<string, unknown>
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const data = callArgs[1] as unknown as Record<string, unknown>
       expect(data.title).toBe('Updated Title')
     })
 
@@ -672,8 +672,8 @@ describe('useSongStore', () => {
       ])
 
       expect(updateDoc).toHaveBeenCalledOnce()
-      const callArgs = vi.mocked(updateDoc).mock.calls[0]
-      const data = callArgs[1] as Record<string, unknown>
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const data = callArgs[1] as unknown as Record<string, unknown>
       expect(data.title).toBe('Updated Via CCLI')
     })
 
@@ -703,8 +703,8 @@ describe('useSongStore', () => {
       ])
 
       expect(updateDoc).toHaveBeenCalledOnce()
-      const callArgs = vi.mocked(updateDoc).mock.calls[0]
-      const data = callArgs[1] as Record<string, unknown>
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const data = callArgs[1] as unknown as Record<string, unknown>
       expect(data.hidden).toBe(true) // preserved from existing song
     })
 
@@ -734,8 +734,8 @@ describe('useSongStore', () => {
       ])
 
       expect(updateDoc).toHaveBeenCalledOnce()
-      const callArgs = vi.mocked(updateDoc).mock.calls[0]
-      const data = callArgs[1] as Record<string, unknown>
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const data = callArgs[1] as unknown as Record<string, unknown>
       // vwTypes should NOT be in the update data (preserving the existing value)
       expect(data.vwTypes).toBeUndefined()
     })
@@ -766,8 +766,8 @@ describe('useSongStore', () => {
       ])
 
       expect(updateDoc).toHaveBeenCalledOnce()
-      const callArgs = vi.mocked(updateDoc).mock.calls[0]
-      const data = callArgs[1] as Record<string, unknown>
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const data = callArgs[1] as unknown as Record<string, unknown>
       expect(data.vwTypes).toEqual([1, 3])
     })
   })
@@ -789,6 +789,8 @@ describe('useSongStore', () => {
         teamTags: [] as string[],
         arrangements: [] as Array<{ id: string; name: string; key: string; bpm: number | null; lengthSeconds: number | null; chordChartUrl: string; notes: string; teamTags: string[] }>,
         lastUsedAt: null,
+        hidden: false,
+        pcSongId: null as string | null,
       }))
 
       await store.importSongs(songs)
@@ -813,6 +815,8 @@ describe('useSongStore', () => {
         teamTags: [] as string[],
         arrangements: [] as Array<{ id: string; name: string; key: string; bpm: number | null; lengthSeconds: number | null; chordChartUrl: string; notes: string; teamTags: string[] }>,
         lastUsedAt: null,
+        hidden: false,
+        pcSongId: null as string | null,
       }))
 
       await store.importSongs(songs)

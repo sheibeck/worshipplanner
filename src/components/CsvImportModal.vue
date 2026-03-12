@@ -371,7 +371,7 @@ const allNonDuplicatesChecked = computed(() => {
   const nonDups = previewSongs.value.filter((s) => !s.isDuplicate)
   if (nonDups.length === 0) return false
   return nonDups.every((_, i) => {
-    const actualIdx = previewSongs.value.indexOf(nonDups[i])
+    const actualIdx = previewSongs.value.indexOf(nonDups[i]!)
     return checkedRows.value[actualIdx]
   })
 })

@@ -45,7 +45,7 @@ async function seedDoc(path: string, data: Record<string, unknown>) {
   await testEnv.withSecurityRulesDisabled(async (context) => {
     const db = context.firestore()
     const parts = path.split('/')
-    const ref = doc(db, parts[0], ...parts.slice(1))
+    const ref = doc(db, parts[0]!, ...parts.slice(1))
     await setDoc(ref, data)
   })
 }

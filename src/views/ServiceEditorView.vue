@@ -1238,7 +1238,7 @@ async function suggestAllSongs() {
       id: s.id,
       title: s.title,
       ccliNumber: s.ccliNumber,
-      vwType: s.vwType,
+      vwTypes: s.vwTypes,
       themes: s.themes,
       lastUsedAt: s.lastUsedAt,
     }))
@@ -1347,7 +1347,7 @@ async function fetchAiForSlot(slotIndex: number) {
         id: s.id,
         title: s.title,
         ccliNumber: s.ccliNumber,
-        vwType: s.vwType,
+        vwTypes: s.vwTypes,
         themes: s.themes,
         lastUsedAt: s.lastUsedAt,
       })),
@@ -1562,7 +1562,7 @@ async function onConfirmExport() {
         const isScripturePlaceholder = titleLower.includes('scripture reading')
 
         if (isSongPlaceholder && songIndex < songSlots.length) {
-          const slot = songSlots[songIndex]
+          const slot = songSlots[songIndex]!
           try {
             await addSlotAsItem(appId, secret, serviceTypeId, planId, slot, item.sequence, songStore.songs, localService.value.sermonPassage)
             songIndex++
@@ -1571,7 +1571,7 @@ async function onConfirmExport() {
             failures.push(label)
           }
         } else if (isScripturePlaceholder && scriptureIndex < scriptureSlots.length) {
-          const slot = scriptureSlots[scriptureIndex]
+          const slot = scriptureSlots[scriptureIndex]!
           try {
             await addSlotAsItem(appId, secret, serviceTypeId, planId, slot, item.sequence, songStore.songs, localService.value.sermonPassage)
             scriptureIndex++
@@ -1588,17 +1588,17 @@ async function onConfirmExport() {
 
       for (let i = songIndex; i < songSlots.length; i++) {
         try {
-          await addSlotAsItem(appId, secret, serviceTypeId, planId, songSlots[i], sequence, songStore.songs, localService.value.sermonPassage)
+          await addSlotAsItem(appId, secret, serviceTypeId, planId, songSlots[i]!, sequence, songStore.songs, localService.value.sermonPassage)
           sequence++
         } catch {
-          const slot = songSlots[i]
+          const slot = songSlots[i]!
           failures.push(slot.kind === 'SONG' ? ((slot as any).songTitle ?? 'Song') : ((slot as any).hymnName ?? 'Hymn'))
         }
       }
 
       for (let i = scriptureIndex; i < scriptureSlots.length; i++) {
         try {
-          await addSlotAsItem(appId, secret, serviceTypeId, planId, scriptureSlots[i], sequence, songStore.songs, localService.value.sermonPassage)
+          await addSlotAsItem(appId, secret, serviceTypeId, planId, scriptureSlots[i]!, sequence, songStore.songs, localService.value.sermonPassage)
           sequence++
         } catch {
           failures.push('Scripture')
@@ -1661,10 +1661,10 @@ async function onConfirmExport() {
 
           try {
             if (isSongItem && songIndex < songSlots.length) {
-              await addSlotAsItem(appId, secret, serviceTypeId, planId, songSlots[songIndex], sequence, songStore.songs, localService.value.sermonPassage, tItem.length)
+              await addSlotAsItem(appId, secret, serviceTypeId, planId, songSlots[songIndex]!, sequence, songStore.songs, localService.value.sermonPassage, tItem.length)
               songIndex++
             } else if (isScriptureItem && scriptureIndex < scriptureSlots.length) {
-              await addSlotAsItem(appId, secret, serviceTypeId, planId, scriptureSlots[scriptureIndex], sequence, songStore.songs, localService.value.sermonPassage, tItem.length)
+              await addSlotAsItem(appId, secret, serviceTypeId, planId, scriptureSlots[scriptureIndex]!, sequence, songStore.songs, localService.value.sermonPassage, tItem.length)
               scriptureIndex++
             } else if (!isSongItem && !isScriptureItem) {
               await createItem(appId, secret, serviceTypeId, planId, {
@@ -1683,17 +1683,17 @@ async function onConfirmExport() {
 
         for (let i = songIndex; i < songSlots.length; i++) {
           try {
-            await addSlotAsItem(appId, secret, serviceTypeId, planId, songSlots[i], sequence, songStore.songs, localService.value.sermonPassage)
+            await addSlotAsItem(appId, secret, serviceTypeId, planId, songSlots[i]!, sequence, songStore.songs, localService.value.sermonPassage)
             sequence++
           } catch {
-            const slot = songSlots[i]
+            const slot = songSlots[i]!
             failures.push(slot.kind === 'SONG' ? ((slot as any).songTitle ?? 'Song') : ((slot as any).hymnName ?? 'Hymn'))
           }
         }
 
         for (let i = scriptureIndex; i < scriptureSlots.length; i++) {
           try {
-            await addSlotAsItem(appId, secret, serviceTypeId, planId, scriptureSlots[i], sequence, songStore.songs, localService.value.sermonPassage)
+            await addSlotAsItem(appId, secret, serviceTypeId, planId, scriptureSlots[i]!, sequence, songStore.songs, localService.value.sermonPassage)
             sequence++
           } catch {
             failures.push('Scripture')

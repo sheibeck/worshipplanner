@@ -125,7 +125,7 @@ const filteredEntries = computed(() => {
 
 // Format a date column header: "Mar 8"
 function formatColumnDate(dateStr: string): string {
-  const [year, month, day] = dateStr.split('-').map(Number)
+  const [year, month, day] = dateStr.split('-').map(Number) as [number, number, number]
   const d = new Date(year, month - 1, day)
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
@@ -160,7 +160,7 @@ function isConsecutiveRepeat(songId: string, date: string): boolean {
   if (idx <= 0) return false
 
   const prevDate = allDates[idx - 1]
-  return datesWithSong.includes(prevDate)
+  return prevDate !== undefined && datesWithSong.includes(prevDate)
 }
 
 // Get cell background class

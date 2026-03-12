@@ -132,7 +132,7 @@ export interface GetSongSuggestionsParams {
   sermonPassage: ScriptureRef | null
   slotVwType: number | null
   alreadySelectedSongIds: string[]
-  songLibrary: Pick<Song, 'id' | 'title' | 'ccliNumber' | 'vwType' | 'themes' | 'lastUsedAt'>[]
+  songLibrary: Pick<Song, 'id' | 'title' | 'ccliNumber' | 'vwTypes' | 'themes' | 'lastUsedAt'>[]
   recentServiceSongIds: string[]
 }
 
@@ -198,7 +198,7 @@ export async function getSongSuggestions(
 
     // Build song library context (id/title/vwType/themes/lastUsedAt only)
     const libraryEntries = songLibrary.map((song) => {
-      const parts = [`id: ${song.id}`, `title: "${song.title}"`, `vwType: ${song.vwType ?? 'unset'}`]
+      const parts = [`id: ${song.id}`, `title: "${song.title}"`, `vwTypes: ${song.vwTypes.length > 0 ? song.vwTypes.join(',') : 'unset'}`]
       if (song.ccliNumber) {
         parts.push(`ccli: ${song.ccliNumber}`)
       }

@@ -86,9 +86,9 @@ export const useAuthStore = defineStore('auth', () => {
       return
     }
 
-    orgId.value = ids[0]
+    orgId.value = ids[0]!
 
-    const orgRef = doc(db, 'organizations', ids[0])
+    const orgRef = doc(db, 'organizations', ids[0]!)
     const orgSnap = await getDoc(orgRef)
     if (orgSnap.exists()) {
       const orgData = orgSnap.data()
@@ -100,7 +100,7 @@ export const useAuthStore = defineStore('auth', () => {
     // Unsubscribe from previous listener if any
     memberUnsub?.()
     memberUnsub = onSnapshot(
-      doc(db, 'organizations', ids[0], 'members', uid),
+      doc(db, 'organizations', ids[0]!, 'members', uid),
       async (snap) => {
         if (!snap.exists()) {
           userRole.value = null

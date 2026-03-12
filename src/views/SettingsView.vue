@@ -250,16 +250,7 @@ async function onSavePcCredentials() {
     authStore.setPcCredentials(
       pcAppIdInput.value.trim(),
       pcSecretInput.value.trim(),
-      authStore.pcServiceTypeId,
     )
-
-    // Fetch service types
-    pcServiceTypes.value = await fetchServiceTypes(pcAppIdInput.value.trim(), pcSecretInput.value.trim())
-
-    // Set selected service type to existing value if available
-    if (authStore.pcServiceTypeId) {
-      pcSelectedServiceTypeId.value = authStore.pcServiceTypeId
-    }
 
     pcSaveSuccess.value = true
     editingPcCreds.value = false
@@ -285,41 +276,11 @@ async function onClearPcCredentials() {
     await updateDoc(doc(db, 'organizations', authStore.orgId), {
       pcAppId: null,
       pcSecret: null,
-      pcServiceTypeId: null,
     })
-    authStore.setPcCredentials(null, null, null)
-    pcServiceTypes.value = []
-    pcSelectedServiceTypeId.value = ''
+    authStore.setPcCredentials(null, null)
     editingPcCreds.value = false
   } catch (err) {
     console.error('[SettingsView] clear PC credentials error:', err)
-  }
-}
-
-async function onSaveServiceType() {
-  if (!authStore.orgId) return
-  if (!pcSelectedServiceTypeId.value) return
-
-  pcServiceTypeSaving.value = true
-  pcServiceTypeSaved.value = false
-
-  try {
-    await updateDoc(doc(db, 'organizations', authStore.orgId), {
-      pcServiceTypeId: pcSelectedServiceTypeId.value,
-    })
-    authStore.setPcCredentials(
-      authStore.pcAppId,
-      authStore.pcSecret,
-      pcSelectedServiceTypeId.value,
-    )
-    pcServiceTypeSaved.value = true
-    setTimeout(() => {
-      pcServiceTypeSaved.value = false
-    }, 2000)
-  } catch (err) {
-    console.error('[SettingsView] save service type error:', err)
-  } finally {
-    pcServiceTypeSaving.value = false
   }
 }
 </script>

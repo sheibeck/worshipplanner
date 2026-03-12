@@ -15,7 +15,7 @@ const mockSongs: Song[] = [
     author: 'Robert Robinson',
     themes: [],
     notes: '',
-    vwType: 1,
+    vwTypes: [1],
     teamTags: [],
     arrangements: [
       {
@@ -30,6 +30,8 @@ const mockSongs: Song[] = [
       },
     ],
     lastUsedAt: null,
+    hidden: false,
+    pcSongId: null,
     createdAt: mockTimestamp,
     updatedAt: mockTimestamp,
   },
@@ -40,7 +42,7 @@ const mockSongs: Song[] = [
     author: 'Thomas Chisholm',
     themes: [],
     notes: '',
-    vwType: 2,
+    vwTypes: [2],
     teamTags: [],
     arrangements: [
       {
@@ -55,6 +57,8 @@ const mockSongs: Song[] = [
       },
     ],
     lastUsedAt: null,
+    hidden: false,
+    pcSongId: null,
     createdAt: mockTimestamp,
     updatedAt: mockTimestamp,
   },

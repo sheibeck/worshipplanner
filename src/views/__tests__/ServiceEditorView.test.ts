@@ -61,7 +61,7 @@ const mockSongs: Song[] = [
     author: 'John Newton',
     themes: [],
     notes: '',
-    vwType: 1,
+    vwTypes: [1],
     teamTags: [],
     arrangements: [
       {
@@ -76,6 +76,8 @@ const mockSongs: Song[] = [
       },
     ],
     lastUsedAt: null,
+    hidden: false,
+    pcSongId: null,
     createdAt: mockTimestamp,
     updatedAt: mockTimestamp,
   },

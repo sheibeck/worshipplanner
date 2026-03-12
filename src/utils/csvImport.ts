@@ -1,4 +1,4 @@
-import type { Arrangement, Song } from '@/types/song'
+import type { Arrangement, Song, VWType } from '@/types/song'
 
 export interface ParsedSongPreview {
   title: string
@@ -6,9 +6,12 @@ export interface ParsedSongPreview {
   author: string
   themes: string[]
   notes: string
-  vwType: null
+  vwTypes: VWType[]
   teamTags: string[]
   arrangements: Arrangement[]
+  lastUsedAt: null
+  hidden: boolean
+  pcSongId: null
   isDuplicate: boolean
   _warnings: string[]
 }
@@ -142,9 +145,12 @@ export function mapRowToSong(row: Record<string, string>): ParsedSongPreview {
     author,
     themes,
     notes,
-    vwType: null,
+    vwTypes: [],
     teamTags,
     arrangements,
+    lastUsedAt: null,
+    hidden: false,
+    pcSongId: null,
     isDuplicate: false,
     _warnings: warnings,
   }

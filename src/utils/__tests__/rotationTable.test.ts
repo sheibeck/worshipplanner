@@ -60,6 +60,7 @@ function makeService(overrides: {
   return {
     id,
     date,
+    name: 'Sunday Service',
     progression: '1-2-2-3',
     teams: [],
     status: 'planned',
@@ -93,9 +94,9 @@ describe('computeRotationTable', () => {
     ]
     const result = computeRotationTable(services)
     expect(result).toHaveLength(1)
-    expect(result[0].songId).toBe('song-a')
-    expect(result[0].songTitle).toBe('Song A')
-    expect(result[0].dates).toEqual(['2026-03-01'])
+    expect(result[0]!.songId).toBe('song-a')
+    expect(result[0]!.songTitle).toBe('Song A')
+    expect(result[0]!.dates).toEqual(['2026-03-01'])
   })
 
   it('collects all dates when a song appears in multiple services', () => {
@@ -113,10 +114,10 @@ describe('computeRotationTable', () => {
     ]
     const result = computeRotationTable(services)
     expect(result).toHaveLength(1)
-    expect(result[0].songId).toBe('song-a')
-    expect(result[0].dates).toContain('2026-03-01')
-    expect(result[0].dates).toContain('2026-03-08')
-    expect(result[0].dates).toHaveLength(2)
+    expect(result[0]!.songId).toBe('song-a')
+    expect(result[0]!.dates).toContain('2026-03-01')
+    expect(result[0]!.dates).toContain('2026-03-08')
+    expect(result[0]!.dates).toHaveLength(2)
   })
 
   it('handles multiple songs across multiple services', () => {
@@ -159,7 +160,7 @@ describe('computeRotationTable', () => {
     ]
     const result = computeRotationTable(services)
     expect(result).toHaveLength(1)
-    expect(result[0].songId).toBe('song-a')
+    expect(result[0]!.songId).toBe('song-a')
   })
 
   it('returns results sorted alphabetically by songTitle', () => {
@@ -175,9 +176,9 @@ describe('computeRotationTable', () => {
       }),
     ]
     const result = computeRotationTable(services)
-    expect(result[0].songTitle).toBe('Amazing Grace')
-    expect(result[1].songTitle).toBe('Mighty to Save')
-    expect(result[2].songTitle).toBe('Zebra Song')
+    expect(result[0]!.songTitle).toBe('Amazing Grace')
+    expect(result[1]!.songTitle).toBe('Mighty to Save')
+    expect(result[2]!.songTitle).toBe('Zebra Song')
   })
 
   it('does not include songs with no appearances (only filled slots count)', () => {

@@ -12,10 +12,12 @@ function makeSong(overrides: Partial<Song> = {}): Song {
     author: 'John Newton',
     themes: [],
     notes: '',
-    vwType: null,
+    vwTypes: [],
     teamTags: [],
     arrangements: [],
     lastUsedAt: null,
+    hidden: false,
+    pcSongId: null,
     createdAt: Timestamp.fromMillis(0),
     updatedAt: Timestamp.fromMillis(0),
     ...overrides,
@@ -86,7 +88,7 @@ describe('mapRowToSong', () => {
   it('sets vwType to null always (user categorizes later)', () => {
     const row = { Title: 'Test' }
     const result = mapRowToSong(row)
-    expect(result.vwType).toBeNull()
+    expect(result.vwTypes).toEqual([])
   })
 
   it('starts with isDuplicate false', () => {
@@ -215,7 +217,7 @@ describe('detectDuplicates', () => {
     const row = { Title: 'New Song', 'CCLI Number': '99999' }
     const parsed = [mapRowToSong(row)]
     const result = detectDuplicates(parsed, [])
-    expect(result[0].isDuplicate).toBe(false)
+    expect(result[0]!.isDuplicate).toBe(false)
   })
 
   it('flags duplicate by CCLI number match', () => {
@@ -223,7 +225,7 @@ describe('detectDuplicates', () => {
     const row = { Title: 'Amazing Grace Different Spelling', 'CCLI Number': '22025' }
     const parsed = [mapRowToSong(row)]
     const result = detectDuplicates(parsed, existing)
-    expect(result[0].isDuplicate).toBe(true)
+    expect(result[0]!.isDuplicate).toBe(true)
   })
 
   it('does not flag non-duplicate when CCLI numbers differ', () => {
@@ -231,7 +233,7 @@ describe('detectDuplicates', () => {
     const row = { Title: 'Different Song', 'CCLI Number': '99999' }
     const parsed = [mapRowToSong(row)]
     const result = detectDuplicates(parsed, existing)
-    expect(result[0].isDuplicate).toBe(false)
+    expect(result[0]!.isDuplicate).toBe(false)
   })
 
   it('flags duplicate by case-insensitive title when no CCLI on parsed song', () => {
@@ -239,7 +241,7 @@ describe('detectDuplicates', () => {
     const row = { Title: 'amazing grace', 'CCLI Number': '' }
     const parsed = [mapRowToSong(row)]
     const result = detectDuplicates(parsed, existing)
-    expect(result[0].isDuplicate).toBe(true)
+    expect(result[0]!.isDuplicate).toBe(true)
   })
 
   it('flags duplicate by title case-insensitively with uppercase/mixed', () => {
@@ -247,7 +249,7 @@ describe('detectDuplicates', () => {
     const row = { Title: 'HOW GREAT IS OUR GOD' }
     const parsed = [mapRowToSong(row)]
     const result = detectDuplicates(parsed, existing)
-    expect(result[0].isDuplicate).toBe(true)
+    expect(result[0]!.isDuplicate).toBe(true)
   })
 
   it('does not use title matching when parsed song has CCLI (even if title matches)', () => {
@@ -256,7 +258,7 @@ describe('detectDuplicates', () => {
     const row = { Title: 'Amazing Grace', 'CCLI Number': '11111' }
     const parsed = [mapRowToSong(row)]
     const result = detectDuplicates(parsed, existing)
-    expect(result[0].isDuplicate).toBe(false)
+    expect(result[0]!.isDuplicate).toBe(false)
   })
 
   it('handles multiple songs: flags only actual duplicates', () => {
@@ -266,8 +268,8 @@ describe('detectDuplicates', () => {
       mapRowToSong({ Title: 'New Song', 'CCLI Number': '99999' }),       // new
     ]
     const result = detectDuplicates(rows, existing)
-    expect(result[0].isDuplicate).toBe(true)
-    expect(result[1].isDuplicate).toBe(false)
+    expect(result[0]!.isDuplicate).toBe(true)
+    expect(result[1]!.isDuplicate).toBe(false)
   })
 
   it('skips CCLI-based match when existing song has no CCLI', () => {
@@ -275,6 +277,6 @@ describe('detectDuplicates', () => {
     const row = { Title: 'Other Song', 'CCLI Number': '' }
     const parsed = [mapRowToSong(row)]
     const result = detectDuplicates(parsed, existing)
-    expect(result[0].isDuplicate).toBe(false)
+    expect(result[0]!.isDuplicate).toBe(false)
   })
 })

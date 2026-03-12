@@ -384,6 +384,8 @@ async function onSave() {
     teamTags: allTags,
     arrangements: form.value.arrangements,
     lastUsedAt: props.song?.lastUsedAt ?? null,
+    hidden: props.song?.hidden ?? false,
+    pcSongId: props.song?.pcSongId ?? null,
   }
 
   isSaving.value = true

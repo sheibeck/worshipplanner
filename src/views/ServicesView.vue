@@ -252,7 +252,7 @@ const availableMonths = computed<{ month: number; year: number; monthName: strin
     const key = `${year}-${month}`
     if (!seen.has(key)) {
       seen.add(key)
-      result.push({ month, year, monthName: MONTH_NAMES[month] })
+      result.push({ month, year, monthName: MONTH_NAMES[month] ?? '' })
     }
   }
   // Already sorted descending because pastServices is sorted descending
@@ -278,7 +278,7 @@ const smartDefault = computed<{ month: number; year: number } | null>(() => {
     (e) => e.month === curMonth && e.year === curYear,
   )
   if (hasCurrentMonth) return { month: curMonth, year: curYear }
-  return { month: availableMonths.value[0].month, year: availableMonths.value[0].year }
+  return { month: availableMonths.value[0]!.month, year: availableMonths.value[0]!.year }
 })
 
 // Active year: user selection or smart default

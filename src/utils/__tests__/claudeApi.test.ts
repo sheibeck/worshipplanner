@@ -83,7 +83,7 @@ describe('validateSongSuggestions', () => {
     ]
     const result = validateSongSuggestions(suggestions, songs)
     expect(result).toHaveLength(1)
-    expect(result[0].songId).toBe('song-1')
+    expect(result[0]!.songId).toBe('song-1')
   })
 
   it('keeps suggestions whose songId matches a provided song', () => {
@@ -176,7 +176,7 @@ describe('validateScriptureSuggestions', () => {
     ]
     const result = validateScriptureSuggestions(suggestions)
     expect(result).toHaveLength(1)
-    expect(result[0].book).toBe('Psalms')
+    expect(result[0]!.book).toBe('Psalms')
   })
 
   it('returns empty array when input is empty', () => {
@@ -198,7 +198,7 @@ describe('getSongSuggestions', () => {
       sermonPassage: null,
       slotVwType: 1,
       alreadySelectedSongIds: [],
-      songLibrary: [{ id: 'song-1', title: 'Amazing Grace', vwType: 1, themes: [], lastUsedAt: null }],
+      songLibrary: [{ id: 'song-1', title: 'Amazing Grace', ccliNumber: '1234567', vwTypes: [1], themes: [], lastUsedAt: null }],
       recentServiceSongIds: [],
     })
 
@@ -220,14 +220,14 @@ describe('getSongSuggestions', () => {
       sermonPassage: null,
       slotVwType: 1,
       alreadySelectedSongIds: [],
-      songLibrary: [{ id: 'song-1', title: 'Amazing Grace', vwType: 1, themes: [], lastUsedAt: null }],
+      songLibrary: [{ id: 'song-1', title: 'Amazing Grace', ccliNumber: '1234567', vwTypes: [1], themes: [], lastUsedAt: null }],
       recentServiceSongIds: [],
     })
 
     expect(result).not.toBeNull()
     expect(result).toHaveLength(1)
-    expect(result![0].songId).toBe('song-1')
-    expect(result![0].reason).toBe('Matches grace theme')
+    expect(result![0]!.songId).toBe('song-1')
+    expect(result![0]!.reason).toBe('Matches grace theme')
   })
 
   it('returns null when API returns response with no valid JSON', async () => {
@@ -267,7 +267,7 @@ describe('getSongSuggestions', () => {
       sermonPassage: null,
       slotVwType: 1,
       alreadySelectedSongIds: [],
-      songLibrary: [{ id: 'real-song', title: 'Real Song', vwType: 1, themes: [], lastUsedAt: null }],
+      songLibrary: [{ id: 'real-song', title: 'Real Song', ccliNumber: '1234567', vwTypes: [1], themes: [], lastUsedAt: null }],
       recentServiceSongIds: [],
     })
 
@@ -312,8 +312,8 @@ describe('getScriptureSuggestions', () => {
 
     expect(result).not.toBeNull()
     expect(result).toHaveLength(1)
-    expect(result![0].book).toBe('Psalms')
-    expect(result![0].chapter).toBe(103)
+    expect(result![0]!.book).toBe('Psalms')
+    expect(result![0]!.chapter).toBe(103)
   })
 
   it('returns null when API returns response with invalid book names', async () => {

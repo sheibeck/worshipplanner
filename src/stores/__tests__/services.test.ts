@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
+import type { Service } from '@/types/service'
 
 // Mock crypto.getRandomValues for deterministic token generation
 vi.stubGlobal('crypto', {
@@ -61,6 +62,7 @@ vi.mock('@/stores/songs', () => ({
 function makeService(overrides: Partial<{
   id: string
   date: string
+  name: string
   progression: '1-2-2-3' | '1-2-3-3'
   teams: string[]
   status: 'draft' | 'planned'
@@ -73,6 +75,7 @@ function makeService(overrides: Partial<{
   return {
     id: 'service-1',
     date: '2026-03-08',
+    name: 'Sunday Service',
     progression: '1-2-2-3' as '1-2-2-3' | '1-2-3-3',
     teams: [],
     status: 'draft' as 'draft' | 'planned',
@@ -136,8 +139,8 @@ describe('useServiceStore', () => {
       const service = makeService()
       triggerSnapshot([service])
       expect(store.services).toHaveLength(1)
-      expect(store.services[0].id).toBe('service-1')
-      expect(store.services[0].date).toBe('2026-03-08')
+      expect(store.services[0]!.id).toBe('service-1')
+      expect(store.services[0]!.date).toBe('2026-03-08')
     })
 
     it('sets isLoading to false after first snapshot', async () => {
@@ -184,7 +187,7 @@ describe('useServiceStore', () => {
       })
 
       expect(addDoc).toHaveBeenCalledOnce()
-      const callArgs = vi.mocked(addDoc).mock.calls[0]
+      const callArgs = vi.mocked(addDoc).mock.calls[0]!
       const data = callArgs[1] as Record<string, unknown>
       expect(data.date).toBe('2026-03-08')
       expect(data.progression).toBe('1-2-2-3')
@@ -205,7 +208,7 @@ describe('useServiceStore', () => {
         teams: [],
       })
 
-      const callArgs = vi.mocked(addDoc).mock.calls[0]
+      const callArgs = vi.mocked(addDoc).mock.calls[0]!
       const data = callArgs[1] as Record<string, unknown>
       const slots = data.slots as Array<{ kind: string; position: number }>
       expect(slots).toHaveLength(9)
@@ -223,17 +226,17 @@ describe('useServiceStore', () => {
         teams: [],
       })
 
-      const callArgs = vi.mocked(addDoc).mock.calls[0]
+      const callArgs = vi.mocked(addDoc).mock.calls[0]!
       const data = callArgs[1] as Record<string, unknown>
       const slots = data.slots as Array<{ kind: string; position: number; requiredVwType?: number }>
 
       const songSlots = slots.filter((s) => s.kind === 'SONG')
       expect(songSlots).toHaveLength(5)
-      expect(songSlots[0].requiredVwType).toBe(1) // position 0
-      expect(songSlots[1].requiredVwType).toBe(2) // position 2
-      expect(songSlots[2].requiredVwType).toBe(2) // position 5
-      expect(songSlots[3].requiredVwType).toBe(3) // position 6
-      expect(songSlots[4].requiredVwType).toBe(3) // position 8
+      expect(songSlots[0]!.requiredVwType).toBe(1) // position 0
+      expect(songSlots[1]!.requiredVwType).toBe(2) // position 2
+      expect(songSlots[2]!.requiredVwType).toBe(2) // position 5
+      expect(songSlots[3]!.requiredVwType).toBe(3) // position 6
+      expect(songSlots[4]!.requiredVwType).toBe(3) // position 8
     })
 
     it('createService 1-2-3-3: song slots get correct VW types', async () => {
@@ -248,16 +251,16 @@ describe('useServiceStore', () => {
         teams: [],
       })
 
-      const callArgs = vi.mocked(addDoc).mock.calls[0]
+      const callArgs = vi.mocked(addDoc).mock.calls[0]!
       const data = callArgs[1] as Record<string, unknown>
       const slots = data.slots as Array<{ kind: string; position: number; requiredVwType?: number }>
 
       const songSlots = slots.filter((s) => s.kind === 'SONG')
-      expect(songSlots[0].requiredVwType).toBe(1)
-      expect(songSlots[1].requiredVwType).toBe(2)
-      expect(songSlots[2].requiredVwType).toBe(2)
-      expect(songSlots[3].requiredVwType).toBe(3)
-      expect(songSlots[4].requiredVwType).toBe(3)
+      expect(songSlots[0]!.requiredVwType).toBe(1)
+      expect(songSlots[1]!.requiredVwType).toBe(2)
+      expect(songSlots[2]!.requiredVwType).toBe(2)
+      expect(songSlots[3]!.requiredVwType).toBe(3)
+      expect(songSlots[4]!.requiredVwType).toBe(3)
     })
 
     it('createService sets status to draft', async () => {
@@ -272,7 +275,7 @@ describe('useServiceStore', () => {
         teams: [],
       })
 
-      const callArgs = vi.mocked(addDoc).mock.calls[0]
+      const callArgs = vi.mocked(addDoc).mock.calls[0]!
       const data = callArgs[1] as Record<string, unknown>
       expect(data.status).toBe('draft')
     })
@@ -302,8 +305,8 @@ describe('useServiceStore', () => {
       await store.updateService('service-1', { notes: 'Updated notes' })
 
       expect(updateDoc).toHaveBeenCalledOnce()
-      const callArgs = vi.mocked(updateDoc).mock.calls[0]
-      const data = callArgs[1] as Record<string, unknown>
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const data = callArgs[1] as unknown as Record<string, unknown>
       expect(data.notes).toBe('Updated notes')
       expect(data.updatedAt).toBeDefined()
       expect(serverTimestamp).toHaveBeenCalled()
@@ -351,8 +354,8 @@ describe('useServiceStore', () => {
       })
 
       expect(updateDoc).toHaveBeenCalledOnce()
-      const callArgs = vi.mocked(updateDoc).mock.calls[0]
-      const data = callArgs[1] as Record<string, unknown>
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const data = callArgs[1] as unknown as Record<string, unknown>
       const updatedSlots = data.slots as Array<{ kind: string; position: number; songId?: string; songTitle?: string; songKey?: string }>
       const slot0 = updatedSlots.find((s) => s.position === 0)
       expect(slot0?.songId).toBe('song-abc')
@@ -377,7 +380,7 @@ describe('useServiceStore', () => {
       })
 
       expect(mockUpdateSong).toHaveBeenCalledOnce()
-      const [songId, data] = mockUpdateSong.mock.calls[0]
+      const [songId, data] = mockUpdateSong.mock.calls[0] as unknown as [string, Record<string, unknown>]
       expect(songId).toBe('song-abc')
       expect((data as Record<string, unknown>).lastUsedAt).toBeDefined()
     })
@@ -398,8 +401,8 @@ describe('useServiceStore', () => {
       await store.clearSongFromSlot('service-1', 0)
 
       expect(updateDoc).toHaveBeenCalledOnce()
-      const callArgs = vi.mocked(updateDoc).mock.calls[0]
-      const data = callArgs[1] as Record<string, unknown>
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const data = callArgs[1] as unknown as Record<string, unknown>
       const updatedSlots = data.slots as Array<{ kind: string; position: number; songId?: null; songTitle?: null; songKey?: null }>
       const slot0 = updatedSlots.find((s) => s.position === 0)
       expect(slot0?.songId).toBeNull()
@@ -414,7 +417,7 @@ describe('useServiceStore', () => {
       const store = useServiceStore()
       store.subscribe('org-1')
 
-      const service = makeService()
+      const service = makeService() as unknown as Service
       const token = await store.createShareToken(service, 'org-1')
 
       expect(token).toHaveLength(36)
@@ -427,11 +430,11 @@ describe('useServiceStore', () => {
       const store = useServiceStore()
       store.subscribe('org-1')
 
-      const service = makeService()
+      const service = makeService() as unknown as Service
       const token = await store.createShareToken(service, 'org-1')
 
       expect(setDoc).toHaveBeenCalledOnce()
-      const [docRef, data] = vi.mocked(setDoc).mock.calls[0]
+      const [docRef, data] = vi.mocked(setDoc).mock.calls[0]!
       expect((docRef as { id: string }).id).toBe(token)
       const writeData = data as Record<string, unknown>
       expect(writeData.serviceId).toBe(service.id)
@@ -451,11 +454,11 @@ describe('useServiceStore', () => {
       const slots = [
         { kind: 'SONG', position: 0, requiredVwType: 1, songId: 'song-abc', songTitle: 'Amazing Grace', songKey: 'G' },
       ]
-      const service = makeService({ slots })
+      const service = makeService({ slots }) as unknown as Service
       await store.createShareToken(service, 'org-1')
 
       expect(setDoc).toHaveBeenCalledOnce()
-      const [, data] = vi.mocked(setDoc).mock.calls[0]
+      const [, data] = vi.mocked(setDoc).mock.calls[0]!
       const writeData = data as Record<string, unknown>
       const snapshot = writeData.serviceSnapshot as Record<string, unknown>
       const snapshotSlots = snapshot.slots as Array<{ kind: string; position: number; bpm?: number | null }>

@@ -199,7 +199,7 @@ describe('ScriptureInput', () => {
       const emitted = wrapper.emitted('update:modelValue')
       expect(emitted).toBeTruthy()
       // Should emit null because isComplete is false (no verses)
-      const lastEmit = emitted![emitted!.length - 1]
+      const lastEmit = emitted![emitted!.length - 1]!
       expect(lastEmit[0]).toBeNull()
     })
   })

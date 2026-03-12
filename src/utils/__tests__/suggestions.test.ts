@@ -91,7 +91,7 @@ describe('rankSongsForSlot - VW type prioritization', () => {
       makeSong({ id: 'no-type', vwTypes: [] }),        // no type, never used: 500
     ]
     const results = rankSongsForSlot(songs, 1, [], NOW_MS)
-    expect(results[0].song.id).toBe('type1')   // matching type first
+    expect(results[0]!.song.id).toBe('type1')   // matching type first
     // non-matching and null both score 500, order among them doesn't matter
     expect(results.map((r) => r.song.id)).toContain('type2')
     expect(results.map((r) => r.song.id)).toContain('no-type')
@@ -125,7 +125,7 @@ describe('rankSongsForSlot - team filtering', () => {
     const songs = [makeSong({ id: 's1', vwTypes: [1], teamTags: [] })]
     const results = rankSongsForSlot(songs, 1, ['Choir'], NOW_MS)
     expect(results).toHaveLength(1)
-    expect(results[0].song.id).toBe('s1')
+    expect(results[0]!.song.id).toBe('s1')
   })
 
   it('includes songs that have all required team tags (AND logic)', () => {
@@ -161,7 +161,7 @@ describe('rankSongsForSlot - team filtering', () => {
     const results = rankSongsForSlot(songs, 1, ['Orchestra'], NOW_MS)
     // Only s3 (empty teamTags = universal) passes team filter
     expect(results).toHaveLength(1)
-    expect(results[0].song.id).toBe('s3')
+    expect(results[0]!.song.id).toBe('s3')
   })
 })
 
@@ -169,15 +169,15 @@ describe('rankSongsForSlot - scoring', () => {
   it('never-used matching-type songs get score 600 (500 base + 100 typeBonus)', () => {
     const songs = [makeSong({ id: 's1', vwTypes: [1], lastUsedMs: undefined })]
     const results = rankSongsForSlot(songs, 1, [], NOW_MS)
-    expect(results[0].score).toBe(600)
-    expect(results[0].weeksAgo).toBeNull()
-    expect(results[0].isRecent).toBe(false)
+    expect(results[0]!.score).toBe(600)
+    expect(results[0]!.weeksAgo).toBeNull()
+    expect(results[0]!.isRecent).toBe(false)
   })
 
   it('never-used non-matching songs get score 500 (500 base + 0 typeBonus)', () => {
     const songs = [makeSong({ id: 's1', vwTypes: [2], lastUsedMs: undefined })]
     const results = rankSongsForSlot(songs, 1, [], NOW_MS)
-    expect(results[0].score).toBe(500)
+    expect(results[0]!.score).toBe(500)
   })
 
   it('recently-used matching songs (within 2 weeks) get score below 200', () => {
@@ -185,8 +185,8 @@ describe('rankSongsForSlot - scoring', () => {
       makeSong({ id: 's1', vwTypes: [1], lastUsedMs: NOW_MS - ONE_WEEK_MS }),
     ]
     const results = rankSongsForSlot(songs, 1, [], NOW_MS)
-    expect(results[0].score).toBeLessThan(200)
-    expect(results[0].isRecent).toBe(true)
+    expect(results[0]!.score).toBeLessThan(200)
+    expect(results[0]!.isRecent).toBe(true)
   })
 
   it('songs used exactly 1 week ago (matching type) get score 160 (60 + 100 typeBonus)', () => {
@@ -194,8 +194,8 @@ describe('rankSongsForSlot - scoring', () => {
       makeSong({ id: 's1', vwTypes: [1], lastUsedMs: NOW_MS - ONE_WEEK_MS }),
     ]
     const results = rankSongsForSlot(songs, 1, [], NOW_MS)
-    expect(results[0].score).toBe(160) // 50 + 1*10 + 100
-    expect(results[0].weeksAgo).toBe(1)
+    expect(results[0]!.score).toBe(160) // 50 + 1*10 + 100
+    expect(results[0]!.weeksAgo).toBe(1)
   })
 
   it('songs used more than 2 weeks ago (matching type) get score 300 or above', () => {
@@ -203,8 +203,8 @@ describe('rankSongsForSlot - scoring', () => {
       makeSong({ id: 's1', vwTypes: [1], lastUsedMs: NOW_MS - THREE_WEEKS_MS }),
     ]
     const results = rankSongsForSlot(songs, 1, [], NOW_MS)
-    expect(results[0].score).toBeGreaterThanOrEqual(300)
-    expect(results[0].isRecent).toBe(false)
+    expect(results[0]!.score).toBeGreaterThanOrEqual(300)
+    expect(results[0]!.isRecent).toBe(false)
   })
 
   it('songs used 3 weeks ago (matching type) get score 345 (245 + 100 typeBonus)', () => {
@@ -212,8 +212,8 @@ describe('rankSongsForSlot - scoring', () => {
       makeSong({ id: 's1', vwTypes: [1], lastUsedMs: NOW_MS - THREE_WEEKS_MS }),
     ]
     const results = rankSongsForSlot(songs, 1, [], NOW_MS)
-    expect(results[0].score).toBe(345) // 200 + 3*15 + 100
-    expect(results[0].weeksAgo).toBe(3)
+    expect(results[0]!.score).toBe(345) // 200 + 3*15 + 100
+    expect(results[0]!.weeksAgo).toBe(3)
   })
 
   it('older songs score higher than newer songs of same type (staleness scoring)', () => {
@@ -222,8 +222,8 @@ describe('rankSongsForSlot - scoring', () => {
       makeSong({ id: 's_new', vwTypes: [1], lastUsedMs: NOW_MS - THREE_WEEKS_MS }),
     ]
     const results = rankSongsForSlot(songs, 1, [], NOW_MS)
-    expect(results[0].song.id).toBe('s_old')
-    expect(results[0].score).toBeGreaterThan(results[1].score)
+    expect(results[0]!.song.id).toBe('s_old')
+    expect(results[0]!.score).toBeGreaterThan(results[1]!.score)
   })
 })
 
@@ -235,9 +235,9 @@ describe('rankSongsForSlot - sorting', () => {
       makeSong({ id: 's_stale', vwTypes: [1], lastUsedMs: NOW_MS - TEN_WEEKS_MS }),
     ]
     const results = rankSongsForSlot(songs, 1, [], NOW_MS)
-    expect(results[0].song.id).toBe('s_never') // score 600 (500+100)
-    expect(results[1].song.id).toBe('s_stale') // score 300+ (10 weeks + 100)
-    expect(results[2].song.id).toBe('s_recent') // score < 200 (1 week + 100)
+    expect(results[0]!.song.id).toBe('s_never') // score 600 (500+100)
+    expect(results[1]!.song.id).toBe('s_stale') // score 300+ (10 weeks + 100)
+    expect(results[2]!.song.id).toBe('s_recent') // score < 200 (1 week + 100)
   })
 
   it('songs used in last 2 weeks appear in results but with lower score (deprioritized, not hidden)', () => {
@@ -249,8 +249,8 @@ describe('rankSongsForSlot - sorting', () => {
     // Both songs appear
     expect(results).toHaveLength(2)
     // Recent song is last
-    expect(results[results.length - 1].song.id).toBe('s_recent')
-    expect(results[0].song.id).toBe('s_never')
+    expect(results[results.length - 1]!.song.id).toBe('s_recent')
+    expect(results[0]!.song.id).toBe('s_never')
   })
 
   it('matching-type songs rank above non-matching songs of same recency', () => {
@@ -259,8 +259,8 @@ describe('rankSongsForSlot - sorting', () => {
       makeSong({ id: 'type1-never', vwTypes: [1] }),  // 500+100=600
     ]
     const results = rankSongsForSlot(songs, 1, [], NOW_MS)
-    expect(results[0].song.id).toBe('type1-never')
-    expect(results[1].song.id).toBe('type2-never')
+    expect(results[0]!.song.id).toBe('type1-never')
+    expect(results[1]!.song.id).toBe('type2-never')
   })
 })
 
@@ -268,9 +268,9 @@ describe('rankSongsForSlot - result shape', () => {
   it('returns SuggestionResult with song, score, weeksAgo, and isRecent', () => {
     const songs = [makeSong({ id: 's1', vwTypes: [2] })]
     const results = rankSongsForSlot(songs, 2, [], NOW_MS)
-    expect(results[0]).toHaveProperty('song')
-    expect(results[0]).toHaveProperty('score')
-    expect(results[0]).toHaveProperty('weeksAgo')
-    expect(results[0]).toHaveProperty('isRecent')
+    expect(results[0]!).toHaveProperty('song')
+    expect(results[0]!).toHaveProperty('score')
+    expect(results[0]!).toHaveProperty('weeksAgo')
+    expect(results[0]!).toHaveProperty('isRecent')
   })
 })

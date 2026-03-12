@@ -79,7 +79,7 @@
                 <template v-else>
                   <!-- Inline remove confirmation -->
                   <template v-if="confirmingRemoveUid === member.uid">
-                    <span class="text-xs text-gray-300 mr-2">Remove {{ member.displayName || member.email.split('@')[0] }}?</span>
+                    <span class="text-xs text-gray-300 mr-2">Remove {{ member.displayName || (member.email ?? '').split('@')[0] }}?</span>
                     <button
                       type="button"
                       @click="onConfirmRemove(member.uid)"

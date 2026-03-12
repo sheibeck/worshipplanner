@@ -46,11 +46,11 @@
     <!-- Current song card -->
     <div v-else class="px-6 py-6">
       <div class="mb-6">
-        <h3 class="text-lg font-semibold text-gray-100">{{ currentSong.title }}</h3>
-        <p v-if="currentSong.author" class="text-sm text-gray-400 mt-0.5">{{ currentSong.author }}</p>
-        <div v-if="currentSong.arrangements.length > 0" class="mt-2 flex flex-wrap gap-2">
+        <h3 class="text-lg font-semibold text-gray-100">{{ currentSong?.title }}</h3>
+        <p v-if="currentSong?.author" class="text-sm text-gray-400 mt-0.5">{{ currentSong?.author }}</p>
+        <div v-if="(currentSong?.arrangements.length ?? 0) > 0" class="mt-2 flex flex-wrap gap-2">
           <span
-            v-for="arr in currentSong.arrangements"
+            v-for="arr in currentSong?.arrangements"
             :key="arr.id"
             class="text-xs text-gray-500 bg-gray-800 border border-gray-700 rounded px-2 py-0.5"
           >
@@ -134,7 +134,7 @@ async function assign(type: VWType) {
   if (!currentSong.value) return
   isAssigning.value = true
   try {
-    await songStore.updateSong(currentSong.value.id, { vwType: type })
+    await songStore.updateSong(currentSong.value.id, { vwTypes: [type] })
     // Advance — Firestore onSnapshot will remove this song from the uncategorized list,
     // so we don't need to manually increment; but we guard the index.
     if (currentIndex.value >= props.songs.length - 1) {
