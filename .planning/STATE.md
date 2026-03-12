@@ -111,6 +111,13 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Quick-6]: autosaveSaving boolean guard serialises concurrent onSave() calls; reschedules at 200ms if inflight; debounce increased to 800ms for drag sequences
 - [Quick-7]: PC export item titles use bare songTitle only — (Key: X) annotation removed from PC item names
 - [Quick-8]: Scripture input replaced with single freeform text field — parses "Isaiah 53:1-6", "John 1:1-10,15-20" etc. into ScriptureRef
+- [Quick-9]: ServiceEditorView merges remote Firestore snapshots into localService when autosaveStatus is idle/saved; skips when pending/saving to prevent conflicts
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 9 | Subscribe to updates so that if 2 or more people are looking at the Services listing or the Edit Service screen they can see updates made by other people who are looking at the same thing | 2026-03-12 | e0ce5e1 | [9-subscribe-to-updates-so-that-if-2-or-mor](.planning/quick/9-subscribe-to-updates-so-that-if-2-or-mor/) |
 
 ### Blockers/Concerns
 
@@ -120,7 +127,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 
 ## Session Continuity
 
-Last activity: 2026-03-12 - Completed quick task 8: replace separate scripture inputs with single freeform text field
+Last activity: 2026-03-12 - Completed quick task 9: Subscribe to real-time service updates for multi-user collaboration
 Last session: 2026-03-12T19:59:30Z
 Stopped at: Completed quick-7 (bare song titles in PC export)
 Resume file: None
