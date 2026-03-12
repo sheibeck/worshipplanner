@@ -224,10 +224,20 @@ function formatRef(scriptureRef: ScriptureRef | null): string {
 const localText = ref<string>(formatRef(props.modelValue))
 const parseError = ref<string>('')
 
+// Flag to prevent the watch from overwriting localText when the change came from
+// the user typing (onTextInput emits → parent updates prop → watch fires → would
+// reset the field mid-edit). Only external changes (e.g. AI suggestion selection
+// in the parent) should re-sync the text field.
+let skipNextWatchSync = false
+
 // Keep in sync when modelValue changes externally (e.g. AI selection from parent)
 watch(
   () => props.modelValue,
   (val) => {
+    if (skipNextWatchSync) {
+      skipNextWatchSync = false
+      return
+    }
     localText.value = formatRef(val)
     parseError.value = ''
   },
@@ -319,6 +329,7 @@ async function fetchPreview() {
 function onTextInput() {
   const text = localText.value
   if (!text.trim()) {
+    skipNextWatchSync = true
     parseError.value = ''
     emit('update:modelValue', null)
     // Clear preview state when input is cleared
@@ -328,6 +339,7 @@ function onTextInput() {
     return
   }
   const parsed = parseScriptureInput(text)
+  skipNextWatchSync = true
   if (parsed) {
     parseError.value = ''
     emit('update:modelValue', parsed)
