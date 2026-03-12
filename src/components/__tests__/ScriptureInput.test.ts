@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { nextTick } from 'vue'
+import { mount, flushPromises } from '@vue/test-utils'
 import ScriptureInput from '../ScriptureInput.vue'
 
 // Use real BIBLE_BOOKS since it's a pure constant (no side effects)
@@ -246,6 +247,41 @@ describe('ScriptureInput', () => {
       expect(wrapper.text()).not.toContain('overlaps with the sermon passage')
 
       vi.mocked(scripturesOverlap).mockReturnValue(false)
+    })
+  })
+
+  describe('Preview dismiss', () => {
+    it('close button dismisses the preview panel and re-shows the Preview passage button', async () => {
+      const wrapper = mount(ScriptureInput, {
+        props: {
+          ...defaultProps,
+          modelValue: { book: 'John', chapter: 3, verseStart: 16, verseEnd: 17 },
+        },
+      })
+
+      // Preview passage button should be visible
+      const previewBtn = wrapper.findAll('button').find((b) => b.text().includes('Preview passage'))
+      expect(previewBtn).toBeTruthy()
+      await previewBtn!.trigger('click')
+
+      // Wait for async fetch to resolve
+      await nextTick()
+      await flushPromises()
+
+      // Passage text should be visible
+      expect(wrapper.text()).toContain('Mocked passage text')
+
+      // Close button should exist
+      const closeBtn = wrapper.find('button[aria-label="Close preview"]')
+      expect(closeBtn.exists()).toBe(true)
+      await closeBtn.trigger('click')
+      await nextTick()
+
+      // Passage text should be gone
+      expect(wrapper.text()).not.toContain('Mocked passage text')
+
+      // Preview passage button should be visible again
+      expect(wrapper.text()).toContain('Preview passage')
     })
   })
 
