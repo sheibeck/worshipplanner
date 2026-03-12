@@ -252,7 +252,7 @@ function emptyForm(): FormState {
 function songToForm(song: Song): FormState {
   return {
     title: song.title,
-    ccliNumber: song.ccliNumber,
+    ccliNumber: String(song.ccliNumber ?? ''),
     author: song.author,
     vwTypes: [...(song.vwTypes ?? [])],
     themes: [...song.themes],
@@ -376,7 +376,7 @@ async function onSave() {
 
   const data = {
     title,
-    ccliNumber: form.value.ccliNumber.trim(),
+    ccliNumber: String(form.value.ccliNumber ?? '').trim(),
     author: form.value.author.trim(),
     vwTypes: form.value.vwTypes,
     themes,
