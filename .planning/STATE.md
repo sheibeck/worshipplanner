@@ -106,6 +106,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Quick-1]: PC export dialog refactored with template-based item matching, existing plan detection, plan times
 - [Quick-2]: SONG slots use item_type 'song' with CCLI-based arrangement auto-linking
 - [Quick-3]: Auto-populate PC item metadata (length, notes) from song's last scheduled item
+- [Quick-4]: Import dialog requires explicit button click to close — backdrop/wrapper click-to-dismiss removed
 
 ### Blockers/Concerns
 
@@ -115,7 +116,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 
 ## Session Continuity
 
-Last activity: 2026-03-06 - Completed quick task 3: Auto-populate PC item metadata from last scheduled item
+Last activity: 2026-03-12 - Completed quick task 4: prevent accidental dismissal of import dialog — require explicit button click to close
 Last session: 2026-03-12T16:04:23.038Z
 Stopped at: Completed 09-03-PLAN.md (PC Import UI and soft-delete flow)
 Resume file: None
