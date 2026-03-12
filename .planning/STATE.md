@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Between milestones
-stopped_at: Completed 09-01-PLAN.md (Song type extension with soft-delete and upsert)
-last_updated: "2026-03-11T17:32:46.880Z"
+stopped_at: Completed 09-03-PLAN.md (PC Import UI and soft-delete flow)
+last_updated: "2026-03-12T16:04:33.516Z"
 last_activity: "2026-03-06 - Completed quick task 3: Auto-populate PC item metadata from last scheduled item"
 progress:
   total_phases: 3
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 6
-  completed_plans: 5
+  completed_plans: 6
 ---
 
 # Project State
@@ -88,6 +88,10 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase 09-pc-song-import-tag-management]: upsertSongs preserves hidden status and omits null vwType from update payload to protect user-set values
 - [Phase 09]: PC_BASE_URL duplicated as PC_SONGS_BASE_URL in pcSongImport.ts to avoid full planningCenterApi module import in tests
 - [Phase 09]: upsertSongs uses direct updateDoc/addDoc calls (not writeBatch) to match test expectations
+- [Phase 09-pc-song-import-tag-management]: CsvImportModal left as dead code to avoid breaking existing tests
+- [Phase 09-pc-song-import-tag-management]: classifySongs triple-key dedup mirrors upsertSongs for consistent import preview counts
+- [Phase 09-pc-song-import-tag-management]: SongTable songs-change watch removed -- it reset infinite scroll cursor after soft-delete
+- [Phase 09-pc-song-import-tag-management]: PC API batch size reduced to 3 with Retry-After support to survive rate limit windows
 
 ### Roadmap Evolution
 
@@ -112,6 +116,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-03-06 - Completed quick task 3: Auto-populate PC item metadata from last scheduled item
-Last session: 2026-03-11T17:32:46.874Z
-Stopped at: Completed 09-01-PLAN.md (Song type extension with soft-delete and upsert)
+Last session: 2026-03-12T16:04:23.038Z
+Stopped at: Completed 09-03-PLAN.md (PC Import UI and soft-delete flow)
 Resume file: None
