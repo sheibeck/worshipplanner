@@ -113,48 +113,16 @@
       </div>
     </div>
 
-    <!-- 4 fields in a row -->
-    <div class="flex gap-2">
-      <!-- Book dropdown -->
-      <select
-        v-model="localBook"
-        @change="onFieldChange"
-        class="flex-1 rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-      >
-        <option value="">Select book...</option>
-        <option v-for="book in BIBLE_BOOKS" :key="book" :value="book">{{ book }}</option>
-      </select>
-
-      <!-- Chapter -->
-      <input
-        v-model.number="localChapter"
-        @input="onFieldChange"
-        type="number"
-        min="1"
-        placeholder="Ch"
-        class="w-16 rounded-md bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-      />
-
-      <!-- Verse start -->
-      <input
-        v-model.number="localVerseStart"
-        @input="onFieldChange"
-        type="number"
-        min="1"
-        placeholder="From"
-        class="w-20 rounded-md bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-      />
-
-      <!-- Verse end -->
-      <input
-        v-model.number="localVerseEnd"
-        @input="onFieldChange"
-        type="number"
-        min="1"
-        placeholder="To"
-        class="w-20 rounded-md bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-      />
-    </div>
+    <!-- Freeform scripture text input -->
+    <input
+      v-model="localText"
+      type="text"
+      :placeholder="label === 'Sermon Passage' ? 'e.g. Romans 8:28' : 'e.g. Isaiah 53:1-6'"
+      class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+      :class="parseError ? 'border-red-700 focus:ring-red-500' : ''"
+      @input="onTextInput"
+    />
+    <p v-if="parseError" class="text-xs text-red-400 mt-1">{{ parseError }}</p>
 
     <!-- ESV link (shown when book and chapter are filled) -->
     <a
@@ -218,7 +186,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { BIBLE_BOOKS, esvLink, scripturesOverlap } from '@/utils/scripture'
+import { esvLink, scripturesOverlap, parseScriptureInput } from '@/utils/scripture'
 import { fetchPassageText } from '@/utils/esvApi'
 import { getScriptureSuggestions, type AiScriptureSuggestion } from '@/utils/claudeApi'
 import type { ScriptureRef } from '@/types/service'
@@ -237,21 +205,31 @@ const emit = defineEmits<{
   'update:modelValue': [value: ScriptureRef | null]
 }>()
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function formatRef(scriptureRef: ScriptureRef | null): string {
+  if (!scriptureRef) return ''
+  const { book, chapter, verseStart, verseEnd } = scriptureRef
+  if (verseStart !== undefined && verseEnd !== undefined) {
+    return `${book} ${chapter}:${verseStart}-${verseEnd}`
+  }
+  if (verseStart !== undefined) {
+    return `${book} ${chapter}:${verseStart}`
+  }
+  return `${book} ${chapter}`
+}
+
 // ── Local state ────────────────────────────────────────────────────────────────
 
-const localBook = ref<string>(props.modelValue?.book ?? '')
-const localChapter = ref<number | ''>(props.modelValue?.chapter ?? '')
-const localVerseStart = ref<number | ''>(props.modelValue?.verseStart ?? '')
-const localVerseEnd = ref<number | ''>(props.modelValue?.verseEnd ?? '')
+const localText = ref<string>(formatRef(props.modelValue))
+const parseError = ref<string>('')
 
-// Keep in sync when modelValue changes externally
+// Keep in sync when modelValue changes externally (e.g. AI selection from parent)
 watch(
   () => props.modelValue,
   (val) => {
-    localBook.value = val?.book ?? ''
-    localChapter.value = val?.chapter ?? ''
-    localVerseStart.value = val?.verseStart ?? ''
-    localVerseEnd.value = val?.verseEnd ?? ''
+    localText.value = formatRef(val)
+    parseError.value = ''
   },
 )
 
@@ -268,33 +246,20 @@ const aiPreviewError = ref(false)
 
 // ── Computed ───────────────────────────────────────────────────────────────────
 
-const isComplete = computed(() => {
-  return (
-    !!localBook.value &&
-    !!localChapter.value &&
-    !!localVerseStart.value &&
-    !!localVerseEnd.value
-  )
+const currentRef = computed<ScriptureRef | null>(() => {
+  return parseScriptureInput(localText.value)
 })
 
-const canPreview = computed(() => {
-  return !!localBook.value && !!localChapter.value
-})
+const canPreview = computed(() => currentRef.value !== null)
 
 const esvUrl = computed(() => {
-  if (!canPreview.value) return ''
-  return esvLink(localBook.value as string, localChapter.value as number)
+  if (!currentRef.value) return ''
+  return esvLink(currentRef.value.book, currentRef.value.chapter)
 })
 
-const currentRef = computed<ScriptureRef | null>(() => {
-  if (!canPreview.value) return null
-  const ref: ScriptureRef = {
-    book: localBook.value as string,
-    chapter: localChapter.value as number,
-  }
-  if (localVerseStart.value) ref.verseStart = localVerseStart.value as number
-  if (localVerseEnd.value) ref.verseEnd = localVerseEnd.value as number
-  return ref
+const isComplete = computed(() => {
+  const r = currentRef.value
+  return r !== null && r.verseStart !== undefined && r.verseEnd !== undefined
 })
 
 const hasOverlap = computed(() => {
@@ -318,10 +283,14 @@ const previewError = ref<string>('')
 const previewRef = ref<string>('')
 
 const passageQuery = computed(() => {
-  if (!canPreview.value) return ''
-  const base = `${localBook.value} ${localChapter.value}`
-  if (localVerseStart.value && localVerseEnd.value) {
-    return `${base}:${localVerseStart.value}-${localVerseEnd.value}`
+  const r = currentRef.value
+  if (!r) return ''
+  const base = `${r.book} ${r.chapter}`
+  if (r.verseStart !== undefined && r.verseEnd !== undefined) {
+    return `${base}:${r.verseStart}-${r.verseEnd}`
+  }
+  if (r.verseStart !== undefined) {
+    return `${base}:${r.verseStart}`
   }
   return base
 })
@@ -342,6 +311,35 @@ async function fetchPreview() {
     previewError.value = 'Could not load passage. Check your connection and try again.'
   } finally {
     previewLoading.value = false
+  }
+}
+
+// ── Text input handler ─────────────────────────────────────────────────────────
+
+function onTextInput() {
+  const text = localText.value
+  if (!text.trim()) {
+    parseError.value = ''
+    emit('update:modelValue', null)
+    // Clear preview state when input is cleared
+    previewText.value = ''
+    previewRef.value = ''
+    previewError.value = ''
+    return
+  }
+  const parsed = parseScriptureInput(text)
+  if (parsed) {
+    parseError.value = ''
+    emit('update:modelValue', parsed)
+  } else {
+    parseError.value = 'Unrecognized reference — try "Book Chapter:Verse-Verse"'
+    emit('update:modelValue', null)
+  }
+  // Clear cached preview when text changes
+  if (passageQuery.value !== previewRef.value) {
+    previewText.value = ''
+    previewRef.value = ''
+    previewError.value = ''
   }
 }
 
@@ -401,11 +399,13 @@ async function togglePreview(index: number) {
 }
 
 function onSelectAiScripture(result: AiScriptureSuggestion) {
-  localBook.value = result.book
-  localChapter.value = result.chapter
-  localVerseStart.value = result.verseStart
-  localVerseEnd.value = result.verseEnd
-  onFieldChange()
+  localText.value = formatRef({
+    book: result.book,
+    chapter: result.chapter,
+    verseStart: result.verseStart,
+    verseEnd: result.verseEnd,
+  })
+  onTextInput()
   aiResults.value = []
   aiQuery.value = ''
   expandedPreview.value = null
@@ -421,17 +421,6 @@ function aiResultOverlapsSermon(result: AiScriptureSuggestion): boolean {
     verseEnd: result.verseEnd,
   }
   return scripturesOverlap(ref, props.sermonPassage)
-}
-
-// ── Emit on field change ───────────────────────────────────────────────────────
-
-function onFieldChange() {
-  emit('update:modelValue', currentRef.value)
-  if (passageQuery.value !== previewRef.value) {
-    previewText.value = ''
-    previewRef.value = ''
-    previewError.value = ''
-  }
 }
 
 // Suppress unused warning for isComplete — available for future template use
