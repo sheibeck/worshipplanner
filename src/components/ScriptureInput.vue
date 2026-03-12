@@ -238,6 +238,19 @@ watch(
       skipNextWatchSync = false
       return
     }
+    // Don't overwrite user's text if it already parses to the same value.
+    // This guards against timing races where the flag alone isn't sufficient.
+    const currentParsed = parseScriptureInput(localText.value)
+    const sameValue =
+      val === null && currentParsed === null
+        ? true
+        : val !== null &&
+          currentParsed !== null &&
+          val.book === currentParsed.book &&
+          val.chapter === currentParsed.chapter &&
+          val.verseStart === currentParsed.verseStart &&
+          val.verseEnd === currentParsed.verseEnd
+    if (sameValue) return
     localText.value = formatRef(val)
     parseError.value = ''
   },
