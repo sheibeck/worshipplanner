@@ -167,7 +167,7 @@ async function onRestoreSong(song: Song) {
 
 // Uncategorized songs (for batch assign)
 const uncategorizedSongs = computed(() =>
-  songStore.songs.filter((s) => s.vwType === null),
+  songStore.songs.filter((s) => s.vwTypes.length === 0),
 )
 
 // Derived filter options from current songs

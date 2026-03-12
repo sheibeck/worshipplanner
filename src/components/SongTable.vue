@@ -134,7 +134,7 @@
 
           <!-- Category (VW type badge) -->
           <td class="px-4 py-3">
-            <SongBadge :type="song.vwType" />
+            <SongBadge :types="song.vwTypes ?? []" />
           </td>
 
           <!-- Key (from first arrangement) -->

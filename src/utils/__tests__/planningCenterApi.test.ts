@@ -408,11 +408,11 @@ describe('fetchSongArrangements', () => {
     vi.stubGlobal('fetch', vi.fn())
   })
 
-  it('calls GET /songs/{songId}/arrangements and returns array of {id, name}', async () => {
+  it('calls GET /songs/{songId}/arrangements and returns array of {id, name, key}', async () => {
     const mockResponse = {
       data: [
-        { id: 'arr-1', attributes: { name: 'Default Arrangement' } },
-        { id: 'arr-2', attributes: { name: 'Acoustic' } },
+        { id: 'arr-1', attributes: { name: 'Default Arrangement', chord_chart_key: 'G' } },
+        { id: 'arr-2', attributes: { name: 'Acoustic', chord_chart_key: null } },
       ],
     }
     vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(mockResponse), { status: 200 }))
@@ -420,8 +420,8 @@ describe('fetchSongArrangements', () => {
     const result = await fetchSongArrangements('app-id', 'secret', 'pc-song-42')
 
     expect(result).toEqual([
-      { id: 'arr-1', name: 'Default Arrangement' },
-      { id: 'arr-2', name: 'Acoustic' },
+      { id: 'arr-1', name: 'Default Arrangement', key: 'G' },
+      { id: 'arr-2', name: 'Acoustic', key: '' },
     ])
     const [url] = vi.mocked(fetch).mock.calls[0]!
     expect(url).toContain('/songs/pc-song-42/arrangements')

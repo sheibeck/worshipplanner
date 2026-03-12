@@ -87,7 +87,7 @@
                   </div>
                   <p class="text-xs text-indigo-400/80 mt-0.5">{{ item.reason }}</p>
                 </div>
-                <SongBadge :type="item.song.vwType" />
+                <SongBadge :types="item.song.vwTypes ?? []" />
               </button>
             </div>
 
@@ -123,7 +123,7 @@
                   </span>
                 </div>
               </div>
-              <SongBadge :type="result.song.vwType" />
+              <SongBadge :types="result.song.vwTypes ?? []" />
             </button>
           </div>
 
@@ -152,7 +152,7 @@
                 <span class="text-sm text-gray-100 truncate block">{{ song.title }}</span>
                 <span class="text-xs text-gray-400">{{ preferredKey(song) }}</span>
               </div>
-              <SongBadge :type="song.vwType" />
+              <SongBadge :types="song.vwTypes ?? []" />
             </button>
           </div>
           <div v-else class="px-4 py-4 text-center">
@@ -211,8 +211,8 @@ const searchResults = computed<Song[]>(() => {
   return props.songs
     .filter((s) => s.title.toLowerCase().includes(q))
     .sort((a, b) => {
-      const aMatch = a.vwType === props.requiredVwType ? 1 : 0
-      const bMatch = b.vwType === props.requiredVwType ? 1 : 0
+      const aMatch = (a.vwTypes ?? []).includes(props.requiredVwType) ? 1 : 0
+      const bMatch = (b.vwTypes ?? []).includes(props.requiredVwType) ? 1 : 0
       return bMatch - aMatch
     })
 })

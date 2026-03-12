@@ -1,16 +1,21 @@
 <template>
-  <span
-    v-if="type !== null"
-    class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border"
-    :class="badgeClasses[type]"
-  >
-    Type {{ type }}
-  </span>
-  <span
-    v-else
-    class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-800 text-gray-500 border border-gray-700"
-  >
-    &mdash;
+  <span class="inline-flex items-center gap-1">
+    <template v-if="types.length > 0">
+      <span
+        v-for="t in types"
+        :key="t"
+        class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border"
+        :class="badgeClasses[t]"
+      >
+        Type {{ t }}
+      </span>
+    </template>
+    <span
+      v-else
+      class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-800 text-gray-500 border border-gray-700"
+    >
+      &mdash;
+    </span>
   </span>
 </template>
 
@@ -18,7 +23,7 @@
 import type { VWType } from '@/types/song'
 
 defineProps<{
-  type: VWType | null
+  types: VWType[]
 }>()
 
 // Static map prevents Tailwind v4 purge of dynamic class strings

@@ -229,7 +229,7 @@ interface FormState {
   title: string
   ccliNumber: string
   author: string
-  vwType: VWType | null
+  vwTypes: VWType[]
   themes: string[]
   notes: string
   teamTags: string[]
@@ -241,7 +241,7 @@ function emptyForm(): FormState {
     title: '',
     ccliNumber: '',
     author: '',
-    vwType: null,
+    vwTypes: [],
     themes: [],
     notes: '',
     teamTags: [],
@@ -254,7 +254,7 @@ function songToForm(song: Song): FormState {
     title: song.title,
     ccliNumber: song.ccliNumber,
     author: song.author,
-    vwType: song.vwType,
+    vwTypes: [...(song.vwTypes ?? [])],
     themes: [...song.themes],
     notes: song.notes,
     teamTags: [...song.teamTags],
@@ -330,11 +330,16 @@ const vwTypeUnselected: Record<1 | 2 | 3, string> = {
 }
 
 function vwTypeClasses(type: 1 | 2 | 3): string {
-  return form.value.vwType === type ? vwTypeSelected[type] : vwTypeUnselected[type]
+  return form.value.vwTypes.includes(type) ? vwTypeSelected[type] : vwTypeUnselected[type]
 }
 
 function toggleVwType(type: VWType) {
-  form.value.vwType = form.value.vwType === type ? null : type
+  const idx = form.value.vwTypes.indexOf(type)
+  if (idx >= 0) {
+    form.value.vwTypes.splice(idx, 1)
+  } else {
+    form.value.vwTypes.push(type)
+  }
 }
 
 // ── Song-level team tags ───────────────────────────────────────────────────────
@@ -373,7 +378,7 @@ async function onSave() {
     title,
     ccliNumber: form.value.ccliNumber.trim(),
     author: form.value.author.trim(),
-    vwType: form.value.vwType,
+    vwTypes: form.value.vwTypes,
     themes,
     notes: form.value.notes.trim(),
     teamTags: allTags,

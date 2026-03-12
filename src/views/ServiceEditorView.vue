@@ -451,7 +451,10 @@
                   <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">
                     {{ slotLabel(slot, index) }}
                   </p>
-                  <SongBadge :type="slot.requiredVwType" />
+                  <SongBadge
+                    v-if="slot.songId"
+                    :types="songStore.songs.find(s => s.id === slot.songId)?.vwTypes ?? []"
+                  />
                 </div>
 
                 <!-- Assigned song display -->

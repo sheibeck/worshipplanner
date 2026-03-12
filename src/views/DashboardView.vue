@@ -71,7 +71,7 @@ const upcomingServices = computed(() =>
 )
 
 const uncategorizedCount = computed(() =>
-  songStore.songs.filter((s) => s.vwType === null).length,
+  songStore.songs.filter((s) => s.vwTypes.length === 0).length,
 )
 
 // Subscribe to songs and services so dashboard data is reactive
