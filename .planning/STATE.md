@@ -110,6 +110,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Quick-5]: Songs support multiple VW types (vwTypes: VWType[]); PC import captures all category tags; service slot shows selected song's actual types
 - [Quick-6]: autosaveSaving boolean guard serialises concurrent onSave() calls; reschedules at 200ms if inflight; debounce increased to 800ms for drag sequences
 - [Quick-7]: PC export item titles use bare songTitle only — (Key: X) annotation removed from PC item names
+- [Quick-8]: Scripture input replaced with single freeform text field — parses "Isaiah 53:1-6", "John 1:1-10,15-20" etc. into ScriptureRef
 
 ### Blockers/Concerns
 
@@ -119,7 +120,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 
 ## Session Continuity
 
-Last activity: 2026-03-12 - Completed quick task 7: remove (Key: X) suffix from PC export song titles
+Last activity: 2026-03-12 - Completed quick task 8: replace separate scripture inputs with single freeform text field
 Last session: 2026-03-12T19:59:30Z
 Stopped at: Completed quick-7 (bare song titles in PC export)
 Resume file: None
