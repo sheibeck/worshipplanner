@@ -257,7 +257,7 @@ describe('createItem', () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(mockResponse), { status: 201 }))
 
     const result = await createItem('app-id', 'secret', 'svc-type-1', 'plan-1', {
-      title: 'Come Thou Fount (Key: G)',
+      title: 'Come Thou Fount',
       itemType: 'song_arrangement',
     })
 
@@ -269,7 +269,7 @@ describe('createItem', () => {
 
     const body = JSON.parse(options?.body as string)
     expect(body.data.attributes.item_type).toBe('song_arrangement')
-    expect(body.data.attributes.title).toBe('Come Thou Fount (Key: G)')
+    expect(body.data.attributes.title).toBe('Come Thou Fount')
   })
 
   it('sends POST with item_type "regular" for non-song items', async () => {
@@ -332,7 +332,7 @@ describe('updateItem', () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response('{}', { status: 200 }))
 
     await updateItem('app-id', 'secret', 'svc-type-1', 'plan-1', 'item-5', {
-      title: 'Come Thou Fount (Key: G)',
+      title: 'Come Thou Fount',
       itemType: 'song_arrangement',
     })
 
@@ -343,7 +343,7 @@ describe('updateItem', () => {
     const body = JSON.parse(options?.body as string)
     expect(body.data.type).toBe('Item')
     expect(body.data.id).toBe('item-5')
-    expect(body.data.attributes.title).toBe('Come Thou Fount (Key: G)')
+    expect(body.data.attributes.title).toBe('Come Thou Fount')
     expect(body.data.attributes.item_type).toBe('song_arrangement')
   })
 
@@ -517,7 +517,7 @@ describe('addSlotAsItem', () => {
   const defaultFetchResponse = () =>
     vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ data: { id: 'item-99' } }), { status: 201 }))
 
-  it('maps SONG slot without CCLI match to song_arrangement with "Title (Key: X)" format', async () => {
+  it('maps SONG slot without CCLI match to song_arrangement with bare song title', async () => {
     defaultFetchResponse()
     const slot: SongSlot = {
       kind: 'SONG',
@@ -533,7 +533,7 @@ describe('addSlotAsItem', () => {
     const [, options] = vi.mocked(fetch).mock.calls[0]!
     const body = JSON.parse(options?.body as string)
     expect(body.data.attributes.item_type).toBe('song_arrangement')
-    expect(body.data.attributes.title).toBe('Come Thou Fount (Key: G)')
+    expect(body.data.attributes.title).toBe('Come Thou Fount')
     expect(body.data.relationships).toBeUndefined()
   })
 
