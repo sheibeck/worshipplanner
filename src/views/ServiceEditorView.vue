@@ -1021,18 +1021,34 @@ const recentScriptureRefs = computed<ScriptureRef[]>(() => {
 watch(
   () => serviceStore.services,
   (services) => {
+    const found = services.find((s) => s.id === serviceId.value)
+    if (!found) return
+
     if (!localService.value) {
       // Initial load: populate from store
-      const found = services.find((s) => s.id === serviceId.value)
-      if (found) {
-        localService.value = JSON.parse(JSON.stringify(found))
-        originalService.value = JSON.parse(JSON.stringify(found))
-        // Reset autosave state when service first loads (or re-loads)
+      localService.value = JSON.parse(JSON.stringify(found))
+      originalService.value = JSON.parse(JSON.stringify(found))
+      // Reset autosave state when service first loads (or re-loads)
+      autosaveInitialized = false
+      previousService.value = null
+      autosaveStatus.value = 'idle'
+    } else if (autosaveStatus.value === 'idle' || autosaveStatus.value === 'saved') {
+      // Remote update arrived while user is not actively editing — apply it.
+      // This is what makes two simultaneous viewers see each other's changes.
+      // Guard: skip if the remote version matches what we already have (avoid
+      // spurious re-renders after our own save completes).
+      const remoteJson = JSON.stringify(found)
+      const localJson = JSON.stringify(localService.value)
+      if (remoteJson !== localJson) {
+        localService.value = JSON.parse(remoteJson)
+        originalService.value = JSON.parse(remoteJson)
+        // Reset autosaveInitialized so the watcher's first local mutation
+        // after a remote merge is NOT mistakenly treated as user-initiated.
         autosaveInitialized = false
-        previousService.value = null
-        autosaveStatus.value = 'idle'
       }
     }
+    // If autosaveStatus is 'pending' or 'saving', the user is actively editing —
+    // do not overwrite their in-progress work. Their save will win.
   },
   { immediate: true, deep: true },
 )
