@@ -141,6 +141,15 @@ describe('parseScriptureInput', () => {
     })
   })
 
+  it('parses "John 1:1-2,6-9" (multi-range with comma: min/max outer range)', () => {
+    expect(parseScriptureInput('John 1:1-2,6-9')).toEqual({
+      book: 'John',
+      chapter: 1,
+      verseStart: 1,
+      verseEnd: 9,
+    })
+  })
+
   it('parses "1 Corinthians 13:4-7" (numbered book)', () => {
     expect(parseScriptureInput('1 Corinthians 13:4-7')).toEqual({
       book: '1 Corinthians',
