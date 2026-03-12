@@ -109,6 +109,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Quick-4]: Import dialog requires explicit button click to close — backdrop/wrapper click-to-dismiss removed
 - [Quick-5]: Songs support multiple VW types (vwTypes: VWType[]); PC import captures all category tags; service slot shows selected song's actual types
 - [Quick-6]: autosaveSaving boolean guard serialises concurrent onSave() calls; reschedules at 200ms if inflight; debounce increased to 800ms for drag sequences
+- [Quick-7]: PC export item titles use bare songTitle only — (Key: X) annotation removed from PC item names
 
 ### Blockers/Concerns
 
@@ -118,7 +119,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 
 ## Session Continuity
 
-Last activity: 2026-03-12 - Completed quick task 6: fix service editor autosave race condition with inflight guard
-Last session: 2026-03-12T16:35:00.000Z
-Stopped at: Completed quick-6 (autosave inflight guard + 800ms debounce)
+Last activity: 2026-03-12 - Completed quick task 7: remove (Key: X) suffix from PC export song titles
+Last session: 2026-03-12T19:59:30Z
+Stopped at: Completed quick-7 (bare song titles in PC export)
 Resume file: None
