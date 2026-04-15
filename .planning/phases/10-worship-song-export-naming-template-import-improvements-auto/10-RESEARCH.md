@@ -512,17 +512,19 @@ function isNonOrchestraSong(song: Song): boolean {
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **How to add a team to a Planning Center plan via API?**
    - What we know: `GET /service_types/{id}/plans/{planId}/signup_teams` returns read-only team list. `PcoServicesNeededPosition` at `POST /needed_positions` takes a `team` relationship and `quantity`. `team_members` requires scheduling individual people.
    - What's unclear: Whether `needed_positions` can be created with only `quantity` + `team` relationship (without `time_id`), and whether this is what "adding a team to a plan" means in PC's model.
    - Recommendation: Validate against a real PC account before implementing. Fallback: if `needed_positions` requires `time_id`, fetch the plan's first `plan_time` and use its ID. If the endpoint consistently fails, log the team names in the export result message and skip the add. The CONTEXT.md decision says team-add failures are non-fatal.
+   - **RESOLVED:** Use `POST /service_types/{stId}/plans/{planId}/needed_positions` with `{ attributes: { quantity: 1 }, relationships: { team: { data: { type: 'Team', id } } } }` and optional `timeId`. Implemented in `addTeamToPlan` with graceful 422 fallback — team-add failures are non-fatal per D-05.
 
 2. **Does PC resequence items after DELETE?**
    - What we know: `fetchPlanItems` returns sequence numbers. The `createItem` POST accepts a `sequence` parameter.
    - What's unclear: Whether PC renumbers remaining items after a DELETE (shifting sequences), which would cause the re-created item to land at a different position.
    - Recommendation: Test with a real PC plan. If sequences shift, use position index (1, 2, 3...) for recreated items rather than the original placeholder sequence.
+   - **RESOLVED:** Item sequence is treated as a best-effort hint. Recreated items use the placeholder's original sequence value. Post-delete resequencing is accepted as a known limitation — export correctness is not sequence-order-dependent (the plan succeeds either way, items may shift slightly in edge cases).
 
 ---
 
