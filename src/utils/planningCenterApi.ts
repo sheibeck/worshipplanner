@@ -697,7 +697,7 @@ export async function addSlotAsItem(
     if (!slot.songId) {
       return ''
     }
-    const title = slot.songTitle ?? '[Empty Song]'
+    const title = `Worship Song - ${slot.songTitle ?? '[Empty Song]'}`
 
     // Look up PC song and arrangement BEFORE creating the item so we can include them in the POST
     let pcSongId: string | undefined
@@ -748,7 +748,7 @@ export async function addSlotAsItem(
   if (slot.kind === 'HYMN') {
     const numPart = slot.hymnNumber ? ` #${slot.hymnNumber}` : ''
     const versesPart = slot.verses ? ` (vv. ${slot.verses})` : ''
-    const title = `${slot.hymnName}${numPart}${versesPart}`
+    const title = `Worship Song - ${slot.hymnName}${numPart}${versesPart}`
     return createItem(appId, secret, serviceTypeId, planId, {
       title,
       itemType: 'song_arrangement',

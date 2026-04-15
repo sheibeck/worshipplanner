@@ -533,7 +533,7 @@ describe('addSlotAsItem', () => {
     const [, options] = vi.mocked(fetch).mock.calls[0]!
     const body = JSON.parse(options?.body as string)
     expect(body.data.attributes.item_type).toBe('song_arrangement')
-    expect(body.data.attributes.title).toBe('Come Thou Fount')
+    expect(body.data.attributes.title).toBe('Worship Song - Come Thou Fount')
     expect(body.data.relationships).toBeUndefined()
   })
 
@@ -746,7 +746,7 @@ describe('addSlotAsItem', () => {
     const [, options] = vi.mocked(fetch).mock.calls[0]!
     const body = JSON.parse(options?.body as string)
     expect(body.data.attributes.item_type).toBe('song_arrangement')
-    expect(body.data.attributes.title).toBe('Amazing Grace #337 (vv. 1, 3, 4)')
+    expect(body.data.attributes.title).toBe('Worship Song - Amazing Grace #337 (vv. 1, 3, 4)')
   })
 
   it('maps HYMN slot without number using just name', async () => {
@@ -763,7 +763,7 @@ describe('addSlotAsItem', () => {
 
     const [, options] = vi.mocked(fetch).mock.calls[0]!
     const body = JSON.parse(options?.body as string)
-    expect(body.data.attributes.title).toBe('Holy Holy Holy')
+    expect(body.data.attributes.title).toBe('Worship Song - Holy Holy Holy')
   })
 
   it('maps SCRIPTURE slot to regular item with title and ESV text as description', async () => {
@@ -1120,6 +1120,103 @@ describe('fetchLastScheduledItem', () => {
     expect(result).toEqual({
       notes: [{ categoryId: 'cat-2', content: 'Actual note' }],
     })
+  })
+})
+
+describe('addSlotAsItem - Worship Song prefix', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  it('SONG with songTitle produces title "Worship Song - I Believe"', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify({ data: { id: 'new-item-1' } }), { status: 201 }),
+    )
+    const slot = {
+      kind: 'SONG',
+      position: 0,
+      requiredVwType: 1,
+      songId: 'song-abc',
+      songTitle: 'I Believe',
+      songKey: 'G',
+    } as unknown as import('@/types/service').ServiceSlot
+
+    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 1, [])
+
+    // Find the fetch call whose URL ends with /items (createItem POST)
+    const createCall = vi.mocked(fetch).mock.calls.find(([url]) =>
+      (url as string).endsWith('/items'),
+    )
+    expect(createCall).toBeDefined()
+    const body = JSON.parse((createCall![1] as RequestInit).body as string)
+    expect(body.data.attributes.title).toBe('Worship Song - I Believe')
+  })
+
+  it('SONG with undefined songTitle produces title "Worship Song - [Empty Song]"', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify({ data: { id: 'new-item-1' } }), { status: 201 }),
+    )
+    const slot = {
+      kind: 'SONG',
+      position: 0,
+      requiredVwType: 1,
+      songId: 'abc',
+      songTitle: undefined,
+      songKey: null,
+    } as unknown as import('@/types/service').ServiceSlot
+
+    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 1, [])
+
+    const createCall = vi.mocked(fetch).mock.calls.find(([url]) =>
+      (url as string).endsWith('/items'),
+    )
+    expect(createCall).toBeDefined()
+    const body = JSON.parse((createCall![1] as RequestInit).body as string)
+    expect(body.data.attributes.title).toBe('Worship Song - [Empty Song]')
+  })
+
+  it('HYMN with hymnName, hymnNumber, and verses produces "Worship Song - Holy, Holy, Holy #1 (vv. 1-3)"', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify({ data: { id: 'new-item-1' } }), { status: 201 }),
+    )
+    const slot = {
+      kind: 'HYMN',
+      position: 1,
+      hymnName: 'Holy, Holy, Holy',
+      hymnNumber: '1',
+      verses: '1-3',
+    } as unknown as import('@/types/service').ServiceSlot
+
+    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 2, [])
+
+    const createCall = vi.mocked(fetch).mock.calls.find(([url]) =>
+      (url as string).endsWith('/items'),
+    )
+    expect(createCall).toBeDefined()
+    const body = JSON.parse((createCall![1] as RequestInit).body as string)
+    expect(body.data.attributes.title).toBe('Worship Song - Holy, Holy, Holy #1 (vv. 1-3)')
+  })
+
+  it('HYMN with bare hymnName (no number, no verses) produces "Worship Song - Amazing Grace"', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify({ data: { id: 'new-item-1' } }), { status: 201 }),
+    )
+    const slot = {
+      kind: 'HYMN',
+      position: 1,
+      hymnName: 'Amazing Grace',
+      hymnNumber: undefined,
+      verses: undefined,
+    } as unknown as import('@/types/service').ServiceSlot
+
+    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 2, [])
+
+    const createCall = vi.mocked(fetch).mock.calls.find(([url]) =>
+      (url as string).endsWith('/items'),
+    )
+    expect(createCall).toBeDefined()
+    const body = JSON.parse((createCall![1] as RequestInit).body as string)
+    expect(body.data.attributes.title).toBe('Worship Song - Amazing Grace')
   })
 })
 
