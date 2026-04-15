@@ -87,6 +87,6 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 10-01-PLAN.md — planningCenterApi.ts: "Worship Song - " title prefix + deleteItem + fetchServiceTypeTeams + addTeamToPlan (with Vitest coverage)
-- [ ] 10-02-PLAN.md — suggestions.ts orchestra soft-bonus (+200) + SongSlotPicker.vue opacity-50 dimming and orchestra-first search sort
+- [x] 10-01-PLAN.md — planningCenterApi.ts: "Worship Song - " title prefix + deleteItem + fetchServiceTypeTeams + addTeamToPlan (with Vitest coverage)
+- [x] 10-02-PLAN.md — suggestions.ts orchestra soft-bonus (+200) + SongSlotPicker.vue opacity-50 dimming and orchestra-first search sort
 - [ ] 10-03-PLAN.md — ServiceEditorView.vue: PC Teams fetch + checkbox UI + team-add on export + delete+recreate existing-plan rewrite + orchestra AI library filter
