@@ -17,7 +17,8 @@ export interface SuggestionResult {
  *
  * @param songs - All songs from the song store
  * @param requiredVwType - The VW type constraint for this slot (soft priority, not hard filter)
- * @param serviceTeams - Active teams for this service (AND logic: song must support ALL)
+ * @param serviceTeams - Active teams for this service. 'Orchestra' uses a soft +200 bonus;
+ *                       all other teams use AND-logic hard filter.
  * @param nowMs - Current time in ms (defaults to Date.now(), injectable for testing)
  */
 export function rankSongsForSlot(
@@ -29,17 +30,21 @@ export function rankSongsForSlot(
   const twoWeeksAgo = nowMs - RECENT_WEEKS * MS_PER_WEEK
 
   // 1. Filter: team compatibility (applied to ALL songs regardless of VW type)
-  // If serviceTeams is empty, no team filtering applies.
-  // If serviceTeams is non-empty, song must either:
+  // Orchestra is a soft-bonus team, not a hard-filter team (D-07)
+  // If serviceTeams is empty (or only Orchestra), no hard filtering applies.
+  // If serviceTeams contains non-Orchestra teams, song must either:
   //   (a) have no teamTags (universal — works for all configurations), OR
-  //   (b) include ALL active teams (AND logic)
+  //   (b) include ALL non-Orchestra active teams (AND logic)
+  const hasOrchestra = serviceTeams.includes('Orchestra')
+  const nonOrchestraTeams = serviceTeams.filter((t) => t !== 'Orchestra')
+
   const teamFiltered =
-    serviceTeams.length === 0
+    nonOrchestraTeams.length === 0
       ? songs
       : songs.filter(
           (s) =>
             s.teamTags.length === 0 ||
-            serviceTeams.every((team) => s.teamTags.includes(team)),
+            nonOrchestraTeams.every((team) => s.teamTags.includes(team)),
         )
 
   // 2. Score each song
@@ -65,7 +70,9 @@ export function rankSongsForSlot(
 
       // Type bonus: matching VW type gets +100 (soft priority, not a hard filter)
       const typeBonus = song.vwTypes.includes(requiredVwType) ? 100 : 0
-      score += typeBonus
+      // Orchestra bonus: +200 when service is orchestra and song is orchestra-tagged (D-07)
+      const orchestraBonus = hasOrchestra && song.teamTags.includes('Orchestra') ? 200 : 0
+      score += typeBonus + orchestraBonus
 
       return { song, score, weeksAgo, isRecent }
     })
