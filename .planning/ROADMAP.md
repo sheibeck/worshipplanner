@@ -78,3 +78,15 @@ Plans:
 - [ ] 09-01-PLAN.md — Song type + store: pcSongId/hidden fields, soft-delete, restoreSong, upsertSongs
 - [ ] 09-02-PLAN.md — PC import utility: fetchAllPcSongs, mapPcSongToUpsert, importFromPc (TDD)
 - [ ] 09-03-PLAN.md — UI: PcImportModal, hidden songs panel, restore flow, SongsView wiring
+
+### Phase 10: Worship song export naming, template import improvements, auto-add teams on import, orchestra filter for song suggestions
+
+**Goal:** Four focused improvements to Planning Center export and song suggestions: (1) prefix all PC-exported song/hymn item titles with "Worship Song - "; (2) when exporting to an existing PC plan, delete matched "Worship Song"/"Scripture Reading" placeholders and recreate the real items at their original sequence while removing any unmatched placeholders; (3) show PC Teams for the selected service type as checkboxes in the export dialog with case-insensitive auto-match against WorshipPlanner service teams, and add the checked teams to the plan on export (non-fatal); (4) replace the Orchestra hard-filter in song suggestions with a +200 scoring bonus so non-orchestra songs still appear but orchestra-tagged songs rank higher, dim non-orchestra songs with opacity-50 in the SongSlotPicker, and filter the AI-suggested songLibrary to orchestra-tagged songs only when the service has Orchestra as a team.
+**Requirements**: FEAT-1, FEAT-2, FEAT-3, FEAT-4a, FEAT-4b, FEAT-4c, FEAT-4-ai
+**Depends on:** Phase 9
+**Plans:** 3 plans
+
+Plans:
+- [ ] 10-01-PLAN.md — planningCenterApi.ts: "Worship Song - " title prefix + deleteItem + fetchServiceTypeTeams + addTeamToPlan (with Vitest coverage)
+- [ ] 10-02-PLAN.md — suggestions.ts orchestra soft-bonus (+200) + SongSlotPicker.vue opacity-50 dimming and orchestra-first search sort
+- [ ] 10-03-PLAN.md — ServiceEditorView.vue: PC Teams fetch + checkbox UI + team-add on export + delete+recreate existing-plan rewrite + orchestra AI library filter
