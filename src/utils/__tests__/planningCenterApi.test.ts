@@ -14,10 +14,13 @@ import {
   validatePcCredentials,
   fetchServiceTypes,
   fetchTemplates,
+  fetchServiceTypeTeams,
   createPlan,
   fetchTemplateItems,
   createItem,
   updateItem,
+  deleteItem,
+  addTeamToPlan,
   addSlotAsItem,
   buildPlanTitle,
   searchSongByCcli,
@@ -1247,6 +1250,108 @@ describe('createItemNote', () => {
     await expect(
       createItemNote('app-id', 'secret', 'svc-type-1', 'plan-1', 'item-99', 'cat-1', 'content'),
     ).rejects.toThrow('Failed to create item note: 400')
+  })
+})
+
+describe('deleteItem', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  it('sends DELETE to /service_types/ST/plans/P/items/I and resolves on 204', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 204 }))
+
+    await deleteItem('app', 'sec', 'ST', 'P', 'I')
+
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1)
+    const [url, options] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toContain('/service_types/ST/plans/P/items/I')
+    expect((options as RequestInit).method).toBe('DELETE')
+    const headers = (options as RequestInit).headers as Record<string, string>
+    expect(headers.Authorization).toBe('Basic ' + btoa('app:sec'))
+  })
+
+  it('throws on non-ok response with status in message', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('Not Found', { status: 404 }))
+
+    await expect(deleteItem('app', 'sec', 'ST', 'P', 'I')).rejects.toThrow('Failed to delete item: 404')
+  })
+})
+
+describe('fetchServiceTypeTeams', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  it('maps response data to {id, name}[] and hits correct URL', async () => {
+    const mockResponse = {
+      data: [
+        { id: 't1', attributes: { name: 'Orchestra' } },
+        { id: 't2', attributes: { name: 'Choir' } },
+      ],
+    }
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(mockResponse), { status: 200 }))
+
+    const result = await fetchServiceTypeTeams('app', 'sec', 'ST')
+
+    expect(result).toEqual([
+      { id: 't1', name: 'Orchestra' },
+      { id: 't2', name: 'Choir' },
+    ])
+    const [url] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toContain('/service_types/ST/teams')
+  })
+
+  it('throws on non-ok response', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('Server Error', { status: 500 }))
+
+    await expect(fetchServiceTypeTeams('app', 'sec', 'ST')).rejects.toThrow('Failed to fetch teams: 500')
+  })
+})
+
+describe('addTeamToPlan', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  it('sends POST to /service_types/ST/plans/P/needed_positions without timeId', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ data: { id: 'np-1' } }), { status: 201 }),
+    )
+
+    await addTeamToPlan('app', 'sec', 'ST', 'P', 'T')
+
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1)
+    const [url, options] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toContain('/service_types/ST/plans/P/needed_positions')
+    expect((options as RequestInit).method).toBe('POST')
+    const headers = (options as RequestInit).headers as Record<string, string>
+    expect(headers['Content-Type']).toBe('application/json')
+    const body = JSON.parse((options as RequestInit).body as string)
+    expect(body.data.type).toBe('NeededPosition')
+    expect(body.data.attributes.quantity).toBe(1)
+    expect(body.data.relationships.team.data).toEqual({ type: 'Team', id: 'T' })
+    expect(body.data.relationships.time).toBeUndefined()
+  })
+
+  it('includes time relationship when timeId is provided', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ data: { id: 'np-2' } }), { status: 201 }),
+    )
+
+    await addTeamToPlan('app', 'sec', 'ST', 'P', 'T', 'time-1')
+
+    const [, options] = vi.mocked(fetch).mock.calls[0]!
+    const body = JSON.parse((options as RequestInit).body as string)
+    expect(body.data.relationships.time.data).toEqual({ type: 'PlanTime', id: 'time-1' })
+  })
+
+  it('throws on non-ok response', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('Unprocessable', { status: 422 }))
+
+    await expect(addTeamToPlan('app', 'sec', 'ST', 'P', 'T')).rejects.toThrow(
+      'Failed to add team to plan: 422',
+    )
   })
 })
 

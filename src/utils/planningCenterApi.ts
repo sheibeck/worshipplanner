@@ -99,6 +99,33 @@ export async function fetchTemplates(
 }
 
 /**
+ * Fetch teams configured for a service type.
+ * Returns an array of {id, name} objects.
+ */
+export async function fetchServiceTypeTeams(
+  appId: string,
+  secret: string,
+  serviceTypeId: string,
+): Promise<Array<{ id: string; name: string }>> {
+  const response = await fetch(
+    `${PC_BASE_URL}/service_types/${serviceTypeId}/teams?per_page=100`,
+    {
+      headers: {
+        Authorization: basicAuthHeader(appId, secret),
+        Accept: 'application/json',
+      },
+    },
+  )
+  if (!response.ok) {
+    throw new Error(`Failed to fetch teams: ${response.status}`)
+  }
+  const json = (await response.json()) as {
+    data: Array<{ id: string; attributes: { name: string } }>
+  }
+  return json.data.map((t) => ({ id: t.id, name: t.attributes.name }))
+}
+
+/**
  * Fetch plans for a service type, optionally filtered to a date range.
  * Returns array of {id, title, sortDate, dates}.
  */
@@ -462,6 +489,77 @@ export async function updateItem(
   if (!response.ok) {
     const text = await response.text()
     throw new Error(`Failed to update item: ${response.status} ${text}`)
+  }
+}
+
+/**
+ * Delete an item from a plan.
+ */
+export async function deleteItem(
+  appId: string,
+  secret: string,
+  serviceTypeId: string,
+  planId: string,
+  itemId: string,
+): Promise<void> {
+  const response = await fetch(
+    `${PC_BASE_URL}/service_types/${serviceTypeId}/plans/${planId}/items/${itemId}`,
+    {
+      method: 'DELETE',
+      headers: {
+        Authorization: basicAuthHeader(appId, secret),
+        Accept: 'application/json',
+      },
+    },
+  )
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(`Failed to delete item: ${response.status} ${text}`)
+  }
+}
+
+/**
+ * Add a team to a plan by creating a needed_positions resource with quantity:1
+ * and a team relationship. Optionally include a time relationship when available.
+ *
+ * NOTE: PC API may require a time relationship depending on service type config.
+ * Callers should treat failures as non-fatal (see CONTEXT.md D-05).
+ */
+export async function addTeamToPlan(
+  appId: string,
+  secret: string,
+  serviceTypeId: string,
+  planId: string,
+  teamId: string,
+  timeId?: string,
+): Promise<void> {
+  const relationships: Record<string, unknown> = {
+    team: { data: { type: 'Team', id: teamId } },
+  }
+  if (timeId) {
+    relationships.time = { data: { type: 'PlanTime', id: timeId } }
+  }
+  const response = await fetch(
+    `${PC_BASE_URL}/service_types/${serviceTypeId}/plans/${planId}/needed_positions`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: basicAuthHeader(appId, secret),
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        data: {
+          type: 'NeededPosition',
+          attributes: { quantity: 1 },
+          relationships,
+        },
+      }),
+    },
+  )
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(`Failed to add team to plan: ${response.status} ${text}`)
   }
 }
 
