@@ -1272,7 +1272,12 @@ async function suggestAllSongs() {
   try {
     const sermonTopic = localService.value.sermonTopic ?? null
     const sermonPassage = localService.value.sermonPassage ?? null
-    const songLibrary = songStore.songs.map((s) => ({
+    // Orchestra AI filter (D-06, D-09): when service is orchestra, only include orchestra-tagged songs
+    const isOrchestraService = (localService.value?.teams ?? []).includes('Orchestra')
+    const librarySource = isOrchestraService
+      ? songStore.songs.filter((s) => s.teamTags.includes('Orchestra'))
+      : songStore.songs
+    const songLibrary = librarySource.map((s) => ({
       id: s.id,
       title: s.title,
       ccliNumber: s.ccliNumber,
@@ -1376,12 +1381,16 @@ async function fetchAiForSlot(slotIndex: number) {
       }
     }
 
+    const isOrchestraService = (localService.value?.teams ?? []).includes('Orchestra')
+    const librarySource = isOrchestraService
+      ? songStore.songs.filter((s) => s.teamTags.includes('Orchestra'))
+      : songStore.songs
     const result = await getSongSuggestions({
       sermonTopic: localService.value.sermonTopic ?? null,
       sermonPassage: localService.value.sermonPassage ?? null,
       slotVwType: songSlot.requiredVwType,
       alreadySelectedSongIds: alreadySelectedIds,
-      songLibrary: songStore.songs.map((s) => ({
+      songLibrary: librarySource.map((s) => ({
         id: s.id,
         title: s.title,
         ccliNumber: s.ccliNumber,
@@ -1619,57 +1628,98 @@ async function onConfirmExport() {
     const scriptureSlots = localService.value.slots.filter(s => s.kind === 'SCRIPTURE')
 
     if (exportMode.value === 'existing' && existingPlan.value) {
-      // ── Add to existing plan: replace placeholders, then append leftovers ──
+      // ── Add to existing plan: replace placeholders, then append leftovers (D-02) ──
       planId = existingPlan.value.id
 
       const existingItems = await fetchPlanItems(appId, secret, serviceTypeId, planId)
+
+      // First pass — classify placeholders into three buckets
       let songIndex = 0
       let scriptureIndex = 0
+      const songMatches: Array<{ item: (typeof existingItems)[number]; slot: (typeof songSlots)[number] }> = []
+      const scriptureMatches: Array<{ item: (typeof existingItems)[number]; slot: (typeof scriptureSlots)[number] }> = []
+      const unmatchedPlaceholderIds: string[] = []
 
-      // First pass: scan existing items for "Worship Song" / "Scripture Reading" placeholders
       for (const item of existingItems) {
         const titleLower = item.title.toLowerCase()
         const isSongPlaceholder = titleLower.includes('worship song')
         const isScripturePlaceholder = titleLower.includes('scripture reading')
 
         if (isSongPlaceholder && songIndex < songSlots.length) {
-          const slot = songSlots[songIndex]!
-          try {
-            await addSlotAsItem(appId, secret, serviceTypeId, planId, slot, item.sequence, songStore.songs, localService.value.sermonPassage)
-            songIndex++
-          } catch {
-            const label = slot.kind === 'SONG' ? ((slot as any).songTitle ?? 'Song') : ((slot as any).hymnName ?? 'Hymn')
-            failures.push(label)
-          }
+          songMatches.push({ item, slot: songSlots[songIndex]! })
+          songIndex++
         } else if (isScripturePlaceholder && scriptureIndex < scriptureSlots.length) {
-          const slot = scriptureSlots[scriptureIndex]!
-          try {
-            await addSlotAsItem(appId, secret, serviceTypeId, planId, slot, item.sequence, songStore.songs, localService.value.sermonPassage)
-            scriptureIndex++
-          } catch {
-            failures.push('Scripture')
-          }
+          scriptureMatches.push({ item, slot: scriptureSlots[scriptureIndex]! })
+          scriptureIndex++
+        } else if (isSongPlaceholder || isScripturePlaceholder) {
+          unmatchedPlaceholderIds.push(item.id)
         }
       }
 
-      // Second pass: append any remaining songs/scriptures after existing items
+      // Second pass — delete unmatched placeholders (non-fatal; D-02)
+      for (const itemId of unmatchedPlaceholderIds) {
+        try {
+          await deleteItem(appId, secret, serviceTypeId, planId, itemId)
+        } catch {
+          // Non-fatal: leaving a stale placeholder is acceptable, do not block export
+        }
+      }
+
+      // Third pass — delete matched song placeholders then recreate at same sequence
+      for (const { item, slot } of songMatches) {
+        try {
+          await deleteItem(appId, secret, serviceTypeId, planId, item.id)
+          await addSlotAsItem(
+            appId, secret, serviceTypeId, planId,
+            slot, item.sequence, songStore.songs, localService.value.sermonPassage,
+          )
+        } catch {
+          const label = slot.kind === 'SONG'
+            ? ((slot as any).songTitle ?? 'Song')
+            : ((slot as any).hymnName ?? 'Hymn')
+          failures.push(label)
+        }
+      }
+
+      // Fourth pass — delete matched scripture placeholders then recreate at same sequence
+      for (const { item, slot } of scriptureMatches) {
+        try {
+          await deleteItem(appId, secret, serviceTypeId, planId, item.id)
+          await addSlotAsItem(
+            appId, secret, serviceTypeId, planId,
+            slot, item.sequence, songStore.songs, localService.value.sermonPassage,
+          )
+        } catch {
+          failures.push('Scripture')
+        }
+      }
+
+      // Fifth pass — append leftover (unmatched WorshipPlanner) slots at end
       let sequence = existingItems.length > 0
-        ? Math.max(...existingItems.map(i => i.sequence)) + 1
+        ? Math.max(...existingItems.map((i) => i.sequence)) + 1
         : 1
 
       for (let i = songIndex; i < songSlots.length; i++) {
         try {
-          await addSlotAsItem(appId, secret, serviceTypeId, planId, songSlots[i]!, sequence, songStore.songs, localService.value.sermonPassage)
+          await addSlotAsItem(
+            appId, secret, serviceTypeId, planId,
+            songSlots[i]!, sequence, songStore.songs, localService.value.sermonPassage,
+          )
           sequence++
         } catch {
           const slot = songSlots[i]!
-          failures.push(slot.kind === 'SONG' ? ((slot as any).songTitle ?? 'Song') : ((slot as any).hymnName ?? 'Hymn'))
+          failures.push(
+            slot.kind === 'SONG' ? ((slot as any).songTitle ?? 'Song') : ((slot as any).hymnName ?? 'Hymn'),
+          )
         }
       }
 
       for (let i = scriptureIndex; i < scriptureSlots.length; i++) {
         try {
-          await addSlotAsItem(appId, secret, serviceTypeId, planId, scriptureSlots[i]!, sequence, songStore.songs, localService.value.sermonPassage)
+          await addSlotAsItem(
+            appId, secret, serviceTypeId, planId,
+            scriptureSlots[i]!, sequence, songStore.songs, localService.value.sermonPassage,
+          )
           sequence++
         } catch {
           failures.push('Scripture')
