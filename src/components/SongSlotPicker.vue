@@ -108,7 +108,10 @@
               :key="result.song.id"
               type="button"
               @click="onSelect(result.song)"
-              class="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-gray-900 transition-colors"
+              :class="[
+                'w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-gray-900 transition-colors',
+                isNonOrchestraSong(result.song) ? 'opacity-50' : '',
+              ]"
             >
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2">
@@ -146,7 +149,10 @@
               :key="song.id"
               type="button"
               @click="onSelect(song)"
-              class="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-gray-900 transition-colors"
+              :class="[
+                'w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-gray-900 transition-colors',
+                isNonOrchestraSong(song) ? 'opacity-50' : '',
+              ]"
             >
               <div class="flex-1 min-w-0">
                 <span class="text-sm text-gray-100 truncate block">{{ song.title }}</span>
@@ -211,6 +217,13 @@ const searchResults = computed<Song[]>(() => {
   return props.songs
     .filter((s) => s.title.toLowerCase().includes(q))
     .sort((a, b) => {
+      // Orchestra-first when service is orchestra (D-08)
+      if (isOrchestraService.value) {
+        const aOrch = a.teamTags.includes('Orchestra') ? 1 : 0
+        const bOrch = b.teamTags.includes('Orchestra') ? 1 : 0
+        if (bOrch !== aOrch) return bOrch - aOrch
+      }
+      // VW type match secondary sort
       const aMatch = (a.vwTypes ?? []).includes(props.requiredVwType) ? 1 : 0
       const bMatch = (b.vwTypes ?? []).includes(props.requiredVwType) ? 1 : 0
       return bMatch - aMatch
@@ -226,6 +239,12 @@ const resolvedAiSuggestions = computed<{ song: Song; reason: string }[]>(() => {
     })
     .filter((item): item is { song: Song; reason: string } => item !== null)
 })
+
+const isOrchestraService = computed(() => props.serviceTeams.includes('Orchestra'))
+
+function isNonOrchestraSong(song: Song): boolean {
+  return isOrchestraService.value && !song.teamTags.includes('Orchestra')
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
