@@ -284,8 +284,28 @@
                   </select>
                 </div>
 
+                <!-- PC Teams (D-04, D-05) -->
+                <div v-if="pcTeams.length > 0" class="mb-3">
+                  <label class="block text-xs text-gray-400 mb-1">Teams</label>
+                  <div class="space-y-1">
+                    <label
+                      v-for="team in pcTeams"
+                      :key="team.id"
+                      class="flex items-center gap-2 text-sm text-gray-200 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        :value="team.id"
+                        v-model="selectedPcTeamIds"
+                        class="h-4 w-4 rounded border-gray-600 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-gray-900"
+                      />
+                      {{ team.name }}
+                    </label>
+                  </div>
+                </div>
+
                 <!-- Info for existing plan mode -->
-                <p v-if="exportMode === 'existing'" class="text-xs text-gray-500 mb-3">Songs replace "Worship Song" items and scriptures replace "Scripture Reading" items in the plan. Any extras are appended at the end.</p>
+                <p v-if="exportMode === 'existing'" class="text-xs text-gray-500 mb-3">Worship Song items are replaced. Scripture Reading items are replaced. Unmatched placeholders are removed. Extras are appended at the end.</p>
 
                 <!-- Service Date (read-only) -->
                 <div class="mb-4">
@@ -834,7 +854,7 @@ import SongSlotPicker from '@/components/SongSlotPicker.vue'
 import ScriptureInput from '@/components/ScriptureInput.vue'
 import ServicePrintLayout from '@/components/ServicePrintLayout.vue'
 import { formatForPlanningCenter } from '@/utils/planningCenterExport'
-import { fetchServiceTypes, fetchTemplates, fetchPlans, fetchPlanItems, createPlan, fetchTemplateItems, addSlotAsItem, buildPlanTitle, createItem, updateItem, createPlanTime } from '@/utils/planningCenterApi'
+import { fetchServiceTypes, fetchTemplates, fetchServiceTypeTeams, fetchPlans, fetchPlanItems, createPlan, fetchTemplateItems, addSlotAsItem, buildPlanTitle, createItem, updateItem, deleteItem, createPlanTime, addTeamToPlan } from '@/utils/planningCenterApi'
 import { serverTimestamp } from 'firebase/firestore'
 import Sortable from 'sortablejs'
 import { getSongSuggestions } from '@/utils/claudeApi'
@@ -891,6 +911,8 @@ const exportSelectedTemplateId = ref('')
 const exportLoading = ref(false)
 const existingPlan = ref<{ id: string; title: string; dates: string } | null>(null)
 const exportMode = ref<'new' | 'existing'>('new')
+const pcTeams = ref<Array<{ id: string; name: string }>>([])
+const selectedPcTeamIds = ref<string[]>([])
 
 // ── Computed: editing guard ─────────────────────────────────────────────────────
 
@@ -1504,6 +1526,8 @@ async function onExportToPC() {
   exportLoading.value = true
   existingPlan.value = null
   exportMode.value = 'new'
+  pcTeams.value = []
+  selectedPcTeamIds.value = []
 
   try {
     const { appId, secret } = authStore.pcCredentials
@@ -1522,6 +1546,22 @@ async function onExportToPC() {
 
       // Check if a plan already exists for this date
       await checkForExistingPlan()
+
+      // Fetch PC teams for the selected service type and pre-select matching ones (D-04, D-05)
+      try {
+        pcTeams.value = await fetchServiceTypeTeams(appId, secret, exportSelectedServiceTypeId.value)
+        selectedPcTeamIds.value = pcTeams.value
+          .filter((pcTeam) =>
+            (localService.value?.teams ?? []).some(
+              (svcTeam) => svcTeam.toLowerCase() === pcTeam.name.toLowerCase(),
+            ),
+          )
+          .map((t) => t.id)
+      } catch {
+        // Non-fatal: if teams cannot be fetched, export can still proceed without team add
+        pcTeams.value = []
+        selectedPcTeamIds.value = []
+      }
     }
   } catch (e) {
     exportError.value = e instanceof Error ? e.message : 'Failed to load export options'
@@ -1537,10 +1577,25 @@ async function onServiceTypeChange() {
   exportSelectedTemplateId.value = ''
   existingPlan.value = null
   exportMode.value = 'new'
+  pcTeams.value = []
+  selectedPcTeamIds.value = []
   try {
     exportTemplates.value = await fetchTemplates(appId, secret, exportSelectedServiceTypeId.value)
     exportSelectedTemplateId.value = exportTemplates.value[0]?.id ?? ''
     await checkForExistingPlan()
+    try {
+      pcTeams.value = await fetchServiceTypeTeams(appId, secret, exportSelectedServiceTypeId.value)
+      selectedPcTeamIds.value = pcTeams.value
+        .filter((pcTeam) =>
+          (localService.value?.teams ?? []).some(
+            (svcTeam) => svcTeam.toLowerCase() === pcTeam.name.toLowerCase(),
+          ),
+        )
+        .map((t) => t.id)
+    } catch {
+      pcTeams.value = []
+      selectedPcTeamIds.value = []
+    }
   } catch {
     // silently ignore — user can still export without template
   }
@@ -1728,6 +1783,15 @@ async function onConfirmExport() {
             failures.push(label)
           }
         }
+      }
+    }
+
+    // Add selected PC teams to the plan (D-04). Non-fatal per partial-failure pattern.
+    for (const teamId of selectedPcTeamIds.value) {
+      try {
+        await addTeamToPlan(appId, secret, serviceTypeId, planId, teamId)
+      } catch {
+        // Non-fatal: team-add failures do not block export completion
       }
     }
 
