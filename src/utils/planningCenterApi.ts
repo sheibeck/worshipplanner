@@ -551,50 +551,25 @@ export async function deleteItem(
 }
 
 /**
- * Fetch all team positions (roles) for a given team.
- * PC's needed_positions endpoint requires a team_position_id, not just a team_id.
- */
-export async function fetchTeamPositions(
-  appId: string,
-  secret: string,
-  serviceTypeId: string,
-  teamId: string,
-): Promise<Array<{ id: string; name: string }>> {
-  const response = await fetch(
-    `${PC_BASE_URL}/service_types/${serviceTypeId}/teams/${teamId}/team_positions`,
-    {
-      headers: {
-        Authorization: basicAuthHeader(appId, secret),
-        Accept: 'application/json',
-      },
-    },
-  )
-  if (!response.ok) {
-    const text = await response.text()
-    throw new Error(`Failed to fetch team positions: ${response.status} ${text}`)
-  }
-  const json = (await response.json()) as {
-    data: Array<{ id: string; attributes: { name: string } }>
-  }
-  return json.data.map((p) => ({ id: p.id, name: p.attributes.name }))
-}
-
-/**
- * Add a single team position to a plan via needed_positions.
+ * Import teams from a plan template into an existing plan using PC's import_template action.
  *
- * PC requires a team_position relationship (a specific role within a team).
- * Sending only a team relationship returns 422 "invalid for team" on team_position_id.
- * Do NOT send time_id — PC returns 422 "can't be assigned for a non split-team team".
+ * This is the same action PC's UI uses when you click Add → Import template on a plan.
+ * Templates carry team associations; this endpoint applies those teams to the plan.
+ *
+ * NOTE: Pass the selectedTeamIds to limit which teams are imported. The exact API
+ * parameter names are inferred from PC JSON API conventions — log the response to
+ * validate and adjust if needed.
  */
-export async function addTeamPositionToPlan(
+export async function importPlanTemplate(
   appId: string,
   secret: string,
   serviceTypeId: string,
   planId: string,
-  teamPositionId: string,
+  templateId: string,
+  selectedTeamIds: string[],
 ): Promise<void> {
   const response = await fetch(
-    `${PC_BASE_URL}/service_types/${serviceTypeId}/plans/${planId}/needed_positions`,
+    `${PC_BASE_URL}/service_types/${serviceTypeId}/plans/${planId}/import_template`,
     {
       method: 'POST',
       headers: {
@@ -604,10 +579,12 @@ export async function addTeamPositionToPlan(
       },
       body: JSON.stringify({
         data: {
-          type: 'NeededPosition',
-          attributes: { quantity: 1 },
-          relationships: {
-            team_position: { data: { type: 'TeamPosition', id: teamPositionId } },
+          type: 'Plan',
+          attributes: {
+            plan_template_id: templateId,
+            import_items: false,
+            import_teams: true,
+            team_ids: selectedTeamIds,
           },
         },
       }),
@@ -615,45 +592,10 @@ export async function addTeamPositionToPlan(
   )
   if (!response.ok) {
     const text = await response.text()
-    throw new Error(`Failed to add team position to plan: ${response.status} ${text}`)
+    console.error('[PC API] import_template response:', text)
+    throw new Error(`Failed to import template teams: ${response.status} ${text}`)
   }
-}
-
-/**
- * Fetch existing needed_positions (team slots) for a plan.
- * Returns the set of team IDs already assigned to the plan.
- * Used to skip teams that are already present before calling addTeamToPlan,
- * preventing duplicate needed_positions on re-export to an existing plan.
- */
-export async function fetchPlanNeededPositionTeamIds(
-  appId: string,
-  secret: string,
-  serviceTypeId: string,
-  planId: string,
-): Promise<Set<string>> {
-  const response = await fetch(
-    `${PC_BASE_URL}/service_types/${serviceTypeId}/plans/${planId}/needed_positions?per_page=100&include=team`,
-    {
-      headers: {
-        Authorization: basicAuthHeader(appId, secret),
-        Accept: 'application/json',
-      },
-    },
-  )
-  if (!response.ok) {
-    throw new Error(`Failed to fetch needed positions: ${response.status}`)
-  }
-  const json = (await response.json()) as {
-    data: Array<{
-      relationships: { team: { data: { id: string } | null } }
-    }>
-  }
-  const ids = new Set<string>()
-  for (const pos of json.data) {
-    const teamId = pos.relationships.team.data?.id
-    if (teamId) ids.add(teamId)
-  }
-  return ids
+  console.log('[PC API] import_template succeeded')
 }
 
 /**

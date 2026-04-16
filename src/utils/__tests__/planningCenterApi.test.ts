@@ -20,8 +20,7 @@ import {
   createItem,
   updateItem,
   deleteItem,
-  fetchTeamPositions,
-  addTeamPositionToPlan,
+  importPlanTemplate,
   addSlotAsItem,
   buildPlanTitle,
   searchSongByCcli,
@@ -1311,71 +1310,31 @@ describe('fetchServiceTypeTeams', () => {
   })
 })
 
-describe('fetchTeamPositions', () => {
+describe('importPlanTemplate', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn())
   })
 
-  it('returns mapped positions and hits correct URL', async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          data: [
-            { id: 'tp-1', attributes: { name: 'Lead Vocals' } },
-            { id: 'tp-2', attributes: { name: 'Keys' } },
-          ],
-        }),
-        { status: 200 },
-      ),
-    )
+  it('POSTs to import_template with plan_template_id, import_items:false, and team_ids', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('{}', { status: 200 }))
 
-    const result = await fetchTeamPositions('app', 'sec', 'ST', 'T1')
-
-    expect(result).toEqual([
-      { id: 'tp-1', name: 'Lead Vocals' },
-      { id: 'tp-2', name: 'Keys' },
-    ])
-    const [url] = vi.mocked(fetch).mock.calls[0]!
-    expect(url).toContain('/service_types/ST/teams/T1/team_positions')
-  })
-
-  it('throws on non-ok response', async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(new Response('Not Found', { status: 404 }))
-
-    await expect(fetchTeamPositions('app', 'sec', 'ST', 'T1')).rejects.toThrow(
-      'Failed to fetch team positions: 404',
-    )
-  })
-})
-
-describe('addTeamPositionToPlan', () => {
-  beforeEach(() => {
-    vi.stubGlobal('fetch', vi.fn())
-  })
-
-  it('sends POST with team_position relationship — no time_id, no team relationship', async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(
-      new Response(JSON.stringify({ data: { id: 'np-1' } }), { status: 201 }),
-    )
-
-    await addTeamPositionToPlan('app', 'sec', 'ST', 'P', 'TP1')
+    await importPlanTemplate('app', 'sec', 'ST', 'P', 'TMPL1', ['T1', 'T2'])
 
     const [url, options] = vi.mocked(fetch).mock.calls[0]!
-    expect(url).toContain('/service_types/ST/plans/P/needed_positions')
+    expect(url).toContain('/service_types/ST/plans/P/import_template')
     expect((options as RequestInit).method).toBe('POST')
     const body = JSON.parse((options as RequestInit).body as string)
-    expect(body.data.type).toBe('NeededPosition')
-    expect(body.data.attributes.quantity).toBe(1)
-    expect(body.data.attributes.time_id).toBeUndefined()
-    expect(body.data.relationships.team_position.data).toEqual({ type: 'TeamPosition', id: 'TP1' })
-    expect(body.data.relationships.team).toBeUndefined()
+    expect(body.data.attributes.plan_template_id).toBe('TMPL1')
+    expect(body.data.attributes.import_items).toBe(false)
+    expect(body.data.attributes.import_teams).toBe(true)
+    expect(body.data.attributes.team_ids).toEqual(['T1', 'T2'])
   })
 
   it('throws on non-ok response', async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(new Response('Unprocessable', { status: 422 }))
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('Error', { status: 422 }))
 
-    await expect(addTeamPositionToPlan('app', 'sec', 'ST', 'P', 'TP1')).rejects.toThrow(
-      'Failed to add team position to plan: 422',
+    await expect(importPlanTemplate('app', 'sec', 'ST', 'P', 'TMPL1', ['T1'])).rejects.toThrow(
+      'Failed to import template teams: 422',
     )
   })
 })
