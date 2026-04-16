@@ -3,7 +3,7 @@
     <div class="px-6 py-8 max-w-4xl">
       <!-- Page header -->
       <div class="mb-6">
-        <h1 class="text-xl font-semibold text-gray-100">Team</h1>
+        <h1 class="text-xl font-semibold text-gray-100">Users</h1>
         <p v-if="authStore.orgName" class="text-sm text-gray-400 mt-1">{{ authStore.orgName }}</p>
       </div>
 
