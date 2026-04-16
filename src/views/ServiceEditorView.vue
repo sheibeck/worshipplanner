@@ -854,7 +854,7 @@ import SongSlotPicker from '@/components/SongSlotPicker.vue'
 import ScriptureInput from '@/components/ScriptureInput.vue'
 import ServicePrintLayout from '@/components/ServicePrintLayout.vue'
 import { formatForPlanningCenter } from '@/utils/planningCenterExport'
-import { fetchServiceTypes, fetchTemplates, fetchServiceTypeTeams, fetchPlans, fetchPlanItems, createPlan, fetchTemplateItems, addSlotAsItem, buildPlanTitle, createItem, updateItem, deleteItem, createPlanTime, addTeamToPlan } from '@/utils/planningCenterApi'
+import { fetchServiceTypes, fetchTemplates, fetchServiceTypeTeams, fetchPlans, fetchPlanItems, createPlan, fetchTemplateItems, addSlotAsItem, buildPlanTitle, createItem, updateItem, deleteItem, createPlanTime, fetchPlanTimes, addTeamToPlan } from '@/utils/planningCenterApi'
 import { serverTimestamp } from 'firebase/firestore'
 import Sortable from 'sortablejs'
 import { getSongSuggestions } from '@/utils/claudeApi'
@@ -869,6 +869,36 @@ const songStore = useSongStore()
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const AVAILABLE_TEAMS = ['Choir', 'Orchestra', 'Communion', 'Special']
+
+// Teams that should be pre-checked in the PC export dialog every time, regardless
+// of what the service has flagged. Matched as case-insensitive substrings against
+// the team name fetched from Planning Center, because PC names may vary slightly
+// (e.g. "Worship Vocals" vs "Worship - Vocals").
+const DEFAULT_PC_TEAM_NAMES = [
+  'Preacher and Deacon and other Leaders',
+  'Scripture Reading',
+  'Worship Vocals',
+  'Worship Band',
+  'Pray-er',
+  'Sanctuary Sound',
+  'Livestream Sound',
+  'Projection',
+  'Livestream Camera',
+] as const
+
+/**
+ * Decide whether a Planning Center team should be pre-checked when the export
+ * dialog opens. Returns true if EITHER:
+ *   (a) the PC team name contains any DEFAULT_PC_TEAM_NAMES entry (case-insensitive substring), OR
+ *   (b) any conditional team flag on the service exactly matches the PC team name (case-insensitive).
+ * Case (b) preserves the existing pre-Quick behavior for Orchestra / Choir / Communion / Special.
+ */
+function shouldPreselectPcTeam(pcTeamName: string, serviceTeams: readonly string[]): boolean {
+  const lowerName = pcTeamName.toLowerCase()
+  const matchesDefault = DEFAULT_PC_TEAM_NAMES.some((d) => lowerName.includes(d.toLowerCase()))
+  if (matchesDefault) return true
+  return serviceTeams.some((svcTeam) => svcTeam.toLowerCase() === lowerName)
+}
 
 const statusBadgeClasses: Record<string, string> = {
   draft: 'bg-gray-800 text-gray-400 border-gray-700',
@@ -1560,11 +1590,7 @@ async function onExportToPC() {
       try {
         pcTeams.value = await fetchServiceTypeTeams(appId, secret, exportSelectedServiceTypeId.value)
         selectedPcTeamIds.value = pcTeams.value
-          .filter((pcTeam) =>
-            (localService.value?.teams ?? []).some(
-              (svcTeam) => svcTeam.toLowerCase() === pcTeam.name.toLowerCase(),
-            ),
-          )
+          .filter((pcTeam) => shouldPreselectPcTeam(pcTeam.name, localService.value?.teams ?? []))
           .map((t) => t.id)
       } catch {
         // Non-fatal: if teams cannot be fetched, export can still proceed without team add
@@ -1595,11 +1621,7 @@ async function onServiceTypeChange() {
     try {
       pcTeams.value = await fetchServiceTypeTeams(appId, secret, exportSelectedServiceTypeId.value)
       selectedPcTeamIds.value = pcTeams.value
-        .filter((pcTeam) =>
-          (localService.value?.teams ?? []).some(
-            (svcTeam) => svcTeam.toLowerCase() === pcTeam.name.toLowerCase(),
-          ),
-        )
+        .filter((pcTeam) => shouldPreselectPcTeam(pcTeam.name, localService.value?.teams ?? []))
         .map((t) => t.id)
     } catch {
       pcTeams.value = []
@@ -1837,9 +1859,17 @@ async function onConfirmExport() {
     }
 
     // Add selected PC teams to the plan (D-04). Non-fatal per partial-failure pattern.
+    // Fetch plan times to supply the required time relationship to needed_positions.
+    let planServiceTimeId: string | undefined
+    try {
+      const planTimes = await fetchPlanTimes(appId, secret, serviceTypeId, planId)
+      planServiceTimeId = planTimes.find((t) => t.timeType === 'service')?.id ?? planTimes[0]?.id
+    } catch {
+      // Non-fatal: if plan times cannot be fetched, proceed without time relationship
+    }
     for (const teamId of selectedPcTeamIds.value) {
       try {
-        await addTeamToPlan(appId, secret, serviceTypeId, planId, teamId)
+        await addTeamToPlan(appId, secret, serviceTypeId, planId, teamId, planServiceTimeId)
       } catch {
         // Non-fatal: team-add failures do not block export completion
       }
