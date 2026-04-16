@@ -551,25 +551,81 @@ export async function deleteItem(
 }
 
 /**
- * Import teams from a plan template into an existing plan using PC's import_template action.
- *
- * This is the same action PC's UI uses when you click Add → Import template on a plan.
- * Templates carry team associations; this endpoint applies those teams to the plan.
- *
- * NOTE: Pass the selectedTeamIds to limit which teams are imported. The exact API
- * parameter names are inferred from PC JSON API conventions — log the response to
- * validate and adjust if needed.
+ * Fetch team IDs that already have needed_positions on a plan.
+ * Used before adding teams to avoid duplicates on re-export.
  */
-export async function importPlanTemplate(
+export async function fetchPlanNeededPositionTeamIds(
   appId: string,
   secret: string,
   serviceTypeId: string,
   planId: string,
-  templateId: string,
-  selectedTeamIds: string[],
+): Promise<Set<string>> {
+  const response = await fetch(
+    `${PC_BASE_URL}/service_types/${serviceTypeId}/plans/${planId}/needed_positions?include=team&per_page=100`,
+    {
+      headers: {
+        Authorization: basicAuthHeader(appId, secret),
+        Accept: 'application/json',
+      },
+    },
+  )
+  if (!response.ok) return new Set()
+  const json = (await response.json()) as {
+    data: Array<{ relationships?: { team?: { data?: { id: string } } } }>
+  }
+  const ids = new Set<string>()
+  for (const pos of json.data) {
+    const teamId = pos.relationships?.team?.data?.id
+    if (teamId) ids.add(teamId)
+  }
+  return ids
+}
+
+/**
+ * Fetch positions configured for a team.
+ * PC requires a valid team_position_id to create a NeededPosition.
+ * Returns [] for teams with no positions — those teams cannot get needed_positions.
+ */
+export async function fetchTeamPositions(
+  appId: string,
+  secret: string,
+  teamId: string,
+): Promise<Array<{ id: string; name: string }>> {
+  const response = await fetch(
+    `${PC_BASE_URL}/teams/${teamId}/team_positions?per_page=100`,
+    {
+      headers: {
+        Authorization: basicAuthHeader(appId, secret),
+        Accept: 'application/json',
+      },
+    },
+  )
+  if (!response.ok) return []
+  const json = (await response.json()) as {
+    data: Array<{ id: string; attributes: { name: string } }>
+  }
+  return json.data.map(p => ({ id: p.id, name: p.attributes.name }))
+}
+
+/**
+ * Add a team to a plan by creating one NeededPosition per team position.
+ *
+ * Teams appear in a PC plan's schedule section when they have needed_positions.
+ * PC requires the team_position relationship — you cannot create a needed_position
+ * without referencing a specific position within the team.
+ *
+ * Creates one unfilled slot per position; slots can be filled later in the PC UI.
+ */
+export async function addNeededPosition(
+  appId: string,
+  secret: string,
+  serviceTypeId: string,
+  planId: string,
+  teamId: string,
+  teamPositionId: string,
 ): Promise<void> {
   const response = await fetch(
-    `${PC_BASE_URL}/service_types/${serviceTypeId}/plans/${planId}/import_template`,
+    `${PC_BASE_URL}/service_types/${serviceTypeId}/plans/${planId}/needed_positions`,
     {
       method: 'POST',
       headers: {
@@ -579,12 +635,17 @@ export async function importPlanTemplate(
       },
       body: JSON.stringify({
         data: {
-          type: 'Plan',
+          type: 'NeededPosition',
           attributes: {
-            plan_template_id: templateId,
-            import_items: false,
-            import_teams: true,
-            team_ids: selectedTeamIds,
+            quantity: 1,
+          },
+          relationships: {
+            team: {
+              data: { type: 'Team', id: teamId },
+            },
+            team_position: {
+              data: { type: 'TeamPosition', id: teamPositionId },
+            },
           },
         },
       }),
@@ -592,10 +653,8 @@ export async function importPlanTemplate(
   )
   if (!response.ok) {
     const text = await response.text()
-    console.error('[PC API] import_template response:', text)
-    throw new Error(`Failed to import template teams: ${response.status} ${text}`)
+    throw new Error(`Failed to add position ${teamPositionId} for team ${teamId}: ${response.status} ${text}`)
   }
-  console.log('[PC API] import_template succeeded')
 }
 
 /**

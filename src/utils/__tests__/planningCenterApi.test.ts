@@ -20,7 +20,9 @@ import {
   createItem,
   updateItem,
   deleteItem,
-  importPlanTemplate,
+  fetchPlanNeededPositionTeamIds,
+  fetchTeamPositions,
+  addNeededPosition,
   addSlotAsItem,
   buildPlanTitle,
   searchSongByCcli,
@@ -1310,32 +1312,87 @@ describe('fetchServiceTypeTeams', () => {
   })
 })
 
-describe('importPlanTemplate', () => {
+describe('addNeededPosition', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn())
   })
 
-  it('POSTs to import_template with plan_template_id, import_items:false, and team_ids', async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(new Response('{}', { status: 200 }))
+  it('POSTs to needed_positions with team and team_position relationships', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('{}', { status: 201 }))
 
-    await importPlanTemplate('app', 'sec', 'ST', 'P', 'TMPL1', ['T1', 'T2'])
+    await addNeededPosition('app', 'sec', 'ST', 'P', 'TEAM1', 'POS1')
 
     const [url, options] = vi.mocked(fetch).mock.calls[0]!
-    expect(url).toContain('/service_types/ST/plans/P/import_template')
+    expect(url).toContain('/service_types/ST/plans/P/needed_positions')
     expect((options as RequestInit).method).toBe('POST')
     const body = JSON.parse((options as RequestInit).body as string)
-    expect(body.data.attributes.plan_template_id).toBe('TMPL1')
-    expect(body.data.attributes.import_items).toBe(false)
-    expect(body.data.attributes.import_teams).toBe(true)
-    expect(body.data.attributes.team_ids).toEqual(['T1', 'T2'])
+    expect(body.data.type).toBe('NeededPosition')
+    expect(body.data.attributes.quantity).toBe(1)
+    expect(body.data.relationships.team.data).toEqual({ type: 'Team', id: 'TEAM1' })
+    expect(body.data.relationships.team_position.data).toEqual({ type: 'TeamPosition', id: 'POS1' })
   })
 
   it('throws on non-ok response', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response('Error', { status: 422 }))
 
-    await expect(importPlanTemplate('app', 'sec', 'ST', 'P', 'TMPL1', ['T1'])).rejects.toThrow(
-      'Failed to import template teams: 422',
+    await expect(addNeededPosition('app', 'sec', 'ST', 'P', 'TEAM1', 'POS1')).rejects.toThrow(
+      'Failed to add position POS1 for team TEAM1: 422',
     )
+  })
+})
+
+describe('fetchTeamPositions', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  it('returns positions for a team from /teams/{id}/team_positions', async () => {
+    const mockPayload = {
+      data: [
+        { id: 'P1', attributes: { name: 'Lead Guitar' } },
+        { id: 'P2', attributes: { name: 'Drums' } },
+      ],
+    }
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(mockPayload), { status: 200 }))
+
+    const result = await fetchTeamPositions('app', 'sec', 'TEAM1')
+
+    const [url] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toContain('/teams/TEAM1/team_positions')
+    expect(result).toEqual([{ id: 'P1', name: 'Lead Guitar' }, { id: 'P2', name: 'Drums' }])
+  })
+
+  it('returns empty array on non-ok response (non-fatal)', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('Error', { status: 404 }))
+
+    const result = await fetchTeamPositions('app', 'sec', 'TEAM1')
+    expect(result).toEqual([])
+  })
+})
+
+describe('fetchPlanNeededPositionTeamIds', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  it('returns a Set of team IDs from existing needed_positions', async () => {
+    const mockPayload = {
+      data: [
+        { relationships: { team: { data: { id: 'T1', type: 'Team' } } } },
+        { relationships: { team: { data: { id: 'T2', type: 'Team' } } } },
+      ],
+    }
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(mockPayload), { status: 200 }))
+
+    const result = await fetchPlanNeededPositionTeamIds('app', 'sec', 'ST', 'P')
+    expect(result).toEqual(new Set(['T1', 'T2']))
+  })
+
+  it('returns empty Set on non-ok response (non-fatal)', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('Error', { status: 500 }))
+
+    const result = await fetchPlanNeededPositionTeamIds('app', 'sec', 'ST', 'P')
+    expect(result).toEqual(new Set())
   })
 })
 

@@ -854,7 +854,7 @@ import SongSlotPicker from '@/components/SongSlotPicker.vue'
 import ScriptureInput from '@/components/ScriptureInput.vue'
 import ServicePrintLayout from '@/components/ServicePrintLayout.vue'
 import { formatForPlanningCenter } from '@/utils/planningCenterExport'
-import { fetchServiceTypes, fetchTemplates, fetchServiceTypeTeams, fetchPlans, fetchPlanItems, createPlan, fetchTemplateItems, addSlotAsItem, buildPlanTitle, createItem, updateItem, deleteItem, createPlanTime, importPlanTemplate } from '@/utils/planningCenterApi'
+import { fetchServiceTypes, fetchTemplates, fetchServiceTypeTeams, fetchPlans, fetchPlanItems, createPlan, fetchTemplateItems, addSlotAsItem, buildPlanTitle, createItem, updateItem, deleteItem, createPlanTime, fetchPlanNeededPositionTeamIds, fetchTeamPositions, addNeededPosition } from '@/utils/planningCenterApi'
 import { serverTimestamp } from 'firebase/firestore'
 import Sortable from 'sortablejs'
 import { getSongSuggestions } from '@/utils/claudeApi'
@@ -1869,20 +1869,27 @@ async function onConfirmExport() {
       }
     }
 
-    // Add selected PC teams via the plan's import_template action.
-    // This mirrors what PC's UI does: Add → Import template → choose teams.
-    // Templates carry team associations; import_template applies them to the plan.
-    // Items are NOT imported here (handled separately by addSlotAsItem above).
-    const tmplId = exportSelectedTemplateId.value
-    if (tmplId && selectedPcTeamIds.value.length > 0) {
-      try {
-        await importPlanTemplate(appId, secret, serviceTypeId, planId, tmplId, selectedPcTeamIds.value)
-      } catch (err) {
-        console.error('[PC export] import_template failed:', err)
-        // Non-fatal: teams not added but export still completes
+    // Add selected PC teams by creating one NeededPosition per team position.
+    // PC requires a valid team_position_id — fetch each team's positions first.
+    // Teams with no positions configured in PC are skipped silently.
+    // For existing plans: skip teams that already have needed_positions to avoid duplicates.
+    if (selectedPcTeamIds.value.length > 0) {
+      let alreadyPresentTeamIds = new Set<string>()
+      if (exportMode.value === 'existing') {
+        alreadyPresentTeamIds = await fetchPlanNeededPositionTeamIds(appId, secret, serviceTypeId, planId)
       }
-    } else if (!tmplId && selectedPcTeamIds.value.length > 0) {
-      console.warn('[PC export] No template selected — teams cannot be added without a template')
+      for (const teamId of selectedPcTeamIds.value) {
+        if (alreadyPresentTeamIds.has(teamId)) continue
+        try {
+          const positions = await fetchTeamPositions(appId, secret, teamId)
+          for (const position of positions) {
+            await addNeededPosition(appId, secret, serviceTypeId, planId, teamId, position.id)
+          }
+        } catch (err) {
+          console.error(`[PC export] addNeededPosition failed for team ${teamId}:`, err)
+          // Non-fatal: continue adding remaining teams
+        }
+      }
     }
 
     // Mark service as exported in Firestore
