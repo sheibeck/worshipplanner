@@ -33,7 +33,7 @@
 
       <!-- Dropdown panel -->
       <div
-        class="fixed z-40 bg-gray-800 border border-gray-700 rounded-lg shadow-xl max-h-80 overflow-y-auto"
+        class="fixed z-40 bg-gray-800 border border-gray-700 rounded-lg shadow-xl max-h-[600px] overflow-y-auto"
         :style="dropdownStyle"
       >
         <!-- Search bar -->
@@ -125,6 +125,16 @@
                     {{ result.weeksAgo !== null ? `Last used ${result.weeksAgo}w ago` : 'Never used' }}
                   </span>
                 </div>
+                <div
+                  v-if="result.song.teamTags.length > 0"
+                  class="flex flex-wrap gap-1 mt-1"
+                >
+                  <TeamTagPill
+                    v-for="tag in result.song.teamTags"
+                    :key="tag"
+                    :tag="tag"
+                  />
+                </div>
               </div>
               <SongBadge :types="result.song.vwTypes ?? []" />
             </button>
@@ -157,6 +167,16 @@
               <div class="flex-1 min-w-0">
                 <span class="text-sm text-gray-100 truncate block">{{ song.title }}</span>
                 <span class="text-xs text-gray-400">{{ preferredKey(song) }}</span>
+                <div
+                  v-if="song.teamTags.length > 0"
+                  class="flex flex-wrap gap-1 mt-1"
+                >
+                  <TeamTagPill
+                    v-for="tag in song.teamTags"
+                    :key="tag"
+                    :tag="tag"
+                  />
+                </div>
               </div>
               <SongBadge :types="song.vwTypes ?? []" />
             </button>
@@ -177,6 +197,7 @@ import type { Song, VWType } from '@/types/song'
 import type { SuggestionResult } from '@/utils/suggestions'
 import type { AiSongSuggestion } from '@/utils/claudeApi'
 import SongBadge from '@/components/SongBadge.vue'
+import TeamTagPill from '@/components/TeamTagPill.vue'
 
 const props = defineProps<{
   requiredVwType: VWType
@@ -208,7 +229,7 @@ const dropdownStyle = ref<Record<string, string>>({})
 
 const suggestions = computed<SuggestionResult[]>(() => {
   const results = rankSongsForSlot(props.songs, props.requiredVwType, props.serviceTeams)
-  return results.slice(0, 5)
+  return results.slice(0, 15)
 })
 
 const searchResults = computed<Song[]>(() => {
@@ -259,7 +280,7 @@ function openDropdown() {
   if (!triggerRef.value) return
 
   const rect = triggerRef.value.getBoundingClientRect()
-  const maxH = 320 // matches max-h-80 (20rem)
+  const maxH = 600 // matches max-h-[600px]
   const gap = 4
   const spaceBelow = window.innerHeight - rect.bottom - gap
   const spaceAbove = rect.top - gap
