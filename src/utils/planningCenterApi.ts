@@ -180,14 +180,16 @@ export async function fetchPlans(
 
 /**
  * Fetch existing items from a plan.
- * Returns the max sequence number so we can append after existing items.
+ * Returns id, title, sequence, and item_type for each item.
+ * item_type is used to distinguish song items ('song', 'song_arrangement') from
+ * other regular items ('regular', 'header') when matching for re-export.
  */
 export async function fetchPlanItems(
   appId: string,
   secret: string,
   serviceTypeId: string,
   planId: string,
-): Promise<Array<{ id: string; title: string; sequence: number }>> {
+): Promise<Array<{ id: string; title: string; sequence: number; itemType: string }>> {
   const response = await fetch(
     `${PC_BASE_URL}/service_types/${serviceTypeId}/plans/${planId}/items?per_page=100`,
     {
@@ -205,7 +207,7 @@ export async function fetchPlanItems(
   const json = (await response.json()) as {
     data: Array<{
       id: string
-      attributes: { title: string; sequence: number }
+      attributes: { title: string; sequence: number; item_type: string }
     }>
   }
 
@@ -213,6 +215,7 @@ export async function fetchPlanItems(
     id: item.id,
     title: item.attributes.title,
     sequence: item.attributes.sequence,
+    itemType: item.attributes.item_type,
   }))
 }
 
@@ -349,6 +352,35 @@ export async function createPlanTime(
 
   const json = (await response.json()) as { data: { id: string } }
   return json.data.id
+}
+
+/**
+ * Fetch plan times for a plan.
+ * Returns an array of {id, timeType} objects sorted by starts_at.
+ * Used to supply a time relationship when creating needed_positions.
+ */
+export async function fetchPlanTimes(
+  appId: string,
+  secret: string,
+  serviceTypeId: string,
+  planId: string,
+): Promise<Array<{ id: string; timeType: string }>> {
+  const response = await fetch(
+    `${PC_BASE_URL}/service_types/${serviceTypeId}/plans/${planId}/plan_times?order=starts_at`,
+    {
+      headers: {
+        Authorization: basicAuthHeader(appId, secret),
+        Accept: 'application/json',
+      },
+    },
+  )
+  if (!response.ok) {
+    throw new Error(`Failed to fetch plan times: ${response.status}`)
+  }
+  const json = (await response.json()) as {
+    data: Array<{ id: string; attributes: { time_type: string } }>
+  }
+  return json.data.map((t) => ({ id: t.id, timeType: t.attributes.time_type }))
 }
 
 /**
@@ -561,6 +593,43 @@ export async function addTeamToPlan(
     const text = await response.text()
     throw new Error(`Failed to add team to plan: ${response.status} ${text}`)
   }
+}
+
+/**
+ * Fetch existing needed_positions (team slots) for a plan.
+ * Returns the set of team IDs already assigned to the plan.
+ * Used to skip teams that are already present before calling addTeamToPlan,
+ * preventing duplicate needed_positions on re-export to an existing plan.
+ */
+export async function fetchPlanNeededPositionTeamIds(
+  appId: string,
+  secret: string,
+  serviceTypeId: string,
+  planId: string,
+): Promise<Set<string>> {
+  const response = await fetch(
+    `${PC_BASE_URL}/service_types/${serviceTypeId}/plans/${planId}/needed_positions?per_page=100&include=team`,
+    {
+      headers: {
+        Authorization: basicAuthHeader(appId, secret),
+        Accept: 'application/json',
+      },
+    },
+  )
+  if (!response.ok) {
+    throw new Error(`Failed to fetch needed positions: ${response.status}`)
+  }
+  const json = (await response.json()) as {
+    data: Array<{
+      relationships: { team: { data: { id: string } | null } }
+    }>
+  }
+  const ids = new Set<string>()
+  for (const pos of json.data) {
+    const teamId = pos.relationships.team.data?.id
+    if (teamId) ids.add(teamId)
+  }
+  return ids
 }
 
 /**
@@ -858,11 +927,12 @@ export async function addSlotAsItem(
   if (slot.kind === 'SCRIPTURE') {
     const verseRange =
       slot.verseStart && slot.verseEnd ? `:${slot.verseStart}-${slot.verseEnd}` : ''
-    const title = `${slot.book ?? ''} ${slot.chapter ?? ''}${verseRange}`.trim()
+    const refText = `${slot.book ?? ''} ${slot.chapter ?? ''}${verseRange}`.trim()
+    const title = `Scripture - ${refText}`
 
     let description: string | undefined
     try {
-      description = await fetchPassageText(title)
+      description = await fetchPassageText(refText)
     } catch {
       // silently ignore ESV fetch errors
     }

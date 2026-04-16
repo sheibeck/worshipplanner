@@ -27,6 +27,7 @@ import {
   fetchSongArrangements,
   fetchLastScheduledItem,
   createItemNote,
+  fetchPlanTimes,
 } from '@/utils/planningCenterApi'
 
 const mockTimestamp = { toDate: () => new Date('2026-03-08') } as unknown as Timestamp
@@ -786,7 +787,7 @@ describe('addSlotAsItem', () => {
     const [, options] = vi.mocked(fetch).mock.calls[0]!
     const body = JSON.parse(options?.body as string)
     expect(body.data.attributes.item_type).toBe('regular')
-    expect(body.data.attributes.title).toBe('John 3:16-17')
+    expect(body.data.attributes.title).toBe('Scripture - John 3:16-17')
     expect(body.data.attributes.html_details).toBe('For God so loved the world...')
   })
 
@@ -1352,6 +1353,37 @@ describe('addTeamToPlan', () => {
     await expect(addTeamToPlan('app', 'sec', 'ST', 'P', 'T')).rejects.toThrow(
       'Failed to add team to plan: 422',
     )
+  })
+})
+
+describe('fetchPlanTimes', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  it('maps response data to {id, timeType}[] and hits correct URL', async () => {
+    const mockResponse = {
+      data: [
+        { id: 'pt1', attributes: { time_type: 'service' } },
+        { id: 'pt2', attributes: { time_type: 'rehearsal' } },
+      ],
+    }
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(mockResponse), { status: 200 }))
+
+    const result = await fetchPlanTimes('app', 'sec', 'ST', 'P')
+
+    expect(result).toEqual([
+      { id: 'pt1', timeType: 'service' },
+      { id: 'pt2', timeType: 'rehearsal' },
+    ])
+    const [url] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toContain('/service_types/ST/plans/P/plan_times')
+  })
+
+  it('throws on non-ok response', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('Server Error', { status: 500 }))
+
+    await expect(fetchPlanTimes('app', 'sec', 'ST', 'P')).rejects.toThrow('Failed to fetch plan times: 500')
   })
 })
 

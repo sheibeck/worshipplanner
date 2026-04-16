@@ -854,7 +854,7 @@ import SongSlotPicker from '@/components/SongSlotPicker.vue'
 import ScriptureInput from '@/components/ScriptureInput.vue'
 import ServicePrintLayout from '@/components/ServicePrintLayout.vue'
 import { formatForPlanningCenter } from '@/utils/planningCenterExport'
-import { fetchServiceTypes, fetchTemplates, fetchServiceTypeTeams, fetchPlans, fetchPlanItems, createPlan, fetchTemplateItems, addSlotAsItem, buildPlanTitle, createItem, updateItem, deleteItem, createPlanTime, fetchPlanTimes, addTeamToPlan } from '@/utils/planningCenterApi'
+import { fetchServiceTypes, fetchTemplates, fetchServiceTypeTeams, fetchPlans, fetchPlanItems, createPlan, fetchTemplateItems, addSlotAsItem, buildPlanTitle, createItem, updateItem, deleteItem, createPlanTime, fetchPlanTimes, addTeamToPlan, fetchPlanNeededPositionTeamIds } from '@/utils/planningCenterApi'
 import { serverTimestamp } from 'firebase/firestore'
 import Sortable from 'sortablejs'
 import { getSongSuggestions } from '@/utils/claudeApi'
@@ -1664,16 +1664,27 @@ async function onConfirmExport() {
 
       for (const item of existingItems) {
         const titleLower = item.title.toLowerCase()
-        const isSongPlaceholder = titleLower.includes('worship song')
-        const isScripturePlaceholder = titleLower.includes('scripture reading')
+        // Match song placeholders (template) or actual song items created by a prior export.
+        // Songs always have 'worship song' in their title (set by addSlotAsItem for SONG/HYMN).
+        const isSongItem = titleLower.includes('worship song')
+          || item.itemType === 'song'
+          || item.itemType === 'song_arrangement'
+        // Match scripture placeholders (template 'scripture reading' title), items created by a
+        // prior export which now carry the 'Scripture - ' prefix, OR regular items that are not
+        // known non-scripture slots (Message, Prayer).
+        const NON_SCRIPTURE_REGULAR_TITLES = new Set(['message', 'prayer'])
+        const isScriptureItem = titleLower.startsWith('scripture - ')
+          || titleLower.includes('scripture reading')
+          || (item.itemType === 'regular' && !NON_SCRIPTURE_REGULAR_TITLES.has(titleLower))
 
-        if (isSongPlaceholder && songIndex < songSlots.length) {
+        if (isSongItem && songIndex < songSlots.length) {
           songMatches.push({ item, slot: songSlots[songIndex]! })
           songIndex++
-        } else if (isScripturePlaceholder && scriptureIndex < scriptureSlots.length) {
+        } else if (!isSongItem && isScriptureItem && scriptureIndex < scriptureSlots.length) {
           scriptureMatches.push({ item, slot: scriptureSlots[scriptureIndex]! })
           scriptureIndex++
-        } else if (isSongPlaceholder || isScripturePlaceholder) {
+        } else if (isSongItem || titleLower.includes('scripture reading')) {
+          // Only push unmatched song items or explicit 'scripture reading' placeholders
           unmatchedPlaceholderIds.push(item.id)
         }
       }
@@ -1800,7 +1811,7 @@ async function onConfirmExport() {
         for (const tItem of templateItems) {
           const titleLower = tItem.title.toLowerCase()
           const isSongItem = titleLower.includes('worship song')
-          const isScriptureItem = titleLower.includes('scripture reading')
+          const isScriptureItem = titleLower.startsWith('scripture - ') || titleLower.includes('scripture reading')
 
           try {
             if (isSongItem && songIndex < songSlots.length) {
@@ -1867,7 +1878,18 @@ async function onConfirmExport() {
     } catch {
       // Non-fatal: if plan times cannot be fetched, proceed without time relationship
     }
+    // For existing plans, skip teams already present to avoid duplicates (BUG 2 fix).
+    let existingTeamIds = new Set<string>()
+    if (exportMode.value === 'existing') {
+      try {
+        existingTeamIds = await fetchPlanNeededPositionTeamIds(appId, secret, serviceTypeId, planId)
+      } catch {
+        // Non-fatal: if we can't fetch existing positions, proceed and let addTeamToPlan
+        // fail non-fatally for any duplicates
+      }
+    }
     for (const teamId of selectedPcTeamIds.value) {
+      if (existingTeamIds.has(teamId)) continue
       try {
         await addTeamToPlan(appId, secret, serviceTypeId, planId, teamId, planServiceTimeId)
       } catch {
