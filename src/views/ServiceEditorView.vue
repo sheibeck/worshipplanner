@@ -854,7 +854,7 @@ import SongSlotPicker from '@/components/SongSlotPicker.vue'
 import ScriptureInput from '@/components/ScriptureInput.vue'
 import ServicePrintLayout from '@/components/ServicePrintLayout.vue'
 import { formatForPlanningCenter } from '@/utils/planningCenterExport'
-import { fetchServiceTypes, fetchTemplates, fetchServiceTypeTeams, fetchPlans, fetchPlanItems, createPlan, fetchTemplateItems, addSlotAsItem, buildPlanTitle, createItem, updateItem, deleteItem, createPlanTime, addTeamToPlan, fetchPlanNeededPositionTeamIds } from '@/utils/planningCenterApi'
+import { fetchServiceTypes, fetchTemplates, fetchServiceTypeTeams, fetchPlans, fetchPlanItems, createPlan, fetchTemplateItems, addSlotAsItem, buildPlanTitle, createItem, updateItem, deleteItem, createPlanTime, fetchTeamPositions, addTeamPositionToPlan, fetchPlanNeededPositionTeamIds } from '@/utils/planningCenterApi'
 import { serverTimestamp } from 'firebase/firestore'
 import Sortable from 'sortablejs'
 import { getSongSuggestions } from '@/utils/claudeApi'
@@ -1869,10 +1869,10 @@ async function onConfirmExport() {
       }
     }
 
-    // Add selected PC teams to the plan (D-04). Non-fatal per partial-failure pattern.
-    // NOTE: Do NOT send time_id — PC returns 422 "can't be assigned for a non split-team team"
-    // when time_id is present on regular (non-split) teams.
-    // For existing plans, skip teams already present to avoid duplicates.
+    // Add selected PC teams to the plan via needed_positions (D-04).
+    // PC requires a team_position_id (specific role within a team), not just a team_id.
+    // Flow: for each selected team, fetch its positions, then POST one needed_position per position.
+    // For existing plans, skip teams that already have needed_positions to avoid duplicates.
     let existingTeamIds = new Set<string>()
     if (exportMode.value === 'existing') {
       try {
@@ -1884,9 +1884,16 @@ async function onConfirmExport() {
     for (const teamId of selectedPcTeamIds.value) {
       if (existingTeamIds.has(teamId)) continue
       try {
-        await addTeamToPlan(appId, secret, serviceTypeId, planId, teamId)
+        const positions = await fetchTeamPositions(appId, secret, serviceTypeId, teamId)
+        for (const position of positions) {
+          try {
+            await addTeamPositionToPlan(appId, secret, serviceTypeId, planId, position.id)
+          } catch {
+            // Non-fatal: individual position failures don't block remaining positions
+          }
+        }
       } catch {
-        // Non-fatal: team-add failures do not block export completion
+        // Non-fatal: team position fetch failure doesn't block remaining teams
       }
     }
 

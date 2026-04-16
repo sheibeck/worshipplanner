@@ -551,22 +551,47 @@ export async function deleteItem(
 }
 
 /**
- * Add a team to a plan by creating a needed_positions resource.
- *
- * PC returns 422 with "can't be assigned for a non split-team team" if time_id
- * is included for regular (non-split) teams. Do NOT send time_id — omit it
- * entirely for standard team assignment.
- *
- * Correct body for non-split teams:
- *   attributes: { quantity: 1 }
- *   relationships: { team: { data: { type: "Team", id: "<teamId>" } } }
+ * Fetch all team positions (roles) for a given team.
+ * PC's needed_positions endpoint requires a team_position_id, not just a team_id.
  */
-export async function addTeamToPlan(
+export async function fetchTeamPositions(
+  appId: string,
+  secret: string,
+  serviceTypeId: string,
+  teamId: string,
+): Promise<Array<{ id: string; name: string }>> {
+  const response = await fetch(
+    `${PC_BASE_URL}/service_types/${serviceTypeId}/teams/${teamId}/team_positions`,
+    {
+      headers: {
+        Authorization: basicAuthHeader(appId, secret),
+        Accept: 'application/json',
+      },
+    },
+  )
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(`Failed to fetch team positions: ${response.status} ${text}`)
+  }
+  const json = (await response.json()) as {
+    data: Array<{ id: string; attributes: { name: string } }>
+  }
+  return json.data.map((p) => ({ id: p.id, name: p.attributes.name }))
+}
+
+/**
+ * Add a single team position to a plan via needed_positions.
+ *
+ * PC requires a team_position relationship (a specific role within a team).
+ * Sending only a team relationship returns 422 "invalid for team" on team_position_id.
+ * Do NOT send time_id — PC returns 422 "can't be assigned for a non split-team team".
+ */
+export async function addTeamPositionToPlan(
   appId: string,
   secret: string,
   serviceTypeId: string,
   planId: string,
-  teamId: string,
+  teamPositionId: string,
 ): Promise<void> {
   const response = await fetch(
     `${PC_BASE_URL}/service_types/${serviceTypeId}/plans/${planId}/needed_positions`,
@@ -582,7 +607,7 @@ export async function addTeamToPlan(
           type: 'NeededPosition',
           attributes: { quantity: 1 },
           relationships: {
-            team: { data: { type: 'Team', id: teamId } },
+            team_position: { data: { type: 'TeamPosition', id: teamPositionId } },
           },
         },
       }),
@@ -590,7 +615,7 @@ export async function addTeamToPlan(
   )
   if (!response.ok) {
     const text = await response.text()
-    throw new Error(`Failed to add team to plan: ${response.status} ${text}`)
+    throw new Error(`Failed to add team position to plan: ${response.status} ${text}`)
   }
 }
 

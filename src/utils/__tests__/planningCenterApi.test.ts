@@ -20,7 +20,8 @@ import {
   createItem,
   updateItem,
   deleteItem,
-  addTeamToPlan,
+  fetchTeamPositions,
+  addTeamPositionToPlan,
   addSlotAsItem,
   buildPlanTitle,
   searchSongByCcli,
@@ -1310,52 +1311,71 @@ describe('fetchServiceTypeTeams', () => {
   })
 })
 
-describe('addTeamToPlan', () => {
+describe('fetchTeamPositions', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn())
   })
 
-  it('sends POST to /service_types/ST/plans/P/needed_positions without timeId', async () => {
+  it('returns mapped positions and hits correct URL', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          data: [
+            { id: 'tp-1', attributes: { name: 'Lead Vocals' } },
+            { id: 'tp-2', attributes: { name: 'Keys' } },
+          ],
+        }),
+        { status: 200 },
+      ),
+    )
+
+    const result = await fetchTeamPositions('app', 'sec', 'ST', 'T1')
+
+    expect(result).toEqual([
+      { id: 'tp-1', name: 'Lead Vocals' },
+      { id: 'tp-2', name: 'Keys' },
+    ])
+    const [url] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toContain('/service_types/ST/teams/T1/team_positions')
+  })
+
+  it('throws on non-ok response', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('Not Found', { status: 404 }))
+
+    await expect(fetchTeamPositions('app', 'sec', 'ST', 'T1')).rejects.toThrow(
+      'Failed to fetch team positions: 404',
+    )
+  })
+})
+
+describe('addTeamPositionToPlan', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  it('sends POST with team_position relationship — no time_id, no team relationship', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
       new Response(JSON.stringify({ data: { id: 'np-1' } }), { status: 201 }),
     )
 
-    await addTeamToPlan('app', 'sec', 'ST', 'P', 'T')
+    await addTeamPositionToPlan('app', 'sec', 'ST', 'P', 'TP1')
 
-    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1)
     const [url, options] = vi.mocked(fetch).mock.calls[0]!
     expect(url).toContain('/service_types/ST/plans/P/needed_positions')
     expect((options as RequestInit).method).toBe('POST')
-    const headers = (options as RequestInit).headers as Record<string, string>
-    expect(headers['Content-Type']).toBe('application/json')
     const body = JSON.parse((options as RequestInit).body as string)
     expect(body.data.type).toBe('NeededPosition')
     expect(body.data.attributes.quantity).toBe(1)
-    expect(body.data.relationships.team.data).toEqual({ type: 'Team', id: 'T' })
-    expect(body.data.relationships.time).toBeUndefined()
     expect(body.data.attributes.time_id).toBeUndefined()
-  })
-
-  it('never sends time_id — PC rejects it with 422 for non-split-team teams', async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(
-      new Response(JSON.stringify({ data: { id: 'np-2' } }), { status: 201 }),
-    )
-
-    await addTeamToPlan('app', 'sec', 'ST', 'P', 'T')
-
-    const [, options] = vi.mocked(fetch).mock.calls[0]!
-    const body = JSON.parse((options as RequestInit).body as string)
-    // time_id must never be sent — PC returns 422 "can't be assigned for a non split-team team"
-    expect(body.data.attributes.time_id).toBeUndefined()
-    expect(body.data.relationships.time).toBeUndefined()
-    expect(body.data.attributes.quantity).toBe(1)
+    expect(body.data.relationships.team_position.data).toEqual({ type: 'TeamPosition', id: 'TP1' })
+    expect(body.data.relationships.team).toBeUndefined()
   })
 
   it('throws on non-ok response', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response('Unprocessable', { status: 422 }))
 
-    await expect(addTeamToPlan('app', 'sec', 'ST', 'P', 'T')).rejects.toThrow(
-      'Failed to add team to plan: 422',
+    await expect(addTeamPositionToPlan('app', 'sec', 'ST', 'P', 'TP1')).rejects.toThrow(
+      'Failed to add team position to plan: 422',
     )
   })
 })
