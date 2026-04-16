@@ -357,7 +357,7 @@ export async function createPlanTime(
 /**
  * Fetch plan times for a plan.
  * Returns an array of {id, timeType} objects sorted by starts_at.
- * Used to supply a time relationship when creating needed_positions.
+ * Used to supply the time_id attribute when creating needed_positions.
  */
 export async function fetchPlanTimes(
   appId: string,
@@ -551,11 +551,15 @@ export async function deleteItem(
 }
 
 /**
- * Add a team to a plan by creating a needed_positions resource with quantity:1
- * and a team relationship. Optionally include a time relationship when available.
+ * Add a team to a plan by creating a needed_positions resource.
  *
- * NOTE: PC API may require a time relationship depending on service type config.
- * Callers should treat failures as non-fatal (see CONTEXT.md D-05).
+ * PC returns 422 with "can't be assigned for a non split-team team" if time_id
+ * is included for regular (non-split) teams. Do NOT send time_id — omit it
+ * entirely for standard team assignment.
+ *
+ * Correct body for non-split teams:
+ *   attributes: { quantity: 1 }
+ *   relationships: { team: { data: { type: "Team", id: "<teamId>" } } }
  */
 export async function addTeamToPlan(
   appId: string,
@@ -563,14 +567,7 @@ export async function addTeamToPlan(
   serviceTypeId: string,
   planId: string,
   teamId: string,
-  timeId?: string,
 ): Promise<void> {
-  const relationships: Record<string, unknown> = {
-    team: { data: { type: 'Team', id: teamId } },
-  }
-  if (timeId) {
-    relationships.time = { data: { type: 'PlanTime', id: timeId } }
-  }
   const response = await fetch(
     `${PC_BASE_URL}/service_types/${serviceTypeId}/plans/${planId}/needed_positions`,
     {
@@ -584,7 +581,9 @@ export async function addTeamToPlan(
         data: {
           type: 'NeededPosition',
           attributes: { quantity: 1 },
-          relationships,
+          relationships: {
+            team: { data: { type: 'Team', id: teamId } },
+          },
         },
       }),
     },

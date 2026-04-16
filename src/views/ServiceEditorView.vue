@@ -854,7 +854,7 @@ import SongSlotPicker from '@/components/SongSlotPicker.vue'
 import ScriptureInput from '@/components/ScriptureInput.vue'
 import ServicePrintLayout from '@/components/ServicePrintLayout.vue'
 import { formatForPlanningCenter } from '@/utils/planningCenterExport'
-import { fetchServiceTypes, fetchTemplates, fetchServiceTypeTeams, fetchPlans, fetchPlanItems, createPlan, fetchTemplateItems, addSlotAsItem, buildPlanTitle, createItem, updateItem, deleteItem, createPlanTime, fetchPlanTimes, addTeamToPlan, fetchPlanNeededPositionTeamIds } from '@/utils/planningCenterApi'
+import { fetchServiceTypes, fetchTemplates, fetchServiceTypeTeams, fetchPlans, fetchPlanItems, createPlan, fetchTemplateItems, addSlotAsItem, buildPlanTitle, createItem, updateItem, deleteItem, createPlanTime, addTeamToPlan, fetchPlanNeededPositionTeamIds } from '@/utils/planningCenterApi'
 import { serverTimestamp } from 'firebase/firestore'
 import Sortable from 'sortablejs'
 import { getSongSuggestions } from '@/utils/claudeApi'
@@ -1870,28 +1870,21 @@ async function onConfirmExport() {
     }
 
     // Add selected PC teams to the plan (D-04). Non-fatal per partial-failure pattern.
-    // Fetch plan times to supply the required time relationship to needed_positions.
-    let planServiceTimeId: string | undefined
-    try {
-      const planTimes = await fetchPlanTimes(appId, secret, serviceTypeId, planId)
-      planServiceTimeId = planTimes.find((t) => t.timeType === 'service')?.id ?? planTimes[0]?.id
-    } catch {
-      // Non-fatal: if plan times cannot be fetched, proceed without time relationship
-    }
-    // For existing plans, skip teams already present to avoid duplicates (BUG 2 fix).
+    // NOTE: Do NOT send time_id — PC returns 422 "can't be assigned for a non split-team team"
+    // when time_id is present on regular (non-split) teams.
+    // For existing plans, skip teams already present to avoid duplicates.
     let existingTeamIds = new Set<string>()
     if (exportMode.value === 'existing') {
       try {
         existingTeamIds = await fetchPlanNeededPositionTeamIds(appId, secret, serviceTypeId, planId)
       } catch {
-        // Non-fatal: if we can't fetch existing positions, proceed and let addTeamToPlan
-        // fail non-fatally for any duplicates
+        // Non-fatal: proceed and let PC handle any duplicates
       }
     }
     for (const teamId of selectedPcTeamIds.value) {
       if (existingTeamIds.has(teamId)) continue
       try {
-        await addTeamToPlan(appId, secret, serviceTypeId, planId, teamId, planServiceTimeId)
+        await addTeamToPlan(appId, secret, serviceTypeId, planId, teamId)
       } catch {
         // Non-fatal: team-add failures do not block export completion
       }

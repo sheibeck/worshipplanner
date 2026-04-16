@@ -1333,18 +1333,22 @@ describe('addTeamToPlan', () => {
     expect(body.data.attributes.quantity).toBe(1)
     expect(body.data.relationships.team.data).toEqual({ type: 'Team', id: 'T' })
     expect(body.data.relationships.time).toBeUndefined()
+    expect(body.data.attributes.time_id).toBeUndefined()
   })
 
-  it('includes time relationship when timeId is provided', async () => {
+  it('never sends time_id — PC rejects it with 422 for non-split-team teams', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
       new Response(JSON.stringify({ data: { id: 'np-2' } }), { status: 201 }),
     )
 
-    await addTeamToPlan('app', 'sec', 'ST', 'P', 'T', 'time-1')
+    await addTeamToPlan('app', 'sec', 'ST', 'P', 'T')
 
     const [, options] = vi.mocked(fetch).mock.calls[0]!
     const body = JSON.parse((options as RequestInit).body as string)
-    expect(body.data.relationships.time.data).toEqual({ type: 'PlanTime', id: 'time-1' })
+    // time_id must never be sent — PC returns 422 "can't be assigned for a non split-team team"
+    expect(body.data.attributes.time_id).toBeUndefined()
+    expect(body.data.relationships.time).toBeUndefined()
+    expect(body.data.attributes.quantity).toBe(1)
   })
 
   it('throws on non-ok response', async () => {
