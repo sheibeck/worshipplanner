@@ -9,6 +9,7 @@ export interface ParsedSongPreview {
   vwTypes: VWType[]
   teamTags: string[]
   arrangements: Arrangement[]
+  primaryArrangementId: string | null
   lastUsedAt: null
   hidden: boolean
   pcSongId: null
@@ -148,6 +149,7 @@ export function mapRowToSong(row: Record<string, string>): ParsedSongPreview {
     vwTypes: [],
     teamTags,
     arrangements,
+    primaryArrangementId: arrangements[0]?.id ?? null,
     lastUsedAt: null,
     hidden: false,
     pcSongId: null,

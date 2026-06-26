@@ -1,5 +1,5 @@
 import { Timestamp } from 'firebase/firestore'
-import { fetchSongArrangements } from '@/utils/planningCenterApi'
+import { fetchSongArrangements, fetchLastScheduledItem } from '@/utils/planningCenterApi'
 import type { UpsertSongInput, VWType } from '@/types/song'
 
 /**
@@ -47,12 +47,15 @@ function isCategoryTag(name: string): boolean {
  * @param pcSong - The PC song data object
  * @param tags - Resolved tag objects for this song (id + name)
  * @param arrangements - Resolved arrangement objects (id + name)
+ * @param lastArrangementId - Arrangement id from the song's most recent PC schedule
+ *   (the "play key"); used to default primaryArrangementId. Optional.
  * @returns UpsertSongInput ready for store.upsertSongs
  */
 export function mapPcSongToUpsert(
   pcSong: PcSongData,
   tags: Array<{ id: string; name: string }>,
   arrangements: Array<{ id: string; name: string; key: string }>,
+  lastArrangementId?: string | null,
 ): UpsertSongInput {
   const { attributes } = pcSong
 
@@ -100,6 +103,13 @@ export function mapPcSongToUpsert(
     teamTags: [],
   }))
 
+  // Primary "play key": the last-scheduled arrangement when it exists in this
+  // song's arrangements, otherwise the first arrangement.
+  const primaryArrangementId =
+    lastArrangementId && mappedArrangements.some((a) => a.id === lastArrangementId)
+      ? lastArrangementId
+      : (mappedArrangements[0]?.id ?? null)
+
   return {
     title: attributes.title,
     ccliNumber: attributes.ccli_number ?? '',
@@ -109,6 +119,7 @@ export function mapPcSongToUpsert(
     vwTypes,
     teamTags,
     arrangements: mappedArrangements,
+    primaryArrangementId,
     lastUsedAt,
     pcSongId: pcSong.id,
     hidden: false,
@@ -218,7 +229,14 @@ export async function fetchAndMapPcSongs(
     const mappedBatch = await Promise.all(
       batch.map(async ({ song, tags }) => {
         const arrangements = await fetchSongArrangements(appId, secret, song.id)
-        return mapPcSongToUpsert(song, tags, arrangements)
+        // Only resolve the last-scheduled arrangement when there are multiple to
+        // choose from — avoids an extra API call for single-arrangement songs.
+        let lastArrangementId: string | null = null
+        if (arrangements.length > 1) {
+          const lastScheduled = await fetchLastScheduledItem(appId, secret, song.id)
+          lastArrangementId = lastScheduled?.arrangementId ?? null
+        }
+        return mapPcSongToUpsert(song, tags, arrangements, lastArrangementId)
       }),
     )
     results.push(...mappedBatch)

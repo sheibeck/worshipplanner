@@ -193,6 +193,7 @@
 <script setup lang="ts">
 import { ref, computed, nextTick } from 'vue'
 import { rankSongsForSlot } from '@/utils/suggestions'
+import { songMatchesQuery, getPrimaryKey } from '@/utils/songSearch'
 import type { Song, VWType } from '@/types/song'
 import type { SuggestionResult } from '@/utils/suggestions'
 import type { AiSongSuggestion } from '@/utils/claudeApi'
@@ -234,9 +235,9 @@ const suggestions = computed<SuggestionResult[]>(() => {
 
 const searchResults = computed<Song[]>(() => {
   if (!searchQuery.value) return []
-  const q = searchQuery.value.toLowerCase()
+  const q = searchQuery.value
   return props.songs
-    .filter((s) => s.title.toLowerCase().includes(q))
+    .filter((s) => songMatchesQuery(s, q))
     .sort((a, b) => {
       // Orchestra-first when service is orchestra (D-08)
       if (isOrchestraService.value) {
@@ -270,8 +271,7 @@ function isNonOrchestraSong(song: Song): boolean {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function preferredKey(song: Song): string {
-  const first = song.arrangements[0]
-  return first?.key ? first.key : '—'
+  return getPrimaryKey(song) || '—'
 }
 
 // ── Dropdown open/close ────────────────────────────────────────────────────────

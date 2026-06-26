@@ -189,7 +189,7 @@ export async function fetchPlanItems(
   secret: string,
   serviceTypeId: string,
   planId: string,
-): Promise<Array<{ id: string; title: string; sequence: number; itemType: string }>> {
+): Promise<Array<{ id: string; title: string; sequence: number; itemType: string; length: number | null }>> {
   const response = await fetch(
     `${PC_BASE_URL}/service_types/${serviceTypeId}/plans/${planId}/items?per_page=100`,
     {
@@ -207,7 +207,7 @@ export async function fetchPlanItems(
   const json = (await response.json()) as {
     data: Array<{
       id: string
-      attributes: { title: string; sequence: number; item_type: string }
+      attributes: { title: string; sequence: number; item_type: string; length: number | null }
     }>
   }
 
@@ -216,6 +216,7 @@ export async function fetchPlanItems(
     title: item.attributes.title,
     sequence: item.attributes.sequence,
     itemType: item.attributes.item_type,
+    length: item.attributes.length ?? null,
   }))
 }
 
@@ -741,7 +742,7 @@ export async function fetchLastScheduledItem(
   appId: string,
   secret: string,
   pcSongId: string,
-): Promise<{ notes: Array<{ categoryId: string; content: string }> } | null> {
+): Promise<{ notes: Array<{ categoryId: string; content: string }>; arrangementId: string | null } | null> {
   try {
     const scheduleResponse = await fetch(
       `${PC_BASE_URL}/songs/${pcSongId}/song_schedules?filter=three_most_recent&order=-plan_sort_date&per_page=1`,
@@ -786,7 +787,10 @@ export async function fetchLastScheduledItem(
     if (!itemResponse.ok) return null
 
     const itemJson = (await itemResponse.json()) as {
-      data: { attributes: Record<string, unknown> }
+      data: {
+        attributes: Record<string, unknown>
+        relationships?: { arrangement?: { data?: { id: string } | null } }
+      }
       included?: Array<{
         type: string
         attributes: { content: string }
@@ -801,7 +805,9 @@ export async function fetchLastScheduledItem(
         content: inc.attributes.content,
       }))
 
-    return { notes }
+    const arrangementId = itemJson.data.relationships?.arrangement?.data?.id ?? null
+
+    return { notes, arrangementId }
   } catch {
     return null
   }

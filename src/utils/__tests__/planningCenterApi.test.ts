@@ -20,6 +20,7 @@ import {
   createItem,
   updateItem,
   deleteItem,
+  fetchPlanItems,
   fetchPlanNeededPositionTeamIds,
   fetchTeamPositions,
   addNeededPosition,
@@ -555,6 +556,7 @@ describe('addSlotAsItem', () => {
       vwTypes: [1 as VWType],
       teamTags: [],
       arrangements: [],
+      primaryArrangementId: null,
       lastUsedAt: null,
       hidden: false,
       pcSongId: null,
@@ -610,6 +612,7 @@ describe('addSlotAsItem', () => {
       vwTypes: [1 as VWType],
       teamTags: [],
       arrangements: [],
+      primaryArrangementId: null,
       lastUsedAt: null,
       hidden: false,
       pcSongId: null,
@@ -646,6 +649,7 @@ describe('addSlotAsItem', () => {
       vwTypes: [1 as VWType],
       teamTags: [],
       arrangements: [],
+      primaryArrangementId: null,
       lastUsedAt: null,
       hidden: false,
       pcSongId: null,
@@ -688,6 +692,7 @@ describe('addSlotAsItem', () => {
       vwTypes: [1 as VWType],
       teamTags: [],
       arrangements: [],
+      primaryArrangementId: null,
       lastUsedAt: null,
       hidden: false,
       pcSongId: null,
@@ -877,6 +882,7 @@ describe('addSlotAsItem', () => {
       vwTypes: [1 as VWType],
       teamTags: [],
       arrangements: [],
+      primaryArrangementId: null,
       lastUsedAt: null,
       hidden: false,
       pcSongId: null,
@@ -961,6 +967,7 @@ describe('addSlotAsItem', () => {
       vwTypes: [1 as VWType],
       teamTags: [],
       arrangements: [],
+      primaryArrangementId: null,
       lastUsedAt: null,
       hidden: false,
       pcSongId: null,
@@ -1054,6 +1061,7 @@ describe('fetchLastScheduledItem', () => {
         { categoryId: 'cat-person', content: 'John Smith' },
         { categoryId: 'cat-vocals', content: 'Lead vocals' },
       ],
+      arrangementId: null,
     })
     const [schedUrl] = vi.mocked(fetch).mock.calls[0]!
     expect(schedUrl).toContain('/songs/pc-song-42/song_schedules?filter=three_most_recent')
@@ -1067,7 +1075,20 @@ describe('fetchLastScheduledItem', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify(mockItemResponse()), { status: 200 }))
 
     const result = await fetchLastScheduledItem('app-id', 'secret', 'pc-song-42')
-    expect(result).toEqual({ notes: [] })
+    expect(result).toEqual({ notes: [], arrangementId: null })
+  })
+
+  it('extracts the arrangement id from the item relationships', async () => {
+    const itemResponse = {
+      data: { attributes: {}, relationships: { arrangement: { data: { type: 'Arrangement', id: 'arr-77' } } } },
+      included: [],
+    }
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(JSON.stringify(mockScheduleResponse()), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(itemResponse), { status: 200 }))
+
+    const result = await fetchLastScheduledItem('app-id', 'secret', 'pc-song-42')
+    expect(result).toEqual({ notes: [], arrangementId: 'arr-77' })
   })
 
   it('returns null when song_schedules returns empty array (song never scheduled)', async () => {
@@ -1125,6 +1146,7 @@ describe('fetchLastScheduledItem', () => {
     const result = await fetchLastScheduledItem('app-id', 'secret', 'pc-song-42')
     expect(result).toEqual({
       notes: [{ categoryId: 'cat-2', content: 'Actual note' }],
+      arrangementId: null,
     })
   })
 })
@@ -1278,6 +1300,41 @@ describe('deleteItem', () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response('Not Found', { status: 404 }))
 
     await expect(deleteItem('app', 'sec', 'ST', 'P', 'I')).rejects.toThrow('Failed to delete item: 404')
+  })
+})
+
+describe('fetchPlanItems', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  it('maps id, title, sequence, itemType, and length (preserving null)', async () => {
+    const mockResponse = {
+      data: [
+        { id: 'i1', attributes: { title: 'Worship Song - A', sequence: 1, item_type: 'song', length: 300 } },
+        { id: 'i2', attributes: { title: 'Message', sequence: 2, item_type: 'regular', length: null } },
+      ],
+    }
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(mockResponse), { status: 200 }))
+
+    const result = await fetchPlanItems('app', 'sec', 'ST', 'P')
+
+    const [url] = vi.mocked(fetch).mock.calls[0]!
+    expect(url).toContain('/service_types/ST/plans/P/items')
+    expect(result).toEqual([
+      { id: 'i1', title: 'Worship Song - A', sequence: 1, itemType: 'song', length: 300 },
+      { id: 'i2', title: 'Message', sequence: 2, itemType: 'regular', length: null },
+    ])
+  })
+
+  it('coerces a missing length attribute to null', async () => {
+    const mockResponse = {
+      data: [{ id: 'i1', attributes: { title: 'Item', sequence: 1, item_type: 'regular' } }],
+    }
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(mockResponse), { status: 200 }))
+
+    const result = await fetchPlanItems('app', 'sec', 'ST', 'P')
+    expect(result[0]?.length).toBeNull()
   })
 })
 

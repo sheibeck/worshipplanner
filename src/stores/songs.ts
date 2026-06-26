@@ -14,6 +14,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/firebase'
 import type { Song, UpsertSongInput, VWType } from '@/types/song'
+import { songMatchesQuery } from '@/utils/songSearch'
 
 type SongInput = Omit<Song, 'id' | 'createdAt' | 'updatedAt'>
 
@@ -34,10 +35,7 @@ export const useSongStore = defineStore('songs', () => {
     return songs.value.filter((song) => {
       // Exclude hidden songs (treat undefined as false for legacy docs)
       if (song.hidden === true) return false
-      const matchesSearch =
-        !searchQuery.value ||
-        song.title.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-        String(song.ccliNumber).includes(searchQuery.value)
+      const matchesSearch = songMatchesQuery(song, searchQuery.value)
 
       const matchesVwType =
         filterVwType.value === null ||
@@ -148,7 +146,12 @@ export const useSongStore = defineStore('songs', () => {
 
       if (existing) {
         // Update existing: preserve hidden status, only set vwTypes when incoming is non-empty
-        const { vwTypes: incomingVwTypes, hidden: _hidden, ...restIncoming } = incoming
+        const {
+          vwTypes: incomingVwTypes,
+          hidden: _hidden,
+          primaryArrangementId: incomingPrimary,
+          ...restIncoming
+        } = incoming
         const updateData: Record<string, unknown> = {
           ...restIncoming,
           hidden: existing.hidden ?? false,
@@ -158,6 +161,14 @@ export const useSongStore = defineStore('songs', () => {
         if (incomingVwTypes.length > 0) {
           updateData.vwTypes = incomingVwTypes
         }
+        // Preserve a user-chosen primary key when it still maps to an arrangement;
+        // otherwise fall back to the import's auto-picked key.
+        const existingPrimaryStillValid =
+          existing.primaryArrangementId != null &&
+          incoming.arrangements.some((a) => a.id === existing.primaryArrangementId)
+        updateData.primaryArrangementId = existingPrimaryStillValid
+          ? existing.primaryArrangementId
+          : (incomingPrimary ?? null)
         await updateDoc(doc(db, 'organizations', orgId.value!, 'songs', existing.id), updateData)
       } else {
         // Create new doc

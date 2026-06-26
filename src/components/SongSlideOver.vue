@@ -163,6 +163,25 @@
             </div>
           </div>
 
+          <!-- Primary key (only when the song has multiple arrangements/keys) -->
+          <div v-if="form.arrangements.length > 1">
+            <label class="block text-xs font-medium text-gray-400 mb-1">
+              Primary key <span class="text-gray-600 font-normal">(shown when planning transitions)</span>
+            </label>
+            <select
+              v-model="form.primaryArrangementId"
+              class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+            >
+              <option
+                v-for="arr in form.arrangements"
+                :key="arr.id"
+                :value="arr.id"
+              >
+                {{ arr.name }}{{ arr.key ? ` — ${arr.key}` : '' }}
+              </option>
+            </select>
+          </div>
+
           <!-- Delete button (edit mode only) -->
           <div v-if="!isCreateMode" class="pt-2 border-t border-gray-800">
             <div v-if="!showDeleteConfirm">
@@ -234,6 +253,7 @@ interface FormState {
   notes: string
   teamTags: string[]
   arrangements: Arrangement[]
+  primaryArrangementId: string | null
 }
 
 function emptyForm(): FormState {
@@ -246,6 +266,7 @@ function emptyForm(): FormState {
     notes: '',
     teamTags: [],
     arrangements: [],
+    primaryArrangementId: null,
   }
 }
 
@@ -262,6 +283,7 @@ function songToForm(song: Song): FormState {
       ...a,
       teamTags: [...a.teamTags],
     })),
+    primaryArrangementId: song.primaryArrangementId ?? null,
   }
 }
 
@@ -374,6 +396,14 @@ async function onSave() {
   form.value.arrangements.forEach((a) => a.teamTags.forEach((t) => arrTags.add(t)))
   const allTags = Array.from(new Set([...form.value.teamTags, ...arrTags]))
 
+  // Validate primary arrangement still exists; fall back to first arrangement
+  const arrangements = form.value.arrangements
+  const primaryArrangementId =
+    form.value.primaryArrangementId &&
+    arrangements.some((a) => a.id === form.value.primaryArrangementId)
+      ? form.value.primaryArrangementId
+      : (arrangements[0]?.id ?? null)
+
   const data = {
     title,
     ccliNumber: String(form.value.ccliNumber ?? '').trim(),
@@ -382,7 +412,8 @@ async function onSave() {
     themes,
     notes: form.value.notes.trim(),
     teamTags: allTags,
-    arrangements: form.value.arrangements,
+    arrangements,
+    primaryArrangementId,
     lastUsedAt: props.song?.lastUsedAt ?? null,
     hidden: props.song?.hidden ?? false,
     pcSongId: props.song?.pcSongId ?? null,

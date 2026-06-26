@@ -75,6 +75,7 @@ const mockSongs: Song[] = [
         teamTags: [],
       },
     ],
+    primaryArrangementId: null,
     lastUsedAt: null,
     hidden: false,
     pcSongId: null,

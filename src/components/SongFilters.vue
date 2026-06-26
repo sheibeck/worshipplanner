@@ -23,7 +23,7 @@
           type="text"
           :value="searchQuery"
           @input="$emit('update:searchQuery', ($event.target as HTMLInputElement).value)"
-          placeholder="Search by title or CCLI number..."
+          placeholder="Search title, CCLI, theme, tag, category..."
           class="w-full rounded-md bg-gray-800 border border-gray-700 pl-9 pr-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
         />
       </div>

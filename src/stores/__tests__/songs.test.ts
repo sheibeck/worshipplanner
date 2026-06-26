@@ -50,6 +50,7 @@ function makeSong(overrides: Partial<{
   vwTypes: VWType[]
   teamTags: string[]
   arrangements: Array<{ id: string; name: string; key: string; bpm: number | null; lengthSeconds: number | null; chordChartUrl: string; notes: string; teamTags: string[] }>
+  primaryArrangementId: string | null
   themes: string[]
   notes: string
   lastUsedAt: null
@@ -79,6 +80,7 @@ function makeSong(overrides: Partial<{
     ],
     themes: ['grace'],
     notes: '',
+    primaryArrangementId: null,
     lastUsedAt: null,
     createdAt: { seconds: 1000000, nanoseconds: 0 },
     updatedAt: { seconds: 1000000, nanoseconds: 0 },
@@ -514,6 +516,7 @@ describe('useSongStore', () => {
         vwTypes: [],
         teamTags: [],
         arrangements: [],
+        primaryArrangementId: null,
         lastUsedAt: null,
         pcSongId: null,
         hidden: false,
@@ -600,6 +603,7 @@ describe('useSongStore', () => {
           vwTypes: [],
           teamTags: [],
           arrangements: [],
+          primaryArrangementId: null,
           lastUsedAt: null,
           pcSongId: 'pc-new-1',
           hidden: false,
@@ -634,6 +638,7 @@ describe('useSongStore', () => {
           vwTypes: [1],
           teamTags: [],
           arrangements: [],
+          primaryArrangementId: null,
           lastUsedAt: null,
           pcSongId: 'pc-123',
           hidden: false,
@@ -665,6 +670,7 @@ describe('useSongStore', () => {
           vwTypes: [],
           teamTags: [],
           arrangements: [],
+          primaryArrangementId: null,
           lastUsedAt: null,
           pcSongId: null,
           hidden: false,
@@ -696,6 +702,7 @@ describe('useSongStore', () => {
           vwTypes: [],
           teamTags: [],
           arrangements: [],
+          primaryArrangementId: null,
           lastUsedAt: null,
           pcSongId: 'pc-hidden',
           hidden: false, // incoming says not hidden, but existing is hidden — preserve hidden
@@ -727,6 +734,7 @@ describe('useSongStore', () => {
           vwTypes: [], // incoming vwTypes is empty — should preserve existing
           teamTags: [],
           arrangements: [],
+          primaryArrangementId: null,
           lastUsedAt: null,
           pcSongId: 'pc-typed',
           hidden: false,
@@ -759,6 +767,7 @@ describe('useSongStore', () => {
           vwTypes: [1, 3],
           teamTags: [],
           arrangements: [],
+          primaryArrangementId: null,
           lastUsedAt: null,
           pcSongId: 'pc-update',
           hidden: false,
@@ -788,6 +797,7 @@ describe('useSongStore', () => {
         vwTypes: [] as VWType[],
         teamTags: [] as string[],
         arrangements: [] as Array<{ id: string; name: string; key: string; bpm: number | null; lengthSeconds: number | null; chordChartUrl: string; notes: string; teamTags: string[] }>,
+        primaryArrangementId: null as string | null,
         lastUsedAt: null,
         hidden: false,
         pcSongId: null as string | null,
@@ -814,6 +824,7 @@ describe('useSongStore', () => {
         vwTypes: [] as VWType[],
         teamTags: [] as string[],
         arrangements: [] as Array<{ id: string; name: string; key: string; bpm: number | null; lengthSeconds: number | null; chordChartUrl: string; notes: string; teamTags: string[] }>,
+        primaryArrangementId: null as string | null,
         lastUsedAt: null,
         hidden: false,
         pcSongId: null as string | null,

@@ -846,6 +846,7 @@ import { useServiceStore } from '@/stores/services'
 import { useSongStore } from '@/stores/songs'
 import { slotLabel, createSlot, reindexSlots } from '@/utils/slotTypes'
 import { scripturesOverlap } from '@/utils/scripture'
+import { getPrimaryKey } from '@/utils/songSearch'
 import type { Service, SongSlot, ScriptureSlot, NonAssignableSlot, HymnSlot, ScriptureRef, SlotKind } from '@/types/service'
 import type { VWType } from '@/types/song'
 import AppShell from '@/components/AppShell.vue'
@@ -1356,7 +1357,7 @@ async function suggestAllSongs() {
       const song = songStore.songs.find((s) => s.id === suggestion.songId)
       if (!song) continue
 
-      const key = song.arrangements[0]?.key ?? ''
+      const key = getPrimaryKey(song)
       const newMap = new Map(aiDraftSongs.value)
       newMap.set(i, {
         songId: song.id,
@@ -1705,6 +1706,7 @@ async function onConfirmExport() {
           await addSlotAsItem(
             appId, secret, serviceTypeId, planId,
             slot, item.sequence, songStore.songs, localService.value.sermonPassage,
+            item.length ?? undefined,
           )
         } catch {
           const label = slot.kind === 'SONG'
@@ -1721,6 +1723,7 @@ async function onConfirmExport() {
           await addSlotAsItem(
             appId, secret, serviceTypeId, planId,
             slot, item.sequence, songStore.songs, localService.value.sermonPassage,
+            item.length ?? undefined,
           )
         } catch {
           failures.push('Scripture')

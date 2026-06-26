@@ -15,6 +15,7 @@ function makeSong(overrides: Partial<Song> = {}): Song {
     vwTypes: [],
     teamTags: [],
     arrangements: [],
+    primaryArrangementId: null,
     lastUsedAt: null,
     hidden: false,
     pcSongId: null,

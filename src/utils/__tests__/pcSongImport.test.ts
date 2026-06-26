@@ -10,13 +10,14 @@ vi.mock('firebase/firestore', () => ({
   },
 }))
 
-// Mock fetchSongArrangements from planningCenterApi
+// Mock fetchSongArrangements + fetchLastScheduledItem from planningCenterApi
 vi.mock('@/utils/planningCenterApi', () => ({
   fetchSongArrangements: vi.fn(),
+  fetchLastScheduledItem: vi.fn(),
 }))
 
 import { mapPcSongToUpsert, fetchAllPcSongs, fetchAndMapPcSongs } from '@/utils/pcSongImport'
-import { fetchSongArrangements } from '@/utils/planningCenterApi'
+import { fetchSongArrangements, fetchLastScheduledItem } from '@/utils/planningCenterApi'
 
 // Helper to build a minimal PC song object
 function makePcSong(overrides: {
@@ -219,6 +220,35 @@ describe('mapPcSongToUpsert', () => {
       const result = mapPcSongToUpsert(pcSong, tags, arrangements)
       expect(result.teamTags).toContain('Ballad')
       expect(result.teamTags).toContain('Orchestra')
+    })
+  })
+
+  describe('primaryArrangementId', () => {
+    it('defaults to the first arrangement when no last-scheduled id is given', () => {
+      const pcSong = makePcSong()
+      const arrangements = [makeArrangement('arr-1', 'Standard'), makeArrangement('arr-2', 'Orchestra')]
+      const result = mapPcSongToUpsert(pcSong, [], arrangements)
+      expect(result.primaryArrangementId).toBe('arr-1')
+    })
+
+    it('uses the last-scheduled arrangement id when it exists among arrangements', () => {
+      const pcSong = makePcSong()
+      const arrangements = [makeArrangement('arr-1', 'Standard'), makeArrangement('arr-2', 'Orchestra')]
+      const result = mapPcSongToUpsert(pcSong, [], arrangements, 'arr-2')
+      expect(result.primaryArrangementId).toBe('arr-2')
+    })
+
+    it('falls back to first arrangement when last-scheduled id is not among arrangements', () => {
+      const pcSong = makePcSong()
+      const arrangements = [makeArrangement('arr-1', 'Standard')]
+      const result = mapPcSongToUpsert(pcSong, [], arrangements, 'arr-unknown')
+      expect(result.primaryArrangementId).toBe('arr-1')
+    })
+
+    it('is null when there are no arrangements', () => {
+      const pcSong = makePcSong()
+      const result = mapPcSongToUpsert(pcSong, [], [])
+      expect(result.primaryArrangementId).toBeNull()
     })
   })
 
@@ -440,5 +470,57 @@ describe('fetchAndMapPcSongs', () => {
     expect(result[1]?.teamTags).toContain('Orchestra')
     // Song 1 does not
     expect(result[0]?.teamTags).not.toContain('Orchestra')
+  })
+
+  it('resolves the last-scheduled arrangement as the primary key when multiple arrangements exist', async () => {
+    const singlePageResponse = {
+      data: [
+        {
+          id: 'pc-song-multi',
+          attributes: { title: 'Multi Key Song', ccli_number: '33333', author: '', last_scheduled_at: null, themes: '' },
+          relationships: { tags: { data: [] } },
+        },
+      ],
+      included: [],
+      links: { self: '/api/planningcenter/services/v2/songs' },
+      meta: { total_count: 1 },
+    }
+
+    global.fetch = vi.fn().mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(singlePageResponse) })
+
+    vi.mocked(fetchSongArrangements).mockResolvedValueOnce([
+      { id: 'arr-g', name: 'Key of G', key: 'G' },
+      { id: 'arr-a', name: 'Key of A', key: 'A' },
+    ])
+    vi.mocked(fetchLastScheduledItem).mockResolvedValueOnce({ notes: [], arrangementId: 'arr-a' })
+
+    const result = await fetchAndMapPcSongs('app-id', 'secret')
+
+    expect(fetchLastScheduledItem).toHaveBeenCalledWith('app-id', 'secret', 'pc-song-multi')
+    expect(result[0]?.primaryArrangementId).toBe('arr-a')
+  })
+
+  it('does NOT call fetchLastScheduledItem for single-arrangement songs', async () => {
+    const singlePageResponse = {
+      data: [
+        {
+          id: 'pc-song-single',
+          attributes: { title: 'Single', ccli_number: '44444', author: '', last_scheduled_at: null, themes: '' },
+          relationships: { tags: { data: [] } },
+        },
+      ],
+      included: [],
+      links: { self: '/api/planningcenter/services/v2/songs' },
+      meta: { total_count: 1 },
+    }
+
+    global.fetch = vi.fn().mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(singlePageResponse) })
+
+    vi.mocked(fetchSongArrangements).mockResolvedValueOnce([{ id: 'arr-only', name: 'Standard', key: 'C' }])
+
+    const result = await fetchAndMapPcSongs('app-id', 'secret')
+
+    expect(fetchLastScheduledItem).not.toHaveBeenCalled()
+    expect(result[0]?.primaryArrangementId).toBe('arr-only')
   })
 })

@@ -2,6 +2,13 @@ import type { Timestamp } from 'firebase/firestore'
 
 export type VWType = 1 | 2 | 3
 
+/** Human-readable labels for VW categories. Shared across editor, search, and pickers. */
+export const VW_TYPE_LABELS: Record<VWType, string> = {
+  1: 'Call to Worship',
+  2: 'Intimate',
+  3: 'Ascription',
+}
+
 export interface Arrangement {
   id: string
   name: string
@@ -23,6 +30,8 @@ export interface Song {
   vwTypes: VWType[]
   teamTags: string[]
   arrangements: Arrangement[]
+  /** Arrangement chosen as the "play key" for transitions; null falls back to arrangements[0]. */
+  primaryArrangementId: string | null
   lastUsedAt: Timestamp | null
   createdAt: Timestamp
   updatedAt: Timestamp

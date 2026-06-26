@@ -137,9 +137,9 @@
             <SongBadge :types="song.vwTypes ?? []" />
           </td>
 
-          <!-- Key (from first arrangement) -->
+          <!-- Key (primary / play key) -->
           <td class="px-4 py-3 text-gray-300">
-            {{ song.arrangements[0]?.key || '&mdash;' }}
+            {{ getPrimaryKey(song) || '&mdash;' }}
           </td>
 
           <!-- CCLI -->
@@ -188,6 +188,7 @@ import type { Song } from '@/types/song'
 import type { Timestamp } from 'firebase/firestore'
 import SongBadge from '@/components/SongBadge.vue'
 import TeamTagPill from '@/components/TeamTagPill.vue'
+import { getPrimaryKey } from '@/utils/songSearch'
 
 const props = defineProps<{
   songs: Song[]
@@ -240,6 +241,11 @@ watch(sortField, () => {
   visibleCount.value = BATCH_SIZE
 })
 watch(sortDir, () => {
+  visibleCount.value = BATCH_SIZE
+})
+// Reset visible count when the (filtered) song list changes so the slice
+// always starts from the top of the new list — fixes "only a–g show" bug.
+watch(() => props.songs, () => {
   visibleCount.value = BATCH_SIZE
 })
 
