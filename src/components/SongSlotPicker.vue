@@ -43,25 +43,18 @@
             v-model="searchQuery"
             type="text"
             placeholder="Search songs..."
+            title="Filter by field: tag: key: type: theme: team:"
             class="w-full rounded-md bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           />
-          <!-- Tag filters (D-03 picker side) -->
-          <div class="flex items-center gap-2">
-            <select
-              v-model="includeTag"
-              class="flex-1 rounded bg-gray-900 border border-gray-700 text-gray-300 text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            >
-              <option value="">Show all tags</option>
-              <option v-for="tag in availableTags" :key="tag" :value="tag">Only: {{ tag }}</option>
-            </select>
-            <select
-              v-model="excludeTag"
-              class="flex-1 rounded bg-gray-900 border border-gray-700 text-gray-300 text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            >
-              <option value="">Hide no tags</option>
-              <option v-for="tag in availableTags" :key="tag" :value="tag">Hide: {{ tag }}</option>
-            </select>
-          </div>
+          <!-- Tag filter (D-14: shared checklist bound to songStore) -->
+          <TagFilterChecklist
+            :availableUserTags="availableTags"
+            :checkedTags="songStore.tagFilterChecked"
+            :hide="songStore.tagFilterHide"
+            @update:checkedTags="songStore.tagFilterChecked = $event"
+            @update:hide="songStore.tagFilterHide = $event"
+            @clear="songStore.clearTagFilter()"
+          />
         </div>
 
         <!-- Non-search content (AI Picks + Rotation suggestions) -->
@@ -217,6 +210,8 @@ import type { SuggestionResult } from '@/utils/suggestions'
 import type { AiSongSuggestion } from '@/utils/claudeApi'
 import SongBadge from '@/components/SongBadge.vue'
 import TeamTagPill from '@/components/TeamTagPill.vue'
+import TagFilterChecklist from '@/components/TagFilterChecklist.vue'
+import { useSongStore } from '@/stores/songs'
 
 const props = defineProps<{
   requiredVwType: VWType
@@ -238,18 +233,17 @@ const emit = defineEmits<{
 
 // ── State ──────────────────────────────────────────────────────────────────────
 
+const songStore = useSongStore()
+
 const isOpen = ref(false)
 const searchQuery = ref('')
 const triggerRef = ref<HTMLElement | null>(null)
 const searchInputRef = ref<HTMLInputElement | null>(null)
 const dropdownStyle = ref<Record<string, string>>({})
 
-// ── Tag filter (D-03 picker side) ─────────────────────────────────────────────
+// ── Tag filter (D-14: shared with Songs panel via songStore) ─────────────────
 
-const includeTag = ref('')
-const excludeTag = ref('')
-
-/** Distinct user tags across all songs — populates the filter selects */
+/** Distinct user tags across all songs — populates the shared checklist */
 const availableTags = computed<string[]>(() => {
   const tagSet = new Set<string>()
   for (const song of props.songs) {
@@ -258,14 +252,16 @@ const availableTags = computed<string[]>(() => {
   return Array.from(tagSet).sort()
 })
 
-/** Props.songs filtered by include/exclude tag controls (D-03). Used as base for ranking and search. */
-const tagFilteredSongs = computed<Song[]>(() =>
-  props.songs.filter(
-    (s) =>
-      (!includeTag.value || (s.tags?.includes(includeTag.value) ?? false)) &&
-      (!excludeTag.value || !(s.tags?.includes(excludeTag.value) ?? false)),
-  ),
-)
+/** Props.songs filtered by the shared store tag-filter state (D-09/D-10: OR-combine in show mode, exclusion in hide mode). */
+const tagFilteredSongs = computed<Song[]>(() => {
+  const checked = songStore.tagFilterChecked
+  const hide = songStore.tagFilterHide
+  if (checked.size === 0) return props.songs
+  return props.songs.filter((s) => {
+    const carriesChecked = (s.tags ?? []).some((t) => checked.has(t))
+    return hide ? !carriesChecked : carriesChecked
+  })
+})
 
 // ── Computed — full ranked/search lists ───────────────────────────────────────
 
@@ -333,8 +329,8 @@ function loadMore() {
 
 // Reset visibleCount when active source changes
 watch(searchQuery, () => { visibleCount.value = BATCH_SIZE })
-watch(includeTag, () => { visibleCount.value = BATCH_SIZE })
-watch(excludeTag, () => { visibleCount.value = BATCH_SIZE })
+watch(() => songStore.tagFilterChecked, () => { visibleCount.value = BATCH_SIZE }, { deep: true })
+watch(() => songStore.tagFilterHide, () => { visibleCount.value = BATCH_SIZE })
 watch(() => props.songs, () => { visibleCount.value = BATCH_SIZE })
 
 // Sentinel element at bottom of scroll container triggers loadMore
