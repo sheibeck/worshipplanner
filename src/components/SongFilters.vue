@@ -63,6 +63,26 @@
         <option value="">All tags</option>
         <option v-for="tag in availableTags" :key="tag" :value="tag">{{ tag }}</option>
       </select>
+
+      <!-- Show only user-tag filter -->
+      <select
+        :value="filterTagInclude"
+        @change="$emit('update:filterTagInclude', ($event.target as HTMLSelectElement).value)"
+        class="rounded-md bg-gray-800 border border-gray-700 px-3 py-2 text-sm text-gray-100 focus:outline-none focus:ring-1 focus:ring-pink-500 focus:border-pink-500"
+      >
+        <option value="">Show only tag...</option>
+        <option v-for="tag in availableUserTags" :key="tag" :value="tag">{{ tag }}</option>
+      </select>
+
+      <!-- Hide user-tag filter -->
+      <select
+        :value="filterTagExclude"
+        @change="$emit('update:filterTagExclude', ($event.target as HTMLSelectElement).value)"
+        class="rounded-md bg-gray-800 border border-gray-700 px-3 py-2 text-sm text-gray-100 focus:outline-none focus:ring-1 focus:ring-pink-500 focus:border-pink-500"
+      >
+        <option value="">Hide tag...</option>
+        <option v-for="tag in availableUserTags" :key="tag" :value="tag">{{ tag }}</option>
+      </select>
     </div>
   </div>
 </template>
@@ -73,8 +93,11 @@ defineProps<{
   filterVwType: 1 | 2 | 3 | 'uncategorized' | null
   filterKey: string
   filterTag: string
+  filterTagInclude: string
+  filterTagExclude: string
   availableKeys: string[]
   availableTags: string[]
+  availableUserTags: string[]
 }>()
 
 const emit = defineEmits<{
@@ -82,6 +105,8 @@ const emit = defineEmits<{
   'update:filterVwType': [value: 1 | 2 | 3 | 'uncategorized' | null]
   'update:filterKey': [value: string]
   'update:filterTag': [value: string]
+  'update:filterTagInclude': [value: string]
+  'update:filterTagExclude': [value: string]
 }>()
 
 function onVwTypeChange(value: string) {

@@ -144,9 +144,9 @@
             ></textarea>
           </div>
 
-          <!-- Song-level Tags -->
+          <!-- Song-level Team Tags -->
           <div>
-            <label class="block text-xs font-medium text-gray-400 mb-2">Tags</label>
+            <label class="block text-xs font-medium text-gray-400 mb-2">Team Tags</label>
             <div class="flex flex-wrap gap-2">
               <button
                 v-for="tag in songLevelTags"
@@ -160,6 +160,43 @@
               >
                 {{ tag }}
               </button>
+            </div>
+          </div>
+
+          <!-- User Tags (ad-hoc, free-text) -->
+          <div>
+            <label class="block text-xs font-medium text-gray-400 mb-2">User Tags</label>
+            <!-- Existing user-tag chips -->
+            <div class="flex flex-wrap gap-2 mb-2">
+              <span
+                v-for="tag in form.tags"
+                :key="tag"
+                class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border bg-pink-900/50 text-pink-300 border-pink-800"
+              >
+                {{ tag }}
+                <button
+                  type="button"
+                  class="ml-0.5 text-pink-400 hover:text-pink-200 leading-none"
+                  @click="removeUserTag(tag)"
+                  aria-label="Remove tag"
+                >&times;</button>
+              </span>
+              <span v-if="form.tags.length === 0" class="text-xs text-gray-600">No user tags yet</span>
+            </div>
+            <!-- Free-text add input -->
+            <div class="flex gap-2">
+              <input
+                v-model="userTagInput"
+                type="text"
+                placeholder="e.g. Christmas, Lent"
+                class="flex-1 rounded-md bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-pink-500 focus:border-pink-500"
+                @keydown.enter.prevent="addUserTags"
+              />
+              <button
+                type="button"
+                class="px-3 py-2 rounded-md text-sm font-medium text-pink-300 bg-pink-900/30 border border-pink-800 hover:bg-pink-900/50 transition-colors"
+                @click="addUserTags"
+              >Add</button>
             </div>
           </div>
 
@@ -292,6 +329,7 @@ function songToForm(song: Song): FormState {
 
 const form = ref<FormState>(emptyForm())
 const themesInput = ref('')
+const userTagInput = ref('')
 const titleError = ref(false)
 const showDeleteConfirm = ref(false)
 const isSaving = ref(false)
@@ -308,6 +346,7 @@ watch(
         form.value = emptyForm()
       }
       themesInput.value = form.value.themes.join(', ')
+      userTagInput.value = ''
       titleError.value = false
       showDeleteConfirm.value = false
     }
@@ -375,6 +414,37 @@ function toggleSongTag(tag: string) {
     form.value.teamTags.splice(idx, 1)
   } else {
     form.value.teamTags.push(tag)
+  }
+}
+
+// ── User tags (ad-hoc free-text) ───────────────────────────────────────────────
+
+function toggleUserTag(tag: string) {
+  const idx = form.value.tags.indexOf(tag)
+  if (idx >= 0) {
+    form.value.tags.splice(idx, 1)
+  } else {
+    form.value.tags.push(tag)
+  }
+}
+
+function addUserTags() {
+  const newTags = userTagInput.value
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean)
+  for (const tag of newTags) {
+    if (!form.value.tags.includes(tag)) {
+      form.value.tags.push(tag)
+    }
+  }
+  userTagInput.value = ''
+}
+
+function removeUserTag(tag: string) {
+  const idx = form.value.tags.indexOf(tag)
+  if (idx >= 0) {
+    form.value.tags.splice(idx, 1)
   }
 }
 

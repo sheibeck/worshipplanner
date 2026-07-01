@@ -67,17 +67,51 @@
             v-model:filterVwType="songStore.filterVwType"
             v-model:filterKey="songStore.filterKey"
             v-model:filterTag="songStore.filterTag"
+            v-model:filterTagInclude="songStore.filterTagInclude"
+            v-model:filterTagExclude="songStore.filterTagExclude"
             :availableKeys="availableKeys"
             :availableTags="availableTags"
+            :availableUserTags="availableUserTags"
           />
+        </div>
+
+        <!-- Bulk tag action bar (visible when songs are selected) -->
+        <div v-if="selectedSongIds.size > 0" class="mb-4 flex items-center gap-3 p-3 rounded-lg border border-indigo-700 bg-indigo-900/20">
+          <span class="text-sm text-indigo-300 font-medium">{{ selectedSongIds.size }} selected</span>
+          <input
+            v-model="bulkTagInput"
+            type="text"
+            placeholder="Tag name"
+            class="rounded-md bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 w-40"
+            @keydown.enter="applyBulkTag"
+          />
+          <button
+            type="button"
+            class="px-3 py-1.5 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors disabled:opacity-50"
+            :disabled="!bulkTagInput.trim()"
+            @click="applyBulkTag"
+          >Apply to selected</button>
+          <button
+            type="button"
+            class="px-3 py-1.5 rounded-md text-sm font-medium text-red-300 bg-red-900/20 border border-red-800 hover:bg-red-900/40 transition-colors disabled:opacity-50"
+            :disabled="!bulkTagInput.trim()"
+            @click="removeBulkTag"
+          >Remove from selected</button>
+          <button
+            type="button"
+            class="ml-auto text-xs text-gray-500 hover:text-gray-300 transition-colors"
+            @click="clearBulkSelection"
+          >Clear selection</button>
         </div>
 
         <!-- Song table -->
         <SongTable
+          ref="songTableRef"
           :songs="songStore.filteredSongs"
           :loading="songStore.isLoading"
           @select="onSelectSong"
           @add="onAddSong"
+          @update:selectedIds="onSelectionUpdate"
         />
 
         <!-- Hidden songs panel -->
@@ -188,6 +222,59 @@ const availableTags = computed(() => {
   })
   return Array.from(tags).sort()
 })
+
+const availableUserTags = computed(() => {
+  const tags = new Set<string>()
+  songStore.songs.forEach((song) => {
+    ;(song.tags ?? []).forEach((tag) => tags.add(tag))
+  })
+  return Array.from(tags).sort()
+})
+
+// ── Bulk tag selection state ───────────────────────────────────────────────────
+
+const selectedSongIds = ref<Set<string>>(new Set())
+const bulkTagInput = ref('')
+const songTableRef = ref<InstanceType<typeof SongTable> | null>(null)
+
+function onSelectionUpdate(ids: Set<string>) {
+  selectedSongIds.value = ids
+}
+
+function clearBulkSelection() {
+  selectedSongIds.value = new Set()
+  songTableRef.value?.clearSelection()
+}
+
+async function applyBulkTag() {
+  const tag = bulkTagInput.value.trim()
+  if (!tag) return
+  const songs = songStore.songs.filter((s) => selectedSongIds.value.has(s.id))
+  await Promise.all(
+    songs.map((song) => {
+      const existingTags = song.tags ?? []
+      if (existingTags.includes(tag)) return Promise.resolve()
+      return songStore.updateSong(song.id, { tags: [...existingTags, tag] })
+    }),
+  )
+  clearBulkSelection()
+  bulkTagInput.value = ''
+}
+
+async function removeBulkTag() {
+  const tag = bulkTagInput.value.trim()
+  if (!tag) return
+  const songs = songStore.songs.filter((s) => selectedSongIds.value.has(s.id))
+  await Promise.all(
+    songs.map((song) => {
+      const existingTags = song.tags ?? []
+      if (!existingTags.includes(tag)) return Promise.resolve()
+      return songStore.updateSong(song.id, { tags: existingTags.filter((t) => t !== tag) })
+    }),
+  )
+  clearBulkSelection()
+  bulkTagInput.value = ''
+}
 
 // Subscribe to Firestore songs collection once orgId is resolved
 function initStore() {
