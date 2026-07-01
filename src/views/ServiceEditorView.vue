@@ -227,6 +227,32 @@
           </div>
         </Teleport>
 
+        <!-- Slot delete confirmation dialog (D-14) -->
+        <Teleport to="body">
+          <div v-if="showSlotDeleteConfirm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+            <div class="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl p-6 w-full max-w-sm mx-4">
+              <h2 class="text-base font-semibold text-gray-100 mb-2">Remove this item?</h2>
+              <p class="text-sm text-gray-400 mb-6">This will delete the assigned song, scripture, or content from the plan. This cannot be undone.</p>
+              <div class="flex justify-end gap-3">
+                <button
+                  type="button"
+                  @click="showSlotDeleteConfirm = false; pendingDeleteIndex = null; pendingDeleteIsClear = false"
+                  class="rounded-md px-4 py-2 text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  @click="confirmSlotDelete"
+                  class="rounded-md px-4 py-2 text-sm font-medium text-white bg-red-700 hover:bg-red-600 transition-colors"
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          </div>
+        </Teleport>
+
         <!-- Export dialog -->
         <Teleport to="body">
           <div v-if="showExportDialog" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
@@ -453,7 +479,7 @@
         <div ref="slotContainerRef" class="space-y-1.5">
           <div
             v-for="(slot, index) in localService.slots"
-            :key="slot.position + '-' + slot.kind + '-' + index"
+            :key="slot.kind + '-' + slot.position"
             class="rounded-lg bg-gray-900 border border-gray-800 p-3 flex items-start gap-2"
           >
             <!-- Drag handle: editor only -->
@@ -847,7 +873,7 @@ import { useSongStore } from '@/stores/songs'
 import { slotLabel, createSlot, reindexSlots } from '@/utils/slotTypes'
 import { scripturesOverlap } from '@/utils/scripture'
 import { getPrimaryKey } from '@/utils/songSearch'
-import type { Service, SongSlot, ScriptureSlot, NonAssignableSlot, HymnSlot, ScriptureRef, SlotKind } from '@/types/service'
+import type { Service, ServiceSlot, SongSlot, ScriptureSlot, NonAssignableSlot, HymnSlot, ScriptureRef, SlotKind } from '@/types/service'
 import type { VWType } from '@/types/song'
 import AppShell from '@/components/AppShell.vue'
 import SongBadge from '@/components/SongBadge.vue'
@@ -926,6 +952,11 @@ const shareError = ref<string | null>(null)
 const showAddMenu = ref(false)
 const showDeleteConfirm = ref(false)
 const isDeleting = ref(false)
+// D-14: slot delete confirmation
+const showSlotDeleteConfirm = ref(false)
+const pendingDeleteIndex = ref<number | null>(null)
+// D-14: tracks whether the pending delete is a "clear song" (true) vs remove slot (false)
+const pendingDeleteIsClear = ref(false)
 
 // ── Export to PC state ─────────────────────────────────────────────────────────
 
@@ -977,18 +1008,40 @@ watch(slotContainerRef, (el) => {
       handle: '.drag-handle',
       animation: 150,
       ghostClass: 'opacity-30',
-      onEnd(evt) {
+      async onEnd(evt) {
         if (!localService.value || evt.oldIndex == null || evt.newIndex == null) return
         if (evt.oldIndex === evt.newIndex) return
+        // D-16: revert SortableJS's DOM move so Vue's reactive render is the single source of truth (prevents snap-back)
+        const parent = evt.item.parentNode
+        if (parent) {
+          const ref = parent.children[evt.oldIndex]
+          parent.insertBefore(evt.item, evt.oldIndex < evt.newIndex ? ref?.nextSibling ?? null : ref ?? null)
+        }
         const slots = [...localService.value.slots]
         const moved = slots.splice(evt.oldIndex, 1)[0]
         if (!moved) return
         slots.splice(evt.newIndex, 0, moved)
-        localService.value.slots = reindexSlots(slots)
-        // Force Vue to re-render in sync with our data
-        nextTick(() => {
-          // After Vue re-renders, Sortable DOM will be correct
-        })
+        const reindexed = reindexSlots(slots)
+        localService.value.slots = reindexed
+        // D-15: persist immediately rather than waiting on the 800ms debounce
+        if (serviceId.value) {
+          if (autosaveTimer) {
+            clearTimeout(autosaveTimer)
+            autosaveTimer = null
+          }
+          autosaveSaving = true
+          autosaveStatus.value = 'saving'
+          try {
+            await serviceStore.updateService(serviceId.value, { slots: reindexed })
+            originalService.value = JSON.parse(JSON.stringify(localService.value))
+            autosaveStatus.value = 'saved'
+            setTimeout(() => {
+              if (autosaveStatus.value === 'saved') autosaveStatus.value = 'idle'
+            }, 3000)
+          } finally {
+            autosaveSaving = false
+          }
+        }
       },
     })
   }
@@ -1135,11 +1188,14 @@ watch(
     }
     if (!isDirty.value) return
 
+    // D-17: always mark pending so status never strands; re-arm timer if it was cleared (e.g. after immediate reorder-save)
     autosaveStatus.value = 'pending'
 
     if (autosaveTimer) clearTimeout(autosaveTimer)
     const scheduleAutosave = () => {
       autosaveTimer = setTimeout(async () => {
+        // D-17: clear the handle immediately so autosaveTimer === null is reachable for the re-arm guard
+        autosaveTimer = null
         if (!isDirty.value) {
           autosaveStatus.value = 'idle'
           return
@@ -1253,10 +1309,65 @@ function addSlot(kind: SlotKind, vwType?: VWType) {
   showAddMenu.value = false
 }
 
-function removeSlot(index: number) {
+// ── Slot populated check (D-14) ────────────────────────────────────────────────
+
+function isSlotPopulated(slot: ServiceSlot): boolean {
+  if (slot.kind === 'SONG') {
+    return (slot as SongSlot).songId != null
+  }
+  if (slot.kind === 'SCRIPTURE') {
+    const s = slot as ScriptureSlot
+    return !!(s.book || s.chapter || s.verseStart || s.verseEnd)
+  }
+  if (slot.kind === 'MESSAGE' || slot.kind === 'PRAYER') {
+    const s = slot as NonAssignableSlot
+    return !!(s.linkUrl?.trim() || s.linkLabel?.trim())
+  }
+  if (slot.kind === 'HYMN') {
+    const s = slot as HymnSlot
+    return !!(s.hymnName?.trim() || s.hymnNumber?.trim())
+  }
+  return false
+}
+
+// ── Slot remove (with D-14 confirmation gate) ──────────────────────────────────
+
+function performRemoveSlot(index: number) {
   if (!localService.value) return
   localService.value.slots.splice(index, 1)
   localService.value.slots = reindexSlots(localService.value.slots)
+}
+
+function removeSlot(index: number) {
+  if (!localService.value) return
+  const slot = localService.value.slots[index]
+  if (!slot) return
+  if (isSlotPopulated(slot)) {
+    // Gate populated slots behind confirm dialog
+    pendingDeleteIndex.value = index
+    pendingDeleteIsClear.value = false
+    showSlotDeleteConfirm.value = true
+    return
+  }
+  // Empty slots delete silently (D-14)
+  performRemoveSlot(index)
+}
+
+function confirmSlotDelete() {
+  if (pendingDeleteIndex.value == null) return
+  if (pendingDeleteIsClear.value) {
+    // Clear-song path
+    const slot = localService.value?.slots[pendingDeleteIndex.value]
+    if (slot?.kind === 'SONG') {
+      const updated: SongSlot = { ...slot as SongSlot, songId: null, songTitle: null, songKey: null }
+      localService.value!.slots[pendingDeleteIndex.value] = updated
+    }
+  } else {
+    performRemoveSlot(pendingDeleteIndex.value)
+  }
+  showSlotDeleteConfirm.value = false
+  pendingDeleteIndex.value = null
+  pendingDeleteIsClear.value = false
 }
 
 // ── Song assignment ────────────────────────────────────────────────────────────
@@ -1279,6 +1390,14 @@ function onClearSong(index: number) {
   const slot = localService.value.slots[index]
   if (!slot) return
   if (slot.kind === 'SONG') {
+    if ((slot as SongSlot).songId != null) {
+      // D-14: slot has an assigned song — gate behind confirm dialog
+      pendingDeleteIndex.value = index
+      pendingDeleteIsClear.value = true
+      showSlotDeleteConfirm.value = true
+      return
+    }
+    // No song assigned — clear directly (no data loss)
     const updated: SongSlot = { ...slot, songId: null, songTitle: null, songKey: null }
     localService.value.slots[index] = updated
   }
@@ -1304,10 +1423,12 @@ async function suggestAllSongs() {
     const sermonTopic = localService.value.sermonTopic ?? null
     const sermonPassage = localService.value.sermonPassage ?? null
     // Orchestra AI filter (D-06, D-09): when service is orchestra, only include orchestra-tagged songs
+    // D-18: exclude hidden (soft-deleted) songs from AI base
     const isOrchestraService = (localService.value?.teams ?? []).includes('Orchestra')
+    const base = songStore.songs.filter((s) => !s.hidden)
     const librarySource = isOrchestraService
-      ? songStore.songs.filter((s) => s.teamTags.includes('Orchestra'))
-      : songStore.songs
+      ? base.filter((s) => s.teamTags.includes('Orchestra'))
+      : base
     const songLibrary = librarySource.map((s) => ({
       id: s.id,
       title: s.title,
@@ -1412,10 +1533,12 @@ async function fetchAiForSlot(slotIndex: number) {
       }
     }
 
+    // D-18: exclude hidden (soft-deleted) songs from AI base
     const isOrchestraService = (localService.value?.teams ?? []).includes('Orchestra')
+    const base = songStore.songs.filter((s) => !s.hidden)
     const librarySource = isOrchestraService
-      ? songStore.songs.filter((s) => s.teamTags.includes('Orchestra'))
-      : songStore.songs
+      ? base.filter((s) => s.teamTags.includes('Orchestra'))
+      : base
     const result = await getSongSuggestions({
       sermonTopic: localService.value.sermonTopic ?? null,
       sermonPassage: localService.value.sermonPassage ?? null,

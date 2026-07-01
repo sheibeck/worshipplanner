@@ -167,7 +167,7 @@
       </div>
       <button
         type="button"
-        @click="dismissPreview"
+        @click.stop="dismissPreview"
         aria-label="Close preview"
         class="shrink-0 text-gray-500 hover:text-gray-300 transition-colors text-xs leading-none mt-0.5"
       >
