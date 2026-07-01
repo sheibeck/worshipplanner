@@ -106,6 +106,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - Phase 9 added: PC Song Import & Tag Management
 - Phase 10 added: Worship song export naming, template import improvements, auto-add teams on import, orchestra filter for song suggestions
 - Phase 11 added: Song catalog & service planner improvements (catalog browsing/search, themes, metadata search, drag-drop ordering & autosave bug fixes, hide-by-tag, AI hidden-song exclusion, column sorting, delete confirmation)
+- Phase 12 added: Advanced song search (metadata-aware + field-scoped syntax) and multi-select persistent tag filtering across the service-plan picker and Songs panel
 
 ### Quick Tasks Completed
 

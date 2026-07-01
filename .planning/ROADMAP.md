@@ -113,3 +113,25 @@ Plans:
 - [x] 11-02-PLAN.md — Editor reliability & safety: SortableJS snap-back, immediate reorder-save, stuck-dirty autosave, delete-confirm, AI hidden-filter (Wave 1)
 - [x] 11-03-PLAN.md — Song catalog UX: all-column sort, themes/tags pills, tag editing (form/inline/bulk), hide/show tag filter (Wave 2)
 - [x] 11-04-PLAN.md — Service planner picker: type-agnostic list, load-more batching, broad AI, tags pills + filter (Wave 2)
+
+### Phase 12: Advanced song search and multi-select persistent tag filtering (picker + Songs panel)
+
+**Goal:** Give users a robust, metadata-aware song search and a persistent multi-select tag filter across both the service-plan song picker and the Songs panel — so any song is findable by name or any known metadata, and tag filtering is fast and remembered.
+**Requirements**: TBD (captured during discuss/plan)
+**Depends on:** Phase 11
+
+Scope (from user request):
+1. Robust search in ONE search box (both the service-plan picker `SongSlotPicker.vue` and the Songs panel `SongsView`/`SongTable`/`SongFilters`):
+   - Bare natural terms match across metadata — "Type 1"/"Type 2" → song category (VW type); "Adoration" → themes; "Key A" → arrangement key; plus name/existing full-field search.
+   - Explicit field-scoped/enforced filters for precision, combinable — e.g. `tag: Orchestra`, `key: E`, `type: 1`.
+   - Builds on Phase 11's `songMatchesQuery` full-field search foundation.
+2. Tag filter UI redesign — replace the two "Show only tag" / "Hide tag" dropdowns with a SINGLE list of all tags, each with a checkbox:
+   - Default: show only checked tags. A top-level "Hide" checkbox inverts semantics so checked tags are hidden instead. A "Clear" option resets selections.
+3. Persistence — remember the tag show/hide filter settings between song selections/searches (ideally across sessions) so users don't re-check boxes; "Clear" resets on demand, but default is to remember state. Applies to both picker and Songs-panel filters.
+
+Direct enhancement of the Phase 11 search + tag-filter work.
+
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 12 to break down)
