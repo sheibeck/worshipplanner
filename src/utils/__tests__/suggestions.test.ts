@@ -31,7 +31,7 @@ const TWO_WEEKS_MS = 2 * ONE_WEEK_MS
 const THREE_WEEKS_MS = 3 * ONE_WEEK_MS
 const TEN_WEEKS_MS = 10 * ONE_WEEK_MS
 
-describe('rankSongsForSlot - VW type prioritization', () => {
+describe('rankSongsForSlot - VW type (type-agnostic, D-10)', () => {
   it('returns empty array when songs array is empty', () => {
     const results = rankSongsForSlot([], 1, [], NOW_MS)
     expect(results).toHaveLength(0)
@@ -61,52 +61,55 @@ describe('rankSongsForSlot - VW type prioritization', () => {
     expect(results.map((r) => r.song.id)).toContain('s2')
   })
 
-  it('songs matching requiredVwType score +100 higher than equivalent non-matching songs', () => {
+  it('type-matching and non-matching songs score EQUALLY (no typeBonus, D-10)', () => {
+    // Both songs never used, same recency — with typeBonus removed they must score identically
     const songs = [
-      makeSong({ id: 'match', vwTypes: [1] }),    // never used: 500 + 100 = 600
-      makeSong({ id: 'nomatch', vwTypes: [2] }),   // never used: 500 + 0 = 500
+      makeSong({ id: 'match', vwTypes: [1] }),    // never used: 500
+      makeSong({ id: 'nomatch', vwTypes: [2] }),   // never used: 500
     ]
     const results = rankSongsForSlot(songs, 1, [], NOW_MS)
     const matchResult = results.find((r) => r.song.id === 'match')!
     const noMatchResult = results.find((r) => r.song.id === 'nomatch')!
-    expect(matchResult.score - noMatchResult.score).toBe(100)
+    expect(matchResult.score).toBe(noMatchResult.score)
+    expect(matchResult.score).toBe(500)
   })
 
-  it('uncategorized songs appear in results with no typeBonus', () => {
+  it('uncategorized songs score the same as type-matching songs (all get 500 base, no bonus)', () => {
     const songs = [
-      makeSong({ id: 'no-type', vwTypes: [] }),   // never used: 500 + 0 = 500
-      makeSong({ id: 'match', vwTypes: [2] }),     // never used: 500 + 100 = 600
+      makeSong({ id: 'no-type', vwTypes: [] }),   // never used: 500
+      makeSong({ id: 'match', vwTypes: [2] }),     // never used: 500 (no typeBonus anymore)
     ]
     const results = rankSongsForSlot(songs, 2, [], NOW_MS)
     const nullResult = results.find((r) => r.song.id === 'no-type')!
     const matchResult = results.find((r) => r.song.id === 'match')!
-    // no type gets no bonus (same base score), match gets +100
-    expect(matchResult.score).toBe(600)
+    // Both get same base score — type match no longer adds any bonus
+    expect(matchResult.score).toBe(500)
     expect(nullResult.score).toBe(500)
   })
 
-  it('with mixed VW types, matching type sorts first given equal recency', () => {
+  it('with mixed VW types, all never-used songs share the same score regardless of type', () => {
     const songs = [
-      makeSong({ id: 'type2', vwTypes: [2] }),        // non-matching, never used: 500
-      makeSong({ id: 'type1', vwTypes: [1] }),         // matching, never used: 600
-      makeSong({ id: 'no-type', vwTypes: [] }),        // no type, never used: 500
+      makeSong({ id: 'type2', vwTypes: [2] }),
+      makeSong({ id: 'type1', vwTypes: [1] }),
+      makeSong({ id: 'no-type', vwTypes: [] }),
     ]
     const results = rankSongsForSlot(songs, 1, [], NOW_MS)
-    expect(results[0]!.song.id).toBe('type1')   // matching type first
-    // non-matching and null both score 500, order among them doesn't matter
+    // All three never-used and no orchestra bonus — all score 500
+    expect(results.every((r) => r.score === 500)).toBe(true)
+    expect(results.map((r) => r.song.id)).toContain('type1')
     expect(results.map((r) => r.song.id)).toContain('type2')
     expect(results.map((r) => r.song.id)).toContain('no-type')
   })
 
-  it('multi-type song gets type bonus when one of its types matches', () => {
+  it('multi-type songs score the same as single-type or no-type songs with equal recency', () => {
     const songs = [
-      makeSong({ id: 'multi', vwTypes: [1, 2] }),   // matches type 1: 500 + 100 = 600
-      makeSong({ id: 'type3', vwTypes: [3] }),        // no match: 500 + 0 = 500
+      makeSong({ id: 'multi', vwTypes: [1, 2] }),   // never used: 500
+      makeSong({ id: 'type3', vwTypes: [3] }),        // never used: 500
     ]
     const results = rankSongsForSlot(songs, 1, [], NOW_MS)
     const multiResult = results.find((r) => r.song.id === 'multi')!
     const type3Result = results.find((r) => r.song.id === 'type3')!
-    expect(multiResult.score).toBe(600)
+    expect(multiResult.score).toBe(500)
     expect(type3Result.score).toBe(500)
   })
 })
@@ -170,21 +173,21 @@ describe('rankSongsForSlot - team filtering', () => {
 })
 
 describe('rankSongsForSlot - scoring', () => {
-  it('never-used matching-type songs get score 600 (500 base + 100 typeBonus)', () => {
+  it('never-used songs get score 500 (base only, no typeBonus)', () => {
     const songs = [makeSong({ id: 's1', vwTypes: [1], lastUsedMs: undefined })]
     const results = rankSongsForSlot(songs, 1, [], NOW_MS)
-    expect(results[0]!.score).toBe(600)
+    expect(results[0]!.score).toBe(500)
     expect(results[0]!.weeksAgo).toBeNull()
     expect(results[0]!.isRecent).toBe(false)
   })
 
-  it('never-used non-matching songs get score 500 (500 base + 0 typeBonus)', () => {
+  it('never-used songs of any VW type all get score 500 (type is irrelevant to score)', () => {
     const songs = [makeSong({ id: 's1', vwTypes: [2], lastUsedMs: undefined })]
     const results = rankSongsForSlot(songs, 1, [], NOW_MS)
     expect(results[0]!.score).toBe(500)
   })
 
-  it('recently-used matching songs (within 2 weeks) get score below 200', () => {
+  it('recently-used songs (within 2 weeks) get score below 200', () => {
     const songs = [
       makeSong({ id: 's1', vwTypes: [1], lastUsedMs: NOW_MS - ONE_WEEK_MS }),
     ]
@@ -193,34 +196,34 @@ describe('rankSongsForSlot - scoring', () => {
     expect(results[0]!.isRecent).toBe(true)
   })
 
-  it('songs used exactly 1 week ago (matching type) get score 160 (60 + 100 typeBonus)', () => {
+  it('songs used exactly 1 week ago get score 60 (50 base + 1*10 staleness, no typeBonus)', () => {
     const songs = [
       makeSong({ id: 's1', vwTypes: [1], lastUsedMs: NOW_MS - ONE_WEEK_MS }),
     ]
     const results = rankSongsForSlot(songs, 1, [], NOW_MS)
-    expect(results[0]!.score).toBe(160) // 50 + 1*10 + 100
+    expect(results[0]!.score).toBe(60) // 50 + 1*10
     expect(results[0]!.weeksAgo).toBe(1)
   })
 
-  it('songs used more than 2 weeks ago (matching type) get score 300 or above', () => {
+  it('songs used more than 2 weeks ago get score 200 or above', () => {
     const songs = [
       makeSong({ id: 's1', vwTypes: [1], lastUsedMs: NOW_MS - THREE_WEEKS_MS }),
     ]
     const results = rankSongsForSlot(songs, 1, [], NOW_MS)
-    expect(results[0]!.score).toBeGreaterThanOrEqual(300)
+    expect(results[0]!.score).toBeGreaterThanOrEqual(200)
     expect(results[0]!.isRecent).toBe(false)
   })
 
-  it('songs used 3 weeks ago (matching type) get score 345 (245 + 100 typeBonus)', () => {
+  it('songs used 3 weeks ago get score 245 (200 + 3*15, no typeBonus)', () => {
     const songs = [
       makeSong({ id: 's1', vwTypes: [1], lastUsedMs: NOW_MS - THREE_WEEKS_MS }),
     ]
     const results = rankSongsForSlot(songs, 1, [], NOW_MS)
-    expect(results[0]!.score).toBe(345) // 200 + 3*15 + 100
+    expect(results[0]!.score).toBe(245) // 200 + 3*15
     expect(results[0]!.weeksAgo).toBe(3)
   })
 
-  it('older songs score higher than newer songs of same type (staleness scoring)', () => {
+  it('older songs score higher than newer songs (staleness scoring)', () => {
     const songs = [
       makeSong({ id: 's_old', vwTypes: [1], lastUsedMs: NOW_MS - TEN_WEEKS_MS }),
       makeSong({ id: 's_new', vwTypes: [1], lastUsedMs: NOW_MS - THREE_WEEKS_MS }),
@@ -239,9 +242,9 @@ describe('rankSongsForSlot - sorting', () => {
       makeSong({ id: 's_stale', vwTypes: [1], lastUsedMs: NOW_MS - TEN_WEEKS_MS }),
     ]
     const results = rankSongsForSlot(songs, 1, [], NOW_MS)
-    expect(results[0]!.song.id).toBe('s_never') // score 600 (500+100)
-    expect(results[1]!.song.id).toBe('s_stale') // score 300+ (10 weeks + 100)
-    expect(results[2]!.song.id).toBe('s_recent') // score < 200 (1 week + 100)
+    expect(results[0]!.song.id).toBe('s_never') // score 500 (base only)
+    expect(results[1]!.song.id).toBe('s_stale') // score 500 (capped staleness) or 200+
+    expect(results[2]!.song.id).toBe('s_recent') // score 60 (1 week)
   })
 
   it('songs used in last 2 weeks appear in results but with lower score (deprioritized, not hidden)', () => {
@@ -257,14 +260,17 @@ describe('rankSongsForSlot - sorting', () => {
     expect(results[0]!.song.id).toBe('s_never')
   })
 
-  it('matching-type songs rank above non-matching songs of same recency', () => {
+  it('songs of different VW types score equally when recency is the same (type-agnostic, D-10)', () => {
     const songs = [
-      makeSong({ id: 'type2-never', vwTypes: [2] }),  // 500+0=500
-      makeSong({ id: 'type1-never', vwTypes: [1] }),  // 500+100=600
+      makeSong({ id: 'type2-never', vwTypes: [2] }),  // 500 (no bonus)
+      makeSong({ id: 'type1-never', vwTypes: [1] }),  // 500 (no bonus)
     ]
     const results = rankSongsForSlot(songs, 1, [], NOW_MS)
-    expect(results[0]!.song.id).toBe('type1-never')
-    expect(results[1]!.song.id).toBe('type2-never')
+    // Both score 500 — neither has advantage over the other
+    expect(results[0]!.score).toBe(500)
+    expect(results[1]!.score).toBe(500)
+    expect(results.map((r) => r.song.id)).toContain('type1-never')
+    expect(results.map((r) => r.song.id)).toContain('type2-never')
   })
 })
 
