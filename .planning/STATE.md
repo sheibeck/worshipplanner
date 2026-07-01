@@ -128,6 +128,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 |---|-------------|------|--------|-----------|
 | 9 | Subscribe to updates so that if 2 or more people are looking at the Services listing or the Edit Service screen they can see updates made by other people who are looking at the same thing | 2026-03-12 | e0ce5e1 | [9-subscribe-to-updates-so-that-if-2-or-mor](.planning/quick/9-subscribe-to-updates-so-that-if-2-or-mor/) |
 | 10 | Allow closing the scripture preview in edit mode | 2026-03-12 | 9c3bd1f | [10-allow-closing-the-scripture-preview-in-e](.planning/quick/10-allow-closing-the-scripture-preview-in-e/) |
+| 260701-awp | Fix song-picker sticky header (search + tag filters) rendering behind scrolling song list | 2026-07-01 | 5de0ae2 | [260701-awp-fix-song-picker-sticky-header-search-tag](.planning/quick/260701-awp-fix-song-picker-sticky-header-search-tag/) |
 
 ### Blockers/Concerns
 
@@ -137,7 +138,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 
 ## Session Continuity
 
-Last activity: 2026-07-01
+Last activity: 2026-07-01 - Completed quick task 260701-awp: fix song-picker sticky header z-index
 Last session: 2026-07-01T02:01:49.484Z
-Stopped at: Phase 11 context gathered
-Resume file: .planning/phases/11-song-catalog-service-planner-improvements/11-CONTEXT.md
+Stopped at: Phase 11 executed (4/4 plans, human UAT pending); quick task 260701-awp complete
+Resume file: .planning/phases/11-song-catalog-service-planner-improvements/11-HUMAN-UAT.md
