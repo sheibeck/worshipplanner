@@ -118,6 +118,7 @@ export function mapPcSongToUpsert(
     notes: '',
     vwTypes,
     teamTags,
+    tags: [], // D-01/D-02: user tags never sourced from PC; import payload always carries []
     arrangements: mappedArrangements,
     primaryArrangementId,
     lastUsedAt,

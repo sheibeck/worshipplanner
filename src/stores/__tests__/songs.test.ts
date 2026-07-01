@@ -49,6 +49,7 @@ function makeSong(overrides: Partial<{
   author: string
   vwTypes: VWType[]
   teamTags: string[]
+  tags: string[]
   arrangements: Array<{ id: string; name: string; key: string; bpm: number | null; lengthSeconds: number | null; chordChartUrl: string; notes: string; teamTags: string[] }>
   primaryArrangementId: string | null
   themes: string[]
@@ -66,6 +67,7 @@ function makeSong(overrides: Partial<{
     author: 'John Newton',
     vwTypes: [1] as VWType[],
     teamTags: ['Choir'],
+    tags: [] as string[],
     arrangements: [
       {
         id: 'arr-1',
@@ -778,6 +780,232 @@ describe('useSongStore', () => {
       const callArgs = vi.mocked(updateDoc).mock.calls[0]!
       const data = callArgs[1] as unknown as Record<string, unknown>
       expect(data.vwTypes).toEqual([1, 3])
+    })
+  })
+
+  describe('upsertSongs — tag preservation and theme merge (D-02, D-08)', () => {
+    it('preserves existing user tags when re-importing (tags from import are ignored)', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'song-tagged', title: 'Tagged Song', pcSongId: 'pc-tagged', ccliNumber: '11111', tags: ['Christmas'] }),
+      ])
+
+      await store.upsertSongs([
+        {
+          title: 'Tagged Song',
+          ccliNumber: '11111',
+          author: 'Author',
+          themes: [],
+          notes: '',
+          vwTypes: [],
+          teamTags: [],
+          tags: [], // import sends empty tags — must NOT overwrite existing user tags
+          arrangements: [],
+          primaryArrangementId: null,
+          lastUsedAt: null,
+          pcSongId: 'pc-tagged',
+          hidden: false,
+        },
+      ])
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const data = callArgs[1] as unknown as Record<string, unknown>
+      expect(data.tags).toEqual(['Christmas']) // preserved from existing song
+    })
+
+    it('unions themes on re-import (existing themes not lost)', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'song-themes', title: 'Theme Song', pcSongId: 'pc-themes', ccliNumber: '22222', themes: ['grace', 'salvation'] }),
+      ])
+
+      await store.upsertSongs([
+        {
+          title: 'Theme Song',
+          ccliNumber: '22222',
+          author: 'Author',
+          themes: ['salvation', 'worship'], // incoming has one overlap + one new
+          notes: '',
+          vwTypes: [],
+          teamTags: [],
+          tags: [],
+          arrangements: [],
+          primaryArrangementId: null,
+          lastUsedAt: null,
+          pcSongId: 'pc-themes',
+          hidden: false,
+        },
+      ])
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const data = callArgs[1] as unknown as Record<string, unknown>
+      const themes = data.themes as string[]
+      expect(themes).toContain('grace')     // existing theme preserved
+      expect(themes).toContain('salvation') // overlap deduplicated
+      expect(themes).toContain('worship')   // new theme added
+      expect(themes.filter((t) => t === 'salvation')).toHaveLength(1) // no duplicates
+    })
+
+    it('new song gets tags: [] when import has tags: []', async () => {
+      const { addDoc } = await import('firebase/firestore')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([])
+
+      await store.upsertSongs([
+        {
+          title: 'New Song With No Tags',
+          ccliNumber: '33333',
+          author: 'Author',
+          themes: [],
+          notes: '',
+          vwTypes: [],
+          teamTags: [],
+          tags: [],
+          arrangements: [],
+          primaryArrangementId: null,
+          lastUsedAt: null,
+          pcSongId: 'pc-new',
+          hidden: false,
+        },
+      ])
+
+      expect(addDoc).toHaveBeenCalledOnce()
+      const callArgs = vi.mocked(addDoc).mock.calls[0]!
+      const data = callArgs[1] as Record<string, unknown>
+      expect(data.tags).toEqual([])
+    })
+  })
+
+  describe('subscribe — legacy tags backfill (D-01)', () => {
+    it('normalizes missing tags field to [] for legacy docs', async () => {
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      if (snapshotCallback) {
+        snapshotCallback({
+          docs: [
+            {
+              id: 'legacy-no-tags',
+              data: () => ({
+                title: 'Legacy Song',
+                ccliNumber: '44444',
+                author: 'Old Author',
+                vwTypes: [],
+                teamTags: [],
+                arrangements: [],
+                themes: [],
+                notes: '',
+                lastUsedAt: null,
+                createdAt: { seconds: 1000000, nanoseconds: 0 },
+                updatedAt: { seconds: 1000000, nanoseconds: 0 },
+                hidden: false,
+                // tags field intentionally omitted — legacy doc
+              }),
+            },
+          ],
+        })
+      }
+      expect(store.songs[0]!.tags).toEqual([])
+    })
+
+    it('preserves existing tags array for docs that already have it', async () => {
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      if (snapshotCallback) {
+        snapshotCallback({
+          docs: [
+            {
+              id: 'song-with-tags',
+              data: () => ({
+                title: 'Tagged Song',
+                ccliNumber: '55555',
+                author: 'Author',
+                vwTypes: [],
+                teamTags: [],
+                tags: ['Christmas', 'Advent'],
+                arrangements: [],
+                themes: [],
+                notes: '',
+                lastUsedAt: null,
+                createdAt: { seconds: 1000000, nanoseconds: 0 },
+                updatedAt: { seconds: 1000000, nanoseconds: 0 },
+                hidden: false,
+              }),
+            },
+          ],
+        })
+      }
+      expect(store.songs[0]!.tags).toEqual(['Christmas', 'Advent'])
+    })
+  })
+
+  describe('filteredSongs — include/exclude tag filter (D-03)', () => {
+    it('filterTagInclude: shows only songs that have the specified tag', async () => {
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'song-1', title: 'Christmas Song', tags: ['Christmas'] }),
+        makeSong({ id: 'song-2', title: 'Regular Song', tags: [] }),
+      ])
+      store.filterTagInclude = 'Christmas'
+      expect(store.filteredSongs).toHaveLength(1)
+      expect(store.filteredSongs[0]!.title).toBe('Christmas Song')
+    })
+
+    it('filterTagInclude: empty string shows all songs', async () => {
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'song-1', title: 'Christmas Song', tags: ['Christmas'] }),
+        makeSong({ id: 'song-2', title: 'Regular Song', tags: [] }),
+      ])
+      store.filterTagInclude = ''
+      expect(store.filteredSongs).toHaveLength(2)
+    })
+
+    it('filterTagExclude: hides songs that have the specified tag', async () => {
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'song-1', title: 'Christmas Song', tags: ['Christmas'] }),
+        makeSong({ id: 'song-2', title: 'Regular Song', tags: [] }),
+      ])
+      store.filterTagExclude = 'Christmas'
+      expect(store.filteredSongs).toHaveLength(1)
+      expect(store.filteredSongs[0]!.title).toBe('Regular Song')
+    })
+
+    it('filterTagExclude: empty string shows all songs', async () => {
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'song-1', title: 'Christmas Song', tags: ['Christmas'] }),
+        makeSong({ id: 'song-2', title: 'Regular Song', tags: [] }),
+      ])
+      store.filterTagExclude = ''
+      expect(store.filteredSongs).toHaveLength(2)
+    })
+
+    it('filterTagInclude and filterTagExclude are exported from store', async () => {
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      expect('filterTagInclude' in store).toBe(true)
+      expect('filterTagExclude' in store).toBe(true)
     })
   })
 

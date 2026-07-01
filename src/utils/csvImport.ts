@@ -8,6 +8,7 @@ export interface ParsedSongPreview {
   notes: string
   vwTypes: VWType[]
   teamTags: string[]
+  tags: string[]
   arrangements: Arrangement[]
   primaryArrangementId: string | null
   lastUsedAt: null
@@ -148,6 +149,7 @@ export function mapRowToSong(row: Record<string, string>): ParsedSongPreview {
     notes,
     vwTypes: [],
     teamTags,
+    tags: [], // D-01: CSV import never sets user tags
     arrangements,
     primaryArrangementId: arrangements[0]?.id ?? null,
     lastUsedAt: null,

@@ -28,6 +28,8 @@ export const useSongStore = defineStore('songs', () => {
   const filterVwType = ref<1 | 2 | 3 | 'uncategorized' | null>(null)
   const filterKey = ref('')
   const filterTag = ref('')
+  const filterTagInclude = ref('')
+  const filterTagExclude = ref('')
 
   let unsubscribeFn: Unsubscribe | null = null
 
@@ -50,7 +52,13 @@ export const useSongStore = defineStore('songs', () => {
       const matchesTag =
         !filterTag.value || song.teamTags.includes(filterTag.value)
 
-      return matchesSearch && matchesVwType && matchesKey && matchesTag
+      const matchesTagInclude =
+        !filterTagInclude.value || (song.tags?.includes(filterTagInclude.value) ?? false)
+
+      const matchesTagExclude =
+        !filterTagExclude.value || !(song.tags?.includes(filterTagExclude.value) ?? false)
+
+      return matchesSearch && matchesVwType && matchesKey && matchesTag && matchesTagInclude && matchesTagExclude
     })
   })
 
@@ -69,6 +77,10 @@ export const useSongStore = defineStore('songs', () => {
         // Normalize legacy vwType scalar field to vwTypes array
         if (!Array.isArray(data.vwTypes)) {
           data.vwTypes = data.vwType != null ? [data.vwType] : []
+        }
+        // Normalize legacy docs without tags field to empty array
+        if (!Array.isArray(data.tags)) {
+          data.tags = []
         }
         return { id: d.id, ...data } as Song
       })
@@ -145,16 +157,22 @@ export const useSongStore = defineStore('songs', () => {
       }
 
       if (existing) {
-        // Update existing: preserve hidden status, only set vwTypes when incoming is non-empty
+        // Update existing: preserve hidden status and user tags, merge themes, only set vwTypes when incoming is non-empty
         const {
           vwTypes: incomingVwTypes,
           hidden: _hidden,
           primaryArrangementId: incomingPrimary,
+          tags: _tags,
+          themes: _themes,
           ...restIncoming
         } = incoming
         const updateData: Record<string, unknown> = {
           ...restIncoming,
           hidden: existing.hidden ?? false,
+          // D-02: never let import overwrite user tags — identical to hidden preservation
+          tags: existing.tags ?? [],
+          // D-08: union themes instead of clobbering (merge existing + incoming, no duplicates)
+          themes: Array.from(new Set([...(existing.themes ?? []), ...(_themes ?? [])])),
           updatedAt: serverTimestamp(),
         }
         // Only include vwTypes if incoming array is non-empty (preserve user-set types if incoming is empty)
@@ -175,6 +193,7 @@ export const useSongStore = defineStore('songs', () => {
         await addDoc(collection(db, 'organizations', orgId.value!, 'songs'), {
           ...incoming,
           hidden: false,
+          tags: incoming.tags ?? [],
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         })
@@ -207,6 +226,8 @@ export const useSongStore = defineStore('songs', () => {
     filterVwType,
     filterKey,
     filterTag,
+    filterTagInclude,
+    filterTagExclude,
     filteredSongs,
     subscribe,
     unsubscribeAll,

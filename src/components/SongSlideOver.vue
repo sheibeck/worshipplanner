@@ -252,6 +252,7 @@ interface FormState {
   themes: string[]
   notes: string
   teamTags: string[]
+  tags: string[]
   arrangements: Arrangement[]
   primaryArrangementId: string | null
 }
@@ -265,6 +266,7 @@ function emptyForm(): FormState {
     themes: [],
     notes: '',
     teamTags: [],
+    tags: [],
     arrangements: [],
     primaryArrangementId: null,
   }
@@ -279,6 +281,7 @@ function songToForm(song: Song): FormState {
     themes: [...song.themes],
     notes: song.notes,
     teamTags: [...song.teamTags],
+    tags: [...(song.tags ?? [])],
     arrangements: song.arrangements.map((a) => ({
       ...a,
       teamTags: [...a.teamTags],
@@ -412,6 +415,7 @@ async function onSave() {
     themes,
     notes: form.value.notes.trim(),
     teamTags: allTags,
+    tags: form.value.tags,
     arrangements,
     primaryArrangementId,
     lastUsedAt: props.song?.lastUsedAt ?? null,
