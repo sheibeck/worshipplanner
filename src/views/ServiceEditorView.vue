@@ -453,7 +453,7 @@
         <div ref="slotContainerRef" class="space-y-1.5">
           <div
             v-for="(slot, index) in localService.slots"
-            :key="slot.position + '-' + slot.kind + '-' + index"
+            :key="slot.kind + '-' + slot.position"
             class="rounded-lg bg-gray-900 border border-gray-800 p-3 flex items-start gap-2"
           >
             <!-- Drag handle: editor only -->
@@ -977,18 +977,40 @@ watch(slotContainerRef, (el) => {
       handle: '.drag-handle',
       animation: 150,
       ghostClass: 'opacity-30',
-      onEnd(evt) {
+      async onEnd(evt) {
         if (!localService.value || evt.oldIndex == null || evt.newIndex == null) return
         if (evt.oldIndex === evt.newIndex) return
+        // D-16: revert SortableJS's DOM move so Vue's reactive render is the single source of truth (prevents snap-back)
+        const parent = evt.item.parentNode
+        if (parent) {
+          const ref = parent.children[evt.oldIndex]
+          parent.insertBefore(evt.item, evt.oldIndex < evt.newIndex ? ref?.nextSibling ?? null : ref ?? null)
+        }
         const slots = [...localService.value.slots]
         const moved = slots.splice(evt.oldIndex, 1)[0]
         if (!moved) return
         slots.splice(evt.newIndex, 0, moved)
-        localService.value.slots = reindexSlots(slots)
-        // Force Vue to re-render in sync with our data
-        nextTick(() => {
-          // After Vue re-renders, Sortable DOM will be correct
-        })
+        const reindexed = reindexSlots(slots)
+        localService.value.slots = reindexed
+        // D-15: persist immediately rather than waiting on the 800ms debounce
+        if (serviceId.value) {
+          if (autosaveTimer) {
+            clearTimeout(autosaveTimer)
+            autosaveTimer = null
+          }
+          autosaveSaving = true
+          autosaveStatus.value = 'saving'
+          try {
+            await serviceStore.updateService(serviceId.value, { slots: reindexed })
+            originalService.value = JSON.parse(JSON.stringify(localService.value))
+            autosaveStatus.value = 'saved'
+            setTimeout(() => {
+              if (autosaveStatus.value === 'saved') autosaveStatus.value = 'idle'
+            }, 3000)
+          } finally {
+            autosaveSaving = false
+          }
+        }
       },
     })
   }
@@ -1135,11 +1157,14 @@ watch(
     }
     if (!isDirty.value) return
 
+    // D-17: always mark pending so status never strands; re-arm timer if it was cleared (e.g. after immediate reorder-save)
     autosaveStatus.value = 'pending'
 
     if (autosaveTimer) clearTimeout(autosaveTimer)
     const scheduleAutosave = () => {
       autosaveTimer = setTimeout(async () => {
+        // D-17: clear the handle immediately so autosaveTimer === null is reachable for the re-arm guard
+        autosaveTimer = null
         if (!isDirty.value) {
           autosaveStatus.value = 'idle'
           return
