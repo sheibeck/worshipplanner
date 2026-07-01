@@ -957,8 +957,8 @@ describe('useSongStore', () => {
     })
   })
 
-  describe('filteredSongs — include/exclude tag filter (D-03)', () => {
-    it('filterTagInclude: shows only songs that have the specified tag', async () => {
+  describe('filteredSongs — tag-filter checklist (D-08/D-09/D-10)', () => {
+    it('default show mode, empty checked set returns all non-hidden songs (unchanged behavior)', async () => {
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       store.subscribe('org-1')
@@ -966,24 +966,41 @@ describe('useSongStore', () => {
         makeSong({ id: 'song-1', title: 'Christmas Song', tags: ['Christmas'] }),
         makeSong({ id: 'song-2', title: 'Regular Song', tags: [] }),
       ])
-      store.filterTagInclude = 'Christmas'
+      expect(store.tagFilterChecked.size).toBe(0)
+      expect(store.tagFilterHide).toBe(false)
+      expect(store.filteredSongs).toHaveLength(2)
+    })
+
+    it('show mode: checked Set(["Christmas"]) shows only songs carrying that tag', async () => {
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'song-1', title: 'Christmas Song', tags: ['Christmas'] }),
+        makeSong({ id: 'song-2', title: 'Easter Song', tags: ['Easter'] }),
+      ])
+      store.tagFilterChecked = new Set(['Christmas'])
       expect(store.filteredSongs).toHaveLength(1)
       expect(store.filteredSongs[0]!.title).toBe('Christmas Song')
     })
 
-    it('filterTagInclude: empty string shows all songs', async () => {
+    it('show mode OR: checked Set(["Christmas","Easter"]) broadens to include either tag', async () => {
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       store.subscribe('org-1')
       triggerSnapshot([
         makeSong({ id: 'song-1', title: 'Christmas Song', tags: ['Christmas'] }),
-        makeSong({ id: 'song-2', title: 'Regular Song', tags: [] }),
+        makeSong({ id: 'song-2', title: 'Easter Song', tags: ['Easter'] }),
+        makeSong({ id: 'song-3', title: 'Regular Song', tags: [] }),
       ])
-      store.filterTagInclude = ''
+      store.tagFilterChecked = new Set(['Christmas', 'Easter'])
       expect(store.filteredSongs).toHaveLength(2)
+      const titles = store.filteredSongs.map((s) => s.title)
+      expect(titles).toContain('Christmas Song')
+      expect(titles).toContain('Easter Song')
     })
 
-    it('filterTagExclude: hides songs that have the specified tag', async () => {
+    it('hide mode: checked tags are EXCLUDED, others appear', async () => {
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       store.subscribe('org-1')
@@ -991,28 +1008,37 @@ describe('useSongStore', () => {
         makeSong({ id: 'song-1', title: 'Christmas Song', tags: ['Christmas'] }),
         makeSong({ id: 'song-2', title: 'Regular Song', tags: [] }),
       ])
-      store.filterTagExclude = 'Christmas'
+      store.tagFilterHide = true
+      store.tagFilterChecked = new Set(['Christmas'])
       expect(store.filteredSongs).toHaveLength(1)
       expect(store.filteredSongs[0]!.title).toBe('Regular Song')
     })
 
-    it('filterTagExclude: empty string shows all songs', async () => {
+    it('clearTagFilter() empties checked set and sets hide false, leaves other filters untouched', async () => {
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       store.subscribe('org-1')
-      triggerSnapshot([
-        makeSong({ id: 'song-1', title: 'Christmas Song', tags: ['Christmas'] }),
-        makeSong({ id: 'song-2', title: 'Regular Song', tags: [] }),
-      ])
-      store.filterTagExclude = ''
-      expect(store.filteredSongs).toHaveLength(2)
+      store.searchQuery = 'amazing'
+      store.filterVwType = 1
+      store.filterKey = 'G'
+      store.tagFilterChecked = new Set(['Christmas'])
+      store.tagFilterHide = true
+
+      store.clearTagFilter()
+
+      expect(store.tagFilterChecked.size).toBe(0)
+      expect(store.tagFilterHide).toBe(false)
+      expect(store.searchQuery).toBe('amazing')
+      expect(store.filterVwType).toBe(1)
+      expect(store.filterKey).toBe('G')
     })
 
-    it('filterTagInclude and filterTagExclude are exported from store', async () => {
+    it('tagFilterChecked, tagFilterHide, and clearTagFilter are exported from store', async () => {
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
-      expect('filterTagInclude' in store).toBe(true)
-      expect('filterTagExclude' in store).toBe(true)
+      expect('tagFilterChecked' in store).toBe(true)
+      expect('tagFilterHide' in store).toBe(true)
+      expect('clearTagFilter' in store).toBe(true)
     })
   })
 

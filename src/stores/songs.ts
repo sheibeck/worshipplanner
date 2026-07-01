@@ -28,8 +28,10 @@ export const useSongStore = defineStore('songs', () => {
   const filterVwType = ref<1 | 2 | 3 | 'uncategorized' | null>(null)
   const filterKey = ref('')
   const filterTag = ref('')
-  const filterTagInclude = ref('')
-  const filterTagExclude = ref('')
+  // D-08: shared multi-select tag-filter checklist state (checked tags + hide toggle)
+  // D-09: OR-combine in show mode; D-10: exclusion set when hide ON
+  const tagFilterChecked = ref<Set<string>>(new Set())
+  const tagFilterHide = ref(false)
 
   let unsubscribeFn: Unsubscribe | null = null
 
@@ -52,15 +54,22 @@ export const useSongStore = defineStore('songs', () => {
       const matchesTag =
         !filterTag.value || song.teamTags.includes(filterTag.value)
 
-      const matchesTagInclude =
-        !filterTagInclude.value || (song.tags?.includes(filterTagInclude.value) ?? false)
+      const checked = tagFilterChecked.value
+      let matchesUserTags = true
+      if (checked.size > 0) {
+        const carriesChecked = (song.tags ?? []).some((t) => checked.has(t))
+        matchesUserTags = tagFilterHide.value ? !carriesChecked : carriesChecked
+      }
 
-      const matchesTagExclude =
-        !filterTagExclude.value || !(song.tags?.includes(filterTagExclude.value) ?? false)
-
-      return matchesSearch && matchesVwType && matchesKey && matchesTag && matchesTagInclude && matchesTagExclude
+      return matchesSearch && matchesVwType && matchesKey && matchesTag && matchesUserTags
     })
   })
+
+  // D-11: clears only the tag filter — searchQuery/filterVwType/filterKey untouched
+  function clearTagFilter() {
+    tagFilterChecked.value = new Set()
+    tagFilterHide.value = false
+  }
 
   function subscribe(orgIdValue: string) {
     if (unsubscribeFn) {
@@ -226,8 +235,8 @@ export const useSongStore = defineStore('songs', () => {
     filterVwType,
     filterKey,
     filterTag,
-    filterTagInclude,
-    filterTagExclude,
+    tagFilterChecked,
+    tagFilterHide,
     filteredSongs,
     subscribe,
     unsubscribeAll,
@@ -237,5 +246,6 @@ export const useSongStore = defineStore('songs', () => {
     restoreSong,
     importSongs,
     upsertSongs,
+    clearTagFilter,
   }
 })
