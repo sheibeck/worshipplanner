@@ -125,4 +125,4 @@ Administrative, Communication, Rehearsal, Service time, Training, Physical setup
 | Autosave with debounce + one-step undo | Better UX than explicit save buttons | ✓ Good — 500ms debounce, Ctrl+Z undo |
 
 ---
-*Last updated: 2026-03-05 after v1.0 milestone*
+*Last updated: 2026-07-01 after Phase 12 (advanced song search + multi-select persistent tag filtering)*
