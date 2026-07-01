@@ -52,17 +52,17 @@ Exceptions: Tag checkbox rows use `py-1` (4px) for density — the checklist may
 
 ## Typography
 
-Matches existing codebase usage exactly — no new sizes introduced.
+Two weights only for this phase's new/touched elements — no new sizes introduced.
 
 | Role | Size | Weight | Line Height |
 |------|------|--------|-------------|
 | Body | 14px (text-sm) | 400 (regular) | 1.5 |
-| Label | 12px (text-xs) | 500 (medium) | 1.5 |
+| Label | 12px (text-xs) | 400 (regular) | 1.5 |
 | Heading | 16px (text-base) | 600 (semibold) | 1.2 |
 | Display | not used this phase | — | — |
 
 Font sizes used: 12px, 14px, 16px (3 sizes — within 3-4 range).
-Font weights used: 400 (regular, body/inputs), 500 (medium, labels/pills/uppercase section headers), 600 (semibold, modal headings/buttons) — codebase already uses 3 weights consistently (400/500/600); this phase does not introduce a 4th and follows existing convention rather than forcing a stricter 2-weight rule onto an established pattern.
+Font weights used: **exactly 2** — 400 (regular: body, inputs, labels, tag-checklist rows, pill text) and 600 (semibold: modal headings, buttons, active/toggle states). This phase's new and touched elements (tag-filter checklist, "Hide tags"/"Clear tags" controls, search hints, delete-confirmation copy) standardize on 400/600 only. The `font-medium` (500) weight used pervasively across the legacy codebase is intentionally NOT carried into this phase's new components — elements that would historically use 500 (labels, section headers) map to 400 (labels/rows) or 600 (emphasis) here. Existing untouched elements outside this phase's scope retain their current weights and are out of scope for this contract.
 
 ---
 
@@ -74,10 +74,10 @@ Matches existing dark-mode canonical theme (gray-950/900/800) per PROJECT.md —
 |------|-------|-------|
 | Dominant (60%) | gray-950 (`#030712`) / gray-900 (`bg-gray-900`) | App background, dropdown panel background, modal background |
 | Secondary (30%) | gray-800 (`bg-gray-800`) / gray-700 (`border-gray-700`) | Input fields, filter row background, borders, checklist panel surface |
-| Accent (10%) | indigo-500/600 (`focus:ring-indigo-500`, `bg-indigo-600`) | Focus rings on search input and checkboxes; "Clear" as ghost/link style, not accent-colored |
+| Accent (10%) | indigo-500/600 (`focus:ring-indigo-500`, `bg-indigo-600`) | Focus rings on search input and checkboxes; "Clear tags" as ghost/link style, not accent-colored |
 | Destructive | red-700/red-600 (`bg-red-700 hover:bg-red-600`) | Confirm button in delete-confirmation modal only ("Remove") |
 
-Accent reserved for: search input focus ring, tag checkbox focus/checked state (indigo check mark or indigo border when checked), the "Hide" toggle when active (indigo background to signal inverted mode is ON). Accent is NOT used for the "Clear" action (renders as plain gray text link, matching existing "Change song" link styling in `SongSlotPicker.vue`) and NOT used decoratively on tag pills (pills keep their existing `user` variant pink per `TeamTagPill.vue` — do not recolor pills to indigo).
+Accent reserved for: search input focus ring, tag checkbox focus/checked state (indigo check mark or indigo border when checked), the "Hide tags" toggle when active (indigo background to signal inverted mode is ON). Accent is NOT used for the "Clear tags" action (renders as plain gray text link, matching existing "Change song" link styling in `SongSlotPicker.vue`) and NOT used decoratively on tag pills (pills keep their existing `user` variant pink per `TeamTagPill.vue` — do not recolor pills to indigo).
 
 Second semantic note: pink (`bg-pink-900/50 text-pink-300 border-pink-800`) is the established color for **user tags** specifically (`TeamTagPill.vue` `user` variant, and the current `focus:ring-pink-500` on the two dropdowns being replaced). The new tag checklist should carry this pink identity forward for consistency — each checked tag chip/checkbox row uses pink accents for its "this is a user tag" identity, while indigo remains the app-wide interactive/focus accent. This is not a new color introduction; it is continuity with Phase 11/12 tag semantics already in the codebase.
 
@@ -87,7 +87,7 @@ Second semantic note: pink (`bg-pink-900/50 text-pink-300 border-pink-800`) is t
 
 | Element | Copy |
 |---------|------|
-| Primary CTA | No new standalone CTA button this phase — search and tag filter are always-visible controls, not gated behind a trigger. The "Hide" toggle label reads: **"Hide"** (compact, paired with checkbox list, tooltip/title="Invert: hide checked tags instead of showing only them"). The reset action reads: **"Clear"** (title="Clear tag filter"). |
+| Primary CTA | No new standalone CTA button this phase — search and tag filter are always-visible controls, not gated behind a trigger. The "Hide" toggle label reads: **"Hide tags"** (compact, paired with checkbox list, tooltip/title="Invert: hide checked tags instead of showing only them"). The reset action reads: **"Clear tags"** (title="Clear tag filter"). |
 | Empty state heading | "No tags yet" (tag checklist, when `Song.tags` is empty across the catalog) |
 | Empty state body | "Add tags to songs in the Songs panel to filter by them here." (shown in both picker and Songs panel checklist when the tag list is empty) |
 | Empty state (search, no matches) | Heading: "No songs match" — Body: "Try a different term, or use `tag:`, `key:`, `type:`, `theme:`, or `team:` to filter by a specific field." |
@@ -102,6 +102,9 @@ Notes:
 
 ## Interaction Contract (phase-specific, beyond template defaults)
 
+### Visual hierarchy / focal point
+- On both surfaces, the **search input is the primary visual anchor** — it sits at the top of the filter/picker area, spans full width, and is the first control the eye lands on. The **tag checklist is secondary**: a bounded, scrollable panel that sits beneath the search input and reads as a supporting refinement control, never competing with the search box for attention. Filter dropdowns (VW type, Key, team tag) remain tertiary quick-affordances.
+
 ### Search box (both surfaces)
 - Placeholder text stays close to current: Songs panel keeps `"Search title, CCLI, theme, tag, category..."`; picker keeps `"Search songs..."` — both may append a subtle hint but must NOT grow the input height or wrap to a second line. Prefer a `title=` tooltip attribute for full syntax help (`tag:`, `key:`, `type:`, `theme:`, `team:`) over inline visible copy, to avoid crowding the compact picker header (per D-06, dropdowns remain the quick affordance; search syntax is power-user, discoverable via tooltip/placeholder only).
 - No visible "syntax help" panel/popover is required for this phase — keep footprint minimal, consistent with the already-cramped sticky picker header (quick-task 260701-awp fixed z-index crowding there; do not reintroduce vertical bloat).
@@ -109,8 +112,8 @@ Notes:
 ### Tag checklist (replaces the two dropdowns, both surfaces)
 - Layout: vertical list of checkbox rows, one per user tag (`Song.tags` universe), each row = checkbox + tag label, `py-1` density, inside a bounded scrollable container (`max-h-48 overflow-y-auto` or similar) so long tag lists don't push other controls off-screen — matches existing `max-h-[600px] overflow-y-auto` scroll-containment pattern already used for the picker dropdown.
 - Placement: Songs panel — inline in the `SongFilters.vue` row area (replaces the two `<select>` elements in place); Picker — inside the existing sticky search+filter bar in `SongSlotPicker.vue` (replaces the two `<select>` elements in place). Both surfaces render the identical shared component/state per D-07/D-14 — this should be a single new shared Vue component (e.g. `TagFilterChecklist.vue`) consumed by both `SongFilters.vue` and `SongSlotPicker.vue`, not two parallel implementations.
-- "Hide" toggle: small checkbox or switch positioned at the top of the checklist, label "Hide", indigo-accented when ON (per Color contract above). When ON, apply a subtle secondary visual cue to the whole checklist (e.g., checked rows show a strikethrough-free but distinctly colored state, or a small "(hiding)" caption) so users don't lose track of inverted mode — exact treatment at Claude's discretion, but MUST be visually distinguishable from default show-only mode at a glance (do not rely on the toggle's own checked state alone, since it can scroll out of view).
-- "Clear" action: plain text link/button, gray (matches "Change song" link style: `text-xs text-gray-500 hover:text-gray-300`), positioned at the top or bottom of the checklist, resets checked tags + Hide toggle to OFF only (does not touch search text or VW-type/Key dropdowns per D-11).
+- "Hide tags" toggle: small checkbox or switch positioned at the top of the checklist, label "Hide tags", indigo-accented when ON (per Color contract above). When ON, apply a subtle secondary visual cue to the whole checklist (e.g., checked rows show a strikethrough-free but distinctly colored state, or a small "(hiding)" caption) so users don't lose track of inverted mode — exact treatment at Claude's discretion, but MUST be visually distinguishable from default show-only mode at a glance (do not rely on the toggle's own checked state alone, since it can scroll out of view).
+- "Clear tags" action: plain text link/button, gray (matches "Change song" link style: `text-xs text-gray-500 hover:text-gray-300`), positioned at the top or bottom of the checklist, resets checked tags + Hide toggle to OFF only (does not touch search text or VW-type/Key dropdowns per D-11).
 - Checkbox visual state: unchecked = gray-700 border on gray-800/900 surface (matches existing input/select borders); checked = pink-800 border + pink-900/50 fill to signal "user tag" per the Color contract's pink continuity note, with an indigo focus ring on keyboard focus (standard focus-visible pattern, matches existing `focus:ring-indigo-500`).
 
 ### Persistence (localStorage)
