@@ -14,6 +14,7 @@ const mockSongs: Song[] = [
     author: 'Robert Robinson',
     themes: [],
     notes: '',
+    tags: [],
     vwTypes: [1],
     teamTags: [],
     arrangements: [
@@ -42,6 +43,7 @@ const mockSongs: Song[] = [
     author: 'Thomas Chisholm',
     themes: [],
     notes: '',
+    tags: [],
     vwTypes: [2],
     teamTags: [],
     arrangements: [
@@ -70,6 +72,7 @@ const mockSongs: Song[] = [
     author: 'Reginald Heber',
     themes: [],
     notes: '',
+    tags: [],
     vwTypes: [2],
     teamTags: [],
     arrangements: [
@@ -98,6 +101,7 @@ const mockSongs: Song[] = [
     author: 'Carl Boberg',
     themes: [],
     notes: '',
+    tags: [],
     vwTypes: [3],
     teamTags: [],
     arrangements: [],
@@ -115,6 +119,7 @@ const mockSongs: Song[] = [
     author: 'Thomas Ken',
     themes: [],
     notes: '',
+    tags: [],
     vwTypes: [3],
     teamTags: [],
     arrangements: [],

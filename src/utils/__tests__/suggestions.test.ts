@@ -12,6 +12,7 @@ function makeSong(overrides: Partial<Omit<Song, 'vwTypes'>> & { lastUsedMs?: num
     author: '',
     themes: [],
     notes: '',
+    tags: [],
     vwTypes: [1],
     teamTags: [],
     arrangements: [],
