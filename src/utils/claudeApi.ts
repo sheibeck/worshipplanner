@@ -28,16 +28,16 @@ VW song types:
 - Type 2: Intimate — personal, devotional, inward focus; draws hearts closer to God
 - Type 3: Ascription — declaratory, bold, attributes of God; closes in exaltation
 
-Your task: suggest songs from the provided library that match the current slot's VW type and the sermon context.
+Your task: suggest songs from the provided library that best fit the sermon context. Suggest broadly across the whole catalog — the slot's VW type is provided as context only and should NOT restrict your suggestions. The worship planner applies the 1-2-3 paradigm themselves; your job is to surface thematically relevant songs.
 
-When a song has vwType "unset", use the song title and CCLI number to identify the song from your knowledge. Based on the song's lyrics and character, infer which VW type it best fits. Strongly prefer songs whose VW type (assigned or inferred) matches the slot's required type.
+When a song has vwType "unset", use the song title and CCLI number to identify the song from your knowledge. Based on the song's lyrics and character, infer which VW type it best fits.
 
 Rules:
 - Respond ONLY with a valid JSON array. No markdown, no code fences, no prose.
 - Return EXACTLY 3 items in this format: [{"songId":"<id>","reason":"<5-10 word reason>"}]
 - songId MUST be an exact ID from the provided song library — do not invent IDs
 - Prefer songs thematically connected to the sermon topic/passage
-- Strongly prefer songs matching the required VW type for this slot
+- The slot's VW type is advisory context — do not use it as a hard filter (D-11)
 - Deprioritize songs used in the last 2 weeks (listed as recent)
 - Consider already-selected songs to build a cohesive service flow
 - If fewer than 3 suitable songs exist, return however many are available`
@@ -173,7 +173,8 @@ export async function getSongSuggestions(
         2: 'Type 2 (Intimate)',
         3: 'Type 3 (Ascription)',
       }
-      contextParts.push(`Required VW Type: ${typeLabels[slotVwType] ?? `Type ${slotVwType}`}`)
+      // Advisory only (D-11): mention as context but do NOT restrict suggestions to this type
+      contextParts.push(`Slot VW Type (advisory context only): ${typeLabels[slotVwType] ?? `Type ${slotVwType}`}`)
     }
 
     if (alreadySelectedSongIds.length > 0) {

@@ -239,16 +239,14 @@ const searchResults = computed<Song[]>(() => {
   return props.songs
     .filter((s) => songMatchesQuery(s, q))
     .sort((a, b) => {
-      // Orchestra-first when service is orchestra (D-08)
+      // Orchestra-first when service is orchestra (D-07)
       if (isOrchestraService.value) {
         const aOrch = a.teamTags.includes('Orchestra') ? 1 : 0
         const bOrch = b.teamTags.includes('Orchestra') ? 1 : 0
         if (bOrch !== aOrch) return bOrch - aOrch
       }
-      // VW type match secondary sort
-      const aMatch = (a.vwTypes ?? []).includes(props.requiredVwType) ? 1 : 0
-      const bMatch = (b.vwTypes ?? []).includes(props.requiredVwType) ? 1 : 0
-      return bMatch - aMatch
+      // VW type secondary sort removed (D-10): slot type no longer influences search ordering
+      return 0
     })
 })
 

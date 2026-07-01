@@ -11,12 +11,13 @@ export interface SuggestionResult {
 }
 
 /**
- * Returns songs ranked for a given slot, prioritized by VW type and filtered by team.
- * All songs are returned (no hard VW type filter) — matching-type songs receive a +100
- * score bonus so they appear first. Pure function — no side effects, easily testable.
+ * Returns songs ranked for a given slot, filtered by team but NOT by VW type.
+ * The VW type is accepted for API compatibility (caller passes slot type) but no longer
+ * influences the score — songs are ranked purely by rotation/recency and team bonus.
+ * All songs are returned (no hard VW type filter). Pure function — no side effects, easily testable.
  *
  * @param songs - All songs from the song store
- * @param requiredVwType - The VW type constraint for this slot (soft priority, not hard filter)
+ * @param requiredVwType - Accepted for API compatibility; no longer contributes to scoring (D-10)
  * @param serviceTeams - Active teams for this service. 'Orchestra' uses a soft +200 bonus;
  *                       all other teams use AND-logic hard filter.
  * @param nowMs - Current time in ms (defaults to Date.now(), injectable for testing)
@@ -68,11 +69,11 @@ export function rankSongsForSlot(
         score = 200 + Math.min((weeksAgo ?? 0) * 15, 300)
       }
 
-      // Type bonus: matching VW type gets +100 (soft priority, not a hard filter)
-      const typeBonus = song.vwTypes.includes(requiredVwType) ? 100 : 0
+      // Type bonus removed (D-10): slot VW type no longer influences picker ranking.
+      // The badge remains visible as information only; ordering is purely rotation/recency.
       // Orchestra bonus: +200 when service is orchestra and song is orchestra-tagged (D-07)
       const orchestraBonus = hasOrchestra && song.teamTags.includes('Orchestra') ? 200 : 0
-      score += typeBonus + orchestraBonus
+      score += orchestraBonus
 
       return { song, score, weeksAgo, isRecent }
     })
