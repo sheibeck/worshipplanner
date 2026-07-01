@@ -36,8 +36,8 @@
         class="fixed z-40 bg-gray-800 border border-gray-700 rounded-lg shadow-xl max-h-[600px] overflow-y-auto"
         :style="dropdownStyle"
       >
-        <!-- Search bar -->
-        <div class="sticky top-0 bg-gray-800 border-b border-gray-700 p-2">
+        <!-- Search + tag filter bar -->
+        <div class="sticky top-0 bg-gray-800 border-b border-gray-700 p-2 space-y-1.5">
           <input
             ref="searchInputRef"
             v-model="searchQuery"
@@ -45,6 +45,23 @@
             placeholder="Search songs..."
             class="w-full rounded-md bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           />
+          <!-- Tag filters (D-03 picker side) -->
+          <div class="flex items-center gap-2">
+            <select
+              v-model="includeTag"
+              class="flex-1 rounded bg-gray-900 border border-gray-700 text-gray-300 text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            >
+              <option value="">Show all tags</option>
+              <option v-for="tag in availableTags" :key="tag" :value="tag">Only: {{ tag }}</option>
+            </select>
+            <select
+              v-model="excludeTag"
+              class="flex-1 rounded bg-gray-900 border border-gray-700 text-gray-300 text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            >
+              <option value="">Hide no tags</option>
+              <option v-for="tag in availableTags" :key="tag" :value="tag">Hide: {{ tag }}</option>
+            </select>
+          </div>
         </div>
 
         <!-- Non-search content (AI Picks + Rotation suggestions) -->
@@ -101,10 +118,10 @@
           </div>
 
           <!-- By Rotation section -->
-          <div v-if="suggestions.length > 0">
+          <div v-if="visibleSuggestions.length > 0">
             <p class="px-3 pt-2 pb-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">By Rotation</p>
             <button
-              v-for="result in suggestions"
+              v-for="result in visibleSuggestions"
               :key="result.song.id"
               type="button"
               @click="onSelect(result.song)"
@@ -125,15 +142,10 @@
                     {{ result.weeksAgo !== null ? `Last used ${result.weeksAgo}w ago` : 'Never used' }}
                   </span>
                 </div>
-                <div
-                  v-if="result.song.teamTags.length > 0"
-                  class="flex flex-wrap gap-1 mt-1"
-                >
-                  <TeamTagPill
-                    v-for="tag in result.song.teamTags"
-                    :key="tag"
-                    :tag="tag"
-                  />
+                <div class="flex flex-wrap gap-1 mt-1">
+                  <TeamTagPill v-for="t in result.song.teamTags" :key="'tm-'+t" :tag="t" variant="team" />
+                  <TeamTagPill v-for="t in result.song.themes" :key="'th-'+t" :tag="t" variant="theme" />
+                  <TeamTagPill v-for="t in result.song.tags" :key="'us-'+t" :tag="t" variant="user" />
                 </div>
               </div>
               <SongBadge :types="result.song.vwTypes ?? []" />
@@ -153,9 +165,9 @@
         <!-- Search results -->
         <div v-else>
           <p class="px-3 pt-2 pb-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">Search Results</p>
-          <div v-if="searchResults.length > 0">
+          <div v-if="visibleSearchResults.length > 0">
             <button
-              v-for="song in searchResults"
+              v-for="song in visibleSearchResults"
               :key="song.id"
               type="button"
               @click="onSelect(song)"
@@ -167,15 +179,10 @@
               <div class="flex-1 min-w-0">
                 <span class="text-sm text-gray-100 truncate block">{{ song.title }}</span>
                 <span class="text-xs text-gray-400">{{ preferredKey(song) }}</span>
-                <div
-                  v-if="song.teamTags.length > 0"
-                  class="flex flex-wrap gap-1 mt-1"
-                >
-                  <TeamTagPill
-                    v-for="tag in song.teamTags"
-                    :key="tag"
-                    :tag="tag"
-                  />
+                <div class="flex flex-wrap gap-1 mt-1">
+                  <TeamTagPill v-for="t in song.teamTags" :key="'tm-'+t" :tag="t" variant="team" />
+                  <TeamTagPill v-for="t in song.themes" :key="'th-'+t" :tag="t" variant="theme" />
+                  <TeamTagPill v-for="t in song.tags" :key="'us-'+t" :tag="t" variant="user" />
                 </div>
               </div>
               <SongBadge :types="song.vwTypes ?? []" />
@@ -185,13 +192,24 @@
             <p class="text-sm text-gray-400">No songs found matching "{{ searchQuery }}"</p>
           </div>
         </div>
+
+        <!-- Sentinel for IntersectionObserver load-more (D-12) -->
+        <div ref="sentinelRef" class="h-1" />
+        <!-- Showing X of Y footer -->
+        <div
+          v-if="totalVisible > 0"
+          class="px-4 py-2 text-xs text-gray-500 text-center border-t border-gray-800"
+        >
+          Showing {{ currentlyShowing }} of {{ totalVisible }}
+          <span v-if="hasMore"> — scroll for more</span>
+        </div>
       </div>
     </template>
   </Teleport>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { rankSongsForSlot } from '@/utils/suggestions'
 import { songMatchesQuery, getPrimaryKey } from '@/utils/songSearch'
 import type { Song, VWType } from '@/types/song'
@@ -226,17 +244,39 @@ const triggerRef = ref<HTMLElement | null>(null)
 const searchInputRef = ref<HTMLInputElement | null>(null)
 const dropdownStyle = ref<Record<string, string>>({})
 
-// ── Computed ───────────────────────────────────────────────────────────────────
+// ── Tag filter (D-03 picker side) ─────────────────────────────────────────────
 
-const suggestions = computed<SuggestionResult[]>(() => {
-  const results = rankSongsForSlot(props.songs, props.requiredVwType, props.serviceTeams)
-  return results.slice(0, 15)
+const includeTag = ref('')
+const excludeTag = ref('')
+
+/** Distinct user tags across all songs — populates the filter selects */
+const availableTags = computed<string[]>(() => {
+  const tagSet = new Set<string>()
+  for (const song of props.songs) {
+    for (const tag of (song.tags ?? [])) tagSet.add(tag)
+  }
+  return Array.from(tagSet).sort()
 })
+
+/** Props.songs filtered by include/exclude tag controls (D-03). Used as base for ranking and search. */
+const tagFilteredSongs = computed<Song[]>(() =>
+  props.songs.filter(
+    (s) =>
+      (!includeTag.value || (s.tags?.includes(includeTag.value) ?? false)) &&
+      (!excludeTag.value || !(s.tags?.includes(excludeTag.value) ?? false)),
+  ),
+)
+
+// ── Computed — full ranked/search lists ───────────────────────────────────────
+
+const suggestions = computed<SuggestionResult[]>(() =>
+  rankSongsForSlot(tagFilteredSongs.value, props.requiredVwType, props.serviceTeams),
+)
 
 const searchResults = computed<Song[]>(() => {
   if (!searchQuery.value) return []
   const q = searchQuery.value
-  return props.songs
+  return tagFilteredSongs.value
     .filter((s) => songMatchesQuery(s, q))
     .sort((a, b) => {
       // Orchestra-first when service is orchestra (D-07)
@@ -260,13 +300,72 @@ const resolvedAiSuggestions = computed<{ song: Song; reason: string }[]>(() => {
     .filter((item): item is { song: Song; reason: string } => item !== null)
 })
 
+// ── IntersectionObserver load-more batching (D-12) ────────────────────────────
+
+const BATCH_SIZE = 50
+const visibleCount = ref(BATCH_SIZE)
+
+/** Slice of rotation suggestions visible so far */
+const visibleSuggestions = computed<SuggestionResult[]>(() =>
+  suggestions.value.slice(0, visibleCount.value),
+)
+
+/** Slice of search results visible so far */
+const visibleSearchResults = computed<Song[]>(() =>
+  searchResults.value.slice(0, visibleCount.value),
+)
+
+/** Total items in the active list (rotation or search) */
+const totalVisible = computed<number>(() =>
+  searchQuery.value ? searchResults.value.length : suggestions.value.length,
+)
+
+/** How many are currently rendered */
+const currentlyShowing = computed<number>(() =>
+  searchQuery.value ? visibleSearchResults.value.length : visibleSuggestions.value.length,
+)
+
+const hasMore = computed<boolean>(() => visibleCount.value < totalVisible.value)
+
+function loadMore() {
+  visibleCount.value = Math.min(visibleCount.value + BATCH_SIZE, totalVisible.value)
+}
+
+// Reset visibleCount when active source changes
+watch(searchQuery, () => { visibleCount.value = BATCH_SIZE })
+watch(includeTag, () => { visibleCount.value = BATCH_SIZE })
+watch(excludeTag, () => { visibleCount.value = BATCH_SIZE })
+watch(() => props.songs, () => { visibleCount.value = BATCH_SIZE })
+
+// Sentinel element at bottom of scroll container triggers loadMore
+const sentinelRef = ref<HTMLElement | null>(null)
+let observer: IntersectionObserver | null = null
+
+onMounted(() => {
+  observer = new IntersectionObserver(
+    (entries) => {
+      if (entries[0]?.isIntersecting && hasMore.value) {
+        loadMore()
+      }
+    },
+    { rootMargin: '200px' },
+  )
+  if (sentinelRef.value) {
+    observer.observe(sentinelRef.value)
+  }
+})
+
+onUnmounted(() => {
+  observer?.disconnect()
+})
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
 const isOrchestraService = computed(() => props.serviceTeams.includes('Orchestra'))
 
 function isNonOrchestraSong(song: Song): boolean {
   return isOrchestraService.value && !song.teamTags.includes('Orchestra')
 }
-
-// ── Helpers ────────────────────────────────────────────────────────────────────
 
 function preferredKey(song: Song): string {
   return getPrimaryKey(song) || '—'
@@ -309,6 +408,7 @@ function openDropdown() {
 
   isOpen.value = true
   searchQuery.value = ''
+  visibleCount.value = BATCH_SIZE
 
   // Request AI suggestions on open if context exists but suggestions not yet fetched
   if (props.hasSermonContext && !props.aiSuggestions && !props.aiLoading) {
@@ -318,6 +418,10 @@ function openDropdown() {
   // Focus search input after DOM update
   nextTick(() => {
     searchInputRef.value?.focus()
+    // Re-observe sentinel after DOM update (teleported, so it's only in DOM when isOpen)
+    if (sentinelRef.value && observer) {
+      observer.observe(sentinelRef.value)
+    }
   })
 }
 
