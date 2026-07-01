@@ -117,7 +117,7 @@ Plans:
 ### Phase 12: Advanced song search and multi-select persistent tag filtering (picker + Songs panel)
 
 **Goal:** Give users a robust, metadata-aware song search and a persistent multi-select tag filter across both the service-plan song picker and the Songs panel — so any song is findable by name or any known metadata, and tag filtering is fast and remembered.
-**Requirements**: TBD (captured during discuss/plan)
+**Requirements**: D-01..D-16 (see 12-CONTEXT.md — no formal REQ-IDs; the 16 decisions are the requirement set)
 **Depends on:** Phase 11
 
 Scope (from user request):
@@ -132,7 +132,11 @@ Scope (from user request):
 
 Direct enhancement of the Phase 11 search + tag-filter work.
 
-**Plans:** 0 plans
+**Plans:** 5 plans
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 12 to break down)
+- [ ] 12-01-PLAN.md — Search engine (TDD): multi-term AND + field-scoped prefixes (type:/key:/tag:/theme:/team:) + natural phrase recognition in songSearch.ts
+- [ ] 12-02-PLAN.md — songs store: tag-filter checklist state (checked Set + Hide toggle) + clearTagFilter + per-user/org localStorage persistence
+- [ ] 12-03-PLAN.md — Shared TagFilterChecklist.vue component + Songs-panel wiring (SongFilters.vue swaps 2 selects, SongsView binds store)
+- [ ] 12-04-PLAN.md — Service-plan picker: consume shared search engine + shared TagFilterChecklist bound to store tag state
+- [ ] 12-05-PLAN.md — Delete-confirmation: widen removeSlot gate to all removals (incl. empty slots) + element-type-aware copy, reusing D-14 modal
