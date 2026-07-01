@@ -90,3 +90,26 @@ Plans:
 - [x] 10-01-PLAN.md — planningCenterApi.ts: "Worship Song - " title prefix + deleteItem + fetchServiceTypeTeams + addTeamToPlan (with Vitest coverage)
 - [x] 10-02-PLAN.md — suggestions.ts orchestra soft-bonus (+200) + SongSlotPicker.vue opacity-50 dimming and orchestra-first search sort
 - [x] 10-03-PLAN.md — ServiceEditorView.vue: PC Teams fetch + checkbox UI + team-add on export + delete+recreate existing-plan rewrite + orchestra AI library filter
+
+### Phase 11: Song catalog & service planner improvements
+
+**Goal:** Make the song catalog fully browsable/searchable and make service-plan editing reliable — remove app-enforced constraints in favor of user control, surface song metadata everywhere, add tagging, and fix the drag-drop ordering/autosave data-integrity bugs.
+**Requirements**: D-01..D-18 (see 11-CONTEXT.md — no formal REQ-IDs; the 18 decisions are the requirement set)
+**Depends on:** Phase 10
+**Plans:** 4 plans
+
+Scope (from user request):
+1. Service-plan song selector — fix pagination so the full catalog is browsable while scrolling (currently stops after a handful); remove the 1/2/3 song-type filter so any song can be picked in any slot (users apply the 1-2-3 paradigm themselves).
+2. Themes — show song themes in the song list and the service-plan song browser; capture themes on Planning Center import.
+3. Searchable metadata — display all song metadata in search results (key, theme, last played, tag, category, etc.) and allow searching on any field via the search bar.
+4. BUG: drag-and-drop reordering unreliable — items snap back to original order in the UI (refresh shows correct order); reordering can corrupt Planning Center export order; autosave/save-timing bug where quick post-drag interactions don't persist and the save button highlights but autosave never fires.
+5. AI song suggestions must exclude hidden (deleted) songs.
+6. Allow sorting the song list by any column.
+7. Tagging — let users tag songs in Worship Planner (e.g. "Christmas") and filter to hide songs by tag in both the song list and the service-planning search.
+8. Require a confirmation before deleting an item from a service plan (avoid accidental scripture deletion when closing the preview).
+
+Plans:
+- [ ] 11-01-PLAN.md — Data model + tag persistence + search + PC theme merge + TeamTagPill variants (Wave 1, foundation)
+- [ ] 11-02-PLAN.md — Editor reliability & safety: SortableJS snap-back, immediate reorder-save, stuck-dirty autosave, delete-confirm, AI hidden-filter (Wave 1)
+- [ ] 11-03-PLAN.md — Song catalog UX: all-column sort, themes/tags pills, tag editing (form/inline/bulk), hide/show tag filter (Wave 2)
+- [ ] 11-04-PLAN.md — Service planner picker: type-agnostic list, load-more batching, broad AI, tags pills + filter (Wave 2)
