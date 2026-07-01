@@ -62,12 +62,28 @@ function matchesToken(song: Song, token: string): boolean {
   return matchesBareTerm(song, token)
 }
 
+// Recognized field-scoped prefix keywords, used both to detect a prefix
+// token and as a boundary when greedily capturing a multi-word field value.
+const FIELD_KEYWORDS = 'type|key|tag|theme|team'
+
+// Captures "prefix:value", where value greedily consumes all words up to the
+// next recognized "prefix:" keyword or end of string — so multi-word values
+// (e.g. `tag:christmas eve`) are captured as a single field-scoped span
+// instead of being split into a field token plus a stray bare term.
+// Bounded, anchored regex on short user-typed query text only — no nested
+// quantifiers, no ReDoS risk.
+const FIELD_SPAN_RE = new RegExp(
+  `\\b(${FIELD_KEYWORDS}):\\s*([\\s\\S]*?)(?=\\s+\\b(?:${FIELD_KEYWORDS}):|$)`,
+  'gi',
+)
+
 /**
  * Multi-term AND search over a song's metadata. Supports field-scoped
  * prefixes (`type:`, `key:`, `tag:`, `theme:`, `team:`, with optional space
- * after the colon) and natural two-word phrases (`Type 1`, `Key A`), in
- * addition to the original bare full-field substring match. Every
- * whitespace-separated token in the query must match (AND).
+ * after the colon) whose value may contain multiple words (e.g.
+ * `tag:christmas eve`), natural two-word phrases (`Type 1`, `Key A`), and the
+ * original bare full-field substring match for any remaining text. Every
+ * extracted term (field-scoped span or bare word) must match (AND).
  */
 export function songMatchesQuery(song: Song, query: string): boolean {
   const trimmed = query.trim()
@@ -80,18 +96,30 @@ export function songMatchesQuery(song: Song, query: string): boolean {
     .replace(/\btype\s+([1-3])\b/gi, 'type:$1')
     .replace(/\bkey\s+([a-g](?:#|b)?m?)\b/gi, 'key:$1')
 
-  // Collapse "prefix: value" (space after colon) into "prefix:value" so it
-  // tokenizes as a single token.
-  const spaceCollapsed = phraseNormalized.replace(/\b(type|key|tag|theme|team):\s+/gi, '$1:')
+  // Extract all field-scoped spans first (each may contain multiple words),
+  // then treat whatever text remains (with those spans removed) as bare
+  // whitespace-separated terms.
+  const fieldTerms: string[] = []
+  let remainder = phraseNormalized
+  FIELD_SPAN_RE.lastIndex = 0
+  let match: RegExpExecArray | null
+  while ((match = FIELD_SPAN_RE.exec(phraseNormalized)) !== null) {
+    const field = match[1]!.toLowerCase()
+    const value = (match[2] ?? '').trim()
+    fieldTerms.push(`${field}:${value}`)
+    remainder = remainder.replace(match[0], ' ')
+  }
 
-  const tokens = spaceCollapsed
+  const bareTerms = remainder
     .trim()
     .split(/\s+/)
     .filter((t) => t.length > 0)
 
-  if (tokens.length === 0) return true
+  const terms = [...fieldTerms, ...bareTerms]
 
-  return tokens.every((tok) => matchesToken(song, tok))
+  if (terms.length === 0) return true
+
+  return terms.every((tok) => matchesToken(song, tok))
 }
 
 /**

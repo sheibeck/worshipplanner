@@ -183,6 +183,36 @@ describe('songMatchesQuery — field-scoped + phrases (Phase 12)', () => {
     expect(songMatchesQuery(song, 'amazing grace')).toBe(true)
     expect(songMatchesQuery(song, 'amazing xylophone')).toBe(false)
   })
+
+  it('matches a multi-word field-scoped value as a single phrase (WR-02 fix)', () => {
+    const song = makeSong({ tags: ['Christmas Eve'] })
+    expect(songMatchesQuery(song, 'tag: christmas eve')).toBe(true)
+    expect(songMatchesQuery(song, 'tag:christmas eve')).toBe(true)
+    // A song without "eve" anywhere else should NOT match a query for an
+    // unrelated single-word tag value.
+    expect(songMatchesQuery(song, 'tag: christmas day')).toBe(false)
+  })
+
+  it('captures a multi-word field value up to the next recognized field prefix', () => {
+    const song = makeSong({
+      tags: ['Christmas Eve'],
+      arrangements: [
+        { id: 'a', name: 'x', key: 'E', bpm: null, lengthSeconds: null, chordChartUrl: '', notes: '', teamTags: [] },
+      ],
+    })
+    expect(songMatchesQuery(song, 'tag: christmas eve key:E')).toBe(true)
+    expect(songMatchesQuery(song, 'tag: christmas eve key:G')).toBe(false)
+  })
+
+  it('ANDs a multi-word field value with a separate bare term placed before it', () => {
+    // A field-scoped value with no following recognized prefix greedily
+    // captures the rest of the string, so a bare term must precede it to
+    // remain a separate AND'd term (documented behavior of the greedy
+    // to-end-of-string capture).
+    const song = makeSong({ title: 'Silent Night', tags: ['Christmas Eve'] })
+    expect(songMatchesQuery(song, 'silent tag: christmas eve')).toBe(true)
+    expect(songMatchesQuery(song, 'xylophone tag: christmas eve')).toBe(false)
+  })
 })
 
 describe('getPrimaryArrangement / getPrimaryKey', () => {
