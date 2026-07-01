@@ -96,7 +96,7 @@ Plans:
 **Goal:** Make the song catalog fully browsable/searchable and make service-plan editing reliable — remove app-enforced constraints in favor of user control, surface song metadata everywhere, add tagging, and fix the drag-drop ordering/autosave data-integrity bugs.
 **Requirements**: D-01..D-18 (see 11-CONTEXT.md — no formal REQ-IDs; the 18 decisions are the requirement set)
 **Depends on:** Phase 10
-**Plans:** 2/4 plans executed
+**Plans:** 4/4 plans complete
 
 Scope (from user request):
 1. Service-plan song selector — fix pagination so the full catalog is browsable while scrolling (currently stops after a handful); remove the 1/2/3 song-type filter so any song can be picked in any slot (users apply the 1-2-3 paradigm themselves).
@@ -111,5 +111,5 @@ Scope (from user request):
 Plans:
 - [x] 11-01-PLAN.md — Data model + tag persistence + search + PC theme merge + TeamTagPill variants (Wave 1, foundation)
 - [x] 11-02-PLAN.md — Editor reliability & safety: SortableJS snap-back, immediate reorder-save, stuck-dirty autosave, delete-confirm, AI hidden-filter (Wave 1)
-- [ ] 11-03-PLAN.md — Song catalog UX: all-column sort, themes/tags pills, tag editing (form/inline/bulk), hide/show tag filter (Wave 2)
-- [ ] 11-04-PLAN.md — Service planner picker: type-agnostic list, load-more batching, broad AI, tags pills + filter (Wave 2)
+- [x] 11-03-PLAN.md — Song catalog UX: all-column sort, themes/tags pills, tag editing (form/inline/bulk), hide/show tag filter (Wave 2)
+- [x] 11-04-PLAN.md — Service planner picker: type-agnostic list, load-more batching, broad AI, tags pills + filter (Wave 2)
