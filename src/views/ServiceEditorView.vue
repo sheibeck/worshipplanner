@@ -231,8 +231,8 @@
         <Teleport to="body">
           <div v-if="showSlotDeleteConfirm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
             <div class="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl p-6 w-full max-w-sm mx-4">
-              <h2 class="text-base font-semibold text-gray-100 mb-2">Remove this item?</h2>
-              <p class="text-sm text-gray-400 mb-6">This will delete the assigned song, scripture, or content from the plan. This cannot be undone.</p>
+              <h2 class="text-base font-semibold text-gray-100 mb-2">{{ deleteConfirmHeading }}</h2>
+              <p class="text-sm text-gray-400 mb-6">{{ deleteConfirmBody }}</p>
               <div class="flex justify-end gap-3">
                 <button
                   type="button"
@@ -958,6 +958,25 @@ const pendingDeleteIndex = ref<number | null>(null)
 // D-14: tracks whether the pending delete is a "clear song" (true) vs remove slot (false)
 const pendingDeleteIsClear = ref(false)
 
+// D-16: element-type-aware delete-confirmation copy
+const pendingSlotKind = computed<SlotKind | null>(() =>
+  pendingDeleteIndex.value != null
+    ? (localService.value?.slots[pendingDeleteIndex.value]?.kind ?? null)
+    : null
+)
+const deleteConfirmHeading = computed(() =>
+  pendingDeleteIsClear.value
+    ? 'Remove this item?'                        // clear-song path keeps existing wording
+    : 'Remove this element from the plan?'        // D-16 remove-element wording
+)
+const deleteConfirmBody = computed(() => {
+  if (pendingDeleteIsClear.value) {
+    return 'This will delete the assigned song, scripture, or content from the plan. This cannot be undone.'
+  }
+  const label = pendingSlotKind.value ? elementLabel(pendingSlotKind.value) : 'this element'
+  return `This will remove ${label} from the service plan. This cannot be undone.`
+})
+
 // ── Export to PC state ─────────────────────────────────────────────────────────
 
 const isExporting = ref(false)
@@ -1342,15 +1361,21 @@ function removeSlot(index: number) {
   if (!localService.value) return
   const slot = localService.value.slots[index]
   if (!slot) return
-  if (isSlotPopulated(slot)) {
-    // Gate populated slots behind confirm dialog
-    pendingDeleteIndex.value = index
-    pendingDeleteIsClear.value = false
-    showSlotDeleteConfirm.value = true
-    return
+  // D-15: confirm ALL element removals, including empty/blank rows
+  pendingDeleteIndex.value = index
+  pendingDeleteIsClear.value = false
+  showSlotDeleteConfirm.value = true
+}
+
+function elementLabel(kind: SlotKind): string {
+  switch (kind) {
+    case 'SONG': return 'this song'
+    case 'SCRIPTURE': return 'this scripture'
+    case 'HYMN': return 'this hymn'
+    case 'MESSAGE': return 'this message'
+    case 'PRAYER': return 'this prayer'
+    default: return 'this element'
   }
-  // Empty slots delete silently (D-14)
-  performRemoveSlot(index)
 }
 
 function confirmSlotDelete() {
