@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { defineStore } from 'pinia'
 import {
   collection,
@@ -15,6 +15,7 @@ import {
 import { db } from '@/firebase'
 import type { Song, UpsertSongInput, VWType } from '@/types/song'
 import { songMatchesQuery } from '@/utils/songSearch'
+import { useAuthStore } from '@/stores/auth'
 
 type SongInput = Omit<Song, 'id' | 'createdAt' | 'updatedAt'>
 
@@ -71,6 +72,41 @@ export const useSongStore = defineStore('songs', () => {
     tagFilterHide.value = false
   }
 
+  // D-12/D-13: persist ONLY the tag-filter checklist to localStorage, namespaced per user+org
+  // so state never bleeds across accounts on a shared browser (T-12-03).
+  function tagFilterStorageKey(): string | null {
+    const auth = useAuthStore()
+    const uid = auth.user?.uid
+    const org = orgId.value ?? auth.orgId
+    if (!uid || !org) return null // don't read/write under a shared/global key
+    return `wp:tagFilter:v1:${org}:${uid}`
+  }
+
+  function persistTagFilter() {
+    const key = tagFilterStorageKey()
+    if (!key) return
+    try {
+      localStorage.setItem(key, JSON.stringify({
+        checked: Array.from(tagFilterChecked.value),
+        hide: tagFilterHide.value,
+      }))
+    } catch { /* ignore: private mode / quota — degrade to in-memory only */ }
+  }
+
+  function hydrateTagFilter() {
+    const key = tagFilterStorageKey()
+    if (!key) return
+    try {
+      const raw = localStorage.getItem(key)
+      if (!raw) return
+      const parsed = JSON.parse(raw) as { checked?: string[]; hide?: boolean }
+      tagFilterChecked.value = new Set(Array.isArray(parsed.checked) ? parsed.checked : [])
+      tagFilterHide.value = parsed.hide === true
+    } catch { /* ignore: corrupt/unavailable — keep in-memory defaults */ }
+  }
+
+  watch([tagFilterChecked, tagFilterHide], persistTagFilter, { deep: true })
+
   function subscribe(orgIdValue: string) {
     if (unsubscribeFn) {
       unsubscribeFn()
@@ -95,6 +131,9 @@ export const useSongStore = defineStore('songs', () => {
       })
       isLoading.value = false
     })
+    // Hydrate the tag filter once org+uid are resolved (mirrors how views call
+    // subscribe once authStore.orgId resolves).
+    hydrateTagFilter()
   }
 
   function unsubscribeAll() {

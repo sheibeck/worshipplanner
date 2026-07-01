@@ -40,6 +40,16 @@ vi.mock('@/firebase', () => ({
   db: {},
 }))
 
+// Mock @/stores/auth — songs store reads useAuthStore().user/orgId for tag-filter persistence keying
+let mockAuthUser: { uid: string } | null = null
+let mockAuthOrgId: string | null = null
+vi.mock('@/stores/auth', () => ({
+  useAuthStore: vi.fn(() => ({
+    get user() { return mockAuthUser },
+    get orgId() { return mockAuthOrgId },
+  })),
+}))
+
 import type { VWType } from '@/types/song'
 
 function makeSong(overrides: Partial<{
@@ -112,6 +122,9 @@ describe('useSongStore', () => {
     vi.clearAllMocks()
     snapshotCallback = null
     mockBatchOps = []
+    mockAuthUser = null
+    mockAuthOrgId = null
+    localStorage.clear()
   })
 
   describe('initial state', () => {
@@ -1096,6 +1109,90 @@ describe('useSongStore', () => {
       await store.importSongs(songs)
 
       expect(writeBatch).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('tag-filter persistence (D-12/D-13)', () => {
+    it('persists checked tags + hide flag to localStorage under a per-user/org key on change', async () => {
+      mockAuthUser = { uid: 'uid-1' }
+      mockAuthOrgId = 'org-1'
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+
+      store.tagFilterChecked = new Set(['Christmas'])
+      store.tagFilterHide = true
+      await vi.waitFor(() => {
+        const raw = localStorage.getItem('wp:tagFilter:v1:org-1:uid-1')
+        expect(raw).not.toBeNull()
+      })
+      const raw = localStorage.getItem('wp:tagFilter:v1:org-1:uid-1')!
+      const parsed = JSON.parse(raw)
+      expect(parsed.checked).toEqual(['Christmas'])
+      expect(parsed.hide).toBe(true)
+    })
+
+    it('does not read or write localStorage when uid is missing', async () => {
+      mockAuthUser = null
+      mockAuthOrgId = 'org-1'
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      store.tagFilterChecked = new Set(['Christmas'])
+      expect(localStorage.length).toBe(0)
+    })
+
+    it('does not read or write localStorage when org is missing', async () => {
+      mockAuthUser = { uid: 'uid-1' }
+      mockAuthOrgId = null
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      // subscribe() sets orgId.value, but tagFilterStorageKey falls back to auth.orgId
+      // when orgId.value is set via subscribe — so simulate missing auth entirely by
+      // not calling subscribe (orgId.value stays null) and auth.orgId also null.
+      store.tagFilterChecked = new Set(['Christmas'])
+      expect(localStorage.length).toBe(0)
+    })
+
+    it('hydrates tagFilterChecked/tagFilterHide from localStorage on subscribe', async () => {
+      mockAuthUser = { uid: 'uid-2' }
+      mockAuthOrgId = 'org-2'
+      localStorage.setItem(
+        'wp:tagFilter:v1:org-2:uid-2',
+        JSON.stringify({ checked: ['Easter', 'Advent'], hide: true }),
+      )
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-2')
+
+      expect(Array.from(store.tagFilterChecked)).toEqual(['Easter', 'Advent'])
+      expect(store.tagFilterHide).toBe(true)
+    })
+
+    it('silently ignores corrupt localStorage JSON and keeps in-memory defaults', async () => {
+      mockAuthUser = { uid: 'uid-3' }
+      mockAuthOrgId = 'org-3'
+      localStorage.setItem('wp:tagFilter:v1:org-3:uid-3', '{not valid json')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      expect(() => store.subscribe('org-3')).not.toThrow()
+      expect(store.tagFilterChecked.size).toBe(0)
+      expect(store.tagFilterHide).toBe(false)
+    })
+
+    it('silently ignores localStorage.setItem failures (quota/private mode)', async () => {
+      mockAuthUser = { uid: 'uid-4' }
+      mockAuthOrgId = 'org-4'
+      const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new Error('QuotaExceededError')
+      })
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-4')
+      expect(() => {
+        store.tagFilterChecked = new Set(['Christmas'])
+      }).not.toThrow()
+      setItemSpy.mockRestore()
     })
   })
 })
