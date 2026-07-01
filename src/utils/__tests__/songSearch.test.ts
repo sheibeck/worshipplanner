@@ -89,6 +89,102 @@ describe('songMatchesQuery', () => {
   })
 })
 
+describe('songMatchesQuery — field-scoped + phrases (Phase 12)', () => {
+  it('matches tag: prefix as case-insensitive substring', () => {
+    const song = makeSong({ tags: ['Orchestra'] })
+    expect(songMatchesQuery(song, 'tag:orch')).toBe(true)
+    expect(songMatchesQuery(song, 'tag:xyz')).toBe(false)
+  })
+
+  it('matches theme: prefix as case-insensitive substring', () => {
+    const song = makeSong({ themes: ['Adoration'] })
+    expect(songMatchesQuery(song, 'theme:ador')).toBe(true)
+  })
+
+  it('matches team: prefix as case-insensitive substring', () => {
+    const song = makeSong({ teamTags: ['Choir'] })
+    expect(songMatchesQuery(song, 'team:cho')).toBe(true)
+  })
+
+  it('matches type: prefix by number', () => {
+    const song = makeSong({ vwTypes: [1] })
+    expect(songMatchesQuery(song, 'type:1')).toBe(true)
+    expect(songMatchesQuery(song, 'type:2')).toBe(false)
+  })
+
+  it('matches key: prefix exactly (case-insensitive)', () => {
+    const song = makeSong({
+      arrangements: [
+        { id: 'arr-1', name: 'Std', key: 'G', bpm: null, lengthSeconds: null, chordChartUrl: '', notes: '', teamTags: [] },
+        { id: 'arr-2', name: 'Alt', key: 'A', bpm: null, lengthSeconds: null, chordChartUrl: '', notes: '', teamTags: [] },
+      ],
+    })
+    expect(songMatchesQuery(song, 'key:a')).toBe(true)
+    expect(songMatchesQuery(song, 'key:e')).toBe(false)
+
+    const songEm = makeSong({
+      arrangements: [
+        { id: 'arr-1', name: 'Std', key: 'Em', bpm: null, lengthSeconds: null, chordChartUrl: '', notes: '', teamTags: [] },
+      ],
+    })
+    expect(songMatchesQuery(songEm, 'key:e')).toBe(false)
+  })
+
+  it('tolerates a space after the prefix colon', () => {
+    const song = makeSong({
+      arrangements: [
+        { id: 'arr-1', name: 'Std', key: 'A', bpm: null, lengthSeconds: null, chordChartUrl: '', notes: '', teamTags: [] },
+      ],
+    })
+    expect(songMatchesQuery(song, 'key: a')).toBe(true)
+    expect(songMatchesQuery(song, 'key:a')).toBe(true)
+  })
+
+  it('recognizes natural two-word phrases "Type N" and "Key X"', () => {
+    const songType1 = makeSong({ vwTypes: [1] })
+    expect(songMatchesQuery(songType1, 'Type 1')).toBe(true)
+
+    const songKeyA = makeSong({
+      arrangements: [
+        { id: 'arr-1', name: 'Std', key: 'A', bpm: null, lengthSeconds: null, chordChartUrl: '', notes: '', teamTags: [] },
+      ],
+    })
+    expect(songMatchesQuery(songKeyA, 'Key A')).toBe(true)
+  })
+
+  it('does not infer type/key from a lone bare number or letter', () => {
+    const song = makeSong({
+      vwTypes: [2] as VWType[],
+      title: 'Zzz',
+      tags: [],
+      themes: [],
+      teamTags: [],
+      ccliNumber: '',
+      author: '',
+      notes: '',
+      arrangements: [],
+    })
+    expect(songMatchesQuery(song, '1')).toBe(false)
+  })
+
+  it('ANDs multiple field-scoped terms together', () => {
+    const song = makeSong({
+      tags: ['Orchestra'],
+      arrangements: [
+        { id: 'a', name: 'x', key: 'E', bpm: null, lengthSeconds: null, chordChartUrl: '', notes: '', teamTags: [] },
+      ],
+    })
+    expect(songMatchesQuery(song, 'tag:orch key:E')).toBe(true)
+    expect(songMatchesQuery(song, 'tag:orch key:G')).toBe(false)
+  })
+
+  it('ANDs multiple bare terms together', () => {
+    const song = makeSong({ title: 'Amazing Grace' })
+    expect(songMatchesQuery(song, 'amazing grace')).toBe(true)
+    expect(songMatchesQuery(song, 'amazing xylophone')).toBe(false)
+  })
+})
+
 describe('getPrimaryArrangement / getPrimaryKey', () => {
   it('returns the arrangement matching primaryArrangementId', () => {
     const song = makeSong({ primaryArrangementId: 'arr-2' })
