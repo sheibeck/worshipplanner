@@ -37,7 +37,7 @@
         :style="dropdownStyle"
       >
         <!-- Search + tag filter bar -->
-        <div class="sticky top-0 bg-gray-800 border-b border-gray-700 p-2 space-y-1.5">
+        <div class="sticky top-0 z-10 bg-gray-800 border-b border-gray-700 p-2 space-y-1.5">
           <input
             ref="searchInputRef"
             v-model="searchQuery"
