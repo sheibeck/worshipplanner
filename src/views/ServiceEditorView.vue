@@ -227,6 +227,32 @@
           </div>
         </Teleport>
 
+        <!-- Slot delete confirmation dialog (D-14) -->
+        <Teleport to="body">
+          <div v-if="showSlotDeleteConfirm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+            <div class="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl p-6 w-full max-w-sm mx-4">
+              <h2 class="text-base font-semibold text-gray-100 mb-2">Remove this item?</h2>
+              <p class="text-sm text-gray-400 mb-6">This will delete the assigned song, scripture, or content from the plan. This cannot be undone.</p>
+              <div class="flex justify-end gap-3">
+                <button
+                  type="button"
+                  @click="showSlotDeleteConfirm = false; pendingDeleteIndex = null; pendingDeleteIsClear = false"
+                  class="rounded-md px-4 py-2 text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  @click="confirmSlotDelete"
+                  class="rounded-md px-4 py-2 text-sm font-medium text-white bg-red-700 hover:bg-red-600 transition-colors"
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          </div>
+        </Teleport>
+
         <!-- Export dialog -->
         <Teleport to="body">
           <div v-if="showExportDialog" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
@@ -847,7 +873,7 @@ import { useSongStore } from '@/stores/songs'
 import { slotLabel, createSlot, reindexSlots } from '@/utils/slotTypes'
 import { scripturesOverlap } from '@/utils/scripture'
 import { getPrimaryKey } from '@/utils/songSearch'
-import type { Service, SongSlot, ScriptureSlot, NonAssignableSlot, HymnSlot, ScriptureRef, SlotKind } from '@/types/service'
+import type { Service, ServiceSlot, SongSlot, ScriptureSlot, NonAssignableSlot, HymnSlot, ScriptureRef, SlotKind } from '@/types/service'
 import type { VWType } from '@/types/song'
 import AppShell from '@/components/AppShell.vue'
 import SongBadge from '@/components/SongBadge.vue'
@@ -926,6 +952,11 @@ const shareError = ref<string | null>(null)
 const showAddMenu = ref(false)
 const showDeleteConfirm = ref(false)
 const isDeleting = ref(false)
+// D-14: slot delete confirmation
+const showSlotDeleteConfirm = ref(false)
+const pendingDeleteIndex = ref<number | null>(null)
+// D-14: tracks whether the pending delete is a "clear song" (true) vs remove slot (false)
+const pendingDeleteIsClear = ref(false)
 
 // ── Export to PC state ─────────────────────────────────────────────────────────
 
@@ -1278,10 +1309,65 @@ function addSlot(kind: SlotKind, vwType?: VWType) {
   showAddMenu.value = false
 }
 
-function removeSlot(index: number) {
+// ── Slot populated check (D-14) ────────────────────────────────────────────────
+
+function isSlotPopulated(slot: ServiceSlot): boolean {
+  if (slot.kind === 'SONG') {
+    return (slot as SongSlot).songId != null
+  }
+  if (slot.kind === 'SCRIPTURE') {
+    const s = slot as ScriptureSlot
+    return !!(s.book || s.chapter || s.verseStart || s.verseEnd)
+  }
+  if (slot.kind === 'MESSAGE' || slot.kind === 'PRAYER') {
+    const s = slot as NonAssignableSlot
+    return !!(s.linkUrl?.trim() || s.linkLabel?.trim())
+  }
+  if (slot.kind === 'HYMN') {
+    const s = slot as HymnSlot
+    return !!(s.hymnName?.trim() || s.hymnNumber?.trim())
+  }
+  return false
+}
+
+// ── Slot remove (with D-14 confirmation gate) ──────────────────────────────────
+
+function performRemoveSlot(index: number) {
   if (!localService.value) return
   localService.value.slots.splice(index, 1)
   localService.value.slots = reindexSlots(localService.value.slots)
+}
+
+function removeSlot(index: number) {
+  if (!localService.value) return
+  const slot = localService.value.slots[index]
+  if (!slot) return
+  if (isSlotPopulated(slot)) {
+    // Gate populated slots behind confirm dialog
+    pendingDeleteIndex.value = index
+    pendingDeleteIsClear.value = false
+    showSlotDeleteConfirm.value = true
+    return
+  }
+  // Empty slots delete silently (D-14)
+  performRemoveSlot(index)
+}
+
+function confirmSlotDelete() {
+  if (pendingDeleteIndex.value == null) return
+  if (pendingDeleteIsClear.value) {
+    // Clear-song path
+    const slot = localService.value?.slots[pendingDeleteIndex.value]
+    if (slot?.kind === 'SONG') {
+      const updated: SongSlot = { ...slot as SongSlot, songId: null, songTitle: null, songKey: null }
+      localService.value!.slots[pendingDeleteIndex.value] = updated
+    }
+  } else {
+    performRemoveSlot(pendingDeleteIndex.value)
+  }
+  showSlotDeleteConfirm.value = false
+  pendingDeleteIndex.value = null
+  pendingDeleteIsClear.value = false
 }
 
 // ── Song assignment ────────────────────────────────────────────────────────────
@@ -1304,6 +1390,14 @@ function onClearSong(index: number) {
   const slot = localService.value.slots[index]
   if (!slot) return
   if (slot.kind === 'SONG') {
+    if ((slot as SongSlot).songId != null) {
+      // D-14: slot has an assigned song — gate behind confirm dialog
+      pendingDeleteIndex.value = index
+      pendingDeleteIsClear.value = true
+      showSlotDeleteConfirm.value = true
+      return
+    }
+    // No song assigned — clear directly (no data loss)
     const updated: SongSlot = { ...slot, songId: null, songTitle: null, songKey: null }
     localService.value.slots[index] = updated
   }
