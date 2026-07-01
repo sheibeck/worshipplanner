@@ -3,10 +3,9 @@ import { VW_TYPE_LABELS } from '@/types/song'
 
 /**
  * Case-insensitive substring match across a song's searchable text fields.
- * Matches: title, CCLI number, author, themes, team tags, and VW category
- * (both the number, e.g. "1", and its label, e.g. "call to worship").
- * Does NOT match arrangement keys — keys are short and noisy in free text;
- * use the dedicated key filter instead.
+ * Matches: title, CCLI number, author, themes, team tags, VW category
+ * (both the number, e.g. "1", and its label, e.g. "call to worship"),
+ * arrangement key (exact), notes, and user tags.
  */
 export function songMatchesQuery(song: Song, query: string): boolean {
   const q = query.toLowerCase().trim()
@@ -24,6 +23,9 @@ export function songMatchesQuery(song: Song, query: string): boolean {
   ) {
     return true
   }
+  if (song.tags?.some((t) => t.toLowerCase().includes(q))) return true
+  if (song.notes?.toLowerCase().includes(q)) return true
+  if (song.arrangements.some((a) => a.key.toLowerCase() === q)) return true
 
   return false
 }

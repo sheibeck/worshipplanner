@@ -37,6 +37,7 @@ export interface Song {
   updatedAt: Timestamp
   pcSongId: string | null
   hidden: boolean
+  tags: string[] // D-01 user-defined tags (e.g. "Christmas") — distinct from themes and teamTags
 }
 
 /**

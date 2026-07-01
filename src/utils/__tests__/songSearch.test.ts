@@ -12,6 +12,7 @@ function makeSong(overrides: Partial<Song> = {}): Song {
     notes: '',
     vwTypes: [1] as VWType[],
     teamTags: ['Choir'],
+    tags: [],
     arrangements: [
       { id: 'arr-1', name: 'Standard', key: 'G', bpm: null, lengthSeconds: null, chordChartUrl: '', notes: '', teamTags: [] },
       { id: 'arr-2', name: 'Orchestra', key: 'A', bpm: null, lengthSeconds: null, chordChartUrl: '', notes: '', teamTags: [] },
@@ -59,11 +60,28 @@ describe('songMatchesQuery', () => {
     expect(songMatchesQuery(makeSong({ vwTypes: [2] }), 'intimate')).toBe(true)
   })
 
-  it('does NOT match arrangement keys (keys are noisy in free text)', () => {
-    // No other field contains 'g' or 'a' as a standalone — but title has 'a'/'g'.
-    // Use a song whose other fields can't match the key to assert key isn't searched.
-    const song = makeSong({ title: 'Zzz', author: '', themes: [], teamTags: [], ccliNumber: '', vwTypes: [] })
-    expect(songMatchesQuery(song, 'A')).toBe(false)
+  it('matches user tags (case-insensitive substring)', () => {
+    const song = makeSong({ tags: ['Christmas'] })
+    expect(songMatchesQuery(song, 'christmas')).toBe(true)
+    expect(songMatchesQuery(song, 'Christ')).toBe(true)
+  })
+
+  it('matches notes (case-insensitive substring)', () => {
+    const song = makeSong({ notes: 'quiet intro, builds slowly' })
+    expect(songMatchesQuery(song, 'quiet intro')).toBe(true)
+    expect(songMatchesQuery(song, 'INTRO')).toBe(true)
+  })
+
+  it('matches arrangement key exactly (case-insensitive)', () => {
+    // arr-1 has key 'G', arr-2 has key 'A'
+    const song = makeSong()
+    expect(songMatchesQuery(song, 'g')).toBe(true)
+    expect(songMatchesQuery(song, 'G')).toBe(true)
+    expect(songMatchesQuery(song, 'a')).toBe(true)
+    // Partial key should NOT match (exact match only)
+    const songBb = makeSong({ title: 'Zzz', author: '', themes: [], teamTags: [], tags: [], ccliNumber: '', vwTypes: [],
+      arrangements: [{ id: 'arr-1', name: 'Std', key: 'Bb', bpm: null, lengthSeconds: null, chordChartUrl: '', notes: '', teamTags: [] }] })
+    expect(songMatchesQuery(songBb, 'b')).toBe(false)
   })
 
   it('returns false when nothing matches', () => {
