@@ -12,6 +12,7 @@ function makeSong(overrides: Partial<Song> = {}): Song {
     author: 'John Newton',
     themes: [],
     notes: '',
+    tags: [],
     vwTypes: [],
     teamTags: [],
     arrangements: [],
