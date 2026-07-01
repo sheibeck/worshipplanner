@@ -1304,10 +1304,12 @@ async function suggestAllSongs() {
     const sermonTopic = localService.value.sermonTopic ?? null
     const sermonPassage = localService.value.sermonPassage ?? null
     // Orchestra AI filter (D-06, D-09): when service is orchestra, only include orchestra-tagged songs
+    // D-18: exclude hidden (soft-deleted) songs from AI base
     const isOrchestraService = (localService.value?.teams ?? []).includes('Orchestra')
+    const base = songStore.songs.filter((s) => !s.hidden)
     const librarySource = isOrchestraService
-      ? songStore.songs.filter((s) => s.teamTags.includes('Orchestra'))
-      : songStore.songs
+      ? base.filter((s) => s.teamTags.includes('Orchestra'))
+      : base
     const songLibrary = librarySource.map((s) => ({
       id: s.id,
       title: s.title,
@@ -1412,10 +1414,12 @@ async function fetchAiForSlot(slotIndex: number) {
       }
     }
 
+    // D-18: exclude hidden (soft-deleted) songs from AI base
     const isOrchestraService = (localService.value?.teams ?? []).includes('Orchestra')
+    const base = songStore.songs.filter((s) => !s.hidden)
     const librarySource = isOrchestraService
-      ? songStore.songs.filter((s) => s.teamTags.includes('Orchestra'))
-      : songStore.songs
+      ? base.filter((s) => s.teamTags.includes('Orchestra'))
+      : base
     const result = await getSongSuggestions({
       sermonTopic: localService.value.sermonTopic ?? null,
       sermonPassage: localService.value.sermonPassage ?? null,
