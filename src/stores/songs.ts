@@ -95,14 +95,31 @@ export const useSongStore = defineStore('songs', () => {
 
   function hydrateTagFilter() {
     const key = tagFilterStorageKey()
-    if (!key) return
+    if (!key) {
+      // No usable storage key (missing uid/org) — reset in-memory state so a
+      // previous account's selection can't leak into this session (T-12-03).
+      tagFilterChecked.value = new Set()
+      tagFilterHide.value = false
+      return
+    }
     try {
       const raw = localStorage.getItem(key)
-      if (!raw) return
+      if (!raw) {
+        // No saved filter for this user/org — reset rather than leaving a
+        // previously-active user's in-memory selection applied (T-12-03).
+        tagFilterChecked.value = new Set()
+        tagFilterHide.value = false
+        return
+      }
       const parsed = JSON.parse(raw) as { checked?: string[]; hide?: boolean }
       tagFilterChecked.value = new Set(Array.isArray(parsed.checked) ? parsed.checked : [])
       tagFilterHide.value = parsed.hide === true
-    } catch { /* ignore: corrupt/unavailable — keep in-memory defaults */ }
+    } catch {
+      // Corrupt/unavailable — reset to defaults rather than keeping stale
+      // in-memory state from a prior user/org.
+      tagFilterChecked.value = new Set()
+      tagFilterHide.value = false
+    }
   }
 
   watch([tagFilterChecked, tagFilterHide], persistTagFilter, { deep: true })

@@ -1194,5 +1194,31 @@ describe('useSongStore', () => {
       }).not.toThrow()
       setItemSpy.mockRestore()
     })
+
+    it('resets in-memory tag filter when switching to a user/org with no stored entry (WR-01, T-12-03)', async () => {
+      // User A has a non-default tag filter saved and active in memory.
+      mockAuthUser = { uid: 'uid-a' }
+      mockAuthOrgId = 'org-a'
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-a')
+      store.tagFilterChecked = new Set(['Christmas'])
+      store.tagFilterHide = true
+      await vi.waitFor(() => {
+        expect(localStorage.getItem('wp:tagFilter:v1:org-a:uid-a')).not.toBeNull()
+      })
+      expect(store.tagFilterChecked.size).toBe(1)
+      expect(store.tagFilterHide).toBe(true)
+
+      // User B logs in within the same tab/session (singleton store) — no
+      // stored filter exists yet for User B's user/org key.
+      mockAuthUser = { uid: 'uid-b' }
+      mockAuthOrgId = 'org-b'
+      store.subscribe('org-b')
+
+      // User A's in-memory selection must NOT leak into User B's session.
+      expect(store.tagFilterChecked.size).toBe(0)
+      expect(store.tagFilterHide).toBe(false)
+    })
   })
 })
