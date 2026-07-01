@@ -128,6 +128,7 @@ Scope (from user request):
 2. Tag filter UI redesign — replace the two "Show only tag" / "Hide tag" dropdowns with a SINGLE list of all tags, each with a checkbox:
    - Default: show only checked tags. A top-level "Hide" checkbox inverts semantics so checked tags are hidden instead. A "Clear" option resets selections.
 3. Persistence — remember the tag show/hide filter settings between song selections/searches (ideally across sessions) so users don't re-check boxes; "Clear" resets on demand, but default is to remember state. Applies to both picker and Songs-panel filters.
+4. Delete-confirmation on the "Remove element" X — clicking the X that removes an element from a service plan must prompt a confirmation before actually deleting the element. NOTE for planner: Phase 11 D-14 already added a confirmation modal for deleting *populated* slots (song/scripture assigned) with silent delete for empty slots. Verify whether the "Remove element" X the user means is a distinct action (e.g. removing an entire element/row such as a Prayer/Message, or removing any element regardless of populated state) that D-14 did not cover — do not assume redundancy; close the actual gap.
 
 Direct enhancement of the Phase 11 search + tag-filter work.
 
