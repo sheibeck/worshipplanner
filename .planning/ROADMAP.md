@@ -132,11 +132,11 @@ Scope (from user request):
 
 Direct enhancement of the Phase 11 search + tag-filter work.
 
-**Plans:** 5 plans
+**Plans:** 3/5 plans executed
 
 Plans:
-- [ ] 12-01-PLAN.md — Search engine (TDD): multi-term AND + field-scoped prefixes (type:/key:/tag:/theme:/team:) + natural phrase recognition in songSearch.ts
-- [ ] 12-02-PLAN.md — songs store: tag-filter checklist state (checked Set + Hide toggle) + clearTagFilter + per-user/org localStorage persistence
+- [x] 12-01-PLAN.md — Search engine (TDD): multi-term AND + field-scoped prefixes (type:/key:/tag:/theme:/team:) + natural phrase recognition in songSearch.ts
+- [x] 12-02-PLAN.md — songs store: tag-filter checklist state (checked Set + Hide toggle) + clearTagFilter + per-user/org localStorage persistence
 - [ ] 12-03-PLAN.md — Shared TagFilterChecklist.vue component + Songs-panel wiring (SongFilters.vue swaps 2 selects, SongsView binds store)
 - [ ] 12-04-PLAN.md — Service-plan picker: consume shared search engine + shared TagFilterChecklist bound to store tag state
-- [ ] 12-05-PLAN.md — Delete-confirmation: widen removeSlot gate to all removals (incl. empty slots) + element-type-aware copy, reusing D-14 modal
+- [x] 12-05-PLAN.md — Delete-confirmation: widen removeSlot gate to all removals (incl. empty slots) + element-type-aware copy, reusing D-14 modal
