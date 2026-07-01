@@ -65,6 +65,18 @@
     <table v-else class="w-full text-sm">
       <thead>
         <tr class="border-b border-gray-800 bg-gray-900/50">
+          <!-- Checkbox column -->
+          <th scope="col" class="px-3 py-3 w-8">
+            <input
+              type="checkbox"
+              class="rounded border-gray-600 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-gray-900"
+              :checked="selectedIds.size > 0 && selectedIds.size === sortedSongs.length"
+              :indeterminate="selectedIds.size > 0 && selectedIds.size < sortedSongs.length"
+              @change.stop="toggleSelectAll"
+              @click.stop
+            />
+          </th>
+          <!-- Title -->
           <th
             scope="col"
             class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer hover:text-gray-200 select-none"
@@ -72,48 +84,54 @@
           >
             <span class="flex items-center gap-1">
               Title
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-3.5 w-3.5"
-                :class="sortField === 'title' ? 'text-indigo-400' : 'text-gray-600'"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path
-                  v-if="sortField === 'title' && sortDir === 'asc'"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M5 15l7-7 7 7"
-                />
-                <path
-                  v-else-if="sortField === 'title' && sortDir === 'desc'"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M19 9l-7 7-7-7"
-                />
-                <path
-                  v-else
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"
-                />
-              </svg>
+              <SortArrow :active="sortField === 'title'" :dir="sortDir" />
             </span>
           </th>
-          <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-            Category
+          <!-- Category -->
+          <th
+            scope="col"
+            class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer hover:text-gray-200 select-none"
+            @click="toggleSort('category')"
+          >
+            <span class="flex items-center gap-1">
+              Category
+              <SortArrow :active="sortField === 'category'" :dir="sortDir" />
+            </span>
           </th>
-          <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-            Key
+          <!-- Key -->
+          <th
+            scope="col"
+            class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer hover:text-gray-200 select-none"
+            @click="toggleSort('key')"
+          >
+            <span class="flex items-center gap-1">
+              Key
+              <SortArrow :active="sortField === 'key'" :dir="sortDir" />
+            </span>
           </th>
-          <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-            CCLI
+          <!-- CCLI -->
+          <th
+            scope="col"
+            class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer hover:text-gray-200 select-none"
+            @click="toggleSort('ccli')"
+          >
+            <span class="flex items-center gap-1">
+              CCLI
+              <SortArrow :active="sortField === 'ccli'" :dir="sortDir" />
+            </span>
           </th>
-          <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-            Last Used
+          <!-- Last Used -->
+          <th
+            scope="col"
+            class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer hover:text-gray-200 select-none"
+            @click="toggleSort('lastUsed')"
+          >
+            <span class="flex items-center gap-1">
+              Last Used
+              <SortArrow :active="sortField === 'lastUsed'" :dir="sortDir" />
+            </span>
           </th>
+          <!-- Tags -->
           <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
             Tags
           </th>
@@ -124,8 +142,20 @@
           v-for="song in visibleSongs"
           :key="song.id"
           class="cursor-pointer hover:bg-gray-800/50 transition-colors"
+          :class="selectedIds.has(song.id) ? 'bg-indigo-900/10' : ''"
           @click="$emit('select', song)"
         >
+          <!-- Checkbox -->
+          <td class="px-3 py-3" @click.stop>
+            <input
+              type="checkbox"
+              class="rounded border-gray-600 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-gray-900"
+              :checked="selectedIds.has(song.id)"
+              @change.stop="toggleSelect(song.id)"
+              @click.stop
+            />
+          </td>
+
           <!-- Title -->
           <td class="px-4 py-3">
             <div class="font-medium text-gray-100">{{ song.title }}</div>
@@ -160,15 +190,76 @@
             {{ formatDate(song.lastUsedAt) }}
           </td>
 
-          <!-- Team Tags -->
-          <td class="px-4 py-3">
-            <div class="flex flex-wrap gap-1">
+          <!-- Tags: team + theme + user pills, inline add/remove -->
+          <td class="px-4 py-3" @click.stop>
+            <div class="flex flex-wrap gap-1 items-center">
+              <!-- Team tags -->
               <TeamTagPill
-                v-for="tag in song.teamTags"
-                :key="tag"
-                :tag="tag"
+                v-for="t in song.teamTags"
+                :key="'tm-' + t"
+                :tag="t"
+                variant="team"
               />
-              <span v-if="song.teamTags.length === 0" class="text-gray-600">&mdash;</span>
+              <!-- Theme pills -->
+              <TeamTagPill
+                v-for="t in song.themes"
+                :key="'th-' + t"
+                :tag="t"
+                variant="theme"
+              />
+              <!-- User tag pills — removable -->
+              <span
+                v-for="t in (song.tags ?? [])"
+                :key="'us-' + t"
+                class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-medium border bg-pink-900/50 text-pink-300 border-pink-800"
+              >
+                {{ t }}
+                <button
+                  type="button"
+                  class="ml-0.5 text-pink-400 hover:text-pink-200 leading-none"
+                  @click.stop="removeUserTag(song, t)"
+                  aria-label="Remove tag"
+                >
+                  &times;
+                </button>
+              </span>
+
+              <!-- Inline add affordance -->
+              <template v-if="inlineEditSongId === song.id">
+                <input
+                  ref="inlineInputRef"
+                  v-model="inlineTagInput"
+                  type="text"
+                  placeholder="tag name"
+                  class="w-24 rounded border border-pink-700 bg-gray-900 text-pink-200 text-xs px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-pink-500"
+                  @keydown.enter.stop="commitInlineTag(song)"
+                  @keydown.escape.stop="cancelInlineTag"
+                  @click.stop
+                />
+                <button
+                  type="button"
+                  class="text-xs text-pink-400 hover:text-pink-200"
+                  @click.stop="commitInlineTag(song)"
+                >Add</button>
+                <button
+                  type="button"
+                  class="text-xs text-gray-500 hover:text-gray-300"
+                  @click.stop="cancelInlineTag"
+                >Cancel</button>
+              </template>
+              <button
+                v-else
+                type="button"
+                class="text-xs text-gray-500 hover:text-pink-300 border border-dashed border-gray-700 hover:border-pink-700 rounded-full px-1.5 py-0.5 leading-none transition-colors"
+                @click.stop="openInlineEdit(song.id)"
+                title="Add user tag"
+              >+</button>
+
+              <!-- Em-dash fallback when all arrays are empty -->
+              <span
+                v-if="!song.teamTags.length && !song.themes.length && !(song.tags ?? []).length && inlineEditSongId !== song.id"
+                class="text-gray-600"
+              >&mdash;</span>
             </div>
           </td>
         </tr>
@@ -183,24 +274,30 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import type { Song } from '@/types/song'
 import type { Timestamp } from 'firebase/firestore'
 import SongBadge from '@/components/SongBadge.vue'
 import TeamTagPill from '@/components/TeamTagPill.vue'
 import { getPrimaryKey } from '@/utils/songSearch'
+import { useSongStore } from '@/stores/songs'
 
 const props = defineProps<{
   songs: Song[]
   loading: boolean
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   select: [song: Song]
   add: []
+  'update:selectedIds': [ids: Set<string>]
 }>()
 
-type SortField = 'title'
+const songStore = useSongStore()
+
+// ── Sort ───────────────────────────────────────────────────────────────────────
+
+type SortField = 'title' | 'category' | 'key' | 'ccli' | 'lastUsed'
 type SortDir = 'asc' | 'desc'
 
 const sortField = ref<SortField>('title')
@@ -215,16 +312,101 @@ function toggleSort(field: SortField) {
   }
 }
 
+function sortKey(song: Song): string | number {
+  switch (sortField.value) {
+    case 'category': return song.vwTypes[0] ?? 99
+    case 'key':      return getPrimaryKey(song).toLowerCase()
+    case 'ccli':     return Number(song.ccliNumber) || 0
+    case 'lastUsed': return song.lastUsedAt?.toMillis() ?? 0
+    default:         return song.title.toLowerCase()
+  }
+}
+
 const sortedSongs = computed(() => {
   return [...props.songs].sort((a, b) => {
-    const aVal = a[sortField.value].toLowerCase()
-    const bVal = b[sortField.value].toLowerCase()
-    const cmp = aVal.localeCompare(bVal)
+    const aVal = sortKey(a)
+    const bVal = sortKey(b)
+    let cmp: number
+    if (typeof aVal === 'number' && typeof bVal === 'number') {
+      cmp = aVal - bVal
+    } else {
+      cmp = String(aVal).localeCompare(String(bVal))
+    }
     return sortDir.value === 'asc' ? cmp : -cmp
   })
 })
 
-// Progressive rendering
+// ── Selection (bulk multi-select) ─────────────────────────────────────────────
+
+const selectedIds = ref<Set<string>>(new Set())
+
+function toggleSelect(id: string) {
+  const next = new Set(selectedIds.value)
+  if (next.has(id)) {
+    next.delete(id)
+  } else {
+    next.add(id)
+  }
+  selectedIds.value = next
+  emit('update:selectedIds', next)
+}
+
+function toggleSelectAll() {
+  if (selectedIds.value.size === sortedSongs.value.length) {
+    selectedIds.value = new Set()
+  } else {
+    selectedIds.value = new Set(sortedSongs.value.map((s) => s.id))
+  }
+  emit('update:selectedIds', selectedIds.value)
+}
+
+function clearSelection() {
+  selectedIds.value = new Set()
+  emit('update:selectedIds', selectedIds.value)
+}
+
+defineExpose({ selectedIds, clearSelection })
+
+// ── Inline tag editing ─────────────────────────────────────────────────────────
+
+const inlineEditSongId = ref<string | null>(null)
+const inlineTagInput = ref('')
+const inlineInputRef = ref<HTMLInputElement | null>(null)
+
+function openInlineEdit(songId: string) {
+  inlineEditSongId.value = songId
+  inlineTagInput.value = ''
+  nextTick(() => {
+    inlineInputRef.value?.focus()
+  })
+}
+
+function cancelInlineTag() {
+  inlineEditSongId.value = null
+  inlineTagInput.value = ''
+}
+
+async function commitInlineTag(song: Song) {
+  const tag = inlineTagInput.value.trim()
+  if (!tag) {
+    cancelInlineTag()
+    return
+  }
+  const existingTags = song.tags ?? []
+  if (!existingTags.includes(tag)) {
+    const newTags = [...existingTags, tag]
+    await songStore.updateSong(song.id, { tags: newTags })
+  }
+  cancelInlineTag()
+}
+
+async function removeUserTag(song: Song, tag: string) {
+  const newTags = (song.tags ?? []).filter((t) => t !== tag)
+  await songStore.updateSong(song.id, { tags: newTags })
+}
+
+// ── Progressive rendering ──────────────────────────────────────────────────────
+
 const BATCH_SIZE = 50
 const visibleCount = ref(BATCH_SIZE)
 
@@ -272,12 +454,55 @@ onUnmounted(() => {
 })
 
 function formatDate(ts: Timestamp | null): string {
-  if (!ts) return '\u2014'
+  if (!ts) return '—'
   try {
     const date = ts.toDate ? ts.toDate() : new Date((ts as unknown as { seconds: number }).seconds * 1000)
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   } catch {
-    return '\u2014'
+    return '—'
   }
 }
+</script>
+
+<!-- SortArrow sub-component (inline via defineComponent) -->
+<script lang="ts">
+import { defineComponent, h } from 'vue'
+
+export const SortArrow = defineComponent({
+  props: {
+    active: { type: Boolean, default: false },
+    dir: { type: String as () => 'asc' | 'desc', default: 'asc' },
+  },
+  setup(props) {
+    return () => {
+      const color = props.active ? 'text-indigo-400' : 'text-gray-600'
+      let path: string
+      if (props.active && props.dir === 'asc') {
+        path = 'M5 15l7-7 7 7'
+      } else if (props.active && props.dir === 'desc') {
+        path = 'M19 9l-7 7-7-7'
+      } else {
+        path = 'M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4'
+      }
+      return h(
+        'svg',
+        {
+          xmlns: 'http://www.w3.org/2000/svg',
+          class: `h-3.5 w-3.5 ${color}`,
+          fill: 'none',
+          viewBox: '0 0 24 24',
+          stroke: 'currentColor',
+          'stroke-width': '2',
+        },
+        [
+          h('path', {
+            'stroke-linecap': 'round',
+            'stroke-linejoin': 'round',
+            d: path,
+          }),
+        ],
+      )
+    }
+  },
+})
 </script>
