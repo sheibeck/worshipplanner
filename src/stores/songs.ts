@@ -28,10 +28,11 @@ export const useSongStore = defineStore('songs', () => {
   const searchQuery = ref('')
   const filterVwType = ref<1 | 2 | 3 | 'uncategorized' | null>(null)
   const filterKey = ref('')
-  // D-08: shared multi-select tag-filter checklist state (checked tags + hide toggle)
-  // D-09: OR-combine in show mode; D-10: exclusion set when hide ON
-  const tagFilterChecked = ref<Set<string>>(new Set())
-  const tagFilterHide = ref(false)
+  // D-08: shared per-tag Show/Hide tag-filter state — independent include/exclude sets
+  // D-09: include set OR-combines (show if carrying ANY included tag)
+  // D-10: exclude set always wins (hide if carrying ANY excluded tag), even alongside include
+  const tagFilterInclude = ref<Set<string>>(new Set())
+  const tagFilterExclude = ref<Set<string>>(new Set())
 
   let unsubscribeFn: Unsubscribe | null = null
 
@@ -51,14 +52,22 @@ export const useSongStore = defineStore('songs', () => {
         !filterKey.value ||
         song.arrangements.some((a) => a.key === filterKey.value)
 
-      const checked = tagFilterChecked.value
+      const include = tagFilterInclude.value
+      const exclude = tagFilterExclude.value
       let matchesUserTags = true
-      if (checked.size > 0) {
-        const carriesChecked =
-          (song.teamTags ?? []).some((t) => checked.has(t)) ||
-          (song.themes ?? []).some((t) => checked.has(t)) ||
-          (song.tags ?? []).some((t) => checked.has(t))
-        matchesUserTags = tagFilterHide.value ? !carriesChecked : carriesChecked
+      if (exclude.size > 0) {
+        const carriesExcluded =
+          (song.teamTags ?? []).some((t) => exclude.has(t)) ||
+          (song.themes ?? []).some((t) => exclude.has(t)) ||
+          (song.tags ?? []).some((t) => exclude.has(t))
+        if (carriesExcluded) matchesUserTags = false
+      }
+      if (matchesUserTags && include.size > 0) {
+        const carriesIncluded =
+          (song.teamTags ?? []).some((t) => include.has(t)) ||
+          (song.themes ?? []).some((t) => include.has(t)) ||
+          (song.tags ?? []).some((t) => include.has(t))
+        matchesUserTags = carriesIncluded
       }
 
       return matchesSearch && matchesVwType && matchesKey && matchesUserTags
@@ -78,18 +87,18 @@ export const useSongStore = defineStore('songs', () => {
 
   // D-11: clears only the tag filter — searchQuery/filterVwType/filterKey untouched
   function clearTagFilter() {
-    tagFilterChecked.value = new Set()
-    tagFilterHide.value = false
+    tagFilterInclude.value = new Set()
+    tagFilterExclude.value = new Set()
   }
 
-  // D-12/D-13: persist ONLY the tag-filter checklist to localStorage, namespaced per user+org
-  // so state never bleeds across accounts on a shared browser (T-12-03).
+  // D-12/D-13: persist ONLY the tag-filter include/exclude sets to localStorage, namespaced
+  // per user+org so state never bleeds across accounts on a shared browser (T-12-03).
   function tagFilterStorageKey(): string | null {
     const auth = useAuthStore()
     const uid = auth.user?.uid
     const org = orgId.value ?? auth.orgId
     if (!uid || !org) return null // don't read/write under a shared/global key
-    return `wp:tagFilter:v1:${org}:${uid}`
+    return `wp:tagFilter:v2:${org}:${uid}`
   }
 
   function persistTagFilter() {
@@ -97,8 +106,8 @@ export const useSongStore = defineStore('songs', () => {
     if (!key) return
     try {
       localStorage.setItem(key, JSON.stringify({
-        checked: Array.from(tagFilterChecked.value),
-        hide: tagFilterHide.value,
+        include: Array.from(tagFilterInclude.value),
+        exclude: Array.from(tagFilterExclude.value),
       }))
     } catch { /* ignore: private mode / quota — degrade to in-memory only */ }
   }
@@ -108,8 +117,8 @@ export const useSongStore = defineStore('songs', () => {
     if (!key) {
       // No usable storage key (missing uid/org) — reset in-memory state so a
       // previous account's selection can't leak into this session (T-12-03).
-      tagFilterChecked.value = new Set()
-      tagFilterHide.value = false
+      tagFilterInclude.value = new Set()
+      tagFilterExclude.value = new Set()
       return
     }
     try {
@@ -117,22 +126,22 @@ export const useSongStore = defineStore('songs', () => {
       if (!raw) {
         // No saved filter for this user/org — reset rather than leaving a
         // previously-active user's in-memory selection applied (T-12-03).
-        tagFilterChecked.value = new Set()
-        tagFilterHide.value = false
+        tagFilterInclude.value = new Set()
+        tagFilterExclude.value = new Set()
         return
       }
-      const parsed = JSON.parse(raw) as { checked?: string[]; hide?: boolean }
-      tagFilterChecked.value = new Set(Array.isArray(parsed.checked) ? parsed.checked : [])
-      tagFilterHide.value = parsed.hide === true
+      const parsed = JSON.parse(raw) as { include?: string[]; exclude?: string[] }
+      tagFilterInclude.value = new Set(Array.isArray(parsed.include) ? parsed.include : [])
+      tagFilterExclude.value = new Set(Array.isArray(parsed.exclude) ? parsed.exclude : [])
     } catch {
       // Corrupt/unavailable — reset to defaults rather than keeping stale
       // in-memory state from a prior user/org.
-      tagFilterChecked.value = new Set()
-      tagFilterHide.value = false
+      tagFilterInclude.value = new Set()
+      tagFilterExclude.value = new Set()
     }
   }
 
-  watch([tagFilterChecked, tagFilterHide], persistTagFilter, { deep: true })
+  watch([tagFilterInclude, tagFilterExclude], persistTagFilter, { deep: true })
 
   function subscribe(orgIdValue: string) {
     if (unsubscribeFn) {
@@ -300,8 +309,8 @@ export const useSongStore = defineStore('songs', () => {
     searchQuery,
     filterVwType,
     filterKey,
-    tagFilterChecked,
-    tagFilterHide,
+    tagFilterInclude,
+    tagFilterExclude,
     filteredSongs,
     allUserTags,
     subscribe,
