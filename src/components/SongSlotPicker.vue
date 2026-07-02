@@ -277,7 +277,15 @@ const tagFilteredSongs = computed<Song[]>(() => {
 // ── Computed — full ranked/search lists ───────────────────────────────────────
 
 const suggestions = computed<SuggestionResult[]>(() =>
-  rankSongsForSlot(tagFilteredSongs.value, props.requiredVwType, props.serviceTeams),
+  // The rotation list is NOT auto-scoped by the service's teams. Users filter by
+  // hand with the tag checkboxes as they wish — simpler, and consistent with the
+  // Songs panel. Only 'Orchestra' is passed through so its soft sort-bonus still
+  // orders orchestra songs first; rankSongsForSlot then applies no team hard-filter.
+  rankSongsForSlot(
+    tagFilteredSongs.value,
+    props.requiredVwType,
+    props.serviceTeams.filter((t) => t === 'Orchestra'),
+  ),
 )
 
 const searchResults = computed<Song[]>(() => {
@@ -301,7 +309,9 @@ const resolvedAiSuggestions = computed<{ song: Song; reason: string }[]>(() => {
   if (!props.aiSuggestions) return []
   return props.aiSuggestions
     .map((ai) => {
-      const song = props.songs.find((s) => s.id === ai.songId)
+      // Resolve against visibleSongs so a cached suggestion for a since-hidden song
+      // never surfaces in the picker (WR-01).
+      const song = visibleSongs.value.find((s) => s.id === ai.songId)
       return song ? { song, reason: ai.reason } : null
     })
     .filter((item): item is { song: Song; reason: string } => item !== null)
