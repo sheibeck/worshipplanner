@@ -132,7 +132,7 @@ Scope (from user request):
 
 Direct enhancement of the Phase 11 search + tag-filter work.
 
-**Plans:** 5/5 plans complete
+**Plans:** 5/5 complete + 3 gap-closure plans (12-06..12-08, from 12-UAT)
 
 Plans:
 - [x] 12-01-PLAN.md — Search engine (TDD): multi-term AND + field-scoped prefixes (type:/key:/tag:/theme:/team:) + natural phrase recognition in songSearch.ts
@@ -140,3 +140,8 @@ Plans:
 - [x] 12-03-PLAN.md — Shared TagFilterChecklist.vue component + Songs-panel wiring (SongFilters.vue swaps 2 selects, SongsView binds store)
 - [x] 12-04-PLAN.md — Service-plan picker: consume shared search engine + shared TagFilterChecklist bound to store tag state
 - [x] 12-05-PLAN.md — Delete-confirmation: widen removeSlot gate to all removals (incl. empty slots) + element-type-aware copy, reusing D-14 modal
+
+Gap-closure plans (from 12-UAT, 2026-07-02 — Option A tag-UI unification, no data-model merge):
+- [ ] 12-06-PLAN.md — Songs panel: widen store filter to teamTags∪themes∪tags union, remove redundant teamTags 'All tags' select + filterTag, update store tests (closes UAT test 3, panel side)
+- [ ] 12-07-PLAN.md — Shared control: convert TagFilterChecklist to fixed-height dropdown/popover (header stops growing) + widen picker to the three-field union (closes UAT test 3, popover + picker)
+- [ ] 12-08-PLAN.md — Docs only: correct D-16/12-05-SUMMARY/ROADMAP to describe generic delete-confirmation wording as intended (closes UAT test 8, doc_update_only)
