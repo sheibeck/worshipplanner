@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 12-06-PLAN.md
-last_updated: "2026-07-02T21:20:53.276Z"
+stopped_at: Completed 12-07-PLAN.md
+last_updated: "2026-07-02T21:27:19.119Z"
 last_activity: 2026-07-02
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 21
-  completed_plans: 19
-  percent: 90
+  completed_plans: 20
+  percent: 95
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 12 (advanced-song-search-and-multi-select-persistent-tag-filteri) — EXECUTING
-Plan: 2 of 8
+Plan: 3 of 8
 Milestone: v1.0 MVP — SHIPPED 2026-03-05
 Next milestone: v1.1 Tasks & Events (not yet started)
 Status: Ready to execute
@@ -67,6 +67,7 @@ Status: Ready to execute
 | Phase 09-pc-song-import-tag-management P01 | 4 | 1 tasks | 3 files |
 | Phase 09 P02 | 25 | 2 tasks | 5 files |
 | Phase 12 P06 | 20min | 1 tasks | 4 files |
+| Phase 12 P07 | 8min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -100,6 +101,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase 09-pc-song-import-tag-management]: PC API batch size reduced to 3 with Retry-After support to survive rate limit windows
 - [Phase 12]: Kept teamTags/themes/tags as three separate Song fields (Option A) — unified only the UI/filter surface, not the data model
 - [Phase 12]: Store, component, and view filterTag removal landed in a single atomic commit to keep vue-tsc --build green at every commit boundary
+- [Phase 12]: Kept TagFilterChecklist.vue fully presentational (internal open ref only, no store import) so both Songs panel and picker inherit the popover for free
 
 ### Roadmap Evolution
 
@@ -143,6 +145,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-02
-Last session: 2026-07-02T21:20:53.246Z
-Stopped at: Completed 12-06-PLAN.md
+Last session: 2026-07-02T21:27:19.107Z
+Stopped at: Completed 12-07-PLAN.md
 Resume file: None
