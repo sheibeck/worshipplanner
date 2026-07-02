@@ -243,10 +243,16 @@ const dropdownStyle = ref<Record<string, string>>({})
 
 // ── Tag filter (D-14: shared with Songs panel via songStore) ─────────────────
 
-/** Distinct tags across all songs (teamTags ∪ themes ∪ tags) — populates the shared checklist */
+/**
+ * Non-hidden songs only. Hidden (soft-deleted) songs must not surface anywhere in the
+ * picker — not as suggestions/search results, and not as tag options in the checklist.
+ */
+const visibleSongs = computed<Song[]>(() => props.songs.filter((s) => s.hidden !== true))
+
+/** Distinct tags across visible songs (teamTags ∪ themes ∪ tags) — populates the shared checklist */
 const availableTags = computed<string[]>(() => {
   const tagSet = new Set<string>()
-  for (const song of props.songs) {
+  for (const song of visibleSongs.value) {
     for (const t of (song.teamTags ?? [])) tagSet.add(t)
     for (const t of (song.themes ?? [])) tagSet.add(t)
     for (const t of (song.tags ?? [])) tagSet.add(t)
@@ -254,12 +260,12 @@ const availableTags = computed<string[]>(() => {
   return Array.from(tagSet).sort()
 })
 
-/** Props.songs filtered by the shared store tag-filter state (D-09/D-10: OR-combine in show mode, exclusion in hide mode). */
+/** Visible songs filtered by the shared store tag-filter state (D-09/D-10: OR-combine in show mode, exclusion in hide mode). */
 const tagFilteredSongs = computed<Song[]>(() => {
   const checked = songStore.tagFilterChecked
   const hide = songStore.tagFilterHide
-  if (checked.size === 0) return props.songs
-  return props.songs.filter((s) => {
+  if (checked.size === 0) return visibleSongs.value
+  return visibleSongs.value.filter((s) => {
     const carriesChecked =
       (s.teamTags ?? []).some((t) => checked.has(t)) ||
       (s.themes ?? []).some((t) => checked.has(t)) ||

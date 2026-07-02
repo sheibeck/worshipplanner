@@ -217,6 +217,9 @@ const availableKeys = computed(() => {
 const availableUserTags = computed(() => {
   const tags = new Set<string>()
   songStore.songs.forEach((song) => {
+    // Hidden (soft-deleted) songs contribute no metadata to the filter list —
+    // otherwise their tags appear as checkable options that match zero visible songs.
+    if (song.hidden === true) return
     ;(song.teamTags ?? []).forEach((t) => tags.add(t))
     ;(song.themes ?? []).forEach((t) => tags.add(t))
     ;(song.tags ?? []).forEach((t) => tags.add(t))
