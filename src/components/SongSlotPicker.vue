@@ -385,6 +385,7 @@ function openDropdown() {
 
   const rect = triggerRef.value.getBoundingClientRect()
   const maxH = 600 // matches max-h-[600px]
+  const minH = 420 // stable floor so the panel doesn't jump around as the result count changes
   const gap = 4
   const spaceBelow = window.innerHeight - rect.bottom - gap
   const spaceAbove = rect.top - gap
@@ -393,7 +394,12 @@ function openDropdown() {
   const w = `${Math.max(rect.width, 280)}px`
 
   if (fitsBelow) {
-    dropdownStyle.value = { top: `${rect.bottom + gap}px`, left: `${rect.left}px`, width: w }
+    dropdownStyle.value = {
+      top: `${rect.bottom + gap}px`,
+      left: `${rect.left}px`,
+      width: w,
+      minHeight: `${minH}px`,
+    }
   } else if (spaceAbove > spaceBelow) {
     // Flip above, cap height to available space
     const h = Math.min(maxH, spaceAbove)
@@ -402,6 +408,7 @@ function openDropdown() {
       left: `${rect.left}px`,
       width: w,
       maxHeight: `${h}px`,
+      minHeight: `${Math.min(minH, h)}px`,
     }
   } else {
     // Not enough room above either — show below but cap height
@@ -410,6 +417,7 @@ function openDropdown() {
       left: `${rect.left}px`,
       width: w,
       maxHeight: `${spaceBelow}px`,
+      minHeight: `${Math.min(minH, spaceBelow)}px`,
     }
   }
 
