@@ -243,11 +243,13 @@ const dropdownStyle = ref<Record<string, string>>({})
 
 // ── Tag filter (D-14: shared with Songs panel via songStore) ─────────────────
 
-/** Distinct user tags across all songs — populates the shared checklist */
+/** Distinct tags across all songs (teamTags ∪ themes ∪ tags) — populates the shared checklist */
 const availableTags = computed<string[]>(() => {
   const tagSet = new Set<string>()
   for (const song of props.songs) {
-    for (const tag of (song.tags ?? [])) tagSet.add(tag)
+    for (const t of (song.teamTags ?? [])) tagSet.add(t)
+    for (const t of (song.themes ?? [])) tagSet.add(t)
+    for (const t of (song.tags ?? [])) tagSet.add(t)
   }
   return Array.from(tagSet).sort()
 })
@@ -258,7 +260,10 @@ const tagFilteredSongs = computed<Song[]>(() => {
   const hide = songStore.tagFilterHide
   if (checked.size === 0) return props.songs
   return props.songs.filter((s) => {
-    const carriesChecked = (s.tags ?? []).some((t) => checked.has(t))
+    const carriesChecked =
+      (s.teamTags ?? []).some((t) => checked.has(t)) ||
+      (s.themes ?? []).some((t) => checked.has(t)) ||
+      (s.tags ?? []).some((t) => checked.has(t))
     return hide ? !carriesChecked : carriesChecked
   })
 })
