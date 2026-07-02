@@ -145,3 +145,15 @@ Gap-closure plans (from 12-UAT, 2026-07-02 — Option A tag-UI unification, no d
 - [x] 12-06-PLAN.md — Songs panel: widen store filter to teamTags∪themes∪tags union, remove redundant teamTags 'All tags' select + filterTag, update store tests (closes UAT test 3, panel side)
 - [x] 12-07-PLAN.md — Shared control: convert TagFilterChecklist to fixed-height dropdown/popover (header stops growing) + widen picker to the three-field union (closes UAT test 3, popover + picker)
 - [x] 12-08-PLAN.md — Docs only: correct D-16/12-05-SUMMARY/ROADMAP to describe generic delete-confirmation wording as intended (closes UAT test 8, doc_update_only)
+
+## Backlog
+
+### Phase 999.1: Extract shared song-browse component (Songs page + service-plan picker) (BACKLOG)
+
+**Goal:** Extract the song search + tag-filtering + results-list functionality into ONE shared component reused on both the Songs page and the service-plan song picker, so there is a single set of code and behavior instead of two parallel implementations. Not exactly 1:1 — the Songs page keeps extra affordances the picker doesn't need (song import, inline edit / slide-over editing, bulk tag actions); those compose around the shared search/tags/list core.
+**Motivation:** Phase 12 repeatedly required parallel fixes in `SongSlotPicker.vue` and `SongsView.vue`/`SongFilters.vue` for the same behavior (tag union, hidden-song exclusion, popover positioning/alignment). A shared component would collapse that duplication.
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (promote with /gsd-review-backlog when ready)
