@@ -28,7 +28,6 @@ export const useSongStore = defineStore('songs', () => {
   const searchQuery = ref('')
   const filterVwType = ref<1 | 2 | 3 | 'uncategorized' | null>(null)
   const filterKey = ref('')
-  const filterTag = ref('')
   // D-08: shared multi-select tag-filter checklist state (checked tags + hide toggle)
   // D-09: OR-combine in show mode; D-10: exclusion set when hide ON
   const tagFilterChecked = ref<Set<string>>(new Set())
@@ -52,17 +51,17 @@ export const useSongStore = defineStore('songs', () => {
         !filterKey.value ||
         song.arrangements.some((a) => a.key === filterKey.value)
 
-      const matchesTag =
-        !filterTag.value || song.teamTags.includes(filterTag.value)
-
       const checked = tagFilterChecked.value
       let matchesUserTags = true
       if (checked.size > 0) {
-        const carriesChecked = (song.tags ?? []).some((t) => checked.has(t))
+        const carriesChecked =
+          (song.teamTags ?? []).some((t) => checked.has(t)) ||
+          (song.themes ?? []).some((t) => checked.has(t)) ||
+          (song.tags ?? []).some((t) => checked.has(t))
         matchesUserTags = tagFilterHide.value ? !carriesChecked : carriesChecked
       }
 
-      return matchesSearch && matchesVwType && matchesKey && matchesTag && matchesUserTags
+      return matchesSearch && matchesVwType && matchesKey && matchesUserTags
     })
   })
 
@@ -290,7 +289,6 @@ export const useSongStore = defineStore('songs', () => {
     searchQuery,
     filterVwType,
     filterKey,
-    filterTag,
     tagFilterChecked,
     tagFilterHide,
     filteredSongs,

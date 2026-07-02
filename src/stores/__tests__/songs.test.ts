@@ -477,7 +477,7 @@ describe('useSongStore', () => {
         makeSong({ id: 'song-1', title: 'Choir Song', teamTags: ['Choir'] }),
         makeSong({ id: 'song-2', title: 'Band Song', teamTags: ['Band'] }),
       ])
-      store.filterTag = 'Choir'
+      store.tagFilterChecked = new Set(['Choir'])
       expect(store.filteredSongs).toHaveLength(1)
       expect(store.filteredSongs[0]!.title).toBe('Choir Song')
     })
@@ -509,7 +509,7 @@ describe('useSongStore', () => {
         makeSong({ id: 'song-3', title: 'Wrong Key', teamTags: ['Choir'], arrangements: [{ id: 'a3', name: 'O', key: 'D', bpm: null, lengthSeconds: null, chordChartUrl: '', notes: '', teamTags: ['Choir'] }] }),
       ])
       store.filterKey = 'G'
-      store.filterTag = 'Choir'
+      store.tagFilterChecked = new Set(['Choir'])
       expect(store.filteredSongs).toHaveLength(1)
       expect(store.filteredSongs[0]!.title).toBe('Match')
     })
@@ -1052,6 +1052,46 @@ describe('useSongStore', () => {
       expect('tagFilterChecked' in store).toBe(true)
       expect('tagFilterHide' in store).toBe(true)
       expect('clearTagFilter' in store).toBe(true)
+    })
+
+    it('show mode: checked value matching a song\'s themes shows that song (union)', async () => {
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'song-1', title: 'Grace Song', themes: ['grace'] }),
+        makeSong({ id: 'song-2', title: 'Other Song', themes: ['salvation'] }),
+      ])
+      store.tagFilterChecked = new Set(['grace'])
+      expect(store.filteredSongs).toHaveLength(1)
+      expect(store.filteredSongs[0]!.title).toBe('Grace Song')
+    })
+
+    it('show mode: checked value matching a song\'s teamTags shows that song (union)', async () => {
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'song-1', title: 'Orchestra Song', teamTags: ['Orchestra'] }),
+        makeSong({ id: 'song-2', title: 'Other Song', teamTags: ['Band'] }),
+      ])
+      store.tagFilterChecked = new Set(['Orchestra'])
+      expect(store.filteredSongs).toHaveLength(1)
+      expect(store.filteredSongs[0]!.title).toBe('Orchestra Song')
+    })
+
+    it('hide mode: checked themes value excludes the song carrying it (union)', async () => {
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'song-1', title: 'Grace Song', themes: ['grace'] }),
+        makeSong({ id: 'song-2', title: 'Other Song', themes: ['salvation'] }),
+      ])
+      store.tagFilterHide = true
+      store.tagFilterChecked = new Set(['grace'])
+      expect(store.filteredSongs).toHaveLength(1)
+      expect(store.filteredSongs[0]!.title).toBe('Other Song')
     })
   })
 

@@ -66,12 +66,10 @@
             v-model:searchQuery="songStore.searchQuery"
             v-model:filterVwType="songStore.filterVwType"
             v-model:filterKey="songStore.filterKey"
-            v-model:filterTag="songStore.filterTag"
             v-model:tagFilterChecked="songStore.tagFilterChecked"
             v-model:tagFilterHide="songStore.tagFilterHide"
             @clearTagFilter="songStore.clearTagFilter()"
             :availableKeys="availableKeys"
-            :availableTags="availableTags"
             :availableUserTags="availableUserTags"
           />
         </div>
@@ -216,18 +214,12 @@ const availableKeys = computed(() => {
   return Array.from(keys).sort()
 })
 
-const availableTags = computed(() => {
-  const tags = new Set<string>()
-  songStore.songs.forEach((song) => {
-    song.teamTags.forEach((tag) => tags.add(tag))
-  })
-  return Array.from(tags).sort()
-})
-
 const availableUserTags = computed(() => {
   const tags = new Set<string>()
   songStore.songs.forEach((song) => {
-    ;(song.tags ?? []).forEach((tag) => tags.add(tag))
+    ;(song.teamTags ?? []).forEach((t) => tags.add(t))
+    ;(song.themes ?? []).forEach((t) => tags.add(t))
+    ;(song.tags ?? []).forEach((t) => tags.add(t))
   })
   return Array.from(tags).sort()
 })

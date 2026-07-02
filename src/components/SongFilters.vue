@@ -54,16 +54,6 @@
         <option v-for="key in availableKeys" :key="key" :value="key">{{ key }}</option>
       </select>
 
-      <!-- Team tag filter -->
-      <select
-        :value="filterTag"
-        @change="$emit('update:filterTag', ($event.target as HTMLSelectElement).value)"
-        class="rounded-md bg-gray-800 border border-gray-700 px-3 py-2 text-sm text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-      >
-        <option value="">All tags</option>
-        <option v-for="tag in availableTags" :key="tag" :value="tag">{{ tag }}</option>
-      </select>
-
     </div>
 
     <!-- Tag filter checklist -->
@@ -85,11 +75,9 @@ defineProps<{
   searchQuery: string
   filterVwType: 1 | 2 | 3 | 'uncategorized' | null
   filterKey: string
-  filterTag: string
   tagFilterChecked: Set<string>
   tagFilterHide: boolean
   availableKeys: string[]
-  availableTags: string[]
   availableUserTags: string[]
 }>()
 
@@ -97,7 +85,6 @@ const emit = defineEmits<{
   'update:searchQuery': [value: string]
   'update:filterVwType': [value: 1 | 2 | 3 | 'uncategorized' | null]
   'update:filterKey': [value: string]
-  'update:filterTag': [value: string]
   'update:tagFilterChecked': [value: Set<string>]
   'update:tagFilterHide': [value: boolean]
   clearTagFilter: []
