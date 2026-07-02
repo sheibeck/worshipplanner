@@ -1,124 +1,116 @@
 ---
 phase: 12-advanced-song-search-and-multi-select-persistent-tag-filteri
-reviewed: 2026-07-01T00:00:00Z
+reviewed: 2026-07-02T21:52:57Z
 depth: standard
-files_reviewed: 9
+diff_base: 98c3a9b
+files_reviewed: 7
 files_reviewed_list:
   - src/utils/songSearch.ts
   - src/stores/songs.ts
-  - src/views/ServiceEditorView.vue
   - src/components/TagFilterChecklist.vue
   - src/components/SongFilters.vue
-  - src/views/SongsView.vue
   - src/components/SongSlotPicker.vue
-  - src/utils/__tests__/songSearch.test.ts
-  - src/stores/__tests__/songs.test.ts
+  - src/views/SongsView.vue
+  - src/views/ServiceEditorView.vue
 findings:
   critical: 0
-  warning: 2
-  info: 2
-  total: 4
-status: issues_found
+  high: 0
+  medium: 2
+  low: 3
+  total: 5
+status: issues
 ---
 
 # Phase 12: Code Review Report
 
-**Reviewed:** 2026-07-01T00:00:00Z
+**Reviewed:** 2026-07-02T21:52:57Z
 **Depth:** standard
-**Files Reviewed:** 9
-**Status:** issues_found
+**Diff base:** `98c3a9b` (phase-start) → HEAD (`fecef46`)
+**Files Reviewed:** 7
+**Status:** issues
+
+Note: this review supersedes/extends the earlier `12-REVIEW.md` pass (base `ecbad1e`), whose two findings (WR-01 tag-filter reset on user switch, WR-02 multi-word field-scoped search) were already fixed per `12-REVIEW-FIX.md` before this diff range begins. This pass covers only what changed between `98c3a9b` and HEAD: the tag-union unification (`e362a41`, `bae5162`), the hidden-song exclusion fix (`11c3760`), and the popover alignment/local-filter/min-height UI fixes (`1a702b8`, `673fe41`, `fecef46`).
 
 ## Summary
 
-Reviewed the Phase 12 diff (base `ecbad1e`): the multi-term/field-scoped search engine (`songSearch.ts`), the shared multi-select persistent tag-filter model (`songs.ts` store + `TagFilterChecklist.vue`), its wiring into `SongFilters.vue`/`SongsView.vue` and `SongSlotPicker.vue`, and the widened delete-confirmation gate in `ServiceEditorView.vue`. The implementation closely follows the phase's documented decisions (D-01 through D-18) and threat model (T-12-03/04/05), and test coverage is thorough for the documented scenarios.
+`src/utils/songSearch.ts` and `src/views/ServiceEditorView.vue` have zero diff against `98c3a9b` — not touched in this range, spot-checked only for integration context (confirmed the AI-suggestion song library already excludes hidden songs via `D-18` at `ServiceEditorView.vue:1452-1456`/`1562-1566`). The `filterTag`/`availableTags` (old, single-select) removal is clean — no dangling references remain anywhere in `src`, and `npx vue-tsc --noEmit` passes with no errors.
 
-Two real issues were found. The more significant one is a logic gap in `hydrateTagFilter()`: when a new org/user subscribes and has no previously-saved tag filter, the in-memory `tagFilterChecked`/`tagFilterHide` state is not reset, so a previous user's tag-filter selection on the same tab can silently leak into the new session — this partially undermines the explicit "state never bleeds across accounts on a shared browser" guarantee stated in the store's own comments (though the localStorage *key* namespacing itself, which was the stated T-12-03 threat-model mitigation, is implemented correctly). The other issue is a search-tokenizer limitation where multi-word field-scoped values (e.g. `tag: christmas eve`) silently fail to match because the tokenizer splits on whitespace after collapsing only the first word after the colon. Two minor Info-level items (dead code, cross-page shared-state side effect) are also noted.
+The hidden-song exclusion fix is correctly applied to `songs.ts` (`filteredSongs`), `SongsView.vue` (`availableUserTags`), and `SongSlotPicker.vue` (`visibleSongs` / `availableTags` / `tagFilteredSongs`). Two gaps remain, though: one path in `SongSlotPicker.vue` still resolves against the raw (hidden-inclusive) song list, and the new tag-filter popover uses CSS positioning that can be clipped when nested inside the picker's own scrollable dropdown. Neither is a security issue; both are UI-correctness gaps worth a follow-up pass. Three low-severity/nit items are also noted, including one instance of the exact "hidden song leaks into a filter option list" bug class this phase just fixed for tags, still present for the Key filter.
 
 ## Warnings
 
-### WR-01: Tag filter does not reset to defaults when switching to an org/user with no saved filter
+### WR-01: AI Picks path bypasses the hidden-song exclusion the rest of the picker enforces
 
-**File:** `src/stores/songs.ts:96-106`
-**Issue:** `hydrateTagFilter()` returns early without resetting `tagFilterChecked`/`tagFilterHide` when no stored value exists for the current user/org key:
-
+**File:** `src/components/SongSlotPicker.vue:300-308`
+**Issue:** The comment above `visibleSongs` (lines 246-249) states hidden songs "must not surface anywhere in the picker — not as suggestions/search results, and not as tag options." `visibleSongs` is correctly used for `availableTags`, `tagFilteredSongs` (→ rotation `suggestions` and `searchResults`), but `resolvedAiSuggestions` still resolves against the raw `props.songs`:
 ```ts
-function hydrateTagFilter() {
-  const key = tagFilterStorageKey()
-  if (!key) return
-  try {
-    const raw = localStorage.getItem(key)
-    if (!raw) return   // <-- leaves current in-memory state untouched
-    ...
+const resolvedAiSuggestions = computed<{ song: Song; reason: string }[]>(() => {
+  if (!props.aiSuggestions) return []
+  return props.aiSuggestions
+    .map((ai) => {
+      const song = props.songs.find((s) => s.id === ai.songId)   // ← raw props.songs, not visibleSongs
+      return song ? { song, reason: ai.reason } : null
+    })
+    .filter((item): item is { song: Song; reason: string } => item !== null)
+})
+```
+In the normal path this is masked because `ServiceEditorView.vue` already filters hidden songs out of the AI request's `songLibrary` before calling `getSongSuggestions` (`D-18`). But `aiPerSlotResults`/`aiSongCache` are cached per `(sermonTopic, sermonPassage, slotVwType)` and are not invalidated when a song's `hidden` flag changes later. If a song referenced by a cached AI suggestion is hidden after the suggestion was fetched (e.g. another team member soft-deletes it mid-session), it will still render in the "AI Picks" section and remain selectable via `onSelect`, silently violating the invariant the surrounding code otherwise enforces.
+**Fix:** Resolve against `visibleSongs.value` instead of `props.songs`, for defense-in-depth consistent with the rest of the component:
+```ts
+const song = visibleSongs.value.find((s) => s.id === ai.songId)
 ```
 
-Because `useSongStore()` is a singleton Pinia store, `tagFilterChecked`/`tagFilterHide` persist in memory across `subscribe()` calls. If User A sets a non-default tag filter, then logs out and User B logs in within the same tab/session (no full page reload), `subscribe()` → `hydrateTagFilter()` runs again for User B's org/uid. If User B has never saved a tag filter (`raw` is `null`), the function returns early and User A's in-memory selection remains active and visibly applied to User B's song list — despite the code comment directly above `tagFilterStorageKey()` stating this design exists "so state never bleeds across accounts on a shared browser (T-12-03)". The localStorage key namespacing itself is correct (no cross-account *read* of another account's key), but the in-memory carry-over defeats the stated goal in this scenario. Not covered by the existing test suite (`songs.test.ts` only tests hydration when a stored key exists, or first-ever load with clean state).
-**Fix:**
-```ts
-function hydrateTagFilter() {
-  const key = tagFilterStorageKey()
-  if (!key) {
-    tagFilterChecked.value = new Set()
-    tagFilterHide.value = false
-    return
-  }
-  try {
-    const raw = localStorage.getItem(key)
-    if (!raw) {
-      tagFilterChecked.value = new Set()
-      tagFilterHide.value = false
-      return
-    }
-    const parsed = JSON.parse(raw) as { checked?: string[]; hide?: boolean }
-    tagFilterChecked.value = new Set(Array.isArray(parsed.checked) ? parsed.checked : [])
-    tagFilterHide.value = parsed.hide === true
-  } catch {
-    tagFilterChecked.value = new Set()
-    tagFilterHide.value = false
-  }
-}
+### WR-02: TagFilterChecklist popover can be clipped when opened inside SongSlotPicker's scrollable dropdown
+
+**File:** `src/components/TagFilterChecklist.vue:21-24`, `src/components/SongSlotPicker.vue:35-58`
+**Issue:** The popover panel is `position: absolute` relative to the component's own `.relative` wrapper:
+```html
+<div class="absolute z-40 mt-1 w-56 rounded-md bg-gray-800 border border-gray-700 shadow-xl p-2" :class="align === 'right' ? 'right-0' : 'left-0'">
 ```
-
-### WR-02: Multi-word field-scoped filter values silently fail to match (`tag: christmas eve`)
-
-**File:** `src/utils/songSearch.ts:83-92`
-**Issue:** The space-collapse step only removes whitespace immediately after the prefix colon, then the whole string is tokenized on whitespace. A field value containing multiple words (e.g. a user tag literally named "Christmas Eve") cannot be matched as a single field-scoped phrase:
-
-```ts
-const spaceCollapsed = phraseNormalized.replace(/\b(type|key|tag|theme|team):\s+/gi, '$1:')
-const tokens = spaceCollapsed.trim().split(/\s+/).filter((t) => t.length > 0)
+Used from `SongFilters.vue` this is fine (no clipping ancestor). But in `SongSlotPicker.vue` the checklist is nested inside the sticky search bar, itself inside the Teleported dropdown panel that has `overflow-y-auto`:
+```html
+<div class="fixed z-40 bg-gray-800 border border-gray-700 rounded-lg shadow-xl max-h-[600px] overflow-y-auto" :style="dropdownStyle">
 ```
-
-`tag: christmas eve` becomes tokens `["tag:christmas", "eve"]`. Because `songMatchesQuery` requires every token to match (AND), the song must independently satisfy a *bare* substring match for "eve" (checked against title/CCLI/author/themes/teamTags/vwTypes/tags/notes/arrangement key) in addition to `tag:christmas`. A song tagged exactly "Christmas Eve" with no other field containing "eve" will not be found by this query, which is a surprising and silent failure mode for a filter feature whose whole purpose is precise tag matching. Not covered by `songSearch.test.ts` (only single-word field values are tested).
-**Fix:** Either document this as a known single-word-value limitation in the search placeholder/tooltip, or extend the tokenizer to consume all words up to the next recognized `prefix:` token or end-of-string when a field prefix is present, e.g.:
-```ts
-// After phrase pre-parse, greedily capture everything after "prefix:" up to
-// the next recognized prefix keyword (or end of string) as that field's value.
-const FIELD_TOKEN_RE = /\b(type|key|tag|theme|team):\s*([^]*?)(?=\s+\b(?:type|key|tag|theme|team):|$)/gi
-```
-(Requires reworking `matchesToken`'s per-token dispatch to operate on these captured spans instead of naive whitespace splitting — a larger change; at minimum, this limitation should be surfaced to the user.)
+An `overflow: auto` ancestor clips absolutely-positioned descendants to its own box. The outer dropdown itself avoids being clipped by whatever contains *it* specifically by using `Teleport to="body"` + `position: fixed` computed from `getBoundingClientRect()` in `openDropdown()` — the nested tag popover doesn't get that treatment. When the outer panel's effective height is constrained (the "flip above" branch with small `spaceAbove`, or the "not enough room below" branch capped to `spaceBelow`; see `openDropdown()` lines 403-421), the popover's header + search input + up to `max-h-48` tag list (roughly ~280-300px, starting ~60-90px below the panel's top) can exceed the panel's clipped viewport and be cut off or forced into the panel's own scroll rather than floating freely as a popover should. Even in the unconstrained (`fitsBelow`) case the margin is fairly tight relative to the new 420px `minHeight` floor introduced in `fecef46`.
+**Fix:** Teleport the popover panel to `body` and position it via `getBoundingClientRect()`, mirroring `openDropdown()`'s own approach — keeps the component consistent with the pattern already established in this file rather than introducing a second, weaker positioning strategy.
 
 ## Info
 
-### IN-01: `isSlotPopulated` is now dead code
+### IN-01: `availableKeys` in SongsView.vue still leaks hidden-song metadata into the Key filter
 
-**File:** `src/views/ServiceEditorView.vue:1333-1350`
-**Issue:** The D-15 change to `removeSlot()` (line ~1360) now unconditionally shows the confirmation dialog for all element removals, regardless of whether the slot is populated. The `isSlotPopulated()` helper function that previously gated this decision is no longer called anywhere in the file:
+**File:** `src/views/SongsView.vue:207-215`
+**Issue:** This diff fixed hidden-song leakage for the tag filter (`availableUserTags`, lines 217-228, now guards `if (song.hidden === true) return`) but the sibling `availableKeys` computed just above it was not updated and still iterates `songStore.songs` unfiltered:
 ```ts
-function isSlotPopulated(slot: ServiceSlot): boolean {
-  if (slot.kind === 'SONG') { ... }
-  ...
-}
+const availableKeys = computed(() => {
+  const keys = new Set<string>()
+  songStore.songs.forEach((song) => {
+    song.arrangements.forEach((arr) => {
+      if (arr.key) keys.add(arr.key)
+    })
+  })
+  return Array.from(keys).sort()
+})
 ```
-**Fix:** Remove the unused function, or if it's kept intentionally for a future feature, add a `// TODO` note explaining why it's retained. As-is it's a 17-line dead code block.
+Since `filteredSongs` in the store already excludes hidden songs from matching (`songs.ts:41`), a key that only exists on a hidden song appears as a selectable "All keys" option that yields zero visible results — the same class of bug this phase's tag-list fix (commit `11c3760`) just addressed for tags. Not part of this diff's touched lines, so flagged as a follow-up rather than a regression, but directly analogous.
+**Fix:** Mirror the same guard: `if (song.hidden === true) return` before collecting `arr.key`.
 
-### IN-02: Tag filter state is shared (and mutated) across the Songs panel and the Service Editor's song picker
+### IN-02: Local `tagQuery` filter text isn't reset when the popover closes (persists across reopens in the SongFilters.vue usage)
 
-**File:** `src/components/SongSlotPicker.vue:50-57`, `src/stores/songs.ts:34-35`
-**Issue:** `SongSlotPicker.vue` binds its tag-filter checklist directly to the same `songStore.tagFilterChecked`/`songStore.tagFilterHide` state used by the standalone Songs panel (`SongFilters.vue`). This is documented as intentional (D-14: "shared checklist bound to songStore") and is core to this phase's goal of a persistent, shared filter — not a defect. Flagging only as a note: because the state is shared and persisted, a user who narrows the tag filter while picking a song inside a service plan will find that same narrowed filter still applied the next time they open the standalone Songs panel (and vice versa), which could be surprising if not documented anywhere user-facing (e.g. in a tooltip or help text).
-**Fix:** No code change required. Consider a subtle UI affordance (e.g. "Filter also applied on Songs page") if user feedback indicates this cross-page persistence is confusing in practice.
+**File:** `src/components/TagFilterChecklist.vue:110-118`
+**Issue:** `tagQuery` is local `ref('')` state, only reset implicitly if the whole component unmounts. In `SongSlotPicker.vue` the component is destroyed/recreated each time the picker opens/closes (parent uses `<template v-if="isOpen">`), so this is a non-issue there. In `SongFilters.vue`, however, `TagFilterChecklist` is always mounted (only the internal `open` flag toggles the panel), so a user's typed filter text from a previous session silently persists the next time they open the tag popover on the Songs page, which may be surprising.
+**Fix:** Reset on close:
+```ts
+watch(open, (v) => { if (!v) tagQuery.value = '' })
+```
+
+### IN-03: Inconsistent naming — `availableUserTags` now contains team tags and themes, not just user tags
+
+**File:** `src/views/SongsView.vue:217-228` vs `src/components/SongSlotPicker.vue:252-261`
+**Issue:** As part of this diff, `SongsView.vue`'s `availableUserTags` computed was widened to union `teamTags ∪ themes ∪ tags` (previously just `song.tags`), but it kept the `availableUserTags` name (and prop name, threaded through `SongFilters.vue` → `TagFilterChecklist.vue`). The equivalent concept in `SongSlotPicker.vue` was correctly named generically as `availableTags` for the same union in the same commit. Purely a naming/readability nit — no functional bug — but worth aligning for future maintainers, since "user tags" now reads as misleading (it drives the same checklist that also filters by team tags and themes).
+**Fix:** Optional rename (e.g. `availableTagOptions`) across the `SongsView.vue` → `SongFilters.vue` → `TagFilterChecklist.vue` prop chain, or at minimum a comment noting the union.
 
 ---
 
-_Reviewed: 2026-07-01T00:00:00Z_
+_Reviewed: 2026-07-02T21:52:57Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
