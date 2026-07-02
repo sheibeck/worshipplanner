@@ -96,6 +96,11 @@
                     <span class="text-sm text-gray-100 truncate">{{ item.song.title }}</span>
                   </div>
                   <p class="text-xs text-indigo-400/80 mt-0.5">{{ item.reason }}</p>
+                  <div class="flex flex-wrap gap-1 mt-1">
+                    <TeamTagPill v-for="t in item.song.teamTags" :key="'tm-'+t" :tag="t" variant="team" />
+                    <TeamTagPill v-for="t in item.song.themes" :key="'th-'+t" :tag="t" variant="theme" />
+                    <TeamTagPill v-for="t in item.song.tags" :key="'us-'+t" :tag="t" variant="user" />
+                  </div>
                 </div>
                 <SongBadge :types="item.song.vwTypes ?? []" />
               </button>
@@ -118,10 +123,7 @@
               :key="result.song.id"
               type="button"
               @click="onSelect(result.song)"
-              :class="[
-                'w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-gray-900 transition-colors',
-                isNonOrchestraSong(result.song) ? 'opacity-50' : '',
-              ]"
+              class="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-gray-900 transition-colors"
             >
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2">
@@ -164,10 +166,7 @@
               :key="song.id"
               type="button"
               @click="onSelect(song)"
-              :class="[
-                'w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-gray-900 transition-colors',
-                isNonOrchestraSong(song) ? 'opacity-50' : '',
-              ]"
+              class="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-gray-900 transition-colors"
             >
               <div class="flex-1 min-w-0">
                 <span class="text-sm text-gray-100 truncate block">{{ song.title }}</span>
@@ -277,32 +276,18 @@ const tagFilteredSongs = computed<Song[]>(() => {
 // ── Computed — full ranked/search lists ───────────────────────────────────────
 
 const suggestions = computed<SuggestionResult[]>(() =>
-  // The rotation list is NOT auto-scoped by the service's teams. Users filter by
-  // hand with the tag checkboxes as they wish — simpler, and consistent with the
-  // Songs panel. Only 'Orchestra' is passed through so its soft sort-bonus still
-  // orders orchestra songs first; rankSongsForSlot then applies no team hard-filter.
-  rankSongsForSlot(
-    tagFilteredSongs.value,
-    props.requiredVwType,
-    props.serviceTeams.filter((t) => t === 'Orchestra'),
-  ),
+  // No Orchestra special-casing and no automatic team scoping — the picker just
+  // ranks by rotation/recency, and users filter by hand with the tag checkboxes.
+  // Passing [] means rankSongsForSlot applies no team hard-filter and no Orchestra
+  // sort-bonus.
+  rankSongsForSlot(tagFilteredSongs.value, props.requiredVwType, []),
 )
 
 const searchResults = computed<Song[]>(() => {
   if (!searchQuery.value) return []
   const q = searchQuery.value
-  return tagFilteredSongs.value
-    .filter((s) => songMatchesQuery(s, q))
-    .sort((a, b) => {
-      // Orchestra-first when service is orchestra (D-07)
-      if (isOrchestraService.value) {
-        const aOrch = a.teamTags.includes('Orchestra') ? 1 : 0
-        const bOrch = b.teamTags.includes('Orchestra') ? 1 : 0
-        if (bOrch !== aOrch) return bOrch - aOrch
-      }
-      // VW type secondary sort removed (D-10): slot type no longer influences search ordering
-      return 0
-    })
+  // No Orchestra-first ordering — results keep the underlying song order.
+  return tagFilteredSongs.value.filter((s) => songMatchesQuery(s, q))
 })
 
 const resolvedAiSuggestions = computed<{ song: Song; reason: string }[]>(() => {
@@ -377,12 +362,6 @@ onUnmounted(() => {
 })
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-
-const isOrchestraService = computed(() => props.serviceTeams.includes('Orchestra'))
-
-function isNonOrchestraSong(song: Song): boolean {
-  return isOrchestraService.value && !song.teamTags.includes('Orchestra')
-}
 
 function preferredKey(song: Song): string {
   return getPrimaryKey(song) || '—'
