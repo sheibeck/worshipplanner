@@ -139,7 +139,7 @@ Plans:
 - [x] 12-02-PLAN.md — songs store: tag-filter checklist state (checked Set + Hide toggle) + clearTagFilter + per-user/org localStorage persistence
 - [x] 12-03-PLAN.md — Shared TagFilterChecklist.vue component + Songs-panel wiring (SongFilters.vue swaps 2 selects, SongsView binds store)
 - [x] 12-04-PLAN.md — Service-plan picker: consume shared search engine + shared TagFilterChecklist bound to store tag state
-- [x] 12-05-PLAN.md — Delete-confirmation: widen removeSlot gate to all removals (incl. empty slots) + element-type-aware copy, reusing D-14 modal
+- [x] 12-05-PLAN.md — Delete-confirmation: widen removeSlot gate to all removals (incl. empty slots) + generic confirmation copy, reusing D-14 modal
 
 Gap-closure plans (from 12-UAT, 2026-07-02 — Option A tag-UI unification, no data-model merge):
 - [x] 12-06-PLAN.md — Songs panel: widen store filter to teamTags∪themes∪tags union, remove redundant teamTags 'All tags' select + filterTag, update store tests (closes UAT test 3, panel side)

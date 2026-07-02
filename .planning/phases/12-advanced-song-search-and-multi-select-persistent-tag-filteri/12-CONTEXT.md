@@ -31,7 +31,7 @@ This clarifies HOW to implement the four items. No new capabilities.
 - **D-07:** The search engine/parser is **shared** by both surfaces (picker + Songs panel) via `src/utils/songSearch.ts` so behavior is identical in both.
 
 ### Tag filter UI (item 2)
-- **D-08:** Replace the two "Show only tag" / "Hide tag" dropdowns (`filterTagInclude`/`filterTagExclude`) with a **single checkbox list of user tags only** (the `Song.tags` field). Team tags and PC themes keep their existing separate handling — they are NOT in this checklist.
+- **D-08:** Replace the two "Show only tag" / "Hide tag" dropdowns (`filterTagInclude`/`filterTagExclude`) with a **single combined tag control** sourcing the de-duplicated union of `teamTags ∪ themes ∪ tags`, with a Hide toggle and Clear action. The three `Song` fields (`teamTags`, `themes`, `tags`) stay separate in the data model — no merge — only the UI/filter surface is unified. (Amended per 12-UAT test 3 Option A, 2026-07-02: the original "user tags only" scope was widened to the teamTags ∪ themes ∪ tags union in plans 12-06/12-07; the standalone teamTags "All tags" select is absorbed into this control.)
 - **D-09:** Default (show-only) mode: checked tags combine with **OR** — a song shows if it carries ANY checked tag. Checking more tags broadens results.
 - **D-10:** A top-level **"Hide" toggle** inverts semantics globally: when ON, the same checked tags become an exclusion set (a song is hidden if it carries ANY checked tag). Simple "show these" vs "hide these" mental model.
 - **D-11:** A **"Clear"** action unchecks all tags and resets the Hide toggle to OFF (returns the tag filter to neutral). Clear is scoped to the tag filter only — it does NOT touch the search box or the VW-type/Key dropdowns.
@@ -43,7 +43,7 @@ This clarifies HOW to implement the four items. No new capabilities.
 
 ### Delete-confirmation (item 4)
 - **D-15:** The "Remove element" X (`removeSlot()` in `ServiceEditorView.vue`, line ~763/1341) must prompt a confirmation for **ALL element removals — including empty/blank rows** (unpopulated song slots and blank Prayer/Message/Scripture/Hymn elements). This extends Phase 11 D-14, which only gated POPULATED slots and let empty slots delete silently. Removing an entire element/row is a structural change worth guarding regardless of content.
-- **D-16:** **Reuse the existing D-14 Teleport modal** (backdrop `z-40`, dialog `z-50`, Cancel + red confirm button). Use **generic wording** — e.g. "Remove this element from the plan?" — naming the element type when known. Do not build a second confirmation pattern. Note: `onClearSong()` (clearing a song from a slot while keeping the slot) already has its own D-14 gate and is a distinct action from removing the whole element.
+- **D-16:** **Reuse the existing D-14 Teleport modal** (backdrop `z-40`, dialog `z-50`, Cancel + red confirm button). Use a single **generic wording** — e.g. "Remove this element from the plan?" / "this item" — the same copy for every element type, not naming the specific element type. Do not build a second confirmation pattern. Note: `onClearSong()` (clearing a song from a slot while keeping the slot) already has its own D-14 gate and is a distinct action from removing the whole element. (Accepted per 12-UAT test 8, 2026-07-02: generic wording is the intended behavior; element-type-aware copy was NOT required.)
 
 ### Claude's Discretion
 - Exact parser implementation for splitting terms and recognizing prefixes (regex vs tokenizer), as long as D-01–D-05 semantics hold.

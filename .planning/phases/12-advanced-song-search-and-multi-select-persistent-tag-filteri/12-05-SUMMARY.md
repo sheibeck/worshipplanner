@@ -10,7 +10,7 @@ requires:
     provides: D-14 existing delete-confirmation Teleport modal (showSlotDeleteConfirm/confirmSlotDelete) in ServiceEditorView.vue
 provides:
   - Widened removeSlot() gate so every element removal (populated or empty/blank) is confirmed via the modal
-  - Element-type-aware delete-confirmation copy (elementLabel helper + deleteConfirmHeading/deleteConfirmBody computeds)
+  - Generic delete-confirmation copy (single wording for all element types, driven by deleteConfirmHeading/deleteConfirmBody computeds; an elementLabel helper exists in code but its output is not surfaced as distinct per-type copy in the shipped modal)
 affects: [service-editor, service-plan-safety]
 
 # Tech tracking
@@ -40,7 +40,7 @@ completed: 2026-07-01
 
 # Phase 12 Plan 05: Widen Delete-Confirmation Gate to All Element Removals Summary
 
-**Widened the existing D-14 delete-confirmation modal in ServiceEditorView.vue so removeSlot() gates every element removal (including previously-silent empty/blank slots) and made the modal heading/body element-type-aware, without introducing a second modal.**
+**Widened the existing D-14 delete-confirmation modal in ServiceEditorView.vue so removeSlot() gates every element removal (including previously-silent empty/blank slots), and kept the modal heading/body generic (single wording for all element types), without introducing a second modal.**
 
 ## Performance
 
@@ -52,8 +52,8 @@ completed: 2026-07-01
 
 ## Accomplishments
 - `removeSlot(index)` now unconditionally opens the confirmation modal for every removal — the `isSlotPopulated` branch that let empty/blank slots delete silently was removed (D-15)
-- Added `elementLabel(kind: SlotKind)` helper mapping SONG/SCRIPTURE/HYMN/MESSAGE/PRAYER to human-readable labels ("this song", "this scripture", etc.)
-- Added `deleteConfirmHeading` and `deleteConfirmBody` computed properties that branch on `pendingDeleteIsClear` (clear-song path keeps original wording) vs. remove-element path (generic, element-type-aware wording per D-16)
+- Added `elementLabel(kind: SlotKind)` helper mapping SONG/SCRIPTURE/HYMN/MESSAGE/PRAYER to human-readable labels ("this song", "this scripture", etc.); the helper exists in the code but its output is not surfaced as distinct per-type copy in the shipped modal
+- Added `deleteConfirmHeading` and `deleteConfirmBody` computed properties that branch on `pendingDeleteIsClear` (clear-song path keeps original wording) vs. remove-element path (generic wording per D-16, the same copy for every element type)
 - Modal `<h2>`/`<p>` now bind to the new computeds instead of static strings; Cancel/Remove buttons, colors, and copy left untouched
 - `onClearSong()` left completely unmodified — remains a distinct action with its own gate and copy path
 
@@ -76,6 +76,10 @@ Each task was committed atomically:
 ## Deviations from Plan
 
 None - plan executed exactly as written. Line numbers in the plan's `<interfaces>` section matched the actual file almost exactly (modal markup 230-254, modal state 956-959 pre-edit, isSlotPopulated 1314-1331, performRemoveSlot 1335-1339, removeSlot 1341-1354, confirmSlotDelete 1356-1371, onClearSong 1388-1404), and `SlotKind` was already imported from `@/types/service` as anticipated.
+
+## Post-UAT Correction
+
+Per 12-UAT test 8 (2026-07-02), the shipped modal copy uses a single generic wording for every element type (it does not name the specific element type); the user accepted this and D-16 was updated to make generic wording the intended behavior. No code change.
 
 ## Issues Encountered
 
