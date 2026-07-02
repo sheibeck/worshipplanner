@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 12 UI-SPEC approved
-last_updated: "2026-07-01T21:29:42.319Z"
-last_activity: 2026-07-01
+stopped_at: Completed 12-06-PLAN.md
+last_updated: "2026-07-02T21:20:53.276Z"
+last_activity: 2026-07-02
 progress:
   total_phases: 6
-  completed_phases: 5
-  total_plans: 18
-  completed_plans: 18
-  percent: 100
+  completed_phases: 4
+  total_plans: 21
+  completed_plans: 19
+  percent: 90
 ---
 
 # Project State
@@ -25,11 +25,11 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 
 ## Current Position
 
-Phase: 12
-Plan: Not started
+Phase: 12 (advanced-song-search-and-multi-select-persistent-tag-filteri) — EXECUTING
+Plan: 2 of 8
 Milestone: v1.0 MVP — SHIPPED 2026-03-05
 Next milestone: v1.1 Tasks & Events (not yet started)
-Status: Executing Phase 12
+Status: Ready to execute
 
 ## Performance Metrics
 
@@ -66,6 +66,7 @@ Status: Executing Phase 12
 | Phase 08 P03 | 8 | 2 tasks | 1 files |
 | Phase 09-pc-song-import-tag-management P01 | 4 | 1 tasks | 3 files |
 | Phase 09 P02 | 25 | 2 tasks | 5 files |
+| Phase 12 P06 | 20min | 1 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -97,6 +98,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase 09-pc-song-import-tag-management]: classifySongs triple-key dedup mirrors upsertSongs for consistent import preview counts
 - [Phase 09-pc-song-import-tag-management]: SongTable songs-change watch removed -- it reset infinite scroll cursor after soft-delete
 - [Phase 09-pc-song-import-tag-management]: PC API batch size reduced to 3 with Retry-After support to survive rate limit windows
+- [Phase 12]: Kept teamTags/themes/tags as three separate Song fields (Option A) — unified only the UI/filter surface, not the data model
+- [Phase 12]: Store, component, and view filterTag removal landed in a single atomic commit to keep vue-tsc --build green at every commit boundary
 
 ### Roadmap Evolution
 
@@ -139,7 +142,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 
 ## Session Continuity
 
-Last activity: 2026-07-01
-Last session: 2026-07-01T12:52:21.203Z
-Stopped at: Phase 12 UI-SPEC approved
-Resume file: .planning/phases/12-advanced-song-search-and-multi-select-persistent-tag-filteri/12-UI-SPEC.md
+Last activity: 2026-07-02
+Last session: 2026-07-02T21:20:53.246Z
+Stopped at: Completed 12-06-PLAN.md
+Resume file: None
