@@ -65,6 +65,17 @@ export const useSongStore = defineStore('songs', () => {
     })
   })
 
+  // Distinct USER tags (song.tags only) across non-hidden songs, sorted — powers
+  // type-ahead suggestions when adding tags so users don't create duplicates.
+  const allUserTags = computed(() => {
+    const tags = new Set<string>()
+    songs.value.forEach((song) => {
+      if (song.hidden === true) return
+      ;(song.tags ?? []).forEach((t) => tags.add(t))
+    })
+    return Array.from(tags).sort()
+  })
+
   // D-11: clears only the tag filter — searchQuery/filterVwType/filterKey untouched
   function clearTagFilter() {
     tagFilterChecked.value = new Set()
@@ -292,6 +303,7 @@ export const useSongStore = defineStore('songs', () => {
     tagFilterChecked,
     tagFilterHide,
     filteredSongs,
+    allUserTags,
     subscribe,
     unsubscribeAll,
     addSong,

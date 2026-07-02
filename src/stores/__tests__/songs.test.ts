@@ -313,6 +313,20 @@ describe('useSongStore', () => {
       expect(store.filteredSongs).toHaveLength(1)
     })
 
+    it('allUserTags excludes tags carried only by hidden songs (deduped + sorted)', async () => {
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'song-1', title: 'Visible', hidden: false, tags: ['Zeal', 'Grace'] }),
+        makeSong({ id: 'song-2', title: 'Also Visible', hidden: false, tags: ['Grace'] }),
+        makeSong({ id: 'song-3', title: 'Hidden', hidden: true, tags: ['Repentance'] }),
+      ])
+      // 'Repentance' lives only on the hidden song, so it must not appear;
+      // 'Grace' is deduped; result is sorted.
+      expect(store.allUserTags).toEqual(['Grace', 'Zeal'])
+    })
+
     it('includes songs where hidden is undefined (legacy docs)', async () => {
       const { useSongStore } = await import('../songs')
       const store = useSongStore()

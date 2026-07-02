@@ -188,10 +188,14 @@
               <input
                 v-model="userTagInput"
                 type="text"
+                list="ss-existing-user-tags"
                 placeholder="e.g. Christmas, Lent"
                 class="flex-1 rounded-md bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-pink-500 focus:border-pink-500"
                 @keydown.enter.prevent="addUserTags"
               />
+              <datalist id="ss-existing-user-tags">
+                <option v-for="t in songStore.allUserTags" :key="t" :value="t" />
+              </datalist>
               <button
                 type="button"
                 class="px-3 py-2 rounded-md text-sm font-medium text-pink-300 bg-pink-900/30 border border-pink-800 hover:bg-pink-900/50 transition-colors"

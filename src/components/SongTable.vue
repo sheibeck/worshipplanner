@@ -230,12 +230,16 @@
                   ref="inlineInputRef"
                   v-model="inlineTagInput"
                   type="text"
+                  list="st-existing-user-tags"
                   placeholder="tag name"
                   class="w-24 rounded border border-pink-700 bg-gray-900 text-pink-200 text-xs px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-pink-500"
                   @keydown.enter.stop="commitInlineTag(song)"
                   @keydown.escape.stop="cancelInlineTag"
                   @click.stop
                 />
+                <datalist id="st-existing-user-tags">
+                  <option v-for="t in songStore.allUserTags" :key="t" :value="t" />
+                </datalist>
                 <button
                   type="button"
                   class="text-xs text-pink-400 hover:text-pink-200"
