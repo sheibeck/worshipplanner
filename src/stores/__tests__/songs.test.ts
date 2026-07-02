@@ -491,7 +491,7 @@ describe('useSongStore', () => {
         makeSong({ id: 'song-1', title: 'Choir Song', teamTags: ['Choir'] }),
         makeSong({ id: 'song-2', title: 'Band Song', teamTags: ['Band'] }),
       ])
-      store.tagFilterChecked = new Set(['Choir'])
+      store.tagFilterInclude = new Set(['Choir'])
       expect(store.filteredSongs).toHaveLength(1)
       expect(store.filteredSongs[0]!.title).toBe('Choir Song')
     })
@@ -523,7 +523,7 @@ describe('useSongStore', () => {
         makeSong({ id: 'song-3', title: 'Wrong Key', teamTags: ['Choir'], arrangements: [{ id: 'a3', name: 'O', key: 'D', bpm: null, lengthSeconds: null, chordChartUrl: '', notes: '', teamTags: ['Choir'] }] }),
       ])
       store.filterKey = 'G'
-      store.tagFilterChecked = new Set(['Choir'])
+      store.tagFilterInclude = new Set(['Choir'])
       expect(store.filteredSongs).toHaveLength(1)
       expect(store.filteredSongs[0]!.title).toBe('Match')
     })
@@ -985,7 +985,7 @@ describe('useSongStore', () => {
   })
 
   describe('filteredSongs — tag-filter checklist (D-08/D-09/D-10)', () => {
-    it('default show mode, empty checked set returns all non-hidden songs (unchanged behavior)', async () => {
+    it('default state, empty include+exclude sets returns all non-hidden songs (unchanged behavior)', async () => {
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       store.subscribe('org-1')
@@ -993,12 +993,12 @@ describe('useSongStore', () => {
         makeSong({ id: 'song-1', title: 'Christmas Song', tags: ['Christmas'] }),
         makeSong({ id: 'song-2', title: 'Regular Song', tags: [] }),
       ])
-      expect(store.tagFilterChecked.size).toBe(0)
-      expect(store.tagFilterHide).toBe(false)
+      expect(store.tagFilterInclude.size).toBe(0)
+      expect(store.tagFilterExclude.size).toBe(0)
       expect(store.filteredSongs).toHaveLength(2)
     })
 
-    it('show mode: checked Set(["Christmas"]) shows only songs carrying that tag', async () => {
+    it('include Set(["Christmas"]) shows only songs carrying that tag', async () => {
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       store.subscribe('org-1')
@@ -1006,12 +1006,12 @@ describe('useSongStore', () => {
         makeSong({ id: 'song-1', title: 'Christmas Song', tags: ['Christmas'] }),
         makeSong({ id: 'song-2', title: 'Easter Song', tags: ['Easter'] }),
       ])
-      store.tagFilterChecked = new Set(['Christmas'])
+      store.tagFilterInclude = new Set(['Christmas'])
       expect(store.filteredSongs).toHaveLength(1)
       expect(store.filteredSongs[0]!.title).toBe('Christmas Song')
     })
 
-    it('show mode OR: checked Set(["Christmas","Easter"]) broadens to include either tag', async () => {
+    it('include OR: Set(["Christmas","Easter"]) broadens to include either tag', async () => {
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       store.subscribe('org-1')
@@ -1020,14 +1020,14 @@ describe('useSongStore', () => {
         makeSong({ id: 'song-2', title: 'Easter Song', tags: ['Easter'] }),
         makeSong({ id: 'song-3', title: 'Regular Song', tags: [] }),
       ])
-      store.tagFilterChecked = new Set(['Christmas', 'Easter'])
+      store.tagFilterInclude = new Set(['Christmas', 'Easter'])
       expect(store.filteredSongs).toHaveLength(2)
       const titles = store.filteredSongs.map((s) => s.title)
       expect(titles).toContain('Christmas Song')
       expect(titles).toContain('Easter Song')
     })
 
-    it('hide mode: checked tags are EXCLUDED, others appear', async () => {
+    it('exclude set: excluded tags are EXCLUDED, others appear', async () => {
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       store.subscribe('org-1')
@@ -1035,40 +1035,39 @@ describe('useSongStore', () => {
         makeSong({ id: 'song-1', title: 'Christmas Song', tags: ['Christmas'] }),
         makeSong({ id: 'song-2', title: 'Regular Song', tags: [] }),
       ])
-      store.tagFilterHide = true
-      store.tagFilterChecked = new Set(['Christmas'])
+      store.tagFilterExclude = new Set(['Christmas'])
       expect(store.filteredSongs).toHaveLength(1)
       expect(store.filteredSongs[0]!.title).toBe('Regular Song')
     })
 
-    it('clearTagFilter() empties checked set and sets hide false, leaves other filters untouched', async () => {
+    it('clearTagFilter() empties both include and exclude sets, leaves other filters untouched', async () => {
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       store.subscribe('org-1')
       store.searchQuery = 'amazing'
       store.filterVwType = 1
       store.filterKey = 'G'
-      store.tagFilterChecked = new Set(['Christmas'])
-      store.tagFilterHide = true
+      store.tagFilterInclude = new Set(['Orchestra'])
+      store.tagFilterExclude = new Set(['Christmas'])
 
       store.clearTagFilter()
 
-      expect(store.tagFilterChecked.size).toBe(0)
-      expect(store.tagFilterHide).toBe(false)
+      expect(store.tagFilterInclude.size).toBe(0)
+      expect(store.tagFilterExclude.size).toBe(0)
       expect(store.searchQuery).toBe('amazing')
       expect(store.filterVwType).toBe(1)
       expect(store.filterKey).toBe('G')
     })
 
-    it('tagFilterChecked, tagFilterHide, and clearTagFilter are exported from store', async () => {
+    it('tagFilterInclude, tagFilterExclude, and clearTagFilter are exported from store', async () => {
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
-      expect('tagFilterChecked' in store).toBe(true)
-      expect('tagFilterHide' in store).toBe(true)
+      expect('tagFilterInclude' in store).toBe(true)
+      expect('tagFilterExclude' in store).toBe(true)
       expect('clearTagFilter' in store).toBe(true)
     })
 
-    it('show mode: checked value matching a song\'s themes shows that song (union)', async () => {
+    it('include value matching a song\'s themes shows that song (union)', async () => {
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       store.subscribe('org-1')
@@ -1076,12 +1075,12 @@ describe('useSongStore', () => {
         makeSong({ id: 'song-1', title: 'Grace Song', themes: ['grace'] }),
         makeSong({ id: 'song-2', title: 'Other Song', themes: ['salvation'] }),
       ])
-      store.tagFilterChecked = new Set(['grace'])
+      store.tagFilterInclude = new Set(['grace'])
       expect(store.filteredSongs).toHaveLength(1)
       expect(store.filteredSongs[0]!.title).toBe('Grace Song')
     })
 
-    it('show mode: checked value matching a song\'s teamTags shows that song (union)', async () => {
+    it('include value matching a song\'s teamTags shows that song (union)', async () => {
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       store.subscribe('org-1')
@@ -1089,12 +1088,12 @@ describe('useSongStore', () => {
         makeSong({ id: 'song-1', title: 'Orchestra Song', teamTags: ['Orchestra'] }),
         makeSong({ id: 'song-2', title: 'Other Song', teamTags: ['Band'] }),
       ])
-      store.tagFilterChecked = new Set(['Orchestra'])
+      store.tagFilterInclude = new Set(['Orchestra'])
       expect(store.filteredSongs).toHaveLength(1)
       expect(store.filteredSongs[0]!.title).toBe('Orchestra Song')
     })
 
-    it('hide mode: checked themes value excludes the song carrying it (union)', async () => {
+    it('exclude themes value excludes the song carrying it (union)', async () => {
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       store.subscribe('org-1')
@@ -1102,10 +1101,48 @@ describe('useSongStore', () => {
         makeSong({ id: 'song-1', title: 'Grace Song', themes: ['grace'] }),
         makeSong({ id: 'song-2', title: 'Other Song', themes: ['salvation'] }),
       ])
-      store.tagFilterHide = true
-      store.tagFilterChecked = new Set(['grace'])
+      store.tagFilterExclude = new Set(['grace'])
       expect(store.filteredSongs).toHaveLength(1)
       expect(store.filteredSongs[0]!.title).toBe('Other Song')
+    })
+
+    it('simultaneous include+exclude: excluding a tag wins even when the song also carries an included tag', async () => {
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        // Carries BOTH the included ("Orchestra") and excluded ("Christmas") tags — must be dropped.
+        makeSong({ id: 'song-1', title: 'Orchestra Christmas Song', teamTags: ['Orchestra'], tags: ['Christmas'] }),
+        // Carries only the included tag — must appear.
+        makeSong({ id: 'song-2', title: 'Orchestra Song', teamTags: ['Orchestra'], tags: [] }),
+        // Carries only the excluded tag — must be dropped.
+        makeSong({ id: 'song-3', title: 'Christmas Song', teamTags: [], tags: ['Christmas'] }),
+        // Carries neither — must be dropped (include set is non-empty, so it must match to pass).
+        makeSong({ id: 'song-4', title: 'Unrelated Song', teamTags: [], tags: [] }),
+      ])
+      store.tagFilterInclude = new Set(['Orchestra'])
+      store.tagFilterExclude = new Set(['Christmas'])
+      expect(store.filteredSongs).toHaveLength(1)
+      expect(store.filteredSongs[0]!.title).toBe('Orchestra Song')
+    })
+
+    it('include-only across the union (teamTags ∪ themes ∪ tags) still works with exclude empty', async () => {
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'song-1', title: 'Team Match', teamTags: ['Orchestra'], themes: [], tags: [] }),
+        makeSong({ id: 'song-2', title: 'Theme Match', teamTags: [], themes: ['grace'], tags: [] }),
+        makeSong({ id: 'song-3', title: 'User Tag Match', teamTags: [], themes: [], tags: ['Christmas'] }),
+        makeSong({ id: 'song-4', title: 'No Match', teamTags: [], themes: [], tags: [] }),
+      ])
+      store.tagFilterInclude = new Set(['Orchestra', 'grace', 'Christmas'])
+      expect(store.filteredSongs).toHaveLength(3)
+      const titles = store.filteredSongs.map((s) => s.title)
+      expect(titles).toContain('Team Match')
+      expect(titles).toContain('Theme Match')
+      expect(titles).toContain('User Tag Match')
+      expect(titles).not.toContain('No Match')
     })
   })
 
@@ -1167,23 +1204,23 @@ describe('useSongStore', () => {
   })
 
   describe('tag-filter persistence (D-12/D-13)', () => {
-    it('persists checked tags + hide flag to localStorage under a per-user/org key on change', async () => {
+    it('persists include + exclude sets to localStorage under a per-user/org v2 key on change', async () => {
       mockAuthUser = { uid: 'uid-1' }
       mockAuthOrgId = 'org-1'
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       store.subscribe('org-1')
 
-      store.tagFilterChecked = new Set(['Christmas'])
-      store.tagFilterHide = true
+      store.tagFilterInclude = new Set(['Orchestra'])
+      store.tagFilterExclude = new Set(['Christmas'])
       await vi.waitFor(() => {
-        const raw = localStorage.getItem('wp:tagFilter:v1:org-1:uid-1')
+        const raw = localStorage.getItem('wp:tagFilter:v2:org-1:uid-1')
         expect(raw).not.toBeNull()
       })
-      const raw = localStorage.getItem('wp:tagFilter:v1:org-1:uid-1')!
+      const raw = localStorage.getItem('wp:tagFilter:v2:org-1:uid-1')!
       const parsed = JSON.parse(raw)
-      expect(parsed.checked).toEqual(['Christmas'])
-      expect(parsed.hide).toBe(true)
+      expect(parsed.include).toEqual(['Orchestra'])
+      expect(parsed.exclude).toEqual(['Christmas'])
     })
 
     it('does not read or write localStorage when uid is missing', async () => {
@@ -1192,7 +1229,7 @@ describe('useSongStore', () => {
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       store.subscribe('org-1')
-      store.tagFilterChecked = new Set(['Christmas'])
+      store.tagFilterInclude = new Set(['Christmas'])
       expect(localStorage.length).toBe(0)
     })
 
@@ -1204,34 +1241,34 @@ describe('useSongStore', () => {
       // subscribe() sets orgId.value, but tagFilterStorageKey falls back to auth.orgId
       // when orgId.value is set via subscribe — so simulate missing auth entirely by
       // not calling subscribe (orgId.value stays null) and auth.orgId also null.
-      store.tagFilterChecked = new Set(['Christmas'])
+      store.tagFilterInclude = new Set(['Christmas'])
       expect(localStorage.length).toBe(0)
     })
 
-    it('hydrates tagFilterChecked/tagFilterHide from localStorage on subscribe', async () => {
+    it('hydrates tagFilterInclude/tagFilterExclude from localStorage on subscribe', async () => {
       mockAuthUser = { uid: 'uid-2' }
       mockAuthOrgId = 'org-2'
       localStorage.setItem(
-        'wp:tagFilter:v1:org-2:uid-2',
-        JSON.stringify({ checked: ['Easter', 'Advent'], hide: true }),
+        'wp:tagFilter:v2:org-2:uid-2',
+        JSON.stringify({ include: ['Easter', 'Advent'], exclude: ['Christmas'] }),
       )
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       store.subscribe('org-2')
 
-      expect(Array.from(store.tagFilterChecked)).toEqual(['Easter', 'Advent'])
-      expect(store.tagFilterHide).toBe(true)
+      expect(Array.from(store.tagFilterInclude)).toEqual(['Easter', 'Advent'])
+      expect(Array.from(store.tagFilterExclude)).toEqual(['Christmas'])
     })
 
     it('silently ignores corrupt localStorage JSON and keeps in-memory defaults', async () => {
       mockAuthUser = { uid: 'uid-3' }
       mockAuthOrgId = 'org-3'
-      localStorage.setItem('wp:tagFilter:v1:org-3:uid-3', '{not valid json')
+      localStorage.setItem('wp:tagFilter:v2:org-3:uid-3', '{not valid json')
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       expect(() => store.subscribe('org-3')).not.toThrow()
-      expect(store.tagFilterChecked.size).toBe(0)
-      expect(store.tagFilterHide).toBe(false)
+      expect(store.tagFilterInclude.size).toBe(0)
+      expect(store.tagFilterExclude.size).toBe(0)
     })
 
     it('silently ignores localStorage.setItem failures (quota/private mode)', async () => {
@@ -1244,7 +1281,7 @@ describe('useSongStore', () => {
       const store = useSongStore()
       store.subscribe('org-4')
       expect(() => {
-        store.tagFilterChecked = new Set(['Christmas'])
+        store.tagFilterInclude = new Set(['Christmas'])
       }).not.toThrow()
       setItemSpy.mockRestore()
     })
@@ -1256,13 +1293,13 @@ describe('useSongStore', () => {
       const { useSongStore } = await import('../songs')
       const store = useSongStore()
       store.subscribe('org-a')
-      store.tagFilterChecked = new Set(['Christmas'])
-      store.tagFilterHide = true
+      store.tagFilterInclude = new Set(['Orchestra'])
+      store.tagFilterExclude = new Set(['Christmas'])
       await vi.waitFor(() => {
-        expect(localStorage.getItem('wp:tagFilter:v1:org-a:uid-a')).not.toBeNull()
+        expect(localStorage.getItem('wp:tagFilter:v2:org-a:uid-a')).not.toBeNull()
       })
-      expect(store.tagFilterChecked.size).toBe(1)
-      expect(store.tagFilterHide).toBe(true)
+      expect(store.tagFilterInclude.size).toBe(1)
+      expect(store.tagFilterExclude.size).toBe(1)
 
       // User B logs in within the same tab/session (singleton store) — no
       // stored filter exists yet for User B's user/org key.
@@ -1271,8 +1308,8 @@ describe('useSongStore', () => {
       store.subscribe('org-b')
 
       // User A's in-memory selection must NOT leak into User B's session.
-      expect(store.tagFilterChecked.size).toBe(0)
-      expect(store.tagFilterHide).toBe(false)
+      expect(store.tagFilterInclude.size).toBe(0)
+      expect(store.tagFilterExclude.size).toBe(0)
     })
   })
 })
