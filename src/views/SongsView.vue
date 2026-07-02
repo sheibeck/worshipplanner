@@ -80,10 +80,14 @@
           <input
             v-model="bulkTagInput"
             type="text"
+            list="sv-existing-user-tags"
             placeholder="Tag name"
             class="rounded-md bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 w-40"
             @keydown.enter="applyBulkTag"
           />
+          <datalist id="sv-existing-user-tags">
+            <option v-for="t in songStore.allUserTags" :key="t" :value="t" />
+          </datalist>
           <button
             type="button"
             class="px-3 py-1.5 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors disabled:opacity-50"
@@ -207,6 +211,8 @@ const uncategorizedSongs = computed(() =>
 const availableKeys = computed(() => {
   const keys = new Set<string>()
   songStore.songs.forEach((song) => {
+    // Hidden songs contribute no filter options (same guard as availableUserTags).
+    if (song.hidden === true) return
     song.arrangements.forEach((arr) => {
       if (arr.key) keys.add(arr.key)
     })

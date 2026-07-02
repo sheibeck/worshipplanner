@@ -88,7 +88,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 
 const props = withDefaults(
   defineProps<{
@@ -111,6 +111,10 @@ const open = ref(false)
 
 // Ephemeral local filter for the tag list — intentionally not persisted anywhere.
 const tagQuery = ref('')
+// Reset the ephemeral filter each time the popover closes so it doesn't persist across reopens.
+watch(open, (isOpen) => {
+  if (!isOpen) tagQuery.value = ''
+})
 const filteredTags = computed(() => {
   const q = tagQuery.value.trim().toLowerCase()
   if (!q) return props.availableUserTags
