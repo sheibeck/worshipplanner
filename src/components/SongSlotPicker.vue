@@ -49,10 +49,10 @@
           <!-- Tag filter (D-14: shared checklist bound to songStore) -->
           <TagFilterChecklist
             :availableUserTags="availableTags"
-            :checkedTags="songStore.tagFilterChecked"
-            :hide="songStore.tagFilterHide"
-            @update:checkedTags="songStore.tagFilterChecked = $event"
-            @update:hide="songStore.tagFilterHide = $event"
+            :includeTags="songStore.tagFilterInclude"
+            :excludeTags="songStore.tagFilterExclude"
+            @update:includeTags="songStore.tagFilterInclude = $event"
+            @update:excludeTags="songStore.tagFilterExclude = $event"
             @clear="songStore.clearTagFilter()"
           />
         </div>
@@ -259,17 +259,30 @@ const availableTags = computed<string[]>(() => {
   return Array.from(tagSet).sort()
 })
 
-/** Visible songs filtered by the shared store tag-filter state (D-09/D-10: OR-combine in show mode, exclusion in hide mode). */
+/**
+ * Visible songs filtered by the shared store tag-filter state (D-09/D-10: independent
+ * per-tag Show/Hide sets — exclusion always wins; include set OR-combines when non-empty).
+ */
 const tagFilteredSongs = computed<Song[]>(() => {
-  const checked = songStore.tagFilterChecked
-  const hide = songStore.tagFilterHide
-  if (checked.size === 0) return visibleSongs.value
+  const include = songStore.tagFilterInclude
+  const exclude = songStore.tagFilterExclude
+  if (include.size === 0 && exclude.size === 0) return visibleSongs.value
   return visibleSongs.value.filter((s) => {
-    const carriesChecked =
-      (s.teamTags ?? []).some((t) => checked.has(t)) ||
-      (s.themes ?? []).some((t) => checked.has(t)) ||
-      (s.tags ?? []).some((t) => checked.has(t))
-    return hide ? !carriesChecked : carriesChecked
+    if (exclude.size > 0) {
+      const carriesExcluded =
+        (s.teamTags ?? []).some((t) => exclude.has(t)) ||
+        (s.themes ?? []).some((t) => exclude.has(t)) ||
+        (s.tags ?? []).some((t) => exclude.has(t))
+      if (carriesExcluded) return false
+    }
+    if (include.size > 0) {
+      const carriesIncluded =
+        (s.teamTags ?? []).some((t) => include.has(t)) ||
+        (s.themes ?? []).some((t) => include.has(t)) ||
+        (s.tags ?? []).some((t) => include.has(t))
+      return carriesIncluded
+    }
+    return true
   })
 })
 
@@ -335,8 +348,8 @@ function loadMore() {
 
 // Reset visibleCount when active source changes
 watch(searchQuery, () => { visibleCount.value = BATCH_SIZE })
-watch(() => songStore.tagFilterChecked, () => { visibleCount.value = BATCH_SIZE }, { deep: true })
-watch(() => songStore.tagFilterHide, () => { visibleCount.value = BATCH_SIZE })
+watch(() => songStore.tagFilterInclude, () => { visibleCount.value = BATCH_SIZE }, { deep: true })
+watch(() => songStore.tagFilterExclude, () => { visibleCount.value = BATCH_SIZE }, { deep: true })
 watch(() => props.songs, () => { visibleCount.value = BATCH_SIZE })
 
 // Sentinel element at bottom of scroll container triggers loadMore

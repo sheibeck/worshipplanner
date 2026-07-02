@@ -59,11 +59,11 @@
     <!-- Tag filter checklist -->
     <TagFilterChecklist
       :availableUserTags="availableUserTags"
-      :checkedTags="tagFilterChecked"
-      :hide="tagFilterHide"
+      :includeTags="tagFilterInclude"
+      :excludeTags="tagFilterExclude"
       align="right"
-      @update:checkedTags="$emit('update:tagFilterChecked', $event)"
-      @update:hide="$emit('update:tagFilterHide', $event)"
+      @update:includeTags="$emit('update:tagFilterInclude', $event)"
+      @update:excludeTags="$emit('update:tagFilterExclude', $event)"
       @clear="$emit('clearTagFilter')"
     />
   </div>
@@ -76,8 +76,8 @@ defineProps<{
   searchQuery: string
   filterVwType: 1 | 2 | 3 | 'uncategorized' | null
   filterKey: string
-  tagFilterChecked: Set<string>
-  tagFilterHide: boolean
+  tagFilterInclude: Set<string>
+  tagFilterExclude: Set<string>
   availableKeys: string[]
   availableUserTags: string[]
 }>()
@@ -86,8 +86,8 @@ const emit = defineEmits<{
   'update:searchQuery': [value: string]
   'update:filterVwType': [value: 1 | 2 | 3 | 'uncategorized' | null]
   'update:filterKey': [value: string]
-  'update:tagFilterChecked': [value: Set<string>]
-  'update:tagFilterHide': [value: boolean]
+  'update:tagFilterInclude': [value: Set<string>]
+  'update:tagFilterExclude': [value: Set<string>]
   clearTagFilter: []
 }>()
 
