@@ -17,8 +17,11 @@
       <!-- Transparent backdrop to close on outside click -->
       <div class="fixed inset-0 z-30" @click="open = false"></div>
 
-      <!-- Popover panel — anchored to the trigger's right edge so it expands leftward and never runs off-screen -->
-      <div class="absolute right-0 z-40 mt-1 w-56 rounded-md bg-gray-800 border border-gray-700 shadow-xl p-2">
+      <!-- Popover panel — aligned under the trigger; the Songs-panel trigger sits far right so it opts into right-0 to avoid running off-screen -->
+      <div
+        class="absolute z-40 mt-1 w-56 rounded-md bg-gray-800 border border-gray-700 shadow-xl p-2"
+        :class="align === 'right' ? 'right-0' : 'left-0'"
+      >
         <!-- Header row: Hide toggle + Clear action -->
         <div class="flex items-center justify-between gap-2 mb-1.5">
           <div class="flex items-center gap-1.5">
@@ -42,10 +45,19 @@
           >Clear tags</button>
         </div>
 
+        <!-- Local tag search — ephemeral, filters the list only (no persisted state) -->
+        <input
+          v-if="availableUserTags.length > 0"
+          v-model="tagQuery"
+          type="text"
+          placeholder="Filter tags…"
+          class="w-full mb-1.5 rounded bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+        />
+
         <!-- Scrollable checklist -->
-        <div v-if="availableUserTags.length > 0" class="max-h-48 overflow-y-auto space-y-0.5">
+        <div v-if="filteredTags.length > 0" class="max-h-48 overflow-y-auto space-y-0.5">
           <label
-            v-for="tag in availableUserTags"
+            v-for="tag in filteredTags"
             :key="tag"
             class="flex items-center gap-2 py-1 px-2 rounded border text-xs cursor-pointer"
             :class="checkedTags.has(tag) ? 'border-pink-800 bg-pink-900/50 text-pink-300' : 'border-gray-700 bg-gray-800 text-gray-300'"
@@ -60,7 +72,12 @@
           </label>
         </div>
 
-        <!-- Empty state -->
+        <!-- No tags match the filter text -->
+        <div v-else-if="availableUserTags.length > 0" class="px-4 py-4 text-center">
+          <p class="text-xs text-gray-500">No tags match “{{ tagQuery }}”</p>
+        </div>
+
+        <!-- Empty state — no tags exist at all -->
         <div v-else class="px-4 py-6 text-center">
           <p class="text-sm text-gray-400">No tags yet</p>
           <p class="text-xs text-gray-500">Add tags to songs in the Songs panel to filter by them here.</p>
@@ -71,13 +88,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 
-const props = defineProps<{
-  availableUserTags: string[]
-  checkedTags: Set<string>
-  hide: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    availableUserTags: string[]
+    checkedTags: Set<string>
+    hide: boolean
+    /** Which edge to anchor the popover to. 'right' for right-aligned triggers (Songs panel). */
+    align?: 'left' | 'right'
+  }>(),
+  { align: 'left' },
+)
 
 const emit = defineEmits<{
   'update:checkedTags': [value: Set<string>]
@@ -86,6 +108,14 @@ const emit = defineEmits<{
 }>()
 
 const open = ref(false)
+
+// Ephemeral local filter for the tag list — intentionally not persisted anywhere.
+const tagQuery = ref('')
+const filteredTags = computed(() => {
+  const q = tagQuery.value.trim().toLowerCase()
+  if (!q) return props.availableUserTags
+  return props.availableUserTags.filter((t) => t.toLowerCase().includes(q))
+})
 
 function toggleTag(tag: string) {
   const next = new Set(props.checkedTags)

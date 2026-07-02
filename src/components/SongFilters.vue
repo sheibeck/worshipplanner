@@ -61,6 +61,7 @@
       :availableUserTags="availableUserTags"
       :checkedTags="tagFilterChecked"
       :hide="tagFilterHide"
+      align="right"
       @update:checkedTags="$emit('update:tagFilterChecked', $event)"
       @update:hide="$emit('update:tagFilterHide', $event)"
       @clear="$emit('clearTagFilter')"
