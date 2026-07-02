@@ -17,8 +17,8 @@
       <!-- Transparent backdrop to close on outside click -->
       <div class="fixed inset-0 z-30" @click="open = false"></div>
 
-      <!-- Popover panel -->
-      <div class="absolute z-40 mt-1 w-56 rounded-md bg-gray-800 border border-gray-700 shadow-xl p-2">
+      <!-- Popover panel — anchored to the trigger's right edge so it expands leftward and never runs off-screen -->
+      <div class="absolute right-0 z-40 mt-1 w-56 rounded-md bg-gray-800 border border-gray-700 shadow-xl p-2">
         <!-- Header row: Hide toggle + Clear action -->
         <div class="flex items-center justify-between gap-2 mb-1.5">
           <div class="flex items-center gap-1.5">
