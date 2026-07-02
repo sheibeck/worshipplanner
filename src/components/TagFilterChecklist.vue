@@ -6,8 +6,10 @@
       @click="open = !open"
       class="flex items-center gap-1.5 rounded-md bg-gray-800 border border-gray-700 px-3 py-2 text-sm text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
     >
-      <span>Tags<span v-if="checkedTags.size > 0"> ({{ checkedTags.size }})</span></span>
-      <span v-if="hide" class="text-xs font-semibold text-indigo-300">(hiding)</span>
+      <span>Tags</span>
+      <span v-if="includeTags.size > 0" class="text-xs font-semibold text-indigo-300">{{ includeTags.size }} shown</span>
+      <span v-if="includeTags.size > 0 && excludeTags.size > 0" class="text-xs text-gray-500">·</span>
+      <span v-if="excludeTags.size > 0" class="text-xs font-semibold text-red-300">{{ excludeTags.size }} hidden</span>
       <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
         <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
       </svg>
@@ -19,24 +21,11 @@
 
       <!-- Popover panel — aligned under the trigger; the Songs-panel trigger sits far right so it opts into right-0 to avoid running off-screen -->
       <div
-        class="absolute z-40 mt-1 w-56 rounded-md bg-gray-800 border border-gray-700 shadow-xl p-2"
+        class="absolute z-40 mt-1 w-64 rounded-md bg-gray-800 border border-gray-700 shadow-xl p-2"
         :class="align === 'right' ? 'right-0' : 'left-0'"
       >
-        <!-- Header row: Hide toggle + Clear action -->
-        <div class="flex items-center justify-between gap-2 mb-1.5">
-          <div class="flex items-center gap-1.5">
-            <label class="flex items-center gap-1.5 cursor-pointer">
-              <input
-                type="checkbox"
-                :checked="hide"
-                @change="$emit('update:hide', ($event.target as HTMLInputElement).checked)"
-                title="Invert: hide checked tags instead of showing only them"
-                class="rounded border-gray-700 bg-gray-800 text-indigo-600 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              />
-              <span class="text-xs text-gray-400" title="Invert: hide checked tags instead of showing only them">Hide tags</span>
-            </label>
-            <span v-if="hide" class="text-xs font-semibold text-indigo-300">(hiding)</span>
-          </div>
+        <!-- Header row: Clear action -->
+        <div class="flex items-center justify-end gap-2 mb-1.5">
           <button
             type="button"
             title="Clear tag filter"
@@ -56,20 +45,34 @@
 
         <!-- Scrollable checklist -->
         <div v-if="filteredTags.length > 0" class="max-h-48 overflow-y-auto space-y-0.5">
-          <label
+          <div
             v-for="tag in filteredTags"
             :key="tag"
-            class="flex items-center gap-2 py-1 px-2 rounded border text-xs cursor-pointer"
-            :class="checkedTags.has(tag) ? 'border-pink-800 bg-pink-900/50 text-pink-300' : 'border-gray-700 bg-gray-800 text-gray-300'"
+            class="flex items-center justify-between gap-2 py-1 px-2 rounded border text-xs"
+            :class="rowClass(tag)"
           >
-            <input
-              type="checkbox"
-              :checked="checkedTags.has(tag)"
-              @change="toggleTag(tag)"
-              class="rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            />
-            <span>{{ tag }}</span>
-          </label>
+            <span class="truncate">{{ tag }}</span>
+            <span class="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                title="Show only songs with this tag"
+                @click="toggleInclude(tag)"
+                class="px-1.5 py-0.5 rounded text-[11px] font-medium border transition-colors"
+                :class="includeTags.has(tag)
+                  ? 'border-indigo-500 bg-indigo-600 text-white'
+                  : 'border-gray-700 bg-gray-900 text-gray-400 hover:text-gray-200'"
+              >Show</button>
+              <button
+                type="button"
+                title="Hide songs with this tag"
+                @click="toggleExclude(tag)"
+                class="px-1.5 py-0.5 rounded text-[11px] font-medium border transition-colors"
+                :class="excludeTags.has(tag)
+                  ? 'border-red-600 bg-red-700 text-white'
+                  : 'border-gray-700 bg-gray-900 text-gray-400 hover:text-gray-200'"
+              >Hide</button>
+            </span>
+          </div>
         </div>
 
         <!-- No tags match the filter text -->
@@ -93,8 +96,8 @@ import { ref, computed, watch } from 'vue'
 const props = withDefaults(
   defineProps<{
     availableUserTags: string[]
-    checkedTags: Set<string>
-    hide: boolean
+    includeTags: Set<string>
+    excludeTags: Set<string>
     /** Which edge to anchor the popover to. 'right' for right-aligned triggers (Songs panel). */
     align?: 'left' | 'right'
   }>(),
@@ -102,8 +105,8 @@ const props = withDefaults(
 )
 
 const emit = defineEmits<{
-  'update:checkedTags': [value: Set<string>]
-  'update:hide': [value: boolean]
+  'update:includeTags': [value: Set<string>]
+  'update:excludeTags': [value: Set<string>]
   clear: []
 }>()
 
@@ -121,9 +124,43 @@ const filteredTags = computed(() => {
   return props.availableUserTags.filter((t) => t.toLowerCase().includes(q))
 })
 
-function toggleTag(tag: string) {
-  const next = new Set(props.checkedTags)
-  next.has(tag) ? next.delete(tag) : next.add(tag)
-  emit('update:checkedTags', next)
+function rowClass(tag: string): string {
+  if (props.includeTags.has(tag)) return 'border-indigo-800 bg-indigo-900/40 text-indigo-200'
+  if (props.excludeTags.has(tag)) return 'border-red-900 bg-red-950/40 text-red-300'
+  return 'border-gray-700 bg-gray-800 text-gray-300'
+}
+
+// Toggling Show on adds to include and removes from exclude (mutual exclusivity);
+// toggling Show off just removes it from include.
+function toggleInclude(tag: string) {
+  const nextInclude = new Set(props.includeTags)
+  if (nextInclude.has(tag)) {
+    nextInclude.delete(tag)
+  } else {
+    nextInclude.add(tag)
+    if (props.excludeTags.has(tag)) {
+      const nextExclude = new Set(props.excludeTags)
+      nextExclude.delete(tag)
+      emit('update:excludeTags', nextExclude)
+    }
+  }
+  emit('update:includeTags', nextInclude)
+}
+
+// Toggling Hide on adds to exclude and removes from include (mutual exclusivity);
+// toggling Hide off just removes it from exclude.
+function toggleExclude(tag: string) {
+  const nextExclude = new Set(props.excludeTags)
+  if (nextExclude.has(tag)) {
+    nextExclude.delete(tag)
+  } else {
+    nextExclude.add(tag)
+    if (props.includeTags.has(tag)) {
+      const nextInclude = new Set(props.includeTags)
+      nextInclude.delete(tag)
+      emit('update:includeTags', nextInclude)
+    }
+  }
+  emit('update:excludeTags', nextExclude)
 }
 </script>
