@@ -227,7 +227,7 @@
               <!-- Inline add affordance -->
               <template v-if="inlineEditSongId === song.id">
                 <input
-                  ref="inlineInputRef"
+                  :ref="setInlineInputRef"
                   v-model="inlineTagInput"
                   type="text"
                   list="st-existing-user-tags"
@@ -376,6 +376,11 @@ defineExpose({ selectedIds, clearSelection })
 const inlineEditSongId = ref<string | null>(null)
 const inlineTagInput = ref('')
 const inlineInputRef = ref<HTMLInputElement | null>(null)
+// Function ref: the input lives inside a v-for row, so a static string ref would
+// resolve to an array. This captures the single active input element (or null on unmount).
+function setInlineInputRef(el: unknown) {
+  inlineInputRef.value = (el as HTMLInputElement | null) ?? null
+}
 
 function openInlineEdit(songId: string) {
   inlineEditSongId.value = songId
