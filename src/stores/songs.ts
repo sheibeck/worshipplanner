@@ -85,6 +85,13 @@ export const useSongStore = defineStore('songs', () => {
     return Array.from(tags).sort()
   })
 
+  // AI song-suggestion candidate pool. Excludes soft-deleted songs — in this app
+  // a soft-delete sets hidden === true (see deleteSong), so the hidden filter IS
+  // the deleted-song exclusion. Treat undefined as not-hidden for legacy docs.
+  const aiCandidateSongs = computed(() =>
+    songs.value.filter((song) => song.hidden !== true),
+  )
+
   // D-11: clears only the tag filter — searchQuery/filterVwType/filterKey untouched
   function clearTagFilter() {
     tagFilterInclude.value = new Set()
@@ -313,6 +320,7 @@ export const useSongStore = defineStore('songs', () => {
     tagFilterExclude,
     filteredSongs,
     allUserTags,
+    aiCandidateSongs,
     subscribe,
     unsubscribeAll,
     addSong,

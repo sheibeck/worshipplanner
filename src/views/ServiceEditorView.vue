@@ -1450,7 +1450,7 @@ async function suggestAllSongs() {
     // Orchestra AI filter (D-06, D-09): when service is orchestra, only include orchestra-tagged songs
     // D-18: exclude hidden (soft-deleted) songs from AI base
     const isOrchestraService = (localService.value?.teams ?? []).includes('Orchestra')
-    const base = songStore.songs.filter((s) => !s.hidden)
+    const base = songStore.aiCandidateSongs
     const librarySource = isOrchestraService
       ? base.filter((s) => s.teamTags.includes('Orchestra'))
       : base
@@ -1560,7 +1560,7 @@ async function fetchAiForSlot(slotIndex: number) {
 
     // D-18: exclude hidden (soft-deleted) songs from AI base
     const isOrchestraService = (localService.value?.teams ?? []).includes('Orchestra')
-    const base = songStore.songs.filter((s) => !s.hidden)
+    const base = songStore.aiCandidateSongs
     const librarySource = isOrchestraService
       ? base.filter((s) => s.teamTags.includes('Orchestra'))
       : base
