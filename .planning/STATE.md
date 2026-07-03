@@ -137,6 +137,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 | 9 | Subscribe to updates so that if 2 or more people are looking at the Services listing or the Edit Service screen they can see updates made by other people who are looking at the same thing | 2026-03-12 | e0ce5e1 | [9-subscribe-to-updates-so-that-if-2-or-mor](.planning/quick/9-subscribe-to-updates-so-that-if-2-or-mor/) |
 | 10 | Allow closing the scripture preview in edit mode | 2026-03-12 | 9c3bd1f | [10-allow-closing-the-scripture-preview-in-e](.planning/quick/10-allow-closing-the-scripture-preview-in-e/) |
 | 260701-awp | Fix song-picker sticky header (search + tag filters) rendering behind scrolling song list | 2026-07-01 | 5de0ae2 | [260701-awp-fix-song-picker-sticky-header-search-tag](.planning/quick/260701-awp-fix-song-picker-sticky-header-search-tag/) |
+| 260703-246 | Exclude soft-deleted (hidden) songs from AI suggestions via shared aiCandidateSongs getter + regression test | 2026-07-03 | 87b6de4 | [260703-246-make-sure-that-when-the-ai-makes-song-su](.planning/quick/260703-246-make-sure-that-when-the-ai-makes-song-su/) |
 
 ### Blockers/Concerns
 
@@ -146,7 +147,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 
 ## Session Continuity
 
-Last activity: 2026-07-02
-Last session: 2026-07-02T21:31:24.340Z
+Last activity: 2026-07-03 - Completed quick task 260703-246: Exclude soft-deleted songs from AI suggestions
+Last session: 2026-07-03T05:31:24.168Z
 Stopped at: Completed 12-08-PLAN.md
 Resume file: None
