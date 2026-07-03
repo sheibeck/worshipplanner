@@ -1,105 +1,87 @@
 ---
-status: partial
+status: complete
 phase: 12-advanced-song-search-and-multi-select-persistent-tag-filteri
-source: [12-01-SUMMARY.md, 12-02-SUMMARY.md, 12-03-SUMMARY.md, 12-04-SUMMARY.md, 12-05-SUMMARY.md]
-started: 2026-07-02T05:33:59Z
-updated: 2026-07-02T05:36:00Z
+source: [12-01-SUMMARY.md, 12-02-SUMMARY.md, 12-03-SUMMARY.md, 12-04-SUMMARY.md, 12-05-SUMMARY.md, 12-06-SUMMARY.md, 12-07-SUMMARY.md, 12-08-SUMMARY.md]
+started: 2026-07-03T01:31:47Z
+updated: 2026-07-03T01:33:00Z
 ---
 
 ## Current Test
-<!-- OVERWRITE each test - shows where we are -->
 
-[testing paused — 4 items deferred pending Option A tag-system rework]
+[testing complete]
 
 ## Tests
 
-### 1. Field-scoped song search
+### 1. Field-scoped + phrase + multi-term search
 expected: |
-  In the Songs panel search box, typing a field-scoped query filters precisely: `key:A` shows only key-A songs (and `key:e` does NOT match "Em" — exact key match); `tag:christmas` shows only christmas-tagged songs; `type:1`, `theme:grace`, `team:orchestra` each scope to that field. `key: A` (space after colon) is tolerated.
+  In the Songs panel search box: `key:A` shows only key-A songs (and `key:e` does NOT match "Em"), `tag:christmas`, `type:1`, `theme:grace`, `team:orchestra` each scope to that field, and `key: A` (space after colon) is tolerated. The natural phrases `Type 1` and `Key A` work without a colon. Two plain words like `christmas acoustic` return only songs matching BOTH terms (AND).
 result: pass
 
-### 2. Natural phrase + multi-term AND search
+### 2. Unified tag control (one dropdown, fixed height)
 expected: |
-  Typing the natural two-word phrase `Type 1` filters to Type-1 songs, and `Key A` filters to key-A songs (no colon needed). Typing two plain words like `christmas acoustic` returns only songs that match BOTH terms (AND), not either — narrowing results as you add terms.
+  On the Songs page the old separate include/exclude tag dropdowns AND the "All tags" team-tag select are gone. There is ONE "Tags" dropdown. Its trigger button stays a constant height no matter how many tags exist (it does not grow the header). Opening it reveals the tag list inside a scrollable popover. The list is the combined, de-duplicated set of your team tags, themes, and user tags.
 result: pass
 
-### 3. Songs panel multi-select tag checklist
+### 3. Per-tag Show / Hide (independent)
 expected: |
-  In the Songs panel filter area, the old single-select "include tag" / "exclude tag" dropdowns are gone, replaced by a scrollable checkbox list of your tags. Checking two or more tags broadens the results (OR) — songs carrying ANY checked tag are shown. Checked rows are visually highlighted (pink). If you have no tags, an empty-state message appears instead.
-result: issue
-reported: "UX confusing. There's a separate 'Tags' dropdown (team tags like Orchestra) AND a whole separate inline checklist of custom tags (Christmas) that grows unbounded and keeps making the header area taller. Should combine team tags + custom tags into ONE tags list presented as a dropdown where each item has a checkbox, with hide-tags / clear-tags next to it. Also themes 'look' like tags but aren't part of the tag system — so there are effectively 3 kinds of tags (teamTags, themes, tags). Wants a single unified tag system."
-severity: major
-
-### 4. Hide-tags (inverted) toggle
-expected: |
-  Turning on the "Hide tags" checkbox inverts the filter: instead of showing only songs with the checked tags, songs carrying any checked tag are now excluded. A "(hiding)" caption appears next to the header while hide mode is on, so it stays clear even if the toggle scrolls out of view.
-result: blocked
-blocked_by: other
-reason: "Deferred by user pending the Option A tag-system rework (test 3 issue). The hide toggle moves into the new combined tag dropdown; user will test after rework lands."
-
-### 5. Clear-tags action
-expected: |
-  Clicking the "Clear tags" link unchecks all tag checkboxes and resets the hide toggle, but leaves your search text, VW-type, key, and team filters untouched.
-result: blocked
-blocked_by: other
-reason: "Deferred pending Option A tag-system rework (test 3 issue). Clear action moves into the new combined tag dropdown; re-verify after rework."
-
-### 6. Persistent tag filter across reload
-expected: |
-  After checking some tags (and/or the hide toggle) in the Songs panel, reloading the page restores the same tag selection automatically. The saved selection is scoped per user + organization — switching accounts/orgs on the same browser does not carry another user's tag selection over.
-result: blocked
-blocked_by: other
-reason: "Deferred pending Option A tag-system rework (test 3 issue). Persistence should carry over, but the selection UI changes; re-verify after rework."
-
-### 7. Service-plan picker shares the same tag filter
-expected: |
-  Opening the song picker inside the service editor shows the same multi-select tag checklist (with Hide toggle and Clear link) as the Songs panel, and its search box accepts the same field-scoped / phrase / multi-term syntax. The tag selection is shared state with the Songs panel. The sticky search/filter bar stays pinned above the scrolling song list.
-result: blocked
-blocked_by: other
-reason: "Deferred pending Option A tag-system rework (test 3 issue). Picker gets the same combined tag dropdown; re-verify shared-state + search/sticky after rework."
-
-### 8. Delete-confirmation gate on every element removal
-expected: |
-  In the service editor, clicking the Remove (X) on ANY plan element — including an empty/blank slot that previously deleted silently — now opens a confirmation modal first. The heading/body wording is element-type-aware (e.g. "remove this song", "this scripture", etc.). Cancel keeps the element; Remove deletes it. The existing "clear song" action keeps its own separate wording.
+  Each tag row inside the dropdown has an independent "Show" and "Hide" control. You can Show one tag and Hide another at the same time (e.g. Show "Orchestra" and Hide "Christmas"). Exclusion wins — a song carrying a Hidden tag is dropped even if it also carries a Shown tag. The closed trigger reflects state, e.g. "Tags · 1 shown · 1 hidden".
 result: pass
-note: "Core behavior PASSES — every removal (populated or empty) is now gated by a confirmation modal; Cancel/Remove work. DEVIATION: the modal copy is NOT element-type-aware — it always reads generic ('this item' / 'this element') rather than 'this song' / 'this scripture'. User ACCEPTS the generic wording and wants to KEEP the functionality; no code fix. Action: update the spec/docs (D-16 and 12-05-SUMMARY.md claim of element-type-aware copy) to describe the generic wording as the intended behavior."
+
+### 4. Filter-the-tags search box
+expected: |
+  Inside the tag dropdown there is a small "Filter tags…" input. Typing in it narrows the visible tag rows by substring (case-insensitive). Clearing it (or closing and reopening the dropdown) restores the full list — the filter text does not stick between opens.
+result: pass
+
+### 5. Popover positioning (both surfaces)
+expected: |
+  On the Songs page the tag dropdown opens aligned so the tag names are fully visible and never clipped off the right edge of the screen. In the service-plan song selector the tag dropdown opens directly under its trigger (left-aligned), not off to the right side of the panel.
+result: pass
+
+### 6. Shared + persistent tag filter across surfaces
+expected: |
+  Set some Show/Hide tags on the Songs page, then open the song selector on a service plan — the same Show/Hide selections are already applied there (shared state). Reload the app and reopen — your selections are still remembered (persisted per your login/org).
+result: pass
+
+### 7. Picker: same filter, no automatic team scoping
+expected: |
+  In the service-plan song selector, Show/Hide tags filter the songs exactly like the Songs page. The list is NOT automatically limited to the service's team — choosing to Show "Orchestra" surfaces orchestra songs even on a non-orchestra service. Searching/filtering shows the same songs you'd see on the Songs page (minus hidden songs).
+result: pass
+
+### 8. Picker rows: no dimming, unified tag pills
+expected: |
+  In the song selector, songs are NOT grayed out/dimmed (the old orchestra dimming is gone). Every song row — including the AI Picks, By Rotation, and Search Results sections — shows its tag pills: team tags, themes, and user tags.
+result: pass
+
+### 9. Hidden songs fully excluded
+expected: |
+  A hidden/deleted song never appears in the Songs page main list, nor in the picker's suggestions or search. Its tags also do NOT appear as options in either tag dropdown — so you never see a tag that matches zero visible songs.
+result: pass
+
+### 10. Picker dropdown stays a stable size
+expected: |
+  Opening the song selector, the dropdown holds a stable minimum height and does not visibly jump/resize as the number of matching songs changes while you type or filter.
+result: pass
+
+### 11. User-tag autocomplete (no duplicates)
+expected: |
+  When adding a user tag to a song — in the song editor slide-over, the inline tag input in the song table, and the bulk "Tag name" bar — typing shows existing matching tags as suggestions, so you can pick an existing tag instead of creating a near-duplicate.
+result: pass
+note: "Autocomplete works. During testing a console error surfaced on the inline '+' add — inlineInputRef.value?.focus is not a function (ref inside v-for resolved to an array). Fixed with a function ref (commit on master). Feature itself was functional."
+
+### 12. Delete-confirmation on element removal
+expected: |
+  On a service plan, clicking the "Remove element" X on any row — including an empty/blank row — prompts a confirmation modal before removing. The heading is generic ("Remove this element from the plan?") and the body names the element type (e.g. "this song" / "this scripture"). Cancel keeps it; confirm removes it.
+result: pass
 
 ## Summary
 
-total: 8
-passed: 3
-issues: 1
+total: 12
+passed: 12
+issues: 0
 pending: 0
 skipped: 0
-blocked: 4
+blocked: 0
 
 ## Gaps
 
-- truth: "Songs panel tag filtering presents a single, clear, unified tag control that doesn't grow the header unbounded"
-  status: failed
-  reason: "User reported: separate 'Tags' dropdown (teamTags e.g. Orchestra) coexists with a separate inline custom-tags checklist (tags e.g. Christmas) that grows unbounded and keeps making the header taller. Wants team tags + custom tags combined into ONE tag list rendered as a dropdown where each item has a checkbox, with hide-tags/clear-tags beside it. Themes also look like tags but are a third separate field — user wants a single unified tag system across teamTags/themes/tags."
-  severity: major
-  test: 3
-  root_cause: "Song model has three separate string[] fields — teamTags (PC arrangement/team tags, drives orchestra suggestion filter), themes (PC song themes), tags (Phase 9 user tags). Phase 12 added the new user-tags checklist as a THIRD control alongside the pre-existing teamTags 'All tags' dropdown, rather than unifying them. Checklist renders inline (not in a dropdown/popover) so its height scales with tag count."
-  artifacts:
-    - path: "src/components/SongFilters.vue"
-      issue: "Renders both a teamTags 'All tags' <select> (filterTag) and a separate inline TagFilterChecklist for user tags"
-    - path: "src/components/TagFilterChecklist.vue"
-      issue: "Inline checklist grows the header height instead of being contained in a dropdown/popover"
-    - path: "src/types/song.ts"
-      issue: "Three parallel string[] fields (teamTags, themes, tags) with no unified tag concept"
-  decision: "Option A (chosen by user 2026-07-02): unify the FILTER UI only — do NOT merge the data model. Keep teamTags/themes/tags as separate Song fields so PC import and the Phase 10 orchestra suggestion filter keep working. Present a single combined tag control: one dropdown/popover listing the union of teamTags ∪ themes ∪ tags, each row a checkbox, with hide-tags + clear-tags beside it. It replaces BOTH the current teamTags 'All tags' <select> (filterTag) in SongFilters.vue AND the separate inline TagFilterChecklist. Contained in a dropdown so header height stays fixed. Filtering matches a song if any of its three fields contains a checked value (OR in show mode / exclude in hide mode). Full data-model unification (Option B) NOT chosen for now."
-  missing:
-    - "Combined tag control as a dropdown/popover with per-item checkboxes + hide + clear, sourcing the union of teamTags ∪ themes ∪ tags, replacing both the teamTags 'All tags' <select> and the inline TagFilterChecklist"
-    - "Filter logic matches across all three fields (teamTags/themes/tags): show = has ANY checked; hide = has NONE checked"
-    - "Apply the same combined control to the service-plan picker (SongSlotPicker.vue) so both surfaces share it"
-    - "Fixed-height/contained rendering so the filter header does not grow unbounded with tag count"
-
-- truth: "Delete-confirmation modal copy matches documented behavior"
-  status: doc_update_only
-  reason: "User accepts the generic wording ('this item'/'this element') and wants functionality kept — NO code fix. Spec/docs claim element-type-aware copy (D-16, 12-05-SUMMARY.md) that the shipped modal does not produce."
-  severity: cosmetic
-  test: 8
-  code_fix: false
-  missing:
-    - "Update D-16 requirement and 12-05-SUMMARY.md to describe generic delete-confirmation wording as intended (drop the element-type-aware copy claim)"
+[none yet]
