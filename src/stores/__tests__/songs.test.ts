@@ -360,6 +360,64 @@ describe('useSongStore', () => {
     })
   })
 
+  describe('aiCandidateSongs — soft-deleted exclusion', () => {
+    it('excludes a soft-deleted (hidden: true) song from the AI candidate pool', async () => {
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'song-1', title: 'Visible Song', hidden: false }),
+        makeSong({ id: 'song-2', title: 'Soft-Deleted Song', hidden: true }),
+      ])
+      expect(store.aiCandidateSongs).toHaveLength(1)
+      expect(store.aiCandidateSongs[0]!.id).toBe('song-1')
+      expect(store.aiCandidateSongs[0]!.title).toBe('Visible Song')
+    })
+
+    it('includes songs where hidden is false', async () => {
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'song-1', title: 'Visible Song', hidden: false }),
+      ])
+      expect(store.aiCandidateSongs).toHaveLength(1)
+      expect(store.aiCandidateSongs[0]!.id).toBe('song-1')
+    })
+
+    it('includes songs where hidden is undefined (legacy docs)', async () => {
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      // Simulate a legacy song doc without hidden field
+      if (snapshotCallback) {
+        snapshotCallback({
+          docs: [
+            {
+              id: 'legacy-song',
+              data: () => ({
+                title: 'Legacy Song',
+                ccliNumber: '99999',
+                author: 'Old Author',
+                vwTypes: [],
+                teamTags: [],
+                arrangements: [],
+                themes: [],
+                notes: '',
+                lastUsedAt: null,
+                createdAt: { seconds: 1000000, nanoseconds: 0 },
+                updatedAt: { seconds: 1000000, nanoseconds: 0 },
+                // hidden field intentionally omitted to simulate legacy doc
+              }),
+            },
+          ],
+        })
+      }
+      expect(store.aiCandidateSongs).toHaveLength(1)
+      expect(store.aiCandidateSongs[0]!.title).toBe('Legacy Song')
+    })
+  })
+
   describe('filteredSongs — search', () => {
     it('returns all songs when searchQuery is empty', async () => {
       const { useSongStore } = await import('../songs')
