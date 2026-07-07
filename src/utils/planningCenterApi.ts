@@ -1082,3 +1082,44 @@ export function mapPcPersonToUpsert(person: PcPerson, emails: string[]): UpsertP
   }
 }
 
+/**
+ * Fetch a person's emails from the nested Services v2 endpoint.
+ * Returns the `address` attribute for each email, or [] on a non-ok response.
+ */
+async function fetchPersonEmails(appId: string, secret: string, personId: string): Promise<string[]> {
+  const response = await fetch(`${PC_BASE_URL}/people/${personId}/emails`, {
+    headers: {
+      Authorization: basicAuthHeader(appId, secret),
+      Accept: 'application/json',
+    },
+  })
+  if (!response.ok) return []
+  const json = (await response.json()) as { data: Array<{ attributes: { address: string } }> }
+  return json.data.map((e) => e.attributes.address)
+}
+
+/**
+ * Orchestrator: fetch all PC people, then fetch each person's emails (batched by 3 to
+ * respect PC rate limits, mirroring fetchAndMapPcSongs's arrangement-batching), map, and
+ * return a preview-ready UpsertPersonInput[] without writing to Firestore.
+ */
+export async function fetchAndMapPeople(appId: string, secret: string): Promise<UpsertPersonInput[]> {
+  const people = await fetchAllPeople(appId, secret)
+
+  const BATCH_SIZE = 3
+  const results: UpsertPersonInput[] = []
+
+  for (let i = 0; i < people.length; i += BATCH_SIZE) {
+    const batch = people.slice(i, i + BATCH_SIZE)
+    const mappedBatch = await Promise.all(
+      batch.map(async (person) => {
+        const emails = await fetchPersonEmails(appId, secret, person.id)
+        return mapPcPersonToUpsert(person, emails)
+      }),
+    )
+    results.push(...mappedBatch)
+  }
+
+  return results
+}
+

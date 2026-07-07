@@ -33,6 +33,7 @@ import {
   fetchPlanTimes,
   fetchAllPeople,
   mapPcPersonToUpsert,
+  fetchAndMapPeople,
 } from '@/utils/planningCenterApi'
 
 const mockTimestamp = { toDate: () => new Date('2026-03-08') } as unknown as Timestamp
@@ -1610,6 +1611,91 @@ describe('mapPcPersonToUpsert', () => {
     const person = { id: 'pc-99', attributes: { name: 'Fay Hall' } }
     const result = mapPcPersonToUpsert(person, [])
     expect(result.pcPersonId).toBe('pc-99')
+  })
+})
+
+describe('fetchAndMapPeople', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  function makePeopleListResponse(count: number) {
+    return {
+      data: Array.from({ length: count }, (_, i) => ({
+        id: `p${i + 1}`,
+        attributes: { name: `Person ${i + 1}` },
+      })),
+      links: { self: 'https://api.planningcenteronline.com/services/v2/people' },
+    }
+  }
+
+  it('fetches all people then their emails, returning UpsertPersonInput[] with name+email and phone ""', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(JSON.stringify(makePeopleListResponse(1)), { status: 200 })) // people list
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ data: [{ attributes: { address: 'p1@example.com' } }] }), { status: 200 }),
+      ) // p1 emails
+
+    const result = await fetchAndMapPeople('app-id', 'secret')
+
+    expect(result).toHaveLength(1)
+    expect(result[0]).toEqual({
+      name: 'Person 1',
+      email: 'p1@example.com',
+      phone: '',
+      pcPersonId: 'p1',
+    })
+
+    const [emailsUrl] = vi.mocked(fetch).mock.calls[1]!
+    expect(emailsUrl as string).toContain('/people/p1/emails')
+  })
+
+  it('reads the email address from the "address" attribute', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(JSON.stringify(makePeopleListResponse(1)), { status: 200 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ data: [{ attributes: { address: 'someone@example.com' } }] }), { status: 200 }),
+      )
+
+    const result = await fetchAndMapPeople('app-id', 'secret')
+    expect(result[0]?.email).toBe('someone@example.com')
+  })
+
+  it('yields email "" and still includes the person when the emails endpoint returns empty data', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(JSON.stringify(makePeopleListResponse(1)), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 }))
+
+    const result = await fetchAndMapPeople('app-id', 'secret')
+    expect(result).toHaveLength(1)
+    expect(result[0]?.email).toBe('')
+  })
+
+  it('issues email fetches in batches of 3 and returns one UpsertPersonInput per fetched person (no silent drops)', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify(makePeopleListResponse(4)), { status: 200 }),
+    )
+    // 4 subsequent email fetches — one per person, in call order p1..p4
+    for (let i = 1; i <= 4; i++) {
+      vi.mocked(fetch).mockResolvedValueOnce(
+        new Response(JSON.stringify({ data: [{ attributes: { address: `p${i}@example.com` } }] }), { status: 200 }),
+      )
+    }
+
+    const result = await fetchAndMapPeople('app-id', 'secret')
+
+    expect(result).toHaveLength(4)
+    // 1 people-list call + 4 email calls
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(5)
+    // First batch (calls 1-3) covers p1-p3, second batch (call 4) covers p4
+    const [batch1Call1] = vi.mocked(fetch).mock.calls[1]!
+    const [batch1Call2] = vi.mocked(fetch).mock.calls[2]!
+    const [batch1Call3] = vi.mocked(fetch).mock.calls[3]!
+    const [batch2Call1] = vi.mocked(fetch).mock.calls[4]!
+    expect(batch1Call1 as string).toContain('/people/p1/emails')
+    expect(batch1Call2 as string).toContain('/people/p2/emails')
+    expect(batch1Call3 as string).toContain('/people/p3/emails')
+    expect(batch2Call1 as string).toContain('/people/p4/emails')
   })
 })
 
