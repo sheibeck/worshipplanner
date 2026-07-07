@@ -1,0 +1,368 @@
+<template>
+  <AppShell>
+    <div class="px-6 py-8">
+      <!-- Page header -->
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <h1 class="text-xl font-semibold text-gray-100">Roster</h1>
+          <p class="text-sm text-gray-400 mt-1">
+            {{ rosterStore.isLoading ? 'Loading...' : `${rosterStore.activePeople.length} active volunteer${rosterStore.activePeople.length !== 1 ? 's' : ''}` }}
+          </p>
+        </div>
+        <div class="flex items-center gap-3">
+          <button
+            @click="importModalOpen = true"
+            class="inline-flex items-center gap-2 rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm font-medium text-gray-200 hover:bg-gray-700 hover:text-white transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            Import from Planning Center
+          </button>
+          <button
+            @click="onAddVolunteer"
+            class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            Add Volunteer
+          </button>
+        </div>
+      </div>
+
+      <!-- Empty state -->
+      <div
+        v-if="!rosterStore.isLoading && rosterStore.people.length === 0"
+        class="flex flex-col items-center justify-center py-20 px-6 text-center rounded-lg border border-gray-800"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-gray-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+        </svg>
+        <h3 class="text-base font-medium text-gray-300 mb-2">No volunteers yet</h3>
+        <p class="text-sm text-gray-500 max-w-sm mb-6">
+          Import your team from Planning Center or add people one at a time.
+        </p>
+        <div class="flex flex-col sm:flex-row items-center gap-3">
+          <button
+            @click="importModalOpen = true"
+            class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 transition-colors"
+          >
+            Import from Planning Center
+          </button>
+          <button
+            @click="onAddVolunteer"
+            class="text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
+          >
+            Add person manually
+          </button>
+        </div>
+      </div>
+
+      <template v-else>
+        <!-- Add/Edit form panel -->
+        <div v-if="formOpen" class="mb-6 rounded-lg border border-gray-700 bg-gray-900 p-5">
+          <h2 class="text-sm font-semibold text-gray-200 mb-4">{{ editingPersonId ? 'Edit Volunteer' : 'Add Volunteer' }}</h2>
+          <form @submit.prevent="onSaveVolunteer" class="space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-medium text-gray-400 mb-1">Name</label>
+                <input
+                  v-model="formName"
+                  type="text"
+                  required
+                  placeholder="Full name"
+                  class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-400 mb-1">Email</label>
+                <input
+                  v-model="formEmail"
+                  type="email"
+                  placeholder="name@example.com"
+                  class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-400 mb-1">
+                  Phone <span class="text-gray-600">(manual — not synced from Planning Center)</span>
+                </label>
+                <input
+                  v-model="formPhone"
+                  type="tel"
+                  placeholder="App-only — enter manually"
+                  class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-400 mb-1">Serve frequency</label>
+                <select
+                  v-model.number="formFrequencyN"
+                  class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                  <option v-for="n in [1, 2, 4]" :key="n" :value="n">{{ nToFrequencyLabel(n) }}</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-400 mb-2">Roles</label>
+              <div class="flex flex-wrap gap-x-4 gap-y-2">
+                <label v-for="role in rosterStore.roles" :key="role.id" class="inline-flex items-center gap-1.5 text-sm text-gray-300">
+                  <input
+                    type="checkbox"
+                    :value="role.id"
+                    v-model="formRoles"
+                    class="rounded border-gray-600 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-gray-900"
+                  />
+                  {{ role.name }}
+                </label>
+                <span v-if="rosterStore.roles.length === 0" class="text-sm text-gray-600">No roles configured yet — add roles below.</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 pt-2">
+              <button
+                type="submit"
+                class="px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors"
+              >Save Volunteer</button>
+              <button
+                type="button"
+                @click="closeForm"
+                class="px-4 py-2 rounded-md text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors"
+              >Cancel</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Active people table -->
+        <div class="rounded-lg border border-gray-800 overflow-hidden">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-gray-800 bg-gray-900/50">
+                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Name</th>
+                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Email</th>
+                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Phone</th>
+                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Roles</th>
+                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Frequency</th>
+                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-800">
+              <template v-for="person in rosterStore.activePeople" :key="person.id">
+                <tr class="hover:bg-gray-800/50 transition-colors">
+                  <td class="px-4 py-3 font-medium text-gray-100">{{ person.name }}</td>
+                  <td class="px-4 py-3 text-gray-300">{{ person.email || '—' }}</td>
+                  <td class="px-4 py-3 text-gray-300">{{ person.phone || '—' }}</td>
+                  <td class="px-4 py-3">
+                    <div class="flex flex-wrap gap-1 items-center">
+                      <span
+                        v-for="badge in personRoleBadges(person)"
+                        :key="badge.roleId"
+                        class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border"
+                        :class="groupBadgeClasses[badge.group]"
+                      >{{ badge.name }}</span>
+                      <span v-if="personRoleBadges(person).length === 0" class="text-gray-600">&mdash;</span>
+                    </div>
+                  </td>
+                  <td class="px-4 py-3 text-gray-300">{{ nToFrequencyLabel(person.frequencyTargetN) }}</td>
+                  <td class="px-4 py-3">
+                    <div class="flex items-center gap-3">
+                      <button @click="onEditPerson(person)" class="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">Edit</button>
+                      <button @click="confirmDeactivateId = person.id" class="text-xs text-red-400 hover:text-red-300 transition-colors">Deactivate</button>
+                    </div>
+                  </td>
+                </tr>
+                <tr v-if="confirmDeactivateId === person.id">
+                  <td colspan="6" class="px-4 py-3 bg-red-900/20 border-t border-b border-red-800">
+                    <p class="text-sm text-red-300">
+                      Deactivate {{ person.name }}? They'll be removed from future schedule proposals and pickers. Their history is kept and they can be reactivated anytime.
+                    </p>
+                    <div class="flex items-center gap-3 mt-3">
+                      <button
+                        @click="onConfirmDeactivate(person.id)"
+                        class="px-3 py-1.5 rounded-md text-xs font-medium text-white bg-red-700 hover:bg-red-600 transition-colors"
+                      >Deactivate</button>
+                      <button
+                        @click="confirmDeactivateId = null"
+                        class="px-3 py-1.5 rounded-md text-xs font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors"
+                      >Cancel</button>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+              <tr v-if="rosterStore.activePeople.length === 0">
+                <td colspan="6" class="px-4 py-6 text-center text-sm text-gray-500">No active volunteers</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Inactive volunteers section -->
+        <div v-if="inactivePeople.length > 0" class="mt-8 border border-gray-700 rounded-xl overflow-hidden">
+          <div class="px-4 py-3 bg-gray-800 border-b border-gray-700">
+            <h2 class="text-sm font-medium text-gray-300">Inactive Volunteers ({{ inactivePeople.length }})</h2>
+            <p class="text-xs text-gray-500 mt-0.5">Removed from schedule proposals and pickers. Reactivate to make them available again.</p>
+          </div>
+          <div class="divide-y divide-gray-800">
+            <div
+              v-for="person in inactivePeople"
+              :key="person.id"
+              class="flex items-center justify-between px-4 py-3 hover:bg-gray-800/40"
+            >
+              <div>
+                <p class="text-sm text-gray-400 line-through">{{ person.name }}</p>
+                <p class="text-xs text-gray-600">{{ person.email || 'No email' }}</p>
+              </div>
+              <button
+                @click="rosterStore.reactivatePerson(person.id)"
+                class="text-xs px-3 py-1.5 rounded-md border border-indigo-700 text-indigo-300 hover:bg-indigo-900/30 transition-colors"
+              >
+                Reactivate
+              </button>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <!-- Roles config panel -->
+      <div class="mt-8">
+        <RolesConfigPanel />
+      </div>
+    </div>
+
+    <!-- PC import modal -->
+    <RosterImportModal
+      :open="importModalOpen"
+      @close="importModalOpen = false"
+      @imported="onImported"
+    />
+  </AppShell>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useAuthStore } from '@/stores/auth'
+import { useRosterStore } from '@/stores/roster'
+import type { Person, RoleGroup } from '@/types/roster'
+import { nToFrequencyLabel } from '@/utils/volunteerCsv'
+import AppShell from '@/components/AppShell.vue'
+import RolesConfigPanel from '@/components/RolesConfigPanel.vue'
+import RosterImportModal from '@/components/RosterImportModal.vue'
+
+const authStore = useAuthStore()
+const rosterStore = useRosterStore()
+
+const inactivePeople = computed(() => rosterStore.people.filter((p) => !p.active))
+
+// ── Import modal ─────────────────────────────────────────────────────────────
+const importModalOpen = ref(false)
+function onImported(count: number) {
+  importModalOpen.value = false
+  console.log(`[RosterView] imported ${count} people`)
+}
+
+// ── Add/Edit form ────────────────────────────────────────────────────────────
+const formOpen = ref(false)
+const editingPersonId = ref<string | null>(null)
+const formName = ref('')
+const formEmail = ref('')
+const formPhone = ref('')
+const formFrequencyN = ref(4)
+const formRoles = ref<string[]>([])
+
+function onAddVolunteer() {
+  editingPersonId.value = null
+  formName.value = ''
+  formEmail.value = ''
+  formPhone.value = ''
+  formFrequencyN.value = 4
+  formRoles.value = []
+  formOpen.value = true
+}
+
+function onEditPerson(person: Person) {
+  editingPersonId.value = person.id
+  formName.value = person.name
+  formEmail.value = person.email
+  formPhone.value = person.phone
+  formFrequencyN.value = person.frequencyTargetN
+  formRoles.value = [...person.roles]
+  formOpen.value = true
+}
+
+function closeForm() {
+  formOpen.value = false
+  editingPersonId.value = null
+}
+
+async function onSaveVolunteer() {
+  const input = {
+    name: formName.value.trim(),
+    email: formEmail.value.trim(),
+    phone: formPhone.value.trim(),
+    roles: formRoles.value,
+    frequencyTargetN: formFrequencyN.value,
+  }
+  if (editingPersonId.value) {
+    await rosterStore.updatePerson(editingPersonId.value, input)
+  } else {
+    await rosterStore.addPerson(input)
+  }
+  closeForm()
+}
+
+// ── Deactivate ───────────────────────────────────────────────────────────────
+const confirmDeactivateId = ref<string | null>(null)
+
+async function onConfirmDeactivate(id: string) {
+  await rosterStore.deactivatePerson(id)
+  confirmDeactivateId.value = null
+}
+
+// ── Role badges ──────────────────────────────────────────────────────────────
+// Static class map — never dynamically constructed Tailwind class strings, so
+// classes survive Tailwind v4 purge (mirrors SongBadge.vue / TeamTagPill.vue).
+const groupBadgeClasses: Record<RoleGroup, string> = {
+  band: 'bg-blue-900/50 text-blue-300 border-blue-800',
+  tech: 'bg-purple-900/50 text-purple-300 border-purple-800',
+  other: 'bg-gray-800 text-gray-400 border-gray-700',
+}
+
+function personRoleBadges(person: Person): Array<{ roleId: string; name: string; group: RoleGroup }> {
+  return person.roles
+    .map((roleId) => rosterStore.roles.find((r) => r.id === roleId))
+    .filter((r): r is NonNullable<typeof r> => r !== undefined)
+    .map((r) => ({ roleId: r.id, name: r.name, group: r.group }))
+}
+
+// ── Lifecycle ────────────────────────────────────────────────────────────────
+let stopSeedWatch: (() => void) | null = null
+
+function initStore() {
+  const orgId = authStore.orgId
+  if (!orgId) return
+  rosterStore.subscribe(orgId)
+  // seedDefaultRolesIfEmpty() checks roles.value.length synchronously, but
+  // Firestore's onSnapshot always resolves asynchronously — calling it
+  // immediately after subscribe() would race with an org that already has
+  // roles and duplicate-seed the defaults. Wait for the first roles snapshot.
+  stopSeedWatch = watch(
+    () => rosterStore.roles,
+    () => {
+      rosterStore.seedDefaultRolesIfEmpty()
+      stopSeedWatch?.()
+      stopSeedWatch = null
+    },
+  )
+}
+
+onMounted(() => {
+  initStore()
+})
+
+onUnmounted(() => {
+  stopSeedWatch?.()
+  stopSeedWatch = null
+  rosterStore.unsubscribeAll()
+})
+</script>
