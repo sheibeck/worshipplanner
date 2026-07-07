@@ -48,7 +48,7 @@ Smart weekly service planning that follows the Vertical Worship methodology (1�
 - Mobile native app — web-first, responsive design serves mobile needs; PWA possible for v2
 - CCLI reporting automation — track numbers but don't file reports
 - Click track/multitracks management — handled outside this app
-- Musician scheduling — handled in Planning Center
+- Musician scheduling — NOW IN SCOPE as of Phase 13 (Volunteer Role Scheduling); volunteers are staffed in-app from a roster + quarterly CSV. See ROADMAP §Phase 13.
 - Offline mode — real-time Firestore is core architecture
 
 ## Context
