@@ -178,7 +178,7 @@ Notes for planner:
 - This reverses the earlier "Musician scheduling — handled in Planning Center" out-of-scope decision in PROJECT.md; update PROJECT.md scope during planning.
 - PC import here is people/teams (Services API), distinct from the Phase 8/9 song + plan export — reuse the existing Planning Center API client and credentials from Phase 8 where possible.
 
-**Plans:** 5/10 plans executed
+**Plans:** 6/10 plans executed
 
 Plans:
 **Wave 1**
@@ -194,7 +194,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 13-06-PLAN.md — Quarters store: lifecycle, CSV apply, propose+persist, share
+- [x] 13-06-PLAN.md — Quarters store: lifecycle, CSV apply, propose+persist, share
 - [ ] 13-07-PLAN.md — Roster UI: view, add/edit, roles config, PC import modal
 
 **Wave 4** *(blocked on Wave 3 completion)*

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: MVP
 status: executing
-stopped_at: Completed 13-01-PLAN.md
-last_updated: "2026-07-07T21:11:38.250Z"
+stopped_at: Completed 13-06-PLAN.md
+last_updated: "2026-07-07T21:44:54.526Z"
 last_activity: 2026-07-07
 progress:
   total_phases: 7
   completed_phases: 5
   total_plans: 31
-  completed_plans: 22
+  completed_plans: 27
   percent: 71
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 13 (volunteer-scheduling-import-servers-from-planning-center-col) — EXECUTING
-Plan: 2 of 10
+Plan: 7 of 10
 Milestone: v1.0 MVP — SHIPPED 2026-03-05
 Next milestone: v1.1 Tasks & Events (not yet started)
 Status: Ready to execute
@@ -70,6 +70,7 @@ Status: Ready to execute
 | Phase 12 P07 | 8min | 2 tasks | 2 files |
 | Phase 12 P08 | 8min | 1 tasks | 3 files |
 | Phase 13 P01 | 5min | 3 tasks | 4 files |
+| Phase 13 P06 | 12min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -107,6 +108,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase 12]: D-16 amended to state generic delete-confirmation wording is the intended/accepted behavior (12-UAT test 8); D-08 amended to describe the single combined tag control sourcing teamTags ∪ themes ∪ tags (Option A)
 - [Phase 13]: Standing (Person.roles/frequencyTargetN) vs quarter-scoped (PersonQuarterData.blackoutDates/pairedWith) field split encoded in roster.ts type contract (D-18)
 - [Phase 13]: DEFAULT_ROLES doc comment reworded to avoid literal 'worship leader' phrase, satisfying both interfaces-block content and acceptance-criteria grep check
+- [Phase 13]: quarters.ts cell edits (assignPerson/clearAssignment/swapAssignment) use Firestore dot-path field keys (calendar.${date}.${roleId}) in updateDoc rather than read-modify-write of the whole calendar map — so concurrent edits to different cells never clobber each other
+- [Phase 13]: applyCsvToQuarter's bidirectional pairing merge only ever adds the reciprocal id to a partner's pairedWith array — never touches a non-CSV partner's other fields, preserving D-19's absent-people-untouched guarantee
 
 ### Roadmap Evolution
 
@@ -152,6 +155,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-07
-Last session: 2026-07-07T21:11:38.191Z
-Stopped at: Completed 13-01-PLAN.md
+Last session: 2026-07-07T21:44:54.485Z
+Stopped at: Completed 13-06-PLAN.md
 Resume file: None
