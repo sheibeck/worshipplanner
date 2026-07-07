@@ -509,24 +509,28 @@ export function proposeQuarterSchedule(
 
 **If this table is empty:** N/A — see entries above.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Does "frequency target" reset or carry forward across quarters, and is it truly editable via CSV each quarter or only in-app?**
+   - **RESOLVED (D-18 / Plan 01):** Frequency target is a STANDING Person field (`frequencyTargetN`), set once and carried forward; the CSV re-import is a convenience upsert path for that standing field (assumption A2), NOT a quarter-scoped value. The roster type contract in Plan 01 (`src/types/roster.ts`) fixes the schema accordingly.
    - What we know: D-18 says roles+frequency are "standing data, set once, carried forward"; D-19 says CSV re-import "overwrites... frequency."
    - What's unclear: Whether the CSV is merely a convenience upsert path for a standing field (assumption A2, recommended) or whether frequency is secretly meant to be quarter-scoped like blackouts.
    - Recommendation: Confirm with the user before finalizing the Firestore schema; the reconciliation in A2 is implementable either way but the schema differs.
 
 2. **What happens when a pairing partner has zero eligible roles active for a given date (e.g., a date override removed the only role they can fill)?**
+   - **RESOLVED (Plan 02):** Modeled as a separate `pairingConflicts` array returned by `proposeQuarterSchedule` (distinct from unfilled slots), so the grid UI (Plan 09, D-23) renders a distinct amber "pairing conflict" flag rather than a plain "Unfilled" slot.
    - What we know: D-09/D-07 establish pairing as hard, D-10 establishes unfillable-slot flagging as the pattern for "can't be honored."
    - What's unclear: Whether a pairing-can't-be-honored case should surface identically to an "Unfilled" role slot, or as a visually distinct "Pairing broken" flag (recommended, since the *cause* — and the fix — differs: an unfilled slot needs a new candidate, a broken pairing needs the leader to manually place the pinned partner or adjust that date's roles).
    - Recommendation: Model as a separate `pairingConflicts` array (as designed above) so the grid UI (D-23) can render a distinct visual treatment.
 
 3. **Should the "furthest below target" deficit computation reset to 0 at the start of every quarter, or carry a running history across quarters?**
+   - **RESOLVED (Plan 02):** Deficit resets to `served=0` at the start of every quarter — no cross-quarter fairness history is tracked; fairness is self-consistent within a single quarter, implemented in the scheduler tie-break (D-11).
    - What we know: D-18 only discusses blackout dates resetting per quarter; nothing in the decisions addresses cross-quarter fairness history.
    - What's unclear: A person who served heavily last quarter and is "ahead" going into a new quarter — should that carry forward, or does every quarter start fair/fresh?
    - Recommendation: Reset to 0 each quarter (simplest, no extra history-tracking infrastructure, and self-consistent within a single quarter's ~13 dates) — flag as the default the planner should implement unless the user says otherwise.
 
 4. **Is "role" grouping (Band/Tech/Other) itself editable, or only the roles within fixed groups?**
+   - **RESOLVED (Plan 01):** Groups are a FIXED 3-value `RoleGroup` enum (Band/Tech/Other, assumption A5); only the individual roles WITHIN those groups are editable (add/rename/change-count/delete via Plan 05/Plan 07). Groups themselves are not user-creatable.
    - What we know: D-03 lists three named groups with defaults and says "the role list is editable... add/rename/remove."
    - What's unclear: Whether "the role list" refers only to individual roles or also to the enclosing groups.
    - Recommendation: Ship with a fixed 3-group enum (per assumption A5) unless the user clarifies during `/gsd:discuss-phase` follow-up or plan review that groups themselves must be creatable.
