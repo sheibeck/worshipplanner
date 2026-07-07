@@ -178,7 +178,7 @@ Notes for planner:
 - This reverses the earlier "Musician scheduling — handled in Planning Center" out-of-scope decision in PROJECT.md; update PROJECT.md scope during planning.
 - PC import here is people/teams (Services API), distinct from the Phase 8/9 song + plan export — reuse the existing Planning Center API client and credentials from Phase 8 where possible.
 
-**Plans:** 1/10 plans executed
+**Plans:** 5/10 plans executed
 
 Plans:
 **Wave 1**
@@ -187,10 +187,10 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 13-02-PLAN.md — Deterministic weighted-fair-share scheduler (TDD)
-- [ ] 13-03-PLAN.md — Volunteer CSV parse / blackout-range / name-match util (TDD)
-- [ ] 13-04-PLAN.md — Planning Center people fetch (name/email; phone app-only)
-- [ ] 13-05-PLAN.md — Roster store: people + editable roles, soft-delete, upsert
+- [x] 13-02-PLAN.md — Deterministic weighted-fair-share scheduler (TDD)
+- [x] 13-03-PLAN.md — Volunteer CSV parse / blackout-range / name-match util (TDD)
+- [x] 13-04-PLAN.md — Planning Center people fetch (name/email; phone app-only)
+- [x] 13-05-PLAN.md — Roster store: people + editable roles, soft-delete, upsert
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
