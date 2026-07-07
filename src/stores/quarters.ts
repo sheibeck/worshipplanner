@@ -6,6 +6,7 @@ import {
   addDoc,
   updateDoc,
   doc,
+  setDoc,
   serverTimestamp,
   query,
   orderBy,
@@ -232,6 +233,46 @@ export const useQuartersStore = defineStore('quarters', () => {
     })
   }
 
+  // Finalize + public share (D-24). No Planning Center write of any kind (D-21) — the
+  // quarterSnapshot is a denormalized, read-only copy resolving person NAMES (not raw ids)
+  // so the public view needs no roster access and no PII beyond names is exposed (T-13-06-02).
+  async function finalizeAndShare(quarterId: string): Promise<string> {
+    if (!orgId.value) throw new Error('No orgId set — call subscribe() first')
+    const quarter = getQuarter(quarterId)
+    const rosterStore = useRosterStore()
+
+    // Cryptographically random 36-char hex token (144-bit entropy) — same generator as
+    // services.ts's createShareToken.
+    const array = new Uint8Array(18)
+    crypto.getRandomValues(array)
+    const token = Array.from(array, (b) => b.toString(16).padStart(2, '0')).join('')
+
+    const nameById = new Map(rosterStore.people.map((p) => [p.id, p.name]))
+    const calendarWithNames: Record<string, Record<string, string[]>> = {}
+    for (const [date, roleMap] of Object.entries(quarter.calendar)) {
+      calendarWithNames[date] = {}
+      for (const [roleId, personIds] of Object.entries(roleMap)) {
+        calendarWithNames[date]![roleId] = personIds.map((id) => nameById.get(id) ?? id)
+      }
+    }
+
+    await setDoc(doc(db, 'shareTokens', token), {
+      orgId: orgId.value,
+      quarterId,
+      quarterSnapshot: {
+        label: quarter.label,
+        serviceDates: quarter.serviceDates,
+        roles: rosterStore.roles.map((r) => ({ id: r.id, name: r.name, group: r.group })),
+        calendar: calendarWithNames,
+      },
+      createdAt: serverTimestamp(),
+    })
+
+    await updateQuarter(quarterId, { status: 'finalized', shareToken: token })
+
+    return token
+  }
+
   return {
     quarters,
     isLoading,
@@ -248,5 +289,6 @@ export const useQuartersStore = defineStore('quarters', () => {
     assignPerson,
     clearAssignment,
     swapAssignment,
+    finalizeAndShare,
   }
 })
