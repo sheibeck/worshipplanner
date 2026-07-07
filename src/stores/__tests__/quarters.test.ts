@@ -274,4 +274,206 @@ describe('useQuartersStore', () => {
       expect(overrides['2026-07-12']).toEqual([{ roleId: 'role-drums', count: 1 }])
     })
   })
+
+  describe('applyCsvToQuarter — per-person replace (D-19)', () => {
+    it('replaces present persons personQuarterData wholesale and upserts standing fields', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useQuartersStore } = await import('../quarters')
+      const store = useQuartersStore()
+      store.subscribe('org-1')
+      triggerQuartersSnapshot([
+        makeQuarterDoc({
+          personQuarterData: {
+            'person-a': { personId: 'person-a', blackoutDates: ['2026-07-05'], pairedWith: [] },
+          },
+        }),
+      ])
+
+      await store.applyCsvToQuarter('quarter-1', [
+        {
+          personId: 'person-a',
+          standing: { name: 'Person A', roles: ['role-guitar'] },
+          blackoutDates: ['2026-07-12'],
+          pairedWith: [],
+        },
+      ])
+
+      expect(mockUpdatePerson).toHaveBeenCalledWith('person-a', { name: 'Person A', roles: ['role-guitar'] })
+      const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+      const pqd = data.personQuarterData as Record<string, { blackoutDates: string[] }>
+      expect(pqd['person-a']!.blackoutDates).toEqual(['2026-07-12'])
+    })
+
+    it('leaves an absent persons personQuarterData entry unchanged', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useQuartersStore } = await import('../quarters')
+      const store = useQuartersStore()
+      store.subscribe('org-1')
+      triggerQuartersSnapshot([
+        makeQuarterDoc({
+          personQuarterData: {
+            'person-c': { personId: 'person-c', blackoutDates: ['2026-07-19'], pairedWith: [] },
+          },
+        }),
+      ])
+
+      await store.applyCsvToQuarter('quarter-1', [
+        {
+          personId: 'person-a',
+          standing: { name: 'Person A' },
+          blackoutDates: [],
+          pairedWith: [],
+        },
+      ])
+
+      const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+      const pqd = data.personQuarterData as Record<string, { blackoutDates: string[] }>
+      expect(pqd['person-c']).toEqual({ personId: 'person-c', blackoutDates: ['2026-07-19'], pairedWith: [] })
+    })
+
+    it('applies pairings bidirectionally', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useQuartersStore } = await import('../quarters')
+      const store = useQuartersStore()
+      store.subscribe('org-1')
+      triggerQuartersSnapshot([makeQuarterDoc({ personQuarterData: {} })])
+
+      await store.applyCsvToQuarter('quarter-1', [
+        {
+          personId: 'person-a',
+          standing: { name: 'Person A' },
+          blackoutDates: [],
+          pairedWith: ['person-b'],
+        },
+      ])
+
+      const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+      const pqd = data.personQuarterData as Record<string, { pairedWith: string[] }>
+      expect(pqd['person-a']!.pairedWith).toEqual(['person-b'])
+      expect(pqd['person-b']!.pairedWith).toEqual(['person-a'])
+    })
+  })
+
+  describe('buildResolveRolesForDate', () => {
+    it('returns per-date override when present, else default template in role.order order', async () => {
+      const { useQuartersStore } = await import('../quarters')
+      const store = useQuartersStore()
+      const quarter = makeQuarterDoc({
+        roleOverridesByDate: { '2026-07-05': [{ roleId: 'role-drums', count: 2 }] },
+      }) as unknown as import('@/types/roster').Quarter
+      const roles = [
+        makeRole({ id: 'role-drums', order: 1, defaultCount: 1 }),
+        makeRole({ id: 'role-guitar', order: 0, defaultCount: 1 }),
+      ]
+
+      const resolve = store.buildResolveRolesForDate(quarter, roles)
+
+      expect(resolve('2026-07-05')).toEqual([{ roleId: 'role-drums', count: 2 }])
+      expect(resolve('2026-07-12')).toEqual([
+        { roleId: 'role-guitar', count: 1 },
+        { roleId: 'role-drums', count: 1 },
+      ])
+    })
+  })
+
+  describe('generateProposal — propose→persist bridge', () => {
+    it('regenerate calls proposeQuarterSchedule with existingCalendar undefined and persists result', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useQuartersStore } = await import('../quarters')
+      const store = useQuartersStore()
+      store.subscribe('org-1')
+      triggerQuartersSnapshot([makeQuarterDoc({ calendar: { '2026-07-05': { 'role-guitar': ['person-a'] } } })])
+      mockRosterState.activePeople = [makePerson({ id: 'person-a' })]
+      mockRosterState.roles = [makeRole()]
+      mockProposeQuarterSchedule.mockReturnValue({
+        calendar: { '2026-07-05': { 'role-guitar': ['person-b'] } },
+        servedCounts: {},
+        unfilled: [],
+        pairingConflicts: [],
+      })
+
+      const result = await store.generateProposal('quarter-1', 'regenerate')
+
+      expect(mockProposeQuarterSchedule).toHaveBeenCalledOnce()
+      const args = mockProposeQuarterSchedule.mock.calls[0]!
+      expect(args[4]).toBeUndefined()
+      expect(result.calendar).toEqual({ '2026-07-05': { 'role-guitar': ['person-b'] } })
+      const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+      expect(data.calendar).toEqual({ '2026-07-05': { 'role-guitar': ['person-b'] } })
+    })
+
+    it('fillGaps passes the existing calendar as existingCalendar', async () => {
+      const { useQuartersStore } = await import('../quarters')
+      const store = useQuartersStore()
+      store.subscribe('org-1')
+      const existingCalendar = { '2026-07-05': { 'role-guitar': ['person-a'] } }
+      triggerQuartersSnapshot([makeQuarterDoc({ calendar: existingCalendar })])
+      mockRosterState.activePeople = [makePerson({ id: 'person-a' })]
+      mockRosterState.roles = [makeRole()]
+      mockProposeQuarterSchedule.mockReturnValue({
+        calendar: existingCalendar,
+        servedCounts: {},
+        unfilled: [],
+        pairingConflicts: [],
+      })
+
+      await store.generateProposal('quarter-1', 'fillGaps')
+
+      const args = mockProposeQuarterSchedule.mock.calls[0]!
+      expect(args[4]).toEqual(existingCalendar)
+    })
+  })
+
+  describe('cell edits — assign/clear/swap (D-22)', () => {
+    it('assignPerson adds a personId to the target cell without duplication', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useQuartersStore } = await import('../quarters')
+      const store = useQuartersStore()
+      store.subscribe('org-1')
+      triggerQuartersSnapshot([
+        makeQuarterDoc({ calendar: { '2026-07-05': { 'role-guitar': ['person-a'] } } }),
+      ])
+
+      await store.assignPerson('quarter-1', '2026-07-05', 'role-guitar', 'person-b')
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+      expect(data['calendar.2026-07-05.role-guitar']).toEqual(['person-a', 'person-b'])
+    })
+
+    it('clearAssignment removes one personId from the target cell', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useQuartersStore } = await import('../quarters')
+      const store = useQuartersStore()
+      store.subscribe('org-1')
+      triggerQuartersSnapshot([
+        makeQuarterDoc({ calendar: { '2026-07-05': { 'role-guitar': ['person-a', 'person-b'] } } }),
+      ])
+
+      await store.clearAssignment('quarter-1', '2026-07-05', 'role-guitar', 'person-a')
+
+      const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+      expect(data['calendar.2026-07-05.role-guitar']).toEqual(['person-b'])
+    })
+
+    it('swapAssignment replaces fromPersonId with toPersonId in that cell only', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useQuartersStore } = await import('../quarters')
+      const store = useQuartersStore()
+      store.subscribe('org-1')
+      triggerQuartersSnapshot([
+        makeQuarterDoc({
+          calendar: {
+            '2026-07-05': { 'role-guitar': ['person-a'], 'role-drums': ['person-c'] },
+          },
+        }),
+      ])
+
+      await store.swapAssignment('quarter-1', '2026-07-05', 'role-guitar', 'person-a', 'person-d')
+
+      const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+      expect(data['calendar.2026-07-05.role-guitar']).toEqual(['person-d'])
+      expect(data['calendar.2026-07-05.role-drums']).toBeUndefined()
+    })
+  })
 })
