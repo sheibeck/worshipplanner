@@ -5,6 +5,7 @@ import {
   onSnapshot,
   addDoc,
   updateDoc,
+  deleteDoc,
   doc,
   serverTimestamp,
   query,
@@ -12,7 +13,8 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore'
 import { db } from '@/firebase'
-import type { Person, UpsertPersonInput } from '@/types/roster'
+import type { Person, Role, UpsertPersonInput } from '@/types/roster'
+import { DEFAULT_ROLES } from '@/types/roster'
 
 // Normalize a name for re-import matching: trim, collapse internal whitespace, lowercase.
 function normalizeName(name: string): string {
@@ -21,10 +23,12 @@ function normalizeName(name: string): string {
 
 export const useRosterStore = defineStore('roster', () => {
   const people = ref<Person[]>([])
+  const roles = ref<Role[]>([])
   const isLoading = ref(true)
   const orgId = ref<string | null>(null)
 
   let unsubscribePeopleFn: Unsubscribe | null = null
+  let unsubscribeRolesFn: Unsubscribe | null = null
 
   // active === true only — inactive (soft-deleted) people are excluded (D-20).
   const activePeople = computed(() => people.value.filter((p) => p.active))
@@ -32,6 +36,9 @@ export const useRosterStore = defineStore('roster', () => {
   function subscribe(orgIdValue: string) {
     if (unsubscribePeopleFn) {
       unsubscribePeopleFn()
+    }
+    if (unsubscribeRolesFn) {
+      unsubscribeRolesFn()
     }
     orgId.value = orgIdValue
     const peopleQuery = query(
@@ -42,13 +49,25 @@ export const useRosterStore = defineStore('roster', () => {
       people.value = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Person)
       isLoading.value = false
     })
+
+    // Roles ordered by `order` ascending — drives the scheduler's stable inner loop.
+    const rolesQuery = query(
+      collection(db, 'organizations', orgIdValue, 'roles'),
+      orderBy('order'),
+    )
+    unsubscribeRolesFn = onSnapshot(rolesQuery, (snap) => {
+      roles.value = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Role)
+    })
   }
 
   function unsubscribeAll() {
     unsubscribePeopleFn?.()
     unsubscribePeopleFn = null
+    unsubscribeRolesFn?.()
+    unsubscribeRolesFn = null
     orgId.value = null
     people.value = []
+    roles.value = []
     isLoading.value = true
   }
 
@@ -152,8 +171,49 @@ export const useRosterStore = defineStore('roster', () => {
     return { added, updated }
   }
 
+  // Seeds the grouped default role list (guitar/drums/vocals/bass/sound/
+  // livestream/projection/scripture reader — see DEFAULT_ROLES) only when the
+  // org has no roles yet. Calling this again once roles exist writes nothing.
+  async function seedDefaultRolesIfEmpty(): Promise<void> {
+    if (!orgId.value) return
+    if (roles.value.length !== 0) return
+    for (const role of DEFAULT_ROLES) {
+      await addDoc(collection(db, 'organizations', orgId.value, 'roles'), {
+        ...role,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      })
+    }
+  }
+
+  async function addRole(input: Omit<Role, 'id'>): Promise<string> {
+    if (!orgId.value) throw new Error('No orgId set — call subscribe() first')
+    const docRef = await addDoc(collection(db, 'organizations', orgId.value, 'roles'), {
+      ...input,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    })
+    return docRef.id
+  }
+
+  async function updateRole(id: string, patch: Partial<Omit<Role, 'id'>>): Promise<void> {
+    if (!orgId.value) return
+    await updateDoc(doc(db, 'organizations', orgId.value, 'roles', id), {
+      ...patch,
+      updatedAt: serverTimestamp(),
+    })
+  }
+
+  async function deleteRole(id: string): Promise<void> {
+    if (!orgId.value) return
+    // Hard-delete the role config doc — clearing this role's assignments
+    // across quarters is handled by the quarters store / UI (Plan 06/08).
+    await deleteDoc(doc(db, 'organizations', orgId.value, 'roles', id))
+  }
+
   return {
     people,
+    roles,
     isLoading,
     orgId,
     activePeople,
@@ -164,5 +224,9 @@ export const useRosterStore = defineStore('roster', () => {
     deactivatePerson,
     reactivatePerson,
     upsertPeople,
+    seedDefaultRolesIfEmpty,
+    addRole,
+    updateRole,
+    deleteRole,
   }
 })

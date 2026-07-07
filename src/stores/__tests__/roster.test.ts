@@ -373,7 +373,7 @@ describe('useRosterStore', () => {
         { name: 'New Person', email: 'n@example.com', pcPersonId: 'pc-2' },
       ])
 
-      const updateData = vi.mocked(updateDoc).mock.calls[0]![1] as Record<string, unknown>
+      const updateData = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
       const addData = vi.mocked(addDoc).mock.calls[0]![1] as Record<string, unknown>
       expect(updateData.blackoutDates).toBeUndefined()
       expect(updateData.pairedWith).toBeUndefined()
