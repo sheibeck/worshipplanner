@@ -1,5 +1,6 @@
 import type { Service, ServiceSlot, ScriptureRef } from '@/types/service'
 import type { Song } from '@/types/song'
+import type { UpsertPersonInput } from '@/types/roster'
 import { formatScriptureRef } from '@/utils/planningCenterExport'
 import { fetchPassageText } from '@/utils/esvApi'
 
@@ -996,3 +997,88 @@ export async function addSlotAsItem(
     sequence,
   })
 }
+
+/**
+ * Raw PC person shape returned from the Planning Center Services v2 People API.
+ * NOTE: Services v2 has no phone-number vertex (RESEARCH.md Pitfall 5 / Assumption A1) —
+ * only name fields are read from this endpoint.
+ */
+interface PcPerson {
+  id: string
+  attributes: { first_name?: string; last_name?: string; name?: string }
+}
+
+/**
+ * Fetch all people from Planning Center Services v2, following pagination via links.next.
+ * Mirrors fetchAllPcSongs's pagination + 429-retry + proxy-URL-rewrite pattern
+ * (src/utils/pcSongImport.ts).
+ *
+ * Do NOT add any phone-number related include or nested resource fetch here — Services v2
+ * has no such vertex and it would 404 (RESEARCH.md Pitfall 5 / Assumption A1). Phone is an
+ * app-only field (D-14), always set to '' by mapPcPersonToUpsert.
+ */
+export async function fetchAllPeople(appId: string, secret: string): Promise<PcPerson[]> {
+  const authHeader = basicAuthHeader(appId, secret)
+
+  let url: string | undefined = `${PC_BASE_URL}/people?per_page=100`
+  const allPeople: PcPerson[] = []
+
+  while (url) {
+    let response: Response
+    // Retry on 429 respecting Retry-After
+    for (let attempt = 0; ; attempt++) {
+      response = await fetch(url, {
+        headers: { Authorization: authHeader, Accept: 'application/json' },
+      })
+      if (response.status !== 429 || attempt >= 3) break
+      const retryAfter = response.headers.get('Retry-After')
+      const waitMs = retryAfter ? parseFloat(retryAfter) * 1000 : 60_000
+      await new Promise((r) => setTimeout(r, waitMs))
+    }
+
+    if (!response!.ok) {
+      throw new Error(`Failed to fetch people: ${response!.status}`)
+    }
+
+    const json = (await response.json()) as {
+      data: PcPerson[]
+      links: { next?: string; self: string }
+    }
+
+    allPeople.push(...json.data)
+
+    // Follow pagination — rewrite absolute PC URL to local proxy path
+    if (json.links.next) {
+      url = json.links.next.replace(
+        'https://api.planningcenteronline.com/services/v2',
+        PC_BASE_URL,
+      )
+    } else {
+      url = undefined
+    }
+  }
+
+  return allPeople
+}
+
+/**
+ * Pure: PC person + its resolved emails → UpsertPersonInput.
+ * `phone` is ALWAYS '' — PC Services v2 has no phone vertex (D-14 app-only field,
+ * RESEARCH.md Pitfall 5). Standing fields (active/roles/frequencyTargetN) are left
+ * to the store's upsert defaults and intentionally omitted here.
+ */
+export function mapPcPersonToUpsert(person: PcPerson, emails: string[]): UpsertPersonInput {
+  const { attributes } = person
+  const name =
+    attributes.name && attributes.name.trim() !== ''
+      ? attributes.name
+      : `${attributes.first_name ?? ''} ${attributes.last_name ?? ''}`.trim()
+
+  return {
+    name,
+    email: emails[0] ?? '',
+    phone: '', // PC Services v2 has no phone vertex — D-14 app-only field
+    pcPersonId: person.id,
+  }
+}
+

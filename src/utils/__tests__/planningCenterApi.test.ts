@@ -31,6 +31,8 @@ import {
   fetchLastScheduledItem,
   createItemNote,
   fetchPlanTimes,
+  fetchAllPeople,
+  mapPcPersonToUpsert,
 } from '@/utils/planningCenterApi'
 
 const mockTimestamp = { toDate: () => new Date('2026-03-08') } as unknown as Timestamp
@@ -1487,6 +1489,127 @@ describe('fetchPlanTimes', () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response('Server Error', { status: 500 }))
 
     await expect(fetchPlanTimes('app', 'sec', 'ST', 'P')).rejects.toThrow('Failed to fetch plan times: 500')
+  })
+})
+
+describe('fetchAllPeople', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  it('follows links.next across 2 pages and returns the concatenated people array', async () => {
+    const page1 = {
+      data: [
+        { id: 'p1', attributes: { first_name: 'Ann', last_name: 'Lee', name: 'Ann Lee' } },
+      ],
+      links: {
+        self: 'https://api.planningcenteronline.com/services/v2/people?per_page=100&offset=0',
+        next: 'https://api.planningcenteronline.com/services/v2/people?per_page=100&offset=100',
+      },
+    }
+    const page2 = {
+      data: [
+        { id: 'p2', attributes: { first_name: 'Bo', last_name: 'Ray', name: 'Bo Ray' } },
+      ],
+      links: {
+        self: 'https://api.planningcenteronline.com/services/v2/people?per_page=100&offset=100',
+      },
+    }
+
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(JSON.stringify(page1), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(page2), { status: 200 }))
+
+    const result = await fetchAllPeople('app-id', 'secret')
+
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2)
+    expect(result).toHaveLength(2)
+    expect(result[0]?.id).toBe('p1')
+    expect(result[1]?.id).toBe('p2')
+  })
+
+  it('rewrites the absolute PC next-link URL to the proxy path before the second fetch', async () => {
+    const page1 = {
+      data: [{ id: 'p1', attributes: { name: 'Ann Lee' } }],
+      links: {
+        self: 'https://api.planningcenteronline.com/services/v2/people?per_page=100&offset=0',
+        next: 'https://api.planningcenteronline.com/services/v2/people?per_page=100&offset=100',
+      },
+    }
+    const page2 = {
+      data: [{ id: 'p2', attributes: { name: 'Bo Ray' } }],
+      links: { self: 'https://api.planningcenteronline.com/services/v2/people?per_page=100&offset=100' },
+    }
+
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(JSON.stringify(page1), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(page2), { status: 200 }))
+
+    await fetchAllPeople('app-id', 'secret')
+
+    const [secondUrl] = vi.mocked(fetch).mock.calls[1]!
+    expect(secondUrl as string).not.toContain('api.planningcenteronline.com')
+    expect(secondUrl as string).toContain('/api/planningcenter/services/v2/people')
+  })
+
+  it('retries a 429 response respecting Retry-After, then succeeds', async () => {
+    const okResponse = {
+      data: [{ id: 'p1', attributes: { name: 'Ann Lee' } }],
+      links: { self: 'https://api.planningcenteronline.com/services/v2/people' },
+    }
+
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response('Too Many Requests', { status: 429, headers: { 'Retry-After': '0' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(okResponse), { status: 200 }))
+
+    const result = await fetchAllPeople('app-id', 'secret')
+
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2)
+    expect(result).toHaveLength(1)
+    expect(result[0]?.id).toBe('p1')
+  })
+
+  it('throws when the final response is not ok', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('Server Error', { status: 500 }))
+    await expect(fetchAllPeople('app-id', 'secret')).rejects.toThrow('Failed to fetch people: 500')
+  })
+})
+
+describe('mapPcPersonToUpsert', () => {
+  it('builds name from attributes.name when present', () => {
+    const person = { id: 'p1', attributes: { name: 'Ann Lee', first_name: 'Ann', last_name: 'Lee' } }
+    const result = mapPcPersonToUpsert(person, ['ann@example.com'])
+    expect(result.name).toBe('Ann Lee')
+  })
+
+  it('builds name from first_name + last_name trimmed when attributes.name is absent', () => {
+    const person = { id: 'p2', attributes: { first_name: 'Bo', last_name: 'Ray' } }
+    const result = mapPcPersonToUpsert(person, [])
+    expect(result.name).toBe('Bo Ray')
+  })
+
+  it('sets email from the first supplied email', () => {
+    const person = { id: 'p3', attributes: { name: 'Cy Doe' } }
+    const result = mapPcPersonToUpsert(person, ['cy@example.com', 'other@example.com'])
+    expect(result.email).toBe('cy@example.com')
+  })
+
+  it('yields email "" (no throw) when emails array is empty', () => {
+    const person = { id: 'p4', attributes: { name: 'Dee Fox' } }
+    const result = mapPcPersonToUpsert(person, [])
+    expect(result.email).toBe('')
+  })
+
+  it('sets phone to "" ALWAYS', () => {
+    const person = { id: 'p5', attributes: { name: 'Eli Gray' } }
+    const result = mapPcPersonToUpsert(person, ['eli@example.com'])
+    expect(result.phone).toBe('')
+  })
+
+  it('sets pcPersonId to the person id', () => {
+    const person = { id: 'pc-99', attributes: { name: 'Fay Hall' } }
+    const result = mapPcPersonToUpsert(person, [])
+    expect(result.pcPersonId).toBe('pc-99')
   })
 })
 
