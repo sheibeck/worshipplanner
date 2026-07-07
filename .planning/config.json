@@ -9,5 +9,8 @@
     "verifier": false,
     "_auto_chain_active": false
   },
-  "granularity": "coarse"
+  "granularity": "coarse",
+  "graphify": {
+    "enabled": true
+  }
 }

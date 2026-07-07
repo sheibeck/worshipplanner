@@ -34,3 +34,11 @@ coverage/
 
 # Crash dumps
 *.stackdump
+
+# Graphify knowledge graph
+# We use the gsd graphify command, which reads/writes .planning/graphs/.
+# graph.json + GRAPH_REPORT.md + graph.html are committed so graphify runs on clone.
+# Regenerable diff cache (rebuilt by `/gsd:graphify build`):
+.planning/graphs/.last-build-snapshot.json
+# Standalone graphify CLI output — unused; gsd graphify is canonical:
+graphify-out/
