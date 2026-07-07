@@ -1,3 +1,5 @@
+import type { Person } from '@/types/roster'
+
 /**
  * One parsed CSV row before name reconciliation. rolesRaw/serveWithRaw are
  * names as typed in the CSV (matched to Role.id / Person.id later, in the
@@ -10,6 +12,14 @@ export interface ParsedVolunteerRow {
   blackoutCellRaw: string
   serveWithRaw: string[]
   warnings: string[]
+}
+
+export type NameMatchStatus = 'matched' | 'unmatched' | 'ambiguous'
+
+export interface NameMatchResult {
+  status: NameMatchStatus
+  personId: string | null
+  candidates: string[]
 }
 
 /**
@@ -126,5 +136,38 @@ export function parseVolunteerCsvRow(row: Record<string, string>): ParsedVolunte
     blackoutCellRaw,
     serveWithRaw,
     warnings,
+  }
+}
+
+/**
+ * Normalize a name for comparison: trim, collapse internal whitespace,
+ * lowercase. Used to match CSV names against roster people (D-16, Pitfall 4).
+ */
+function normalizeName(s: string): string {
+  return s.trim().replace(/\s+/g, ' ').toLowerCase()
+}
+
+/**
+ * Match a CSV name to an existing roster person, normalizing both sides
+ * (trim + collapse whitespace + lowercase) before comparing. Never
+ * fuzzy-matches beyond that — any non-exact-after-normalization case is
+ * surfaced as 'unmatched'/'ambiguous' for human resolution (D-16, T-13-03-02).
+ */
+export function matchNameToPerson(name: string, roster: Person[]): NameMatchResult {
+  const target = normalizeName(name)
+  const matches = roster.filter((person) => normalizeName(person.name) === target)
+
+  if (matches.length === 0) {
+    return { status: 'unmatched', personId: null, candidates: [] }
+  }
+
+  if (matches.length === 1) {
+    return { status: 'matched', personId: matches[0]!.id, candidates: [] }
+  }
+
+  return {
+    status: 'ambiguous',
+    personId: null,
+    candidates: matches.map((p) => p.id),
   }
 }
