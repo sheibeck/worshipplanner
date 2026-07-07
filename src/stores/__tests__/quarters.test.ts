@@ -476,4 +476,82 @@ describe('useQuartersStore', () => {
       expect(data['calendar.2026-07-05.role-drums']).toBeUndefined()
     })
   })
+
+  describe('finalizeAndShare — public share token (D-21, D-24)', () => {
+    it('generates a 36-char hex token via crypto.getRandomValues (Uint8Array(18))', async () => {
+      const { useQuartersStore } = await import('../quarters')
+      const store = useQuartersStore()
+      store.subscribe('org-1')
+      triggerQuartersSnapshot([makeQuarterDoc()])
+      mockRosterState.people = []
+      mockRosterState.roles = []
+
+      const token = await store.finalizeAndShare('quarter-1')
+
+      expect(token).toHaveLength(36)
+      expect(token).toMatch(/^[0-9a-f]{36}$/)
+      expect(crypto.getRandomValues).toHaveBeenCalledWith(expect.any(Uint8Array))
+      const calledArg = vi.mocked(crypto.getRandomValues).mock.calls[0]![0] as Uint8Array
+      expect(calledArg.length).toBe(18)
+    })
+
+    it('writes shareTokens/{token} with a denormalized quarterSnapshot resolving person NAMES', async () => {
+      const { setDoc, doc } = await import('firebase/firestore')
+      const { useQuartersStore } = await import('../quarters')
+      const store = useQuartersStore()
+      store.subscribe('org-1')
+      triggerQuartersSnapshot([
+        makeQuarterDoc({
+          label: 'Q3 2026',
+          serviceDates: ['2026-07-05'],
+          calendar: { '2026-07-05': { 'role-guitar': ['person-a'] } },
+        }),
+      ])
+      mockRosterState.people = [makePerson({ id: 'person-a', name: 'Sarah Smith' })]
+      mockRosterState.roles = [makeRole({ id: 'role-guitar', name: 'guitar' })]
+
+      const token = await store.finalizeAndShare('quarter-1')
+
+      expect(setDoc).toHaveBeenCalledOnce()
+      const [docRef, data] = vi.mocked(setDoc).mock.calls[0]!
+      expect((docRef as unknown as { id: string }).id).toBe(token)
+      const writeData = data as Record<string, unknown>
+      expect(writeData.orgId).toBe('org-1')
+      expect(writeData.quarterId).toBe('quarter-1')
+      const snapshot = writeData.quarterSnapshot as Record<string, unknown>
+      expect(snapshot.label).toBe('Q3 2026')
+      const calendar = snapshot.calendar as Record<string, Record<string, string[]>>
+      expect(calendar['2026-07-05']!['role-guitar']).toEqual(['Sarah Smith'])
+      expect(doc).toHaveBeenCalled()
+    })
+
+    it('sets the quarter status finalized + shareToken via updateDoc', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useQuartersStore } = await import('../quarters')
+      const store = useQuartersStore()
+      store.subscribe('org-1')
+      triggerQuartersSnapshot([makeQuarterDoc()])
+      mockRosterState.people = []
+      mockRosterState.roles = []
+
+      const token = await store.finalizeAndShare('quarter-1')
+
+      const updateCall = vi.mocked(updateDoc).mock.calls.find((call) => {
+        const d = call[1] as unknown as Record<string, unknown>
+        return d.status === 'finalized'
+      })
+      expect(updateCall).toBeDefined()
+      const data = updateCall![1] as unknown as Record<string, unknown>
+      expect(data.status).toBe('finalized')
+      expect(data.shareToken).toBe(token)
+    })
+
+    it('never calls Planning Center write functions (D-21)', async () => {
+      const fs = await import('node:fs')
+      const path = await import('node:path')
+      const filePath = path.resolve(path.dirname(new URL(import.meta.url).pathname).replace(/^\/([A-Za-z]:)/, '$1'), '../quarters.ts')
+      const source = fs.readFileSync(filePath, 'utf-8')
+      expect(/planningCenterApi|addTeamToPlan|createPlan|createItem/.test(source)).toBe(false)
+    })
+  })
 })
