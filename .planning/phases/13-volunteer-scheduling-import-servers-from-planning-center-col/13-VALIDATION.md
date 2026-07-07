@@ -115,5 +115,3 @@ implementation; the `❌ W0` markers above clear as those plans execute.*
 - [x] `nyquist_compliant: true` set in frontmatter
 
 **Approval:** ready — validation map populated from Plans 01-10; logic covered by Vitest, presentation gated by `vue-tsc` + blocking human-verify checkpoints.
-</content>
-</invoke>
