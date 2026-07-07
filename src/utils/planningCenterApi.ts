@@ -1,5 +1,6 @@
 import type { Service, ServiceSlot, ScriptureRef } from '@/types/service'
 import type { Song } from '@/types/song'
+import type { UpsertPersonInput } from '@/types/roster'
 import { formatScriptureRef } from '@/utils/planningCenterExport'
 import { fetchPassageText } from '@/utils/esvApi'
 
@@ -996,3 +997,129 @@ export async function addSlotAsItem(
     sequence,
   })
 }
+
+/**
+ * Raw PC person shape returned from the Planning Center Services v2 People API.
+ * NOTE: Services v2 has no phone-number vertex (RESEARCH.md Pitfall 5 / Assumption A1) —
+ * only name fields are read from this endpoint.
+ */
+interface PcPerson {
+  id: string
+  attributes: { first_name?: string; last_name?: string; name?: string }
+}
+
+/**
+ * Fetch all people from Planning Center Services v2, following pagination via links.next.
+ * Mirrors fetchAllPcSongs's pagination + 429-retry + proxy-URL-rewrite pattern
+ * (src/utils/pcSongImport.ts).
+ *
+ * Do NOT add any phone-number related include or nested resource fetch here — Services v2
+ * has no such vertex and it would 404 (RESEARCH.md Pitfall 5 / Assumption A1). Phone is an
+ * app-only field (D-14), always set to '' by mapPcPersonToUpsert.
+ */
+export async function fetchAllPeople(appId: string, secret: string): Promise<PcPerson[]> {
+  const authHeader = basicAuthHeader(appId, secret)
+
+  let url: string | undefined = `${PC_BASE_URL}/people?per_page=100`
+  const allPeople: PcPerson[] = []
+
+  while (url) {
+    let response: Response
+    // Retry on 429 respecting Retry-After
+    for (let attempt = 0; ; attempt++) {
+      response = await fetch(url, {
+        headers: { Authorization: authHeader, Accept: 'application/json' },
+      })
+      if (response.status !== 429 || attempt >= 3) break
+      const retryAfter = response.headers.get('Retry-After')
+      const waitMs = retryAfter ? parseFloat(retryAfter) * 1000 : 60_000
+      await new Promise((r) => setTimeout(r, waitMs))
+    }
+
+    if (!response!.ok) {
+      throw new Error(`Failed to fetch people: ${response!.status}`)
+    }
+
+    const json = (await response.json()) as {
+      data: PcPerson[]
+      links: { next?: string; self: string }
+    }
+
+    allPeople.push(...json.data)
+
+    // Follow pagination — rewrite absolute PC URL to local proxy path
+    if (json.links.next) {
+      url = json.links.next.replace(
+        'https://api.planningcenteronline.com/services/v2',
+        PC_BASE_URL,
+      )
+    } else {
+      url = undefined
+    }
+  }
+
+  return allPeople
+}
+
+/**
+ * Pure: PC person + its resolved emails → UpsertPersonInput.
+ * `phone` is ALWAYS '' — PC Services v2 has no phone vertex (D-14 app-only field,
+ * RESEARCH.md Pitfall 5). Standing fields (active/roles/frequencyTargetN) are left
+ * to the store's upsert defaults and intentionally omitted here.
+ */
+export function mapPcPersonToUpsert(person: PcPerson, emails: string[]): UpsertPersonInput {
+  const { attributes } = person
+  const name =
+    attributes.name && attributes.name.trim() !== ''
+      ? attributes.name
+      : `${attributes.first_name ?? ''} ${attributes.last_name ?? ''}`.trim()
+
+  return {
+    name,
+    email: emails[0] ?? '',
+    phone: '', // PC Services v2 has no phone vertex — D-14 app-only field
+    pcPersonId: person.id,
+  }
+}
+
+/**
+ * Fetch a person's emails from the nested Services v2 endpoint.
+ * Returns the `address` attribute for each email, or [] on a non-ok response.
+ */
+async function fetchPersonEmails(appId: string, secret: string, personId: string): Promise<string[]> {
+  const response = await fetch(`${PC_BASE_URL}/people/${personId}/emails`, {
+    headers: {
+      Authorization: basicAuthHeader(appId, secret),
+      Accept: 'application/json',
+    },
+  })
+  if (!response.ok) return []
+  const json = (await response.json()) as { data: Array<{ attributes: { address: string } }> }
+  return json.data.map((e) => e.attributes.address)
+}
+
+/**
+ * Orchestrator: fetch all PC people, then fetch each person's emails (batched by 3 to
+ * respect PC rate limits, mirroring fetchAndMapPcSongs's arrangement-batching), map, and
+ * return a preview-ready UpsertPersonInput[] without writing to Firestore.
+ */
+export async function fetchAndMapPeople(appId: string, secret: string): Promise<UpsertPersonInput[]> {
+  const people = await fetchAllPeople(appId, secret)
+
+  const BATCH_SIZE = 3
+  const results: UpsertPersonInput[] = []
+
+  for (let i = 0; i < people.length; i += BATCH_SIZE) {
+    const batch = people.slice(i, i + BATCH_SIZE)
+    const mappedBatch = await Promise.all(
+      batch.map(async (person) => {
+        const emails = await fetchPersonEmails(appId, secret, person.id)
+        return mapPcPersonToUpsert(person, emails)
+      }),
+    )
+    results.push(...mappedBatch)
+  }
+
+  return results
+}
+
