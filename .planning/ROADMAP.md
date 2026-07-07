@@ -146,6 +146,29 @@ Gap-closure plans (from 12-UAT, 2026-07-02 — Option A tag-UI unification, no d
 - [x] 12-07-PLAN.md — Shared control: convert TagFilterChecklist to fixed-height dropdown/popover (header stops growing) + widen picker to the three-field union (closes UAT test 3, popover + picker)
 - [x] 12-08-PLAN.md — Docs only: correct D-16/12-05-SUMMARY/ROADMAP to describe generic delete-confirmation wording as intended (closes UAT test 8, doc_update_only)
 
+### Phase 13: Volunteer Role Scheduling
+
+**Goal:** Let worship leaders staff every worship role across a quarter's service dates from a managed volunteer roster and an auto-proposed, manually-editable roster calendar. Roles span three groups: worship band (guitar, drums, vocals, bass), worship tech (sound, livestream, projection), and scripture reader. A role can hold multiple people on a given Sunday (e.g. several vocalists), and one person can serve multiple roles on the same Sunday (e.g. plays an instrument and also sings). (Worship leaders are NOT scheduled by this tool — the leaders assign themselves manually, so "worship leader" is not a role here.) Volunteers are seeded by importing servers from Planning Center (Services), then refined each quarter with a CSV import carrying per-person blackout dates (dates they cannot serve), required co-scheduling pairings (e.g. kids who must serve on the same dates as their serving parent), and the role(s) each person serves. The app generates a proposed quarterly calendar that assigns people to roles on each service date while honoring unavailability and pairing constraints and balancing load per each person's serve-frequency weight ("how often do you want to serve"), which the leader can then adjust by hand before finalizing.
+**Depends on:** Phase 12
+**Requirements**: TBD (derive during /gsd-discuss-phase 13 — candidate areas below)
+
+Scope (from user request):
+1. Role model — configurable schedulable roles (defaults: band = guitar/drums/vocals/bass; tech = sound/livestream/projection; scripture reader), each in a group; leader can add/rename/remove. A role can hold multiple people on one Sunday (e.g. several vocalists); one person can hold multiple roles on the same Sunday (e.g. instrument + vocals). "Worship leader" is intentionally NOT a role — leaders self-assign.
+2. Volunteer roster — add/manage people who serve; each person has one or more roles they can fill and a serve-frequency **target** (1-in-N cadence — e.g. weekly, twice a month, once a month) that drives how the balancer spreads them out. Seed via import from Planning Center Services (people + team/role membership).
+3. Quarterly availability collection — capture each volunteer's blackout dates (dates they cannot serve) for the quarter. The real-world trigger is a quarterly email asking when people can NOT serve; the app ingests those results.
+4. CSV import — bulk import people with optional blackout dates, required co-scheduling pairings (person → must-serve-with person, same dates / own roles), and the role(s) each serves.
+5. Auto-proposed calendar — generate a quarterly assignment of people to roles across service dates. Blackout dates and pairings are HARD constraints; the 1-in-N frequency target is SOFT (balanced toward, bent to fill). When a slot has no eligible person, leave it empty and flag it rather than violate a blackout.
+6. Manual adjustment — edit the proposed calendar (reassign / swap / clear / add a second person to a role) before finalizing.
+
+Notes for planner:
+- This reverses the earlier "Musician scheduling — handled in Planning Center" out-of-scope decision in PROJECT.md; update PROJECT.md scope during planning.
+- PC import here is people/teams (Services API), distinct from the Phase 8/9 song + plan export — reuse the existing Planning Center API client and credentials from Phase 8 where possible.
+
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 13 to break down)
+
 ## Backlog
 
 ### Phase 999.1: Extract shared song-browse component (Songs page + service-plan picker) (BACKLOG)

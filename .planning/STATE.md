@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.0
-milestone_name: milestone
+milestone_name: MVP
 status: executing
-stopped_at: Completed 12-08-PLAN.md
-last_updated: "2026-07-02T22:06:59.657Z"
-last_activity: 2026-07-02
+stopped_at: Phase 13 context gathered
+last_updated: "2026-07-07T03:51:15.444Z"
+last_activity: "2026-07-03 - Completed quick task 260703-246: Exclude soft-deleted songs from AI suggestions"
 progress:
   total_phases: 7
   completed_phases: 5
   total_plans: 21
   completed_plans: 21
-  percent: 100
+  percent: 71
 ---
 
 # Project State
@@ -114,6 +114,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - Phase 10 added: Worship song export naming, template import improvements, auto-add teams on import, orchestra filter for song suggestions
 - Phase 11 added: Song catalog & service planner improvements (catalog browsing/search, themes, metadata search, drag-drop ordering & autosave bug fixes, hide-by-tag, AI hidden-song exclusion, column sorting, delete confirmation)
 - Phase 12 added: Advanced song search (metadata-aware + field-scoped syntax) and multi-select persistent tag filtering across the service-plan picker and Songs panel
+- Phase 13 added: Volunteer Role Scheduling — roster + PC people import (name/email/phone), editable roles (band/tech/scripture reader; worship leader intentionally NOT a role — leaders self-assign) with multi-person-per-role and multi-role-per-person, per-person 1-in-N serve-frequency target, quarterly blackout dates + must-serve-with pairings via name-matched CSV, auto-proposed frequency-balanced quarterly grid (dates×roles) with manual editing. NOTE: reverses PROJECT.md "Musician scheduling — out of scope" decision.
 
 ### Quick Tasks Completed
 
@@ -148,6 +149,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-03 - Completed quick task 260703-246: Exclude soft-deleted songs from AI suggestions
-Last session: 2026-07-03T05:31:24.168Z
-Stopped at: Completed 12-08-PLAN.md
-Resume file: None
+Last session: 2026-07-07T03:51:15.411Z
+Stopped at: Phase 13 context gathered
+Resume file: .planning/phases/13-volunteer-scheduling-import-servers-from-planning-center-col/13-CONTEXT.md
