@@ -4,7 +4,26 @@ import {
   frequencyLabelToN,
   nToFrequencyLabel,
   expandBlackoutCell,
+  matchNameToPerson,
 } from '@/utils/volunteerCsv'
+import type { Person } from '@/types/roster'
+
+function makePerson(id: string, name: string, active = true): Person {
+  return {
+    id,
+    name,
+    email: '',
+    phone: '',
+    active,
+    roles: [],
+    frequencyTargetN: 4,
+    pcPersonId: null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    createdAt: null as any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    updatedAt: null as any,
+  }
+}
 
 describe('parseVolunteerCsvRow', () => {
   it('parses a well-formed row into a ParsedVolunteerRow', () => {
@@ -123,5 +142,50 @@ describe('expandBlackoutCell', () => {
       serviceDates,
     )
     expect(result).toEqual(['2026-08-09', '2026-08-16'])
+  })
+})
+
+describe('matchNameToPerson', () => {
+  it('matches despite double internal whitespace', () => {
+    const roster = [makePerson('p1', 'sarah  smith')]
+    const result = matchNameToPerson('Sarah Smith', roster)
+    expect(result).toEqual({ status: 'matched', personId: 'p1', candidates: [] })
+  })
+
+  it('matches despite trailing whitespace', () => {
+    const roster = [makePerson('p1', 'Sarah Smith ')]
+    const result = matchNameToPerson('Sarah Smith', roster)
+    expect(result.status).toBe('matched')
+    expect(result.personId).toBe('p1')
+  })
+
+  it('returns ambiguous with all candidate ids when two people normalize the same', () => {
+    const roster = [makePerson('p1', 'Chris'), makePerson('p2', 'chris ')]
+    const result = matchNameToPerson('Chris', roster)
+    expect(result.status).toBe('ambiguous')
+    expect(result.personId).toBeNull()
+    expect(result.candidates.sort()).toEqual(['p1', 'p2'])
+  })
+
+  it('returns unmatched with null personId when no roster entry normalizes the same', () => {
+    const roster = [makePerson('p1', 'Sarah Smith')]
+    const result = matchNameToPerson('Nobody Here', roster)
+    expect(result).toEqual({ status: 'unmatched', personId: null, candidates: [] })
+  })
+
+  it('includes inactive people in matching (caller decides eligibility)', () => {
+    const roster = [makePerson('p1', 'Sarah Smith', false)]
+    const result = matchNameToPerson('Sarah Smith', roster)
+    expect(result.status).toBe('matched')
+    expect(result.personId).toBe('p1')
+  })
+
+  it('does not mutate the roster input and is deterministic across calls', () => {
+    const roster = [makePerson('p1', 'Sarah Smith')]
+    const snapshot = JSON.stringify(roster)
+    const first = matchNameToPerson('Sarah Smith', roster)
+    const second = matchNameToPerson('Sarah Smith', roster)
+    expect(JSON.stringify(roster)).toBe(snapshot)
+    expect(first).toEqual(second)
   })
 })
