@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: MVP
 status: executing
-stopped_at: Phase 13 UI-SPEC approved
-last_updated: "2026-07-07T20:54:14.907Z"
+stopped_at: Completed 13-01-PLAN.md
+last_updated: "2026-07-07T21:11:38.250Z"
 last_activity: 2026-07-07
 progress:
   total_phases: 7
   completed_phases: 5
   total_plans: 31
-  completed_plans: 21
-  percent: 68
+  completed_plans: 22
+  percent: 71
 ---
 
 # Project State
@@ -21,12 +21,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 12 — advanced-song-search-and-multi-select-persistent-tag-filteri
+**Current focus:** Phase 13 — volunteer-scheduling-import-servers-from-planning-center-col
 
 ## Current Position
 
-Phase: 999.1
-Plan: Not started
+Phase: 13 (volunteer-scheduling-import-servers-from-planning-center-col) — EXECUTING
+Plan: 2 of 10
 Milestone: v1.0 MVP — SHIPPED 2026-03-05
 Next milestone: v1.1 Tasks & Events (not yet started)
 Status: Ready to execute
@@ -69,6 +69,7 @@ Status: Ready to execute
 | Phase 12 P06 | 20min | 1 tasks | 4 files |
 | Phase 12 P07 | 8min | 2 tasks | 2 files |
 | Phase 12 P08 | 8min | 1 tasks | 3 files |
+| Phase 13 P01 | 5min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -104,6 +105,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase 12]: Store, component, and view filterTag removal landed in a single atomic commit to keep vue-tsc --build green at every commit boundary
 - [Phase 12]: Kept TagFilterChecklist.vue fully presentational (internal open ref only, no store import) so both Songs panel and picker inherit the popover for free
 - [Phase 12]: D-16 amended to state generic delete-confirmation wording is the intended/accepted behavior (12-UAT test 8); D-08 amended to describe the single combined tag control sourcing teamTags ∪ themes ∪ tags (Option A)
+- [Phase 13]: Standing (Person.roles/frequencyTargetN) vs quarter-scoped (PersonQuarterData.blackoutDates/pairedWith) field split encoded in roster.ts type contract (D-18)
+- [Phase 13]: DEFAULT_ROLES doc comment reworded to avoid literal 'worship leader' phrase, satisfying both interfaces-block content and acceptance-criteria grep check
 
 ### Roadmap Evolution
 
@@ -149,6 +152,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-07
-Last session: 2026-07-07T12:08:19.445Z
-Stopped at: Phase 13 UI-SPEC approved
-Resume file: .planning/phases/13-volunteer-scheduling-import-servers-from-planning-center-col/13-UI-SPEC.md
+Last session: 2026-07-07T21:11:38.191Z
+Stopped at: Completed 13-01-PLAN.md
+Resume file: None
