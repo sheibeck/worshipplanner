@@ -27,6 +27,12 @@ created: 2026-07-07
 
 ---
 
+## Visual Hierarchy
+
+The **quarter scheduling grid (`QuarterView.vue`) is the primary visual anchor** of this phase's main screen — it occupies the dominant content area, is the first thing the eye lands on, and is where the leader spends the bulk of their time spotting gaps and balancing load (D-22/D-23). The **roster list is secondary**: it lives on its own route/view (`RosterView.vue`) for people management (add/import/deactivate) and is referenced from the grid only via the gap-filling panel's candidate lists, never competing with the grid for primary attention on the schedule screen.
+
+---
+
 ## Spacing Scale
 
 Declared values (must be multiples of 4) — **no new scale introduced; this is the scale already in use project-wide**:
@@ -34,33 +40,37 @@ Declared values (must be multiples of 4) — **no new scale introduced; this is 
 | Token | Value | Usage |
 |-------|-------|-------|
 | xs | 4px | Icon gaps, badge internal padding (`px-2 py-0.5`) |
-| sm | 8px | Compact element spacing, `gap-2`/`gap-3` between inline controls |
-| md | 12–16px | Table/grid cell padding (`px-4 py-3`), default element spacing |
+| sm | 8px | Compact element spacing, `gap-2`/`gap-3` between inline controls, quarter-grid cell padding (`px-2 py-2`) |
+| md | 16px | Table/grid cell padding (`px-4 py-3`), default element spacing |
 | lg | 24px | Section padding, page header margin (`mb-6`) |
 | xl | 32px | Layout gaps between major page regions |
 | 2xl | 48px | Major section breaks (e.g. empty-state vertical padding `py-20`) |
 | 3xl | 64px | Not used at page level in this phase |
 
-Exceptions: **Quarter grid cells** (dates × roles) use tighter `px-3 py-2` cell padding (12px/8px) to keep a full quarter (~13 rows × ~7–10 role columns) legible without horizontal scroll on a standard laptop viewport — this is a deliberate density exception for the grid only, consistent with the existing `SongTable.vue` row density (`px-4 py-3`) being slightly loosened, not tightened, elsewhere.
+Exceptions: **none.** The quarter grid (dates × roles) uses the `sm` token (8px, `px-2 py-2`) for cell padding — tighter than the standard `md` table padding (`px-4 py-3`) so a full quarter (~13 rows × ~7–10 role columns) stays legible without horizontal scroll on a standard laptop viewport, but still a discrete value drawn from the standard scale (no 12px, no ranges).
 
 ---
 
 ## Typography
 
-Reusing the exact scale already established across `PcImportModal.vue`, `SongsView.vue`, `SongTable.vue` — **no new sizes or weights introduced**.
+Core scale — reusing sizes/weights already established across `PcImportModal.vue`, `SongsView.vue`, `SongTable.vue`. **4 sizes, 2 weights, no new values introduced.**
 
 | Role | Size | Weight | Line Height |
 |------|------|--------|-------------|
+| Caption / label | 12px (`text-xs`) | 400 regular | 1.4 |
 | Body | 14px (`text-sm`) | 400 regular | 1.5 (`leading-normal`) |
-| Label | 12px (`text-xs`) | 500 medium* | 1.4 |
 | Heading | 16px (`text-base`) | 600 semibold | 1.2 (`leading-tight`) |
-| Display | 20px (`text-xl`) | 600 semibold | 1.2 |
+| Display / stat number | 20px (`text-xl`) | 600 semibold | 1.2 |
 
-\* **Existing codebase exception, carried forward (not a new decision):** the app uses a 3rd weight — 500 medium — project-wide for buttons, table headers, and pill/badge text (e.g. `PcImportModal.vue` footer buttons, `SongTable.vue` `<th>` headers). The 2 primary weights for headings/body remain 400/600; 500 is an established UI-chrome exception this phase must match, not deviate from.
+Stat/count numbers (import preview counts, the grid summary bar's "N unfilled" / "N pairing conflicts") use the **Display 20px / 600** row above — this phase deliberately specifies `text-xl` (20px) rather than the `text-2xl` (24px) that `PcImportModal.vue`'s preview panel happens to use, to keep the contract at 4 discrete sizes. New stat displays in this phase are 20px.
 
-Additional established micro-pattern to reuse: table headers and grid column headers are `text-xs font-medium text-gray-400 uppercase tracking-wider` (see `SongTable.vue` `<th>`). The quarter grid's role-column headers must use this exact treatment.
+### Locked Exceptions (documented deviations — do NOT expand the core scale above)
 
-Stat/count numbers (e.g. import preview counts, "N unfilled slots" summary) use 24px (`text-2xl font-bold`) per `PcImportModal.vue`'s preview panel — reuse for the grid's summary bar (unfilled count, pairing-conflict count).
+| # | Exception | Justification | Existing-codebase evidence |
+|---|-----------|---------------|-----------------------------|
+| T-1 | **500 medium (`font-medium`)** used for UI chrome only: button labels, table/grid column headers, badge/pill text | This is a genuine, pervasive, codebase-wide convention. Every button and `<th>` in the app is `font-medium`; dropping it to 400 or 600 would require restyling every existing control (out of this phase's scope) and would make new components visibly inconsistent with old ones. The 2 core content weights (400 body, 600 heading/display) are unchanged — 500 is chrome-only. | `PcImportModal.vue` footer buttons (`text-sm font-medium`), `SongTable.vue` `<th>` (`text-xs font-medium ... uppercase tracking-wider`), `TeamTagPill.vue` / `SongBadge.vue` (`text-xs font-medium`), `SettingsView.vue` Save button (`text-sm font-medium`) |
+
+Additional established micro-pattern to reuse: table headers and grid column headers are `text-xs font-medium text-gray-400 uppercase tracking-wider` (see `SongTable.vue` `<th>` — combines the 12px Caption size with the T-1 500-weight exception). The quarter grid's role-column headers must use this exact treatment.
 
 ---
 
@@ -72,7 +82,7 @@ Dark-mode palette, reusing the exact tokens already in use — **no new base tok
 |------|-------|-------|
 | Dominant (60%) | `#030712` gray-950 (`bg-gray-950`, set globally on `html/body/#app`) | App background |
 | Secondary (30%) | `#111827` gray-900 (cards/modals) and `#1f2937` gray-800 (inputs, nested panels, secondary buttons) | Roster list rows, quarter grid container, modal bodies, CSV drop zone, table header row background |
-| Accent (10%) | `#4f46e5` indigo-600 (`bg-indigo-600 hover:bg-indigo-500`) | **Reserved exclusively for:** primary CTA buttons ("Import from Planning Center", "Import Volunteer CSV", "Generate Schedule", "Save"), the active/selected grid-cell outline when editing an assignment, checkbox/radio accent (`text-indigo-600`), focus rings (`focus:ring-indigo-500`), text links (person names that open detail, CCLI-style links), progress bar fill, and selected-row tint (`bg-indigo-900/10`) |
+| Accent (10%) | `#4f46e5` indigo-600 (`bg-indigo-600 hover:bg-indigo-500`) | **Reserved exclusively for:** primary CTA buttons ("Import from Planning Center", "Import Volunteer CSV", "Generate Schedule", "Save Volunteer", "Save Role" — see Copywriting Contract), the active/selected grid-cell outline when editing an assignment, checkbox/radio accent (`text-indigo-600`), focus rings (`focus:ring-indigo-500`), text links (person names that open detail, CCLI-style links), progress bar fill, and selected-row tint (`bg-indigo-900/10`) |
 | Destructive | `#b91c1c` red-700 / `#991b1b` red-800 (`bg-red-700 hover:bg-red-600` for buttons; `bg-red-900/20 border-red-800` for banners) | Reserved for: "Deactivate person" confirm button, "Delete Role" confirm button, "Unfilled" slot flag/badge, blackout indicator, PC/CSV import error banners |
 
 Accent reserved for: primary CTA buttons, selected/active grid cell, form focus rings, checkbox accents, in-page navigational links, progress indicators. **Never** applied to passive/decorative surfaces, badges, or informational chips.
@@ -99,6 +109,8 @@ This phase has multiple distinct flows (roster import, CSV import, schedule gene
 | Primary CTA — schedule generation (first run) | "Generate Schedule" |
 | Primary CTA — schedule generation (re-run with existing assignments) | "Regenerate" (destructive-adjacent — see confirmation row below) and "Fill Remaining Gaps" (non-destructive, only touches unfilled cells) |
 | Primary CTA — add person manually | "Add Volunteer" |
+| Primary CTA — save person detail form (add/edit volunteer: name, phone, roles, frequency) | "Save Volunteer" |
+| Primary CTA — save role config (add/rename role, edit default counts) | "Save Role" |
 | Primary CTA — finalize + share | "Finalize & Share" |
 | Empty state heading — roster | "No volunteers yet" |
 | Empty state body — roster | "Import your team from Planning Center or add people one at a time." with actions "Import from Planning Center" (primary) / "Add person manually" (secondary text link) — mirrors `SongTable.vue`'s empty-state layout exactly |
@@ -130,7 +142,7 @@ Not applicable — no shadcn, no component registries (first-party or third-part
 
 These extend the template's structural sections with phase-specific detail flagged in CONTEXT.md as "Claude's Discretion — defer detailed layout to /gsd:ui-phase 13":
 
-- **Quarter grid (D-22/D-23):** rows = service Sundays (date + weekday, `text-sm font-medium text-gray-100` left-most sticky column), columns = roles grouped by Band/Tech/Other with a group-colored header band (blue/purple/gray per the Color section above), cells = comma-or-stacked person chips (reuse the pill shape from `TeamTagPill.vue`: `rounded-full px-2 py-0.5 text-xs font-medium border`). Unfilled cells render as a dashed-border empty slot (`border border-dashed border-gray-700`) with the red "Unfilled" badge, matching the dashed-add-affordance style already used in `SongTable.vue`'s inline tag-add button.
+- **Quarter grid (D-22/D-23):** rows = service Sundays (date + weekday, `text-sm font-medium text-gray-100` left-most sticky column), columns = roles grouped by Band/Tech/Other with a group-colored header band (blue/purple/gray per the Color section above), cells = comma-or-stacked person chips (reuse the pill shape from `TeamTagPill.vue`: `rounded-full px-2 py-0.5 text-xs font-medium border`). Cell padding is `px-2 py-2` (the `sm` 8px spacing token). Unfilled cells render as a dashed-border empty slot (`border border-dashed border-gray-700`) with the red "Unfilled" badge, matching the dashed-add-affordance style already used in `SongTable.vue`'s inline tag-add button.
 - **Gap-filling panel (D-23):** click/expand an unfilled or low-fill cell to reveal two inline lists directly under the grid row: "Blacked out today" (gray-500 strikethrough names, mirrors `SongsView.vue`'s hidden-song list styling) and "Available, not yet assigned" (green-tinted list per the semantic-color table above), so the leader can see who to contact without leaving the grid.
 - **Role badges (D-03):** static class-map pattern per `SongBadge.vue`/`TeamTagPill.vue` (never dynamically constructed Tailwind class strings, to survive Tailwind v4 purge) — Band roles blue, Tech roles purple, Other/Scripture gray, exactly mirroring the existing VW Type 1/2/3 badge convention.
 - **Import modals (roster PC import + quarterly CSV import):** both must be built as near-exact structural clones of `PcImportModal.vue` (idle → fetching → preview → importing → done/error) and `CsvImportModal.vue` (select/drop-zone → parsing → preview-with-checkboxes → importing-with-progress-bar → done), respectively — same Teleport/Transition wrapper, same modal chrome (`max-w-lg`/`max-w-3xl`, `bg-gray-900 rounded-xl border border-gray-700 shadow-2xl`), same footer button layout.
