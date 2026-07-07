@@ -164,10 +164,19 @@ Notes for planner:
 - This reverses the earlier "Musician scheduling — handled in Planning Center" out-of-scope decision in PROJECT.md; update PROJECT.md scope during planning.
 - PC import here is people/teams (Services API), distinct from the Phase 8/9 song + plan export — reuse the existing Planning Center API client and credentials from Phase 8 where possible.
 
-**Plans:** 0 plans
+**Plans:** 10 plans
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 13 to break down)
+- [ ] 13-01-PLAN.md — Roster types contract + quarter-Sunday generator (foundation)
+- [ ] 13-02-PLAN.md — Deterministic weighted-fair-share scheduler (TDD)
+- [ ] 13-03-PLAN.md — Volunteer CSV parse / blackout-range / name-match util (TDD)
+- [ ] 13-04-PLAN.md — Planning Center people fetch (name/email; phone app-only)
+- [ ] 13-05-PLAN.md — Roster store: people + editable roles, soft-delete, upsert
+- [ ] 13-06-PLAN.md — Quarters store: lifecycle, CSV apply, propose+persist, share
+- [ ] 13-07-PLAN.md — Roster UI: view, add/edit, roles config, PC import modal
+- [ ] 13-08-PLAN.md — Quarter setup + CSV import UI + /schedule route
+- [ ] 13-09-PLAN.md — Editable dates×roles grid + gap-filling panel
+- [ ] 13-10-PLAN.md — Printable roster + public read-only share link
 
 ## Backlog
 
