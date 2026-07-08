@@ -60,6 +60,9 @@
                 v-for="preset in FREQ_PRESETS"
                 :key="preset.key"
                 type="button"
+                data-role="freq-preset"
+                :data-preset="preset.key"
+                :data-active="activePresetKey === preset.key"
                 class="px-3 py-1.5 rounded-md text-xs font-medium border transition-colors"
                 :class="presetButtonClass(preset.key)"
                 @click="selectPreset(preset.key)"
@@ -136,6 +139,8 @@
                 </p>
                 <button
                   type="button"
+                  data-role="sunday-cell"
+                  :data-date="date"
                   class="rounded-md border px-2 py-2 text-xs font-semibold text-center transition-transform active:scale-95"
                   :class="isBlackedOut(date)
                     ? 'bg-red-900/30 border-red-700/60 text-red-300 line-through'
@@ -306,6 +311,14 @@ const quarter = computed(() => {
 
 const serviceDates = computed<string[]>(() => quarter.value?.serviceDates ?? [])
 
+// Declared ahead of loadDraft/the immediate watcher below (which runs synchronously
+// during setup) so they're initialized before first use — refs declared later in this
+// file would still be in the temporal dead zone when the immediate watcher fires.
+const rangeStart = ref('')
+const rangeEnd = ref('')
+const pairQuery = ref('')
+const pairMenuOpen = ref(false)
+
 function loadDraft(personId: string) {
   const person = rosterStore.people.find((p) => p.id === personId)
   const pqd = quarter.value?.personQuarterData[personId]
@@ -433,9 +446,6 @@ function toggleNth(n: number) {
   }
 }
 
-const rangeStart = ref('')
-const rangeEnd = ref('')
-
 function applyRange() {
   if (!rangeStart.value || !rangeEnd.value) return
   for (const d of serviceDates.value) {
@@ -450,9 +460,6 @@ function clearAllBlackouts() {
 }
 
 // ── Must-serve-with typeahead ────────────────────────────────────────────────
-const pairQuery = ref('')
-const pairMenuOpen = ref(false)
-
 const pairCandidates = computed(() => {
   const q = pairQuery.value.trim().toLowerCase()
   return rosterStore.people
