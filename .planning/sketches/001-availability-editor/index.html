@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sketch 001 — Quarter Availability Editor</title>
+<link rel="stylesheet" href="../themes/default.css" />
+<style>
+  body { padding-top: 46px; }
+
+  /* ---- variant tab bar ---- */
+  #variant-nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 9998;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 7px 14px; display: flex; gap: 6px; align-items: center;
+  }
+  #variant-nav .brand { font-weight: 700; font-size: 13px; margin-right: 10px; color: var(--text-dim); }
+  .variant-tab {
+    background: transparent; color: var(--text-dim); border: 1px solid transparent;
+    padding: 5px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 500;
+  }
+  .variant-tab:hover { color: var(--text); background: var(--surface-2); }
+  .variant-tab.active { color: #fff; background: var(--accent); border-color: var(--accent); }
+
+  .variant { display: none; }
+  .variant.active { display: block; }
+
+  /* ---- app chrome ---- */
+  .app { max-width: 1200px; margin: 0 auto; padding: 22px; }
+  .page-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px; flex-wrap: wrap; gap: 8px; }
+  .page-head h1 { font-size: 20px; }
+  .quarter-pill { font-size: 12px; color: var(--text-dim); background: var(--surface-2); border: 1px solid var(--border); padding: 3px 10px; border-radius: 999px; }
+  .sub { color: var(--text-dim); font-size: 13px; margin: 2px 0 18px; max-width: 62ch; }
+  .toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+  .search { flex: 1; min-width: 180px; background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: var(--radius-sm); padding: 8px 11px; font-size: 13px; }
+  .filter-chip { font-size: 12px; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text-dim); }
+  .filter-chip.on { color: #fff; background: var(--surface-3); border-color: var(--surface-3); }
+
+  /* ---- role chips ---- */
+  .rolechip { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; margin: 1px 2px 1px 0; white-space: nowrap; }
+  .rolechip.band  { color: #93c5fd; background: var(--band-bg);  border: 1px solid var(--band-bd); }
+  .rolechip.tech  { color: #d8b4fe; background: var(--tech-bg);  border: 1px solid var(--tech-bd); }
+  .rolechip.other { color: #d1d5db; background: var(--other-bg); border: 1px solid var(--other-bd); }
+
+  /* ---- status pill ---- */
+  .status { font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
+  .status.regular { color: #86efac; background: var(--ok-bg); border: 1px solid rgba(34,197,94,0.4); }
+  .status.fillin  { color: #fcd34d; background: var(--warn-bg); border: 1px solid var(--warn-bd); }
+  .status.out     { color: #fca5a5; background: var(--danger-bg); border: 1px solid rgba(239,68,68,0.4); }
+
+  /* ---- table ---- */
+  table.roster { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.roster thead th { text-align: left; color: var(--text-faint); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  table.roster tbody tr { border-bottom: 1px solid var(--border-soft); cursor: pointer; }
+  table.roster tbody tr:hover { background: var(--surface); }
+  table.roster tbody tr.sel { background: rgba(59,130,246,0.08); box-shadow: inset 3px 0 0 var(--accent); }
+  table.roster td { padding: 10px 12px; vertical-align: middle; }
+  .name-cell { font-weight: 600; color: var(--text); }
+  .blk-summary { color: var(--text-dim); }
+  .blk-summary .none { color: var(--text-faint); font-style: italic; }
+  .pair-summary { color: #d8b4fe; font-size: 12px; }
+  .edit-hint { color: var(--text-faint); font-size: 16px; }
+
+  /* mini frequency preview badge inside table */
+  .freq-badge { font-size: 11px; font-weight: 600; color: var(--text-dim); background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 2px 9px; }
+
+  /* ---- editor (shared) ---- */
+  .editor { }
+  .editor .who { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+  .editor .who h2 { font-size: 17px; }
+  .editor .who .email { color: var(--text-faint); font-size: 12px; }
+  .ed-section { border-top: 1px solid var(--border-soft); padding: 16px 0; }
+  .ed-section:first-of-type { border-top: none; }
+  .ed-label { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-faint); font-weight: 700; margin-bottom: 9px; display: flex; align-items: center; gap: 8px; }
+  .ed-label .hint { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--text-faint); font-size: 11px; }
+
+  /* segmented frequency control */
+  .seg { display: flex; flex-wrap: wrap; gap: 6px; }
+  .seg button { background: var(--surface-2); color: var(--text-dim); border: 1px solid var(--border); padding: 7px 12px; border-radius: var(--radius-sm); font-size: 12.5px; font-weight: 500; }
+  .seg button:hover { color: var(--text); border-color: var(--surface-3); }
+  .seg button.on { color: #fff; background: var(--accent); border-color: var(--accent); }
+  .seg button.on.fillin { background: var(--warn); border-color: var(--warn); color: #1a1206; }
+  .seg button.on.out { background: var(--danger); border-color: var(--danger); }
+  .freq-readout { margin-top: 10px; font-size: 12.5px; color: var(--text-dim); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .freq-readout b { color: var(--text); }
+  .adv { margin-left: auto; display: flex; align-items: center; gap: 6px; color: var(--text-faint); font-size: 12px; }
+  .adv input { width: 52px; background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 4px 6px; font-size: 12px; text-align: center; }
+
+  /* blackout: input modes */
+  .blk-modes { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .nth-chip { font-size: 12px; padding: 5px 11px; border-radius: 999px; border: 1px dashed var(--border); background: transparent; color: var(--text-dim); }
+  .nth-chip:hover { border-color: var(--warn-bd); color: var(--warn); }
+  .nth-chip.on { border-style: solid; color: #1a1206; background: var(--warn); border-color: var(--warn); }
+  .range-row { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; font-size: 12px; color: var(--text-dim); flex-wrap: wrap; }
+  .range-row input[type=date] { background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 5px 8px; font-size: 12px; color-scheme: dark; }
+  .range-row button { background: var(--surface-2); border: 1px solid var(--border); color: var(--text-dim); border-radius: 6px; padding: 5px 10px; font-size: 12px; }
+
+  /* Sundays-only calendar */
+  .cal { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 8px; }
+  .cal .month-label { grid-column: 1 / -1; font-size: 11px; font-weight: 700; color: var(--text-faint); text-transform: uppercase; letter-spacing: .05em; margin-top: 6px; }
+  .sunday { position: relative; text-align: center; padding: 10px 6px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 13px; font-weight: 600; user-select: none; transition: transform .05s; }
+  .sunday .dow { display: block; font-size: 10px; font-weight: 500; color: var(--text-faint); margin-bottom: 2px; }
+  .sunday:hover { border-color: var(--surface-3); }
+  .sunday:active { transform: scale(0.96); }
+  .sunday.off { background: var(--danger-bg); border-color: rgba(239,68,68,0.5); color: #fca5a5; text-decoration: line-through; }
+  .sunday.off .dow { color: #fca5a5; }
+  .sunday.off::after { content: '✕'; position: absolute; top: 3px; right: 5px; font-size: 9px; color: #fca5a5; }
+  .cal-foot { margin-top: 10px; font-size: 12px; color: var(--text-dim); }
+  .cal-foot b { color: #fca5a5; }
+
+  /* pairing typeahead */
+  .pair-input-wrap { position: relative; }
+  .pair-input { width: 100%; background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: var(--radius-sm); padding: 8px 11px; font-size: 13px; }
+  .pair-menu { position: absolute; left: 0; right: 0; top: 100%; margin-top: 4px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); z-index: 40; max-height: 190px; overflow: auto; box-shadow: 0 12px 30px rgba(0,0,0,.45); }
+  .pair-menu div { padding: 8px 11px; font-size: 13px; }
+  .pair-menu div:hover { background: var(--accent); color: #fff; cursor: pointer; }
+  .pair-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+  .pair-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #d8b4fe; background: var(--tech-bg); border: 1px solid var(--tech-bd); border-radius: 999px; padding: 3px 6px 3px 10px; }
+  .pair-chip button { background: rgba(0,0,0,.25); border: none; color: #d8b4fe; border-radius: 999px; width: 16px; height: 16px; font-size: 11px; line-height: 1; display: grid; place-items: center; }
+  .pair-note { font-size: 11px; color: var(--text-faint); margin-top: 7px; }
+
+  .note-area { width: 100%; min-height: 60px; background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: var(--radius-sm); padding: 9px 11px; font-size: 13px; font-family: inherit; resize: vertical; }
+
+  .ed-actions { display: flex; gap: 8px; justify-content: flex-end; padding-top: 6px; }
+  .btn { border-radius: var(--radius-sm); padding: 8px 15px; font-size: 13px; font-weight: 600; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.ghost { background: transparent; color: var(--text-dim); }
+
+  /* ---- Variant A: right drawer ---- */
+  .drawer-scrim { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 60; opacity: 0; pointer-events: none; transition: opacity .2s; }
+  .drawer-scrim.open { opacity: 1; pointer-events: auto; }
+  .drawer { position: fixed; top: 46px; right: 0; bottom: 0; width: min(520px, 94vw); background: var(--surface); border-left: 1px solid var(--border); z-index: 61; transform: translateX(100%); transition: transform .22s ease; overflow-y: auto; box-shadow: -18px 0 40px rgba(0,0,0,.4); }
+  .drawer.open { transform: translateX(0); }
+  .drawer-inner { padding: 20px 22px 40px; }
+  .drawer-close { position: absolute; top: 14px; right: 16px; background: var(--surface-2); border: 1px solid var(--border); color: var(--text-dim); width: 30px; height: 30px; border-radius: 8px; font-size: 15px; }
+
+  /* ---- Variant B: master-detail split ---- */
+  .split { display: grid; grid-template-columns: 340px 1fr; gap: 0; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .split .master { border-right: 1px solid var(--border); background: var(--surface); max-height: 74vh; overflow-y: auto; }
+  .split .master .m-row { padding: 11px 14px; border-bottom: 1px solid var(--border-soft); cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .split .master .m-row:hover { background: var(--surface-2); }
+  .split .master .m-row.sel { background: rgba(59,130,246,0.1); box-shadow: inset 3px 0 0 var(--accent); }
+  .split .master .m-row .m-name { font-weight: 600; font-size: 13px; }
+  .split .master .m-row .m-sub { font-size: 11px; color: var(--text-faint); margin-top: 1px; }
+  .split .detail { padding: 20px 24px; background: var(--bg); max-height: 74vh; overflow-y: auto; }
+
+  /* ---- Variant C: inline expand ---- */
+  .acc-row .acc-editor { background: var(--surface); border-left: 3px solid var(--accent); }
+  .acc-row .acc-editor td { padding: 4px 20px 22px; }
+
+  .cmp-note { background: var(--surface); border: 1px solid var(--border-soft); border-left: 3px solid var(--accent); border-radius: 8px; padding: 12px 15px; font-size: 12.5px; color: var(--text-dim); margin-bottom: 16px; }
+  .cmp-note b { color: var(--text); }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; color: var(--text-faint); margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<div id="variant-nav">
+  <span class="brand">◆ Availability Editor</span>
+  <button class="variant-tab active" onclick="showVariant('a', event)">A — Right drawer</button>
+  <button class="variant-tab" onclick="showVariant('b', event)">B — Master-detail split</button>
+  <button class="variant-tab" onclick="showVariant('c', event)">C — Inline expand</button>
+</div>
+
+<!-- ============ VARIANT A: RIGHT DRAWER ============ -->
+<div id="variant-a" class="variant active">
+  <div class="app">
+    <div class="page-head">
+      <h1>Volunteer Availability</h1>
+      <span class="quarter-pill">Q3 2026 · 13 Sundays</span>
+    </div>
+    <p class="sub">Enter each volunteer's serve frequency and the Sundays they're unavailable — straight from the quarterly replies. No spreadsheet, no CSV. Click a person to edit.</p>
+    <div class="cmp-note"><b>Variant A — Right drawer.</b> The roster stays full-width and scannable; clicking a row slides the editor in from the right. Good when you mostly review and touch a few people.</div>
+    <div class="toolbar">
+      <input class="search" placeholder="Search volunteers…" />
+      <button class="filter-chip on">All</button>
+      <button class="filter-chip">Needs input</button>
+      <button class="filter-chip">Out this quarter</button>
+    </div>
+    <table class="roster" id="tableA"></table>
+  </div>
+
+  <div class="drawer-scrim" id="scrimA" onclick="closeDrawer()"></div>
+  <div class="drawer" id="drawerA">
+    <button class="drawer-close" onclick="closeDrawer()">✕</button>
+    <div class="drawer-inner" id="drawerBodyA"></div>
+  </div>
+</div>
+
+<!-- ============ VARIANT B: MASTER-DETAIL SPLIT ============ -->
+<div id="variant-b" class="variant">
+  <div class="app">
+    <div class="page-head">
+      <h1>Volunteer Availability</h1>
+      <span class="quarter-pill">Q3 2026 · 13 Sundays</span>
+    </div>
+    <p class="sub">Enter each volunteer's serve frequency and the Sundays they're unavailable — straight from the quarterly replies. No spreadsheet, no CSV.</p>
+    <div class="cmp-note"><b>Variant B — Master-detail split.</b> The editor is always open on the right. Best for powering down the whole roster in one sitting — pick a name, fill it, pick the next. Fastest for bulk data entry.</div>
+    <div class="split">
+      <div class="master" id="masterB"></div>
+      <div class="detail" id="detailB"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ VARIANT C: INLINE EXPAND ============ -->
+<div id="variant-c" class="variant">
+  <div class="app">
+    <div class="page-head">
+      <h1>Volunteer Availability</h1>
+      <span class="quarter-pill">Q3 2026 · 13 Sundays</span>
+    </div>
+    <p class="sub">Enter each volunteer's serve frequency and the Sundays they're unavailable — straight from the quarterly replies. No spreadsheet, no CSV. Click a row to expand.</p>
+    <div class="cmp-note"><b>Variant C — Inline expand.</b> Clicking a row opens the editor in place, full-width beneath it (accordion). Keeps you anchored in the list with maximum room for the calendar.</div>
+    <table class="roster" id="tableC"></table>
+  </div>
+</div>
+
+<!-- ============ SKETCH TOOLBAR ============ -->
+<div id="sketch-tools" style="position:fixed;bottom:12px;right:12px;z-index:9999;font-family:system-ui;font-size:12px;background:rgba(0,0,0,0.7);color:white;padding:8px 12px;border-radius:8px;opacity:0.4;transition:opacity 0.2s;display:flex;gap:10px;align-items:center;" onmouseenter="this.style.opacity='1'" onmouseleave="this.style.opacity='0.4'">
+  <span>Sketch 001</span>
+  <span style="opacity:.6">|</span>
+  <span style="opacity:.8">Q3 2026 demo data</span>
+</div>
+
+<script>
+/* ---------------- shared model ---------------- */
+// Q3 2026 Sundays (real): Jul 5,12,19,26 · Aug 2,9,16,23,30 · Sep 6,13,20,27  => 13
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const SUNDAYS = [
+  '2026-07-05','2026-07-12','2026-07-19','2026-07-26',
+  '2026-08-02','2026-08-09','2026-08-16','2026-08-23','2026-08-30',
+  '2026-09-06','2026-09-13','2026-09-20','2026-09-27'
+];
+const N_SUNDAYS = SUNDAYS.length;
+function fmtShort(iso){ const [y,m,d]=iso.split('-'); return MONTHS[+m-1]+' '+(+d); }
+function ordinalOf(iso){ // which Nth Sunday of its month (1..5)
+  const day = +iso.split('-')[2];
+  return Math.floor((day-1)/7)+1;
+}
+// Frequency presets -> targetN (1-in-N) or special tiers
+const FREQ = {
+  weekly:  {label:'Every week',    N:1, tier:'regular'},
+  biweek:  {label:'Twice a month', N:2, tier:'regular'},
+  monthly: {label:'Monthly',       N:4, tier:'regular'},
+  fillin:  {label:'As-needed (fill-in)', N:0, tier:'fillin'},
+  out:     {label:'Out this quarter',    N:0, tier:'out'},
+};
+const FREQ_ORDER = ['weekly','biweek','monthly','fillin','out'];
+
+const ROLEGROUP = { // role name -> group
+  Reader:'other','Scripture Reader':'other', Vocal:'band', Bass:'band', Guitar:'band', Drums:'band', Piano:'band',
+  Sound:'tech', Livestream:'tech', Projection:'tech'
+};
+function roleGroup(r){ return ROLEGROUP[r] || 'other'; }
+
+// people — drawn from the real Sample Frequency Notes
+let PEOPLE = [
+  { id:'anne',  name:'Anne Bachle Fifer', email:'anne@abfifer.com', roles:['Reader'],
+    freq:'monthly', blackout: pick(['2026-07-05','2026-08-02','2026-09-06','2026-07-19','2026-08-30']), pairs:[], note:'' },
+  { id:'krystyn', name:'Krystyn Broersma', email:'krystynbroersma@gmail.com', roles:['Vocal'],
+    freq:'monthly', blackout: everyExcept2ndSundays(), pairs:[], note:'Available ONLY 2nd week of the month; gone Jun 12–19.' },
+  { id:'david', name:'David DeBoer', email:'davidjdeboer@gmail.com', roles:['Bass'],
+    freq:'fillin', blackout: pick(['2026-07-26','2026-08-23','2026-09-27']), pairs:[], note:'Desperate fill-in only this summer.' },
+  { id:'john', name:'John Segard', email:'johnsegard@icloud.com', roles:['Sound'],
+    freq:'out', blackout: SUNDAYS.slice(), pairs:[], note:'Unavailable this cycle.' },
+  { id:'tim', name:'Tim Paasche', email:'paaschet@gmail.com', roles:['Bass','Sound'],
+    freq:'monthly', blackout: pick(['2026-07-12','2026-08-02','2026-08-09','2026-08-16','2026-08-23']), pairs:[], note:'~1 week off per month.' },
+  { id:'julia', name:'Julia Woodard', email:'deanlisawoodard@gmail.com', roles:['Projection'],
+    freq:'monthly', blackout: nthSundays([3]).concat(['2026-08-16','2026-08-23','2026-08-30','2026-09-06','2026-09-13','2026-09-20','2026-09-27']), pairs:['dean','lisa'], note:'Schedule only with Dean or Lisa. Gone to college by Aug 16.' },
+  { id:'dean', name:'Dean Woodard', email:'1masteryoda@gmail.com', roles:['Livestream'], freq:'biweek', blackout:[], pairs:[], note:'' },
+  { id:'lisa', name:'Lisa Woodard', email:'deanlisawoodard@gmail.com', roles:['Vocal'], freq:'monthly', blackout: nthSundays([3]), pairs:['julia'], note:'Schedule Julia with her on 1st Sundays.' },
+  { id:'sterling', name:'Sterling Heibeck', email:'sheibeck@gmail.com', roles:['Vocal','Bass'], freq:'weekly', blackout:['2026-08-02'], pairs:[], note:'' },
+  { id:'becky', name:'Becky Kerr', email:'bkerr@biblesint.org', roles:['Piano','Vocal'], freq:'monthly', blackout: nthSundays([1]), pairs:[], note:'1 piano + 1 choir per month.' },
+];
+function pick(a){ return a.filter(x=>SUNDAYS.includes(x)); }
+function nthSundays(nths){ return SUNDAYS.filter(s=>nths.includes(ordinalOf(s))); }
+function everyExcept2ndSundays(){ return SUNDAYS.filter(s=>ordinalOf(s)!==2); }
+
+/* ---------------- summary helpers ---------------- */
+function blackoutSummary(p){
+  if(p.freq==='out') return '<span class="none">— out all quarter —</span>';
+  const b = p.blackout;
+  if(!b.length) return '<span class="none">fully available</span>';
+  // detect a dominant ordinal pattern
+  const byOrd = {};
+  b.forEach(s=>{ const o=ordinalOf(s); byOrd[o]=(byOrd[o]||0)+1; });
+  const counts = {}; SUNDAYS.forEach(s=>{const o=ordinalOf(s);counts[o]=(counts[o]||0)+1;});
+  let parts=[]; let claimed=new Set();
+  Object.keys(byOrd).forEach(o=>{ if(byOrd[o]===counts[o] && counts[o]>1){ parts.push(nth(+o)+' Sundays'); b.forEach(s=>{if(ordinalOf(s)==o)claimed.add(s);}); } });
+  const extras = b.filter(s=>!claimed.has(s));
+  if(extras.length) parts.push(extras.length+' date'+(extras.length>1?'s':''));
+  if(!parts.length) parts.push(b.length+' date'+(b.length>1?'s':''));
+  return parts.join(' + ');
+}
+function nth(n){ return n+({1:'st',2:'nd',3:'rd'}[n]||'th'); }
+function freqBadge(p){
+  const f=FREQ[p.freq];
+  if(p.freq==='out') return '<span class="freq-badge">—</span>';
+  if(p.freq==='fillin') return '<span class="freq-badge">fill-in</span>';
+  const servable = N_SUNDAYS - p.blackout.length;
+  const approx = Math.min(servable, Math.ceil(N_SUNDAYS / f.N));
+  return '<span class="freq-badge">'+f.label+' · ≈'+approx+'</span>';
+}
+function statusPill(p){
+  const t = FREQ[p.freq].tier;
+  if(t==='out') return '<span class="status out">Out this quarter</span>';
+  if(t==='fillin') return '<span class="status fillin">Fill-in</span>';
+  return '<span class="status regular">Regular</span>';
+}
+function roleChips(p){ return p.roles.map(r=>'<span class="rolechip '+roleGroup(r)+'">'+r+'</span>').join(''); }
+
+/* ---------------- table rendering (A & C) ---------------- */
+function rowHtml(p, mode){
+  return '<tr data-id="'+p.id+'" onclick="onRowClick(\''+p.id+'\',\''+mode+'\',event)">'
+    + '<td class="name-cell">'+p.name+'</td>'
+    + '<td>'+roleChips(p)+'</td>'
+    + '<td>'+freqBadge(p)+'</td>'
+    + '<td class="blk-summary">'+blackoutSummary(p)+'</td>'
+    + '<td class="pair-summary">'+(p.pairs.length?('↔ '+p.pairs.map(id=>firstName(id)).join(', ')):'')+'</td>'
+    + '<td>'+statusPill(p)+'</td>'
+    + '<td class="edit-hint">'+(mode==='c'?'▾':'›')+'</td>'
+    + '</tr>';
+}
+function firstName(id){ const p=PEOPLE.find(x=>x.id===id); return p?p.name.split(' ')[0]:id; }
+function tableHead(){
+  return '<thead><tr><th>Volunteer</th><th>Roles</th><th>Frequency</th><th>Unavailable</th><th>Pairing</th><th>Status</th><th></th></tr></thead>';
+}
+function renderTable(elId, mode){
+  const el=document.getElementById(elId);
+  el.innerHTML = tableHead()+'<tbody>'+PEOPLE.map(p=>rowHtml(p,mode)).join('')+'</tbody>';
+}
+
+/* ---------------- the shared EDITOR ---------------- */
+function editorHtml(p){
+  return ''
+  + '<div class="editor" data-id="'+p.id+'">'
+  +   '<div class="who"><h2>'+p.name+'</h2>'+roleChips(p)+'</div>'
+  +   '<div class="email" style="color:var(--text-faint);font-size:12px;margin-bottom:6px">'+p.email+'</div>'
+
+  // frequency
+  +   '<div class="ed-section">'
+  +     '<div class="ed-label">Serve frequency <span class="hint">how often they want to serve</span></div>'
+  +     '<div class="seg">'+FREQ_ORDER.map(k=>{
+            const extra = k==='fillin'?' fillin':(k==='out'?' out':'');
+            return '<button class="'+(p.freq===k?('on'+extra):'')+'" onclick="setFreq(\''+p.id+'\',\''+k+'\')">'+FREQ[k].label+'</button>';
+          }).join('')+'</div>'
+  +     '<div class="freq-readout" id="freqread-'+p.id+'">'+freqReadout(p)+'</div>'
+  +   '</div>'
+
+  // blackout
+  +   '<div class="ed-section">'
+  +     '<div class="ed-label">Unavailable Sundays <span class="hint">tap the Sundays they can\'t serve</span></div>'
+  +     '<div class="blk-modes" id="nth-'+p.id+'">'
+  +       [1,2,3,4,5].map(n=>'<button class="nth-chip'+(ordFullySelected(p,n)?' on':'')+'" onclick="toggleNth(\''+p.id+'\','+n+')">'+nth(n)+' Sundays</button>').join('')
+  +     '</div>'
+  +     '<div class="range-row">Range: <input type="date" id="rs-'+p.id+'" value="2026-08-01"> → <input type="date" id="re-'+p.id+'" value="2026-08-31"><button onclick="applyRange(\''+p.id+'\')">Block Sundays in range</button><button onclick="clearBlackout(\''+p.id+'\')">Clear all</button></div>'
+  +     '<div class="cal" id="cal-'+p.id+'">'+calHtml(p)+'</div>'
+  +     '<div class="cal-foot" id="calfoot-'+p.id+'">'+calFoot(p)+'</div>'
+  +   '</div>'
+
+  // pairing
+  +   '<div class="ed-section">'
+  +     '<div class="ed-label">Must serve with <span class="hint">bidirectional — both get scheduled together</span></div>'
+  +     '<div class="pair-input-wrap">'
+  +       '<input class="pair-input" id="pairin-'+p.id+'" placeholder="Type a name…" oninput="pairSearch(\''+p.id+'\')" onfocus="pairSearch(\''+p.id+'\')">'
+  +       '<div class="pair-menu" id="pairmenu-'+p.id+'" style="display:none"></div>'
+  +     '</div>'
+  +     '<div class="pair-chips" id="pairchips-'+p.id+'">'+pairChipsHtml(p)+'</div>'
+  +   '</div>'
+
+  // note
+  +   '<div class="ed-section">'
+  +     '<div class="ed-label">Quarter note <span class="hint">for you — never auto-scheduled</span></div>'
+  +     '<textarea class="note-area" oninput="PEOPLE.find(x=>x.id===\''+p.id+'\').note=this.value" placeholder="e.g. try again in the Fall">'+ (p.note||'') +'</textarea>'
+  +   '</div>'
+
+  +   '<div class="ed-actions"><button class="btn ghost" onclick="closeDrawer()">Close</button><button class="btn primary" onclick="saveP(\''+p.id+'\')">Save</button></div>'
+  + '</div>';
+}
+function freqReadout(p){
+  const f=FREQ[p.freq];
+  if(p.freq==='out') return '<span style="color:#fca5a5">Excluded from every proposal this quarter.</span>';
+  const servable = N_SUNDAYS - p.blackout.length;
+  if(p.freq==='fillin') return '<span style="color:#fcd34d">Only scheduled to fill gaps</span> · available on <b>'+servable+'</b> of '+N_SUNDAYS+' Sundays';
+  const approx = Math.min(servable, Math.ceil(N_SUNDAYS/f.N));
+  return 'Target ≈ <b>'+approx+'</b> of '+N_SUNDAYS+' Sundays'
+    + '<span class="adv">1-in-<input type="number" min="1" max="8" value="'+f.N+'" onchange="setN(\''+p.id+'\',this.value)"></span>';
+}
+function calHtml(p){
+  let html=''; let curMonth='';
+  SUNDAYS.forEach(s=>{
+    const m = s.split('-')[1];
+    if(m!==curMonth){ curMonth=m; html += '<div class="month-label">'+MONTHS[+m-1]+' 2026</div>'; }
+    const off = p.blackout.includes(s);
+    html += '<div class="sunday'+(off?' off':'')+'" onclick="toggleSunday(\''+p.id+'\',\''+s+'\')"><span class="dow">'+nth(ordinalOf(s))+' Sun</span>'+(+s.split('-')[2])+'</div>';
+  });
+  return html;
+}
+function calFoot(p){
+  const n=p.blackout.length; const servable=N_SUNDAYS-n;
+  return 'Blocking <b>'+n+'</b> Sunday'+(n===1?'':'s')+' · available <b style="color:#86efac">'+servable+'</b> of '+N_SUNDAYS;
+}
+function ordFullySelected(p,nn){
+  const inMonth = SUNDAYS.filter(s=>ordinalOf(s)===nn);
+  return inMonth.length>0 && inMonth.every(s=>p.blackout.includes(s));
+}
+function pairChipsHtml(p){
+  return p.pairs.map(id=>'<span class="pair-chip">'+firstName(id)+'<button onclick="removePair(\''+p.id+'\',\''+id+'\')">✕</button></span>').join('')
+    || '<span class="pair-note">No pairings.</span>';
+}
+
+/* ---------------- interactions ---------------- */
+let CURRENT=null, MODE='a';
+function P(id){ return PEOPLE.find(x=>x.id===id); }
+
+function setFreq(id,k){ const p=P(id); p.freq=k; if(k==='out'){/* keep blackout as-is visually */} refreshEditor(id); refreshRow(id); }
+function setN(id,v){ v=Math.max(1,Math.min(8,+v||1)); const p=P(id);
+  // map raw N back onto nearest preset for the tier display
+  p.freq = v===1?'weekly': v===2?'biweek':'monthly';
+  FREQ[p.freq].N = v; // reflect exact N in readout
+  refreshEditor(id); refreshRow(id);
+}
+function toggleSunday(id,s){ const p=P(id); const i=p.blackout.indexOf(s); if(i>=0)p.blackout.splice(i,1); else p.blackout.push(s); refreshEditor(id); refreshRow(id); }
+function toggleNth(id,n){ const p=P(id); const inMonth=SUNDAYS.filter(s=>ordinalOf(s)===n);
+  const all=inMonth.every(s=>p.blackout.includes(s));
+  if(all){ p.blackout=p.blackout.filter(s=>!inMonth.includes(s)); }
+  else { inMonth.forEach(s=>{ if(!p.blackout.includes(s))p.blackout.push(s); }); }
+  refreshEditor(id); refreshRow(id);
+}
+function applyRange(id){ const p=P(id); const a=document.getElementById('rs-'+id).value, b=document.getElementById('re-'+id).value;
+  SUNDAYS.forEach(s=>{ if(s>=a&&s<=b&&!p.blackout.includes(s))p.blackout.push(s); }); refreshEditor(id); refreshRow(id);
+}
+function clearBlackout(id){ P(id).blackout=[]; refreshEditor(id); refreshRow(id); }
+
+function pairSearch(id){ const p=P(id); const q=(document.getElementById('pairin-'+id).value||'').toLowerCase();
+  const menu=document.getElementById('pairmenu-'+id);
+  const matches=PEOPLE.filter(x=>x.id!==id && !p.pairs.includes(x.id) && x.name.toLowerCase().includes(q));
+  if(!matches.length){ menu.style.display='none'; return; }
+  menu.innerHTML=matches.slice(0,6).map(x=>'<div onclick="addPair(\''+id+'\',\''+x.id+'\')">'+x.name+'</div>').join('');
+  menu.style.display='block';
+}
+function addPair(id,pid){ const p=P(id); if(!p.pairs.includes(pid))p.pairs.push(pid);
+  const q=P(pid); if(!q.pairs.includes(id))q.pairs.push(id); // bidirectional
+  document.getElementById('pairin-'+id).value=''; document.getElementById('pairmenu-'+id).style.display='none';
+  refreshEditor(id); refreshRow(id); refreshRow(pid);
+}
+function removePair(id,pid){ P(id).pairs=P(id).pairs.filter(x=>x!==pid); P(pid).pairs=P(pid).pairs.filter(x=>x!==id);
+  refreshEditor(id); refreshRow(id); refreshRow(pid);
+}
+function saveP(id){ if(MODE==='a') closeDrawer(); flash(id); }
+function flash(id){ /* subtle confirmation could go here */ }
+
+/* refresh helpers keep the open editor + table row in sync */
+function refreshEditor(id){
+  if(CURRENT!==id) return;
+  if(MODE==='a') document.getElementById('drawerBodyA').innerHTML=editorHtml(P(id));
+  if(MODE==='b') document.getElementById('detailB').innerHTML=editorHtml(P(id));
+  if(MODE==='c'){ const host=document.getElementById('acced-'+id); if(host) host.innerHTML=editorHtml(P(id)); }
+}
+function refreshRow(id){
+  ['tableA','tableC'].forEach(t=>{ const tb=document.getElementById(t); if(!tb)return; const tr=tb.querySelector('tr[data-id="'+id+'"]'); if(tr) tr.outerHTML=rowHtml(P(id), t==='tableC'?'c':'a'); });
+  if(document.getElementById('masterB')) renderMaster();
+}
+
+/* ---- Variant A drawer ---- */
+function openDrawer(id){ CURRENT=id; MODE='a';
+  document.getElementById('drawerBodyA').innerHTML=editorHtml(P(id));
+  document.getElementById('drawerA').classList.add('open');
+  document.getElementById('scrimA').classList.add('open');
+  markSel('tableA',id);
+}
+function closeDrawer(){ document.getElementById('drawerA').classList.remove('open'); document.getElementById('scrimA').classList.remove('open'); }
+
+/* ---- Variant C accordion ---- */
+function toggleAcc(id){
+  const tb=document.getElementById('tableC'); const existing=document.getElementById('accrow-'+id);
+  // close any open
+  tb.querySelectorAll('.acc-editor').forEach(r=>r.remove());
+  if(existing){ CURRENT=null; markSel('tableC',null); return; }
+  CURRENT=id; MODE='c'; markSel('tableC',id);
+  const tr=tb.querySelector('tr[data-id="'+id+'"]');
+  const row=document.createElement('tr'); row.className='acc-editor'; row.id='accrow-'+id;
+  row.innerHTML='<td colspan="7"><div id="acced-'+id+'">'+editorHtml(P(id))+'</div></td>';
+  tr.after(row);
+}
+
+/* ---- Variant B master ---- */
+function renderMaster(){
+  const el=document.getElementById('masterB');
+  el.innerHTML=PEOPLE.map(p=>'<div class="m-row'+(CURRENT===p.id?' sel':'')+'" onclick="selectB(\''+p.id+'\')"><div><div class="m-name">'+p.name+'</div><div class="m-sub">'+p.roles.join(' · ')+'</div></div>'+statusPill(p)+'</div>').join('');
+}
+function selectB(id){ CURRENT=id; MODE='b'; renderMaster(); document.getElementById('detailB').innerHTML=editorHtml(P(id)); }
+
+function markSel(tableId,id){ const tb=document.getElementById(tableId); if(!tb)return; tb.querySelectorAll('tr[data-id]').forEach(r=>r.classList.toggle('sel', r.getAttribute('data-id')===id)); }
+
+/* ---- row click dispatch ---- */
+function onRowClick(id,mode,e){ if(mode==='a') openDrawer(id); else if(mode==='c') toggleAcc(id); }
+
+/* ---------------- variant switching ---------------- */
+function showVariant(v, e){
+  document.querySelectorAll('.variant').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.variant-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('variant-'+v).classList.add('active');
+  if(e&&e.target) e.target.classList.add('active');
+  MODE=v; if(v==='a') closeDrawer();
+  if(v==='b' && !CURRENT){ selectB(PEOPLE[0].id); }
+}
+
+/* ---------------- init ---------------- */
+renderTable('tableA','a');
+renderTable('tableC','c');
+renderMaster();
+selectB(PEOPLE[0].id);
+CURRENT=null; // reset so drawer/accordion start closed
+document.addEventListener('click',(e)=>{ // close pair menus on outside click
+  if(!e.target.closest('.pair-input-wrap')) document.querySelectorAll('.pair-menu').forEach(m=>m.style.display='none');
+});
+</script>
+</body>
+</html>
