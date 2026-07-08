@@ -197,36 +197,37 @@
           </table>
         </div>
 
-        <!-- Inactive volunteers section -->
-        <div v-if="inactivePeople.length > 0" class="mt-8 border border-gray-700 rounded-xl overflow-hidden">
-          <div class="px-4 py-3 bg-gray-800 border-b border-gray-700">
-            <h2 class="text-sm font-medium text-gray-300">Inactive Volunteers ({{ inactivePeople.length }})</h2>
-            <p class="text-xs text-gray-500 mt-0.5">Removed from schedule proposals and pickers. Reactivate to make them available again.</p>
-          </div>
-          <div class="divide-y divide-gray-800">
-            <div
-              v-for="person in inactivePeople"
-              :key="person.id"
-              class="flex items-center justify-between px-4 py-3 hover:bg-gray-800/40"
-            >
-              <div>
-                <p class="text-sm text-gray-400 line-through">{{ person.name }}</p>
-                <p class="text-xs text-gray-600">{{ person.email || 'No email' }}</p>
-              </div>
-              <button
-                @click="rosterStore.reactivatePerson(person.id)"
-                class="text-xs px-3 py-1.5 rounded-md border border-indigo-700 text-indigo-300 hover:bg-indigo-900/30 transition-colors"
-              >
-                Reactivate
-              </button>
-            </div>
-          </div>
-        </div>
       </template>
 
       <!-- Roles config panel -->
       <div class="mt-8">
         <RolesConfigPanel />
+      </div>
+
+      <!-- Inactive volunteers section (placed below Roles) -->
+      <div v-if="inactivePeople.length > 0" class="mt-8 border border-gray-700 rounded-xl overflow-hidden">
+        <div class="px-4 py-3 bg-gray-800 border-b border-gray-700">
+          <h2 class="text-sm font-medium text-gray-300">Inactive Volunteers ({{ inactivePeople.length }})</h2>
+          <p class="text-xs text-gray-500 mt-0.5">Removed from schedule proposals and pickers. Reactivate to make them available again.</p>
+        </div>
+        <div class="divide-y divide-gray-800">
+          <div
+            v-for="person in inactivePeople"
+            :key="person.id"
+            class="flex items-center justify-between px-4 py-3 hover:bg-gray-800/40"
+          >
+            <div>
+              <p class="text-sm text-gray-400 line-through">{{ person.name }}</p>
+              <p class="text-xs text-gray-600">{{ person.email || 'No email' }}</p>
+            </div>
+            <button
+              @click="rosterStore.reactivatePerson(person.id)"
+              class="text-xs px-3 py-1.5 rounded-md border border-indigo-700 text-indigo-300 hover:bg-indigo-900/30 transition-colors"
+            >
+              Reactivate
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
