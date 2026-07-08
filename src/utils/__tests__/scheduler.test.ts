@@ -24,6 +24,8 @@ function makePQD(overrides: Partial<PersonQuarterData> & { personId: string }): 
     personId: overrides.personId,
     blackoutDates: overrides.blackoutDates ?? [],
     pairedWith: overrides.pairedWith ?? [],
+    ...(overrides.frequencyTier !== undefined ? { frequencyTier: overrides.frequencyTier } : {}),
+    ...(overrides.note !== undefined ? { note: overrides.note } : {}),
   }
 }
 
@@ -199,6 +201,95 @@ describe('proposeQuarterSchedule', () => {
       expect(result.calendar[date]?.['guitar']).toContain('p1')
     }
     expect(result.servedCounts['p1']).toBe(3)
+  })
+
+  it('fillin: a regular-tier candidate is always chosen over a fillin-tier candidate when both are eligible', () => {
+    const people = [
+      makePerson({ id: 'reg', roles: ['guitar'], frequencyTargetN: 1 }),
+      makePerson({ id: 'fill', roles: ['guitar'], frequencyTargetN: 1 }),
+    ]
+    const dates = ['2026-01-04']
+    const resolver = makeResolver([{ roleId: 'guitar', count: 1 }])
+    const pqd = [
+      makePQD({ personId: 'reg', frequencyTier: 'regular' }),
+      makePQD({ personId: 'fill', frequencyTier: 'fillin' }),
+    ]
+
+    const result = proposeQuarterSchedule(people, dates, resolver, pqd)
+
+    // Both eligible — regular-tier person is always chosen first, never the fillin-tier person
+    expect(result.calendar['2026-01-04']?.['guitar']).toEqual(['reg'])
+  })
+
+  it('fillin last resort: fillin-tier candidate is chosen only when the regular candidate is blacked out/assigned and no other regular exists', () => {
+    const people = [
+      makePerson({ id: 'reg', roles: ['guitar'], frequencyTargetN: 1 }),
+      makePerson({ id: 'fill', roles: ['guitar'], frequencyTargetN: 1 }),
+    ]
+    const dates = ['2026-01-04']
+    const resolver = makeResolver([{ roleId: 'guitar', count: 1 }])
+    const pqd = [
+      makePQD({ personId: 'reg', frequencyTier: 'regular', blackoutDates: ['2026-01-04'] }),
+      makePQD({ personId: 'fill', frequencyTier: 'fillin' }),
+    ]
+
+    const result = proposeQuarterSchedule(people, dates, resolver, pqd)
+
+    // reg is blacked out -> zero regular candidates -> fillin last-resort kicks in
+    expect(result.calendar['2026-01-04']?.['guitar']).toEqual(['fill'])
+  })
+
+  it('out tier: an out-tier person eligible by role is never assigned and never appears in unfilled as a filler', () => {
+    const people = [makePerson({ id: 'out1', roles: ['guitar'], frequencyTargetN: 1 })]
+    const dates = ['2026-01-04']
+    const resolver = makeResolver([{ roleId: 'guitar', count: 1 }])
+    const pqd = [makePQD({ personId: 'out1', frequencyTier: 'out' })]
+
+    const result = proposeQuarterSchedule(people, dates, resolver, pqd)
+
+    expect(result.calendar['2026-01-04']?.['guitar'] ?? []).not.toContain('out1')
+    expect(result.calendar['2026-01-04']?.['guitar'] ?? []).toHaveLength(0)
+    expect(result.unfilled).toContainEqual({ date: '2026-01-04', roleId: 'guitar' })
+  })
+
+  it('out tier: paired partner who is out-tier is not force-scheduled and produces a pairingConflicts entry', () => {
+    const people = [
+      makePerson({ id: 'a', roles: ['guitar'], frequencyTargetN: 1 }),
+      makePerson({ id: 'b', roles: ['vocals'], frequencyTargetN: 1 }),
+    ]
+    const dates = ['2026-01-04']
+    const resolver = makeResolver([
+      { roleId: 'guitar', count: 1 },
+      { roleId: 'vocals', count: 1 },
+    ])
+    const pqd = [
+      makePQD({ personId: 'a', pairedWith: ['b'] }),
+      makePQD({ personId: 'b', pairedWith: ['a'], frequencyTier: 'out' }),
+    ]
+
+    const result = proposeQuarterSchedule(people, dates, resolver, pqd)
+
+    expect(result.calendar['2026-01-04']?.['guitar']).toContain('a')
+    expect(result.calendar['2026-01-04']?.['vocals'] ?? []).not.toContain('b')
+    expect(result.pairingConflicts).toContainEqual(
+      expect.objectContaining({ date: '2026-01-04', personId: 'a', partnerId: 'b', reason: 'partner out this quarter' }),
+    )
+  })
+
+  it('default safety: a candidate whose PersonQuarterData has no frequencyTier (or no entry at all) is scheduled as regular, identical to prior behavior', () => {
+    const people = [
+      makePerson({ id: 'p1', roles: ['guitar'], frequencyTargetN: 1 }),
+      makePerson({ id: 'p2', roles: ['guitar'], frequencyTargetN: 4 }),
+    ]
+    const dates = ['2026-01-04']
+    const resolver = makeResolver([{ roleId: 'guitar', count: 1 }])
+    // p1 has no PQD entry at all; p2 has a PQD entry but no frequencyTier field
+    const pqd = [makePQD({ personId: 'p2' })]
+
+    const result = proposeQuarterSchedule(people, dates, resolver, pqd)
+
+    // Same deficit-scoring result as the pre-existing 'deficit' test: weekly (N=1) outranks monthly (N=4)
+    expect(result.calendar['2026-01-04']?.['guitar']).toEqual(['p1'])
   })
 
   it('fill gaps: existingCalendar seeds servedCounts so locked assignments reflect in deficit, only empty slots get filled', () => {
