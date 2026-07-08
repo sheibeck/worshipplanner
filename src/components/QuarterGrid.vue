@@ -183,7 +183,7 @@
 import { ref, computed } from 'vue'
 import { useQuartersStore } from '@/stores/quarters'
 import { useRosterStore } from '@/stores/roster'
-import type { Quarter, Role, RoleGroup, ProposeResult, Person } from '@/types/roster'
+import type { Quarter, Role, RoleGroup, ProposeResult, Person, FrequencyTier } from '@/types/roster'
 
 const props = defineProps<{
   quarter: Quarter
@@ -258,12 +258,23 @@ function hasRole(person: Person, roleId: string): boolean {
   return person.roles.includes(roleId)
 }
 
+// D-04: 'out'-tier people must never be offered as a manual gap-filling candidate,
+// mirroring the auto-proposal exclusion (defaults 'regular' when absent — pre-Phase-14
+// data has no frequencyTier at all).
+function frequencyTierOf(personId: string): FrequencyTier {
+  return props.quarter.personQuarterData[personId]?.frequencyTier ?? 'regular'
+}
+
 // Available-unassigned for (date, roleId) = activePeople with roleId in roles,
-// NOT blacked out that date, NOT already in that cell.
+// NOT blacked out that date, NOT already in that cell, NOT 'out'-tier this quarter.
 function availableUnassigned(date: string, roleId: string): Person[] {
   const assigned = new Set(cellPeople(date, roleId))
   return rosterStore.activePeople.filter(
-    (p) => hasRole(p, roleId) && !isBlackedOut(p.id, date) && !assigned.has(p.id),
+    (p) =>
+      hasRole(p, roleId) &&
+      !isBlackedOut(p.id, date) &&
+      !assigned.has(p.id) &&
+      frequencyTierOf(p.id) !== 'out',
   )
 }
 
