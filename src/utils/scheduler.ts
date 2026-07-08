@@ -4,6 +4,7 @@ import type {
   PersonQuarterData,
   QuarterCalendar,
   ProposeResult,
+  FrequencyTier,
 } from '@/types/roster'
 
 /**
@@ -32,6 +33,8 @@ export function proposeQuarterSchedule(
   const isBlackedOut = (personId: string, date: string) =>
     pqdById.get(personId)?.blackoutDates.includes(date) ?? false
   const partnersOf = (personId: string) => pqdById.get(personId)?.pairedWith ?? []
+  // undefined = pre-migration data (or no PQD entry at all) — treat as 'regular' (D-05)
+  const tierOf = (personId: string): FrequencyTier => pqdById.get(personId)?.frequencyTier ?? 'regular'
 
   const served = new Map<string, number>(people.map((p) => [p.id, 0]))
   const calendar: QuarterCalendar = {}
@@ -71,6 +74,10 @@ export function proposeQuarterSchedule(
           pairingConflicts.push({ date, personId, partnerId, reason: 'partner blacked out' })
           continue
         }
+        if (tierOf(partnerId) === 'out') {
+          pairingConflicts.push({ date, personId, partnerId, reason: 'partner out this quarter' })
+          continue
+        }
         const partner = people.find((p) => p.id === partnerId)
         if (!partner) continue
         // Own roles only (D-09) — prefer a role with remaining template capacity, else overflow first eligible role
@@ -92,9 +99,20 @@ export function proposeQuarterSchedule(
       calendar[date]![roleId] ??= []
       while (calendar[date]![roleId]!.length < count) {
         const alreadyInRole = new Set(calendar[date]![roleId])
-        const candidates = people.filter(
-          (p) => p.active && p.roles.includes(roleId) && !isBlackedOut(p.id, date) && !alreadyInRole.has(p.id),
-        )
+        const eligible = (tier: FrequencyTier) =>
+          people.filter(
+            (p) =>
+              p.active &&
+              p.roles.includes(roleId) &&
+              !isBlackedOut(p.id, date) &&
+              !alreadyInRole.has(p.id) &&
+              tierOf(p.id) === tier,
+          )
+        // Regular-tier pass first; fillin-tier is a last resort only when zero regular
+        // candidates exist (D-04). 'out'-tier people are excluded from both passes.
+        let candidates = eligible('regular')
+        if (candidates.length === 0) candidates = eligible('fillin')
+
         if (candidates.length === 0) {
           unfilled.push({ date, roleId })
           break // stop trying to fill this role's remaining slots for this date
@@ -102,7 +120,12 @@ export function proposeQuarterSchedule(
         const scored = candidates
           .map((p) => ({
             p,
-            deficit: (dateIndex + 1) / p.frequencyTargetN - (served.get(p.id) ?? 0),
+            // fillin-tier candidates have no meaningful frequencyTargetN-based deficit —
+            // tie-break purely by (servedCount asc, name asc) instead
+            deficit:
+              tierOf(p.id) === 'regular'
+                ? (dateIndex + 1) / p.frequencyTargetN - (served.get(p.id) ?? 0)
+                : 0,
           }))
           .sort(
             (a, b) =>
