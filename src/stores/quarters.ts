@@ -330,6 +330,7 @@ export const useQuartersStore = defineStore('quarters', () => {
     orgId,
     subscribe,
     unsubscribeAll,
+    getQuarter,
     createQuarter,
     addServiceDate,
     removeServiceDate,
