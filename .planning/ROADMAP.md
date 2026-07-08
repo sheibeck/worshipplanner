@@ -213,7 +213,6 @@ Plans:
 
 **Goal:** Replace the Phase 13 CSV import round-trip with an in-app quarterly availability editor so the worship leader transcribes each volunteer's quarterly email reply directly into constrained controls — no data ever arrives as free-text or CSV. From the roster, the leader picks a person and edits, for the active quarter: a **Sundays-only blackout calendar** (only real service dates are clickable, with "Nth Sunday" chips and a date-range block that selects the Sundays inside it), a **frequency** control (Every week / Twice a month / Monthly / As-needed fill-in / Out this quarter, with an advanced raw 1-in-N override and a live "≈ X of N Sundays" readout), a **must-serve-with** typeahead that creates bidirectional pairing chips, and a free-text **quarter note** (for the leader — never auto-scheduled). Edits write directly into the existing `PersonQuarterData` (blackoutDates, pairedWith) via the store, exactly as `applyCsvToQuarter` does today — the CSV import path remains as a secondary bulk option but is no longer the primary way availability enters the app.
 **Depends on:** Phase 13
-**Requirements**: TBD (derive during /gsd-discuss-phase 14)
 
 Scope (from user request):
 
@@ -231,6 +230,29 @@ Notes for planner:
 - Builds directly on Phase 13's data model (`src/types/roster.ts` — `PersonQuarterData`, `Person.frequencyTargetN`), store (`src/stores/quarters.ts` — `applyCsvToQuarter` mutation pattern, bidirectional pairing sync), and quarter-Sundays generator (`src/utils/quarterDates.ts`). Editor writes go through the store, not CSV.
 - Sketch: `.planning/sketches/001-availability-editor/index.html` (Variant A chosen) + `README.md`. CSV sample: `docs/Sample Frequency Notes.csv`.
 - The CSV import path (`VolunteerCsvImportModal.vue`, `volunteerCsv.ts`) is NOT removed — it stays as a secondary bulk-entry option; this phase makes the in-app editor the primary path.
+
+**Requirements**: D-01..D-11 (see 14-CONTEXT.md — no formal REQ-IDs; REQUIREMENTS.md absent, so the 11 locked decisions are the requirement/traceability set)
+**Plans:** 6 plans
+
+Plans:
+
+**Wave 1**
+
+- [ ] 14-01-PLAN.md — Data model (FrequencyTier on PersonQuarterData) + scheduler two-pass fill (regular→fillin, out-excluded) (TDD)
+- [ ] 14-02-PLAN.md — Selective PC import fetch: fetchPeopleForTeamPositions (team-scoped assignments, filter+dedupe) (TDD)
+
+**Wave 2**
+
+- [ ] 14-03-PLAN.md — quarters store setPersonAvailability: single-person write + symmetric add/remove bidirectional pairing (TDD)
+- [ ] 14-04-PLAN.md — RosterImportModal selective flow: service-type→team→positions+Role mapping, replaces whole-directory fetch
+
+**Wave 3**
+
+- [ ] 14-05-PLAN.md — AvailabilityDrawer.vue (Variant A) all controls + QuarterGrid 'out'-tier exclusion (+ tests)
+
+**Wave 4**
+
+- [ ] 14-06-PLAN.md — AvailabilityRosterTable.vue + QuarterView mount (openPersonId) + end-to-end human-verify
 
 ## Backlog
 
