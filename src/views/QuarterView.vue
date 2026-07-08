@@ -22,6 +22,17 @@
             Print
           </button>
           <button
+            v-if="selectedQuarter && hasAssignments"
+            @click="onFinalizeAndShare"
+            :disabled="isFinalizing"
+            class="inline-flex items-center gap-2 rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm font-medium text-gray-200 hover:bg-gray-700 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+            </svg>
+            {{ isFinalizing ? 'Finalizing...' : 'Finalize & Share' }}
+          </button>
+          <button
             v-if="selectedQuarter"
             @click="csvModalOpen = true"
             class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 transition-colors"
@@ -33,6 +44,21 @@
           </button>
         </div>
       </div>
+
+      <!-- Share link banner -->
+      <div
+        v-if="shareUrl"
+        class="rounded-lg border border-indigo-800 bg-indigo-950/40 p-4 mb-6 flex items-center gap-3 flex-wrap"
+      >
+        <p class="text-sm text-gray-300 flex-1 min-w-0 truncate">{{ shareUrl }}</p>
+        <button
+          @click="onCopyShareUrl"
+          class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors shrink-0"
+        >
+          {{ shareCopied ? 'Copied!' : 'Copy link' }}
+        </button>
+      </div>
+      <div v-if="shareError" class="text-sm text-red-400 mb-6">{{ shareError }}</div>
 
       <!-- Quarter selector + create -->
       <div class="rounded-lg border border-gray-800 bg-gray-900 p-5 mb-6">
@@ -395,6 +421,54 @@ function onCsvImported() {
 // ── Print ─────────────────────────────────────────────────────────────────────
 function onPrint() {
   window.print()
+}
+
+// ── Finalize & Share (D-24) ─────────────────────────────────────────────────
+const isFinalizing = ref(false)
+const shareUrl = ref<string | null>(null)
+const shareCopied = ref(false)
+const shareError = ref<string | null>(null)
+
+// Reflect an already-finalized quarter's share link when switching quarters.
+watch(
+  selectedQuarter,
+  (quarter) => {
+    shareUrl.value = quarter?.shareToken
+      ? `${window.location.origin}/quarter-share/${quarter.shareToken}`
+      : null
+    shareCopied.value = false
+    shareError.value = null
+  },
+  { immediate: true },
+)
+
+async function onFinalizeAndShare() {
+  if (!selectedQuarter.value) return
+  isFinalizing.value = true
+  shareError.value = null
+  try {
+    const token = await quartersStore.finalizeAndShare(selectedQuarter.value.id)
+    shareUrl.value = `${window.location.origin}/quarter-share/${token}`
+  } catch (err) {
+    console.error('Finalize & Share failed:', err)
+    shareError.value = 'Failed to finalize and share'
+    setTimeout(() => {
+      shareError.value = null
+    }, 3000)
+  } finally {
+    isFinalizing.value = false
+  }
+}
+
+async function onCopyShareUrl() {
+  if (!shareUrl.value) return
+  if (navigator.clipboard) {
+    await navigator.clipboard.writeText(shareUrl.value)
+  }
+  shareCopied.value = true
+  setTimeout(() => {
+    shareCopied.value = false
+  }, 2000)
 }
 
 // ── Lifecycle ────────────────────────────────────────────────────────────────

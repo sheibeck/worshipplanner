@@ -80,6 +80,12 @@ const router = createRouter({
       component: () => import('../views/ShareView.vue'),
       // Intentionally no meta.requiresAuth — public route for unauthenticated viewers
     },
+    {
+      path: '/quarter-share/:token',
+      name: 'quarter-share',
+      component: () => import('../views/QuarterShareView.vue'),
+      // Intentionally no meta.requiresAuth — public route for unauthenticated viewers (D-24)
+    },
   ],
 })
 
