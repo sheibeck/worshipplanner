@@ -225,8 +225,11 @@
           </button>
         </div>
         <div v-else class="rounded-lg border border-gray-800 bg-gray-900 p-5">
-          <!-- QuarterGrid mounts here (Plan 09) -->
-          <p class="text-sm text-gray-500">Schedule grid coming soon.</p>
+          <QuarterGrid
+            :quarter="selectedQuarter"
+            :roles="rosterStore.roles"
+            :lastProposeResult="proposeResult"
+          />
         </div>
       </template>
 
@@ -253,6 +256,7 @@ import { useRosterStore } from '@/stores/roster'
 import type { ProposeResult } from '@/types/roster'
 import AppShell from '@/components/AppShell.vue'
 import VolunteerCsvImportModal from '@/components/VolunteerCsvImportModal.vue'
+import QuarterGrid from '@/components/QuarterGrid.vue'
 
 const authStore = useAuthStore()
 const quartersStore = useQuartersStore()

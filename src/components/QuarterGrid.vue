@@ -1,0 +1,280 @@
+<template>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm border-collapse">
+      <thead>
+        <tr>
+          <th
+            class="sticky left-0 z-10 bg-gray-900 px-2 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider"
+          >
+            Date
+          </th>
+          <th
+            v-for="role in sortedRoles"
+            :key="role.id"
+            class="px-2 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider"
+            :class="groupHeaderBg[role.group]"
+          >
+            {{ role.name }}
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <template v-for="date in quarter.serviceDates" :key="date">
+          <tr class="border-b border-gray-800/50">
+            <td
+              class="sticky left-0 z-10 bg-gray-900 px-2 py-2 text-sm font-medium text-gray-100 whitespace-nowrap align-top"
+            >
+              {{ formatDateLabel(date) }}
+            </td>
+            <td v-for="role in sortedRoles" :key="role.id" class="px-2 py-2 align-top">
+              <button
+                type="button"
+                class="w-full text-left rounded-md p-1 transition-colors hover:bg-gray-800/60"
+                :class="cellIsUnfilled(date, role.id) ? 'border border-dashed border-gray-700' : ''"
+                :aria-expanded="isExpanded(date, role.id)"
+                @click="toggleCell(date, role.id)"
+              >
+                <div class="flex flex-wrap gap-1 items-center">
+                  <span
+                    v-for="personId in cellPeople(date, role.id)"
+                    :key="personId"
+                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border bg-gray-800 text-gray-200 border-gray-700"
+                  >
+                    {{ personName(personId) }}
+                    <span
+                      role="button"
+                      aria-label="Remove"
+                      class="text-gray-500 hover:text-red-400 cursor-pointer"
+                      @click.stop="onClear(date, role.id, personId)"
+                    >&times;</span>
+                  </span>
+                  <span v-if="cellPeople(date, role.id).length === 0" class="text-xs text-gray-600">&mdash;</span>
+                </div>
+                <div class="flex items-center gap-1 mt-1 flex-wrap">
+                  <span
+                    v-if="cellIsUnfilled(date, role.id)"
+                    class="text-xs px-2 py-0.5 rounded-full bg-red-900/40 border border-red-700/50 text-red-400"
+                  >
+                    Unfilled
+                  </span>
+                  <span
+                    v-if="cellHasConflict(date, role.id)"
+                    class="text-xs px-2 py-0.5 rounded-full bg-amber-900/40 border border-amber-700/50 text-amber-300"
+                  >
+                    Pairing conflict
+                  </span>
+                </div>
+              </button>
+            </td>
+          </tr>
+
+          <!-- Expanded cell editor + gap-filling panel -->
+          <tr v-if="expandedCell && expandedCell.date === date" class="bg-gray-800/30 border-b border-gray-800/50">
+            <td :colspan="sortedRoles.length + 1" class="px-4 py-4">
+              <p class="text-sm font-medium text-gray-200 mb-3">
+                {{ expandedRoleName }} &mdash; {{ formatDateLabel(expandedCell.date) }}
+              </p>
+
+              <!-- Current assignments: clear / swap -->
+              <div v-if="expandedAssigned.length > 0" class="space-y-2 mb-4">
+                <div
+                  v-for="personId in expandedAssigned"
+                  :key="personId"
+                  class="flex items-center gap-3 flex-wrap"
+                >
+                  <span class="text-sm text-gray-200 min-w-[8rem]">{{ personName(personId) }}</span>
+                  <button
+                    type="button"
+                    class="text-xs px-2 py-1 rounded-md text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors"
+                    @click="onClear(expandedCell.date, expandedCell.roleId, personId)"
+                  >
+                    Clear
+                  </button>
+                  <select
+                    class="text-xs rounded-md bg-gray-800 border border-gray-700 text-gray-300 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    value=""
+                    @change="onSwapSelect($event, personId)"
+                  >
+                    <option value="">Swap with&hellip;</option>
+                    <option
+                      v-for="candidate in expandedEligible"
+                      :key="candidate.id"
+                      :value="candidate.id"
+                    >
+                      {{ candidate.name }}
+                    </option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Add another person (multi-person-per-role, D-04) -->
+              <div class="flex items-center gap-2 mb-4 flex-wrap">
+                <select
+                  v-model="addSelectId"
+                  class="text-xs rounded-md bg-gray-800 border border-gray-700 text-gray-300 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                >
+                  <option value="">Add a person&hellip;</option>
+                  <option
+                    v-for="candidate in expandedEligible"
+                    :key="candidate.id"
+                    :value="candidate.id"
+                  >
+                    {{ candidate.name }}
+                  </option>
+                </select>
+                <button
+                  type="button"
+                  class="text-xs px-3 py-1.5 rounded-md text-white bg-indigo-600 hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  :disabled="!addSelectId"
+                  @click="onAdd"
+                >
+                  Assign
+                </button>
+              </div>
+            </td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, computed } from 'vue'
+import { useQuartersStore } from '@/stores/quarters'
+import { useRosterStore } from '@/stores/roster'
+import type { Quarter, Role, RoleGroup, ProposeResult, Person } from '@/types/roster'
+
+const props = defineProps<{
+  quarter: Quarter
+  roles: Role[]
+  lastProposeResult: ProposeResult | null
+}>()
+
+const quartersStore = useQuartersStore()
+const rosterStore = useRosterStore()
+
+// ── Static class maps (never dynamically constructed — Tailwind v4 purge safety) ──
+const groupHeaderBg: Record<RoleGroup, string> = {
+  band: 'bg-blue-900/50',
+  tech: 'bg-purple-900/50',
+  other: 'bg-gray-800',
+} as const
+
+const GROUP_ORDER: RoleGroup[] = ['band', 'tech', 'other']
+
+// ── Roles grouped Band/Tech/Other, ordered within group ────────────────────────
+const sortedRoles = computed<Role[]>(() => {
+  return [...props.roles].sort((a, b) => {
+    const groupDiff = GROUP_ORDER.indexOf(a.group) - GROUP_ORDER.indexOf(b.group)
+    if (groupDiff !== 0) return groupDiff
+    return a.order - b.order
+  })
+})
+
+// ── Cell data helpers ────────────────────────────────────────────────────────────
+function cellPeople(date: string, roleId: string): string[] {
+  return props.quarter.calendar[date]?.[roleId] ?? []
+}
+
+function effectiveCountFor(date: string, roleId: string): number {
+  const override = props.quarter.roleOverridesByDate[date]
+  const overrideMatch = override?.find((r) => r.roleId === roleId)
+  if (overrideMatch) return overrideMatch.count
+  const role = props.roles.find((r) => r.id === roleId)
+  return role?.defaultCount ?? 0
+}
+
+function isInUnfilledList(date: string, roleId: string): boolean {
+  return props.lastProposeResult?.unfilled.some((u) => u.date === date && u.roleId === roleId) ?? false
+}
+
+function cellIsUnfilled(date: string, roleId: string): boolean {
+  return cellPeople(date, roleId).length < effectiveCountFor(date, roleId) || isInUnfilledList(date, roleId)
+}
+
+function cellHasConflict(date: string, roleId: string): boolean {
+  const conflicts = props.lastProposeResult?.pairingConflicts.filter((c) => c.date === date) ?? []
+  if (conflicts.length === 0) return false
+  const assigned = cellPeople(date, roleId)
+  return assigned.some((id) => conflicts.some((c) => c.personId === id || c.partnerId === id))
+}
+
+function personName(id: string): string {
+  return rosterStore.people.find((p) => p.id === id)?.name ?? '(unknown)'
+}
+
+function formatDateLabel(date: string): string {
+  const d = new Date(`${date}T00:00:00`)
+  return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
+// ── Blackout + candidate helpers (D-23) ─────────────────────────────────────────
+function isBlackedOut(personId: string, date: string): boolean {
+  return props.quarter.personQuarterData[personId]?.blackoutDates.includes(date) ?? false
+}
+
+function hasRole(person: Person, roleId: string): boolean {
+  return person.roles.includes(roleId)
+}
+
+// Available-unassigned for (date, roleId) = activePeople with roleId in roles,
+// NOT blacked out that date, NOT already in that cell.
+function availableUnassigned(date: string, roleId: string): Person[] {
+  const assigned = new Set(cellPeople(date, roleId))
+  return rosterStore.activePeople.filter(
+    (p) => hasRole(p, roleId) && !isBlackedOut(p.id, date) && !assigned.has(p.id),
+  )
+}
+
+// ── Expanded cell state (click-to-edit + gap panel) ─────────────────────────────
+const expandedCell = ref<{ date: string; roleId: string } | null>(null)
+const addSelectId = ref('')
+
+function isExpanded(date: string, roleId: string): boolean {
+  return expandedCell.value?.date === date && expandedCell.value?.roleId === roleId
+}
+
+function toggleCell(date: string, roleId: string) {
+  if (isExpanded(date, roleId)) {
+    expandedCell.value = null
+  } else {
+    expandedCell.value = { date, roleId }
+  }
+  addSelectId.value = ''
+}
+
+const expandedRoleName = computed<string>(() => {
+  if (!expandedCell.value) return ''
+  return props.roles.find((r) => r.id === expandedCell.value!.roleId)?.name ?? ''
+})
+
+const expandedAssigned = computed<string[]>(() => {
+  if (!expandedCell.value) return []
+  return cellPeople(expandedCell.value.date, expandedCell.value.roleId)
+})
+
+const expandedEligible = computed<Person[]>(() => {
+  if (!expandedCell.value) return []
+  return availableUnassigned(expandedCell.value.date, expandedCell.value.roleId)
+})
+
+// ── Store actions — scoped Firestore dot-path updates only (D-22, T-13-09-02) ──
+function onClear(date: string, roleId: string, personId: string) {
+  quartersStore.clearAssignment(props.quarter.id, date, roleId, personId)
+}
+
+function onAdd() {
+  if (!expandedCell.value || !addSelectId.value) return
+  quartersStore.assignPerson(props.quarter.id, expandedCell.value.date, expandedCell.value.roleId, addSelectId.value)
+  addSelectId.value = ''
+}
+
+function onSwapSelect(event: Event, fromPersonId: string) {
+  const select = event.target as HTMLSelectElement
+  const toPersonId = select.value
+  if (!toPersonId || !expandedCell.value) return
+  quartersStore.swapAssignment(props.quarter.id, expandedCell.value.date, expandedCell.value.roleId, fromPersonId, toPersonId)
+  select.value = ''
+}
+</script>
