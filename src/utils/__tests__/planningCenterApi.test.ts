@@ -34,6 +34,7 @@ import {
   fetchAllPeople,
   mapPcPersonToUpsert,
   fetchAndMapPeople,
+  fetchPeopleForTeamPositions,
 } from '@/utils/planningCenterApi'
 
 const mockTimestamp = { toDate: () => new Date('2026-03-08') } as unknown as Timestamp
@@ -1573,6 +1574,87 @@ describe('fetchAllPeople', () => {
   it('throws when the final response is not ok', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response('Server Error', { status: 500 }))
     await expect(fetchAllPeople('app-id', 'secret')).rejects.toThrow('Failed to fetch people: 500')
+  })
+})
+
+describe('fetchPeopleForTeamPositions', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  it('filters by selectedPositionIds, dedupes a person on two selected positions, and paginates across pages', async () => {
+    const page1 = {
+      data: [
+        { id: 'a1', relationships: { person: { data: { id: 'p1' } }, team_position: { data: { id: 'POS1' } } } },
+        { id: 'a2', relationships: { person: { data: { id: 'p1' } }, team_position: { data: { id: 'POS2' } } } },
+        { id: 'a3', relationships: { person: { data: { id: 'p2' } }, team_position: { data: { id: 'POS_UNSELECTED' } } } },
+      ],
+      included: [
+        { type: 'Person', id: 'p1', attributes: { name: 'Ann Lee' } },
+        { type: 'Person', id: 'p2', attributes: { name: 'Bo Ray' } },
+      ],
+      links: {
+        self: 'https://api.planningcenteronline.com/services/v2/teams/TEAM1/person_team_position_assignments?per_page=100&offset=0',
+        next: 'https://api.planningcenteronline.com/services/v2/teams/TEAM1/person_team_position_assignments?per_page=100&offset=100',
+      },
+    }
+    const page2 = {
+      data: [
+        { id: 'a4', relationships: { person: { data: { id: 'p3' } }, team_position: { data: { id: 'POS1' } } } },
+      ],
+      included: [{ type: 'Person', id: 'p3', attributes: { name: 'Cy Doe' } }],
+      links: {
+        self: 'https://api.planningcenteronline.com/services/v2/teams/TEAM1/person_team_position_assignments?per_page=100&offset=100',
+      },
+    }
+
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(JSON.stringify(page1), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(page2), { status: 200 }))
+
+    const result = await fetchPeopleForTeamPositions('app', 'sec', 'TEAM1', new Set(['POS1', 'POS2']))
+
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2)
+    const [firstUrl] = vi.mocked(fetch).mock.calls[0]!
+    expect(firstUrl as string).toContain('/teams/TEAM1/person_team_position_assignments')
+    expect(firstUrl as string).toContain('include=person')
+    const [secondUrl] = vi.mocked(fetch).mock.calls[1]!
+    expect(secondUrl as string).not.toContain('api.planningcenteronline.com')
+
+    expect(result).toHaveLength(2)
+    expect(result).toEqual(
+      expect.arrayContaining([
+        { pcPersonId: 'p1', name: 'Ann Lee' },
+        { pcPersonId: 'p3', name: 'Cy Doe' },
+      ]),
+    )
+    expect(result.find((r) => r.pcPersonId === 'p2')).toBeUndefined()
+  })
+
+  it('retries a 429 response respecting Retry-After, then succeeds', async () => {
+    const okPayload = {
+      data: [
+        { id: 'a1', relationships: { person: { data: { id: 'p1' } }, team_position: { data: { id: 'POS1' } } } },
+      ],
+      included: [{ type: 'Person', id: 'p1', attributes: { name: 'Ann Lee' } }],
+      links: { self: 'https://api.planningcenteronline.com/services/v2/teams/TEAM1/person_team_position_assignments' },
+    }
+
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response('Too Many Requests', { status: 429, headers: { 'Retry-After': '0' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(okPayload), { status: 200 }))
+
+    const result = await fetchPeopleForTeamPositions('app', 'sec', 'TEAM1', new Set(['POS1']))
+
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2)
+    expect(result).toEqual([{ pcPersonId: 'p1', name: 'Ann Lee' }])
+  })
+
+  it('throws when the final response is not ok', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('Server Error', { status: 500 }))
+    await expect(
+      fetchPeopleForTeamPositions('app', 'sec', 'TEAM1', new Set(['POS1'])),
+    ).rejects.toThrow('Failed to fetch team position assignments: 500')
   })
 })
 
