@@ -31,6 +31,10 @@ export interface RoleSlotConfig {
   count: number
 }
 
+// Quarter-scoped fill-in/out frequency behavior (D-04/D-05). Optional — defaults to
+// 'regular' when absent (pre-migration Phase 13 data has no frequencyTier at all).
+export type FrequencyTier = 'regular' | 'fillin' | 'out'
+
 /**
  * Quarter-scoped, per-person availability — reset each quarter (D-18),
  * replaced per person on re-import (D-19). NOT standing data.
@@ -39,6 +43,10 @@ export interface PersonQuarterData {
   personId: string
   blackoutDates: string[] // expanded YYYY-MM-DD list (D-17 ranges already expanded against serviceDates)
   pairedWith: string[] // Person.id[], bidirectional — must-serve-with pairings (D-09)
+  /** Quarter-scoped (D-05/A1) — resets each new quarter. Optional; defaults to 'regular' when absent. */
+  frequencyTier?: FrequencyTier
+  /** Free-text quarter note (D-03/D-07) — never auto-scheduled. Optional; defaults to '' when absent. */
+  note?: string
 }
 
 // calendar[date][roleId] = personId[]  (multi-person-per-role, multi-role-per-person — D-04)
