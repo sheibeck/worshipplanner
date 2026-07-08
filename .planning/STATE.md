@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: MVP
 status: verifying
-stopped_at: Completed 13-10-PLAN.md
-last_updated: "2026-07-08T01:33:26.866Z"
+stopped_at: Phase 14 context gathered
+last_updated: "2026-07-08T03:19:06.067Z"
 last_activity: 2026-07-08
 progress:
-  total_phases: 7
+  total_phases: 8
   completed_phases: 6
   total_plans: 31
   completed_plans: 31
-  percent: 86
+  percent: 75
 ---
 
 # Project State
@@ -168,6 +168,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-08
-Last session: 2026-07-08T01:33:10.661Z
-Stopped at: Completed 13-06-PLAN.md
-Resume file: None
+Last session: 2026-07-08T03:19:06.032Z
+Stopped at: Phase 14 context gathered
+Resume file: .planning/phases/14-in-app-quarterly-availability-editor/14-CONTEXT.md
