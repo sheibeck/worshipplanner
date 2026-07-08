@@ -1062,6 +1062,93 @@ export async function fetchAllPeople(appId: string, secret: string): Promise<PcP
 }
 
 /**
+ * Raw PC person-team-position-assignment shape (Services v2), plus the `included`
+ * Person resources returned alongside it via `include=person`.
+ */
+interface PcAssignment {
+  id: string
+  relationships: { person: { data: { id: string } }; team_position: { data: { id: string } } }
+}
+interface PcIncludedPerson {
+  type: 'Person'
+  id: string
+  attributes: { first_name?: string; last_name?: string; name?: string }
+}
+
+/**
+ * Fetch the distinct people currently serving one of the caller's selected team positions
+ * (D-08/D-09/D-10 — selective import scoped by team AND role/position). Uses the team-scoped
+ * `/teams/{teamId}/person_team_position_assignments?include=person` endpoint (NOT the
+ * service_type-scoped sibling — RESEARCH.md Pitfall 4) so the included Person resources are
+ * returned inline, avoiding an N+1 per-person fetch. Mirrors fetchAllPeople's pagination +
+ * 429-retry + proxy-URL-rewrite loop.
+ *
+ * Choir/orchestra positions are excluded simply by never being in `selectedPositionIds` (D-09).
+ * Emails are NOT fetched here — that is Plan 04's concern if/when needed downstream.
+ */
+export async function fetchPeopleForTeamPositions(
+  appId: string,
+  secret: string,
+  teamId: string,
+  selectedPositionIds: Set<string>,
+): Promise<Array<{ pcPersonId: string; name: string }>> {
+  const authHeader = basicAuthHeader(appId, secret)
+
+  let url: string | undefined =
+    `${PC_BASE_URL}/teams/${teamId}/person_team_position_assignments?include=person&per_page=100`
+  const peopleById = new Map<string, string>() // pcPersonId -> name
+
+  while (url) {
+    let response: Response
+    // Retry on 429 respecting Retry-After
+    for (let attempt = 0; ; attempt++) {
+      response = await fetch(url, {
+        headers: { Authorization: authHeader, Accept: 'application/json' },
+      })
+      if (response.status !== 429 || attempt >= 3) break
+      const retryAfter = response.headers.get('Retry-After')
+      const waitMs = retryAfter ? parseFloat(retryAfter) * 1000 : 60_000
+      await new Promise((r) => setTimeout(r, waitMs))
+    }
+
+    if (!response!.ok) {
+      throw new Error(`Failed to fetch team position assignments: ${response!.status}`)
+    }
+
+    const json = (await response.json()) as {
+      data: PcAssignment[]
+      included?: PcIncludedPerson[]
+      links: { next?: string }
+    }
+
+    const includedById = new Map((json.included ?? []).map((p) => [p.id, p]))
+    for (const assignment of json.data) {
+      const posId = assignment.relationships.team_position.data.id
+      if (!selectedPositionIds.has(posId)) continue
+      const personId = assignment.relationships.person.data.id
+      const person = includedById.get(personId)
+      if (!person) continue
+      const name =
+        person.attributes.name?.trim() ||
+        `${person.attributes.first_name ?? ''} ${person.attributes.last_name ?? ''}`.trim()
+      peopleById.set(personId, name) // dedupes people serving multiple selected positions
+    }
+
+    // Follow pagination — rewrite absolute PC URL to local proxy path
+    if (json.links.next) {
+      url = json.links.next.replace(
+        'https://api.planningcenteronline.com/services/v2',
+        PC_BASE_URL,
+      )
+    } else {
+      url = undefined
+    }
+  }
+
+  return Array.from(peopleById, ([pcPersonId, name]) => ({ pcPersonId, name }))
+}
+
+/**
  * Pure: PC person + its resolved emails → UpsertPersonInput.
  * `phone` is ALWAYS '' — PC Services v2 has no phone vertex (D-14 app-only field,
  * RESEARCH.md Pitfall 5). Standing fields (active/roles/frequencyTargetN) are left
