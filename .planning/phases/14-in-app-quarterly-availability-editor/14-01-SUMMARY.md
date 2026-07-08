@@ -103,3 +103,7 @@ None - no external service configuration required.
 ---
 *Phase: 14-in-app-quarterly-availability-editor*
 *Completed: 2026-07-08*
+
+## Self-Check: PASSED
+
+All created/modified files verified present; all task commit hashes (6db38b9, 3a81a78, 48e49fc, 719a927) verified in git log.
