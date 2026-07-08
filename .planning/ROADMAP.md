@@ -232,7 +232,7 @@ Notes for planner:
 - The CSV import path (`VolunteerCsvImportModal.vue`, `volunteerCsv.ts`) is NOT removed — it stays as a secondary bulk-entry option; this phase makes the in-app editor the primary path.
 
 **Requirements**: D-01..D-11 (see 14-CONTEXT.md — no formal REQ-IDs; REQUIREMENTS.md absent, so the 11 locked decisions are the requirement/traceability set)
-**Plans:** 3/6 plans executed
+**Plans:** 4/6 plans executed
 
 Plans:
 
@@ -248,7 +248,7 @@ Plans:
 
 **Wave 3**
 
-- [ ] 14-05-PLAN.md — AvailabilityDrawer.vue (Variant A) all controls + QuarterGrid 'out'-tier exclusion (+ tests)
+- [x] 14-05-PLAN.md — AvailabilityDrawer.vue (Variant A) all controls + QuarterGrid 'out'-tier exclusion (+ tests)
 
 **Wave 4**
 
