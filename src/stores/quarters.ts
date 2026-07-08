@@ -13,7 +13,14 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore'
 import { db } from '@/firebase'
-import type { Quarter, RoleSlotConfig, PersonQuarterData, ProposeResult, Role } from '@/types/roster'
+import type {
+  Quarter,
+  RoleSlotConfig,
+  PersonQuarterData,
+  ProposeResult,
+  Role,
+  FrequencyTier,
+} from '@/types/roster'
 import { generateSundaysInQuarter, applyDateAdditionsRemovals } from '@/utils/quarterDates'
 import { proposeQuarterSchedule } from '@/utils/scheduler'
 import { useRosterStore } from '@/stores/roster'
@@ -152,6 +159,50 @@ export const useQuartersStore = defineStore('quarters', () => {
     await updateQuarter(quarterId, { personQuarterData })
   }
 
+  // D-03/D-05/D-06: single-person quarter-data save from the availability drawer. Writes only
+  // scoped `personQuarterData.${id}` / `personQuarterData.${id}.pairedWith` dot-paths — never the
+  // whole `personQuarterData` map — so concurrent edits to other people's entries aren't clobbered
+  // (T-14-03-01). Performs a symmetric added/removed diff against the *previous* pairedWith so a
+  // dropped partner is reciprocally un-paired, not just left as a stale one-directional link
+  // (T-14-03-02 / 14-RESEARCH Pitfall 2).
+  async function setPersonAvailability(
+    quarterId: string,
+    personId: string,
+    data: { blackoutDates: string[]; pairedWith: string[]; frequencyTier: FrequencyTier; note: string },
+  ): Promise<void> {
+    if (!orgId.value) return
+    const quarter = getQuarter(quarterId)
+    const previous = quarter.personQuarterData[personId]?.pairedWith ?? []
+    const added = data.pairedWith.filter((id) => !previous.includes(id))
+    const removed = previous.filter((id) => !data.pairedWith.includes(id))
+
+    const updates: Record<string, unknown> = {
+      [`personQuarterData.${personId}`]: { personId, ...data },
+      updatedAt: serverTimestamp(),
+    }
+    for (const partnerId of added) {
+      const partnerPaired = quarter.personQuarterData[partnerId]?.pairedWith ?? []
+      if (!partnerPaired.includes(personId)) {
+        updates[`personQuarterData.${partnerId}`] = {
+          personId: partnerId,
+          blackoutDates: quarter.personQuarterData[partnerId]?.blackoutDates ?? [],
+          pairedWith: [...partnerPaired, personId],
+          frequencyTier: quarter.personQuarterData[partnerId]?.frequencyTier ?? 'regular',
+          note: quarter.personQuarterData[partnerId]?.note ?? '',
+        }
+      }
+    }
+    for (const partnerId of removed) {
+      const partnerData = quarter.personQuarterData[partnerId]
+      if (partnerData) {
+        updates[`personQuarterData.${partnerId}.pairedWith`] = partnerData.pairedWith.filter(
+          (id) => id !== personId,
+        )
+      }
+    }
+    await updateDoc(doc(db, 'organizations', orgId.value, 'quarters', quarterId), updates)
+  }
+
   function buildResolveRolesForDate(
     quarter: Quarter,
     roles: Role[],
@@ -284,6 +335,7 @@ export const useQuartersStore = defineStore('quarters', () => {
     removeServiceDate,
     setRoleOverrideForDate,
     applyCsvToQuarter,
+    setPersonAvailability,
     buildResolveRolesForDate,
     generateProposal,
     assignPerson,

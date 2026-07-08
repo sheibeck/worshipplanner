@@ -354,6 +354,119 @@ describe('useQuartersStore', () => {
     })
   })
 
+  describe('setPersonAvailability (D-03, D-05, D-06)', () => {
+    function seedJuliaPairedWithLisa() {
+      triggerQuartersSnapshot([
+        makeQuarterDoc({
+          personQuarterData: {
+            julia: {
+              personId: 'julia',
+              blackoutDates: ['2026-07-05'],
+              pairedWith: ['lisa'],
+              frequencyTier: 'regular',
+              note: 'old note',
+            },
+            lisa: {
+              personId: 'lisa',
+              blackoutDates: [],
+              pairedWith: ['julia'],
+              frequencyTier: 'regular',
+              note: '',
+            },
+          },
+        }),
+      ])
+    }
+
+    it('writes the own entry under personQuarterData.{personId} with all four fields', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useQuartersStore } = await import('../quarters')
+      const store = useQuartersStore()
+      store.subscribe('org-1')
+      seedJuliaPairedWithLisa()
+
+      await store.setPersonAvailability('quarter-1', 'julia', {
+        blackoutDates: ['2026-07-19'],
+        pairedWith: ['dean'],
+        frequencyTier: 'regular',
+        note: 'x',
+      })
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+      expect(data['personQuarterData.julia']).toEqual({
+        personId: 'julia',
+        blackoutDates: ['2026-07-19'],
+        pairedWith: ['dean'],
+        frequencyTier: 'regular',
+        note: 'x',
+      })
+      expect(data.updatedAt).toBeDefined()
+    })
+
+    it('reciprocally adds this person to a newly paired partner who did not previously list them', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useQuartersStore } = await import('../quarters')
+      const store = useQuartersStore()
+      store.subscribe('org-1')
+      seedJuliaPairedWithLisa()
+
+      await store.setPersonAvailability('quarter-1', 'julia', {
+        blackoutDates: ['2026-07-19'],
+        pairedWith: ['dean'],
+        frequencyTier: 'regular',
+        note: 'x',
+      })
+
+      const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+      // dean had no prior entry — should be seeded whole with defaults and julia in pairedWith
+      const deanEntry = data['personQuarterData.dean'] as
+        | { pairedWith: string[] }
+        | undefined
+      const deanPairedPath = data['personQuarterData.dean.pairedWith'] as string[] | undefined
+      const deanPairedWith = deanEntry?.pairedWith ?? deanPairedPath
+      expect(deanPairedWith).toContain('julia')
+    })
+
+    it('reciprocally removes this person from a dropped partners pairedWith without touching other fields', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useQuartersStore } = await import('../quarters')
+      const store = useQuartersStore()
+      store.subscribe('org-1')
+      seedJuliaPairedWithLisa()
+
+      await store.setPersonAvailability('quarter-1', 'julia', {
+        blackoutDates: ['2026-07-19'],
+        pairedWith: ['dean'],
+        frequencyTier: 'regular',
+        note: 'x',
+      })
+
+      const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+      expect(data['personQuarterData.lisa.pairedWith']).toEqual([])
+      // scoping: partner remove must only touch pairedWith, never rewrite lisa's whole entry
+      expect(data['personQuarterData.lisa']).toBeUndefined()
+    })
+
+    it('never writes the bare personQuarterData map key', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useQuartersStore } = await import('../quarters')
+      const store = useQuartersStore()
+      store.subscribe('org-1')
+      seedJuliaPairedWithLisa()
+
+      await store.setPersonAvailability('quarter-1', 'julia', {
+        blackoutDates: ['2026-07-19'],
+        pairedWith: ['dean'],
+        frequencyTier: 'regular',
+        note: 'x',
+      })
+
+      const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+      expect(data.personQuarterData).toBeUndefined()
+    })
+  })
+
   describe('buildResolveRolesForDate', () => {
     it('returns per-date override when present, else default template in role.order order', async () => {
       const { useQuartersStore } = await import('../quarters')
