@@ -323,6 +323,34 @@ describe('useRosterStore', () => {
       expect(result).toEqual({ added: 0, updated: 1 })
     })
 
+    it('merges (unions) roles on update — never removes a role the existing person already has', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useRosterStore } = await import('../roster')
+      const store = useRosterStore()
+      store.subscribe('org-1')
+      triggerPeopleSnapshot([
+        makePerson({
+          id: 'existing-person',
+          name: 'Multi Role',
+          pcPersonId: 'pc-multi',
+          active: true,
+          roles: ['role-projection', 'role-vocals'],
+        }),
+      ])
+
+      // Import only reports the Sound role — the person's existing projection/vocals
+      // roles must be preserved, not clobbered.
+      await store.upsertPeople([
+        { name: 'Multi Role', email: '', pcPersonId: 'pc-multi', roles: ['role-sound'] },
+      ])
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const data = callArgs[1] as unknown as Record<string, unknown>
+      const written = data.roles as string[]
+      expect(new Set(written)).toEqual(new Set(['role-projection', 'role-vocals', 'role-sound']))
+    })
+
     it('matches by normalized name (trim + collapse whitespace + lowercase) when no pcPersonId match', async () => {
       const { updateDoc } = await import('firebase/firestore')
       const { useRosterStore } = await import('../roster')

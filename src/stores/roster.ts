@@ -154,7 +154,13 @@ export const useRosterStore = defineStore('roster', () => {
           updatedAt: serverTimestamp(),
         }
         if (incoming.phone !== undefined) updateData.phone = incoming.phone
-        if (incoming.roles !== undefined) updateData.roles = incoming.roles
+        // Roles are MERGED (union), never replaced — an import must never remove a
+        // role an existing volunteer already has in Worship Planner. A PC/CSV import
+        // only ever tells us the roles that source knows about; roles added in-app
+        // (or from a different team's import) must be preserved.
+        if (incoming.roles !== undefined) {
+          updateData.roles = Array.from(new Set([...(existing.roles ?? []), ...incoming.roles]))
+        }
         if (incoming.frequencyTargetN !== undefined) updateData.frequencyTargetN = incoming.frequencyTargetN
         if (incoming.pcPersonId !== undefined) updateData.pcPersonId = incoming.pcPersonId
         await updateDoc(doc(db, 'organizations', orgId.value!, 'people', existing.id), updateData)

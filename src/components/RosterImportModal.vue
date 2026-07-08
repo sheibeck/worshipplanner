@@ -142,17 +142,24 @@
                   <label :for="`position-${position.id}`" class="flex-1 text-sm text-gray-200">
                     {{ position.name }}
                   </label>
-                  <select
-                    v-if="selectedPositionIds.has(position.id)"
-                    class="text-sm bg-gray-900 border border-gray-700 rounded-md px-2 py-1 text-gray-200"
-                    :value="positionRoleMap[position.id] ?? ''"
-                    @change="setPositionRole(position.id, ($event.target as HTMLSelectElement).value)"
-                  >
-                    <option value="" disabled>Map to Role...</option>
-                    <option v-for="role in rosterStore.rolesSorted" :key="role.id" :value="role.id">
-                      {{ role.name }}
-                    </option>
-                  </select>
+                  <template v-if="selectedPositionIds.has(position.id)">
+                    <select
+                      v-if="rosterStore.rolesSorted.length > 0"
+                      class="text-sm bg-gray-900 border border-gray-700 rounded-md px-2 py-1 text-gray-200"
+                      :value="positionRoleMap[position.id] ?? ''"
+                      @change="setPositionRole(position.id, ($event.target as HTMLSelectElement).value)"
+                    >
+                      <option value="" disabled>Map to Role...</option>
+                      <option v-for="role in rosterStore.rolesSorted" :key="role.id" :value="role.id">
+                        {{ role.name }}
+                      </option>
+                    </select>
+                    <!-- Fail loudly instead of showing a silent empty dropdown when the
+                         roster store has no roles loaded (e.g. store not yet subscribed). -->
+                    <span v-else class="text-xs text-amber-400">
+                      No roles available — configure roles on the Roster screen first.
+                    </span>
+                  </template>
                 </li>
               </ul>
               <p v-if="positions.length === 0" class="text-xs text-gray-500">No positions found for this team.</p>
