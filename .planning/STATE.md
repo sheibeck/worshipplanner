@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: MVP
-status: executing
+status: verifying
 stopped_at: Completed 13-06-PLAN.md
-last_updated: "2026-07-08T01:21:01.320Z"
+last_updated: "2026-07-08T01:33:26.866Z"
 last_activity: 2026-07-08
 progress:
   total_phases: 7
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 31
-  completed_plans: 30
-  percent: 71
+  completed_plans: 31
+  percent: 86
 ---
 
 # Project State
@@ -29,7 +29,7 @@ Phase: 13 (volunteer-scheduling-import-servers-from-planning-center-col) — EXE
 Plan: 10 of 10
 Milestone: v1.0 MVP — SHIPPED 2026-03-05
 Next milestone: v1.1 Tasks & Events (not yet started)
-Status: Ready to execute
+Status: Phase complete — ready for verification
 
 ## Performance Metrics
 
@@ -74,6 +74,7 @@ Status: Ready to execute
 | Phase 13 P07 | 20min | 2 tasks | 5 files |
 | Phase 13 P08 | 18min | 3 tasks | 4 files |
 | Phase 13 P09 | ~15min | 3 tasks | 2 files |
+| Phase 13 P10 | ~15min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -120,6 +121,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: [Phase 13]: QuarterGrid cell edits dispatch straight to the Plan-06 scoped store actions (assignPerson/clearAssignment/swapAssignment) which each write only calendar.{date}.{roleId} via Firestore dot-path — the grid never rewrites the whole calendar map (T-13-09-02)
 - [Phase ?]: [Phase 13]: QuarterGrid flags a cell unfilled when assigned count < effective count (roleOverridesByDate else role.defaultCount) OR the cell is in lastProposeResult.unfilled — so manual clears re-flag immediately without regenerating
 - [Phase ?]: [Phase 13]: gap-filling panel candidate lists derive purely from personQuarterData + calendar + activePeople; blacked-out people are strikethrough-listed but excluded from assignable candidates (D-23, T-13-09-03)
+- [Phase ?]: [Phase 13]: Print/public share surfaces (RosterPrintLayout, QuarterShareView) use the light palette — deliberate existing exception to the dark app theme for output surfaces (D-24)
+- [Phase ?]: [Phase 13]: QuarterShareView reads ONLY the self-contained quarterSnapshot (names pre-resolved) and imports no roster/auth store, so the public route cannot touch org-scoped PII (T-13-10-02/03)
 
 ### Roadmap Evolution
 
@@ -165,6 +168,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-08
-Last session: 2026-07-08T01:20:13.820Z
+Last session: 2026-07-08T01:33:10.661Z
 Stopped at: Completed 13-06-PLAN.md
 Resume file: None
