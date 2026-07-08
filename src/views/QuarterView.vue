@@ -105,6 +105,12 @@
       </div>
 
       <template v-if="selectedQuarter">
+        <!-- Volunteer Availability: full-width roster table opening the per-person drawer (D-02/D-03) -->
+        <div class="rounded-lg border border-gray-800 bg-gray-900 p-5 mb-6">
+          <h2 class="text-sm font-semibold text-gray-200 mb-3">Volunteer Availability</h2>
+          <AvailabilityRosterTable :quarter="selectedQuarter" @select="openPersonId = $event" />
+        </div>
+
         <!-- Setup: service dates with inline per-date role overrides -->
         <div class="rounded-lg border border-gray-800 bg-gray-900 p-5 mb-6">
           <h2 class="text-sm font-semibold text-gray-200 mb-3">Service dates</h2>
@@ -291,6 +297,12 @@
       @close="csvModalOpen = false"
       @imported="onCsvImported"
     />
+
+    <AvailabilityDrawer
+      :quarter-id="selectedQuarter?.id ?? null"
+      :person-id="openPersonId"
+      @close="openPersonId = null"
+    />
   </AppShell>
   </div>
 
@@ -312,6 +324,8 @@ import AppShell from '@/components/AppShell.vue'
 import VolunteerCsvImportModal from '@/components/VolunteerCsvImportModal.vue'
 import QuarterGrid from '@/components/QuarterGrid.vue'
 import RosterPrintLayout from '@/components/RosterPrintLayout.vue'
+import AvailabilityDrawer from '@/components/AvailabilityDrawer.vue'
+import AvailabilityRosterTable from '@/components/AvailabilityRosterTable.vue'
 
 const authStore = useAuthStore()
 const quartersStore = useQuartersStore()
@@ -319,6 +333,9 @@ const rosterStore = useRosterStore()
 
 // ── Quarter selection ────────────────────────────────────────────────────────
 const selectedQuarterId = ref<string | null>(null)
+
+// ── Availability drawer (D-02) — controlled by which person's drawer is open ──
+const openPersonId = ref<string | null>(null)
 
 const selectedQuarter = computed(() => {
   if (!selectedQuarterId.value) return null
