@@ -1,8 +1,8 @@
 ---
 phase: 14
 slug: in-app-quarterly-availability-editor
-status: draft
-nyquist_compliant: false
+status: approved
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-07-07
 ---
@@ -80,4 +80,4 @@ created: 2026-07-07
 - [ ] Feedback latency < 30s
 - [ ] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved 2026-07-08 (plan-checker verified Per-Task Verification Map fully covered; `wave_0_complete` flips true during execution)
