@@ -7,6 +7,8 @@ import {
   updateDoc,
   deleteDoc,
   doc,
+  getDocs,
+  writeBatch,
   serverTimestamp,
   query,
   orderBy,
@@ -171,6 +173,29 @@ export const useRosterStore = defineStore('roster', () => {
     return { added, updated }
   }
 
+  // HARD-deletes every person doc for the org (irreversible). Used to clear a
+  // bad wholesale import before re-importing selectively. Does NOT touch roles
+  // or quarter docs. Batched at Firestore's 500-op limit. Returns count deleted.
+  async function deleteAllPeople(): Promise<number> {
+    if (!orgId.value) return 0
+    const snap = await getDocs(collection(db, 'organizations', orgId.value, 'people'))
+    let deleted = 0
+    let batch = writeBatch(db)
+    let ops = 0
+    for (const d of snap.docs) {
+      batch.delete(d.ref)
+      deleted++
+      ops++
+      if (ops === 500) {
+        await batch.commit()
+        batch = writeBatch(db)
+        ops = 0
+      }
+    }
+    if (ops > 0) await batch.commit()
+    return deleted
+  }
+
   // Seeds the grouped default role list (guitar/drums/vocals/bass/sound/
   // livestream/projection/scripture reader — see DEFAULT_ROLES) only when the
   // org has no roles yet. Calling this again once roles exist writes nothing.
@@ -224,6 +249,7 @@ export const useRosterStore = defineStore('roster', () => {
     deactivatePerson,
     reactivatePerson,
     upsertPeople,
+    deleteAllPeople,
     seedDefaultRolesIfEmpty,
     addRole,
     updateRole,

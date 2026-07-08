@@ -229,6 +229,49 @@
           </div>
         </div>
       </div>
+
+      <!-- Danger zone: permanently clear all volunteers (irreversible) -->
+      <div v-if="rosterStore.people.length > 0" class="mt-10 border border-red-900/50 rounded-xl overflow-hidden">
+        <div class="px-4 py-3 bg-red-950/30 border-b border-red-900/50">
+          <h2 class="text-sm font-medium text-red-300">Danger Zone</h2>
+          <p class="text-xs text-gray-500 mt-0.5">Permanently delete every volunteer for this organization — use this to clear a bad import before re-importing selectively. This cannot be undone.</p>
+        </div>
+        <div class="px-4 py-4">
+          <button
+            v-if="!clearConfirmOpen"
+            @click="clearConfirmOpen = true"
+            class="text-xs px-3 py-1.5 rounded-md border border-red-700 text-red-300 hover:bg-red-900/30 transition-colors"
+          >
+            Clear all volunteers ({{ rosterStore.people.length }})
+          </button>
+          <div v-else class="space-y-3">
+            <p class="text-xs text-gray-400">
+              Type <span class="font-mono font-semibold text-red-300">DELETE</span> to permanently remove all {{ rosterStore.people.length }} volunteers.
+            </p>
+            <div class="flex items-center gap-2">
+              <input
+                v-model="clearConfirmText"
+                placeholder="DELETE"
+                class="rounded-md bg-gray-900 border border-gray-700 px-3 py-1.5 text-sm text-gray-200 focus:outline-none focus:border-red-600"
+              />
+              <button
+                :disabled="clearConfirmText !== 'DELETE' || clearing"
+                @click="onClearAllVolunteers"
+                class="text-xs px-3 py-1.5 rounded-md bg-red-700 text-white hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                {{ clearing ? 'Deleting…' : 'Delete all' }}
+              </button>
+              <button
+                @click="cancelClear"
+                :disabled="clearing"
+                class="text-xs px-3 py-1.5 rounded-md border border-gray-700 text-gray-400 hover:bg-gray-800 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- PC import modal -->
@@ -260,6 +303,27 @@ const importModalOpen = ref(false)
 function onImported(count: number) {
   importModalOpen.value = false
   console.log(`[RosterView] imported ${count} people`)
+}
+
+// ── Danger zone: clear all volunteers ────────────────────────────────────────
+const clearConfirmOpen = ref(false)
+const clearConfirmText = ref('')
+const clearing = ref(false)
+function cancelClear() {
+  clearConfirmOpen.value = false
+  clearConfirmText.value = ''
+}
+async function onClearAllVolunteers() {
+  if (clearConfirmText.value !== 'DELETE') return
+  clearing.value = true
+  try {
+    const n = await rosterStore.deleteAllPeople()
+    console.log(`[RosterView] cleared ${n} volunteers`)
+  } finally {
+    clearing.value = false
+    clearConfirmOpen.value = false
+    clearConfirmText.value = ''
+  }
 }
 
 // ── Add/Edit form ────────────────────────────────────────────────────────────
