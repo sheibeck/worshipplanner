@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: MVP
 status: executing
 stopped_at: Completed 13-06-PLAN.md
-last_updated: "2026-07-08T00:46:38.344Z"
+last_updated: "2026-07-08T01:02:44.353Z"
 last_activity: 2026-07-08
 progress:
   total_phases: 7
   completed_phases: 5
   total_plans: 31
-  completed_plans: 28
+  completed_plans: 29
   percent: 71
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 13 (volunteer-scheduling-import-servers-from-planning-center-col) — EXECUTING
-Plan: 8 of 10
+Plan: 9 of 10
 Milestone: v1.0 MVP — SHIPPED 2026-03-05
 Next milestone: v1.1 Tasks & Events (not yet started)
 Status: Ready to execute
@@ -72,6 +72,7 @@ Status: Ready to execute
 | Phase 13 P01 | 5min | 3 tasks | 4 files |
 | Phase 13 P06 | 12min | 3 tasks | 2 files |
 | Phase 13 P07 | 20min | 2 tasks | 5 files |
+| Phase 13 P08 | 18min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -113,6 +114,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase 13]: applyCsvToQuarter's bidirectional pairing merge only ever adds the reciprocal id to a partner's pairedWith array — never touches a non-CSV partner's other fields, preserving D-19's absent-people-untouched guarantee
 - [Phase 13]: RosterView defers seedDefaultRolesIfEmpty() behind a one-shot watch on the roles snapshot (not synchronously after subscribe) to avoid the async-onSnapshot race that would duplicate-seed default roles for orgs that already have them
 - [Phase 13]: RolesConfigPanel holds per-role edit drafts committed only on 'Save Role' so the live Firestore roles snapshot never clobbers an in-progress rename/count edit
+- [Phase ?]: [Phase 13]: QuarterView derives hasAssignments from the calendar (any cell with >=1 person) to switch first-run Generate Schedule (no confirm) vs Regenerate/Fill Remaining Gaps, gating Regenerate behind the destructive confirmation
+- [Phase ?]: [Phase 13]: CSV import commit is two-pass — resolve/create people then resolve serve-with against a seeded name->id map; unmatched/ambiguous rows require explicit map-to-existing/create-new (no silent auto-create, D-16)
 
 ### Roadmap Evolution
 
@@ -158,6 +161,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-08
-Last session: 2026-07-08T00:46:07.493Z
+Last session: 2026-07-08T01:02:13.586Z
 Stopped at: Completed 13-06-PLAN.md
 Resume file: None
