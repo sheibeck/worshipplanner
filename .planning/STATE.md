@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: MVP
 status: executing
 stopped_at: Completed 13-06-PLAN.md
-last_updated: "2026-07-07T21:44:54.526Z"
-last_activity: 2026-07-07
+last_updated: "2026-07-08T00:46:38.344Z"
+last_activity: 2026-07-08
 progress:
   total_phases: 7
   completed_phases: 5
   total_plans: 31
-  completed_plans: 27
+  completed_plans: 28
   percent: 71
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 13 (volunteer-scheduling-import-servers-from-planning-center-col) — EXECUTING
-Plan: 7 of 10
+Plan: 8 of 10
 Milestone: v1.0 MVP — SHIPPED 2026-03-05
 Next milestone: v1.1 Tasks & Events (not yet started)
 Status: Ready to execute
@@ -71,6 +71,7 @@ Status: Ready to execute
 | Phase 12 P08 | 8min | 1 tasks | 3 files |
 | Phase 13 P01 | 5min | 3 tasks | 4 files |
 | Phase 13 P06 | 12min | 3 tasks | 2 files |
+| Phase 13 P07 | 20min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -110,6 +111,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase 13]: DEFAULT_ROLES doc comment reworded to avoid literal 'worship leader' phrase, satisfying both interfaces-block content and acceptance-criteria grep check
 - [Phase 13]: quarters.ts cell edits (assignPerson/clearAssignment/swapAssignment) use Firestore dot-path field keys (calendar.${date}.${roleId}) in updateDoc rather than read-modify-write of the whole calendar map — so concurrent edits to different cells never clobber each other
 - [Phase 13]: applyCsvToQuarter's bidirectional pairing merge only ever adds the reciprocal id to a partner's pairedWith array — never touches a non-CSV partner's other fields, preserving D-19's absent-people-untouched guarantee
+- [Phase 13]: RosterView defers seedDefaultRolesIfEmpty() behind a one-shot watch on the roles snapshot (not synchronously after subscribe) to avoid the async-onSnapshot race that would duplicate-seed default roles for orgs that already have them
+- [Phase 13]: RolesConfigPanel holds per-role edit drafts committed only on 'Save Role' so the live Firestore roles snapshot never clobbers an in-progress rename/count edit
 
 ### Roadmap Evolution
 
@@ -154,7 +157,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 
 ## Session Continuity
 
-Last activity: 2026-07-07
-Last session: 2026-07-07T21:44:54.485Z
+Last activity: 2026-07-08
+Last session: 2026-07-08T00:46:07.493Z
 Stopped at: Completed 13-06-PLAN.md
 Resume file: None
