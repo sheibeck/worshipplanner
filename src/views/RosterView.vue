@@ -108,7 +108,7 @@
             <div>
               <label class="block text-xs font-medium text-gray-400 mb-2">Roles</label>
               <div class="flex flex-wrap gap-x-4 gap-y-2">
-                <label v-for="role in rosterStore.roles" :key="role.id" class="inline-flex items-center gap-1.5 text-sm text-gray-300">
+                <label v-for="role in rosterStore.rolesSorted" :key="role.id" class="inline-flex items-center gap-1.5 text-sm text-gray-300">
                   <input
                     type="checkbox"
                     :value="role.id"

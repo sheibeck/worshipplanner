@@ -35,6 +35,11 @@ export const useRosterStore = defineStore('roster', () => {
   // active === true only — inactive (soft-deleted) people are excluded (D-20).
   const activePeople = computed(() => people.value.filter((p) => p.active))
 
+  // Alphabetical view of roles for DISPLAY only (dropdowns/checklists) — logic
+  // and lookups (find-by-id, membership tests) must keep using `roles` (ordered
+  // by `order`, which drives the scheduler's stable inner loop).
+  const rolesSorted = computed(() => [...roles.value].sort((a, b) => a.name.localeCompare(b.name)))
+
   function subscribe(orgIdValue: string) {
     if (unsubscribePeopleFn) {
       unsubscribePeopleFn()
@@ -242,6 +247,7 @@ export const useRosterStore = defineStore('roster', () => {
     isLoading,
     orgId,
     activePeople,
+    rolesSorted,
     subscribe,
     unsubscribeAll,
     addPerson,

@@ -165,7 +165,7 @@
                 </div>
                 <div v-else class="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 mb-3">
                   <div
-                    v-for="role in rosterStore.roles"
+                    v-for="role in rosterStore.rolesSorted"
                     :key="role.id"
                     class="flex items-center justify-between gap-2"
                   >

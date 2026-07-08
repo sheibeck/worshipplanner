@@ -149,7 +149,7 @@
                     @change="setPositionRole(position.id, ($event.target as HTMLSelectElement).value)"
                   >
                     <option value="" disabled>Map to Role...</option>
-                    <option v-for="role in rosterStore.roles" :key="role.id" :value="role.id">
+                    <option v-for="role in rosterStore.rolesSorted" :key="role.id" :value="role.id">
                       {{ role.name }}
                     </option>
                   </select>
