@@ -76,19 +76,93 @@
                     <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                   </svg>
                 </div>
-                <p class="text-sm text-gray-300">Ready to sync volunteers from Planning Center.</p>
+                <p class="text-sm text-gray-300">Import volunteers scoped to a worship team's positions.</p>
                 <p class="text-xs text-gray-500 mt-1">
-                  Existing volunteers will be updated. New volunteers will be added. Phone numbers are never
-                  imported — Planning Center does not provide them; enter phone manually per person.
+                  Pick a service type, then a team, then which positions to import — group positions
+                  like Choir/Orchestra can be left unchecked. Phone numbers are never imported —
+                  Planning Center does not provide them; enter phone manually per person.
                 </p>
               </div>
+            </div>
+
+            <!-- Select service type state -->
+            <div v-else-if="step === 'selectServiceType'" class="px-6 py-6">
+              <h3 class="text-sm font-semibold text-gray-200 mb-4">Choose a service type</h3>
+              <ul class="space-y-2">
+                <li v-for="st in serviceTypes" :key="st.id">
+                  <button
+                    type="button"
+                    class="w-full text-left px-4 py-2.5 rounded-md text-sm text-gray-200 bg-gray-800/60 hover:bg-gray-800 border border-gray-700 transition-colors"
+                    @click="onSelectServiceType(st.id)"
+                  >
+                    {{ st.name }}
+                  </button>
+                </li>
+              </ul>
+              <p v-if="serviceTypes.length === 0" class="text-xs text-gray-500">No service types found.</p>
+            </div>
+
+            <!-- Select team state -->
+            <div v-else-if="step === 'selectTeam'" class="px-6 py-6">
+              <h3 class="text-sm font-semibold text-gray-200 mb-4">Choose a worship team</h3>
+              <ul class="space-y-2">
+                <li v-for="team in teams" :key="team.id">
+                  <button
+                    type="button"
+                    class="w-full text-left px-4 py-2.5 rounded-md text-sm text-gray-200 bg-gray-800/60 hover:bg-gray-800 border border-gray-700 transition-colors"
+                    @click="onSelectTeam(team.id)"
+                  >
+                    {{ team.name }}
+                  </button>
+                </li>
+              </ul>
+              <p v-if="teams.length === 0" class="text-xs text-gray-500">No teams found for this service type.</p>
+            </div>
+
+            <!-- Select positions state -->
+            <div v-else-if="step === 'selectPositions'" class="px-6 py-6">
+              <h3 class="text-sm font-semibold text-gray-200 mb-2">Choose positions to import</h3>
+              <p class="text-xs text-gray-500 mb-4">
+                Check only the individually-scheduled positions (e.g. Guitar, Sound). Leave group
+                positions like Choir/Orchestra unchecked — they are excluded, not auto-detected.
+              </p>
+              <ul class="space-y-2">
+                <li
+                  v-for="position in positions"
+                  :key="position.id"
+                  class="flex items-center gap-3 px-4 py-2.5 rounded-md bg-gray-800/60 border border-gray-700"
+                >
+                  <input
+                    :id="`position-${position.id}`"
+                    type="checkbox"
+                    class="h-4 w-4 rounded border-gray-600 bg-gray-900 text-indigo-500 focus:ring-indigo-500"
+                    :checked="selectedPositionIds.has(position.id)"
+                    @change="togglePosition(position.id)"
+                  />
+                  <label :for="`position-${position.id}`" class="flex-1 text-sm text-gray-200">
+                    {{ position.name }}
+                  </label>
+                  <select
+                    v-if="selectedPositionIds.has(position.id)"
+                    class="text-sm bg-gray-900 border border-gray-700 rounded-md px-2 py-1 text-gray-200"
+                    :value="positionRoleMap[position.id] ?? ''"
+                    @change="setPositionRole(position.id, ($event.target as HTMLSelectElement).value)"
+                  >
+                    <option value="" disabled>Map to Role...</option>
+                    <option v-for="role in rosterStore.roles" :key="role.id" :value="role.id">
+                      {{ role.name }}
+                    </option>
+                  </select>
+                </li>
+              </ul>
+              <p v-if="positions.length === 0" class="text-xs text-gray-500">No positions found for this team.</p>
             </div>
 
             <!-- Fetching state -->
             <div v-else-if="step === 'fetching'" class="px-6 py-12 text-center">
               <div class="flex flex-col items-center gap-4">
                 <div class="h-8 w-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-                <p class="text-sm text-gray-300">Fetching volunteers from Planning Center...</p>
+                <p class="text-sm text-gray-300">Fetching from Planning Center...</p>
                 <p class="text-xs text-gray-500">This may take a moment for large rosters.</p>
               </div>
             </div>
@@ -175,9 +249,20 @@
               type="button"
               class="px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               :disabled="!authStore.hasPcCredentials"
-              @click="onStartFetch"
+              @click="onStartSelectiveImport"
             >
               Import
+            </button>
+
+            <!-- Confirm positions button (selectPositions state) -->
+            <button
+              v-if="step === 'selectPositions'"
+              type="button"
+              class="px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              :disabled="!canConfirmPositions()"
+              @click="onConfirmPositions"
+            >
+              Continue
             </button>
 
             <!-- Retry button (error state) -->
@@ -185,7 +270,7 @@
               v-if="step === 'error'"
               type="button"
               class="px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors"
-              @click="onStartFetch"
+              @click="lastRetry?.()"
             >
               Retry
             </button>
@@ -221,7 +306,12 @@
 import { ref, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRosterStore } from '@/stores/roster'
-import { fetchAndMapPeople } from '@/utils/planningCenterApi'
+import {
+  fetchServiceTypes,
+  fetchServiceTypeTeams,
+  fetchTeamPositions,
+  fetchPeopleForTeamPositions,
+} from '@/utils/planningCenterApi'
 import type { UpsertPersonInput, Person } from '@/types/roster'
 
 const props = defineProps<{
@@ -238,16 +328,40 @@ const rosterStore = useRosterStore()
 
 // ── State ──────────────────────────────────────────────────────────────────────
 
-type Step = 'idle' | 'fetching' | 'preview' | 'importing' | 'done' | 'error'
+// Selective team/position import flow (D-08/D-09/D-10/D-11): service type → team →
+// positions (with per-position Role mapping) → fetch scoped people → preview → confirm.
+type Step =
+  | 'idle'
+  | 'selectServiceType'
+  | 'selectTeam'
+  | 'selectPositions'
+  | 'fetching'
+  | 'preview'
+  | 'importing'
+  | 'done'
+  | 'error'
 const step = ref<Step>('idle')
 const errorMessage = ref('')
 
 // Mapped people from PC (stored between fetch and confirm). Never carries a
-// PC-sourced phone value — fetchAndMapPeople always sets phone to '' (D-14).
+// PC-sourced phone value — the selective fetch always leaves email '' (leader edits later).
 const mappedPeople = ref<UpsertPersonInput[]>([])
 
 // Preview counts
 const preview = ref({ toAdd: 0, toUpdate: 0 })
+
+// Selective import selection state — always freshly derived on modal open, never
+// cached across opens (14-RESEARCH Security Domain / T-14-04-01).
+const serviceTypes = ref<Array<{ id: string; name: string }>>([])
+const teams = ref<Array<{ id: string; name: string }>>([])
+const positions = ref<Array<{ id: string; name: string }>>([])
+const selectedServiceTypeId = ref<string | null>(null)
+const selectedTeamId = ref<string | null>(null)
+const selectedPositionIds = ref<Set<string>>(new Set())
+const positionRoleMap = ref<Record<string, string>>({})
+
+// Re-invokes whichever step last failed, wired to the error state's Retry button.
+const lastRetry = ref<(() => void) | null>(null)
 
 // ── Reset on open ──────────────────────────────────────────────────────────────
 
@@ -263,6 +377,14 @@ function resetToIdle() {
   errorMessage.value = ''
   mappedPeople.value = []
   preview.value = { toAdd: 0, toUpdate: 0 }
+  serviceTypes.value = []
+  teams.value = []
+  positions.value = []
+  selectedServiceTypeId.value = null
+  selectedTeamId.value = null
+  selectedPositionIds.value = new Set()
+  positionRoleMap.value = {}
+  lastRetry.value = null
 }
 
 // ── Classification helper ─────────────────────────────────────────────────────
@@ -290,17 +412,136 @@ function classifyPeople(mapped: UpsertPersonInput[], existing: Person[]) {
 
 // ── Actions ───────────────────────────────────────────────────────────────────
 
-async function onStartFetch() {
+// Start the selective service-type → team → positions flow (D-08/D-11).
+async function onStartSelectiveImport() {
   const creds = authStore.pcCredentials
   if (!creds) return
 
+  lastRetry.value = onStartSelectiveImport
   step.value = 'fetching'
   errorMessage.value = ''
 
   try {
-    const people = await fetchAndMapPeople(creds.appId, creds.secret)
-    mappedPeople.value = people
-    preview.value = classifyPeople(people, rosterStore.people)
+    serviceTypes.value = await fetchServiceTypes(creds.appId, creds.secret)
+    step.value = 'selectServiceType'
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'An unknown error occurred'
+    errorMessage.value = message
+    step.value = 'error'
+  }
+}
+
+async function onSelectServiceType(serviceTypeId: string) {
+  const creds = authStore.pcCredentials
+  if (!creds) return
+
+  selectedServiceTypeId.value = serviceTypeId
+  lastRetry.value = () => onSelectServiceType(serviceTypeId)
+  step.value = 'fetching'
+  errorMessage.value = ''
+
+  try {
+    teams.value = await fetchServiceTypeTeams(creds.appId, creds.secret, serviceTypeId)
+    step.value = 'selectTeam'
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'An unknown error occurred'
+    errorMessage.value = message
+    step.value = 'error'
+  }
+}
+
+async function onSelectTeam(teamId: string) {
+  const creds = authStore.pcCredentials
+  if (!creds) return
+
+  selectedTeamId.value = teamId
+  selectedPositionIds.value = new Set()
+  positionRoleMap.value = {}
+  lastRetry.value = () => onSelectTeam(teamId)
+  step.value = 'fetching'
+  errorMessage.value = ''
+
+  try {
+    positions.value = await fetchTeamPositions(creds.appId, creds.secret, teamId)
+    step.value = 'selectPositions'
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'An unknown error occurred'
+    errorMessage.value = message
+    step.value = 'error'
+  }
+}
+
+// Toggle a position's inclusion. Leaving a position (e.g. choir/orchestra) unchecked
+// is how it is excluded from import — there is no auto-detection (D-09).
+function togglePosition(positionId: string) {
+  const next = new Set(selectedPositionIds.value)
+  if (next.has(positionId)) {
+    next.delete(positionId)
+    const rest = { ...positionRoleMap.value }
+    delete rest[positionId]
+    positionRoleMap.value = rest
+  } else {
+    next.add(positionId)
+  }
+  selectedPositionIds.value = next
+}
+
+function setPositionRole(positionId: string, roleId: string) {
+  positionRoleMap.value = { ...positionRoleMap.value, [positionId]: roleId }
+}
+
+// True when every checked position has a Role mapped — required before fetching people.
+function canConfirmPositions(): boolean {
+  const checked = Array.from(selectedPositionIds.value)
+  if (checked.length === 0) return false
+  return checked.every((id) => !!positionRoleMap.value[id])
+}
+
+// Fetch the people currently serving each checked position and build UpsertPersonInput[],
+// unioning mapped Role ids for anyone serving more than one selected position.
+async function onConfirmPositions() {
+  const creds = authStore.pcCredentials
+  const teamId = selectedTeamId.value
+  if (!creds || !teamId) return
+  if (!canConfirmPositions()) return
+
+  lastRetry.value = onConfirmPositions
+  step.value = 'fetching'
+  errorMessage.value = ''
+
+  try {
+    const checkedPositionIds = Array.from(selectedPositionIds.value)
+    const nameByPerson = new Map<string, string>()
+    const roleIdsByPerson = new Map<string, Set<string>>()
+
+    for (const positionId of checkedPositionIds) {
+      const roleId = positionRoleMap.value[positionId]
+      if (!roleId) continue
+      const peopleForPosition = await fetchPeopleForTeamPositions(
+        creds.appId,
+        creds.secret,
+        teamId,
+        new Set([positionId]),
+      )
+      for (const person of peopleForPosition) {
+        nameByPerson.set(person.pcPersonId, person.name)
+        const roles = roleIdsByPerson.get(person.pcPersonId) ?? new Set<string>()
+        roles.add(roleId)
+        roleIdsByPerson.set(person.pcPersonId, roles)
+      }
+    }
+
+    const mapped: UpsertPersonInput[] = Array.from(roleIdsByPerson.entries()).map(
+      ([pcPersonId, roleIds]) => ({
+        name: nameByPerson.get(pcPersonId) ?? '',
+        email: '',
+        pcPersonId,
+        roles: Array.from(roleIds),
+      }),
+    )
+
+    mappedPeople.value = mapped
+    preview.value = classifyPeople(mapped, rosterStore.people)
     step.value = 'preview'
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'An unknown error occurred'
