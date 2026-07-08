@@ -60,21 +60,55 @@
       </div>
 
       <template v-else>
+        <!-- Search & role filter -->
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-4">
+          <div class="relative flex-1 max-w-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 10.5A6.5 6.5 0 114 10.5a6.5 6.5 0 0113 0z" />
+            </svg>
+            <input
+              v-model="searchQuery"
+              type="text"
+              placeholder="Search by name…"
+              class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm pl-9 pr-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          </div>
+          <select
+            v-model="roleFilter"
+            class="rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+          >
+            <option value="">All roles</option>
+            <option v-for="role in rosterStore.rolesSorted" :key="role.id" :value="role.id">{{ role.name }}</option>
+          </select>
+        </div>
+
         <!-- Active people table -->
         <div class="rounded-lg border border-gray-800 overflow-hidden">
           <table class="w-full text-sm">
             <thead>
               <tr class="border-b border-gray-800 bg-gray-900/50">
-                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Name</th>
+                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                  <button type="button" class="inline-flex items-center gap-1 hover:text-gray-200 transition-colors" @click="toggleSort('name')">
+                    Name <span v-if="sortKey === 'name'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
+                  </button>
+                </th>
                 <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Email</th>
                 <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Phone</th>
-                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Roles</th>
-                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Frequency</th>
+                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                  <button type="button" class="inline-flex items-center gap-1 hover:text-gray-200 transition-colors" @click="toggleSort('role')">
+                    Roles <span v-if="sortKey === 'role'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
+                  </button>
+                </th>
+                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                  <button type="button" class="inline-flex items-center gap-1 hover:text-gray-200 transition-colors" @click="toggleSort('frequency')">
+                    Frequency <span v-if="sortKey === 'frequency'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
+                  </button>
+                </th>
                 <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-800">
-              <template v-for="person in rosterStore.activePeople" :key="person.id">
+              <template v-for="person in displayedPeople" :key="person.id">
                 <tr class="hover:bg-gray-800/50 transition-colors">
                   <td class="px-4 py-3 font-medium text-gray-100">{{ person.name }}</td>
                   <td class="px-4 py-3 text-gray-300">{{ person.email || '—' }}</td>
@@ -116,8 +150,10 @@
                   </td>
                 </tr>
               </template>
-              <tr v-if="rosterStore.activePeople.length === 0">
-                <td colspan="6" class="px-4 py-6 text-center text-sm text-gray-500">No active volunteers</td>
+              <tr v-if="displayedPeople.length === 0">
+                <td colspan="6" class="px-4 py-6 text-center text-sm text-gray-500">
+                  {{ rosterStore.activePeople.length === 0 ? 'No active volunteers' : 'No volunteers match your search/filter' }}
+                </td>
               </tr>
             </tbody>
           </table>
@@ -447,6 +483,52 @@ function personRoleBadges(person: Person): Array<{ roleId: string; name: string;
     .filter((r): r is NonNullable<typeof r> => r !== undefined)
     .map((r) => ({ roleId: r.id, name: r.name, group: r.group }))
 }
+
+// ── Search, filter & sort (active people table) ─────────────────────────────
+const searchQuery = ref('')
+const roleFilter = ref('')
+type SortKey = 'name' | 'role' | 'frequency'
+const sortKey = ref<SortKey>('name')
+const sortDir = ref<'asc' | 'desc'>('asc')
+
+function toggleSort(key: SortKey) {
+  if (sortKey.value === key) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortKey.value = key
+    sortDir.value = 'asc'
+  }
+}
+
+// Alphabetically-first role name among the person's assigned roles — used both
+// as the "Roles" column sort key and tie-break-free comparator input.
+function firstRoleName(person: Person): string {
+  const names = personRoleBadges(person).map((b) => b.name).sort((a, b) => a.localeCompare(b))
+  return names[0] ?? ''
+}
+
+const displayedPeople = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  let list = rosterStore.activePeople.filter((p) => {
+    if (q !== '' && !p.name.toLowerCase().includes(q)) return false
+    if (roleFilter.value !== '' && !p.roles.includes(roleFilter.value)) return false
+    return true
+  })
+
+  list = [...list].sort((a, b) => {
+    let cmp = 0
+    if (sortKey.value === 'name') {
+      cmp = a.name.localeCompare(b.name)
+    } else if (sortKey.value === 'role') {
+      cmp = firstRoleName(a).localeCompare(firstRoleName(b))
+    } else {
+      cmp = a.frequencyTargetN - b.frequencyTargetN
+    }
+    return sortDir.value === 'asc' ? cmp : -cmp
+  })
+
+  return list
+})
 
 // ── Lifecycle ────────────────────────────────────────────────────────────────
 let stopSeedWatch: (() => void) | null = null
