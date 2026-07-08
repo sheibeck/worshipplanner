@@ -419,7 +419,7 @@ each phase's CONTEXT.md for the evolution chain.
 **None of the above are compliance/security/performance-target claims** — all are internal
 architecture recommendations grounded in code actually read this session.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Exact field name and shape for per-role tier on `PersonQuarterData`**
    - What we know: it must be per-role (D-05), quarter-scoped (stays on `PersonQuarterData`, not
@@ -435,6 +435,11 @@ architecture recommendations grounded in code actually read this session.
      old singular fields after migration; keeping them is lower-risk (additive change, existing
      tests/reads keep working) but adds minor duplication.
 
+   - RESOLVED: Plan 15-01 adds `PersonQuarterData.roleTiers?: Record<string, FrequencyTier>`
+     as an additive optional field and retains `frequencyTier?` as the deprecated per-person
+     default-source fallback (old singular field kept, not dropped — the lower-risk additive
+     path). Per-role reads default to `roleTiers[roleId] ?? frequencyTier ?? 'regular'`.
+
 2. **Whether `servedCounts` in `ProposeResult` should become per-(person, role) or stay
    per-person aggregate**
    - What we know: nothing in the current codebase reads `servedCounts` outside
@@ -445,6 +450,10 @@ architecture recommendations grounded in code actually read this session.
      number>` (aggregate, for back-compat and because nothing currently needs more), but track
      deficit scoring internally per-(person, role) — this satisfies both the "don't break the
      external contract" and "score fairness correctly" concerns simultaneously.
+
+   - RESOLVED: Plan 15-02 keeps the external `ProposeResult.servedCounts` aggregate shape
+     `Record<personId, number>` unchanged (no UI/consumer break) while tracking deficit
+     scoring internally per-(person, role) keyed by `${personId}::${roleId}`.
 
 ## Environment Availability
 

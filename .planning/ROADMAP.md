@@ -289,4 +289,7 @@ Plans:
 
 - [ ] 15-04-PLAN.md — Quarters store: buildRoleGroupOf wired into generateProposal + per-role roleTiers scoped write (TDD) (D-05/D-12)
 - [ ] 15-05-PLAN.md — RosterView Edit Volunteer form: per-role cadence controls + frequency-sort reconciliation (D-01/D-02)
+
+**Wave 4** *(blocked on Wave 3 — 15-06 consumes the setPersonAvailability roleTiers param added by 15-04)*
+
 - [ ] 15-06-PLAN.md — AvailabilityDrawer per-role tier controls + QuarterGrid live group-conflict warning (D-05/D-06/D-11)

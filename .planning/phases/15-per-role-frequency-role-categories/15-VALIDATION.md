@@ -50,9 +50,9 @@ created: 2026-07-08
 | 15-05-01 | 05 | 3 | D-01, D-02 | T-15-05-01, T-15-05-02 | One cadence control per held role; N=4 default; tuning preserved | component | `npx vitest run src/views/__tests__/RosterView.test.ts` | ❌ W0 (new file) | ⬜ pending |
 | 15-05-02 | 05 | 3 | D-01 | T-15-05-01 | Deterministic per-role frequency sort | component | `npx vitest run src/views/__tests__/RosterView.test.ts` | ❌ W0 (new file) | ⬜ pending |
 | 15-05-03 | 05 | 3 | D-01, D-02 | — | Human-verify: per-role cadence renders/persists | manual | human-check (see Manual-Only) | N/A | ⬜ pending |
-| 15-06-01 | 06 | 3 | D-05, D-06 | T-15-06-01 | One tier control per held role; roleTiers persisted | component | `npx vitest run src/components/__tests__/AvailabilityDrawer.test.ts` | ✅ | ⬜ pending |
-| 15-06-02 | 06 | 3 | D-11 | T-15-06-02 | Live group-conflict warning reuses evaluateGroupCombo; non-blocking | component | `npx vitest run src/components/__tests__/QuarterGrid.test.ts` | ✅ | ⬜ pending |
-| 15-06-03 | 06 | 3 | D-06, D-11 | — | Human-verify: drawer tiers + grid warning behavior | manual | human-check (see Manual-Only) | N/A | ⬜ pending |
+| 15-06-01 | 06 | 4 | D-05, D-06 | T-15-06-01 | One tier control per held role; roleTiers persisted | component | `npx vitest run src/components/__tests__/AvailabilityDrawer.test.ts` | ✅ | ⬜ pending |
+| 15-06-02 | 06 | 4 | D-11 | T-15-06-02 | Live group-conflict warning reuses evaluateGroupCombo; non-blocking | component | `npx vitest run src/components/__tests__/QuarterGrid.test.ts` | ✅ | ⬜ pending |
+| 15-06-03 | 06 | 4 | D-06, D-11 | — | Human-verify: drawer tiers + grid warning behavior | manual | human-check (see Manual-Only) | N/A | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
