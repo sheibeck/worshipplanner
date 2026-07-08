@@ -93,3 +93,11 @@ None - no external service configuration required.
 ---
 *Phase: 14-in-app-quarterly-availability-editor*
 *Completed: 2026-07-08*
+
+## Self-Check: PASSED
+- FOUND: src/stores/quarters.ts
+- FOUND: src/stores/__tests__/quarters.test.ts
+- FOUND: .planning/phases/14-in-app-quarterly-availability-editor/14-03-SUMMARY.md
+- FOUND commit: e8d802f (test RED)
+- FOUND commit: 49aa36d (feat GREEN)
+- FOUND commit: bbd4021 (docs SUMMARY)
