@@ -33,6 +33,8 @@ Smart weekly service planning that follows the Vertical Worship methodology (1�
 - ✓ AI-powered song suggestions using sermon context (topic + passage) — v1.0
 - ✓ Natural language scripture discovery with inline preview — v1.0
 - ✓ RBAC: editor/viewer roles enforced across Firestore, router, and UI — v1.0
+- ✓ In-app quarterly availability editor: per-person right-drawer for Sundays-only blackout calendar (Nth-Sunday chips + range block), frequency tier (regular/fill-in/out), must-serve-with bidirectional pairing, and quarter note — writing directly into PersonQuarterData; CSV import retained as secondary — v1.0 (Validated in Phase 14)
+- ✓ Selective Planning Center roster import: scope by worship team + individually-scheduled positions with per-position Role mapping (choir/orchestra excluded), importing name, email, and roles — v1.0 (Validated in Phase 14)
 
 ### Active
 
