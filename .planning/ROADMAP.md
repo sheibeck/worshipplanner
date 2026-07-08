@@ -232,7 +232,7 @@ Notes for planner:
 - The CSV import path (`VolunteerCsvImportModal.vue`, `volunteerCsv.ts`) is NOT removed — it stays as a secondary bulk-entry option; this phase makes the in-app editor the primary path.
 
 **Requirements**: D-01..D-11 (see 14-CONTEXT.md — no formal REQ-IDs; REQUIREMENTS.md absent, so the 11 locked decisions are the requirement/traceability set)
-**Plans:** 4/6 plans executed
+**Plans:** 6/6 plans complete
 
 Plans:
 
@@ -244,7 +244,7 @@ Plans:
 **Wave 2**
 
 - [x] 14-03-PLAN.md — quarters store setPersonAvailability: single-person write + symmetric add/remove bidirectional pairing (TDD)
-- [ ] 14-04-PLAN.md — RosterImportModal selective flow: service-type→team→positions+Role mapping, replaces whole-directory fetch
+- [x] 14-04-PLAN.md — RosterImportModal selective flow: service-type→team→positions+Role mapping, replaces whole-directory fetch
 
 **Wave 3**
 
@@ -252,7 +252,7 @@ Plans:
 
 **Wave 4**
 
-- [ ] 14-06-PLAN.md — AvailabilityRosterTable.vue + QuarterView mount (openPersonId) + end-to-end human-verify
+- [x] 14-06-PLAN.md — AvailabilityRosterTable.vue + QuarterView mount (openPersonId) + end-to-end human-verify
 
 ## Backlog
 
