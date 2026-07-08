@@ -60,80 +60,6 @@
       </div>
 
       <template v-else>
-        <!-- Add/Edit form panel -->
-        <div v-if="formOpen" class="mb-6 rounded-lg border border-gray-700 bg-gray-900 p-5">
-          <h2 class="text-sm font-semibold text-gray-200 mb-4">{{ editingPersonId ? 'Edit Volunteer' : 'Add Volunteer' }}</h2>
-          <form @submit.prevent="onSaveVolunteer" class="space-y-4">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs font-medium text-gray-400 mb-1">Name</label>
-                <input
-                  v-model="formName"
-                  type="text"
-                  required
-                  placeholder="Full name"
-                  class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                />
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-gray-400 mb-1">Email</label>
-                <input
-                  v-model="formEmail"
-                  type="email"
-                  placeholder="name@example.com"
-                  class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                />
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-gray-400 mb-1">
-                  Phone <span class="text-gray-600">(manual — not synced from Planning Center)</span>
-                </label>
-                <input
-                  v-model="formPhone"
-                  type="tel"
-                  placeholder="App-only — enter manually"
-                  class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                />
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-gray-400 mb-1">Serve frequency</label>
-                <select
-                  v-model.number="formFrequencyN"
-                  class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                >
-                  <option v-for="n in [1, 2, 4]" :key="n" :value="n">{{ nToFrequencyLabel(n) }}</option>
-                </select>
-              </div>
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-gray-400 mb-2">Roles</label>
-              <div class="flex flex-wrap gap-x-4 gap-y-2">
-                <label v-for="role in rosterStore.rolesSorted" :key="role.id" class="inline-flex items-center gap-1.5 text-sm text-gray-300">
-                  <input
-                    type="checkbox"
-                    :value="role.id"
-                    v-model="formRoles"
-                    class="rounded border-gray-600 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-gray-900"
-                  />
-                  {{ role.name }}
-                </label>
-                <span v-if="rosterStore.roles.length === 0" class="text-sm text-gray-600">No roles configured yet — add roles below.</span>
-              </div>
-            </div>
-            <div class="flex items-center gap-3 pt-2">
-              <button
-                type="submit"
-                class="px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors"
-              >Save Volunteer</button>
-              <button
-                type="button"
-                @click="closeForm"
-                class="px-4 py-2 rounded-md text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors"
-              >Cancel</button>
-            </div>
-          </form>
-        </div>
-
         <!-- Active people table -->
         <div class="rounded-lg border border-gray-800 overflow-hidden">
           <table class="w-full text-sm">
@@ -281,6 +207,128 @@
       @imported="onImported"
     />
   </AppShell>
+
+  <Teleport to="body">
+    <!-- Backdrop -->
+    <Transition
+      enter-active-class="transition-opacity duration-200 ease-out"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="transition-opacity duration-150 ease-in"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div
+        v-if="formOpen"
+        class="fixed inset-0 z-40 bg-black/60"
+        @click="closeForm"
+      ></div>
+    </Transition>
+
+    <!-- Add/Edit Volunteer drawer (right-anchored, mirrors AvailabilityDrawer.vue) -->
+    <Transition
+      enter-active-class="transition-transform duration-200 ease-out"
+      enter-from-class="translate-x-full"
+      enter-to-class="translate-x-0"
+      leave-active-class="transition-transform duration-150 ease-in"
+      leave-from-class="translate-x-0"
+      leave-to-class="translate-x-full"
+    >
+      <div
+        v-if="formOpen"
+        class="fixed top-0 right-0 bottom-0 z-50 w-full max-w-md bg-gray-900 border-l border-gray-700 shadow-2xl flex flex-col"
+      >
+        <!-- Header -->
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-800 shrink-0">
+          <h2 class="text-base font-semibold text-gray-100">{{ editingPersonId ? 'Edit Volunteer' : 'Add Volunteer' }}</h2>
+          <button
+            type="button"
+            class="p-1.5 rounded-md text-gray-500 hover:text-gray-300 hover:bg-gray-800 transition-colors"
+            @click="closeForm"
+            aria-label="Close"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- Scrollable body -->
+        <div class="flex-1 overflow-y-auto px-6 py-5">
+          <form id="volunteer-form" @submit.prevent="onSaveVolunteer" class="space-y-4">
+            <div>
+              <label class="block text-xs font-medium text-gray-400 mb-1">Name</label>
+              <input
+                v-model="formName"
+                type="text"
+                required
+                placeholder="Full name"
+                class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-400 mb-1">Email</label>
+              <input
+                v-model="formEmail"
+                type="email"
+                placeholder="name@example.com"
+                class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-400 mb-1">
+                Phone <span class="text-gray-600">(manual — not synced from Planning Center)</span>
+              </label>
+              <input
+                v-model="formPhone"
+                type="tel"
+                placeholder="App-only — enter manually"
+                class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-400 mb-1">Serve frequency</label>
+              <select
+                v-model.number="formFrequencyN"
+                class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                <option v-for="n in [1, 2, 4]" :key="n" :value="n">{{ nToFrequencyLabel(n) }}</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-400 mb-2">Roles</label>
+              <div class="flex flex-wrap gap-x-4 gap-y-2">
+                <label v-for="role in rosterStore.rolesSorted" :key="role.id" class="inline-flex items-center gap-1.5 text-sm text-gray-300">
+                  <input
+                    type="checkbox"
+                    :value="role.id"
+                    v-model="formRoles"
+                    class="rounded border-gray-600 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-gray-900"
+                  />
+                  {{ role.name }}
+                </label>
+                <span v-if="rosterStore.roles.length === 0" class="text-sm text-gray-600">No roles configured yet — add roles below.</span>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        <!-- Footer actions -->
+        <div class="px-6 py-4 border-t border-gray-800 flex items-center gap-3 shrink-0">
+          <button
+            type="submit"
+            form="volunteer-form"
+            class="px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors"
+          >Save Volunteer</button>
+          <button
+            type="button"
+            @click="closeForm"
+            class="px-4 py-2 rounded-md text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors"
+          >Cancel</button>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
