@@ -45,6 +45,12 @@ const router = createRouter({
       meta: { requiresAuth: true, requiresEditor: true },
     },
     {
+      path: '/schedule',
+      name: 'schedule',
+      component: () => import('../views/QuarterView.vue'),
+      meta: { requiresAuth: true, requiresEditor: true },
+    },
+    {
       path: '/services',
       name: 'services',
       component: () => import('../views/ServicesView.vue'),

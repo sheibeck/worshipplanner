@@ -104,6 +104,17 @@ const navItems = computed(() => {
 
   if (authStore.isEditor) {
     items.push({
+      label: 'Schedule',
+      to: '/schedule',
+      icon: `<svg xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        <path stroke-linecap="round" stroke-linejoin="round" d="M8 14h.01M12 14h.01M16 14h.01M8 17h.01M12 17h.01" />
+      </svg>`,
+    })
+  }
+
+  if (authStore.isEditor) {
+    items.push({
       label: 'Songs',
       to: '/songs',
       icon: `<svg xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
