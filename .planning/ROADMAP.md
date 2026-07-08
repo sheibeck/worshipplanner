@@ -209,6 +209,29 @@ Plans:
 
 - [x] 13-10-PLAN.md — Printable roster + public read-only share link
 
+### Phase 14: In-App Quarterly Availability Editor
+
+**Goal:** Replace the Phase 13 CSV import round-trip with an in-app quarterly availability editor so the worship leader transcribes each volunteer's quarterly email reply directly into constrained controls — no data ever arrives as free-text or CSV. From the roster, the leader picks a person and edits, for the active quarter: a **Sundays-only blackout calendar** (only real service dates are clickable, with "Nth Sunday" chips and a date-range block that selects the Sundays inside it), a **frequency** control (Every week / Twice a month / Monthly / As-needed fill-in / Out this quarter, with an advanced raw 1-in-N override and a live "≈ X of N Sundays" readout), a **must-serve-with** typeahead that creates bidirectional pairing chips, and a free-text **quarter note** (for the leader — never auto-scheduled). Edits write directly into the existing `PersonQuarterData` (blackoutDates, pairedWith) via the store, exactly as `applyCsvToQuarter` does today — the CSV import path remains as a secondary bulk option but is no longer the primary way availability enters the app.
+**Depends on:** Phase 13
+**Requirements**: TBD (derive during /gsd-discuss-phase 14)
+
+Scope (from user request):
+
+1. In-app availability editor replacing the CSV import as the primary input path. The app controls the input shape so everything is guaranteed compatible — no cleaning messy free-text (see `docs/Sample Frequency Notes.csv` for the real, messy quarterly notes this structures: "Any", "As needed", "1 week off per month", "1st Sundays", date lists, ranges like "gone June 12-19", conditional pairings like "schedule only with Dean or Lisa").
+2. **UI: Variant A — Right drawer** (from sketch `001-availability-editor`): the roster stays full-width and scannable; clicking a person's row slides the editor in from the right. Shared core controls: Sundays-only blackout calendar, frequency segmented control (+ advanced raw 1-in-N), must-serve-with bidirectional pairing picker, quarter note.
+3. Frequency abstraction over the messy real-world spellings — segmented presets mapping to the existing `frequencyTargetN` 1-in-N model, plus the sketch's fill-in vs. out-this-quarter tiers (gray area: how to represent "As-needed fill-in" and "Out this quarter" against a numeric `frequencyTargetN` — resolve in discuss).
+4. Sundays-only blackout entry — tap Sundays to toggle; "Nth Sunday" chips auto-select every Nth Sunday of the quarter; a range picker blocks the Sundays inside a date span. Writes expanded `YYYY-MM-DD` blackoutDates (same shape `expandBlackoutCell` produces).
+5. Must-serve-with pairing — typeahead over active roster → bidirectional `pairedWith` chips, reusing the same bidirectional-sync logic `applyCsvToQuarter` already implements.
+6. **Selective Planning Center import** — the current PC import pulls in everyone from the church, but the worship volunteer list is much smaller and music-only. Replace the bulk "import all servers" behavior with a selective import scoped **by PC worship team AND by role/position**: bring in only people **currently serving on a worship team** who serve in a **specific individually-scheduled role**. Explicitly EXCLUDE group positions — **choir and orchestra people are not imported** (those aren't roles WorshipPlanner fills by individual). Mechanism (resolve exact UI in discuss/research): surface the worship team's PC positions and let the leader include only the individually-filled ones (choir/orchestra excluded), mapping each PC position → a WorshipPlanner Role. Requires PC Services API research on team membership + team positions.
+
+Note: An editor-only "Clear all volunteers" danger action (type-to-confirm, `deleteAllPeople`) already exists (commit 0b55d76) and is OUT of this phase's scope — deletion is done. Minor known gap (not required here): `deleteAllPeople` does not clear orphaned `personQuarterData` on quarter docs; low-risk since re-import + re-entry follows.
+
+Notes for planner:
+
+- Builds directly on Phase 13's data model (`src/types/roster.ts` — `PersonQuarterData`, `Person.frequencyTargetN`), store (`src/stores/quarters.ts` — `applyCsvToQuarter` mutation pattern, bidirectional pairing sync), and quarter-Sundays generator (`src/utils/quarterDates.ts`). Editor writes go through the store, not CSV.
+- Sketch: `.planning/sketches/001-availability-editor/index.html` (Variant A chosen) + `README.md`. CSV sample: `docs/Sample Frequency Notes.csv`.
+- The CSV import path (`VolunteerCsvImportModal.vue`, `volunteerCsv.ts`) is NOT removed — it stays as a secondary bulk-entry option; this phase makes the in-app editor the primary path.
+
 ## Backlog
 
 ### Phase 999.1: Extract shared song-browse component (Songs page + service-plan picker) (BACKLOG)
