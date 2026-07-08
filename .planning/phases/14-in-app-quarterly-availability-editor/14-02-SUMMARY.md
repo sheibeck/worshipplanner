@@ -89,6 +89,14 @@ None - no external service configuration required. Reuses existing Phase 8 Plann
 - `fetchPeopleForTeamPositions` is a settled, unit-tested contract ready for Plan 04 to wire into the selective-import modal
 - No blockers or concerns
 
+## Self-Check: PASSED
+
+- FOUND: src/utils/planningCenterApi.ts
+- FOUND: SUMMARY.md
+- FOUND: c2a034e (test commit)
+- FOUND: ed4483e (feat commit)
+- FOUND: 9c1c383 (docs commit)
+
 ---
 *Phase: 14-in-app-quarterly-availability-editor*
 *Completed: 2026-07-08*
