@@ -138,7 +138,7 @@
                     @click="toggleOverride(date)"
                     class="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
                   >
-                    {{ overrideDate === date ? 'Close' : 'Override' }}
+                    {{ overrideDate === date ? 'Close' : 'Override Roles' }}
                   </button>
                   <button
                     @click="onRemoveDate(date)"
