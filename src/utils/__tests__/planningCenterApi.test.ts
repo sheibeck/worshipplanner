@@ -1611,21 +1611,26 @@ describe('fetchPeopleForTeamPositions', () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(new Response(JSON.stringify(page1), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify(page2), { status: 200 }))
+      // Per-person email lookups (batched) after pagination — Map order: p1, p3
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ attributes: { address: 'ann@example.com' } }] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ attributes: { address: 'cy@example.com' } }] }), { status: 200 }))
 
     const result = await fetchPeopleForTeamPositions('app', 'sec', 'TEAM1', new Set(['POS1', 'POS2']))
 
-    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2)
+    // 2 assignment pages + 2 per-person email lookups
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(4)
     const [firstUrl] = vi.mocked(fetch).mock.calls[0]!
     expect(firstUrl as string).toContain('/teams/TEAM1/person_team_position_assignments')
     expect(firstUrl as string).toContain('include=person')
     const [secondUrl] = vi.mocked(fetch).mock.calls[1]!
     expect(secondUrl as string).not.toContain('api.planningcenteronline.com')
+    expect(vi.mocked(fetch).mock.calls[2]![0] as string).toContain('/people/p1/emails')
 
     expect(result).toHaveLength(2)
     expect(result).toEqual(
       expect.arrayContaining([
-        { pcPersonId: 'p1', name: 'Ann Lee' },
-        { pcPersonId: 'p3', name: 'Cy Doe' },
+        { pcPersonId: 'p1', name: 'Ann Lee', email: 'ann@example.com' },
+        { pcPersonId: 'p3', name: 'Cy Doe', email: 'cy@example.com' },
       ]),
     )
     expect(result.find((r) => r.pcPersonId === 'p2')).toBeUndefined()
@@ -1643,11 +1648,13 @@ describe('fetchPeopleForTeamPositions', () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(new Response('Too Many Requests', { status: 429, headers: { 'Retry-After': '0' } }))
       .mockResolvedValueOnce(new Response(JSON.stringify(okPayload), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [{ attributes: { address: 'ann@example.com' } }] }), { status: 200 }))
 
     const result = await fetchPeopleForTeamPositions('app', 'sec', 'TEAM1', new Set(['POS1']))
 
-    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2)
-    expect(result).toEqual([{ pcPersonId: 'p1', name: 'Ann Lee' }])
+    // 429 retry + ok assignment page + 1 per-person email lookup
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(3)
+    expect(result).toEqual([{ pcPersonId: 'p1', name: 'Ann Lee', email: 'ann@example.com' }])
   })
 
   it('throws when the final response is not ok', async () => {

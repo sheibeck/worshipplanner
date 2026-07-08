@@ -1091,7 +1091,7 @@ export async function fetchPeopleForTeamPositions(
   secret: string,
   teamId: string,
   selectedPositionIds: Set<string>,
-): Promise<Array<{ pcPersonId: string; name: string }>> {
+): Promise<Array<{ pcPersonId: string; name: string; email: string }>> {
   const authHeader = basicAuthHeader(appId, secret)
 
   let url: string | undefined =
@@ -1145,7 +1145,23 @@ export async function fetchPeopleForTeamPositions(
     }
   }
 
-  return Array.from(peopleById, ([pcPersonId, name]) => ({ pcPersonId, name }))
+  // Resolve each selected person's email from the nested Services v2 endpoint,
+  // batched by 3 to respect rate limits (mirrors fetchAndMapPeople). The scoped
+  // import now brings email over just like the whole-directory import did.
+  const entries = Array.from(peopleById, ([pcPersonId, name]) => ({ pcPersonId, name }))
+  const BATCH_SIZE = 3
+  const result: Array<{ pcPersonId: string; name: string; email: string }> = []
+  for (let i = 0; i < entries.length; i += BATCH_SIZE) {
+    const batch = entries.slice(i, i + BATCH_SIZE)
+    const mapped = await Promise.all(
+      batch.map(async (entry) => ({
+        ...entry,
+        email: (await fetchPersonEmails(appId, secret, entry.pcPersonId))[0] ?? '',
+      })),
+    )
+    result.push(...mapped)
+  }
+  return result
 }
 
 /**

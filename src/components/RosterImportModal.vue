@@ -351,7 +351,7 @@ const step = ref<Step>('idle')
 const errorMessage = ref('')
 
 // Mapped people from PC (stored between fetch and confirm). Never carries a
-// PC-sourced phone value — the selective fetch always leaves email '' (leader edits later).
+// PC-sourced phone stays '' (Services v2 has no phone vertex); email now comes from the scoped fetch.
 const mappedPeople = ref<UpsertPersonInput[]>([])
 
 // Preview counts
@@ -519,6 +519,7 @@ async function onConfirmPositions() {
   try {
     const checkedPositionIds = Array.from(selectedPositionIds.value)
     const nameByPerson = new Map<string, string>()
+    const emailByPerson = new Map<string, string>()
     const roleIdsByPerson = new Map<string, Set<string>>()
 
     for (const positionId of checkedPositionIds) {
@@ -532,6 +533,7 @@ async function onConfirmPositions() {
       )
       for (const person of peopleForPosition) {
         nameByPerson.set(person.pcPersonId, person.name)
+        emailByPerson.set(person.pcPersonId, person.email)
         const roles = roleIdsByPerson.get(person.pcPersonId) ?? new Set<string>()
         roles.add(roleId)
         roleIdsByPerson.set(person.pcPersonId, roles)
@@ -541,7 +543,7 @@ async function onConfirmPositions() {
     const mapped: UpsertPersonInput[] = Array.from(roleIdsByPerson.entries()).map(
       ([pcPersonId, roleIds]) => ({
         name: nameByPerson.get(pcPersonId) ?? '',
-        email: '',
+        email: emailByPerson.get(pcPersonId) ?? '',
         pcPersonId,
         roles: Array.from(roleIds),
       }),
