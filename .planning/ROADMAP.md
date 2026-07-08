@@ -232,14 +232,14 @@ Notes for planner:
 - The CSV import path (`VolunteerCsvImportModal.vue`, `volunteerCsv.ts`) is NOT removed — it stays as a secondary bulk-entry option; this phase makes the in-app editor the primary path.
 
 **Requirements**: D-01..D-11 (see 14-CONTEXT.md — no formal REQ-IDs; REQUIREMENTS.md absent, so the 11 locked decisions are the requirement/traceability set)
-**Plans:** 6 plans
+**Plans:** 2/6 plans executed
 
 Plans:
 
 **Wave 1**
 
-- [ ] 14-01-PLAN.md — Data model (FrequencyTier on PersonQuarterData) + scheduler two-pass fill (regular→fillin, out-excluded) (TDD)
-- [ ] 14-02-PLAN.md — Selective PC import fetch: fetchPeopleForTeamPositions (team-scoped assignments, filter+dedupe) (TDD)
+- [x] 14-01-PLAN.md — Data model (FrequencyTier on PersonQuarterData) + scheduler two-pass fill (regular→fillin, out-excluded) (TDD)
+- [x] 14-02-PLAN.md — Selective PC import fetch: fetchPeopleForTeamPositions (team-scoped assignments, filter+dedupe) (TDD)
 
 **Wave 2**
 
