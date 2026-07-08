@@ -131,6 +131,46 @@
                   Assign
                 </button>
               </div>
+
+              <!-- Gap-filling panel (D-23) -->
+              <div
+                v-if="cellIsUnfilled(expandedCell.date, expandedCell.roleId)"
+                class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-gray-800"
+              >
+                <div>
+                  <p class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1.5">Blacked out today</p>
+                  <ul class="space-y-1">
+                    <li
+                      v-for="p in expandedBlackedOut"
+                      :key="p.id"
+                      class="text-sm text-gray-500 line-through"
+                    >
+                      {{ p.name }}
+                    </li>
+                    <li v-if="expandedBlackedOut.length === 0" class="text-xs text-gray-600">None</li>
+                  </ul>
+                </div>
+                <div>
+                  <p class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1.5">Available, not yet assigned</p>
+                  <ul class="space-y-1">
+                    <li
+                      v-for="p in expandedEligible"
+                      :key="p.id"
+                      class="flex items-center justify-between gap-2 text-sm px-2 py-1 rounded-md bg-green-900/30 text-green-400"
+                    >
+                      {{ p.name }}
+                      <button
+                        type="button"
+                        class="text-xs text-green-300 hover:text-green-200 underline"
+                        @click="onQuickAssign(expandedCell.date, expandedCell.roleId, p.id)"
+                      >
+                        Assign
+                      </button>
+                    </li>
+                    <li v-if="expandedEligible.length === 0" class="text-xs text-gray-600">None</li>
+                  </ul>
+                </div>
+              </div>
             </td>
           </tr>
         </template>
@@ -227,6 +267,15 @@ function availableUnassigned(date: string, roleId: string): Person[] {
   )
 }
 
+// Blacked-out-today for a (date, roleId) gap = active people who could fill this role
+// but are blacked out that date and not already assigned to the cell.
+function blackedOutToday(date: string, roleId: string): Person[] {
+  const assigned = new Set(cellPeople(date, roleId))
+  return rosterStore.activePeople.filter(
+    (p) => hasRole(p, roleId) && isBlackedOut(p.id, date) && !assigned.has(p.id),
+  )
+}
+
 // ── Expanded cell state (click-to-edit + gap panel) ─────────────────────────────
 const expandedCell = ref<{ date: string; roleId: string } | null>(null)
 const addSelectId = ref('')
@@ -259,6 +308,11 @@ const expandedEligible = computed<Person[]>(() => {
   return availableUnassigned(expandedCell.value.date, expandedCell.value.roleId)
 })
 
+const expandedBlackedOut = computed<Person[]>(() => {
+  if (!expandedCell.value) return []
+  return blackedOutToday(expandedCell.value.date, expandedCell.value.roleId)
+})
+
 // ── Store actions — scoped Firestore dot-path updates only (D-22, T-13-09-02) ──
 function onClear(date: string, roleId: string, personId: string) {
   quartersStore.clearAssignment(props.quarter.id, date, roleId, personId)
@@ -268,6 +322,10 @@ function onAdd() {
   if (!expandedCell.value || !addSelectId.value) return
   quartersStore.assignPerson(props.quarter.id, expandedCell.value.date, expandedCell.value.roleId, addSelectId.value)
   addSelectId.value = ''
+}
+
+function onQuickAssign(date: string, roleId: string, personId: string) {
+  quartersStore.assignPerson(props.quarter.id, date, roleId, personId)
 }
 
 function onSwapSelect(event: Event, fromPersonId: string) {
