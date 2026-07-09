@@ -130,19 +130,42 @@ const STATUS_LABEL: Record<FrequencyTier, string> = {
   out: 'Out this quarter',
 }
 
+// D-05: per-role tier read mirroring scheduler.ts's canonical tierOf —
+// roleTiers?.[roleId] ?? frequencyTier ?? 'regular'.
+function tierOf(personId: string, roleId: string): FrequencyTier {
+  const pqd = props.quarter?.personQuarterData[personId]
+  return pqd?.roleTiers?.[roleId] ?? pqd?.frequencyTier ?? 'regular'
+}
+
+// Aggregate a person's per-role tiers across their held roles into a single status
+// for this admin table, most-restrictive-wins (out > fillin > regular) — a person
+// out for ANY held role must surface as 'out' here, the primary admin audit surface
+// for the per-role frequency feature (D-05). Falls back to the legacy per-person
+// frequencyTier only when roleTiers is absent/empty (back-compat for pre-migration data).
+function aggregateTier(person: Person): FrequencyTier {
+  const pqd = props.quarter?.personQuarterData[person.id]
+  if (!pqd?.roleTiers || Object.keys(pqd.roleTiers).length === 0) {
+    return pqd?.frequencyTier ?? 'regular'
+  }
+  const tiers = person.roles.map((roleId) => tierOf(person.id, roleId))
+  if (tiers.includes('out')) return 'out'
+  if (tiers.includes('fillin')) return 'fillin'
+  return 'regular'
+}
+
 // ── Quarter-scoped data lookup, defaulted per Phase 14 convention (lazy-default
 // on read — pre-migration Phase 13 data has no frequencyTier/note at all) ──
-function quarterDataFor(personId: string): {
+function quarterDataFor(person: Person): {
   blackoutDates: string[]
   pairedWith: string[]
   frequencyTier: FrequencyTier
   note: string
 } {
-  const pqd = props.quarter?.personQuarterData[personId]
+  const pqd = props.quarter?.personQuarterData[person.id]
   return {
     blackoutDates: pqd?.blackoutDates ?? [],
     pairedWith: pqd?.pairedWith ?? [],
-    frequencyTier: pqd?.frequencyTier ?? 'regular',
+    frequencyTier: aggregateTier(person),
     note: pqd?.note ?? '',
   }
 }
@@ -164,7 +187,7 @@ const filteredPeople = computed<Person[]>(() => {
   if (activeFilter.value === 'needsInput') {
     list = list.filter((p) => !props.quarter?.personQuarterData[p.id])
   } else if (activeFilter.value === 'out') {
-    list = list.filter((p) => quarterDataFor(p.id).frequencyTier === 'out')
+    list = list.filter((p) => quarterDataFor(p).frequencyTier === 'out')
   }
 
   return list
@@ -189,7 +212,7 @@ function freqLabel(n: number): string {
 }
 
 function freqBadge(person: Person): string {
-  const pqd = quarterDataFor(person.id)
+  const pqd = quarterDataFor(person)
   if (pqd.frequencyTier === 'out') return '—'
   if (pqd.frequencyTier === 'fillin') return 'fill-in'
   const total = serviceDates.value.length
@@ -201,11 +224,11 @@ function freqBadge(person: Person): string {
 
 // ── Status pill ───────────────────────────────────────────────────────────────
 function statusLabel(person: Person): string {
-  return STATUS_LABEL[quarterDataFor(person.id).frequencyTier]
+  return STATUS_LABEL[quarterDataFor(person).frequencyTier]
 }
 
 function statusPillClass(person: Person): string {
-  return STATUS_PILL_CLASS[quarterDataFor(person.id).frequencyTier]
+  return STATUS_PILL_CLASS[quarterDataFor(person).frequencyTier]
 }
 
 // ── Blackout summary (sketch blackoutSummary()) — detects a dominant Nth-Sunday
@@ -221,7 +244,7 @@ function ordinalLabel(n: number): string {
 }
 
 function blackoutSummary(person: Person): string {
-  const pqd = quarterDataFor(person.id)
+  const pqd = quarterDataFor(person)
   if (pqd.frequencyTier === 'out') return '— out all quarter —'
 
   const blackout = pqd.blackoutDates
@@ -268,7 +291,7 @@ function firstName(id: string): string {
 }
 
 function pairSummary(person: Person): string {
-  const pairedWith = quarterDataFor(person.id).pairedWith
+  const pairedWith = quarterDataFor(person).pairedWith
   if (pairedWith.length === 0) return ''
   return '↔ ' + pairedWith.map((id) => firstName(id)).join(', ')
 }
