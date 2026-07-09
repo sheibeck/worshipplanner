@@ -2,8 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 
 // Track onSnapshot callbacks per collection path so people/roles subscriptions
-// can be triggered independently.
-type SnapshotDoc = { id: string; data: () => Record<string, unknown> }
+// can be triggered independently. `ref` mirrors the real Firestore
+// QueryDocumentSnapshot shape so per-doc migration patches (updateDoc(d.ref, ...))
+// can be asserted against the specific doc they targeted.
+type SnapshotDoc = { id: string; data: () => Record<string, unknown>; ref: { id: string; path: string } }
 type SnapshotCallback = (snap: { docs: SnapshotDoc[] }) => void
 
 const snapshotCallbacks: Record<string, SnapshotCallback> = {}
@@ -48,10 +50,15 @@ function makePerson(overrides: Partial<{
   active: boolean
   roles: string[]
   frequencyTargetN: number
+  roleFrequencies: Record<string, number>
   pcPersonId: string | null
   createdAt: { seconds: number; nanoseconds: number }
   updatedAt: { seconds: number; nanoseconds: number }
 }> = {}) {
+  // roleFrequencies is conditionally spread (mirrors PersonQuarterData.frequencyTier's
+  // optional-field test convention) so tests can construct a doc with the field
+  // WHOLLY ABSENT — required to exercise the D-03 patch-on-read migration guard.
+  const { roleFrequencies, ...rest } = overrides
   return {
     id: 'person-1',
     name: 'Sarah Smith',
@@ -63,14 +70,15 @@ function makePerson(overrides: Partial<{
     pcPersonId: null,
     createdAt: { seconds: 1000000, nanoseconds: 0 },
     updatedAt: { seconds: 1000000, nanoseconds: 0 },
-    ...overrides,
+    ...rest,
+    ...(roleFrequencies !== undefined ? { roleFrequencies } : {}),
   }
 }
 
 function makeRole(overrides: Partial<{
   id: string
   name: string
-  group: 'band' | 'tech' | 'other'
+  group: 'band' | 'tech' | 'vocals' | 'other'
   defaultCount: number
   order: number
 }> = {}) {
@@ -94,6 +102,7 @@ function triggerPeopleSnapshot(people: ReturnType<typeof makePerson>[]) {
           const { id: _id, ...rest } = p
           return rest
         },
+        ref: { id: p.id, path: `organizations/org-1/people/${p.id}` },
       })),
     })
   }
@@ -109,6 +118,7 @@ function triggerRolesSnapshot(roles: ReturnType<typeof makeRole>[]) {
           const { id: _id, ...rest } = r
           return rest
         },
+        ref: { id: r.id, path: `organizations/org-1/roles/${r.id}` },
       })),
     })
   }
@@ -518,6 +528,260 @@ describe('useRosterStore', () => {
       await store.deleteRole('role-1')
 
       expect(deleteDoc).toHaveBeenCalledOnce()
+    })
+  })
+
+  describe('patch-on-read migrations (D-03 roleFrequencies, D-09 vocals group)', () => {
+    it('D-03: backfills roleFrequencies from frequencyTargetN onto every held role when the field is wholly absent', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useRosterStore } = await import('../roster')
+      const store = useRosterStore()
+      store.subscribe('org-1')
+
+      triggerPeopleSnapshot([
+        makePerson({ id: 'p1', roles: ['guitar', 'vocals'], frequencyTargetN: 2 }),
+      ])
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const ref = callArgs[0] as unknown as { id: string }
+      const data = callArgs[1] as unknown as Record<string, unknown>
+      expect(ref.id).toBe('p1')
+      expect(data).toEqual({ roleFrequencies: { guitar: 2, vocals: 2 } })
+    })
+
+    it('D-03: is idempotent — does not patch a person doc that already has roleFrequencies', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useRosterStore } = await import('../roster')
+      const store = useRosterStore()
+      store.subscribe('org-1')
+
+      triggerPeopleSnapshot([
+        makePerson({ id: 'p1', roles: ['guitar'], frequencyTargetN: 2, roleFrequencies: { guitar: 1 } }),
+      ])
+
+      expect(updateDoc).not.toHaveBeenCalled()
+    })
+
+    it('D-03: only patches docs missing roleFrequencies, leaving already-migrated sibling docs untouched', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useRosterStore } = await import('../roster')
+      const store = useRosterStore()
+      store.subscribe('org-1')
+
+      triggerPeopleSnapshot([
+        makePerson({ id: 'p1', roles: ['guitar'], frequencyTargetN: 2, roleFrequencies: { guitar: 1 } }),
+        makePerson({ id: 'p2', roles: ['bass'], frequencyTargetN: 3 }),
+      ])
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const ref = vi.mocked(updateDoc).mock.calls[0]![0] as unknown as { id: string }
+      expect(ref.id).toBe('p2')
+    })
+
+    it('D-03: a person with no roles at all backfills to an empty roleFrequencies map (no throw)', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useRosterStore } = await import('../roster')
+      const store = useRosterStore()
+      store.subscribe('org-1')
+
+      triggerPeopleSnapshot([makePerson({ id: 'p1', roles: [], frequencyTargetN: 4 })])
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+      expect(data).toEqual({ roleFrequencies: {} })
+    })
+
+    it('D-09: patches a "vocals" role doc from group band to group vocals', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useRosterStore } = await import('../roster')
+      const store = useRosterStore()
+      store.subscribe('org-1')
+
+      triggerRolesSnapshot([makeRole({ id: 'role-vocals', name: 'vocals', group: 'band' })])
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const ref = callArgs[0] as unknown as { id: string }
+      const data = callArgs[1] as unknown as Record<string, unknown>
+      expect(ref.id).toBe('role-vocals')
+      expect(data).toEqual({ group: 'vocals' })
+    })
+
+    it('D-09: name match is case-insensitive', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useRosterStore } = await import('../roster')
+      const store = useRosterStore()
+      store.subscribe('org-1')
+
+      triggerRolesSnapshot([makeRole({ id: 'role-vocals', name: 'VOCALS', group: 'band' })])
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+    })
+
+    it('D-09: is idempotent — does not patch a role already in group vocals, or an unrelated role', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useRosterStore } = await import('../roster')
+      const store = useRosterStore()
+      store.subscribe('org-1')
+
+      triggerRolesSnapshot([
+        makeRole({ id: 'role-vocals', name: 'vocals', group: 'vocals' }),
+        makeRole({ id: 'role-guitar', name: 'guitar', group: 'band' }),
+      ])
+
+      expect(updateDoc).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('roleFrequencies persistence + CSV graceful degrade (D-02/D-04/D-07)', () => {
+    it('updatePerson persists an explicit roleFrequencies map (round-trip)', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useRosterStore } = await import('../roster')
+      const store = useRosterStore()
+      store.subscribe('org-1')
+
+      await store.updatePerson('person-1', { roleFrequencies: { guitar: 2, vocals: 1 } })
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+      expect(data.roleFrequencies).toEqual({ guitar: 2, vocals: 1 })
+    })
+
+    it('addPerson persists an explicit roleFrequencies map (round-trip)', async () => {
+      const { addDoc } = await import('firebase/firestore')
+      const { useRosterStore } = await import('../roster')
+      const store = useRosterStore()
+      store.subscribe('org-1')
+
+      await store.addPerson({
+        name: 'New Person',
+        email: 'new@example.com',
+        roles: ['guitar'],
+        roleFrequencies: { guitar: 3 },
+      })
+
+      const data = vi.mocked(addDoc).mock.calls[0]![1] as Record<string, unknown>
+      expect(data.roleFrequencies).toEqual({ guitar: 3 })
+    })
+
+    it('addPerson synthesizes roleFrequencies from roles x frequencyTargetN when no map is supplied (D-02/D-07)', async () => {
+      const { addDoc } = await import('firebase/firestore')
+      const { useRosterStore } = await import('../roster')
+      const store = useRosterStore()
+      store.subscribe('org-1')
+
+      await store.addPerson({
+        name: 'New Person',
+        email: 'new@example.com',
+        roles: ['guitar', 'bass'],
+        frequencyTargetN: 2,
+      })
+
+      const data = vi.mocked(addDoc).mock.calls[0]![1] as Record<string, unknown>
+      expect(data.roleFrequencies).toEqual({ guitar: 2, bass: 2 })
+    })
+
+    it('addPerson defaults per-role frequency to N=4 when neither roleFrequencies nor frequencyTargetN is supplied (D-02)', async () => {
+      const { addDoc } = await import('firebase/firestore')
+      const { useRosterStore } = await import('../roster')
+      const store = useRosterStore()
+      store.subscribe('org-1')
+
+      await store.addPerson({ name: 'New Person', email: 'new@example.com', roles: ['drums'] })
+
+      const data = vi.mocked(addDoc).mock.calls[0]![1] as Record<string, unknown>
+      expect(data.roleFrequencies).toEqual({ drums: 4 })
+    })
+
+    describe('upsertPeople', () => {
+      it('new person: synthesizes roleFrequencies from roles x frequencyTargetN when no map is supplied (D-07 graceful degrade)', async () => {
+        const { addDoc } = await import('firebase/firestore')
+        const { useRosterStore } = await import('../roster')
+        const store = useRosterStore()
+        store.subscribe('org-1')
+        triggerPeopleSnapshot([])
+
+        await store.upsertPeople([
+          { name: 'Brand New Person', email: 'brand@example.com', roles: ['guitar', 'bass'], frequencyTargetN: 2 },
+        ])
+
+        const data = vi.mocked(addDoc).mock.calls[0]![1] as Record<string, unknown>
+        expect(data.roleFrequencies).toEqual({ guitar: 2, bass: 2 })
+      })
+
+      it('new person: defaults to per-role N=4 when neither roleFrequencies nor frequencyTargetN is supplied (D-02)', async () => {
+        const { addDoc } = await import('firebase/firestore')
+        const { useRosterStore } = await import('../roster')
+        const store = useRosterStore()
+        store.subscribe('org-1')
+        triggerPeopleSnapshot([])
+
+        await store.upsertPeople([
+          { name: 'Brand New Person', email: 'brand@example.com', roles: ['drums'] },
+        ])
+
+        const data = vi.mocked(addDoc).mock.calls[0]![1] as Record<string, unknown>
+        expect(data.roleFrequencies).toEqual({ drums: 4 })
+      })
+
+      it('existing person: an explicit roleFrequencies map on the incoming row wins outright', async () => {
+        const { updateDoc } = await import('firebase/firestore')
+        const { useRosterStore } = await import('../roster')
+        const store = useRosterStore()
+        store.subscribe('org-1')
+        triggerPeopleSnapshot([
+          makePerson({ id: 'existing-person', name: 'Existing Person', pcPersonId: 'pc-1', active: true, roles: ['guitar'] }),
+        ])
+
+        await store.upsertPeople([
+          { name: 'Existing Person', email: 'e@example.com', pcPersonId: 'pc-1', roles: ['guitar'], roleFrequencies: { guitar: 6 } },
+        ])
+
+        const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+        expect(data.roleFrequencies).toEqual({ guitar: 6 })
+      })
+
+      it('existing person: roles without a map synthesizes defaults for new roles while preserving already-tuned entries (T-15-03-01 non-clobber)', async () => {
+        const { updateDoc } = await import('firebase/firestore')
+        const { useRosterStore } = await import('../roster')
+        const store = useRosterStore()
+        store.subscribe('org-1')
+        triggerPeopleSnapshot([
+          makePerson({
+            id: 'existing-person',
+            name: 'Existing Person',
+            pcPersonId: 'pc-1',
+            active: true,
+            roles: ['vocals'],
+            roleFrequencies: { vocals: 3 },
+          }),
+        ])
+
+        await store.upsertPeople([
+          { name: 'Existing Person', email: 'e@example.com', pcPersonId: 'pc-1', roles: ['guitar'], frequencyTargetN: 2 },
+        ])
+
+        const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+        expect(data.roleFrequencies).toEqual({ guitar: 2, vocals: 3 })
+      })
+
+      it('existing person: not supplying roles at all leaves roleFrequencies untouched', async () => {
+        const { updateDoc } = await import('firebase/firestore')
+        const { useRosterStore } = await import('../roster')
+        const store = useRosterStore()
+        store.subscribe('org-1')
+        triggerPeopleSnapshot([
+          makePerson({ id: 'existing-person', name: 'Existing Person', pcPersonId: 'pc-1', active: true, roleFrequencies: { guitar: 3 } }),
+        ])
+
+        await store.upsertPeople([
+          { name: 'Existing Person', email: 'e@example.com', pcPersonId: 'pc-1' },
+        ])
+
+        const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+        expect(data.roleFrequencies).toBeUndefined()
+      })
     })
   })
 })
