@@ -558,6 +558,15 @@ function firstRoleName(person: Person): string {
   return names[0] ?? ''
 }
 
+// Frequency sort key (D-01 reconciliation) — frequencyTargetN is now a fallback,
+// not the tuned value, so sort by the person's most-frequent (minimum N) held
+// role instead. `person.frequencyTargetN` is always included in the Math.min
+// spread, so an empty/absent roleFrequencies map never produces NaN/throws —
+// it just falls back to the retained frequencyTargetN.
+function minRoleFrequency(person: Person): number {
+  return Math.min(...Object.values(person.roleFrequencies ?? {}), person.frequencyTargetN)
+}
+
 const displayedPeople = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
   let list = rosterStore.activePeople.filter((p) => {
@@ -573,7 +582,8 @@ const displayedPeople = computed(() => {
     } else if (sortKey.value === 'role') {
       cmp = firstRoleName(a).localeCompare(firstRoleName(b))
     } else {
-      cmp = a.frequencyTargetN - b.frequencyTargetN
+      cmp = minRoleFrequency(a) - minRoleFrequency(b)
+      if (cmp === 0) cmp = a.name.localeCompare(b.name)
     }
     return sortDir.value === 'asc' ? cmp : -cmp
   })

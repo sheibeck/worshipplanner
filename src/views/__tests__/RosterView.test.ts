@@ -4,7 +4,7 @@ import RosterView from '../RosterView.vue'
 import type { Person, Role } from '@/types/roster'
 
 const mockAddPerson = vi.fn(() => Promise.resolve('new-id'))
-const mockUpdatePerson = vi.fn(() => Promise.resolve())
+const mockUpdatePerson = vi.fn((_id: string, _input: Record<string, unknown>) => Promise.resolve())
 const mockDeactivatePerson = vi.fn(() => Promise.resolve())
 const mockReactivatePerson = vi.fn(() => Promise.resolve())
 const mockDeleteAllPeople = vi.fn(() => Promise.resolve(0))
