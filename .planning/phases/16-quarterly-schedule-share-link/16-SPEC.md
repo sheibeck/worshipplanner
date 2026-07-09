@@ -1,12 +1,12 @@
 # Phase 16: Quarterly Schedule Share Link — matrix view, name filter, cross-screen volunteer editing & UX overhaul — Specification
 
 **Created:** 2026-07-09
-**Ambiguity score:** 0.19 (gate: ≤ 0.20)
-**Requirements:** 13 locked
+**Ambiguity score:** 0.20 (gate: ≤ 0.20)
+**Requirements:** 14 locked
 
 ## Goal
 
-Make the quarterly schedule usable for both organizers and volunteers by giving the public share link a matrix view + memorable URL + name filter, unifying volunteer availability/frequency/pairing editing across the Schedule and Volunteer screens (authenticated only), and reworking the schedule editing UX (research-then-concrete redesign, collapsible sections, whole-cell-clickable right-side slide-out group editor). The scheduler pairing fix (original R-12) is split into its own separate phase and is NOT part of Phase 16.
+Make the quarterly schedule usable for both organizers and volunteers by giving the public share link a matrix view + memorable URL + name filter, unifying volunteer availability/frequency/pairing editing across the Schedule and Volunteer screens (authenticated only), fixing must-serve-with pairing so it honors each person's own per-role frequency, and reworking the schedule editing UX (research-then-concrete redesign, collapsible sections, whole-cell-clickable right-side slide-out group editor).
 
 ## Background
 
@@ -16,7 +16,7 @@ Current state, grounded in code:
 - **Schedule screen** (`src/views/QuarterView.vue`, route `/schedule`, authenticated + editor-gated): quarter create/select via a bare `<select>` + year/quarter inputs (R-10 pain point), CSV import, service-date editor, generate/regenerate/fill-gaps, `AvailabilityRosterTable` → `AvailabilityDrawer`, and `QuarterGrid`. Includes a **separate serve-frequency** surface and a **date-range picker** inside `AvailabilityDrawer.vue` (lines ~122-136) for blocking Sundays in a span (R-08 target).
 - **QuarterGrid** (`src/components/QuarterGrid.vue`): a scheduled-group cell `@click` toggles an editor that **expands underneath** the row; per-person remove pills use `@click.stop`. R-13 wants the whole cell clickable; R-14 wants a right-side slide-out instead of expand-underneath.
 - **Data model** (`src/types/roster.ts`): per-role frequency (`Person.roleFrequencies`, `PersonQuarterData.roleTiers`) already exists from Phase 15. `blackoutDates` is quarter-scoped on `PersonQuarterData` (reset each quarter, D-18). Org has a `name` (auth store `orgName`) but **no URL slug**.
-- **Scheduler** (`src/utils/scheduler.ts`): `propagatePairing` pulls a paired partner in on every occurrence the anchor serves — the R-12 concern — but R-12 is **out of this phase** (separate phase).
+- **Scheduler** (`src/utils/scheduler.ts`): `propagatePairing` pulls a paired partner in on **every occurrence** the anchor serves, regardless of the partner's own per-role cadence — the R-12 bug. Fixing it requires reconciling pairing with each person's per-role frequency (`roleFrequencies`/`roleTiers`) so the lower-frequency partner is only co-scheduled on the occurrences they actually serve.
 - No `REQUIREMENTS.md` exists; the requirement set is the R-01..R-14 list in ROADMAP.md.
 
 ## Requirements
@@ -86,6 +86,11 @@ Current state, grounded in code:
     - Target: The group editor opens as a right-side slide-out panel (same pattern as `AvailabilityDrawer`), replacing the expand-underneath behavior entirely
     - Acceptance: Opening a cell's editor slides a panel in from the right; the old under-row expansion no longer appears; the slide-out supports the existing edit actions (add/remove/clear people for that date+role)
 
+14. **Pairing honors per-role frequency (R-12)**: A must-serve-with pairing no longer forces the linked partner onto every date the anchor serves; the partner is co-scheduled only on the occurrences their own per-role frequency allows.
+    - Current: `scheduler.ts::propagatePairing` pulls a paired partner in on every occurrence the anchor serves, inflating the partner's serve count past their cadence
+    - Target: Pairing is reconciled with each person's own per-role frequency (`roleFrequencies`/`roleTiers`) — the lower-frequency partner still serves at their own cadence, but their served occurrences are aligned to (paired with) the anchor's dates where possible; the pairing must not push the partner above their frequency target
+    - Acceptance: Given Nolan (once/month, must-serve-with Tim) and Tim (twice/month), a generated quarter schedules Nolan ~once/month and every Nolan occurrence coincides with a Tim occurrence; Tim's extra occurrences do not each drag Nolan in; existing hard constraints (blackout, group-compatibility) remain honored and the scheduler's existing test suite passes
+
 ## Boundaries
 
 **In scope:**
@@ -98,9 +103,9 @@ Current state, grounded in code:
 - Collapsible dense sections on the Schedule and Volunteer pages
 - Schedule-page UX research note + the concrete redesign it recommends (incl. add-quarter flow clarity)
 - QuarterGrid group editor: whole-cell click target + right-side slide-out panel
+- Scheduler fix (`scheduler.ts::propagatePairing`) so must-serve-with pairing honors each person's per-role frequency (R-12)
 
 **Out of scope:**
-- **Scheduler pairing-honors-frequency fix (original R-12)** — split into its own separate phase; no `scheduler.ts` algorithm changes here
 - **Public-link editing / volunteer self-service** — the public share link stays strictly read-only; no volunteer login or self-edit (locked round 1)
 - **Planning Center import / re-import changes** — no changes to PC people/song import flows
 - **Notifications / emailing volunteers** — sharing remains link-only; no email or push
@@ -110,7 +115,7 @@ Current state, grounded in code:
 
 - The public share page must remain unauthenticated and read-only, exposing no PII beyond person names — preserve the D-24 denormalized-snapshot pattern (`shareTokens/{token}`, names pre-resolved); the matrix view and name filter must read only the snapshot, not roster/auth stores.
 - The memorable URL is intentionally guessable (`/{slug}/quarter{N}-{YYYY}`) — this privacy tradeoff is accepted (locked round 2). Church slug must be unique across orgs (collision → numeric suffix).
-- Reuse the Phase-15 per-role frequency model (`Person.roleFrequencies`, `PersonQuarterData.roleTiers`); do not introduce a parallel frequency representation.
+- Reuse the Phase-15 per-role frequency model (`Person.roleFrequencies`, `PersonQuarterData.roleTiers`); do not introduce a parallel frequency representation. The R-12 pairing fix must read the same per-role cadence, and must keep pairing's existing hard constraints (blackout, group-compatibility) intact.
 - `blackoutDates` remains quarter-scoped on `PersonQuarterData` — no migration to standing/person-level data.
 - Cross-screen editing writes through the existing shared stores (`roster`, `quarters`); the same edit from either screen must produce identical persisted state.
 
@@ -129,19 +134,21 @@ Current state, grounded in code:
 - [ ] Dense sections on the Schedule and Volunteer pages can be collapsed and expanded
 - [ ] Clicking anywhere in a group cell opens the editor; a person's remove (x) removes only that person without opening the editor
 - [ ] The group editor opens as a right-side slide-out panel; the expand-underneath behavior is gone
-- [ ] No `scheduler.ts` algorithm changes are included (R-12 handled separately)
+- [ ] Must-serve-with pairing honors per-role frequency: the Nolan(1/mo, with Tim)/Tim(2/mo) case schedules Nolan ~once/month, always paired with a Tim date, without exceeding Nolan's cadence; the scheduler test suite passes
 
 ## Ambiguity Report
 
 | Dimension          | Score | Min  | Status | Notes                                             |
 |--------------------|-------|------|--------|---------------------------------------------------|
-| Goal Clarity       | 0.88  | 0.75 | ✓      | R-12 split out; all remaining features concrete   |
+| Goal Clarity       | 0.86  | 0.75 | ✓      | R-12 folded back in; all features concrete        |
 | Boundary Clarity   | 0.82  | 0.70 | ✓      | Explicit out-of-scope; auth-only edit surface     |
 | Constraint Clarity | 0.74  | 0.65 | ✓      | Public read-only, slug uniqueness, no migration   |
-| Acceptance Criteria| 0.74  | 0.70 | ✓      | 14 pass/fail criteria                             |
-| **Ambiguity**      | 0.19  | ≤0.20| ✓      | Gate passed after 3 rounds                        |
+| Acceptance Criteria| 0.73  | 0.70 | ✓      | 14 pass/fail criteria                             |
+| **Ambiguity**      | 0.20  | ≤0.20| ✓      | Gate passed after 3 rounds                        |
 
 Status: ✓ = met minimum, ⚠ = below minimum (planner treats as assumption)
+
+**Note on R-12:** Folded back in at the user's request after round 3. Its *intent* is falsifiable (Nolan/Tim canonical case), but the exact reconciliation semantics in `propagatePairing` (how the partner's occurrences align to the anchor's dates) carry the most residual HOW-ambiguity in the phase — discuss-phase should pin this down before planning.
 
 ## Interview Log
 
@@ -155,7 +162,8 @@ Status: ✓ = met minimum, ⚠ = below minimum (planner treats as assumption)
 | 2     | Researcher      | How is the church slug created/managed?       | Auto-derive from org name, editable in Settings, collision-suffixed   |
 | 3     | Boundary Keeper | R-07 blackout: standing or quarter-scoped?    | Quarter-scoped (no migration), editable from Volunteer screen too     |
 | 3     | Boundary Keeper | R-13/R-14 cell editor design?                 | Right-side slide-out, whole cell clickable (replaces expand-underneath)|
-| 3     | Boundary Keeper | What's explicitly out of scope?               | PC import changes + notifications OUT (plus R-12 & public-editing R1)  |
+| 3     | Boundary Keeper | What's explicitly out of scope?               | PC import changes + notifications OUT; public-editing OUT (R1)         |
+| post  | User revision   | Keep the scheduler pairing fix R-12?          | R-12 folded back INTO this phase (reversed R1 split) — don't lose it   |
 
 ---
 
