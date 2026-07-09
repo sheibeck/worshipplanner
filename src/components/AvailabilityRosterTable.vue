@@ -153,6 +153,21 @@ function aggregateTier(person: Person): FrequencyTier {
   return 'regular'
 }
 
+// D-05: distinguish a person out for EVERY held role (genuinely unavailable all
+// quarter) from one out for only SOME roles. The status pill uses the most-restrictive
+// aggregate (aggregateTier) so anyone out for any role surfaces in the "Out this quarter"
+// filter, but the Frequency and Unavailable columns describe overall availability — they
+// must render the fully-out treatment ONLY when the person is out for ALL held roles,
+// else a partially-out volunteer is falsely shown as unavailable (WR-01).
+function allRolesOut(person: Person): boolean {
+  const pqd = props.quarter?.personQuarterData[person.id]
+  if (!pqd?.roleTiers || Object.keys(pqd.roleTiers).length === 0) {
+    return (pqd?.frequencyTier ?? 'regular') === 'out'
+  }
+  if (person.roles.length === 0) return false
+  return person.roles.every((roleId) => tierOf(person.id, roleId) === 'out')
+}
+
 // ── Quarter-scoped data lookup, defaulted per Phase 14 convention (lazy-default
 // on read — pre-migration Phase 13 data has no frequencyTier/note at all) ──
 function quarterDataFor(person: Person): {
@@ -213,7 +228,7 @@ function freqLabel(n: number): string {
 
 function freqBadge(person: Person): string {
   const pqd = quarterDataFor(person)
-  if (pqd.frequencyTier === 'out') return '—'
+  if (allRolesOut(person)) return '—'
   if (pqd.frequencyTier === 'fillin') return 'fill-in'
   const total = serviceDates.value.length
   if (total === 0) return freqLabel(person.frequencyTargetN)
@@ -245,7 +260,7 @@ function ordinalLabel(n: number): string {
 
 function blackoutSummary(person: Person): string {
   const pqd = quarterDataFor(person)
-  if (pqd.frequencyTier === 'out') return '— out all quarter —'
+  if (allRolesOut(person)) return '— out all quarter —'
 
   const blackout = pqd.blackoutDates
   if (blackout.length === 0) return 'fully available'

@@ -155,4 +155,23 @@ describe('AvailabilityRosterTable — per-role tier aggregation (D-05 gap closur
     const rachelRow = wrapper.findAll('tr').find((r) => r.text().includes('Regular Rachel'))!
     expect(rachelRow.text()).toContain('Regular')
   })
+
+  it('does NOT render full-quarter unavailability for a person out for only SOME held roles (WR-01)', () => {
+    const wrapper = mount(AvailabilityRosterTable, { props: { quarter: makeQuarter() } })
+
+    // Ollie is out for role-guitar but regular for role-drums — she is still available.
+    // The aggregate status pill reads "Out this quarter" (audit surface), but the
+    // Frequency and Unavailable columns must NOT assert she is out all quarter.
+    const ollieRow = wrapper.findAll('tr').find((r) => r.text().includes('Outrole Ollie'))!
+    expect(ollieRow.text()).not.toContain('out all quarter')
+    expect(ollieRow.text()).toContain('fully available')
+  })
+
+  it('DOES render full-quarter unavailability for a person out for ALL held roles (legacy fallback)', () => {
+    const wrapper = mount(AvailabilityRosterTable, { props: { quarter: makeQuarter() } })
+
+    // Larry holds only role-drums and is legacy frequencyTier 'out' → genuinely out all quarter.
+    const larryRow = wrapper.findAll('tr').find((r) => r.text().includes('Legacy Larry'))!
+    expect(larryRow.text()).toContain('out all quarter')
+  })
 })
