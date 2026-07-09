@@ -323,13 +323,25 @@
               />
             </div>
             <div>
-              <label class="block text-xs font-medium text-gray-400 mb-1">Serve frequency</label>
-              <select
-                v-model.number="formFrequencyN"
-                class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-              >
-                <option v-for="n in [1, 2, 4]" :key="n" :value="n">{{ nToFrequencyLabel(n) }}</option>
-              </select>
+              <label class="block text-xs font-medium text-gray-400 mb-2">Serve frequency by role</label>
+              <div class="space-y-2">
+                <div
+                  v-for="role in heldRolesSorted"
+                  :key="role.id"
+                  class="flex items-center justify-between gap-3"
+                >
+                  <span class="text-sm text-gray-300">{{ role.name }}</span>
+                  <select
+                    v-model.number="formRoleFrequencies[role.id]"
+                    data-role="cadence-select"
+                    :data-role-id="role.id"
+                    class="w-40 rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                  >
+                    <option v-for="n in [1, 2, 4]" :key="n" :value="n">{{ nToFrequencyLabel(n) }}</option>
+                  </select>
+                </div>
+                <p v-if="formRoles.length === 0" class="text-xs text-gray-600">Check a role below to set its serve cadence.</p>
+              </div>
             </div>
             <div>
               <label class="block text-xs font-medium text-gray-400 mb-2">Roles</label>
@@ -418,6 +430,34 @@ const formEmail = ref('')
 const formPhone = ref('')
 const formFrequencyN = ref(4)
 const formRoles = ref<string[]>([])
+// Per-role cadence map (D-01) — one 1-in-N target per held role, replacing the
+// single Serve-frequency select. Blanks/newly-checked roles default to N=4
+// (monthly, D-02); frequencyTargetN above is retained as the store-write fallback.
+const formRoleFrequencies = ref<Record<string, number>>({})
+
+// Held roles in display order (alphabetical, matches rosterStore.rolesSorted),
+// used to render one cadence row per checked role.
+const heldRolesSorted = computed(() =>
+  rosterStore.rolesSorted.filter((r) => formRoles.value.includes(r.id)),
+)
+
+// Keep formRoleFrequencies in sync with the roles checklist: a newly-checked
+// role gets a default N=4 entry (D-02), an unchecked role's entry is removed.
+// Guards against overwriting an entry already populated by onEditPerson.
+watch(formRoles, (newRoles, oldRoles) => {
+  const oldSet = new Set(oldRoles ?? [])
+  const newSet = new Set(newRoles)
+  for (const id of newRoles) {
+    if (!oldSet.has(id) && !(id in formRoleFrequencies.value)) {
+      formRoleFrequencies.value[id] = 4
+    }
+  }
+  for (const id of Object.keys(formRoleFrequencies.value)) {
+    if (!newSet.has(id)) {
+      delete formRoleFrequencies.value[id]
+    }
+  }
+}, { deep: true })
 
 function onAddVolunteer() {
   editingPersonId.value = null
@@ -426,6 +466,7 @@ function onAddVolunteer() {
   formPhone.value = ''
   formFrequencyN.value = 4
   formRoles.value = []
+  formRoleFrequencies.value = {}
   formOpen.value = true
 }
 
@@ -435,6 +476,14 @@ function onEditPerson(person: Person) {
   formEmail.value = person.email
   formPhone.value = person.phone
   formFrequencyN.value = person.frequencyTargetN
+  // D-03-at-read-time: a held role missing a roleFrequencies entry falls back
+  // to the person's retained frequencyTargetN, then to N=4 if that's absent too.
+  formRoleFrequencies.value = Object.fromEntries(
+    person.roles.map((roleId) => [
+      roleId,
+      person.roleFrequencies?.[roleId] ?? person.frequencyTargetN ?? 4,
+    ]),
+  )
   formRoles.value = [...person.roles]
   formOpen.value = true
 }
@@ -451,6 +500,7 @@ async function onSaveVolunteer() {
     phone: formPhone.value.trim(),
     roles: formRoles.value,
     frequencyTargetN: formFrequencyN.value,
+    roleFrequencies: formRoleFrequencies.value,
   }
   if (editingPersonId.value) {
     await rosterStore.updatePerson(editingPersonId.value, input)
