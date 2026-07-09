@@ -298,15 +298,18 @@ function hasRole(person: Person, roleId: string): boolean {
   return person.roles.includes(roleId)
 }
 
-// D-04: 'out'-tier people must never be offered as a manual gap-filling candidate,
+// D-04/D-05: 'out'-tier people must never be offered as a manual gap-filling candidate,
 // mirroring the auto-proposal exclusion (defaults 'regular' when absent — pre-Phase-14
-// data has no frequencyTier at all).
-function frequencyTierOf(personId: string): FrequencyTier {
-  return props.quarter.personQuarterData[personId]?.frequencyTier ?? 'regular'
+// data has no frequencyTier at all). Per-role (D-05): a person can be 'out' for one role
+// they hold while remaining 'regular' for another — reads roleTiers[roleId] first, then
+// falls back to the legacy per-person frequencyTier, mirroring scheduler.ts's tierOf.
+function tierOf(personId: string, roleId: string): FrequencyTier {
+  const pqd = props.quarter.personQuarterData[personId]
+  return pqd?.roleTiers?.[roleId] ?? pqd?.frequencyTier ?? 'regular'
 }
 
 // Available-unassigned for (date, roleId) = activePeople with roleId in roles,
-// NOT blacked out that date, NOT already in that cell, NOT 'out'-tier this quarter.
+// NOT blacked out that date, NOT already in that cell, NOT 'out'-tier for this role.
 function availableUnassigned(date: string, roleId: string): Person[] {
   const assigned = new Set(cellPeople(date, roleId))
   return rosterStore.activePeople.filter(
@@ -314,7 +317,7 @@ function availableUnassigned(date: string, roleId: string): Person[] {
       hasRole(p, roleId) &&
       !isBlackedOut(p.id, date) &&
       !assigned.has(p.id) &&
-      frequencyTierOf(p.id) !== 'out',
+      tierOf(p.id, roleId) !== 'out',
   )
 }
 

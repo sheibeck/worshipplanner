@@ -36,6 +36,18 @@ const mockActivePeople: Person[] = [
     createdAt: {} as never,
     updatedAt: {} as never,
   },
+  {
+    id: 'person-role-tier',
+    name: 'Perrole Petra',
+    email: 'petra@example.com',
+    phone: '',
+    active: true,
+    roles: ['role-guitar', 'role-drums'],
+    frequencyTargetN: 4,
+    pcPersonId: null,
+    createdAt: {} as never,
+    updatedAt: {} as never,
+  },
 ]
 
 vi.mock('@/stores/roster', () => ({
@@ -111,6 +123,42 @@ describe('QuarterGrid', () => {
     const text = wrapper.text()
     expect(text).toContain('Regular Rachel')
     expect(text).toContain('Outbound Otto')
+  })
+
+  it('excludes a person from a candidate list only for the role they are out for, per-role (D-05 gap closure)', async () => {
+    const DATE = '2026-07-05'
+    const roles: Role[] = [
+      { id: 'role-guitar', name: 'guitar', group: 'band', defaultCount: 1, order: 0 },
+      { id: 'role-drums', name: 'drums', group: 'band', defaultCount: 1, order: 1 },
+    ]
+    const quarter = makeQuarter({
+      serviceDates: [DATE],
+      personQuarterData: {
+        'person-role-tier': {
+          personId: 'person-role-tier',
+          blackoutDates: [],
+          pairedWith: [],
+          roleTiers: { 'role-guitar': 'out', 'role-drums': 'regular' },
+          note: '',
+        },
+      },
+    })
+    const wrapper = mount(QuarterGrid, {
+      props: { quarter, roles, lastProposeResult: null },
+    })
+
+    const guitarCell = wrapper.find('button[data-role-id="role-guitar"][data-date="2026-07-05"]')
+    const drumsCell = wrapper.find('button[data-role-id="role-drums"][data-date="2026-07-05"]')
+
+    // Expand role-guitar: Petra is 'out' for this role => excluded from candidates.
+    await guitarCell.trigger('click')
+    expect(wrapper.text()).not.toContain('Perrole Petra')
+
+    // Collapse guitar, expand role-drums: Petra is 'regular' for this role (per-role,
+    // not per-person) => still eligible here.
+    await guitarCell.trigger('click')
+    await drumsCell.trigger('click')
+    expect(wrapper.text()).toContain('Perrole Petra')
   })
 })
 

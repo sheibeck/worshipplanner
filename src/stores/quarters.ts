@@ -191,14 +191,28 @@ export const useQuartersStore = defineStore('quarters', () => {
       updatedAt: serverTimestamp(),
     }
     for (const partnerId of added) {
-      const partnerPaired = quarter.personQuarterData[partnerId]?.pairedWith ?? []
+      const existingPartnerData = quarter.personQuarterData[partnerId]
+      const partnerPaired = existingPartnerData?.pairedWith ?? []
       if (!partnerPaired.includes(personId)) {
-        updates[`personQuarterData.${partnerId}`] = {
-          personId: partnerId,
-          blackoutDates: quarter.personQuarterData[partnerId]?.blackoutDates ?? [],
-          pairedWith: [...partnerPaired, personId],
-          frequencyTier: quarter.personQuarterData[partnerId]?.frequencyTier ?? 'regular',
-          note: quarter.personQuarterData[partnerId]?.note ?? '',
+        if (existingPartnerData) {
+          // D-05 gap closure: partner already has an entry (possibly with tuned roleTiers) —
+          // write ONLY the scoped pairedWith sub-path so every other field, including
+          // roleTiers, is left untouched. A whole-object replace here would silently erase
+          // the partner's tuned per-role tiers (this is a Firestore field replacement, not
+          // a merge).
+          updates[`personQuarterData.${partnerId}.pairedWith`] = [...partnerPaired, personId]
+        } else {
+          // Brand-new partner — no prior entry exists, so there is nothing to preserve.
+          // Seed a complete, well-formed PersonQuarterData with defaults so downstream
+          // unguarded `.blackoutDates.includes(date)` reads (QuarterGrid.vue, scheduler.ts)
+          // never see a partial doc.
+          updates[`personQuarterData.${partnerId}`] = {
+            personId: partnerId,
+            blackoutDates: [],
+            pairedWith: [personId],
+            frequencyTier: 'regular',
+            note: '',
+          }
         }
       }
     }
