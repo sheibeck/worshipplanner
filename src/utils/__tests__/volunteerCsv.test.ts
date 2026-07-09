@@ -79,6 +79,32 @@ describe('parseVolunteerCsvRow', () => {
   })
 })
 
+describe('parseVolunteerCsvRow — no per-role CSV schema change (Pitfall 4, D-07 graceful degrade)', () => {
+  it('emits exactly one scalar frequencyTargetN per row, regardless of role count — no roleFrequencies/per-role structure', () => {
+    const result = parseVolunteerCsvRow({
+      Name: 'Multi Role Person',
+      Roles: 'guitar; vocals; bass',
+      Frequency: 'twice a month',
+      'Blackout Dates': '',
+      'Serve-With': '',
+    })
+    expect(typeof result.frequencyTargetN).toBe('number')
+    expect(result.frequencyTargetN).toBe(2)
+    expect(result.rolesRaw).toHaveLength(3)
+    expect(result).not.toHaveProperty('roleFrequencies')
+    // Exact key set — proves the parser's output shape is unchanged by Phase 15
+    // (the per-role application happens at the caller layer, not here).
+    expect(Object.keys(result)).toEqual([
+      'name',
+      'rolesRaw',
+      'frequencyTargetN',
+      'blackoutCellRaw',
+      'serveWithRaw',
+      'warnings',
+    ])
+  })
+})
+
 describe('frequencyLabelToN', () => {
   it('maps known friendly labels', () => {
     expect(frequencyLabelToN('weekly')).toBe(1)

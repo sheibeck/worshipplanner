@@ -50,28 +50,32 @@ function makePerson(overrides: Partial<{
   active: boolean
   roles: string[]
   frequencyTargetN: number
-  roleFrequencies: Record<string, number>
+  // Record<...> = force that exact map. `null` = force the field WHOLLY ABSENT
+  // (pre-migration doc shape, needed to exercise the D-03 patch-on-read guard).
+  // Omitted = defaults to an already-migrated map synthesized from roles x
+  // frequencyTargetN, so tests unrelated to migration don't trip the D-03 guard.
+  roleFrequencies: Record<string, number> | null
   pcPersonId: string | null
   createdAt: { seconds: number; nanoseconds: number }
   updatedAt: { seconds: number; nanoseconds: number }
 }> = {}) {
-  // roleFrequencies is conditionally spread (mirrors PersonQuarterData.frequencyTier's
-  // optional-field test convention) so tests can construct a doc with the field
-  // WHOLLY ABSENT — required to exercise the D-03 patch-on-read migration guard.
   const { roleFrequencies, ...rest } = overrides
+  const roles = rest.roles ?? ([] as string[])
+  const frequencyTargetN = rest.frequencyTargetN ?? 4
+  const defaultRoleFrequencies = Object.fromEntries(roles.map((r) => [r, frequencyTargetN]))
   return {
     id: 'person-1',
     name: 'Sarah Smith',
     email: 'sarah@example.com',
     phone: '',
     active: true,
-    roles: [] as string[],
-    frequencyTargetN: 4,
+    roles,
+    frequencyTargetN,
     pcPersonId: null,
     createdAt: { seconds: 1000000, nanoseconds: 0 },
     updatedAt: { seconds: 1000000, nanoseconds: 0 },
     ...rest,
-    ...(roleFrequencies !== undefined ? { roleFrequencies } : {}),
+    ...(roleFrequencies === null ? {} : { roleFrequencies: roleFrequencies ?? defaultRoleFrequencies }),
   }
 }
 
@@ -539,7 +543,7 @@ describe('useRosterStore', () => {
       store.subscribe('org-1')
 
       triggerPeopleSnapshot([
-        makePerson({ id: 'p1', roles: ['guitar', 'vocals'], frequencyTargetN: 2 }),
+        makePerson({ id: 'p1', roles: ['guitar', 'vocals'], frequencyTargetN: 2, roleFrequencies: null }),
       ])
 
       expect(updateDoc).toHaveBeenCalledOnce()
@@ -571,7 +575,7 @@ describe('useRosterStore', () => {
 
       triggerPeopleSnapshot([
         makePerson({ id: 'p1', roles: ['guitar'], frequencyTargetN: 2, roleFrequencies: { guitar: 1 } }),
-        makePerson({ id: 'p2', roles: ['bass'], frequencyTargetN: 3 }),
+        makePerson({ id: 'p2', roles: ['bass'], frequencyTargetN: 3, roleFrequencies: null }),
       ])
 
       expect(updateDoc).toHaveBeenCalledOnce()
@@ -585,7 +589,7 @@ describe('useRosterStore', () => {
       const store = useRosterStore()
       store.subscribe('org-1')
 
-      triggerPeopleSnapshot([makePerson({ id: 'p1', roles: [], frequencyTargetN: 4 })])
+      triggerPeopleSnapshot([makePerson({ id: 'p1', roles: [], frequencyTargetN: 4, roleFrequencies: null })])
 
       expect(updateDoc).toHaveBeenCalledOnce()
       const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
