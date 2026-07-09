@@ -107,3 +107,7 @@ Existing Phase 13/14 Firestore data now self-heals to the per-role/vocals shape 
 ---
 *Phase: 15-per-role-frequency-role-categories*
 *Completed: 2026-07-08*
+
+## Self-Check: PASSED
+
+All 3 modified/created files verified present on disk (src/stores/roster.ts, src/stores/__tests__/roster.test.ts, src/utils/__tests__/volunteerCsv.test.ts); all 4 commits (cd6d7b2, f0e5e7f, c243ee7, 0c1154c) verified present in git log.
