@@ -169,7 +169,16 @@ export const useQuartersStore = defineStore('quarters', () => {
   async function setPersonAvailability(
     quarterId: string,
     personId: string,
-    data: { blackoutDates: string[]; pairedWith: string[]; frequencyTier: FrequencyTier; note: string },
+    data: {
+      blackoutDates: string[]
+      pairedWith: string[]
+      frequencyTier: FrequencyTier
+      note: string
+      // D-05: per-role tier, keyed by roleId. Optional/back-compat — written wholesale within
+      // the already-scoped `personQuarterData.${personId}` dot-path below (T-15-04-01), never a
+      // whole-map rewrite, so other people's entries are never touched by this write.
+      roleTiers?: Record<string, FrequencyTier>
+    },
   ): Promise<void> {
     if (!orgId.value) return
     const quarter = getQuarter(quarterId)
