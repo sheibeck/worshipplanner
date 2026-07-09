@@ -96,3 +96,7 @@ None — pure internal TypeScript logic change, no external services, no new pac
 ---
 *Phase: 15-per-role-frequency-role-categories*
 *Completed: 2026-07-09*
+
+## Self-Check: PASSED
+
+Both modified files (`src/utils/scheduler.ts`, `src/utils/__tests__/scheduler.test.ts`) verified present on disk; all 3 commits (f043e15, 552c512, de97671) verified present in git log.
