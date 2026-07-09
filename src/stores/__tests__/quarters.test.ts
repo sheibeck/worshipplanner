@@ -535,6 +535,69 @@ describe('useQuartersStore', () => {
       const args = mockProposeQuarterSchedule.mock.calls[0]!
       expect(args[4]).toEqual(existingCalendar)
     })
+
+    it('passes a roleGroupOf built from rosterStore.roles as the final arg (D-12 wiring)', async () => {
+      const { useQuartersStore } = await import('../quarters')
+      const store = useQuartersStore()
+      store.subscribe('org-1')
+      triggerQuartersSnapshot([makeQuarterDoc()])
+      mockRosterState.activePeople = [makePerson({ id: 'person-a' })]
+      mockRosterState.roles = [
+        makeRole({ id: 'role-sound', name: 'sound', group: 'tech' }),
+        makeRole({ id: 'role-guitar', name: 'guitar', group: 'band' }),
+      ]
+      mockProposeQuarterSchedule.mockReturnValue({
+        calendar: {},
+        servedCounts: {},
+        unfilled: [],
+        pairingConflicts: [],
+      })
+
+      await store.generateProposal('quarter-1', 'regenerate')
+
+      const args = mockProposeQuarterSchedule.mock.calls[0]!
+      const roleGroupOf = args[5] as (roleId: string) => string
+      expect(typeof roleGroupOf).toBe('function')
+      expect(roleGroupOf('role-sound')).toBe('tech')
+      expect(roleGroupOf('role-guitar')).toBe('band')
+      expect(roleGroupOf('role-unknown')).toBe('other')
+    })
+
+    it('end-to-end: the real scheduler never double-assigns a TECH+BAND combo to the same person on one date (group rules engaged in production)', async () => {
+      const { useQuartersStore } = await import('../quarters')
+      const actualScheduler =
+        await vi.importActual<typeof import('@/utils/scheduler')>('@/utils/scheduler')
+      mockProposeQuarterSchedule.mockImplementation(actualScheduler.proposeQuarterSchedule)
+
+      const store = useQuartersStore()
+      store.subscribe('org-1')
+      triggerQuartersSnapshot([
+        makeQuarterDoc({ serviceDates: ['2026-07-05'], calendar: {}, personQuarterData: {} }),
+      ])
+      // A single person eligible for both a TECH role and a BAND role — without roleGroupOf
+      // wired in, the pre-15-04 scheduler would happily double-book them on the same date.
+      mockRosterState.activePeople = [
+        makePerson({ id: 'person-a', roles: ['role-sound', 'role-guitar'], frequencyTargetN: 1 }),
+      ]
+      mockRosterState.roles = [
+        makeRole({ id: 'role-sound', name: 'sound', group: 'tech', order: 0 }),
+        makeRole({ id: 'role-guitar', name: 'guitar', group: 'band', order: 1 }),
+      ]
+
+      const result = await store.generateProposal('quarter-1', 'regenerate')
+
+      const dayAssignments = result.calendar['2026-07-05'] ?? {}
+      const soundAssignees = dayAssignments['role-sound'] ?? []
+      const guitarAssignees = dayAssignments['role-guitar'] ?? []
+      // person-a can be in at most ONE of the two groups this date, never both.
+      const inBoth = soundAssignees.includes('person-a') && guitarAssignees.includes('person-a')
+      expect(inBoth).toBe(false)
+      // Confirm the TECH slot won the greedy pass (deterministic — processed first by role.order)
+      // and the BAND slot was left unfilled rather than illegally double-booking person-a.
+      expect(soundAssignees).toEqual(['person-a'])
+      expect(guitarAssignees).toEqual([])
+      expect(result.unfilled).toContainEqual({ date: '2026-07-05', roleId: 'role-guitar' })
+    })
   })
 
   describe('cell edits — assign/clear/swap (D-22)', () => {
