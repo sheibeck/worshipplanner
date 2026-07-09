@@ -272,7 +272,7 @@ Plans:
 **Goal:** Move serve frequency from one cadence per person to an independent cadence per (person, role) — someone can play Guitar weekly but sing Vocals monthly — and enforce same-service role compatibility by category. Role categories are TECH, BAND (instruments), VOCALS, and OTHER: TECH is exclusive (if you're on tech that service you do tech only), while BAND/VOCALS/OTHER combine freely, capped at one BAND instrument per person per service (so "1 instrument + vocals" is the canonical allowed combo). Replaces the scheduler's blanket one-slot-per-person/service check with a category exclusivity + cardinality check. Includes: adding a role `category` field with classification/migration of existing roles; migrating per-person `frequencyTargetN` to a per-role structure; reconciling Phase 14's per-person quarter `frequencyTier` (regular/fill-in/out) with per-role cadence; and updating the Edit Volunteer form's single frequency control to per-role. Full context and open questions captured in `.planning/todos/pending/per-role-frequency-and-vocal-instrument-pairing.md`.
 **Requirements**: D-01..D-12 (see 15-CONTEXT.md — no formal REQ-IDs; the 12 locked decisions are the requirement/traceability set)
 **Depends on:** Phase 14
-**Plans:** 1/6 plans executed
+**Plans:** 3/6 plans executed
 
 Plans:
 
@@ -282,8 +282,8 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 15-02-PLAN.md — Scheduler group co-occurrence + per-role cadence/tier (TDD): shared helper in eligible() AND propagatePairing(), roleGroupOf param (D-05/D-07/D-10/D-11/D-12)
-- [ ] 15-03-PLAN.md — Roster store patch-on-read migrations (D-03/D-09) + roleFrequencies persistence + CSV graceful degrade (TDD) (D-02/D-03/D-04/D-07/D-09)
+- [x] 15-02-PLAN.md — Scheduler group co-occurrence + per-role cadence/tier (TDD): shared helper in eligible() AND propagatePairing(), roleGroupOf param (D-05/D-07/D-10/D-11/D-12)
+- [x] 15-03-PLAN.md — Roster store patch-on-read migrations (D-03/D-09) + roleFrequencies persistence + CSV graceful degrade (TDD) (D-02/D-03/D-04/D-07/D-09)
 
 **Wave 3** *(blocked on Wave 2)*
 
