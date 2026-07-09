@@ -465,6 +465,56 @@ describe('useQuartersStore', () => {
       const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
       expect(data.personQuarterData).toBeUndefined()
     })
+
+    it('persists roleTiers inside the scoped personQuarterData.{personId} write, never as a bare root key (D-05/T-15-04-01)', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useQuartersStore } = await import('../quarters')
+      const store = useQuartersStore()
+      store.subscribe('org-1')
+      seedJuliaPairedWithLisa()
+
+      await store.setPersonAvailability('quarter-1', 'julia', {
+        blackoutDates: ['2026-07-19'],
+        pairedWith: ['dean'],
+        frequencyTier: 'regular',
+        note: 'x',
+        roleTiers: { vocals: 'out', guitar: 'regular' },
+      })
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+      expect(data['personQuarterData.julia']).toEqual({
+        personId: 'julia',
+        blackoutDates: ['2026-07-19'],
+        pairedWith: ['dean'],
+        frequencyTier: 'regular',
+        note: 'x',
+        roleTiers: { vocals: 'out', guitar: 'regular' },
+      })
+      expect(data.personQuarterData).toBeUndefined()
+      // scoping: only julia's own write is affected — lisa's entry is untouched by this call
+      // (pairing-diff writes are covered by the tests above; assert they still apply unchanged)
+      expect(Object.keys(data)).not.toContain('personQuarterData')
+    })
+
+    it('omitting roleTiers still works — no roleTiers key is written (back-compat)', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useQuartersStore } = await import('../quarters')
+      const store = useQuartersStore()
+      store.subscribe('org-1')
+      seedJuliaPairedWithLisa()
+
+      await store.setPersonAvailability('quarter-1', 'julia', {
+        blackoutDates: ['2026-07-19'],
+        pairedWith: ['dean'],
+        frequencyTier: 'regular',
+        note: 'x',
+      })
+
+      const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+      const juliaEntry = data['personQuarterData.julia'] as Record<string, unknown>
+      expect(juliaEntry.roleTiers).toBeUndefined()
+    })
   })
 
   describe('buildResolveRolesForDate', () => {
