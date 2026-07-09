@@ -515,6 +515,79 @@ describe('useQuartersStore', () => {
       const juliaEntry = data['personQuarterData.julia'] as Record<string, unknown>
       expect(juliaEntry.roleTiers).toBeUndefined()
     })
+
+    // D-05 gap closure (15-07): the reciprocal 'added' write must not silently erase an
+    // already-tuned partner's roleTiers by reconstructing their whole PersonQuarterData.
+    function seedJuliaAndDeanWithRoleTiers() {
+      triggerQuartersSnapshot([
+        makeQuarterDoc({
+          personQuarterData: {
+            julia: {
+              personId: 'julia',
+              blackoutDates: [],
+              pairedWith: [],
+              frequencyTier: 'regular',
+              note: '',
+            },
+            dean: {
+              personId: 'dean',
+              blackoutDates: ['2026-07-12'],
+              pairedWith: [],
+              frequencyTier: 'regular',
+              roleTiers: { 'role-guitar': 'out' },
+              note: 'dean note',
+            },
+          },
+        }),
+      ])
+    }
+
+    it('existing-entry reciprocal write uses a scoped pairedWith-only sub-path, preserving the partners tuned roleTiers (D-05 gap closure)', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useQuartersStore } = await import('../quarters')
+      const store = useQuartersStore()
+      store.subscribe('org-1')
+      seedJuliaAndDeanWithRoleTiers()
+
+      await store.setPersonAvailability('quarter-1', 'julia', {
+        blackoutDates: [],
+        pairedWith: ['dean'],
+        frequencyTier: 'regular',
+        note: '',
+      })
+
+      const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+      // Scoped sub-path only — a whole-object replace here would silently drop dean's roleTiers.
+      expect(data['personQuarterData.dean.pairedWith']).toEqual(['julia'])
+      expect(data['personQuarterData.dean']).toBeUndefined()
+    })
+
+    it('brand-new-partner reciprocal write seeds a complete PersonQuarterData entry with blackoutDates initialized, not a pairedWith-only partial (D-05 gap closure)', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useQuartersStore } = await import('../quarters')
+      const store = useQuartersStore()
+      store.subscribe('org-1')
+      seedJuliaPairedWithLisa() // dean is absent from personQuarterData entirely
+
+      await store.setPersonAvailability('quarter-1', 'julia', {
+        blackoutDates: ['2026-07-19'],
+        pairedWith: ['dean'],
+        frequencyTier: 'regular',
+        note: 'x',
+      })
+
+      const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+      expect(data['personQuarterData.dean']).toEqual({
+        personId: 'dean',
+        blackoutDates: [],
+        pairedWith: ['julia'],
+        frequencyTier: 'regular',
+        note: '',
+      })
+      // Must not be a partial pairedWith-only sub-path write — that would leave
+      // blackoutDates undefined and crash downstream unguarded .blackoutDates.includes() reads.
+      expect(data['personQuarterData.dean.pairedWith']).toBeUndefined()
+    })
   })
 
   describe('buildResolveRolesForDate', () => {
