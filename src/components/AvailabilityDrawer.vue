@@ -50,26 +50,37 @@
         <!-- Scrollable body -->
         <div class="flex-1 overflow-y-auto px-6 py-5 space-y-6">
 
-          <!-- Serve frequency -->
+          <!-- Serve frequency (per-role quarter tier, D-05/D-06) -->
           <section>
             <h3 class="text-xs font-bold uppercase tracking-wide text-gray-500 mb-2">
-              Serve frequency <span class="font-normal normal-case text-gray-600">how often they want to serve</span>
+              Serve frequency <span class="font-normal normal-case text-gray-600">quarter tier — one control per role held</span>
             </h3>
-            <div class="flex flex-wrap gap-2">
-              <button
-                v-for="preset in FREQ_PRESETS"
-                :key="preset.key"
-                type="button"
-                data-role="freq-preset"
-                :data-preset="preset.key"
-                :data-active="activePresetKey === preset.key"
-                class="px-3 py-1.5 rounded-md text-xs font-medium border transition-colors"
-                :class="presetButtonClass(preset.key)"
-                @click="selectPreset(preset.key)"
-              >
-                {{ preset.label }}
-              </button>
+            <div
+              v-for="role in heldRoles"
+              :key="role.id"
+              class="mb-3 last:mb-0"
+            >
+              <p class="text-xs font-semibold text-gray-300 mb-1.5">{{ role.name }}</p>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  v-for="preset in FREQ_PRESETS"
+                  :key="preset.key"
+                  type="button"
+                  data-role="freq-preset"
+                  :data-role-id="role.id"
+                  :data-preset="preset.key"
+                  :data-active="activeRoleTierPresetKey(role.id) === preset.key"
+                  class="px-3 py-1.5 rounded-md text-xs font-medium border transition-colors"
+                  :class="presetButtonClassFor(role.id, preset.key)"
+                  @click="selectRoleTierPreset(role.id, preset.key)"
+                >
+                  {{ preset.label }}
+                </button>
+              </div>
             </div>
+            <p v-if="heldRoles.length === 0" class="text-xs text-gray-600 mb-2">
+              No roles assigned yet — add roles in the roster to set a per-role quarter tier.
+            </p>
             <p class="text-xs text-gray-400 mt-2.5 flex items-center gap-3 flex-wrap">
               <span>{{ freqReadout }}</span>
               <span v-if="draft.frequencyTier === 'regular'" class="flex items-center gap-1.5 text-gray-500">
@@ -249,7 +260,7 @@
 import { reactive, ref, computed, watch } from 'vue'
 import { useQuartersStore } from '@/stores/quarters'
 import { useRosterStore } from '@/stores/roster'
-import type { FrequencyTier } from '@/types/roster'
+import type { FrequencyTier, Role } from '@/types/roster'
 
 const props = defineProps<{
   quarterId: string | null
@@ -293,6 +304,8 @@ const draft = reactive({
   blackoutDates: [] as string[],
   pairedWith: [] as string[],
   frequencyTier: 'regular' as FrequencyTier,
+  // Per-role quarter tier (D-05/D-06) — one tier per currently-held role.
+  roleTiers: {} as Record<string, FrequencyTier>,
   note: '',
 })
 
@@ -310,6 +323,17 @@ const quarter = computed(() => {
 })
 
 const serviceDates = computed<string[]>(() => quarter.value?.serviceDates ?? [])
+
+// Held roles (D-06) — the currently-open person's Role objects, resolved from
+// their standing roles[] (roleIds) against the roster's role list. Drives one
+// per-role tier control row.
+const heldRoles = computed<Role[]>(() => {
+  const person = rosterStore.people.find((p) => p.id === props.personId)
+  if (!person) return []
+  return person.roles
+    .map((id) => rosterStore.roles.find((r) => r.id === id))
+    .filter((r): r is Role => r !== undefined)
+})
 
 // Declared ahead of loadDraft/the immediate watcher below (which runs synchronously
 // during setup) so they're initialized before first use — refs declared later in this
@@ -331,6 +355,13 @@ function loadDraft(personId: string) {
   draft.frequencyTier = pqd?.frequencyTier ?? 'regular'
   draft.note = pqd?.note ?? ''
 
+  // Per-role quarter tier (D-05/D-06) — one tier per currently-held role, falling
+  // back to the legacy person-level frequencyTier, then to 'regular'.
+  draft.roleTiers = {}
+  for (const roleId of person?.roles ?? []) {
+    draft.roleTiers[roleId] = pqd?.roleTiers?.[roleId] ?? pqd?.frequencyTier ?? 'regular'
+  }
+
   loadedFrequencyTargetN.value = draft.frequencyTargetN
   pairQuery.value = ''
   pairMenuOpen.value = false
@@ -346,25 +377,27 @@ watch(
   { immediate: true },
 )
 
-// ── Serve frequency ──────────────────────────────────────────────────────────
-function presetButtonClass(key: FreqPresetKey): string {
-  return activePresetKey.value === key ? PRESET_ON_CLASS[key] : PRESET_OFF_CLASS
+// ── Serve frequency (per-role quarter tier, D-05/D-06) ──────────────────────
+// roleTiers only stores the tier (regular/fillin/out), not a cadence N —
+// per-role cadence (weekly/biweek/monthly N) is standing data, already
+// editable per-role in RosterView.vue's Edit Volunteer form (15-05). So for
+// the 'regular' tier, all three (weekly/biweek/monthly) preset buttons map to
+// the same roleTiers[roleId] = 'regular' value; 'weekly' is shown active as
+// the tier's default representative.
+function activeRoleTierPresetKey(roleId: string): FreqPresetKey {
+  const tier = draft.roleTiers[roleId] ?? 'regular'
+  if (tier === 'fillin') return 'fillin'
+  if (tier === 'out') return 'out'
+  return 'weekly'
 }
 
-const activePresetKey = computed<FreqPresetKey>(() => {
-  if (draft.frequencyTier === 'fillin') return 'fillin'
-  if (draft.frequencyTier === 'out') return 'out'
-  if (draft.frequencyTargetN <= 1) return 'weekly'
-  if (draft.frequencyTargetN <= 2) return 'biweek'
-  return 'monthly'
-})
+function presetButtonClassFor(roleId: string, key: FreqPresetKey): string {
+  return activeRoleTierPresetKey(roleId) === key ? PRESET_ON_CLASS[key] : PRESET_OFF_CLASS
+}
 
-function selectPreset(key: FreqPresetKey) {
+function selectRoleTierPreset(roleId: string, key: FreqPresetKey) {
   const preset = FREQ_PRESETS.find((p) => p.key === key)!
-  draft.frequencyTier = preset.tier
-  if (preset.tier === 'regular') {
-    draft.frequencyTargetN = preset.n
-  }
+  draft.roleTiers[roleId] = preset.tier
 }
 
 function onFrequencyNChange() {
@@ -497,6 +530,7 @@ async function onSave() {
     blackoutDates: draft.blackoutDates,
     pairedWith: draft.pairedWith,
     frequencyTier: draft.frequencyTier,
+    roleTiers: draft.roleTiers,
     note: draft.note,
   })
 
