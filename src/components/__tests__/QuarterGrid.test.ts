@@ -113,3 +113,87 @@ describe('QuarterGrid', () => {
     expect(text).toContain('Outbound Otto')
   })
 })
+
+describe('QuarterGrid — live group co-occurrence warning (D-11)', () => {
+  const DATE = '2026-07-05'
+
+  function makeRolesFull(): Role[] {
+    return [
+      { id: 'role-guitar', name: 'guitar', group: 'band', defaultCount: 1, order: 0 },
+      { id: 'role-bass', name: 'bass', group: 'band', defaultCount: 1, order: 1 },
+      { id: 'role-vocals', name: 'vocals', group: 'vocals', defaultCount: 1, order: 2 },
+      { id: 'role-sound', name: 'sound', group: 'tech', defaultCount: 1, order: 3 },
+    ]
+  }
+
+  function cellFor(wrapper: ReturnType<typeof mount>, roleId: string) {
+    return wrapper.find(`button[data-role-id="${roleId}"][data-date="${DATE}"]`)
+  }
+
+  it('shows a Group conflict warning on both cells when the same person holds a TECH role and a BAND role the same date, and does not remove either assignment', () => {
+    const quarter = makeQuarter({
+      serviceDates: [DATE],
+      calendar: {
+        [DATE]: {
+          'role-guitar': ['person-regular'],
+          'role-sound': ['person-regular'],
+        },
+      },
+    })
+    const wrapper = mount(QuarterGrid, {
+      props: { quarter, roles: makeRolesFull(), lastProposeResult: null },
+    })
+
+    const guitarCell = cellFor(wrapper, 'role-guitar')
+    const soundCell = cellFor(wrapper, 'role-sound')
+
+    expect(guitarCell.text()).toContain('Group conflict')
+    expect(soundCell.text()).toContain('Group conflict')
+
+    // The warning never blocks the edit — the assignment stays present in both cells.
+    expect(guitarCell.text()).toContain('Regular Rachel')
+    expect(soundCell.text()).toContain('Regular Rachel')
+  })
+
+  it('shows a Group conflict warning on both cells when a person holds 2 BAND roles the same date', () => {
+    const quarter = makeQuarter({
+      serviceDates: [DATE],
+      calendar: {
+        [DATE]: {
+          'role-guitar': ['person-regular'],
+          'role-bass': ['person-regular'],
+        },
+      },
+    })
+    const wrapper = mount(QuarterGrid, {
+      props: { quarter, roles: makeRolesFull(), lastProposeResult: null },
+    })
+
+    const guitarCell = cellFor(wrapper, 'role-guitar')
+    const bassCell = cellFor(wrapper, 'role-bass')
+
+    expect(guitarCell.text()).toContain('Group conflict')
+    expect(bassCell.text()).toContain('Group conflict')
+  })
+
+  it('shows NO Group conflict warning for the legal 1 BAND + 1 VOCALS combo', () => {
+    const quarter = makeQuarter({
+      serviceDates: [DATE],
+      calendar: {
+        [DATE]: {
+          'role-guitar': ['person-regular'],
+          'role-vocals': ['person-regular'],
+        },
+      },
+    })
+    const wrapper = mount(QuarterGrid, {
+      props: { quarter, roles: makeRolesFull(), lastProposeResult: null },
+    })
+
+    const guitarCell = cellFor(wrapper, 'role-guitar')
+    const vocalsCell = cellFor(wrapper, 'role-vocals')
+
+    expect(guitarCell.text()).not.toContain('Group conflict')
+    expect(vocalsCell.text()).not.toContain('Group conflict')
+  })
+})

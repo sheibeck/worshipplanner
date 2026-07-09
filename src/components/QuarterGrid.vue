@@ -29,6 +29,9 @@
             <td v-for="role in sortedRoles" :key="role.id" class="px-2 py-2 align-top">
               <button
                 type="button"
+                data-role="grid-cell"
+                :data-role-id="role.id"
+                :data-date="date"
                 class="w-full text-left rounded-md p-1 transition-colors hover:bg-gray-800/60"
                 :class="cellIsUnfilled(date, role.id) ? 'border border-dashed border-gray-700' : ''"
                 :aria-expanded="isExpanded(date, role.id)"
@@ -62,6 +65,12 @@
                     class="text-xs px-2 py-0.5 rounded-full bg-amber-900/40 border border-amber-700/50 text-amber-300"
                   >
                     Pairing conflict
+                  </span>
+                  <span
+                    v-if="cellHasGroupViolation(date, role.id)"
+                    class="text-xs px-2 py-0.5 rounded-full bg-orange-900/40 border border-orange-700/50 text-orange-300"
+                  >
+                    Group conflict
                   </span>
                 </div>
               </button>
@@ -183,6 +192,7 @@
 import { ref, computed } from 'vue'
 import { useQuartersStore } from '@/stores/quarters'
 import { useRosterStore } from '@/stores/roster'
+import { evaluateGroupCombo } from '@/utils/scheduler'
 import type { Quarter, Role, RoleGroup, ProposeResult, Person, FrequencyTier } from '@/types/roster'
 
 const props = defineProps<{
@@ -239,6 +249,35 @@ function cellHasConflict(date: string, roleId: string): boolean {
   if (conflicts.length === 0) return false
   const assigned = cellPeople(date, roleId)
   return assigned.some((id) => conflicts.some((c) => c.personId === id || c.partnerId === id))
+}
+
+// ── Group co-occurrence warning (D-11, warn-don't-block) ────────────────────────
+// Map-backed lookup (not a repeated .find), consistent with cellIsUnfilled/
+// cellHasConflict's O(roles) per-cell cost — no new perf class (T-15-06-03).
+const roleGroupById = computed(() => {
+  const m = new Map<string, RoleGroup>()
+  for (const r of props.roles) m.set(r.id, r.group)
+  return m
+})
+
+function roleGroupOf(roleId: string): RoleGroup {
+  return roleGroupById.value.get(roleId) ?? 'other'
+}
+
+// Live-computed from props.quarter.calendar + props.roles (NOT props.lastProposeResult) —
+// works for a loaded historical calendar, not only immediately after a fresh propose.
+// Reuses the same exported evaluateGroupCombo helper the scheduler uses (T-15-06-02):
+// one rule source, no drift between auto-propose enforcement and this advisory badge.
+function cellHasGroupViolation(date: string, roleId: string): boolean {
+  const peopleInCell = cellPeople(date, roleId)
+  if (peopleInCell.length === 0) return false
+  const calendarForDate = props.quarter.calendar[date] ?? {}
+  return peopleInCell.some((personId) => {
+    const roleIdsThisDate = Object.entries(calendarForDate)
+      .filter(([, ids]) => ids.includes(personId))
+      .map(([rId]) => rId)
+    return !evaluateGroupCombo(roleIdsThisDate, roleGroupOf).ok
+  })
 }
 
 function personName(id: string): string {
