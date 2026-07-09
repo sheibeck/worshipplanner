@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { proposeQuarterSchedule } from '@/utils/scheduler'
-import type { Person, RoleSlotConfig, PersonQuarterData, QuarterCalendar } from '@/types/roster'
+import type { Person, RoleSlotConfig, PersonQuarterData, QuarterCalendar, RoleGroup } from '@/types/roster'
 
 // Factory helper for Person
 function makePerson(overrides: Partial<Person> & { id: string }): Person {
@@ -12,6 +12,7 @@ function makePerson(overrides: Partial<Person> & { id: string }): Person {
     active: overrides.active ?? true,
     roles: overrides.roles ?? [],
     frequencyTargetN: overrides.frequencyTargetN ?? 1,
+    ...(overrides.roleFrequencies !== undefined ? { roleFrequencies: overrides.roleFrequencies } : {}),
     pcPersonId: overrides.pcPersonId ?? null,
     createdAt: overrides.createdAt ?? ({} as any),
     updatedAt: overrides.updatedAt ?? ({} as any),
@@ -25,6 +26,7 @@ function makePQD(overrides: Partial<PersonQuarterData> & { personId: string }): 
     blackoutDates: overrides.blackoutDates ?? [],
     pairedWith: overrides.pairedWith ?? [],
     ...(overrides.frequencyTier !== undefined ? { frequencyTier: overrides.frequencyTier } : {}),
+    ...(overrides.roleTiers !== undefined ? { roleTiers: overrides.roleTiers } : {}),
     ...(overrides.note !== undefined ? { note: overrides.note } : {}),
   }
 }
@@ -32,6 +34,12 @@ function makePQD(overrides: Partial<PersonQuarterData> & { personId: string }): 
 // Simple static role resolver (no per-date overrides) unless a map is passed
 function makeResolver(defaultRoles: RoleSlotConfig[], overrides?: Record<string, RoleSlotConfig[]>) {
   return (date: string): RoleSlotConfig[] => overrides?.[date] ?? defaultRoles
+}
+
+// roleId -> RoleGroup lookup helper, mirroring makeResolver's shape. Unknown roleIds default to
+// 'other' (safe default per D-10 implementation notes), matching proposeQuarterSchedule's own default.
+function makeRoleGroupOf(map: Record<string, RoleGroup>) {
+  return (roleId: string): RoleGroup => map[roleId] ?? 'other'
 }
 
 describe('proposeQuarterSchedule', () => {
@@ -312,5 +320,176 @@ describe('proposeQuarterSchedule', () => {
     expect(result.servedCounts['p1']).toBeGreaterThanOrEqual(1)
     // second date's empty slot gets filled by the algorithm (p2 has higher deficit, since p1 already served)
     expect(result.calendar['2026-01-11']?.['guitar']).toContain('p2')
+  })
+
+  // --- D-10/D-12 group co-occurrence enforcement + D-05 per-role cadence/tier (Phase 15) ---
+
+  it('group TECH exclusivity: a person already on a TECH role that date is ineligible for a same-date BAND role (D-10)', () => {
+    const people = [makePerson({ id: 'p1', roles: ['sound', 'guitar'], frequencyTargetN: 1 })]
+    const dates = ['2026-01-04']
+    const resolver = makeResolver([
+      { roleId: 'sound', count: 1 },
+      { roleId: 'guitar', count: 1 },
+    ])
+    const roleGroupOf = makeRoleGroupOf({ sound: 'tech', guitar: 'band' })
+
+    const result = proposeQuarterSchedule(people, dates, resolver, [], undefined, roleGroupOf)
+
+    expect(result.calendar['2026-01-04']?.['sound']).toEqual(['p1'])
+    expect(result.calendar['2026-01-04']?.['guitar'] ?? []).not.toContain('p1')
+    expect(result.unfilled).toContainEqual({ date: '2026-01-04', roleId: 'guitar' })
+  })
+
+  it('group TECH exclusivity (vice versa): a person already on a BAND role that date is ineligible for a same-date TECH role (D-10)', () => {
+    const people = [makePerson({ id: 'p1', roles: ['guitar', 'sound'], frequencyTargetN: 1 })]
+    const dates = ['2026-01-04']
+    const resolver = makeResolver([
+      { roleId: 'guitar', count: 1 },
+      { roleId: 'sound', count: 1 },
+    ])
+    const roleGroupOf = makeRoleGroupOf({ guitar: 'band', sound: 'tech' })
+
+    const result = proposeQuarterSchedule(people, dates, resolver, [], undefined, roleGroupOf)
+
+    expect(result.calendar['2026-01-04']?.['guitar']).toEqual(['p1'])
+    expect(result.calendar['2026-01-04']?.['sound'] ?? []).not.toContain('p1')
+    expect(result.unfilled).toContainEqual({ date: '2026-01-04', roleId: 'sound' })
+  })
+
+  it('group cardinality: a person already holding one BAND role that date is not given a second BAND role (D-10)', () => {
+    const people = [makePerson({ id: 'p1', roles: ['guitar', 'bass'], frequencyTargetN: 1 })]
+    const dates = ['2026-01-04']
+    const resolver = makeResolver([
+      { roleId: 'guitar', count: 1 },
+      { roleId: 'bass', count: 1 },
+    ])
+    const roleGroupOf = makeRoleGroupOf({ guitar: 'band', bass: 'band' })
+
+    const result = proposeQuarterSchedule(people, dates, resolver, [], undefined, roleGroupOf)
+
+    expect(result.calendar['2026-01-04']?.['guitar']).toEqual(['p1'])
+    expect(result.calendar['2026-01-04']?.['bass'] ?? []).not.toContain('p1')
+    expect(result.unfilled).toContainEqual({ date: '2026-01-04', roleId: 'bass' })
+  })
+
+  it('group cardinality: a person already holding one VOCALS role that date is not given a second VOCALS role (D-10)', () => {
+    const people = [makePerson({ id: 'p1', roles: ['vocals1', 'vocals2'], frequencyTargetN: 1 })]
+    const dates = ['2026-01-04']
+    const resolver = makeResolver([
+      { roleId: 'vocals1', count: 1 },
+      { roleId: 'vocals2', count: 1 },
+    ])
+    const roleGroupOf = makeRoleGroupOf({ vocals1: 'vocals', vocals2: 'vocals' })
+
+    const result = proposeQuarterSchedule(people, dates, resolver, [], undefined, roleGroupOf)
+
+    expect(result.calendar['2026-01-04']?.['vocals1']).toEqual(['p1'])
+    expect(result.calendar['2026-01-04']?.['vocals2'] ?? []).not.toContain('p1')
+    expect(result.unfilled).toContainEqual({ date: '2026-01-04', roleId: 'vocals2' })
+  })
+
+  it('group cardinality: OTHER group is uncapped — a person can hold two OTHER roles the same date (D-10)', () => {
+    const people = [makePerson({ id: 'p1', roles: ['other1', 'other2'], frequencyTargetN: 1 })]
+    const dates = ['2026-01-04']
+    const resolver = makeResolver([
+      { roleId: 'other1', count: 1 },
+      { roleId: 'other2', count: 1 },
+    ])
+    const roleGroupOf = makeRoleGroupOf({ other1: 'other', other2: 'other' })
+
+    const result = proposeQuarterSchedule(people, dates, resolver, [], undefined, roleGroupOf)
+
+    expect(result.calendar['2026-01-04']?.['other1']).toEqual(['p1'])
+    expect(result.calendar['2026-01-04']?.['other2']).toEqual(['p1'])
+  })
+
+  it('group allowed combo: 1 BAND + 1 VOCALS for the same person on one date IS produced when that is the fair assignment (D-10)', () => {
+    const people = [makePerson({ id: 'p1', roles: ['guitar', 'vocals'], frequencyTargetN: 1 })]
+    const dates = ['2026-01-04']
+    const resolver = makeResolver([
+      { roleId: 'guitar', count: 1 },
+      { roleId: 'vocals', count: 1 },
+    ])
+    const roleGroupOf = makeRoleGroupOf({ guitar: 'band', vocals: 'vocals' })
+
+    const result = proposeQuarterSchedule(people, dates, resolver, [], undefined, roleGroupOf)
+
+    expect(result.calendar['2026-01-04']?.['guitar']).toEqual(['p1'])
+    expect(result.calendar['2026-01-04']?.['vocals']).toEqual(['p1'])
+  })
+
+  it('propagatePairing group case (Pitfall 2, D-12): a partner pulled in via pairing to a TECH role is correctly excluded from a later conflicting BAND role, never producing an illegal combo', () => {
+    // 'a' has no group-conflicting roles; 'b' is paired with 'a' and has roles spanning
+    // both TECH ('sound') and BAND ('guitar'). Processing order: other_role (fills 'a' directly,
+    // which propagates the pairing and pulls 'b' into 'sound'), then 'sound' (already filled by
+    // the pairing propagation), then 'guitar' (the ONLY remaining candidate is 'b', who must now
+    // be excluded because 'b' already holds a TECH role this date via propagatePairing).
+    const people = [
+      makePerson({ id: 'a', roles: ['other_role'], frequencyTargetN: 1 }),
+      makePerson({ id: 'b', roles: ['sound', 'guitar'], frequencyTargetN: 1 }),
+    ]
+    const dates = ['2026-01-04']
+    const resolver = makeResolver([
+      { roleId: 'other_role', count: 1 },
+      { roleId: 'sound', count: 1 },
+      { roleId: 'guitar', count: 1 },
+    ])
+    const pqd = [
+      makePQD({ personId: 'a', pairedWith: ['b'] }),
+      makePQD({ personId: 'b', pairedWith: ['a'] }),
+    ]
+    const roleGroupOf = makeRoleGroupOf({ other_role: 'other', sound: 'tech', guitar: 'band' })
+
+    const result = proposeQuarterSchedule(people, dates, resolver, pqd, undefined, roleGroupOf)
+
+    expect(result.calendar['2026-01-04']?.['other_role']).toEqual(['a'])
+    // 'b' was pulled into 'sound' (TECH) via propagatePairing.
+    expect(result.calendar['2026-01-04']?.['sound']).toEqual(['b'])
+    // 'b' must NEVER also appear in 'guitar' (BAND) — that would be an illegal TECH+BAND combo.
+    expect(result.calendar['2026-01-04']?.['guitar'] ?? []).not.toContain('b')
+    expect(result.unfilled).toContainEqual({ date: '2026-01-04', roleId: 'guitar' })
+  })
+
+  it('per-role cadence: deficit is scored against each role\'s own N, not a blended per-person total (D-05)', () => {
+    // p1 has an equally-weekly need for BOTH guitar and vocals (N=1 each). p4 only needs vocals
+    // monthly (N=4). On the very first date, p1's guitar assignment (processed first in
+    // rolesForDate order) must NOT inflate p1's vocals deficit via a shared/blended served
+    // counter — if it did, p1's vocals deficit would incorrectly drop to 0 and p4 (0.25) would
+    // wrongly win vocals despite p1's genuinely higher (tied, weekly) need.
+    const people = [
+      makePerson({ id: 'p1', name: 'Amy', roles: ['guitar', 'vocals'], roleFrequencies: { guitar: 1, vocals: 1 } }),
+      makePerson({ id: 'p4', name: 'Zoe', roles: ['vocals'], frequencyTargetN: 4 }),
+    ]
+    const dates = ['2026-01-04']
+    const resolver = makeResolver([
+      { roleId: 'guitar', count: 1 },
+      { roleId: 'vocals', count: 1 },
+    ])
+    const roleGroupOf = makeRoleGroupOf({ guitar: 'band', vocals: 'vocals' })
+
+    const result = proposeQuarterSchedule(people, dates, resolver, [], undefined, roleGroupOf)
+
+    expect(result.calendar['2026-01-04']?.['guitar']).toEqual(['p1'])
+    // Per-role tracking: p1's vocals-specific served count is still 0 going into the vocals
+    // scoring pass (guitar's serve doesn't leak into vocals' deficit) — p1 (deficit 1) beats p4
+    // (deficit 0.25) fairly.
+    expect(result.calendar['2026-01-04']?.['vocals']).toEqual(['p1'])
+  })
+
+  it('per-role tier: a person \'out\' for one role but \'regular\' for another is excluded only from the \'out\' role (D-05)', () => {
+    const people = [makePerson({ id: 'p1', roles: ['guitar', 'vocals'], frequencyTargetN: 1 })]
+    const dates = ['2026-01-04']
+    const resolver = makeResolver([
+      { roleId: 'guitar', count: 1 },
+      { roleId: 'vocals', count: 1 },
+    ])
+    const pqd = [makePQD({ personId: 'p1', roleTiers: { guitar: 'out', vocals: 'regular' } })]
+    const roleGroupOf = makeRoleGroupOf({ guitar: 'band', vocals: 'vocals' })
+
+    const result = proposeQuarterSchedule(people, dates, resolver, pqd, undefined, roleGroupOf)
+
+    expect(result.calendar['2026-01-04']?.['guitar'] ?? []).not.toContain('p1')
+    expect(result.unfilled).toContainEqual({ date: '2026-01-04', roleId: 'guitar' })
+    expect(result.calendar['2026-01-04']?.['vocals']).toEqual(['p1'])
   })
 })
