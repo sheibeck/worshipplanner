@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import AvailabilityDrawer from '../AvailabilityDrawer.vue'
-import type { Person, Quarter } from '@/types/roster'
+import type { Person, Quarter, Role } from '@/types/roster'
 
 // Q3 2026 Sundays (13 total) — same demo data as the sketch (.planning/sketches/001-availability-editor).
 const SERVICE_DATES = [
@@ -9,6 +9,8 @@ const SERVICE_DATES = [
   '2026-08-02', '2026-08-09', '2026-08-16', '2026-08-23', '2026-08-30',
   '2026-09-06', '2026-09-13', '2026-09-20', '2026-09-27',
 ]
+
+const FREQ_PRESET_COUNT = 5 // weekly, biweek, monthly, fillin, out
 
 const mockSetPersonAvailability = vi.fn(() => Promise.resolve())
 const mockUpdatePerson = vi.fn(() => Promise.resolve())
@@ -27,6 +29,7 @@ function makeQuarter(overrides: Partial<Quarter> = {}): Quarter {
         blackoutDates: ['2026-07-19'],
         pairedWith: ['dean'],
         frequencyTier: 'fillin',
+        roleTiers: { sound: 'out' },
         note: 'x',
       },
     },
@@ -51,6 +54,8 @@ vi.mock('@/stores/quarters', () => ({
   }),
 }))
 
+// person-1 holds two roles (one TECH, one VOCALS) so per-role tier controls (D-06)
+// have something real to render for.
 const mockPeople: Person[] = [
   {
     id: 'person-1',
@@ -58,7 +63,7 @@ const mockPeople: Person[] = [
     email: 'test@example.com',
     phone: '',
     active: true,
-    roles: [],
+    roles: ['sound', 'vocals'],
     frequencyTargetN: 4,
     pcPersonId: null,
     createdAt: {} as never,
@@ -78,9 +83,15 @@ const mockPeople: Person[] = [
   },
 ]
 
+const mockRoles: Role[] = [
+  { id: 'sound', name: 'Sound', group: 'tech', defaultCount: 1, order: 0 },
+  { id: 'vocals', name: 'Vocals', group: 'vocals', defaultCount: 1, order: 1 },
+]
+
 vi.mock('@/stores/roster', () => ({
   useRosterStore: () => ({
     people: mockPeople,
+    roles: mockRoles,
     updatePerson: mockUpdatePerson,
   }),
 }))
@@ -97,17 +108,34 @@ describe('AvailabilityDrawer', () => {
     })
   }
 
-  it('pre-populates frequency, calendar, pairing chips, and note from existing PersonQuarterData', () => {
+  it('renders one tier control (preset row) per held role, populated from roleTiers with legacy frequencyTier fallback (D-05/D-06)', () => {
     mockQuarter = makeQuarter()
     mockSetPersonAvailability.mockClear()
     mockUpdatePerson.mockClear()
 
     const wrapper = mountDrawer()
 
-    // Fill-in preset active
-    const fillinButton = wrapper.find('button[data-preset="fillin"]')
-    expect(fillinButton.exists()).toBe(true)
-    expect(fillinButton.attributes('data-active')).toBe('true')
+    const soundButtons = wrapper.findAll('button[data-role-id="sound"]')
+    const vocalsButtons = wrapper.findAll('button[data-role-id="vocals"]')
+    expect(soundButtons.length).toBe(FREQ_PRESET_COUNT)
+    expect(vocalsButtons.length).toBe(FREQ_PRESET_COUNT)
+
+    // Sound has an explicit roleTiers entry: 'out'.
+    const soundOut = soundButtons.find((b) => b.attributes('data-preset') === 'out')!
+    expect(soundOut.attributes('data-active')).toBe('true')
+
+    // Vocals has no roleTiers entry — falls back to the legacy person-level
+    // frequencyTier ('fillin') per D-05.
+    const vocalsFillin = vocalsButtons.find((b) => b.attributes('data-preset') === 'fillin')!
+    expect(vocalsFillin.attributes('data-active')).toBe('true')
+  })
+
+  it('pre-populates blackout calendar, pairing chips, and quarter note from existing PersonQuarterData (D-07 unchanged)', () => {
+    mockQuarter = makeQuarter()
+    mockSetPersonAvailability.mockClear()
+    mockUpdatePerson.mockClear()
+
+    const wrapper = mountDrawer()
 
     // Blacked-out Sunday rendered marked off
     const blockedCell = wrapper.find('button[data-date="2026-07-19"]')
@@ -149,12 +177,22 @@ describe('AvailabilityDrawer', () => {
     expect(blockedNow.sort()).toEqual(['2026-07-05', '2026-07-19'].sort())
   })
 
-  it('save calls setPersonAvailability with the current draft blackoutDates/pairedWith/frequencyTier/note', async () => {
+  it('changing per-role tiers (Vocals -> Monthly, Sound -> Out) then saving calls setPersonAvailability with roleTiers carrying both (D-05)', async () => {
     mockQuarter = makeQuarter()
     mockSetPersonAvailability.mockClear()
     mockUpdatePerson.mockClear()
 
     const wrapper = mountDrawer()
+
+    const vocalsMonthly = wrapper
+      .findAll('button[data-role-id="vocals"]')
+      .find((b) => b.attributes('data-preset') === 'monthly')!
+    await vocalsMonthly.trigger('click')
+
+    const soundOut = wrapper
+      .findAll('button[data-role-id="sound"]')
+      .find((b) => b.attributes('data-preset') === 'out')!
+    await soundOut.trigger('click')
 
     const saveButton = wrapper.findAll('button').find((b) => b.text() === 'Save')!
     await saveButton.trigger('click')
@@ -163,6 +201,7 @@ describe('AvailabilityDrawer', () => {
       blackoutDates: ['2026-07-19'],
       pairedWith: ['dean'],
       frequencyTier: 'fillin',
+      roleTiers: { sound: 'out', vocals: 'regular' },
       note: 'x',
     })
   })
