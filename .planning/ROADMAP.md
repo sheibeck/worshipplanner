@@ -232,7 +232,7 @@ Notes for planner:
 - The CSV import path (`VolunteerCsvImportModal.vue`, `volunteerCsv.ts`) is NOT removed — it stays as a secondary bulk-entry option; this phase makes the in-app editor the primary path.
 
 **Requirements**: D-01..D-11 (see 14-CONTEXT.md — no formal REQ-IDs; REQUIREMENTS.md absent, so the 11 locked decisions are the requirement/traceability set)
-**Plans:** 6/6 plans complete
+**Plans:** 6/6 complete + 1 gap-closure plan (15-07)
 
 Plans:
 
@@ -293,3 +293,7 @@ Plans:
 **Wave 4** *(blocked on Wave 3 — 15-06 consumes the setPersonAvailability roleTiers param added by 15-04)*
 
 - [x] 15-06-PLAN.md — AvailabilityDrawer per-role tier controls + QuarterGrid live group-conflict warning (D-05/D-06/D-11)
+
+**Gap closure (Wave 1)** *(from 15-VERIFICATION.md — D-05 not reconciled across all read/write surfaces)*
+
+- [ ] 15-07-PLAN.md — Reconcile roleTiers across QuarterGrid quick-assign, AvailabilityRosterTable status/filter, and quarters.ts reciprocal-pairing write (D-05)
