@@ -83,6 +83,7 @@
             class="rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
           >
             <option value="band">Band</option>
+            <option value="vocals">Vocals</option>
             <option value="tech">Tech</option>
             <option value="other">Other</option>
           </select>
@@ -111,20 +112,22 @@ import type { Role, RoleGroup } from '@/types/roster'
 
 const rosterStore = useRosterStore()
 
-const groupOrder: RoleGroup[] = ['band', 'tech', 'other']
-const groupLabels: Record<RoleGroup, string> = { band: 'Band', tech: 'Tech', other: 'Other' }
+const groupOrder: RoleGroup[] = ['band', 'vocals', 'tech', 'other']
+const groupLabels: Record<RoleGroup, string> = { band: 'Band', tech: 'Tech', vocals: 'Vocals', other: 'Other' }
 
 // Static class map — never dynamically constructed Tailwind class strings, so
 // classes survive Tailwind v4 purge (mirrors SongBadge.vue / TeamTagPill.vue).
 const groupBadgeClasses: Record<RoleGroup, string> = {
   band: 'bg-blue-900/50 text-blue-300 border-blue-800',
   tech: 'bg-purple-900/50 text-purple-300 border-purple-800',
+  vocals: 'bg-pink-900/50 text-pink-300 border-pink-800',
   other: 'bg-gray-800 text-gray-400 border-gray-700',
 }
 
 const groupedRoles = computed(() => ({
   band: rosterStore.roles.filter((r) => r.group === 'band'),
   tech: rosterStore.roles.filter((r) => r.group === 'tech'),
+  vocals: rosterStore.roles.filter((r) => r.group === 'vocals'),
   other: rosterStore.roles.filter((r) => r.group === 'other'),
 }))
 

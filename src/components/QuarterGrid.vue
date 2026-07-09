@@ -198,10 +198,11 @@ const rosterStore = useRosterStore()
 const groupHeaderBg: Record<RoleGroup, string> = {
   band: 'bg-blue-900/50',
   tech: 'bg-purple-900/50',
+  vocals: 'bg-pink-900/50',
   other: 'bg-gray-800',
 } as const
 
-const GROUP_ORDER: RoleGroup[] = ['band', 'tech', 'other']
+const GROUP_ORDER: RoleGroup[] = ['band', 'vocals', 'tech', 'other']
 
 // ── Roles grouped Band/Tech/Other, ordered within group ────────────────────────
 const sortedRoles = computed<Role[]>(() => {
