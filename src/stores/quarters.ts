@@ -19,6 +19,7 @@ import type {
   PersonQuarterData,
   ProposeResult,
   Role,
+  RoleGroup,
   FrequencyTier,
 } from '@/types/roster'
 import { generateSundaysInQuarter, applyDateAdditionsRemovals } from '@/utils/quarterDates'
@@ -214,6 +215,15 @@ export const useQuartersStore = defineStore('quarters', () => {
     return (date: string) => quarter.roleOverridesByDate[date] ?? defaultConfig
   }
 
+  // D-12: projects Role[]→roleId→RoleGroup lookup so the scheduler's group co-occurrence
+  // rules (TECH exclusivity, 1-BAND/1-VOCALS cap) are actually enforced in production, not just
+  // at the unit level inside scheduler.ts. Unknown/stale roleIds default to 'other' (the
+  // least-restrictive group) so a missing lookup entry never crashes or silently blocks a slot.
+  function buildRoleGroupOf(roles: Role[]): (roleId: string) => RoleGroup {
+    const groupById = new Map(roles.map((r) => [r.id, r.group]))
+    return (roleId: string) => groupById.get(roleId) ?? 'other'
+  }
+
   async function generateProposal(
     quarterId: string,
     mode: 'regenerate' | 'fillGaps',
@@ -229,6 +239,7 @@ export const useQuartersStore = defineStore('quarters', () => {
       resolveRolesForDate,
       personQuarterData,
       mode === 'fillGaps' ? quarter.calendar : undefined,
+      buildRoleGroupOf(rosterStore.roles),
     )
 
     await updateQuarter(quarterId, { calendar: result.calendar })
@@ -338,6 +349,7 @@ export const useQuartersStore = defineStore('quarters', () => {
     applyCsvToQuarter,
     setPersonAvailability,
     buildResolveRolesForDate,
+    buildRoleGroupOf,
     generateProposal,
     assignPerson,
     clearAssignment,
