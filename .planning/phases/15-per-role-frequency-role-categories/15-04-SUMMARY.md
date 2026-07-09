@@ -100,3 +100,7 @@ Auto-propose (`generateProposal`) now enforces the D-10/D-12 group co-occurrence
 ---
 *Phase: 15-per-role-frequency-role-categories*
 *Completed: 2026-07-09*
+
+## Self-Check: PASSED
+
+Both modified files (`src/stores/quarters.ts`, `src/stores/__tests__/quarters.test.ts`) verified present on disk; all 5 commits (dcb7303, b88021d, 26fd1b6, d85f77b, 3b8cae7) verified present in git log.
