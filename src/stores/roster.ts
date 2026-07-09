@@ -55,6 +55,23 @@ export const useRosterStore = defineStore('roster', () => {
     unsubscribePeopleFn = onSnapshot(peopleQuery, (snap) => {
       people.value = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Person)
       isLoading.value = false
+
+      // One-time migration (D-03): pre-Phase-15 person docs have no roleFrequencies
+      // field at all. Backfill by copying the person's single frequencyTargetN
+      // onto every currently-held role. Guarded on the field being WHOLLY ABSENT —
+      // idempotent, never overwrites an already-tuned per-role map. Fired without
+      // gating the reactive assignment above (mirrors auth.ts's opportunistic
+      // patch-on-read shape, adapted for a collection snapshot).
+      for (const d of snap.docs) {
+        const data = d.data()
+        if (data.roleFrequencies === undefined) {
+          const personRoles = (data.roles as string[] | undefined) ?? []
+          const n = (data.frequencyTargetN as number | undefined) ?? 4
+          void updateDoc(d.ref, {
+            roleFrequencies: Object.fromEntries(personRoles.map((r) => [r, n])),
+          })
+        }
+      }
     })
 
     // Roles ordered by `order` ascending — drives the scheduler's stable inner loop.
@@ -64,6 +81,16 @@ export const useRosterStore = defineStore('roster', () => {
     )
     unsubscribeRolesFn = onSnapshot(rolesQuery, (snap) => {
       roles.value = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Role)
+
+      // One-time migration (D-09): the seeded 'vocals' role predates the dedicated
+      // 'vocals' RoleGroup and was originally classified under 'band'. Guarded,
+      // case-insensitive name check, idempotent — never touches any other role.
+      for (const d of snap.docs) {
+        const data = d.data()
+        if (String(data.name).toLowerCase() === 'vocals' && data.group === 'band') {
+          void updateDoc(d.ref, { group: 'vocals' })
+        }
+      }
     })
   }
 
