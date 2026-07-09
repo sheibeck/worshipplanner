@@ -98,3 +98,7 @@ The `'vocals'` RoleGroup and per-role (`roleFrequencies`/`roleTiers`) schema fie
 ---
 *Phase: 15-per-role-frequency-role-categories*
 *Completed: 2026-07-08*
+
+## Self-Check: PASSED
+
+All 5 modified files verified present on disk; all 3 commits (cef9c6d, b484644, c391de8) verified present in git log.
