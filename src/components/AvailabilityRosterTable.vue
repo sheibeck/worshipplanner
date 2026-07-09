@@ -111,6 +111,7 @@ const rosterStore = useRosterStore()
 const ROLE_CHIP_CLASS: Record<RoleGroup, string> = {
   band: 'text-blue-300 bg-blue-900/40 border border-blue-700/50',
   tech: 'text-purple-300 bg-purple-900/40 border border-purple-700/50',
+  vocals: 'text-pink-300 bg-pink-900/40 border border-pink-700/50',
   other: 'text-gray-300 bg-gray-800 border border-gray-700',
 }
 

@@ -1,6 +1,6 @@
 import type { Timestamp } from 'firebase/firestore'
 
-export type RoleGroup = 'band' | 'tech' | 'other'
+export type RoleGroup = 'band' | 'tech' | 'vocals' | 'other'
 
 export interface Role {
   id: string
@@ -19,8 +19,13 @@ export interface Person {
   active: boolean // soft-delete inverse (D-20); inactive people drop out of proposals + pickers
   /** STANDING data (D-18) — Role.id[] this person can fill */
   roles: string[]
-  /** STANDING data (D-06/D-18) — 1-in-N cadence: 1 = weekly, 2 = every other week, 4 = ~monthly */
+  /** STANDING data (D-06/D-18) — 1-in-N cadence: 1 = weekly, 2 = every other week, 4 = ~monthly.
+   *  RETAINED as the fallback/default-for-new-roles value — do NOT delete. */
   frequencyTargetN: number
+  /** STANDING data (D-04) — roleId -> 1-in-N cadence, one target per held role. Optional;
+   *  per-role lookups default to `frequencyTargetN` when a role has no entry, then to N=4 (D-02)
+   *  when `frequencyTargetN` itself is absent. */
+  roleFrequencies?: Record<string, number>
   pcPersonId: string | null // Planning Center people id, for re-import matching
   createdAt: Timestamp
   updatedAt: Timestamp
@@ -43,8 +48,12 @@ export interface PersonQuarterData {
   personId: string
   blackoutDates: string[] // expanded YYYY-MM-DD list (D-17 ranges already expanded against serviceDates)
   pairedWith: string[] // Person.id[], bidirectional — must-serve-with pairings (D-09)
-  /** Quarter-scoped (D-05/A1) — resets each new quarter. Optional; defaults to 'regular' when absent. */
+  /** Quarter-scoped (D-05/A1) — resets each new quarter. Optional; defaults to 'regular' when absent.
+   *  RETAINED as the fallback value when a role has no `roleTiers` entry — do NOT delete. */
   frequencyTier?: FrequencyTier
+  /** Quarter-scoped (D-05) — roleId -> tier, one tier per held role. Optional; per-role lookups
+   *  default to the legacy `frequencyTier` when a role has no entry, then to 'regular' when absent. */
+  roleTiers?: Record<string, FrequencyTier>
   /** Free-text quarter note (D-03/D-07) — never auto-scheduled. Optional; defaults to '' when absent. */
   note?: string
 }
@@ -81,6 +90,7 @@ export interface UpsertPersonInput {
   phone?: string
   roles?: string[]
   frequencyTargetN?: number
+  roleFrequencies?: Record<string, number>
   pcPersonId?: string | null
 }
 
@@ -89,7 +99,7 @@ export interface UpsertPersonInput {
 export const DEFAULT_ROLES: Array<Omit<Role, 'id'>> = [
   { name: 'guitar', group: 'band', defaultCount: 1, order: 0 },
   { name: 'drums', group: 'band', defaultCount: 1, order: 1 },
-  { name: 'vocals', group: 'band', defaultCount: 1, order: 2 },
+  { name: 'vocals', group: 'vocals', defaultCount: 1, order: 2 },
   { name: 'bass', group: 'band', defaultCount: 1, order: 3 },
   { name: 'sound', group: 'tech', defaultCount: 1, order: 4 },
   { name: 'livestream', group: 'tech', defaultCount: 1, order: 5 },

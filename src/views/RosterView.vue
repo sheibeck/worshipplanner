@@ -474,6 +474,7 @@ async function onConfirmDeactivate(id: string) {
 const groupBadgeClasses: Record<RoleGroup, string> = {
   band: 'bg-blue-900/50 text-blue-300 border-blue-800',
   tech: 'bg-purple-900/50 text-purple-300 border-purple-800',
+  vocals: 'bg-pink-900/50 text-pink-300 border-pink-800',
   other: 'bg-gray-800 text-gray-400 border-gray-700',
 }
 
