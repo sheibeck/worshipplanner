@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: MVP
-status: ready_to_plan
-stopped_at: Phase 15 complete (7/7) — ready to discuss Phase 999.1
-last_updated: 2026-07-09T18:05:50.177Z
+status: planning
+stopped_at: Phase 16 context gathered
+last_updated: "2026-07-09T23:07:25.574Z"
 last_activity: 2026-07-09
 progress:
-  total_phases: 9
-  completed_phases: 7
+  total_phases: 10
+  completed_phases: 8
   total_plans: 44
   completed_plans: 44
-  percent: 78
+  percent: 80
 ---
 
 # Project State
@@ -135,6 +135,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - Phase 12 added: Advanced song search (metadata-aware + field-scoped syntax) and multi-select persistent tag filtering across the service-plan picker and Songs panel
 - Phase 13 added: Volunteer Role Scheduling — roster + PC people import (name/email/phone), editable roles (band/tech/scripture reader; worship leader intentionally NOT a role — leaders self-assign) with multi-person-per-role and multi-role-per-person, per-person 1-in-N serve-frequency target, quarterly blackout dates + must-serve-with pairings via name-matched CSV, auto-proposed frequency-balanced quarterly grid (dates×roles) with manual editing. NOTE: reverses PROJECT.md "Musician scheduling — out of scope" decision.
 - Phase 15 added: Per-Role Frequency & Role-Category Co-occurrence Rules — frequency per (person, role) instead of per person; same-service role compatibility by category (TECH exclusive; BAND/VOCALS/OTHER combine; max 1 instrument/service). Reshapes Phase 14's per-person frequency model. Requested during Phase 14 execution; full context in .planning/todos/pending/per-role-frequency-and-vocal-instrument-pairing.md.
+- Phase 16 added: Quarterly Schedule share link — matrix view + list/matrix toggle, memorable /{church}/quarterN-YYYY URL, filter-by-name, cross-screen (Schedule ↔ Volunteer) editing of pairings/roles/per-role frequency/unavailable Sundays, remove Schedule's separate frequency + volunteer date-range picker, pairing that honors per-role frequency (paired only on the occurrences the lower-frequency person serves), collapsible sections, calendar-format UX research, and a right-side slide-out group editor with whole-cell hit target. See ROADMAP.md R-01..R-14.
 
 ### Quick Tasks Completed
 
@@ -169,6 +170,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-09
-Last session: 2026-07-08T18:39:14.048Z
-Stopped at: Phase 15 context gathered
-Resume file: .planning/phases/15-per-role-frequency-role-categories/15-CONTEXT.md
+Last session: 2026-07-09T23:07:25.519Z
+Stopped at: Phase 16 context gathered
+Resume file: .planning/phases/16-quarterly-schedule-share-link/16-CONTEXT.md
