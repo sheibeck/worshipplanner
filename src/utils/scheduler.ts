@@ -5,6 +5,7 @@ import type {
   QuarterCalendar,
   ProposeResult,
   FrequencyTier,
+  RoleFrequencyEntry,
   RoleGroup,
 } from '@/types/roster'
 
@@ -86,10 +87,16 @@ export function proposeQuarterSchedule(
     pqdById.get(personId)?.blackoutDates.includes(date) ?? false
   const partnersOf = (personId: string) => pqdById.get(personId)?.pairedWith ?? []
   // undefined = pre-migration data (or no PQD entry at all) — treat as 'regular' (D-05).
-  // Per-role tier reads roleTiers[roleId] first, then falls back to the legacy per-person
-  // frequencyTier, then to 'regular'.
+  // Quarter-scoped, per-role single source of truth (D-04) — tier and cadence-N both read
+  // from PersonQuarterData.roleFrequency; absent role entry defaults to {tier:'regular', n:4}.
+  const roleFrequencyOf = (personId: string, roleId: string): RoleFrequencyEntry =>
+    pqdById.get(personId)?.roleFrequency?.[roleId] ?? { tier: 'regular', n: 4 }
   const tierOf = (personId: string, roleId: string): FrequencyTier =>
-    pqdById.get(personId)?.roleTiers?.[roleId] ?? pqdById.get(personId)?.frequencyTier ?? 'regular'
+    roleFrequencyOf(personId, roleId).tier
+  // D-01/D-02 — whole-quarter cadence budget ceiling for a person's role, e.g. n=4 over 13
+  // dates -> ceil(13/4) = 4. Used by propagatePairing's remaining-cadence-budget gate below.
+  const roleBudget = (personId: string, roleId: string): number =>
+    Math.ceil(serviceDates.length / roleFrequencyOf(personId, roleId).n)
 
   // Aggregate served count — kept for the external ProposeResult.servedCounts shape (unchanged,
   // Record<personId, number>; nothing outside scheduler.ts reads it beyond that shape).
@@ -174,10 +181,34 @@ export function proposeQuarterSchedule(
           pairingConflicts.push({ date, personId, partnerId, reason: 'group rule violation for partner today' })
           continue
         }
-        const withCapacity = eligibleRoles.find(
+        // D-01/D-02 — the R-12 fix: only pull the partner in when doing so stays within their
+        // OWN remaining per-role cadence budget (whole-quarter ceiling, not "so far"). This is
+        // what gives containment its correct asymmetric shape: a lower-cadence partner (e.g.
+        // Nolan, ~once/month) is pulled onto a subset of the higher-cadence anchor's (e.g. Tim,
+        // ~twice/month) already fair-share-spread dates, capped at Nolan's own budget — Tim's
+        // "extra" occurrences beyond that budget proceed without Nolan, never inflating Nolan's
+        // serve count up to Tim's cadence (anti-pattern explicitly rejected by D-01).
+        const withinCadence = eligibleRoles.filter(
+          (r) => getServedByRole(partnerId, r.roleId) < roleBudget(partnerId, r.roleId),
+        )
+        if (withinCadence.length === 0) {
+          // D-03: cadence-driven skip is silent — do NOT push to pairingConflicts. This is
+          // expected/normal (the anchor's cadence exceeds what the partner's budget can absorb),
+          // not a genuine problem like blackout/no-role/group-violation above.
+          continue
+        }
+        // Residual scope boundary (RESEARCH Pitfall 4 / Open Question 1, consciously accepted):
+        // this gate only constrains pull-ins via propagation. If the partner independently holds
+        // a role the anchor does not, the main eligible() loop's deficit-fair-share pass could in
+        // principle still pick the partner directly on a date the anchor isn't serving at all,
+        // which a maximally strict reading of containment would forbid. A fully general fix would
+        // require constraining the main loop too (larger, riskier change than this SPEC's
+        // acceptance criteria require) — the canonical pairing shape (co-vocalists / parent-child
+        // sharing the same role) does not hit this edge case, so it's shipped as-is.
+        const withCapacity = withinCadence.find(
           (r) => (calendar[date]![r.roleId]?.length ?? 0) < r.count,
         )
-        const target = withCapacity ?? eligibleRoles[0]!
+        const target = withCapacity ?? withinCadence[0]!
         assignToRole(target.roleId, partnerId)
         propagatePairing(partnerId, visited) // handle chained pairings (e.g. two kids, one parent)
       }
@@ -209,9 +240,9 @@ export function proposeQuarterSchedule(
         }
         const scored = candidates
           .map((p) => {
-            // Per-role cadence (D-05): N falls back to the person's frequencyTargetN when this
-            // role has no explicit entry in roleFrequencies.
-            const n = p.roleFrequencies?.[roleId] ?? p.frequencyTargetN
+            // Per-role cadence (D-05): N sourced from the quarter-scoped roleFrequency entry
+            // (D-04); absent role entry defaults to n=4 via roleFrequencyOf.
+            const n = roleFrequencyOf(p.id, roleId).n
             return {
               p,
               // fillin-tier candidates have no meaningful cadence-based deficit — tie-break
