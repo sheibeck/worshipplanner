@@ -42,9 +42,8 @@
             <th class="px-3 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Volunteer</th>
             <th class="px-3 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Roles</th>
             <th class="px-3 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Frequency</th>
-            <th class="px-3 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Unavailable</th>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Quarter Note</th>
             <th class="px-3 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Pairing</th>
-            <th class="px-3 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
             <th class="px-3 py-2"></th>
           </tr>
         </thead>
@@ -71,20 +70,15 @@
                 {{ freqBadge(person) }}
               </span>
             </td>
-            <td class="px-3 py-2.5 text-gray-400">{{ blackoutSummary(person) }}</td>
-            <td class="px-3 py-2.5 text-purple-300 text-xs">{{ pairSummary(person) }}</td>
-            <td class="px-3 py-2.5">
-              <span
-                class="text-xs font-semibold px-2.5 py-0.5 rounded-full whitespace-nowrap"
-                :class="statusPillClass(person)"
-              >
-                {{ statusLabel(person) }}
-              </span>
+            <td class="px-3 py-2.5 text-gray-400 max-w-[20rem]">
+              <span v-if="noteSummary(person)" class="whitespace-pre-wrap">{{ noteSummary(person) }}</span>
+              <span v-else class="text-gray-600 italic">—</span>
             </td>
+            <td class="px-3 py-2.5 text-purple-300 text-xs">{{ pairSummary(person) }}</td>
             <td class="px-3 py-2.5 text-gray-600 text-base">&rsaquo;</td>
           </tr>
           <tr v-if="filteredPeople.length === 0">
-            <td colspan="7" class="px-3 py-6 text-center text-sm text-gray-600">No volunteers match this filter.</td>
+            <td colspan="6" class="px-3 py-6 text-center text-sm text-gray-600">No volunteers match this filter.</td>
           </tr>
         </tbody>
       </table>
@@ -117,18 +111,6 @@ const ROLE_CHIP_CLASS: Record<RoleGroup, string> = {
 
 const FILTER_ON_CLASS = 'bg-gray-700 border-gray-600 text-white'
 const FILTER_OFF_CLASS = 'bg-gray-900 border-gray-700 text-gray-400 hover:text-gray-200'
-
-const STATUS_PILL_CLASS: Record<FrequencyTier, string> = {
-  regular: 'text-green-300 bg-green-900/30 border border-green-700/50',
-  fillin: 'text-amber-300 bg-amber-900/30 border border-amber-700/50',
-  out: 'text-red-300 bg-red-900/30 border border-red-700/50',
-}
-
-const STATUS_LABEL: Record<FrequencyTier, string> = {
-  regular: 'Regular',
-  fillin: 'Fill-in',
-  out: 'Out this quarter',
-}
 
 // D-04/D-05: per-role tier read from the single quarter-scoped source of
 // truth — roleFrequency?.[roleId]?.tier, defaulting to 'regular' when the
@@ -254,66 +236,11 @@ function freqBadge(person: Person): string {
   return `${freqLabel(n)} · ≈${approx}`
 }
 
-// ── Status pill ───────────────────────────────────────────────────────────────
-function statusLabel(person: Person): string {
-  return STATUS_LABEL[quarterDataFor(person).tier]
-}
-
-function statusPillClass(person: Person): string {
-  return STATUS_PILL_CLASS[quarterDataFor(person).tier]
-}
-
-// ── Blackout summary (sketch blackoutSummary()) — detects a dominant Nth-Sunday
-// pattern across the quarter's serviceDates, else falls back to a raw date count ──
-function ordinalOf(date: string): number {
-  const day = Number(date.split('-')[2])
-  return Math.floor((day - 1) / 7) + 1
-}
-
-function ordinalLabel(n: number): string {
-  const suffix = n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'
-  return `${n}${suffix}`
-}
-
-function blackoutSummary(person: Person): string {
-  const pqd = quarterDataFor(person)
-  if (allRolesOut(person)) return '— out all quarter —'
-
-  const blackout = pqd.blackoutDates
-  if (blackout.length === 0) return 'fully available'
-
-  const dates = serviceDates.value
-  const countByOrdinal: Record<number, number> = {}
-  for (const d of dates) {
-    const o = ordinalOf(d)
-    countByOrdinal[o] = (countByOrdinal[o] ?? 0) + 1
-  }
-  const blockedByOrdinal: Record<number, number> = {}
-  for (const d of blackout) {
-    const o = ordinalOf(d)
-    blockedByOrdinal[o] = (blockedByOrdinal[o] ?? 0) + 1
-  }
-
-  const parts: string[] = []
-  const claimed = new Set<string>()
-  for (const key of Object.keys(blockedByOrdinal)) {
-    const o = Number(key)
-    if (blockedByOrdinal[o] === countByOrdinal[o] && (countByOrdinal[o] ?? 0) > 1) {
-      parts.push(`${ordinalLabel(o)} Sundays`)
-      for (const d of blackout) {
-        if (ordinalOf(d) === o) claimed.add(d)
-      }
-    }
-  }
-
-  const extras = blackout.filter((d) => !claimed.has(d))
-  if (extras.length > 0) {
-    parts.push(`${extras.length} date${extras.length > 1 ? 's' : ''}`)
-  }
-  if (parts.length === 0) {
-    parts.push(`${blackout.length} date${blackout.length > 1 ? 's' : ''}`)
-  }
-  return parts.join(' + ')
+// ── Quarter note ────────────────────────────────────────────────────────────
+// Per-quarter, per-person free-text note (PersonQuarterData.note), surfaced as
+// its own column. Empty string renders the muted em-dash placeholder in-template.
+function noteSummary(person: Person): string {
+  return quarterDataFor(person).note.trim()
 }
 
 // ── Pairing summary (sketch pairChipsHtml()/firstName()) ─────────────────────

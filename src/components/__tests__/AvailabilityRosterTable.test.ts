@@ -86,7 +86,7 @@ function makeQuarter(): Quarter {
           'role-guitar': { tier: 'out', n: 4 },
           'role-drums': { tier: 'regular', n: 4 },
         },
-        note: '',
+        note: 'Traveling the first two Sundays',
       },
       'person-fillin-role': {
         personId: 'person-fillin-role',
@@ -115,56 +115,49 @@ function makeQuarter(): Quarter {
   }
 }
 
-describe('AvailabilityRosterTable — per-role tier aggregation from roleFrequency (R-05)', () => {
-  it('shows "Out this quarter" status for a person out for one held role, and includes them in the out filter', async () => {
+describe('AvailabilityRosterTable — columns (Quarter Note replaces Unavailable; no Status column)', () => {
+  it('renders a "Quarter Note" header and no "Unavailable" or "Status" header', () => {
     const wrapper = mount(AvailabilityRosterTable, { props: { quarter: makeQuarter() } })
 
-    // Default 'all' filter — status pill shows the aggregate 'out' status.
-    const ollieRow = wrapper.findAll('tr').find((r) => r.text().includes('Outrole Ollie'))!
-    expect(ollieRow.text()).toContain('Out this quarter')
-
-    // Switch to the "Out this quarter" filter — Ollie must still appear.
-    const outFilterBtn = wrapper.findAll('button').find((b) => b.text() === 'Out this quarter')!
-    await outFilterBtn.trigger('click')
-    expect(wrapper.text()).toContain('Outrole Ollie')
+    const headers = wrapper.findAll('thead th').map((th) => th.text())
+    expect(headers).toContain('Quarter Note')
+    expect(headers).not.toContain('Unavailable')
+    expect(headers).not.toContain('Status')
   })
 
-  it('shows a non-Regular (Fill-in) status for a person fillin for one held role, and excludes them from the out filter', async () => {
+  it('renders the per-quarter note text in the Quarter Note column', () => {
     const wrapper = mount(AvailabilityRosterTable, { props: { quarter: makeQuarter() } })
 
+    const ollieRow = wrapper.findAll('tr').find((r) => r.text().includes('Outrole Ollie'))!
+    expect(ollieRow.text()).toContain('Traveling the first two Sundays')
+  })
+
+  it('renders the em-dash placeholder for a person with an empty quarter note', () => {
+    const wrapper = mount(AvailabilityRosterTable, { props: { quarter: makeQuarter() } })
+
+    // Fiona's note is '' and her frequency badge is 'fill-in' (never an em-dash),
+    // so the only '—' in her row is the empty-note placeholder.
     const fionaRow = wrapper.findAll('tr').find((r) => r.text().includes('Fillin Fiona'))!
-    expect(fionaRow.text()).toContain('Fill-in')
-    expect(fionaRow.text()).not.toContain('Regular')
+    expect(fionaRow.text()).toContain('—')
+  })
+
+  it('does not render aggregate status labels as row content (Status column removed)', () => {
+    const wrapper = mount(AvailabilityRosterTable, { props: { quarter: makeQuarter() } })
+
+    // "Fill-in" only ever came from the removed status pill — it must be gone now.
+    expect(wrapper.text()).not.toContain('Fill-in')
+  })
+
+  it('keeps the "Out this quarter" filter working off the aggregate tier (R-05)', async () => {
+    const wrapper = mount(AvailabilityRosterTable, { props: { quarter: makeQuarter() } })
 
     const outFilterBtn = wrapper.findAll('button').find((b) => b.text() === 'Out this quarter')!
     await outFilterBtn.trigger('click')
+
+    // Ollie is out for one held role → aggregate 'out' → included.
+    expect(wrapper.text()).toContain('Outrole Ollie')
+    // Fiona is fill-in, not out → excluded.
     expect(wrapper.text()).not.toContain('Fillin Fiona')
-  })
-
-  it('shows "Regular" status for a person with no personQuarterData entry at all', () => {
-    const wrapper = mount(AvailabilityRosterTable, { props: { quarter: makeQuarter() } })
-
-    const rachelRow = wrapper.findAll('tr').find((r) => r.text().includes('Regular Rachel'))!
-    expect(rachelRow.text()).toContain('Regular')
-  })
-
-  it('does NOT render full-quarter unavailability for a person out for only SOME held roles (WR-01)', () => {
-    const wrapper = mount(AvailabilityRosterTable, { props: { quarter: makeQuarter() } })
-
-    // Ollie is out for role-guitar but regular for role-drums — she is still available.
-    // The aggregate status pill reads "Out this quarter" (audit surface), but the
-    // Frequency and Unavailable columns must NOT assert she is out all quarter.
-    const ollieRow = wrapper.findAll('tr').find((r) => r.text().includes('Outrole Ollie'))!
-    expect(ollieRow.text()).not.toContain('out all quarter')
-    expect(ollieRow.text()).toContain('fully available')
-  })
-
-  it('DOES render full-quarter unavailability for a person out for ALL held roles', () => {
-    const wrapper = mount(AvailabilityRosterTable, { props: { quarter: makeQuarter() } })
-
-    // Alan holds only role-drums and is out for it → genuinely out all quarter.
-    const alanRow = wrapper.findAll('tr').find((r) => r.text().includes('Allout Alan'))!
-    expect(alanRow.text()).toContain('out all quarter')
   })
 
   it('derives the frequency badge from roleFrequency n (not a standing field)', () => {
