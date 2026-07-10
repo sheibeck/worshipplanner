@@ -580,7 +580,7 @@ describe('proposeQuarterSchedule', () => {
       expect(result.servedCounts['nolan']).toBe(7)
       // Tim serves far more often than Nolan (his own ~twice-a-month cadence, competing with
       // Jamie for the shared slot) — proof pairing did NOT drag Nolan up to Tim's cadence.
-      expect(result.servedCounts['tim']).toBeGreaterThan(result.servedCounts['nolan'])
+      expect(result.servedCounts['tim']).toBeGreaterThan(result.servedCounts['nolan']!)
     })
 
     it('even spread: Nolan\'s pulled-in occurrences land on a consistent cadence, inherited from Tim\'s already-evenly-spread schedule — not clustered together (D-02)', () => {
