@@ -201,6 +201,31 @@
             ></textarea>
           </section>
 
+          <!-- Roles (D-09) — standing data, editable from this screen too -->
+          <section class="border-t border-gray-800 pt-5">
+            <h3 class="text-xs font-bold uppercase tracking-wide text-gray-500 mb-2">
+              Roles <span class="font-normal normal-case text-gray-600">roles this person can fill</span>
+            </h3>
+            <div class="flex flex-wrap gap-x-4 gap-y-2">
+              <label
+                v-for="role in rosterStore.roles"
+                :key="role.id"
+                class="inline-flex items-center gap-1.5 text-sm text-gray-300"
+              >
+                <input
+                  type="checkbox"
+                  data-role="role-checkbox"
+                  :data-role-id="role.id"
+                  :checked="draft.roles.includes(role.id)"
+                  class="rounded border-gray-600 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-gray-900"
+                  @change="onToggleRole(role.id)"
+                />
+                {{ role.name }}
+              </label>
+              <span v-if="rosterStore.roles.length === 0" class="text-sm text-gray-600">No roles configured yet.</span>
+            </div>
+          </section>
+
         </div>
 
         <!-- Footer actions -->
@@ -337,6 +362,23 @@ watch(
   },
   { immediate: true },
 )
+
+// ── Roles checklist (D-09) — STANDING data, written through the roster store
+// the instant a checkbox is toggled (same rosterStore.updatePerson path
+// RosterView.vue's Edit Volunteer form uses), never deferred to the drawer's
+// own Save button and never routed through quartersStore (D-08 — disjoint
+// schemas: Person.roles vs PersonQuarterData.roleFrequency).
+function onToggleRole(roleId: string) {
+  const i = draft.roles.indexOf(roleId)
+  if (i >= 0) {
+    draft.roles.splice(i, 1)
+  } else {
+    draft.roles.push(roleId)
+  }
+  if (props.personId) {
+    void rosterStore.updatePerson(props.personId, { roles: [...draft.roles] })
+  }
+}
 
 // ── Serve frequency (per-role quarter tier + cadence, D-05/D-06) ───────────
 // draft.roleFrequency[roleId] carries both the tier AND the cadence n in one
