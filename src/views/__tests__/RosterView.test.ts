@@ -44,6 +44,9 @@ vi.mock('@/stores/roster', () => ({
   }),
 }))
 
+// Cast via `unknown` — the Person type still carries its (deprecated, to be
+// removed in plan 16-11) standing-frequency field, but this roles-only-form
+// test suite never constructs or asserts on it (D-07/D-04).
 function makePerson(overrides: Partial<Person> & { id: string; name: string }): Person {
   return {
     id: overrides.id,
@@ -52,12 +55,10 @@ function makePerson(overrides: Partial<Person> & { id: string; name: string }): 
     phone: overrides.phone ?? '',
     active: overrides.active ?? true,
     roles: overrides.roles ?? [],
-    frequencyTargetN: overrides.frequencyTargetN ?? 4,
-    roleFrequencies: overrides.roleFrequencies,
     pcPersonId: overrides.pcPersonId ?? null,
     createdAt: overrides.createdAt ?? ({} as never),
     updatedAt: overrides.updatedAt ?? ({} as never),
-  }
+  } as unknown as Person
 }
 
 function mountRosterView() {
@@ -73,7 +74,7 @@ function mountRosterView() {
   })
 }
 
-describe('RosterView — per-role cadence controls (D-01/D-02)', () => {
+describe('RosterView — roles-only Volunteer form (D-07)', () => {
   beforeEach(() => {
     mockAddPerson.mockClear()
     mockUpdatePerson.mockClear()
@@ -81,14 +82,12 @@ describe('RosterView — per-role cadence controls (D-01/D-02)', () => {
     mockReactivatePerson.mockClear()
   })
 
-  it('renders exactly one cadence select per held role, defaulting a missing entry to frequencyTargetN', async () => {
+  it('does not render a serve-frequency/cadence control anywhere in the form', async () => {
     mockPeople = [
       makePerson({
         id: 'p-1',
         name: 'Alice',
         roles: ['r-guitar', 'r-vocals'],
-        roleFrequencies: { 'r-guitar': 1 }, // vocals has no tuned entry
-        frequencyTargetN: 2,
       }),
     ]
 
@@ -96,26 +95,16 @@ describe('RosterView — per-role cadence controls (D-01/D-02)', () => {
     const editButton = wrapper.findAll('button').find((b) => b.text() === 'Edit')!
     await editButton.trigger('click')
 
-    const selects = wrapper.findAll('select[data-role="cadence-select"]')
-    expect(selects.length).toBe(2)
-
-    const guitarSelect = selects.find((s) => s.attributes('data-role-id') === 'r-guitar')!
-    const vocalsSelect = selects.find((s) => s.attributes('data-role-id') === 'r-vocals')!
-    expect(guitarSelect.exists()).toBe(true)
-    expect(vocalsSelect.exists()).toBe(true)
-    expect((guitarSelect.element as HTMLSelectElement).value).toBe('1')
-    // No roleFrequencies entry for vocals — falls back to frequencyTargetN (D-03-at-read-time).
-    expect((vocalsSelect.element as HTMLSelectElement).value).toBe('2')
+    expect(wrapper.findAll('select[data-role="cadence-select"]').length).toBe(0)
+    expect(wrapper.text()).not.toContain('Serve frequency by role')
   })
 
-  it('checking a new role adds a cadence select defaulting to N=4 (monthly, D-02)', async () => {
+  it('renders the roles checklist and toggles a role on/off', async () => {
     mockPeople = [
       makePerson({
         id: 'p-1',
         name: 'Alice',
         roles: ['r-guitar'],
-        roleFrequencies: { 'r-guitar': 1 },
-        frequencyTargetN: 1,
       }),
     ]
 
@@ -123,54 +112,25 @@ describe('RosterView — per-role cadence controls (D-01/D-02)', () => {
     const editButton = wrapper.findAll('button').find((b) => b.text() === 'Edit')!
     await editButton.trigger('click')
 
-    expect(wrapper.findAll('select[data-role="cadence-select"]').length).toBe(1)
+    const guitarCheckbox = wrapper
+      .findAll('input[type="checkbox"]')
+      .find((c) => c.attributes('value') === 'r-guitar')!
+    expect((guitarCheckbox.element as HTMLInputElement).checked).toBe(true)
 
     const drumsCheckbox = wrapper
       .findAll('input[type="checkbox"]')
       .find((c) => c.attributes('value') === 'r-drums')!
+    expect((drumsCheckbox.element as HTMLInputElement).checked).toBe(false)
     await drumsCheckbox.setValue(true)
-
-    const selects = wrapper.findAll('select[data-role="cadence-select"]')
-    expect(selects.length).toBe(2)
-    const drumsSelect = selects.find((s) => s.attributes('data-role-id') === 'r-drums')!
-    expect((drumsSelect.element as HTMLSelectElement).value).toBe('4')
+    expect((drumsCheckbox.element as HTMLInputElement).checked).toBe(true)
   })
 
-  it('unchecking a role removes its cadence row', async () => {
+  it('onSaveVolunteer payload includes only name/email/phone/roles — no frequency fields', async () => {
     mockPeople = [
       makePerson({
         id: 'p-1',
         name: 'Alice',
         roles: ['r-guitar', 'r-vocals'],
-        roleFrequencies: { 'r-guitar': 1, 'r-vocals': 2 },
-        frequencyTargetN: 2,
-      }),
-    ]
-
-    const wrapper = mountRosterView()
-    const editButton = wrapper.findAll('button').find((b) => b.text() === 'Edit')!
-    await editButton.trigger('click')
-
-    expect(wrapper.findAll('select[data-role="cadence-select"]').length).toBe(2)
-
-    const vocalsCheckbox = wrapper
-      .findAll('input[type="checkbox"]')
-      .find((c) => c.attributes('value') === 'r-vocals')!
-    await vocalsCheckbox.setValue(false)
-
-    const selects = wrapper.findAll('select[data-role="cadence-select"]')
-    expect(selects.length).toBe(1)
-    expect(selects.find((s) => s.attributes('data-role-id') === 'r-vocals')).toBeUndefined()
-  })
-
-  it('onSaveVolunteer payload includes roleFrequencies for all held roles', async () => {
-    mockPeople = [
-      makePerson({
-        id: 'p-1',
-        name: 'Alice',
-        roles: ['r-guitar', 'r-vocals'],
-        roleFrequencies: { 'r-guitar': 1 },
-        frequencyTargetN: 2,
       }),
     ]
 
@@ -184,51 +144,62 @@ describe('RosterView — per-role cadence controls (D-01/D-02)', () => {
     expect(mockUpdatePerson).toHaveBeenCalledTimes(1)
     const [personId, input] = mockUpdatePerson.mock.calls[0]!
     expect(personId).toBe('p-1')
-    expect(input).toMatchObject({
-      roleFrequencies: { 'r-guitar': 1, 'r-vocals': 2 },
+    expect(input).toEqual({
+      name: 'Alice',
+      email: 'p-1@example.com',
+      phone: '',
+      roles: ['r-guitar', 'r-vocals'],
     })
+    expect(input).not.toHaveProperty('frequencyTargetN')
+    expect(input).not.toHaveProperty('roleFrequencies')
   })
 })
 
-describe('RosterView — frequency sort reconciled with per-role cadence', () => {
-  beforeEach(() => {
-    mockUpdatePerson.mockClear()
-  })
-
-  it('sorts by minimum per-role cadence N, with a deterministic name tie-break, and never throws on an absent roleFrequencies map', async () => {
+describe('RosterView — collapsible dense sections (R-11)', () => {
+  it('wraps Roles config and Inactive Volunteers in CollapsibleSection', () => {
     mockPeople = [
-      makePerson({
-        id: 'p-bob',
-        name: 'Bob',
-        roles: [],
-        roleFrequencies: undefined, // absent map — must fall back to frequencyTargetN, never NaN/throw
-        frequencyTargetN: 2,
-      }),
-      makePerson({
-        id: 'p-alice',
-        name: 'Alice',
-        roles: ['r-guitar'],
-        roleFrequencies: { 'r-guitar': 1 },
-        frequencyTargetN: 4,
-      }),
-      makePerson({
-        id: 'p-zoe',
-        name: 'Zoe',
-        roles: ['r-vocals'],
-        roleFrequencies: { 'r-vocals': 1 },
-        frequencyTargetN: 4,
-      }),
+      makePerson({ id: 'p-active', name: 'Alice', active: true, roles: [] }),
+      makePerson({ id: 'p-inactive', name: 'Bob', active: false, roles: [] }),
     ]
 
     const wrapper = mountRosterView()
 
-    const frequencyHeader = wrapper.findAll('button').find((b) => b.text().includes('Frequency'))!
-    await frequencyHeader.trigger('click')
+    expect(wrapper.text()).toContain('Roles config')
+    expect(wrapper.text()).toContain('Inactive Volunteers (1)')
+    // Both sections default expanded (D-17) — the inactive person's name is visible.
+    expect(wrapper.text()).toContain('Bob')
+  })
+})
+
+describe('RosterView — name/role sort (frequency sort removed)', () => {
+  beforeEach(() => {
+    mockUpdatePerson.mockClear()
+  })
+
+  it('sorts alphabetically by name and toggles direction', async () => {
+    mockPeople = [
+      makePerson({ id: 'p-bob', name: 'Bob', roles: [] }),
+      makePerson({ id: 'p-alice', name: 'Alice', roles: ['r-guitar'] }),
+      makePerson({ id: 'p-zoe', name: 'Zoe', roles: ['r-vocals'] }),
+    ]
+
+    const wrapper = mountRosterView()
 
     const nameCells = wrapper.findAll('tbody tr td:first-child')
     const names = nameCells.map((c) => c.text())
-    // Alice and Zoe both have min-N=1 (tie-break by name); Bob (absent map, falls back to
-    // frequencyTargetN=2) sorts last. No NaN/throw for Bob's absent roleFrequencies map.
-    expect(names).toEqual(['Alice', 'Zoe', 'Bob'])
+    expect(names).toEqual(['Alice', 'Bob', 'Zoe'])
+
+    const nameHeader = wrapper.findAll('button').find((b) => b.text().includes('Name'))!
+    await nameHeader.trigger('click')
+
+    const namesDesc = wrapper.findAll('tbody tr td:first-child').map((c) => c.text())
+    expect(namesDesc).toEqual(['Zoe', 'Bob', 'Alice'])
+  })
+
+  it('has no Frequency column header', () => {
+    mockPeople = [makePerson({ id: 'p-1', name: 'Alice', roles: [] })]
+    const wrapper = mountRosterView()
+    const headers = wrapper.findAll('th').map((h) => h.text())
+    expect(headers.some((h) => h.includes('Frequency'))).toBe(false)
   })
 })
