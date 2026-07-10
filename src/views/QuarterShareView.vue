@@ -21,10 +21,44 @@
         <p class="text-sm text-gray-600 mt-1">Volunteer Schedule</p>
       </div>
 
+      <!-- Toolbar: view toggle -->
+      <div class="flex items-center gap-2 mb-4">
+        <div
+          class="inline-flex rounded-md border border-gray-200 overflow-hidden text-sm"
+          role="group"
+          aria-label="Schedule view"
+        >
+          <button
+            type="button"
+            class="px-3 py-1.5"
+            :class="viewMode === 'matrix' ? 'bg-gray-900 text-white font-semibold' : 'bg-white text-gray-600'"
+            @click="viewMode = 'matrix'"
+          >
+            Matrix
+          </button>
+          <button
+            type="button"
+            class="px-3 py-1.5 border-l border-gray-200"
+            :class="viewMode === 'list' ? 'bg-gray-900 text-white font-semibold' : 'bg-white text-gray-600'"
+            @click="viewMode = 'list'"
+          >
+            List
+          </button>
+        </div>
+      </div>
+
       <div class="border-b border-gray-200 mb-4"></div>
 
-      <!-- Date list -->
-      <div>
+      <!-- Matrix view -->
+      <QuarterShareMatrix
+        v-if="viewMode === 'matrix'"
+        :roles="sortedRoles"
+        :dates="quarterSnapshot.serviceDates"
+        :people-for="peopleFor"
+      />
+
+      <!-- List view -->
+      <div v-else>
         <div
           v-for="date in quarterSnapshot.serviceDates"
           :key="date"
@@ -53,10 +87,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { doc, getDoc } from 'firebase/firestore'
 import { db } from '@/firebase'
+import QuarterShareMatrix from '@/components/QuarterShareMatrix.vue'
+import { useIsMobile } from '@/components/useIsMobile'
 
 // Read-only public shape written by quarters.ts::finalizeAndShare (Plan 06/10).
 // Person names are pre-resolved into the calendar — no roster/auth access needed here.
@@ -75,9 +111,18 @@ interface QuarterSnapshot {
 
 // ── State ───────────────────────────────────────────────────────────────────
 
+const route = useRoute()
+const router = useRouter()
+const { isDesktop } = useIsMobile()
+
 const isLoading = ref(true)
 const notFound = ref(false)
 const quarterSnapshot = ref<QuarterSnapshot | null>(null)
+
+type ViewMode = 'matrix' | 'list'
+
+const initialView = (route.query.view as ViewMode | undefined) ?? (isDesktop.value ? 'matrix' : 'list')
+const viewMode = ref<ViewMode>(initialView)
 
 // ── Computed ────────────────────────────────────────────────────────────────
 
@@ -105,10 +150,16 @@ function formatDateLabel(date: string): string {
   })
 }
 
+// ── URL persistence (D-16) ─────────────────────────────────────────────────
+// Mirrors SongsView.vue's router.replace({query}) convention — spreads existing
+// route.query and never pushes a history entry for view-mode changes.
+watch(viewMode, (view) => {
+  router.replace({ query: { ...route.query, view } })
+})
+
 // ── Mount ───────────────────────────────────────────────────────────────────
 
 onMounted(async () => {
-  const route = useRoute()
   const token = route.params.token as string | undefined
   try {
     const snap = token
