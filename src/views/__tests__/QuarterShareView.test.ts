@@ -133,4 +133,16 @@ describe('QuarterShareView', () => {
     // Clearing restores all dates
     expect(wrapper.text()).toContain('January 11')
   })
+
+  // WR-05 regression: a name filter matching zero dates must NOT show "No service dates" —
+  // the quarter plainly has service dates, the filter just excluded all of them.
+  it('shows a distinct zero-match message (not "No service dates") when a name filter matches zero dates, in matrix view', async () => {
+    mockRouteQuery = { name: 'Nobody' }
+    const wrapper = await mountQuarterShareView()
+    await flushPromises()
+
+    expect(wrapper.find('tbody tr').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('No service dates')
+    expect(wrapper.text()).toContain('No dates found for Nobody')
+  })
 })

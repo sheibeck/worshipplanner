@@ -92,6 +92,8 @@
         :roles="sortedRoles"
         :dates="filteredDates"
         :people-for="peopleFor"
+        :total-date-count="quarterSnapshot.serviceDates.length"
+        :active-name-filter="nameFilter"
       />
 
       <!-- List view -->

@@ -26,7 +26,13 @@
         </tr>
       </tbody>
     </table>
-    <p v-if="dates.length === 0" class="text-gray-400 italic text-sm py-3">No service dates</p>
+    <!-- WR-05: distinguish "quarter genuinely has no service dates" from "a name filter
+         matched zero dates" — the raw/unfiltered totalDateCount (mirroring the list view's
+         quarterSnapshot.serviceDates.length check) decides which message applies. -->
+    <p v-if="totalDateCount === 0" class="text-gray-400 italic text-sm py-3">No service dates</p>
+    <p v-else-if="dates.length === 0" class="text-gray-400 italic text-sm py-3">
+      {{ activeNameFilter ? `No dates found for ${activeNameFilter}` : 'No matching dates' }}
+    </p>
   </div>
 </template>
 
@@ -44,6 +50,12 @@ const props = defineProps<{
   roles: QuarterSnapshotRole[]
   dates: string[]
   peopleFor: (date: string, roleId: string) => string[]
+  // WR-05: raw/unfiltered service-date count for the quarter, independent of any active name
+  // filter narrowing `dates` — lets this component tell "genuinely empty quarter" apart from
+  // "filter matched zero dates" instead of collapsing both into "No service dates".
+  totalDateCount: number
+  // Currently active name filter (if any), for the zero-match message.
+  activeNameFilter?: string | null
 }>()
 
 function peopleFor(date: string, roleId: string): string[] {
