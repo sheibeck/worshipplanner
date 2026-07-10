@@ -85,14 +85,20 @@
 
       <template v-if="selectedQuarter">
         <!-- Volunteer Availability: full-width roster table opening the per-person drawer (D-02/D-03) -->
-        <div class="rounded-lg border border-gray-800 bg-gray-900 p-5 mb-6">
-          <h2 class="text-sm font-semibold text-gray-200 mb-3">Volunteer Availability</h2>
+        <CollapsibleSection
+          title="Volunteer Availability"
+          storage-key="schedule.section.volunteerAvailability"
+          class="mb-6"
+        >
           <AvailabilityRosterTable :quarter="selectedQuarter" @select="openPersonId = $event" />
-        </div>
+        </CollapsibleSection>
 
         <!-- Setup: service dates with inline per-date role overrides -->
-        <div class="rounded-lg border border-gray-800 bg-gray-900 p-5 mb-6">
-          <h2 class="text-sm font-semibold text-gray-200 mb-3">Service dates</h2>
+        <CollapsibleSection
+          title="Service dates"
+          storage-key="schedule.section.serviceDates"
+          class="mb-6"
+        >
           <div class="flex items-center gap-2 mb-3">
             <input
               v-model="newDateInput"
@@ -177,10 +183,14 @@
               No service dates yet
             </li>
           </ul>
-        </div>
+        </CollapsibleSection>
 
         <!-- Generate controls -->
-        <div class="rounded-lg border border-gray-800 bg-gray-900 p-5 mb-6">
+        <CollapsibleSection
+          title="Generate controls"
+          storage-key="schedule.section.generateControls"
+          class="mb-6"
+        >
           <div class="flex items-center gap-3 flex-wrap">
             <button
               v-if="!hasAssignments"
@@ -237,7 +247,7 @@
               <p class="text-xs text-gray-500">pairing conflicts</p>
             </div>
           </div>
-        </div>
+        </CollapsibleSection>
 
         <!-- Empty state / grid host -->
         <div
@@ -384,6 +394,7 @@ import QuarterGrid from '@/components/QuarterGrid.vue'
 import RosterPrintLayout from '@/components/RosterPrintLayout.vue'
 import AvailabilityDrawer from '@/components/AvailabilityDrawer.vue'
 import AvailabilityRosterTable from '@/components/AvailabilityRosterTable.vue'
+import CollapsibleSection from '@/components/CollapsibleSection.vue'
 
 const authStore = useAuthStore()
 const quartersStore = useQuartersStore()
