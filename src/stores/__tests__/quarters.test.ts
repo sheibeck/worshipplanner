@@ -181,8 +181,8 @@ describe('useQuartersStore', () => {
     })
   })
 
-  describe('createQuarter (D-01)', () => {
-    it('creates a quarter doc with generated Sundays and empty quarter-scoped maps', async () => {
+  describe('createQuarter (D-01, D-06)', () => {
+    it('creates a quarter doc with generated Sundays and empty quarter-scoped maps when no people exist', async () => {
       const { addDoc } = await import('firebase/firestore')
       const { useQuartersStore } = await import('../quarters')
       const { generateSundaysInQuarter } = await import('@/utils/quarterDates')
@@ -199,6 +199,101 @@ describe('useQuartersStore', () => {
       expect(data.calendar).toEqual({})
       expect(data.status).toBe('draft')
       expect(data.shareToken).toBeNull()
+    })
+
+    it('seeds each (person, role) frequency to once/month default (N=4) when there is no prior quarter', async () => {
+      const { addDoc } = await import('firebase/firestore')
+      const { useQuartersStore } = await import('../quarters')
+      const store = useQuartersStore()
+      store.subscribe('org-1')
+      mockRosterState.people = [makePerson({ id: 'person-a', roles: ['role-guitar'] })]
+
+      await store.createQuarter(2026, 3, 'Q3 2026')
+
+      const data = vi.mocked(addDoc).mock.calls[0]![1] as Record<string, unknown>
+      const pqd = data.personQuarterData as Record<
+        string,
+        { roleFrequency: Record<string, unknown>; pairedWith: string[]; blackoutDates: string[] }
+      >
+      expect(pqd['person-a']!.roleFrequency).toEqual({ 'role-guitar': { tier: 'regular', n: 4 } })
+      expect(pqd['person-a']!.pairedWith).toEqual([])
+      expect(pqd['person-a']!.blackoutDates).toEqual([])
+    })
+
+    it('seeds per-role frequency and pairing from the chronologically prior quarter, always resetting blackout', async () => {
+      const { addDoc } = await import('firebase/firestore')
+      const { useQuartersStore } = await import('../quarters')
+      const store = useQuartersStore()
+      store.subscribe('org-1')
+      triggerQuartersSnapshot([
+        makeQuarterDoc({
+          id: 'quarter-q2',
+          year: 2026,
+          quarter: 2,
+          personQuarterData: {
+            'person-a': {
+              personId: 'person-a',
+              blackoutDates: ['2026-04-05'],
+              pairedWith: ['person-b'],
+              roleFrequency: { 'role-guitar': { tier: 'regular', n: 2 } },
+            },
+          },
+        }),
+      ])
+      mockRosterState.people = [makePerson({ id: 'person-a', roles: ['role-guitar'] })]
+
+      await store.createQuarter(2026, 3, 'Q3 2026')
+
+      const data = vi.mocked(addDoc).mock.calls[0]![1] as Record<string, unknown>
+      const pqd = data.personQuarterData as Record<
+        string,
+        { roleFrequency: Record<string, unknown>; pairedWith: string[]; blackoutDates: string[] }
+      >
+      expect(pqd['person-a']!.roleFrequency).toEqual({ 'role-guitar': { tier: 'regular', n: 2 } })
+      expect(pqd['person-a']!.pairedWith).toEqual(['person-b'])
+      expect(pqd['person-a']!.blackoutDates).toEqual([])
+    })
+
+    it('picks the chronologically nearest prior quarter, not just any earlier quarter', async () => {
+      const { addDoc } = await import('firebase/firestore')
+      const { useQuartersStore } = await import('../quarters')
+      const store = useQuartersStore()
+      store.subscribe('org-1')
+      triggerQuartersSnapshot([
+        makeQuarterDoc({
+          id: 'quarter-q1',
+          year: 2026,
+          quarter: 1,
+          personQuarterData: {
+            'person-a': {
+              personId: 'person-a',
+              blackoutDates: [],
+              pairedWith: [],
+              roleFrequency: { 'role-guitar': { tier: 'regular', n: 1 } },
+            },
+          },
+        }),
+        makeQuarterDoc({
+          id: 'quarter-q2',
+          year: 2026,
+          quarter: 2,
+          personQuarterData: {
+            'person-a': {
+              personId: 'person-a',
+              blackoutDates: [],
+              pairedWith: [],
+              roleFrequency: { 'role-guitar': { tier: 'regular', n: 3 } },
+            },
+          },
+        }),
+      ])
+      mockRosterState.people = [makePerson({ id: 'person-a', roles: ['role-guitar'] })]
+
+      await store.createQuarter(2026, 3, 'Q3 2026')
+
+      const data = vi.mocked(addDoc).mock.calls[0]![1] as Record<string, unknown>
+      const pqd = data.personQuarterData as Record<string, { roleFrequency: Record<string, unknown> }>
+      expect(pqd['person-a']!.roleFrequency).toEqual({ 'role-guitar': { tier: 'regular', n: 3 } })
     })
   })
 
@@ -304,6 +399,29 @@ describe('useQuartersStore', () => {
       expect(pqd['person-a']!.blackoutDates).toEqual(['2026-07-12'])
     })
 
+    it('writes the per-role roleFrequency resolved from the CSV Frequency column onto the quarter entry (no standing frequency write, D-04/D-05)', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useQuartersStore } = await import('../quarters')
+      const store = useQuartersStore()
+      store.subscribe('org-1')
+      triggerQuartersSnapshot([makeQuarterDoc({ personQuarterData: {} })])
+
+      await store.applyCsvToQuarter('quarter-1', [
+        {
+          personId: 'person-a',
+          standing: { name: 'Person A', roles: ['role-guitar'] },
+          blackoutDates: [],
+          pairedWith: [],
+          roleFrequency: { 'role-guitar': { tier: 'regular', n: 2 } },
+        },
+      ])
+
+      expect(mockUpdatePerson).toHaveBeenCalledWith('person-a', { name: 'Person A', roles: ['role-guitar'] })
+      const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+      const pqd = data.personQuarterData as Record<string, { roleFrequency?: Record<string, unknown> }>
+      expect(pqd['person-a']!.roleFrequency).toEqual({ 'role-guitar': { tier: 'regular', n: 2 } })
+    })
+
     it('leaves an absent persons personQuarterData entry unchanged', async () => {
       const { updateDoc } = await import('firebase/firestore')
       const { useQuartersStore } = await import('../quarters')
@@ -354,7 +472,7 @@ describe('useQuartersStore', () => {
     })
   })
 
-  describe('setPersonAvailability (D-03, D-05, D-06)', () => {
+  describe('setPersonAvailability (D-03, D-04, D-05, D-06)', () => {
     function seedJuliaPairedWithLisa() {
       triggerQuartersSnapshot([
         makeQuarterDoc({
@@ -363,14 +481,14 @@ describe('useQuartersStore', () => {
               personId: 'julia',
               blackoutDates: ['2026-07-05'],
               pairedWith: ['lisa'],
-              frequencyTier: 'regular',
+              roleFrequency: {},
               note: 'old note',
             },
             lisa: {
               personId: 'lisa',
               blackoutDates: [],
               pairedWith: ['julia'],
-              frequencyTier: 'regular',
+              roleFrequency: {},
               note: '',
             },
           },
@@ -388,8 +506,8 @@ describe('useQuartersStore', () => {
       await store.setPersonAvailability('quarter-1', 'julia', {
         blackoutDates: ['2026-07-19'],
         pairedWith: ['dean'],
-        frequencyTier: 'regular',
         note: 'x',
+        roleFrequency: {},
       })
 
       expect(updateDoc).toHaveBeenCalledOnce()
@@ -398,8 +516,8 @@ describe('useQuartersStore', () => {
         personId: 'julia',
         blackoutDates: ['2026-07-19'],
         pairedWith: ['dean'],
-        frequencyTier: 'regular',
         note: 'x',
+        roleFrequency: {},
       })
       expect(data.updatedAt).toBeDefined()
     })
@@ -414,8 +532,8 @@ describe('useQuartersStore', () => {
       await store.setPersonAvailability('quarter-1', 'julia', {
         blackoutDates: ['2026-07-19'],
         pairedWith: ['dean'],
-        frequencyTier: 'regular',
         note: 'x',
+        roleFrequency: {},
       })
 
       const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
@@ -438,8 +556,8 @@ describe('useQuartersStore', () => {
       await store.setPersonAvailability('quarter-1', 'julia', {
         blackoutDates: ['2026-07-19'],
         pairedWith: ['dean'],
-        frequencyTier: 'regular',
         note: 'x',
+        roleFrequency: {},
       })
 
       const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
@@ -458,15 +576,15 @@ describe('useQuartersStore', () => {
       await store.setPersonAvailability('quarter-1', 'julia', {
         blackoutDates: ['2026-07-19'],
         pairedWith: ['dean'],
-        frequencyTier: 'regular',
         note: 'x',
+        roleFrequency: {},
       })
 
       const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
       expect(data.personQuarterData).toBeUndefined()
     })
 
-    it('persists roleTiers inside the scoped personQuarterData.{personId} write, never as a bare root key (D-05/T-15-04-01)', async () => {
+    it('persists roleFrequency inside the scoped personQuarterData.{personId} write, never as a bare root key (D-04/D-05)', async () => {
       const { updateDoc } = await import('firebase/firestore')
       const { useQuartersStore } = await import('../quarters')
       const store = useQuartersStore()
@@ -476,9 +594,8 @@ describe('useQuartersStore', () => {
       await store.setPersonAvailability('quarter-1', 'julia', {
         blackoutDates: ['2026-07-19'],
         pairedWith: ['dean'],
-        frequencyTier: 'regular',
         note: 'x',
-        roleTiers: { vocals: 'out', guitar: 'regular' },
+        roleFrequency: { vocals: { tier: 'out', n: 4 }, guitar: { tier: 'regular', n: 4 } },
       })
 
       expect(updateDoc).toHaveBeenCalledOnce()
@@ -487,9 +604,8 @@ describe('useQuartersStore', () => {
         personId: 'julia',
         blackoutDates: ['2026-07-19'],
         pairedWith: ['dean'],
-        frequencyTier: 'regular',
         note: 'x',
-        roleTiers: { vocals: 'out', guitar: 'regular' },
+        roleFrequency: { vocals: { tier: 'out', n: 4 }, guitar: { tier: 'regular', n: 4 } },
       })
       expect(data.personQuarterData).toBeUndefined()
       // scoping: only julia's own write is affected — lisa's entry is untouched by this call
@@ -497,28 +613,9 @@ describe('useQuartersStore', () => {
       expect(Object.keys(data)).not.toContain('personQuarterData')
     })
 
-    it('omitting roleTiers still works — no roleTiers key is written (back-compat)', async () => {
-      const { updateDoc } = await import('firebase/firestore')
-      const { useQuartersStore } = await import('../quarters')
-      const store = useQuartersStore()
-      store.subscribe('org-1')
-      seedJuliaPairedWithLisa()
-
-      await store.setPersonAvailability('quarter-1', 'julia', {
-        blackoutDates: ['2026-07-19'],
-        pairedWith: ['dean'],
-        frequencyTier: 'regular',
-        note: 'x',
-      })
-
-      const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
-      const juliaEntry = data['personQuarterData.julia'] as Record<string, unknown>
-      expect(juliaEntry.roleTiers).toBeUndefined()
-    })
-
     // D-05 gap closure (15-07): the reciprocal 'added' write must not silently erase an
-    // already-tuned partner's roleTiers by reconstructing their whole PersonQuarterData.
-    function seedJuliaAndDeanWithRoleTiers() {
+    // already-tuned partner's roleFrequency by reconstructing their whole PersonQuarterData.
+    function seedJuliaAndDeanWithRoleFrequency() {
       triggerQuartersSnapshot([
         makeQuarterDoc({
           personQuarterData: {
@@ -526,15 +623,14 @@ describe('useQuartersStore', () => {
               personId: 'julia',
               blackoutDates: [],
               pairedWith: [],
-              frequencyTier: 'regular',
+              roleFrequency: {},
               note: '',
             },
             dean: {
               personId: 'dean',
               blackoutDates: ['2026-07-12'],
               pairedWith: [],
-              frequencyTier: 'regular',
-              roleTiers: { 'role-guitar': 'out' },
+              roleFrequency: { 'role-guitar': { tier: 'out', n: 4 } },
               note: 'dean note',
             },
           },
@@ -542,22 +638,22 @@ describe('useQuartersStore', () => {
       ])
     }
 
-    it('existing-entry reciprocal write uses a scoped pairedWith-only sub-path, preserving the partners tuned roleTiers (D-05 gap closure)', async () => {
+    it('existing-entry reciprocal write uses a scoped pairedWith-only sub-path, preserving the partners tuned roleFrequency (D-05 gap closure)', async () => {
       const { updateDoc } = await import('firebase/firestore')
       const { useQuartersStore } = await import('../quarters')
       const store = useQuartersStore()
       store.subscribe('org-1')
-      seedJuliaAndDeanWithRoleTiers()
+      seedJuliaAndDeanWithRoleFrequency()
 
       await store.setPersonAvailability('quarter-1', 'julia', {
         blackoutDates: [],
         pairedWith: ['dean'],
-        frequencyTier: 'regular',
         note: '',
+        roleFrequency: {},
       })
 
       const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
-      // Scoped sub-path only — a whole-object replace here would silently drop dean's roleTiers.
+      // Scoped sub-path only — a whole-object replace here would silently drop dean's roleFrequency.
       expect(data['personQuarterData.dean.pairedWith']).toEqual(['julia'])
       expect(data['personQuarterData.dean']).toBeUndefined()
     })
@@ -572,8 +668,8 @@ describe('useQuartersStore', () => {
       await store.setPersonAvailability('quarter-1', 'julia', {
         blackoutDates: ['2026-07-19'],
         pairedWith: ['dean'],
-        frequencyTier: 'regular',
         note: 'x',
+        roleFrequency: {},
       })
 
       const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
@@ -581,7 +677,7 @@ describe('useQuartersStore', () => {
         personId: 'dean',
         blackoutDates: [],
         pairedWith: ['julia'],
-        frequencyTier: 'regular',
+        roleFrequency: {},
         note: '',
       })
       // Must not be a partial pairedWith-only sub-path write — that would leave
