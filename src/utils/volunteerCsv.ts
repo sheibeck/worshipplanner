@@ -50,9 +50,13 @@ export function frequencyLabelToN(label: string): number {
     return bareInt
   }
 
+  // WR-03: mirror the bareInt branch's `> 0` guard — "1-in-0" (and any other non-positive N)
+  // must fall through to the same default-4 path as an invalid bare integer, never accepted
+  // as a literal 0 (which would produce an Infinity deficit score in scheduler.ts).
   const oneInNMatch = normalized.match(/^1-in-(\d+)$/)
   if (oneInNMatch) {
-    return Number(oneInNMatch[1])
+    const n = Number(oneInNMatch[1])
+    if (n > 0) return n
   }
 
   return 4
@@ -115,12 +119,17 @@ export function parseVolunteerCsvRow(row: Record<string, string>): ParsedVolunte
 
   const frequencyRaw = row['Frequency']?.trim() ?? ''
   const frequencyN = frequencyLabelToN(frequencyRaw)
+  // WR-03: a "1-in-N" cell only counts as a known/recognized label when N is actually a
+  // positive integer — "1-in-0" must surface the same unrecognized/defaulted warning as an
+  // invalid bare integer, not be silently accepted as N=0.
+  const oneInNMatch = frequencyRaw.trim().match(/^1-in-(\d+)$/i)
+  const oneInNIsValid = oneInNMatch !== null && Number(oneInNMatch[1]) > 0
   const isKnownLabel =
     frequencyRaw.trim().toLowerCase() === 'weekly' ||
     frequencyRaw.trim().toLowerCase() === 'twice a month' ||
     frequencyRaw.trim().toLowerCase() === 'once a month' ||
     /^\d+$/.test(frequencyRaw.trim()) ||
-    /^1-in-\d+$/i.test(frequencyRaw.trim())
+    oneInNIsValid
   if (frequencyRaw !== '' && !isKnownLabel) {
     warnings.push(`Frequency unrecognized — defaulted to N=${frequencyN}`)
   }

@@ -66,6 +66,21 @@ describe('parseVolunteerCsvRow', () => {
     expect(result.warnings.some((w) => w.includes('Frequency'))).toBe(true)
   })
 
+  // WR-03 regression: "1-in-0" is matched by the "1-in-N" shape but N=0 is invalid — it must
+  // surface the same unrecognized/defaulted warning as an invalid bare integer, not be
+  // silently accepted (which is what let scheduler.ts see an Infinity deficit score).
+  it('defaults frequencyN to 4 and warns for "1-in-0" (non-positive N)', () => {
+    const result = parseVolunteerCsvRow({
+      Name: 'Jamie Lee',
+      Roles: 'drums',
+      Frequency: '1-in-0',
+      'Blackout Dates': '',
+      'Serve-With': '',
+    })
+    expect(result.frequencyN).toBe(4)
+    expect(result.warnings.some((w) => w.includes('Frequency'))).toBe(true)
+  })
+
   it('splits multi-value cells on ";", trims, and drops empties', () => {
     const result = parseVolunteerCsvRow({
       Name: 'Pat Doe',
@@ -120,6 +135,13 @@ describe('frequencyLabelToN', () => {
 
   it('defaults unknown labels to 4', () => {
     expect(frequencyLabelToN('whenever')).toBe(4)
+  })
+
+  // WR-03 regression: "1-in-0" must not be accepted as a literal N=0 (which would produce an
+  // Infinity deficit score in scheduler.ts) — it must fall back to the same default-4 path as
+  // an invalid bare integer like "0" or "-5".
+  it('rejects "1-in-0" (non-positive N) and defaults to 4, same as an invalid bare integer', () => {
+    expect(frequencyLabelToN('1-in-0')).toBe(4)
   })
 })
 
