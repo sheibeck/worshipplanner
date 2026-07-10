@@ -28,8 +28,7 @@ function makeQuarter(overrides: Partial<Quarter> = {}): Quarter {
         personId: 'person-1',
         blackoutDates: ['2026-07-19'],
         pairedWith: ['dean'],
-        frequencyTier: 'fillin',
-        roleTiers: { sound: 'out' },
+        roleFrequency: { sound: { tier: 'out', n: 0 } },
         note: 'x',
       },
     },
@@ -83,9 +82,12 @@ const mockPeople: Person[] = [
   },
 ]
 
+// 'guitar' is intentionally NOT held by person-1 — used to test toggling a
+// role ON via the drawer's roles checklist (D-09).
 const mockRoles: Role[] = [
   { id: 'sound', name: 'Sound', group: 'tech', defaultCount: 1, order: 0 },
   { id: 'vocals', name: 'Vocals', group: 'vocals', defaultCount: 1, order: 1 },
+  { id: 'guitar', name: 'Guitar', group: 'band', defaultCount: 1, order: 2 },
 ]
 
 vi.mock('@/stores/roster', () => ({
@@ -108,7 +110,7 @@ describe('AvailabilityDrawer', () => {
     })
   }
 
-  it('renders one tier control (preset row) per held role, populated from roleTiers with legacy frequencyTier fallback (D-05/D-06)', () => {
+  it('renders one tier control (preset row) per held role, populated from roleFrequency with a regular/monthly default for absent roles (D-05/D-06)', () => {
     mockQuarter = makeQuarter()
     mockSetPersonAvailability.mockClear()
     mockUpdatePerson.mockClear()
@@ -120,14 +122,25 @@ describe('AvailabilityDrawer', () => {
     expect(soundButtons.length).toBe(FREQ_PRESET_COUNT)
     expect(vocalsButtons.length).toBe(FREQ_PRESET_COUNT)
 
-    // Sound has an explicit roleTiers entry: 'out'.
+    // Sound has an explicit roleFrequency entry: { tier: 'out', n: 0 }.
     const soundOut = soundButtons.find((b) => b.attributes('data-preset') === 'out')!
     expect(soundOut.attributes('data-active')).toBe('true')
 
-    // Vocals has no roleTiers entry — falls back to the legacy person-level
-    // frequencyTier ('fillin') per D-05.
-    const vocalsFillin = vocalsButtons.find((b) => b.attributes('data-preset') === 'fillin')!
-    expect(vocalsFillin.attributes('data-active')).toBe('true')
+    // Vocals has no roleFrequency entry — defaults to { tier: 'regular', n: 4 },
+    // which maps to the 'monthly' preset (D-05).
+    const vocalsMonthly = vocalsButtons.find((b) => b.attributes('data-preset') === 'monthly')!
+    expect(vocalsMonthly.attributes('data-active')).toBe('true')
+  })
+
+  it('does not render a date-range picker — per-Sunday click-to-toggle is the only blackout entry method (R-08)', () => {
+    mockQuarter = makeQuarter()
+    mockSetPersonAvailability.mockClear()
+    mockUpdatePerson.mockClear()
+
+    const wrapper = mountDrawer()
+
+    expect(wrapper.findAll('input[type="date"]').length).toBe(0)
+    expect(wrapper.text()).not.toContain('Block Sundays in range')
   })
 
   it('pre-populates blackout calendar, pairing chips, and quarter note from existing PersonQuarterData (D-07 unchanged)', () => {
@@ -177,7 +190,7 @@ describe('AvailabilityDrawer', () => {
     expect(blockedNow.sort()).toEqual(['2026-07-05', '2026-07-19'].sort())
   })
 
-  it('changing per-role tiers (Vocals -> Monthly, Sound -> Out) then saving calls setPersonAvailability with roleTiers carrying both (D-05)', async () => {
+  it('changing per-role tiers (Vocals -> Monthly, Sound -> Out) then saving calls setPersonAvailability with roleFrequency carrying both, and never writes a standing frequency through rosterStore (D-05)', async () => {
     mockQuarter = makeQuarter()
     mockSetPersonAvailability.mockClear()
     mockUpdatePerson.mockClear()
@@ -197,14 +210,48 @@ describe('AvailabilityDrawer', () => {
     const saveButton = wrapper.findAll('button').find((b) => b.text() === 'Save')!
     await saveButton.trigger('click')
 
-    // TEMPORARY (Phase 16 D-04/D-05 relocation, plan 16-01): the drawer still edits
-    // only the legacy per-role tier — full per-role cadence (n) editing lands in
-    // plan 16-04, which will replace this n:4 shim assertion.
     expect(mockSetPersonAvailability).toHaveBeenCalledWith('quarter-1', 'person-1', {
       blackoutDates: ['2026-07-19'],
       pairedWith: ['dean'],
-      roleFrequency: { sound: { tier: 'out', n: 4 }, vocals: { tier: 'regular', n: 4 } },
+      roleFrequency: { sound: { tier: 'out', n: 0 }, vocals: { tier: 'regular', n: 4 } },
       note: 'x',
     })
+
+    // No standing frequency write remains — frequency is fully quarter-scoped (D-05).
+    expect(mockUpdatePerson).not.toHaveBeenCalled()
+  })
+
+  it('renders a roles checklist bound to person.roles and toggling a role ON calls the roster store (not the quarters store) (D-09)', async () => {
+    mockQuarter = makeQuarter()
+    mockSetPersonAvailability.mockClear()
+    mockUpdatePerson.mockClear()
+
+    const wrapper = mountDrawer()
+
+    const soundCheckbox = wrapper.find('input[data-role="role-checkbox"][data-role-id="sound"]')
+    const vocalsCheckbox = wrapper.find('input[data-role="role-checkbox"][data-role-id="vocals"]')
+    const guitarCheckbox = wrapper.find('input[data-role="role-checkbox"][data-role-id="guitar"]')
+    expect((soundCheckbox.element as HTMLInputElement).checked).toBe(true)
+    expect((vocalsCheckbox.element as HTMLInputElement).checked).toBe(true)
+    expect((guitarCheckbox.element as HTMLInputElement).checked).toBe(false)
+
+    await guitarCheckbox.trigger('change')
+
+    expect(mockUpdatePerson).toHaveBeenCalledWith('person-1', { roles: ['sound', 'vocals', 'guitar'] })
+    expect(mockSetPersonAvailability).not.toHaveBeenCalled()
+  })
+
+  it('toggling an already-held role OFF calls rosterStore.updatePerson with it removed (D-09)', async () => {
+    mockQuarter = makeQuarter()
+    mockSetPersonAvailability.mockClear()
+    mockUpdatePerson.mockClear()
+
+    const wrapper = mountDrawer()
+
+    const soundCheckbox = wrapper.find('input[data-role="role-checkbox"][data-role-id="sound"]')
+    await soundCheckbox.trigger('change')
+
+    expect(mockUpdatePerson).toHaveBeenCalledWith('person-1', { roles: ['vocals'] })
+    expect(mockSetPersonAvailability).not.toHaveBeenCalled()
   })
 })
