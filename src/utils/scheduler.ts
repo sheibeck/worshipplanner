@@ -95,8 +95,16 @@ export function proposeQuarterSchedule(
     roleFrequencyOf(personId, roleId).tier
   // D-01/D-02 — whole-quarter cadence budget ceiling for a person's role, e.g. n=4 over 13
   // dates -> ceil(13/4) = 4. Used by propagatePairing's remaining-cadence-budget gate below.
-  const roleBudget = (personId: string, roleId: string): number =>
-    Math.ceil(serviceDates.length / roleFrequencyOf(personId, roleId).n)
+  // WR-02: n<=0 (the drawer's "As-needed (fill-in)" preset writes n:0, and a malformed/legacy
+  // roleFrequency entry could too) must NOT divide-by-zero into Infinity — that would make the
+  // withinCadence gate below always pass, letting a fill-in-tier partner be pulled onto every
+  // occurrence the anchor serves (the exact bug R-12 was written to prevent). Budget 0 means
+  // "never proactively pull this partner in via pairing propagation," matching R-12's intent.
+  const roleBudget = (personId: string, roleId: string): number => {
+    const n = roleFrequencyOf(personId, roleId).n
+    if (n <= 0) return 0
+    return Math.ceil(serviceDates.length / n)
+  }
 
   // Aggregate served count — kept for the external ProposeResult.servedCounts shape (unchanged,
   // Record<personId, number>; nothing outside scheduler.ts reads it beyond that shape).

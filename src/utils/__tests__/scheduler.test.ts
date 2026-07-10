@@ -605,4 +605,45 @@ describe('proposeQuarterSchedule', () => {
       expect(timAloneDates.length).toBeGreaterThan(0)
     })
   })
+
+  // --- WR-02 regression: fillin-tier n:0 (the drawer's real "As-needed (fill-in)" preset
+  // value) must not divide-by-zero into an Infinity roleBudget, which would defeat the R-12
+  // cadence gate above for exactly the tier the drawer actually produces. ---
+  describe('fillin-tier n=0 cadence gate (WR-02)', () => {
+    it('a paired fillin-tier partner with n:0 is never pulled in via pairing propagation (roleBudget does not divide by zero into Infinity)', () => {
+      const dates = Array.from({ length: 12 }, (_, i) => {
+        const d = new Date('2026-01-04T00:00:00Z')
+        d.setUTCDate(d.getUTCDate() + i * 7)
+        return d.toISOString().slice(0, 10)
+      })
+      const people = [
+        makePerson({ id: 'tim', name: 'Tim', roles: ['vocals'] }),
+        makePerson({ id: 'casey', name: 'Casey', roles: ['vocals'] }),
+        makePerson({ id: 'jamie', name: 'Jamie', roles: ['vocals'] }),
+      ]
+      const resolver = makeResolver([{ roleId: 'vocals', count: 1 }])
+      const pqd = [
+        makePQD({ personId: 'tim', pairedWith: ['casey'], roleFrequency: freq('vocals', 'regular', 2) }),
+        // n:0 — exactly the value AvailabilityDrawer.vue's "As-needed (fill-in)" preset writes.
+        makePQD({ personId: 'casey', pairedWith: ['tim'], roleFrequency: freq('vocals', 'fillin', 0) }),
+        // Jamie always out-competes Casey for the single regular slot so Casey (fillin-tier)
+        // is never chosen directly by the main eligible() loop — her only route onto the
+        // calendar would be via propagatePairing off Tim, same isolation trick as the
+        // Nolan/Tim scenario above.
+        makePQD({ personId: 'jamie', roleFrequency: freq('vocals', 'regular', 2) }),
+      ]
+
+      const result = proposeQuarterSchedule(people, dates, resolver, pqd)
+
+      // Pre-fix: roleBudget('casey', 'vocals') = ceil(12/0) = Infinity, so the withinCadence
+      // gate never excluded Casey and she'd be pulled onto every date Tim serves. Post-fix,
+      // budget is 0, so she is never proactively pulled in via pairing.
+      expect(result.servedCounts['casey'] ?? 0).toBe(0)
+      for (const date of dates) {
+        expect(result.calendar[date]?.['vocals'] ?? []).not.toContain('casey')
+      }
+      // Cadence-driven skip is silent (D-03) — no pairingConflicts entries for Casey.
+      expect(result.pairingConflicts.filter((c) => c.partnerId === 'casey')).toHaveLength(0)
+    })
+  })
 })
