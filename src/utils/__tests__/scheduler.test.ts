@@ -9,10 +9,8 @@ import type {
   RoleFrequencyEntry,
 } from '@/types/roster'
 
-// Factory helper for Person. Standing frequency fields (frequencyTargetN/roleFrequencies) are
-// @deprecated (Phase 16 D-04) and no longer read by the scheduler — frequencyTargetN is still
-// required by the Person type shape, so a harmless default is supplied, but no test below relies
-// on it to convey scheduling behavior (see makePQD's roleFrequency instead).
+// Factory helper for Person. Frequency behavior is entirely quarter-scoped now (D-04/D-05) —
+// see makePQD's roleFrequency for the single source of truth the scheduler reads.
 function makePerson(overrides: Partial<Person> & { id: string }): Person {
   return {
     id: overrides.id,
@@ -21,7 +19,6 @@ function makePerson(overrides: Partial<Person> & { id: string }): Person {
     phone: overrides.phone ?? '',
     active: overrides.active ?? true,
     roles: overrides.roles ?? [],
-    frequencyTargetN: overrides.frequencyTargetN ?? 4,
     pcPersonId: overrides.pcPersonId ?? null,
     createdAt: overrides.createdAt ?? ({} as any),
     updatedAt: overrides.updatedAt ?? ({} as any),

@@ -16,7 +16,6 @@ function makePerson(id: string, name: string, active = true): Person {
     phone: '',
     active,
     roles: [],
-    frequencyTargetN: 4,
     pcPersonId: null,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     createdAt: null as any,
@@ -80,7 +79,7 @@ describe('parseVolunteerCsvRow', () => {
 })
 
 describe('parseVolunteerCsvRow — no per-role CSV schema change (Pitfall 4, D-07 graceful degrade)', () => {
-  it('emits exactly one scalar frequencyN per row, regardless of role count — no roleFrequencies/per-role structure', () => {
+  it('emits exactly one scalar frequencyN per row, regardless of role count — no per-role structure', () => {
     const result = parseVolunteerCsvRow({
       Name: 'Multi Role Person',
       Roles: 'guitar; vocals; bass',
@@ -91,7 +90,6 @@ describe('parseVolunteerCsvRow — no per-role CSV schema change (Pitfall 4, D-0
     expect(typeof result.frequencyN).toBe('number')
     expect(result.frequencyN).toBe(2)
     expect(result.rolesRaw).toHaveLength(3)
-    expect(result).not.toHaveProperty('roleFrequencies')
     // Exact key set — proves the parser's output shape is unchanged by Phase 15
     // (the per-role application happens at the caller layer, not here).
     expect(Object.keys(result)).toEqual([

@@ -150,8 +150,6 @@ describe('RosterView — roles-only Volunteer form (D-07)', () => {
       phone: '',
       roles: ['r-guitar', 'r-vocals'],
     })
-    expect(input).not.toHaveProperty('frequencyTargetN')
-    expect(input).not.toHaveProperty('roleFrequencies')
   })
 })
 

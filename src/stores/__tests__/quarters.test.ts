@@ -93,7 +93,6 @@ function makePerson(overrides: Partial<Person> = {}): Person {
     phone: '',
     active: true,
     roles: [],
-    frequencyTargetN: 4,
     pcPersonId: null,
     createdAt: { seconds: 1000000, nanoseconds: 0 } as never,
     updatedAt: { seconds: 1000000, nanoseconds: 0 } as never,
@@ -810,7 +809,7 @@ describe('useQuartersStore', () => {
       // A single person eligible for both a TECH role and a BAND role — without roleGroupOf
       // wired in, the pre-15-04 scheduler would happily double-book them on the same date.
       mockRosterState.activePeople = [
-        makePerson({ id: 'person-a', roles: ['role-sound', 'role-guitar'], frequencyTargetN: 1 }),
+        makePerson({ id: 'person-a', roles: ['role-sound', 'role-guitar'] }),
       ]
       mockRosterState.roles = [
         makeRole({ id: 'role-sound', name: 'sound', group: 'tech', order: 0 }),

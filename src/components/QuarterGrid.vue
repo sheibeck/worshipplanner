@@ -345,8 +345,8 @@ function hasRole(person: Person, roleId: string): boolean {
 }
 
 // D-04/D-05: 'out'-tier people must never be offered as a manual gap-filling candidate,
-// mirroring the auto-proposal exclusion (defaults 'regular' when absent — pre-Phase-14
-// data has no frequencyTier at all). Per-role (D-05): a person can be 'out' for one role
+// mirroring the auto-proposal exclusion (defaults 'regular' when the roleFrequency entry
+// is absent). Per-role (D-05): a person can be 'out' for one role
 // they hold while remaining 'regular' for another — reads roleFrequency[roleId].tier,
 // the single source of truth (R-05), mirroring scheduler.ts's tierOf.
 function tierOf(personId: string, roleId: string): FrequencyTier {
