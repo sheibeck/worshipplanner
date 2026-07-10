@@ -60,7 +60,7 @@
       </div>
       <div v-if="shareError" class="text-sm text-red-400 mb-6">{{ shareError }}</div>
 
-      <!-- Quarter selector + create -->
+      <!-- Quarter switcher (select-only, D-13) -->
       <div class="rounded-lg border border-gray-800 bg-gray-900 p-5 mb-6">
         <div class="flex flex-wrap items-end gap-4">
           <div v-if="quartersStore.quarters.length > 0">
@@ -73,34 +73,13 @@
             </select>
           </div>
 
-          <div class="flex items-end gap-3">
-            <div>
-              <label class="block text-xs font-medium text-gray-400 mb-1">Year</label>
-              <input
-                v-model.number="newQuarterYear"
-                type="number"
-                class="w-24 rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-              />
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-gray-400 mb-1">Quarter</label>
-              <select
-                v-model.number="newQuarterNum"
-                class="rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-              >
-                <option :value="1">Q1</option>
-                <option :value="2">Q2</option>
-                <option :value="3">Q3</option>
-                <option :value="4">Q4</option>
-              </select>
-            </div>
-            <button
-              @click="onCreateQuarter"
-              class="inline-flex items-center gap-2 rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm font-medium text-gray-200 hover:bg-gray-700 hover:text-white transition-colors"
-            >
-              New quarter ({{ newQuarterLabel }})
-            </button>
-          </div>
+          <button
+            type="button"
+            @click="addQuarterOpen = true"
+            class="inline-flex items-center gap-2 rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm font-medium text-gray-200 hover:bg-gray-700 hover:text-white transition-colors"
+          >
+            + Add quarter
+          </button>
         </div>
       </div>
 
@@ -303,6 +282,85 @@
       :person-id="openPersonId"
       @close="openPersonId = null"
     />
+
+    <!-- Add-quarter modal (R-10/D-13) — secondary, separate from the quarter switcher -->
+    <Teleport to="body">
+      <Transition
+        enter-active-class="transition-opacity duration-200 ease-out"
+        enter-from-class="opacity-0"
+        enter-to-class="opacity-100"
+        leave-active-class="transition-opacity duration-150 ease-in"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0"
+      >
+        <div
+          v-if="addQuarterOpen"
+          class="fixed inset-0 z-40 bg-black/60"
+          @click="onCloseAddQuarter"
+        ></div>
+      </Transition>
+
+      <Transition
+        enter-active-class="transition-all duration-200 ease-out"
+        enter-from-class="opacity-0 scale-95"
+        enter-to-class="opacity-100 scale-100"
+        leave-active-class="transition-all duration-150 ease-in"
+        leave-from-class="opacity-100 scale-100"
+        leave-to-class="opacity-0 scale-95"
+      >
+        <div
+          v-if="addQuarterOpen"
+          class="fixed inset-0 z-50 flex items-center justify-center p-4"
+          @click.self="onCloseAddQuarter"
+        >
+          <div class="w-full max-w-sm bg-gray-900 rounded-xl border border-gray-700 shadow-2xl flex flex-col">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-800 shrink-0">
+              <h2 class="text-base font-semibold text-gray-100">Add a new quarter</h2>
+            </div>
+            <div class="px-6 py-4 space-y-4">
+              <div class="flex items-end gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-gray-400 mb-1">Year</label>
+                  <input
+                    v-model.number="newQuarterYear"
+                    type="number"
+                    class="w-24 rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-400 mb-1">Quarter</label>
+                  <select
+                    v-model.number="newQuarterNum"
+                    class="rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                  >
+                    <option :value="1">Q1</option>
+                    <option :value="2">Q2</option>
+                    <option :value="3">Q3</option>
+                    <option :value="4">Q4</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 px-6 py-4 border-t border-gray-800 shrink-0">
+              <button
+                type="button"
+                @click="onCreateQuarter"
+                class="px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors"
+              >
+                Create quarter
+              </button>
+              <button
+                type="button"
+                @click="onCloseAddQuarter"
+                class="px-4 py-2 rounded-md text-sm text-gray-400 border border-gray-700 hover:bg-gray-800 transition-colors"
+              >
+                Don't create
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </AppShell>
   </div>
 
@@ -352,7 +410,8 @@ watch(
   },
 )
 
-// ── New quarter creation ─────────────────────────────────────────────────────
+// ── New quarter creation (Add-quarter modal, R-10/D-13) ─────────────────────
+const addQuarterOpen = ref(false)
 const newQuarterYear = ref(new Date().getFullYear())
 const newQuarterNum = ref<1 | 2 | 3 | 4>(1)
 const newQuarterLabel = computed(() => `Q${newQuarterNum.value} ${newQuarterYear.value}`)
@@ -360,6 +419,11 @@ const newQuarterLabel = computed(() => `Q${newQuarterNum.value} ${newQuarterYear
 async function onCreateQuarter() {
   const id = await quartersStore.createQuarter(newQuarterYear.value, newQuarterNum.value, newQuarterLabel.value)
   selectedQuarterId.value = id
+  addQuarterOpen.value = false
+}
+
+function onCloseAddQuarter() {
+  addQuarterOpen.value = false
 }
 
 // ── Service dates ────────────────────────────────────────────────────────────
