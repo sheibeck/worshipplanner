@@ -533,4 +533,79 @@ describe('proposeQuarterSchedule', () => {
     expect(result.unfilled).toContainEqual({ date: '2026-01-04', roleId: 'guitar' })
     expect(result.calendar['2026-01-04']?.['vocals']).toEqual(['p1'])
   })
+
+  // --- R-12: propagatePairing gated by remaining per-role cadence budget (D-01/D-02/D-03) ---
+
+  describe('cadence-gated pairing (R-12)', () => {
+    // Canonical Nolan/Tim scenario, constructed per RESEARCH.md Pitfall 4's mitigation: Nolan's
+    // only role ('vocals') is the SAME role Tim holds (co-vocalist shape), which sidesteps the
+    // documented residual edge case (Open Question 1 — the main loop's independent selection
+    // path) by adding a third regular vocalist (Jamie) who out-competes Nolan for the single
+    // slot every date, so Nolan is never chosen directly by the main eligible() loop — his only
+    // route onto the calendar is via propagatePairing off a Tim (or Jamie) pick.
+    function buildNolanTimScenario(dateCount: number) {
+      const dates = Array.from({ length: dateCount }, (_, i) => {
+        const d = new Date('2026-01-04T00:00:00Z')
+        d.setUTCDate(d.getUTCDate() + i * 7)
+        return d.toISOString().slice(0, 10)
+      })
+      const people = [
+        makePerson({ id: 'tim', name: 'Tim', roles: ['vocals'] }),
+        makePerson({ id: 'nolan', name: 'Nolan', roles: ['vocals'] }),
+        makePerson({ id: 'jamie', name: 'Jamie', roles: ['vocals'] }),
+      ]
+      const resolver = makeResolver([{ roleId: 'vocals', count: 1 }])
+      const pqd = [
+        makePQD({ personId: 'tim', pairedWith: ['nolan'], roleFrequency: freq('vocals', 'regular', 2) }),
+        makePQD({ personId: 'nolan', pairedWith: ['tim'], roleFrequency: freq('vocals', 'regular', 4) }),
+        makePQD({ personId: 'jamie', roleFrequency: freq('vocals', 'regular', 2) }),
+      ]
+      const result = proposeQuarterSchedule(people, dates, resolver, pqd)
+      return { dates, result }
+    }
+
+    it('containment: every date Nolan serves, Tim also serves that date — across the FULL calendar, not just dates Tim already served (D-01)', () => {
+      const { dates, result } = buildNolanTimScenario(26)
+      for (const date of dates) {
+        const vocals = result.calendar[date]?.['vocals'] ?? []
+        if (vocals.includes('nolan')) {
+          expect(vocals).toContain('tim')
+        }
+      }
+    })
+
+    it('cadence budget: Nolan\'s served count is capped at his own remaining-cadence budget (ceil(dates/4)), never inflated to Tim\'s cadence (D-01/D-02)', () => {
+      const { result } = buildNolanTimScenario(26)
+      // budget = ceil(26 / 4) = 7
+      expect(result.servedCounts['nolan']).toBe(7)
+      // Tim serves far more often than Nolan (his own ~twice-a-month cadence, competing with
+      // Jamie for the shared slot) — proof pairing did NOT drag Nolan up to Tim's cadence.
+      expect(result.servedCounts['tim']).toBeGreaterThan(result.servedCounts['nolan'])
+    })
+
+    it('even spread: Nolan\'s pulled-in occurrences land on a consistent cadence, inherited from Tim\'s already-evenly-spread schedule — not clustered together (D-02)', () => {
+      const { dates, result } = buildNolanTimScenario(26)
+      const nolanIndices = dates
+        .map((date, i) => ({ i, served: (result.calendar[date]?.['vocals'] ?? []).includes('nolan') }))
+        .filter((e) => e.served)
+        .map((e) => e.i)
+      const gaps = nolanIndices.slice(1).map((v, i) => v - nolanIndices[i]!)
+      // Every gap between consecutive Nolan occurrences is identical and > 1 date apart —
+      // evenly spaced, not arbitrarily front-loaded/clustered back-to-back.
+      expect(new Set(gaps).size).toBe(1)
+      expect(gaps[0]).toBeGreaterThan(1)
+    })
+
+    it('silent skip: once Nolan\'s cadence budget is exhausted, Tim\'s remaining ("extra") dates proceed alone with NO pairingConflicts entry recorded (D-03)', () => {
+      const { dates, result } = buildNolanTimScenario(26)
+      expect(result.pairingConflicts).toHaveLength(0)
+      const timAloneDates = dates.filter((date) => {
+        const vocals = result.calendar[date]?.['vocals'] ?? []
+        return vocals.includes('tim') && !vocals.includes('nolan')
+      })
+      // Tim has at least one date where his cadence exceeds what Nolan's budget can absorb —
+      // that date proceeds with Tim alone, silently (no conflict entry for it).
+      expect(timAloneDates.length).toBeGreaterThan(0)
+    })
+  })
 })
