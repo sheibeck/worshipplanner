@@ -5,6 +5,7 @@ import type {
   QuarterCalendar,
   ProposeResult,
   FrequencyTier,
+  RoleFrequencyEntry,
   RoleGroup,
 } from '@/types/roster'
 
@@ -86,10 +87,12 @@ export function proposeQuarterSchedule(
     pqdById.get(personId)?.blackoutDates.includes(date) ?? false
   const partnersOf = (personId: string) => pqdById.get(personId)?.pairedWith ?? []
   // undefined = pre-migration data (or no PQD entry at all) — treat as 'regular' (D-05).
-  // Per-role tier reads roleTiers[roleId] first, then falls back to the legacy per-person
-  // frequencyTier, then to 'regular'.
+  // Quarter-scoped, per-role single source of truth (D-04) — tier and cadence-N both read
+  // from PersonQuarterData.roleFrequency; absent role entry defaults to {tier:'regular', n:4}.
+  const roleFrequencyOf = (personId: string, roleId: string): RoleFrequencyEntry =>
+    pqdById.get(personId)?.roleFrequency?.[roleId] ?? { tier: 'regular', n: 4 }
   const tierOf = (personId: string, roleId: string): FrequencyTier =>
-    pqdById.get(personId)?.roleTiers?.[roleId] ?? pqdById.get(personId)?.frequencyTier ?? 'regular'
+    roleFrequencyOf(personId, roleId).tier
 
   // Aggregate served count — kept for the external ProposeResult.servedCounts shape (unchanged,
   // Record<personId, number>; nothing outside scheduler.ts reads it beyond that shape).
@@ -209,9 +212,9 @@ export function proposeQuarterSchedule(
         }
         const scored = candidates
           .map((p) => {
-            // Per-role cadence (D-05): N falls back to the person's frequencyTargetN when this
-            // role has no explicit entry in roleFrequencies.
-            const n = p.roleFrequencies?.[roleId] ?? p.frequencyTargetN
+            // Per-role cadence (D-05): N sourced from the quarter-scoped roleFrequency entry
+            // (D-04); absent role entry defaults to n=4 via roleFrequencyOf.
+            const n = roleFrequencyOf(p.id, roleId).n
             return {
               p,
               // fillin-tier candidates have no meaningful cadence-based deficit — tie-break
