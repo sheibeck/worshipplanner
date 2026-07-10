@@ -19,12 +19,6 @@ export interface Person {
   active: boolean // soft-delete inverse (D-20); inactive people drop out of proposals + pickers
   /** STANDING data (D-18) — Role.id[] this person can fill */
   roles: string[]
-  /** @deprecated replaced by PersonQuarterData.roleFrequency (Phase 16 D-04); removed in plan 16-11.
-   *  STANDING data (D-06/D-18) — 1-in-N cadence: 1 = weekly, 2 = every other week, 4 = ~monthly. */
-  frequencyTargetN: number
-  /** @deprecated replaced by PersonQuarterData.roleFrequency (Phase 16 D-04); removed in plan 16-11.
-   *  STANDING data (D-04) — roleId -> 1-in-N cadence, one target per held role. */
-  roleFrequencies?: Record<string, number>
   pcPersonId: string | null // Planning Center people id, for re-import matching
   createdAt: Timestamp
   updatedAt: Timestamp
@@ -36,7 +30,7 @@ export interface RoleSlotConfig {
 }
 
 // Quarter-scoped fill-in/out frequency behavior (D-04/D-05). Optional — defaults to
-// 'regular' when absent (pre-migration Phase 13 data has no frequencyTier at all).
+// 'regular' when the roleFrequency entry for a role is absent.
 export type FrequencyTier = 'regular' | 'fillin' | 'out'
 
 /**
@@ -57,17 +51,10 @@ export interface PersonQuarterData {
   personId: string
   blackoutDates: string[] // expanded YYYY-MM-DD list (D-17 ranges already expanded against serviceDates)
   pairedWith: string[] // Person.id[], bidirectional — must-serve-with pairings (D-09)
-  /** Quarter-scoped, per-role, single source of truth (D-04/D-05) — replaces the old
-   *  standing Person.roleFrequencies/frequencyTargetN AND the old PersonQuarterData
-   *  roleTiers/frequencyTier split. One control, one lookup, one field per held role.
-   *  Default when a role entry is absent: { tier: 'regular', n: 4 }. */
+  /** Quarter-scoped, per-role, single source of truth (D-04/D-05) — one control, one
+   *  lookup, one field per held role. Default when a role entry is absent:
+   *  { tier: 'regular', n: 4 }. */
   roleFrequency?: Record<string, RoleFrequencyEntry>
-  /** @deprecated replaced by PersonQuarterData.roleFrequency (Phase 16 D-04); removed in plan 16-11.
-   *  Quarter-scoped (D-05/A1) — resets each new quarter. Optional; defaults to 'regular' when absent. */
-  frequencyTier?: FrequencyTier
-  /** @deprecated replaced by PersonQuarterData.roleFrequency (Phase 16 D-04); removed in plan 16-11.
-   *  Quarter-scoped (D-05) — roleId -> tier, one tier per held role. */
-  roleTiers?: Record<string, FrequencyTier>
   /** Free-text quarter note (D-03/D-07) — never auto-scheduled. Optional; defaults to '' when absent. */
   note?: string
 }
@@ -103,8 +90,6 @@ export interface UpsertPersonInput {
   email: string
   phone?: string
   roles?: string[]
-  frequencyTargetN?: number
-  roleFrequencies?: Record<string, number>
   pcPersonId?: string | null
 }
 
