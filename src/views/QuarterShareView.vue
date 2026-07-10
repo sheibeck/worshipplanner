@@ -21,8 +21,8 @@
         <p class="text-sm text-gray-600 mt-1">Volunteer Schedule</p>
       </div>
 
-      <!-- Toolbar: view toggle -->
-      <div class="flex items-center gap-2 mb-4">
+      <!-- Toolbar: view toggle + name filter -->
+      <div class="flex flex-wrap items-center gap-3 mb-4">
         <div
           class="inline-flex rounded-md border border-gray-200 overflow-hidden text-sm"
           role="group"
@@ -45,6 +45,43 @@
             List
           </button>
         </div>
+
+        <div class="relative">
+          <input
+            v-model="nameQuery"
+            type="text"
+            placeholder="Filter by name…"
+            class="w-48 border border-gray-200 rounded-md px-3 py-1.5 text-sm text-gray-900 placeholder-gray-400"
+            @focus="nameMenuOpen = true"
+            @blur="onNameBlur"
+          />
+          <div
+            v-if="nameMenuOpen"
+            class="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10 max-h-48 overflow-auto"
+          >
+            <div
+              v-for="candidate in filteredCandidateNames"
+              :key="candidate"
+              data-role="name-candidate"
+              class="px-3 py-2 text-sm text-gray-800 hover:bg-gray-100 cursor-pointer"
+              @mousedown.prevent="selectName(candidate)"
+            >
+              {{ candidate }}
+            </div>
+            <div v-if="filteredCandidateNames.length === 0" class="px-3 py-2 text-sm text-gray-400">
+              No matching names
+            </div>
+          </div>
+        </div>
+
+        <button
+          v-if="nameFilter"
+          type="button"
+          class="text-sm text-gray-600 underline"
+          @click="clearNameFilter"
+        >
+          Show everyone
+        </button>
       </div>
 
       <div class="border-b border-gray-200 mb-4"></div>
@@ -53,14 +90,14 @@
       <QuarterShareMatrix
         v-if="viewMode === 'matrix'"
         :roles="sortedRoles"
-        :dates="quarterSnapshot.serviceDates"
+        :dates="filteredDates"
         :people-for="peopleFor"
       />
 
       <!-- List view -->
       <div v-else>
         <div
-          v-for="date in quarterSnapshot.serviceDates"
+          v-for="date in filteredDates"
           :key="date"
           class="py-2.5 border-b border-gray-100"
         >
@@ -124,6 +161,12 @@ type ViewMode = 'matrix' | 'list'
 const initialView = (route.query.view as ViewMode | undefined) ?? (isDesktop.value ? 'matrix' : 'list')
 const viewMode = ref<ViewMode>(initialView)
 
+// Name filter (D-15/D-16) — nameFilter is the exact, selected snapshot name (or null);
+// nameQuery is the raw typeahead input text; hydrated from route.query.name on mount.
+const nameFilter = ref<string | null>((route.query.name as string | undefined) ?? null)
+const nameQuery = ref(nameFilter.value ?? '')
+const nameMenuOpen = ref(false)
+
 // ── Computed ────────────────────────────────────────────────────────────────
 
 // Roles grouped Band/Tech/Other, mirroring QuarterGrid/RosterPrintLayout ordering.
@@ -140,6 +183,49 @@ function peopleFor(date: string, roleId: string): string[] {
   return quarterSnapshot.value?.calendar[date]?.[roleId] ?? []
 }
 
+// Deduped person names collected from the snapshot's own calendar — never rosterStore (D-24).
+const candidateNames = computed<string[]>(() => {
+  if (!quarterSnapshot.value) return []
+  const names = new Set<string>()
+  for (const dateEntry of Object.values(quarterSnapshot.value.calendar)) {
+    for (const people of Object.values(dateEntry)) {
+      for (const name of people) names.add(name)
+    }
+  }
+  return [...names].sort()
+})
+
+const filteredCandidateNames = computed<string[]>(() => {
+  const q = nameQuery.value.trim().toLowerCase()
+  return candidateNames.value.filter((name) => q === '' || name.toLowerCase().includes(q))
+})
+
+// Dates where the selected name serves in at least one role; unfiltered when no name is set.
+const filteredDates = computed<string[]>(() => {
+  if (!quarterSnapshot.value) return []
+  if (!nameFilter.value) return quarterSnapshot.value.serviceDates
+  return quarterSnapshot.value.serviceDates.filter((date) =>
+    sortedRoles.value.some((role) => peopleFor(date, role.id).includes(nameFilter.value!)),
+  )
+})
+
+function selectName(name: string) {
+  nameFilter.value = name
+  nameQuery.value = name
+  nameMenuOpen.value = false
+}
+
+function clearNameFilter() {
+  nameFilter.value = null
+  nameQuery.value = ''
+}
+
+function onNameBlur() {
+  window.setTimeout(() => {
+    nameMenuOpen.value = false
+  }, 150)
+}
+
 function formatDateLabel(date: string): string {
   const [year, month, day] = date.split('-').map(Number)
   return new Date(year!, month! - 1, day!).toLocaleDateString('en-US', {
@@ -152,9 +238,9 @@ function formatDateLabel(date: string): string {
 
 // ── URL persistence (D-16) ─────────────────────────────────────────────────
 // Mirrors SongsView.vue's router.replace({query}) convention — spreads existing
-// route.query and never pushes a history entry for view-mode changes.
-watch(viewMode, (view) => {
-  router.replace({ query: { ...route.query, view } })
+// route.query and never pushes a history entry for view/filter changes.
+watch([viewMode, nameFilter], ([view, name]) => {
+  router.replace({ query: { ...route.query, view, name: name || undefined } })
 })
 
 // ── Mount ───────────────────────────────────────────────────────────────────
