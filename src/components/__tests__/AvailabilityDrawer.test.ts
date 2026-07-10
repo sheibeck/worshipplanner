@@ -82,9 +82,12 @@ const mockPeople: Person[] = [
   },
 ]
 
+// 'guitar' is intentionally NOT held by person-1 — used to test toggling a
+// role ON via the drawer's roles checklist (D-09).
 const mockRoles: Role[] = [
   { id: 'sound', name: 'Sound', group: 'tech', defaultCount: 1, order: 0 },
   { id: 'vocals', name: 'Vocals', group: 'vocals', defaultCount: 1, order: 1 },
+  { id: 'guitar', name: 'Guitar', group: 'band', defaultCount: 1, order: 2 },
 ]
 
 vi.mock('@/stores/roster', () => ({
@@ -216,5 +219,39 @@ describe('AvailabilityDrawer', () => {
 
     // No standing frequency write remains — frequency is fully quarter-scoped (D-05).
     expect(mockUpdatePerson).not.toHaveBeenCalled()
+  })
+
+  it('renders a roles checklist bound to person.roles and toggling a role ON calls the roster store (not the quarters store) (D-09)', async () => {
+    mockQuarter = makeQuarter()
+    mockSetPersonAvailability.mockClear()
+    mockUpdatePerson.mockClear()
+
+    const wrapper = mountDrawer()
+
+    const soundCheckbox = wrapper.find('input[data-role="role-checkbox"][data-role-id="sound"]')
+    const vocalsCheckbox = wrapper.find('input[data-role="role-checkbox"][data-role-id="vocals"]')
+    const guitarCheckbox = wrapper.find('input[data-role="role-checkbox"][data-role-id="guitar"]')
+    expect((soundCheckbox.element as HTMLInputElement).checked).toBe(true)
+    expect((vocalsCheckbox.element as HTMLInputElement).checked).toBe(true)
+    expect((guitarCheckbox.element as HTMLInputElement).checked).toBe(false)
+
+    await guitarCheckbox.trigger('change')
+
+    expect(mockUpdatePerson).toHaveBeenCalledWith('person-1', { roles: ['sound', 'vocals', 'guitar'] })
+    expect(mockSetPersonAvailability).not.toHaveBeenCalled()
+  })
+
+  it('toggling an already-held role OFF calls rosterStore.updatePerson with it removed (D-09)', async () => {
+    mockQuarter = makeQuarter()
+    mockSetPersonAvailability.mockClear()
+    mockUpdatePerson.mockClear()
+
+    const wrapper = mountDrawer()
+
+    const soundCheckbox = wrapper.find('input[data-role="role-checkbox"][data-role-id="sound"]')
+    await soundCheckbox.trigger('change')
+
+    expect(mockUpdatePerson).toHaveBeenCalledWith('person-1', { roles: ['vocals'] })
+    expect(mockSetPersonAvailability).not.toHaveBeenCalled()
   })
 })
