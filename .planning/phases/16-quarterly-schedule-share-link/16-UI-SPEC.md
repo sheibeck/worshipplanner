@@ -28,37 +28,54 @@ created: 2026-07-09
 
 ---
 
+## Visual Hierarchy / Focal Points
+
+One declared focal point per primary screen this phase touches:
+
+- **Schedule screen (`QuarterView`, dark):** `QuarterGrid` (the dates × roles assignment table) is the primary visual anchor — it stays always-visible and full-width; the collapsible setup sections above it recede (collapsed by preference) so the grid dominates once a schedule exists.
+- **Public share page (`QuarterShareView`, light):** the matrix table is the primary visual anchor by default (D-14) — the view toggle and name filter are secondary chrome sitting above it in a lightweight toolbar.
+- **Volunteer screen (`RosterView`, dark):** the active-people table is the primary visual anchor — Roles config and Inactive Volunteers collapse beneath it so the roster stays the focus.
+- **Slide-out group editor (`QuarterGrid` R-14, dark):** the current-assignments list is the focal element inside the panel; the add-person control and gap-filling lists are secondary below it.
+
+---
+
 ## Spacing Scale
 
-Declared values (multiples of 4, Tailwind's native grid — matches the existing app exactly):
+Declared values (standard 8-point scale — 4, 8, 16, 24, 32; matches the standard set exactly):
 
 | Token | Value | Usage |
 |-------|-------|-------|
 | xs | 4px | Icon-to-text gaps (`gap-1`), tight badge padding |
-| sm | 8px | Compact control spacing (`gap-2`, `px-2 py-2` grid cells) |
-| md | 12px | Row-level gaps (`gap-3`), inline control clusters |
-| base | 16px | Default element spacing (`px-4 py-3`, section padding) |
-| lg | 20px | Card padding (`p-5` — used on every `QuarterView`/`RosterView` panel) |
-| xl | 24px | Section margins (`mb-6`), page-edge padding (`px-6`) |
-| 2xl | 32px | Page vertical padding (`py-8`) |
+| sm | 8px | Compact control spacing (`gap-2`, `px-2 py-2` grid/matrix cells), row-level inline control gaps |
+| base | 16px | Default element spacing (`px-4`, `gap-4`), section/card padding, collapsible-section header padding |
+| lg | 24px | Section margins (`mb-6`), page-edge padding (`px-6`), major card padding (`p-6`) |
+| xl | 32px | Page vertical padding (`py-8`) |
 
-Exceptions:
-- `py-2.5` (10px) is an established one-off on `QuarterShareView`'s list rows — do not introduce new 10px usages; the 12px (`gap-3`/`py-3`) token is the deliberate replacement for the 20-row cadence in this phase's new matrix rows.
-- Matrix cells (new, `QuarterShareMatrix.vue`) use `px-2 py-2` (8px) to match `QuarterGrid.vue`'s existing cell padding — visual parity between the editing grid and the share matrix is intentional (Pattern 4, RESEARCH.md).
-- `CollapsibleSection.vue` header uses `px-4 py-3` (16px/12px), copied verbatim from `ArrangementAccordion.vue`'s header — do not invent new header padding.
+**Remapping for this phase's new surfaces (bringing existing off-grid usages onto the standard scale):**
+- Row-level gaps the existing app renders at 12px (`gap-3`) are declared at **8px (`gap-2`)** for this phase's new inline control clusters (add-quarter modal, matrix toolbar, name-filter row).
+- Card padding the existing app renders at 20px (`p-5`) is declared at **16px (`p-4`)** or **24px (`p-6`)** for this phase's new panels (add-quarter modal, `CollapsibleSection` body) — never 20px.
+- Collapsible-section header padding is declared at **16px (`p-4`)** for new usage.
+- Matrix cells (new, `QuarterShareMatrix.vue`) use `px-2 py-2` (**8px**), matching `QuarterGrid.vue`'s existing cell padding — visual parity between the editing grid and the share matrix is intentional (Pattern 4, RESEARCH.md).
+
+Exceptions / do-not-replicate (pre-existing legacy, untouched by this phase):
+- `py-2.5` (10px, `QuarterShareView` list rows), `p-5` (20px, existing `QuarterView`/`RosterView` panels), and `py-3` (12px, `ArrangementAccordion` header) are pre-existing off-grid values from earlier phases. This phase does NOT introduce them on any new surface and does NOT refactor the existing ones — documented here only as "do not replicate." New share-matrix rows use **8px (`py-2`)**; new panels/headers use 16px/24px per the remapping above.
 
 ---
 
 ## Typography
 
-| Role | Size | Weight | Line Height |
-|------|------|--------|-------------|
-| Label / meta | 12px (`text-xs`) | 500 (medium) | 1.4 (Tailwind default) — used for uppercase eyebrow headers, badges, table column headers, help text |
-| Body / control | 14px (`text-sm`) | 400 (regular); 500 (medium) for buttons, links, table cell emphasis | 1.5 |
-| Heading-sm | 16px (`text-base`) | 500 (medium) — used for empty-state headings, share-page date rows, drawer title | 1.3 |
-| Page heading | 20px (`text-xl`) | 600 (semibold) — page `<h1>`, drawer `<h2>` | 1.2 |
+This phase's own new surfaces declare exactly **2 weights**: 400 (regular) and 600 (semibold).
 
-**2 primary weights declared:** 400 (regular, body copy) and 600 (semibold, headings/emphasis). **500 (medium) is an established, heavily-used exception** across the whole existing app (buttons, labels, table headers, nav items) — kept as-is because the entire 15-phase codebase is built on it; do not remove or replace it in this phase's new surfaces. **700 (bold)** appears only on `AvailabilityDrawer.vue`'s uppercase section eyebrows (`text-xs font-bold uppercase tracking-wide`) — reuse this exact pattern for any new section eyebrow in this phase (e.g. `CollapsibleSection` if it needs an eyebrow), do not extend bold usage elsewhere.
+| Role | Size | Weight (this phase's new surfaces) | Line Height |
+|------|------|-------------------------------------|-------------|
+| Label / meta | 12px (`text-xs`) | 400 regular (600 semibold for eyebrow section headers) | 1.4 |
+| Body / control | 14px (`text-sm`) | 400 regular (600 semibold for emphasized cells/CTAs) | 1.5 |
+| Heading-sm | 16px (`text-base`) | 600 semibold — empty-state headings, share-page date rows, drawer/slide-out title | 1.3 |
+| Page heading | 20px (`text-xl`) | 600 semibold — page `<h1>`, drawer `<h2>` | 1.2 |
+
+**2 weights declared for this phase:** 400 (regular, body copy) and 600 (semibold, headings/emphasis/eyebrows). New eyebrow section headers (e.g. `CollapsibleSection`) that in existing components used `font-bold` (700) are declared here at **600 (semibold)** — the phase's own type scale does not use 700.
+
+**Pre-established legacy weights (NOT declared or introduced by this phase — reused verbatim only when extending untouched existing components):** the 15-phase codebase renders many buttons, labels, table headers, and nav items at **500 (medium)**, and `AvailabilityDrawer.vue`'s uppercase eyebrows at **700 (bold)**. When this phase edits an existing component in place (e.g. removing the frequency section from `AvailabilityDrawer`/`RosterView`), the surrounding 500/700 markup is left as-is rather than restyled — those are pre-existing declarations, not part of this phase's 2-weight scale. Any *new* surface (`QuarterShareMatrix`, `CollapsibleSection`, add-quarter modal, name filter, view toggle) uses only 400/600.
 
 ---
 
@@ -69,7 +86,7 @@ Exceptions:
 | Role | Value | Usage |
 |------|-------|-------|
 | Dominant (60%) | `#030712` (gray-950) | `html`/`body`/`#app` background — the base canvas behind every authenticated screen |
-| Secondary (30%) | `#111827` (gray-900) w/ `#1f2937` (gray-800) borders | Sidebar, page cards (`rounded-lg border border-gray-800 bg-gray-900 p-5`), drawer/slide-out panel background, table header rows |
+| Secondary (30%) | `#111827` (gray-900) w/ `#1f2937` (gray-800) borders | Sidebar, page cards (`rounded-lg border border-gray-800 bg-gray-900`), drawer/slide-out panel background, table header rows |
 | Accent (10%) | `#4f46e5` (indigo-600), hover `#6366f1` (indigo-500) | **Reserved for:** primary CTA buttons (Generate Schedule, Add Quarter, Assign, Save, Import), active/selected nav item (`bg-indigo-600/20 text-indigo-300`), input focus rings (`focus:ring-indigo-500`), links/toggle affordances (`text-indigo-400`) |
 | Destructive | `#dc2626`/`#b91c1c` (red-600/700) | Regenerate-confirmation button, remove/delete hover states (`hover:text-red-400`), "Unfilled" badge |
 
@@ -96,7 +113,7 @@ Accent reserved for: **primary action buttons, active nav/tab state, focus rings
 | Accent (10%) | `#111827` (gray-900, text-weight emphasis only — no color accent on this read-only public page) | Reserved for: the list/matrix toggle's active-state indicator and the name-filter's selected-chip only. **Do not introduce indigo/brand color onto the public share page** — it stays neutral grayscale, matching the existing list view exactly. |
 | Destructive | not applicable | No destructive actions exist on the read-only public page |
 
-Accent reserved for: **the view-mode toggle's active segment and the name-filter's active/selected state only** — everything else on this page stays grayscale text (`text-gray-900`/`text-gray-600`/`text-gray-400`), matching the existing "not assigned" italic gray-400 convention.
+Accent reserved for: **the view-mode toggle's active segment and the name-filter's active/selected state only** — everything else stays grayscale text (`text-gray-900`/`text-gray-600`/`text-gray-400`), matching the existing "not assigned" italic gray-400 convention.
 
 ---
 
@@ -111,7 +128,7 @@ Accent reserved for: **the view-mode toggle's active segment and the name-filter
 | Add-quarter button (D-13) | **"+ Add quarter"** — visually secondary/outlined (`border-gray-700 bg-gray-800`, NOT the indigo-600 primary fill), opens a small modal |
 | Add-quarter modal title | **"Add a new quarter"** |
 | Add-quarter modal CTA | **"Create quarter"** (primary, indigo-600) |
-| Add-quarter modal cancel | **"Cancel"** |
+| Add-quarter modal cancel | **"Don't create"** (dismisses the modal without creating a quarter) |
 | Settings — share slug field label | **"Share URL slug"** |
 | Settings — slug helper text | **"yourapp.com/{slug}/quarter1-2026 — used in every quarterly share link"** (fill `{slug}` live with the current derived value) |
 | Settings — slug collision error | **"That URL is already taken — try a different one."** |
@@ -120,13 +137,13 @@ Accent reserved for: **the view-mode toggle's active segment and the name-filter
 | Roles-only Volunteer form (D-07) | No new copy — remove the "Serve frequency by role" section from `RosterView.vue` entirely; the roles checklist section keeps its existing label unchanged |
 | Collapsible section (R-11) — generic pattern | Header = existing section title unchanged (e.g. "Volunteer Availability", "Service dates", "Generate controls", "Roles config", "Inactive Volunteers"); no added copy, only the chevron affordance (reuse `ArrangementAccordion`'s chevron) |
 | Slide-out group editor (R-14) title | **"{Role name} — {formatted date}"** (exact existing pattern from the expand-underneath editor, e.g. "Vocals — Sun, Jan 4") |
-| Slide-out close | **"Close"** (existing pattern — icon-only × button in header, matches `AvailabilityDrawer`) |
-| Primary CTA (phase-wide, no single one — largest-traffic new action) | **"+ Add quarter"** is the phase's headline new primary action; existing **"Generate Schedule"** / **"Save"** / **"Assign"** CTAs are unchanged |
-| Empty state — no matrix data (share page) | Heading: reuse existing **"No service dates"** (already covers the zero-dates case in the list view; the matrix must render the identical empty state, not a new one) |
-| Error state — invalid share link (existing, keep verbatim, applies to both token AND memorable URL routes) | **"This shared schedule is no longer available or the link is invalid."** / sub-line: **"Please ask your worship leader to share the schedule again."** |
-| Destructive confirmation — Regenerate (existing, keep verbatim, no destructive actions are newly introduced by this phase) | **"Regenerate the full schedule? This replaces all current assignments, including any manual edits you've made. This cannot be undone."** — buttons: **"Regenerate"** (red-700) / **"Cancel"** (gray-800 outline) |
+| Slide-out close | Icon-only × button in header (matches `AvailabilityDrawer`), `aria-label="Close editor"` |
+| Primary CTA (phase-wide headline new action) | **"+ Add quarter"** is the phase's headline new primary action; existing **"Generate Schedule"** / **"Assign"** CTAs are unchanged |
+| Empty state — no matrix data (share page) | Reuse existing **"No service dates"** (already covers the zero-dates case in the list view; the matrix must render the identical empty state, not a new one) |
+| Error state — invalid share link (existing, keep verbatim, applies to BOTH token AND memorable URL routes) | **"This shared schedule is no longer available or the link is invalid."** / sub-line: **"Please ask your worship leader to share the schedule again."** |
+| Destructive confirmation — Regenerate (existing prompt kept verbatim; cancel label made specific) | Prompt: **"Regenerate the full schedule? This replaces all current assignments, including any manual edits you've made. This cannot be undone."** — buttons: **"Regenerate schedule"** (red-700) / **"Keep current schedule"** (gray-800 outline) |
 
-No new destructive actions are introduced by this phase (matrix/list toggle, name filter, roles cross-screen edit, slug edit, and the frequency consolidation are all non-destructive; the slide-out editor's "Clear"/remove-pill actions reuse `QuarterGrid`'s existing non-confirmed quick-remove pattern, unchanged by R-13/R-14).
+No new destructive actions are introduced by this phase (matrix/list toggle, name filter, roles cross-screen edit, slug edit, and the frequency consolidation are all non-destructive; the slide-out editor's remove-pill actions reuse `QuarterGrid`'s existing non-confirmed quick-remove pattern, unchanged by R-13/R-14).
 
 ---
 
@@ -141,8 +158,8 @@ No new destructive actions are introduced by this phase (matrix/list toggle, nam
 
 ## Component-Specific Notes for This Phase
 
-- **`QuarterShareMatrix.vue` (new):** light theme, mirrors `QuarterGrid.vue`'s existing table orientation (roles-across-top `<th>`, dates-down `<tr>`) but read-only — no `@click`, no badges, no hover states beyond a subtle `hover:bg-gray-50` row highlight. Multi-person cells: comma-separated (matches list view `join(', ')`, per RESEARCH.md Pattern 4 / A3).
-- **`CollapsibleSection.vue` (new, shared):** dark theme only (used on `QuarterView`/`RosterView`, never on the public share page). Extract `ArrangementAccordion.vue`'s exact header markup (chevron `h-4 w-4 text-gray-400`, rotate-90 open state, `bg-gray-800` header bar) — do not restyle. Default state: expanded. Persistence key format: `localStorage['schedule.section.{id}']` / `localStorage['roster.section.{id}']` = `'open'|'closed'`.
+- **`QuarterShareMatrix.vue` (new):** light theme, mirrors `QuarterGrid.vue`'s existing table orientation (roles-across-top `<th>`, dates-down `<tr>`) but read-only — no `@click`, no badges, no hover states beyond a subtle `hover:bg-gray-50` row highlight. Multi-person cells: comma-separated (matches list view `join(', ')`, per RESEARCH.md Pattern 4 / A3). Weights 400/600 only.
+- **`CollapsibleSection.vue` (new, shared):** dark theme only (used on `QuarterView`/`RosterView`, never on the public share page). Reuse `ArrangementAccordion.vue`'s chevron affordance (`h-4 w-4 text-gray-400`, rotate-90 open state) and `bg-gray-800` header bar, but declare the header title at 600 semibold and header padding at `p-4` (16px) — do not carry over the source's 12px vertical padding. Default state: expanded. Persistence key: `localStorage['schedule.section.{id}']` / `localStorage['roster.section.{id}']` = `'open'|'closed'`.
 - **`QuarterGrid.vue` slide-out (R-13/R-14):** reuse `AvailabilityDrawer.vue`'s exact `Teleport to="body"` + backdrop (`fixed inset-0 z-40 bg-black/60`) + panel (`fixed top-0 right-0 bottom-0 z-50 w-full max-w-lg bg-gray-900 border-l border-gray-700 shadow-2xl`) markup and transition classes verbatim — this phase must not invent a second slide-out visual language.
 - **Mobile fallback (D-14):** matrix/list is a structural DOM swap, not a CSS breakpoint — implement via a `useIsMobile()` composable (`window.matchMedia('(min-width: 640px)')`), not a `hidden sm:block` pair (per RESEARCH.md "Don't Hand-Roll").
 - **Whole-cell hit target (R-13):** verify against current `QuarterGrid.vue` markup before treating as new work — the outer `<button class="w-full text-left ...">` already wraps the full cell; only the remove-pill's existing `@click.stop` needs to be preserved when this cell's structure is rebuilt for the slide-out.
