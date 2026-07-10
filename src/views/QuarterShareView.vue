@@ -109,9 +109,17 @@ function formatDateLabel(date: string): string {
 
 onMounted(async () => {
   const route = useRoute()
-  const token = route.params.token as string
+  const token = route.params.token as string | undefined
   try {
-    const snap = await getDoc(doc(db, 'shareTokens', token))
+    const snap = token
+      ? await getDoc(doc(db, 'shareTokens', token))
+      : await getDoc(
+          doc(
+            db,
+            'quarterShares',
+            `${route.params.slug as string}__q${route.params.num as string}-${route.params.year as string}`,
+          ),
+        )
     if (!snap.exists()) {
       notFound.value = true
     } else {

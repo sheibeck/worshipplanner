@@ -59,6 +59,18 @@ function createTestRouter() {
         component: { template: '<div>Share</div>' },
         // No meta.requiresAuth — matches production router
       },
+      {
+        path: '/schedule',
+        name: 'schedule',
+        component: { template: '<div>Schedule</div>' },
+        meta: { requiresAuth: true },
+      },
+      {
+        path: '/:slug/quarter:num([1-4])-:year(\\d{4})',
+        name: 'quarter-memorable-share',
+        component: { template: '<div>Quarter Memorable Share</div>' },
+        // No meta.requiresAuth — matches production router (D-24)
+      },
     ],
   })
 
@@ -140,6 +152,25 @@ describe('Router guard', () => {
       await router.push('/share/abc123')
       expect(router.currentRoute.value.name).toBe('share')
       expect(router.currentRoute.value.params.token).toBe('abc123')
+    })
+  })
+
+  describe('memorable quarter share route', () => {
+    it('resolves /:slug/quarter:num-:year for a sample slug/quarter without redirect', async () => {
+      mockGetCurrentUser.mockResolvedValue(null)
+      const router = createTestRouter()
+      await router.push('/gracechurch/quarter1-2026')
+      expect(router.currentRoute.value.name).toBe('quarter-memorable-share')
+      expect(router.currentRoute.value.params.slug).toBe('gracechurch')
+      expect(router.currentRoute.value.params.num).toBe('1')
+      expect(router.currentRoute.value.params.year).toBe('2026')
+    })
+
+    it('does not shadow an existing static route when the first segment is reserved', async () => {
+      mockGetCurrentUser.mockResolvedValue(mockUser)
+      const router = createTestRouter()
+      await router.push('/schedule')
+      expect(router.currentRoute.value.name).toBe('schedule')
     })
   })
 })

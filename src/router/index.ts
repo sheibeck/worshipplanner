@@ -86,6 +86,14 @@ const router = createRouter({
       component: () => import('../views/QuarterShareView.vue'),
       // Intentionally no meta.requiresAuth — public route for unauthenticated viewers (D-24)
     },
+    {
+      path: '/:slug/quarter:num([1-4])-:year(\\d{4})',
+      name: 'quarter-memorable-share',
+      component: () => import('../views/QuarterShareView.vue'),
+      // Intentionally no meta.requiresAuth — public route for unauthenticated viewers (D-24).
+      // Appended after all static routes: Vue Router ranks static segments above dynamic
+      // ones, so this can never shadow /songs, /roster, /schedule, etc. (D-19).
+    },
   ],
 })
 
