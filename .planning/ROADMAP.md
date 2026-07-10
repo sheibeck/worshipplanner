@@ -319,14 +319,14 @@ Plans:
 - R-14 **Slide-out editor** — Open the group editor as a right-side slide-out panel instead of expanding underneath the cell.
 
 **Depends on:** Phase 15
-**Plans:** 11 plans in 3 waves
+**Plans:** 3/11 plans executed
 
 Plans:
 
 **Wave 1**
-- [ ] 16-01-PLAN.md — Frequency data-model relocation (roleFrequency) + quarters store seeding (D-04/05/06)
-- [ ] 16-02-PLAN.md — Slug util + orgSlugs/quarterShares Firestore rules + [BLOCKING] rules deploy (R-02)
-- [ ] 16-03-PLAN.md — CollapsibleSection component + R-09 Schedule-page UX research note
+- [x] 16-01-PLAN.md — Frequency data-model relocation (roleFrequency) + quarters store seeding (D-04/05/06)
+- [x] 16-02-PLAN.md — Slug util + orgSlugs/quarterShares Firestore rules + [BLOCKING] rules deploy (R-02)
+- [x] 16-03-PLAN.md — CollapsibleSection component + R-09 Schedule-page UX research note
 
 **Wave 2**
 - [ ] 16-04-PLAN.md — R-12 scheduler pairing fix honoring per-role cadence (TDD)
