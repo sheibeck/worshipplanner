@@ -297,3 +297,45 @@ Plans:
 **Gap closure (Wave 1)** *(from 15-VERIFICATION.md — D-05 not reconciled across all read/write surfaces)*
 
 - [x] 15-07-PLAN.md — Reconcile roleTiers across QuarterGrid quick-assign, AvailabilityRosterTable status/filter, and quarters.ts reciprocal-pairing write (D-05)
+
+### Phase 16: Quarterly Schedule share link — matrix view, name filter, cross-screen volunteer editing & UX overhaul
+
+**Goal:** Make the quarterly schedule genuinely usable for both organizers and volunteers by (a) giving the public share link a matrix view and a memorable URL, (b) letting volunteers find their own dates, (c) unifying volunteer management so the same frequency/availability/pairing data is edited from either the Schedule or the Volunteer screen, (d) fixing pairing to respect per-role frequency, and (e) reworking the schedule editing UX. Builds directly on Phase 15's per-role frequency & co-occurrence model.
+
+**Requirements** (to be formalized in discuss/spec — captured verbatim from request):
+- R-01 **Share-link matrix view** — Render the shared schedule as a matrix (roles across the top, dates down the left column). Provide a toggle to switch between the existing list view and the matrix view.
+- R-02 **Memorable share URL** — Support a friendly URL like `/{church-name}/quarter1-2026` instead of an opaque link.
+- R-03 **Filter by name** — Let a viewer filter the schedule by a person's name; filtering hides any date where that person isn't serving a role (so a volunteer sees only the dates they're on).
+- R-04 **Cross-screen pairing & role editing** — Allow editing pairings and roles from either the Schedule screen or the Volunteer screen.
+- R-05 **Unify serve frequency** — Remove the Schedule's separate serve-frequency control; instead surface and allow editing of the same per-role frequency defined at the volunteer level (Phase 15), editable from both Schedule and Volunteer screens.
+- R-06 **Quarter = blackout dates** — Frame per-quarter volunteer editing as setting blackout dates for that quarter.
+- R-07 **Unavailable Sundays travel with volunteer** — A volunteer's unavailable Sundays should be stored on the volunteer and be editable from either the Volunteer or Schedule screen.
+- R-08 **Remove date-range control** — Remove the date-range picker on the volunteer edit screen; with only ~13 Sundays per quarter, clicking individual Sundays to remove them is sufficient.
+- R-09 **Schedule-page UX research** — Do UI research to make the schedule page more intuitive; evaluate whether a calendar-style format fits.
+- R-10 **Clearer add-quarter flow** — Make adding a new quarter vs. selecting an already-defined quarter more intuitive.
+- R-11 **Collapsible sections** — Make dense sections on the Schedule and Volunteer pages collapsible.
+- R-12 **Pairing honors frequency** — "Serve with other person" must not force the linked person to always be scheduled together. It must honor each person's own frequency: e.g. Nolan (once/month, must-be-with Tim) + Tim (twice/month) → Nolan still serves once/month but is paired with Tim on the occurrence he does serve.
+- R-13 **Group-edit hit target** — Make the whole scheduled-group cell clickable (not just the area near the pills).
+- R-14 **Slide-out editor** — Open the group editor as a right-side slide-out panel instead of expanding underneath the cell.
+
+**Depends on:** Phase 15
+**Plans:** 11 plans in 3 waves
+
+Plans:
+
+**Wave 1**
+- [ ] 16-01-PLAN.md — Frequency data-model relocation (roleFrequency) + quarters store seeding (D-04/05/06)
+- [ ] 16-02-PLAN.md — Slug util + orgSlugs/quarterShares Firestore rules + [BLOCKING] rules deploy (R-02)
+- [ ] 16-03-PLAN.md — CollapsibleSection component + R-09 Schedule-page UX research note
+
+**Wave 2**
+- [ ] 16-04-PLAN.md — R-12 scheduler pairing fix honoring per-role cadence (TDD)
+- [ ] 16-05-PLAN.md — AvailabilityDrawer: remove date-range, unify frequency, roles editing (R-05/06/08, D-09)
+- [ ] 16-06-PLAN.md — Roles-only Volunteer form + badge repoint + roster collapsible (D-07, R-11)
+- [ ] 16-07-PLAN.md — QuarterGrid whole-cell + right-side slide-out editor (R-13/R-14)
+- [ ] 16-08-PLAN.md — QuarterView redesign: quarter switcher + Add-quarter modal + collapsible sections (R-09/10/11)
+- [ ] 16-09-PLAN.md — Settings slug field + finalizeAndShare quarterShares write (R-02)
+- [ ] 16-10-PLAN.md — Share page matrix + name filter + memorable route (R-01/02/03)
+
+**Wave 3**
+- [ ] 16-11-PLAN.md — Cleanup: remove deprecated frequency fields (D-04)
