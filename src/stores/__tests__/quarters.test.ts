@@ -17,6 +17,10 @@ type SnapshotCallback = (snap: { docs: SnapshotDoc[] }) => void
 const snapshotCallbacks: Record<string, SnapshotCallback> = {}
 const mockUnsubscribe = vi.fn()
 
+// Mutable org doc fixture read by finalizeAndShare's slug resolution (Plan 16-09) — tests
+// override the shape per-case; reset to a slug-less default in beforeEach below.
+let mockOrgDoc: Record<string, unknown> = { name: 'Test Org' }
+
 // Mock firebase/firestore module
 vi.mock('firebase/firestore', () => {
   return {
@@ -31,6 +35,15 @@ vi.mock('firebase/firestore', () => {
     addDoc: vi.fn(() => Promise.resolve({ id: 'new-quarter-id' })),
     updateDoc: vi.fn(() => Promise.resolve()),
     setDoc: vi.fn(() => Promise.resolve()),
+    getDoc: vi.fn((docRef: { path?: string }) => {
+      if (docRef?.path && /^organizations\/[^/]+$/.test(docRef.path)) {
+        return Promise.resolve({
+          exists: () => Object.keys(mockOrgDoc).length > 0,
+          data: () => mockOrgDoc,
+        })
+      }
+      return Promise.resolve({ exists: () => false, data: () => ({}) })
+    }),
     query: vi.fn((ref) => ref),
     orderBy: vi.fn(),
     serverTimestamp: vi.fn(() => ({ seconds: 1000000, nanoseconds: 0 })),
@@ -140,6 +153,7 @@ describe('useQuartersStore', () => {
     mockRosterState.people = []
     mockRosterState.activePeople = []
     mockRosterState.roles = []
+    mockOrgDoc = { name: 'Test Org' }
   })
 
   describe('initial state', () => {
@@ -907,8 +921,11 @@ describe('useQuartersStore', () => {
 
       const token = await store.finalizeAndShare('quarter-1')
 
-      expect(setDoc).toHaveBeenCalledOnce()
-      const [docRef, data] = vi.mocked(setDoc).mock.calls[0]!
+      const shareTokenCall = vi
+        .mocked(setDoc)
+        .mock.calls.find((call) => (call[0] as unknown as { path?: string }).path === `shareTokens/${token}`)
+      expect(shareTokenCall).toBeDefined()
+      const [docRef, data] = shareTokenCall!
       expect((docRef as unknown as { id: string }).id).toBe(token)
       const writeData = data as Record<string, unknown>
       expect(writeData.orgId).toBe('org-1')
@@ -918,6 +935,73 @@ describe('useQuartersStore', () => {
       const calendar = snapshot.calendar as Record<string, Record<string, string[]>>
       expect(calendar['2026-07-05']!['role-guitar']).toEqual(['Sarah Smith'])
       expect(doc).toHaveBeenCalled()
+    })
+
+    it('writes quarterShares/{slug}__qN-year overwritten-in-place, reusing the names-only snapshot (R-02, Pitfall 2)', async () => {
+      const { setDoc } = await import('firebase/firestore')
+      const { useQuartersStore } = await import('../quarters')
+      const store = useQuartersStore()
+      store.subscribe('org-1')
+      triggerQuartersSnapshot([
+        makeQuarterDoc({
+          quarter: 3,
+          year: 2026,
+          label: 'Q3 2026',
+          serviceDates: ['2026-07-05'],
+          calendar: { '2026-07-05': { 'role-guitar': ['person-a'] } },
+        }),
+      ])
+      mockRosterState.people = [makePerson({ id: 'person-a', name: 'Sarah Smith' })]
+      mockRosterState.roles = [makeRole({ id: 'role-guitar', name: 'guitar' })]
+      mockOrgDoc = { name: 'Grace Church', slug: 'grace-church' }
+
+      await store.finalizeAndShare('quarter-1')
+
+      const shareCall = vi
+        .mocked(setDoc)
+        .mock.calls.find(
+          (call) => (call[0] as unknown as { path?: string }).path === 'quarterShares/grace-church__q3-2026',
+        )
+      expect(shareCall).toBeDefined()
+      const data = shareCall![1] as Record<string, unknown>
+      expect(data.orgSlug).toBe('grace-church')
+      const snapshot = data.quarterSnapshot as Record<string, unknown>
+      expect(snapshot.label).toBe('Q3 2026')
+      const calendar = snapshot.calendar as Record<string, Record<string, string[]>>
+      expect(calendar['2026-07-05']!['role-guitar']).toEqual(['Sarah Smith'])
+      // D-24: names-only — no email/phone anywhere in the written payload
+      expect(JSON.stringify(data)).not.toMatch(/email|phone/i)
+    })
+
+    it('derives and claims a slug from the org name when unset, then persists it on the org doc', async () => {
+      const { setDoc, updateDoc } = await import('firebase/firestore')
+      const { useQuartersStore } = await import('../quarters')
+      const store = useQuartersStore()
+      store.subscribe('org-1')
+      triggerQuartersSnapshot([makeQuarterDoc({ quarter: 1, year: 2027 })])
+      mockRosterState.people = []
+      mockRosterState.roles = []
+      mockOrgDoc = { name: 'First Church' } // no slug yet
+
+      await store.finalizeAndShare('quarter-1')
+
+      const claimCall = vi
+        .mocked(setDoc)
+        .mock.calls.find((call) => (call[0] as unknown as { path?: string }).path === 'orgSlugs/first-church')
+      expect(claimCall).toBeDefined()
+
+      const persistCall = vi.mocked(updateDoc).mock.calls.find((call) => {
+        const d = call[1] as unknown as Record<string, unknown>
+        return d.slug === 'first-church'
+      })
+      expect(persistCall).toBeDefined()
+
+      const shareCall = vi
+        .mocked(setDoc)
+        .mock.calls.find(
+          (call) => (call[0] as unknown as { path?: string }).path === 'quarterShares/first-church__q1-2027',
+        )
+      expect(shareCall).toBeDefined()
     })
 
     it('sets the quarter status finalized + shareToken via updateDoc', async () => {

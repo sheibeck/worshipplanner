@@ -34,6 +34,34 @@
         </div>
 
         <p v-if="saveError" class="text-red-400 text-sm mt-2">{{ saveError }}</p>
+
+        <!-- Share URL slug field (R-02, D-18) -->
+        <div class="mt-6 pt-6 border-t border-gray-800">
+          <label class="block text-xs text-gray-400 mb-1">Share URL slug</label>
+          <input
+            v-model="editSlug"
+            type="text"
+            placeholder="Enter a URL slug"
+            class="w-full sm:w-80 bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500"
+            @keydown.enter="onSaveSlug"
+          />
+          <p class="text-xs text-gray-500 mt-1">
+            yourapp.com/{{ liveSlugPreview }}/quarter1-2026 — used in every quarterly share link
+          </p>
+        </div>
+
+        <div class="mt-3 flex items-center gap-3">
+          <button
+            type="button"
+            @click="onSaveSlug"
+            :disabled="isSlugSaveDisabled"
+            class="inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white rounded-md px-4 py-2 text-sm font-medium transition-colors"
+          >
+            {{ isSlugSaving ? 'Saving...' : slugSavedFeedback ? 'Saved!' : 'Save' }}
+          </button>
+        </div>
+
+        <p v-if="slugSaveError" class="text-red-400 text-sm mt-2">{{ slugSaveError }}</p>
       </div>
 
       <!-- Planning Center Integration section -->
@@ -136,11 +164,12 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { doc, updateDoc } from 'firebase/firestore'
+import { doc, updateDoc, getDoc } from 'firebase/firestore'
 import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import AppShell from '@/components/AppShell.vue'
 import { validatePcCredentials } from '@/utils/planningCenterApi'
+import { deriveSlug, claimSlug } from '@/utils/slug'
 
 const authStore = useAuthStore()
 
@@ -150,6 +179,14 @@ const editName = ref(authStore.orgName ?? '')
 const isSaving = ref(false)
 const savedFeedback = ref(false)
 const saveError = ref<string | null>(null)
+
+// ── Share URL slug state (R-02, D-18) ──────────────────────────────────────────
+
+const editSlug = ref('')
+const persistedSlug = ref<string | null>(null)
+const isSlugSaving = ref(false)
+const slugSavedFeedback = ref(false)
+const slugSaveError = ref<string | null>(null)
 
 // ── PC credential state ────────────────────────────────────────────────────────
 
@@ -170,6 +207,15 @@ const isSaveDisabled = computed(() => {
   )
 })
 
+// Sanitized live preview so the helper text's {slug} segment updates as the user types,
+// before any save/claim happens.
+const liveSlugPreview = computed(() => deriveSlug(editSlug.value) || 'your-church')
+
+const isSlugSaveDisabled = computed(() => {
+  const candidate = deriveSlug(editSlug.value)
+  return isSlugSaving.value || candidate === '' || candidate === persistedSlug.value
+})
+
 // ── Sync editName if orgName changes externally (skip during save) ────────────
 
 watch(
@@ -179,6 +225,30 @@ watch(
       editName.value = newName
     }
   },
+)
+
+// ── Load the org's persisted slug (or derive a live default from orgName) ─────
+
+async function loadOrgSlug() {
+  if (!authStore.orgId) return
+  try {
+    const snap = await getDoc(doc(db, 'organizations', authStore.orgId))
+    if (!snap.exists()) return
+    const data = snap.data()
+    const slug = (data.slug as string | undefined) ?? null
+    persistedSlug.value = slug
+    editSlug.value = slug ?? deriveSlug(authStore.orgName ?? '')
+  } catch (err) {
+    console.error('[SettingsView] load org slug error:', err)
+  }
+}
+
+watch(
+  () => authStore.orgId,
+  (id) => {
+    if (id) loadOrgSlug()
+  },
+  { immediate: true },
 )
 
 // ── Save action (Org name) ─────────────────────────────────────────────────────
@@ -204,6 +274,46 @@ async function onSave() {
     saveError.value = 'Failed to save. Please try again.'
   } finally {
     isSaving.value = false
+  }
+}
+
+// ── Save action (Share URL slug, R-02/D-18) ────────────────────────────────────
+// Uniqueness always goes through claimSlug's create-only orgSlugs claim — never a raw
+// updateDoc of organizations/{orgId}.slug alone.
+
+async function onSaveSlug() {
+  if (isSlugSaveDisabled.value) return
+  if (!authStore.orgId) return
+
+  slugSaveError.value = null
+  isSlugSaving.value = true
+
+  try {
+    const candidate = deriveSlug(editSlug.value)
+    const claimed = await claimSlug(candidate, authStore.orgId)
+
+    if (claimed !== candidate) {
+      // The exact slug the user asked for is already claimed by another org — claimSlug's
+      // retry loop silently reserved a numeric-suffixed fallback instead. For a manual
+      // Settings edit that silent substitution would be surprising, so surface it as a
+      // collision rather than accepting it (D-18: manual edits should be explicit).
+      slugSaveError.value = 'That URL is already taken — try a different one.'
+      return
+    }
+
+    await updateDoc(doc(db, 'organizations', authStore.orgId), { slug: claimed })
+    persistedSlug.value = claimed
+    editSlug.value = claimed
+
+    slugSavedFeedback.value = true
+    setTimeout(() => {
+      slugSavedFeedback.value = false
+    }, 2000)
+  } catch (err) {
+    console.error('[SettingsView] save slug error:', err)
+    slugSaveError.value = 'That URL is already taken — try a different one.'
+  } finally {
+    isSlugSaving.value = false
   }
 }
 

@@ -6,6 +6,7 @@ import {
   addDoc,
   updateDoc,
   doc,
+  getDoc,
   setDoc,
   serverTimestamp,
   query,
@@ -25,6 +26,7 @@ import type {
 import { generateSundaysInQuarter, applyDateAdditionsRemovals } from '@/utils/quarterDates'
 import { proposeQuarterSchedule } from '@/utils/scheduler'
 import { useRosterStore } from '@/stores/roster'
+import { deriveSlug, claimSlug } from '@/utils/slug'
 
 // Payload for applyCsvToQuarter — the Plan 08 UI resolves CSV names→personIds and role-names→roleIds first.
 export interface ResolvedCsvPerson {
@@ -394,6 +396,33 @@ export const useQuartersStore = defineStore('quarters', () => {
     })
 
     await updateQuarter(quarterId, { status: 'finalized', shareToken: token })
+
+    // R-02/D-18: resolve (or claim, on first share) the org's memorable-URL slug, then
+    // write the quarterShares/{slug}__q{N}-{year} doc — a stable doc ID so every finalize
+    // OVERWRITES in place (Pitfall 2), never accumulates like shareTokens above. Reuses the
+    // exact calendarWithNames/roles/label/serviceDates snapshot already built — names only,
+    // no email/phone (D-24).
+    const orgRef = doc(db, 'organizations', orgId.value)
+    const orgSnap = await getDoc(orgRef)
+    const orgData = orgSnap.exists() ? orgSnap.data() : {}
+    let slug = orgData.slug as string | undefined
+    if (!slug) {
+      const base = deriveSlug((orgData.name as string | undefined) ?? '')
+      slug = await claimSlug(base, orgId.value)
+      await updateDoc(orgRef, { slug })
+    }
+
+    await setDoc(doc(db, 'quarterShares', `${slug}__q${quarter.quarter}-${quarter.year}`), {
+      orgSlug: slug,
+      quarterSnapshot: {
+        label: quarter.label,
+        serviceDates: quarter.serviceDates,
+        roles: rosterStore.roles.map((r) => ({ id: r.id, name: r.name, group: r.group })),
+        calendar: calendarWithNames,
+      },
+      token,
+      updatedAt: serverTimestamp(),
+    })
 
     return token
   }
