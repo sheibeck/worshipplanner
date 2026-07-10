@@ -6,7 +6,10 @@ import { onMounted, onUnmounted, ref } from 'vue'
  * so the mobile fallback (D-14) needs a real breakpoint signal to pick the initial view.
  */
 export function useIsMobile(query = '(min-width: 640px)') {
-  const mediaQuery = typeof window !== 'undefined' ? window.matchMedia(query) : null
+  const mediaQuery =
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia(query)
+      : null
   const isDesktop = ref(mediaQuery?.matches ?? true)
 
   function onChange(event: MediaQueryListEvent) {
