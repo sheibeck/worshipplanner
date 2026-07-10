@@ -130,6 +130,39 @@ describe('AvailabilityDrawer', () => {
     expect(vocalsMonthly.attributes('data-active')).toBe('true')
   })
 
+  // WR-04 regression: a non-preset n (e.g. imported via CSV as a bare "3" or "1-in-6",
+  // both valid frequencyLabelToN inputs) must not be shown as an active preset — previously
+  // this fell back to highlighting "Monthly" as active even though the real cadence differs,
+  // so clicking it silently overwrote the person's real n with 4.
+  it('does not highlight any preset as active for a non-canonical regular-tier n, and shows a distinct custom readout', () => {
+    mockQuarter = makeQuarter({
+      personQuarterData: {
+        'person-1': {
+          personId: 'person-1',
+          blackoutDates: [],
+          pairedWith: [],
+          roleFrequency: { sound: { tier: 'regular', n: 3 } },
+          note: '',
+        },
+      },
+    })
+    mockSetPersonAvailability.mockClear()
+    mockUpdatePerson.mockClear()
+
+    const wrapper = mountDrawer()
+
+    const soundButtons = wrapper.findAll('button[data-role-id="sound"]')
+    expect(soundButtons.length).toBe(FREQ_PRESET_COUNT)
+    // None of weekly/biweek/monthly/fillin/out should be marked active for n:3.
+    for (const button of soundButtons) {
+      expect(button.attributes('data-active')).toBe('false')
+    }
+
+    // The readout explicitly surfaces the custom cadence instead of silently agreeing with
+    // whichever preset the fallback used to pick.
+    expect(wrapper.text()).toContain('Custom (1-in-3)')
+  })
+
   it('does not render a date-range picker — per-Sunday click-to-toggle is the only blackout entry method (R-08)', () => {
     mockQuarter = makeQuarter()
     mockSetPersonAvailability.mockClear()
