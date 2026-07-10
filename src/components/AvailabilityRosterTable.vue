@@ -40,9 +40,8 @@
         <thead>
           <tr>
             <th class="px-3 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Volunteer</th>
-            <th class="px-3 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Roles</th>
-            <th class="px-3 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Frequency</th>
-            <th class="px-3 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Quarter Note</th>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Roles &amp; Frequency</th>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Blackout &amp; Note</th>
             <th class="px-3 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Pairing</th>
             <th class="px-3 py-2"></th>
           </tr>
@@ -54,31 +53,38 @@
             class="border-b border-gray-800/50 cursor-pointer hover:bg-gray-800/40 transition-colors"
             @click="emit('select', person.id)"
           >
-            <td class="px-3 py-2.5 font-medium text-gray-100 whitespace-nowrap">{{ person.name }}</td>
-            <td class="px-3 py-2.5">
-              <span
+            <td class="px-3 py-2.5 font-medium text-gray-100 whitespace-nowrap align-top">{{ person.name }}</td>
+            <td class="px-3 py-2.5 align-top">
+              <div
                 v-for="roleId in person.roles"
                 :key="roleId"
-                class="inline-block text-xs font-semibold px-2 py-0.5 rounded-full mr-1 mb-1 whitespace-nowrap"
-                :class="roleChipClass(roleId)"
+                class="flex items-center gap-2 mb-1 last:mb-0 whitespace-nowrap"
               >
-                {{ roleName(roleId) }}
-              </span>
+                <span
+                  class="inline-block text-xs font-semibold px-2 py-0.5 rounded-full"
+                  :class="roleChipClass(roleId)"
+                >
+                  {{ roleName(roleId) }}
+                </span>
+                <span class="text-xs text-gray-400">{{ roleFreqLabel(person.id, roleId) }}</span>
+              </div>
+              <span v-if="person.roles.length === 0" class="text-gray-600 italic text-xs">no roles</span>
             </td>
-            <td class="px-3 py-2.5">
-              <span class="text-xs font-semibold text-gray-300 bg-gray-800 border border-gray-700 rounded-full px-2.5 py-0.5">
-                {{ freqBadge(person) }}
-              </span>
+            <td class="px-3 py-2.5 text-gray-400 max-w-[20rem] align-top">
+              <div v-if="blackoutDatesFormatted(person).length" class="text-xs text-amber-300/90 mb-1">
+                <span class="text-[10px] uppercase tracking-wide text-gray-500 mr-1">Out</span>{{ blackoutDatesFormatted(person).join(', ') }}
+              </div>
+              <div v-if="noteSummary(person)" class="whitespace-pre-wrap text-gray-300">{{ noteSummary(person) }}</div>
+              <span
+                v-if="!blackoutDatesFormatted(person).length && !noteSummary(person)"
+                class="text-gray-600 italic"
+              >—</span>
             </td>
-            <td class="px-3 py-2.5 text-gray-400 max-w-[20rem]">
-              <span v-if="noteSummary(person)" class="whitespace-pre-wrap">{{ noteSummary(person) }}</span>
-              <span v-else class="text-gray-600 italic">—</span>
-            </td>
-            <td class="px-3 py-2.5 text-purple-300 text-xs">{{ pairSummary(person) }}</td>
-            <td class="px-3 py-2.5 text-gray-600 text-base">&rsaquo;</td>
+            <td class="px-3 py-2.5 text-purple-300 text-xs align-top">{{ pairSummary(person) }}</td>
+            <td class="px-3 py-2.5 text-gray-600 text-base align-top">&rsaquo;</td>
           </tr>
           <tr v-if="filteredPeople.length === 0">
-            <td colspan="6" class="px-3 py-6 text-center text-sm text-gray-600">No volunteers match this filter.</td>
+            <td colspan="5" class="px-3 py-6 text-center text-sm text-gray-600">No volunteers match this filter.</td>
           </tr>
         </tbody>
       </table>
@@ -136,21 +142,6 @@ function aggregateTier(person: Person): FrequencyTier {
   return 'regular'
 }
 
-// D-05: distinguish a person out for EVERY held role (genuinely unavailable all
-// quarter) from one out for only SOME roles. The status pill uses the most-restrictive
-// aggregate (aggregateTier) so anyone out for any role surfaces in the "Out this quarter"
-// filter, but the Frequency and Unavailable columns describe overall availability — they
-// must render the fully-out treatment ONLY when the person is out for ALL held roles,
-// else a partially-out volunteer is falsely shown as unavailable (WR-01).
-function allRolesOut(person: Person): boolean {
-  const pqd = props.quarter?.personQuarterData[person.id]
-  if (!pqd?.roleFrequency || Object.keys(pqd.roleFrequency).length === 0) {
-    return false
-  }
-  if (person.roles.length === 0) return false
-  return person.roles.every((roleId) => tierOf(person.id, roleId) === 'out')
-}
-
 // ── Quarter-scoped data lookup, defaulted per Phase 14 convention (lazy-default
 // on read — a quarter with no personQuarterData entry for this person at all) ──
 function quarterDataFor(person: Person): {
@@ -167,8 +158,6 @@ function quarterDataFor(person: Person): {
     note: pqd?.note ?? '',
   }
 }
-
-const serviceDates = computed<string[]>(() => props.quarter?.serviceDates ?? [])
 
 // ── Search + filter toolbar ──────────────────────────────────────────────────
 const searchQuery = ref('')
@@ -201,7 +190,7 @@ function roleChipClass(roleId: string): string {
   return ROLE_CHIP_CLASS[group]
 }
 
-// ── Frequency badge (sketch freqBadge()) ─────────────────────────────────────
+// ── Per-role frequency (Roles & Frequency column) ────────────────────────────
 function freqLabel(n: number): string {
   if (n <= 1) return 'Every week'
   if (n <= 2) return 'Twice a month'
@@ -209,36 +198,46 @@ function freqLabel(n: number): string {
   return `1-in-${n}`
 }
 
-// D-04/D-05: per-role cadence read from roleFrequency, defaulting to N=4 when
-// a held role has no tuned entry. Aggregated to the most-frequent (minimum N)
-// held role for this single-badge-per-row admin table — mirrors the retired
-// RosterView.minRoleFrequency's "most-frequent-wins" convention, now reading
-// the quarter-scoped source instead of the deleted standing fields.
+// D-04/D-05: per-role cadence read from the quarter-scoped roleFrequency map,
+// defaulting to N=4 when a held role has no tuned entry.
 function roleFrequencyN(personId: string, roleId: string): number {
   const pqd = props.quarter?.personQuarterData[personId]
   return pqd?.roleFrequency?.[roleId]?.n ?? 4
 }
 
-function minRoleFrequencyN(person: Person): number {
-  if (person.roles.length === 0) return 4
-  return Math.min(...person.roles.map((roleId) => roleFrequencyN(person.id, roleId)))
+// Human label for a single held role's cadence — 'out'/'fillin' tiers win over
+// the numeric cadence so an out/fill-in role reads plainly next to its chip.
+// Each held role is shown with its OWN frequency (a volunteer with multiple roles
+// no longer collapses to one aggregate badge).
+function roleFreqLabel(personId: string, roleId: string): string {
+  const tier = tierOf(personId, roleId)
+  if (tier === 'out') return 'Out this quarter'
+  if (tier === 'fillin') return 'Fill-in'
+  return freqLabel(roleFrequencyN(personId, roleId))
 }
 
-function freqBadge(person: Person): string {
-  const pqd = quarterDataFor(person)
-  if (allRolesOut(person)) return '—'
-  if (pqd.tier === 'fillin') return 'fill-in'
-  const n = minRoleFrequencyN(person)
-  const total = serviceDates.value.length
-  if (total === 0) return freqLabel(n)
-  const servable = total - pqd.blackoutDates.length
-  const approx = Math.min(servable, Math.ceil(total / Math.max(1, n)))
-  return `${freqLabel(n)} · ≈${approx}`
+// ── Blackout dates + note (Blackout & Note column) ───────────────────────────
+const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+// Format an ISO 'YYYY-MM-DD' as e.g. 'Jul 5' WITHOUT constructing a Date (avoids
+// the UTC-vs-local off-by-one that new Date('2026-07-05') introduces). Falls back
+// to the raw string if it doesn't parse.
+function formatShortDate(iso: string): string {
+  const parts = iso.split('-')
+  if (parts.length !== 3) return iso
+  const month = Number(parts[1])
+  const day = Number(parts[2])
+  if (!month || !day || month < 1 || month > 12) return iso
+  return `${MONTH_ABBR[month - 1]} ${day}`
 }
 
-// ── Quarter note ────────────────────────────────────────────────────────────
-// Per-quarter, per-person free-text note (PersonQuarterData.note), surfaced as
-// its own column. Empty string renders the muted em-dash placeholder in-template.
+// The person's actual blacked-out service dates for this quarter, chronologically
+// sorted and human-formatted (not just a count).
+function blackoutDatesFormatted(person: Person): string[] {
+  return [...quarterDataFor(person).blackoutDates].sort().map(formatShortDate)
+}
+
+// Per-quarter, per-person free-text note (PersonQuarterData.note).
 function noteSummary(person: Person): string {
   return quarterDataFor(person).note.trim()
 }

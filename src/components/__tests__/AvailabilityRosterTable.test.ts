@@ -80,7 +80,8 @@ function makeQuarter(): Quarter {
     personQuarterData: {
       'person-out-role': {
         personId: 'person-out-role',
-        blackoutDates: [],
+        // Intentionally unsorted to prove chronological sorting in the column.
+        blackoutDates: ['2026-07-19', '2026-07-05'],
         pairedWith: [],
         roleFrequency: {
           'role-guitar': { tier: 'out', n: 4 },
@@ -115,37 +116,61 @@ function makeQuarter(): Quarter {
   }
 }
 
-describe('AvailabilityRosterTable — columns (Quarter Note replaces Unavailable; no Status column)', () => {
-  it('renders a "Quarter Note" header and no "Unavailable" or "Status" header', () => {
+describe('AvailabilityRosterTable — Roles & Frequency + Blackout & Note columns', () => {
+  it('renders "Roles & Frequency" and "Blackout & Note" headers (no standalone Frequency/Roles/Quarter Note/Status)', () => {
     const wrapper = mount(AvailabilityRosterTable, { props: { quarter: makeQuarter() } })
 
     const headers = wrapper.findAll('thead th').map((th) => th.text())
-    expect(headers).toContain('Quarter Note')
-    expect(headers).not.toContain('Unavailable')
+    expect(headers).toContain('Roles & Frequency')
+    expect(headers).toContain('Blackout & Note')
+    expect(headers).not.toContain('Frequency')
+    expect(headers).not.toContain('Roles')
+    expect(headers).not.toContain('Quarter Note')
     expect(headers).not.toContain('Status')
   })
 
-  it('renders the per-quarter note text in the Quarter Note column', () => {
+  it('shows EACH held role with its OWN per-role frequency (multi-role volunteer)', () => {
+    const wrapper = mount(AvailabilityRosterTable, { props: { quarter: makeQuarter() } })
+
+    // Ollie holds Guitar (tier out) + Drums (regular, n=4 → Monthly). Both roles and
+    // both distinct frequencies must appear — not a single collapsed aggregate.
+    const ollieRow = wrapper.findAll('tr').find((r) => r.text().includes('Outrole Ollie'))!
+    expect(ollieRow.text()).toContain('Guitar')
+    expect(ollieRow.text()).toContain('Drums')
+    expect(ollieRow.text()).toContain('Out this quarter') // guitar tier
+    expect(ollieRow.text()).toContain('Monthly') // drums cadence
+  })
+
+  it('labels a fill-in role as "Fill-in" and a default (no-entry) role as "Monthly"', () => {
+    const wrapper = mount(AvailabilityRosterTable, { props: { quarter: makeQuarter() } })
+
+    const fionaRow = wrapper.findAll('tr').find((r) => r.text().includes('Fillin Fiona'))!
+    expect(fionaRow.text()).toContain('Fill-in') // role-guitar tier fillin
+
+    // Rachel has no personQuarterData entry → her one role defaults to n=4 → Monthly.
+    const rachelRow = wrapper.findAll('tr').find((r) => r.text().includes('Regular Rachel'))!
+    expect(rachelRow.text()).toContain('Monthly')
+  })
+
+  it('shows actual blackout dates (chronologically sorted) plus the note in the Blackout & Note column', () => {
     const wrapper = mount(AvailabilityRosterTable, { props: { quarter: makeQuarter() } })
 
     const ollieRow = wrapper.findAll('tr').find((r) => r.text().includes('Outrole Ollie'))!
+    // Actual dates, formatted and sorted (Jul 5 before Jul 19) — not just a count.
+    expect(ollieRow.text()).toContain('Jul 5')
+    expect(ollieRow.text()).toContain('Jul 19')
+    expect(ollieRow.text().indexOf('Jul 5')).toBeLessThan(ollieRow.text().indexOf('Jul 19'))
+    // …and the free-text note.
     expect(ollieRow.text()).toContain('Traveling the first two Sundays')
   })
 
-  it('renders the em-dash placeholder for a person with an empty quarter note', () => {
+  it('renders the em-dash placeholder when a person has no blackout dates and no note', () => {
     const wrapper = mount(AvailabilityRosterTable, { props: { quarter: makeQuarter() } })
 
-    // Fiona's note is '' and her frequency badge is 'fill-in' (never an em-dash),
-    // so the only '—' in her row is the empty-note placeholder.
+    // Fiona: no blackout dates, empty note. Her row text otherwise contains 'Fill-in'
+    // / 'Guitar' (never an em-dash), so the only '—' is the empty-cell placeholder.
     const fionaRow = wrapper.findAll('tr').find((r) => r.text().includes('Fillin Fiona'))!
     expect(fionaRow.text()).toContain('—')
-  })
-
-  it('does not render aggregate status labels as row content (Status column removed)', () => {
-    const wrapper = mount(AvailabilityRosterTable, { props: { quarter: makeQuarter() } })
-
-    // "Fill-in" only ever came from the removed status pill — it must be gone now.
-    expect(wrapper.text()).not.toContain('Fill-in')
   })
 
   it('keeps the "Out this quarter" filter working off the aggregate tier (R-05)', async () => {
@@ -158,18 +183,5 @@ describe('AvailabilityRosterTable — columns (Quarter Note replaces Unavailable
     expect(wrapper.text()).toContain('Outrole Ollie')
     // Fiona is fill-in, not out → excluded.
     expect(wrapper.text()).not.toContain('Fillin Fiona')
-  })
-
-  it('derives the frequency badge from roleFrequency n (not a standing field)', () => {
-    const wrapper = mount(AvailabilityRosterTable, { props: { quarter: makeQuarter() } })
-
-    // person-out-all's held role-drums is tier 'out', n=2 (Twice a month baseline) —
-    // but full-quarter-out renders '—' regardless of n.
-    const alanRow = wrapper.findAll('tr').find((r) => r.text().includes('Allout Alan'))!
-    expect(alanRow.text()).toContain('—')
-
-    // person-regular has no personQuarterData entry — falls back to the default n=4 (Monthly).
-    const rachelRow = wrapper.findAll('tr').find((r) => r.text().includes('Regular Rachel'))!
-    expect(rachelRow.text()).toContain('Monthly')
   })
 })
