@@ -11,10 +11,10 @@ const mockRoles: Role[] = [
 ]
 
 // person-out-role: 'out' for role-guitar only, 'regular' for role-drums (per-role, D-05).
-// person-fillin-role: 'fillin' for role-guitar only, no other roleTiers entry.
-// person-legacy-out: no roleTiers at all, legacy frequencyTier 'out' (back-compat).
+// person-fillin-role: 'fillin' for role-guitar only, no other roleFrequency entry.
+// person-out-all: 'out' for its one held role — genuinely out all quarter.
 // person-regular: no personQuarterData entry at all (defaults to 'regular').
-const mockPeople: Person[] = [
+const mockPeople: Person[] = ([
   {
     id: 'person-out-role',
     name: 'Outrole Ollie',
@@ -22,7 +22,6 @@ const mockPeople: Person[] = [
     phone: '',
     active: true,
     roles: ['role-guitar', 'role-drums'],
-    frequencyTargetN: 4,
     pcPersonId: null,
     createdAt: {} as never,
     updatedAt: {} as never,
@@ -34,19 +33,17 @@ const mockPeople: Person[] = [
     phone: '',
     active: true,
     roles: ['role-guitar'],
-    frequencyTargetN: 4,
     pcPersonId: null,
     createdAt: {} as never,
     updatedAt: {} as never,
   },
   {
-    id: 'person-legacy-out',
-    name: 'Legacy Larry',
-    email: 'larry@example.com',
+    id: 'person-out-all',
+    name: 'Allout Alan',
+    email: 'alan@example.com',
     phone: '',
     active: true,
     roles: ['role-drums'],
-    frequencyTargetN: 4,
     pcPersonId: null,
     createdAt: {} as never,
     updatedAt: {} as never,
@@ -58,12 +55,11 @@ const mockPeople: Person[] = [
     phone: '',
     active: true,
     roles: ['role-guitar'],
-    frequencyTargetN: 4,
     pcPersonId: null,
     createdAt: {} as never,
     updatedAt: {} as never,
   },
-]
+] as unknown) as Person[]
 
 vi.mock('@/stores/roster', () => ({
   useRosterStore: () => ({
@@ -86,21 +82,28 @@ function makeQuarter(): Quarter {
         personId: 'person-out-role',
         blackoutDates: [],
         pairedWith: [],
-        roleTiers: { 'role-guitar': 'out', 'role-drums': 'regular' },
+        roleFrequency: {
+          'role-guitar': { tier: 'out', n: 4 },
+          'role-drums': { tier: 'regular', n: 4 },
+        },
         note: '',
       },
       'person-fillin-role': {
         personId: 'person-fillin-role',
         blackoutDates: [],
         pairedWith: [],
-        roleTiers: { 'role-guitar': 'fillin' },
+        roleFrequency: {
+          'role-guitar': { tier: 'fillin', n: 4 },
+        },
         note: '',
       },
-      'person-legacy-out': {
-        personId: 'person-legacy-out',
+      'person-out-all': {
+        personId: 'person-out-all',
         blackoutDates: [],
         pairedWith: [],
-        frequencyTier: 'out',
+        roleFrequency: {
+          'role-drums': { tier: 'out', n: 2 },
+        },
         note: '',
       },
     },
@@ -112,7 +115,7 @@ function makeQuarter(): Quarter {
   }
 }
 
-describe('AvailabilityRosterTable — per-role tier aggregation (D-05 gap closure)', () => {
+describe('AvailabilityRosterTable — per-role tier aggregation from roleFrequency (R-05)', () => {
   it('shows "Out this quarter" status for a person out for one held role, and includes them in the out filter', async () => {
     const wrapper = mount(AvailabilityRosterTable, { props: { quarter: makeQuarter() } })
 
@@ -138,17 +141,6 @@ describe('AvailabilityRosterTable — per-role tier aggregation (D-05 gap closur
     expect(wrapper.text()).not.toContain('Fillin Fiona')
   })
 
-  it('still resolves "Out this quarter" via the legacy frequencyTier when roleTiers is absent (back-compat)', async () => {
-    const wrapper = mount(AvailabilityRosterTable, { props: { quarter: makeQuarter() } })
-
-    const larryRow = wrapper.findAll('tr').find((r) => r.text().includes('Legacy Larry'))!
-    expect(larryRow.text()).toContain('Out this quarter')
-
-    const outFilterBtn = wrapper.findAll('button').find((b) => b.text() === 'Out this quarter')!
-    await outFilterBtn.trigger('click')
-    expect(wrapper.text()).toContain('Legacy Larry')
-  })
-
   it('shows "Regular" status for a person with no personQuarterData entry at all', () => {
     const wrapper = mount(AvailabilityRosterTable, { props: { quarter: makeQuarter() } })
 
@@ -167,11 +159,24 @@ describe('AvailabilityRosterTable — per-role tier aggregation (D-05 gap closur
     expect(ollieRow.text()).toContain('fully available')
   })
 
-  it('DOES render full-quarter unavailability for a person out for ALL held roles (legacy fallback)', () => {
+  it('DOES render full-quarter unavailability for a person out for ALL held roles', () => {
     const wrapper = mount(AvailabilityRosterTable, { props: { quarter: makeQuarter() } })
 
-    // Larry holds only role-drums and is legacy frequencyTier 'out' → genuinely out all quarter.
-    const larryRow = wrapper.findAll('tr').find((r) => r.text().includes('Legacy Larry'))!
-    expect(larryRow.text()).toContain('out all quarter')
+    // Alan holds only role-drums and is out for it → genuinely out all quarter.
+    const alanRow = wrapper.findAll('tr').find((r) => r.text().includes('Allout Alan'))!
+    expect(alanRow.text()).toContain('out all quarter')
+  })
+
+  it('derives the frequency badge from roleFrequency n (not a standing field)', () => {
+    const wrapper = mount(AvailabilityRosterTable, { props: { quarter: makeQuarter() } })
+
+    // person-out-all's held role-drums is tier 'out', n=2 (Twice a month baseline) —
+    // but full-quarter-out renders '—' regardless of n.
+    const alanRow = wrapper.findAll('tr').find((r) => r.text().includes('Allout Alan'))!
+    expect(alanRow.text()).toContain('—')
+
+    // person-regular has no personQuarterData entry — falls back to the default n=4 (Monthly).
+    const rachelRow = wrapper.findAll('tr').find((r) => r.text().includes('Regular Rachel'))!
+    expect(rachelRow.text()).toContain('Monthly')
   })
 })

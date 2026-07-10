@@ -130,22 +130,23 @@ const STATUS_LABEL: Record<FrequencyTier, string> = {
   out: 'Out this quarter',
 }
 
-// D-05: per-role tier read mirroring scheduler.ts's canonical tierOf —
-// roleTiers?.[roleId] ?? frequencyTier ?? 'regular'.
+// D-04/D-05: per-role tier read from the single quarter-scoped source of
+// truth — roleFrequency?.[roleId]?.tier, defaulting to 'regular' when the
+// role has no tuned entry (or no personQuarterData entry exists at all).
 function tierOf(personId: string, roleId: string): FrequencyTier {
   const pqd = props.quarter?.personQuarterData[personId]
-  return pqd?.roleTiers?.[roleId] ?? pqd?.frequencyTier ?? 'regular'
+  return pqd?.roleFrequency?.[roleId]?.tier ?? 'regular'
 }
 
 // Aggregate a person's per-role tiers across their held roles into a single status
 // for this admin table, most-restrictive-wins (out > fillin > regular) — a person
 // out for ANY held role must surface as 'out' here, the primary admin audit surface
-// for the per-role frequency feature (D-05). Falls back to the legacy per-person
-// frequencyTier only when roleTiers is absent/empty (back-compat for pre-migration data).
+// for the per-role frequency feature (D-05). Defaults to 'regular' when no
+// roleFrequency map exists (greenfield — no legacy-data migration per D-04).
 function aggregateTier(person: Person): FrequencyTier {
   const pqd = props.quarter?.personQuarterData[person.id]
-  if (!pqd?.roleTiers || Object.keys(pqd.roleTiers).length === 0) {
-    return pqd?.frequencyTier ?? 'regular'
+  if (!pqd?.roleFrequency || Object.keys(pqd.roleFrequency).length === 0) {
+    return 'regular'
   }
   const tiers = person.roles.map((roleId) => tierOf(person.id, roleId))
   if (tiers.includes('out')) return 'out'
@@ -161,26 +162,26 @@ function aggregateTier(person: Person): FrequencyTier {
 // else a partially-out volunteer is falsely shown as unavailable (WR-01).
 function allRolesOut(person: Person): boolean {
   const pqd = props.quarter?.personQuarterData[person.id]
-  if (!pqd?.roleTiers || Object.keys(pqd.roleTiers).length === 0) {
-    return (pqd?.frequencyTier ?? 'regular') === 'out'
+  if (!pqd?.roleFrequency || Object.keys(pqd.roleFrequency).length === 0) {
+    return false
   }
   if (person.roles.length === 0) return false
   return person.roles.every((roleId) => tierOf(person.id, roleId) === 'out')
 }
 
 // ── Quarter-scoped data lookup, defaulted per Phase 14 convention (lazy-default
-// on read — pre-migration Phase 13 data has no frequencyTier/note at all) ──
+// on read — a quarter with no personQuarterData entry for this person at all) ──
 function quarterDataFor(person: Person): {
   blackoutDates: string[]
   pairedWith: string[]
-  frequencyTier: FrequencyTier
+  tier: FrequencyTier
   note: string
 } {
   const pqd = props.quarter?.personQuarterData[person.id]
   return {
     blackoutDates: pqd?.blackoutDates ?? [],
     pairedWith: pqd?.pairedWith ?? [],
-    frequencyTier: aggregateTier(person),
+    tier: aggregateTier(person),
     note: pqd?.note ?? '',
   }
 }
@@ -202,7 +203,7 @@ const filteredPeople = computed<Person[]>(() => {
   if (activeFilter.value === 'needsInput') {
     list = list.filter((p) => !props.quarter?.personQuarterData[p.id])
   } else if (activeFilter.value === 'out') {
-    list = list.filter((p) => quarterDataFor(p).frequencyTier === 'out')
+    list = list.filter((p) => quarterDataFor(p).tier === 'out')
   }
 
   return list
@@ -226,24 +227,40 @@ function freqLabel(n: number): string {
   return `1-in-${n}`
 }
 
+// D-04/D-05: per-role cadence read from roleFrequency, defaulting to N=4 when
+// a held role has no tuned entry. Aggregated to the most-frequent (minimum N)
+// held role for this single-badge-per-row admin table — mirrors the retired
+// RosterView.minRoleFrequency's "most-frequent-wins" convention, now reading
+// the quarter-scoped source instead of the deleted standing fields.
+function roleFrequencyN(personId: string, roleId: string): number {
+  const pqd = props.quarter?.personQuarterData[personId]
+  return pqd?.roleFrequency?.[roleId]?.n ?? 4
+}
+
+function minRoleFrequencyN(person: Person): number {
+  if (person.roles.length === 0) return 4
+  return Math.min(...person.roles.map((roleId) => roleFrequencyN(person.id, roleId)))
+}
+
 function freqBadge(person: Person): string {
   const pqd = quarterDataFor(person)
   if (allRolesOut(person)) return '—'
-  if (pqd.frequencyTier === 'fillin') return 'fill-in'
+  if (pqd.tier === 'fillin') return 'fill-in'
+  const n = minRoleFrequencyN(person)
   const total = serviceDates.value.length
-  if (total === 0) return freqLabel(person.frequencyTargetN)
+  if (total === 0) return freqLabel(n)
   const servable = total - pqd.blackoutDates.length
-  const approx = Math.min(servable, Math.ceil(total / Math.max(1, person.frequencyTargetN)))
-  return `${freqLabel(person.frequencyTargetN)} · ≈${approx}`
+  const approx = Math.min(servable, Math.ceil(total / Math.max(1, n)))
+  return `${freqLabel(n)} · ≈${approx}`
 }
 
 // ── Status pill ───────────────────────────────────────────────────────────────
 function statusLabel(person: Person): string {
-  return STATUS_LABEL[quarterDataFor(person).frequencyTier]
+  return STATUS_LABEL[quarterDataFor(person).tier]
 }
 
 function statusPillClass(person: Person): string {
-  return STATUS_PILL_CLASS[quarterDataFor(person).frequencyTier]
+  return STATUS_PILL_CLASS[quarterDataFor(person).tier]
 }
 
 // ── Blackout summary (sketch blackoutSummary()) — detects a dominant Nth-Sunday
