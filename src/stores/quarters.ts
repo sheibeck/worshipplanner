@@ -402,32 +402,52 @@ export const useQuartersStore = defineStore('quarters', () => {
     // OVERWRITES in place (Pitfall 2), never accumulates like shareTokens above. Reuses the
     // exact calendarWithNames/roles/label/serviceDates snapshot already built — names only,
     // no email/phone (D-24).
-    const orgRef = doc(db, 'organizations', orgId.value)
-    const orgSnap = await getDoc(orgRef)
-    const orgData = orgSnap.exists() ? orgSnap.data() : {}
-    let slug = orgData.slug as string | undefined
-    if (!slug) {
-      const base = deriveSlug((orgData.name as string | undefined) ?? '')
-      slug = await claimSlug(base, orgId.value)
-      await updateDoc(orgRef, { slug })
-    }
+    //
+    // WR-06: by this point the opaque shareTokens doc AND the quarter's finalized status
+    // have already been committed above — a failure in this memorable-URL step must NOT
+    // surface as a hard "Failed to finalize and share" to the caller, since the finalize
+    // itself already succeeded. This whole step is therefore soft-fail: any error here is
+    // logged and swallowed, and the opaque token is still returned.
+    try {
+      const orgRef = doc(db, 'organizations', orgId.value)
+      const orgSnap = await getDoc(orgRef)
+      const orgData = orgSnap.exists() ? orgSnap.data() : {}
+      let slug = orgData.slug as string | undefined
+      if (!slug) {
+        // An org with no name (or a name with no [a-z0-9] characters after lowercasing,
+        // e.g. non-Latin-script) derives to '' — claimSlug('') would throw synchronously
+        // (Firestore rejects an empty document-ID path) well before the retry loop's
+        // permission-denied handling ever runs. Fall back to a generic base so claimSlug
+        // always has a valid, non-empty candidate to start from (its own numeric-suffix
+        // retry loop still guarantees uniqueness: org, org-2, org-3, ...).
+        const derived = deriveSlug((orgData.name as string | undefined) ?? '')
+        const base = derived || 'org'
+        slug = await claimSlug(base, orgId.value)
+        await updateDoc(orgRef, { slug })
+      }
 
-    await setDoc(doc(db, 'quarterShares', `${slug}__q${quarter.quarter}-${quarter.year}`), {
-      // CR-01: the owning orgId is stored on the doc so firestore.rules can scope
-      // create/update to editors of the org that actually owns this share (the shareId
-      // itself is a guessable, deterministic string, so this field is what closes the
-      // cross-tenant write gap).
-      orgId: orgId.value,
-      orgSlug: slug,
-      quarterSnapshot: {
-        label: quarter.label,
-        serviceDates: quarter.serviceDates,
-        roles: rosterStore.roles.map((r) => ({ id: r.id, name: r.name, group: r.group })),
-        calendar: calendarWithNames,
-      },
-      token,
-      updatedAt: serverTimestamp(),
-    })
+      await setDoc(doc(db, 'quarterShares', `${slug}__q${quarter.quarter}-${quarter.year}`), {
+        // CR-01: the owning orgId is stored on the doc so firestore.rules can scope
+        // create/update to editors of the org that actually owns this share (the shareId
+        // itself is a guessable, deterministic string, so this field is what closes the
+        // cross-tenant write gap).
+        orgId: orgId.value,
+        orgSlug: slug,
+        quarterSnapshot: {
+          label: quarter.label,
+          serviceDates: quarter.serviceDates,
+          roles: rosterStore.roles.map((r) => ({ id: r.id, name: r.name, group: r.group })),
+          calendar: calendarWithNames,
+        },
+        token,
+        updatedAt: serverTimestamp(),
+      })
+    } catch (err) {
+      console.error(
+        'finalizeAndShare: memorable-URL slug/quarterShares write failed — the opaque share link above already succeeded',
+        err,
+      )
+    }
 
     return token
   }

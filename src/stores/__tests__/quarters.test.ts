@@ -1024,6 +1024,89 @@ describe('useQuartersStore', () => {
       expect(data.shareToken).toBe(token)
     })
 
+    // WR-06 regression: an org name that derives to an empty slug (blank name, or a name
+    // with no [a-z0-9] characters after lowercasing, e.g. non-Latin-script) must not throw
+    // inside claimSlug — it must fall back to a generic base so the memorable-URL step
+    // still succeeds instead of masking the already-succeeded opaque-token finalize.
+    it('falls back to a generic slug base when the org name derives to an empty slug', async () => {
+      const { setDoc } = await import('firebase/firestore')
+      const { useQuartersStore } = await import('../quarters')
+      const store = useQuartersStore()
+      store.subscribe('org-1')
+      triggerQuartersSnapshot([makeQuarterDoc({ quarter: 4, year: 2026 })])
+      mockRosterState.people = []
+      mockRosterState.roles = []
+      // '日本語' has no [a-z0-9] characters after lowercasing — deriveSlug('日本語') === ''.
+      mockOrgDoc = { name: '日本語' }
+
+      const token = await store.finalizeAndShare('quarter-1')
+
+      expect(token).toHaveLength(36)
+      const claimCall = vi
+        .mocked(setDoc)
+        .mock.calls.find((call) => (call[0] as unknown as { path?: string }).path === 'orgSlugs/org')
+      expect(claimCall).toBeDefined()
+      const shareCall = vi
+        .mocked(setDoc)
+        .mock.calls.find(
+          (call) => (call[0] as unknown as { path?: string }).path === 'quarterShares/org__q4-2026',
+        )
+      expect(shareCall).toBeDefined()
+    })
+
+    // WR-06 regression: by the time the memorable-URL slug/quarterShares write runs, the
+    // opaque shareTokens doc and finalized status are already committed — a failure in this
+    // step must be soft-failed (logged, swallowed), not surfaced as a thrown error that
+    // would make callers believe the whole finalize failed.
+    it('does not throw when the memorable-URL slug/quarterShares write fails — the opaque share token is still returned', async () => {
+      const { setDoc, updateDoc } = await import('firebase/firestore')
+      const { useQuartersStore } = await import('../quarters')
+      const store = useQuartersStore()
+      store.subscribe('org-1')
+      triggerQuartersSnapshot([makeQuarterDoc({ quarter: 2, year: 2026 })])
+      mockRosterState.people = []
+      mockRosterState.roles = []
+      mockOrgDoc = { name: 'Grace Church', slug: 'grace-church' }
+
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      vi.mocked(setDoc).mockImplementation((ref: unknown) => {
+        const path = (ref as { path?: string }).path ?? ''
+        if (path.startsWith('quarterShares/')) {
+          return Promise.reject(new Error('simulated write failure'))
+        }
+        return Promise.resolve()
+      })
+
+      let token: string | undefined
+      let thrown: unknown
+      try {
+        token = await store.finalizeAndShare('quarter-1')
+      } catch (err) {
+        thrown = err
+      }
+
+      expect(thrown).toBeUndefined()
+      expect(token).toHaveLength(36)
+      // The opaque shareTokens write and finalized-status update already happened before the
+      // memorable-URL step, and both must be unaffected by its later failure.
+      const shareTokenCall = vi
+        .mocked(setDoc)
+        .mock.calls.find((call) => (call[0] as unknown as { path?: string }).path === `shareTokens/${token}`)
+      expect(shareTokenCall).toBeDefined()
+      const finalizedCall = vi.mocked(updateDoc).mock.calls.find((call) => {
+        const d = call[1] as unknown as Record<string, unknown>
+        return d.status === 'finalized'
+      })
+      expect(finalizedCall).toBeDefined()
+      expect(consoleErrorSpy).toHaveBeenCalled()
+
+      // Restore the default always-resolves implementation so later tests aren't affected —
+      // vi.clearAllMocks() (in this file's beforeEach) clears call history but not overridden
+      // implementations.
+      vi.mocked(setDoc).mockImplementation(() => Promise.resolve())
+      consoleErrorSpy.mockRestore()
+    })
+
     it('never calls Planning Center write functions (D-21)', async () => {
       const fs = await import('node:fs')
       const path = await import('node:path')
