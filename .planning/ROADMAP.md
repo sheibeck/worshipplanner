@@ -319,7 +319,7 @@ Plans:
 - R-14 **Slide-out editor** — Open the group editor as a right-side slide-out panel instead of expanding underneath the cell.
 
 **Depends on:** Phase 15
-**Plans:** 4/11 plans executed
+**Plans:** 10/11 plans executed
 
 Plans:
 
@@ -329,13 +329,13 @@ Plans:
 - [x] 16-03-PLAN.md — CollapsibleSection component + R-09 Schedule-page UX research note
 
 **Wave 2**
-- [ ] 16-04-PLAN.md — R-12 scheduler pairing fix honoring per-role cadence (TDD)
-- [ ] 16-05-PLAN.md — AvailabilityDrawer: remove date-range, unify frequency, roles editing (R-05/06/08, D-09)
-- [ ] 16-06-PLAN.md — Roles-only Volunteer form + badge repoint + roster collapsible (D-07, R-11)
-- [ ] 16-07-PLAN.md — QuarterGrid whole-cell + right-side slide-out editor (R-13/R-14)
+- [x] 16-04-PLAN.md — R-12 scheduler pairing fix honoring per-role cadence (TDD)
+- [x] 16-05-PLAN.md — AvailabilityDrawer: remove date-range, unify frequency, roles editing (R-05/06/08, D-09)
+- [x] 16-06-PLAN.md — Roles-only Volunteer form + badge repoint + roster collapsible (D-07, R-11)
+- [x] 16-07-PLAN.md — QuarterGrid whole-cell + right-side slide-out editor (R-13/R-14)
 - [x] 16-08-PLAN.md — QuarterView redesign: quarter switcher + Add-quarter modal + collapsible sections (R-09/10/11)
-- [ ] 16-09-PLAN.md — Settings slug field + finalizeAndShare quarterShares write (R-02)
-- [ ] 16-10-PLAN.md — Share page matrix + name filter + memorable route (R-01/02/03)
+- [x] 16-09-PLAN.md — Settings slug field + finalizeAndShare quarterShares write (R-02)
+- [x] 16-10-PLAN.md — Share page matrix + name filter + memorable route (R-01/02/03)
 
 **Wave 3**
 - [ ] 16-11-PLAN.md — Cleanup: remove deprecated frequency fields (D-04)
