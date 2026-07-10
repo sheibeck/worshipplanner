@@ -77,22 +77,10 @@
                   {{ preset.label }}
                 </button>
               </div>
+              <p class="text-xs text-gray-400 mt-1.5">{{ roleFreqReadout(role.id) }}</p>
             </div>
             <p v-if="heldRoles.length === 0" class="text-xs text-gray-600 mb-2">
-              No roles assigned yet — add roles in the roster to set a per-role quarter tier.
-            </p>
-            <p class="text-xs text-gray-400 mt-2.5 flex items-center gap-3 flex-wrap">
-              <span>{{ freqReadout }}</span>
-              <span v-if="draft.frequencyTier === 'regular'" class="flex items-center gap-1.5 text-gray-500">
-                1-in-<input
-                  type="number"
-                  min="1"
-                  max="8"
-                  v-model.number="draft.frequencyTargetN"
-                  @change="onFrequencyNChange"
-                  class="w-12 text-center bg-gray-800 border border-gray-700 rounded px-1 py-0.5 text-gray-200"
-                />
-              </span>
+              No roles assigned yet — check a role below to set its per-role quarter tier.
             </p>
           </section>
 
@@ -116,25 +104,6 @@
               </button>
             </div>
             <div class="flex items-center gap-2 mb-3 text-xs text-gray-400 flex-wrap">
-              <span>Range:</span>
-              <input
-                type="date"
-                v-model="rangeStart"
-                class="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-gray-200"
-              />
-              <span>&rarr;</span>
-              <input
-                type="date"
-                v-model="rangeEnd"
-                class="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-gray-200"
-              />
-              <button
-                type="button"
-                class="px-2 py-1 rounded-md bg-gray-800 border border-gray-700 hover:bg-gray-700"
-                @click="applyRange"
-              >
-                Block Sundays in range
-              </button>
               <button
                 type="button"
                 class="px-2 py-1 rounded-md bg-gray-800 border border-gray-700 hover:bg-gray-700"
@@ -300,18 +269,17 @@ const PRESET_OFF_CLASS = 'bg-gray-800 border-gray-700 text-gray-300 hover:text-g
 const draft = reactive({
   name: '',
   email: '',
-  frequencyTargetN: 4,
   blackoutDates: [] as string[],
   pairedWith: [] as string[],
-  frequencyTier: 'regular' as FrequencyTier,
-  // Per-role quarter tier (D-05/D-06) — one tier per currently-held role.
-  roleTiers: {} as Record<string, FrequencyTier>,
+  // Quarter-scoped, per-role serve frequency (D-04/D-05) — single source of
+  // truth, one entry per currently-held role. Replaces the old standing
+  // per-person cadence field plus the old quarter-scoped tier-only split.
+  roleFrequency: {} as Record<string, RoleFrequencyEntry>,
   note: '',
+  // Standing roles (D-09) — editable from this drawer too, written through the
+  // roster store the moment a checkbox is toggled (not deferred to Save).
+  roles: [] as string[],
 })
-
-// Tracks the value loaded from standing data, to diff on save — only write
-// frequencyTargetN through rosterStore.updatePerson if it actually changed.
-const loadedFrequencyTargetN = ref(4)
 
 const quarter = computed(() => {
   if (!props.quarterId) return null
@@ -324,13 +292,12 @@ const quarter = computed(() => {
 
 const serviceDates = computed<string[]>(() => quarter.value?.serviceDates ?? [])
 
-// Held roles (D-06) — the currently-open person's Role objects, resolved from
-// their standing roles[] (roleIds) against the roster's role list. Drives one
-// per-role tier control row.
+// Held roles (D-06) — driven by draft.roles (not the live roster snapshot) so a
+// role just toggled on/off in this drawer's checklist (D-09) immediately shows
+// or hides its per-role frequency control, without waiting on a Firestore
+// round-trip.
 const heldRoles = computed<Role[]>(() => {
-  const person = rosterStore.people.find((p) => p.id === props.personId)
-  if (!person) return []
-  return person.roles
+  return draft.roles
     .map((id) => rosterStore.roles.find((r) => r.id === id))
     .filter((r): r is Role => r !== undefined)
 })
@@ -338,8 +305,6 @@ const heldRoles = computed<Role[]>(() => {
 // Declared ahead of loadDraft/the immediate watcher below (which runs synchronously
 // during setup) so they're initialized before first use — refs declared later in this
 // file would still be in the temporal dead zone when the immediate watcher fires.
-const rangeStart = ref('')
-const rangeEnd = ref('')
 const pairQuery = ref('')
 const pairMenuOpen = ref(false)
 
@@ -349,24 +314,20 @@ function loadDraft(personId: string) {
 
   draft.name = person?.name ?? ''
   draft.email = person?.email ?? ''
-  draft.frequencyTargetN = person?.frequencyTargetN ?? 4
   draft.blackoutDates = pqd?.blackoutDates ? [...pqd.blackoutDates] : []
   draft.pairedWith = pqd?.pairedWith ? [...pqd.pairedWith] : []
-  draft.frequencyTier = pqd?.frequencyTier ?? 'regular'
   draft.note = pqd?.note ?? ''
+  draft.roles = person ? [...person.roles] : []
 
-  // Per-role quarter tier (D-05/D-06) — one tier per currently-held role, falling
-  // back to the legacy person-level frequencyTier, then to 'regular'.
-  draft.roleTiers = {}
-  for (const roleId of person?.roles ?? []) {
-    draft.roleTiers[roleId] = pqd?.roleTiers?.[roleId] ?? pqd?.frequencyTier ?? 'regular'
+  // Quarter-scoped, per-role frequency (D-04/D-05) — one entry per currently
+  // held role, defaulting to { tier: 'regular', n: 4 } when absent.
+  draft.roleFrequency = {}
+  for (const roleId of draft.roles) {
+    draft.roleFrequency[roleId] = pqd?.roleFrequency?.[roleId] ?? { tier: 'regular', n: 4 }
   }
 
-  loadedFrequencyTargetN.value = draft.frequencyTargetN
   pairQuery.value = ''
   pairMenuOpen.value = false
-  rangeStart.value = ''
-  rangeEnd.value = ''
 }
 
 watch(
@@ -377,18 +338,16 @@ watch(
   { immediate: true },
 )
 
-// ── Serve frequency (per-role quarter tier, D-05/D-06) ──────────────────────
-// roleTiers only stores the tier (regular/fillin/out), not a cadence N —
-// per-role cadence (weekly/biweek/monthly N) is standing data, already
-// editable per-role in RosterView.vue's Edit Volunteer form (15-05). So for
-// the 'regular' tier, all three (weekly/biweek/monthly) preset buttons map to
-// the same roleTiers[roleId] = 'regular' value; 'weekly' is shown active as
-// the tier's default representative.
+// ── Serve frequency (per-role quarter tier + cadence, D-05/D-06) ───────────
+// draft.roleFrequency[roleId] carries both the tier AND the cadence n in one
+// write (D-05) — no separate standing frequency field remains. The 'regular'
+// tier's active preset is derived from n (weekly n=1, biweek n=2, monthly n=4).
 function activeRoleTierPresetKey(roleId: string): FreqPresetKey {
-  const tier = draft.roleTiers[roleId] ?? 'regular'
-  if (tier === 'fillin') return 'fillin'
-  if (tier === 'out') return 'out'
-  return 'weekly'
+  const entry = draft.roleFrequency[roleId] ?? { tier: 'regular' as FrequencyTier, n: 4 }
+  if (entry.tier === 'fillin') return 'fillin'
+  if (entry.tier === 'out') return 'out'
+  const preset = FREQ_PRESETS.find((p) => p.tier === 'regular' && p.n === entry.n)
+  return preset?.key ?? 'monthly'
 }
 
 function presetButtonClassFor(roleId: string, key: FreqPresetKey): string {
@@ -397,26 +356,21 @@ function presetButtonClassFor(roleId: string, key: FreqPresetKey): string {
 
 function selectRoleTierPreset(roleId: string, key: FreqPresetKey) {
   const preset = FREQ_PRESETS.find((p) => p.key === key)!
-  draft.roleTiers[roleId] = preset.tier
+  draft.roleFrequency[roleId] = { tier: preset.tier, n: preset.n }
 }
 
-function onFrequencyNChange() {
-  const n = Math.max(1, Math.min(8, draft.frequencyTargetN || 1))
-  draft.frequencyTargetN = n
-  draft.frequencyTier = 'regular'
-}
-
-const freqReadout = computed<string>(() => {
-  if (draft.frequencyTier === 'out') {
+function roleFreqReadout(roleId: string): string {
+  const entry = draft.roleFrequency[roleId] ?? { tier: 'regular' as FrequencyTier, n: 4 }
+  if (entry.tier === 'out') {
     return 'Excluded from every proposal this quarter.'
   }
   const servable = serviceDates.value.length - draft.blackoutDates.length
-  if (draft.frequencyTier === 'fillin') {
+  if (entry.tier === 'fillin') {
     return `Only scheduled to fill gaps · available on ${servable} of ${serviceDates.value.length} Sundays`
   }
-  const approx = Math.min(servable, Math.ceil(serviceDates.value.length / draft.frequencyTargetN))
+  const approx = Math.min(servable, Math.ceil(serviceDates.value.length / entry.n))
   return `≈ ${approx} of ${serviceDates.value.length} Sundays`
-})
+}
 
 // ── Sundays-only calendar (never a generic date-picker — iterates serviceDates directly) ──
 function isBlackedOut(date: string): boolean {
@@ -479,15 +433,6 @@ function toggleNth(n: number) {
   }
 }
 
-function applyRange() {
-  if (!rangeStart.value || !rangeEnd.value) return
-  for (const d of serviceDates.value) {
-    if (d >= rangeStart.value && d <= rangeEnd.value && !draft.blackoutDates.includes(d)) {
-      draft.blackoutDates.push(d)
-    }
-  }
-}
-
 function clearAllBlackouts() {
   draft.blackoutDates = []
 }
@@ -525,28 +470,15 @@ function pairedPersonName(id: string): string {
 async function onSave() {
   if (!props.quarterId || !props.personId) return
 
-  // Quarter-scoped fields go through quartersStore.setPersonAvailability ONLY.
-  // TEMPORARY (Phase 16 D-04/D-05 relocation, plan 16-01): this UI still edits the
-  // legacy per-role tier only (draft.roleTiers) — full per-role cadence (n) editing
-  // is wired in plan 16-04. Shim roleTiers -> roleFrequency here (n defaults to 4)
-  // so the store's new signature compiles and existing tier edits keep working;
-  // 16-04 replaces this shim with a real per-role N control.
-  const roleFrequency: Record<string, RoleFrequencyEntry> = {}
-  for (const [roleId, tier] of Object.entries(draft.roleTiers)) {
-    roleFrequency[roleId] = { tier, n: 4 }
-  }
+  // Quarter-scoped fields go through quartersStore.setPersonAvailability ONLY —
+  // roleFrequency is now the single source of truth for serve cadence (D-05),
+  // no standing frequency write remains (frequency is fully quarter-scoped).
   await quartersStore.setPersonAvailability(props.quarterId, props.personId, {
     blackoutDates: draft.blackoutDates,
     pairedWith: draft.pairedWith,
-    roleFrequency,
+    roleFrequency: draft.roleFrequency,
     note: draft.note,
   })
-
-  // Standing frequencyTargetN goes through rosterStore.updatePerson ONLY, and only
-  // when it actually changed (Phase 13 D-18 standing/quarter split).
-  if (draft.frequencyTargetN !== loadedFrequencyTargetN.value) {
-    await rosterStore.updatePerson(props.personId, { frequencyTargetN: draft.frequencyTargetN })
-  }
 
   emit('close')
 }
