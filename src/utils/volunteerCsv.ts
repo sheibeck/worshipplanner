@@ -8,7 +8,7 @@ import type { Person } from '@/types/roster'
 export interface ParsedVolunteerRow {
   name: string
   rolesRaw: string[]
-  frequencyTargetN: number
+  frequencyN: number
   blackoutCellRaw: string
   serveWithRaw: string[]
   warnings: string[]
@@ -114,7 +114,7 @@ export function parseVolunteerCsvRow(row: Record<string, string>): ParsedVolunte
   const rolesRaw = splitMultiValueCell(row['Roles']?.trim() ?? '')
 
   const frequencyRaw = row['Frequency']?.trim() ?? ''
-  const frequencyTargetN = frequencyLabelToN(frequencyRaw)
+  const frequencyN = frequencyLabelToN(frequencyRaw)
   const isKnownLabel =
     frequencyRaw.trim().toLowerCase() === 'weekly' ||
     frequencyRaw.trim().toLowerCase() === 'twice a month' ||
@@ -122,7 +122,7 @@ export function parseVolunteerCsvRow(row: Record<string, string>): ParsedVolunte
     /^\d+$/.test(frequencyRaw.trim()) ||
     /^1-in-\d+$/i.test(frequencyRaw.trim())
   if (frequencyRaw !== '' && !isKnownLabel) {
-    warnings.push(`Frequency unrecognized — defaulted to N=${frequencyTargetN}`)
+    warnings.push(`Frequency unrecognized — defaulted to N=${frequencyN}`)
   }
 
   const blackoutCellRaw = row['Blackout Dates']?.trim() ?? ''
@@ -132,7 +132,7 @@ export function parseVolunteerCsvRow(row: Record<string, string>): ParsedVolunte
   return {
     name,
     rolesRaw,
-    frequencyTargetN,
+    frequencyN,
     blackoutCellRaw,
     serveWithRaw,
     warnings,

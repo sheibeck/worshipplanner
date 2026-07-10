@@ -260,7 +260,7 @@
 import { reactive, ref, computed, watch } from 'vue'
 import { useQuartersStore } from '@/stores/quarters'
 import { useRosterStore } from '@/stores/roster'
-import type { FrequencyTier, Role } from '@/types/roster'
+import type { FrequencyTier, Role, RoleFrequencyEntry } from '@/types/roster'
 
 const props = defineProps<{
   quarterId: string | null
@@ -526,11 +526,19 @@ async function onSave() {
   if (!props.quarterId || !props.personId) return
 
   // Quarter-scoped fields go through quartersStore.setPersonAvailability ONLY.
+  // TEMPORARY (Phase 16 D-04/D-05 relocation, plan 16-01): this UI still edits the
+  // legacy per-role tier only (draft.roleTiers) — full per-role cadence (n) editing
+  // is wired in plan 16-04. Shim roleTiers -> roleFrequency here (n defaults to 4)
+  // so the store's new signature compiles and existing tier edits keep working;
+  // 16-04 replaces this shim with a real per-role N control.
+  const roleFrequency: Record<string, RoleFrequencyEntry> = {}
+  for (const [roleId, tier] of Object.entries(draft.roleTiers)) {
+    roleFrequency[roleId] = { tier, n: 4 }
+  }
   await quartersStore.setPersonAvailability(props.quarterId, props.personId, {
     blackoutDates: draft.blackoutDates,
     pairedWith: draft.pairedWith,
-    frequencyTier: draft.frequencyTier,
-    roleTiers: draft.roleTiers,
+    roleFrequency,
     note: draft.note,
   })
 

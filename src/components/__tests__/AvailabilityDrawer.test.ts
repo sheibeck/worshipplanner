@@ -197,11 +197,13 @@ describe('AvailabilityDrawer', () => {
     const saveButton = wrapper.findAll('button').find((b) => b.text() === 'Save')!
     await saveButton.trigger('click')
 
+    // TEMPORARY (Phase 16 D-04/D-05 relocation, plan 16-01): the drawer still edits
+    // only the legacy per-role tier — full per-role cadence (n) editing lands in
+    // plan 16-04, which will replace this n:4 shim assertion.
     expect(mockSetPersonAvailability).toHaveBeenCalledWith('quarter-1', 'person-1', {
       blackoutDates: ['2026-07-19'],
       pairedWith: ['dean'],
-      frequencyTier: 'fillin',
-      roleTiers: { sound: 'out', vocals: 'regular' },
+      roleFrequency: { sound: { tier: 'out', n: 4 }, vocals: { tier: 'regular', n: 4 } },
       note: 'x',
     })
   })

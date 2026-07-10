@@ -19,12 +19,11 @@ export interface Person {
   active: boolean // soft-delete inverse (D-20); inactive people drop out of proposals + pickers
   /** STANDING data (D-18) — Role.id[] this person can fill */
   roles: string[]
-  /** STANDING data (D-06/D-18) — 1-in-N cadence: 1 = weekly, 2 = every other week, 4 = ~monthly.
-   *  RETAINED as the fallback/default-for-new-roles value — do NOT delete. */
+  /** @deprecated replaced by PersonQuarterData.roleFrequency (Phase 16 D-04); removed in plan 16-11.
+   *  STANDING data (D-06/D-18) — 1-in-N cadence: 1 = weekly, 2 = every other week, 4 = ~monthly. */
   frequencyTargetN: number
-  /** STANDING data (D-04) — roleId -> 1-in-N cadence, one target per held role. Optional;
-   *  per-role lookups default to `frequencyTargetN` when a role has no entry, then to N=4 (D-02)
-   *  when `frequencyTargetN` itself is absent. */
+  /** @deprecated replaced by PersonQuarterData.roleFrequency (Phase 16 D-04); removed in plan 16-11.
+   *  STANDING data (D-04) — roleId -> 1-in-N cadence, one target per held role. */
   roleFrequencies?: Record<string, number>
   pcPersonId: string | null // Planning Center people id, for re-import matching
   createdAt: Timestamp
@@ -41,6 +40,16 @@ export interface RoleSlotConfig {
 export type FrequencyTier = 'regular' | 'fillin' | 'out'
 
 /**
+ * Quarter-scoped, per-role serve frequency (D-04/D-05) — one control, one field per
+ * held role. `tier` gates whether the role is regular/fill-in/out; `n` is the 1-in-N
+ * cadence, meaningful when tier === 'regular' (default 4, ~once/month).
+ */
+export interface RoleFrequencyEntry {
+  tier: FrequencyTier
+  n: number
+}
+
+/**
  * Quarter-scoped, per-person availability — reset each quarter (D-18),
  * replaced per person on re-import (D-19). NOT standing data.
  */
@@ -48,11 +57,16 @@ export interface PersonQuarterData {
   personId: string
   blackoutDates: string[] // expanded YYYY-MM-DD list (D-17 ranges already expanded against serviceDates)
   pairedWith: string[] // Person.id[], bidirectional — must-serve-with pairings (D-09)
-  /** Quarter-scoped (D-05/A1) — resets each new quarter. Optional; defaults to 'regular' when absent.
-   *  RETAINED as the fallback value when a role has no `roleTiers` entry — do NOT delete. */
+  /** Quarter-scoped, per-role, single source of truth (D-04/D-05) — replaces the old
+   *  standing Person.roleFrequencies/frequencyTargetN AND the old PersonQuarterData
+   *  roleTiers/frequencyTier split. One control, one lookup, one field per held role.
+   *  Default when a role entry is absent: { tier: 'regular', n: 4 }. */
+  roleFrequency?: Record<string, RoleFrequencyEntry>
+  /** @deprecated replaced by PersonQuarterData.roleFrequency (Phase 16 D-04); removed in plan 16-11.
+   *  Quarter-scoped (D-05/A1) — resets each new quarter. Optional; defaults to 'regular' when absent. */
   frequencyTier?: FrequencyTier
-  /** Quarter-scoped (D-05) — roleId -> tier, one tier per held role. Optional; per-role lookups
-   *  default to the legacy `frequencyTier` when a role has no entry, then to 'regular' when absent. */
+  /** @deprecated replaced by PersonQuarterData.roleFrequency (Phase 16 D-04); removed in plan 16-11.
+   *  Quarter-scoped (D-05) — roleId -> tier, one tier per held role. */
   roleTiers?: Record<string, FrequencyTier>
   /** Free-text quarter note (D-03/D-07) — never auto-scheduled. Optional; defaults to '' when absent. */
   note?: string

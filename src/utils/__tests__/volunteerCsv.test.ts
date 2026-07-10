@@ -37,7 +37,7 @@ describe('parseVolunteerCsvRow', () => {
     expect(result).toEqual({
       name: 'Sarah Smith',
       rolesRaw: ['vocals', 'guitar'],
-      frequencyTargetN: 2,
+      frequencyN: 2,
       blackoutCellRaw: '2026-07-05; 2026-08-16',
       serveWithRaw: ['Ben Smith'],
       warnings: [],
@@ -55,7 +55,7 @@ describe('parseVolunteerCsvRow', () => {
     expect(result.warnings).toContain('Missing name')
   })
 
-  it('defaults frequencyTargetN and warns when Frequency is unrecognized', () => {
+  it('defaults frequencyN and warns when Frequency is unrecognized', () => {
     const result = parseVolunteerCsvRow({
       Name: 'Jamie Lee',
       Roles: 'drums',
@@ -63,7 +63,7 @@ describe('parseVolunteerCsvRow', () => {
       'Blackout Dates': '',
       'Serve-With': '',
     })
-    expect(result.frequencyTargetN).toBe(4)
+    expect(result.frequencyN).toBe(4)
     expect(result.warnings.some((w) => w.includes('Frequency'))).toBe(true)
   })
 
@@ -80,7 +80,7 @@ describe('parseVolunteerCsvRow', () => {
 })
 
 describe('parseVolunteerCsvRow — no per-role CSV schema change (Pitfall 4, D-07 graceful degrade)', () => {
-  it('emits exactly one scalar frequencyTargetN per row, regardless of role count — no roleFrequencies/per-role structure', () => {
+  it('emits exactly one scalar frequencyN per row, regardless of role count — no roleFrequencies/per-role structure', () => {
     const result = parseVolunteerCsvRow({
       Name: 'Multi Role Person',
       Roles: 'guitar; vocals; bass',
@@ -88,8 +88,8 @@ describe('parseVolunteerCsvRow — no per-role CSV schema change (Pitfall 4, D-0
       'Blackout Dates': '',
       'Serve-With': '',
     })
-    expect(typeof result.frequencyTargetN).toBe('number')
-    expect(result.frequencyTargetN).toBe(2)
+    expect(typeof result.frequencyN).toBe('number')
+    expect(result.frequencyN).toBe(2)
     expect(result.rolesRaw).toHaveLength(3)
     expect(result).not.toHaveProperty('roleFrequencies')
     // Exact key set — proves the parser's output shape is unchanged by Phase 15
@@ -97,7 +97,7 @@ describe('parseVolunteerCsvRow — no per-role CSV schema change (Pitfall 4, D-0
     expect(Object.keys(result)).toEqual([
       'name',
       'rolesRaw',
-      'frequencyTargetN',
+      'frequencyN',
       'blackoutCellRaw',
       'serveWithRaw',
       'warnings',

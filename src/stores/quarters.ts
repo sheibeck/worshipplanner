@@ -20,7 +20,7 @@ import type {
   ProposeResult,
   Role,
   RoleGroup,
-  FrequencyTier,
+  RoleFrequencyEntry,
 } from '@/types/roster'
 import { generateSundaysInQuarter, applyDateAdditionsRemovals } from '@/utils/quarterDates'
 import { proposeQuarterSchedule } from '@/utils/scheduler'
@@ -29,9 +29,25 @@ import { useRosterStore } from '@/stores/roster'
 // Payload for applyCsvToQuarter — the Plan 08 UI resolves CSV names→personIds and role-names→roleIds first.
 export interface ResolvedCsvPerson {
   personId: string
-  standing: { name?: string; email?: string; phone?: string; roles?: string[]; frequencyTargetN?: number }
+  standing: { name?: string; email?: string; phone?: string; roles?: string[] }
   blackoutDates: string[]
   pairedWith: string[]
+  // D-04/D-05: per-role cadence resolved from the CSV Frequency column, written to the quarter
+  // (never a standing frequency write — CSV import is a quarter-scoped operation).
+  roleFrequency?: Record<string, RoleFrequencyEntry>
+}
+
+// D-06: chronological ordering key for (year, quarterNum) — pure helper, no side effects.
+function quarterKey(year: number, quarterNum: number): number {
+  return year * 4 + quarterNum
+}
+
+// D-06: finds the chronologically prior quarter (if any) for new-quarter seeding.
+function findPriorQuarter(quarters: Quarter[], year: number, quarterNum: number): Quarter | undefined {
+  const target = quarterKey(year, quarterNum)
+  return quarters
+    .filter((q) => quarterKey(q.year, q.quarter) < target)
+    .sort((a, b) => quarterKey(b.year, b.quarter) - quarterKey(a.year, a.quarter))[0]
 }
 
 export const useQuartersStore = defineStore('quarters', () => {
@@ -78,15 +94,38 @@ export const useQuartersStore = defineStore('quarters', () => {
     })
   }
 
+  // D-06: seeds each (person, role) frequency + pairing from the chronologically prior
+  // quarter when one exists, else defaults to once/month (N=4). Blackout Sundays never
+  // carry forward — always reset to []. T-16-01-01: this whole-map construction is safe
+  // ONLY at quarter creation (writing into a brand-new, empty doc) — ongoing edits use
+  // the scoped dot-path writes in setPersonAvailability/applyCsvToQuarter, never this path.
   async function createQuarter(year: number, quarter: 1 | 2 | 3 | 4, label: string): Promise<string> {
     if (!orgId.value) throw new Error('No orgId set — call subscribe() first')
+    const rosterStore = useRosterStore()
+    const prior = findPriorQuarter(quarters.value, year, quarter)
+
+    const personQuarterData: Record<string, PersonQuarterData> = {}
+    for (const person of rosterStore.people) {
+      const priorPQD = prior?.personQuarterData[person.id]
+      const roleFrequency: Record<string, RoleFrequencyEntry> = {}
+      for (const roleId of person.roles) {
+        roleFrequency[roleId] = priorPQD?.roleFrequency?.[roleId] ?? { tier: 'regular', n: 4 }
+      }
+      personQuarterData[person.id] = {
+        personId: person.id,
+        blackoutDates: [], // D-06: never carried forward, always resets
+        pairedWith: priorPQD?.pairedWith ?? [], // D-06: seeded from previous quarter when present
+        roleFrequency,
+      }
+    }
+
     const docRef = await addDoc(collection(db, 'organizations', orgId.value, 'quarters'), {
       label,
       year,
       quarter,
       serviceDates: generateSundaysInQuarter(year, quarter),
       roleOverridesByDate: {},
-      personQuarterData: {},
+      personQuarterData,
       calendar: {},
       status: 'draft',
       shareToken: null,
@@ -136,6 +175,7 @@ export const useQuartersStore = defineStore('quarters', () => {
         personId: row.personId,
         blackoutDates: row.blackoutDates,
         pairedWith: row.pairedWith,
+        roleFrequency: row.roleFrequency ?? {},
       }
     }
 
@@ -147,6 +187,7 @@ export const useQuartersStore = defineStore('quarters', () => {
           personId: partnerId,
           blackoutDates: [],
           pairedWith: [],
+          roleFrequency: {},
         }
         if (!partnerEntry.pairedWith.includes(row.personId)) {
           personQuarterData[partnerId] = {
@@ -172,12 +213,11 @@ export const useQuartersStore = defineStore('quarters', () => {
     data: {
       blackoutDates: string[]
       pairedWith: string[]
-      frequencyTier: FrequencyTier
       note: string
-      // D-05: per-role tier, keyed by roleId. Optional/back-compat — written wholesale within
-      // the already-scoped `personQuarterData.${personId}` dot-path below (T-15-04-01), never a
-      // whole-map rewrite, so other people's entries are never touched by this write.
-      roleTiers?: Record<string, FrequencyTier>
+      // D-04/D-05: per-role frequency, keyed by roleId — written wholesale within the
+      // already-scoped `personQuarterData.${personId}` dot-path below, never a whole-map
+      // rewrite, so other people's entries are never touched by this write.
+      roleFrequency: Record<string, RoleFrequencyEntry>
     },
   ): Promise<void> {
     if (!orgId.value) return
@@ -195,10 +235,10 @@ export const useQuartersStore = defineStore('quarters', () => {
       const partnerPaired = existingPartnerData?.pairedWith ?? []
       if (!partnerPaired.includes(personId)) {
         if (existingPartnerData) {
-          // D-05 gap closure: partner already has an entry (possibly with tuned roleTiers) —
+          // D-05 gap closure: partner already has an entry (possibly with tuned roleFrequency) —
           // write ONLY the scoped pairedWith sub-path so every other field, including
-          // roleTiers, is left untouched. A whole-object replace here would silently erase
-          // the partner's tuned per-role tiers (this is a Firestore field replacement, not
+          // roleFrequency, is left untouched. A whole-object replace here would silently erase
+          // the partner's tuned per-role cadence (this is a Firestore field replacement, not
           // a merge).
           updates[`personQuarterData.${partnerId}.pairedWith`] = [...partnerPaired, personId]
         } else {
@@ -210,7 +250,7 @@ export const useQuartersStore = defineStore('quarters', () => {
             personId: partnerId,
             blackoutDates: [],
             pairedWith: [personId],
-            frequencyTier: 'regular',
+            roleFrequency: {},
             note: '',
           }
         }
