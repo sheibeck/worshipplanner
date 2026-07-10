@@ -81,6 +81,22 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Org slug claims: public read, authenticated create-only (first-writer-wins).
+    // Reassignment abandons a slug, never reclaims it — no update/delete allowed.
+    match /orgSlugs/{slug} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if false;
+    }
+
+    // Memorable-URL quarter shares: public read, authenticated create/update
+    // (overwritten in place on every finalize, unlike frozen shareTokens).
+    match /quarterShares/{shareId} {
+      allow read: if true;
+      allow create, update: if isSignedIn();
+      allow delete: if false;
+    }
+
     // Catch-all: deny everything else
     match /{document=**} {
       allow read, write: if false;

@@ -152,6 +152,71 @@ describe('Catch-all deny', () => {
   })
 })
 
+describe('orgSlugs — public read, create-once claim', () => {
+  it('allows unauthenticated read of an orgSlugs doc', async () => {
+    await seedDoc('orgSlugs/grace-church', { orgId: 'orgA' })
+    const context = testEnv.unauthenticatedContext()
+    const db = context.firestore()
+    await assertSucceeds(getDoc(doc(db, 'orgSlugs', 'grace-church')))
+  })
+
+  it('allows a signed-in user to create an unclaimed orgSlugs doc', async () => {
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertSucceeds(setDoc(doc(db, 'orgSlugs', 'grace-church'), { orgId: 'orgA' }))
+  })
+
+  it('denies unauthenticated write to orgSlugs', async () => {
+    const context = testEnv.unauthenticatedContext()
+    const db = context.firestore()
+    await assertFails(setDoc(doc(db, 'orgSlugs', 'grace-church'), { orgId: 'orgA' }))
+  })
+
+  it('denies a second signed-in write to an already-claimed orgSlugs slug (first-writer-wins)', async () => {
+    await seedDoc('orgSlugs/grace-church', { orgId: 'orgA' })
+    const context = testEnv.authenticatedContext('userB')
+    const db = context.firestore()
+    await assertFails(setDoc(doc(db, 'orgSlugs', 'grace-church'), { orgId: 'orgB' }))
+  })
+})
+
+describe('quarterShares — public read, authenticated create/update', () => {
+  it('allows unauthenticated read of a quarterShares doc', async () => {
+    await seedDoc('quarterShares/grace-church__q3-2026', { orgSlug: 'grace-church' })
+    const context = testEnv.unauthenticatedContext()
+    const db = context.firestore()
+    await assertSucceeds(getDoc(doc(db, 'quarterShares', 'grace-church__q3-2026')))
+  })
+
+  it('allows a signed-in user to create a quarterShares doc', async () => {
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertSucceeds(
+      setDoc(doc(db, 'quarterShares', 'grace-church__q3-2026'), { orgSlug: 'grace-church' }),
+    )
+  })
+
+  it('allows a signed-in user to update (overwrite-in-place) an existing quarterShares doc', async () => {
+    await seedDoc('quarterShares/grace-church__q3-2026', { orgSlug: 'grace-church' })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertSucceeds(
+      setDoc(doc(db, 'quarterShares', 'grace-church__q3-2026'), {
+        orgSlug: 'grace-church',
+        updatedAgain: true,
+      }),
+    )
+  })
+
+  it('denies unauthenticated write to quarterShares', async () => {
+    const context = testEnv.unauthenticatedContext()
+    const db = context.firestore()
+    await assertFails(
+      setDoc(doc(db, 'quarterShares', 'grace-church__q3-2026'), { orgSlug: 'grace-church' }),
+    )
+  })
+})
+
 describe('Editor/Viewer RBAC', () => {
   it('editor can write to songs collection', async () => {
     await seedMembershipDoc('orgA', 'userA', 'editor')
