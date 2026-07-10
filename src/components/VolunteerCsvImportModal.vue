@@ -147,7 +147,7 @@
                         </div>
                       </td>
                       <td class="px-4 py-2.5 text-gray-400 hidden sm:table-cell">{{ row.rolesRaw.join(', ') || '—' }}</td>
-                      <td class="px-4 py-2.5 text-gray-400 hidden md:table-cell">{{ row.frequencyTargetN }}</td>
+                      <td class="px-4 py-2.5 text-gray-400 hidden md:table-cell">{{ row.frequencyN }}</td>
                       <td class="px-4 py-2.5">
                         <span v-if="row.matchStatus === 'matched'" class="text-xs px-2 py-0.5 rounded-full bg-green-900/30 border border-green-700/40 text-green-400">
                           Matched
@@ -323,7 +323,7 @@ const isDragging = ref(false)
 interface PreviewRow {
   name: string
   rolesRaw: string[]
-  frequencyTargetN: number
+  frequencyN: number
   serveWithRaw: string[]
   matchStatus: NameMatchStatus
   resolution: 'existing' | 'create' | null
@@ -420,7 +420,7 @@ function processFile(file: File) {
           return {
             name: row.name,
             rolesRaw: row.rolesRaw,
-            frequencyTargetN: row.frequencyTargetN,
+            frequencyN: row.frequencyN,
             serveWithRaw: row.serveWithRaw,
             matchStatus: match.status,
             resolution: match.status === 'matched' ? 'existing' : null,
@@ -476,22 +476,25 @@ async function onCommit() {
     for (const row of previewRows.value) {
       let personId: string
       let standing: ResolvedCsvPerson['standing']
+      const roleIds = mapRoleNamesToIds(row.rolesRaw)
+      // D-04/D-05: CSV Frequency column resolves to per-role quarter-scoped cadence — one
+      // entry per held role, never a standing frequency write (CSV import is quarter-scoped).
+      const roleFrequency: Record<string, { tier: 'regular'; n: number }> = Object.fromEntries(
+        roleIds.map((id) => [id, { tier: 'regular' as const, n: row.frequencyN }]),
+      )
 
       if (row.matchStatus !== 'matched' && row.resolution === 'create') {
-        const roleIds = mapRoleNamesToIds(row.rolesRaw)
         personId = await rosterStore.addPerson({
           name: row.name,
           email: '',
           roles: roleIds,
-          frequencyTargetN: row.frequencyTargetN,
         })
         nameToId.set(normalizeName(row.name), personId)
         standing = {}
       } else {
         personId = row.selectedPersonId!
         standing = {
-          roles: mapRoleNamesToIds(row.rolesRaw),
-          frequencyTargetN: row.frequencyTargetN,
+          roles: roleIds,
         }
       }
 
@@ -500,6 +503,7 @@ async function onCommit() {
         standing,
         blackoutDates: row.blackoutDates,
         pairedWith: [],
+        roleFrequency,
       })
     }
 
