@@ -319,7 +319,7 @@ Plans:
 - R-14 **Slide-out editor** — Open the group editor as a right-side slide-out panel instead of expanding underneath the cell.
 
 **Depends on:** Phase 15
-**Plans:** 10/11 plans executed
+**Plans:** 11/11 plans complete
 
 Plans:
 
@@ -338,4 +338,4 @@ Plans:
 - [x] 16-10-PLAN.md — Share page matrix + name filter + memorable route (R-01/02/03)
 
 **Wave 3**
-- [ ] 16-11-PLAN.md — Cleanup: remove deprecated frequency fields (D-04)
+- [x] 16-11-PLAN.md — Cleanup: remove deprecated frequency fields (D-04)
