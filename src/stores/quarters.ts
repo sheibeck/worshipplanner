@@ -413,6 +413,11 @@ export const useQuartersStore = defineStore('quarters', () => {
     }
 
     await setDoc(doc(db, 'quarterShares', `${slug}__q${quarter.quarter}-${quarter.year}`), {
+      // CR-01: the owning orgId is stored on the doc so firestore.rules can scope
+      // create/update to editors of the org that actually owns this share (the shareId
+      // itself is a guessable, deterministic string, so this field is what closes the
+      // cross-tenant write gap).
+      orgId: orgId.value,
       orgSlug: slug,
       quarterSnapshot: {
         label: quarter.label,

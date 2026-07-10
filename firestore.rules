@@ -89,11 +89,17 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
-    // Memorable-URL quarter shares: public read, authenticated create/update
-    // (overwritten in place on every finalize, unlike frozen shareTokens).
+    // Memorable-URL quarter shares: public read, org-editor-scoped create/update
+    // (overwritten in place on every finalize, unlike frozen shareTokens). CR-01: shareId is
+    // a guessable, deterministic string (`${slug}__q${N}-${year}`), so isSignedIn() alone let
+    // any authenticated user of ANY org overwrite another org's public share doc. Both create
+    // and update require the caller to be an editor of the orgId embedded in the doc, and
+    // update additionally forbids changing orgId (no reassigning a share to a different org).
     match /quarterShares/{shareId} {
       allow read: if true;
-      allow create, update: if isSignedIn();
+      allow create: if isOrgEditor(request.resource.data.orgId);
+      allow update: if isOrgEditor(resource.data.orgId)
+                       && request.resource.data.orgId == resource.data.orgId;
       allow delete: if false;
     }
 

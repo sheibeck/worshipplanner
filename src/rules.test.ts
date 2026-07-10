@@ -180,28 +180,102 @@ describe('orgSlugs — public read, create-once claim', () => {
   })
 })
 
-describe('quarterShares — public read, authenticated create/update', () => {
+describe('quarterShares — public read, org-editor-scoped create/update (CR-01)', () => {
   it('allows unauthenticated read of a quarterShares doc', async () => {
-    await seedDoc('quarterShares/grace-church__q3-2026', { orgSlug: 'grace-church' })
+    await seedDoc('quarterShares/grace-church__q3-2026', { orgId: 'orgA', orgSlug: 'grace-church' })
     const context = testEnv.unauthenticatedContext()
     const db = context.firestore()
     await assertSucceeds(getDoc(doc(db, 'quarterShares', 'grace-church__q3-2026')))
   })
 
-  it('allows a signed-in user to create a quarterShares doc', async () => {
-    const context = testEnv.authenticatedContext('userA')
-    const db = context.firestore()
-    await assertSucceeds(
-      setDoc(doc(db, 'quarterShares', 'grace-church__q3-2026'), { orgSlug: 'grace-church' }),
-    )
-  })
-
-  it('allows a signed-in user to update (overwrite-in-place) an existing quarterShares doc', async () => {
-    await seedDoc('quarterShares/grace-church__q3-2026', { orgSlug: 'grace-church' })
+  it('allows an editor of the owning org to create a quarterShares doc', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
     const context = testEnv.authenticatedContext('userA')
     const db = context.firestore()
     await assertSucceeds(
       setDoc(doc(db, 'quarterShares', 'grace-church__q3-2026'), {
+        orgId: 'orgA',
+        orgSlug: 'grace-church',
+      }),
+    )
+  })
+
+  it('denies a signed-in user with no membership in the target org from creating a quarterShares doc', async () => {
+    // userA has no seeded membership anywhere — isOrgEditor('orgA') must be false.
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertFails(
+      setDoc(doc(db, 'quarterShares', 'grace-church__q3-2026'), {
+        orgId: 'orgA',
+        orgSlug: 'grace-church',
+      }),
+    )
+  })
+
+  it('denies a member of a DIFFERENT org from creating a quarterShares doc for orgA (cross-tenant)', async () => {
+    await seedMembershipDoc('orgB', 'userB', 'editor')
+    const context = testEnv.authenticatedContext('userB')
+    const db = context.firestore()
+    await assertFails(
+      setDoc(doc(db, 'quarterShares', 'grace-church__q3-2026'), {
+        orgId: 'orgA',
+        orgSlug: 'grace-church',
+      }),
+    )
+  })
+
+  it('allows an editor of the owning org to update (overwrite-in-place) an existing quarterShares doc', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('quarterShares/grace-church__q3-2026', { orgId: 'orgA', orgSlug: 'grace-church' })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertSucceeds(
+      setDoc(doc(db, 'quarterShares', 'grace-church__q3-2026'), {
+        orgId: 'orgA',
+        orgSlug: 'grace-church',
+        updatedAgain: true,
+      }),
+    )
+  })
+
+  // CR-01 regression: this test previously asserted the overwrite SUCCEEDED for a completely
+  // unaffiliated user (no membership seeded for any org) — that assertion encoded the
+  // cross-tenant vulnerability itself. It is now inverted to assert the write is DENIED.
+  it('denies a signed-in user with no org membership from overwriting another org\'s existing quarterShares doc', async () => {
+    await seedDoc('quarterShares/grace-church__q3-2026', { orgId: 'orgA', orgSlug: 'grace-church' })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertFails(
+      setDoc(doc(db, 'quarterShares', 'grace-church__q3-2026'), {
+        orgSlug: 'grace-church',
+        orgId: 'orgA',
+        updatedAgain: true,
+      }),
+    )
+  })
+
+  it('denies an editor of a DIFFERENT org from overwriting orgA\'s existing quarterShares doc', async () => {
+    await seedMembershipDoc('orgB', 'userB', 'editor')
+    await seedDoc('quarterShares/grace-church__q3-2026', { orgId: 'orgA', orgSlug: 'grace-church' })
+    const context = testEnv.authenticatedContext('userB')
+    const db = context.firestore()
+    await assertFails(
+      setDoc(doc(db, 'quarterShares', 'grace-church__q3-2026'), {
+        orgId: 'orgA',
+        orgSlug: 'grace-church',
+        updatedAgain: true,
+      }),
+    )
+  })
+
+  it('denies an editor of the owning org from reassigning an existing quarterShares doc to a different orgId', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('quarterShares/grace-church__q3-2026', { orgId: 'orgA', orgSlug: 'grace-church' })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertFails(
+      setDoc(doc(db, 'quarterShares', 'grace-church__q3-2026'), {
+        orgId: 'orgB',
         orgSlug: 'grace-church',
         updatedAgain: true,
       }),
@@ -212,7 +286,7 @@ describe('quarterShares — public read, authenticated create/update', () => {
     const context = testEnv.unauthenticatedContext()
     const db = context.firestore()
     await assertFails(
-      setDoc(doc(db, 'quarterShares', 'grace-church__q3-2026'), { orgSlug: 'grace-church' }),
+      setDoc(doc(db, 'quarterShares', 'grace-church__q3-2026'), { orgId: 'orgA', orgSlug: 'grace-church' }),
     )
   })
 })
