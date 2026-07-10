@@ -1167,8 +1167,8 @@ export async function fetchPeopleForTeamPositions(
 /**
  * Pure: PC person + its resolved emails → UpsertPersonInput.
  * `phone` is ALWAYS '' — PC Services v2 has no phone vertex (D-14 app-only field,
- * RESEARCH.md Pitfall 5). Standing fields (active/roles/frequencyTargetN) are left
- * to the store's upsert defaults and intentionally omitted here.
+ * RESEARCH.md Pitfall 5). Standing fields (active/roles) are left to the
+ * store's upsert defaults and intentionally omitted here.
  */
 export function mapPcPersonToUpsert(person: PcPerson, emails: string[]): UpsertPersonInput {
   const { attributes } = person

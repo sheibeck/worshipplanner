@@ -55,23 +55,6 @@ export const useRosterStore = defineStore('roster', () => {
     unsubscribePeopleFn = onSnapshot(peopleQuery, (snap) => {
       people.value = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Person)
       isLoading.value = false
-
-      // One-time migration (D-03): pre-Phase-15 person docs have no roleFrequencies
-      // field at all. Backfill by copying the person's single frequencyTargetN
-      // onto every currently-held role. Guarded on the field being WHOLLY ABSENT —
-      // idempotent, never overwrites an already-tuned per-role map. Fired without
-      // gating the reactive assignment above (mirrors auth.ts's opportunistic
-      // patch-on-read shape, adapted for a collection snapshot).
-      for (const d of snap.docs) {
-        const data = d.data()
-        if (data.roleFrequencies === undefined) {
-          const personRoles = (data.roles as string[] | undefined) ?? []
-          const n = (data.frequencyTargetN as number | undefined) ?? 4
-          void updateDoc(d.ref, {
-            roleFrequencies: Object.fromEntries(personRoles.map((r) => [r, n])),
-          })
-        }
-      }
     })
 
     // Roles ordered by `order` ascending — drives the scheduler's stable inner loop.
@@ -105,21 +88,16 @@ export const useRosterStore = defineStore('roster', () => {
     isLoading.value = true
   }
 
+  // D-04/D-07: this store no longer synthesizes or persists standing per-person
+  // frequency — quarter-scoped serve cadence lives solely on PersonQuarterData
+  // (see quarters.ts), never on the person doc.
   async function addPerson(input: UpsertPersonInput): Promise<string> {
     if (!orgId.value) throw new Error('No orgId set — call subscribe() first')
-    const frequencyTargetN = input.frequencyTargetN ?? 4
-    // D-07/D-02 graceful degrade: when no explicit roleFrequencies map is supplied,
-    // apply the single frequencyTargetN (or the N=4 default) to every held role —
-    // same shape as the D-03 read-time migration, applied at creation time instead.
-    const roleFrequencies =
-      input.roleFrequencies ?? Object.fromEntries((input.roles ?? []).map((r) => [r, frequencyTargetN]))
     const docRef = await addDoc(collection(db, 'organizations', orgId.value, 'people'), {
       name: input.name,
       email: input.email,
       phone: input.phone ?? '',
       roles: input.roles ?? [],
-      frequencyTargetN,
-      roleFrequencies,
       pcPersonId: input.pcPersonId ?? null,
       active: true,
       createdAt: serverTimestamp(),
@@ -128,12 +106,18 @@ export const useRosterStore = defineStore('roster', () => {
     return docRef.id
   }
 
+  // D-04: writes only the standing fields this store persists — any other
+  // properties a caller passes (e.g. a not-yet-migrated legacy per-person
+  // cadence value) are intentionally not forwarded to Firestore.
   async function updatePerson(id: string, patch: Partial<UpsertPersonInput>): Promise<void> {
     if (!orgId.value) return
-    await updateDoc(doc(db, 'organizations', orgId.value, 'people', id), {
-      ...patch,
-      updatedAt: serverTimestamp(),
-    })
+    const updates: Record<string, unknown> = { updatedAt: serverTimestamp() }
+    if (patch.name !== undefined) updates.name = patch.name
+    if (patch.email !== undefined) updates.email = patch.email
+    if (patch.phone !== undefined) updates.phone = patch.phone
+    if (patch.roles !== undefined) updates.roles = patch.roles
+    if (patch.pcPersonId !== undefined) updates.pcPersonId = patch.pcPersonId
+    await updateDoc(doc(db, 'organizations', orgId.value, 'people', id), updates)
   }
 
   async function deactivatePerson(id: string): Promise<void> {
@@ -181,7 +165,9 @@ export const useRosterStore = defineStore('roster', () => {
       if (existing) {
         // Update ONLY standing fields — never include `active`, never write
         // quarter-scoped availability/serve-with data (that lives on the
-        // quarter doc from Plan 06, never on this person doc).
+        // quarter doc from Plan 06, never on this person doc). D-04: any
+        // legacy per-person cadence a caller still supplies is intentionally
+        // not forwarded — this store no longer persists standing frequency.
         const updateData: Record<string, unknown> = {
           name: incoming.name,
           email: incoming.email,
@@ -195,37 +181,16 @@ export const useRosterStore = defineStore('roster', () => {
         if (incoming.roles !== undefined) {
           updateData.roles = Array.from(new Set([...(existing.roles ?? []), ...incoming.roles]))
         }
-        if (incoming.frequencyTargetN !== undefined) updateData.frequencyTargetN = incoming.frequencyTargetN
-        // D-04 persistence + D-07/D-02 CSV graceful degrade: an explicit map wins
-        // outright; otherwise, when roles are supplied without a map, synthesize
-        // defaults for the incoming roles from frequencyTargetN (row's value, else
-        // the existing person's, else N=4) while PRESERVING any already-tuned
-        // entries on `existing.roleFrequencies` (T-15-03-01 — an import must never
-        // clobber cadence already tuned in-app, mirrors the roles-merge convention
-        // above). No `incoming.roles` at all means roleFrequencies is left untouched.
-        if (incoming.roleFrequencies !== undefined) {
-          updateData.roleFrequencies = incoming.roleFrequencies
-        } else if (incoming.roles !== undefined) {
-          const n = incoming.frequencyTargetN ?? existing.frequencyTargetN ?? 4
-          const synthesized = Object.fromEntries(incoming.roles.map((r) => [r, n]))
-          updateData.roleFrequencies = { ...synthesized, ...(existing.roleFrequencies ?? {}) }
-        }
         if (incoming.pcPersonId !== undefined) updateData.pcPersonId = incoming.pcPersonId
         await updateDoc(doc(db, 'organizations', orgId.value!, 'people', existing.id), updateData)
         updated++
       } else {
-        const frequencyTargetN = incoming.frequencyTargetN ?? 4
-        // Brand-new person via import: no existing roleFrequencies to preserve, so
-        // synthesize from roles x frequencyTargetN (or N=4 default) exactly like addPerson.
-        const roleFrequencies =
-          incoming.roleFrequencies ?? Object.fromEntries((incoming.roles ?? []).map((r) => [r, frequencyTargetN]))
+        // Brand-new person via import — standing fields only (D-04).
         await addDoc(collection(db, 'organizations', orgId.value!, 'people'), {
           name: incoming.name,
           email: incoming.email,
           phone: incoming.phone ?? '',
           roles: incoming.roles ?? [],
-          frequencyTargetN,
-          roleFrequencies,
           pcPersonId: incoming.pcPersonId ?? null,
           active: true,
           createdAt: serverTimestamp(),
