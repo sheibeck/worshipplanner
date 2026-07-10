@@ -116,3 +116,13 @@ None - no external service configuration required.
 ---
 *Phase: 16-quarterly-schedule-share-link*
 *Completed: 2026-07-10*
+
+## Self-Check: PASSED
+
+- FOUND: src/views/RosterView.vue
+- FOUND: src/components/AvailabilityRosterTable.vue
+- FOUND: src/stores/roster.ts
+- FOUND: .planning/phases/16-quarterly-schedule-share-link/16-06-SUMMARY.md
+- FOUND commit: ef932ca (Task 1)
+- FOUND commit: 62dfc3c (Task 2)
+- FOUND commit: a826b3a (SUMMARY)
