@@ -152,7 +152,7 @@ describe('Catch-all deny', () => {
   })
 })
 
-describe('orgSlugs — public read, create-once claim', () => {
+describe('orgSlugs — public read, org-editor-scoped create-once claim (WR-01)', () => {
   it('allows unauthenticated read of an orgSlugs doc', async () => {
     await seedDoc('orgSlugs/grace-church', { orgId: 'orgA' })
     const context = testEnv.unauthenticatedContext()
@@ -160,10 +160,26 @@ describe('orgSlugs — public read, create-once claim', () => {
     await assertSucceeds(getDoc(doc(db, 'orgSlugs', 'grace-church')))
   })
 
-  it('allows a signed-in user to create an unclaimed orgSlugs doc', async () => {
+  it('allows an editor of the target org to create an unclaimed orgSlugs doc', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
     const context = testEnv.authenticatedContext('userA')
     const db = context.firestore()
     await assertSucceeds(setDoc(doc(db, 'orgSlugs', 'grace-church'), { orgId: 'orgA' }))
+  })
+
+  // WR-01 regression: a signed-in user with no membership in the target orgId must NOT be
+  // able to claim a slug for it (slug-squatting with an arbitrary/victim orgId).
+  it('denies a signed-in user with no membership in the target org from claiming a slug for it', async () => {
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertFails(setDoc(doc(db, 'orgSlugs', 'grace-church'), { orgId: 'orgA' }))
+  })
+
+  it('denies a member of a DIFFERENT org from claiming a slug for orgA (cross-tenant slug-squatting)', async () => {
+    await seedMembershipDoc('orgB', 'userB', 'editor')
+    const context = testEnv.authenticatedContext('userB')
+    const db = context.firestore()
+    await assertFails(setDoc(doc(db, 'orgSlugs', 'grace-church'), { orgId: 'orgA' }))
   })
 
   it('denies unauthenticated write to orgSlugs', async () => {
@@ -172,8 +188,9 @@ describe('orgSlugs — public read, create-once claim', () => {
     await assertFails(setDoc(doc(db, 'orgSlugs', 'grace-church'), { orgId: 'orgA' }))
   })
 
-  it('denies a second signed-in write to an already-claimed orgSlugs slug (first-writer-wins)', async () => {
+  it('denies a second write to an already-claimed orgSlugs slug, even from an editor of the new orgId (first-writer-wins)', async () => {
     await seedDoc('orgSlugs/grace-church', { orgId: 'orgA' })
+    await seedMembershipDoc('orgB', 'userB', 'editor')
     const context = testEnv.authenticatedContext('userB')
     const db = context.firestore()
     await assertFails(setDoc(doc(db, 'orgSlugs', 'grace-church'), { orgId: 'orgB' }))

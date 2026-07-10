@@ -81,11 +81,14 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
-    // Org slug claims: public read, authenticated create-only (first-writer-wins).
-    // Reassignment abandons a slug, never reclaims it — no update/delete allowed.
+    // Org slug claims: public read, org-editor-scoped create-only (first-writer-wins).
+    // Reassignment abandons a slug, never reclaims it — no update/delete allowed. WR-01:
+    // isSignedIn() alone let any authenticated user claim a slug for an arbitrary orgId
+    // (slug-squatting), so create requires the caller to be an editor of the orgId in the
+    // payload.
     match /orgSlugs/{slug} {
       allow read: if true;
-      allow create: if isSignedIn();
+      allow create: if isOrgEditor(request.resource.data.orgId);
       allow update, delete: if false;
     }
 
