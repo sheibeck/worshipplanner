@@ -1,4 +1,17 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+
+// deriveSlug/RESERVED_SLUGS are pure; claimSlug's Firestore create-only retry
+// semantics are covered by the emulator-backed rules test (Task 2) — mock the
+// Firestore/firebase modules here purely to avoid real Firebase app init at
+// import time (`@/firebase`'s getAuth() throws on an invalid test API key).
+vi.mock('firebase/firestore', () => ({
+  doc: vi.fn(),
+  setDoc: vi.fn(),
+}))
+vi.mock('@/firebase', () => ({
+  db: {},
+}))
+
 import { deriveSlug, RESERVED_SLUGS } from '@/utils/slug'
 
 describe('deriveSlug', () => {
