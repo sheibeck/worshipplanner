@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest'
 import {
   parseVolunteerCsvRow,
   frequencyLabelToN,
-  nToFrequencyLabel,
   expandBlackoutCell,
   matchNameToPerson,
 } from '@/utils/volunteerCsv'
@@ -142,14 +141,6 @@ describe('frequencyLabelToN', () => {
   // an invalid bare integer like "0" or "-5".
   it('rejects "1-in-0" (non-positive N) and defaults to 4, same as an invalid bare integer', () => {
     expect(frequencyLabelToN('1-in-0')).toBe(4)
-  })
-})
-
-describe('nToFrequencyLabel', () => {
-  it('round-trips the known labels', () => {
-    expect(nToFrequencyLabel(1)).toBe('weekly')
-    expect(nToFrequencyLabel(2)).toBe('twice a month')
-    expect(nToFrequencyLabel(4)).toBe('once a month')
   })
 })
 

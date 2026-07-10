@@ -63,17 +63,6 @@ export function frequencyLabelToN(label: string): number {
 }
 
 /**
- * Map a 1-in-N integer back to its friendly label, for the known round-trip
- * values (1, 2, 4). Other values return a generic "1-in-N" string.
- */
-export function nToFrequencyLabel(n: number): string {
-  if (n === 1) return 'weekly'
-  if (n === 2) return 'twice a month'
-  if (n === 4) return 'once a month'
-  return `1-in-${n}`
-}
-
-/**
  * Expand a blackout cell against the quarter's generated Sundays (D-17).
  * Iterates only the finite serviceDates list (never a raw day-by-day walk),
  * so malformed or enormous ranges cannot blow up memory (T-13-03-01).
