@@ -230,7 +230,7 @@
             Generate Schedule
           </button>
         </div>
-        <div v-else class="rounded-lg border border-gray-800 bg-gray-900 p-5">
+        <div v-else class="rounded-lg border border-gray-800 overflow-hidden">
           <QuarterGrid
             :quarter="selectedQuarter"
             :roles="rosterStore.roles"
