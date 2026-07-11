@@ -6,7 +6,7 @@ import {
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing'
 import { readFileSync } from 'fs'
-import { doc, getDoc, setDoc } from 'firebase/firestore'
+import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore'
 
 let testEnv: RulesTestEnvironment
 
@@ -304,6 +304,72 @@ describe('quarterShares — public read, org-editor-scoped create/update (CR-01)
     const db = context.firestore()
     await assertFails(
       setDoc(doc(db, 'quarterShares', 'grace-church__q3-2026'), { orgId: 'orgA', orgSlug: 'grace-church' }),
+    )
+  })
+
+  // Delete = revoke a public share when its quarter is deleted (deleteQuarter).
+  it('allows an editor of the owning org to delete a quarterShares doc', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('quarterShares/grace-church__q3-2026', { orgId: 'orgA', orgSlug: 'grace-church' })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertSucceeds(deleteDoc(doc(db, 'quarterShares', 'grace-church__q3-2026')))
+  })
+
+  it('denies an editor of a DIFFERENT org from deleting orgA\'s quarterShares doc', async () => {
+    await seedMembershipDoc('orgB', 'userB', 'editor')
+    await seedDoc('quarterShares/grace-church__q3-2026', { orgId: 'orgA', orgSlug: 'grace-church' })
+    const context = testEnv.authenticatedContext('userB')
+    const db = context.firestore()
+    await assertFails(deleteDoc(doc(db, 'quarterShares', 'grace-church__q3-2026')))
+  })
+
+  it('denies unauthenticated delete of a quarterShares doc', async () => {
+    await seedDoc('quarterShares/grace-church__q3-2026', { orgId: 'orgA', orgSlug: 'grace-church' })
+    const context = testEnv.unauthenticatedContext()
+    const db = context.firestore()
+    await assertFails(deleteDoc(doc(db, 'quarterShares', 'grace-church__q3-2026')))
+  })
+})
+
+describe('shareTokens — public read, signed-in create, editor-scoped delete (revoke on quarter delete)', () => {
+  it('allows unauthenticated read of a shareTokens doc (public share link)', async () => {
+    await seedDoc('shareTokens/tok-abc', { orgId: 'orgA', quarterId: 'q1' })
+    const context = testEnv.unauthenticatedContext()
+    const db = context.firestore()
+    await assertSucceeds(getDoc(doc(db, 'shareTokens', 'tok-abc')))
+  })
+
+  it('allows an editor of the owning org to delete a shareTokens doc', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('shareTokens/tok-abc', { orgId: 'orgA', quarterId: 'q1' })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertSucceeds(deleteDoc(doc(db, 'shareTokens', 'tok-abc')))
+  })
+
+  it('denies an editor of a DIFFERENT org from deleting orgA\'s shareTokens doc', async () => {
+    await seedMembershipDoc('orgB', 'userB', 'editor')
+    await seedDoc('shareTokens/tok-abc', { orgId: 'orgA', quarterId: 'q1' })
+    const context = testEnv.authenticatedContext('userB')
+    const db = context.firestore()
+    await assertFails(deleteDoc(doc(db, 'shareTokens', 'tok-abc')))
+  })
+
+  it('denies unauthenticated delete of a shareTokens doc', async () => {
+    await seedDoc('shareTokens/tok-abc', { orgId: 'orgA', quarterId: 'q1' })
+    const context = testEnv.unauthenticatedContext()
+    const db = context.firestore()
+    await assertFails(deleteDoc(doc(db, 'shareTokens', 'tok-abc')))
+  })
+
+  it('denies updating a shareTokens doc (frozen snapshot — update stays false)', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('shareTokens/tok-abc', { orgId: 'orgA', quarterId: 'q1' })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertFails(
+      setDoc(doc(db, 'shareTokens', 'tok-abc'), { orgId: 'orgA', quarterId: 'q1', tampered: true }),
     )
   })
 })

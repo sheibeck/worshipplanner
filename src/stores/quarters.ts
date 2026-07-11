@@ -5,6 +5,7 @@ import {
   onSnapshot,
   addDoc,
   updateDoc,
+  deleteDoc,
   doc,
   getDoc,
   setDoc,
@@ -452,6 +453,39 @@ export const useQuartersStore = defineStore('quarters', () => {
     return token
   }
 
+  // Delete an entire quarter — its setup (personQuarterData), its generated schedule
+  // (calendar), and any public share artifacts finalizeAndShare wrote for it. The
+  // public docs are revoked FIRST so a deleted quarter can never leave a live,
+  // unauthenticated share link dangling. Deleting shareTokens/quarterShares requires
+  // the org-editor delete rules added alongside this action; each delete is guarded by
+  // a getDoc existence check so we never issue a delete against a non-existent doc
+  // (which the rules deny on a null `resource`). If revocation fails (e.g. rules not
+  // yet deployed), this throws before the quarter is removed — no orphaned link.
+  async function deleteQuarter(quarterId: string): Promise<void> {
+    if (!orgId.value) throw new Error('No orgId set — call subscribe() first')
+    const quarter = getQuarter(quarterId)
+
+    if (quarter.shareToken) {
+      // 1. Opaque token share (shareTokens/{token}).
+      const tokenRef = doc(db, 'shareTokens', quarter.shareToken)
+      const tokenSnap = await getDoc(tokenRef)
+      if (tokenSnap.exists()) await deleteDoc(tokenRef)
+
+      // 2. Memorable-URL share (quarterShares/{slug}__q{N}-{year}) — the doc id is
+      // deterministic from the org slug plus this quarter's number/year.
+      const orgSnap = await getDoc(doc(db, 'organizations', orgId.value))
+      const slug = orgSnap.exists() ? (orgSnap.data().slug as string | undefined) : undefined
+      if (slug) {
+        const shareRef = doc(db, 'quarterShares', `${slug}__q${quarter.quarter}-${quarter.year}`)
+        const shareSnap = await getDoc(shareRef)
+        if (shareSnap.exists()) await deleteDoc(shareRef)
+      }
+    }
+
+    // 3. Delete the quarter document itself.
+    await deleteDoc(doc(db, 'organizations', orgId.value, 'quarters', quarterId))
+  }
+
   return {
     quarters,
     isLoading,
@@ -472,5 +506,6 @@ export const useQuartersStore = defineStore('quarters', () => {
     clearAssignment,
     swapAssignment,
     finalizeAndShare,
+    deleteQuarter,
   }
 })

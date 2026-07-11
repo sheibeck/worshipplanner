@@ -78,7 +78,11 @@ service cloud.firestore {
     match /shareTokens/{token} {
       allow read: if true;
       allow create: if isSignedIn();
-      allow update, delete: if false;
+      allow update: if false;
+      // Delete allowed so an org editor can revoke a share when its quarter is deleted
+      // (quarters store deleteQuarter). Scoped to the orgId stored on the token doc so
+      // one org can never revoke another org's link.
+      allow delete: if isOrgEditor(resource.data.orgId);
     }
 
     // Org slug claims: public read, org-editor-scoped create-only (first-writer-wins).
@@ -103,7 +107,9 @@ service cloud.firestore {
       allow create: if isOrgEditor(request.resource.data.orgId);
       allow update: if isOrgEditor(resource.data.orgId)
                        && request.resource.data.orgId == resource.data.orgId;
-      allow delete: if false;
+      // Delete allowed so an org editor can revoke the memorable share when its quarter
+      // is deleted (deleteQuarter), scoped to the owning orgId on the doc.
+      allow delete: if isOrgEditor(resource.data.orgId);
     }
 
     // Catch-all: deny everything else

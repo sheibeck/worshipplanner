@@ -21,6 +21,10 @@ const mockUnsubscribe = vi.fn()
 // override the shape per-case; reset to a slug-less default in beforeEach below.
 let mockOrgDoc: Record<string, unknown> = { name: 'Test Org' }
 
+// Doc paths that getDoc should report as existing (beyond the org doc) — used by
+// deleteQuarter tests to simulate present shareTokens/quarterShares docs. Reset per test.
+let mockExistingSharePaths: Set<string> = new Set()
+
 // Mock firebase/firestore module
 vi.mock('firebase/firestore', () => {
   return {
@@ -35,12 +39,16 @@ vi.mock('firebase/firestore', () => {
     addDoc: vi.fn(() => Promise.resolve({ id: 'new-quarter-id' })),
     updateDoc: vi.fn(() => Promise.resolve()),
     setDoc: vi.fn(() => Promise.resolve()),
+    deleteDoc: vi.fn(() => Promise.resolve()),
     getDoc: vi.fn((docRef: { path?: string }) => {
       if (docRef?.path && /^organizations\/[^/]+$/.test(docRef.path)) {
         return Promise.resolve({
           exists: () => Object.keys(mockOrgDoc).length > 0,
           data: () => mockOrgDoc,
         })
+      }
+      if (docRef?.path && mockExistingSharePaths.has(docRef.path)) {
+        return Promise.resolve({ exists: () => true, data: () => ({}) })
       }
       return Promise.resolve({ exists: () => false, data: () => ({}) })
     }),
@@ -153,6 +161,7 @@ describe('useQuartersStore', () => {
     mockRosterState.activePeople = []
     mockRosterState.roles = []
     mockOrgDoc = { name: 'Test Org' }
+    mockExistingSharePaths = new Set()
   })
 
   describe('initial state', () => {
@@ -1113,6 +1122,66 @@ describe('useQuartersStore', () => {
       const filePath = path.resolve(path.dirname(new URL(import.meta.url).pathname).replace(/^\/([A-Za-z]:)/, '$1'), '../quarters.ts')
       const source = fs.readFileSync(filePath, 'utf-8')
       expect(/planningCenterApi|addTeamToPlan|createPlan|createItem/.test(source)).toBe(false)
+    })
+  })
+
+  describe('deleteQuarter', () => {
+    function deletePaths(deleteDocMock: unknown): (string | undefined)[] {
+      return vi
+        .mocked(deleteDocMock as (ref: unknown) => Promise<void>)
+        .mock.calls.map((c) => (c[0] as unknown as { path?: string }).path)
+    }
+
+    it('deletes only the quarter doc for a never-finalized (draft) quarter — no share docs touched', async () => {
+      const { deleteDoc } = await import('firebase/firestore')
+      const { useQuartersStore } = await import('../quarters')
+      const store = useQuartersStore()
+      store.subscribe('org-1')
+      triggerQuartersSnapshot([makeQuarterDoc({ shareToken: null })])
+
+      await store.deleteQuarter('quarter-1')
+
+      expect(deletePaths(deleteDoc)).toEqual(['organizations/org-1/quarters/quarter-1'])
+    })
+
+    it('revokes the opaque shareTokens AND memorable quarterShares docs before deleting a finalized quarter', async () => {
+      const { deleteDoc } = await import('firebase/firestore')
+      const { useQuartersStore } = await import('../quarters')
+      mockOrgDoc = { name: 'Test Org', slug: 'test-org' }
+      mockExistingSharePaths = new Set(['shareTokens/tok-123', 'quarterShares/test-org__q3-2026'])
+      const store = useQuartersStore()
+      store.subscribe('org-1')
+      triggerQuartersSnapshot([
+        makeQuarterDoc({ shareToken: 'tok-123', status: 'finalized', quarter: 3, year: 2026 }),
+      ])
+
+      await store.deleteQuarter('quarter-1')
+
+      const paths = deletePaths(deleteDoc)
+      expect(paths).toContain('shareTokens/tok-123')
+      expect(paths).toContain('quarterShares/test-org__q3-2026')
+      expect(paths).toContain('organizations/org-1/quarters/quarter-1')
+      // The quarter doc is deleted LAST — after both public links are revoked, so a delete
+      // can never leave a live public link dangling.
+      expect(paths[paths.length - 1]).toBe('organizations/org-1/quarters/quarter-1')
+    })
+
+    it('skips the quarterShares delete when the memorable doc does not exist', async () => {
+      const { deleteDoc } = await import('firebase/firestore')
+      const { useQuartersStore } = await import('../quarters')
+      mockOrgDoc = { name: 'Test Org', slug: 'test-org' }
+      // Only the opaque token exists; the memorable share was never written.
+      mockExistingSharePaths = new Set(['shareTokens/tok-123'])
+      const store = useQuartersStore()
+      store.subscribe('org-1')
+      triggerQuartersSnapshot([makeQuarterDoc({ shareToken: 'tok-123', status: 'finalized' })])
+
+      await store.deleteQuarter('quarter-1')
+
+      const paths = deletePaths(deleteDoc)
+      expect(paths).toContain('shareTokens/tok-123')
+      expect(paths.some((p) => p?.startsWith('quarterShares/'))).toBe(false)
+      expect(paths).toContain('organizations/org-1/quarters/quarter-1')
     })
   })
 })

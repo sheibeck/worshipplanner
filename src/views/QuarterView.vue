@@ -80,6 +80,47 @@
           >
             + Add quarter
           </button>
+
+          <button
+            v-if="selectedQuarter && !deleteConfirmOpen"
+            type="button"
+            @click="deleteConfirmOpen = true"
+            class="inline-flex items-center gap-2 rounded-md border border-red-800 bg-transparent px-3 py-2 text-sm font-medium text-red-300 hover:bg-red-900/30 transition-colors"
+          >
+            Delete quarter
+          </button>
+        </div>
+
+        <!-- Delete-quarter confirm (type DELETE) — removes the quarter, its generated
+             schedule, and revokes any public share link. Irreversible. -->
+        <div v-if="selectedQuarter && deleteConfirmOpen" class="mt-4 border-t border-red-900/40 pt-4 space-y-3">
+          <p class="text-xs text-gray-400">
+            Permanently delete <span class="font-semibold text-gray-200">{{ selectedQuarter.label }}</span> — its
+            volunteer setup, the generated schedule, and any public share link. This cannot be undone.
+            Type <span class="font-mono font-semibold text-red-300">DELETE</span> to confirm.
+          </p>
+          <div class="flex items-center gap-2 flex-wrap">
+            <input
+              v-model="deleteConfirmText"
+              placeholder="DELETE"
+              class="rounded-md bg-gray-900 border border-gray-700 px-3 py-1.5 text-sm text-gray-200 focus:outline-none focus:border-red-600"
+            />
+            <button
+              :disabled="deleteConfirmText !== 'DELETE' || deletingQuarter"
+              @click="onDeleteQuarter"
+              class="text-xs px-3 py-1.5 rounded-md bg-red-700 text-white hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              {{ deletingQuarter ? 'Deleting…' : 'Delete quarter' }}
+            </button>
+            <button
+              @click="cancelDeleteQuarter"
+              :disabled="deletingQuarter"
+              class="text-xs px-3 py-1.5 rounded-md border border-gray-700 text-gray-400 hover:bg-gray-800 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+          <p v-if="deleteQuarterError" class="text-xs text-red-400">{{ deleteQuarterError }}</p>
         </div>
       </div>
 
@@ -420,6 +461,39 @@ watch(
     }
   },
 )
+
+// ── Delete quarter (danger zone next to the switcher) ────────────────────────
+const deleteConfirmOpen = ref(false)
+const deleteConfirmText = ref('')
+const deletingQuarter = ref(false)
+const deleteQuarterError = ref('')
+
+function cancelDeleteQuarter() {
+  deleteConfirmOpen.value = false
+  deleteConfirmText.value = ''
+  deleteQuarterError.value = ''
+}
+
+async function onDeleteQuarter() {
+  if (!selectedQuarter.value || deleteConfirmText.value !== 'DELETE') return
+  const deletedId = selectedQuarter.value.id
+  deletingQuarter.value = true
+  deleteQuarterError.value = ''
+  try {
+    await quartersStore.deleteQuarter(deletedId)
+    // Advance selection to the next remaining quarter (or clear). The snapshot
+    // listener may not have pruned the local list yet, so compute from the current
+    // list minus the just-deleted id; the shareUrl watch re-syncs off selectedQuarter.
+    const remaining = quartersStore.quarters.filter((q) => q.id !== deletedId)
+    selectedQuarterId.value = remaining.length > 0 ? remaining[0]!.id : null
+    deleteConfirmOpen.value = false
+    deleteConfirmText.value = ''
+  } catch (err) {
+    deleteQuarterError.value = err instanceof Error ? err.message : 'Failed to delete quarter.'
+  } finally {
+    deletingQuarter.value = false
+  }
+}
 
 // ── New quarter creation (Add-quarter modal, R-10/D-13) ─────────────────────
 const addQuarterOpen = ref(false)
