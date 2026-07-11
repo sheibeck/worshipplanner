@@ -16,7 +16,7 @@
           <div>
             <h1 class="text-xl font-semibold text-gray-100">Songs</h1>
             <p class="text-sm text-gray-400 mt-1">
-              {{ songStore.isLoading ? 'Loading...' : `${songStore.songs.length} song${songStore.songs.length !== 1 ? 's' : ''}` }}
+              {{ songStore.isLoading ? 'Loading...' : `${songStore.visibleSongs.length} song${songStore.visibleSongs.length !== 1 ? 's' : ''}` }}
             </p>
           </div>
           <div class="flex items-center gap-3">

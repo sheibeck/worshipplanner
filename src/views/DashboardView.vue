@@ -18,7 +18,7 @@
           to="/songs"
           class="bg-gray-900 border border-gray-800 rounded-lg px-4 py-3 hover:bg-gray-800/50 transition-colors"
         >
-          <p class="text-2xl font-bold text-gray-100">{{ songStore.songs.length }}</p>
+          <p class="text-2xl font-bold text-gray-100">{{ songStore.visibleSongs.length }}</p>
           <p class="text-xs text-gray-500">Songs</p>
         </router-link>
         <router-link

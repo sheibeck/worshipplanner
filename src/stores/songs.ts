@@ -92,6 +92,13 @@ export const useSongStore = defineStore('songs', () => {
     songs.value.filter((song) => song.hidden !== true),
   )
 
+  // Active (non-soft-deleted) songs, for counts shown to users (Dashboard stat,
+  // Songs-page header). Mirrors aiCandidateSongs' hidden filter — undefined is
+  // treated as not-hidden for legacy docs.
+  const visibleSongs = computed(() =>
+    songs.value.filter((song) => song.hidden !== true),
+  )
+
   // D-11: clears only the tag filter — searchQuery/filterVwType/filterKey untouched
   function clearTagFilter() {
     tagFilterInclude.value = new Set()
@@ -321,6 +328,7 @@ export const useSongStore = defineStore('songs', () => {
     filteredSongs,
     allUserTags,
     aiCandidateSongs,
+    visibleSongs,
     subscribe,
     unsubscribeAll,
     addSong,
