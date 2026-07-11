@@ -45,16 +45,6 @@
           </button>
           <button
             v-if="selectedQuarter && hasAssignments"
-            @click="onPrint"
-            class="inline-flex items-center gap-2 rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm font-medium text-gray-200 hover:bg-gray-700 hover:text-white transition-colors"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-            </svg>
-            Print
-          </button>
-          <button
-            v-if="selectedQuarter && hasAssignments"
             @click="onFinalizeAndShare"
             :disabled="isFinalizing"
             class="inline-flex items-center gap-2 rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm font-medium text-gray-200 hover:bg-gray-700 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -63,16 +53,6 @@
               <path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
             </svg>
             {{ isFinalizing ? 'Finalizing...' : 'Finalize & Share' }}
-          </button>
-          <button
-            v-if="selectedQuarter"
-            @click="csvModalOpen = true"
-            class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 transition-colors"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-            </svg>
-            Import Volunteer CSV
           </button>
           <button
             type="button"
@@ -593,11 +573,6 @@ const csvModalOpen = ref(false)
 
 function onCsvImported() {
   csvModalOpen.value = false
-}
-
-// ── Print ─────────────────────────────────────────────────────────────────────
-function onPrint() {
-  window.print()
 }
 
 // ── Finalize & Share (D-24) ─────────────────────────────────────────────────
