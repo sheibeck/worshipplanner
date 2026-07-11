@@ -11,6 +11,16 @@
           </p>
         </div>
         <div class="flex items-center gap-2 flex-wrap">
+          <div v-if="quartersStore.quarters.length > 0" class="flex items-center gap-2">
+            <label for="quarter-select" class="text-xs font-medium text-gray-400">Quarter</label>
+            <select
+              id="quarter-select"
+              v-model="selectedQuarterId"
+              class="rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+            >
+              <option v-for="q in quartersStore.quarters" :key="q.id" :value="q.id">{{ q.label }}</option>
+            </select>
+          </div>
           <button
             v-if="selectedQuarter && hasAssignments"
             @click="onPrint"
@@ -66,62 +76,6 @@
         </button>
       </div>
       <div v-if="shareError" class="text-sm text-red-400 mb-6">{{ shareError }}</div>
-
-      <!-- Quarter switcher (select-only, D-13) -->
-      <div class="rounded-lg border border-gray-800 bg-gray-900 p-5 mb-6">
-        <div class="flex flex-wrap items-end gap-4">
-          <div v-if="quartersStore.quarters.length > 0">
-            <label class="block text-xs font-medium text-gray-400 mb-1">Quarter</label>
-            <select
-              v-model="selectedQuarterId"
-              class="rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-            >
-              <option v-for="q in quartersStore.quarters" :key="q.id" :value="q.id">{{ q.label }}</option>
-            </select>
-          </div>
-
-          <button
-            v-if="selectedQuarter && !deleteConfirmOpen"
-            type="button"
-            @click="deleteConfirmOpen = true"
-            class="inline-flex items-center gap-2 rounded-md border border-red-800 bg-transparent px-3 py-2 text-sm font-medium text-red-300 hover:bg-red-900/30 transition-colors"
-          >
-            Delete quarter
-          </button>
-        </div>
-
-        <!-- Delete-quarter confirm (type DELETE) — removes the quarter, its generated
-             schedule, and revokes any public share link. Irreversible. -->
-        <div v-if="selectedQuarter && deleteConfirmOpen" class="mt-4 border-t border-red-900/40 pt-4 space-y-3">
-          <p class="text-xs text-gray-400">
-            Permanently delete <span class="font-semibold text-gray-200">{{ selectedQuarter.label }}</span> — its
-            volunteer setup, the generated schedule, and any public share link. This cannot be undone.
-            Type <span class="font-mono font-semibold text-red-300">DELETE</span> to confirm.
-          </p>
-          <div class="flex items-center gap-2 flex-wrap">
-            <input
-              v-model="deleteConfirmText"
-              placeholder="DELETE"
-              class="rounded-md bg-gray-900 border border-gray-700 px-3 py-1.5 text-sm text-gray-200 focus:outline-none focus:border-red-600"
-            />
-            <button
-              :disabled="deleteConfirmText !== 'DELETE' || deletingQuarter"
-              @click="onDeleteQuarter"
-              class="text-xs px-3 py-1.5 rounded-md bg-red-700 text-white hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              {{ deletingQuarter ? 'Deleting…' : 'Delete quarter' }}
-            </button>
-            <button
-              @click="cancelDeleteQuarter"
-              :disabled="deletingQuarter"
-              class="text-xs px-3 py-1.5 rounded-md border border-gray-700 text-gray-400 hover:bg-gray-800 transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-          <p v-if="deleteQuarterError" class="text-xs text-red-400">{{ deleteQuarterError }}</p>
-        </div>
-      </div>
 
       <template v-if="selectedQuarter">
         <!-- Volunteer Availability: full-width roster table opening the per-person drawer (D-02/D-03) -->
@@ -311,6 +265,55 @@
             :roles="rosterStore.roles"
             :lastProposeResult="proposeResult"
           />
+        </div>
+
+        <!-- Danger zone: permanently delete this quarter (irreversible) — removes the
+             quarter, its generated schedule, and revokes any public share link. -->
+        <div class="mt-10 border border-red-900/50 rounded-xl overflow-hidden">
+          <div class="px-4 py-3 bg-red-950/30 border-b border-red-900/50">
+            <h2 class="text-sm font-medium text-red-300">Danger Zone</h2>
+            <p class="text-xs text-gray-500 mt-0.5">
+              Permanently delete <span class="font-semibold text-gray-300">{{ selectedQuarter.label }}</span> — its
+              volunteer setup, the generated schedule, and any public share link. This cannot be undone.
+            </p>
+          </div>
+          <div class="px-4 py-4">
+            <button
+              v-if="!deleteConfirmOpen"
+              @click="deleteConfirmOpen = true"
+              class="text-xs px-3 py-1.5 rounded-md border border-red-700 text-red-300 hover:bg-red-900/30 transition-colors"
+            >
+              Delete quarter
+            </button>
+            <div v-else class="space-y-3">
+              <p class="text-xs text-gray-400">
+                Type <span class="font-mono font-semibold text-red-300">DELETE</span> to permanently delete
+                <span class="font-semibold text-gray-300">{{ selectedQuarter.label }}</span>.
+              </p>
+              <div class="flex items-center gap-2 flex-wrap">
+                <input
+                  v-model="deleteConfirmText"
+                  placeholder="DELETE"
+                  class="rounded-md bg-gray-900 border border-gray-700 px-3 py-1.5 text-sm text-gray-200 focus:outline-none focus:border-red-600"
+                />
+                <button
+                  :disabled="deleteConfirmText !== 'DELETE' || deletingQuarter"
+                  @click="onDeleteQuarter"
+                  class="text-xs px-3 py-1.5 rounded-md bg-red-700 text-white hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  {{ deletingQuarter ? 'Deleting…' : 'Delete quarter' }}
+                </button>
+                <button
+                  @click="cancelDeleteQuarter"
+                  :disabled="deletingQuarter"
+                  class="text-xs px-3 py-1.5 rounded-md border border-gray-700 text-gray-400 hover:bg-gray-800 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+              <p v-if="deleteQuarterError" class="text-xs text-red-400">{{ deleteQuarterError }}</p>
+            </div>
+          </div>
         </div>
       </template>
 
