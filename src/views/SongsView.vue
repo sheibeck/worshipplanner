@@ -12,14 +12,14 @@
       <!-- Normal view -->
       <template v-else>
         <!-- Page header -->
-        <div class="flex items-center justify-between mb-6">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 pb-4 border-b border-gray-800">
           <div>
             <h1 class="text-xl font-semibold text-gray-100">Songs</h1>
             <p class="text-sm text-gray-400 mt-1">
               {{ songStore.isLoading ? 'Loading...' : `${songStore.visibleSongs.length} song${songStore.visibleSongs.length !== 1 ? 's' : ''}` }}
             </p>
           </div>
-          <div class="flex items-center gap-3">
+          <div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-end gap-2 w-full sm:w-auto [&>*]:w-full sm:[&>*]:w-auto [&>*]:justify-center sm:[&>*]:justify-start">
             <!-- Batch Assign — visible only when uncategorized songs exist -->
             <button
               v-if="uncategorizedSongs.length > 0"

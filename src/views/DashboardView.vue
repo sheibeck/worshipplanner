@@ -2,7 +2,7 @@
   <AppShell>
     <div class="px-6 py-8 max-w-4xl">
       <!-- Page header -->
-      <div class="mb-6">
+      <div class="mb-6 pb-4 border-b border-gray-800">
         <h1 class="text-xl font-semibold text-gray-100">Dashboard</h1>
         <p class="text-sm text-gray-400 mt-1">
           Welcome{{ displayName ? `, ${displayName}` : '' }}

@@ -2,14 +2,14 @@
   <AppShell>
     <div class="px-6 py-8">
       <!-- Page header -->
-      <div class="flex items-center justify-between mb-6">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 pb-4 border-b border-gray-800">
         <div>
           <h1 class="text-xl font-semibold text-gray-100">Volunteers</h1>
           <p class="text-sm text-gray-400 mt-1">
             {{ rosterStore.isLoading ? 'Loading...' : `${rosterStore.activePeople.length} active volunteer${rosterStore.activePeople.length !== 1 ? 's' : ''}` }}
           </p>
         </div>
-        <div class="flex items-center gap-3">
+        <div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-end gap-2 w-full sm:w-auto [&>*]:w-full sm:[&>*]:w-auto [&>*]:justify-center sm:[&>*]:justify-start">
           <button
             @click="importModalOpen = true"
             class="inline-flex items-center gap-2 rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm font-medium text-gray-200 hover:bg-gray-700 hover:text-white transition-colors"

@@ -3,14 +3,14 @@
   <AppShell>
     <div class="px-6 py-8">
       <!-- Page header -->
-      <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 pb-4 border-b border-gray-800">
         <div>
           <h1 class="text-xl font-semibold text-gray-100">Schedule</h1>
           <p class="text-sm text-gray-400 mt-1">
             {{ quartersStore.isLoading ? 'Loading...' : `${quartersStore.quarters.length} quarter${quartersStore.quarters.length !== 1 ? 's' : ''}` }}
           </p>
         </div>
-        <div class="flex items-center gap-2 flex-wrap">
+        <div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-end gap-2 w-full sm:w-auto [&>*]:w-full sm:[&>*]:w-auto [&>*]:justify-center sm:[&>*]:justify-start">
           <div v-if="quartersStore.quarters.length > 0" class="flex items-center gap-2">
             <label for="quarter-select" class="text-xs font-medium text-gray-400">Quarter</label>
             <select
@@ -21,6 +21,28 @@
               <option v-for="q in quartersStore.quarters" :key="q.id" :value="q.id">{{ q.label }}</option>
             </select>
           </div>
+          <!-- Generator controls (moved into header to save vertical space) -->
+          <button
+            v-if="selectedQuarter && !hasAssignments"
+            @click="onGenerateSchedule"
+            class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 transition-colors"
+          >
+            Generate Schedule
+          </button>
+          <button
+            v-if="selectedQuarter && hasAssignments"
+            @click="onFillGaps"
+            class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 transition-colors"
+          >
+            Fill Remaining Gaps
+          </button>
+          <button
+            v-if="selectedQuarter && hasAssignments"
+            @click="showRegenerateConfirm = true"
+            class="inline-flex items-center gap-2 rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm font-medium text-gray-200 hover:bg-gray-700 hover:text-white transition-colors"
+          >
+            Regenerate
+          </button>
           <button
             v-if="selectedQuarter && hasAssignments"
             @click="onPrint"
@@ -179,69 +201,38 @@
           </ul>
         </CollapsibleSection>
 
-        <!-- Generate controls -->
-        <CollapsibleSection
-          title="Generate controls"
-          storage-key="schedule.section.generateControls"
-          class="mb-6"
-        >
-          <div class="flex items-center gap-3 flex-wrap">
+        <!-- Regenerate confirmation (triggered from the header controls) -->
+        <div v-if="showRegenerateConfirm" class="mb-6 rounded-md bg-red-900/20 border border-red-800 p-4">
+          <p class="text-sm text-red-300">
+            Regenerate the full schedule? This replaces all current assignments, including any manual edits you've made. This cannot be undone.
+          </p>
+          <div class="flex items-center gap-3 mt-3">
             <button
-              v-if="!hasAssignments"
-              @click="onGenerateSchedule"
-              class="px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors"
+              @click="onConfirmRegenerate"
+              class="px-3 py-1.5 rounded-md text-xs font-medium text-white bg-red-700 hover:bg-red-600 transition-colors"
             >
-              Generate Schedule
+              Regenerate
             </button>
-            <template v-else>
-              <button
-                @click="onFillGaps"
-                class="px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors"
-              >
-                Fill Remaining Gaps
-              </button>
-              <button
-                @click="showRegenerateConfirm = true"
-                class="px-4 py-2 rounded-md text-sm font-medium text-gray-200 bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors"
-              >
-                Regenerate
-              </button>
-            </template>
+            <button
+              @click="showRegenerateConfirm = false"
+              class="px-3 py-1.5 rounded-md text-xs font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors"
+            >
+              Cancel
+            </button>
           </div>
+        </div>
 
-          <!-- Regenerate confirmation -->
-          <div v-if="showRegenerateConfirm" class="mt-4 rounded-md bg-red-900/20 border border-red-800 p-4">
-            <p class="text-sm text-red-300">
-              Regenerate the full schedule? This replaces all current assignments, including any manual edits you've made. This cannot be undone.
-            </p>
-            <div class="flex items-center gap-3 mt-3">
-              <button
-                @click="onConfirmRegenerate"
-                class="px-3 py-1.5 rounded-md text-xs font-medium text-white bg-red-700 hover:bg-red-600 transition-colors"
-              >
-                Regenerate
-              </button>
-              <button
-                @click="showRegenerateConfirm = false"
-                class="px-3 py-1.5 rounded-md text-xs font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
+        <!-- Generation summary -->
+        <div v-if="proposeResult" class="mb-6 rounded-lg border border-gray-800 bg-gray-900 px-5 py-4 flex items-center gap-6 flex-wrap">
+          <div>
+            <p class="text-xl font-semibold text-gray-100">{{ proposeResult.unfilled.length }}</p>
+            <p class="text-xs text-gray-500">unfilled</p>
           </div>
-
-          <!-- Summary bar -->
-          <div v-if="proposeResult" class="mt-4 flex items-center gap-6 flex-wrap">
-            <div>
-              <p class="text-xl font-semibold text-gray-100">{{ proposeResult.unfilled.length }}</p>
-              <p class="text-xs text-gray-500">unfilled</p>
-            </div>
-            <div>
-              <p class="text-xl font-semibold text-gray-100">{{ proposeResult.pairingConflicts.length }}</p>
-              <p class="text-xs text-gray-500">pairing conflicts</p>
-            </div>
+          <div>
+            <p class="text-xl font-semibold text-gray-100">{{ proposeResult.pairingConflicts.length }}</p>
+            <p class="text-xs text-gray-500">pairing conflicts</p>
           </div>
-        </CollapsibleSection>
+        </div>
 
         <!-- Empty state / grid host -->
         <div
