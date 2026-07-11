@@ -35,6 +35,11 @@ coverage/
 # Crash dumps
 *.stackdump
 
+# Claude Code local tooling state (per-machine; not shared via the repo).
+# settings.local.json and worktrees/ are already covered by the global gitignore.
+.claude/settings.json
+.claude/scheduled_tasks.lock
+
 # Graphify knowledge graph (gsd graphify — reads/writes .planning/graphs/).
 # graph.json + GRAPH_REPORT.md + graph.html are committed so graphify runs on clone.
 # Regenerable diff cache (rebuilt by `/gsd:graphify build`):
