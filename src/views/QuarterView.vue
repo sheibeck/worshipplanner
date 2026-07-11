@@ -56,7 +56,7 @@
           </button>
           <button
             type="button"
-            @click="addQuarterOpen = true"
+            @click="onOpenAddQuarter"
             class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 transition-colors"
           >
             + Add quarter
@@ -469,10 +469,30 @@ async function onDeleteQuarter() {
 }
 
 // ── New quarter creation (Add-quarter modal, R-10/D-13) ─────────────────────
+// Default the modal to the NEXT quarter after the one we're currently in — even
+// if the current quarter hasn't been created yet, we look forward, since you
+// schedule the upcoming quarter, not the one already underway.
+function nextQuarterFromToday(): { year: number; quarter: 1 | 2 | 3 | 4 } {
+  const now = new Date()
+  const currentQuarter = Math.floor(now.getMonth() / 3) + 1 // 1..4
+  if (currentQuarter === 4) {
+    return { year: now.getFullYear() + 1, quarter: 1 }
+  }
+  return { year: now.getFullYear(), quarter: (currentQuarter + 1) as 1 | 2 | 3 | 4 }
+}
+
 const addQuarterOpen = ref(false)
-const newQuarterYear = ref(new Date().getFullYear())
-const newQuarterNum = ref<1 | 2 | 3 | 4>(1)
+const newQuarterYear = ref(nextQuarterFromToday().year)
+const newQuarterNum = ref<1 | 2 | 3 | 4>(nextQuarterFromToday().quarter)
 const newQuarterLabel = computed(() => `Q${newQuarterNum.value} ${newQuarterYear.value}`)
+
+function onOpenAddQuarter() {
+  // Recompute on open so the default stays correct across a long-lived session.
+  const { year, quarter } = nextQuarterFromToday()
+  newQuarterYear.value = year
+  newQuarterNum.value = quarter
+  addQuarterOpen.value = true
+}
 
 async function onCreateQuarter() {
   const id = await quartersStore.createQuarter(newQuarterYear.value, newQuarterNum.value, newQuarterLabel.value)
