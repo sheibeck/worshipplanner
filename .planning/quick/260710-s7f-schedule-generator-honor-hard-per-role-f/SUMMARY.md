@@ -3,7 +3,8 @@ quick_id: 260710-s7f
 slug: schedule-generator-honor-hard-per-role-f
 date: 2026-07-11
 status: complete
-commit: 8b2aa1a
+commit: 0d4d127
+commits: [8b2aa1a, 0d4d127]
 ---
 
 # Summary: Honor hard per-role frequency caps; fill-ins are manual-only
@@ -45,3 +46,24 @@ commit: 8b2aa1a
 - Full suite `npx vitest run` — 33 files, 692 tests pass.
 
 Commit: `8b2aa1a`
+
+## Follow-up: even spread across the quarter (commit `0d4d127`)
+
+The initial commit's whole-quarter *count* budget stopped over-serving but still
+**front-loaded**: when someone is the only viable candidate, the greedy loop booked
+them every week until the budget ran out, then left the rest blank (Gabriel every
+Sunday in June, nothing after). Paired partners had the same issue (Nolan pulled onto
+the anchor's first N dates → 2x/month for the first half, then nothing).
+
+Fix: replaced the flat count budget with an **even-spread cadence gate** — a person is
+eligible for a role on a date only while their per-role served count is below the
+running target `(dateIndex+1)/n` (behind their ideal 1-in-N pace). Because the target
+advances with the calendar, a monthly (n=4) person lands on weeks 1, 5, 9, 13… across
+the whole quarter. Applied to BOTH the main loop and `propagatePairing`. Fill-in tier
+is now also excluded from pairing pull-in (manual-only); the `n<=0` guard moved into
+the shared `withinCadence` helper.
+
+Tests strengthened to actually catch front-loading: Gabriel asserts served indices
+`[0, 4]` (not just count); the R-12 even-spread test asserts Nolan's gap equals his
+cadence (4) and reaches the final quarter of the calendar (both old tests passed even
+when front-loaded). All 30 scheduler + 692 full-suite tests green; type-check clean.
