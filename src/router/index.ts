@@ -39,8 +39,8 @@ const router = createRouter({
       meta: { requiresAuth: true, requiresEditor: true },
     },
     {
-      path: '/roster',
-      name: 'roster',
+      path: '/volunteers',
+      name: 'volunteers',
       component: () => import('../views/RosterView.vue'),
       meta: { requiresAuth: true, requiresEditor: true },
     },
@@ -63,8 +63,8 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
-      path: '/team',
-      name: 'team',
+      path: '/admins',
+      name: 'admins',
       component: () => import('../views/TeamView.vue'),
       meta: { requiresAuth: true, requiresEditor: true },
     },
@@ -92,7 +92,7 @@ const router = createRouter({
       component: () => import('../views/QuarterShareView.vue'),
       // Intentionally no meta.requiresAuth — public route for unauthenticated viewers (D-24).
       // Appended after all static routes: Vue Router ranks static segments above dynamic
-      // ones, so this can never shadow /songs, /roster, /schedule, etc. (D-19).
+      // ones, so this can never shadow /songs, /volunteers, /schedule, etc. (D-19).
     },
   ],
 })

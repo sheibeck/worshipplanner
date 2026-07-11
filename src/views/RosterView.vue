@@ -4,7 +4,7 @@
       <!-- Page header -->
       <div class="flex items-center justify-between mb-6">
         <div>
-          <h1 class="text-xl font-semibold text-gray-100">Roster</h1>
+          <h1 class="text-xl font-semibold text-gray-100">Volunteers</h1>
           <p class="text-sm text-gray-400 mt-1">
             {{ rosterStore.isLoading ? 'Loading...' : `${rosterStore.activePeople.length} active volunteer${rosterStore.activePeople.length !== 1 ? 's' : ''}` }}
           </p>
