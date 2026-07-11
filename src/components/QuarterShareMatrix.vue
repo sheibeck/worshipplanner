@@ -17,7 +17,7 @@
       </thead>
       <tbody>
         <tr v-for="date in dates" :key="date" class="border-b border-gray-100 hover:bg-gray-50">
-          <td class="px-2 py-2 text-sm font-semibold text-gray-900 whitespace-nowrap">
+          <td class="px-2 py-2 text-sm font-semibold text-gray-900">
             {{ formatDateLabel(date) }}
           </td>
           <td v-for="role in roles" :key="role.id" class="px-2 py-2 text-sm text-gray-800">
@@ -63,12 +63,13 @@ function peopleFor(date: string, roleId: string): string[] {
 }
 
 function formatDateLabel(date: string): string {
+  // Compact label for the matrix's Date column — the quarter label already carries
+  // the year, so weekday + month abbreviations keep the column narrow (and wrappable).
   const [year, month, day] = date.split('-').map(Number)
   return new Date(year!, month! - 1, day!).toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
+    weekday: 'short',
+    month: 'short',
     day: 'numeric',
-    year: 'numeric',
   })
 }
 </script>

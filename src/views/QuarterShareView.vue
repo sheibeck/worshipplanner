@@ -14,15 +14,16 @@
     </div>
 
     <!-- Quarter content -->
-    <div v-else-if="quarterSnapshot" class="max-w-2xl mx-auto px-4 py-8 sm:px-6">
-      <!-- Header -->
-      <div class="mb-6">
-        <h1 class="text-xl font-bold text-gray-900">{{ quarterSnapshot.label }}</h1>
-        <p class="text-sm text-gray-600 mt-1">Volunteer Schedule</p>
-      </div>
+    <div v-else-if="quarterSnapshot" class="max-w-5xl mx-auto px-4 py-8 sm:px-6">
+      <!-- Header with view + filter controls -->
+      <div class="flex flex-col gap-4 mb-6 pb-4 border-b border-gray-200 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 class="text-xl font-bold text-gray-900">{{ quarterSnapshot.label }}</h1>
+          <p class="text-sm text-gray-600 mt-1">Volunteer Schedule</p>
+        </div>
 
-      <!-- Toolbar: view toggle + name filter -->
-      <div class="flex flex-wrap items-center gap-3 mb-4">
+        <!-- Toolbar: view toggle + name filter -->
+        <div class="flex flex-wrap items-center gap-3">
         <div
           class="inline-flex rounded-md border border-gray-200 overflow-hidden text-sm"
           role="group"
@@ -82,9 +83,8 @@
         >
           Show everyone
         </button>
+        </div>
       </div>
-
-      <div class="border-b border-gray-200 mb-4"></div>
 
       <!-- Matrix view -->
       <QuarterShareMatrix
