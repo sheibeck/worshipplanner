@@ -136,6 +136,14 @@ export const useRosterStore = defineStore('roster', () => {
     })
   }
 
+  // Permanently remove a single person. Intended for inactive volunteers only —
+  // the UI surfaces this from the Inactive Volunteers list (deactivate first),
+  // so an actively-scheduled person is never one click from deletion.
+  async function deletePerson(id: string): Promise<void> {
+    if (!orgId.value) return
+    await deleteDoc(doc(db, 'organizations', orgId.value, 'people', id))
+  }
+
   async function upsertPeople(
     inputs: UpsertPersonInput[],
   ): Promise<{ added: number; updated: number }> {
@@ -279,6 +287,7 @@ export const useRosterStore = defineStore('roster', () => {
     updatePerson,
     deactivatePerson,
     reactivatePerson,
+    deletePerson,
     upsertPeople,
     deleteAllPeople,
     seedDefaultRolesIfEmpty,

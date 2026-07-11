@@ -172,23 +172,50 @@
       <!-- Inactive volunteers section (placed below Roles) -->
       <div v-if="inactivePeople.length > 0" class="mt-8">
         <CollapsibleSection :title="`Inactive Volunteers (${inactivePeople.length})`" storageKey="roster.section.inactiveVolunteers">
-          <p class="text-xs text-gray-500 -mt-2">Removed from schedule proposals and pickers. Reactivate to make them available again.</p>
+          <p class="text-xs text-gray-500 -mt-2">Removed from schedule proposals and pickers. Reactivate to make them available again, or delete permanently.</p>
           <div class="divide-y divide-gray-800 border border-gray-700 rounded-lg overflow-hidden">
             <div
               v-for="person in inactivePeople"
               :key="person.id"
-              class="flex items-center justify-between px-4 py-3 hover:bg-gray-800/40"
+              class="flex items-center justify-between gap-3 px-4 py-3 hover:bg-gray-800/40"
             >
-              <div>
-                <p class="text-sm text-gray-400 line-through">{{ person.name }}</p>
-                <p class="text-xs text-gray-600">{{ person.email || 'No email' }}</p>
+              <div class="min-w-0">
+                <p class="text-sm text-gray-400 line-through truncate">{{ person.name }}</p>
+                <p class="text-xs text-gray-600 truncate">{{ person.email || 'No email' }}</p>
               </div>
-              <button
-                @click="rosterStore.reactivatePerson(person.id)"
-                class="text-xs px-3 py-1.5 rounded-md border border-indigo-700 text-indigo-300 hover:bg-indigo-900/30 transition-colors"
-              >
-                Reactivate
-              </button>
+              <div class="flex items-center gap-2 shrink-0">
+                <template v-if="confirmDeleteInactiveId !== person.id">
+                  <button
+                    @click="rosterStore.reactivatePerson(person.id)"
+                    class="text-xs px-3 py-1.5 rounded-md border border-indigo-700 text-indigo-300 hover:bg-indigo-900/30 transition-colors"
+                  >
+                    Reactivate
+                  </button>
+                  <button
+                    @click="confirmDeleteInactiveId = person.id"
+                    class="text-xs px-3 py-1.5 rounded-md border border-red-800 text-red-300 hover:bg-red-900/30 transition-colors"
+                  >
+                    Delete
+                  </button>
+                </template>
+                <template v-else>
+                  <span class="text-xs text-red-300">Delete permanently?</span>
+                  <button
+                    :disabled="deletingInactiveId === person.id"
+                    @click="onDeleteInactive(person.id)"
+                    class="text-xs px-3 py-1.5 rounded-md bg-red-700 text-white hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {{ deletingInactiveId === person.id ? 'Deleting…' : 'Delete' }}
+                  </button>
+                  <button
+                    :disabled="deletingInactiveId === person.id"
+                    @click="confirmDeleteInactiveId = null"
+                    class="text-xs px-3 py-1.5 rounded-md border border-gray-700 text-gray-400 hover:bg-gray-800 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </template>
+              </div>
             </div>
           </div>
         </CollapsibleSection>
@@ -455,6 +482,20 @@ const confirmDeactivateId = ref<string | null>(null)
 async function onConfirmDeactivate(id: string) {
   await rosterStore.deactivatePerson(id)
   confirmDeactivateId.value = null
+}
+
+// ── Permanently delete an inactive volunteer (from the Inactive list) ─────────
+const confirmDeleteInactiveId = ref<string | null>(null)
+const deletingInactiveId = ref<string | null>(null)
+
+async function onDeleteInactive(id: string) {
+  deletingInactiveId.value = id
+  try {
+    await rosterStore.deletePerson(id)
+    confirmDeleteInactiveId.value = null
+  } finally {
+    deletingInactiveId.value = null
+  }
 }
 
 // ── Role badges ──────────────────────────────────────────────────────────────
