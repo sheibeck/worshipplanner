@@ -378,7 +378,7 @@
                 @click="onCloseAddQuarter"
                 class="px-4 py-2 rounded-md text-sm text-gray-400 border border-gray-700 hover:bg-gray-800 transition-colors"
               >
-                Don't create
+                Cancel
               </button>
             </div>
           </div>
