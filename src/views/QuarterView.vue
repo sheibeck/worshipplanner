@@ -42,6 +42,13 @@
             </svg>
             Import Volunteer CSV
           </button>
+          <button
+            type="button"
+            @click="addQuarterOpen = true"
+            class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 transition-colors"
+          >
+            + Add quarter
+          </button>
         </div>
       </div>
 
@@ -72,14 +79,6 @@
               <option v-for="q in quartersStore.quarters" :key="q.id" :value="q.id">{{ q.label }}</option>
             </select>
           </div>
-
-          <button
-            type="button"
-            @click="addQuarterOpen = true"
-            class="inline-flex items-center gap-2 rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm font-medium text-gray-200 hover:bg-gray-700 hover:text-white transition-colors"
-          >
-            + Add quarter
-          </button>
 
           <button
             v-if="selectedQuarter && !deleteConfirmOpen"
