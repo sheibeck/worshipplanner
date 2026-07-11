@@ -21,9 +21,11 @@ export function deriveSlug(orgName: string): string {
 export const RESERVED_SLUGS = new Set([
   'songs',
   'roster',
+  'volunteers',
   'schedule',
   'services',
   'team',
+  'admins',
   'settings',
   'login',
   'share',

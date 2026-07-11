@@ -4,7 +4,7 @@
       <!-- Page header -->
       <div class="flex items-center justify-between mb-6">
         <div>
-          <h1 class="text-xl font-semibold text-gray-100">Roster</h1>
+          <h1 class="text-xl font-semibold text-gray-100">Volunteers</h1>
           <p class="text-sm text-gray-400 mt-1">
             {{ rosterStore.isLoading ? 'Loading...' : `${rosterStore.activePeople.length} active volunteer${rosterStore.activePeople.length !== 1 ? 's' : ''}` }}
           </p>
@@ -100,11 +100,12 @@
                   </button>
                 </th>
                 <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                <th scope="col" class="px-4 py-3 w-8"></th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-800">
               <template v-for="person in displayedPeople" :key="person.id">
-                <tr class="hover:bg-gray-800/50 transition-colors">
+                <tr class="cursor-pointer hover:bg-gray-800/50 transition-colors" @click="onEditPerson(person)">
                   <td class="px-4 py-3 font-medium text-gray-100">{{ person.name }}</td>
                   <td class="px-4 py-3 text-gray-300">{{ person.email || '—' }}</td>
                   <td class="px-4 py-3 text-gray-300">{{ person.phone || '—' }}</td>
@@ -121,13 +122,17 @@
                   </td>
                   <td class="px-4 py-3">
                     <div class="flex items-center gap-3">
-                      <button @click="onEditPerson(person)" class="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">Edit</button>
-                      <button @click="confirmDeactivateId = person.id" class="text-xs text-red-400 hover:text-red-300 transition-colors">Deactivate</button>
+                      <button @click.stop="confirmDeactivateId = person.id" class="text-xs text-red-400 hover:text-red-300 transition-colors">Deactivate</button>
                     </div>
+                  </td>
+                  <td class="px-4 py-3 text-right">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
                   </td>
                 </tr>
                 <tr v-if="confirmDeactivateId === person.id">
-                  <td colspan="5" class="px-4 py-3 bg-red-900/20 border-t border-b border-red-800">
+                  <td colspan="6" class="px-4 py-3 bg-red-900/20 border-t border-b border-red-800">
                     <p class="text-sm text-red-300">
                       Deactivate {{ person.name }}? They'll be removed from future schedule proposals and pickers. Their history is kept and they can be reactivated anytime.
                     </p>
@@ -145,7 +150,7 @@
                 </tr>
               </template>
               <tr v-if="displayedPeople.length === 0">
-                <td colspan="5" class="px-4 py-6 text-center text-sm text-gray-500">
+                <td colspan="6" class="px-4 py-6 text-center text-sm text-gray-500">
                   {{ rosterStore.activePeople.length === 0 ? 'No active volunteers' : 'No volunteers match your search/filter' }}
                 </td>
               </tr>

@@ -19,19 +19,20 @@
 
     <!-- Nav -->
     <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-0.5">
-      <router-link
-        v-for="item in navItems"
-        :key="item.to"
-        :to="item.to"
-        @click="$emit('close')"
-        class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors group"
-        :class="isActive(item.to)
-          ? 'bg-indigo-600/20 text-indigo-300'
-          : 'text-gray-400 hover:bg-gray-800 hover:text-gray-100'"
-      >
-        <span class="shrink-0" :class="isActive(item.to) ? 'text-indigo-400' : 'text-gray-500 group-hover:text-gray-300'" v-html="item.icon"></span>
-        {{ item.label }}
-      </router-link>
+      <template v-for="item in navItems" :key="item.to">
+        <div v-if="item.separatorBefore" class="my-2 border-t border-gray-800" aria-hidden="true" />
+        <router-link
+          :to="item.to"
+          @click="$emit('close')"
+          class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors group"
+          :class="isActive(item.to)
+            ? 'bg-indigo-600/20 text-indigo-300'
+            : 'text-gray-400 hover:bg-gray-800 hover:text-gray-100'"
+        >
+          <span class="shrink-0" :class="isActive(item.to) ? 'text-indigo-400' : 'text-gray-500 group-hover:text-gray-300'" v-html="item.icon"></span>
+          {{ item.label }}
+        </router-link>
+      </template>
     </nav>
 
     <!-- User + Sign out -->
@@ -93,7 +94,7 @@ const navItems = computed(() => {
     })
   }
 
-  // Services: visible for all roles
+  // Group A: Services (visible for all roles), Songs
   items.push({
     label: 'Services',
     to: '/services',
@@ -101,17 +102,6 @@ const navItems = computed(() => {
       <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
     </svg>`,
   })
-
-  if (authStore.isEditor) {
-    items.push({
-      label: 'Schedule',
-      to: '/schedule',
-      icon: `<svg xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        <path stroke-linecap="round" stroke-linejoin="round" d="M8 14h.01M12 14h.01M16 14h.01M8 17h.01M12 17h.01" />
-      </svg>`,
-    })
-  }
 
   if (authStore.isEditor) {
     items.push({
@@ -123,20 +113,35 @@ const navItems = computed(() => {
     })
   }
 
+  // Group B: Schedule, Volunteers
   if (authStore.isEditor) {
     items.push({
-      label: 'Volunteers',
-      to: '/roster',
+      label: 'Schedule',
+      to: '/schedule',
+      separatorBefore: true,
       icon: `<svg xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+        <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        <path stroke-linecap="round" stroke-linejoin="round" d="M8 14h.01M12 14h.01M16 14h.01M8 17h.01M12 17h.01" />
       </svg>`,
     })
   }
 
   if (authStore.isEditor) {
     items.push({
+      label: 'Volunteers',
+      to: '/volunteers',
+      icon: `<svg xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+      </svg>`,
+    })
+  }
+
+  // Group C: Admins, Settings
+  if (authStore.isEditor) {
+    items.push({
       label: 'Admins',
-      to: '/team',
+      to: '/admins',
+      separatorBefore: true,
       icon: `<svg xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
       </svg>`,

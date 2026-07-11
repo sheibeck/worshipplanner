@@ -135,6 +135,8 @@
           <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
             Tags
           </th>
+          <!-- Trailing chevron (opens edit drawer) -->
+          <th scope="col" class="px-4 py-3 w-8"></th>
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-800">
@@ -265,6 +267,13 @@
                 class="text-gray-600"
               >&mdash;</span>
             </div>
+          </td>
+
+          <!-- Trailing chevron (opens edit drawer) -->
+          <td class="px-4 py-3 text-right">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
           </td>
         </tr>
       </tbody>

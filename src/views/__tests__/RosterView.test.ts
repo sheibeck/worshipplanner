@@ -92,8 +92,9 @@ describe('RosterView — roles-only Volunteer form (D-07)', () => {
     ]
 
     const wrapper = mountRosterView()
-    const editButton = wrapper.findAll('button').find((b) => b.text() === 'Edit')!
-    await editButton.trigger('click')
+    // Edit button was removed (260711-dto) — rows are now fully clickable to open the edit drawer.
+    const row = wrapper.findAll('tbody tr')[0]!
+    await row.trigger('click')
 
     expect(wrapper.findAll('select[data-role="cadence-select"]').length).toBe(0)
     expect(wrapper.text()).not.toContain('Serve frequency by role')
@@ -109,8 +110,9 @@ describe('RosterView — roles-only Volunteer form (D-07)', () => {
     ]
 
     const wrapper = mountRosterView()
-    const editButton = wrapper.findAll('button').find((b) => b.text() === 'Edit')!
-    await editButton.trigger('click')
+    // Edit button was removed (260711-dto) — rows are now fully clickable to open the edit drawer.
+    const row = wrapper.findAll('tbody tr')[0]!
+    await row.trigger('click')
 
     const guitarCheckbox = wrapper
       .findAll('input[type="checkbox"]')
@@ -135,8 +137,9 @@ describe('RosterView — roles-only Volunteer form (D-07)', () => {
     ]
 
     const wrapper = mountRosterView()
-    const editButton = wrapper.findAll('button').find((b) => b.text() === 'Edit')!
-    await editButton.trigger('click')
+    // Edit button was removed (260711-dto) — rows are now fully clickable to open the edit drawer.
+    const row = wrapper.findAll('tbody tr')[0]!
+    await row.trigger('click')
 
     const form = wrapper.find('form#volunteer-form')
     await form.trigger('submit.prevent')

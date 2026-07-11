@@ -109,7 +109,7 @@ const steps = computed(() => [
     title: 'Share with your team',
     description: 'Invite team members to collaborate.',
     done: memberCount.value > 1,
-    to: '/team',
+    to: '/admins',
   },
 ])
 
