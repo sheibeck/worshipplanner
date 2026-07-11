@@ -229,10 +229,12 @@ describe('proposeQuarterSchedule', () => {
     expect(result.servedCounts['p1']).toBe(3)
   })
 
-  it('hard cap: the sole monthly (N=4) guitarist is capped at his own budget and later weeks are left blank, not over-served (Gabriel scenario)', () => {
-    // Gabriel is the ONLY guitarist and set to serve ~monthly (N=4). Over an 8-week span his
-    // whole-quarter budget is ceil(8/4) = 2. The generator must NOT put him on every week just
-    // because no one else can play — it caps him at 2 and leaves the remaining weeks blank.
+  it('even spread: the sole monthly (N=4) guitarist is spaced evenly across the quarter (weeks 1 & 5), NOT front-loaded into consecutive weeks (Gabriel scenario)', () => {
+    // Gabriel is the ONLY guitarist and set to serve ~monthly (N=4). Over an 8-week span "1-in-4"
+    // means he should land ~once a month — spread across the quarter, not booked every week nor
+    // clustered into the first few weeks and then dropped. With the even-spread cadence gate he
+    // is only eligible while behind pace (dateIndex+1)/4, so he serves week 1 (index 0) and
+    // week 5 (index 4) — a gap of 4 — and the rest are left blank.
     const dates = ['2026-01-04', '2026-01-11', '2026-01-18', '2026-01-25', '2026-02-01', '2026-02-08', '2026-02-15', '2026-02-22']
     const people = [makePerson({ id: 'gabriel', name: 'Gabriel', roles: ['guitar'] })]
     const resolver = makeResolver([{ roleId: 'guitar', count: 1 }])
@@ -240,10 +242,12 @@ describe('proposeQuarterSchedule', () => {
 
     const result = proposeQuarterSchedule(people, dates, resolver, pqd)
 
-    // Capped at ceil(8/4) = 2 serves — hard cap honored, not stretched to all 8 weeks.
+    const servedIndices = dates
+      .map((d, i) => ((result.calendar[d]?.['guitar'] ?? []).includes('gabriel') ? i : -1))
+      .filter((i) => i >= 0)
+    // Spread evenly at a 1-in-4 cadence — indices 0 and 4, NOT front-loaded to 0,1.
+    expect(servedIndices).toEqual([0, 4])
     expect(result.servedCounts['gabriel']).toBe(2)
-    const servedDates = dates.filter((d) => (result.calendar[d]?.['guitar'] ?? []).includes('gabriel'))
-    expect(servedDates).toHaveLength(2)
     // The other 6 weeks are blank (unfilled), not fabricated assignments.
     const blankDates = dates.filter((d) => (result.calendar[d]?.['guitar'] ?? []).length === 0)
     expect(blankDates).toHaveLength(6)
@@ -614,9 +618,14 @@ describe('proposeQuarterSchedule', () => {
         .filter((e) => e.served)
         .map((e) => e.i)
       const gaps = nolanIndices.slice(1).map((v, i) => v - nolanIndices[i]!)
-      // Every gap between consecutive Nolan occurrences is identical and > 1 date apart —
-      // evenly spaced, not arbitrarily front-loaded/clustered back-to-back.
+      // Every gap between consecutive Nolan occurrences is identical AND equals his own 1-in-4
+      // cadence — evenly spaced across the WHOLE quarter, not front-loaded into the first half at
+      // Tim's 1-in-2 rate (the "Nolan 2x/month then nothing" bug: that would show gap 2, not 4).
       expect(new Set(gaps).size).toBe(1)
+      expect(gaps[0]).toBe(4)
+      // Occurrences span the full calendar — the last one lands in the final quarter of dates,
+      // not clustered up front.
+      expect(nolanIndices[nolanIndices.length - 1]!).toBeGreaterThanOrEqual(dates.length - 4)
       expect(gaps[0]).toBeGreaterThan(1)
     })
 
@@ -633,11 +642,12 @@ describe('proposeQuarterSchedule', () => {
     })
   })
 
-  // --- WR-02 regression: fillin-tier n:0 (the drawer's real "As-needed (fill-in)" preset
-  // value) must not divide-by-zero into an Infinity roleBudget, which would defeat the R-12
-  // cadence gate above for exactly the tier the drawer actually produces. ---
+  // --- WR-02 regression: a fillin-tier partner (the drawer's "As-needed (fill-in)" preset,
+  // which writes n:0) is manual-only and must never be auto-pulled in via pairing. Doubly
+  // guarded: propagatePairing excludes non-regular tiers, and withinCadence treats n<=0 as
+  // "no valid cadence" (no divide-by-zero into an always-passing gate). ---
   describe('fillin-tier n=0 cadence gate (WR-02)', () => {
-    it('a paired fillin-tier partner with n:0 is never pulled in via pairing propagation (roleBudget does not divide by zero into Infinity)', () => {
+    it('a paired fillin-tier partner with n:0 is never pulled in via pairing propagation (manual-only; no divide-by-zero)', () => {
       const dates = Array.from({ length: 12 }, (_, i) => {
         const d = new Date('2026-01-04T00:00:00Z')
         d.setUTCDate(d.getUTCDate() + i * 7)
@@ -662,9 +672,9 @@ describe('proposeQuarterSchedule', () => {
 
       const result = proposeQuarterSchedule(people, dates, resolver, pqd)
 
-      // Pre-fix: roleBudget('casey', 'vocals') = ceil(12/0) = Infinity, so the withinCadence
-      // gate never excluded Casey and she'd be pulled onto every date Tim serves. Post-fix,
-      // budget is 0, so she is never proactively pulled in via pairing.
+      // Casey is fillin-tier -> excluded from pairing pull-in (manual-only), and even if she
+      // weren't, withinCadence returns false for n<=0 rather than dividing 12/0 into an
+      // always-passing gate. Either way she is never proactively pulled onto Tim's dates.
       expect(result.servedCounts['casey'] ?? 0).toBe(0)
       for (const date of dates) {
         expect(result.calendar[date]?.['vocals'] ?? []).not.toContain('casey')

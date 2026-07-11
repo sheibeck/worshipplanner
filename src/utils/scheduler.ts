@@ -93,17 +93,22 @@ export function proposeQuarterSchedule(
     pqdById.get(personId)?.roleFrequency?.[roleId] ?? { tier: 'regular', n: 4 }
   const tierOf = (personId: string, roleId: string): FrequencyTier =>
     roleFrequencyOf(personId, roleId).tier
-  // D-01/D-02 — whole-quarter cadence budget ceiling for a person's role, e.g. n=4 over 13
-  // dates -> ceil(13/4) = 4. Used by propagatePairing's remaining-cadence-budget gate below.
-  // WR-02: n<=0 (the drawer's "As-needed (fill-in)" preset writes n:0, and a malformed/legacy
-  // roleFrequency entry could too) must NOT divide-by-zero into Infinity — that would make the
-  // withinCadence gate below always pass, letting a fill-in-tier partner be pulled onto every
-  // occurrence the anchor serves (the exact bug R-12 was written to prevent). Budget 0 means
-  // "never proactively pull this partner in via pairing propagation," matching R-12's intent.
-  const roleBudget = (personId: string, roleId: string): number => {
+  // D-01/D-02 — even-spread cadence gate. "1-in-N" means "serve at most once every N dates", so
+  // a person stays eligible for a role on the date at `dateIndex` ONLY while their per-role served
+  // count is still below the running even-spread target (dateIndex+1)/n — i.e. while they are
+  // behind their ideal pace. This is what spreads a monthly (n=4) person evenly across the WHOLE
+  // quarter (weeks 1, 5, 9, 13…) instead of greedily booking them every week until a flat
+  // whole-quarter budget runs out and then leaving the rest blank (the front-loading bug: the
+  // sole guitarist getting every Sunday in June, then nothing). A simple count ceiling can't do
+  // this — the target has to advance with the calendar. WR-02: n<=0 (the drawer's "As-needed
+  // (fill-in)" preset writes n:0, and malformed/legacy entries could too) has no valid cadence,
+  // so the person is NEVER proactively scheduled — no divide-by-zero into Infinity. Used by BOTH
+  // the main assignment loop and propagatePairing so direct picks and pull-ins are spaced
+  // identically (no front-loading on either path).
+  const withinCadence = (personId: string, roleId: string, dateIndex: number): boolean => {
     const n = roleFrequencyOf(personId, roleId).n
-    if (n <= 0) return 0
-    return Math.ceil(serviceDates.length / n)
+    if (n <= 0) return false
+    return getServedByRole(personId, roleId) < (dateIndex + 1) / n
   }
 
   // Aggregate served count — kept for the external ProposeResult.servedCounts shape (unchanged,
@@ -179,44 +184,45 @@ export function proposeQuarterSchedule(
           pairingConflicts.push({ date, personId, partnerId, reason: 'partner out this quarter' })
           continue
         }
+        // Fill-in tier is manual-only — a paired fill-in partner is NOT auto-pulled in. Silent
+        // skip (like the cadence skip below), not a genuine conflict: the coordinator schedules
+        // fill-ins by hand.
+        const regularRoles = notOutTier.filter((r) => tierOf(partnerId, r.roleId) === 'regular')
+        if (regularRoles.length === 0) continue
         // D-12/Pitfall 2 — the CONFIRMED landmine: propagatePairing is a second, independent
         // role-selection path. It MUST apply the exact same shared group-compatibility check as
-        // eligible() below, or a paired partner can silently be pulled into an illegal combo.
-        const eligibleRoles = notOutTier.filter((r) =>
+        // the main loop below, or a paired partner can silently be pulled into an illegal combo.
+        const eligibleRoles = regularRoles.filter((r) =>
           isGroupCompatible(rolesHeldThisDate(partnerId), r.roleId, roleGroupOf),
         )
         if (eligibleRoles.length === 0) {
           pairingConflicts.push({ date, personId, partnerId, reason: 'group rule violation for partner today' })
           continue
         }
-        // D-01/D-02 — the R-12 fix: only pull the partner in when doing so stays within their
-        // OWN remaining per-role cadence budget (whole-quarter ceiling, not "so far"). This is
-        // what gives containment its correct asymmetric shape: a lower-cadence partner (e.g.
-        // Nolan, ~once/month) is pulled onto a subset of the higher-cadence anchor's (e.g. Tim,
-        // ~twice/month) already fair-share-spread dates, capped at Nolan's own budget — Tim's
-        // "extra" occurrences beyond that budget proceed without Nolan, never inflating Nolan's
-        // serve count up to Tim's cadence (anti-pattern explicitly rejected by D-01).
-        const withinCadence = eligibleRoles.filter(
-          (r) => getServedByRole(partnerId, r.roleId) < roleBudget(partnerId, r.roleId),
-        )
-        if (withinCadence.length === 0) {
+        // D-01/D-02 — only pull the partner in on the occurrences where they're behind their OWN
+        // even-spread per-role pace (same withinCadence gate the main loop uses). This gives
+        // containment its correct asymmetric shape AND spreads the pull-ins evenly: a lower-cadence
+        // partner (e.g. Nolan, ~once/month) lands on an evenly-spaced subset of the higher-cadence
+        // anchor's (e.g. Tim, ~twice/month) dates — every 4th of Tim's dates, not front-loaded onto
+        // Tim's first several. Tim's "extra" occurrences beyond Nolan's pace proceed without Nolan,
+        // never inflating Nolan's serve count up to Tim's cadence (anti-pattern rejected by D-01).
+        const spaced = eligibleRoles.filter((r) => withinCadence(partnerId, r.roleId, dateIndex))
+        if (spaced.length === 0) {
           // D-03: cadence-driven skip is silent — do NOT push to pairingConflicts. This is
-          // expected/normal (the anchor's cadence exceeds what the partner's budget can absorb),
+          // expected/normal (the anchor's pace exceeds what the partner's cadence can absorb),
           // not a genuine problem like blackout/no-role/group-violation above.
           continue
         }
         // Residual scope boundary (RESEARCH Pitfall 4 / Open Question 1, consciously accepted):
         // this gate only constrains pull-ins via propagation. If the partner independently holds
-        // a role the anchor does not, the main eligible() loop's deficit-fair-share pass could in
-        // principle still pick the partner directly on a date the anchor isn't serving at all,
-        // which a maximally strict reading of containment would forbid. A fully general fix would
-        // require constraining the main loop too (larger, riskier change than this SPEC's
-        // acceptance criteria require) — the canonical pairing shape (co-vocalists / parent-child
-        // sharing the same role) does not hit this edge case, so it's shipped as-is.
-        const withCapacity = withinCadence.find(
+        // a role the anchor does not, the main loop's spacing pass could in principle still pick
+        // the partner directly on a date the anchor isn't serving at all, which a maximally strict
+        // reading of containment would forbid. The canonical pairing shape (co-vocalists /
+        // parent-child sharing the same role) does not hit this edge case, so it's shipped as-is.
+        const withCapacity = spaced.find(
           (r) => (calendar[date]![r.roleId]?.length ?? 0) < r.count,
         )
-        const target = withCapacity ?? withinCadence[0]!
+        const target = withCapacity ?? spaced[0]!
         assignToRole(target.roleId, partnerId)
         propagatePairing(partnerId, visited) // handle chained pairings (e.g. two kids, one parent)
       }
@@ -229,13 +235,14 @@ export function proposeQuarterSchedule(
         // Only 'regular'-tier people are auto-scheduled. 'fillin'-tier is manual-only — the
         // coordinator fills those gaps by hand (there is intentionally NO last-resort fillin
         // auto-fill), and 'out'-tier is excluded for the whole quarter. A regular candidate
-        // stays eligible only while still UNDER their own hard per-role cadence cap
-        // (getServedByRole < roleBudget) — the same whole-quarter ceiling propagatePairing's
-        // withinCadence gate uses (R-12). Once a person hits their cap for this role, the slot
-        // is left BLANK (pushed to `unfilled`) rather than over-serving them: hard caps win
-        // over full coverage, and blank spots are acceptable/expected (they get filled in by
-        // hand). This is what stops the "only guitarist gets booked every single week" and
-        // "once-a-month person lands twice a month" over-scheduling.
+        // stays eligible only while still BEHIND their even-spread cadence pace
+        // (withinCadence): "1-in-N" means once every N dates, so a monthly (n=4) person is only
+        // eligible on ~every 4th date and lands evenly across the whole quarter instead of being
+        // front-loaded into the first few weeks and then dropped. When nobody is behind their
+        // pace, the slot is left BLANK (pushed to `unfilled`) rather than over-serving someone:
+        // hard caps win over full coverage, and blank spots are acceptable/expected (they get
+        // filled in by hand). This is what stops the "only guitarist gets booked every single
+        // week" and "once-a-month person lands twice a month" over-scheduling.
         const candidates = people.filter(
           (p) =>
             p.active &&
@@ -243,7 +250,7 @@ export function proposeQuarterSchedule(
             !isBlackedOut(p.id, date) &&
             !alreadyInRole.has(p.id) &&
             tierOf(p.id, roleId) === 'regular' &&
-            getServedByRole(p.id, roleId) < roleBudget(p.id, roleId) &&
+            withinCadence(p.id, roleId, dateIndex) &&
             // D-10/D-12 — same shared helper as propagatePairing above.
             isGroupCompatible(rolesHeldThisDate(p.id), roleId, roleGroupOf),
         )
