@@ -161,6 +161,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 | 260701-awp | Fix song-picker sticky header (search + tag filters) rendering behind scrolling song list | 2026-07-01 | 5de0ae2 | [260701-awp-fix-song-picker-sticky-header-search-tag](.planning/quick/260701-awp-fix-song-picker-sticky-header-search-tag/) |
 | 260703-246 | Exclude soft-deleted (hidden) songs from AI suggestions via shared aiCandidateSongs getter + regression test | 2026-07-03 | 87b6de4 | [260703-246-make-sure-that-when-the-ai-makes-song-su](.planning/quick/260703-246-make-sure-that-when-the-ai-makes-song-su/) |
 | 260710-s7f | Scheduler honors hard per-role frequency caps AND spreads serves evenly across the quarter (no front-loading); fill-in tier is manual-only, not auto-filled | 2026-07-11 | 8b2aa1a, 0d4d127 | [260710-s7f-schedule-generator-honor-hard-per-role-f](.planning/quick/260710-s7f-schedule-generator-honor-hard-per-role-f/) |
+| 260711-dto | UI-consistency cleanup: renamed Roster/Users routes+titles to Volunteers/Admins (/volunteers, /admins), active-only song counts on Dashboard/Songs, chevron + full-row-click edit affordance on Songs/Volunteers, Add-quarter button moved to Schedule header top-right, sidebar reordered/grouped {Services,Songs}\|{Schedule,Volunteers}\|{Admins,Settings} | 2026-07-11 | a6fedca | [260711-dto-menu-page-route-naming-cleanup-drawer-ed](.planning/quick/260711-dto-menu-page-route-naming-cleanup-drawer-ed/) |
 
 ### Blockers/Concerns
 
@@ -170,7 +171,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 
 ## Session Continuity
 
-Last activity: 2026-07-10
-Last session: 2026-07-10T01:05:49.262Z
-Stopped at: Phase 16 UI-SPEC approved
-Resume file: .planning/phases/16-quarterly-schedule-share-link/16-UI-SPEC.md
+Last activity: 2026-07-11 - Completed quick task 260711-dto: menu/page/route naming cleanup, drawer-edit row affordances, active-only song counts, button placement, sidebar grouping
+Last session: 2026-07-11T13:57:13.162Z
+Stopped at: Quick task 260711-dto — awaiting human-verify checkpoint
+Resume file: .planning/quick/260711-dto-menu-page-route-naming-cleanup-drawer-ed/260711-dto-SUMMARY.md
