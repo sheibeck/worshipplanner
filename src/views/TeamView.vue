@@ -45,6 +45,7 @@
 
       <!-- Member table -->
       <div v-else class="rounded-lg border border-gray-800 overflow-hidden">
+        <div class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead>
             <tr class="bg-gray-800/50 border-b border-gray-700">
@@ -145,6 +146,7 @@
             </tr>
           </tbody>
         </table>
+        </div>
       </div>
 
       <!-- Action error (for role toggle / remove errors) -->

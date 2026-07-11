@@ -26,11 +26,8 @@
         />
       </div>
 
-      <!-- Table wrapper with horizontal scroll if many columns -->
-      <div
-        class="rounded-lg border border-gray-800 overflow-hidden"
-        :class="sortedDates.length > 12 ? 'overflow-x-auto' : ''"
-      >
+      <!-- Table wrapper with horizontal scroll when columns overflow (esp. mobile) -->
+      <div class="rounded-lg border border-gray-800 overflow-x-auto">
         <table class="w-full text-sm border-collapse">
           <!-- Column headers: dates -->
           <thead>

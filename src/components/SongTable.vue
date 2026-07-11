@@ -62,7 +62,8 @@
     </div>
 
     <!-- Table -->
-    <table v-else class="w-full text-sm">
+    <div v-else class="overflow-x-auto">
+      <table class="w-full text-sm">
       <thead>
         <tr class="border-b border-gray-800 bg-gray-900/50">
           <!-- Checkbox column -->
@@ -278,6 +279,7 @@
         </tr>
       </tbody>
     </table>
+    </div>
     <div ref="sentinelRef" class="h-1" />
     <div v-if="!loading && songs.length > 0" class="px-4 py-2 text-xs text-gray-500 text-center border-t border-gray-800">
       Showing {{ visibleSongs.length }} of {{ sortedSongs.length }} songs

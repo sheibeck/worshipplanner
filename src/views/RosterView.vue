@@ -84,6 +84,7 @@
 
         <!-- Active people table -->
         <div class="rounded-lg border border-gray-800 overflow-hidden">
+          <div class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
               <tr class="border-b border-gray-800 bg-gray-900/50">
@@ -156,6 +157,7 @@
               </tr>
             </tbody>
           </table>
+          </div>
         </div>
 
       </template>
