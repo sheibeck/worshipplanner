@@ -1,6 +1,6 @@
 <template>
   <AppShell>
-    <div class="px-6 py-8 max-w-4xl">
+    <div class="px-6 py-8">
       <!-- Page header -->
       <div class="mb-6 pb-4 border-b border-gray-800">
         <h1 class="text-xl font-semibold text-gray-100">Dashboard</h1>
@@ -12,8 +12,10 @@
       <!-- Getting started checklist: editor only, hides when complete -->
       <GettingStarted v-if="authStore.isEditor" class="mb-6" />
 
+      <!-- Overview panels: single column on mobile, flowing into columns when wide -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
       <!-- Next service -->
-      <section class="mb-8">
+      <section>
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-xs font-semibold uppercase tracking-widest text-gray-500">Next service</h2>
           <span v-if="upcomingServices.length > 0" class="text-xs text-gray-600">
@@ -88,7 +90,7 @@
       </section>
 
       <!-- Volunteer & role coverage (editor only — planning concern) -->
-      <section v-if="authStore.isEditor" class="mb-8">
+      <section v-if="authStore.isEditor">
         <h2 class="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-3">Volunteer coverage</h2>
         <div class="rounded-lg border border-gray-800 bg-gray-900 p-5">
           <div class="flex items-center gap-8 flex-wrap mb-4">
@@ -126,8 +128,8 @@
         </div>
       </section>
 
-      <!-- Song library health (editor only) -->
-      <section v-if="authStore.isEditor">
+      <!-- Song library health (editor only) — full width below the two side panels -->
+      <section v-if="authStore.isEditor" class="lg:col-span-2">
         <h2 class="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-3">Song library</h2>
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <router-link
@@ -143,6 +145,7 @@
           </router-link>
         </div>
       </section>
+      </div>
     </div>
   </AppShell>
 </template>
@@ -228,22 +231,31 @@ const uncategorizedCount = computed(
   () => activeSongs.value.filter((s) => s.vwTypes.length === 0).length,
 )
 
+// Coerce with String() before trimming — imported data can carry a numeric
+// ccliNumber / arrangement key, which would blow up a bare .trim() call.
 const missingKeyCount = computed(
   () =>
     activeSongs.value.filter(
-      (s) => s.arrangements.length === 0 || s.arrangements.every((a) => !a.key || !a.key.trim()),
+      (s) =>
+        s.arrangements.length === 0 ||
+        s.arrangements.every((a) => String(a.key ?? '').trim() === ''),
     ).length,
 )
 
 const missingCcliCount = computed(
-  () => activeSongs.value.filter((s) => !s.ccliNumber || !s.ccliNumber.trim()).length,
+  () => activeSongs.value.filter((s) => String(s.ccliNumber ?? '').trim() === '').length,
 )
 
 // Stale = last scheduled more than ~6 months ago. Never-used songs (lastUsedAt null)
 // are excluded — a brand-new song shouldn't read as stale.
 const staleCount = computed(() => {
   const cutoffMs = Date.now() - 1000 * 60 * 60 * 24 * 182
-  return activeSongs.value.filter((s) => s.lastUsedAt && s.lastUsedAt.toMillis() < cutoffMs).length
+  return activeSongs.value.filter(
+    (s) =>
+      s.lastUsedAt &&
+      typeof s.lastUsedAt.toMillis === 'function' &&
+      s.lastUsedAt.toMillis() < cutoffMs,
+  ).length
 })
 
 const songTiles = computed(() => [
