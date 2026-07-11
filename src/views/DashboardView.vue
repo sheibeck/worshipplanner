@@ -115,11 +115,11 @@
                 ? 'bg-red-900/40 border-red-700/50 text-red-300'
                 : 'bg-amber-900/40 border-amber-700/50 text-amber-300'"
             >
-              {{ entry.role.name }}: {{ entry.count === 0 ? 'none' : `${entry.count} of ${entry.role.defaultCount}` }}
+              {{ entry.role.name }}: {{ entry.count === 0 ? 'none' : `${entry.count} volunteer${entry.count === 1 ? '' : 's'}` }}
             </router-link>
           </div>
           <p v-else-if="rosterStore.roles.length > 0" class="text-sm text-gray-500">
-            All roles have enough volunteers for the default plan.
+            Every role has at least 2 volunteers.
           </p>
           <p v-else class="text-sm text-gray-500">
             No roles configured yet —
@@ -213,15 +213,16 @@ function formatServiceDate(date: string): string {
 }
 
 // ── Volunteer & role coverage ─────────────────────────────────────────────────
-// A role is "under-staffed" when fewer active volunteers can fill it than the
-// role's default plan count (defaultCount) — a count of 0 is the critical case.
+// A role is "under-staffed" when fewer than 2 active volunteers can fill it —
+// a single point of failure (or none at all) for that role.
+const MIN_VOLUNTEERS_PER_ROLE = 2
 const understaffedRoles = computed(() =>
   rosterStore.rolesSorted
     .map((role) => ({
       role,
       count: rosterStore.activePeople.filter((p) => p.roles.includes(role.id)).length,
     }))
-    .filter((entry) => entry.count < entry.role.defaultCount),
+    .filter((entry) => entry.count < MIN_VOLUNTEERS_PER_ROLE),
 )
 
 // ── Song library health ───────────────────────────────────────────────────────
