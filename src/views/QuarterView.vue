@@ -601,13 +601,25 @@ const shareUrl = ref<string | null>(null)
 const shareCopied = ref(false)
 const shareError = ref<string | null>(null)
 
+// Prefer the memorable, slug-based public URL (/{slug}/quarterN-YYYY) that
+// finalizeAndShare also writes (R-02/D-18). Fall back to the opaque token URL
+// only when the org has no configured slug yet.
+function buildShareUrl(
+  quarter: { quarter: number; year: number },
+  token: string | null,
+): string | null {
+  const slug = authStore.orgSlug
+  if (slug) {
+    return `${window.location.origin}/${slug}/quarter${quarter.quarter}-${quarter.year}`
+  }
+  return token ? `${window.location.origin}/quarter-share/${token}` : null
+}
+
 // Reflect an already-finalized quarter's share link when switching quarters.
 watch(
   selectedQuarter,
   (quarter) => {
-    shareUrl.value = quarter?.shareToken
-      ? `${window.location.origin}/quarter-share/${quarter.shareToken}`
-      : null
+    shareUrl.value = quarter?.shareToken ? buildShareUrl(quarter, quarter.shareToken) : null
     shareCopied.value = false
     shareError.value = null
   },
@@ -620,7 +632,7 @@ async function onFinalizeAndShare() {
   shareError.value = null
   try {
     const token = await quartersStore.finalizeAndShare(selectedQuarter.value.id)
-    shareUrl.value = `${window.location.origin}/quarter-share/${token}`
+    shareUrl.value = buildShareUrl(selectedQuarter.value, token)
   } catch (err) {
     console.error('Finalize & Share failed:', err)
     shareError.value = 'Failed to finalize and share'

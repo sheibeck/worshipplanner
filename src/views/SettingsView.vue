@@ -304,6 +304,9 @@ async function onSaveSlug() {
     await updateDoc(doc(db, 'organizations', authStore.orgId), { slug: claimed })
     persistedSlug.value = claimed
     editSlug.value = claimed
+    // Keep the shared auth-store slug current so share links (e.g. the Schedule
+    // page's Finalize & Share URL) reflect the new slug without a reload.
+    authStore.orgSlug = claimed
 
     slugSavedFeedback.value = true
     setTimeout(() => {

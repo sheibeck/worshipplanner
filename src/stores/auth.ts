@@ -31,6 +31,8 @@ export const useAuthStore = defineStore('auth', () => {
 
   const orgId = ref<string | null>(null)
   const orgName = ref<string | null>(null)
+  // Memorable share-URL slug (R-02/D-18) — used to build /{slug}/quarterN-YYYY links.
+  const orgSlug = ref<string | null>(null)
   const userRole = ref<'editor' | 'viewer' | null>(null)
 
   // Planning Center credential state
@@ -80,6 +82,7 @@ export const useAuthStore = defineStore('auth', () => {
     if (ids.length === 0) {
       orgId.value = null
       orgName.value = null
+      orgSlug.value = null
       userRole.value = null
       pcAppId.value = null
       pcSecret.value = null
@@ -93,6 +96,7 @@ export const useAuthStore = defineStore('auth', () => {
     if (orgSnap.exists()) {
       const orgData = orgSnap.data()
       orgName.value = (orgData.name as string) ?? null
+      orgSlug.value = (orgData.slug as string) ?? null
       pcAppId.value = (orgData.pcAppId as string) ?? null
       pcSecret.value = (orgData.pcSecret as string) ?? null
     }
@@ -135,6 +139,7 @@ export const useAuthStore = defineStore('auth', () => {
     } else {
       orgId.value = null
       orgName.value = null
+      orgSlug.value = null
       userRole.value = null
       memberUnsub?.()
       memberUnsub = null
@@ -275,6 +280,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function logout(): Promise<void> {
     orgId.value = null
     orgName.value = null
+    orgSlug.value = null
     userRole.value = null
     pcAppId.value = null
     pcSecret.value = null
@@ -297,6 +303,7 @@ export const useAuthStore = defineStore('auth', () => {
     isAuthenticated,
     orgId,
     orgName,
+    orgSlug,
     userRole,
     isEditor,
     waitForRole,
