@@ -226,21 +226,27 @@ export function proposeQuarterSchedule(
       calendar[date]![roleId] ??= []
       while (calendar[date]![roleId]!.length < count) {
         const alreadyInRole = new Set(calendar[date]![roleId])
-        const eligible = (tier: FrequencyTier) =>
-          people.filter(
-            (p) =>
-              p.active &&
-              p.roles.includes(roleId) &&
-              !isBlackedOut(p.id, date) &&
-              !alreadyInRole.has(p.id) &&
-              tierOf(p.id, roleId) === tier &&
-              // D-10/D-12 — same shared helper as propagatePairing above.
-              isGroupCompatible(rolesHeldThisDate(p.id), roleId, roleGroupOf),
-          )
-        // Regular-tier pass first; fillin-tier is a last resort only when zero regular
-        // candidates exist (D-04). 'out'-tier people are excluded from both passes.
-        let candidates = eligible('regular')
-        if (candidates.length === 0) candidates = eligible('fillin')
+        // Only 'regular'-tier people are auto-scheduled. 'fillin'-tier is manual-only — the
+        // coordinator fills those gaps by hand (there is intentionally NO last-resort fillin
+        // auto-fill), and 'out'-tier is excluded for the whole quarter. A regular candidate
+        // stays eligible only while still UNDER their own hard per-role cadence cap
+        // (getServedByRole < roleBudget) — the same whole-quarter ceiling propagatePairing's
+        // withinCadence gate uses (R-12). Once a person hits their cap for this role, the slot
+        // is left BLANK (pushed to `unfilled`) rather than over-serving them: hard caps win
+        // over full coverage, and blank spots are acceptable/expected (they get filled in by
+        // hand). This is what stops the "only guitarist gets booked every single week" and
+        // "once-a-month person lands twice a month" over-scheduling.
+        const candidates = people.filter(
+          (p) =>
+            p.active &&
+            p.roles.includes(roleId) &&
+            !isBlackedOut(p.id, date) &&
+            !alreadyInRole.has(p.id) &&
+            tierOf(p.id, roleId) === 'regular' &&
+            getServedByRole(p.id, roleId) < roleBudget(p.id, roleId) &&
+            // D-10/D-12 — same shared helper as propagatePairing above.
+            isGroupCompatible(rolesHeldThisDate(p.id), roleId, roleGroupOf),
+        )
 
         if (candidates.length === 0) {
           unfilled.push({ date, roleId })
@@ -249,16 +255,12 @@ export function proposeQuarterSchedule(
         const scored = candidates
           .map((p) => {
             // Per-role cadence (D-05): N sourced from the quarter-scoped roleFrequency entry
-            // (D-04); absent role entry defaults to n=4 via roleFrequencyOf.
+            // (D-04); absent role entry defaults to n=4 via roleFrequencyOf. Only regular-tier
+            // candidates reach here, so the deficit formula always applies.
             const n = roleFrequencyOf(p.id, roleId).n
             return {
               p,
-              // fillin-tier candidates have no meaningful cadence-based deficit — tie-break
-              // purely by (per-role servedCount asc, name asc) instead.
-              deficit:
-                tierOf(p.id, roleId) === 'regular'
-                  ? (dateIndex + 1) / n - getServedByRole(p.id, roleId)
-                  : 0,
+              deficit: (dateIndex + 1) / n - getServedByRole(p.id, roleId),
             }
           })
           .sort(

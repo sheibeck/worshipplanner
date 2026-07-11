@@ -229,7 +229,30 @@ describe('proposeQuarterSchedule', () => {
     expect(result.servedCounts['p1']).toBe(3)
   })
 
-  it('fillin: a regular-tier candidate is always chosen over a fillin-tier candidate when both are eligible', () => {
+  it('hard cap: the sole monthly (N=4) guitarist is capped at his own budget and later weeks are left blank, not over-served (Gabriel scenario)', () => {
+    // Gabriel is the ONLY guitarist and set to serve ~monthly (N=4). Over an 8-week span his
+    // whole-quarter budget is ceil(8/4) = 2. The generator must NOT put him on every week just
+    // because no one else can play — it caps him at 2 and leaves the remaining weeks blank.
+    const dates = ['2026-01-04', '2026-01-11', '2026-01-18', '2026-01-25', '2026-02-01', '2026-02-08', '2026-02-15', '2026-02-22']
+    const people = [makePerson({ id: 'gabriel', name: 'Gabriel', roles: ['guitar'] })]
+    const resolver = makeResolver([{ roleId: 'guitar', count: 1 }])
+    const pqd = [makePQD({ personId: 'gabriel', roleFrequency: freq('guitar', 'regular', 4) })]
+
+    const result = proposeQuarterSchedule(people, dates, resolver, pqd)
+
+    // Capped at ceil(8/4) = 2 serves — hard cap honored, not stretched to all 8 weeks.
+    expect(result.servedCounts['gabriel']).toBe(2)
+    const servedDates = dates.filter((d) => (result.calendar[d]?.['guitar'] ?? []).includes('gabriel'))
+    expect(servedDates).toHaveLength(2)
+    // The other 6 weeks are blank (unfilled), not fabricated assignments.
+    const blankDates = dates.filter((d) => (result.calendar[d]?.['guitar'] ?? []).length === 0)
+    expect(blankDates).toHaveLength(6)
+    for (const d of blankDates) {
+      expect(result.unfilled).toContainEqual({ date: d, roleId: 'guitar' })
+    }
+  })
+
+  it('fillin: a regular-tier candidate is chosen over a fillin-tier candidate (fillin is never auto-scheduled)', () => {
     const people = [
       makePerson({ id: 'reg', roles: ['guitar'] }),
       makePerson({ id: 'fill', roles: ['guitar'] }),
@@ -243,11 +266,11 @@ describe('proposeQuarterSchedule', () => {
 
     const result = proposeQuarterSchedule(people, dates, resolver, pqd)
 
-    // Both eligible — regular-tier person is always chosen first, never the fillin-tier person
+    // Only the regular-tier person is auto-scheduled — fillin-tier is manual-only.
     expect(result.calendar['2026-01-04']?.['guitar']).toEqual(['reg'])
   })
 
-  it('fillin last resort: fillin-tier candidate is chosen only when the regular candidate is blacked out/assigned and no other regular exists', () => {
+  it('fillin manual-only: a fillin-tier person is NEVER auto-scheduled, even as the sole candidate — the slot is left unfilled', () => {
     const people = [
       makePerson({ id: 'reg', roles: ['guitar'] }),
       makePerson({ id: 'fill', roles: ['guitar'] }),
@@ -265,8 +288,12 @@ describe('proposeQuarterSchedule', () => {
 
     const result = proposeQuarterSchedule(people, dates, resolver, pqd)
 
-    // reg is blacked out -> zero regular candidates -> fillin last-resort kicks in
-    expect(result.calendar['2026-01-04']?.['guitar']).toEqual(['fill'])
+    // reg is blacked out -> zero regular candidates. There is NO fillin last-resort auto-fill:
+    // the coordinator schedules fill-ins by hand, so the slot is left blank.
+    expect(result.calendar['2026-01-04']?.['guitar'] ?? []).toHaveLength(0)
+    expect(result.calendar['2026-01-04']?.['guitar'] ?? []).not.toContain('fill')
+    expect(result.unfilled).toContainEqual({ date: '2026-01-04', roleId: 'guitar' })
+    expect(result.servedCounts['fill'] ?? 0).toBe(0)
   })
 
   it('out tier: an out-tier person eligible by role is never assigned and never appears in unfilled as a filler', () => {
