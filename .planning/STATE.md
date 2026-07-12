@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: MVP
-status: ready_to_plan
-stopped_at: Phase 16 complete (11/11) — ready to discuss Phase 999.1
-last_updated: 2026-07-10T22:55:10.960Z
-last_activity: 2026-07-10
+status: planning
+stopped_at: Phase 16.1 context gathered
+last_updated: "2026-07-12T22:57:26.086Z"
+last_activity: "2026-07-11 - Completed quick task 260711-dto: menu/page/route naming cleanup, drawer-edit row affordances, active-only song counts, button placement, sidebar grouping"
 progress:
-  total_phases: 10
-  completed_phases: 8
+  total_phases: 11
+  completed_phases: 9
   total_plans: 55
   completed_plans: 55
-  percent: 80
+  percent: 82
 ---
 
 # Project State
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 
 ## Current Position
 
-Phase: 999.1
+Phase: 16.1
 Plan: Not started
 Milestone: v1.0 MVP — SHIPPED 2026-03-05
 Next milestone: v1.1 Tasks & Events (not yet started)
@@ -136,6 +136,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - Phase 13 added: Volunteer Role Scheduling — roster + PC people import (name/email/phone), editable roles (band/tech/scripture reader; worship leader intentionally NOT a role — leaders self-assign) with multi-person-per-role and multi-role-per-person, per-person 1-in-N serve-frequency target, quarterly blackout dates + must-serve-with pairings via name-matched CSV, auto-proposed frequency-balanced quarterly grid (dates×roles) with manual editing. NOTE: reverses PROJECT.md "Musician scheduling — out of scope" decision.
 - Phase 15 added: Per-Role Frequency & Role-Category Co-occurrence Rules — frequency per (person, role) instead of per person; same-service role compatibility by category (TECH exclusive; BAND/VOCALS/OTHER combine; max 1 instrument/service). Reshapes Phase 14's per-person frequency model. Requested during Phase 14 execution; full context in .planning/todos/pending/per-role-frequency-and-vocal-instrument-pairing.md.
 - Phase 16 added: Quarterly Schedule share link — matrix view + list/matrix toggle, memorable /{church}/quarterN-YYYY URL, filter-by-name, cross-screen (Schedule ↔ Volunteer) editing of pairings/roles/per-role frequency/unavailable Sundays, remove Schedule's separate frequency + volunteer date-range picker, pairing that honors per-role frequency (paired only on the occurrences the lower-frequency person serves), collapsible sections, calendar-format UX research, and a right-side slide-out group editor with whole-cell hit target. See ROADMAP.md R-01..R-14.
+- Phase 16.1 inserted after Phase 16: Song list tags & columns customization: fold Team tags into Tags, Themes as separate column + column-visibility cog, document 1-2-3 methodology (URGENT)
 
 ### Quick Tasks Completed
 
@@ -172,6 +173,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-11 - Completed quick task 260711-dto: menu/page/route naming cleanup, drawer-edit row affordances, active-only song counts, button placement, sidebar grouping
-Last session: 2026-07-11T13:57:13.162Z
-Stopped at: Quick task 260711-dto — awaiting human-verify checkpoint
-Resume file: .planning/quick/260711-dto-menu-page-route-naming-cleanup-drawer-ed/260711-dto-SUMMARY.md
+Last session: 2026-07-12T22:57:26.017Z
+Stopped at: Phase 16.1 context gathered
+Resume file: .planning/phases/16.1-song-list-tags-columns-customization/16.1-CONTEXT.md
