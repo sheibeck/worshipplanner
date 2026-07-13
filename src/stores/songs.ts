@@ -72,14 +72,12 @@ export const useSongStore = defineStore('songs', () => {
       let matchesUserTags = true
       if (exclude.size > 0) {
         const carriesExcluded =
-          (song.teamTags ?? []).some((t) => exclude.has(t)) ||
           (song.themes ?? []).some((t) => exclude.has(t)) ||
           (song.tags ?? []).some((t) => exclude.has(t))
         if (carriesExcluded) matchesUserTags = false
       }
       if (matchesUserTags && include.size > 0) {
         const carriesIncluded =
-          (song.teamTags ?? []).some((t) => include.has(t)) ||
           (song.themes ?? []).some((t) => include.has(t)) ||
           (song.tags ?? []).some((t) => include.has(t))
         matchesUserTags = carriesIncluded

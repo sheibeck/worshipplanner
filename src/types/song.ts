@@ -28,7 +28,6 @@ export interface Song {
   themes: string[]
   notes: string
   vwTypes: VWType[]
-  teamTags: string[]
   arrangements: Arrangement[]
   /** Arrangement chosen as the "play key" for transitions; null falls back to arrangements[0]. */
   primaryArrangementId: string | null
@@ -37,7 +36,7 @@ export interface Song {
   updatedAt: Timestamp
   pcSongId: string | null
   hidden: boolean
-  tags: string[] // D-01 user-defined tags (e.g. "Christmas") — distinct from themes and teamTags
+  tags: string[] // D-01 user-defined tags (e.g. "Christmas") — folded team tags + user tags (Song.teamTags removed)
   /** Themes the user removed locally; subtracted from PC theme union on re-import (D-14). */
   removedThemes: string[]
 }

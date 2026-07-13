@@ -118,7 +118,6 @@ export function mapPcSongToUpsert(
     themes,
     notes: '',
     vwTypes,
-    teamTags: [], // D-01: field still required on the type until plan 08, but no longer populated here
     // D-01: team-style tag names (Orchestra + non-category PC tags) now go into the flat
     // tags field; upsertSongs unions this into any pre-existing user tags on re-import.
     tags: teamStyleTags,

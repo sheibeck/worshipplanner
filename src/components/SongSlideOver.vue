@@ -458,10 +458,6 @@ async function onSave() {
     vwTypes: form.value.vwTypes,
     themes,
     notes: form.value.notes.trim(),
-    // teamTags is no longer editable here (D-01 flat tag model) — pass the
-    // existing value through unchanged (empty for new songs) until it is
-    // fully removed from the Song type in plan 08.
-    teamTags: props.song?.teamTags ?? [],
     tags: form.value.tags,
     arrangements,
     primaryArrangementId,
