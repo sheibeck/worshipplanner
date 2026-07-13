@@ -353,11 +353,22 @@ function sortKey(song: Song): string | number {
 }
 
 // Click-to-filter (checkpoint feedback): clicking a Category badge, Tag, or Theme
-// pill drops a field-scoped term into the shared search bar, reusing the existing
-// songMatchesQuery mechanism (no parallel filter path). searchQuery is bound to
+// pill APPENDS a field-scoped term to the shared search bar, reusing the existing
+// songMatchesQuery multi-term AND behavior (no parallel filter path) so successive
+// clicks keep narrowing the list. Free text the user already typed is preserved;
+// re-clicking the same pill is a no-op (de-duped). searchQuery is bound to
 // SongFilters' input via SongsView's v-model.
 function filterByPill(field: 'type' | 'tag' | 'theme', value: string | number) {
-  songStore.searchQuery = `${field}:${value}`
+  const term = `${field}:${value}`
+  const current = songStore.searchQuery.trim()
+  if (!current) {
+    songStore.searchQuery = term
+    return
+  }
+  // De-dupe: skip if the exact term is already present as a whitespace-delimited token.
+  const alreadyPresent = current.split(/\s+/).includes(term)
+  if (alreadyPresent) return
+  songStore.searchQuery = `${current} ${term}`
 }
 
 const sortedSongs = computed(() => {

@@ -177,5 +177,41 @@ describe('SongTable', () => {
       await badge!.trigger('click')
       expect(mockSongStore.searchQuery).toBe('type:2')
     })
+
+    it('appends (does not replace) when a second pill is clicked — additive AND', async () => {
+      const wrapper = mountTable([makeSong({ vwTypes: [2], tags: ['Acoustic'], themes: [] })])
+      const badge = wrapper
+        .findAll('span')
+        .find((s) => s.text() === 'Type 2' && s.classes().includes('cursor-pointer'))
+      await badge!.trigger('click')
+      expect(mockSongStore.searchQuery).toBe('type:2')
+
+      const tagPill = wrapper
+        .findAll('span')
+        .find((s) => s.text() === 'Acoustic' && s.attributes('title') === 'Filter by this tag')
+      await tagPill!.trigger('click')
+      // Both terms present, space-separated, in click order.
+      expect(mockSongStore.searchQuery).toBe('type:2 tag:Acoustic')
+    })
+
+    it('preserves free text the user already typed and appends the pill term', async () => {
+      mockSongStore.searchQuery = 'grace'
+      const wrapper = mountTable([makeSong({ tags: ['Acoustic'], themes: [] })])
+      const tagPill = wrapper
+        .findAll('span')
+        .find((s) => s.text() === 'Acoustic' && s.attributes('title') === 'Filter by this tag')
+      await tagPill!.trigger('click')
+      expect(mockSongStore.searchQuery).toBe('grace tag:Acoustic')
+    })
+
+    it('does not stack duplicates when the same pill is clicked twice', async () => {
+      const wrapper = mountTable([makeSong({ tags: ['Acoustic'], themes: [] })])
+      const tagPill = wrapper
+        .findAll('span')
+        .find((s) => s.text() === 'Acoustic' && s.attributes('title') === 'Filter by this tag')
+      await tagPill!.trigger('click')
+      await tagPill!.trigger('click')
+      expect(mockSongStore.searchQuery).toBe('tag:Acoustic')
+    })
   })
 })
