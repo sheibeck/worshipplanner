@@ -1,8 +1,10 @@
 ---
 type: design-change
-status: pending
-needs_planning: true
+status: dismissed
+needs_planning: false
 created: 2026-07-08
+resolved: 2026-07-13
+resolution: "Superseded/satisfied by Phase 15 (Per-Role Frequency & Role-Category Co-occurrence Rules), which is Complete. Project owner confirmed 2026-07-13 that the current per-role frequency + vocals/instrument implementation is sufficient. No further work planned."
 source: user-request (during phase 14 execution)
 area: scheduling model — src/types/roster.ts, src/utils/scheduler.ts, availability editor UI
 supersedes_partially: Phase 14 Plan 14-01 (per-person frequencyTier/frequency)

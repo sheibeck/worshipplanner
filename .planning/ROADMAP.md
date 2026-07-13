@@ -54,9 +54,9 @@ Full details: milestones/v1.0-ROADMAP.md
 
 Plans:
 
-- [ ] 08-01-PLAN.md — PC API client utility, Service type extension, Vite dev proxy
-- [ ] 08-02-PLAN.md — Settings UI for PC credentials and service type selection
-- [ ] 08-03-PLAN.md — Export flow in ServiceEditorView with button, feedback, and exported state
+- [x] 08-01-PLAN.md — PC API client utility, Service type extension, Vite dev proxy
+- [x] 08-02-PLAN.md — Settings UI for PC credentials and service type selection
+- [x] 08-03-PLAN.md — Export flow in ServiceEditorView with button, feedback, and exported state
 
 ## Progress
 
@@ -69,8 +69,8 @@ Plans:
 | 6. AI Assisted Service Suggesting | v1.0 | 4/4 | Complete | 2026-03-04 |
 | 7. Invite & RBAC | v1.0 | 2/2 | Complete | 2026-03-04 |
 | 5. Collaboration, Tasks & Events | v1.1 | 0/TBD | Not started | - |
-| 8. Planning Center API Export | 3/3 | Complete   | 2026-03-05 | - |
-| 9. PC Song Import & Tag Management | 3/3 | Complete   | 2026-03-12 | - |
+| 8. Planning Center API Export | 3/3 | 3/3 | Complete    | 2026-07-13 |
+| 9. PC Song Import & Tag Management | 3/3 | 3/3 | Complete    | 2026-07-13 |
 
 ### Phase 9: PC Song Import & Tag Management
 
@@ -81,16 +81,16 @@ Plans:
 
 Plans:
 
-- [ ] 09-01-PLAN.md — Song type + store: pcSongId/hidden fields, soft-delete, restoreSong, upsertSongs
-- [ ] 09-02-PLAN.md — PC import utility: fetchAllPcSongs, mapPcSongToUpsert, importFromPc (TDD)
-- [ ] 09-03-PLAN.md — UI: PcImportModal, hidden songs panel, restore flow, SongsView wiring
+- [x] 09-01-PLAN.md — Song type + store: pcSongId/hidden fields, soft-delete, restoreSong, upsertSongs
+- [x] 09-02-PLAN.md — PC import utility: fetchAllPcSongs, mapPcSongToUpsert, importFromPc (TDD)
+- [x] 09-03-PLAN.md — UI: PcImportModal, hidden songs panel, restore flow, SongsView wiring
 
 ### Phase 10: Worship song export naming, template import improvements, auto-add teams on import, orchestra filter for song suggestions
 
 **Goal:** Four focused improvements to Planning Center export and song suggestions: (1) prefix all PC-exported song/hymn item titles with "Worship Song - "; (2) when exporting to an existing PC plan, delete matched "Worship Song"/"Scripture Reading" placeholders and recreate the real items at their original sequence while removing any unmatched placeholders; (3) show PC Teams for the selected service type as checkboxes in the export dialog with case-insensitive auto-match against WorshipPlanner service teams, and add the checked teams to the plan on export (non-fatal); (4) replace the Orchestra hard-filter in song suggestions with a +200 scoring bonus so non-orchestra songs still appear but orchestra-tagged songs rank higher, dim non-orchestra songs with opacity-50 in the SongSlotPicker, and filter the AI-suggested songLibrary to orchestra-tagged songs only when the service has Orchestra as a team.
 **Requirements**: FEAT-1, FEAT-2, FEAT-3, FEAT-4a, FEAT-4b, FEAT-4c, FEAT-4-ai
 **Depends on:** Phase 9
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
 
 Plans:
 
@@ -269,7 +269,7 @@ Plans:
 
 ### Phase 15: Per-Role Frequency & Role-Category Co-occurrence Rules
 
-**Goal:** Move serve frequency from one cadence per person to an independent cadence per (person, role) — someone can play Guitar weekly but sing Vocals monthly — and enforce same-service role compatibility by category. Role categories are TECH, BAND (instruments), VOCALS, and OTHER: TECH is exclusive (if you're on tech that service you do tech only), while BAND/VOCALS/OTHER combine freely, capped at one BAND instrument per person per service (so "1 instrument + vocals" is the canonical allowed combo). Replaces the scheduler's blanket one-slot-per-person/service check with a category exclusivity + cardinality check. Includes: adding a role `category` field with classification/migration of existing roles; migrating per-person `frequencyTargetN` to a per-role structure; reconciling Phase 14's per-person quarter `frequencyTier` (regular/fill-in/out) with per-role cadence; and updating the Edit Volunteer form's single frequency control to per-role. Full context and open questions captured in `.planning/todos/pending/per-role-frequency-and-vocal-instrument-pairing.md`.
+**Goal:** Move serve frequency from one cadence per person to an independent cadence per (person, role) — someone can play Guitar weekly but sing Vocals monthly — and enforce same-service role compatibility by category. Role categories are TECH, BAND (instruments), VOCALS, and OTHER: TECH is exclusive (if you're on tech that service you do tech only), while BAND/VOCALS/OTHER combine freely, capped at one BAND instrument per person per service (so "1 instrument + vocals" is the canonical allowed combo). Replaces the scheduler's blanket one-slot-per-person/service check with a category exclusivity + cardinality check. Includes: adding a role `category` field with classification/migration of existing roles; migrating per-person `frequencyTargetN` to a per-role structure; reconciling Phase 14's per-person quarter `frequencyTier` (regular/fill-in/out) with per-role cadence; and updating the Edit Volunteer form's single frequency control to per-role. Full context and open questions captured in `.planning/todos/completed/per-role-frequency-and-vocal-instrument-pairing.md`.
 **Requirements**: D-01..D-12 (see 15-CONTEXT.md — no formal REQ-IDs; the 12 locked decisions are the requirement/traceability set)
 **Depends on:** Phase 14
 **Plans:** 7/7 plans complete

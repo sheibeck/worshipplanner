@@ -4,14 +4,14 @@ milestone: v1.0
 milestone_name: MVP
 status: ready_to_plan
 stopped_at: Phase 16.1 complete (8/8) — ready to discuss Phase 999.1
-last_updated: 2026-07-13T20:59:48.956Z
+last_updated: 2026-07-13T21:06:57.272Z
 last_activity: 2026-07-13
 progress:
   total_phases: 11
-  completed_phases: 9
-  total_plans: 63
+  completed_phases: 2
+  total_plans: 6
   completed_plans: 63
-  percent: 82
+  percent: 18
 ---
 
 # Project State
@@ -35,7 +35,7 @@ Status: Ready to plan
 
 **Velocity:**
 
-- Total plans completed: 94
+- Total plans completed: 121
 - Timeline: 2 days (2026-03-03 → 2026-03-04)
 - Total commits: 218
 - Lines of code: 12,747
@@ -134,7 +134,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - Phase 11 added: Song catalog & service planner improvements (catalog browsing/search, themes, metadata search, drag-drop ordering & autosave bug fixes, hide-by-tag, AI hidden-song exclusion, column sorting, delete confirmation)
 - Phase 12 added: Advanced song search (metadata-aware + field-scoped syntax) and multi-select persistent tag filtering across the service-plan picker and Songs panel
 - Phase 13 added: Volunteer Role Scheduling — roster + PC people import (name/email/phone), editable roles (band/tech/scripture reader; worship leader intentionally NOT a role — leaders self-assign) with multi-person-per-role and multi-role-per-person, per-person 1-in-N serve-frequency target, quarterly blackout dates + must-serve-with pairings via name-matched CSV, auto-proposed frequency-balanced quarterly grid (dates×roles) with manual editing. NOTE: reverses PROJECT.md "Musician scheduling — out of scope" decision.
-- Phase 15 added: Per-Role Frequency & Role-Category Co-occurrence Rules — frequency per (person, role) instead of per person; same-service role compatibility by category (TECH exclusive; BAND/VOCALS/OTHER combine; max 1 instrument/service). Reshapes Phase 14's per-person frequency model. Requested during Phase 14 execution; full context in .planning/todos/pending/per-role-frequency-and-vocal-instrument-pairing.md.
+- Phase 15 added: Per-Role Frequency & Role-Category Co-occurrence Rules — frequency per (person, role) instead of per person; same-service role compatibility by category (TECH exclusive; BAND/VOCALS/OTHER combine; max 1 instrument/service). Reshapes Phase 14's per-person frequency model. Requested during Phase 14 execution; full context in .planning/todos/completed/per-role-frequency-and-vocal-instrument-pairing.md.
 - Phase 16 added: Quarterly Schedule share link — matrix view + list/matrix toggle, memorable /{church}/quarterN-YYYY URL, filter-by-name, cross-screen (Schedule ↔ Volunteer) editing of pairings/roles/per-role frequency/unavailable Sundays, remove Schedule's separate frequency + volunteer date-range picker, pairing that honors per-role frequency (paired only on the occurrences the lower-frequency person serves), collapsible sections, calendar-format UX research, and a right-side slide-out group editor with whole-cell hit target. See ROADMAP.md R-01..R-14.
 - Phase 16.1 inserted after Phase 16: Song list tags & columns customization: fold Team tags into Tags, Themes as separate column + column-visibility cog, document 1-2-3 methodology (URGENT)
 
