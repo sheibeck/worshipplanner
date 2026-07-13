@@ -266,22 +266,32 @@ export const useSongStore = defineStore('songs', () => {
       }
 
       if (existing) {
-        // Update existing: preserve hidden status and user tags, merge themes, only set vwTypes when incoming is non-empty
+        // Update existing: preserve hidden status, grow-only union tags/themes, only set vwTypes when incoming is non-empty
         const {
           vwTypes: incomingVwTypes,
           hidden: _hidden,
           primaryArrangementId: incomingPrimary,
           tags: _tags,
           themes: _themes,
+          removedThemes: _removedThemes,
           ...restIncoming
         } = incoming
+        const existingRemovedThemes = existing.removedThemes ?? []
         const updateData: Record<string, unknown> = {
           ...restIncoming,
           hidden: existing.hidden ?? false,
-          // D-02: never let import overwrite user tags — identical to hidden preservation
-          tags: existing.tags ?? [],
-          // D-08: union themes instead of clobbering (merge existing + incoming, no duplicates)
-          themes: Array.from(new Set([...(existing.themes ?? []), ...(_themes ?? [])])),
+          // D-05: grow-only de-duplicated union of existing user tags + incoming
+          // (imported) team-style tags — a re-import never drops a user tag.
+          // Tradeoff: a user-removed *tag* (as opposed to a theme) can reappear on
+          // reimport since only themes track explicit removals this phase (D-14).
+          tags: Array.from(new Set([...(existing.tags ?? []), ...(_tags ?? [])])),
+          // D-08/D-14: union themes with incoming, then subtract any theme the user
+          // explicitly removed locally so a removed theme doesn't resurrect on re-import.
+          themes: Array.from(new Set([...(existing.themes ?? []), ...(_themes ?? [])])).filter(
+            (t) => !existingRemovedThemes.includes(t),
+          ),
+          // D-14: removedThemes tracking is preserved verbatim across re-import.
+          removedThemes: existingRemovedThemes,
           updatedAt: serverTimestamp(),
         }
         // Only include vwTypes if incoming array is non-empty (preserve user-set types if incoming is empty)
@@ -303,6 +313,7 @@ export const useSongStore = defineStore('songs', () => {
           ...incoming,
           hidden: false,
           tags: incoming.tags ?? [],
+          removedThemes: incoming.removedThemes ?? [],
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         })

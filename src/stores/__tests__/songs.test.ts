@@ -69,6 +69,7 @@ function makeSong(overrides: Partial<{
   updatedAt: { seconds: number; nanoseconds: number }
   pcSongId: string | null
   hidden: boolean
+  removedThemes: string[]
 }> = {}) {
   return {
     id: 'song-1',
@@ -78,6 +79,7 @@ function makeSong(overrides: Partial<{
     vwTypes: [1] as VWType[],
     teamTags: ['Choir'],
     tags: [] as string[],
+    removedThemes: [] as string[],
     arrangements: [
       {
         id: 'arr-1',
@@ -690,6 +692,7 @@ describe('useSongStore', () => {
         vwTypes: [],
         teamTags: [],
         tags: [],
+        removedThemes: [],
         arrangements: [],
         primaryArrangementId: null,
         lastUsedAt: null,
@@ -778,6 +781,7 @@ describe('useSongStore', () => {
           vwTypes: [],
           teamTags: [],
           tags: [],
+          removedThemes: [],
           arrangements: [],
           primaryArrangementId: null,
           lastUsedAt: null,
@@ -814,6 +818,7 @@ describe('useSongStore', () => {
           vwTypes: [1],
           teamTags: [],
           tags: [],
+          removedThemes: [],
           arrangements: [],
           primaryArrangementId: null,
           lastUsedAt: null,
@@ -847,6 +852,7 @@ describe('useSongStore', () => {
           vwTypes: [],
           teamTags: [],
           tags: [],
+          removedThemes: [],
           arrangements: [],
           primaryArrangementId: null,
           lastUsedAt: null,
@@ -880,6 +886,7 @@ describe('useSongStore', () => {
           vwTypes: [],
           teamTags: [],
           tags: [],
+          removedThemes: [],
           arrangements: [],
           primaryArrangementId: null,
           lastUsedAt: null,
@@ -913,6 +920,7 @@ describe('useSongStore', () => {
           vwTypes: [], // incoming vwTypes is empty — should preserve existing
           teamTags: [],
           tags: [],
+          removedThemes: [],
           arrangements: [],
           primaryArrangementId: null,
           lastUsedAt: null,
@@ -947,6 +955,7 @@ describe('useSongStore', () => {
           vwTypes: [1, 3],
           teamTags: [],
           tags: [],
+          removedThemes: [],
           arrangements: [],
           primaryArrangementId: null,
           lastUsedAt: null,
@@ -982,6 +991,7 @@ describe('useSongStore', () => {
           vwTypes: [],
           teamTags: [],
           tags: [], // import sends empty tags — must NOT overwrite existing user tags
+          removedThemes: [],
           arrangements: [],
           primaryArrangementId: null,
           lastUsedAt: null,
@@ -1015,6 +1025,7 @@ describe('useSongStore', () => {
           vwTypes: [],
           teamTags: [],
           tags: [],
+          removedThemes: [],
           arrangements: [],
           primaryArrangementId: null,
           lastUsedAt: null,
@@ -1050,6 +1061,7 @@ describe('useSongStore', () => {
           vwTypes: [],
           teamTags: [],
           tags: [],
+          removedThemes: [],
           arrangements: [],
           primaryArrangementId: null,
           lastUsedAt: null,
@@ -1062,6 +1074,128 @@ describe('useSongStore', () => {
       const callArgs = vi.mocked(addDoc).mock.calls[0]!
       const data = callArgs[1] as Record<string, unknown>
       expect(data.tags).toEqual([])
+    })
+  })
+
+  describe('upsertSongs — tag union + theme-removal-aware merge (D-05, D-14)', () => {
+    it('unions incoming team tags into existing tags without dropping the user tag', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'song-union', title: 'Union Song', pcSongId: 'pc-union', ccliNumber: '44001', teamTags: [], tags: ['Christmas'] }),
+      ])
+
+      await store.upsertSongs([
+        {
+          title: 'Union Song',
+          ccliNumber: '44001',
+          author: 'Author',
+          themes: [],
+          notes: '',
+          vwTypes: [],
+          teamTags: [],
+          tags: ['Orchestra'], // imported team-style tag
+          removedThemes: [],
+          arrangements: [],
+          primaryArrangementId: null,
+          lastUsedAt: null,
+          pcSongId: 'pc-union',
+          hidden: false,
+        },
+      ])
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const data = callArgs[1] as unknown as Record<string, unknown>
+      expect(new Set(data.tags as string[])).toEqual(new Set(['Christmas', 'Orchestra']))
+    })
+
+    it('a theme listed in existing.removedThemes is NOT present in the written themes after re-import', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({
+          id: 'song-removed-theme',
+          title: 'Removed Theme Song',
+          pcSongId: 'pc-removed-theme',
+          ccliNumber: '44002',
+          teamTags: [],
+          themes: ['grace'],
+          removedThemes: ['salvation'],
+        }),
+      ])
+
+      await store.upsertSongs([
+        {
+          title: 'Removed Theme Song',
+          ccliNumber: '44002',
+          author: 'Author',
+          themes: ['salvation', 'worship'], // PC still sends the removed theme back
+          notes: '',
+          vwTypes: [],
+          teamTags: [],
+          tags: [],
+          removedThemes: [],
+          arrangements: [],
+          primaryArrangementId: null,
+          lastUsedAt: null,
+          pcSongId: 'pc-removed-theme',
+          hidden: false,
+        },
+      ])
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const data = callArgs[1] as unknown as Record<string, unknown>
+      const themes = data.themes as string[]
+      expect(themes).toContain('grace')
+      expect(themes).toContain('worship')
+      expect(themes).not.toContain('salvation') // user-removed theme stays removed
+    })
+
+    it('removedThemes survives an upsert unchanged', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({
+          id: 'song-preserve-removed',
+          title: 'Preserve Removed',
+          pcSongId: 'pc-preserve-removed',
+          ccliNumber: '44003',
+          teamTags: [],
+          removedThemes: ['salvation'],
+        }),
+      ])
+
+      await store.upsertSongs([
+        {
+          title: 'Preserve Removed',
+          ccliNumber: '44003',
+          author: 'Author',
+          themes: [],
+          notes: '',
+          vwTypes: [],
+          teamTags: [],
+          tags: [],
+          removedThemes: [], // import never sets removedThemes itself
+          arrangements: [],
+          primaryArrangementId: null,
+          lastUsedAt: null,
+          pcSongId: 'pc-preserve-removed',
+          hidden: false,
+        },
+      ])
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const data = callArgs[1] as unknown as Record<string, unknown>
+      expect(data.removedThemes).toEqual(['salvation'])
     })
   })
 
@@ -1307,6 +1441,7 @@ describe('useSongStore', () => {
         vwTypes: [] as VWType[],
         teamTags: [] as string[],
         tags: [] as string[],
+        removedThemes: [] as string[],
         arrangements: [] as Array<{ id: string; name: string; key: string; bpm: number | null; lengthSeconds: number | null; chordChartUrl: string; notes: string; teamTags: string[] }>,
         primaryArrangementId: null as string | null,
         lastUsedAt: null,
@@ -1335,6 +1470,7 @@ describe('useSongStore', () => {
         vwTypes: [] as VWType[],
         teamTags: [] as string[],
         tags: [] as string[],
+        removedThemes: [] as string[],
         arrangements: [] as Array<{ id: string; name: string; key: string; bpm: number | null; lengthSeconds: number | null; chordChartUrl: string; notes: string; teamTags: string[] }>,
         primaryArrangementId: null as string | null,
         lastUsedAt: null,
