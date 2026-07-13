@@ -353,7 +353,7 @@ Plans:
 **Depends on:** Phase 16 (builds on the song-catalog tag/theme/column work of Phases 11–12 and the shared song-browse direction of backlog Phase 999.1)
 **Marker:** (INSERTED) — urgent work discovered mid-milestone
 **Requirements**: D-01..D-18 (see 16.1-CONTEXT.md — no formal REQ-IDs; the 18 locked decisions are the requirement/traceability set)
-**Plans:** 2/8 plans executed
+**Plans:** 5/8 plans executed
 
 Plans:
 
@@ -362,12 +362,12 @@ Plans:
 - [x] 16.1-02-PLAN.md — vwModeEnabled church-level flag (auth store) + Settings toggle (D-15/D-16)
 
 **Wave 2**
-- [ ] 16.1-03-PLAN.md — Suggestions nudge-only + songSearch team: alias (TDD) (D-02/D-03/D-04/D-06)
-- [ ] 16.1-04-PLAN.md — Column-visibility store: per-user/org persist + hydrate (D-08/D-09/D-10)
+- [x] 16.1-03-PLAN.md — Suggestions nudge-only + songSearch team: alias (TDD) (D-02/D-03/D-04/D-06)
+- [x] 16.1-04-PLAN.md — Column-visibility store: per-user/org persist + hydrate (D-08/D-09/D-10)
 
 **Wave 3**
 - [ ] 16.1-05-PLAN.md — SongTable: Themes column + cog + inline theme edit + VW-gated Category + VwExplainer (D-07..D-13/D-16/D-17/D-18)
-- [ ] 16.1-06-PLAN.md — SongsView/SongFilters union + SongSlideOver team-tag fold + VW gating (D-01/D-12/D-16)
+- [x] 16.1-06-PLAN.md — SongsView/SongFilters union + SongSlideOver team-tag fold + VW gating (D-01/D-12/D-16)
 - [ ] 16.1-07-PLAN.md — SongSlotPicker + ServiceEditorView: fold pills, gate badges, orchestra AI over tags (D-02/D-04/D-11/D-16)
 
 **Wave 4**
