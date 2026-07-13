@@ -290,6 +290,72 @@ describe('useSongStore', () => {
     })
   })
 
+  describe('subscribe — teamTags fold into tags (D-01)', () => {
+    it('folds teamTags into tags, de-duplicated (order-insensitive)', async () => {
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'song-1', teamTags: ['Orchestra'], tags: ['Christmas'] }),
+      ])
+      expect(new Set(store.songs[0]!.tags)).toEqual(new Set(['Christmas', 'Orchestra']))
+    })
+
+    it('does not duplicate a teamTags value that already exists in tags', async () => {
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'song-1', teamTags: ['Orchestra'], tags: ['Orchestra'] }),
+      ])
+      expect(store.songs[0]!.tags).toEqual(['Orchestra'])
+    })
+
+    it('does not fold when teamTags is empty', async () => {
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'song-1', teamTags: [], tags: ['Christmas'] }),
+      ])
+      expect(store.songs[0]!.tags).toEqual(['Christmas'])
+    })
+  })
+
+  describe('subscribe — removedThemes default (D-14)', () => {
+    it('defaults removedThemes to [] for a legacy doc missing the field', async () => {
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      if (snapshotCallback) {
+        snapshotCallback({
+          docs: [
+            {
+              id: 'legacy-no-removed-themes',
+              data: () => ({
+                title: 'Legacy Song',
+                ccliNumber: '66666',
+                author: 'Old Author',
+                vwTypes: [],
+                teamTags: [],
+                tags: [],
+                arrangements: [],
+                themes: [],
+                notes: '',
+                lastUsedAt: null,
+                createdAt: { seconds: 1000000, nanoseconds: 0 },
+                updatedAt: { seconds: 1000000, nanoseconds: 0 },
+                hidden: false,
+                // removedThemes field intentionally omitted — legacy doc
+              }),
+            },
+          ],
+        })
+      }
+      expect(store.songs[0]!.removedThemes).toEqual([])
+    })
+  })
+
   describe('filteredSongs — hidden songs', () => {
     it('excludes songs where hidden is true', async () => {
       const { useSongStore } = await import('../songs')
@@ -318,9 +384,9 @@ describe('useSongStore', () => {
       const store = useSongStore()
       store.subscribe('org-1')
       triggerSnapshot([
-        makeSong({ id: 'song-1', title: 'Visible', hidden: false, tags: ['Zeal', 'Grace'] }),
-        makeSong({ id: 'song-2', title: 'Also Visible', hidden: false, tags: ['Grace'] }),
-        makeSong({ id: 'song-3', title: 'Hidden', hidden: true, tags: ['Repentance'] }),
+        makeSong({ id: 'song-1', title: 'Visible', hidden: false, teamTags: [], tags: ['Zeal', 'Grace'] }),
+        makeSong({ id: 'song-2', title: 'Also Visible', hidden: false, teamTags: [], tags: ['Grace'] }),
+        makeSong({ id: 'song-3', title: 'Hidden', hidden: true, teamTags: [], tags: ['Repentance'] }),
       ])
       // 'Repentance' lives only on the hidden song, so it must not appear;
       // 'Grace' is deduped; result is sorted.
@@ -552,6 +618,27 @@ describe('useSongStore', () => {
       store.tagFilterInclude = new Set(['Choir'])
       expect(store.filteredSongs).toHaveLength(1)
       expect(store.filteredSongs[0]!.title).toBe('Choir Song')
+    })
+
+    it('include/exclude matching is unaffected by the teamTags→tags read-fold (D-01)', async () => {
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        // 'Orchestra' now also lives in the folded tags set, but filter matching
+        // against the raw teamTags union must still behave identically.
+        makeSong({ id: 'song-1', title: 'Orchestra Song', teamTags: ['Orchestra'], tags: [] }),
+        makeSong({ id: 'song-2', title: 'Other Song', teamTags: [], tags: [] }),
+      ])
+      expect(new Set(store.songs[0]!.tags)).toEqual(new Set(['Orchestra']))
+      store.tagFilterInclude = new Set(['Orchestra'])
+      expect(store.filteredSongs).toHaveLength(1)
+      expect(store.filteredSongs[0]!.title).toBe('Orchestra Song')
+
+      store.tagFilterInclude = new Set()
+      store.tagFilterExclude = new Set(['Orchestra'])
+      expect(store.filteredSongs).toHaveLength(1)
+      expect(store.filteredSongs[0]!.title).toBe('Other Song')
     })
   })
 
@@ -882,7 +969,7 @@ describe('useSongStore', () => {
       const store = useSongStore()
       store.subscribe('org-1')
       triggerSnapshot([
-        makeSong({ id: 'song-tagged', title: 'Tagged Song', pcSongId: 'pc-tagged', ccliNumber: '11111', tags: ['Christmas'] }),
+        makeSong({ id: 'song-tagged', title: 'Tagged Song', pcSongId: 'pc-tagged', ccliNumber: '11111', teamTags: [], tags: ['Christmas'] }),
       ])
 
       await store.upsertSongs([

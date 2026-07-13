@@ -177,6 +177,17 @@ export const useSongStore = defineStore('songs', () => {
         if (!Array.isArray(data.tags)) {
           data.tags = []
         }
+        // D-01: read-fold legacy teamTags into the flat tags set so every consumer
+        // reading song.tags sees the merged set. teamTags itself is left untouched
+        // in memory (still read directly until repointed in later waves).
+        const legacyTeamTags = Array.isArray(data.teamTags) ? (data.teamTags as string[]) : []
+        if (legacyTeamTags.length > 0) {
+          data.tags = Array.from(new Set([...(data.tags as string[]), ...legacyTeamTags]))
+        }
+        // D-14: default removedThemes for legacy docs missing the field.
+        if (!Array.isArray(data.removedThemes)) {
+          data.removedThemes = []
+        }
         return { id: d.id, ...data } as Song
       })
       isLoading.value = false
