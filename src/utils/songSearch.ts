@@ -3,9 +3,9 @@ import { VW_TYPE_LABELS } from '@/types/song'
 
 /**
  * Case-insensitive substring match against a song's full searchable text field
- * set: title, CCLI number, author, themes, team tags, VW category (both the
- * number, e.g. "1", and its label, e.g. "call to worship"), user tags, notes,
- * and arrangement key (exact).
+ * set: title, CCLI number, author, themes, VW category (both the number, e.g.
+ * "1", and its label, e.g. "call to worship"), user tags (which include folded
+ * team names, D-01), notes, and arrangement key (exact).
  */
 function matchesBareTerm(song: Song, term: string): boolean {
   const q = term.toLowerCase()
@@ -15,7 +15,6 @@ function matchesBareTerm(song: Song, term: string): boolean {
   if (String(song.ccliNumber).includes(q)) return true
   if (song.author?.toLowerCase().includes(q)) return true
   if (song.themes.some((t) => t.toLowerCase().includes(q))) return true
-  if (song.teamTags.some((t) => t.toLowerCase().includes(q))) return true
   if (
     song.vwTypes.some(
       (vw) => String(vw) === q || VW_TYPE_LABELS[vw].toLowerCase().includes(q),
@@ -33,7 +32,7 @@ function matchesBareTerm(song: Song, term: string): boolean {
 const FIELD_PREFIX_RE = /^(type|key|tag|theme|team):(.*)$/i
 
 /** Dispatches a single field-scoped or bare token against the song. */
-function matchesToken(song: Song, token: string): boolean {
+function matchesToken(song: Song, token: string, vwModeEnabled: boolean): boolean {
   const prefixMatch = FIELD_PREFIX_RE.exec(token)
   if (prefixMatch) {
     const field = prefixMatch[1]!.toLowerCase()
@@ -43,6 +42,8 @@ function matchesToken(song: Song, token: string): boolean {
     const lowerValue = value.toLowerCase()
     switch (field) {
       case 'type':
+        // D-16: the type: prefix is hidden app-wide when VW mode is off — no match at all.
+        if (!vwModeEnabled) return false
         return song.vwTypes.some(
           (vw) => String(vw) === value || VW_TYPE_LABELS[vw].toLowerCase().includes(lowerValue),
         )
@@ -53,7 +54,8 @@ function matchesToken(song: Song, token: string): boolean {
       case 'theme':
         return song.themes.some((t) => t.toLowerCase().includes(lowerValue))
       case 'team':
-        return song.teamTags.some((t) => t.toLowerCase().includes(lowerValue))
+        // D-06: team: is aliased to a plain tag match — team names are folded into tags (D-01).
+        return (song.tags ?? []).some((t) => t.toLowerCase().includes(lowerValue))
       default:
         return matchesBareTerm(song, token)
     }
@@ -84,8 +86,12 @@ const FIELD_SPAN_RE = new RegExp(
  * `tag:christmas eve`), natural two-word phrases (`Type 1`, `Key A`), and the
  * original bare full-field substring match for any remaining text. Every
  * extracted term (field-scoped span or bare word) must match (AND).
+ * `team:` is aliased to a plain tag match (D-06). `vwModeEnabled` (default
+ * `true`) gates the `type:` prefix — when `false`, `type:` matches nothing,
+ * hiding VW-type search app-wide when VW mode is off (D-16). Only the `type:`
+ * prefix is gated; all other prefixes and bare terms are unaffected.
  */
-export function songMatchesQuery(song: Song, query: string): boolean {
+export function songMatchesQuery(song: Song, query: string, vwModeEnabled = true): boolean {
   const trimmed = query.trim()
   if (!trimmed) return true
 
@@ -119,7 +125,7 @@ export function songMatchesQuery(song: Song, query: string): boolean {
 
   if (terms.length === 0) return true
 
-  return terms.every((tok) => matchesToken(song, tok))
+  return terms.every((tok) => matchesToken(song, tok, vwModeEnabled))
 }
 
 /**
