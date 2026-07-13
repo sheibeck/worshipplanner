@@ -443,6 +443,16 @@ async function onSave() {
     .map((t) => t.trim())
     .filter(Boolean)
 
+  // D-14: record any theme dropped from the edit-drawer field into removedThemes
+  // so it does not resurrect on the next PC re-import (upsertSongs subtracts
+  // removedThemes from the incoming union). A theme that's present again in the
+  // saved themes (re-added) is pruned back out of removedThemes.
+  const oldThemes = props.song?.themes ?? []
+  const newlyRemoved = oldThemes.filter((t) => !themes.includes(t))
+  const removedThemes = Array.from(
+    new Set([...(props.song?.removedThemes ?? []), ...newlyRemoved]),
+  ).filter((t) => !themes.includes(t))
+
   // Validate primary arrangement still exists; fall back to first arrangement
   const arrangements = form.value.arrangements
   const primaryArrangementId =
@@ -464,7 +474,7 @@ async function onSave() {
     lastUsedAt: props.song?.lastUsedAt ?? null,
     hidden: props.song?.hidden ?? false,
     pcSongId: props.song?.pcSongId ?? null,
-    removedThemes: props.song?.removedThemes ?? [],
+    removedThemes,
   }
 
   isSaving.value = true
