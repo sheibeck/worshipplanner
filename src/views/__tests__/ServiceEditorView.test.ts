@@ -62,6 +62,7 @@ const mockSongs: Song[] = [
     themes: [],
     notes: '',
     tags: [],
+    removedThemes: [],
     vwTypes: [1],
     teamTags: [],
     arrangements: [

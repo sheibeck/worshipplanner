@@ -441,8 +441,12 @@ async function onImport() {
   importProgress.value = 0
   step.value = 'importing'
 
-  // Strip ParsedSongPreview-specific fields to get SongInput shape
-  const songInputs = toImport.map(({ isDuplicate: _d, _warnings: _w, ...song }) => song)
+  // Strip ParsedSongPreview-specific fields to get SongInput shape.
+  // removedThemes is not tracked by CSV import (D-14 only applies to PC re-import) — default to [].
+  const songInputs = toImport.map(({ isDuplicate: _d, _warnings: _w, ...song }) => ({
+    ...song,
+    removedThemes: [] as string[],
+  }))
 
   // importSongs handles batch chunking internally (499 ops per batch)
   // For progress indication, we call in batches ourselves

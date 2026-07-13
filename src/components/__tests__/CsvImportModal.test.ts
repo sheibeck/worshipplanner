@@ -13,6 +13,7 @@ function makeSong(overrides: Partial<Song> = {}): Song {
     themes: [],
     notes: '',
     tags: [],
+    removedThemes: [],
     vwTypes: [],
     teamTags: [],
     arrangements: [],

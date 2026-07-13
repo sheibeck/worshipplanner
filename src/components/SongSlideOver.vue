@@ -495,6 +495,7 @@ async function onSave() {
     lastUsedAt: props.song?.lastUsedAt ?? null,
     hidden: props.song?.hidden ?? false,
     pcSongId: props.song?.pcSongId ?? null,
+    removedThemes: props.song?.removedThemes ?? [],
   }
 
   isSaving.value = true
