@@ -250,6 +250,7 @@
 import { ref, computed, watch } from 'vue'
 import { useSongStore } from '@/stores/songs'
 import { useAuthStore } from '@/stores/auth'
+import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import type { Song, Arrangement, VWType } from '@/types/song'
 
 const props = defineProps<{
@@ -319,6 +320,11 @@ const showDeleteConfirm = ref(false)
 const isSaving = ref(false)
 const isDeleting = ref(false)
 
+// ── Unsaved-changes guard ──────────────────────────────────────────────────
+// Snapshot covers the editable form fields + the raw themes text input (the
+// latter can be dirtied without yet having been parsed back into form.themes).
+const unsavedGuard = useUnsavedGuard(() => ({ form: form.value, themesInput: themesInput.value }))
+
 // Keep themesInput in sync with form.themes when panel opens
 watch(
   () => props.open,
@@ -333,6 +339,7 @@ watch(
       userTagInput.value = ''
       titleError.value = false
       showDeleteConfirm.value = false
+      unsavedGuard.capture()
     }
   },
 )
@@ -475,6 +482,7 @@ async function onSave() {
 }
 
 function onCancel() {
+  if (!unsavedGuard.confirmDiscard()) return
   emit('close')
 }
 
