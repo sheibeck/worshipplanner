@@ -18,14 +18,19 @@ let mockColumnVisibility: Record<string, boolean> = {
   themes: true,
 }
 
+// Singleton store object so a test can observe searchQuery mutations made by
+// the listing's click-to-filter (filterByPill) behavior.
+const mockSongStore = {
+  get columnVisibility() { return mockColumnVisibility },
+  allUserTags: [] as string[],
+  searchQuery: '',
+  updateSong: mockUpdateSong,
+  toggleColumn: mockToggleColumn,
+  resetColumns: mockResetColumns,
+}
+
 vi.mock('@/stores/songs', () => ({
-  useSongStore: () => ({
-    get columnVisibility() { return mockColumnVisibility },
-    allUserTags: [] as string[],
-    updateSong: mockUpdateSong,
-    toggleColumn: mockToggleColumn,
-    resetColumns: mockResetColumns,
-  }),
+  useSongStore: () => mockSongStore,
 }))
 
 let mockVwModeEnabled = true
@@ -82,6 +87,7 @@ describe('SongTable', () => {
       themes: true,
     }
     mockVwModeEnabled = true
+    mockSongStore.searchQuery = ''
     mockUpdateSong.mockClear()
     mockToggleColumn.mockClear()
     mockResetColumns.mockClear()
@@ -127,6 +133,49 @@ describe('SongTable', () => {
       expect(text).toContain('Grace')
       // Team pills are gone — folded into tags upstream (D-01/D-12).
       expect(text).not.toContain('Choir')
+    })
+
+    it('does not render inline add/remove controls on the listing (display-only)', () => {
+      const wrapper = mountTable([makeSong({ tags: ['Christmas'], themes: ['Grace'] })])
+      // No inline edit inputs and no remove/add affordances in the listing pills —
+      // editing lives on the edit screen (SongSlideOver).
+      expect(wrapper.find('input[placeholder="tag name"]').exists()).toBe(false)
+      expect(wrapper.find('input[placeholder="theme name"]').exists()).toBe(false)
+      expect(wrapper.find('button[aria-label="Remove tag"]').exists()).toBe(false)
+      expect(wrapper.find('button[aria-label="Remove theme"]').exists()).toBe(false)
+    })
+  })
+
+  describe('click-to-filter', () => {
+    it('sets a tag:-scoped search query when a tag pill is clicked', async () => {
+      const wrapper = mountTable([makeSong({ tags: ['Christmas'], themes: [] })])
+      const tagPill = wrapper
+        .findAll('span')
+        .find((s) => s.text() === 'Christmas' && s.attributes('title') === 'Filter by this tag')
+      expect(tagPill).toBeTruthy()
+      await tagPill!.trigger('click')
+      expect(mockSongStore.searchQuery).toBe('tag:Christmas')
+    })
+
+    it('sets a theme:-scoped search query when a theme pill is clicked', async () => {
+      const wrapper = mountTable([makeSong({ tags: [], themes: ['Grace'] })])
+      const themePill = wrapper
+        .findAll('span')
+        .find((s) => s.text() === 'Grace' && s.attributes('title') === 'Filter by this theme')
+      expect(themePill).toBeTruthy()
+      await themePill!.trigger('click')
+      expect(mockSongStore.searchQuery).toBe('theme:Grace')
+    })
+
+    it('sets a type:-scoped search query when a category badge is clicked', async () => {
+      const wrapper = mountTable([makeSong({ vwTypes: [2] })])
+      // The inner clickable pill (not the SongBadge wrapper span) carries cursor-pointer.
+      const badge = wrapper
+        .findAll('span')
+        .find((s) => s.text() === 'Type 2' && s.classes().includes('cursor-pointer'))
+      expect(badge).toBeTruthy()
+      await badge!.trigger('click')
+      expect(mockSongStore.searchQuery).toBe('type:2')
     })
   })
 })

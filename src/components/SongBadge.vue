@@ -5,7 +5,8 @@
         v-for="t in types"
         :key="t"
         class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border"
-        :class="badgeClasses[t]"
+        :class="[badgeClasses[t], clickable ? 'cursor-pointer hover:brightness-125 transition' : '']"
+        @click="clickable && $emit('select', t)"
       >
         Type {{ t }}
       </span>
@@ -22,8 +23,18 @@
 <script setup lang="ts">
 import type { VWType } from '@/types/song'
 
-defineProps<{
-  types: VWType[]
+withDefaults(
+  defineProps<{
+    types: VWType[]
+    // When true, each Type pill becomes clickable and emits `select` with its
+    // value — used by the Songs list to filter by clicking a category badge.
+    clickable?: boolean
+  }>(),
+  { clickable: false },
+)
+
+defineEmits<{
+  select: [type: VWType]
 }>()
 
 // Static map prevents Tailwind v4 purge of dynamic class strings

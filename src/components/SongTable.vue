@@ -235,128 +235,37 @@
             {{ formatDate(song.lastUsedAt) }}
           </td>
 
-          <!-- Tags: user tags only — team pills folded upstream into tags (D-01/D-12) -->
-          <td v-if="songStore.columnVisibility.tags" class="px-4 py-3" @click.stop>
+          <!-- Tags: display-only user-tag pills; click a pill to filter. Add/remove
+               lives exclusively on the edit screen (SongSlideOver), D-01/D-12. -->
+          <td v-if="songStore.columnVisibility.tags" class="px-4 py-3">
             <div class="flex flex-wrap gap-1 items-center">
-              <!-- User tag pills — removable -->
               <span
                 v-for="t in (song.tags ?? [])"
                 :key="'us-' + t"
-                class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-medium border bg-pink-900/50 text-pink-300 border-pink-800 cursor-pointer hover:bg-pink-800/60"
+                class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border bg-pink-900/50 text-pink-300 border-pink-800 cursor-pointer hover:bg-pink-800/60"
                 title="Filter by this tag"
                 @click.stop="filterByPill('tag', t)"
               >
                 {{ t }}
-                <button
-                  type="button"
-                  class="ml-0.5 text-pink-400 hover:text-pink-200 leading-none"
-                  @click.stop="removeTagOrTheme(song, t, 'tags')"
-                  aria-label="Remove tag"
-                >
-                  &times;
-                </button>
               </span>
-
-              <!-- Inline add affordance -->
-              <template v-if="inlineEditSongId === song.id && inlineEditField === 'tags'">
-                <input
-                  :ref="setInlineInputRef"
-                  v-model="inlineTagInput"
-                  type="text"
-                  list="st-existing-user-tags"
-                  placeholder="tag name"
-                  class="w-24 rounded border border-pink-700 bg-gray-900 text-pink-200 text-xs px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-pink-500"
-                  @keydown.enter.stop="commitInlineTag(song)"
-                  @keydown.escape.stop="cancelInlineTag"
-                  @click.stop
-                />
-                <datalist id="st-existing-user-tags">
-                  <option v-for="t in songStore.allUserTags" :key="t" :value="t" />
-                </datalist>
-                <button
-                  type="button"
-                  class="text-xs text-pink-400 hover:text-pink-200"
-                  @click.stop="commitInlineTag(song)"
-                >Add</button>
-                <button
-                  type="button"
-                  class="text-xs text-gray-500 hover:text-gray-300"
-                  @click.stop="cancelInlineTag"
-                >Cancel</button>
-              </template>
-              <button
-                v-else
-                type="button"
-                class="text-xs text-gray-500 hover:text-pink-300 border border-dashed border-gray-700 hover:border-pink-700 rounded-full px-1.5 py-0.5 leading-none transition-colors"
-                @click.stop="openInlineEdit(song.id, 'tags')"
-                title="Add user tag"
-              >+</button>
-
-              <!-- Em-dash fallback when tags is empty and not editing -->
-              <span
-                v-if="!(song.tags ?? []).length && !(inlineEditSongId === song.id && inlineEditField === 'tags')"
-                class="text-gray-600"
-              >&mdash;</span>
+              <span v-if="!(song.tags ?? []).length" class="text-gray-600">&mdash;</span>
             </div>
           </td>
 
-          <!-- Themes: its own inline-editable column now (no longer folded into Tags; rendered after Tags per checkpoint feedback) -->
-          <td v-if="songStore.columnVisibility.themes" class="px-4 py-3" @click.stop>
+          <!-- Themes: display-only pills; click a pill to filter. Add/remove lives
+               exclusively on the edit screen (SongSlideOver). Rendered after Tags. -->
+          <td v-if="songStore.columnVisibility.themes" class="px-4 py-3">
             <div class="flex flex-wrap gap-1 items-center">
               <span
                 v-for="t in (song.themes ?? [])"
                 :key="'th-' + t"
-                class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-medium border bg-teal-900/50 text-teal-300 border-teal-800 cursor-pointer hover:bg-teal-800/60"
+                class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border bg-teal-900/50 text-teal-300 border-teal-800 cursor-pointer hover:bg-teal-800/60"
                 title="Filter by this theme"
                 @click.stop="filterByPill('theme', t)"
               >
                 {{ t }}
-                <button
-                  type="button"
-                  class="ml-0.5 text-teal-400 hover:text-teal-200 leading-none"
-                  @click.stop="removeTagOrTheme(song, t, 'themes')"
-                  aria-label="Remove theme"
-                >
-                  &times;
-                </button>
               </span>
-
-              <!-- Inline add affordance -->
-              <template v-if="inlineEditSongId === song.id && inlineEditField === 'themes'">
-                <input
-                  :ref="setInlineInputRef"
-                  v-model="inlineTagInput"
-                  type="text"
-                  placeholder="theme name"
-                  class="w-24 rounded border border-teal-700 bg-gray-900 text-teal-200 text-xs px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-teal-500"
-                  @keydown.enter.stop="commitInlineTag(song)"
-                  @keydown.escape.stop="cancelInlineTag"
-                  @click.stop
-                />
-                <button
-                  type="button"
-                  class="text-xs text-teal-400 hover:text-teal-200"
-                  @click.stop="commitInlineTag(song)"
-                >Add</button>
-                <button
-                  type="button"
-                  class="text-xs text-gray-500 hover:text-gray-300"
-                  @click.stop="cancelInlineTag"
-                >Cancel</button>
-              </template>
-              <button
-                v-else
-                type="button"
-                class="text-xs text-gray-500 hover:text-teal-300 border border-dashed border-gray-700 hover:border-teal-700 rounded-full px-1.5 py-0.5 leading-none transition-colors"
-                @click.stop="openInlineEdit(song.id, 'themes')"
-                title="Add theme"
-              >+</button>
-
-              <!-- Em-dash fallback when themes is empty and not editing -->
-              <span
-                v-if="!(song.themes ?? []).length && !(inlineEditSongId === song.id && inlineEditField === 'themes')"
-                class="text-gray-600"
-              >&mdash;</span>
+              <span v-if="!(song.themes ?? []).length" class="text-gray-600">&mdash;</span>
             </div>
           </td>
 
@@ -379,7 +288,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import type { Song } from '@/types/song'
 import type { Timestamp } from 'firebase/firestore'
 import SongBadge from '@/components/SongBadge.vue'
@@ -496,73 +405,10 @@ function clearSelection() {
 
 defineExpose({ selectedIds, clearSelection })
 
-// ── Inline tag/theme editing ────────────────────────────────────────────────────
-// Generalized over field so the Tags and Themes columns share one add/remove UX
-// (D-13). inlineEditField tracks which of the two columns is mid-edit for the
-// active inlineEditSongId row.
-
-type InlineField = 'tags' | 'themes'
-
-const inlineEditSongId = ref<string | null>(null)
-const inlineEditField = ref<InlineField | null>(null)
-const inlineTagInput = ref('')
-const inlineInputRef = ref<HTMLInputElement | null>(null)
-// Function ref: the input lives inside a v-for row, so a static string ref would
-// resolve to an array. This captures the single active input element (or null on unmount).
-function setInlineInputRef(el: unknown) {
-  inlineInputRef.value = (el as HTMLInputElement | null) ?? null
-}
-
-function openInlineEdit(songId: string, field: InlineField) {
-  inlineEditSongId.value = songId
-  inlineEditField.value = field
-  inlineTagInput.value = ''
-  nextTick(() => {
-    inlineInputRef.value?.focus()
-  })
-}
-
-function cancelInlineTag() {
-  inlineEditSongId.value = null
-  inlineEditField.value = null
-  inlineTagInput.value = ''
-}
-
-async function commitInlineTag(song: Song) {
-  const value = inlineTagInput.value.trim()
-  const field = inlineEditField.value
-  if (!value || !field) {
-    cancelInlineTag()
-    return
-  }
-  if (field === 'tags') {
-    const existingTags = song.tags ?? []
-    if (!existingTags.includes(value)) {
-      await songStore.updateSong(song.id, { tags: [...existingTags, value] })
-    }
-  } else {
-    const existingThemes = song.themes ?? []
-    if (!existingThemes.includes(value)) {
-      await songStore.updateSong(song.id, { themes: [...existingThemes, value] })
-    }
-  }
-  cancelInlineTag()
-}
-
-// D-14: removing a theme also records it in removedThemes so a re-import (which
-// unions incoming PC themes with existing ones) doesn't resurrect it. Removing a
-// user tag has no such tracking — tags aren't subject to PC re-import unions.
-async function removeTagOrTheme(song: Song, value: string, field: InlineField) {
-  if (field === 'tags') {
-    const newTags = (song.tags ?? []).filter((t) => t !== value)
-    await songStore.updateSong(song.id, { tags: newTags })
-  } else {
-    const newThemes = (song.themes ?? []).filter((t) => t !== value)
-    const existingRemoved = song.removedThemes ?? []
-    const newRemoved = existingRemoved.includes(value) ? existingRemoved : [...existingRemoved, value]
-    await songStore.updateSong(song.id, { themes: newThemes, removedThemes: newRemoved })
-  }
-}
+// Note: Tags/Themes on this listing are display-only + click-to-filter
+// (filterByPill above). All add/edit/remove of tags and themes — including the
+// removedThemes tracking (D-14) that survives PC re-import — lives on the edit
+// screen (SongSlideOver.vue), not here.
 
 // ── Progressive rendering ──────────────────────────────────────────────────────
 
