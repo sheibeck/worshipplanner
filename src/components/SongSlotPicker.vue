@@ -43,7 +43,7 @@
             v-model="searchQuery"
             type="text"
             placeholder="Search songs..."
-            title="Filter by field: tag: key: type: theme: team:"
+            :title="searchFieldHint"
             class="w-full rounded-md bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           />
           <!-- Tag filter (D-14: shared checklist bound to songStore) -->
@@ -237,6 +237,14 @@ const isOpen = ref(false)
 const searchQuery = ref('')
 const triggerRef = ref<HTMLElement | null>(null)
 const searchInputRef = ref<HTMLInputElement | null>(null)
+
+// IN-01: omit the `type:` prefix from the tooltip when VW mode is off, since
+// it's gated to match nothing in that state (songSearch.ts).
+const searchFieldHint = computed(() =>
+  authStore.vwModeEnabled
+    ? 'Filter by field: tag: key: type: theme: team:'
+    : 'Filter by field: tag: key: theme: team:',
+)
 const dropdownStyle = ref<Record<string, string>>({})
 
 // ── Tag filter (D-14: shared with Songs panel via songStore) ─────────────────
