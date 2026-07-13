@@ -41,12 +41,15 @@ vi.mock('@/firebase', () => ({
 }))
 
 // Mock @/stores/auth — songs store reads useAuthStore().user/orgId for tag-filter persistence keying
+// and useAuthStore().vwModeEnabled to gate the search `type:` prefix + filterVwType dropdown (CR-01).
 let mockAuthUser: { uid: string } | null = null
 let mockAuthOrgId: string | null = null
+let mockAuthVwModeEnabled = true
 vi.mock('@/stores/auth', () => ({
   useAuthStore: vi.fn(() => ({
     get user() { return mockAuthUser },
     get orgId() { return mockAuthOrgId },
+    get vwModeEnabled() { return mockAuthVwModeEnabled },
   })),
 }))
 
@@ -126,6 +129,7 @@ describe('useSongStore', () => {
     mockBatchOps = []
     mockAuthUser = null
     mockAuthOrgId = null
+    mockAuthVwModeEnabled = true
     localStorage.clear()
   })
 
@@ -578,6 +582,34 @@ describe('useSongStore', () => {
         makeSong({ id: 'song-2', vwTypes: [] }),
       ])
       store.filterVwType = null
+      expect(store.filteredSongs).toHaveLength(2)
+    })
+
+    // CR-01: a stale filterVwType selection must not silently keep filtering
+    // once VW mode is turned off — mirrors the search `type:` prefix gate.
+    it('D-16/CR-01: does not filter by numeric vwType when VW mode is disabled', async () => {
+      mockAuthVwModeEnabled = false
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'song-1', title: 'Type1 Song', vwTypes: [1] }),
+        makeSong({ id: 'song-2', title: 'Type2 Song', vwTypes: [2] }),
+      ])
+      store.filterVwType = 2
+      expect(store.filteredSongs).toHaveLength(2)
+    })
+
+    it('D-16/CR-01: does not filter by "uncategorized" vwType when VW mode is disabled', async () => {
+      mockAuthVwModeEnabled = false
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'song-1', title: 'Categorized', vwTypes: [1] }),
+        makeSong({ id: 'song-2', title: 'Uncategorized', vwTypes: [] }),
+      ])
+      store.filterVwType = 'uncategorized'
       expect(store.filteredSongs).toHaveLength(2)
     })
   })

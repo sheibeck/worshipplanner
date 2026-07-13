@@ -57,7 +57,10 @@ export const useSongStore = defineStore('songs', () => {
       // D-16: gate the `type:` search prefix on VW mode so it hides app-wide when off.
       const matchesSearch = songMatchesQuery(song, searchQuery.value, authStore.vwModeEnabled)
 
+      // D-16: gate the VW-type dropdown filter on VW mode so a stale selection
+      // doesn't silently keep filtering the list after VW mode is disabled.
       const matchesVwType =
+        !authStore.vwModeEnabled ||
         filterVwType.value === null ||
         (filterVwType.value === 'uncategorized'
           ? song.vwTypes.length === 0
