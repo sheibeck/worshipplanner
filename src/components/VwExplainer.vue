@@ -17,10 +17,11 @@
       <div class="fixed inset-0 z-30" @click.stop="open = false"></div>
 
       <div class="absolute z-40 left-0 mt-1 w-80 rounded-md bg-gray-900 border border-gray-800 shadow-xl p-4 text-left">
-        <h3 class="text-sm font-semibold text-gray-100 mb-2">The 1-2-3 worship flow</h3>
+        <h3 class="text-sm font-semibold text-gray-100 mb-2">Vertical Worship</h3>
         <p class="text-xs text-gray-400 mb-2">
-          This app plans a service as a journey from gathering together toward pure adoration of
-          God — moving from the horizontal (us, our testimony) to the vertical (God alone).
+          This app supports Vertical Worship which plans a service as a journey from gathering
+          together toward pure adoration of God — moving from the horizontal (us, our testimony)
+          to the vertical (God alone).
         </p>
         <ul class="text-xs text-gray-400 space-y-1.5 mb-2 list-disc list-inside">
           <li>
