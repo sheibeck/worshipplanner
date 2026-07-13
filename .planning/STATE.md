@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: MVP
-status: ready_to_plan
-stopped_at: Phase 16.1 complete (8/8) — ready to discuss Phase 999.1
-last_updated: 2026-07-13T21:06:57.272Z
+status: planning
+stopped_at: Phase 16.1 context gathered
+last_updated: "2026-07-13T21:14:50.686Z"
 last_activity: 2026-07-13
 progress:
-  total_phases: 11
-  completed_phases: 2
-  total_plans: 6
+  total_phases: 12
+  completed_phases: 10
+  total_plans: 63
   completed_plans: 63
-  percent: 18
+  percent: 83
 ---
 
 # Project State
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 
 ## Current Position
 
-Phase: 999.1
+Phase: 16.2
 Plan: Not started
 Milestone: v1.0 MVP — SHIPPED 2026-03-05
 Next milestone: v1.1 Tasks & Events (not yet started)
@@ -137,6 +137,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - Phase 15 added: Per-Role Frequency & Role-Category Co-occurrence Rules — frequency per (person, role) instead of per person; same-service role compatibility by category (TECH exclusive; BAND/VOCALS/OTHER combine; max 1 instrument/service). Reshapes Phase 14's per-person frequency model. Requested during Phase 14 execution; full context in .planning/todos/completed/per-role-frequency-and-vocal-instrument-pairing.md.
 - Phase 16 added: Quarterly Schedule share link — matrix view + list/matrix toggle, memorable /{church}/quarterN-YYYY URL, filter-by-name, cross-screen (Schedule ↔ Volunteer) editing of pairings/roles/per-role frequency/unavailable Sundays, remove Schedule's separate frequency + volunteer date-range picker, pairing that honors per-role frequency (paired only on the occurrences the lower-frequency person serves), collapsible sections, calendar-format UX research, and a right-side slide-out group editor with whole-cell hit target. See ROADMAP.md R-01..R-14.
 - Phase 16.1 inserted after Phase 16: Song list tags & columns customization: fold Team tags into Tags, Themes as separate column + column-visibility cog, document 1-2-3 methodology (URGENT)
+- Phase 16.2 inserted after Phase 16: Admin permissions hardening — Viewer role strictly read-only (view Services/Songs/Schedules/Volunteers, no edits) with no access to Admin/Settings screens; Editor unchanged (URGENT)
 
 ### Quick Tasks Completed
 
