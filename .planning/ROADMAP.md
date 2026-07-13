@@ -353,7 +353,7 @@ Plans:
 **Depends on:** Phase 16 (builds on the song-catalog tag/theme/column work of Phases 11–12 and the shared song-browse direction of backlog Phase 999.1)
 **Marker:** (INSERTED) — urgent work discovered mid-milestone
 **Requirements**: D-01..D-18 (see 16.1-CONTEXT.md — no formal REQ-IDs; the 18 locked decisions are the requirement/traceability set)
-**Plans:** 7/8 plans executed
+**Plans:** 8/8 plans complete
 
 Plans:
 
@@ -371,4 +371,4 @@ Plans:
 - [x] 16.1-07-PLAN.md — SongSlotPicker + ServiceEditorView: fold pills, gate badges, orchestra AI over tags (D-02/D-04/D-11/D-16)
 
 **Wave 4**
-- [ ] 16.1-08-PLAN.md — Remove Song.teamTags + vue-tsc blast-radius cleanup + full-suite gate (D-01)
+- [x] 16.1-08-PLAN.md — Remove Song.teamTags + vue-tsc blast-radius cleanup + full-suite gate (D-01)
