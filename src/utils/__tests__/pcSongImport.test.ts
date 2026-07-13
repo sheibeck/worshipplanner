@@ -120,29 +120,29 @@ describe('mapPcSongToUpsert', () => {
     })
   })
 
-  describe('Orchestra arrangement → teamTags', () => {
-    it('adds "Orchestra" to teamTags when an arrangement named "Orchestra" exists', () => {
+  describe('Orchestra arrangement → tags (D-01: team-style tags write into tags, not teamTags)', () => {
+    it('adds "Orchestra" to tags when an arrangement named "Orchestra" exists', () => {
       const pcSong = makePcSong()
       const result = mapPcSongToUpsert(pcSong, [], [makeArrangement('arr-1', 'Orchestra')])
-      expect(result.teamTags).toContain('Orchestra')
+      expect(result.tags).toContain('Orchestra')
     })
 
-    it('adds "Orchestra" to teamTags when arrangement named "orchestra" (lowercase) exists', () => {
+    it('adds "Orchestra" to tags when arrangement named "orchestra" (lowercase) exists', () => {
       const pcSong = makePcSong()
       const result = mapPcSongToUpsert(pcSong, [], [makeArrangement('arr-1', 'orchestra')])
-      expect(result.teamTags).toContain('Orchestra')
+      expect(result.tags).toContain('Orchestra')
     })
 
     it('does NOT add "Orchestra" when no arrangement has that name', () => {
       const pcSong = makePcSong()
       const result = mapPcSongToUpsert(pcSong, [], [makeArrangement('arr-1', 'Standard')])
-      expect(result.teamTags).not.toContain('Orchestra')
+      expect(result.tags).not.toContain('Orchestra')
     })
 
     it('does NOT add "Orchestra" when arrangements array is empty', () => {
       const pcSong = makePcSong()
       const result = mapPcSongToUpsert(pcSong, [], [])
-      expect(result.teamTags).not.toContain('Orchestra')
+      expect(result.tags).not.toContain('Orchestra')
     })
   })
 
@@ -196,21 +196,31 @@ describe('mapPcSongToUpsert', () => {
       const result = mapPcSongToUpsert(pcSong, [], [])
       expect(result.ccliNumber).toBe('')
     })
+
+    it('sets teamTags to [] and removedThemes to [] (D-01/D-14)', () => {
+      const pcSong = makePcSong({ tagIds: ['tag-ballad'] })
+      const tags = [makeTag('tag-ballad', 'Ballad')]
+      const result = mapPcSongToUpsert(pcSong, tags, [makeArrangement('arr-1', 'Orchestra')])
+      expect(result.teamTags).toEqual([])
+      expect(result.removedThemes).toEqual([])
+    })
   })
 
-  describe('non-category tags go into teamTags', () => {
-    it('puts non-category PC tags into teamTags', () => {
+  describe('non-category tags go into tags (D-01)', () => {
+    it('puts non-category PC tags into tags', () => {
       const pcSong = makePcSong({ tagIds: ['tag-ballad'] })
       const tags = [makeTag('tag-ballad', 'Ballad')]
       const result = mapPcSongToUpsert(pcSong, tags, [])
-      expect(result.teamTags).toContain('Ballad')
+      expect(result.tags).toContain('Ballad')
     })
 
-    it('does NOT put category tags into teamTags', () => {
+    it('does NOT put category tags into tags', () => {
       const pcSong = makePcSong({ tagIds: ['tag-cat1'] })
       const tags = [makeTag('tag-cat1', 'Category 1')]
       const result = mapPcSongToUpsert(pcSong, tags, [])
-      expect(result.teamTags).not.toContain('Category 1')
+      expect(result.tags).not.toContain('Category 1')
+      // Category tags still map to vwTypes, not tags
+      expect(result.vwTypes).toEqual([1])
     })
 
     it('combines non-category tags with Orchestra when both present', () => {
@@ -218,8 +228,8 @@ describe('mapPcSongToUpsert', () => {
       const tags = [makeTag('tag-ballad', 'Ballad')]
       const arrangements = [makeArrangement('arr-1', 'Orchestra')]
       const result = mapPcSongToUpsert(pcSong, tags, arrangements)
-      expect(result.teamTags).toContain('Ballad')
-      expect(result.teamTags).toContain('Orchestra')
+      expect(result.tags).toContain('Ballad')
+      expect(result.tags).toContain('Orchestra')
     })
   })
 
@@ -424,7 +434,7 @@ describe('fetchAndMapPcSongs', () => {
     expect(song.title).toBe('How Great Thou Art')
     expect(song.ccliNumber).toBe('78890')
     expect(song.vwTypes).toEqual([2])
-    expect(song.teamTags).toContain('Orchestra')
+    expect(song.tags).toContain('Orchestra')
     expect(song.lastUsedAt).not.toBeNull()
     expect(song.hidden).toBe(false)
   })
@@ -467,9 +477,9 @@ describe('fetchAndMapPcSongs', () => {
     expect(fetchSongArrangements).toHaveBeenCalledWith('app-id', 'secret', 'pc-song-2')
 
     // Song 2 has Orchestra arrangement
-    expect(result[1]?.teamTags).toContain('Orchestra')
+    expect(result[1]?.tags).toContain('Orchestra')
     // Song 1 does not
-    expect(result[0]?.teamTags).not.toContain('Orchestra')
+    expect(result[0]?.tags).not.toContain('Orchestra')
   })
 
   it('resolves the last-scheduled arrangement as the primary key when multiple arrangements exist', async () => {
