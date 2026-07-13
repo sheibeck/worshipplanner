@@ -339,3 +339,36 @@ Plans:
 
 **Wave 3**
 - [x] 16-11-PLAN.md — Cleanup: remove deprecated frequency fields (D-04)
+
+### Phase 16.1: Song list tags & columns customization (INSERTED)
+
+**Goal:** Simplify and make customizable the Songs screen's tag/theme/column display, and make the app's song-planning conventions self-explanatory. (1) Remove the dedicated "Team" tags concept and fold team tags into general Tags — no separate team-tag category. (2) Show Themes as its own column separate from Tags, and add a settings-cog control that lets each user choose which columns to show/hide so they can tailor the song list to what they care about. (3) The app uses the Vertical Worship 1-2-3 song types but never explains them; add an in-app helper describing how the 1-2-3 methodology is used to plan a service (so churches unfamiliar with it understand the categories), and decide whether to keep them as-is / make them optional when generalizing to churches that don't follow that approach.
+
+**Requirements** (to be formalized in discuss/spec — captured verbatim from request):
+- R-01 **Fold Team tags into Tags** — Remove "Team" tags as a distinct category on the Songs screen; team tags become ordinary Tags. Evaluate whether a separate team-tag concept is needed at all.
+- R-02 **Themes as a separate column** — Split Themes out of the Tags column into its own column in the song list.
+- R-03 **Column-visibility settings cog** — Add a settings cog on the song list that lets the user show/hide individual columns to customize the view.
+- R-04 **Explain the 1-2-3 song methodology** — The system uses 1/2/3 song types but doesn't describe what they are or why they're useful. Add an in-app helper describing how to use them to plan a service; consider making them optional/removable for churches (future multi-tenant) that don't follow the VW 1-2-3 approach.
+
+**Depends on:** Phase 16 (builds on the song-catalog tag/theme/column work of Phases 11–12 and the shared song-browse direction of backlog Phase 999.1)
+**Marker:** (INSERTED) — urgent work discovered mid-milestone
+**Requirements**: D-01..D-18 (see 16.1-CONTEXT.md — no formal REQ-IDs; the 18 locked decisions are the requirement/traceability set)
+**Plans:** 8 plans
+
+Plans:
+
+**Wave 1**
+- [ ] 16.1-01-PLAN.md — Store + PC-import teamTags→tags fold + theme-removal tracking (D-01/D-05/D-14)
+- [ ] 16.1-02-PLAN.md — vwModeEnabled church-level flag (auth store) + Settings toggle (D-15/D-16)
+
+**Wave 2**
+- [ ] 16.1-03-PLAN.md — Suggestions nudge-only + songSearch team: alias (TDD) (D-02/D-03/D-04/D-06)
+- [ ] 16.1-04-PLAN.md — Column-visibility store: per-user/org persist + hydrate (D-08/D-09/D-10)
+
+**Wave 3**
+- [ ] 16.1-05-PLAN.md — SongTable: Themes column + cog + inline theme edit + VW-gated Category + VwExplainer (D-07..D-13/D-16/D-17/D-18)
+- [ ] 16.1-06-PLAN.md — SongsView/SongFilters union + SongSlideOver team-tag fold + VW gating (D-01/D-12/D-16)
+- [ ] 16.1-07-PLAN.md — SongSlotPicker + ServiceEditorView: fold pills, gate badges, orchestra AI over tags (D-02/D-04/D-11/D-16)
+
+**Wave 4**
+- [ ] 16.1-08-PLAN.md — Remove Song.teamTags + vue-tsc blast-radius cleanup + full-suite gate (D-01)
