@@ -304,18 +304,34 @@
         class="fixed top-0 right-0 bottom-0 z-50 w-full max-w-md bg-gray-900 border-l border-gray-700 shadow-2xl flex flex-col"
       >
         <!-- Header -->
-        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-800 shrink-0">
+        <div class="flex items-center justify-between gap-3 px-6 py-4 border-b border-gray-800 shrink-0">
           <h2 class="text-base font-semibold text-gray-100">{{ editingPersonId ? 'Edit Volunteer' : 'Add Volunteer' }}</h2>
-          <button
-            type="button"
-            class="p-1.5 rounded-md text-gray-500 hover:text-gray-300 hover:bg-gray-800 transition-colors"
-            @click="closeForm"
-            aria-label="Close"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <div class="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              class="px-3 py-1.5 rounded-md text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-gray-600 transition-colors"
+              @click="closeForm"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              form="volunteer-form"
+              class="px-3 py-1.5 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors"
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              class="p-1.5 rounded-md text-gray-500 hover:text-gray-300 hover:bg-gray-800 transition-colors"
+              @click="closeForm"
+              aria-label="Close"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         <!-- Scrollable body -->
@@ -368,20 +384,6 @@
             </div>
           </form>
         </div>
-
-        <!-- Footer actions -->
-        <div class="px-6 py-4 border-t border-gray-800 flex items-center gap-3 shrink-0">
-          <button
-            type="submit"
-            form="volunteer-form"
-            class="px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors"
-          >Save Volunteer</button>
-          <button
-            type="button"
-            @click="closeForm"
-            class="px-4 py-2 rounded-md text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors"
-          >Cancel</button>
-        </div>
       </div>
     </Transition>
   </Teleport>
@@ -391,6 +393,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRosterStore } from '@/stores/roster'
+import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import type { Person, RoleGroup } from '@/types/roster'
 import AppShell from '@/components/AppShell.vue'
 import CollapsibleSection from '@/components/CollapsibleSection.vue'
@@ -438,6 +441,14 @@ const formEmail = ref('')
 const formPhone = ref('')
 const formRoles = ref<string[]>([])
 
+// ── Unsaved-changes guard ──────────────────────────────────────────────────
+const unsavedGuard = useUnsavedGuard(() => ({
+  name: formName.value,
+  email: formEmail.value,
+  phone: formPhone.value,
+  roles: formRoles.value,
+}))
+
 function onAddVolunteer() {
   editingPersonId.value = null
   formName.value = ''
@@ -445,6 +456,7 @@ function onAddVolunteer() {
   formPhone.value = ''
   formRoles.value = []
   formOpen.value = true
+  unsavedGuard.capture()
 }
 
 function onEditPerson(person: Person) {
@@ -454,11 +466,18 @@ function onEditPerson(person: Person) {
   formPhone.value = person.phone
   formRoles.value = [...person.roles]
   formOpen.value = true
+  unsavedGuard.capture()
 }
 
-function closeForm() {
+function forceCloseForm() {
   formOpen.value = false
   editingPersonId.value = null
+}
+
+// Guarded close — used by Cancel / backdrop / × (prompts if dirty).
+function closeForm() {
+  if (!unsavedGuard.confirmDiscard()) return
+  forceCloseForm()
 }
 
 async function onSaveVolunteer() {
@@ -473,7 +492,7 @@ async function onSaveVolunteer() {
   } else {
     await rosterStore.addPerson(input)
   }
-  closeForm()
+  forceCloseForm()
 }
 
 // ── Deactivate ───────────────────────────────────────────────────────────────
