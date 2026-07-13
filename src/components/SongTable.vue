@@ -98,6 +98,7 @@
             <span class="flex items-center gap-1">
               Category
               <SortArrow :active="sortField === 'category'" :dir="sortDir" />
+              <VwExplainer />
             </span>
           </th>
           <!-- Key -->
@@ -152,8 +153,43 @@
           <th v-if="songStore.columnVisibility.tags" scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
             Tags
           </th>
-          <!-- Trailing chevron (opens edit drawer) -->
-          <th scope="col" class="px-4 py-3 w-8"></th>
+          <!-- Column-visibility cog + trailing chevron slot (opens edit drawer per-row) -->
+          <th scope="col" class="px-4 py-3 w-10 text-right relative">
+            <button
+              type="button"
+              class="text-gray-500 hover:text-gray-300"
+              title="Column settings"
+              aria-label="Column settings"
+              @click.stop="cogOpen = !cogOpen"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </button>
+            <template v-if="cogOpen">
+              <div class="fixed inset-0 z-30" @click="cogOpen = false"></div>
+              <div class="absolute z-40 right-0 mt-1 w-48 rounded-md bg-gray-900 border border-gray-800 shadow-xl p-2 text-left normal-case tracking-normal font-normal">
+                <div class="flex items-center justify-between mb-1.5">
+                  <span class="text-xs font-medium text-gray-300">Columns</span>
+                  <button type="button" class="text-xs text-gray-500 hover:text-gray-300" @click.stop="songStore.resetColumns()">Reset</button>
+                </div>
+                <label
+                  v-for="col in toggleableColumns"
+                  :key="col.key"
+                  class="flex items-center gap-2 py-1 px-1 text-xs text-gray-300 hover:bg-gray-800 rounded cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    class="rounded border-gray-600 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-gray-900"
+                    :checked="songStore.columnVisibility[col.key]"
+                    @change.stop="songStore.toggleColumn(col.key)"
+                  />
+                  {{ col.label }}
+                </label>
+              </div>
+            </template>
+          </th>
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-800">
@@ -353,6 +389,7 @@ import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import type { Song } from '@/types/song'
 import type { Timestamp } from 'firebase/firestore'
 import SongBadge from '@/components/SongBadge.vue'
+import VwExplainer from '@/components/VwExplainer.vue'
 import { getPrimaryKey } from '@/utils/songSearch'
 import { useSongStore } from '@/stores/songs'
 import { useAuthStore } from '@/stores/auth'
@@ -370,6 +407,19 @@ const emit = defineEmits<{
 
 const songStore = useSongStore()
 const authStore = useAuthStore()
+
+// ── Column-visibility cog ──────────────────────────────────────────────────────
+
+const cogOpen = ref(false)
+// Title is intentionally excluded — always visible, not a user preference.
+const toggleableColumns = [
+  { key: 'category', label: 'Category' },
+  { key: 'key', label: 'Key' },
+  { key: 'ccli', label: 'CCLI' },
+  { key: 'lastUsed', label: 'Last Used' },
+  { key: 'tags', label: 'Tags' },
+  { key: 'themes', label: 'Themes' },
+] as const
 
 // ── Sort ───────────────────────────────────────────────────────────────────────
 
