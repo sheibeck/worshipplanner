@@ -182,6 +182,33 @@
           categories are kept and reappear when you turn it back on.
         </p>
 
+        <!-- Always-visible inline explanation (mirrors the Songs-page VwExplainer copy). -->
+        <div class="mt-4 rounded-md bg-gray-950/40 border border-gray-800 p-3">
+          <p class="text-xs text-gray-400 mb-2">
+            This app supports Vertical Worship which plans a service as a journey from gathering
+            together toward pure adoration of God — moving from the horizontal (us, our testimony)
+            to the vertical (God alone).
+          </p>
+          <ul class="text-xs text-gray-400 space-y-1.5 mb-2 list-disc list-inside">
+            <li>
+              <span class="font-medium text-gray-200">Type 1 — Call to Worship (Gather):</span>
+              bright, inviting songs that gather the congregation.
+            </li>
+            <li>
+              <span class="font-medium text-gray-200">Type 2 — Intimate (Testimony):</span>
+              reflective songs that voice our shared response.
+            </li>
+            <li>
+              <span class="font-medium text-gray-200">Type 3 — Ascription (Arrive):</span>
+              songs of pure ascription and adoration directed to God.
+            </li>
+          </ul>
+          <p class="text-xs text-gray-400">
+            A common flow is 1 → 2 → 2 → 3, ending on a Type 3 so the service arrives at undivided
+            worship. You can turn this methodology off anytime in Settings.
+          </p>
+        </div>
+
         <p v-if="vwSavedFeedback" class="text-green-400 text-sm mt-2">Saved!</p>
         <p v-if="vwSaveError" class="text-red-400 text-sm mt-2">{{ vwSaveError }}</p>
       </div>
