@@ -137,7 +137,11 @@
               <SortArrow :active="sortField === 'lastUsed'" :dir="sortDir" />
             </span>
           </th>
-          <!-- Themes (own column now — no longer folded into Tags) -->
+          <!-- Tags (user tags only — team pills folded upstream into tags, D-01/D-12) -->
+          <th v-if="songStore.columnVisibility.tags" scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+            Tags
+          </th>
+          <!-- Themes (own column now — no longer folded into Tags; rendered after Tags per checkpoint feedback) -->
           <th
             v-if="songStore.columnVisibility.themes"
             scope="col"
@@ -148,10 +152,6 @@
               Themes
               <SortArrow :active="sortField === 'themes'" :dir="sortDir" />
             </span>
-          </th>
-          <!-- Tags (user tags only — team pills folded upstream into tags, D-01/D-12) -->
-          <th v-if="songStore.columnVisibility.tags" scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-            Tags
           </th>
           <!-- Column-visibility cog + trailing chevron slot (opens edit drawer per-row) -->
           <th scope="col" class="px-4 py-3 w-10 text-right relative">
@@ -245,64 +245,6 @@
             {{ formatDate(song.lastUsedAt) }}
           </td>
 
-          <!-- Themes: its own inline-editable column now (no longer folded into Tags) -->
-          <td v-if="songStore.columnVisibility.themes" class="px-4 py-3" @click.stop>
-            <div class="flex flex-wrap gap-1 items-center">
-              <span
-                v-for="t in (song.themes ?? [])"
-                :key="'th-' + t"
-                class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-medium border bg-teal-900/50 text-teal-300 border-teal-800"
-              >
-                {{ t }}
-                <button
-                  type="button"
-                  class="ml-0.5 text-teal-400 hover:text-teal-200 leading-none"
-                  @click.stop="removeTagOrTheme(song, t, 'themes')"
-                  aria-label="Remove theme"
-                >
-                  &times;
-                </button>
-              </span>
-
-              <!-- Inline add affordance -->
-              <template v-if="inlineEditSongId === song.id && inlineEditField === 'themes'">
-                <input
-                  :ref="setInlineInputRef"
-                  v-model="inlineTagInput"
-                  type="text"
-                  placeholder="theme name"
-                  class="w-24 rounded border border-teal-700 bg-gray-900 text-teal-200 text-xs px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-teal-500"
-                  @keydown.enter.stop="commitInlineTag(song)"
-                  @keydown.escape.stop="cancelInlineTag"
-                  @click.stop
-                />
-                <button
-                  type="button"
-                  class="text-xs text-teal-400 hover:text-teal-200"
-                  @click.stop="commitInlineTag(song)"
-                >Add</button>
-                <button
-                  type="button"
-                  class="text-xs text-gray-500 hover:text-gray-300"
-                  @click.stop="cancelInlineTag"
-                >Cancel</button>
-              </template>
-              <button
-                v-else
-                type="button"
-                class="text-xs text-gray-500 hover:text-teal-300 border border-dashed border-gray-700 hover:border-teal-700 rounded-full px-1.5 py-0.5 leading-none transition-colors"
-                @click.stop="openInlineEdit(song.id, 'themes')"
-                title="Add theme"
-              >+</button>
-
-              <!-- Em-dash fallback when themes is empty and not editing -->
-              <span
-                v-if="!(song.themes ?? []).length && !(inlineEditSongId === song.id && inlineEditField === 'themes')"
-                class="text-gray-600"
-              >&mdash;</span>
-            </div>
-          </td>
-
           <!-- Tags: user tags only — team pills folded upstream into tags (D-01/D-12) -->
           <td v-if="songStore.columnVisibility.tags" class="px-4 py-3" @click.stop>
             <div class="flex flex-wrap gap-1 items-center">
@@ -361,6 +303,64 @@
               <!-- Em-dash fallback when tags is empty and not editing -->
               <span
                 v-if="!(song.tags ?? []).length && !(inlineEditSongId === song.id && inlineEditField === 'tags')"
+                class="text-gray-600"
+              >&mdash;</span>
+            </div>
+          </td>
+
+          <!-- Themes: its own inline-editable column now (no longer folded into Tags; rendered after Tags per checkpoint feedback) -->
+          <td v-if="songStore.columnVisibility.themes" class="px-4 py-3" @click.stop>
+            <div class="flex flex-wrap gap-1 items-center">
+              <span
+                v-for="t in (song.themes ?? [])"
+                :key="'th-' + t"
+                class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-medium border bg-teal-900/50 text-teal-300 border-teal-800"
+              >
+                {{ t }}
+                <button
+                  type="button"
+                  class="ml-0.5 text-teal-400 hover:text-teal-200 leading-none"
+                  @click.stop="removeTagOrTheme(song, t, 'themes')"
+                  aria-label="Remove theme"
+                >
+                  &times;
+                </button>
+              </span>
+
+              <!-- Inline add affordance -->
+              <template v-if="inlineEditSongId === song.id && inlineEditField === 'themes'">
+                <input
+                  :ref="setInlineInputRef"
+                  v-model="inlineTagInput"
+                  type="text"
+                  placeholder="theme name"
+                  class="w-24 rounded border border-teal-700 bg-gray-900 text-teal-200 text-xs px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                  @keydown.enter.stop="commitInlineTag(song)"
+                  @keydown.escape.stop="cancelInlineTag"
+                  @click.stop
+                />
+                <button
+                  type="button"
+                  class="text-xs text-teal-400 hover:text-teal-200"
+                  @click.stop="commitInlineTag(song)"
+                >Add</button>
+                <button
+                  type="button"
+                  class="text-xs text-gray-500 hover:text-gray-300"
+                  @click.stop="cancelInlineTag"
+                >Cancel</button>
+              </template>
+              <button
+                v-else
+                type="button"
+                class="text-xs text-gray-500 hover:text-teal-300 border border-dashed border-gray-700 hover:border-teal-700 rounded-full px-1.5 py-0.5 leading-none transition-colors"
+                @click.stop="openInlineEdit(song.id, 'themes')"
+                title="Add theme"
+              >+</button>
+
+              <!-- Em-dash fallback when themes is empty and not editing -->
+              <span
+                v-if="!(song.themes ?? []).length && !(inlineEditSongId === song.id && inlineEditField === 'themes')"
                 class="text-gray-600"
               >&mdash;</span>
             </div>
