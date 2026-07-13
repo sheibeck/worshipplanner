@@ -82,7 +82,11 @@
     </table>
   </div>
 
-  <!-- Group editor slide-out (R-14) — reuses AvailabilityDrawer's exact Teleport/backdrop/panel/Transition markup -->
+  <!-- Group editor slide-out (R-14) — reuses AvailabilityDrawer's exact Teleport/backdrop/panel/Transition markup.
+       Intentionally exempt from the header Cancel/Save + unsaved-changes-guard standardization
+       (16.1-05 checkpoint round 3): every row action here (clear/swap/assign) writes straight
+       through to quartersStore immediately — there is no pending/unsaved state and no Save button,
+       so only the × close action applies. -->
   <Teleport to="body">
     <!-- Backdrop -->
     <Transition
