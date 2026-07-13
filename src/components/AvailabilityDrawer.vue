@@ -30,21 +30,37 @@
         class="fixed top-0 right-0 bottom-0 z-50 w-full max-w-lg bg-gray-900 border-l border-gray-700 shadow-2xl flex flex-col"
       >
         <!-- Header -->
-        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-800 shrink-0">
-          <div>
-            <h2 class="text-base font-semibold text-gray-100">{{ draft.name }}</h2>
-            <p class="text-xs text-gray-400 mt-0.5">{{ draft.email }}</p>
+        <div class="flex items-center justify-between gap-3 px-6 py-4 border-b border-gray-800 shrink-0">
+          <div class="min-w-0">
+            <h2 class="text-base font-semibold text-gray-100 truncate">{{ draft.name }}</h2>
+            <p class="text-xs text-gray-400 mt-0.5 truncate">{{ draft.email }}</p>
           </div>
-          <button
-            type="button"
-            class="p-1.5 rounded-md text-gray-500 hover:text-gray-300 hover:bg-gray-800 transition-colors"
-            @click="onClose"
-            aria-label="Close"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <div class="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              class="px-3 py-1.5 rounded-md text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-gray-600 transition-colors"
+              @click="onClose"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="px-3 py-1.5 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors"
+              @click="onSave"
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              class="p-1.5 rounded-md text-gray-500 hover:text-gray-300 hover:bg-gray-800 transition-colors"
+              @click="onClose"
+              aria-label="Close"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         <!-- Scrollable body -->
@@ -227,24 +243,6 @@
           </section>
 
         </div>
-
-        <!-- Footer actions -->
-        <div class="px-6 py-4 border-t border-gray-800 flex items-center justify-end gap-3 shrink-0">
-          <button
-            type="button"
-            class="px-4 py-2 rounded-md text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors"
-            @click="onClose"
-          >
-            Close
-          </button>
-          <button
-            type="button"
-            class="px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors"
-            @click="onSave"
-          >
-            Save
-          </button>
-        </div>
       </div>
     </Transition>
   </Teleport>
@@ -254,6 +252,7 @@
 import { reactive, ref, computed, watch } from 'vue'
 import { useQuartersStore } from '@/stores/quarters'
 import { useRosterStore } from '@/stores/roster'
+import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import type { FrequencyTier, Role, RoleFrequencyEntry } from '@/types/roster'
 
 const props = defineProps<{
@@ -333,6 +332,18 @@ const heldRoles = computed<Role[]>(() => {
 const pairQuery = ref('')
 const pairMenuOpen = ref(false)
 
+// ── Unsaved-changes guard ──────────────────────────────────────────────────
+// Only the deferred (Save-button) edits count as "unsaved" — blackout dates,
+// pairings, note, and per-role frequency. draft.roles is excluded: the Roles
+// checklist writes through rosterStore.updatePerson immediately on toggle
+// (see onToggleRole below), so it's never part of a pending/discardable edit.
+const unsavedGuard = useUnsavedGuard(() => ({
+  blackoutDates: draft.blackoutDates,
+  pairedWith: draft.pairedWith,
+  roleFrequency: draft.roleFrequency,
+  note: draft.note,
+}))
+
 function loadDraft(personId: string) {
   const person = rosterStore.people.find((p) => p.id === personId)
   const pqd = quarter.value?.personQuarterData[personId]
@@ -353,6 +364,8 @@ function loadDraft(personId: string) {
 
   pairQuery.value = ''
   pairMenuOpen.value = false
+
+  unsavedGuard.capture()
 }
 
 watch(
@@ -536,6 +549,7 @@ async function onSave() {
 }
 
 function onClose() {
+  if (!unsavedGuard.confirmDiscard()) return
   emit('close')
 }
 </script>
