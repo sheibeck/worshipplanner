@@ -88,16 +88,14 @@
               <SortArrow :active="sortField === 'title'" :dir="sortDir" />
             </span>
           </th>
-          <!-- Category (VW-gated: hidden entirely when VW methodology is off, D-16) -->
+          <!-- Category (VW-gated: hidden entirely when VW methodology is off, D-16; not sortable — click a badge to filter) -->
           <th
             v-if="authStore.vwModeEnabled && songStore.columnVisibility.category"
             scope="col"
-            class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer hover:text-gray-200 select-none"
-            @click="toggleSort('category')"
+            class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider"
           >
             <span class="flex items-center gap-1">
               Category
-              <SortArrow :active="sortField === 'category'" :dir="sortDir" />
               <VwExplainer />
             </span>
           </th>
@@ -113,17 +111,13 @@
               <SortArrow :active="sortField === 'key'" :dir="sortDir" />
             </span>
           </th>
-          <!-- CCLI -->
+          <!-- CCLI (not sortable per checkpoint feedback) -->
           <th
             v-if="songStore.columnVisibility.ccli"
             scope="col"
-            class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer hover:text-gray-200 select-none"
-            @click="toggleSort('ccli')"
+            class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider"
           >
-            <span class="flex items-center gap-1">
-              CCLI
-              <SortArrow :active="sortField === 'ccli'" :dir="sortDir" />
-            </span>
+            CCLI
           </th>
           <!-- Last Used -->
           <th
@@ -141,17 +135,13 @@
           <th v-if="songStore.columnVisibility.tags" scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
             Tags
           </th>
-          <!-- Themes (own column now — no longer folded into Tags; rendered after Tags per checkpoint feedback) -->
+          <!-- Themes (own column now — no longer folded into Tags; rendered after Tags per checkpoint feedback; not sortable — click a pill to filter) -->
           <th
             v-if="songStore.columnVisibility.themes"
             scope="col"
-            class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer hover:text-gray-200 select-none"
-            @click="toggleSort('themes')"
+            class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider"
           >
-            <span class="flex items-center gap-1">
-              Themes
-              <SortArrow :active="sortField === 'themes'" :dir="sortDir" />
-            </span>
+            Themes
           </th>
           <!-- Column-visibility cog + trailing chevron slot (opens edit drawer per-row) -->
           <th scope="col" class="px-4 py-3 w-10 text-right relative">
@@ -217,9 +207,9 @@
             <div v-if="song.author" class="text-xs text-gray-500 mt-0.5">{{ song.author }}</div>
           </td>
 
-          <!-- Category (VW type badge; VW-gated, D-16) -->
-          <td v-if="authStore.vwModeEnabled && songStore.columnVisibility.category" class="px-4 py-3">
-            <SongBadge :types="song.vwTypes ?? []" />
+          <!-- Category (VW type badge; VW-gated, D-16). Clicking a badge filters by that type. -->
+          <td v-if="authStore.vwModeEnabled && songStore.columnVisibility.category" class="px-4 py-3" @click.stop>
+            <SongBadge :types="song.vwTypes ?? []" clickable @select="filterByPill('type', $event)" />
           </td>
 
           <!-- Key (primary / play key) -->
@@ -252,7 +242,9 @@
               <span
                 v-for="t in (song.tags ?? [])"
                 :key="'us-' + t"
-                class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-medium border bg-pink-900/50 text-pink-300 border-pink-800"
+                class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-medium border bg-pink-900/50 text-pink-300 border-pink-800 cursor-pointer hover:bg-pink-800/60"
+                title="Filter by this tag"
+                @click.stop="filterByPill('tag', t)"
               >
                 {{ t }}
                 <button
@@ -314,7 +306,9 @@
               <span
                 v-for="t in (song.themes ?? [])"
                 :key="'th-' + t"
-                class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-medium border bg-teal-900/50 text-teal-300 border-teal-800"
+                class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-medium border bg-teal-900/50 text-teal-300 border-teal-800 cursor-pointer hover:bg-teal-800/60"
+                title="Filter by this theme"
+                @click.stop="filterByPill('theme', t)"
               >
                 {{ t }}
                 <button
@@ -423,7 +417,10 @@ const toggleableColumns = [
 
 // ── Sort ───────────────────────────────────────────────────────────────────────
 
-type SortField = 'title' | 'category' | 'key' | 'ccli' | 'lastUsed' | 'themes'
+// Category, CCLI, Tags, and Themes are intentionally NOT sortable (checkpoint
+// feedback): Category/Tags/Themes are filter-by-click instead (see filterByPill),
+// and CCLI has no sort affordance.
+type SortField = 'title' | 'key' | 'lastUsed'
 type SortDir = 'asc' | 'desc'
 
 const sortField = ref<SortField>('title')
@@ -440,13 +437,18 @@ function toggleSort(field: SortField) {
 
 function sortKey(song: Song): string | number {
   switch (sortField.value) {
-    case 'category': return song.vwTypes[0] ?? 99
     case 'key':      return getPrimaryKey(song).toLowerCase()
-    case 'ccli':     return Number(song.ccliNumber) || 0
     case 'lastUsed': return song.lastUsedAt?.toMillis() ?? 0
-    case 'themes':   return (song.themes ?? []).slice().sort().join(',').toLowerCase()
     default:         return song.title.toLowerCase()
   }
+}
+
+// Click-to-filter (checkpoint feedback): clicking a Category badge, Tag, or Theme
+// pill drops a field-scoped term into the shared search bar, reusing the existing
+// songMatchesQuery mechanism (no parallel filter path). searchQuery is bound to
+// SongFilters' input via SongsView's v-model.
+function filterByPill(field: 'type' | 'tag' | 'theme', value: string | number) {
+  songStore.searchQuery = `${field}:${value}`
 }
 
 const sortedSongs = computed(() => {
