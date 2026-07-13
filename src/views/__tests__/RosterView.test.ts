@@ -7,6 +7,7 @@ const mockAddPerson = vi.fn(() => Promise.resolve('new-id'))
 const mockUpdatePerson = vi.fn((_id: string, _input: Record<string, unknown>) => Promise.resolve())
 const mockDeactivatePerson = vi.fn(() => Promise.resolve())
 const mockReactivatePerson = vi.fn(() => Promise.resolve())
+const mockDeletePerson = vi.fn(() => Promise.resolve())
 const mockDeleteAllPeople = vi.fn(() => Promise.resolve(0))
 const mockSeedDefaultRolesIfEmpty = vi.fn(() => Promise.resolve())
 const mockSubscribe = vi.fn()
@@ -39,6 +40,7 @@ vi.mock('@/stores/roster', () => ({
     updatePerson: mockUpdatePerson,
     deactivatePerson: mockDeactivatePerson,
     reactivatePerson: mockReactivatePerson,
+    deletePerson: mockDeletePerson,
     seedDefaultRolesIfEmpty: mockSeedDefaultRolesIfEmpty,
     deleteAllPeople: mockDeleteAllPeople,
   }),
@@ -80,6 +82,7 @@ describe('RosterView — roles-only Volunteer form (D-07)', () => {
     mockUpdatePerson.mockClear()
     mockDeactivatePerson.mockClear()
     mockReactivatePerson.mockClear()
+    mockDeletePerson.mockClear()
   })
 
   it('does not render a serve-frequency/cadence control anywhere in the form', async () => {
@@ -208,6 +211,82 @@ describe('RosterView — unified table with Show-inactive toggle (260713-d60)', 
     const wrapper = mountRosterView()
     const buttons = wrapper.findAll('button').map((b) => b.text())
     expect(buttons.some((t) => t.includes('Deactivate'))).toBe(false)
+  })
+})
+
+describe('RosterView — drawer status actions (immediate-apply, 260713-d60)', () => {
+  beforeEach(() => {
+    mockDeactivatePerson.mockClear()
+    mockReactivatePerson.mockClear()
+    mockDeletePerson.mockClear()
+    mockUpdatePerson.mockClear()
+  })
+
+  it('shows a Deactivate control for an active person and calls deactivatePerson, not updatePerson', async () => {
+    mockPeople = [makePerson({ id: 'p-1', name: 'Alice', active: true, roles: [] })]
+    const wrapper = mountRosterView()
+
+    const row = wrapper.findAll('tbody tr')[0]!
+    await row.trigger('click')
+
+    const deactivateBtn = wrapper.findAll('button').find((b) => b.text() === 'Deactivate')!
+    await deactivateBtn.trigger('click')
+
+    expect(mockDeactivatePerson).toHaveBeenCalledTimes(1)
+    expect(mockDeactivatePerson).toHaveBeenCalledWith('p-1')
+    expect(mockUpdatePerson).not.toHaveBeenCalled()
+  })
+
+  it('shows Reactivate and a Delete affordance for an inactive person; clicking Reactivate calls reactivatePerson', async () => {
+    mockPeople = [makePerson({ id: 'p-1', name: 'Bob', active: false, roles: [] })]
+    const wrapper = mountRosterView()
+
+    // Toggle "Show inactive" on so the row is visible/clickable.
+    const toggle = wrapper.find('input[type="checkbox"]')
+    await toggle.setValue(true)
+
+    const row = wrapper.findAll('tbody tr')[0]!
+    await row.trigger('click')
+
+    const reactivateBtn = wrapper.findAll('button').find((b) => b.text() === 'Reactivate')!
+    await reactivateBtn.trigger('click')
+
+    expect(mockReactivatePerson).toHaveBeenCalledTimes(1)
+    expect(mockReactivatePerson).toHaveBeenCalledWith('p-1')
+
+    const deleteBtn = wrapper.findAll('button').find((b) => b.text() === 'Delete permanently')
+    expect(deleteBtn).toBeTruthy()
+  })
+
+  it('permanently deletes an inactive person from the drawer after confirmation', async () => {
+    mockPeople = [makePerson({ id: 'p-1', name: 'Bob', active: false, roles: [] })]
+    const wrapper = mountRosterView()
+
+    const toggle = wrapper.find('input[type="checkbox"]')
+    await toggle.setValue(true)
+
+    const row = wrapper.findAll('tbody tr')[0]!
+    await row.trigger('click')
+
+    const deleteBtn = wrapper.findAll('button').find((b) => b.text() === 'Delete permanently')!
+    await deleteBtn.trigger('click')
+
+    const confirmDeleteBtn = wrapper.findAll('button').find((b) => b.text() === 'Delete')!
+    await confirmDeleteBtn.trigger('click')
+
+    expect(mockDeletePerson).toHaveBeenCalledTimes(1)
+    expect(mockDeletePerson).toHaveBeenCalledWith('p-1')
+  })
+
+  it('does not render the status action section when adding a new volunteer', async () => {
+    mockPeople = []
+    const wrapper = mountRosterView()
+
+    const addBtn = wrapper.findAll('button').find((b) => b.text().includes('Add Volunteer'))!
+    await addBtn.trigger('click')
+
+    expect(wrapper.text()).not.toContain('Deactivate')
+    expect(wrapper.text()).not.toContain('Reactivate')
   })
 })
 

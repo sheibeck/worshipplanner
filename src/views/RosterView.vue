@@ -327,6 +327,72 @@
               </div>
             </div>
           </form>
+
+          <!-- Status actions (immediate-apply, independent of form Save) -->
+          <div v-if="editingPerson" class="mt-6 pt-5 border-t border-gray-800">
+            <h3 class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Status</h3>
+            <div class="flex items-center gap-2 mb-2">
+              <span
+                class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border"
+                :class="editingPerson.active ? 'bg-emerald-900/50 text-emerald-300 border-emerald-800' : 'bg-gray-800 text-gray-400 border-gray-700'"
+              >{{ editingPerson.active ? 'Active' : 'Inactive' }}</span>
+            </div>
+
+            <template v-if="editingPerson.active">
+              <p class="text-xs text-gray-500 mb-2">
+                Deactivating removes them from schedule proposals and pickers; history is kept and they can be reactivated anytime.
+              </p>
+              <button
+                type="button"
+                @click="onDeactivateFromDrawer"
+                class="text-xs px-3 py-1.5 rounded-md border border-red-800 text-red-300 hover:bg-red-900/30 transition-colors"
+              >
+                Deactivate
+              </button>
+            </template>
+            <template v-else>
+              <p class="text-xs text-gray-500 mb-2">
+                Reactivate to make them available again for schedule proposals and pickers, or delete permanently.
+              </p>
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  @click="onReactivateFromDrawer"
+                  class="text-xs px-3 py-1.5 rounded-md border border-indigo-700 text-indigo-300 hover:bg-indigo-900/30 transition-colors"
+                >
+                  Reactivate
+                </button>
+                <template v-if="confirmDeleteInactiveId !== editingPerson.id">
+                  <button
+                    type="button"
+                    @click="confirmDeleteInactiveId = editingPerson.id"
+                    class="text-xs px-3 py-1.5 rounded-md border border-red-800 text-red-300 hover:bg-red-900/30 transition-colors"
+                  >
+                    Delete permanently
+                  </button>
+                </template>
+                <template v-else>
+                  <span class="text-xs text-red-300">Delete permanently?</span>
+                  <button
+                    type="button"
+                    :disabled="deletingInactiveId === editingPerson.id"
+                    @click="onDeleteInactive(editingPerson.id)"
+                    class="text-xs px-3 py-1.5 rounded-md bg-red-700 text-white hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {{ deletingInactiveId === editingPerson.id ? 'Deleting…' : 'Delete' }}
+                  </button>
+                  <button
+                    type="button"
+                    :disabled="deletingInactiveId === editingPerson.id"
+                    @click="confirmDeleteInactiveId = null"
+                    class="text-xs px-3 py-1.5 rounded-md border border-gray-700 text-gray-400 hover:bg-gray-800 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </template>
+              </div>
+            </template>
+          </div>
         </div>
       </div>
     </Transition>
@@ -383,6 +449,11 @@ const formEmail = ref('')
 const formPhone = ref('')
 const formRoles = ref<string[]>([])
 
+// Resolves the person currently being edited straight from the live store —
+// reflects `active` state immediately after a status action (store updates
+// via onSnapshot), independent of the form's own (possibly-stale) fields.
+const editingPerson = computed(() => rosterStore.people.find((p) => p.id === editingPersonId.value) ?? null)
+
 // ── Unsaved-changes guard ──────────────────────────────────────────────────
 const unsavedGuard = useUnsavedGuard(() => ({
   name: formName.value,
@@ -437,7 +508,22 @@ async function onSaveVolunteer() {
   forceCloseForm()
 }
 
-// ── Permanently delete an inactive volunteer (from the drawer's status action) ─
+// ── Status actions (drawer) ─────────────────────────────────────────────────
+// Immediate-apply — deliberately independent of the form's Save button and
+// the unsavedGuard snapshot (which only tracks name/email/phone/roles), so a
+// status change never trips the unsaved-changes discard prompt. The drawer
+// stays open after deactivate/reactivate so the pill update is visible.
+async function onDeactivateFromDrawer() {
+  if (!editingPersonId.value) return
+  await rosterStore.deactivatePerson(editingPersonId.value)
+}
+
+async function onReactivateFromDrawer() {
+  if (!editingPersonId.value) return
+  await rosterStore.reactivatePerson(editingPersonId.value)
+}
+
+// Permanently delete an inactive volunteer (from the drawer's status action).
 const confirmDeleteInactiveId = ref<string | null>(null)
 const deletingInactiveId = ref<string | null>(null)
 
@@ -446,6 +532,11 @@ async function onDeleteInactive(id: string) {
   try {
     await rosterStore.deletePerson(id)
     confirmDeleteInactiveId.value = null
+    // Deleting the person currently being edited leaves nothing to show —
+    // close the drawer rather than leave it open on a now-gone person.
+    if (editingPersonId.value === id) {
+      forceCloseForm()
+    }
   } finally {
     deletingInactiveId.value = null
   }
