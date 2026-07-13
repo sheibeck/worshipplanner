@@ -1593,4 +1593,151 @@ describe('useSongStore', () => {
       expect(store.tagFilterExclude.size).toBe(0)
     })
   })
+
+  describe('column visibility (D-08/D-09/D-10)', () => {
+    it('defaults all six toggleable columns to visible, with no title key', async () => {
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      expect(store.columnVisibility).toEqual({
+        category: true,
+        key: true,
+        ccli: true,
+        lastUsed: true,
+        tags: true,
+        themes: true,
+      })
+      expect('title' in store.columnVisibility).toBe(false)
+    })
+
+    it('toggleColumn flips only the targeted key', async () => {
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.toggleColumn('tags')
+      expect(store.columnVisibility.tags).toBe(false)
+      expect(store.columnVisibility.category).toBe(true)
+      expect(store.columnVisibility.key).toBe(true)
+      expect(store.columnVisibility.ccli).toBe(true)
+      expect(store.columnVisibility.lastUsed).toBe(true)
+      expect(store.columnVisibility.themes).toBe(true)
+    })
+
+    it('resetColumns restores every key to true', async () => {
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.toggleColumn('tags')
+      store.toggleColumn('key')
+      store.resetColumns()
+      expect(store.columnVisibility).toEqual({
+        category: true,
+        key: true,
+        ccli: true,
+        lastUsed: true,
+        tags: true,
+        themes: true,
+      })
+    })
+  })
+
+  describe('column-visibility persistence (D-08/D-09/D-10)', () => {
+    it('persists columnVisibility to localStorage under a per-user/org namespaced key on change', async () => {
+      mockAuthUser = { uid: 'uid-1' }
+      mockAuthOrgId = 'org-1'
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+
+      store.toggleColumn('tags')
+      await vi.waitFor(() => {
+        const raw = localStorage.getItem('wp:songTableColumns:v1:org-1:uid-1')
+        expect(raw).not.toBeNull()
+      })
+      const raw = localStorage.getItem('wp:songTableColumns:v1:org-1:uid-1')!
+      const parsed = JSON.parse(raw)
+      expect(parsed.tags).toBe(false)
+      expect(parsed.category).toBe(true)
+    })
+
+    it('does not read or write localStorage when uid is missing', async () => {
+      mockAuthUser = null
+      mockAuthOrgId = 'org-1'
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      store.toggleColumn('tags')
+      expect(localStorage.length).toBe(0)
+    })
+
+    it('does not read or write localStorage when org is missing', async () => {
+      mockAuthUser = { uid: 'uid-1' }
+      mockAuthOrgId = null
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.toggleColumn('tags')
+      expect(localStorage.length).toBe(0)
+    })
+
+    it('hydrates columnVisibility from localStorage on subscribe', async () => {
+      mockAuthUser = { uid: 'uid-2' }
+      mockAuthOrgId = 'org-2'
+      localStorage.setItem(
+        'wp:songTableColumns:v1:org-2:uid-2',
+        JSON.stringify({ category: false, key: true, ccli: true, lastUsed: true, tags: true, themes: true }),
+      )
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-2')
+
+      expect(store.columnVisibility.category).toBe(false)
+      expect(store.columnVisibility.tags).toBe(true)
+    })
+
+    it('resets to all-true when the saved payload is corrupt', async () => {
+      mockAuthUser = { uid: 'uid-3' }
+      mockAuthOrgId = 'org-3'
+      localStorage.setItem('wp:songTableColumns:v1:org-3:uid-3', '{not valid json')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      expect(() => store.subscribe('org-3')).not.toThrow()
+      expect(store.columnVisibility).toEqual({
+        category: true,
+        key: true,
+        ccli: true,
+        lastUsed: true,
+        tags: true,
+        themes: true,
+      })
+    })
+
+    it('resets to all-true when no saved key exists', async () => {
+      mockAuthUser = { uid: 'uid-4' }
+      mockAuthOrgId = 'org-4'
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-4')
+      expect(store.columnVisibility).toEqual({
+        category: true,
+        key: true,
+        ccli: true,
+        lastUsed: true,
+        tags: true,
+        themes: true,
+      })
+    })
+
+    it('merges hydrated keys over the default map so a newly-added column key defaults visible', async () => {
+      mockAuthUser = { uid: 'uid-5' }
+      mockAuthOrgId = 'org-5'
+      // Simulate an older saved payload missing the 'themes' key entirely.
+      localStorage.setItem(
+        'wp:songTableColumns:v1:org-5:uid-5',
+        JSON.stringify({ category: false, key: true, ccli: true, lastUsed: true, tags: true }),
+      )
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-5')
+
+      expect(store.columnVisibility.category).toBe(false)
+      expect(store.columnVisibility.themes).toBe(true)
+    })
+  })
 })
