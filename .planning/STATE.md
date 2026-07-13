@@ -4,7 +4,7 @@ milestone: v1.0
 milestone_name: MVP
 status: executing
 stopped_at: Phase 16.1 context gathered
-last_updated: "2026-07-13T03:48:55.535Z"
+last_updated: "2026-07-13T03:51:20.333Z"
 last_activity: 2026-07-13
 progress:
   total_phases: 11
@@ -21,15 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 999.1 — extract shared song browse component reused by songs page an
+**Current focus:** Phase 16.1 — song-list-tags-columns-customization
 
 ## Current Position
 
-Phase: 16.1
-Plan: Not started
+Phase: 16.1 (song-list-tags-columns-customization) — EXECUTING
+Plan: 1 of 8
 Milestone: v1.0 MVP — SHIPPED 2026-03-05
 Next milestone: v1.1 Tasks & Events (not yet started)
-Status: Ready to execute
+Status: Executing Phase 16.1
 
 ## Performance Metrics
 

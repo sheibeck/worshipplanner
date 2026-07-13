@@ -353,13 +353,13 @@ Plans:
 **Depends on:** Phase 16 (builds on the song-catalog tag/theme/column work of Phases 11–12 and the shared song-browse direction of backlog Phase 999.1)
 **Marker:** (INSERTED) — urgent work discovered mid-milestone
 **Requirements**: D-01..D-18 (see 16.1-CONTEXT.md — no formal REQ-IDs; the 18 locked decisions are the requirement/traceability set)
-**Plans:** 8 plans
+**Plans:** 2/8 plans executed
 
 Plans:
 
 **Wave 1**
-- [ ] 16.1-01-PLAN.md — Store + PC-import teamTags→tags fold + theme-removal tracking (D-01/D-05/D-14)
-- [ ] 16.1-02-PLAN.md — vwModeEnabled church-level flag (auth store) + Settings toggle (D-15/D-16)
+- [x] 16.1-01-PLAN.md — Store + PC-import teamTags→tags fold + theme-removal tracking (D-01/D-05/D-14)
+- [x] 16.1-02-PLAN.md — vwModeEnabled church-level flag (auth store) + Settings toggle (D-15/D-16)
 
 **Wave 2**
 - [ ] 16.1-03-PLAN.md — Suggestions nudge-only + songSearch team: alias (TDD) (D-02/D-03/D-04/D-06)
