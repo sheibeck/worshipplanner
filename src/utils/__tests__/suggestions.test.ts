@@ -116,61 +116,37 @@ describe('rankSongsForSlot - VW type (type-agnostic, D-10)', () => {
   })
 })
 
-describe('rankSongsForSlot - team filtering', () => {
+describe('rankSongsForSlot - team softening: no hard filter (D-03)', () => {
   it('returns all songs when serviceTeams is empty (no team filter)', () => {
     const songs = [
-      makeSong({ id: 's1', vwTypes: [1], teamTags: ['Choir'] }),
-      makeSong({ id: 's2', vwTypes: [2], teamTags: ['Orchestra'] }),
-      makeSong({ id: 's3', vwTypes: [1], teamTags: [] }),
+      makeSong({ id: 's1', vwTypes: [1], tags: ['Choir'] }),
+      makeSong({ id: 's2', vwTypes: [2], tags: ['Orchestra'] }),
+      makeSong({ id: 's3', vwTypes: [1], tags: [] }),
     ]
     const results = rankSongsForSlot(songs, 1, [], NOW_MS)
     expect(results).toHaveLength(3)
   })
 
-  it('includes songs with empty teamTags regardless of serviceTeams (universal songs)', () => {
-    const songs = [makeSong({ id: 's1', vwTypes: [1], teamTags: [] })]
+  it('returns ALL songs regardless of tag match when serviceTeams is non-empty (no hard filter)', () => {
+    const songs = [
+      makeSong({ id: 's1', vwTypes: [1], tags: ['Choir'] }), // matches scheduled team
+      makeSong({ id: 's2', vwTypes: [1], tags: [] }), // no tags at all
+      makeSong({ id: 's3', vwTypes: [1], tags: ['Orchestra'] }), // tagged with a non-scheduled team
+    ]
     const results = rankSongsForSlot(songs, 1, ['Choir'], NOW_MS)
-    expect(results).toHaveLength(1)
-    expect(results[0]!.song.id).toBe('s1')
-  })
-
-  it('includes songs that have all required team tags (AND logic)', () => {
-    const songs = [
-      makeSong({ id: 's1', vwTypes: [1], teamTags: ['Choir', 'Orchestra'] }),
-    ]
-    const results = rankSongsForSlot(songs, 1, ['Choir', 'Orchestra'], NOW_MS)
-    expect(results).toHaveLength(1)
-  })
-
-  it('excludes songs missing a required non-Orchestra team tag', () => {
-    const songs = [
-      makeSong({ id: 's1', vwTypes: [1], teamTags: ['Choir'] }), // has Choir but not SpecialService
-    ]
-    const results = rankSongsForSlot(songs, 1, ['Choir', 'SpecialService'], NOW_MS)
-    // SpecialService is a non-Orchestra team — AND-logic excludes this song
-    expect(results).toHaveLength(0)
-  })
-
-  it('excludes songs with only some matching team tags', () => {
-    const songs = [
-      makeSong({ id: 's1', vwTypes: [1], teamTags: ['Orchestra'] }),
-    ]
-    const results = rankSongsForSlot(songs, 1, ['Choir', 'Orchestra'], NOW_MS)
-    expect(results).toHaveLength(0)
-  })
-
-  it('includes non-orchestra songs when Orchestra is the only active team (soft bonus, not hard filter)', () => {
-    const songs = [
-      makeSong({ id: 's1', vwTypes: [1], teamTags: ['Choir'] }),  // non-orchestra, no Choir filter applied
-      makeSong({ id: 's2', vwTypes: [2], teamTags: ['Choir'] }),  // non-orchestra, still appears
-      makeSong({ id: 's3', vwTypes: [1], teamTags: [] }),          // universal
-    ]
-    const results = rankSongsForSlot(songs, 1, ['Orchestra'], NOW_MS)
-    // Orchestra is a soft bonus only — all 3 songs appear (no hard filter for Orchestra-only serviceTeams)
     expect(results).toHaveLength(3)
     expect(results.map((r) => r.song.id)).toContain('s1')
     expect(results.map((r) => r.song.id)).toContain('s2')
     expect(results.map((r) => r.song.id)).toContain('s3')
+  })
+
+  it('returns all songs even when scheduled with multiple teams and no song matches any', () => {
+    const songs = [
+      makeSong({ id: 's1', vwTypes: [1], tags: [] }),
+      makeSong({ id: 's2', vwTypes: [1], tags: ['Drama'] }),
+    ]
+    const results = rankSongsForSlot(songs, 1, ['Choir', 'Orchestra'], NOW_MS)
+    expect(results).toHaveLength(2)
   })
 })
 
@@ -287,55 +263,62 @@ describe('rankSongsForSlot - result shape', () => {
   })
 })
 
-describe('rankSongsForSlot - orchestra scoring bonus', () => {
-  it('orchestra-tagged song gets +200 bonus when Orchestra is in serviceTeams', () => {
+describe('rankSongsForSlot - team-tag soft bonus (D-04)', () => {
+  it('a song tagged with a scheduled team scores strictly higher than the same song without it', () => {
     const songs = [
-      makeSong({ id: 'orch', vwTypes: [1], teamTags: ['Orchestra'] }),
-      makeSong({ id: 'plain', vwTypes: [1], teamTags: [] }),
+      makeSong({ id: 'tagged', vwTypes: [1], tags: ['Choir'] }),
+      makeSong({ id: 'untagged', vwTypes: [1], tags: [] }),
     ]
-    const results = rankSongsForSlot(songs, 1, ['Orchestra'], NOW_MS)
-    const orchResult = results.find((r) => r.song.id === 'orch')!
-    const plainResult = results.find((r) => r.song.id === 'plain')!
-    expect(orchResult.score - plainResult.score).toBe(200)
+    const results = rankSongsForSlot(songs, 1, ['Choir'], NOW_MS)
+    const tagged = results.find((r) => r.song.id === 'tagged')!
+    const untagged = results.find((r) => r.song.id === 'untagged')!
+    expect(tagged.score).toBeGreaterThan(untagged.score)
+    expect(tagged.score - untagged.score).toBe(200)
+    expect(results[0]!.song.id).toBe('tagged')
+  })
+
+  it('the team-name match is case-insensitive (serviceTeams "orchestra" boosts a song tagged "Orchestra")', () => {
+    const songs = [
+      makeSong({ id: 'orch', vwTypes: [1], tags: ['Orchestra'] }),
+      makeSong({ id: 'plain', vwTypes: [1], tags: [] }),
+    ]
+    const results = rankSongsForSlot(songs, 1, ['orchestra'], NOW_MS)
+    const orch = results.find((r) => r.song.id === 'orch')!
+    const plain = results.find((r) => r.song.id === 'plain')!
+    expect(orch.score - plain.score).toBe(200)
     expect(results[0]!.song.id).toBe('orch')
   })
 
-  it('non-orchestra songs still appear in results when Orchestra is in serviceTeams', () => {
+  it('multiple scheduled teams each contribute an additive bonus (data-driven, no hardcoded team list)', () => {
     const songs = [
-      makeSong({ id: 'orch', vwTypes: [1], teamTags: ['Orchestra'] }),
-      makeSong({ id: 'plain', vwTypes: [2], teamTags: [] }),
-    ]
-    const results = rankSongsForSlot(songs, 1, ['Orchestra'], NOW_MS)
-    expect(results).toHaveLength(2)
-    expect(results.map((r) => r.song.id)).toContain('plain')
-  })
-
-  it('orchestra bonus is zero when Orchestra is NOT in serviceTeams', () => {
-    const songs = [
-      makeSong({ id: 'orch', vwTypes: [1], teamTags: ['Orchestra'] }),
-    ]
-    const withOrch = rankSongsForSlot(songs, 1, ['Orchestra'], NOW_MS)
-    const withoutOrch = rankSongsForSlot(songs, 1, [], NOW_MS)
-    expect(withOrch[0]!.score - withoutOrch[0]!.score).toBe(200)
-  })
-
-  it('Choir AND-logic still applies when serviceTeams includes both Choir and Orchestra', () => {
-    const songs = [
-      makeSong({ id: 'choir-and-orch', vwTypes: [1], teamTags: ['Choir', 'Orchestra'] }),
-      makeSong({ id: 'choir-only', vwTypes: [1], teamTags: ['Choir'] }),
-      makeSong({ id: 'universal', vwTypes: [1], teamTags: [] }),
-      makeSong({ id: 'orch-only', vwTypes: [1], teamTags: ['Orchestra'] }),
+      makeSong({ id: 'both', vwTypes: [1], tags: ['Choir', 'Orchestra'] }),
+      makeSong({ id: 'one', vwTypes: [1], tags: ['Choir'] }),
+      makeSong({ id: 'none', vwTypes: [1], tags: [] }),
     ]
     const results = rankSongsForSlot(songs, 1, ['Choir', 'Orchestra'], NOW_MS)
-    const ids = results.map((r) => r.song.id)
-    // orch-only must be excluded (fails Choir AND-logic); universal passes (empty teamTags); choir-only passes; choir-and-orch passes
-    expect(ids).not.toContain('orch-only')
-    expect(ids).toContain('choir-and-orch')
-    expect(ids).toContain('choir-only')
-    expect(ids).toContain('universal')
-    // choir-and-orch gets +200 orchestra bonus over choir-only
-    const both = results.find((r) => r.song.id === 'choir-and-orch')!
-    const choir = results.find((r) => r.song.id === 'choir-only')!
-    expect(both.score - choir.score).toBe(200)
+    const both = results.find((r) => r.song.id === 'both')!
+    const one = results.find((r) => r.song.id === 'one')!
+    const none = results.find((r) => r.song.id === 'none')!
+    expect(both.score - one.score).toBe(200)
+    expect(one.score - none.score).toBe(200)
+    expect(results[0]!.song.id).toBe('both')
+  })
+
+  it('a non-scheduled team tag does not contribute a bonus', () => {
+    const songs = [
+      makeSong({ id: 'wrong-team', vwTypes: [1], tags: ['SpecialService'] }),
+      makeSong({ id: 'no-tags', vwTypes: [1], tags: [] }),
+    ]
+    const results = rankSongsForSlot(songs, 1, ['Choir'], NOW_MS)
+    const wrong = results.find((r) => r.song.id === 'wrong-team')!
+    const none = results.find((r) => r.song.id === 'no-tags')!
+    expect(wrong.score).toBe(none.score)
+  })
+
+  it('no bonus applied when serviceTeams is empty, even if the song has team-name tags', () => {
+    const songs = [makeSong({ id: 's1', vwTypes: [1], tags: ['Choir', 'Orchestra'] })]
+    const withTeams = rankSongsForSlot(songs, 1, ['Choir', 'Orchestra'], NOW_MS)
+    const withoutTeams = rankSongsForSlot(songs, 1, [], NOW_MS)
+    expect(withTeams[0]!.score - withoutTeams[0]!.score).toBe(400)
   })
 })
