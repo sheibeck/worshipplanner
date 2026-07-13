@@ -197,11 +197,10 @@ describe('mapPcSongToUpsert', () => {
       expect(result.ccliNumber).toBe('')
     })
 
-    it('sets teamTags to [] and removedThemes to [] (D-01/D-14)', () => {
+    it('sets removedThemes to [] (D-14) — Song.teamTags no longer exists (D-01)', () => {
       const pcSong = makePcSong({ tagIds: ['tag-ballad'] })
       const tags = [makeTag('tag-ballad', 'Ballad')]
       const result = mapPcSongToUpsert(pcSong, tags, [makeArrangement('arr-1', 'Orchestra')])
-      expect(result.teamTags).toEqual([])
       expect(result.removedThemes).toEqual([])
     })
   })

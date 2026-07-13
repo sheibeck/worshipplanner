@@ -15,7 +15,6 @@ function makeSong(overrides: Partial<Omit<Song, 'vwTypes'>> & { lastUsedMs?: num
     tags: [],
     removedThemes: [],
     vwTypes: [1],
-    teamTags: [],
     arrangements: [],
     primaryArrangementId: null,
     lastUsedAt: lastUsedMs != null ? { toMillis: () => lastUsedMs } as any : null,

@@ -11,7 +11,6 @@ function makeSong(overrides: Partial<Song> = {}): Song {
     themes: ['grace', 'salvation'],
     notes: '',
     vwTypes: [1] as VWType[],
-    teamTags: ['Choir'],
     tags: [],
     removedThemes: [],
     arrangements: [
@@ -81,7 +80,7 @@ describe('songMatchesQuery', () => {
     expect(songMatchesQuery(song, 'G')).toBe(true)
     expect(songMatchesQuery(song, 'a')).toBe(true)
     // Partial key should NOT match (exact match only)
-    const songBb = makeSong({ title: 'Zzz', author: '', themes: [], teamTags: [], tags: [], ccliNumber: '', vwTypes: [],
+    const songBb = makeSong({ title: 'Zzz', author: '', themes: [], tags: [], ccliNumber: '', vwTypes: [],
       arrangements: [{ id: 'arr-1', name: 'Std', key: 'Bb', bpm: null, lengthSeconds: null, chordChartUrl: '', notes: '', teamTags: [] }] })
     expect(songMatchesQuery(songBb, 'b')).toBe(false)
   })
@@ -131,7 +130,7 @@ describe('songMatchesQuery — field-scoped + phrases (Phase 12)', () => {
   })
 
   it('vwModeEnabled=false does not affect tag:/theme:/key:/team:/bare matches — only type: is gated', () => {
-    const song = makeSong({ tags: ['Christmas'], themes: ['grace'], teamTags: [] })
+    const song = makeSong({ tags: ['Christmas'], themes: ['grace'] })
     expect(songMatchesQuery(song, 'tag:christmas', false)).toBe(true)
     expect(songMatchesQuery(song, 'theme:grace', false)).toBe(true)
     expect(songMatchesQuery(song, 'key:g', false)).toBe(true)
@@ -186,7 +185,6 @@ describe('songMatchesQuery — field-scoped + phrases (Phase 12)', () => {
       title: 'Zzz',
       tags: [],
       themes: [],
-      teamTags: [],
       ccliNumber: '',
       author: '',
       notes: '',

@@ -15,7 +15,6 @@ function makeSong(overrides: Partial<Song> = {}): Song {
     tags: [],
     removedThemes: [],
     vwTypes: [],
-    teamTags: [],
     arrangements: [],
     primaryArrangementId: null,
     lastUsedAt: null,
@@ -118,18 +117,6 @@ describe('mapRowToSong', () => {
     expect(result._warnings).toContain('Missing title')
   })
 
-  it('computes song-level teamTags as union of arrangement teamTags', () => {
-    const row = {
-      Title: 'Test Song',
-      'Arrangement 1 Name': 'Standard',
-      'Arrangement 1 Tags': 'Band, Acoustic',
-      'Arrangement 2 Name': 'Full Band',
-      'Arrangement 2 Tags': 'Band, Orchestra',
-    }
-    const result = mapRowToSong(row)
-    expect(result.teamTags).toEqual(expect.arrayContaining(['Band', 'Acoustic', 'Orchestra']))
-    expect(result.teamTags.length).toBe(3) // Union, no duplicates
-  })
 })
 
 describe('parseArrangementFromRow', () => {

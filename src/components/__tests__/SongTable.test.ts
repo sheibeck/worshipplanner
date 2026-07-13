@@ -58,7 +58,6 @@ function makeSong(overrides: Partial<Song> = {}): Song {
     themes: ['Grace', 'Redemption'],
     notes: '',
     vwTypes: [1],
-    teamTags: ['Choir'],
     arrangements: [],
     primaryArrangementId: null,
     lastUsedAt: null,
@@ -126,13 +125,14 @@ describe('SongTable', () => {
   describe('Tags/Themes split', () => {
     it('renders tags in the Tags cell and themes in the Themes cell, with no team pills', () => {
       const wrapper = mountTable([
-        makeSong({ tags: ['Christmas'], themes: ['Grace'], teamTags: ['Choir'] }),
+        makeSong({ tags: ['Christmas', 'Choir'], themes: ['Grace'] }),
       ])
       const text = wrapper.text()
       expect(text).toContain('Christmas')
       expect(text).toContain('Grace')
-      // Team pills are gone — folded into tags upstream (D-01/D-12).
-      expect(text).not.toContain('Choir')
+      // Team tags are folded into the flat tags set upstream (D-01/D-12) — 'Choir'
+      // renders as an ordinary tag pill alongside 'Christmas', not a separate team pill.
+      expect(text).toContain('Choir')
     })
 
     it('does not render inline add/remove controls on the listing (display-only)', () => {
