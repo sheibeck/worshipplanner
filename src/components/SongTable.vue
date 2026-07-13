@@ -88,8 +88,9 @@
               <SortArrow :active="sortField === 'title'" :dir="sortDir" />
             </span>
           </th>
-          <!-- Category -->
+          <!-- Category (VW-gated: hidden entirely when VW methodology is off, D-16) -->
           <th
+            v-if="authStore.vwModeEnabled && songStore.columnVisibility.category"
             scope="col"
             class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer hover:text-gray-200 select-none"
             @click="toggleSort('category')"
@@ -101,6 +102,7 @@
           </th>
           <!-- Key -->
           <th
+            v-if="songStore.columnVisibility.key"
             scope="col"
             class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer hover:text-gray-200 select-none"
             @click="toggleSort('key')"
@@ -112,6 +114,7 @@
           </th>
           <!-- CCLI -->
           <th
+            v-if="songStore.columnVisibility.ccli"
             scope="col"
             class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer hover:text-gray-200 select-none"
             @click="toggleSort('ccli')"
@@ -123,6 +126,7 @@
           </th>
           <!-- Last Used -->
           <th
+            v-if="songStore.columnVisibility.lastUsed"
             scope="col"
             class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer hover:text-gray-200 select-none"
             @click="toggleSort('lastUsed')"
@@ -132,8 +136,20 @@
               <SortArrow :active="sortField === 'lastUsed'" :dir="sortDir" />
             </span>
           </th>
-          <!-- Tags -->
-          <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+          <!-- Themes (own column now — no longer folded into Tags) -->
+          <th
+            v-if="songStore.columnVisibility.themes"
+            scope="col"
+            class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider cursor-pointer hover:text-gray-200 select-none"
+            @click="toggleSort('themes')"
+          >
+            <span class="flex items-center gap-1">
+              Themes
+              <SortArrow :active="sortField === 'themes'" :dir="sortDir" />
+            </span>
+          </th>
+          <!-- Tags (user tags only — team pills folded upstream into tags, D-01/D-12) -->
+          <th v-if="songStore.columnVisibility.tags" scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
             Tags
           </th>
           <!-- Trailing chevron (opens edit drawer) -->
@@ -165,18 +181,18 @@
             <div v-if="song.author" class="text-xs text-gray-500 mt-0.5">{{ song.author }}</div>
           </td>
 
-          <!-- Category (VW type badge) -->
-          <td class="px-4 py-3">
+          <!-- Category (VW type badge; VW-gated, D-16) -->
+          <td v-if="authStore.vwModeEnabled && songStore.columnVisibility.category" class="px-4 py-3">
             <SongBadge :types="song.vwTypes ?? []" />
           </td>
 
           <!-- Key (primary / play key) -->
-          <td class="px-4 py-3 text-gray-300">
+          <td v-if="songStore.columnVisibility.key" class="px-4 py-3 text-gray-300">
             {{ getPrimaryKey(song) || '&mdash;' }}
           </td>
 
           <!-- CCLI -->
-          <td class="px-4 py-3 text-gray-300">
+          <td v-if="songStore.columnVisibility.ccli" class="px-4 py-3 text-gray-300">
             <a
               v-if="song.ccliNumber"
               :href="`https://songselect.ccli.com/songs/${song.ccliNumber}`"
@@ -189,27 +205,71 @@
           </td>
 
           <!-- Last Used -->
-          <td class="px-4 py-3 text-gray-400">
+          <td v-if="songStore.columnVisibility.lastUsed" class="px-4 py-3 text-gray-400">
             {{ formatDate(song.lastUsedAt) }}
           </td>
 
-          <!-- Tags: team + theme + user pills, inline add/remove -->
-          <td class="px-4 py-3" @click.stop>
+          <!-- Themes: its own inline-editable column now (no longer folded into Tags) -->
+          <td v-if="songStore.columnVisibility.themes" class="px-4 py-3" @click.stop>
             <div class="flex flex-wrap gap-1 items-center">
-              <!-- Team tags -->
-              <TeamTagPill
-                v-for="t in song.teamTags"
-                :key="'tm-' + t"
-                :tag="t"
-                variant="team"
-              />
-              <!-- Theme pills -->
-              <TeamTagPill
-                v-for="t in song.themes"
+              <span
+                v-for="t in (song.themes ?? [])"
                 :key="'th-' + t"
-                :tag="t"
-                variant="theme"
-              />
+                class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-medium border bg-teal-900/50 text-teal-300 border-teal-800"
+              >
+                {{ t }}
+                <button
+                  type="button"
+                  class="ml-0.5 text-teal-400 hover:text-teal-200 leading-none"
+                  @click.stop="removeTagOrTheme(song, t, 'themes')"
+                  aria-label="Remove theme"
+                >
+                  &times;
+                </button>
+              </span>
+
+              <!-- Inline add affordance -->
+              <template v-if="inlineEditSongId === song.id && inlineEditField === 'themes'">
+                <input
+                  :ref="setInlineInputRef"
+                  v-model="inlineTagInput"
+                  type="text"
+                  placeholder="theme name"
+                  class="w-24 rounded border border-teal-700 bg-gray-900 text-teal-200 text-xs px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                  @keydown.enter.stop="commitInlineTag(song)"
+                  @keydown.escape.stop="cancelInlineTag"
+                  @click.stop
+                />
+                <button
+                  type="button"
+                  class="text-xs text-teal-400 hover:text-teal-200"
+                  @click.stop="commitInlineTag(song)"
+                >Add</button>
+                <button
+                  type="button"
+                  class="text-xs text-gray-500 hover:text-gray-300"
+                  @click.stop="cancelInlineTag"
+                >Cancel</button>
+              </template>
+              <button
+                v-else
+                type="button"
+                class="text-xs text-gray-500 hover:text-teal-300 border border-dashed border-gray-700 hover:border-teal-700 rounded-full px-1.5 py-0.5 leading-none transition-colors"
+                @click.stop="openInlineEdit(song.id, 'themes')"
+                title="Add theme"
+              >+</button>
+
+              <!-- Em-dash fallback when themes is empty and not editing -->
+              <span
+                v-if="!(song.themes ?? []).length && !(inlineEditSongId === song.id && inlineEditField === 'themes')"
+                class="text-gray-600"
+              >&mdash;</span>
+            </div>
+          </td>
+
+          <!-- Tags: user tags only — team pills folded upstream into tags (D-01/D-12) -->
+          <td v-if="songStore.columnVisibility.tags" class="px-4 py-3" @click.stop>
+            <div class="flex flex-wrap gap-1 items-center">
               <!-- User tag pills — removable -->
               <span
                 v-for="t in (song.tags ?? [])"
@@ -220,7 +280,7 @@
                 <button
                   type="button"
                   class="ml-0.5 text-pink-400 hover:text-pink-200 leading-none"
-                  @click.stop="removeUserTag(song, t)"
+                  @click.stop="removeTagOrTheme(song, t, 'tags')"
                   aria-label="Remove tag"
                 >
                   &times;
@@ -228,7 +288,7 @@
               </span>
 
               <!-- Inline add affordance -->
-              <template v-if="inlineEditSongId === song.id">
+              <template v-if="inlineEditSongId === song.id && inlineEditField === 'tags'">
                 <input
                   :ref="setInlineInputRef"
                   v-model="inlineTagInput"
@@ -258,13 +318,13 @@
                 v-else
                 type="button"
                 class="text-xs text-gray-500 hover:text-pink-300 border border-dashed border-gray-700 hover:border-pink-700 rounded-full px-1.5 py-0.5 leading-none transition-colors"
-                @click.stop="openInlineEdit(song.id)"
+                @click.stop="openInlineEdit(song.id, 'tags')"
                 title="Add user tag"
               >+</button>
 
-              <!-- Em-dash fallback when all arrays are empty -->
+              <!-- Em-dash fallback when tags is empty and not editing -->
               <span
-                v-if="!song.teamTags.length && !song.themes.length && !(song.tags ?? []).length && inlineEditSongId !== song.id"
+                v-if="!(song.tags ?? []).length && !(inlineEditSongId === song.id && inlineEditField === 'tags')"
                 class="text-gray-600"
               >&mdash;</span>
             </div>
@@ -293,9 +353,9 @@ import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import type { Song } from '@/types/song'
 import type { Timestamp } from 'firebase/firestore'
 import SongBadge from '@/components/SongBadge.vue'
-import TeamTagPill from '@/components/TeamTagPill.vue'
 import { getPrimaryKey } from '@/utils/songSearch'
 import { useSongStore } from '@/stores/songs'
+import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps<{
   songs: Song[]
@@ -309,10 +369,11 @@ const emit = defineEmits<{
 }>()
 
 const songStore = useSongStore()
+const authStore = useAuthStore()
 
 // ── Sort ───────────────────────────────────────────────────────────────────────
 
-type SortField = 'title' | 'category' | 'key' | 'ccli' | 'lastUsed'
+type SortField = 'title' | 'category' | 'key' | 'ccli' | 'lastUsed' | 'themes'
 type SortDir = 'asc' | 'desc'
 
 const sortField = ref<SortField>('title')
@@ -333,6 +394,7 @@ function sortKey(song: Song): string | number {
     case 'key':      return getPrimaryKey(song).toLowerCase()
     case 'ccli':     return Number(song.ccliNumber) || 0
     case 'lastUsed': return song.lastUsedAt?.toMillis() ?? 0
+    case 'themes':   return (song.themes ?? []).slice().sort().join(',').toLowerCase()
     default:         return song.title.toLowerCase()
   }
 }
@@ -382,9 +444,15 @@ function clearSelection() {
 
 defineExpose({ selectedIds, clearSelection })
 
-// ── Inline tag editing ─────────────────────────────────────────────────────────
+// ── Inline tag/theme editing ────────────────────────────────────────────────────
+// Generalized over field so the Tags and Themes columns share one add/remove UX
+// (D-13). inlineEditField tracks which of the two columns is mid-edit for the
+// active inlineEditSongId row.
+
+type InlineField = 'tags' | 'themes'
 
 const inlineEditSongId = ref<string | null>(null)
+const inlineEditField = ref<InlineField | null>(null)
 const inlineTagInput = ref('')
 const inlineInputRef = ref<HTMLInputElement | null>(null)
 // Function ref: the input lives inside a v-for row, so a static string ref would
@@ -393,8 +461,9 @@ function setInlineInputRef(el: unknown) {
   inlineInputRef.value = (el as HTMLInputElement | null) ?? null
 }
 
-function openInlineEdit(songId: string) {
+function openInlineEdit(songId: string, field: InlineField) {
   inlineEditSongId.value = songId
+  inlineEditField.value = field
   inlineTagInput.value = ''
   nextTick(() => {
     inlineInputRef.value?.focus()
@@ -403,26 +472,44 @@ function openInlineEdit(songId: string) {
 
 function cancelInlineTag() {
   inlineEditSongId.value = null
+  inlineEditField.value = null
   inlineTagInput.value = ''
 }
 
 async function commitInlineTag(song: Song) {
-  const tag = inlineTagInput.value.trim()
-  if (!tag) {
+  const value = inlineTagInput.value.trim()
+  const field = inlineEditField.value
+  if (!value || !field) {
     cancelInlineTag()
     return
   }
-  const existingTags = song.tags ?? []
-  if (!existingTags.includes(tag)) {
-    const newTags = [...existingTags, tag]
-    await songStore.updateSong(song.id, { tags: newTags })
+  if (field === 'tags') {
+    const existingTags = song.tags ?? []
+    if (!existingTags.includes(value)) {
+      await songStore.updateSong(song.id, { tags: [...existingTags, value] })
+    }
+  } else {
+    const existingThemes = song.themes ?? []
+    if (!existingThemes.includes(value)) {
+      await songStore.updateSong(song.id, { themes: [...existingThemes, value] })
+    }
   }
   cancelInlineTag()
 }
 
-async function removeUserTag(song: Song, tag: string) {
-  const newTags = (song.tags ?? []).filter((t) => t !== tag)
-  await songStore.updateSong(song.id, { tags: newTags })
+// D-14: removing a theme also records it in removedThemes so a re-import (which
+// unions incoming PC themes with existing ones) doesn't resurrect it. Removing a
+// user tag has no such tracking — tags aren't subject to PC re-import unions.
+async function removeTagOrTheme(song: Song, value: string, field: InlineField) {
+  if (field === 'tags') {
+    const newTags = (song.tags ?? []).filter((t) => t !== value)
+    await songStore.updateSong(song.id, { tags: newTags })
+  } else {
+    const newThemes = (song.themes ?? []).filter((t) => t !== value)
+    const existingRemoved = song.removedThemes ?? []
+    const newRemoved = existingRemoved.includes(value) ? existingRemoved : [...existingRemoved, value]
+    await songStore.updateSong(song.id, { themes: newThemes, removedThemes: newRemoved })
+  }
 }
 
 // ── Progressive rendering ──────────────────────────────────────────────────────
