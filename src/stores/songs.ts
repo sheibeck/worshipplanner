@@ -34,6 +34,19 @@ export const useSongStore = defineStore('songs', () => {
   const tagFilterInclude = ref<Set<string>>(new Set())
   const tagFilterExclude = ref<Set<string>>(new Set())
 
+  // D-08/D-09/D-10: per-user, per-org column-visibility preference for the Songs
+  // table (plan 05 cog UI binds to this). Title is always visible and therefore
+  // has no entry here — only the toggleable columns are tracked.
+  const DEFAULT_COLUMN_VISIBILITY: Record<string, boolean> = {
+    category: true,
+    key: true,
+    ccli: true,
+    lastUsed: true,
+    tags: true,
+    themes: true,
+  }
+  const columnVisibility = ref<Record<string, boolean>>({ ...DEFAULT_COLUMN_VISIBILITY })
+
   let unsubscribeFn: Unsubscribe | null = null
 
   const filteredSongs = computed(() => {
@@ -105,6 +118,21 @@ export const useSongStore = defineStore('songs', () => {
     tagFilterExclude.value = new Set()
   }
 
+  // D-08: flips a single column's visibility. Reassigns a new object (rather than
+  // mutating the existing one in place) to keep Vue reactivity consistent with the
+  // rest of this store's ref-object patterns.
+  function toggleColumn(col: string) {
+    columnVisibility.value = {
+      ...columnVisibility.value,
+      [col]: !columnVisibility.value[col],
+    }
+  }
+
+  // D-09: restores every toggleable column to visible.
+  function resetColumns() {
+    columnVisibility.value = { ...DEFAULT_COLUMN_VISIBILITY }
+  }
+
   // D-12/D-13: persist ONLY the tag-filter include/exclude sets to localStorage, namespaced
   // per user+org so state never bleeds across accounts on a shared browser (T-12-03).
   function tagFilterStorageKey(): string | null {
@@ -157,6 +185,54 @@ export const useSongStore = defineStore('songs', () => {
 
   watch([tagFilterInclude, tagFilterExclude], persistTagFilter, { deep: true })
 
+  // D-10: persist ONLY the column-visibility map to localStorage, namespaced per
+  // user+org so a personal view preference never bleeds across accounts on a
+  // shared browser (mirrors tagFilterStorageKey's T-12-03 guard verbatim).
+  function columnStorageKey(): string | null {
+    const auth = useAuthStore()
+    const uid = auth.user?.uid
+    const org = orgId.value ?? auth.orgId
+    if (!uid || !org) return null // don't read/write under a shared/global key
+    return `wp:songTableColumns:v1:${org}:${uid}`
+  }
+
+  function persistColumnVisibility() {
+    const key = columnStorageKey()
+    if (!key) return
+    try {
+      localStorage.setItem(key, JSON.stringify(columnVisibility.value))
+    } catch { /* ignore: private mode / quota — degrade to in-memory only */ }
+  }
+
+  function hydrateColumnVisibility() {
+    const key = columnStorageKey()
+    if (!key) {
+      // No usable storage key (missing uid/org) — reset in-memory state so a
+      // previous account's selection can't leak into this session (T-12-03).
+      columnVisibility.value = { ...DEFAULT_COLUMN_VISIBILITY }
+      return
+    }
+    try {
+      const raw = localStorage.getItem(key)
+      if (!raw) {
+        // No saved preference for this user/org — reset rather than leaving a
+        // previously-active user's in-memory selection applied (T-12-03).
+        columnVisibility.value = { ...DEFAULT_COLUMN_VISIBILITY }
+        return
+      }
+      const parsed = JSON.parse(raw) as Record<string, boolean>
+      // Merge hydrated keys over the default map so a newly-added column key
+      // defaults visible even if an older saved payload omits it.
+      columnVisibility.value = { ...DEFAULT_COLUMN_VISIBILITY, ...parsed }
+    } catch {
+      // Corrupt/unavailable — reset to defaults rather than keeping stale
+      // in-memory state from a prior user/org.
+      columnVisibility.value = { ...DEFAULT_COLUMN_VISIBILITY }
+    }
+  }
+
+  watch(columnVisibility, persistColumnVisibility, { deep: true })
+
   function subscribe(orgIdValue: string) {
     if (unsubscribeFn) {
       unsubscribeFn()
@@ -195,6 +271,7 @@ export const useSongStore = defineStore('songs', () => {
     // Hydrate the tag filter once org+uid are resolved (mirrors how views call
     // subscribe once authStore.orgId resolves).
     hydrateTagFilter()
+    hydrateColumnVisibility()
   }
 
   function unsubscribeAll() {
@@ -347,6 +424,7 @@ export const useSongStore = defineStore('songs', () => {
     filterKey,
     tagFilterInclude,
     tagFilterExclude,
+    columnVisibility,
     filteredSongs,
     allUserTags,
     aiCandidateSongs,
@@ -360,5 +438,7 @@ export const useSongStore = defineStore('songs', () => {
     importSongs,
     upsertSongs,
     clearTagFilter,
+    toggleColumn,
+    resetColumns,
   }
 })
