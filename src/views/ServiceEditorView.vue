@@ -498,7 +498,7 @@
                     {{ slotLabel(slot, index) }}
                   </p>
                   <SongBadge
-                    v-if="slot.songId"
+                    v-if="slot.songId && authStore.vwModeEnabled"
                     :types="songStore.songs.find(s => s.id === slot.songId)?.vwTypes ?? []"
                   />
                 </div>
@@ -1452,7 +1452,7 @@ async function suggestAllSongs() {
     const isOrchestraService = (localService.value?.teams ?? []).includes('Orchestra')
     const base = songStore.aiCandidateSongs
     const librarySource = isOrchestraService
-      ? base.filter((s) => s.teamTags.includes('Orchestra'))
+      ? base.filter((s) => s.tags.includes('Orchestra'))
       : base
     const songLibrary = librarySource.map((s) => ({
       id: s.id,
@@ -1562,7 +1562,7 @@ async function fetchAiForSlot(slotIndex: number) {
     const isOrchestraService = (localService.value?.teams ?? []).includes('Orchestra')
     const base = songStore.aiCandidateSongs
     const librarySource = isOrchestraService
-      ? base.filter((s) => s.teamTags.includes('Orchestra'))
+      ? base.filter((s) => s.tags.includes('Orchestra'))
       : base
     const result = await getSongSuggestions({
       sermonTopic: localService.value.sermonTopic ?? null,
