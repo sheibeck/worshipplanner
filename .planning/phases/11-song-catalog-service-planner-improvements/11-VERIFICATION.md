@@ -1,9 +1,10 @@
 ---
 phase: 11-song-catalog-service-planner-improvements
 verified: 2026-07-01T12:00:00Z
-status: human_needed
+status: passed
 score: 24/24
 overrides_applied: 0
+human_verified: "user approved feature-complete 2026-07-13 (drag-drop/UAT items confirmed in production)"
 human_verification:
   - test: "Drag a slot from position 1 to position 3; confirm it stays at position 3 with no snap-back"
     expected: "Slot remains at position 3 (no revert to original position)"
