@@ -97,12 +97,11 @@
                   </div>
                   <p class="text-xs text-indigo-400/80 mt-0.5">{{ item.reason }}</p>
                   <div class="flex flex-wrap gap-1 mt-1">
-                    <TeamTagPill v-for="t in item.song.teamTags" :key="'tm-'+t" :tag="t" variant="team" />
                     <TeamTagPill v-for="t in item.song.themes" :key="'th-'+t" :tag="t" variant="theme" />
                     <TeamTagPill v-for="t in item.song.tags" :key="'us-'+t" :tag="t" variant="user" />
                   </div>
                 </div>
-                <SongBadge :types="item.song.vwTypes ?? []" />
+                <SongBadge v-if="authStore.vwModeEnabled" :types="item.song.vwTypes ?? []" />
               </button>
             </div>
 
@@ -138,12 +137,11 @@
                   </span>
                 </div>
                 <div class="flex flex-wrap gap-1 mt-1">
-                  <TeamTagPill v-for="t in result.song.teamTags" :key="'tm-'+t" :tag="t" variant="team" />
                   <TeamTagPill v-for="t in result.song.themes" :key="'th-'+t" :tag="t" variant="theme" />
                   <TeamTagPill v-for="t in result.song.tags" :key="'us-'+t" :tag="t" variant="user" />
                 </div>
               </div>
-              <SongBadge :types="result.song.vwTypes ?? []" />
+              <SongBadge v-if="authStore.vwModeEnabled" :types="result.song.vwTypes ?? []" />
             </button>
           </div>
 
@@ -172,12 +170,11 @@
                 <span class="text-sm text-gray-100 truncate block">{{ song.title }}</span>
                 <span class="text-xs text-gray-400">{{ preferredKey(song) }}</span>
                 <div class="flex flex-wrap gap-1 mt-1">
-                  <TeamTagPill v-for="t in song.teamTags" :key="'tm-'+t" :tag="t" variant="team" />
                   <TeamTagPill v-for="t in song.themes" :key="'th-'+t" :tag="t" variant="theme" />
                   <TeamTagPill v-for="t in song.tags" :key="'us-'+t" :tag="t" variant="user" />
                 </div>
               </div>
-              <SongBadge :types="song.vwTypes ?? []" />
+              <SongBadge v-if="authStore.vwModeEnabled" :types="song.vwTypes ?? []" />
             </button>
           </div>
           <div v-else class="px-4 py-4 text-center">
@@ -211,6 +208,7 @@ import SongBadge from '@/components/SongBadge.vue'
 import TeamTagPill from '@/components/TeamTagPill.vue'
 import TagFilterChecklist from '@/components/TagFilterChecklist.vue'
 import { useSongStore } from '@/stores/songs'
+import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps<{
   requiredVwType: VWType
@@ -233,6 +231,7 @@ const emit = defineEmits<{
 // ── State ──────────────────────────────────────────────────────────────────────
 
 const songStore = useSongStore()
+const authStore = useAuthStore()
 
 const isOpen = ref(false)
 const searchQuery = ref('')
@@ -248,11 +247,10 @@ const dropdownStyle = ref<Record<string, string>>({})
  */
 const visibleSongs = computed<Song[]>(() => props.songs.filter((s) => s.hidden !== true))
 
-/** Distinct tags across visible songs (teamTags ∪ themes ∪ tags) — populates the shared checklist */
+/** Distinct tags across visible songs (themes ∪ tags) — populates the shared checklist */
 const availableTags = computed<string[]>(() => {
   const tagSet = new Set<string>()
   for (const song of visibleSongs.value) {
-    for (const t of (song.teamTags ?? [])) tagSet.add(t)
     for (const t of (song.themes ?? [])) tagSet.add(t)
     for (const t of (song.tags ?? [])) tagSet.add(t)
   }
@@ -270,14 +268,12 @@ const tagFilteredSongs = computed<Song[]>(() => {
   return visibleSongs.value.filter((s) => {
     if (exclude.size > 0) {
       const carriesExcluded =
-        (s.teamTags ?? []).some((t) => exclude.has(t)) ||
         (s.themes ?? []).some((t) => exclude.has(t)) ||
         (s.tags ?? []).some((t) => exclude.has(t))
       if (carriesExcluded) return false
     }
     if (include.size > 0) {
       const carriesIncluded =
-        (s.teamTags ?? []).some((t) => include.has(t)) ||
         (s.themes ?? []).some((t) => include.has(t)) ||
         (s.tags ?? []).some((t) => include.has(t))
       return carriesIncluded
@@ -300,7 +296,7 @@ const searchResults = computed<Song[]>(() => {
   if (!searchQuery.value) return []
   const q = searchQuery.value
   // No Orchestra-first ordering — results keep the underlying song order.
-  return tagFilteredSongs.value.filter((s) => songMatchesQuery(s, q))
+  return tagFilteredSongs.value.filter((s) => songMatchesQuery(s, q, authStore.vwModeEnabled))
 })
 
 const resolvedAiSuggestions = computed<{ song: Song; reason: string }[]>(() => {

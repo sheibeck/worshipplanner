@@ -50,10 +50,12 @@ export const useSongStore = defineStore('songs', () => {
   let unsubscribeFn: Unsubscribe | null = null
 
   const filteredSongs = computed(() => {
+    const authStore = useAuthStore()
     return songs.value.filter((song) => {
       // Exclude hidden songs (treat undefined as false for legacy docs)
       if (song.hidden === true) return false
-      const matchesSearch = songMatchesQuery(song, searchQuery.value)
+      // D-16: gate the `type:` search prefix on VW mode so it hides app-wide when off.
+      const matchesSearch = songMatchesQuery(song, searchQuery.value, authStore.vwModeEnabled)
 
       const matchesVwType =
         filterVwType.value === null ||
