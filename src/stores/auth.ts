@@ -39,6 +39,12 @@ export const useAuthStore = defineStore('auth', () => {
   const pcAppId = ref<string | null>(null)
   const pcSecret = ref<string | null>(null)
 
+  // Church-level Vertical Worship 1-2-3 methodology toggle (D-15). Default ON —
+  // missing field on legacy org docs means VW mode is enabled. Single source of
+  // truth every VW surface gates on (D-16). Mirror-written from Settings; NOT
+  // live-synced via onSnapshot (Pitfall 2).
+  const vwModeEnabled = ref(true)
+
   const isAuthenticated = computed(() => user.value !== null)
   const isEditor = computed(() => userRole.value === 'editor')
 
@@ -86,6 +92,7 @@ export const useAuthStore = defineStore('auth', () => {
       userRole.value = null
       pcAppId.value = null
       pcSecret.value = null
+      vwModeEnabled.value = true
       return
     }
 
@@ -99,6 +106,7 @@ export const useAuthStore = defineStore('auth', () => {
       orgSlug.value = (orgData.slug as string) ?? null
       pcAppId.value = (orgData.pcAppId as string) ?? null
       pcSecret.value = (orgData.pcSecret as string) ?? null
+      vwModeEnabled.value = (orgData.vwModeEnabled as boolean) ?? true
     }
 
     // Unsubscribe from previous listener if any
@@ -141,6 +149,7 @@ export const useAuthStore = defineStore('auth', () => {
       orgName.value = null
       orgSlug.value = null
       userRole.value = null
+      vwModeEnabled.value = true
       memberUnsub?.()
       memberUnsub = null
     }
@@ -284,6 +293,7 @@ export const useAuthStore = defineStore('auth', () => {
     userRole.value = null
     pcAppId.value = null
     pcSecret.value = null
+    vwModeEnabled.value = true
     memberUnsub?.()
     memberUnsub = null
     await signOut(auth)
@@ -318,5 +328,6 @@ export const useAuthStore = defineStore('auth', () => {
     hasPcCredentials,
     pcCredentials,
     setPcCredentials,
+    vwModeEnabled,
   }
 })

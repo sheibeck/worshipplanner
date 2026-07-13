@@ -64,6 +64,7 @@ import {
   sendPasswordResetEmail,
   signOut,
 } from 'firebase/auth'
+import { doc, getDoc } from 'firebase/firestore'
 
 const mockUser = {
   uid: 'test-uid',
@@ -72,13 +73,36 @@ const mockUser = {
   photoURL: null,
 }
 
-function triggerAuthStateChange(user: unknown) {
+async function triggerAuthStateChange(user: unknown) {
   const callbacks = (globalThis as Record<string, unknown>).__authCallbacks as
-    | ((user: unknown) => void)[]
+    | ((user: unknown) => void | Promise<void>)[]
     | undefined
   if (callbacks) {
-    callbacks.forEach((cb) => cb(user))
+    await Promise.all(callbacks.map((cb) => cb(user)))
   }
+}
+
+/** Path-aware doc()/getDoc() mock setup for loadOrgContext coverage. */
+function mockOrgDocPath(orgData: Record<string, unknown> | null) {
+  vi.mocked(doc).mockImplementation(
+    (_db: unknown, ...segments: string[]) => ({ path: segments.join('/') }) as never,
+  )
+  vi.mocked(getDoc).mockImplementation((ref: unknown) => {
+    const path = (ref as { path?: string }).path
+    if (path === 'users/test-uid') {
+      return Promise.resolve({
+        exists: () => true,
+        data: () => ({ orgIds: ['org-1'] }),
+      }) as never
+    }
+    if (path === 'organizations/org-1') {
+      return Promise.resolve({
+        exists: () => orgData !== null,
+        data: () => orgData,
+      }) as never
+    }
+    return Promise.resolve({ exists: () => false, data: () => null }) as never
+  })
 }
 
 describe('useAuthStore', () => {
@@ -264,6 +288,36 @@ describe('useAuthStore', () => {
       const store = useAuthStore()
       await store.loginWithGoogle()
       expect(setDoc).toHaveBeenCalled()
+    })
+  })
+
+  describe('vwModeEnabled (D-15/D-16)', () => {
+    it('defaults to true after loadOrgContext when the org doc has no vwModeEnabled field', async () => {
+      mockOrgDocPath({ name: 'Test Org' })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.vwModeEnabled).toBe(true)
+    })
+
+    it('reflects an explicit false vwModeEnabled field on the org doc', async () => {
+      mockOrgDocPath({ name: 'Test Org', vwModeEnabled: false })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.vwModeEnabled).toBe(false)
+    })
+
+    it('resets to true on logout', async () => {
+      mockOrgDocPath({ name: 'Test Org', vwModeEnabled: false })
+      vi.mocked(signOut).mockResolvedValueOnce(undefined)
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.vwModeEnabled).toBe(false)
+
+      await store.logout()
+      expect(store.vwModeEnabled).toBe(true)
     })
   })
 })

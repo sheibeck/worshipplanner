@@ -158,6 +158,33 @@
           </div>
         </template>
       </div>
+
+      <!-- Vertical Worship section (D-15/D-16) -->
+      <div class="rounded-lg bg-gray-900 border border-gray-800 p-4 mt-6">
+        <h2 class="text-sm font-semibold text-gray-300 mb-3">Vertical Worship</h2>
+
+        <label
+          class="flex items-center gap-3"
+          :class="authStore.isEditor ? 'cursor-pointer' : 'opacity-60 cursor-not-allowed'"
+        >
+          <input
+            v-model="vwModeInput"
+            type="checkbox"
+            :disabled="!authStore.isEditor"
+            @change="onToggleVwMode"
+            class="h-4 w-4 rounded border-gray-700 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0"
+          />
+          <span class="text-sm text-gray-200">Vertical Worship 1-2-3 methodology</span>
+        </label>
+
+        <p class="text-xs text-gray-500 mt-2">
+          When off, all Vertical Worship 1-2-3 indicators are hidden across the app. Your song
+          categories are kept and reappear when you turn it back on.
+        </p>
+
+        <p v-if="vwSavedFeedback" class="text-green-400 text-sm mt-2">Saved!</p>
+        <p v-if="vwSaveError" class="text-red-400 text-sm mt-2">{{ vwSaveError }}</p>
+      </div>
     </div>
   </AppShell>
 </template>
@@ -196,6 +223,12 @@ const pcSecretInput = ref('')
 const pcValidating = ref(false)
 const pcValidationError = ref<string | null>(null)
 const pcSaveSuccess = ref(false)
+
+// ── Vertical Worship toggle state (D-15/D-16) ─────────────────────────────────
+
+const vwModeInput = ref(authStore.vwModeEnabled)
+const vwSavedFeedback = ref(false)
+const vwSaveError = ref<string | null>(null)
 
 // ── Computed ───────────────────────────────────────────────────────────────────
 
@@ -249,6 +282,16 @@ watch(
     if (id) loadOrgSlug()
   },
   { immediate: true },
+)
+
+// Keep the local checkbox in sync if the store's org context finishes loading
+// after this component mounts (org doc is not live-synced — Pitfall 2 — so this
+// only reflects our own mirror-writes and the initial async loadOrgContext read).
+watch(
+  () => authStore.vwModeEnabled,
+  (val) => {
+    vwModeInput.value = val
+  },
 )
 
 // ── Save action (Org name) ─────────────────────────────────────────────────────
@@ -394,6 +437,32 @@ async function onClearPcCredentials() {
     editingPcCreds.value = false
   } catch (err) {
     console.error('[SettingsView] clear PC credentials error:', err)
+  }
+}
+
+// ── Vertical Worship toggle action (D-15/D-16) ─────────────────────────────────
+// Mirror-write template follows onSaveSlug: updateDoc the org doc, then
+// immediately reassign the store ref (org doc is not live-synced — Pitfall 2).
+
+async function onToggleVwMode() {
+  if (!authStore.orgId || !authStore.isEditor) return
+
+  const newValue = vwModeInput.value
+  vwSaveError.value = null
+
+  try {
+    await updateDoc(doc(db, 'organizations', authStore.orgId), { vwModeEnabled: newValue })
+    authStore.vwModeEnabled = newValue
+
+    vwSavedFeedback.value = true
+    setTimeout(() => {
+      vwSavedFeedback.value = false
+    }, 2000)
+  } catch (err) {
+    console.error('[SettingsView] save vwModeEnabled error:', err)
+    vwSaveError.value = 'Failed to save. Please try again.'
+    // Revert the local checkbox to reflect the unsaved state
+    vwModeInput.value = !newValue
   }
 }
 </script>
