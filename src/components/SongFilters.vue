@@ -24,8 +24,20 @@
           :value="searchQuery"
           @input="$emit('update:searchQuery', ($event.target as HTMLInputElement).value)"
           placeholder="Search title, CCLI, theme, tag, category..."
-          class="w-full rounded-md bg-gray-800 border border-gray-700 pl-9 pr-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+          class="w-full rounded-md bg-gray-800 border border-gray-700 pl-9 pr-9 py-2 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
         />
+        <button
+          v-if="searchQuery"
+          type="button"
+          class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-200"
+          title="Clear search"
+          aria-label="Clear search"
+          @click="$emit('update:searchQuery', '')"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
       </div>
     </div>
 
