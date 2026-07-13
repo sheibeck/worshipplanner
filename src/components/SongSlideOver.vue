@@ -104,7 +104,7 @@
           </div>
 
           <!-- VW Type -->
-          <div>
+          <div v-if="authStore.vwModeEnabled">
             <label class="block text-xs font-medium text-gray-400 mb-2">VW Category</label>
             <div class="flex gap-2">
               <button
@@ -144,25 +144,6 @@
             ></textarea>
           </div>
 
-          <!-- Song-level Team Tags -->
-          <div>
-            <label class="block text-xs font-medium text-gray-400 mb-2">Team Tags</label>
-            <div class="flex flex-wrap gap-2">
-              <button
-                v-for="tag in songLevelTags"
-                :key="tag"
-                type="button"
-                class="px-3 py-1 rounded-full text-xs font-medium border transition-colors"
-                :class="form.teamTags.includes(tag)
-                  ? 'bg-indigo-600 border-indigo-500 text-white'
-                  : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-600 hover:text-gray-300'"
-                @click="toggleSongTag(tag)"
-              >
-                {{ tag }}
-              </button>
-            </div>
-          </div>
-
           <!-- User Tags (ad-hoc, free-text) -->
           <div>
             <label class="block text-xs font-medium text-gray-400 mb-2">User Tags</label>
@@ -194,7 +175,7 @@
                 @keydown.enter.prevent="addUserTags"
               />
               <datalist id="ss-existing-user-tags">
-                <option v-for="t in songStore.allUserTags" :key="t" :value="t" />
+                <option v-for="t in tagSuggestions" :key="t" :value="t" />
               </datalist>
               <button
                 type="button"
@@ -268,6 +249,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useSongStore } from '@/stores/songs'
+import { useAuthStore } from '@/stores/auth'
 import type { Song, Arrangement, VWType } from '@/types/song'
 
 const props = defineProps<{
@@ -282,6 +264,7 @@ const emit = defineEmits<{
 }>()
 
 const songStore = useSongStore()
+const authStore = useAuthStore()
 
 // ── Form state ────────────────────────────────────────────────────────────────
 
@@ -292,7 +275,6 @@ interface FormState {
   vwTypes: VWType[]
   themes: string[]
   notes: string
-  teamTags: string[]
   tags: string[]
   arrangements: Arrangement[]
   primaryArrangementId: string | null
@@ -306,7 +288,6 @@ function emptyForm(): FormState {
     vwTypes: [],
     themes: [],
     notes: '',
-    teamTags: [],
     tags: [],
     arrangements: [],
     primaryArrangementId: null,
@@ -321,7 +302,6 @@ function songToForm(song: Song): FormState {
     vwTypes: [...(song.vwTypes ?? [])],
     themes: [...song.themes],
     notes: song.notes,
-    teamTags: [...song.teamTags],
     tags: [...(song.tags ?? [])],
     arrangements: song.arrangements.map((a) => ({
       ...a,
@@ -361,20 +341,16 @@ const isCreateMode = computed(() => props.song === null)
 
 // ── Available tags ─────────────────────────────────────────────────────────────
 
-// Predefined song-level tags + any tags found in the store
+// Predefined former "team tag" names — folded into the flat User Tags editor (D-01).
+// Seeded into the type-ahead so users can still quickly apply them as ordinary tags.
 const PREDEFINED_TAGS = ['Choir', 'Orchestra', 'Hymn']
 
-const availableTags = computed(() => {
+// Type-ahead suggestions for the User Tags input: predefined names + tags already in use.
+const tagSuggestions = computed(() => {
   const tags = new Set<string>(PREDEFINED_TAGS)
-  songStore.songs.forEach((s) => {
-    s.teamTags.forEach((t) => tags.add(t))
-    s.arrangements.forEach((a) => a.teamTags.forEach((t) => tags.add(t)))
-  })
+  songStore.allUserTags.forEach((t) => tags.add(t))
   return Array.from(tags).sort()
 })
-
-// Song-level tags = predefined + any tags already on this song or in the store
-const songLevelTags = computed(() => availableTags.value)
 
 // ── VW Type ────────────────────────────────────────────────────────────────────
 
@@ -407,17 +383,6 @@ function toggleVwType(type: VWType) {
     form.value.vwTypes.splice(idx, 1)
   } else {
     form.value.vwTypes.push(type)
-  }
-}
-
-// ── Song-level team tags ───────────────────────────────────────────────────────
-
-function toggleSongTag(tag: string) {
-  const idx = form.value.teamTags.indexOf(tag)
-  if (idx >= 0) {
-    form.value.teamTags.splice(idx, 1)
-  } else {
-    form.value.teamTags.push(tag)
   }
 }
 
@@ -468,11 +433,6 @@ async function onSave() {
     .map((t) => t.trim())
     .filter(Boolean)
 
-  // Song-level teamTags = union of arrangement teamTags + explicitly toggled song tags
-  const arrTags = new Set<string>()
-  form.value.arrangements.forEach((a) => a.teamTags.forEach((t) => arrTags.add(t)))
-  const allTags = Array.from(new Set([...form.value.teamTags, ...arrTags]))
-
   // Validate primary arrangement still exists; fall back to first arrangement
   const arrangements = form.value.arrangements
   const primaryArrangementId =
@@ -488,7 +448,10 @@ async function onSave() {
     vwTypes: form.value.vwTypes,
     themes,
     notes: form.value.notes.trim(),
-    teamTags: allTags,
+    // teamTags is no longer editable here (D-01 flat tag model) — pass the
+    // existing value through unchanged (empty for new songs) until it is
+    // fully removed from the Song type in plan 08.
+    teamTags: props.song?.teamTags ?? [],
     tags: form.value.tags,
     arrangements,
     primaryArrangementId,
