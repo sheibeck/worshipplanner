@@ -157,7 +157,19 @@ describe('RosterView — roles-only Volunteer form (D-07)', () => {
 })
 
 describe('RosterView — collapsible dense sections (R-11)', () => {
-  it('wraps Roles config and Inactive Volunteers in CollapsibleSection', () => {
+  it('wraps Roles config in CollapsibleSection', () => {
+    mockPeople = [
+      makePerson({ id: 'p-active', name: 'Alice', active: true, roles: [] }),
+    ]
+
+    const wrapper = mountRosterView()
+
+    expect(wrapper.text()).toContain('Roles config')
+  })
+})
+
+describe('RosterView — unified table with Show-inactive toggle (260713-d60)', () => {
+  it('hides inactive people by default and shows them when "Show inactive" is toggled on', async () => {
     mockPeople = [
       makePerson({ id: 'p-active', name: 'Alice', active: true, roles: [] }),
       makePerson({ id: 'p-inactive', name: 'Bob', active: false, roles: [] }),
@@ -165,10 +177,37 @@ describe('RosterView — collapsible dense sections (R-11)', () => {
 
     const wrapper = mountRosterView()
 
-    expect(wrapper.text()).toContain('Roles config')
-    expect(wrapper.text()).toContain('Inactive Volunteers (1)')
-    // Both sections default expanded (D-17) — the inactive person's name is visible.
+    expect(wrapper.text()).toContain('Alice')
+    expect(wrapper.text()).not.toContain('Bob')
+
+    const toggle = wrapper.find('input[type="checkbox"]')
+    await toggle.setValue(true)
+
     expect(wrapper.text()).toContain('Bob')
+  })
+
+  it('renders a Status column with Active/Inactive pills instead of Actions', async () => {
+    mockPeople = [
+      makePerson({ id: 'p-active', name: 'Alice', active: true, roles: [] }),
+      makePerson({ id: 'p-inactive', name: 'Bob', active: false, roles: [] }),
+    ]
+
+    const wrapper = mountRosterView()
+    const headers = wrapper.findAll('th').map((h) => h.text())
+    expect(headers).toContain('Status')
+    expect(headers.some((h) => h.includes('Actions'))).toBe(false)
+    expect(wrapper.text()).toContain('Active')
+
+    const toggle = wrapper.find('input[type="checkbox"]')
+    await toggle.setValue(true)
+    expect(wrapper.text()).toContain('Inactive')
+  })
+
+  it('does not render a per-row Deactivate button', () => {
+    mockPeople = [makePerson({ id: 'p-1', name: 'Alice', active: true, roles: [] })]
+    const wrapper = mountRosterView()
+    const buttons = wrapper.findAll('button').map((b) => b.text())
+    expect(buttons.some((t) => t.includes('Deactivate'))).toBe(false)
   })
 })
 

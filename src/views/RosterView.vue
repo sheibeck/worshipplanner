@@ -80,6 +80,14 @@
             <option value="">All roles</option>
             <option v-for="role in rosterStore.rolesSorted" :key="role.id" :value="role.id">{{ role.name }}</option>
           </select>
+          <label class="inline-flex items-center gap-2 text-sm text-gray-400 select-none sm:ml-auto">
+            <input
+              v-model="showInactive"
+              type="checkbox"
+              class="rounded border-gray-600 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-gray-900"
+            />
+            Show inactive
+          </label>
         </div>
 
         <!-- Active people table -->
@@ -100,13 +108,17 @@
                     Roles <span v-if="sortKey === 'role'">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
                   </button>
                 </th>
-                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
                 <th scope="col" class="px-4 py-3 w-8"></th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-800">
               <template v-for="person in displayedPeople" :key="person.id">
-                <tr class="cursor-pointer hover:bg-gray-800/50 transition-colors" @click="onEditPerson(person)">
+                <tr
+                  class="cursor-pointer hover:bg-gray-800/50 transition-colors"
+                  :class="{ 'opacity-60': !person.active }"
+                  @click="onEditPerson(person)"
+                >
                   <td class="px-4 py-3 font-medium text-gray-100">{{ person.name }}</td>
                   <td class="px-4 py-3 text-gray-300">{{ person.email || '—' }}</td>
                   <td class="px-4 py-3 text-gray-300">{{ person.phone || '—' }}</td>
@@ -122,9 +134,10 @@
                     </div>
                   </td>
                   <td class="px-4 py-3">
-                    <div class="flex items-center gap-3">
-                      <button @click.stop="confirmDeactivateId = person.id" class="text-xs text-red-400 hover:text-red-300 transition-colors">Deactivate</button>
-                    </div>
+                    <span
+                      class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border"
+                      :class="person.active ? 'bg-emerald-900/50 text-emerald-300 border-emerald-800' : 'bg-gray-800 text-gray-400 border-gray-700'"
+                    >{{ person.active ? 'Active' : 'Inactive' }}</span>
                   </td>
                   <td class="px-4 py-3 text-right">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -132,27 +145,10 @@
                     </svg>
                   </td>
                 </tr>
-                <tr v-if="confirmDeactivateId === person.id">
-                  <td colspan="6" class="px-4 py-3 bg-red-900/20 border-t border-b border-red-800">
-                    <p class="text-sm text-red-300">
-                      Deactivate {{ person.name }}? They'll be removed from future schedule proposals and pickers. Their history is kept and they can be reactivated anytime.
-                    </p>
-                    <div class="flex items-center gap-3 mt-3">
-                      <button
-                        @click="onConfirmDeactivate(person.id)"
-                        class="px-3 py-1.5 rounded-md text-xs font-medium text-white bg-red-700 hover:bg-red-600 transition-colors"
-                      >Deactivate</button>
-                      <button
-                        @click="confirmDeactivateId = null"
-                        class="px-3 py-1.5 rounded-md text-xs font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors"
-                      >Cancel</button>
-                    </div>
-                  </td>
-                </tr>
               </template>
               <tr v-if="displayedPeople.length === 0">
                 <td colspan="6" class="px-4 py-6 text-center text-sm text-gray-500">
-                  {{ rosterStore.activePeople.length === 0 ? 'No active volunteers' : 'No volunteers match your search/filter' }}
+                  {{ rosterStore.people.length === 0 ? 'No volunteers' : 'No volunteers match your search/filter' }}
                 </td>
               </tr>
             </tbody>
@@ -166,58 +162,6 @@
       <div class="mt-8">
         <CollapsibleSection title="Roles config" storageKey="roster.section.rolesConfig">
           <RolesConfigPanel />
-        </CollapsibleSection>
-      </div>
-
-      <!-- Inactive volunteers section (placed below Roles) -->
-      <div v-if="inactivePeople.length > 0" class="mt-8">
-        <CollapsibleSection :title="`Inactive Volunteers (${inactivePeople.length})`" storageKey="roster.section.inactiveVolunteers">
-          <p class="text-xs text-gray-500 -mt-2">Removed from schedule proposals and pickers. Reactivate to make them available again, or delete permanently.</p>
-          <div class="divide-y divide-gray-800 border border-gray-700 rounded-lg overflow-hidden">
-            <div
-              v-for="person in inactivePeople"
-              :key="person.id"
-              class="flex items-center justify-between gap-3 px-4 py-3 hover:bg-gray-800/40"
-            >
-              <div class="min-w-0">
-                <p class="text-sm text-gray-400 line-through truncate">{{ person.name }}</p>
-                <p class="text-xs text-gray-600 truncate">{{ person.email || 'No email' }}</p>
-              </div>
-              <div class="flex items-center gap-2 shrink-0">
-                <template v-if="confirmDeleteInactiveId !== person.id">
-                  <button
-                    @click="rosterStore.reactivatePerson(person.id)"
-                    class="text-xs px-3 py-1.5 rounded-md border border-indigo-700 text-indigo-300 hover:bg-indigo-900/30 transition-colors"
-                  >
-                    Reactivate
-                  </button>
-                  <button
-                    @click="confirmDeleteInactiveId = person.id"
-                    class="text-xs px-3 py-1.5 rounded-md border border-red-800 text-red-300 hover:bg-red-900/30 transition-colors"
-                  >
-                    Delete
-                  </button>
-                </template>
-                <template v-else>
-                  <span class="text-xs text-red-300">Delete permanently?</span>
-                  <button
-                    :disabled="deletingInactiveId === person.id"
-                    @click="onDeleteInactive(person.id)"
-                    class="text-xs px-3 py-1.5 rounded-md bg-red-700 text-white hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {{ deletingInactiveId === person.id ? 'Deleting…' : 'Delete' }}
-                  </button>
-                  <button
-                    :disabled="deletingInactiveId === person.id"
-                    @click="confirmDeleteInactiveId = null"
-                    class="text-xs px-3 py-1.5 rounded-md border border-gray-700 text-gray-400 hover:bg-gray-800 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </template>
-              </div>
-            </div>
-          </div>
         </CollapsibleSection>
       </div>
 
@@ -403,8 +347,6 @@ import RosterImportModal from '@/components/RosterImportModal.vue'
 const authStore = useAuthStore()
 const rosterStore = useRosterStore()
 
-const inactivePeople = computed(() => rosterStore.people.filter((p) => !p.active))
-
 // ── Import modal ─────────────────────────────────────────────────────────────
 const importModalOpen = ref(false)
 function onImported(count: number) {
@@ -495,15 +437,7 @@ async function onSaveVolunteer() {
   forceCloseForm()
 }
 
-// ── Deactivate ───────────────────────────────────────────────────────────────
-const confirmDeactivateId = ref<string | null>(null)
-
-async function onConfirmDeactivate(id: string) {
-  await rosterStore.deactivatePerson(id)
-  confirmDeactivateId.value = null
-}
-
-// ── Permanently delete an inactive volunteer (from the Inactive list) ─────────
+// ── Permanently delete an inactive volunteer (from the drawer's status action) ─
 const confirmDeleteInactiveId = ref<string | null>(null)
 const deletingInactiveId = ref<string | null>(null)
 
@@ -557,9 +491,12 @@ function firstRoleName(person: Person): string {
   return names[0] ?? ''
 }
 
+const showInactive = ref(false)
+
 const displayedPeople = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
-  let list = rosterStore.activePeople.filter((p) => {
+  let list = rosterStore.people.filter((p) => {
+    if (!showInactive.value && !p.active) return false
     if (q !== '' && !p.name.toLowerCase().includes(q)) return false
     if (roleFilter.value !== '' && !p.roles.includes(roleFilter.value)) return false
     return true
