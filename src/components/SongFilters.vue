@@ -33,6 +33,7 @@
     <div class="flex flex-wrap gap-2">
       <!-- VW Type filter -->
       <select
+        v-if="authStore.vwModeEnabled"
         :value="filterVwType ?? ''"
         @change="onVwTypeChange(($event.target as HTMLSelectElement).value)"
         class="rounded-md bg-gray-800 border border-gray-700 px-3 py-2 text-sm text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
@@ -71,6 +72,9 @@
 
 <script setup lang="ts">
 import TagFilterChecklist from '@/components/TagFilterChecklist.vue'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
 
 defineProps<{
   searchQuery: string
