@@ -213,5 +213,39 @@ describe('SongTable', () => {
       await tagPill!.trigger('click')
       expect(mockSongStore.searchQuery).toBe('tag:Acoustic')
     })
+
+    // WR-01: a whitespace-token de-dupe check breaks for multi-word tag/theme
+    // values (e.g. "tag:Christmas Eve" fragments into two tokens on split).
+    it('does not stack duplicates when a multi-word tag pill is clicked twice', async () => {
+      const wrapper = mountTable([makeSong({ tags: ['Christmas Eve'], themes: [] })])
+      const tagPill = wrapper
+        .findAll('span')
+        .find((s) => s.text() === 'Christmas Eve' && s.attributes('title') === 'Filter by this tag')
+      expect(tagPill).toBeTruthy()
+      await tagPill!.trigger('click')
+      await tagPill!.trigger('click')
+      expect(mockSongStore.searchQuery).toBe('tag:Christmas Eve')
+    })
+
+    it('does not stack duplicates when a multi-word theme pill is clicked twice', async () => {
+      const wrapper = mountTable([makeSong({ tags: [], themes: ['Christmas Eve'] })])
+      const themePill = wrapper
+        .findAll('span')
+        .find((s) => s.text() === 'Christmas Eve' && s.attributes('title') === 'Filter by this theme')
+      expect(themePill).toBeTruthy()
+      await themePill!.trigger('click')
+      await themePill!.trigger('click')
+      expect(mockSongStore.searchQuery).toBe('theme:Christmas Eve')
+    })
+
+    it('does not falsely de-dupe a multi-word term against a different prior term with overlapping prefix', async () => {
+      mockSongStore.searchQuery = 'tag:Christmas'
+      const wrapper = mountTable([makeSong({ tags: ['Christmas Eve'], themes: [] })])
+      const tagPill = wrapper
+        .findAll('span')
+        .find((s) => s.text() === 'Christmas Eve' && s.attributes('title') === 'Filter by this tag')
+      await tagPill!.trigger('click')
+      expect(mockSongStore.searchQuery).toBe('tag:Christmas tag:Christmas Eve')
+    })
   })
 })

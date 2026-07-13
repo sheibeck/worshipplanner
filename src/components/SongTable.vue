@@ -365,8 +365,15 @@ function filterByPill(field: 'type' | 'tag' | 'theme', value: string | number) {
     songStore.searchQuery = term
     return
   }
-  // De-dupe: skip if the exact term is already present as a whitespace-delimited token.
-  const alreadyPresent = current.split(/\s+/).includes(term)
+  // De-dupe: skip if the exact term is already present as a whole field-scoped
+  // span. A whitespace-token check breaks for multi-word values (e.g.
+  // "tag:Christmas Eve"), since splitting on whitespace would fragment the term
+  // itself into separate tokens that never match.
+  const alreadyPresent =
+    current === term ||
+    current.startsWith(term + ' ') ||
+    current.includes(' ' + term + ' ') ||
+    current.endsWith(' ' + term)
   if (alreadyPresent) return
   songStore.searchQuery = `${current} ${term}`
 }
