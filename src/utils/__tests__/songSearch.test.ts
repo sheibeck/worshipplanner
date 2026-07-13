@@ -51,8 +51,9 @@ describe('songMatchesQuery', () => {
     expect(songMatchesQuery(makeSong(), 'salvation')).toBe(true)
   })
 
-  it('matches a team tag', () => {
-    expect(songMatchesQuery(makeSong(), 'choir')).toBe(true)
+  it('matches a folded team name via the tags bare-term scan (team names now live in tags)', () => {
+    const song = makeSong({ tags: ['Choir'] })
+    expect(songMatchesQuery(song, 'choir')).toBe(true)
   })
 
   it('matches category by number and by label', () => {
@@ -102,15 +103,41 @@ describe('songMatchesQuery — field-scoped + phrases (Phase 12)', () => {
     expect(songMatchesQuery(song, 'theme:ador')).toBe(true)
   })
 
-  it('matches team: prefix as case-insensitive substring', () => {
-    const song = makeSong({ teamTags: ['Choir'] })
+  it('matches team: prefix as case-insensitive substring aliased to tags (D-06)', () => {
+    const song = makeSong({ tags: ['Choir'] })
     expect(songMatchesQuery(song, 'team:cho')).toBe(true)
+  })
+
+  it('team: prefix returns false for a song without the team name in its tags', () => {
+    const song = makeSong({ tags: ['Orchestra'] })
+    expect(songMatchesQuery(song, 'team:choir')).toBe(false)
   })
 
   it('matches type: prefix by number', () => {
     const song = makeSong({ vwTypes: [1] })
     expect(songMatchesQuery(song, 'type:1')).toBe(true)
     expect(songMatchesQuery(song, 'type:2')).toBe(false)
+  })
+
+  it('type: prefix matches by default (vwModeEnabled omitted → true, D-16)', () => {
+    const song = makeSong({ vwTypes: [1] })
+    expect(songMatchesQuery(song, 'type:1', true)).toBe(true)
+    expect(songMatchesQuery(song, 'type:1')).toBe(true)
+  })
+
+  it('type: prefix matches nothing when vwModeEnabled is false (D-16)', () => {
+    const song = makeSong({ vwTypes: [1] })
+    expect(songMatchesQuery(song, 'type:1', false)).toBe(false)
+  })
+
+  it('vwModeEnabled=false does not affect tag:/theme:/key:/team:/bare matches — only type: is gated', () => {
+    const song = makeSong({ tags: ['Christmas'], themes: ['grace'], teamTags: [] })
+    expect(songMatchesQuery(song, 'tag:christmas', false)).toBe(true)
+    expect(songMatchesQuery(song, 'theme:grace', false)).toBe(true)
+    expect(songMatchesQuery(song, 'key:g', false)).toBe(true)
+    const teamSong = makeSong({ tags: ['Choir'] })
+    expect(songMatchesQuery(teamSong, 'team:choir', false)).toBe(true)
+    expect(songMatchesQuery(makeSong(), 'amazing', false)).toBe(true)
   })
 
   it('matches key: prefix exactly (case-insensitive)', () => {
