@@ -261,7 +261,12 @@ const staleCount = computed(() => {
 
 const songTiles = computed(() => [
   { label: 'Songs', value: activeSongs.value.length, to: '/songs', warn: false },
-  { label: 'Uncategorized', value: uncategorizedCount.value, to: '/songs', warn: true },
+  // Uncategorized counts songs with no VW category — hide it entirely when VW
+  // mode is off, matching how Category is gated elsewhere in this phase
+  // (SongTable.vue / SongFilters.vue on authStore.vwModeEnabled).
+  ...(authStore.vwModeEnabled
+    ? [{ label: 'Uncategorized', value: uncategorizedCount.value, to: '/songs', warn: true }]
+    : []),
   { label: 'Missing key', value: missingKeyCount.value, to: '/songs', warn: true },
   { label: 'Missing CCLI', value: missingCcliCount.value, to: '/songs', warn: true },
   { label: 'Stale (6+ mo)', value: staleCount.value, to: '/songs', warn: true },
