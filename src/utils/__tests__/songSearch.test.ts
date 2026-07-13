@@ -13,6 +13,7 @@ function makeSong(overrides: Partial<Song> = {}): Song {
     vwTypes: [1] as VWType[],
     teamTags: ['Choir'],
     tags: [],
+    removedThemes: [],
     arrangements: [
       { id: 'arr-1', name: 'Standard', key: 'G', bpm: null, lengthSeconds: null, chordChartUrl: '', notes: '', teamTags: [] },
       { id: 'arr-2', name: 'Orchestra', key: 'A', bpm: null, lengthSeconds: null, chordChartUrl: '', notes: '', teamTags: [] },

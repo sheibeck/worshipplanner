@@ -67,14 +67,15 @@ export function mapPcSongToUpsert(
     else if (CATEGORY_3_RE.test(tag.name)) vwTypes.push(3)
   }
 
-  // teamTags = non-category tag names + "Orchestra" if any arrangement matches
-  const teamTags: string[] = tags
+  // team-style tags = non-category tag names + "Orchestra" if any arrangement matches.
+  // D-01: these are written into the flat `tags` field (not `teamTags`) below.
+  const teamStyleTags: string[] = tags
     .filter((tag) => !isCategoryTag(tag.name))
     .map((tag) => tag.name)
 
   const hasOrchestra = arrangements.some((arr) => /orchestra/i.test(arr.name))
   if (hasOrchestra) {
-    teamTags.push('Orchestra')
+    teamStyleTags.push('Orchestra')
   }
 
   // Map last_scheduled_at to Firestore Timestamp
@@ -117,8 +118,11 @@ export function mapPcSongToUpsert(
     themes,
     notes: '',
     vwTypes,
-    teamTags,
-    tags: [], // D-01/D-02: user tags never sourced from PC; import payload always carries []
+    teamTags: [], // D-01: field still required on the type until plan 08, but no longer populated here
+    // D-01: team-style tag names (Orchestra + non-category PC tags) now go into the flat
+    // tags field; upsertSongs unions this into any pre-existing user tags on re-import.
+    tags: teamStyleTags,
+    removedThemes: [], // D-14: PC import never removes themes itself
     arrangements: mappedArrangements,
     primaryArrangementId,
     lastUsedAt,

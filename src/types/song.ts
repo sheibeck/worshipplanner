@@ -38,6 +38,8 @@ export interface Song {
   pcSongId: string | null
   hidden: boolean
   tags: string[] // D-01 user-defined tags (e.g. "Christmas") — distinct from themes and teamTags
+  /** Themes the user removed locally; subtracted from PC theme union on re-import (D-14). */
+  removedThemes: string[]
 }
 
 /**

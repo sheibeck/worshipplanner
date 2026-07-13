@@ -69,6 +69,7 @@ function makeSong(overrides: Partial<{
   updatedAt: { seconds: number; nanoseconds: number }
   pcSongId: string | null
   hidden: boolean
+  removedThemes: string[]
 }> = {}) {
   return {
     id: 'song-1',
@@ -78,6 +79,7 @@ function makeSong(overrides: Partial<{
     vwTypes: [1] as VWType[],
     teamTags: ['Choir'],
     tags: [] as string[],
+    removedThemes: [] as string[],
     arrangements: [
       {
         id: 'arr-1',
@@ -290,6 +292,72 @@ describe('useSongStore', () => {
     })
   })
 
+  describe('subscribe — teamTags fold into tags (D-01)', () => {
+    it('folds teamTags into tags, de-duplicated (order-insensitive)', async () => {
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'song-1', teamTags: ['Orchestra'], tags: ['Christmas'] }),
+      ])
+      expect(new Set(store.songs[0]!.tags)).toEqual(new Set(['Christmas', 'Orchestra']))
+    })
+
+    it('does not duplicate a teamTags value that already exists in tags', async () => {
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'song-1', teamTags: ['Orchestra'], tags: ['Orchestra'] }),
+      ])
+      expect(store.songs[0]!.tags).toEqual(['Orchestra'])
+    })
+
+    it('does not fold when teamTags is empty', async () => {
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'song-1', teamTags: [], tags: ['Christmas'] }),
+      ])
+      expect(store.songs[0]!.tags).toEqual(['Christmas'])
+    })
+  })
+
+  describe('subscribe — removedThemes default (D-14)', () => {
+    it('defaults removedThemes to [] for a legacy doc missing the field', async () => {
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      if (snapshotCallback) {
+        snapshotCallback({
+          docs: [
+            {
+              id: 'legacy-no-removed-themes',
+              data: () => ({
+                title: 'Legacy Song',
+                ccliNumber: '66666',
+                author: 'Old Author',
+                vwTypes: [],
+                teamTags: [],
+                tags: [],
+                arrangements: [],
+                themes: [],
+                notes: '',
+                lastUsedAt: null,
+                createdAt: { seconds: 1000000, nanoseconds: 0 },
+                updatedAt: { seconds: 1000000, nanoseconds: 0 },
+                hidden: false,
+                // removedThemes field intentionally omitted — legacy doc
+              }),
+            },
+          ],
+        })
+      }
+      expect(store.songs[0]!.removedThemes).toEqual([])
+    })
+  })
+
   describe('filteredSongs — hidden songs', () => {
     it('excludes songs where hidden is true', async () => {
       const { useSongStore } = await import('../songs')
@@ -318,9 +386,9 @@ describe('useSongStore', () => {
       const store = useSongStore()
       store.subscribe('org-1')
       triggerSnapshot([
-        makeSong({ id: 'song-1', title: 'Visible', hidden: false, tags: ['Zeal', 'Grace'] }),
-        makeSong({ id: 'song-2', title: 'Also Visible', hidden: false, tags: ['Grace'] }),
-        makeSong({ id: 'song-3', title: 'Hidden', hidden: true, tags: ['Repentance'] }),
+        makeSong({ id: 'song-1', title: 'Visible', hidden: false, teamTags: [], tags: ['Zeal', 'Grace'] }),
+        makeSong({ id: 'song-2', title: 'Also Visible', hidden: false, teamTags: [], tags: ['Grace'] }),
+        makeSong({ id: 'song-3', title: 'Hidden', hidden: true, teamTags: [], tags: ['Repentance'] }),
       ])
       // 'Repentance' lives only on the hidden song, so it must not appear;
       // 'Grace' is deduped; result is sorted.
@@ -553,6 +621,27 @@ describe('useSongStore', () => {
       expect(store.filteredSongs).toHaveLength(1)
       expect(store.filteredSongs[0]!.title).toBe('Choir Song')
     })
+
+    it('include/exclude matching is unaffected by the teamTags→tags read-fold (D-01)', async () => {
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        // 'Orchestra' now also lives in the folded tags set, but filter matching
+        // against the raw teamTags union must still behave identically.
+        makeSong({ id: 'song-1', title: 'Orchestra Song', teamTags: ['Orchestra'], tags: [] }),
+        makeSong({ id: 'song-2', title: 'Other Song', teamTags: [], tags: [] }),
+      ])
+      expect(new Set(store.songs[0]!.tags)).toEqual(new Set(['Orchestra']))
+      store.tagFilterInclude = new Set(['Orchestra'])
+      expect(store.filteredSongs).toHaveLength(1)
+      expect(store.filteredSongs[0]!.title).toBe('Orchestra Song')
+
+      store.tagFilterInclude = new Set()
+      store.tagFilterExclude = new Set(['Orchestra'])
+      expect(store.filteredSongs).toHaveLength(1)
+      expect(store.filteredSongs[0]!.title).toBe('Other Song')
+    })
   })
 
   describe('filteredSongs — combined filters (AND logic)', () => {
@@ -603,6 +692,7 @@ describe('useSongStore', () => {
         vwTypes: [],
         teamTags: [],
         tags: [],
+        removedThemes: [],
         arrangements: [],
         primaryArrangementId: null,
         lastUsedAt: null,
@@ -691,6 +781,7 @@ describe('useSongStore', () => {
           vwTypes: [],
           teamTags: [],
           tags: [],
+          removedThemes: [],
           arrangements: [],
           primaryArrangementId: null,
           lastUsedAt: null,
@@ -727,6 +818,7 @@ describe('useSongStore', () => {
           vwTypes: [1],
           teamTags: [],
           tags: [],
+          removedThemes: [],
           arrangements: [],
           primaryArrangementId: null,
           lastUsedAt: null,
@@ -760,6 +852,7 @@ describe('useSongStore', () => {
           vwTypes: [],
           teamTags: [],
           tags: [],
+          removedThemes: [],
           arrangements: [],
           primaryArrangementId: null,
           lastUsedAt: null,
@@ -793,6 +886,7 @@ describe('useSongStore', () => {
           vwTypes: [],
           teamTags: [],
           tags: [],
+          removedThemes: [],
           arrangements: [],
           primaryArrangementId: null,
           lastUsedAt: null,
@@ -826,6 +920,7 @@ describe('useSongStore', () => {
           vwTypes: [], // incoming vwTypes is empty — should preserve existing
           teamTags: [],
           tags: [],
+          removedThemes: [],
           arrangements: [],
           primaryArrangementId: null,
           lastUsedAt: null,
@@ -860,6 +955,7 @@ describe('useSongStore', () => {
           vwTypes: [1, 3],
           teamTags: [],
           tags: [],
+          removedThemes: [],
           arrangements: [],
           primaryArrangementId: null,
           lastUsedAt: null,
@@ -882,7 +978,7 @@ describe('useSongStore', () => {
       const store = useSongStore()
       store.subscribe('org-1')
       triggerSnapshot([
-        makeSong({ id: 'song-tagged', title: 'Tagged Song', pcSongId: 'pc-tagged', ccliNumber: '11111', tags: ['Christmas'] }),
+        makeSong({ id: 'song-tagged', title: 'Tagged Song', pcSongId: 'pc-tagged', ccliNumber: '11111', teamTags: [], tags: ['Christmas'] }),
       ])
 
       await store.upsertSongs([
@@ -895,6 +991,7 @@ describe('useSongStore', () => {
           vwTypes: [],
           teamTags: [],
           tags: [], // import sends empty tags — must NOT overwrite existing user tags
+          removedThemes: [],
           arrangements: [],
           primaryArrangementId: null,
           lastUsedAt: null,
@@ -928,6 +1025,7 @@ describe('useSongStore', () => {
           vwTypes: [],
           teamTags: [],
           tags: [],
+          removedThemes: [],
           arrangements: [],
           primaryArrangementId: null,
           lastUsedAt: null,
@@ -963,6 +1061,7 @@ describe('useSongStore', () => {
           vwTypes: [],
           teamTags: [],
           tags: [],
+          removedThemes: [],
           arrangements: [],
           primaryArrangementId: null,
           lastUsedAt: null,
@@ -975,6 +1074,128 @@ describe('useSongStore', () => {
       const callArgs = vi.mocked(addDoc).mock.calls[0]!
       const data = callArgs[1] as Record<string, unknown>
       expect(data.tags).toEqual([])
+    })
+  })
+
+  describe('upsertSongs — tag union + theme-removal-aware merge (D-05, D-14)', () => {
+    it('unions incoming team tags into existing tags without dropping the user tag', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'song-union', title: 'Union Song', pcSongId: 'pc-union', ccliNumber: '44001', teamTags: [], tags: ['Christmas'] }),
+      ])
+
+      await store.upsertSongs([
+        {
+          title: 'Union Song',
+          ccliNumber: '44001',
+          author: 'Author',
+          themes: [],
+          notes: '',
+          vwTypes: [],
+          teamTags: [],
+          tags: ['Orchestra'], // imported team-style tag
+          removedThemes: [],
+          arrangements: [],
+          primaryArrangementId: null,
+          lastUsedAt: null,
+          pcSongId: 'pc-union',
+          hidden: false,
+        },
+      ])
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const data = callArgs[1] as unknown as Record<string, unknown>
+      expect(new Set(data.tags as string[])).toEqual(new Set(['Christmas', 'Orchestra']))
+    })
+
+    it('a theme listed in existing.removedThemes is NOT present in the written themes after re-import', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({
+          id: 'song-removed-theme',
+          title: 'Removed Theme Song',
+          pcSongId: 'pc-removed-theme',
+          ccliNumber: '44002',
+          teamTags: [],
+          themes: ['grace'],
+          removedThemes: ['salvation'],
+        }),
+      ])
+
+      await store.upsertSongs([
+        {
+          title: 'Removed Theme Song',
+          ccliNumber: '44002',
+          author: 'Author',
+          themes: ['salvation', 'worship'], // PC still sends the removed theme back
+          notes: '',
+          vwTypes: [],
+          teamTags: [],
+          tags: [],
+          removedThemes: [],
+          arrangements: [],
+          primaryArrangementId: null,
+          lastUsedAt: null,
+          pcSongId: 'pc-removed-theme',
+          hidden: false,
+        },
+      ])
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const data = callArgs[1] as unknown as Record<string, unknown>
+      const themes = data.themes as string[]
+      expect(themes).toContain('grace')
+      expect(themes).toContain('worship')
+      expect(themes).not.toContain('salvation') // user-removed theme stays removed
+    })
+
+    it('removedThemes survives an upsert unchanged', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({
+          id: 'song-preserve-removed',
+          title: 'Preserve Removed',
+          pcSongId: 'pc-preserve-removed',
+          ccliNumber: '44003',
+          teamTags: [],
+          removedThemes: ['salvation'],
+        }),
+      ])
+
+      await store.upsertSongs([
+        {
+          title: 'Preserve Removed',
+          ccliNumber: '44003',
+          author: 'Author',
+          themes: [],
+          notes: '',
+          vwTypes: [],
+          teamTags: [],
+          tags: [],
+          removedThemes: [], // import never sets removedThemes itself
+          arrangements: [],
+          primaryArrangementId: null,
+          lastUsedAt: null,
+          pcSongId: 'pc-preserve-removed',
+          hidden: false,
+        },
+      ])
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const data = callArgs[1] as unknown as Record<string, unknown>
+      expect(data.removedThemes).toEqual(['salvation'])
     })
   })
 
@@ -1220,6 +1441,7 @@ describe('useSongStore', () => {
         vwTypes: [] as VWType[],
         teamTags: [] as string[],
         tags: [] as string[],
+        removedThemes: [] as string[],
         arrangements: [] as Array<{ id: string; name: string; key: string; bpm: number | null; lengthSeconds: number | null; chordChartUrl: string; notes: string; teamTags: string[] }>,
         primaryArrangementId: null as string | null,
         lastUsedAt: null,
@@ -1248,6 +1470,7 @@ describe('useSongStore', () => {
         vwTypes: [] as VWType[],
         teamTags: [] as string[],
         tags: [] as string[],
+        removedThemes: [] as string[],
         arrangements: [] as Array<{ id: string; name: string; key: string; bpm: number | null; lengthSeconds: number | null; chordChartUrl: string; notes: string; teamTags: string[] }>,
         primaryArrangementId: null as string | null,
         lastUsedAt: null,

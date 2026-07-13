@@ -15,6 +15,7 @@ const mockSongs: Song[] = [
     themes: [],
     notes: '',
     tags: [],
+    removedThemes: [],
     vwTypes: [1],
     teamTags: [],
     arrangements: [
@@ -44,6 +45,7 @@ const mockSongs: Song[] = [
     themes: [],
     notes: '',
     tags: [],
+    removedThemes: [],
     vwTypes: [2],
     teamTags: [],
     arrangements: [
@@ -73,6 +75,7 @@ const mockSongs: Song[] = [
     themes: [],
     notes: '',
     tags: [],
+    removedThemes: [],
     vwTypes: [2],
     teamTags: [],
     arrangements: [
@@ -102,6 +105,7 @@ const mockSongs: Song[] = [
     themes: [],
     notes: '',
     tags: [],
+    removedThemes: [],
     vwTypes: [3],
     teamTags: [],
     arrangements: [],
@@ -120,6 +124,7 @@ const mockSongs: Song[] = [
     themes: [],
     notes: '',
     tags: [],
+    removedThemes: [],
     vwTypes: [3],
     teamTags: [],
     arrangements: [],
