@@ -261,7 +261,11 @@
             <button
               type="submit"
               form="volunteer-form"
-              class="px-3 py-1.5 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors"
+              class="px-3 py-1.5 rounded-md text-sm font-medium text-white transition-colors"
+              :class="unsavedGuard.isDirty.value
+                ? 'bg-indigo-600 hover:bg-indigo-500'
+                : 'bg-indigo-600/40 cursor-default text-white/50'"
+              :disabled="!unsavedGuard.isDirty.value"
             >
               Save
             </button>

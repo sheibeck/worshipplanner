@@ -221,35 +221,60 @@ describe('AvailabilityDrawer', () => {
     expect(blockedNow.sort()).toEqual(['2026-07-05', '2026-07-19'].sort())
   })
 
-  it('changing per-role tiers (Vocals -> Monthly, Sound -> Out) then saving calls setPersonAvailability with roleFrequency carrying both, and never writes a standing frequency through rosterStore (D-05)', async () => {
+  it('changing a per-role tier (Vocals -> Weekly) then saving calls setPersonAvailability with roleFrequency carrying every held role, and never writes a standing frequency through rosterStore (D-05)', async () => {
     mockQuarter = makeQuarter()
     mockSetPersonAvailability.mockClear()
     mockUpdatePerson.mockClear()
 
     const wrapper = mountDrawer()
 
-    const vocalsMonthly = wrapper
+    // Vocals defaults to Monthly (regular n=4); switch it to Weekly (regular n=1)
+    // — a genuine change from the loaded baseline, which is what marks the drawer
+    // dirty and enables the Save button (Sound stays Out, unchanged).
+    const vocalsWeekly = wrapper
       .findAll('button[data-role-id="vocals"]')
-      .find((b) => b.attributes('data-preset') === 'monthly')!
-    await vocalsMonthly.trigger('click')
-
-    const soundOut = wrapper
-      .findAll('button[data-role-id="sound"]')
-      .find((b) => b.attributes('data-preset') === 'out')!
-    await soundOut.trigger('click')
+      .find((b) => b.attributes('data-preset') === 'weekly')!
+    await vocalsWeekly.trigger('click')
 
     const saveButton = wrapper.findAll('button').find((b) => b.text() === 'Save')!
+    // Dirty now — Save is enabled.
+    expect((saveButton.element as HTMLButtonElement).disabled).toBe(false)
     await saveButton.trigger('click')
 
+    // setPersonAvailability writes the full roleFrequency map for every held role,
+    // carrying Sound's unchanged Out tier alongside the newly-changed Vocals tier.
     expect(mockSetPersonAvailability).toHaveBeenCalledWith('quarter-1', 'person-1', {
       blackoutDates: ['2026-07-19'],
       pairedWith: ['dean'],
-      roleFrequency: { sound: { tier: 'out', n: 0 }, vocals: { tier: 'regular', n: 4 } },
+      roleFrequency: { sound: { tier: 'out', n: 0 }, vocals: { tier: 'regular', n: 1 } },
       note: 'x',
     })
 
     // No standing frequency write remains — frequency is fully quarter-scoped (D-05).
     expect(mockUpdatePerson).not.toHaveBeenCalled()
+  })
+
+  it('dims/disables the Save button when there are no unsaved changes and enables it once the drawer is dirty (mirrors ServiceEditorView save affordance)', async () => {
+    mockQuarter = makeQuarter()
+    mockSetPersonAvailability.mockClear()
+    mockUpdatePerson.mockClear()
+
+    const wrapper = mountDrawer()
+
+    const saveButton = () => wrapper.findAll('button').find((b) => b.text() === 'Save')!
+
+    // Freshly opened, nothing changed → clean → Save dimmed + disabled.
+    expect((saveButton().element as HTMLButtonElement).disabled).toBe(true)
+    expect(saveButton().classes()).toContain('bg-indigo-600/40')
+    expect(saveButton().classes()).not.toContain('bg-indigo-600')
+
+    // Make a genuine change (block a not-yet-blocked Sunday) → dirty → Save active.
+    const notYetBlocked = wrapper.find('button[data-date="2026-07-05"]')
+    await notYetBlocked.trigger('click')
+
+    expect((saveButton().element as HTMLButtonElement).disabled).toBe(false)
+    expect(saveButton().classes()).toContain('bg-indigo-600')
+    expect(saveButton().classes()).not.toContain('bg-indigo-600/40')
   })
 
   it('renders a roles checklist bound to person.roles and toggling a role ON calls the roster store (not the quarters store) (D-09)', async () => {
