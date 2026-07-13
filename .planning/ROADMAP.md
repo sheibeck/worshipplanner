@@ -372,20 +372,3 @@ Plans:
 
 **Wave 4**
 - [x] 16.1-08-PLAN.md — Remove Song.teamTags + vue-tsc blast-radius cleanup + full-suite gate (D-01)
-
-### Phase 16.2: Admin permissions hardening — Viewer read-only access, no Admin/Settings visibility (INSERTED)
-
-**Goal:** Shore up role-based access control so the `viewer` role is strictly read-only and cannot reach admin surfaces. Viewers may view every operational screen (Services, Songs, Schedules, Volunteers) but cannot create, edit, delete, or otherwise mutate anything on them, and must have no visibility whatsoever to the Admins and Settings screens (hidden from navigation AND blocked at the route level, not merely disabled). Editors retain full edit access. Builds on Phase 7 (Invite & RBAC), which introduced the Editor/Viewer roles.
-
-**Requirements** (to be formalized in discuss/spec — captured verbatim from request):
-- R-01 **No admin surface for viewers** — A viewer must never see or reach the Admins or Settings screens. Remove them from navigation for viewers and enforce with a route guard (direct URL navigation is blocked/redirected, not just hidden).
-- R-02 **Services read-only for viewers** — Viewers can view services/service plans but cannot create, edit, reorder, delete, autosave, or export them; all edit affordances are hidden or disabled.
-- R-03 **Songs read-only for viewers** — Viewers can view the song catalog but cannot add, edit, import, tag/untag, hide, or delete songs.
-- R-04 **Schedules read-only for viewers** — Viewers can view quarterly schedules but cannot generate, assign, clear, swap, or edit any cell or schedule setting.
-- R-05 **Volunteers read-only for viewers** — Viewers can view volunteers but cannot add, edit, deactivate/reactivate, delete, or import people, roles, availability, or pairings.
-- R-06 **Editor unchanged** — The `editor` role retains full create/edit/delete access across all screens.
-- R-07 **Defense in depth** — Enforce read-only at the UI (hide/disable controls), the route (guards), and ideally validate against Firestore security rules so a viewer cannot mutate data even via a crafted request.
-
-**Depends on:** Phase 7 (Invite & RBAC — Editor/Viewer roles and role storage) and Phase 16 (current volunteer/schedule surfaces)
-**Marker:** (INSERTED) — urgent work discovered post-ship
-**Status:** Not planned yet
