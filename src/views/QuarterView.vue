@@ -38,7 +38,7 @@
           </button>
           <button
             v-if="selectedQuarter && hasAssignments"
-            @click="showRegenerateConfirm = true"
+            @click="onRequestRegenerate"
             class="inline-flex items-center gap-2 rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm font-medium text-gray-200 hover:bg-gray-700 hover:text-white transition-colors"
           >
             Regenerate
@@ -80,21 +80,47 @@
       <div v-if="shareError" class="text-sm text-red-400 mb-6">{{ shareError }}</div>
 
       <template v-if="selectedQuarter">
-        <!-- Volunteer Availability: full-width roster table opening the per-person drawer (D-02/D-03) -->
-        <CollapsibleSection
-          title="Volunteer Availability"
-          storage-key="schedule.section.volunteerAvailability"
-          class="mb-6"
-        >
-          <AvailabilityRosterTable :quarter="selectedQuarter" @select="openPersonId = $event" />
-        </CollapsibleSection>
+        <!-- Tab bar (mirrors ServicesView.vue) -->
+        <div class="flex items-center gap-1 mb-6 border-b border-gray-800 pb-0">
+          <button
+            type="button"
+            class="px-4 py-2 text-sm font-medium rounded-t-md transition-colors -mb-px border-b-2"
+            :class="activeTab === 'volunteers'
+              ? 'text-indigo-300 border-indigo-500 bg-gray-900'
+              : 'text-gray-400 border-transparent hover:text-gray-200 hover:border-gray-600'"
+            @click="activeTab = 'volunteers'"
+          >
+            Volunteers
+          </button>
+          <button
+            type="button"
+            class="px-4 py-2 text-sm font-medium rounded-t-md transition-colors -mb-px border-b-2"
+            :class="activeTab === 'schedule'
+              ? 'text-indigo-300 border-indigo-500 bg-gray-900'
+              : 'text-gray-400 border-transparent hover:text-gray-200 hover:border-gray-600'"
+            @click="activeTab = 'schedule'"
+          >
+            Schedule
+          </button>
+          <button
+            type="button"
+            class="px-4 py-2 text-sm font-medium rounded-t-md transition-colors -mb-px border-b-2"
+            :class="activeTab === 'serviceDates'
+              ? 'text-indigo-300 border-indigo-500 bg-gray-900'
+              : 'text-gray-400 border-transparent hover:text-gray-200 hover:border-gray-600'"
+            @click="activeTab = 'serviceDates'"
+          >
+            Service dates
+          </button>
+        </div>
 
-        <!-- Setup: service dates with inline per-date role overrides -->
-        <CollapsibleSection
-          title="Service dates"
-          storage-key="schedule.section.serviceDates"
-          class="mb-6"
-        >
+        <!-- Volunteers tab: full-width roster table opening the per-person drawer (D-02/D-03) -->
+        <div v-show="activeTab === 'volunteers'">
+          <AvailabilityRosterTable :quarter="selectedQuarter" @select="openPersonId = $event" />
+        </div>
+
+        <!-- Service dates tab: service dates with inline per-date role overrides -->
+        <div v-show="activeTab === 'serviceDates'">
           <div class="flex items-center gap-2 mb-3">
             <input
               v-model="newDateInput"
@@ -179,9 +205,60 @@
               No service dates yet
             </li>
           </ul>
-        </CollapsibleSection>
 
-        <!-- Regenerate confirmation (triggered from the header controls) -->
+          <!-- Danger zone: permanently delete this quarter (irreversible) — removes the
+               quarter, its generated schedule, and revokes any public share link. -->
+          <div class="mt-10 border border-red-900/50 rounded-xl overflow-hidden">
+            <div class="px-4 py-3 bg-red-950/30 border-b border-red-900/50">
+              <h2 class="text-sm font-medium text-red-300">Danger Zone</h2>
+              <p class="text-xs text-gray-500 mt-0.5">
+                Permanently delete <span class="font-semibold text-gray-300">{{ selectedQuarter.label }}</span> — its
+                volunteer setup, the generated schedule, and any public share link. This cannot be undone.
+              </p>
+            </div>
+            <div class="px-4 py-4">
+              <button
+                v-if="!deleteConfirmOpen"
+                @click="deleteConfirmOpen = true"
+                class="text-xs px-3 py-1.5 rounded-md border border-red-700 text-red-300 hover:bg-red-900/30 transition-colors"
+              >
+                Delete quarter
+              </button>
+              <div v-else class="space-y-3">
+                <p class="text-xs text-gray-400">
+                  Type <span class="font-mono font-semibold text-red-300">DELETE</span> to permanently delete
+                  <span class="font-semibold text-gray-300">{{ selectedQuarter.label }}</span>.
+                </p>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <input
+                    v-model="deleteConfirmText"
+                    placeholder="DELETE"
+                    class="rounded-md bg-gray-900 border border-gray-700 px-3 py-1.5 text-sm text-gray-200 focus:outline-none focus:border-red-600"
+                  />
+                  <button
+                    :disabled="deleteConfirmText !== 'DELETE' || deletingQuarter"
+                    @click="onDeleteQuarter"
+                    class="text-xs px-3 py-1.5 rounded-md bg-red-700 text-white hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {{ deletingQuarter ? 'Deleting…' : 'Delete quarter' }}
+                  </button>
+                  <button
+                    @click="cancelDeleteQuarter"
+                    :disabled="deletingQuarter"
+                    class="text-xs px-3 py-1.5 rounded-md border border-gray-700 text-gray-400 hover:bg-gray-800 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                <p v-if="deleteQuarterError" class="text-xs text-red-400">{{ deleteQuarterError }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Schedule tab -->
+        <div v-show="activeTab === 'schedule'">
+          <!-- Regenerate confirmation (triggered from the header controls) -->
         <div v-if="showRegenerateConfirm" class="mb-6 rounded-md bg-red-900/20 border border-red-800 p-4">
           <p class="text-sm text-red-300">
             Regenerate the full schedule? This replaces all current assignments, including any manual edits you've made. This cannot be undone.
@@ -238,53 +315,6 @@
           />
         </div>
 
-        <!-- Danger zone: permanently delete this quarter (irreversible) — removes the
-             quarter, its generated schedule, and revokes any public share link. -->
-        <div class="mt-10 border border-red-900/50 rounded-xl overflow-hidden">
-          <div class="px-4 py-3 bg-red-950/30 border-b border-red-900/50">
-            <h2 class="text-sm font-medium text-red-300">Danger Zone</h2>
-            <p class="text-xs text-gray-500 mt-0.5">
-              Permanently delete <span class="font-semibold text-gray-300">{{ selectedQuarter.label }}</span> — its
-              volunteer setup, the generated schedule, and any public share link. This cannot be undone.
-            </p>
-          </div>
-          <div class="px-4 py-4">
-            <button
-              v-if="!deleteConfirmOpen"
-              @click="deleteConfirmOpen = true"
-              class="text-xs px-3 py-1.5 rounded-md border border-red-700 text-red-300 hover:bg-red-900/30 transition-colors"
-            >
-              Delete quarter
-            </button>
-            <div v-else class="space-y-3">
-              <p class="text-xs text-gray-400">
-                Type <span class="font-mono font-semibold text-red-300">DELETE</span> to permanently delete
-                <span class="font-semibold text-gray-300">{{ selectedQuarter.label }}</span>.
-              </p>
-              <div class="flex items-center gap-2 flex-wrap">
-                <input
-                  v-model="deleteConfirmText"
-                  placeholder="DELETE"
-                  class="rounded-md bg-gray-900 border border-gray-700 px-3 py-1.5 text-sm text-gray-200 focus:outline-none focus:border-red-600"
-                />
-                <button
-                  :disabled="deleteConfirmText !== 'DELETE' || deletingQuarter"
-                  @click="onDeleteQuarter"
-                  class="text-xs px-3 py-1.5 rounded-md bg-red-700 text-white hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  {{ deletingQuarter ? 'Deleting…' : 'Delete quarter' }}
-                </button>
-                <button
-                  @click="cancelDeleteQuarter"
-                  :disabled="deletingQuarter"
-                  class="text-xs px-3 py-1.5 rounded-md border border-gray-700 text-gray-400 hover:bg-gray-800 transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-              <p v-if="deleteQuarterError" class="text-xs text-red-400">{{ deleteQuarterError }}</p>
-            </div>
-          </div>
         </div>
       </template>
 
@@ -408,7 +438,6 @@ import QuarterGrid from '@/components/QuarterGrid.vue'
 import RosterPrintLayout from '@/components/RosterPrintLayout.vue'
 import AvailabilityDrawer from '@/components/AvailabilityDrawer.vue'
 import AvailabilityRosterTable from '@/components/AvailabilityRosterTable.vue'
-import CollapsibleSection from '@/components/CollapsibleSection.vue'
 
 const authStore = useAuthStore()
 const quartersStore = useQuartersStore()
@@ -419,6 +448,12 @@ const selectedQuarterId = ref<string | null>(null)
 
 // ── Availability drawer (D-02) — controlled by which person's drawer is open ──
 const openPersonId = ref<string | null>(null)
+
+// ── Tabbed layout ────────────────────────────────────────────────────────────
+// Default to the schedule so it's reachable without scrolling past volunteer/date
+// setup. Generating/regenerating/filling jumps back to schedule; adding a new
+// quarter jumps to volunteers (set up availability first). Service dates is last.
+const activeTab = ref<'volunteers' | 'schedule' | 'serviceDates'>('schedule')
 
 const selectedQuarter = computed(() => {
   if (!selectedQuarterId.value) return null
@@ -498,6 +533,8 @@ async function onCreateQuarter() {
   const id = await quartersStore.createQuarter(newQuarterYear.value, newQuarterNum.value, newQuarterLabel.value)
   selectedQuarterId.value = id
   addQuarterOpen.value = false
+  // A brand-new quarter needs volunteer availability set up first.
+  activeTab.value = 'volunteers'
 }
 
 function onCloseAddQuarter() {
@@ -574,16 +611,25 @@ const hasAssignments = computed(() => {
 
 async function onGenerateSchedule() {
   if (!selectedQuarter.value) return
+  activeTab.value = 'schedule'
   proposeResult.value = await quartersStore.generateProposal(selectedQuarter.value.id, 'regenerate')
 }
 
 async function onFillGaps() {
   if (!selectedQuarter.value) return
+  activeTab.value = 'schedule'
   proposeResult.value = await quartersStore.generateProposal(selectedQuarter.value.id, 'fillGaps')
+}
+
+// Opening the regenerate confirmation lives on the Schedule tab, so surface it.
+function onRequestRegenerate() {
+  activeTab.value = 'schedule'
+  showRegenerateConfirm.value = true
 }
 
 async function onConfirmRegenerate() {
   if (!selectedQuarter.value) return
+  activeTab.value = 'schedule'
   proposeResult.value = await quartersStore.generateProposal(selectedQuarter.value.id, 'regenerate')
   showRegenerateConfirm.value = false
 }
