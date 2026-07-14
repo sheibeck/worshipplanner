@@ -36,8 +36,10 @@
                 <button
                   type="button"
                   @click="onSaveRole(row.role.id)"
-                  class="text-xs px-3 py-1.5 rounded-md font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors"
-                >Save Role</button>
+                  :disabled="savingRoleId === row.role.id"
+                  class="text-xs px-3 py-1.5 rounded-md font-medium text-white transition-colors disabled:opacity-80"
+                  :class="savedRoleId === row.role.id ? 'bg-emerald-600' : 'bg-indigo-600 hover:bg-indigo-500'"
+                >{{ savingRoleId === row.role.id ? 'Saving…' : savedRoleId === row.role.id ? 'Saved ✓' : 'Save Role' }}</button>
                 <button
                   type="button"
                   @click="confirmDeleteId = row.role.id"
@@ -95,10 +97,11 @@
           />
           <button
             type="button"
-            :disabled="!newRoleName.trim()"
+            :disabled="!newRoleName.trim() && !roleAdded"
             @click="onAddRole"
-            class="px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >Save Role</button>
+            class="px-4 py-2 rounded-md text-sm font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            :class="roleAdded ? 'bg-emerald-600' : 'bg-indigo-600 hover:bg-indigo-500'"
+          >{{ roleAdded ? 'Added ✓' : 'Save Role' }}</button>
         </div>
       </div>
     </div>
@@ -106,7 +109,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { useRosterStore } from '@/stores/roster'
 import type { Role, RoleGroup } from '@/types/roster'
 
@@ -160,13 +163,28 @@ function rowsForGroup(group: RoleGroup): RoleRow[] {
   return groupedRoles.value[group].map((role) => ({ role, draft: roleDrafts.value[role.id] }))
 }
 
+// ── Save feedback (transient "Saving…" → "Saved ✓") ──────────────────────────
+const savingRoleId = ref<string | null>(null)
+const savedRoleId = ref<string | null>(null)
+let savedTimer: ReturnType<typeof setTimeout> | null = null
+
 async function onSaveRole(roleId: string) {
   const draft = roleDrafts.value[roleId]
   if (!draft) return
-  await rosterStore.updateRole(roleId, {
-    name: draft.name.trim(),
-    defaultCount: draft.defaultCount,
-  })
+  savingRoleId.value = roleId
+  try {
+    await rosterStore.updateRole(roleId, {
+      name: draft.name.trim(),
+      defaultCount: draft.defaultCount,
+    })
+    savedRoleId.value = roleId
+    if (savedTimer) clearTimeout(savedTimer)
+    savedTimer = setTimeout(() => {
+      if (savedRoleId.value === roleId) savedRoleId.value = null
+    }, 1800)
+  } finally {
+    savingRoleId.value = null
+  }
 }
 
 // ── Delete ───────────────────────────────────────────────────────────────────
@@ -181,6 +199,8 @@ async function onConfirmDelete(roleId: string) {
 const newRoleName = ref('')
 const newRoleGroup = ref<RoleGroup>('band')
 const newRoleCount = ref(1)
+const roleAdded = ref(false)
+let addedTimer: ReturnType<typeof setTimeout> | null = null
 
 async function onAddRole() {
   const name = newRoleName.value.trim()
@@ -195,5 +215,15 @@ async function onAddRole() {
   newRoleName.value = ''
   newRoleGroup.value = 'band'
   newRoleCount.value = 1
+  roleAdded.value = true
+  if (addedTimer) clearTimeout(addedTimer)
+  addedTimer = setTimeout(() => {
+    roleAdded.value = false
+  }, 1800)
 }
+
+onUnmounted(() => {
+  if (savedTimer) clearTimeout(savedTimer)
+  if (addedTimer) clearTimeout(addedTimer)
+})
 </script>
