@@ -85,22 +85,22 @@
           <button
             type="button"
             class="px-4 py-2 text-sm font-medium rounded-t-md transition-colors -mb-px border-b-2"
-            :class="activeTab === 'volunteers'
-              ? 'text-indigo-300 border-indigo-500 bg-gray-900'
-              : 'text-gray-400 border-transparent hover:text-gray-200 hover:border-gray-600'"
-            @click="activeTab = 'volunteers'"
-          >
-            Volunteers
-          </button>
-          <button
-            type="button"
-            class="px-4 py-2 text-sm font-medium rounded-t-md transition-colors -mb-px border-b-2"
             :class="activeTab === 'schedule'
               ? 'text-indigo-300 border-indigo-500 bg-gray-900'
               : 'text-gray-400 border-transparent hover:text-gray-200 hover:border-gray-600'"
             @click="activeTab = 'schedule'"
           >
             Schedule
+          </button>
+          <button
+            type="button"
+            class="px-4 py-2 text-sm font-medium rounded-t-md transition-colors -mb-px border-b-2"
+            :class="activeTab === 'volunteers'
+              ? 'text-indigo-300 border-indigo-500 bg-gray-900'
+              : 'text-gray-400 border-transparent hover:text-gray-200 hover:border-gray-600'"
+            @click="activeTab = 'volunteers'"
+          >
+            Volunteers
           </button>
           <button
             type="button"
