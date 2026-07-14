@@ -110,7 +110,7 @@
               : 'text-gray-400 border-transparent hover:text-gray-200 hover:border-gray-600'"
             @click="activeTab = 'serviceDates'"
           >
-            Service dates
+            Service Dates
           </button>
         </div>
 
