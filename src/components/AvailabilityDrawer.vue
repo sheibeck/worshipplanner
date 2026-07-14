@@ -509,7 +509,10 @@ function clearAllBlackouts() {
 // ── Must-serve-with typeahead ────────────────────────────────────────────────
 const pairCandidates = computed(() => {
   const q = pairQuery.value.trim().toLowerCase()
-  return rosterStore.people
+  // Only active volunteers are offerable as a new pairing — an inactive person
+  // is excluded from schedule proposals, so pairing to one would be a dead link.
+  // (Existing pairing chips still resolve their name from the full people list.)
+  return rosterStore.activePeople
     .filter((p) => p.id !== props.personId && !draft.pairedWith.includes(p.id))
     .filter((p) => q === '' || p.name.toLowerCase().includes(q))
     .slice(0, 6)
