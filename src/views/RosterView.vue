@@ -11,7 +11,7 @@
         </div>
         <div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-end gap-2 w-full sm:w-auto [&>*]:w-full sm:[&>*]:w-auto [&>*]:justify-center sm:[&>*]:justify-start">
           <button
-            @click="importModalOpen = true"
+            @click="onOpenImport"
             class="inline-flex items-center gap-2 rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm font-medium text-gray-200 hover:bg-gray-700 hover:text-white transition-colors"
           >
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -31,6 +31,32 @@
         </div>
       </div>
 
+      <!-- Tab bar (mirrors ServicesView.vue) -->
+      <div class="flex items-center gap-1 mb-6 border-b border-gray-800 pb-0">
+        <button
+          type="button"
+          class="px-4 py-2 text-sm font-medium rounded-t-md transition-colors -mb-px border-b-2"
+          :class="activeTab === 'volunteers'
+            ? 'text-indigo-300 border-indigo-500 bg-gray-900'
+            : 'text-gray-400 border-transparent hover:text-gray-200 hover:border-gray-600'"
+          @click="activeTab = 'volunteers'"
+        >
+          Volunteers
+        </button>
+        <button
+          type="button"
+          class="px-4 py-2 text-sm font-medium rounded-t-md transition-colors -mb-px border-b-2"
+          :class="activeTab === 'roles'
+            ? 'text-indigo-300 border-indigo-500 bg-gray-900'
+            : 'text-gray-400 border-transparent hover:text-gray-200 hover:border-gray-600'"
+          @click="activeTab = 'roles'"
+        >
+          Roles config
+        </button>
+      </div>
+
+      <!-- Volunteers tab -->
+      <div v-show="activeTab === 'volunteers'">
       <!-- Empty state -->
       <div
         v-if="!rosterStore.isLoading && rosterStore.people.length === 0"
@@ -45,7 +71,7 @@
         </p>
         <div class="flex flex-col sm:flex-row items-center gap-3">
           <button
-            @click="importModalOpen = true"
+            @click="onOpenImport"
             class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 transition-colors"
           >
             Import from Planning Center
@@ -158,13 +184,6 @@
 
       </template>
 
-      <!-- Roles config panel -->
-      <div class="mt-8">
-        <CollapsibleSection title="Roles config" storageKey="roster.section.rolesConfig">
-          <RolesConfigPanel />
-        </CollapsibleSection>
-      </div>
-
       <!-- Danger zone: permanently clear all volunteers (irreversible) -->
       <div v-if="rosterStore.people.length > 0" class="mt-10 border border-red-900/50 rounded-xl overflow-hidden">
         <div class="px-4 py-3 bg-red-950/30 border-b border-red-900/50">
@@ -206,6 +225,12 @@
             </div>
           </div>
         </div>
+      </div>
+      </div>
+
+      <!-- Roles config tab -->
+      <div v-show="activeTab === 'roles'">
+        <RolesConfigPanel />
       </div>
     </div>
 
@@ -410,15 +435,22 @@ import { useRosterStore } from '@/stores/roster'
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import type { Person, RoleGroup } from '@/types/roster'
 import AppShell from '@/components/AppShell.vue'
-import CollapsibleSection from '@/components/CollapsibleSection.vue'
 import RolesConfigPanel from '@/components/RolesConfigPanel.vue'
 import RosterImportModal from '@/components/RosterImportModal.vue'
 
 const authStore = useAuthStore()
 const rosterStore = useRosterStore()
 
+// ── Tabbed layout ────────────────────────────────────────────────────────────
+const activeTab = ref<'volunteers' | 'roles'>('volunteers')
+
 // ── Import modal ─────────────────────────────────────────────────────────────
 const importModalOpen = ref(false)
+// Importing/adding shows results in the volunteers list — surface that tab first.
+function onOpenImport() {
+  activeTab.value = 'volunteers'
+  importModalOpen.value = true
+}
 function onImported(count: number) {
   importModalOpen.value = false
   console.log(`[RosterView] imported ${count} people`)
@@ -467,6 +499,7 @@ const unsavedGuard = useUnsavedGuard(() => ({
 }))
 
 function onAddVolunteer() {
+  activeTab.value = 'volunteers'
   editingPersonId.value = null
   formName.value = ''
   formEmail.value = ''
