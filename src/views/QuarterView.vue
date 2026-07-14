@@ -134,7 +134,7 @@
               Add date
             </button>
           </div>
-          <ul class="max-h-96 overflow-y-auto divide-y divide-gray-800">
+          <ul class="divide-y divide-gray-800">
             <template v-for="date in selectedQuarter.serviceDates" :key="date">
               <li class="flex items-center justify-between py-2 text-sm text-gray-300">
                 <span class="flex items-center gap-2">
