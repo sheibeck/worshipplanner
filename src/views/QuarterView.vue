@@ -7,7 +7,7 @@
         <div>
           <h1 class="text-xl font-semibold text-gray-100">Schedule</h1>
           <p class="text-sm text-gray-400 mt-1">
-            {{ quartersStore.isLoading ? 'Loading...' : (selectedQuarter?.label ?? 'No quarter selected') }}
+            {{ quarterSubheader }}
           </p>
         </div>
         <div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-end gap-2 w-full sm:w-auto [&>*]:w-full sm:[&>*]:w-auto [&>*]:justify-center sm:[&>*]:justify-start">
@@ -512,6 +512,23 @@ const activeTab = ref<'volunteers' | 'schedule' | 'serviceDates'>('schedule')
 const selectedQuarter = computed(() => {
   if (!selectedQuarterId.value) return null
   return quartersStore.quarters.find((q) => q.id === selectedQuarterId.value) ?? null
+})
+
+// Header subline: "Q4 2026 · Oct 4 – Dec 27, 2026" using the quarter's first and
+// last service dates. Falls back to just the label when no service dates exist.
+const quarterSubheader = computed(() => {
+  if (quartersStore.isLoading) return 'Loading...'
+  const q = selectedQuarter.value
+  if (!q) return 'No quarter selected'
+  const dates = q.serviceDates ?? []
+  if (dates.length === 0) return q.label
+  const sorted = [...dates].sort()
+  const first = new Date(`${sorted[0]}T00:00:00`)
+  const last = new Date(`${sorted[sorted.length - 1]}T00:00:00`)
+  const firstStr = first.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  const lastStr = last.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+  const range = sorted.length === 1 ? lastStr : `${firstStr} – ${lastStr}`
+  return `${q.label} · ${range}`
 })
 
 // ── Quarter picker window ────────────────────────────────────────────────────
