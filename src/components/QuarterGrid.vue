@@ -57,7 +57,7 @@
             </div>
             <div
               v-if="cellIsUnfilled(date, role.id) || cellHasConflict(date, role.id) || cellHasGroupViolation(date, role.id)"
-              class="mt-0.5 flex flex-wrap gap-x-2 text-[10px]"
+              class="mt-0.5 flex flex-wrap gap-x-2 text-xs"
             >
               <span v-if="cellIsUnfilled(date, role.id)" class="text-red-400">unfilled</span>
               <span v-if="cellHasConflict(date, role.id)" class="text-amber-400">conflict</span>
