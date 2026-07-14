@@ -19,74 +19,59 @@
         </tr>
       </thead>
       <tbody>
-        <template v-for="date in quarter.serviceDates" :key="date">
-          <tr class="border-b border-gray-800/50">
-            <td
-              class="sticky left-0 z-10 bg-gray-900 px-2 py-2 text-sm font-medium text-gray-100 whitespace-nowrap align-top"
-            >
+        <tr
+          v-for="date in quarter.serviceDates"
+          :key="date"
+          :data-date="date"
+          class="border-b border-gray-800/50 cursor-pointer transition-colors hover:bg-gray-800/40"
+          :class="isChanged(date) ? 'bg-indigo-950/30' : ''"
+          @click="openRow(date)"
+        >
+          <!-- Date cell (sticky) — carries the change accent + badge -->
+          <td
+            class="sticky left-0 z-10 bg-gray-900 px-2 py-2 text-sm font-medium text-gray-100 whitespace-nowrap align-top border-l-2"
+            :class="isChanged(date) ? 'border-indigo-500' : 'border-transparent'"
+          >
+            <div class="flex items-center gap-2">
               {{ formatDateLabel(date) }}
-            </td>
-            <td v-for="role in sortedRoles" :key="role.id" class="px-2 py-2 align-top">
-              <button
-                type="button"
-                data-role="grid-cell"
-                :data-role-id="role.id"
-                :data-date="date"
-                class="w-full text-left rounded-md p-1 transition-colors hover:bg-gray-800/60"
-                :class="cellIsUnfilled(date, role.id) ? 'border border-dashed border-gray-700' : ''"
-                :aria-expanded="isExpanded(date, role.id)"
-                @click="toggleCell(date, role.id)"
+              <span
+                v-if="isChanged(date)"
+                class="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-900/50 border border-indigo-700/50 text-indigo-300"
               >
-                <div class="flex flex-wrap gap-1 items-center">
-                  <span
-                    v-for="personId in cellPeople(date, role.id)"
-                    :key="personId"
-                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border bg-gray-800 text-gray-200 border-gray-700"
-                  >
-                    {{ personName(personId) }}
-                    <span
-                      role="button"
-                      aria-label="Remove"
-                      class="text-gray-500 hover:text-red-400 cursor-pointer"
-                      @click.stop="onClear(date, role.id, personId)"
-                    >&times;</span>
-                  </span>
-                  <span v-if="cellPeople(date, role.id).length === 0" class="text-xs text-gray-600">&mdash;</span>
-                </div>
-                <div class="flex items-center gap-1 mt-1 flex-wrap">
-                  <span
-                    v-if="cellIsUnfilled(date, role.id)"
-                    class="text-xs px-2 py-0.5 rounded-full bg-red-900/40 border border-red-700/50 text-red-400"
-                  >
-                    Unfilled
-                  </span>
-                  <span
-                    v-if="cellHasConflict(date, role.id)"
-                    class="text-xs px-2 py-0.5 rounded-full bg-amber-900/40 border border-amber-700/50 text-amber-300"
-                  >
-                    Pairing conflict
-                  </span>
-                  <span
-                    v-if="cellHasGroupViolation(date, role.id)"
-                    class="text-xs px-2 py-0.5 rounded-full bg-orange-900/40 border border-orange-700/50 text-orange-300"
-                  >
-                    Group conflict
-                  </span>
-                </div>
-              </button>
-            </td>
-          </tr>
+                changed
+              </span>
+            </div>
+          </td>
 
-        </template>
+          <!-- Role cells — plain names, no pills -->
+          <td
+            v-for="role in sortedRoles"
+            :key="role.id"
+            :data-role-id="role.id"
+            :data-date="date"
+            class="px-2 py-2 align-top"
+          >
+            <div v-if="cellPeople(date, role.id).length || !cellIsUnfilled(date, role.id)" class="text-xs text-gray-300 leading-snug">
+              <template v-if="cellPeople(date, role.id).length">{{ namesFor(date, role.id) }}</template>
+              <span v-else class="text-gray-600">&mdash;</span>
+            </div>
+            <div
+              v-if="cellIsUnfilled(date, role.id) || cellHasConflict(date, role.id) || cellHasGroupViolation(date, role.id)"
+              class="mt-0.5 flex flex-wrap gap-x-2 text-[10px]"
+            >
+              <span v-if="cellIsUnfilled(date, role.id)" class="text-red-400">unfilled</span>
+              <span v-if="cellHasConflict(date, role.id)" class="text-amber-400">conflict</span>
+              <span v-if="cellHasGroupViolation(date, role.id)" class="text-orange-400">group</span>
+            </div>
+          </td>
+        </tr>
       </tbody>
     </table>
   </div>
 
-  <!-- Group editor slide-out (R-14) — reuses AvailabilityDrawer's exact Teleport/backdrop/panel/Transition markup.
-       Intentionally exempt from the header Cancel/Save + unsaved-changes-guard standardization
-       (16.1-05 checkpoint round 3): every row action here (clear/swap/assign) writes straight
-       through to quartersStore immediately — there is no pending/unsaved state and no Save button,
-       so only the × close action applies. -->
+  <!-- Full-row editor slide-out — reuses AvailabilityDrawer's Teleport/backdrop/panel/Transition
+       markup. Every action writes straight through to quartersStore immediately (no pending/unsaved
+       state, no Save button), so only the × close action applies. -->
   <Teleport to="body">
     <!-- Backdrop -->
     <Transition
@@ -98,7 +83,7 @@
       leave-to-class="opacity-0"
     >
       <div
-        v-if="expandedCell"
+        v-if="expandedDate"
         class="fixed inset-0 z-40 bg-black/60"
         @click="closeDrawer"
       ></div>
@@ -114,13 +99,13 @@
       leave-to-class="translate-x-full"
     >
       <div
-        v-if="expandedCell"
+        v-if="expandedDate"
         class="fixed top-0 right-0 bottom-0 z-50 w-full max-w-lg bg-gray-900 border-l border-gray-700 shadow-2xl flex flex-col"
       >
         <!-- Header -->
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-800 shrink-0">
           <h2 class="text-base font-semibold text-gray-100">
-            {{ expandedRoleName }} &mdash; {{ formatDateLabel(expandedCell.date) }}
+            {{ formatDateLabel(activeDate) }}
           </h2>
           <button
             type="button"
@@ -134,102 +119,118 @@
           </button>
         </div>
 
-        <!-- Scrollable body -->
-        <div class="flex-1 overflow-y-auto px-6 py-5 space-y-4">
-          <!-- Current assignments: clear / swap -->
-          <div v-if="expandedAssigned.length > 0" class="space-y-2 mb-4">
-            <div
-              v-for="personId in expandedAssigned"
-              :key="personId"
-              class="flex items-center gap-3 flex-wrap"
-            >
-              <span class="text-sm text-gray-200 min-w-[8rem]">{{ personName(personId) }}</span>
-              <button
-                type="button"
-                class="text-xs px-2 py-1 rounded-md text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors"
-                @click="onClear(expandedCell.date, expandedCell.roleId, personId)"
+        <!-- Scrollable body — one section per role for this date -->
+        <div class="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+          <div
+            v-for="role in sortedRoles"
+            :key="role.id"
+            :data-role-section="role.id"
+            class="border-t border-gray-800 pt-4 first:border-t-0 first:pt-0"
+          >
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="text-sm font-semibold text-gray-100">{{ role.name }}</h3>
+              <span
+                class="text-xs"
+                :class="cellIsUnfilled(activeDate, role.id) ? 'text-red-400' : 'text-gray-500'"
               >
-                Clear
-              </button>
+                {{ cellPeople(activeDate, role.id).length }}/{{ effectiveCountFor(activeDate, role.id) }}
+              </span>
+            </div>
+
+            <!-- Current assignments: clear / swap -->
+            <div v-if="cellPeople(activeDate, role.id).length > 0" class="space-y-2 mb-3">
+              <div
+                v-for="personId in cellPeople(activeDate, role.id)"
+                :key="personId"
+                class="flex items-center gap-3 flex-wrap"
+              >
+                <span class="text-sm text-gray-200 min-w-[8rem]">{{ personName(personId) }}</span>
+                <button
+                  type="button"
+                  class="text-xs px-2 py-1 rounded-md text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors"
+                  @click="onClear(activeDate, role.id, personId)"
+                >
+                  Clear
+                </button>
+                <select
+                  class="text-xs rounded-md bg-gray-800 border border-gray-700 text-gray-300 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  value=""
+                  @change="onSwapSelect($event, activeDate, role.id, personId)"
+                >
+                  <option value="">Swap with&hellip;</option>
+                  <option
+                    v-for="candidate in availableUnassigned(activeDate, role.id)"
+                    :key="candidate.id"
+                    :value="candidate.id"
+                  >
+                    {{ candidate.name }}
+                  </option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Add another person (multi-person-per-role, D-04) -->
+            <div class="flex items-center gap-2 mb-2 flex-wrap">
               <select
+                v-model="addSelectByRole[role.id]"
                 class="text-xs rounded-md bg-gray-800 border border-gray-700 text-gray-300 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                value=""
-                @change="onSwapSelect($event, personId)"
               >
-                <option value="">Swap with&hellip;</option>
+                <option value="">Add a person&hellip;</option>
                 <option
-                  v-for="candidate in expandedEligible"
+                  v-for="candidate in availableUnassigned(activeDate, role.id)"
                   :key="candidate.id"
                   :value="candidate.id"
                 >
                   {{ candidate.name }}
                 </option>
               </select>
-            </div>
-          </div>
-
-          <!-- Add another person (multi-person-per-role, D-04) -->
-          <div class="flex items-center gap-2 mb-4 flex-wrap">
-            <select
-              v-model="addSelectId"
-              class="text-xs rounded-md bg-gray-800 border border-gray-700 text-gray-300 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            >
-              <option value="">Add a person&hellip;</option>
-              <option
-                v-for="candidate in expandedEligible"
-                :key="candidate.id"
-                :value="candidate.id"
+              <button
+                type="button"
+                class="text-xs px-3 py-1.5 rounded-md text-white bg-indigo-600 hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                :disabled="!addSelectByRole[role.id]"
+                @click="onAdd(role.id)"
               >
-                {{ candidate.name }}
-              </option>
-            </select>
-            <button
-              type="button"
-              class="text-xs px-3 py-1.5 rounded-md text-white bg-indigo-600 hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              :disabled="!addSelectId"
-              @click="onAdd"
-            >
-              Assign
-            </button>
-          </div>
-
-          <!-- Gap-filling panel (D-23) -->
-          <div
-            v-if="expandedCell && cellIsUnfilled(expandedCell.date, expandedCell.roleId)"
-            class="grid grid-cols-1 gap-4 pt-3 border-t border-gray-800"
-          >
-            <div>
-              <p class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1.5">Blacked out today</p>
-              <ul class="space-y-1">
-                <li
-                  v-for="p in expandedBlackedOut"
-                  :key="p.id"
-                  class="text-sm text-gray-500 line-through"
-                >
-                  {{ p.name }}
-                </li>
-                <li v-if="expandedBlackedOut.length === 0" class="text-xs text-gray-600">None</li>
-              </ul>
+                Assign
+              </button>
             </div>
-            <div>
-              <p class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1.5">Available, not yet assigned</p>
-              <ul class="space-y-1">
-                <li
-                  v-for="p in expandedEligible"
-                  :key="p.id"
-                  class="flex items-center justify-between gap-2 text-sm px-2 py-1 rounded-md bg-green-900/30 text-green-400"
-                >
-                  {{ p.name }}
-                  <button
-                    type="button"
-                    class="text-xs text-green-300 hover:text-green-200 underline"
-                    @click="onQuickAssign(expandedCell.date, expandedCell.roleId, p.id)"
+
+            <!-- Gap-filling panel (D-23) — only when this role is short -->
+            <div
+              v-if="cellIsUnfilled(activeDate, role.id)"
+              class="grid grid-cols-1 gap-3 pt-2"
+            >
+              <div v-if="blackedOutToday(activeDate, role.id).length > 0">
+                <p class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Blacked out today</p>
+                <ul class="space-y-1">
+                  <li
+                    v-for="p in blackedOutToday(activeDate, role.id)"
+                    :key="p.id"
+                    class="text-sm text-gray-500 line-through"
                   >
-                    Assign
-                  </button>
-                </li>
-                <li v-if="expandedEligible.length === 0" class="text-xs text-gray-600">None</li>
-              </ul>
+                    {{ p.name }}
+                  </li>
+                </ul>
+              </div>
+              <div>
+                <p class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Available, not yet assigned</p>
+                <ul class="space-y-1">
+                  <li
+                    v-for="p in availableUnassigned(activeDate, role.id)"
+                    :key="p.id"
+                    class="flex items-center justify-between gap-2 text-sm px-2 py-1 rounded-md bg-green-900/30 text-green-400"
+                  >
+                    {{ p.name }}
+                    <button
+                      type="button"
+                      class="text-xs text-green-300 hover:text-green-200 underline"
+                      @click="onQuickAssign(activeDate, role.id, p.id)"
+                    >
+                      Assign
+                    </button>
+                  </li>
+                  <li v-if="availableUnassigned(activeDate, role.id).length === 0" class="text-xs text-gray-600">None</li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>
@@ -245,11 +246,15 @@ import { useRosterStore } from '@/stores/roster'
 import { evaluateGroupCombo } from '@/utils/scheduler'
 import type { Quarter, Role, RoleGroup, ProposeResult, Person, FrequencyTier } from '@/types/roster'
 
-const props = defineProps<{
-  quarter: Quarter
-  roles: Role[]
-  lastProposeResult: ProposeResult | null
-}>()
+const props = withDefaults(
+  defineProps<{
+    quarter: Quarter
+    roles: Role[]
+    lastProposeResult: ProposeResult | null
+    changedDates?: string[]
+  }>(),
+  { changedDates: () => [] },
+)
 
 const quartersStore = useQuartersStore()
 const rosterStore = useRosterStore()
@@ -278,6 +283,10 @@ function cellPeople(date: string, roleId: string): string[] {
   return props.quarter.calendar[date]?.[roleId] ?? []
 }
 
+function namesFor(date: string, roleId: string): string {
+  return cellPeople(date, roleId).map(personName).join(', ')
+}
+
 function effectiveCountFor(date: string, roleId: string): number {
   const override = props.quarter.roleOverridesByDate[date]
   const overrideMatch = override?.find((r) => r.roleId === roleId)
@@ -302,8 +311,6 @@ function cellHasConflict(date: string, roleId: string): boolean {
 }
 
 // ── Group co-occurrence warning (D-11, warn-don't-block) ────────────────────────
-// Map-backed lookup (not a repeated .find), consistent with cellIsUnfilled/
-// cellHasConflict's O(roles) per-cell cost — no new perf class (T-15-06-03).
 const roleGroupById = computed(() => {
   const m = new Map<string, RoleGroup>()
   for (const r of props.roles) m.set(r.id, r.group)
@@ -316,8 +323,6 @@ function roleGroupOf(roleId: string): RoleGroup {
 
 // Live-computed from props.quarter.calendar + props.roles (NOT props.lastProposeResult) —
 // works for a loaded historical calendar, not only immediately after a fresh propose.
-// Reuses the same exported evaluateGroupCombo helper the scheduler uses (T-15-06-02):
-// one rule source, no drift between auto-propose enforcement and this advisory badge.
 function cellHasGroupViolation(date: string, roleId: string): boolean {
   const peopleInCell = cellPeople(date, roleId)
   if (peopleInCell.length === 0) return false
@@ -339,6 +344,11 @@ function formatDateLabel(date: string): string {
   return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
 }
 
+// ── Change highlight (last regenerate) ──────────────────────────────────────────
+function isChanged(date: string): boolean {
+  return props.changedDates.includes(date)
+}
+
 // ── Blackout + candidate helpers (D-23) ─────────────────────────────────────────
 function isBlackedOut(personId: string, date: string): boolean {
   return props.quarter.personQuarterData[personId]?.blackoutDates.includes(date) ?? false
@@ -348,11 +358,7 @@ function hasRole(person: Person, roleId: string): boolean {
   return person.roles.includes(roleId)
 }
 
-// D-04/D-05: 'out'-tier people must never be offered as a manual gap-filling candidate,
-// mirroring the auto-proposal exclusion (defaults 'regular' when the roleFrequency entry
-// is absent). Per-role (D-05): a person can be 'out' for one role
-// they hold while remaining 'regular' for another — reads roleFrequency[roleId].tier,
-// the single source of truth (R-05), mirroring scheduler.ts's tierOf.
+// D-04/D-05: 'out'-tier people must never be offered as a manual gap-filling candidate.
 function tierOf(personId: string, roleId: string): FrequencyTier {
   const pqd = props.quarter.personQuarterData[personId]
   return pqd?.roleFrequency?.[roleId]?.tier ?? 'regular'
@@ -380,68 +386,43 @@ function blackedOutToday(date: string, roleId: string): Person[] {
   )
 }
 
-// ── Expanded cell state (click-to-edit + gap panel) ─────────────────────────────
-const expandedCell = ref<{ date: string; roleId: string } | null>(null)
-const addSelectId = ref('')
+// ── Expanded row state (click-to-edit whole date) ───────────────────────────────
+const expandedDate = ref<string | null>(null)
+const activeDate = computed<string>(() => expandedDate.value ?? '')
+// Per-role "add a person" selection, keyed by roleId (reset each open/close).
+const addSelectByRole = ref<Record<string, string>>({})
 
-function isExpanded(date: string, roleId: string): boolean {
-  return expandedCell.value?.date === date && expandedCell.value?.roleId === roleId
-}
-
-function toggleCell(date: string, roleId: string) {
-  if (isExpanded(date, roleId)) {
-    expandedCell.value = null
-  } else {
-    expandedCell.value = { date, roleId }
-  }
-  addSelectId.value = ''
+function openRow(date: string) {
+  expandedDate.value = date
+  addSelectByRole.value = {}
 }
 
 function closeDrawer() {
-  expandedCell.value = null
-  addSelectId.value = ''
+  expandedDate.value = null
+  addSelectByRole.value = {}
 }
-
-const expandedRoleName = computed<string>(() => {
-  if (!expandedCell.value) return ''
-  return props.roles.find((r) => r.id === expandedCell.value!.roleId)?.name ?? ''
-})
-
-const expandedAssigned = computed<string[]>(() => {
-  if (!expandedCell.value) return []
-  return cellPeople(expandedCell.value.date, expandedCell.value.roleId)
-})
-
-const expandedEligible = computed<Person[]>(() => {
-  if (!expandedCell.value) return []
-  return availableUnassigned(expandedCell.value.date, expandedCell.value.roleId)
-})
-
-const expandedBlackedOut = computed<Person[]>(() => {
-  if (!expandedCell.value) return []
-  return blackedOutToday(expandedCell.value.date, expandedCell.value.roleId)
-})
 
 // ── Store actions — scoped Firestore dot-path updates only (D-22, T-13-09-02) ──
 function onClear(date: string, roleId: string, personId: string) {
   quartersStore.clearAssignment(props.quarter.id, date, roleId, personId)
 }
 
-function onAdd() {
-  if (!expandedCell.value || !addSelectId.value) return
-  quartersStore.assignPerson(props.quarter.id, expandedCell.value.date, expandedCell.value.roleId, addSelectId.value)
-  addSelectId.value = ''
+function onAdd(roleId: string) {
+  const personId = addSelectByRole.value[roleId]
+  if (!expandedDate.value || !personId) return
+  quartersStore.assignPerson(props.quarter.id, expandedDate.value, roleId, personId)
+  addSelectByRole.value[roleId] = ''
 }
 
 function onQuickAssign(date: string, roleId: string, personId: string) {
   quartersStore.assignPerson(props.quarter.id, date, roleId, personId)
 }
 
-function onSwapSelect(event: Event, fromPersonId: string) {
+function onSwapSelect(event: Event, date: string, roleId: string, fromPersonId: string) {
   const select = event.target as HTMLSelectElement
   const toPersonId = select.value
-  if (!toPersonId || !expandedCell.value) return
-  quartersStore.swapAssignment(props.quarter.id, expandedCell.value.date, expandedCell.value.roleId, fromPersonId, toPersonId)
+  if (!toPersonId) return
+  quartersStore.swapAssignment(props.quarter.id, date, roleId, fromPersonId, toPersonId)
   select.value = ''
 }
 </script>
