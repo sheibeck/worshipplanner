@@ -19,14 +19,6 @@
       <button
         type="button"
         class="text-xs px-3 py-1.5 rounded-full border transition-colors"
-        :class="activeFilter === 'needsInput' ? FILTER_ON_CLASS : FILTER_OFF_CLASS"
-        @click="activeFilter = 'needsInput'"
-      >
-        Needs input
-      </button>
-      <button
-        type="button"
-        class="text-xs px-3 py-1.5 rounded-full border transition-colors"
         :class="activeFilter === 'out' ? FILTER_ON_CLASS : FILTER_OFF_CLASS"
         @click="activeFilter = 'out'"
       >
@@ -161,7 +153,7 @@ function quarterDataFor(person: Person): {
 
 // ── Search + filter toolbar ──────────────────────────────────────────────────
 const searchQuery = ref('')
-const activeFilter = ref<'all' | 'needsInput' | 'out'>('all')
+const activeFilter = ref<'all' | 'out'>('all')
 
 const filteredPeople = computed<Person[]>(() => {
   let list = rosterStore.activePeople
@@ -171,9 +163,7 @@ const filteredPeople = computed<Person[]>(() => {
     list = list.filter((p) => p.name.toLowerCase().includes(q))
   }
 
-  if (activeFilter.value === 'needsInput') {
-    list = list.filter((p) => !props.quarter?.personQuarterData[p.id])
-  } else if (activeFilter.value === 'out') {
+  if (activeFilter.value === 'out') {
     list = list.filter((p) => quarterDataFor(p).tier === 'out')
   }
 
