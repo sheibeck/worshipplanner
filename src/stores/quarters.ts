@@ -58,6 +58,12 @@ export const useQuartersStore = defineStore('quarters', () => {
   const isLoading = ref(true)
   const orgId = ref<string | null>(null)
 
+  // Ephemeral (in-memory) record of which service dates had their assignments
+  // change on the last generateProposal run, so the UI can highlight them. Not
+  // persisted — cleared on reload, scoped to a quarter so a stale set from
+  // another quarter never highlights the wrong grid.
+  const lastRegenerate = ref<{ quarterId: string; changedDates: string[] } | null>(null)
+
   let unsubscribeFn: Unsubscribe | null = null
 
   function subscribe(orgIdValue: string) {
@@ -308,6 +314,28 @@ export const useQuartersStore = defineStore('quarters', () => {
       buildRoleGroupOf(rosterStore.roles),
     )
 
+    // Diff the previous calendar against the freshly proposed one so the UI can
+    // highlight dates whose assignments changed (person added/removed). Compares
+    // sorted person-id arrays per role; any difference marks the whole date.
+    const prevCalendar = quarter.calendar
+    const changedDates: string[] = []
+    for (const date of quarter.serviceDates) {
+      const prevRoles = prevCalendar[date] ?? {}
+      const nextRoles = result.calendar[date] ?? {}
+      const roleIds = new Set([...Object.keys(prevRoles), ...Object.keys(nextRoles)])
+      let changed = false
+      for (const roleId of roleIds) {
+        const a = [...(prevRoles[roleId] ?? [])].sort()
+        const b = [...(nextRoles[roleId] ?? [])].sort()
+        if (a.length !== b.length || a.some((v, i) => v !== b[i])) {
+          changed = true
+          break
+        }
+      }
+      if (changed) changedDates.push(date)
+    }
+    lastRegenerate.value = { quarterId, changedDates }
+
     await updateQuarter(quarterId, { calendar: result.calendar })
     return result
   }
@@ -490,6 +518,7 @@ export const useQuartersStore = defineStore('quarters', () => {
     quarters,
     isLoading,
     orgId,
+    lastRegenerate,
     subscribe,
     unsubscribeAll,
     getQuarter,
