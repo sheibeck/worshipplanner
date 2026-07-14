@@ -504,26 +504,42 @@ async function onDeleteQuarter() {
 }
 
 // ── New quarter creation (Add-quarter modal, R-10/D-13) ─────────────────────
-// Default the modal to the NEXT quarter after the one we're currently in — even
-// if the current quarter hasn't been created yet, we look forward, since you
-// schedule the upcoming quarter, not the one already underway.
+// The quarter chronologically after (year, quarter). Q4 rolls over to Q1 next year.
+function quarterAfter(year: number, quarter: 1 | 2 | 3 | 4): { year: number; quarter: 1 | 2 | 3 | 4 } {
+  if (quarter === 4) return { year: year + 1, quarter: 1 }
+  return { year, quarter: (quarter + 1) as 1 | 2 | 3 | 4 }
+}
+
+// Fallback when no quarters exist yet: the quarter after the one we're currently
+// in — we look forward, since you schedule the upcoming quarter, not the one
+// already underway.
 function nextQuarterFromToday(): { year: number; quarter: 1 | 2 | 3 | 4 } {
   const now = new Date()
-  const currentQuarter = Math.floor(now.getMonth() / 3) + 1 // 1..4
-  if (currentQuarter === 4) {
-    return { year: now.getFullYear() + 1, quarter: 1 }
-  }
-  return { year: now.getFullYear(), quarter: (currentQuarter + 1) as 1 | 2 | 3 | 4 }
+  const currentQuarter = (Math.floor(now.getMonth() / 3) + 1) as 1 | 2 | 3 | 4
+  return quarterAfter(now.getFullYear(), currentQuarter)
+}
+
+// Default the modal to the quarter after the most recently scheduled quarter
+// (the chronologically latest existing quarter). Falls back to the quarter after
+// today when there are no quarters yet.
+function defaultNextQuarter(): { year: number; quarter: 1 | 2 | 3 | 4 } {
+  const quarters = quartersStore.quarters
+  if (quarters.length === 0) return nextQuarterFromToday()
+  const latest = quarters.reduce((max, q) =>
+    q.year * 4 + q.quarter > max.year * 4 + max.quarter ? q : max,
+  )
+  return quarterAfter(latest.year, latest.quarter as 1 | 2 | 3 | 4)
 }
 
 const addQuarterOpen = ref(false)
-const newQuarterYear = ref(nextQuarterFromToday().year)
-const newQuarterNum = ref<1 | 2 | 3 | 4>(nextQuarterFromToday().quarter)
+const newQuarterYear = ref(defaultNextQuarter().year)
+const newQuarterNum = ref<1 | 2 | 3 | 4>(defaultNextQuarter().quarter)
 const newQuarterLabel = computed(() => `Q${newQuarterNum.value} ${newQuarterYear.value}`)
 
 function onOpenAddQuarter() {
-  // Recompute on open so the default stays correct across a long-lived session.
-  const { year, quarter } = nextQuarterFromToday()
+  // Recompute on open so the default reflects the latest quarter, even after
+  // adding one earlier in the same session.
+  const { year, quarter } = defaultNextQuarter()
   newQuarterYear.value = year
   newQuarterNum.value = quarter
   addQuarterOpen.value = true
