@@ -7,7 +7,7 @@
         <div>
           <h1 class="text-xl font-semibold text-gray-100">Schedule</h1>
           <p class="text-sm text-gray-400 mt-1">
-            {{ quartersStore.isLoading ? 'Loading...' : `${quartersStore.quarters.length} quarter${quartersStore.quarters.length !== 1 ? 's' : ''}` }}
+            {{ quartersStore.isLoading ? 'Loading...' : (selectedQuarter?.label ?? 'No quarter selected') }}
           </p>
         </div>
         <div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-end gap-2 w-full sm:w-auto [&>*]:w-full sm:[&>*]:w-auto [&>*]:justify-center sm:[&>*]:justify-start">
