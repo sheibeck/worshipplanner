@@ -1,16 +1,16 @@
-# Graph Report - worshipplanner  (2026-07-11)
+# Graph Report - worshipplanner  (2026-07-14)
 
 ## Corpus Check
-- 431 files · ~1,086,588 words
+- 466 files · ~1,141,557 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 4762 nodes · 4525 edges · 452 communities (376 shown, 76 thin omitted)
-- Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 4 edges (avg confidence: 0.57)
+- 5104 nodes · 4836 edges · 488 communities (399 shown, 89 thin omitted)
+- Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 5 edges (avg confidence: 0.56)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `88c24fbe`
+- Built from commit: `7ca7d3bb`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -386,6 +386,39 @@
 - [[_COMMUNITY_confirmSlotDelete|confirmSlotDelete]]
 - [[_COMMUNITY_handleUndoKey|handleUndoKey]]
 - [[_COMMUNITY_vite.config.ts|vite.config.ts]]
+- [[_COMMUNITY_Canonical References|Canonical References]]
+- [[_COMMUNITY_Phase 16.1 Plan 05 Song List TagsThemes Split + Column Customization + VW Explainer Summary|Phase 16.1 Plan 05: Song List Tags/Themes Split + Column Customization + VW Explainer Summary]]
+- [[_COMMUNITY_Phase 16.1 Plan 01 Fold Team Tags Into Tags (Data Layer) Summary|Phase 16.1 Plan 01: Fold Team Tags Into Tags (Data Layer) Summary]]
+- [[_COMMUNITY_Phase 16.1 Plan 08 Remove Song.teamTags Summary|Phase 16.1 Plan 08: Remove Song.teamTags Summary]]
+- [[_COMMUNITY_Phase 16.1 Plan 02 Church-level Vertical Worship mode flag Summary|Phase 16.1 Plan 02: Church-level Vertical Worship mode flag Summary]]
+- [[_COMMUNITY_Phase 16.1 Plan 03 Decouple songs from service teams in rankingsearch Summary|Phase 16.1 Plan 03: Decouple songs from service teams in ranking/search Summary]]
+- [[_COMMUNITY_Phase 16.1 Plan 04 Column-Visibility Store State Summary|Phase 16.1 Plan 04: Column-Visibility Store State Summary]]
+- [[_COMMUNITY_Phase 16.1 Plan 06 Songs-panel tag fold + VW gating Summary|Phase 16.1 Plan 06: Songs-panel tag fold + VW gating Summary]]
+- [[_COMMUNITY_Phase 16.1 Plan 07 Picker + Service-Editor Tag Repoint & VW-Gate Summary|Phase 16.1 Plan 07: Picker + Service-Editor Tag Repoint & VW-Gate Summary]]
+- [[_COMMUNITY_Phase 16.1 Code Review Report|Phase 16.1: Code Review Report]]
+- [[_COMMUNITY_RosterView.test.ts|RosterView.test.ts]]
+- [[_COMMUNITY_Quick Task Schedule & Volunteers tabbed layout|Quick Task: Schedule & Volunteers tabbed layout]]
+- [[_COMMUNITY_Phase 16.1 Song list tags & columns customization - Discussion Log|Phase 16.1: Song list tags & columns customization - Discussion Log]]
+- [[_COMMUNITY_Phase 16.1 — Validation Strategy|Phase 16.1 — Validation Strategy]]
+- [[_COMMUNITY_Phase 16.1 Verification — Song list tags & columns customization|Phase 16.1 Verification — Song list tags & columns customization]]
+- [[_COMMUNITY_Summary Schedule & Volunteers tabbed layout|Summary: Schedule & Volunteers tabbed layout]]
+- [[_COMMUNITY_Phase 16 Verification — Quarterly Schedule Share Link|Phase 16 Verification — Quarterly Schedule Share Link]]
+- [[_COMMUNITY_forceCloseForm|forceCloseForm]]
+- [[_COMMUNITY_Phase 08 Verification — Planning Center API Export|Phase 08 Verification — Planning Center API Export]]
+- [[_COMMUNITY_Phase 09 Verification — PC Song Import & Tag Management|Phase 09 Verification — PC Song Import & Tag Management]]
+- [[_COMMUNITY_Phase 10 Verification — Song Export Naming, Template Import, Auto-Add Teams, Orchestra Filter|Phase 10 Verification — Song Export Naming, Template Import, Auto-Add Teams, Orchestra Filter]]
+- [[_COMMUNITY_Phase 13 Verification — Volunteer Role Scheduling|Phase 13 Verification — Volunteer Role Scheduling]]
+- [[_COMMUNITY_16.1-01-PLAN|16.1-01-PLAN.md]]
+- [[_COMMUNITY_16.1-02-PLAN|16.1-02-PLAN.md]]
+- [[_COMMUNITY_16.1-03-PLAN|16.1-03-PLAN.md]]
+- [[_COMMUNITY_16.1-04-PLAN|16.1-04-PLAN.md]]
+- [[_COMMUNITY_16.1-05-PLAN|16.1-05-PLAN.md]]
+- [[_COMMUNITY_16.1-06-PLAN|16.1-06-PLAN.md]]
+- [[_COMMUNITY_16.1-07-PLAN|16.1-07-PLAN.md]]
+- [[_COMMUNITY_16.1-08-PLAN|16.1-08-PLAN.md]]
+- [[_COMMUNITY_per-role-frequency-and-vocal-instrument-pairing|per-role-frequency-and-vocal-instrument-pairing.md]]
+- [[_COMMUNITY_VwExplainer.vue|VwExplainer.vue]]
+- [[_COMMUNITY_firstRoleName|firstRoleName]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `Communities (452 total, 76 thin omitted)` - 296 edges
@@ -395,9 +428,9 @@
 5. `Phase 16: Quarterly Schedule Share Link — Research` - 19 edges
 6. `Tests` - 18 edges
 7. `Human Verification Required` - 18 edges
-8. `Phase 10: Export Naming, Template Replace, PC Teams, Orchestra Filter — Research` - 17 edges
-9. `Phase 15: Per-Role Frequency & Role-Category Co-occurrence Rules - Research` - 17 edges
-10. `Pattern Assignments` - 17 edges
+8. `Phase 16.1: Song list tags & columns customization - Research` - 18 edges
+9. `Phase 10: Export Naming, Template Replace, PC Teams, Orchestra Filter — Research` - 17 edges
+10. `Phase 15: Per-Role Frequency & Role-Category Co-occurrence Rules - Research` - 17 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `getCurrentUser()` --indirect_call--> `user()`  [INFERRED]
@@ -408,7 +441,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (452 total, 76 thin omitted)
+## Communities (488 total, 89 thin omitted)
 
 ### Community 0 - "Communities (300 total, 35 thin omitted)"
 Cohesion: 0.01
@@ -436,7 +469,7 @@ Nodes (46): addSlotAsItem — title modification (SONG and HYMN cases), Anti-Pat
 
 ### Community 6 - "AvailabilityDrawer.vue"
 Cohesion: 0.05
-Nodes (33): activeRoleTierPresetKey(), draft, emit, FREQ_PRESETS, FreqPresetKey, heldRoles, monthLabel(), onClose() (+25 more)
+Nodes (34): activeRoleTierPresetKey(), draft, emit, FREQ_PRESETS, FreqPresetKey, heldRoles, monthLabel(), onClose() (+26 more)
 
 ### Community 7 - "Phase 4: Output - Research"
 Cohesion: 0.04
@@ -451,16 +484,16 @@ Cohesion: 0.06
 Nodes (33): addSelectId, availableUnassigned(), blackedOutToday(), cellHasConflict(), cellHasGroupViolation(), cellIsUnfilled(), cellPeople(), effectiveCountFor() (+25 more)
 
 ### Community 10 - "RosterView.vue"
-Cohesion: 0.05
-Nodes (34): authStore, clearConfirmOpen, clearConfirmText, clearing, closeForm(), confirmDeactivateId, displayedPeople, editingPersonId (+26 more)
+Cohesion: 0.06
+Nodes (24): activeTab, authStore, clearConfirmOpen, clearConfirmText, clearing, confirmDeleteInactiveId, deletingInactiveId, displayedPeople (+16 more)
 
 ### Community 11 - "Phase 2: Song Library - Research"
 Cohesion: 0.04
 Nodes (44): Alternatives Considered, Anti-Patterns to Avoid, Architecture Patterns, Claude's Discretion, Code Examples, Common Pitfalls, Core, Deferred Ideas (OUT OF SCOPE) (+36 more)
 
 ### Community 12 - "QuarterView.vue"
-Cohesion: 0.05
-Nodes (29): addQuarterOpen, authStore, buildShareUrl(), csvModalOpen, deleteConfirmOpen, deleteConfirmText, deleteQuarterError, deletingQuarter (+21 more)
+Cohesion: 0.04
+Nodes (30): activeTab, addQuarterOpen, authStore, buildShareUrl(), csvModalOpen, deleteConfirmOpen, deleteConfirmText, deleteQuarterError (+22 more)
 
 ### Community 13 - "Phase 15: Per-Role Frequency & Role-Category Co-occurrence Rules - Research"
 Cohesion: 0.05
@@ -483,8 +516,8 @@ Cohesion: 0.08
 Nodes (22): authStore, canConfirmPositions(), classifyPeople(), emit, errorMessage, lastRetry, mappedPeople, normalizeName() (+14 more)
 
 ### Community 18 - "SongSlideOver.vue"
-Cohesion: 0.07
-Nodes (21): availableTags, emit, form, FormState, isCreateMode, isDeleting, isSaving, onCancel() (+13 more)
+Cohesion: 0.06
+Nodes (26): authStore, emit, form, FormState, isCreateMode, isDeleting, isSaving, onCancel() (+18 more)
 
 ### Community 19 - "Human Verification Required"
 Cohesion: 0.07
@@ -507,8 +540,8 @@ Cohesion: 0.07
 Nodes (27): File Classification, Import-preservation (never clobber user data), IntersectionObserver progressive rendering (BATCH_SIZE 50), Legacy-field `[]` normalization on subscribe, Metadata, No Analog Found, Pattern Assignments, Phase 11: Song Catalog & Service Planner Improvements - Pattern Map (+19 more)
 
 ### Community 24 - "SongTable.vue"
-Cohesion: 0.08
-Nodes (20): cancelInlineTag(), clearSelection(), commitInlineTag(), emit, hasMore, inlineEditSongId, inlineInputRef, inlineTagInput (+12 more)
+Cohesion: 0.06
+Nodes (24): authStore, clearSelection(), cogOpen, emit, hasMore, props, selectedIds, sentinelRef (+16 more)
 
 ### Community 25 - "QuarterShareView.vue"
 Cohesion: 0.07
@@ -528,11 +561,11 @@ Nodes (23): allNonDuplicatesChecked, checkedNonDuplicateCount, checkedRows, dete
 
 ### Community 29 - "SongSlotPicker.vue"
 Cohesion: 0.08
-Nodes (24): availableTags, closeDropdown(), currentlyShowing, dropdownStyle, emit, hasMore, isOpen, onSelect() (+16 more)
+Nodes (26): authStore, availableTags, closeDropdown(), currentlyShowing, dropdownStyle, emit, hasMore, isOpen (+18 more)
 
 ### Community 30 - "SettingsView.vue"
-Cohesion: 0.07
-Nodes (19): authStore, editingPcCreds, editName, editSlug, isSaveDisabled, isSaving, isSlugSaveDisabled, isSlugSaving (+11 more)
+Cohesion: 0.06
+Nodes (22): authStore, editingPcCreds, editName, editSlug, isSaveDisabled, isSaving, isSlugSaveDisabled, isSlugSaving (+14 more)
 
 ### Community 31 - "Implementation Decisions"
 Cohesion: 0.08
@@ -615,8 +648,8 @@ Cohesion: 0.11
 Nodes (18): IN-01: `toggleUserTag` is dead code, IN-02: `isComplete` / `checkScriptureOverlap` kept alive with `void` to suppress unused warnings, IN-03: Debug `console.log` left in imported handler, IN-04: Unused `router` import in ServiceEditorView / unused `VWType`/`toggleUserTag` symbols, IN-05: `availableTags` in SongSlideOver recomputed by scanning the whole store on every keystroke context, IN-06: IntersectionObserver re-observes without unobserving; sentinel lifecycle relies on teleport timing, IN-07: `existingCcliNumbers` add/update counting can double-count a song as "updated", IN-08: `:key` on AI scripture results uses array index (+10 more)
 
 ### Community 51 - "Progress"
-Cohesion: 0.11
-Nodes (18): Backlog, Milestones, Phase 10: Worship song export naming, template import improvements, auto-add teams on import, orchestra filter for song suggestions, Phase 11: Song catalog & service planner improvements, Phase 12: Advanced song search and multi-select persistent tag filtering (picker + Songs panel), Phase 13: Volunteer Role Scheduling, Phase 14: In-App Quarterly Availability Editor, Phase 15: Per-Role Frequency & Role-Category Co-occurrence Rules (+10 more)
+Cohesion: 0.10
+Nodes (19): Backlog, Milestones, Phase 10: Worship song export naming, template import improvements, auto-add teams on import, orchestra filter for song suggestions, Phase 11: Song catalog & service planner improvements, Phase 12: Advanced song search and multi-select persistent tag filtering (picker + Songs panel), Phase 13: Volunteer Role Scheduling, Phase 14: In-App Quarterly Availability Editor, Phase 15: Per-Role Frequency & Role-Category Co-occurrence Rules (+11 more)
 
 ### Community 52 - "Phase 14: In-App Quarterly Availability Editor - Context"
 Cohesion: 0.11
@@ -747,7 +780,7 @@ Cohesion: 0.12
 Nodes (15): Accomplishments, Auto-fixed Issues, Decisions Made, Dependency graph, Deviations from Plan, Files Created/Modified, Issues Encountered, Metrics (+7 more)
 
 ### Community 84 - "songs.test.ts"
-Cohesion: 0.13
+Cohesion: 0.12
 Nodes (9): authStore, app, getCurrentUser(), RouteMeta, router, vue-router, mockBatchOps, mockUnsubscribe (+1 more)
 
 ### Community 85 - "RolesConfigPanel.vue"
@@ -1315,8 +1348,8 @@ Cohesion: 0.25
 Nodes (5): formattedDate, props, mockService, mockSongs, mockTimestamp
 
 ### Community 226 - "DashboardView.vue"
-Cohesion: 0.25
-Nodes (7): authStore, displayName, serviceStore, songStore, todayStr, uncategorizedCount, upcomingServices
+Cohesion: 0.10
+Nodes (18): activeSongs, authStore, displayName, isServiceReady(), missingCcliCount, missingKeyCount, nextService, rosterStore (+10 more)
 
 ### Community 227 - "tsconfig.vitest.json"
 Cohesion: 0.25
@@ -1511,8 +1544,8 @@ Cohesion: 0.40
 Nodes (3): mockService, mockSongs, mockTimestamp
 
 ### Community 280 - "index.ts"
-Cohesion: 0.50
-Nodes (3): api, FORWARDED_HEADERS, PROXY_TARGETS
+Cohesion: 0.25
+Nodes (6): api, CLAUDE_API_KEY, ESV_API_KEY, FORWARDED_HEADERS, PROXY_TARGETS, SECRET_INJECTED
 
 ### Community 281 - "Milestones"
 Cohesion: 0.50
@@ -1590,25 +1623,105 @@ Nodes (3): Applicable ASVS Categories, Known Threat Patterns for this stack, Sec
 Cohesion: 0.67
 Nodes (3): Code Examples, Drawer-to-store save call (D-01/D-02/D-03 wiring), `FrequencyTier` type + `PersonQuarterData` extension (D-05)
 
+### Community 349 - "SongFilters.vue"
+Cohesion: 0.67
+Nodes (3): authStore, emit, onVwTypeChange()
+
+### Community 364 - "per-role-frequency-and-vocal-instrument-pairing.md"
+Cohesion: 0.05
+Nodes (37): Architectural Responsibility Map, Architecture Patterns, Assumptions Log, Code Examples, Common Pitfalls, D-06 alternatives: `team:` prefix removal vs. alias (songSearch.ts), D-10 pattern: existing per-user/org localStorage persistence (songs.ts, template to copy for column visibility), D-13 pattern: existing inline pill add/remove (SongTable.vue, template to generalize for Themes) (+29 more)
+
+### Community 452 - "Canonical References"
+Cohesion: 0.08
+Nodes (23): Canonical References, Claude's Discretion, Data Model, Deferred Ideas, Established Patterns, Existing Code Insights, Implementation Decisions, Integration Points (+15 more)
+
+### Community 453 - "Phase 16.1 Plan 05: Song List Tags/Themes Split + Column Customization + VW Explainer Summary"
+Cohesion: 0.11
+Nodes (17): Accomplishments, Additional checkpoint changes (second round), Checkpoint Resolution, Checkpoint Resolution (round 3), Decisions Made, Dependency graph, Deviations from Plan, Files Created/Modified (+9 more)
+
+### Community 454 - "Phase 16.1 Plan 01: Fold Team Tags Into Tags (Data Layer) Summary"
+Cohesion: 0.12
+Nodes (15): Accomplishments, Auto-fixed Issues, Decisions Made, Dependency graph, Deviations from Plan, Files Created/Modified, Issues Encountered, Metrics (+7 more)
+
+### Community 455 - "Phase 16.1 Plan 08: Remove Song.teamTags Summary"
+Cohesion: 0.12
+Nodes (15): Accomplishments, Auto-fixed Issues, Decisions Made, Dependency graph, Deviations from Plan, Files Created/Modified, Human Verification, Issues Encountered (+7 more)
+
+### Community 456 - "Phase 16.1 Plan 02: Church-level Vertical Worship mode flag Summary"
+Cohesion: 0.13
+Nodes (14): Accomplishments, Decisions Made, Dependency graph, Deviations from Plan, Files Created/Modified, Issues Encountered, Metrics, Next Phase Readiness (+6 more)
+
+### Community 457 - "Phase 16.1 Plan 03: Decouple songs from service teams in ranking/search Summary"
+Cohesion: 0.13
+Nodes (14): Accomplishments, Decisions Made, Dependency graph, Deviations from Plan, Files Created/Modified, Issues Encountered, Metrics, Next Phase Readiness (+6 more)
+
+### Community 458 - "Phase 16.1 Plan 04: Column-Visibility Store State Summary"
+Cohesion: 0.13
+Nodes (14): Accomplishments, Decisions Made, Dependency graph, Deviations from Plan, Files Created/Modified, Issues Encountered, Metrics, Next Phase Readiness (+6 more)
+
+### Community 459 - "Phase 16.1 Plan 06: Songs-panel tag fold + VW gating Summary"
+Cohesion: 0.14
+Nodes (13): Accomplishments, Decisions Made, Dependency graph, Deviations from Plan, Files Created/Modified, Issues Encountered, Metrics, Next Phase Readiness (+5 more)
+
+### Community 460 - "Phase 16.1 Plan 07: Picker + Service-Editor Tag Repoint & VW-Gate Summary"
+Cohesion: 0.14
+Nodes (13): Accomplishments, Decisions Made, Dependency graph, Deviations from Plan, Files Created/Modified, Issues Encountered, Metrics, Next Phase Readiness (+5 more)
+
+### Community 461 - "Phase 16.1: Code Review Report"
+Cohesion: 0.14
+Nodes (13): CR-01: VW-type filter is not cleared/gated when VW mode is turned off, silently hiding songs with no visible cause, CR-02: D-14 "removed theme doesn't reappear on re-import" has no write path anywhere in the shipped UI, Critical Issues, Fixes Applied, IN-01: `SongSlotPicker.vue` search placeholder advertises `type:` even when VW mode is off, IN-02: `upsertSongs`'s grow-only tag union can resurrect a user-removed tag on PC re-import (documented tradeoff, flagged for visibility), Info, Phase 16.1: Code Review Report (+5 more)
+
+### Community 462 - "RosterView.test.ts"
+Cohesion: 0.14
+Nodes (11): mockAddPerson, mockDeactivatePerson, mockDeleteAllPeople, mockDeletePerson, mockPeople, mockReactivatePerson, mockRoles, mockSeedDefaultRolesIfEmpty (+3 more)
+
+### Community 463 - "Quick Task: Schedule & Volunteers tabbed layout"
+Cohesion: 0.22
+Nodes (8): Commits (atomic), Files, Problem, Quick Task: Schedule & Volunteers tabbed layout, Schedule page — `src/views/QuarterView.vue`, Solution, Verification, Volunteers page — `src/views/RosterView.vue`
+
+### Community 464 - "Phase 16.1: Song list tags & columns customization - Discussion Log"
+Cohesion: 0.25
+Nodes (7): 1-2-3 helper & optionality (R-04), Claude's Discretion, Columns & visibility cog (R-02 + R-03), Deferred Ideas, Phase 16.1: Song list tags & columns customization - Discussion Log, Tags vs Themes content (R-01 + R-02), Team-tag fold scope (R-01)
+
+### Community 465 - "Phase 16.1 — Validation Strategy"
+Cohesion: 0.25
+Nodes (7): Manual-Only Verifications, Per-Task Verification Map, Phase 16.1 — Validation Strategy, Sampling Rate, Test Infrastructure, Validation Sign-Off, Wave 0 Requirements
+
+### Community 466 - "Phase 16.1 Verification — Song list tags & columns customization"
+Cohesion: 0.25
+Nodes (7): Automated Checks, Goal, Human Verification (recommended end-to-end pass — from plan 16.1-08 checkpoint), Must-Haves Scorecard, Phase 16.1 Verification — Song list tags & columns customization, Post-Plan Enhancements (checkpoint refinements + quick task — verified not to break the goal), Verdict
+
+### Community 467 - "Summary: Schedule & Volunteers tabbed layout"
+Cohesion: 0.29
+Nodes (6): Notes / decisions, Schedule page — `src/views/QuarterView.vue`, Summary: Schedule & Volunteers tabbed layout, Verification, Volunteers page — `src/views/RosterView.vue`, What changed
+
+### Community 468 - "Phase 16 Verification — Quarterly Schedule Share Link"
+Cohesion: 0.50
+Nodes (3): Notes, Phase 16 Verification — Quarterly Schedule Share Link, Verdict
+
+### Community 469 - "forceCloseForm"
+Cohesion: 0.50
+Nodes (4): closeForm(), forceCloseForm(), onDeleteInactive(), onSaveVolunteer()
+
 ## Knowledge Gaps
-- **3412 isolated node(s):** `name`, `private`, `main`, `build`, `serve` (+3407 more)
+- **3660 isolated node(s):** `name`, `private`, `main`, `build`, `serve` (+3655 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **76 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **89 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `Communities (452 total, 76 thin omitted)` connect `Communities (300 total, 35 thin omitted)` to `Graph Report - worshipplanner  (2026-07-06)`?**
-  _High betweenness centrality (0.003) - this node is a cross-community bridge._
-- **Why does `Graph Report - worshipplanner  (2026-07-11)` connect `Graph Report - worshipplanner  (2026-07-06)` to `Communities (300 total, 35 thin omitted)`?**
-  _High betweenness centrality (0.001) - this node is a cross-community bridge._
+  _High betweenness centrality (0.002) - this node is a cross-community bridge._
 - **Why does `Phase 6: AI Assisted Service Suggesting and Scripture Searching - Research` connect `Phase 6: AI Assisted Service Suggesting and Scripture Searching - Research` to `Data Shape Decisions (Claude's Discretion — Researched)`, `Validation Architecture`, `Architecture Patterns`, `Common Pitfalls`, `Standard Stack`, `User Constraints (from CONTEXT.md)`, `Sources`, `Code Examples`?**
   _High betweenness centrality (0.000) - this node is a cross-community bridge._
 - **What connects `name`, `private`, `main` to the rest of the system?**
-  _3413 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _3661 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Communities (300 total, 35 thin omitted)` be split into smaller, more focused modules?**
   _Cohesion score 0.006756756756756757 - nodes in this community are weakly interconnected._
 - **Should `ServiceEditorView.vue` be split into smaller, more focused modules?**
   _Cohesion score 0.02666666666666667 - nodes in this community are weakly interconnected._
 - **Should `Phase 3: Service Planning - Research` be split into smaller, more focused modules?**
+  _Cohesion score 0.04081632653061224 - nodes in this community are weakly interconnected._
+- **Should `Phase 16: Quarterly Schedule Share Link — Research` be split into smaller, more focused modules?**
   _Cohesion score 0.04081632653061224 - nodes in this community are weakly interconnected._
