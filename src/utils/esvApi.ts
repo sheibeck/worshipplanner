@@ -1,3 +1,5 @@
+import { getAppAuthHeaders } from '@/utils/appAuth'
+
 export async function fetchPassageText(query: string): Promise<string> {
   const params = new URLSearchParams({
     q: query,
@@ -8,10 +10,11 @@ export async function fetchPassageText(query: string): Promise<string> {
     'include-passage-references': 'false',
   })
 
-  const response = await fetch(`https://api.esv.org/v3/passage/text/?${params.toString()}`, {
-    headers: {
-      Authorization: `Token ${import.meta.env.VITE_ESV_API_KEY}`,
-    },
+  // Routed through the /api/esv proxy (Cloud Function) so the ESV API key stays
+  // server-side and never ships in the client bundle. The proxy injects the
+  // Authorization header; we only send our app-identity token for the auth gate.
+  const response = await fetch(`/api/esv/v3/passage/text/?${params.toString()}`, {
+    headers: await getAppAuthHeaders(),
   })
 
   if (!response.ok) {

@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import type { Song } from '@/types/song'
 import type { ScriptureRef } from '@/types/service'
 import { BIBLE_BOOKS } from '@/utils/scripture'
+import { getAppAuthHeaders } from '@/utils/appAuth'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -62,7 +63,9 @@ let _client: Anthropic | null = null
 function getClient(): Anthropic {
   if (!_client) {
     _client = new Anthropic({
-      apiKey: import.meta.env.VITE_CLAUDE_API_KEY,
+      // The real key lives server-side in the /api/anthropic proxy (Cloud Function).
+      // This placeholder is overwritten by the proxy and never reaches Anthropic.
+      apiKey: 'proxied-server-side',
       baseURL: `${window.location.origin}/api/anthropic`,
       dangerouslyAllowBrowser: true,
     })
@@ -221,12 +224,15 @@ export async function getSongSuggestions(
       ...libraryEntries,
     ].join('\n')
 
-    const response = await getClient().messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 512,
-      system: SONG_SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userMessage }],
-    })
+    const response = await getClient().messages.create(
+      {
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 512,
+        system: SONG_SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: userMessage }],
+      },
+      { headers: await getAppAuthHeaders() },
+    )
 
     const textContent = response.content.find((c) => c.type === 'text')
     if (!textContent || textContent.type !== 'text') return null
@@ -294,12 +300,15 @@ export async function getScriptureSuggestions(
 
     const userMessage = contextParts.join('\n')
 
-    const response = await getClient().messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 512,
-      system: SCRIPTURE_SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userMessage }],
-    })
+    const response = await getClient().messages.create(
+      {
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 512,
+        system: SCRIPTURE_SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: userMessage }],
+      },
+      { headers: await getAppAuthHeaders() },
+    )
 
     const textContent = response.content.find((c) => c.type === 'text')
     if (!textContent || textContent.type !== 'text') return null

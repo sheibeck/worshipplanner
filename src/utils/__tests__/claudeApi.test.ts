@@ -6,8 +6,11 @@ const { mockCreate } = vi.hoisted(() => {
   return { mockCreate }
 })
 
-// Mock import.meta.env
-vi.stubEnv('VITE_CLAUDE_API_KEY', 'test-key')
+// The proxy holds the real key server-side; the client only attaches an app-auth
+// token. Mock the helper so unit tests don't touch Firebase Auth.
+vi.mock('@/utils/appAuth', () => ({
+  getAppAuthHeaders: vi.fn().mockResolvedValue({ 'X-App-Auth': 'test-token' }),
+}))
 
 // Mock the Anthropic SDK using the hoisted mockCreate
 vi.mock('@anthropic-ai/sdk', () => {
