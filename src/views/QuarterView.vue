@@ -18,7 +18,7 @@
               v-model="selectedQuarterId"
               class="rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
             >
-              <option v-for="q in quartersStore.quarters" :key="q.id" :value="q.id">{{ q.label }}</option>
+              <option v-for="q in pickerQuarters" :key="q.id" :value="q.id">{{ q.label }}</option>
             </select>
           </div>
           <!-- Generator controls (moved into header to save vertical space) -->
@@ -460,12 +460,34 @@ const selectedQuarter = computed(() => {
   return quartersStore.quarters.find((q) => q.id === selectedQuarterId.value) ?? null
 })
 
-// Auto-select the first quarter once loaded (only if nothing selected yet).
+// ── Quarter picker window ────────────────────────────────────────────────────
+// With many quarters accumulated, the switcher only needs the previous quarter,
+// the current quarter, and any future quarters — not the full backlog of past
+// ones. Threshold is (current quarter − 1) by chronological key (year*4+quarter,
+// consecutive quarters differ by exactly 1). The currently-selected quarter is
+// always kept in the list so the switcher never renders blank.
+function currentQuarterKey(): number {
+  const now = new Date()
+  return now.getFullYear() * 4 + (Math.floor(now.getMonth() / 3) + 1)
+}
+
+const pickerQuarters = computed(() => {
+  const minKey = currentQuarterKey() - 1
+  return quartersStore.quarters.filter(
+    (q) => q.year * 4 + q.quarter >= minKey || q.id === selectedQuarterId.value,
+  )
+})
+
+// Auto-select once loaded (only if nothing selected yet). Prefer the most
+// recently created quarter within the picker window; fall back to the most
+// recently created overall if every quarter is older than the window.
 watch(
   () => quartersStore.quarters,
   (quarters) => {
     if (!selectedQuarterId.value && quarters.length > 0) {
-      selectedQuarterId.value = quarters[0]!.id
+      const minKey = currentQuarterKey() - 1
+      const inWindow = quarters.find((q) => q.year * 4 + q.quarter >= minKey)
+      selectedQuarterId.value = (inWindow ?? quarters[0]!).id
     }
   },
 )
