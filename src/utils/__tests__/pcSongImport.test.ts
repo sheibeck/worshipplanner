@@ -16,8 +16,14 @@ vi.mock('@/utils/planningCenterApi', () => ({
   fetchLastScheduledItem: vi.fn(),
 }))
 
-import { mapPcSongToUpsert, fetchAllPcSongs, fetchAndMapPcSongs } from '@/utils/pcSongImport'
+import {
+  mapPcSongToUpsert,
+  fetchAllPcSongs,
+  fetchAndMapPcSongs,
+  partitionPcSongs,
+} from '@/utils/pcSongImport'
 import { fetchSongArrangements, fetchLastScheduledItem } from '@/utils/planningCenterApi'
+import type { UpsertSongInput } from '@/types/song'
 
 // Helper to build a minimal PC song object
 function makePcSong(overrides: {
@@ -531,5 +537,110 @@ describe('fetchAndMapPcSongs', () => {
 
     expect(fetchLastScheduledItem).not.toHaveBeenCalled()
     expect(result[0]?.primaryArrangementId).toBe('arr-only')
+  })
+})
+
+// Helper to build a minimal UpsertSongInput fixture for partitionPcSongs tests
+function makeMappedSong(overrides: {
+  pcSongId?: string | null
+  ccliNumber?: string
+  title?: string
+} = {}): UpsertSongInput {
+  return {
+    title: overrides.title ?? 'Some Song',
+    ccliNumber: overrides.ccliNumber ?? '',
+    author: '',
+    themes: [],
+    notes: '',
+    vwTypes: [],
+    arrangements: [],
+    primaryArrangementId: null,
+    lastUsedAt: null,
+    pcSongId: overrides.pcSongId ?? null,
+    hidden: false,
+    tags: [],
+    removedThemes: [],
+  }
+}
+
+// Helper to build a minimal existing-song fixture (the shape partitionPcSongs expects)
+function makeExisting(overrides: {
+  pcSongId?: string | null
+  ccliNumber?: string
+  title?: string
+} = {}): { pcSongId: string | null; ccliNumber: string; title: string } {
+  return {
+    pcSongId: overrides.pcSongId ?? null,
+    ccliNumber: overrides.ccliNumber ?? '',
+    title: overrides.title ?? 'Some Song',
+  }
+}
+
+describe('partitionPcSongs', () => {
+  it('classifies a song as existing when pcSongId matches exactly', () => {
+    const mapped = [makeMappedSong({ pcSongId: 'pc-1', title: 'A' })]
+    const existing = [makeExisting({ pcSongId: 'pc-1', title: 'Different Title' })]
+    const result = partitionPcSongs(mapped, existing)
+    expect(result.newSongs).toHaveLength(0)
+    expect(result.existingSongs).toHaveLength(1)
+    expect(result.existingSongs[0]?.pcSongId).toBe('pc-1')
+  })
+
+  it('classifies a song as existing when ccliNumber matches exactly', () => {
+    const mapped = [makeMappedSong({ ccliNumber: '12345', title: 'A' })]
+    const existing = [makeExisting({ ccliNumber: '12345', title: 'Different Title' })]
+    const result = partitionPcSongs(mapped, existing)
+    expect(result.newSongs).toHaveLength(0)
+    expect(result.existingSongs).toHaveLength(1)
+  })
+
+  it('classifies a song as existing when title matches case-insensitively', () => {
+    const mapped = [makeMappedSong({ title: 'Amazing Grace' })]
+    const existing = [makeExisting({ title: 'amazing grace' })]
+    const result = partitionPcSongs(mapped, existing)
+    expect(result.newSongs).toHaveLength(0)
+    expect(result.existingSongs).toHaveLength(1)
+  })
+
+  it('classifies a song as new when no key matches', () => {
+    const mapped = [makeMappedSong({ pcSongId: 'pc-2', ccliNumber: '99999', title: 'Brand New Song' })]
+    const existing = [makeExisting({ pcSongId: 'pc-1', ccliNumber: '11111', title: 'Old Song' })]
+    const result = partitionPcSongs(mapped, existing)
+    expect(result.newSongs).toHaveLength(1)
+    expect(result.existingSongs).toHaveLength(0)
+  })
+
+  it('does NOT match on empty-string ccliNumber alone', () => {
+    const mapped = [makeMappedSong({ ccliNumber: '', title: 'Unique Title Here' })]
+    const existing = [makeExisting({ ccliNumber: '', title: 'Other Title' })]
+    const result = partitionPcSongs(mapped, existing)
+    expect(result.newSongs).toHaveLength(1)
+    expect(result.existingSongs).toHaveLength(0)
+  })
+
+  it('treats all mapped songs as new when existing list is empty', () => {
+    const mapped = [makeMappedSong({ title: 'Song A' }), makeMappedSong({ title: 'Song B' })]
+    const result = partitionPcSongs(mapped, [])
+    expect(result.newSongs).toHaveLength(2)
+    expect(result.existingSongs).toHaveLength(0)
+  })
+
+  it('returns empty arrays when mapped list is empty', () => {
+    const existing = [makeExisting({ title: 'Song A' })]
+    const result = partitionPcSongs([], existing)
+    expect(result.newSongs).toHaveLength(0)
+    expect(result.existingSongs).toHaveLength(0)
+  })
+
+  it('preserves original input order across both output arrays', () => {
+    const mapped = [
+      makeMappedSong({ pcSongId: 'pc-new-1', title: 'New One' }),
+      makeMappedSong({ pcSongId: 'pc-existing', title: 'Existing One' }),
+      makeMappedSong({ pcSongId: 'pc-new-2', title: 'New Two' }),
+    ]
+    const existing = [makeExisting({ pcSongId: 'pc-existing', title: 'Existing One' })]
+    const result = partitionPcSongs(mapped, existing)
+    expect(result.newSongs.map((s) => s.title)).toEqual(['New One', 'New Two'])
+    expect(result.existingSongs.map((s) => s.title)).toEqual(['Existing One'])
   })
 })

@@ -250,6 +250,46 @@ export async function fetchAndMapPcSongs(
 }
 
 /**
+ * Split mapped PC songs into "new" (not yet in the library) and "already-imported"
+ * (matches an existing song) based on the shared triple-key matching rule:
+ * pcSongId (exact) OR ccliNumber (exact, non-empty) OR title (case-insensitive).
+ *
+ * This is a pure function — no side effects, no store access. It centralizes the
+ * matching logic previously duplicated in PcImportModal's classifySongs and in
+ * importFromPc's inline counting.
+ *
+ * @param mapped - Mapped PC songs (from fetchAndMapPcSongs) to classify
+ * @param existing - Existing library songs to match against
+ * @returns { newSongs, existingSongs } — both preserve the original `mapped` order
+ */
+export function partitionPcSongs(
+  mapped: UpsertSongInput[],
+  existing: Array<{ pcSongId: string | null; ccliNumber: string; title: string }>,
+): { newSongs: UpsertSongInput[]; existingSongs: UpsertSongInput[] } {
+  const byPcId = new Set(existing.filter((s) => s.pcSongId).map((s) => s.pcSongId as string))
+  const byCcli = new Set(existing.filter((s) => s.ccliNumber).map((s) => s.ccliNumber))
+  const byTitle = new Set(existing.map((s) => s.title.toLowerCase()))
+
+  const newSongs: UpsertSongInput[] = []
+  const existingSongs: UpsertSongInput[] = []
+
+  for (const song of mapped) {
+    const isExisting =
+      (song.pcSongId != null && byPcId.has(song.pcSongId)) ||
+      (song.ccliNumber !== '' && byCcli.has(song.ccliNumber)) ||
+      byTitle.has(song.title.toLowerCase())
+
+    if (isExisting) {
+      existingSongs.push(song)
+    } else {
+      newSongs.push(song)
+    }
+  }
+
+  return { newSongs, existingSongs }
+}
+
+/**
  * Import all songs from Planning Center into the WorshipPlanner store.
  * Orchestrates: fetch → map → upsert, reporting progress along the way.
  *
