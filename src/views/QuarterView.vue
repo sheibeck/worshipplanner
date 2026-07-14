@@ -251,6 +251,17 @@
             <p class="text-xl font-semibold text-gray-100">{{ proposeResult.pairingConflicts.length }}</p>
             <p class="text-xs text-gray-500">pairing conflicts</p>
           </div>
+          <label
+            v-if="changedDates.length > 0"
+            class="sm:ml-auto inline-flex items-center gap-2 text-sm text-gray-300 select-none cursor-pointer"
+          >
+            <input
+              v-model="showChanges"
+              type="checkbox"
+              class="rounded border-gray-600 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-gray-900"
+            />
+            Show changes ({{ changedDates.length }})
+          </label>
         </div>
 
         <!-- Empty state / grid host -->
@@ -274,6 +285,7 @@
             :quarter="selectedQuarter"
             :roles="rosterStore.roles"
             :lastProposeResult="proposeResult"
+            :changed-dates="showChanges ? changedDates : []"
           />
         </div>
 
@@ -714,6 +726,16 @@ async function onSaveOverride() {
 // ── Generate / regenerate / fill gaps ───────────────────────────────────────
 const proposeResult = ref<ProposeResult | null>(null)
 const showRegenerateConfirm = ref(false)
+
+// ── Last-regenerate change highlights ────────────────────────────────────────
+const showChanges = ref(true)
+// Dates changed by the last generateProposal, scoped to the quarter in view so a
+// stale set from another quarter never highlights this grid.
+const changedDates = computed<string[]>(() => {
+  const lr = quartersStore.lastRegenerate
+  if (!lr || lr.quarterId !== selectedQuarter.value?.id) return []
+  return lr.changedDates
+})
 
 const hasAssignments = computed(() => {
   if (!selectedQuarter.value) return false
