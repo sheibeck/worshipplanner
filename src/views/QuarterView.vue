@@ -148,10 +148,10 @@
                 </span>
                 <span class="flex items-center gap-3">
                   <button
-                    @click="toggleOverride(date)"
+                    @click="openOverride(date)"
                     class="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
                   >
-                    {{ overrideDate === date ? 'Close' : 'Override Roles' }}
+                    Override Roles
                   </button>
                   <button
                     @click="onRemoveDate(date)"
@@ -161,44 +161,6 @@
                     &times;
                   </button>
                 </span>
-              </li>
-              <!-- Inline override editor for this row only -->
-              <li v-if="overrideDate === date" class="py-3 px-3 bg-gray-950/40 rounded-md">
-                <p class="text-xs text-gray-500 mb-2">
-                  Role counts for {{ formatDateLabel(date) }} — overrides the default for this date only.
-                </p>
-                <div v-if="rosterStore.roles.length === 0" class="text-sm text-gray-600">
-                  No roles configured yet — add roles from the Roster screen.
-                </div>
-                <div v-else class="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 mb-3">
-                  <div
-                    v-for="role in rosterStore.rolesSorted"
-                    :key="role.id"
-                    class="flex items-center justify-between gap-2"
-                  >
-                    <span class="text-sm text-gray-300 truncate">{{ role.name }}</span>
-                    <input
-                      v-model.number="overrideDraft[role.id]"
-                      type="number"
-                      min="0"
-                      class="w-16 shrink-0 rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                    />
-                  </div>
-                </div>
-                <div class="flex items-center gap-2">
-                  <button
-                    @click="onSaveOverride"
-                    class="px-3 py-1.5 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors"
-                  >
-                    Save role counts
-                  </button>
-                  <button
-                    @click="toggleOverride(date)"
-                    class="px-3 py-1.5 rounded-md text-sm text-gray-400 border border-gray-700 hover:bg-gray-800 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
               </li>
             </template>
             <li v-if="selectedQuarter.serviceDates.length === 0" class="py-3 text-sm text-gray-600 text-center">
@@ -415,6 +377,98 @@
         </div>
       </Transition>
     </Teleport>
+
+    <!-- Per-date role override drawer (mirrors the volunteer edit drawer) -->
+    <Teleport to="body">
+      <Transition
+        enter-active-class="transition-opacity duration-200 ease-out"
+        enter-from-class="opacity-0"
+        enter-to-class="opacity-100"
+        leave-active-class="transition-opacity duration-150 ease-in"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0"
+      >
+        <div
+          v-if="overrideDate"
+          class="fixed inset-0 z-40 bg-black/60"
+          @click="closeOverride"
+        ></div>
+      </Transition>
+
+      <Transition
+        enter-active-class="transition-transform duration-200 ease-out"
+        enter-from-class="translate-x-full"
+        enter-to-class="translate-x-0"
+        leave-active-class="transition-transform duration-150 ease-in"
+        leave-from-class="translate-x-0"
+        leave-to-class="translate-x-full"
+      >
+        <div
+          v-if="overrideDate"
+          class="fixed top-0 right-0 bottom-0 z-50 w-full max-w-md bg-gray-900 border-l border-gray-700 shadow-2xl flex flex-col"
+        >
+          <!-- Header -->
+          <div class="flex items-center justify-between gap-3 px-6 py-4 border-b border-gray-800 shrink-0">
+            <div class="min-w-0">
+              <h2 class="text-base font-semibold text-gray-100">Override Roles</h2>
+              <p class="text-xs text-gray-400 mt-0.5 truncate">{{ overrideDate ? formatDateLabel(overrideDate) : '' }}</p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                class="px-3 py-1.5 rounded-md text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-gray-600 transition-colors"
+                @click="closeOverride"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                :disabled="rosterStore.roles.length === 0"
+                class="px-3 py-1.5 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                @click="onSaveOverride"
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                class="p-1.5 rounded-md text-gray-500 hover:text-gray-300 hover:bg-gray-800 transition-colors"
+                @click="closeOverride"
+                aria-label="Close"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Scrollable body -->
+          <div class="flex-1 overflow-y-auto px-6 py-5">
+            <p class="text-xs text-gray-500 mb-4">
+              Role counts for this date only — overrides the quarter default.
+            </p>
+            <div v-if="rosterStore.roles.length === 0" class="text-sm text-gray-600">
+              No roles configured yet — add roles from the Volunteers screen.
+            </div>
+            <div v-else class="space-y-2">
+              <div
+                v-for="role in rosterStore.rolesSorted"
+                :key="role.id"
+                class="flex items-center justify-between gap-3"
+              >
+                <span class="text-sm text-gray-300 truncate">{{ role.name }}</span>
+                <input
+                  v-model.number="overrideDraft[role.id]"
+                  type="number"
+                  min="0"
+                  class="w-20 shrink-0 rounded-md bg-gray-800 border border-gray-700 text-gray-100 text-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </AppShell>
   </div>
 
@@ -603,8 +657,12 @@ function formatDateLabel(date: string): string {
 const overrideDate = ref<string | null>(null)
 const overrideDraft = ref<Record<string, number>>({})
 
-function toggleOverride(date: string) {
-  overrideDate.value = overrideDate.value === date ? null : date
+function openOverride(date: string) {
+  overrideDate.value = date
+}
+
+function closeOverride() {
+  overrideDate.value = null
 }
 
 function hasOverride(date: string): boolean {
