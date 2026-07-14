@@ -73,9 +73,8 @@ vi.mock('@/utils/scheduler', () => ({
 
 // Mock the roster store — quarters.ts reads activePeople/roles/people and upserts standing fields.
 const mockUpdatePerson = vi.fn(() => Promise.resolve())
-const mockRosterState: { people: Person[]; activePeople: Person[]; roles: Role[] } = {
+const mockRosterState: { people: Person[]; roles: Role[] } = {
   people: [],
-  activePeople: [],
   roles: [],
 }
 vi.mock('@/stores/roster', () => ({
@@ -84,7 +83,8 @@ vi.mock('@/stores/roster', () => ({
       return mockRosterState.people
     },
     get activePeople() {
-      return mockRosterState.activePeople
+      // Mirror the real store: activePeople is the active subset of people.
+      return mockRosterState.people.filter((p) => p.active)
     },
     get roles() {
       return mockRosterState.roles
@@ -158,7 +158,6 @@ describe('useQuartersStore', () => {
     vi.clearAllMocks()
     for (const key of Object.keys(snapshotCallbacks)) delete snapshotCallbacks[key]
     mockRosterState.people = []
-    mockRosterState.activePeople = []
     mockRosterState.roles = []
     mockOrgDoc = { name: 'Test Org' }
     mockExistingSharePaths = new Set()
@@ -737,7 +736,7 @@ describe('useQuartersStore', () => {
       const store = useQuartersStore()
       store.subscribe('org-1')
       triggerQuartersSnapshot([makeQuarterDoc({ calendar: { '2026-07-05': { 'role-guitar': ['person-a'] } } })])
-      mockRosterState.activePeople = [makePerson({ id: 'person-a' })]
+      mockRosterState.people = [makePerson({ id: 'person-a' })]
       mockRosterState.roles = [makeRole()]
       mockProposeQuarterSchedule.mockReturnValue({
         calendar: { '2026-07-05': { 'role-guitar': ['person-b'] } },
@@ -762,7 +761,7 @@ describe('useQuartersStore', () => {
       store.subscribe('org-1')
       const existingCalendar = { '2026-07-05': { 'role-guitar': ['person-a'] } }
       triggerQuartersSnapshot([makeQuarterDoc({ calendar: existingCalendar })])
-      mockRosterState.activePeople = [makePerson({ id: 'person-a' })]
+      mockRosterState.people = [makePerson({ id: 'person-a' })]
       mockRosterState.roles = [makeRole()]
       mockProposeQuarterSchedule.mockReturnValue({
         calendar: existingCalendar,
@@ -782,7 +781,7 @@ describe('useQuartersStore', () => {
       const store = useQuartersStore()
       store.subscribe('org-1')
       triggerQuartersSnapshot([makeQuarterDoc()])
-      mockRosterState.activePeople = [makePerson({ id: 'person-a' })]
+      mockRosterState.people = [makePerson({ id: 'person-a' })]
       mockRosterState.roles = [
         makeRole({ id: 'role-sound', name: 'sound', group: 'tech' }),
         makeRole({ id: 'role-guitar', name: 'guitar', group: 'band' }),
@@ -817,7 +816,7 @@ describe('useQuartersStore', () => {
       ])
       // A single person eligible for both a TECH role and a BAND role — without roleGroupOf
       // wired in, the pre-15-04 scheduler would happily double-book them on the same date.
-      mockRosterState.activePeople = [
+      mockRosterState.people = [
         makePerson({ id: 'person-a', roles: ['role-sound', 'role-guitar'] }),
       ]
       mockRosterState.roles = [

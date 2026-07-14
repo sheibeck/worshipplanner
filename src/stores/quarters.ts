@@ -114,7 +114,9 @@ export const useQuartersStore = defineStore('quarters', () => {
     const prior = findPriorQuarter(quarters.value, year, quarter)
 
     const personQuarterData: Record<string, PersonQuarterData> = {}
-    for (const person of rosterStore.people) {
+    // Only seed active volunteers — inactive people are excluded from schedule
+    // proposals, so seeding quarter data for them just creates throwaway entries.
+    for (const person of rosterStore.activePeople) {
       const priorPQD = prior?.personQuarterData[person.id]
       const roleFrequency: Record<string, RoleFrequencyEntry> = {}
       for (const roleId of person.roles) {
