@@ -77,7 +77,18 @@
                   </svg>
                 </div>
                 <p class="text-sm text-gray-300">Ready to sync songs from Planning Center.</p>
-                <p class="text-xs text-gray-500 mt-1">Existing songs will be updated. New songs will be added.</p>
+                <p v-if="!newOnly" class="text-xs text-gray-500 mt-1">Existing songs will be updated. New songs will be added.</p>
+
+                <label class="mt-4 flex items-center justify-center gap-2 cursor-pointer select-none">
+                  <input
+                    id="pc-import-new-only"
+                    v-model="newOnly"
+                    type="checkbox"
+                    class="h-4 w-4 rounded border-gray-600 bg-gray-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-gray-900"
+                  />
+                  <span class="text-sm text-gray-300">Import new songs only</span>
+                </label>
+                <p class="text-xs text-gray-500 mt-1">Skip songs already in your library.</p>
               </div>
             </div>
 
@@ -101,7 +112,7 @@
                   </div>
                   <div class="rounded-lg bg-blue-900/20 border border-blue-800/50 p-4 text-center">
                     <p class="text-2xl font-bold text-blue-300">{{ preview.toUpdate }}</p>
-                    <p class="text-xs text-blue-400/80 mt-1">Existing songs to update</p>
+                    <p class="text-xs text-blue-400/80 mt-1">{{ newOnly ? 'Existing songs skipped' : 'Existing songs to update' }}</p>
                   </div>
                 </div>
                 <p class="text-xs text-gray-500 mt-4 text-center">
@@ -130,7 +141,8 @@
                   <p class="text-base font-semibold text-gray-100">Import complete!</p>
                   <p class="text-sm text-gray-400 mt-1">
                     {{ preview.toAdd }} song{{ preview.toAdd !== 1 ? 's' : '' }} added,
-                    {{ preview.toUpdate }} song{{ preview.toUpdate !== 1 ? 's' : '' }} updated.
+                    {{ preview.toUpdate }} song{{ preview.toUpdate !== 1 ? 's' : '' }}
+                    {{ newOnly ? 'skipped' : 'updated' }}.
                   </p>
                 </div>
               </div>
@@ -217,9 +229,8 @@
 import { ref, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useSongStore } from '@/stores/songs'
-import { fetchAndMapPcSongs } from '@/utils/pcSongImport'
+import { fetchAndMapPcSongs, partitionPcSongs } from '@/utils/pcSongImport'
 import type { UpsertSongInput } from '@/types/song'
-import type { Song } from '@/types/song'
 
 const props = defineProps<{
   open: boolean
@@ -239,8 +250,12 @@ type Step = 'idle' | 'fetching' | 'preview' | 'importing' | 'done' | 'error'
 const step = ref<Step>('idle')
 const errorMessage = ref('')
 
-// Mapped songs from PC (stored between fetch and confirm)
-const mappedSongs = ref<UpsertSongInput[]>([])
+// Checked by default: only import songs not already in the library.
+const newOnly = ref(true)
+
+// Partitioned mapped songs from PC (stored between fetch and confirm)
+const newSongs = ref<UpsertSongInput[]>([])
+const existingSongs = ref<UpsertSongInput[]>([])
 
 // Preview counts
 const preview = ref({ toAdd: 0, toUpdate: 0 })
@@ -257,27 +272,9 @@ watch(
 function resetToIdle() {
   step.value = 'idle'
   errorMessage.value = ''
-  mappedSongs.value = []
+  newSongs.value = []
+  existingSongs.value = []
   preview.value = { toAdd: 0, toUpdate: 0 }
-}
-
-// ── Classification helper ─────────────────────────────────────────────────────
-
-function classifySongs(mapped: UpsertSongInput[], existing: Song[]) {
-  const byPcId = new Map(existing.filter((s) => s.pcSongId).map((s) => [s.pcSongId!, s]))
-  const byCcli = new Map(existing.filter((s) => s.ccliNumber).map((s) => [s.ccliNumber, s]))
-  const byTitle = new Map(existing.map((s) => [s.title.toLowerCase(), s]))
-  let toAdd = 0
-  let toUpdate = 0
-  for (const song of mapped) {
-    const isExisting =
-      (song.pcSongId && byPcId.has(song.pcSongId)) ||
-      (song.ccliNumber && byCcli.has(song.ccliNumber)) ||
-      byTitle.has(song.title.toLowerCase())
-    if (isExisting) toUpdate++
-    else toAdd++
-  }
-  return { toAdd, toUpdate }
 }
 
 // ── Actions ───────────────────────────────────────────────────────────────────
@@ -291,8 +288,10 @@ async function onStartFetch() {
 
   try {
     const songs = await fetchAndMapPcSongs(creds.appId, creds.secret)
-    mappedSongs.value = songs
-    preview.value = classifySongs(songs, songStore.songs)
+    const partition = partitionPcSongs(songs, songStore.songs)
+    newSongs.value = partition.newSongs
+    existingSongs.value = partition.existingSongs
+    preview.value = { toAdd: partition.newSongs.length, toUpdate: partition.existingSongs.length }
     step.value = 'preview'
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'An unknown error occurred'
@@ -304,7 +303,8 @@ async function onStartFetch() {
 async function onConfirmImport() {
   step.value = 'importing'
   try {
-    await songStore.upsertSongs(mappedSongs.value)
+    const songsToImport = newOnly.value ? newSongs.value : [...newSongs.value, ...existingSongs.value]
+    await songStore.upsertSongs(songsToImport)
     step.value = 'done'
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'An unknown error occurred'
@@ -321,7 +321,8 @@ function onClose() {
 }
 
 function onDoneClose() {
-  emit('imported', preview.value.toAdd + preview.value.toUpdate)
+  const importedCount = newOnly.value ? preview.value.toAdd : preview.value.toAdd + preview.value.toUpdate
+  emit('imported', importedCount)
   emit('close')
 }
 </script>
