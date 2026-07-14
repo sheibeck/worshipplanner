@@ -51,7 +51,7 @@
             : 'text-gray-400 border-transparent hover:text-gray-200 hover:border-gray-600'"
           @click="activeTab = 'roles'"
         >
-          Roles config
+          Roles
         </button>
       </div>
 
