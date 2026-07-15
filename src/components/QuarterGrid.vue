@@ -295,12 +295,11 @@ function effectiveCountFor(date: string, roleId: string): number {
   return role?.defaultCount ?? 0
 }
 
-function isInUnfilledList(date: string, roleId: string): boolean {
-  return props.lastProposeResult?.unfilled.some((u) => u.date === date && u.roleId === roleId) ?? false
-}
-
+// Live-computed from the calendar + effective count (NOT props.lastProposeResult.unfilled,
+// which is a static snapshot from the last propose and does NOT update when a slot is filled
+// by hand — using it here left the red "unfilled" tag stuck after a manual assignment).
 function cellIsUnfilled(date: string, roleId: string): boolean {
-  return cellPeople(date, roleId).length < effectiveCountFor(date, roleId) || isInUnfilledList(date, roleId)
+  return cellPeople(date, roleId).length < effectiveCountFor(date, roleId)
 }
 
 function cellHasConflict(date: string, roleId: string): boolean {
