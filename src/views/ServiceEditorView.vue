@@ -2113,32 +2113,25 @@ async function onSave() {
   try {
     const { id, createdAt, updatedAt, ...data } = localService.value
 
-    // Compare song IDs globally to update lastUsedAt for newly assigned songs
-    if (originalService.value) {
-      const original = originalService.value
-      const newSongIds = new Set(
+    // Only bump lastUsedAt when the service transitions from draft to scheduled (planned).
+    // Merely editing songs while still a draft — or the AI auto song selector *showing*
+    // suggested/drafted songs — must NOT age songs; a song counts as "used" only once the
+    // service it belongs to is actually scheduled.
+    if (originalService.value?.status === 'draft' && data.status === 'planned') {
+      const scheduledSongIds = new Set(
         localService.value.slots
           .filter((s) => s.kind === 'SONG' && (s as SongSlot).songId)
           .map((s) => (s as SongSlot).songId!),
       )
-      const oldSongIds = new Set(
-        original.slots
-          .filter((s) => s.kind === 'SONG' && (s as SongSlot).songId)
-          .map((s) => (s as SongSlot).songId!),
-      )
-
-      // Update lastUsedAt for newly added songs
-      for (const songId of newSongIds) {
-        if (!oldSongIds.has(songId)) {
-          const songSlot = localService.value.slots.find(
-            (s) => s.kind === 'SONG' && (s as SongSlot).songId === songId,
-          ) as SongSlot
-          await serviceStore.assignSongToSlot(id, localService.value.slots.indexOf(songSlot), {
-            id: songId,
-            title: songSlot.songTitle!,
-            key: songSlot.songKey!,
-          })
-        }
+      for (const songId of scheduledSongIds) {
+        const songSlot = localService.value.slots.find(
+          (s) => s.kind === 'SONG' && (s as SongSlot).songId === songId,
+        ) as SongSlot
+        await serviceStore.assignSongToSlot(id, localService.value.slots.indexOf(songSlot), {
+          id: songId,
+          title: songSlot.songTitle!,
+          key: songSlot.songKey!,
+        })
       }
     }
 
