@@ -1,330 +1,327 @@
 # Codebase Structure
 
-**Analysis Date:** 2026-07-15
+**Analysis Date:** 2026-07-16
 
 ## Directory Layout
 
 ```
-worshipplanner-ea415a6b/                          # Project root
-├── .planning/                                    # GSD planning documents
-│   ├── codebase/                                 # This directory (ARCHITECTURE.md, STRUCTURE.md, etc.)
-│   ├── graphs/                                   # Knowledge graph (auto-built by /gsd-graphify)
-│   ├── phases/                                   # Phase workstreams
-│   └── quick/                                    # Quick tasks
-├── docs/                                         # External documentation
-├── functions/                                    # Firebase Cloud Functions (backend proxy)
+worshipplanner-6e2629ea/
+├── src/                           # Vue 3 SPA source code
+│   ├── main.ts                    # Entry point: create app, register Pinia, mount router
+│   ├── App.vue                    # Root component: auth guard, loading state, router outlet
+│   ├── assets/                    # Static assets (CSS, images)
+│   │   └── main.css               # Tailwind CSS imports
+│   ├── components/                # Reusable UI components
+│   │   ├── __tests__/             # Component unit tests
+│   │   ├── AppShell.vue           # Layout wrapper (header, sidebar, main content)
+│   │   ├── AppSidebar.vue         # Navigation sidebar
+│   │   ├── ServiceCard.vue        # Service preview card
+│   │   ├── SongTable.vue          # Sortable songs library table
+│   │   ├── SongSlideOver.vue      # Drawer for editing song details
+│   │   ├── SongSlotPicker.vue     # Modal to assign songs to service slots
+│   │   ├── ArrangementAccordion.vue # Collapsible song arrangements list
+│   │   ├── QuarterGrid.vue        # Quarterly schedule grid view
+│   │   ├── RosterImportModal.vue  # CSV import for volunteers
+│   │   ├── PcImportModal.vue      # Planning Center import dialog
+│   │   ├── AvailabilityDrawer.vue # Volunteer availability editor
+│   │   ├── AvailabilityRosterTable.vue # Volunteer × service matrix
+│   │   ├── RolesConfigPanel.vue   # Team role configuration
+│   │   ├── CsvImportModal.vue     # Generic CSV import handler
+│   │   ├── ScriptureInput.vue     # Bible verse reference editor
+│   │   ├── ScriptureRotationTable.vue # Scripture reading scheduler
+│   │   ├── RotationTable.vue      # Volunteer role rotation view
+│   │   ├── TagFilterChecklist.vue # Song tag filter UI
+│   │   ├── SongFilters.vue        # Song search/filter header
+│   │   ├── GettingStarted.vue     # Onboarding checklist
+│   │   ├── NewServiceDialog.vue   # Create service dialog
+│   │   └── BatchQuickAssign.vue   # Bulk song assignment
+│   ├── views/                     # Route-mapped page components
+│   │   ├── __tests__/             # View integration tests
+│   │   ├── LoginView.vue          # Sign in / sign up page
+│   │   ├── DashboardView.vue      # Home page: next service, volunteer coverage
+│   │   ├── ServiceEditorView.vue  # Service detail editor (103KB — largest view)
+│   │   ├── ServicesView.vue       # List of all services
+│   │   ├── SongsView.vue          # Song library management
+│   │   ├── RosterView.vue         # Volunteer roster
+│   │   ├── QuarterView.vue        # Quarterly planning grid
+│   │   ├── SettingsView.vue       # Church settings, imports, integrations
+│   │   ├── TeamView.vue           # Team member / admin management
+│   │   ├── ShareView.vue          # Public read-only service share (via token)
+│   │   └── QuarterShareView.vue   # Public read-only quarterly share
+│   ├── stores/                    # Pinia state management
+│   │   ├── __tests__/             # Store unit tests
+│   │   ├── auth.ts                # Auth state, org context, role, PC credentials
+│   │   ├── songs.ts               # Songs library, filtering, search
+│   │   ├── services.ts            # Services collection, CRUD, slot assignment
+│   │   ├── quarters.ts            # Quarterly schedule state
+│   │   └── roster.ts              # Volunteer roster, availability, roles
+│   ├── router/                    # Vue Router configuration
+│   │   ├── __tests__/             # Router guard tests
+│   │   └── index.ts               # Route definitions, auth guards, role checks
+│   ├── firebase/                  # Firebase configuration
+│   │   └── index.ts               # Initialize Firebase app, auth, Firestore
+│   ├── types/                     # Shared TypeScript interfaces
+│   │   ├── service.ts             # Service, ServiceSlot, Progression, SlotKind types
+│   │   ├── song.ts                # Song, Arrangement, VWType, UpsertSongInput
+│   │   └── roster.ts              # Person, Team, Availability, Role types
+│   ├── utils/                     # Business logic, API clients, helpers
+│   │   ├── __tests__/             # Utility function tests
+│   │   ├── appAuth.ts             # Firebase Auth helper (signOut, getCurrentUser)
+│   │   ├── planningCenterApi.ts   # PC API wrapper: songs, plans, services
+│   │   ├── pcSongImport.ts        # Transform PC songs → app Song model
+│   │   ├── claudeApi.ts           # Claude API client for AI song suggestions
+│   │   ├── esvApi.ts              # ESV Bible API client for scripture lookups
+│   │   ├── csvImport.ts           # Generic CSV parser utilities
+│   │   ├── volunteerCsv.ts        # CSV ↔ roster transformation
+│   │   ├── planningCenterExport.ts # Format service for PC export
+│   │   ├── slotTypes.ts           # buildSlots, createSlot, reindexSlots, PROGRESSION_SLOT_TYPES
+│   │   ├── songSearch.ts          # songMatchesQuery filtering logic
+│   │   ├── scheduler.ts           # Schedule assignment algorithms
+│   │   ├── scripture.ts           # Parse / format bible references
+│   │   ├── quarterDates.ts        # Quarter boundary calculations
+│   │   ├── slug.ts                # Generate memorable URL slugs
+│   │   ├── suggestions.ts         # AI-powered suggestions helpers
+│   │   └── rotationTable.ts       # Rotation table helpers
+│   ├── composables/               # Reusable Vue 3 Composition Functions
+│   │   └── useUnsavedGuard.ts     # Dirty-check & confirm-discard for forms
+│   ├── rules.test.ts              # Firestore security rules unit tests
+│   └── env.d.ts                   # TypeScript env type declarations
+├── functions/                     # Firebase Cloud Functions
 │   ├── src/
-│   │   └── index.ts                              # Express-like API proxy (anthropic, esv, planningcenter)
-│   ├── package.json
-│   ├── tsconfig.json
-│   └── lib/ (build output, not committed)
-├── public/                                       # Static assets served by Vite
-│   └── index.html                                # Entry HTML file (mounts #app)
-├── src/                                          # Frontend application
-│   ├── assets/
-│   │   └── main.css                              # Global Tailwind CSS
-│   ├── components/                               # Reusable Vue components
-│   │   ├── __tests__/                            # Component unit tests
-│   │   ├── AppShell.vue                          # Main layout wrapper
-│   │   ├── AppSidebar.vue                        # Navigation sidebar
-│   │   ├── PcImportModal.vue                     # Planning Center import dialog
-│   │   ├── CsvImportModal.vue                    # CSV import dialog
-│   │   ├── RosterImportModal.vue                 # Volunteer roster import
-│   │   ├── NewServiceDialog.vue                  # Create new service
-│   │   ├── QuarterGrid.vue                       # Quarterly schedule grid (largest component)
-│   │   ├── SongTable.vue                         # Song library table
-│   │   ├── SongSlideOver.vue                     # Song detail drawer
-│   │   ├── SongFilters.vue                       # Song search & filter controls
-│   │   ├── AvailabilityDrawer.vue                # Volunteer availability editor
-│   │   ├── AvailabilityRosterTable.vue           # Volunteer rotation table
-│   │   ├── ScriptureInput.vue                    # Bible passage lookup & input
-│   │   ├── ServiceCard.vue                       # Service preview card
-│   │   ├── ArrangementAccordion.vue              # Song arrangement details
-│   │   ├── RotationTable.vue                     # Weekly rotation view
-│   │   ├── RolesConfigPanel.vue                  # Role management
-│   │   ├── BatchQuickAssign.vue                  # Bulk volunteer assign
-│   │   ├── CsvImportModal.vue                    # CSV parser UI
-│   │   ├── RosterPrintLayout.vue                 # Roster print template
-│   │   ├── ServicePrintLayout.vue                # Service print template
-│   │   └── [other utility components]
-│   ├── composables/                              # Reusable Vue composition functions
-│   │   └── useUnsavedGuard.ts                    # Dirty-check + discard confirmation
-│   ├── firebase/
-│   │   └── index.ts                              # Firebase SDK init (auth, firestore, emulator config)
-│   ├── router/
-│   │   ├── __tests__/                            # Router unit tests
-│   │   └── index.ts                              # Vue Router config; auth guards; route definitions
-│   ├── stores/                                   # Pinia state management (Firestore real-time)
-│   │   ├── __tests__/                            # Store unit tests
-│   │   ├── auth.ts                               # Auth state + org/role info
-│   │   ├── songs.ts                              # Song catalog + filtering
-│   │   ├── services.ts                           # Service/worship plan documents
-│   │   ├── quarters.ts                           # Quarterly schedules + schedule generation
-│   │   └── roster.ts                             # Volunteers, roles, availability
-│   ├── types/                                    # TypeScript type definitions
-│   │   ├── song.ts                               # Song, Arrangement, VWType
-│   │   ├── service.ts                            # Service, ServiceSlot (discriminated union)
-│   │   └── roster.ts                             # Person, Role, Quarter, RoleFrequencyEntry, etc.
-│   ├── utils/                                    # Pure business logic utilities
-│   │   ├── __tests__/                            # Utility unit tests
-│   │   ├── scheduler.ts                          # Fair-share volunteer scheduler (pure function)
-│   │   ├── planningCenterApi.ts                  # Planning Center API client
-│   │   ├── pcSongImport.ts                       # Import songs from Planning Center
-│   │   ├── songSearch.ts                         # Text search over song catalog
-│   │   ├── csvImport.ts                          # CSV parse & map to songs/people
-│   │   ├── claudeApi.ts                          # Claude AI integration (via proxy)
-│   │   ├── esvApi.ts                             # ESV Bible API client (via proxy)
-│   │   ├── planningCenterExport.ts               # Export service plan to Planning Center
-│   │   ├── scripture.ts                          # Bible reference parsing & formatting
-│   │   ├── quarterDates.ts                       # Generate quarter Sunday dates
-│   │   ├── slug.ts                               # Share URL slug generation
-│   │   ├── slotTypes.ts                          # Build service slots by VW progression
-│   │   ├── rotationTable.ts                      # Format rotation table data
-│   │   ├── suggestions.ts                        # Claude AI suggestions parsing
-│   │   ├── appAuth.ts                            # Auth header helpers
-│   │   └── volunteerCsv.ts                       # Volunteer CSV export format
-│   ├── views/                                    # Page/view components (top-level routes)
-│   │   ├── __tests__/                            # View unit tests
-│   │   ├── LoginView.vue                         # /login — Firebase auth UI
-│   │   ├── DashboardView.vue                     # / — Dashboard summary
-│   │   ├── SongsView.vue                         # /songs — Song library (search, import, edit)
-│   │   ├── RosterView.vue                        # /volunteers — Volunteer roster management
-│   │   ├── QuarterView.vue                       # /schedule — Quarterly schedule editor
-│   │   ├── ServicesView.vue                      # /services — List of service plans
-│   │   ├── ServiceEditorView.vue                 # /services/:id — Service editor (largest view, 103 KB)
-│   │   ├── SettingsView.vue                      # /settings — App configuration (VW mode, PC credentials)
-│   │   ├── TeamView.vue                          # /admins — Team member management
-│   │   ├── ShareView.vue                         # /share/:token — Public service share link
-│   │   ├── QuarterShareView.vue                  # /quarter-share/:token & /:slug/quarter{N}-{YYYY} — Public schedule
-│   │   └── __tests__/
-│   ├── App.vue                                   # Root component (auth loading spinner + RouterView)
-│   ├── main.ts                                   # Entry point (Vue app creation, Pinia, Router setup)
-│   └── rules.test.ts                             # Firestore security rules unit tests (special test config)
-├── .env.example                                  # Example environment variables (never commit .env)
-├── .env.local (NOT COMMITTED)                    # Local development secrets (VITE_FIREBASE_*, CLAUDE_API_KEY, ESV_API_KEY)
-├── .env.production (POSSIBLY COMMITTED)          # Production config (only public vars, VITE_* prefix)
-├── eslint.config.ts                              # ESLint configuration
-├── vite.config.ts                                # Vite + Vue + Tailwind build config; dev API proxies
-├── vitest.config.ts (generated from vite.config.ts) # Vitest configuration
-├── vitest.rules.config.ts                        # Special test config for Firestore rules testing
-├── tsconfig.json                                 # Base TypeScript config
-├── tsconfig.app.json                             # App-specific TypeScript config (strict mode)
-├── tsconfig.node.json                            # Build tools TypeScript config
-├── tsconfig.vitest.json                          # Vitest TypeScript config
-├── package.json                                  # Frontend dependencies & scripts
-├── package-lock.json                             # Dependency lock file
-├── .gitignore                                    # Git ignore rules (excludes .env, dist, node_modules)
-├── CLAUDE.md                                     # This project's Claude instructions
-├── firebase.json                                 # Firebase hosting & functions config
-├── firestore.rules                               # Firestore security rules (deployed separately)
-└── README.md (if exists)                         # Project documentation
+│   │   └── index.ts               # API reverse proxy (Anthropic, ESV, Planning Center)
+│   ├── package.json               # Cloud Functions dependencies
+│   ├── tsconfig.json              # Cloud Functions TypeScript config
+│   └── package-lock.json
+├── public/                        # Static assets served as-is
+│   └── favicon.ico
+├── vite.config.ts                 # Vite build config: Vue plugin, Tailwind, alias, dev proxy
+├── vitest.rules.config.ts         # Vitest config for firestore.rules tests
+├── tsconfig.json                  # Root TypeScript config
+├── tsconfig.app.json              # App-specific TypeScript config
+├── tsconfig.node.json             # Node tools TypeScript config
+├── tsconfig.vitest.json           # Test TypeScript config
+├── eslint.config.ts               # ESLint config (oxlint + eslint-plugin-vue)
+├── index.html                     # HTML entry point
+├── .firebaserc                    # Firebase project alias
+├── firebase.json                  # Firebase hosting & functions config
+├── firestore.rules                # Firestore security rules
+├── firestore.indexes.json         # Firestore composite indexes
+├── package.json                   # App dependencies, build scripts
+├── package-lock.json
+├── .env.local.example             # Example environment variables
+├── CLAUDE.md                      # Project instructions for Claude
+├── .gitignore                     # Git ignore rules
+└── docs/                          # Documentation (if any)
 ```
 
 ## Directory Purposes
 
-**`src/components/`**
-- Purpose: Reusable Vue Single File Components — modals, tables, forms, layout wrappers
-- Contains: Vue SFC files + optional scoped CSS (Tailwind)
-- Key files:
-  - `AppShell.vue`, `AppSidebar.vue` - Main layout wrapper & navigation
-  - Modal dialogs: `PcImportModal.vue`, `CsvImportModal.vue`, `NewServiceDialog.vue`, `RosterImportModal.vue`
-  - Tables: `SongTable.vue`, `AvailabilityRosterTable.vue`, `QuarterGrid.vue`, `RotationTable.vue`
-  - Forms: `ScriptureInput.vue`, `SongFilters.vue`, `AvailabilityDrawer.vue`, `RolesConfigPanel.vue`
+**`src/`:**
+- Purpose: All Vue 3 application code
+- Contains: Views, components, stores, routing, utilities, types, composables
+- Key files: `main.ts` (entry), `App.vue` (root), `router/index.ts` (routing)
 
-**`src/composables/`**
-- Purpose: Reusable Vue composition functions (shared logic between components/views)
-- Contains: Functions that return reactive state + methods (following Vue 3 Composition API)
-- Currently: Only `useUnsavedGuard.ts` (form dirty detection)
-- Future: Could add `useServiceForm`, `useQuarterData`, etc.
+**`src/components/`:**
+- Purpose: Reusable, presentational Vue components
+- Contains: Modal dialogs, tables, sidebars, cards, form inputs
+- Pattern: Self-contained `.vue` files with scoped Tailwind CSS
+- Naming: PascalCase, descriptive names (e.g., `SongSlotPicker.vue`, `AvailabilityDrawer.vue`)
 
-**`src/stores/`**
-- Purpose: Pinia state stores — centralized reactive state synced with Firestore
-- Contains: 5 stores (auth, songs, services, quarters, roster)
-- Pattern: Each store has `subscribe(orgId)` that sets up `onSnapshot` listeners
-- Firestore structure: Most collections nested under `/organizations/{orgId}/`
+**`src/views/`:**
+- Purpose: Route-mapped, page-level components
+- Contains: One component per route + layout composition
+- Pattern: Import route-specific components; compose with `AppShell` layout
+- Naming: `*View.vue` suffix (e.g., `ServiceEditorView.vue`)
+- Subscriptions: Each view initializes its store subscriptions on mount
 
-**`src/types/`**
-- Purpose: TypeScript type definitions shared across codebase
-- Contains: 3 main files (song.ts, service.ts, roster.ts) defining domain models
-- Exports: Discriminated unions (ServiceSlot), enums (VWType), interfaces (Person, Quarter, etc.)
+**`src/stores/`:**
+- Purpose: Pinia stores managing application state with Firestore subscriptions
+- Contains: One store per domain (auth, songs, services, quarters, roster)
+- Pattern: Composition API with refs/computed/functions; `onSnapshot` listeners
+- Exports: Store instance via `useXStore()` function
+- Responsibilities: Subscribe to Firestore, maintain reactive state, expose mutations
 
-**`src/utils/`**
-- Purpose: Pure business logic utilities — no framework imports, no side effects, fully testable
-- Contains: 15+ utilities for scheduling, API integration, search, import/export
-- Key utilities:
-  - `scheduler.ts` - Deterministic volunteer scheduling with constraints
-  - `planningCenterApi.ts` - Planning Center API client (services, songs, people)
-  - `pcSongImport.ts` - Merge Planning Center songs into local catalog
-  - `songSearch.ts` - Text search over songs
-  - `claudeApi.ts` - Claude AI integration
-  - `csvImport.ts` - CSV parsing for batch imports
+**`src/router/`:**
+- Purpose: Vue Router configuration and route guards
+- Contains: Route definitions, auth guard logic, role-based access control
+- Entry point: `src/router/index.ts` (imported in `main.ts`)
+- Guards: `beforeEach` checks `requiresAuth`, `requiresEditor` meta flags
 
-**`src/views/`**
-- Purpose: Page/view components — top-level containers for each route
-- Contains: Large Vue SFC files (typically 200-1000 lines), each representing a page
-- Route mapping:
-  - `/login` → `LoginView.vue`
-  - `/` → `DashboardView.vue`
-  - `/songs` → `SongsView.vue`
-  - `/volunteers` → `RosterView.vue`
-  - `/schedule` → `QuarterView.vue`
-  - `/services` → `ServicesView.vue`
-  - `/services/:id` → `ServiceEditorView.vue`
+**`src/firebase/`:**
+- Purpose: Firebase SDK initialization and configuration
+- Contains: `initializeApp()`, Firebase auth/Firestore instances
+- Exports: `app`, `auth`, `db` singletons
+- Emulator: Enabled via `VITE_USE_EMULATORS=true` env var
 
-**`src/router/`**
-- Purpose: Vue Router configuration + auth guards
-- Contains: `index.ts` (route definitions, guards, getCurrentUser helper)
-- Route meta: `requiresAuth`, `requiresEditor` control access
+**`src/types/`:**
+- Purpose: Shared TypeScript domain models
+- Contains: Interfaces for `Service`, `Song`, `Arrangement`, `Person`, `Team`, `Progression`, `VWType`
+- Pattern: Exported as type-only (no runtime code)
+- Imported by: Views, components, stores, utils
 
-**`src/firebase/`**
-- Purpose: Firebase SDK initialization
-- Contains: `index.ts` (initializeApp, getAuth, getFirestore, emulator config)
-- Exports: Module-level singletons `app`, `auth`, `db`
+**`src/utils/`:**
+- Purpose: Business logic, external API clients, transformers, validators
+- Contains: Planning Center API wrapper, CSV parsers, scheduling algorithms, string formatters
+- Pattern: Exported functions/classes (no default exports)
+- Usage: Called by views/components/stores for side effects or data transformation
 
-**`functions/src/`**
-- Purpose: Firebase Cloud Functions — secure API proxy
-- Contains: Express-like request handler
-- Routes: `/api/anthropic/`, `/api/esv/`, `/api/planningcenter/`
-- Security: Verifies Firebase ID token for secret-bearing routes; injects server-held keys
+**`src/composables/`:**
+- Purpose: Reusable Vue 3 Composition Functions
+- Contains: Logic that can be composed into multiple components
+- Pattern: Exported functions returning reactive state/methods
+- Example: `useUnsavedGuard()` for form dirty checks
 
-**`src/assets/`**
-- Purpose: Global styles & static assets
-- Contains: `main.css` (Tailwind @import)
+**`src/assets/`:**
+- Purpose: Static resources (CSS, images, icons)
+- Contains: Tailwind CSS imports, global styles
+- Note: Images/icons committed to repo or linked from CDN
 
-**`.env` & `.env.local`**
-- Purpose: Environment variables (never committed)
-- Examples:
-  - `VITE_FIREBASE_API_KEY` - Firebase public config (safe to expose)
-  - `CLAUDE_API_KEY` - Server-held, never in browser (Cloud Function injects)
-  - `ESV_API_KEY` - Server-held, never in browser (Cloud Function injects)
+**`src/__tests__/`** (at various levels):
+- Purpose: Unit and integration tests for components, stores, views, utilities
+- Pattern: Co-located `__tests__` dirs next to source files
+- Framework: Vitest + Vue Test Utils for components; Vitest for logic
+- Naming: `*.test.ts` or `*.spec.ts`
+
+**`functions/`:**
+- Purpose: Firebase Cloud Functions (backend services)
+- Contains: Reverse proxy API (`functions/src/index.ts`)
+- Responsibility: Inject server-held API keys (Anthropic, ESV), verify Firebase ID tokens
+- Deployed to: Google Cloud Functions (via `firebase deploy`)
+
+**`public/`:**
+- Purpose: Static files served as-is by Vite dev server and Hosting
+- Contains: `favicon.ico` and any public assets
+- Deployment: Copied to `dist/` during build, served from Firebase Hosting root
 
 ## Key File Locations
 
 **Entry Points:**
-- `public/index.html` - HTML entry point (mounts Vue to `#app`)
-- `src/main.ts` - JavaScript entry point (creates Vue app, installs plugins)
-- `src/router/index.ts` - Route definitions & auth guards
+- `src/main.ts` — App initialization (create Vue app, Pinia, router)
+- `index.html` — HTML shell (mounts app at `#app`)
+- `src/router/index.ts` — Route definitions and guards
 
 **Configuration:**
-- `vite.config.ts` - Build config, dev proxies, Vue + Tailwind setup
-- `tsconfig.app.json` - TypeScript strict mode
-- `eslint.config.ts` - Linting rules
-- `.env.example` - Example environment template
-- `firebase.json` - Firebase hosting & functions deployment config
-- `firestore.rules` - Firestore security rules (deployed separately)
+- `vite.config.ts` — Build config, dev proxy, test setup
+- `tsconfig.json` — TypeScript root config
+- `eslint.config.ts` — Linting rules
+- `.firebaserc` — Firebase project mapping
+- `firebase.json` — Firebase Hosting and Functions config
+- `firestore.rules` — Firestore security rules
+- `.env.local.example` — Example env vars (local dev, Firestore emulator)
 
 **Core Logic:**
-- `src/utils/scheduler.ts` - Volunteer scheduling algorithm
-- `src/utils/planningCenterApi.ts` - Planning Center integration
-- `src/stores/auth.ts` - Auth state & org initialization
-- `src/types/service.ts` - Service & slot type definitions
+- `src/stores/auth.ts` — Authentication, org context, user role
+- `src/stores/songs.ts` — Songs library with Firestore subscription
+- `src/stores/services.ts` — Service CRUD, song slot assignments
+- `src/stores/quarters.ts` — Quarterly schedule management
+- `src/stores/roster.ts` — Volunteer roster, availability, team roles
+- `src/router/index.ts` — Route guards, role-based redirects
 
 **Testing:**
-- `src/components/__tests__/` - Component unit tests (Vitest + Vue Test Utils)
-- `src/stores/__tests__/` - Store unit tests
-- `src/utils/__tests__/` - Utility unit tests
-- `src/rules.test.ts` - Firestore rules tests (special config via `vitest.rules.config.ts`)
+- `src/**/__tests__/` — Unit tests for components, stores, views
+- `src/rules.test.ts` — Firestore security rules tests (uses Firebase emulator)
+- `vitest.rules.config.ts` — Vitest config for rules tests
 
 ## Naming Conventions
 
 **Files:**
-- Vue components: PascalCase + `.vue` (e.g., `SongTable.vue`, `PcImportModal.vue`)
-- Utilities: camelCase + `.ts` (e.g., `scheduler.ts`, `songSearch.ts`)
-- Stores: camelCase + `.ts` (e.g., `songs.ts`, `quarters.ts`)
-- Types: camelCase + `.ts` (e.g., `song.ts`, `service.ts`)
-- Test files: match source file name + `.test.ts` or `.spec.ts` (e.g., `SongBadge.test.ts`)
+- Components: `PascalCase.vue` (e.g., `AppShell.vue`, `SongTable.vue`)
+- Views: `*View.vue` suffix (e.g., `ServiceEditorView.vue`)
+- Stores: `lowercase.ts` (e.g., `auth.ts`, `songs.ts`)
+- Utils: `camelCase.ts` (e.g., `planningCenterApi.ts`, `slotTypes.ts`)
+- Tests: `*.test.ts` or `*.spec.ts`
 
 **Directories:**
-- Lowercase plural for feature folders (e.g., `components`, `stores`, `views`, `utils`)
-- Test folders: `__tests__` (follows Vue conventions)
+- Features: `lowercase` plural (e.g., `components/`, `utils/`, `stores/`)
+- Test dirs: `__tests__` (co-located with source)
 
-**Vue Component Props & Events:**
-- Props: camelCase (e.g., `types`, `modelValue`, `isLoading`)
-- Events: camelCase with `@` in templates (e.g., `@click`, `@update:modelValue`)
-- Method names: camelCase (e.g., `onClickSave`, `handleSubmit`)
+**Functions & Variables:**
+- Composables: `useXxx` prefix (e.g., `useAuthStore`, `useUnsavedGuard`)
+- Store exports: `useXStore` function (e.g., `useAuthStore()`, `useSongStore()`)
+- Computed: Descriptive names reflecting the computed value (e.g., `filteredSongs`, `isEditor`)
+- Refs: Clear intent (e.g., `searchQuery`, `isLoading`, `selectedSongId`)
 
-**TypeScript:**
-- Interfaces: PascalCase (e.g., `Song`, `Service`, `Person`, `Quarter`)
-- Types (unions, aliases): PascalCase (e.g., `ServiceSlot`, `VWType`, `FrequencyTier`)
-- Constants: UPPER_CASE (e.g., `VW_TYPE_LABELS`, `DEFAULT_ROLES`, `PC_BASE_URL`)
-- Functions: camelCase (e.g., `proposeQuarterSchedule`, `fetchServiceTypes`)
-
-**Stores (Pinia):**
-- Store name: camelCase (e.g., `songs`, `quarters`, `auth`)
-- Store file: camelCase + `Store` suffix (e.g., `songsStore.ts`, but defined as `useSongsStore()`)
-- State variables: camelCase (e.g., `songs.value`, `isLoading.value`)
-- Getters: camelCase, computed (e.g., `filteredSongs`, `isAuthenticated`)
-- Actions: camelCase, verb-first (e.g., `createService`, `updateSong`, `generateProposal`)
+**Types:**
+- Interfaces: PascalCase (e.g., `Service`, `Song`, `Arrangement`)
+- Union types: PascalCase (e.g., `Progression`, `ServiceSlot`, `VWType`)
+- Constants: UPPER_SNAKE_CASE (e.g., `PROGRESSION_SLOT_TYPES`, `VW_TYPE_LABELS`)
 
 ## Where to Add New Code
 
-**New Feature:**
-1. **Primary code:** Add Vue components to `src/components/` and views to `src/views/`
-2. **State:** Add Pinia store to `src/stores/` if feature needs shared state across views
-3. **Business logic:** Add utilities to `src/utils/` for pure functions (scheduling, search, etc.)
-4. **Types:** Add interfaces to `src/types/` for domain models
-5. **Routes:** Add route to `src/router/index.ts` with appropriate auth guards
-6. **Tests:** Add `*.test.ts` files co-located with source (e.g., `src/components/__tests__/MyComponent.test.ts`)
+**New Feature (e.g., new page or major section):**
+1. **Router:** Add route to `src/router/index.ts` (lazy-loaded import)
+2. **View:** Create `src/views/YourFeatureView.vue` (compose components + stores)
+3. **Store (if needed):** Create `src/stores/yourFeature.ts` with `onSnapshot` subscription
+4. **Components:** Create reusable UI blocks in `src/components/` (e.g., `YourFeatureTable.vue`, `YourFeatureModal.vue`)
+5. **Types (if needed):** Add interfaces to `src/types/yourFeature.ts`
+6. **Utils (if needed):** Add helpers to `src/utils/` (e.g., `yourFeatureHelpers.ts`, or extend existing util files)
+7. **Tests:** Create `src/views/__tests__/YourFeatureView.test.ts` and `src/components/__tests__/YourFeatureModal.test.ts`
 
-**New Component/Module:**
-- Implementation: `src/components/MyComponent.vue` (single file component)
-- Test: `src/components/__tests__/MyComponent.test.ts` (co-located with source)
-- Export: Import in view or parent component as needed; no barrel file (index.ts) currently used
+**New Component/Modal (Reusable UI):**
+1. Create `src/components/YourComponentName.vue`
+2. Import in parent view/component
+3. If component needs store data: access via `useXStore()` inside component
+4. Add unit test to `src/components/__tests__/YourComponentName.test.ts`
 
-**Reusable Utility Function:**
-- Location: `src/utils/myUtility.ts`
-- Convention: Pure function (no framework imports, no side effects)
-- Test: `src/utils/__tests__/myUtility.test.ts`
-- Import: Any component/store can `import { myFunction } from '@/utils/myUtility'`
+**New Store (New domain/entity):**
+1. Create `src/stores/yourDomain.ts`
+2. Use composition API pattern: `export const useYourDomainStore = defineStore('yourDomain', () => { ... })`
+3. Set up `onSnapshot` subscription for Firestore collection
+4. Export refs for state, computed for derived state, functions for mutations
+5. Call `unsubscribeAll()` on logout (handled in router guard)
+6. Add unit tests to `src/stores/__tests__/yourDomain.test.ts`
 
-**New Pinia Store:**
-- Location: `src/stores/myDomain.ts`
-- Pattern: Use `defineStore('myDomain', () => { ... })` (composition API)
-- Subscribe to Firestore: `onSnapshot(collection(...), (snap) => { state.value = snap.docs.map(...) })`
-- Access: `const store = useMyDomainStore()` in components/views
-- Test: `src/stores/__tests__/myDomain.test.ts`
+**New Utility/Helper:**
+1. Create or extend file in `src/utils/`
+2. Name: descriptive, lowercase.ts (e.g., `yourFeatureHelpers.ts`, `yourApiClient.ts`)
+3. Export functions only (no default export)
+4. Add unit tests to `src/utils/__tests__/yourFeature.test.ts`
 
-**New External API Integration:**
-- Client code: `src/utils/myApiClient.ts` (fetch calls, auth headers)
-- Proxy route: Add to `functions/src/index.ts` if secrets needed (e.g., `/api/myservice/`)
-- Dev proxy: Add to `vite.config.ts` `server.proxy` if developing locally
-- Usage: Utilities call client functions; views/stores call utilities
+**New API Integration:**
+1. If calling external API: Create client in `src/utils/yourApiClient.ts`
+2. Use Vite dev proxy for dev (configured in `vite.config.ts`)
+3. Use Cloud Functions proxy for prod (call `/api/yourService/...` → `functions/src/index.ts` routes it)
+4. For server-held secrets (API keys): Add to Cloud Functions, verify Firebase ID token, inject in proxy
 
-**External API that requires server-held secrets:**
-1. Add secret to Firebase Secret Manager: `firebase functions:secrets:set MY_API_KEY`
-2. Add to `functions/src/index.ts`:
-   ```typescript
-   const MY_API_KEY = defineSecret("MY_API_KEY");
-   // ... in handler:
-   if (service === "myservice") {
-     headers["authorization"] = `Bearer ${MY_API_KEY.value()}`;
-   }
-   ```
-3. Create client at `src/utils/myApiClient.ts` that calls `/api/myservice/...`
-4. Use in utilities/stores/views as normal
+**New Type/Interface:**
+1. Add to appropriate file in `src/types/` (e.g., `service.ts`, `song.ts`, `roster.ts`)
+2. Or create new type file if domain-specific (e.g., `src/types/yourFeature.ts`)
+3. Export as type-only: `export type YourType = ...`
+4. Import in stores/components/utils as needed
 
 ## Special Directories
 
-**`.planning/`**
-- Purpose: GSD planning & analysis artifacts
-- Generated: By GSD tools (`/gsd-map-codebase`, `/gsd-graphify`, etc.)
-- Committed: Yes; tracked in git for project history
+**`src/__tests__/` and `src/*//__tests__/`:**
+- Purpose: Co-located unit tests
+- Generated: No (committed to git)
+- Committed: Yes
+- Framework: Vitest + Vue Test Utils
+- Run: `npm run test:unit` (all tests), `npm run test:unit -- --watch` (watch mode)
 
-**`functions/lib/` (build output)**
-- Purpose: Compiled JavaScript output of Cloud Functions
-- Generated: By `npm run build` in `functions/` directory
-- Committed: No; generated from `functions/src/`
+**`src/rules.test.ts`:**
+- Purpose: Firestore security rules validation tests
+- Generated: No
+- Committed: Yes
+- Framework: Vitest + `@firebase/rules-unit-testing`
+- Run: `npm run test:rules` (uses Firebase emulator)
+- Note: Separate config file `vitest.rules.config.ts` because of emulator dependency
 
-**`node_modules/`**
-- Purpose: Package dependencies
-- Generated: By `npm install`
-- Committed: No; only `package-lock.json` committed
+**`dist/`:**
+- Purpose: Built app (generated)
+- Generated: Yes (`npm run build`)
+- Committed: No (in `.gitignore`)
+- Deployment: Contents uploaded to Firebase Hosting
 
-**`dist/` or `.next/` (build output)**
-- Purpose: Final bundled application
-- Generated: By `npm run build`
-- Committed: No; generated from `src/`
+**`node_modules/`:**
+- Purpose: Installed dependencies
+- Generated: Yes (`npm install`)
+- Committed: No (in `.gitignore`)
+
+**`.planning/codebase/`:**
+- Purpose: GSD codebase documentation (ARCHITECTURE.md, STRUCTURE.md, etc.)
+- Generated: No (maintained by GSD mapping agent)
+- Committed: Yes
 
 ---
 
-*Structure analysis: 2026-07-15*
+*Structure analysis: 2026-07-16*

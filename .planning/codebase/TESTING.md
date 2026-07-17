@@ -1,427 +1,415 @@
 # Testing Patterns
 
-**Analysis Date:** 2026-07-15
+**Analysis Date:** 2026-07-16
 
 ## Test Framework
 
 **Runner:**
-- Vitest 4.0.18
-- Config: `vite.config.ts` (test section defines jsdom environment)
-- Environment: jsdom (DOM simulation for component testing)
+- Vitest v4.0.18
+- Config: `vite.config.ts` (inline test config)
+- Separate rules config: `vitest.rules.config.ts` (node environment for Firebase Security Rules)
 
 **Assertion Library:**
-- Vitest built-in expect() syntax
-- No external assertion library
+- Vitest built-in (no external assertion library)
+- Pattern: `expect(actual).toBe(expected)`, `expect(array).toEqual([...])`
 
 **Run Commands:**
 ```bash
-npm run test:unit              # Run all tests
-npm run test:rules             # Run Firestore security rules tests (firebase emulator)
+npm run test:unit              # Run all tests in jsdom environment
+npm run test:rules             # Run Firebase Security Rules tests (node + emulator)
 ```
 
-**Watch Mode:**
-- Implicit in Vitest; invoke `npx vitest` in project root (not configured in package.json scripts)
-
-**Coverage:**
-- No explicit coverage reporting configured
-- No coverage thresholds enforced
+**Environment:**
+- `jsdom` for UI tests (Vue components, browser APIs)
+- `node` for security rules tests (firebase-rules-unit-testing)
+- Configuration in `tsconfig.vitest.json`: separates jsdom types from app types
 
 ## Test File Organization
 
 **Location:**
-- Co-located with source: `src/components/__tests__/`, `src/stores/__tests__/`, `src/utils/__tests__/`
-- Firestore rules test: `src/rules.test.ts` (root of src, special case)
+- Co-located in `__tests__` directories parallel to source
+- Pattern: `src/[category]/__tests__/[FileName].test.ts`
+- Examples:
+  - `src/utils/quarterDates.ts` → `src/utils/__tests__/quarterDates.test.ts`
+  - `src/stores/songs.ts` → `src/stores/__tests__/songs.test.ts`
+  - `src/components/SongBadge.vue` → `src/components/__tests__/SongBadge.test.ts`
 
 **Naming:**
-- Match source file with `.test.ts` suffix: `ServiceCard.vue` → `ServiceCard.test.ts`, `claudeApi.ts` → `claudeApi.test.ts`
-- All test files in `__tests__/` subdirectory
+- `.test.ts` suffix for all test files
+- No `.spec.ts` files in this codebase
 
 **Directory Structure:**
 ```
 src/
 ├── components/
 │   ├── ServiceCard.vue
-│   ├── SongTable.vue
+│   ├── SongBadge.vue
 │   └── __tests__/
 │       ├── ServiceCard.test.ts
-│       ├── SongTable.test.ts
-│       └── ... (20+ component tests)
-├── stores/
-│   ├── services.ts
-│   ├── songs.ts
-│   └── __tests__/
-│       ├── services.test.ts
-│       ├── songs.test.ts
-│       └── ... (4 store tests)
+│       └── SongBadge.test.ts
 ├── utils/
-│   ├── claudeApi.ts
-│   ├── csvImport.ts
+│   ├── quarterDates.ts
 │   └── __tests__/
-│       ├── claudeApi.test.ts
-│       ├── csvImport.test.ts (not seen but pattern)
-│       └── ... (6+ utility tests)
-└── rules.test.ts (Firestore security rules, special)
+│       └── quarterDates.test.ts
+└── stores/
+    ├── songs.ts
+    └── __tests__/
+        └── songs.test.ts
 ```
 
 ## Test Structure
 
 **Suite Organization:**
 ```typescript
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 
-describe('ComponentOrFunctionName', () => {
-  // Optional setup
-  beforeEach(() => {
-    vi.clearAllMocks()
-    mockStore.reset()
-  })
-
-  // Grouped test suites
-  describe('subsection', () => {
-    it('does specific thing', () => {
-      // Arrange
-      const input = makeData()
-      
-      // Act
-      const result = functionUnderTest(input)
-      
-      // Assert
-      expect(result).toBe(expected)
+describe('functionName', () => {
+  describe('when behavior context', () => {
+    it('should do what is expected', () => {
+      expect(actual).toBe(expected)
     })
-
-    it('handles edge case', () => {
-      // ...
-    })
-  })
-
-  describe('another subsection', () => {
-    // ...
   })
 })
 ```
 
 **Patterns:**
-- Setup: `vi.mock()` calls at top of file (before imports if needed)
-- Hoisting: `vi.hoisted()` for shared mock state across mocks
-- Globals: `vi.stubGlobal()` for browser APIs (IntersectionObserver, crypto, etc)
-- Teardown: `vi.clearAllMocks()` in beforeEach to reset mock call counts
-- No afterEach observed in codebase
+- Top-level `describe()` wraps the unit (function, component, store)
+- Nested `describe()` for feature areas or context
+- Each `it()` tests one specific behavior
+- Descriptive test names explain the expected outcome
+
+**Example from `quarterDates.test.ts`:**
+```typescript
+describe('generateSundaysInQuarter', () => {
+  it('returns every Sunday from 2026-07-01 through 2026-09-30 for Q3 2026, ascending', () => {
+    const result = generateSundaysInQuarter(2026, 3)
+    expect(result).toEqual([
+      '2026-07-05',
+      '2026-07-12',
+      // ... rest of expected array
+    ])
+  })
+})
+```
+
+**Setup & Teardown:**
+- `beforeEach()` for test setup (initializing Pinia, resetting mocks)
+- No `afterEach()` cleanup needed in most tests; mocks are reset automatically
+- Pinia setup: `setActivePinia(createPinia())` in beforeEach
+
+**Example from `songs.test.ts`:**
+```typescript
+import { setActivePinia, createPinia } from 'pinia'
+
+// Mock modules at top level
+vi.mock('firebase/firestore', () => ({ /* ... */ }))
+vi.mock('@/stores/auth', () => ({ /* ... */ }))
+
+describe('useSongsStore', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+  
+  it('loads songs on init', () => {
+    // test body
+  })
+})
+```
 
 ## Mocking
 
-**Framework:** Vitest `vi` API
+**Framework:** Vitest `vi` utilities
 
-**Module Mocking:**
+**Patterns:**
+
+### Module Mocking
 ```typescript
-// Pattern 1: Mock entire module
 vi.mock('firebase/firestore', () => ({
   getFirestore: vi.fn(() => ({})),
+  doc: vi.fn((db, ...segments) => ({ path: segments.join('/') })),
   collection: vi.fn((db, ...segments) => ({ path: segments.join('/') })),
   onSnapshot: vi.fn((_query, callback) => {
     snapshotCallback = callback
     return mockUnsubscribe
   }),
-  // ... other exports
 }))
-
-// Pattern 2: Mock with hoisted shared state
-const { mockCreate } = vi.hoisted(() => {
-  const mockCreate = vi.fn()
-  return { mockCreate }
-})
-
-vi.mock('@anthropic-ai/sdk', () => {
-  function MockAnthropic() {
-    return {
-      messages: {
-        create: mockCreate,
-      },
-    }
-  }
-  return { default: MockAnthropic }
-})
-
-// Pattern 3: Mock store modules
-const mockSongStore = {
-  get columnVisibility() { return mockColumnVisibility },
-  allUserTags: [] as string[],
-  searchQuery: '',
-  updateSong: vi.fn(() => Promise.resolve()),
-  toggleColumn: vi.fn(),
-  resetColumns: vi.fn(),
-}
-
-vi.mock('@/stores/songs', () => ({
-  useSongStore: () => mockSongStore,
-}))
-```
-
-**Function Mocks:**
-```typescript
-// Create vi.fn() with mock behavior
-const mockUnsubscribe = vi.fn()
-const mockUpdateSong = vi.fn(() => Promise.resolve())
-
-// Access mock calls for assertions
-expect(mockUnsubscribe).toHaveBeenCalledOnce()
-const callArgs = vi.mocked(addDoc).mock.calls[0]!
-```
-
-**Global Stubs:**
-```typescript
-// Stub browser APIs that jsdom doesn't implement
-class MockIntersectionObserver {
-  observe() {}
-  unobserve() {}
-  disconnect() {}
-}
-vi.stubGlobal('IntersectionObserver', MockIntersectionObserver)
-
-// Stub crypto for deterministic testing
-vi.stubGlobal('crypto', {
-  getRandomValues: vi.fn((arr: Uint8Array) => {
-    for (let i = 0; i < arr.length; i++) arr[i] = i + 1
-    return arr
-  }),
-})
-```
-
-**Component Stubs:**
-```typescript
-// Stub router-link in component tests
-const globalStubs = {
-  'router-link': {
-    template: '<a :href="to"><slot /></a>',
-    props: ['to'],
-  },
-}
-
-const wrapper = mount(ServiceCard, {
-  props: { service: mockService },
-  global: { stubs: globalStubs },
-})
 ```
 
 **What to Mock:**
-- All external dependencies: Firebase, HTTP APIs, third-party SDKs
-- Browser APIs not implemented in jsdom: IntersectionObserver
-- Crypto/random for deterministic results
-- Router if component uses useRouter()
-- Store modules (even in integration tests, to avoid full Pinia setup)
+- External APIs (Firebase, Anthropic, Planning Center)
+- Async dependencies with side effects
+- Modules that require setup (auth, database)
+- Keep mocks minimal; only mock what's actually tested
 
 **What NOT to Mock:**
-- Pure utilities and helpers (test them directly)
-- Types and interfaces (not mocked)
-- Real data structures that define the schema (e.g., BIBLE_BOOKS)
-- Path aliases (tsconfig resolution works in tests)
+- Constants (BIBLE_BOOKS, VW_TYPE_LABELS) — use real values
+- Pure utility functions — call them directly
+- Simple data builders — implement them in tests
+- The unit under test itself
+
+**Accessing Mocked Functions:**
+```typescript
+import { vi, vi.mocked } from 'vitest'
+import { fetchSongArrangements } from '@/utils/planningCenterApi'
+
+// Later in test
+vi.mocked(fetchSongArrangements).mockResolvedValue(someData)
+expect(vi.mocked(fetchSongArrangements)).toHaveBeenCalledWith(...)
+```
+
+**Mock Reset:**
+- Vitest clears mocks between tests automatically
+- Manual reset if needed: `vi.clearAllMocks()` in beforeEach
+
+### Callback/Subscription Mocking
+```typescript
+// Store callback reference for manual triggering
+let snapshotCallback: ((snap: object) => void) | null = null
+
+vi.mock('firebase/firestore', () => ({
+  onSnapshot: vi.fn((_query, callback) => {
+    snapshotCallback = callback
+    return mockUnsubscribe
+  }),
+}))
+
+// In test: trigger callback manually
+it('loads data on snapshot', () => {
+  const wrapper = mount(Component)
+  snapshotCallback?.({ docs: [{ id: 'doc-1', data: () => ({ /* ... */ }) }] })
+  expect(wrapper.text()).toContain('doc-1')
+})
+```
 
 ## Fixtures and Factories
 
-**Test Data:**
+**Test Data Builders:**
 ```typescript
-// Factory pattern for building consistent test objects
-function makeSong(overrides: Partial<Song> = {}): Song {
-  return {
-    id: 'song-1',
-    title: 'Amazing Grace',
-    ccliNumber: '12345',
-    author: 'John Newton',
-    themes: ['Grace', 'Redemption'],
-    notes: '',
-    vwTypes: [1],
-    arrangements: [],
-    primaryArrangementId: null,
-    lastUsedAt: null,
-    createdAt: {} as never,
-    updatedAt: {} as never,
-    pcSongId: null,
-    hidden: false,
-    tags: ['Christmas'],
-    removedThemes: [],
-    ...overrides,  // Override defaults with test-specific values
-  }
-}
-
-// Specific factories per type
-function makePcSong(overrides: { id?: string; title?: string; ... } = {}) {
+function makePcSong(overrides: {
+  id?: string
+  title?: string
+  ccli_number?: string | null
+} = {}) {
   return {
     id: overrides.id ?? 'pc-song-1',
     attributes: {
       title: overrides.title ?? 'Amazing Grace',
-      // ... other fields
+      ccli_number: 'ccli_number' in overrides ? overrides.ccli_number ?? null : '12345',
+      // ... rest of song object
     },
-    // ...
   }
 }
 
-function makeService(overrides: Partial<{...}> = {}) {
-  return {
-    id: 'service-1',
-    date: '2026-03-08',
-    name: 'Sunday Service',
-    // ... defaults
-    ...overrides,
-  }
-}
+// Usage
+const song = makePcSong({ title: 'Custom Song' })
+const songNoId = makePcSong({ ccli_number: null })
 ```
 
 **Location:**
-- Defined within test file, near top before describe() blocks
-- Exported only if shared across multiple test files (not observed in this codebase)
-- Factories take override param to allow test-specific mutations
+- Defined at top of test file, after imports and mocks
+- Marked with JSDoc comment if non-obvious
+- Can accept partial overrides object for flexibility
+
+**Pattern:**
+- Set sensible defaults for common properties
+- Accept overrides object for test-specific values
+- Return fully-formed object matching the real shape
+
+## Vue Component Testing
+
+**Mount & Assertions:**
+```typescript
+import { mount } from '@vue/test-utils'
+import { nextTick } from 'vue'
+
+it('renders component text', () => {
+  const wrapper = mount(SongBadge, { props: { types: [1] } })
+  expect(wrapper.text()).toContain('Type 1')
+})
+
+it('emits event on click', async () => {
+  const wrapper = mount(SongBadge, { props: { types: [1], clickable: true } })
+  await wrapper.find('span').trigger('click')
+  expect(wrapper.emitted('select')).toHaveLength(1)
+  expect(wrapper.emitted('select')[0]).toEqual([1])
+})
+
+it('updates on prop change', async () => {
+  const wrapper = mount(SongBadge, { props: { types: [1] } })
+  await wrapper.setProps({ types: [2] })
+  await nextTick()
+  expect(wrapper.text()).toContain('Type 2')
+})
+```
+
+**Patterns:**
+- Pass props via `{ props: { ... } }` mount option
+- Use `wrapper.find()` for single elements, `wrapper.findAll()` for multiple
+- Call `await nextTick()` after state/prop changes to ensure DOM updates
+- Check emits via `wrapper.emitted('eventName')`
+- Use `flushPromises()` from @vue/test-utils for async operations
+
+**Store Access in Components:**
+- Stores are instantiated normally via `useAuthStore()`
+- Wrap in `setActivePinia(createPinia())` beforeEach if needed
+- Mock store methods if testing component in isolation
+
+## Pinia Store Testing
+
+**Setup:**
+```typescript
+import { setActivePinia, createPinia } from 'pinia'
+
+beforeEach(() => {
+  setActivePinia(createPinia())
+})
+
+it('initializes state correctly', () => {
+  const store = useAuthStore()
+  expect(store.user).toBeNull()
+  expect(store.isAuthenticated).toBe(false)
+})
+```
+
+**Testing Actions:**
+```typescript
+it('updates state on sign in', async () => {
+  vi.mocked(signInWithPopup).mockResolvedValue(mockUser)
+  const store = useAuthStore()
+  
+  await store.signIn()
+  
+  expect(store.user).toEqual(mockUser)
+  expect(store.isAuthenticated).toBe(true)
+})
+```
+
+**Testing Computed:**
+```typescript
+it('computes editor role', () => {
+  setActivePinia(createPinia())
+  const store = useAuthStore()
+  
+  expect(store.isEditor).toBe(false)
+  
+  store.userRole = 'editor'
+  expect(store.isEditor).toBe(true)
+})
+```
 
 ## Coverage
 
-**Requirements:** None enforced
+**Requirements:** No enforced coverage threshold
 
 **View Coverage:**
-- Coverage commands not configured in package.json
-- Run manually with: `npx vitest --coverage` (requires coverage plugin)
+```bash
+npm run test:unit -- --coverage
+```
+
+**Coverage is informational; aim for:**
+- Core business logic: 90%+
+- UI/presentational components: 60%+
+- Error paths and edge cases: covered where possible
 
 ## Test Types
 
 **Unit Tests:**
-- Scope: Individual functions, utilities, store actions
-- Approach: Test pure logic, mock external dependencies
-- Examples: `src/utils/__tests__/claudeApi.test.ts` (parsing/validation), `src/stores/__tests__/services.test.ts` (store actions)
-
-**Component Tests:**
-- Scope: Vue components in isolation
-- Approach: Use `@vue/test-utils` mount() for DOM assertions
-- Examples: `src/components/__tests__/ServiceCard.test.ts`, `src/components/__tests__/SongTable.test.ts`
-- Mocking: Router, stores, browser APIs
+- Scope: Single function, component, or store action
+- Approach: Test inputs and outputs, mock dependencies
+- Location: Same `__tests__` directory as source
+- Examples: `quarterDates.test.ts`, `slug.test.ts`, `songSearch.test.ts`
 
 **Integration Tests:**
-- Scope: Cross-store interactions, complex workflows
-- Approach: Test full store workflow with mocked Firebase
-- Examples: `src/stores/__tests__/services.test.ts` (createService → assignSongToSlot → useSongStore.updateSong)
+- Scope: Multiple modules working together
+- Approach: Mock APIs, test data flow between store + component
+- Location: Same `__tests__` directories
+- Examples: `songs.test.ts` (mocks Firebase, tests store with auth)
 
-**E2E Tests:**
-- Framework: Not used
-- Firestore Rules Tests: `src/rules.test.ts` (uses firebase emulator via `npm run test:rules`)
+**Component Integration Tests:**
+- Scope: Component + its store usage
+- Approach: Mount component, set Pinia, mock API calls
+- Location: `components/__tests__/[Component].test.ts`
+- Examples: `ServiceCard.test.ts`, `ScriptureInput.test.ts`
+
+**Security Rules Tests:**
+- Scope: Firebase Security Rules
+- Approach: `@firebase/rules-unit-testing` with Firestore emulator
+- Location: `src/rules.test.ts` (separate config)
+- Command: `npm run test:rules`
+- Environment: Node.js (not jsdom)
 
 ## Common Patterns
 
-**Async Testing:**
+### Async Testing
 ```typescript
-// Pattern 1: await promise-returning functions
-it('createService returns the new document id', async () => {
-  const { useServiceStore } = await import('../services')
-  const store = useServiceStore()
-  store.subscribe('org-1')
-
-  const id = await store.createService({
-    date: '2026-03-08',
-    name: '',
-    teams: [],
+it('loads songs asynchronously', async () => {
+  const store = useSongsStore()
+  
+  // API is mocked to resolve with data
+  vi.mocked(onSnapshot).mockImplementation((_query, callback) => {
+    callback({ docs: [{ id: 'song-1', data: () => ({...}) }] })
+    return () => {}
   })
-
-  expect(id).toBe('new-service-id')
-})
-
-// Pattern 2: trigger async callbacks manually
-function triggerSnapshot(services: ReturnType<typeof makeService>[]) {
-  if (snapshotCallback) {
-    snapshotCallback({
-      docs: services.map((s) => ({
-        id: s.id,
-        data: () => {
-          const { id: _id, ...rest } = s
-          return rest
-        },
-      })),
-    })
-  }
-}
-
-it('populates services from snapshot', async () => {
-  const store = useServiceStore()
-  store.subscribe('org-1')
-  const service = makeService()
-  triggerSnapshot([service])  // Manually invoke the callback
-  expect(store.services).toHaveLength(1)
+  
+  await store.loadSongs()
+  expect(store.songs).toHaveLength(1)
 })
 ```
 
-**Error Testing:**
+### Error Testing
 ```typescript
-// Pattern: expect thrown errors
-it('throws when orgId not set', () => {
-  const store = useServiceStore()
-  expect(() => store.createService({...})).toThrow('No orgId set')
-})
-
-// Pattern: expect null returns on error
-it('returns null on parse error', () => {
-  const result = safeParseJsonArray('no json here')
+it('handles fetch error gracefully', async () => {
+  vi.mocked(getSongSuggestions).mockResolvedValue(null)
+  
+  const result = await getSongSuggestions(params)
+  
   expect(result).toBeNull()
 })
+```
 
-// Pattern: expect mock error handling
-it('logs error and returns null on API failure', async () => {
-  mockCreate.mockRejectedValueOnce(new Error('API error'))
-  const result = await getSongSuggestions({...})
-  expect(result).toBeNull()
-  expect(console.error).toHaveBeenCalledWith(
-    expect.stringContaining('[claudeApi]'),
-    expect.any(Error),
-  )
+### Promise Handling
+```typescript
+import { flushPromises } from '@vue/test-utils'
+
+it('waits for async operation', async () => {
+  vi.mocked(fetchData).mockResolvedValue({ data: 'value' })
+  
+  const promise = someAsyncFunction()
+  await flushPromises()
+  
+  expect(state.data).toBe('value')
 })
 ```
 
-**State Mutations:**
+### Iterating Over Test Cases
 ```typescript
-// Pattern: test reactive state changes
-it('sets isLoading to false after first snapshot', async () => {
-  const store = useServiceStore()
-  store.subscribe('org-1')
-  triggerSnapshot([])
-  expect(store.isLoading).toBe(false)
-})
+const testCases = [
+  { input: [1, 2, 3], expected: 6 },
+  { input: [], expected: 0 },
+  { input: [10], expected: 10 },
+]
 
-// Pattern: test unsubscription resets state
-it('unsubscribeAll calls the unsubscribe fn and resets state', async () => {
-  const store = useServiceStore()
-  store.subscribe('org-1')
-  triggerSnapshot([makeService()])
-  store.unsubscribeAll()
-  expect(mockUnsubscribe).toHaveBeenCalled()
-  expect(store.services).toEqual([])
-  expect(store.isLoading).toBe(true)
-})
-```
-
-**Component DOM Testing:**
-```typescript
-// Pattern: mount component and query DOM
-it('renders formatted date with month and day', () => {
-  const wrapper = mount(ServiceCard, {
-    props: { service: mockService },
-    global: { stubs: globalStubs },
+testCases.forEach(({ input, expected }) => {
+  it(`sums ${input} to ${expected}`, () => {
+    expect(sum(input)).toBe(expected)
   })
-  expect(wrapper.text()).toContain('Mar')
-  expect(wrapper.text()).toContain('8')
 })
+```
 
-// Pattern: user interactions
-it('sets search query when pill is clicked', async () => {
-  const wrapper = mountTable([makeSong({ tags: ['Christmas'] })])
-  const tagPill = wrapper
-    .findAll('span')
-    .find((s) => s.text() === 'Christmas')
-  await tagPill!.trigger('click')
-  expect(mockSongStore.searchQuery).toBe('tag:Christmas')
-})
+## Snapshot Testing
 
-// Pattern: CSS class assertions
-it('uses flex-col layout with pinned footer', () => {
-  const wrapper = mount(ServiceCard, {...})
-  const root = wrapper.element as HTMLElement
-  expect(root.className).toContain('flex')
-  expect(root.className).toContain('flex-col')
-})
+**Not used in this codebase.** All tests use explicit assertions via `expect()`.
+
+## Test Commands
+
+```bash
+npm run test:unit              # Run all tests in watch mode (default)
+npm run test:unit -- --run     # Single run (CI mode)
+npm run test:unit -- --ui      # Vitest UI dashboard
+npm run test:unit -- --coverage # Show coverage report
+npm run test:rules             # Firebase Security Rules tests
 ```
 
 ---
 
-*Testing analysis: 2026-07-15*
+*Testing analysis: 2026-07-16*

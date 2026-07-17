@@ -1,205 +1,196 @@
 # External Integrations
 
-**Analysis Date:** 2026-07-15
+**Analysis Date:** 2026-07-16
 
 ## APIs & External Services
 
-**AI & Suggestions:**
-- Anthropic API (Claude) - AI-powered song and scripture suggestions for worship services
-  - SDK: @anthropic-ai/sdk ^0.78.0
-  - Model: claude-haiku-4-5-20251001
-  - Auth: X-API-Key header (server-side only)
-  - Environment Variable: CLAUDE_API_KEY (stored in Cloud Function secrets)
-  - Integration: `src/utils/claudeApi.ts` → getSongSuggestions(), getScriptureSuggestions()
-  - Request Path: /api/anthropic (proxied)
+**Anthropic Claude API:**
+- Service: AI-powered song and scripture suggestions for worship planning
+  - SDK/Client: `@anthropic-ai/sdk` (v0.78.0)
+  - Model: `claude-haiku-4-5-20251001`
+  - Auth: API key held in Google Secret Manager (`CLAUDE_API_KEY`)
+  - Access: Browser client → `/api/anthropic` proxy (Cloud Function) → `https://api.anthropic.com`
+  - Usage: `src/utils/claudeApi.ts`
+    - `getSongSuggestions()`: Suggests worship songs matching sermon context
+    - `getScriptureSuggestions()`: Suggests scripture passages matching sermon topic
+  - Request Headers: Firebase ID token in `X-App-Auth` header for authentication gate
+  - Response: JSON arrays of suggestions with validation against local libraries
 
-**Bible Content:**
-- ESV API (English Standard Version) - Scripture text retrieval for worship planning
-  - SDK: fetch-based HTTP client
-  - Auth: Authorization Token header (server-side only)
-  - Environment Variable: ESV_API_KEY (stored in Cloud Function secrets)
-  - Integration: `src/utils/esvApi.ts` → fetchPassageText()
-  - Request Path: /api/esv/v3/passage/text/ (proxied)
+**ESV (English Standard Version) Bible API:**
+- Service: Fetch scripture text passages for worship service items
+  - Auth: Token-based (`Authorization: Token {ESV_API_KEY}`)
+  - Key Location: Google Secret Manager (`ESV_API_KEY`)
+  - Access: Browser client → `/api/esv` proxy (Cloud Function) → `https://api.esv.org`
+  - Usage: `src/utils/esvApi.ts`
+    - `fetchPassageText()`: Retrieves formatted scripture text by passage reference
+  - Endpoint: `/v3/passage/text/`
+  - Query Params: `q` (passage), `include-verse-numbers=true`, `include-headings=false`, etc.
+  - Response: JSON with `passages` array containing formatted scripture text
 
-**Church Planning:**
-- Planning Center Online API - Integration with church planning workflow
-  - SDK: Fetch-based HTTP client
-  - Auth: Basic Auth (app ID + secret, client-provided in settings)
-  - Environment Variable: None (credentials managed in Firestore)
-  - Integration: `src/utils/planningCenterApi.ts` → validatePcCredentials(), fetchServiceTypes(), fetchTemplates()
-  - Request Path: /api/planningcenter/services/v2 (proxied)
-  - Features: Service type enumeration, plan template fetching, song/scripture export
-  - Credentials Storage: Firestore user document fields (pcAppId, pcSecret)
+**Planning Center Online API (Services v2):**
+- Service: Church service planning platform integration
+  - API Endpoint: `https://api.planningcenteronline.com/services/v2`
+  - Auth: Basic Auth (App ID + Secret) in Authorization header
+  - Access: Browser client → `/api/planningcenter` proxy (Vite dev / Cloud Function prod) → Planning Center
+  - Credentials Storage: Stored in Firestore at `organizations/{orgId}.pcAppId` and `.pcSecret` (encrypted at rest by Firestore)
+  - Usage: `src/utils/planningCenterApi.ts` (26+ functions)
+    - Service Types: `fetchServiceTypes()`, `fetchTemplates()`
+    - Plans: `fetchPlans()`, `createPlan()`, `fetchPlanItems()`, `fetchPlanTimes()`
+    - Items: `createItem()`, `updateItem()`, `deleteItem()`, `createItemNote()`
+    - Songs: `searchSongByCcli()`, `fetchSongArrangements()`, `fetchLastScheduledItem()`
+    - Teams: `fetchServiceTypeTeams()`, `fetchTeamPositions()`, `addNeededPosition()`
+    - People: `fetchAllPeople()`, `fetchPeopleForTeamPositions()`, `fetchPersonEmails()`
+  - Rate Limiting: Implements 429 (Too Many Requests) retry logic with exponential backoff
+  - Pagination: Follows `links.next` for paginated responses, rewrites absolute URLs to proxy paths
 
 ## Data Storage
 
-**Databases:**
-- Firestore (Firebase NoSQL) - Primary application database
-  - Connection: Via firebase ^12.0.0 SDK
-  - Client SDK: getFirestore() in `src/firebase/index.ts`
-  - Admin SDK: firebase-admin ^13.10.0 in `functions/src/index.ts`
-  - Collections: users, organizations, services, quarters, songs, roster, etc.
-  - Real-time: onSnapshot listeners for reactive state synchronization
-  - Security: firestore.rules (deployment rules in `firestore.rules`)
-
-**Indexes:**
-- Firestore Composite Indexes
-  - Configuration: `firestore.indexes.json`
-  - Managed via Firebase CLI
+**Firestore (Cloud Firestore):**
+- Primary database for all application data
+  - Collections: `users`, `organizations`, `inviteLookup`, `shareTokens`, `orgSlugs`
+  - Subcollections (per org): `members`, `invites`, `services`, `songs`, `quarters`, `teams`, `roster`, `assignments`, `arrangements`
+  - Client SDK: `firebase` (v12.0.0)
+  - Access: `src/firebase/index.ts` initializes `db = getFirestore(app)`
+  - Emulator: Local development uses Firestore emulator at `127.0.0.1:8080` (port 8080)
+  - Connection: Configured via environment variables (`VITE_FIREBASE_*`)
+  - Write Strategy: Batch writes for transactional consistency (e.g., invite acceptance, org creation)
+  - Real-time Listeners: `onSnapshot()` for live data sync in stores (`auth.ts`, `quarters.ts`, etc.)
+  - Security: Defined in `firestore.rules` with role-based access control (editor vs. viewer)
 
 **File Storage:**
-- Local filesystem only
-  - CSV exports via PapaParse (client-side generation)
-  - No cloud file storage (Google Cloud Storage) integration
+- Not used in this codebase; local filesystem only for development
 
 **Caching:**
-- In-Memory: Pinia stores cache application state
-- Browser Local Storage: Session persistence (Vue Router history, auth tokens)
-- Service Worker: Not configured (full network fetch)
+- Not configured; relies on browser-side Pinia store and Firestore listeners for state management
 
 ## Authentication & Identity
 
 **Auth Provider:**
-- Firebase Authentication
-  - Implementation: `src/firebase/index.ts` (getAuth())
-  - Integration: `src/stores/auth.ts` (useAuthStore)
-  - Sign-In Methods:
-    - Google OAuth 2.0 (signInWithPopup via GoogleAuthProvider)
-    - Email + Password (signInWithEmailAndPassword, createUserWithEmailAndPassword)
-    - Password Reset (sendPasswordResetEmail)
-  - ID Token Usage: X-App-Auth header sent to Cloud Function proxy for authorization
-  - Token Verification: getAuth().verifyIdToken() in `functions/src/index.ts`
-  - Session: onAuthStateChanged listener for reactive user state
+- Firebase Authentication (with multiple methods)
+
+**Implementation Details:**
+- Location: `src/firebase/index.ts` (initialization), `src/stores/auth.ts` (business logic)
+- Methods Supported:
+  - Google OAuth: `loginWithGoogle()` uses `GoogleAuthProvider` + `signInWithPopup()`
+  - Email/Password: `loginWithEmail()` with auto-create on first sign-in, `registerWithEmail()`, `sendPasswordResetEmail()`
+- Auth State Listener: `onAuthStateChanged()` monitors login/logout transitions
+- ID Token: Firebase ID tokens issued to signed-in users, sent to Cloud Function proxy in `X-App-Auth` header for server-held secret access
+- Session Management: ID tokens expire and refresh automatically via Firebase SDK
+- Emulator: Local development uses Auth emulator at `127.0.0.1:9099` (port 9099)
 
 ## Monitoring & Observability
 
 **Error Tracking:**
-- None detected (no Sentry, Rollbar, etc.)
-- Manual console.error logging in error handlers
+- Not configured; errors logged to browser console via `console.error()`
 
 **Logs:**
-- Browser Console: console.error() in error handlers
-- Cloud Functions: Node.js stdout/stderr to Cloud Logging (GCP)
-- Firebase Emulator: stdout to terminal during local dev
-
-**Performance:**
-- No APM (Application Performance Monitoring) detected
-- No analytics collection (Google Analytics, Mixpanel, etc.)
+- Browser console logging in utility modules (e.g., `[claudeApi]` prefix in `src/utils/claudeApi.ts`)
+- Cloud Function logs available via Firebase Console / Google Cloud Logging
 
 ## CI/CD & Deployment
 
 **Hosting:**
-- Firebase Hosting
-  - Deployment: `firebase deploy` via Firebase CLI
-  - Configuration: `firebase.json` (rewrites, public root)
-  - Public Root: `dist/` (Vite build output)
-  - Rewrites: `/api/**` → Cloud Function "api", `**` → index.html (SPA)
-
-**Cloud Functions:**
-- Firebase Cloud Functions (2nd Gen)
-  - Runtime: Node.js 22
-  - Entry: `functions/src/index.ts` → export const api
-  - Deployed as: Single HTTP function named "api"
-  - Triggers: HTTPS
-  - Secrets: CLAUDE_API_KEY, ESV_API_KEY (Google Secret Manager)
-  - Deployment: `firebase deploy --only functions`
+- Firebase Hosting (static + Cloud Functions)
+  - Public: `dist/` directory
+  - Rewrites: `/api/**` routes to `api` Cloud Function
+  - SPA: `/**` rewrites to `/index.html` for client-side routing
 
 **CI Pipeline:**
-- Not detected (no GitHub Actions, GitLab CI, CircleCI config)
-- Manual `npm run build && firebase deploy` workflow
+- Not detected in codebase; likely configured externally (GitHub Actions, etc.)
 
-**Local Emulation:**
-- Firebase Emulator Suite
-  - Services: Auth, Firestore, Cloud Functions, UI
-  - Script: `npm run test:rules` (emulator-based Firestore rule testing)
-  - Configuration: `firebase.json` emulators section
+**Deployment:**
+- Functions: `npm run build && firebase deploy --only functions` (in `functions/`)
+- Hosting: `firebase deploy --only hosting` (auto-deploy SPA)
 
 ## Environment Configuration
 
-**Required env vars (client):**
-- VITE_FIREBASE_API_KEY
-- VITE_FIREBASE_AUTH_DOMAIN
-- VITE_FIREBASE_PROJECT_ID
-- VITE_FIREBASE_STORAGE_BUCKET
-- VITE_FIREBASE_MESSAGING_SENDER_ID
-- VITE_FIREBASE_APP_ID
-- VITE_FIREBASE_MEASUREMENT_ID
-- VITE_USE_EMULATORS (optional, local dev only)
+**Required Environment Variables (Client - VITE_ prefixed):**
+- `VITE_FIREBASE_API_KEY`: Firebase API key
+- `VITE_FIREBASE_AUTH_DOMAIN`: Firebase auth domain
+- `VITE_FIREBASE_PROJECT_ID`: Firebase project ID
+- `VITE_FIREBASE_STORAGE_BUCKET`: Firebase storage bucket
+- `VITE_FIREBASE_MESSAGING_SENDER_ID`: Firebase messaging sender ID
+- `VITE_FIREBASE_APP_ID`: Firebase app ID
+- `VITE_FIREBASE_MEASUREMENT_ID`: Firebase Analytics measurement ID (optional)
+- `VITE_USE_EMULATORS`: Set to `'true'` to connect to local emulators (dev only)
 
-**Required env vars (server/secrets):**
-- CLAUDE_API_KEY (Cloud Function secret)
-- ESV_API_KEY (Cloud Function secret)
+**Server-Held Secrets (Google Secret Manager):**
+- `CLAUDE_API_KEY`: Anthropic Claude API key (never exposed to browser)
+- `ESV_API_KEY`: ESV Bible API key (never exposed to browser)
+- Set via: `firebase functions:secrets:set CLAUDE_API_KEY` / `firebase functions:secrets:set ESV_API_KEY`
+- Consumed by: Cloud Function proxy at `functions/src/index.ts`
 
-**Secrets location:**
-- Local dev: `.env.local` file (never committed)
-- Cloud: Google Secret Manager (gcloud secrets)
-  - Set via: `firebase functions:secrets:set CLAUDE_API_KEY`
+**Planning Center Credentials:**
+- Not environment variables; stored per-organization in Firestore
+- User provides App ID + Secret through UI settings
+- Credentials used for Planning Center API calls (client or proxy)
 
-**Proxy Configuration:**
-- Dev Server: `vite.config.ts` defines /api/* proxy targets
-- Production: Firebase Hosting rewrites route /api/* to Cloud Function
-- Supported Proxies:
-  - `/api/anthropic` → https://api.anthropic.com
-  - `/api/esv` → https://api.esv.org
-  - `/api/planningcenter` → https://api.planningcenteronline.com
+**Secrets Location:**
+- Client: All VITE_ vars loaded from `.env.local` (not checked in; Vite handles at build time)
+- Server: Cloud Functions reference secrets via `defineSecret()` from Firebase params library
+- Development Proxy: Vite dev server reads non-VITE_ secrets from `.env.local` for dev proxy
 
 ## Webhooks & Callbacks
 
 **Incoming:**
-- None detected (no webhook receivers)
+- None detected; app is pull-only (client fetches data from APIs)
 
 **Outgoing:**
-- None detected (no third-party webhook dispatches)
-- Firestore listeners used for real-time sync instead
+- None configured; app does not send webhooks to external services
+- Planning Center integration: One-way push (create/update/delete items in PC)
 
-## Data Flow & Access Patterns
+## API Proxy Architecture
 
-**Authentication Flow:**
-1. User signs in via Firebase Auth (Google OAuth or Email)
-2. Firebase client SDK obtains ID token
-3. Token stored in browser session by Firebase SDK
-4. Subsequent API calls to Cloud Function include token in X-App-Auth header
-5. Cloud Function verifies token before forwarding to Anthropic/ESV
+All external API calls route through a proxy layer to centralize authentication and secret management:
 
-**Song Suggestion Flow:**
-1. Frontend calls `getSongSuggestions()` with sermon context
-2. Anthropic SDK client created with baseURL=/api/anthropic
-3. Request intercepted by dev server proxy or Firebase Hosting rewrite
-4. Cloud Function verifies caller is authenticated
-5. Injects CLAUDE_API_KEY into request headers
-6. Forwards to api.anthropic.com
-7. Response returned to frontend, parsed and validated
+**Architecture:**
+```
+┌─────────────────────────────────────┐
+│   Browser (Vue 3 App)               │
+│   src/utils/claudeApi.ts            │
+│   src/utils/esvApi.ts               │
+│   src/utils/planningCenterApi.ts    │
+└────────────────┬────────────────────┘
+                 │
+                 │ HTTP with X-App-Auth token
+                 ▼
+┌─────────────────────────────────────┐
+│   Proxy Layer (Cloud Function)      │
+│   functions/src/index.ts            │
+│   - Verifies Firebase ID token      │
+│   - Injects server-held secrets     │
+│   - Routes to upstream APIs         │
+└────────────────┬────────────────────┘
+                 │
+    ┌────────────┼────────────────┐
+    │            │                │
+    ▼            ▼                ▼
+  Claude API  ESV API        Planning Center
+```
 
-**Scripture Lookup Flow:**
-1. Frontend calls `fetchPassageText()` with passage query
-2. Fetch to `/api/esv/v3/passage/text/` with auth headers
-3. Cloud Function verifies caller
-4. Injects ESV_API_KEY into Authorization header
-5. Forwards to api.esv.org
-6. Response parsed and returned
+**Flow:**
+1. Client calls e.g., `fetch('/api/anthropic/v1/messages', { headers: X-App-Auth: token })`
+2. Cloud Function proxy receives request, verifies token against Firebase Auth
+3. If valid, proxy injects `X-API-Key: {CLAUDE_API_KEY}` (from Secret Manager)
+4. Proxy forwards modified request to upstream API
+5. Response returned to client
 
-**Planning Center Integration:**
-1. User enters App ID and Secret in Settings UI
-2. Credentials stored in Firestore user document
-3. Frontend retrieves from auth store (pcAppId, pcSecret)
-4. Credentials sent in Basic Auth header to /api/planningcenter
-5. Cloud Function forwards to Planning Center API (no secret injection)
-6. Response used for service type/template enumeration
+**Dev Proxy (Vite):**
+- Same pattern: Vite dev server intercepts `/api/*` requests
+- Reads `CLAUDE_API_KEY` and `ESV_API_KEY` from `.env.local` (for local development)
+- Injects headers and forwards to actual APIs
+- Planning Center proxy: Routes directly (no API key needed for dev)
 
-## Rate Limiting & Quotas
+## Integration Endpoints Summary
 
-**Anthropic API:**
-- Subject to Anthropic's rate limits (not explicitly configured)
-- Model: claude-haiku-4-5-20251001 (low cost, suitable for real-time suggestions)
-
-**ESV API:**
-- Shared key held server-side, subject to ESV's rate plan
-- Passage lookups typically low-volume
-
-**Planning Center API:**
-- Depends on church's Planning Center subscription tier
-- No rate limiting implemented in proxy
+| Service | Endpoint | Auth | Method | Route | Key Location |
+|---------|----------|------|--------|-------|--------------|
+| Anthropic | `https://api.anthropic.com` | `X-API-Key` header | POST `/v1/messages` | `/api/anthropic` | Secret Manager |
+| ESV | `https://api.esv.org` | `Authorization: Token` | GET `/v3/passage/text` | `/api/esv` | Secret Manager |
+| Planning Center | `https://api.planningcenteronline.com` | Basic Auth | GET/POST/PATCH/DELETE `/services/v2/*` | `/api/planningcenter` | Firestore per-org |
+| Firebase Auth | `https://identitytoolkit.googleapis.com` | SDK | Various | N/A (SDK direct) | Project config |
+| Firestore | `https://firestore.googleapis.com` | ID token + rules | REST/gRPC | N/A (SDK direct) | Project config |
 
 ---
 
-*Integration audit: 2026-07-15*
+*Integration audit: 2026-07-16*

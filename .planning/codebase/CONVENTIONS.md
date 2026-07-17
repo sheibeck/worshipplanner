@@ -1,257 +1,240 @@
 # Coding Conventions
 
-**Analysis Date:** 2026-07-15
+**Analysis Date:** 2026-07-16
 
 ## Naming Patterns
 
 **Files:**
-- Vue components: PascalCase (`ServiceCard.vue`, `SongTable.vue`, `AvailabilityDrawer.vue`)
-- TypeScript utilities/stores: camelCase (`claudeApi.ts`, `csvImport.ts`, `scheduler.ts`)
-- Test files: match source name with `.test.ts` suffix (`services.test.ts`, `claudeApi.test.ts`)
-- Configuration files: camelCase or dotfiles (`.oxlintrc.json`, `vite.config.ts`, `eslint.config.ts`)
+- Components: PascalCase `.vue` files (e.g., `SongBadge.vue`, `ServiceCard.vue`)
+- Utilities: camelCase `.ts` files (e.g., `quarterDates.ts`, `claudeApi.ts`)
+- Stores: camelCase `.ts` files without prefix (e.g., `auth.ts`, `songs.ts`)
+- Types: camelCase `.ts` files (e.g., `song.ts`, `service.ts`)
+- Tests: `.test.ts` suffix in `__tests__` directories parallel to source
 
 **Functions:**
-- Event handlers: camelCase, verb-first (`handleClick`, `toggleSort`, `toggleSelectAll`)
-- Exported functions: camelCase (`getSongSuggestions`, `mapRowToSong`, `fetchPassageText`)
-- Helper functions: camelCase, descriptive (`parseArrangementTags`, `safeParseJsonArray`, `validateSongSuggestions`)
-- Computed properties: camelCase (`filteredSongs`, `allUserTags`, `isLoading`)
+- camelCase for all exported and private functions
+- Descriptive names matching their primary purpose: `generateSundaysInQuarter()`, `mapPcSongToUpsert()`, `validateSongSuggestions()`
 
-**Variables:**
-- Constants (module-level): UPPERCASE or camelCase (`DEFAULT_COLUMN_VISIBILITY`, `SONG_SYSTEM_PROMPT`)
-- Local variables: camelCase (`mockService`, `tagFilterInclude`, `unsubscribeFn`)
-- Store properties: camelCase (`services`, `searchQuery`, `columnVisibility`)
-- Reactive refs: camelCase with `ref` suffix when needed for clarity (`services`, `isLoading`)
+**Variables & Constants:**
+- camelCase for local variables and ref/computed: `isSharing`, `songLibrary`, `openingSlots`
+- SCREAMING_SNAKE_CASE for module-level constants: `BIBLE_BOOKS`, `SONG_SYSTEM_PROMPT`, `VW_TYPE_LABELS`
+- Ref types annotated explicitly: `const user = ref<User | null>(null)`
+- Constants marked `readonly` where appropriate: `export const BIBLE_BOOKS: readonly string[]`
 
-**Types:**
-- Interfaces: PascalCase (`Service`, `Song`, `ParsedSongPreview`, `GetSongSuggestionsParams`)
-- Type aliases: PascalCase (`VWType`, `CreateServiceInput`, `SongInput`)
-- Generic parameters: PascalCase (T, K in generics)
-- Store hooks: `use<StoreName>` pattern (`useServiceStore`, `useSongStore`, `useAuthStore`)
+**Types & Interfaces:**
+- PascalCase for all types, interfaces, and type aliases: `Song`, `Service`, `VWType`, `AiSongSuggestion`
+- Use `type` for union types or Omit/Pick: `type VWType = 1 | 2 | 3`
+- Use `interface` for object shapes: `interface Song { ... }`
+- Suffix input types with `Input`: `UpsertSongInput`, `GetSongSuggestionsParams`
+
+**Stores:**
+- Store names: `use{Name}Store()` following Pinia convention: `useAuthStore()`, `useSongStore()`
+- State properties: camelCase refs and computed values
 
 ## Code Style
 
 **Formatting:**
-- Tool: Prettier 3.8.1 (no custom config detected; uses default settings)
-- Run with: `npm run format` (formats `src/` directory)
-- Default Prettier behavior: 80-char line wrap, 2-space indent, single quotes where possible, trailing commas
+- Tool: Prettier v3.8.1
+- Applied via `npm run format` on src/ directory
+- ESLint config disables formatting rules to avoid conflicts
 
 **Linting:**
-- Tools: ESLint 10.0.2 with oxlint plugin (~1.50.0)
-- Vue plugin: `@vue/eslint-config-typescript` (14.7.0) with `eslint-plugin-vue` (10.8.0)
-- Config file: `eslint.config.ts` (flat config format)
-- Run with: `npm run lint:oxlint --fix` (oxlint pass) and `npm run lint:eslint --fix` (ESLint pass)
-- Combined: `npm run lint` runs both in sequence (`run-s lint:*`)
+- Tool: ESLint v10.0.2 with flat config (`eslint.config.ts`)
+- Plugins: `@vue/eslint-config-typescript`, `eslint-plugin-vue`, `@vitest/eslint-plugin`, `eslint-plugin-oxlint`
+- Oxlint v1.50.0 provides fast linting for TypeScript
+- Run: `npm run lint` (oxlint + eslint with --fix)
+- Caching: ESLint cache enabled (`--cache` flag)
 
-**Language:**
-- TypeScript 5.9.3 with strict mode enabled
-- Target: ES2020 (via Vue 3 standard setup)
-- Path aliases: `@/*` maps to `./src/*` (configured in `tsconfig.app.json`)
+**TypeScript:**
+- Strict settings: `noUncheckedIndexedAccess: true` for safety
+- Vue tsconfig extends `@vue/tsconfig/tsconfig.dom.json`
+- Test tsconfig (`tsconfig.vitest.json`) separates jsdom types from app types
+- Path aliases: `@/*` maps to `./src/*` — use this in all imports
 
 ## Import Organization
 
 **Order:**
-1. Type imports from external packages (marked with `type` keyword)
-2. Value imports from external packages (Vue, Pinia, Firebase)
-3. Type imports from local modules (from `@/types/`)
-4. Value imports from local modules (stores, utils, components)
-
-**Example from `src/stores/services.ts`:**
-```typescript
-import { ref } from 'vue'                    // Framework
-import { defineStore } from 'pinia'          // State mgmt
-import { ... } from 'firebase/firestore'    // External API
-import { db } from '@/firebase'              // Local config
-import { useSongStore } from '@/stores/songs' // Local stores
-import { buildSlots } from '@/utils/slotTypes' // Local utils
-import type { Service } from '@/types/service' // Local types
-```
-
-**Path Aliases:**
-- `@/` always resolves to `./src/`
-- Used consistently throughout for relative imports to avoid `../../` chains
-- Never mix: all local imports use `@/`, no relative paths
-
-## Error Handling
-
-**Patterns:**
-- Async functions return explicit nullable types: `Promise<Result | null>` on error
-- Try/catch blocks wrap async operations
-- Functions return `null` silently on validation/parse failures (not throwing)
-- Guard clauses for early returns: `if (!orgId.value) return`
-- Firebase Firestore operations wrapped in try/catch with console.error logging
+1. Vue imports (`import { ref, computed } from 'vue'`)
+2. External package imports (`import router from 'vue-router'`, `import Anthropic from '@anthropic-ai/sdk'`)
+3. Firebase imports (`import { doc, setDoc } from 'firebase/firestore'`)
+4. Local imports from `@/*` (types, stores, components, utils)
 
 **Examples:**
 ```typescript
-// Pattern 1: Return null on error
-async function getSongSuggestions(...): Promise<AiSongSuggestion[] | null> {
-  try {
-    const response = await getClient().messages.create(...)
-    const parsed = safeParseJsonArray(textContent.text)
-    if (!parsed) return null
-    return validated
-  } catch (err) {
-    console.error('[claudeApi] getSongSuggestions failed:', err)
-    return null
-  }
-}
+import { ref, computed, watch } from 'vue'
+import { defineStore } from 'pinia'
+import { doc, setDoc } from 'firebase/firestore'
+import { auth, db } from '@/firebase'
+import type { Service } from '@/types/service'
+import { useAuthStore } from '@/stores/auth'
+```
 
-// Pattern 2: Guard clauses for missing context
-async function createService(data: CreateServiceInput): Promise<string> {
-  if (!orgId.value) throw new Error('No orgId set — call subscribe() first')
-  // ... continue
-}
+**Path Aliases:**
+- Always use `@/` prefix for local imports, never relative paths
+- `@/types/song` — type definitions
+- `@/stores/auth` — Pinia stores
+- `@/utils/quarterDates` — utility functions
+- `@/components/ServiceCard` — Vue components
+- `@/firebase` — Firebase config module
 
-// Pattern 3: Validate before use
-function validateSongSuggestions(
-  aiResult: AiSongSuggestion[],
-  songs: { id: string }[],
-): AiSongSuggestion[] {
-  const songIdSet = new Set(songs.map((s) => s.id))
-  return aiResult.filter((suggestion) => songIdSet.has(suggestion.songId))
+## Error Handling
+
+**Pattern:**
+```typescript
+try {
+  const result = await someAsyncOperation()
+  return result
+} catch (err) {
+  console.error('[moduleName] functionName failed:', err)
+  return null
 }
 ```
+
+**Conventions:**
+- Log errors with `console.error()` including module name in brackets: `[claudeApi]`, `[planningCenterApi]`
+- Return `null` on error for optional results
+- Return empty array `[]` for collection operations
+- Don't throw from service/utility functions; let callers handle null
+- Wrap API calls and async operations; pure functions don't need try/catch
+
+**Defensive Validation:**
+- Filter/validate data from external sources (APIs, user input, mocked data)
+- Example: `validateSongSuggestions()` removes hallucinated song IDs
+- Example: `validateScriptureSuggestions()` ensures books are in Protestant canon
 
 ## Logging
 
-**Framework:** console (no external logging library)
+**Framework:** `console` (no external logging library)
 
 **Patterns:**
-- `console.error()` with namespace prefix: `console.error('[moduleName] operation failed:', err)`
-- Minimal logging — errors only, no info/debug/warn levels
-- Error messages include context module name in brackets
-- Full error object passed to console for debugging
-
-**Examples from codebase:**
-```typescript
-console.error('[claudeApi] getSongSuggestions failed:', err)
-console.error('[claudeApi] getScriptureSuggestions failed:', err)
-console.error('[stores/quarters] onSnapshot error:', e)
-```
-
-**No logging for:**
-- Success cases
-- Normal flow execution
-- Debug information
+- Error logging: `console.error('[moduleName] operation:', error)`
+- No debug logging in production code (keep logs for real errors only)
+- Include module name in brackets for traceable logs
 
 ## Comments
 
 **When to Comment:**
-- Exported functions: Include JSDoc block
-- Non-obvious logic: Explain design decisions or constraints
-- Workarounds/regressions: Use pattern codes (D-XX for design, WR-XX for workaround)
-- Complex conditions: Clarify intent above the code
-- Rules/constraints: Document cross-file or business logic
+- JSDoc on all exported functions and types
+- Inline comments explaining "why", not "what" (code shows what it does)
+- Comments on side effects or non-obvious design decisions
+- Design document references (D-01, R-02, C-01 pattern)
 
 **JSDoc/TSDoc:**
-- Used for all exported functions, types, and interfaces
-- Include `@param` tags for complex parameters
-- Include `@returns` tags for non-obvious return values
-- Use `/**` block format
-
-**Comment Style:**
 ```typescript
 /**
- * Safely parse a JSON array from AI response text.
- * Handles: clean JSON, prose-wrapped JSON, markdown-fenced JSON.
- * Returns null on any failure.
+ * Returns every Sunday in the given quarter as zero-padded YYYY-MM-DD strings, ascending.
+ * Q1 = Jan-Mar, Q2 = Apr-Jun, Q3 = Jul-Sep, Q4 = Oct-Dec.
  */
-export function safeParseJsonArray(text: string): unknown[] | null {
-  // ... implementation
-}
-
-// Section dividers
-// ─── Song Suggestion Parameters ──────────────────────────────────────────
-
-// Pattern codes for decision tracking
-// D-11: VW type is advisory context only, do NOT restrict suggestions to this type
-// WR-01: whitespace-token de-dupe check breaks for multi-word tag/theme values
+export function generateSundaysInQuarter(year: number, quarter: 1 | 2 | 3 | 4): string[]
 ```
 
-**Pattern Codes:**
-- `D-XX`: Design decision or architectural constraint (e.g., D-08, D-16)
-- `WR-XX`: Workaround or known regression (e.g., WR-01, WR-04)
-- Used in comments to link logic to CLAUDE.md or decision docs
-- Enables tracking of "why" across refactors
+**Section Dividers:**
+- Use ASCII art dividers for major sections in larger files
+- Pattern: `// ─── Section Name ───────────────────────────────────────────────────────────`
+- See `src/utils/claudeApi.ts` for examples
+
+**Design References:**
+- Comments reference internal design docs: `(D-01)`, `(R-02)`, `(CR-01)`
+- Used for explaining non-obvious choices or trade-offs
 
 ## Function Design
 
-**Size:**
-- Target: Under 50 lines per function
-- Complex operations break into smaller helpers
-- Setup/teardown separated into distinct functions
+**Size:** 
+- Keep functions under 40 lines where possible
+- Extract complex logic into separate named functions
+- Use pure functions for data transformation
 
 **Parameters:**
-- Use typed interfaces for multiple parameters: `GetSongSuggestionsParams`
-- Avoid single-line function declarations with 5+ params
-- Destructure params in function body for clarity
-- Pass immutable data structures when possible
+- Use object parameters for functions with 2+ parameters
+- Example: `function applyDateAdditionsRemovals(dates: string[], changes: { add?: string[]; remove?: string[] })`
+- Destructure immediately in function body when helpful
 
 **Return Values:**
-- Always explicitly typed: `Promise<Result | null>` or `Result[]`
-- Nullable returns: use `| null` not `| undefined` consistently
-- Async functions: always return `Promise<T>` form, never bare promises
-- Validation functions: return filtered/mapped results, not boolean flags
-
-**Example Pattern:**
-```typescript
-// ✓ Good: typed interface, explicit return type
-async function assignSongToSlot(
-  serviceId: string,
-  slotIndex: number,
-  song: { id: string; title: string; key: string },
-): Promise<void> {
-  // ... implementation
-}
-
-// ✓ Good: validation returns filtered result
-export function detectDuplicates(
-  parsed: ParsedSongPreview[],
-  existing: Song[],
-): ParsedSongPreview[] {
-  return parsed.map((song) => {
-    // ... detect and return updated song
-  })
-}
-```
+- Return descriptive types (objects over booleans when multiple values)
+- Return `null` on error for optional results
+- Return types explicitly annotated on exported functions
 
 ## Module Design
 
 **Exports:**
-- Named exports preferred over default exports
-- Stores: export single `defineStore()` call
-- Utils: export multiple named functions
-- Types: export interfaces and type aliases
-- No mixing: file exports either store OR utilities OR types, rarely mixed
+- Export only public APIs from utils
+- Keep internal helpers private (no export)
+- Export types alongside implementations
 
 **Barrel Files:**
-- Not used extensively; most imports are direct
-- Test imports typically direct from source file
+- Not used; import directly from source files
+- Example: `import { generateSundaysInQuarter } from '@/utils/quarterDates'` (not from `@/utils/index.ts`)
 
-**Store Pattern:**
+**Organization:**
+- Each utility file handles one domain/feature
+- Store files use Pinia composition API pattern
+- Component files follow Vue SFC structure
+
+## Vue Component Patterns
+
+**Script Setup:**
+- Use `<script setup lang="ts">` in all Vue components
+- Declare props with `defineProps<T>()` and TypeScript interface
+- Declare emits with `defineEmits<{ eventName: [args] }>()`
+- Use `withDefaults()` for prop defaults
+
+**Example:**
+```vue
+<script setup lang="ts">
+import type { Song } from '@/types/song'
+
+const props = withDefaults(
+  defineProps<{
+    songs: Song[]
+    clickable?: boolean
+  }>(),
+  { clickable: false },
+)
+
+defineEmits<{
+  select: [song: Song]
+}>()
+</script>
+```
+
+**Styling:**
+- Tailwind CSS utility classes only (no scoped CSS)
+- Static class maps to prevent dynamic class purging
+- Example from `SongBadge.vue`:
+  ```typescript
+  const badgeClasses = {
+    1: 'bg-blue-900/50 text-blue-300 border-blue-800',
+    2: 'bg-purple-900/50 text-purple-300 border-purple-800',
+    3: 'bg-amber-900/50 text-amber-300 border-amber-800',
+  } as const
+  ```
+
+## Pinia Store Patterns
+
+**Composition API Style:**
 ```typescript
-// ✓ Pattern from src/stores/services.ts
-export const useServiceStore = defineStore('services', () => {
-  // state
-  const services = ref<Service[]>([])
+export const useAuthStore = defineStore('auth', () => {
+  // State refs
+  const user = ref<User | null>(null)
+  const isReady = ref(false)
   
-  // actions
-  async function createService(data: CreateServiceInput): Promise<string> {
-    // ...
-  }
+  // Computed
+  const isAuthenticated = computed(() => user.value !== null)
   
-  // return public API
-  return {
-    services,
-    isLoading,
-    orgId,
-    subscribe,
-    unsubscribeAll,
-    createService,
-    // ... other actions
-  }
+  // Actions (functions)
+  async function signIn() { ... }
+  
+  return { user, isReady, isAuthenticated, signIn }
 })
 ```
 
+**Patterns:**
+- Refs for mutable state: `const state = ref<Type>(initial)`
+- Computed for derived state: `const isDerived = computed(() => ...)`
+- Functions for actions, no special action prefix
+- Always type-annotate refs and computed values
+- Return all public state/actions at end of function
+
 ---
 
-*Convention analysis: 2026-07-15*
+*Convention analysis: 2026-07-16*

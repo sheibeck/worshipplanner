@@ -1,297 +1,312 @@
+<!-- refreshed: 2026-07-16 -->
 # Architecture
 
-**Analysis Date:** 2026-07-15
+**Analysis Date:** 2026-07-16
 
 ## System Overview
 
-Worship Planner is a web application for planning church worship services and managing volunteer schedules. It integrates with Planning Center for importing songs and volunteers, uses Claude AI for schedule suggestions, and manages quarterly volunteer rotations.
-
 ```text
-┌─────────────────────────────────────────────────────────────┐
-│                      View Layer                              │
-│  LoginView, DashboardView, SongsView, RosterView,           │
-│  QuarterView, ServicesView, ServiceEditorView, etc.         │
-│  `src/views/`                                               │
-└────────────────────┬────────────────────────────────────────┘
-                     │
-┌────────────────────▼────────────────────────────────────────┐
-│              Component Layer (UI Components)                 │
-│  AppShell, AppSidebar, Modal dialogs, Tables, Forms         │
-│  `src/components/`                                          │
-└────────────────────┬────────────────────────────────────────┘
-                     │
-┌────────────────────▼────────────────────────────────────────┐
-│         State Management Layer (Pinia Stores)               │
-│  auth, songs, services, quarters, roster                    │
-│  `src/stores/` — Real-time Firestore subscriptions          │
-└────────────────────┬────────────────────────────────────────┘
-                     │
-┌────────────────────▼────────────────────────────────────────┐
-│           Business Logic / Utilities Layer                   │
-│  scheduler, planningCenterApi, songSearch, etc.             │
-│  `src/utils/` — Pure functions, no side effects             │
-└────────────────────┬────────────────────────────────────────┘
-                     │
-┌────────────────────▼────────────────────────────────────────┐
-│              Backend Integration Layer                       │
-│  Firebase Auth, Firestore, Cloud Functions Proxy            │
-│  Planning Center, Claude API, ESV Bible API                 │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           Vue 3 SPA (Vite)                                   │
+│                    `src/App.vue` + `src/main.ts`                             │
+├─────────────────┬────────────────────────┬────────────────────┬──────────────┤
+│    Views        │    Components          │    Stores (Pinia)  │  Utilities   │
+│  `src/views/`   │  `src/components/`     │   `src/stores/`    │ `src/utils/` │
+│                 │                        │                    │              │
+│ • LoginView     │ • AppShell             │ • auth.ts          │ • API clients│
+│ • DashboardView │ • ServiceCard          │ • songs.ts         │ • Formatters │
+│ • ServiceEditor │ • SongTable            │ • services.ts      │ • Validators │
+│ • SongsView     │ • ArrangementAccordion │ • quarters.ts      │ • Helpers    │
+│ • RosterView    │ • AvailabilityDrawer   │ • roster.ts        │              │
+│ • QuarterView   │ • RosterImportModal    │                    │              │
+└─────────────────┴────────────────────────┴────────────────────┴──────────────┘
+         │                    │                       │                │
+         └────────────────────┴───────────────────────┴────────────────┘
+                              │
+         ┌────────────────────┴────────────────────┐
+         │                                         │
+         ▼                                         ▼
+┌────────────────────────────────┐    ┌───────────────────────────────┐
+│  Firebase Firestore            │    │  Cloud Functions (Reverse     │
+│  (Real-time Subscriptions)     │    │  Proxy with Auth)             │
+│                                │    │                               │
+│ • users/{uid}                  │    │ `functions/src/index.ts`      │
+│ • organizations/{orgId}        │    │                               │
+│ • organizations/{orgId}/songs  │    │ Routes:                       │
+│ • organizations/{orgId}/services
+│ • organizations/{orgId}/roster │    │ • /api/anthropic (Claude)     │
+│ • shareTokens/{token}          │    │ • /api/esv (Bible text)       │
+│ • firestore.rules              │    │ • /api/planningcenter (PC)    │
+└────────────────────────────────┘    └───────────────────────────────┘
+         │                                         │
+         └─────────────────────┬───────────────────┘
+                               │
+          ┌────────────────────┴─────────────────────┐
+          │                                          │
+          ▼                                          ▼
+    ┌─────────────┐                        ┌──────────────────┐
+    │ Firebase    │                        │ External APIs    │
+    │ Auth        │                        │                  │
+    └─────────────┘                        │ • Anthropic      │
+                                          │ • ESV (Bible)    │
+                                          │ • Planning Center│
+                                          └──────────────────┘
 ```
 
 ## Component Responsibilities
 
 | Component | Responsibility | File |
 |-----------|----------------|------|
-| Views | Page containers; orchestrate stores & components | `src/views/*.vue` |
-| Pinia Stores | State management; real-time Firestore sync | `src/stores/*.ts` |
-| Components | Reusable UI elements (modals, tables, forms) | `src/components/*.vue` |
-| Composables | Reusable logic (unsaved guard, hooks) | `src/composables/*.ts` |
-| Utilities | Pure business logic (scheduling, imports, search) | `src/utils/*.ts` |
-| Router | Page routing & auth guards | `src/router/index.ts` |
-| Firebase | Auth & Firestore client initialization | `src/firebase/index.ts` |
-| Cloud Functions | Secure API proxy for external services | `functions/src/index.ts` |
+| **Views** | Page-level components rendering routes; contain major feature areas | `src/views/*.vue` |
+| **Components** | Reusable UI building blocks (modals, tables, sidebars, cards) | `src/components/*.vue` |
+| **Stores (Pinia)** | Centralized state management with Firestore subscriptions | `src/stores/*.ts` |
+| **Router** | URL routing with auth/role guards | `src/router/index.ts` |
+| **Firebase** | Real-time database (Firestore), authentication, Cloud Functions | `src/firebase/index.ts` |
+| **Utils** | API clients, import/export, business logic helpers | `src/utils/*.ts` |
+| **Types** | Shared TypeScript interfaces for domain models | `src/types/*.ts` |
+| **Composables** | Reusable Vue 3 composition functions (e.g., unsaved changes guard) | `src/composables/*.ts` |
 
 ## Pattern Overview
 
-**Overall:** Vue 3 + Pinia + Firebase SPA with real-time Firestore synchronization
+**Overall:** Vue 3 SPA with Pinia state management, real-time Firestore subscriptions, Firebase Authentication, and Cloud Functions as a reverse proxy for paid APIs (Anthropic, ESV Bible).
 
 **Key Characteristics:**
-- **Reactive state:** Pinia stores maintain real-time Firestore collections via `onSnapshot` listeners
-- **Pure utilities:** Business logic (scheduling, search, validation) isolated as pure functions in `src/utils/`
-- **Component composition:** Modular components + layout shells (AppShell, AppSidebar)
-- **Secure API proxy:** Cloud Function routes external API calls, injects server-held secrets (Claude, ESV keys)
-- **Route-based auth:** Vue Router guards enforce authentication and role-based access (editor vs. viewer)
+- **Real-time sync:** All collections use `onSnapshot` subscriptions in stores to keep UI in sync with Firestore
+- **Auth-first architecture:** Route guards check Firebase Auth + Pinia auth store for roles before rendering
+- **Org-scoped data:** Everything is namespaced under `organizations/{orgId}` — data is never shared across orgs
+- **Soft deletes:** Songs, services, and roster members use `hidden: true` instead of deletion
+- **Server-held secrets:** Sensitive API keys live in Cloud Functions; client never sees them
+- **Vertical Worship methodology:** Song categorization (1=Call to Worship, 2=Intimate, 3=Ascription) gates song selection
 
 ## Layers
 
 **View Layer:**
-- Purpose: Page containers that render a specific feature (songs, schedule, services, roster, etc.)
+- Purpose: Route-mapped page components that compose lower-layer components and subscribe to stores
 - Location: `src/views/`
-- Contains: Vue SFC files, each one a top-level page
-- Depends on: Pinia stores, Router, components, utilities
-- Used by: Router (dynamic import in route config)
-- Examples:
-  - `QuarterView.vue` - Quarterly volunteer schedule editor (includes QuarterGrid component)
-  - `ServiceEditorView.vue` - Service/plan editor (103 KB — largest view; complex form state)
-  - `RosterView.vue` - Volunteer roster management
-  - `SongsView.vue` - Song library search & management
+- Contains: `.vue` SFC files like `ServiceEditorView.vue`, `SongsView.vue`, `DashboardView.vue`
+- Depends on: Router, components, stores, utilities
+- Used by: Vue Router
 
 **Component Layer:**
-- Purpose: Reusable UI elements (modals, tables, forms, cards, sidebars)
+- Purpose: Reusable UI blocks (modals, tables, sidebars, accordions) composed in views
 - Location: `src/components/`
-- Contains: Vue SFC files with limited scope (typically render/event emit only)
-- Depends on: Pinia stores (for data), utilities (rarely; mostly for type definitions)
+- Contains: `.vue` SFC files implementing buttons, cards, import dialogs, roster tables, etc.
+- Depends on: Stores (read-only for most components), utils, types
 - Used by: Views and other components
-- Examples:
-  - Modal dialogs: `PcImportModal.vue`, `CsvImportModal.vue`, `RosterImportModal.vue`, `NewServiceDialog.vue`
-  - Tables/grids: `QuarterGrid.vue`, `SongTable.vue`, `RotationTable.vue`, `AvailabilityRosterTable.vue`
-  - Forms/inputs: `ScriptureInput.vue`, `SongFilters.vue`, `AvailabilityDrawer.vue`
-  - Layout: `AppShell.vue`, `AppSidebar.vue`
 
-**State Management Layer (Pinia Stores):**
-- Purpose: Centralized, reactive state synchronized with Firestore in real-time
+**Store Layer:**
+- Purpose: Pinia stores managing application state with real-time Firestore subscriptions
 - Location: `src/stores/`
-- Contains: 5 stores managing different data domains
-  - `auth.ts` - User authentication, organization, role, Planning Center credentials
-  - `songs.ts` - Song catalog with filtering (VW type, key, tags)
-  - `services.ts` - Service/worship plan documents
-  - `quarters.ts` - Quarterly volunteer schedules; calls `proposeQuarterSchedule` to generate
-  - `roster.ts` - People, roles, and per-person volunteer metadata
-- Pattern: Each store uses `onSnapshot(collection(...), (snap) => { state.value = snap.docs.map(...) })`
-- Firestore structure: `/organizations/{orgId}/songs`, `/organizations/{orgId}/services`, etc.
+- Contains: TypeScript composition API stores with `onSnapshot` listeners
+- Depends on: Firebase Firestore SDK, types, utilities
+- Used by: Views, components, and other stores
 
-**Business Logic / Utilities Layer:**
-- Purpose: Pure, deterministic functions for domain logic
+**Data Access Layer:**
+- Purpose: Direct Firebase Firestore API integration (done inline in stores, not abstracted)
+- Located in: Store methods calling `collection()`, `onSnapshot()`, `updateDoc()`, etc.
+- Patterns: Async methods with `serverTimestamp()`, `writeBatch()` for consistency
+- Enforced by: `firestore.rules` (Firestore security rules)
+
+**Utility Layer:**
+- Purpose: Business logic helpers, external API clients, import/export formatters
 - Location: `src/utils/`
-- Contains:
-  - `scheduler.ts` - Deterministic fair-share quarterly volunteer scheduling (with blackout, pairing, frequency constraints)
-  - `planningCenterApi.ts` - Planning Center API client (fetch service types, templates, songs, people)
-  - `pcSongImport.ts` - Logic to merge Planning Center songs into local catalog
-  - `songSearch.ts` - Text search over songs by title, themes, tags
-  - `csvImport.ts` - Parse CSV and map to song/person/roster updates
-  - `esvApi.ts` - ESV Bible API client for scripture lookups
-  - `claudeApi.ts` - Claude AI integration for schedule suggestions
-  - `scripture.ts` - Scripture reference parsing & formatting
-  - `quarterDates.ts` - Generate Sundays, apply date additions/removals
-- Key property: No framework imports, no Firestore writes, fully testable
+- Contains: `planningCenterApi.ts`, `claudeApi.ts`, `pcSongImport.ts`, `scheduler.ts`, etc.
+- Depends on: Types, Firebase (via stores)
+- Used by: Views, components, stores
 
-**API Integration Layer:**
-- Firebase Auth (`src/firebase/index.ts`) - Client initialization; connects to emulator in dev
-- Firebase Firestore - Real-time document listeners in stores
-- Cloud Functions proxy (`functions/src/index.ts`) - Secure gateway:
-  - Proxies `/api/anthropic/` → Anthropic API (injects `CLAUDE_API_KEY`)
-  - Proxies `/api/esv/` → ESV Bible API (injects `ESV_API_KEY`)
-  - Proxies `/api/planningcenter/` → Planning Center API (no injection; uses client-provided Basic Auth)
-  - Verifies Firebase ID token for secret-bearing routes before allowing access
+**Type Layer:**
+- Purpose: Shared TypeScript domain models (Song, Service, Arrangement, etc.)
+- Location: `src/types/`
+- Contains: Interfaces for `service.ts`, `song.ts`, `roster.ts`
+- Used by: All layers
 
 ## Data Flow
 
-### Primary Request Path (User Action → Firestore Update)
+### Primary Request Path: Creating/Editing a Service
 
-1. User clicks button or submits form in a View (`src/views/*.vue`)
-2. View calls a Pinia store action (e.g., `await serviceStore.updateService(id, data)`)
-3. Store action calls Firestore SDK (`updateDoc`, `addDoc`, `setDoc`, etc.)
-4. Firestore updates document; `onSnapshot` listener in the same store fires
-5. Store state updates reactively; all components reading that state re-render
+1. User navigates to `/services/:id` → `ServiceEditorView.vue` mounts (`src/views/ServiceEditorView.vue`)
+2. View reads from `useServiceStore()` which has an active `onSnapshot` subscription
+3. Firestore listener (`src/stores/services.ts:35`) pushes service doc to `services.value`
+4. View binds UI to service state and listens for user input
+5. User edits a slot → View calls `serviceStore.assignSongToSlot(serviceId, slotIndex, song)` (`src/stores/services.ts:91`)
+6. Store updates local state: `updateService(serviceId, { slots: updatedSlots })` (`src/stores/services.ts:78`)
+7. Store writes to Firestore: `updateDoc(doc(db, 'organizations', orgId, 'services', id), ...)`
+8. Firestore listener fires → all subscribed clients receive updated doc
+9. View reactively updates
 
-**Example:** Adding a new service
-- User opens `ServicesView.vue` (displays list of services via `serviceStore.services`)
-- User clicks "+ New Service" → `NewServiceDialog.vue` renders
-- User submits form → `serviceStore.createService({ name, date, teams })` called
-- Store calls `addDoc(collection(db, 'organizations', orgId, 'services'), serviceData)`
-- Firestore fires `onSnapshot` listener; store updates `services.value`
-- `ServicesView` re-renders with new service
+### Song Import Path: Planning Center → Firestore
 
-### Quarterly Schedule Generation (Complex Flow)
+1. User opens `SettingsView.vue` and clicks "Import from Planning Center"
+2. View displays `PcImportModal.vue` (`src/components/PcImportModal.vue`)
+3. User provides Planning Center credentials
+4. Modal calls `planningCenterApi.fetchSongs()` (`src/utils/planningCenterApi.ts`) via `/api/planningcenter` proxy
+5. `pcSongImport.ts` transforms PC song JSON into `UpsertSongInput` format
+6. Store calls `useSongStore().upsertSongs(songs)` → batches writes to Firestore
+7. Firestore listener fires → all clients see new songs in `filteredSongs` computed
 
-1. User opens `QuarterView.vue`; selects a quarter from dropdown
-2. User clicks "Generate Schedule" button
-3. View calls `quarterStore.generateProposal(quarterId)`
-4. Store retrieves data from Firestore and calls pure `proposeQuarterSchedule` utility
-5. Utility returns `{ calendar, servedCounts, unfilled, pairingConflicts }`
-6. Store writes calendar back to Firestore
-7. `onSnapshot` listener fires; UI updates with new assignments
-8. View renders `QuarterGrid.vue` component showing assignments
+### Authentication Flow
+
+1. User loads app → `App.vue` checks `authStore.isReady` (initially false)
+2. App shows loading spinner while auth initializes
+3. `authStore` has an `onAuthStateChanged` listener (set up in `auth.ts`) that:
+   - Catches Firebase Auth user or null
+   - Calls `loadOrgContext(uid)` to fetch org/role from Firestore
+   - Sets `isReady = true` once org context is loaded
+4. App renders routing + guards check `requiresAuth` and `requiresEditor` meta
+5. Router guard calls `getCurrentUser()` which returns Firebase Auth user promise
+6. If `requiresEditor`, guard waits for `authStore.waitForRole()` (D-15 gating on VW mode)
 
 **State Management:**
-- Quarterly calendar state persists in Firestore (`Quarter.calendar` document field)
-- Per-person quarter-scoped data (blackouts, pairings, role frequency) in `Quarter.personQuarterData`
-- Ephemeral in-memory state (`lastRegenerate`) highlights changed dates after regeneration
-
-### External API Integration (Secure Proxy Flow)
-
-**Planning Center Song Import:**
-1. User clicks "Import from Planning Center" in `SongsView.vue` → `PcImportModal.vue` opens
-2. Modal fetches service types: `GET /api/planningcenter/v2/service_types` (via `planningCenterApi.ts`)
-3. Vite dev proxy or Cloud Function proxy forwards request to Planning Center
-4. Response returned; user selects service type & plan template
-5. Modal calls `proposeNewSongsFromTemplate(pcSongList, ...)` utility
-6. Utility returns new song objects (merged with existing catalog)
-7. Modal calls `songStore.upsertSongs(newSongs)` to write Firestore
-
-**Claude AI Suggestions:**
-1. User fills service plan in `ServiceEditorView.vue` → clicks "Suggest Arrangements"
-2. View calls `suggestSongArrangements(serviceSummary)` utility → builds prompt
-3. Utility calls `/api/anthropic/v1/messages` with POST body
-4. Cloud Function verifies Firebase ID token in `x-app-auth` header
-5. Cloud Function injects `CLAUDE_API_KEY` into request headers
-6. Request forwarded to `https://api.anthropic.com`; response returned
-7. Utility parses Claude's response; View renders suggestions
+- Pinia stores maintain refs for reactive state (`songs`, `services`, `isLoading`, etc.)
+- Firestore `onSnapshot` listeners automatically update these refs
+- Computed properties filter/transform state (e.g., `filteredSongs` based on search + tag filters)
+- User preferences (tag filters, column visibility) are persisted to localStorage, scoped by `${orgId}:${uid}`
 
 ## Key Abstractions
 
-**VW (Vertical Worship) Model:**
-- Purpose: Represents the worship progression structure (Call to Worship → Intimate → Ascription)
-- Examples: Types defined in `src/types/song.ts` (VWType = 1 | 2 | 3); service templates structure slots by progression
-- Pattern: Songs carry `vwTypes: VWType[]`; services have slots requiring specific types
+**ServiceSlot (Polymorphic slot model):**
+- Purpose: Represents any item in a service order (song, scripture, prayer, message, hymn)
+- Examples: `src/types/service.ts` defines `SongSlot`, `ScriptureSlot`, `NonAssignableSlot`, `HymnSlot`
+- Pattern: Discriminated union on `kind: 'SONG' | 'SCRIPTURE' | 'PRAYER' | 'MESSAGE' | 'HYMN'`
+- Created by: `buildSlots(progression)` in `src/utils/slotTypes.ts` based on service progression template
 
-**Slot System:**
-- Purpose: Flexible service structure (songs, scripture, prayers, messages, hymns)
-- Examples: `ServiceSlot` discriminated union: `SongSlot | ScriptureSlot | NonAssignableSlot | HymnSlot` in `src/types/service.ts`
-- Pattern: Service has `.slots: ServiceSlot[]` (position-ordered); slots filled in editor
+**VWType (Vertical Worship categorization):**
+- Purpose: Categorize songs by their liturgical function in worship (D-15, D-16)
+- Values: `1 = 'Call to Worship'`, `2 = 'Intimate'`, `3 = 'Ascription'`
+- Labels: `VW_TYPE_LABELS` in `src/types/song.ts`
+- Used in: Song filtering in `filteredSongs`, slot assignment requirements in `SongSlot.requiredVwType`
+- Gated by: `authStore.vwModeEnabled` toggle (church-level setting)
 
-**Quarterly Scheduler:**
-- Purpose: Fair-share volunteer assignment with constraints
-- Examples: `proposeQuarterSchedule(people, serviceDates, resolveRolesForDate, personQuarterData)`
-- Pattern: Pure function; returns `{ calendar, unfilled, pairingConflicts }` deterministically
+**Progression (Service template):**
+- Purpose: Define the standard order of slots for a service
+- Values: `'1-2-2-3'` or `'1-2-3-3'` (song VW-type sequence)
+- Mapping: `PROGRESSION_SLOT_TYPES` in `src/utils/slotTypes.ts` maps progression → slot positions to VW types
+- Applied in: `ServiceEditorView` to dynamically require VW types when assigning songs
 
-**Tag & Theme System:**
-- Purpose: Flexible song categorization (themes from Planning Center, user-defined tags)
-- Examples: Song has `.themes` (built-in categories) and `.tags` (user tags); Songs table filterable by both
-- Pattern: `tagFilterInclude` / `tagFilterExclude` in song store; OR-combines include, exclude always wins
+**ShareToken (Public share model):**
+- Purpose: Create a shareable link for read-only service viewing
+- Structure: Random 36-char hex token stored in Firestore `shareTokens/{token}`
+- Contains: Immutable snapshot of service (date, name, songs, progression, scripture)
+- Routes: `/share/{token}` (old format) or `/{slug}/quarter{N}-{YYYY}` (memorable format)
 
 ## Entry Points
 
-**Web Application:**
+**App Initialization:**
 - Location: `src/main.ts`
-- Triggers: Browser loads HTML bundle
-- Responsibilities:
-  1. Import global CSS (`src/assets/main.css`)
-  2. Create Vue app instance
-  3. Install Pinia store plugin
-  4. Install Vue Router
-  5. Mount to `#app` in DOM
+- Triggers: Browser loads `/index.html`
+- Responsibilities: Creates Vue app, registers Pinia, mounts router, attaches to `#app`
 
-**Router Navigation:**
+**Root Component:**
+- Location: `src/App.vue`
+- Triggers: After app mount
+- Responsibilities: Shows loading spinner while `authStore.isReady`, then renders `<RouterView />`
+
+**Router:**
 - Location: `src/router/index.ts`
-- Triggers: User navigates to a route or page loads
-- Responsibilities:
-  1. `beforeEach` guard checks `meta.requiresAuth` → verifies Firebase user
-  2. `beforeEach` guard checks `meta.requiresEditor` → verifies `authStore.isEditor` role
-  3. Redirects to `/login` if not authenticated; redirects to `/services` (viewer home) if not editor
+- Triggers: Navigation or direct URL entry
+- Responsibilities: Defines all routes, beforeEach guards check auth/role before rendering
 
-**Auth Initialization:**
-- Location: `useAuthStore()` in `src/stores/auth.ts`
-- Triggers: First component mount using auth store
-- Responsibilities:
-  1. Sets up `onAuthStateChanged(auth, (user) => { authStore.user = user; authStore.isReady = true })`
-  2. Fetches organization document from Firestore (user's org membership)
-  3. Sets `authStore.isReady = true` after user & org loaded → `App.vue` stops showing loading spinner
+**Store Initialization:**
+- Location: `src/stores/*.ts`
+- Triggers: First component imports store with `useXStore()`
+- Responsibilities: Set up Firestore subscriptions, initialize state, expose mutations/queries
 
 ## Architectural Constraints
 
-- **Threading:** Single-threaded event loop (browser + Node.js). Firebase SDK handles network I/O non-blocking.
-- **Global state:** Firestore auth object (`src/firebase/auth`) and DB connection (`src/firebase/db`) are module-level singletons. Firestore listeners are stored on each store as `unsubscribeFn` to manage subscription lifecycle.
-- **Circular imports:** None detected. Import hierarchy is clean: views → stores/components → utils → types.
-- **Real-time consistency:** Firestore listeners (`onSnapshot`) are the single source of truth. No optimistic updates; all state mutations flow through Firestore.
-- **Offline mode:** Not implemented. App assumes internet connectivity; Firestore writes fail silently if offline.
-- **Secrets handling:** API keys (Claude, ESV) never shipped to browser. Injected server-side by Cloud Function proxy (verified Firebase auth token required for secret-bearing routes).
+- **Org-scoped data access:** All Firestore reads/writes prefixed with `organizations/{orgId}`. No user data outside this scope. Enforced by security rules in `firestore.rules`.
+- **Single-org per user (for now):** `authStore.orgId` holds the first org from user's `orgIds` array. Multi-org support not yet implemented.
+- **Real-time subscriptions in stores:** Views must not call Firestore directly. Use stores' `subscribe(orgId)` then read from state.
+- **Unsubscribe on logout:** Router guards and auth store call `unsubscribeAll()` on stores when user logs out to prevent orphaned listeners.
+- **No cross-store direct writes:** If store A needs to update data owned by store B (e.g., services updating song `lastUsedAt`), it calls `storeB.updateX()` via import, not Firestore directly.
+- **Firestore client-side validation:** Models enforce constraints via TypeScript types; server-side validation in `firestore.rules`.
+- **Server-held API secrets:** Anthropic and ESV API keys never reach the browser. Cloud Function proxy (`functions/src/index.ts`) verifies Firebase ID token and injects secrets.
 
 ## Anti-Patterns
 
-### Stale Filter State After Feature Toggle
+### Direct Firestore Calls in Components
 
-**What happens:** User disables "VW Mode" in settings; song list still has VW-type filter selected, silently filtering list
-**Why it's wrong:** User sees empty list; doesn't understand why songs disappeared
-**Do this instead:** In `src/stores/songs.ts`, filter computation explicitly gates filters on `authStore.vwModeEnabled`:
+**What happens:** Components import `db` and call `getDoc()` / `updateDoc()` directly, bypassing stores.
+
+**Why it's wrong:** Breaks the store-as-single-source-of-truth pattern; multiple instances of same data exist in memory; unsubscribe logic is missed on logout; testing becomes harder.
+
+**Do this instead:** Route all Firestore access through stores. If a view needs different data, add a store subscription. Example:
 ```typescript
-const matchesVwType =
-  !authStore.vwModeEnabled ||  // If VW mode off, skip this filter entirely
-  filterVwType.value === null ||
-  (filterVwType.value === 'uncategorized' ? ...)
+// In src/stores/roster.ts, add a new subscription method:
+export const useRosterStore = defineStore('roster', () => {
+  function subscribeToTeam(teamId: string) {
+    // Set up onSnapshot for that team
+  }
+})
+
+// In view:
+onMounted(() => {
+  rosterStore.subscribeToTeam(props.teamId)
+})
 ```
-(Already implemented correctly in the codebase — see `src/stores/songs.ts` line 62-67.)
 
-### Client-Side API Key Exposure
+### Mutating Firestore Data Without Store
 
-**What happens:** Hardcoding API keys in component props or config files
-**Why it's wrong:** Keys leak in browser network tab, git history, etc. — security incident
-**Do this instead:** Use Cloud Function proxy (`functions/src/index.ts`). Client sends `x-app-auth` (Firebase ID token); proxy verifies it, injects secret server-side, forwards to upstream API.
-(Already implemented correctly.)
+**What happens:** A component calls `updateDoc()` directly after a user action.
 
-### Synchronous Blocking on Async Firestore Calls
+**Why it's wrong:** UI is not guaranteed to sync with Firestore listener (race condition); Pinia state gets out of sync with server truth.
 
-**What happens:** Waiting for Firestore to finish via `await` in tight loops during large imports
-**Why it's wrong:** Blocks UI; poor UX for batch operations (1000+ song imports)
-**Do this instead:** Use `writeBatch()` for groups of <500 writes; show progress spinner; chunk large imports across multiple batches.
-(Already implemented in `src/utils/pcSongImport.ts` — uses batch writes.)
+**Do this instead:** Call a store method that updates both Firestore and local state atomically:
+```typescript
+// In store:
+async function updateRoster(rosterId: string, data: Partial<Roster>) {
+  await updateDoc(doc(db, 'organizations', orgId.value, 'rosters', rosterId), data)
+  // Listener fire automatically; no need to manually update local state
+}
+```
+
+### Hardcoded Org IDs
+
+**What happens:** Code assumes a known org ID instead of reading from `authStore.orgId`.
+
+**Why it's wrong:** Multi-org support becomes impossible; tests fail; switching orgs requires code changes.
+
+**Do this instead:** Always read `orgId` from auth store at runtime:
+```typescript
+const authStore = useAuthStore()
+const orgId = authStore.orgId // or pass as parameter
+if (!orgId) throw new Error('No org context')
+```
+
+### Missing Unsubscribe on Route Change
+
+**What happens:** A view subscribes to Firestore but doesn't unsubscribe when leaving the route.
+
+**Why it's wrong:** Listeners accumulate; memory leaks occur; stale data may be synced into new routes.
+
+**Do this instead:** Store the unsubscribe function and call it in `onBeforeUnmount()` or route guard:
+```typescript
+const unsubscribe = ref<Unsubscribe | null>(null)
+onMounted(() => {
+  unsubscribe.value = onSnapshot(q, (snap) => { ... })
+})
+onBeforeUnmount(() => {
+  unsubscribe.value?.()
+})
+```
 
 ## Error Handling
 
-**Strategy:** Try/catch at API boundary (fetch calls); graceful degradation downstream
+**Strategy:** Optimistic UI updates with fallback to last known state on Firestore failure.
 
 **Patterns:**
-- API client functions (e.g., `planningCenterApi.fetchServiceTypes`) throw on HTTP error; caller decides whether to bubble or show toast
-- Firestore listener errors logged to console but don't crash app (Firestore auto-reconnects)
-- Vue Router auth guards catch promise rejection from `getCurrentUser()` and redirect to login
-- Form submission: catch + show user-facing error toast (e.g., "Invalid Planning Center credentials")
+- Try-catch in async store methods; log to console (dev), optionally show toast (prod)
+- Firebase throws on auth failure, network timeout, permission denied → caught as standard Error
+- Firestore listener errors (permission denied) emit as listener error callback
+- Unhandled rejections bubble to window error handler
 
 ## Cross-Cutting Concerns
 
-**Logging:** `console.error()` for errors; no centralized logging system (could add Sentry/Firebase Analytics in future)
+**Logging:** Console.log for dev debugging (no centralized logger yet). Error details logged to browser console.
 
-**Validation:**
-- UI validation: Reactive form state + computed flags (e.g., `isDirty` in `useUnsavedGuard`)
-- API validation: Firestore security rules enforce document structure; client assumes success
-- Business logic validation: `isGroupCompatible()`, `evaluateGroupCombo()` check volunteer constraints before assignment
+**Validation:** Client-side type checking via TypeScript; server-side via `firestore.rules` security rules. No custom validators.
 
-**Authentication:**
-- Firebase Auth (Google OAuth, email/password)
-- Organization membership verified by checking Firestore org document
-- Role (editor vs. viewer) fetched from org document; cached in `authStore.userRole`
-- Router guards enforce `meta.requiresAuth` and `meta.requiresEditor`
+**Authentication:** Firebase Auth handles sign-in/sign-out. Router guards check `getCurrentUser()` promise. Roles fetched from Firestore and cached in `authStore.userRole`.
 
 ---
 
-*Architecture analysis: 2026-07-15*
+*Architecture analysis: 2026-07-16*
