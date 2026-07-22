@@ -112,6 +112,23 @@ service cloud.firestore {
       allow delete: if isOrgEditor(resource.data.orgId);
     }
 
+    // Memorable-URL per-service shares: public read, org-editor-scoped create/update
+    // (overwritten in place on every finalize, unlike frozen shareTokens). Mirrors
+    // quarterShares: shareId is a guessable, deterministic string
+    // (`${slug}__service-${date}`), so isSignedIn() alone would let any authenticated
+    // user of ANY org overwrite another org's public share doc. Both create and update
+    // require the caller to be an editor of the orgId embedded in the doc, and update
+    // additionally forbids changing orgId (no reassigning a share to a different org).
+    match /serviceShares/{shareId} {
+      allow read: if true;
+      allow create: if isOrgEditor(request.resource.data.orgId);
+      allow update: if isOrgEditor(resource.data.orgId)
+                       && request.resource.data.orgId == resource.data.orgId;
+      // Delete allowed so an org editor can revoke the memorable share when its service
+      // is deleted, scoped to the owning orgId on the doc.
+      allow delete: if isOrgEditor(resource.data.orgId);
+    }
+
     // Catch-all: deny everything else
     match /{document=**} {
       allow read, write: if false;
