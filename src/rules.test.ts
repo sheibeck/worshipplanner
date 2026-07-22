@@ -332,6 +332,138 @@ describe('quarterShares — public read, org-editor-scoped create/update (CR-01)
   })
 })
 
+describe('serviceShares — public read, org-editor-scoped create/update', () => {
+  it('allows unauthenticated read of a serviceShares doc', async () => {
+    await seedDoc('serviceShares/grace-church__service-2026-08-02', { orgId: 'orgA', orgSlug: 'grace-church' })
+    const context = testEnv.unauthenticatedContext()
+    const db = context.firestore()
+    await assertSucceeds(getDoc(doc(db, 'serviceShares', 'grace-church__service-2026-08-02')))
+  })
+
+  it('allows an editor of the owning org to create a serviceShares doc', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertSucceeds(
+      setDoc(doc(db, 'serviceShares', 'grace-church__service-2026-08-02'), {
+        orgId: 'orgA',
+        orgSlug: 'grace-church',
+      }),
+    )
+  })
+
+  it('denies a signed-in user with no membership in the target org from creating a serviceShares doc', async () => {
+    // userA has no seeded membership anywhere — isOrgEditor('orgA') must be false.
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertFails(
+      setDoc(doc(db, 'serviceShares', 'grace-church__service-2026-08-02'), {
+        orgId: 'orgA',
+        orgSlug: 'grace-church',
+      }),
+    )
+  })
+
+  it('denies a member of a DIFFERENT org from creating a serviceShares doc for orgA (cross-tenant)', async () => {
+    await seedMembershipDoc('orgB', 'userB', 'editor')
+    const context = testEnv.authenticatedContext('userB')
+    const db = context.firestore()
+    await assertFails(
+      setDoc(doc(db, 'serviceShares', 'grace-church__service-2026-08-02'), {
+        orgId: 'orgA',
+        orgSlug: 'grace-church',
+      }),
+    )
+  })
+
+  it('allows an editor of the owning org to update (overwrite-in-place) an existing serviceShares doc', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('serviceShares/grace-church__service-2026-08-02', { orgId: 'orgA', orgSlug: 'grace-church' })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertSucceeds(
+      setDoc(doc(db, 'serviceShares', 'grace-church__service-2026-08-02'), {
+        orgId: 'orgA',
+        orgSlug: 'grace-church',
+        updatedAgain: true,
+      }),
+    )
+  })
+
+  it('denies a signed-in user with no org membership from overwriting another org\'s existing serviceShares doc', async () => {
+    await seedDoc('serviceShares/grace-church__service-2026-08-02', { orgId: 'orgA', orgSlug: 'grace-church' })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertFails(
+      setDoc(doc(db, 'serviceShares', 'grace-church__service-2026-08-02'), {
+        orgSlug: 'grace-church',
+        orgId: 'orgA',
+        updatedAgain: true,
+      }),
+    )
+  })
+
+  it('denies an editor of a DIFFERENT org from overwriting orgA\'s existing serviceShares doc', async () => {
+    await seedMembershipDoc('orgB', 'userB', 'editor')
+    await seedDoc('serviceShares/grace-church__service-2026-08-02', { orgId: 'orgA', orgSlug: 'grace-church' })
+    const context = testEnv.authenticatedContext('userB')
+    const db = context.firestore()
+    await assertFails(
+      setDoc(doc(db, 'serviceShares', 'grace-church__service-2026-08-02'), {
+        orgId: 'orgA',
+        orgSlug: 'grace-church',
+        updatedAgain: true,
+      }),
+    )
+  })
+
+  it('denies an editor of the owning org from reassigning an existing serviceShares doc to a different orgId', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('serviceShares/grace-church__service-2026-08-02', { orgId: 'orgA', orgSlug: 'grace-church' })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertFails(
+      setDoc(doc(db, 'serviceShares', 'grace-church__service-2026-08-02'), {
+        orgId: 'orgB',
+        orgSlug: 'grace-church',
+        updatedAgain: true,
+      }),
+    )
+  })
+
+  it('denies unauthenticated write to serviceShares', async () => {
+    const context = testEnv.unauthenticatedContext()
+    const db = context.firestore()
+    await assertFails(
+      setDoc(doc(db, 'serviceShares', 'grace-church__service-2026-08-02'), { orgId: 'orgA', orgSlug: 'grace-church' }),
+    )
+  })
+
+  // Delete = revoke a public share when its service is deleted.
+  it('allows an editor of the owning org to delete a serviceShares doc', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('serviceShares/grace-church__service-2026-08-02', { orgId: 'orgA', orgSlug: 'grace-church' })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertSucceeds(deleteDoc(doc(db, 'serviceShares', 'grace-church__service-2026-08-02')))
+  })
+
+  it('denies an editor of a DIFFERENT org from deleting orgA\'s serviceShares doc', async () => {
+    await seedMembershipDoc('orgB', 'userB', 'editor')
+    await seedDoc('serviceShares/grace-church__service-2026-08-02', { orgId: 'orgA', orgSlug: 'grace-church' })
+    const context = testEnv.authenticatedContext('userB')
+    const db = context.firestore()
+    await assertFails(deleteDoc(doc(db, 'serviceShares', 'grace-church__service-2026-08-02')))
+  })
+
+  it('denies unauthenticated delete of a serviceShares doc', async () => {
+    await seedDoc('serviceShares/grace-church__service-2026-08-02', { orgId: 'orgA', orgSlug: 'grace-church' })
+    const context = testEnv.unauthenticatedContext()
+    const db = context.firestore()
+    await assertFails(deleteDoc(doc(db, 'serviceShares', 'grace-church__service-2026-08-02')))
+  })
+})
+
 describe('shareTokens — public read, signed-in create, editor-scoped delete (revoke on quarter delete)', () => {
   it('allows unauthenticated read of a shareTokens doc (public share link)', async () => {
     await seedDoc('shareTokens/tok-abc', { orgId: 'orgA', quarterId: 'q1' })
