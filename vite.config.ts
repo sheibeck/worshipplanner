@@ -10,12 +10,34 @@ import tailwindcss from '@tailwindcss/vite'
 const gitHash = execSync('git log -1 --format=%h -- src/').toString().trim()
 
 // https://vite.dev/config/
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode, command }) => {
   // Load NON-VITE_ secrets for the dev proxy only. Because they are not VITE_
   // prefixed, they are never exposed to `import.meta.env` / the client bundle —
   // they exist only in this Node dev-server process, mirroring the prod Cloud
   // Function proxy which injects the same keys server-side.
   const env = loadEnv(mode, process.cwd(), '')
+
+  // Fail the production build loudly if the Firebase client config is missing.
+  // Vite statically inlines `import.meta.env.VITE_FIREBASE_*` at build time, so
+  // a build with these unset silently ships an empty apiKey → runtime
+  // `auth/invalid-api-key`. Guard only `vite build` (never dev/serve/test).
+  if (command === 'build') {
+    const requiredFirebaseVars = [
+      'VITE_FIREBASE_API_KEY',
+      'VITE_FIREBASE_AUTH_DOMAIN',
+      'VITE_FIREBASE_PROJECT_ID',
+      'VITE_FIREBASE_STORAGE_BUCKET',
+      'VITE_FIREBASE_MESSAGING_SENDER_ID',
+      'VITE_FIREBASE_APP_ID',
+    ]
+    const missing = requiredFirebaseVars.filter((key) => !env[key])
+    if (missing.length) {
+      throw new Error(
+        `Production build aborted: missing required Firebase env vars: ${missing.join(', ')}. ` +
+          'Populate .env.local (or the build environment) before running `npm run build`.',
+      )
+    }
+  }
 
   return {
     plugins: [vue(), tailwindcss()],
