@@ -19,3 +19,20 @@ plan's changes). Logged here for a future plan/quick-task to pick up.
   `ServiceEditorView.vue` or its test).
 
 Both were present before and after 17-05's commits; scope-excluded here.
+
+## From 17-04 execution (2026-07-22)
+
+- **`src/views/__tests__/ServiceEditorView.test.ts` — Print/Copy-for-PC mount tests
+  timing out (5000ms):** RESOLVED by 17-04. 17-04 legitimately grew `ServiceEditorView.vue`
+  (Roles tab template + `useRosterStore`/`useQuartersStore` imports), pushing the *first*
+  cold SFC transform + template-compile of this 2200+ line component over vitest's default
+  5s per-test timeout on a loaded machine. Fixed within 17-04's own test file by warming
+  the transform once in a top-level `beforeAll(…, 30000)` so each individual test's timer
+  measures only a warm mount (per-test time dropped to ~350ms). Not deferred — closed.
+
+- **`src/views/__tests__/RosterView.test.ts` — "wraps Roles config in CollapsibleSection"**:
+  still deferred for 17-04 as well. 17-04 only modifies `ServiceEditorView.vue` and its
+  test; the stale RosterView assertion (tab renamed "Roles config" → "Roles" in `df1ca34`,
+  pre-dating this phase) is untouched by 17-04 and remains out of scope. It only became
+  visible because `.env.local` now lets `RosterView.test.ts` load (it previously failed at
+  module import with `Firebase: Error (auth/invalid-api-key)`).

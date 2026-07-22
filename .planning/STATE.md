@@ -5,14 +5,14 @@ milestone_name: MVP
 current_phase: 17
 current_phase_name: sync-schedule-with-planned-services-add-a-roles-tab-to-servi
 status: executing
-stopped_at: Completed 17-03-PLAN.md
-last_updated: "2026-07-22T18:12:17.630Z"
+stopped_at: Completed 17-04-PLAN.md
+last_updated: "2026-07-22T21:10:26.708Z"
 last_activity: 2026-07-22
 progress:
   total_phases: 12
   completed_phases: 10
   total_plans: 68
-  completed_plans: 66
+  completed_plans: 67
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 17 (sync-schedule-with-planned-services-add-a-roles-tab-to-servi) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Milestone: v1.0 MVP — SHIPPED 2026-03-05
 Next milestone: v1.1 Tasks & Events (not yet started)
 Status: Ready to execute
@@ -83,6 +83,7 @@ Status: Ready to execute
 | Phase 17 P01 | 25min | 2 tasks | 3 files |
 | Phase 17 P02 | ~10min | 3 tasks | 4 files |
 | Phase 17 P03 | 20min | 2 tasks | 3 files |
+| Phase 17 P04 | ~40min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -137,6 +138,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 17-02: 'service-share' added to RESERVED_SLUGS proactively even though the opaque /share/:token route is reused (consistency with quarter-share reserved word, T-17-02-04)
 - [Phase ?]: 17-03: createShareToken's memorable-URL write uses the orgIdValue param (not orgId ref), consistent with the opaque write's existing usage
 - [Phase ?]: 17-03: fixed pre-existing RESERVED_SLUGS count regression from 17-02 (test:rules doesn't catch test:unit staleness)
+- [Phase ?]: 17-04: Roles tab is editor-only in-app — the tab button is hidden for viewers AND rosterStore/quartersStore are subscribed only when authStore.isEditor (not just UI hiding), so a viewer on the guard-less /services/:id route never reads editor-only roles/quarters/people (T-17-04-01); viewer visibility ships only via the 17-05 public share link, Phase 16.2 decision intact
+- [Phase ?]: 17-04: Roles override picker reuses QuarterGrid.vue's person.roles.includes(roleId) eligibility (no hand-rolled eligibility, D-03); toggles write via 17-03's scoped setRoleOverride/clearRoleOverride so the Quarter/schedule is never mutated from the service editor
 
 ### Roadmap Evolution
 
@@ -194,6 +197,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-22
-Last session: 2026-07-22T18:12:17.593Z
-Stopped at: Completed 17-03-PLAN.md
+Last session: 2026-07-22T21:10:26.578Z
+Stopped at: Completed 17-04-PLAN.md
 Resume file: None
