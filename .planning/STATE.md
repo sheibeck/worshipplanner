@@ -2,16 +2,17 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: MVP
-status: planning
-stopped_at: Phase 17 planned (5 plans, verification PASSED)
-last_updated: "2026-07-22T00:00:00.000Z"
+current_phase: 17
+current_phase_name: sync-schedule-with-planned-services-add-a-roles-tab-to-servi
+status: executing
+stopped_at: Completed 17-01-PLAN.md
+last_updated: "2026-07-22T13:56:39.308Z"
 last_activity: 2026-07-22
 progress:
   total_phases: 12
   completed_phases: 10
-  total_plans: 63
-  completed_plans: 63
-  percent: 83
+  total_plans: 68
+  completed_plans: 64
 ---
 
 # Project State
@@ -21,15 +22,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 999.1 — extract shared song browse component reused by songs page an
+**Current focus:** Phase 17 — sync-schedule-with-planned-services-add-a-roles-tab-to-servi
 
 ## Current Position
 
-Phase: 17 (Sync schedule with planned services) — PLANNED, ready to execute
-Plan: 5 plans across 3 waves (17-01..17-05); plan-checker VERIFICATION PASSED (0 blockers)
+Phase: 17 (sync-schedule-with-planned-services-add-a-roles-tab-to-servi) — EXECUTING
+Plan: 2 of 5
 Milestone: v1.0 MVP — SHIPPED 2026-03-05
 Next milestone: v1.1 Tasks & Events (not yet started)
-Status: Phase 17 planned via auto mode (research + pattern-map + plan + verify). Next: /gsd-execute-phase 17
+Status: Ready to execute
 
 ## Performance Metrics
 
@@ -75,6 +76,11 @@ Status: Phase 17 planned via auto mode (research + pattern-map + plan + verify).
 | Phase 13 P08 | 18min | 3 tasks | 4 files |
 | Phase 13 P09 | ~15min | 3 tasks | 2 files |
 | Phase 13 P10 | ~15min | 2 tasks | 4 files |
+**Per-Plan Metrics:**
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 17 P01 | 25min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -123,6 +129,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: [Phase 13]: gap-filling panel candidate lists derive purely from personQuarterData + calendar + activePeople; blacked-out people are strikethrough-listed but excluded from assignable candidates (D-23, T-13-09-03)
 - [Phase ?]: [Phase 13]: Print/public share surfaces (RosterPrintLayout, QuarterShareView) use the light palette — deliberate existing exception to the dark app theme for output surfaces (D-24)
 - [Phase ?]: [Phase 13]: QuarterShareView reads ONLY the self-contained quarterSnapshot (names pre-resolved) and imports no roster/auth store, so the public route cannot touch org-scoped PII (T-13-10-02/03)
+- [Phase ?]: 17-01: Adopted first-match-wins tie-break for findQuarterForDate when two quarters share a service date (accepted pre-existing edge case)
+- [Phase ?]: 17-01: resolveServiceRoleAssignments stays id-only, never surfaces email/phone (T-17-01-01)
 
 ### Roadmap Evolution
 
@@ -179,7 +187,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 
 ## Session Continuity
 
-Last activity: 2026-07-14 - Completed quick task 260714-f4p: Import new songs only checkbox on PC import
-Last session: 2026-07-12T22:57:26.017Z
-Stopped at: Phase 16.1 context gathered
-Resume file: .planning/phases/16.1-song-list-tags-columns-customization/16.1-CONTEXT.md
+Last activity: 2026-07-22
+Last session: 2026-07-22T13:56:39.282Z
+Stopped at: Completed 17-01-PLAN.md
+Resume file: None
