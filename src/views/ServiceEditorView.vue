@@ -908,8 +908,11 @@
             Print
           </button>
 
-          <!-- Share button -->
+          <!-- Share button: editor only — a share denormalizes an editor-only
+               roster/schedule snapshot (roster/quarters are subscribed for editors
+               only), so a viewer-created share would silently omit "Who's Serving". -->
           <button
+            v-if="authStore.isEditor"
             type="button"
             @click="onShare"
             :disabled="!localService || isSharing"
