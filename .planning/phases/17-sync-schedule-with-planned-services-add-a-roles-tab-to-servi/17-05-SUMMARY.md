@@ -153,6 +153,14 @@ None — the `serviceShares` public-read rule was already deployed live in 17-02
 - `npx vitest run src/views/__tests__/ShareView.test.ts` — 9/9 passed.
 - Human-verify checkpoint (Task 3) — APPROVED by the user against the live, deployed, unauthenticated share (both routes, DevTools check, not-found check).
 
+## Self-Check: PASSED (post-commit verification)
+
+- FOUND: `src/views/ShareView.vue`
+- FOUND: `src/views/__tests__/ShareView.test.ts`
+- FOUND: `.planning/phases/17-sync-schedule-with-planned-services-add-a-roles-tab-to-servi/deferred-items.md`
+- FOUND: `.planning/phases/17-sync-schedule-with-planned-services-add-a-roles-tab-to-servi/17-05-SUMMARY.md`
+- FOUND commit: `aad55e1`, `05520a3`, `c7d662a`, `0ec8745`, `6461b1b`
+
 ---
 *Phase: 17-sync-schedule-with-planned-services-add-a-roles-tab-to-servi*
 *Completed: 2026-07-22*

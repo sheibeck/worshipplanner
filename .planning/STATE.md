@@ -4,15 +4,15 @@ milestone: v1.0
 milestone_name: MVP
 current_phase: 17
 current_phase_name: sync-schedule-with-planned-services-add-a-roles-tab-to-servi
-status: executing
-stopped_at: Completed 17-04-PLAN.md
-last_updated: "2026-07-22T21:10:26.708Z"
+status: verifying
+stopped_at: Completed 17-05-PLAN.md — Phase 17 complete (5/5 plans)
+last_updated: "2026-07-22T21:20:01.868Z"
 last_activity: 2026-07-22
 progress:
   total_phases: 12
-  completed_phases: 10
+  completed_phases: 11
   total_plans: 68
-  completed_plans: 67
+  completed_plans: 68
 ---
 
 # Project State
@@ -30,7 +30,7 @@ Phase: 17 (sync-schedule-with-planned-services-add-a-roles-tab-to-servi) — EXE
 Plan: 5 of 5
 Milestone: v1.0 MVP — SHIPPED 2026-03-05
 Next milestone: v1.1 Tasks & Events (not yet started)
-Status: Ready to execute
+Status: Phase complete — ready for verification
 
 ## Performance Metrics
 
@@ -84,6 +84,7 @@ Status: Ready to execute
 | Phase 17 P02 | ~10min | 3 tasks | 4 files |
 | Phase 17 P03 | 20min | 2 tasks | 3 files |
 | Phase 17 P04 | ~40min | 2 tasks | 2 files |
+| Phase 17 P05 | ~25min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -140,6 +141,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 17-03: fixed pre-existing RESERVED_SLUGS count regression from 17-02 (test:rules doesn't catch test:unit staleness)
 - [Phase ?]: 17-04: Roles tab is editor-only in-app — the tab button is hidden for viewers AND rosterStore/quartersStore are subscribed only when authStore.isEditor (not just UI hiding), so a viewer on the guard-less /services/:id route never reads editor-only roles/quarters/people (T-17-04-01); viewer visibility ships only via the 17-05 public share link, Phase 16.2 decision intact
 - [Phase ?]: 17-04: Roles override picker reuses QuarterGrid.vue's person.roles.includes(roleId) eligibility (no hand-rolled eligibility, D-03); toggles write via 17-03's scoped setRoleOverride/clearRoleOverride so the Quarter/schedule is never mutated from the service editor
+- [Phase ?]: [Phase 17] 17-05: ShareView dual-path public read (opaque token vs memorable serviceShares) reads only the snapshot doc, no roster/org/auth store import (T-17-05-01)
+- [Phase ?]: [Phase 17] 17-05: Who's Serving section renders serviceSnapshot.roleAssignments, gracefully omitted for legacy shares with no roleAssignments (T-17-05-03)
 
 ### Roadmap Evolution
 
@@ -197,6 +200,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-22
-Last session: 2026-07-22T21:10:26.578Z
-Stopped at: Completed 17-04-PLAN.md
+Last session: 2026-07-22T21:20:01.841Z
+Stopped at: Completed 17-05-PLAN.md — Phase 17 complete (5/5 plans)
 Resume file: None
