@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
 import { shallowMount } from '@vue/test-utils'
 import type { Service } from '@/types/service'
 import type { Song } from '@/types/song'
@@ -177,6 +177,27 @@ vi.mock('@/stores/quarters', () => ({
     subscribe: vi.fn(),
   }),
 }))
+
+// Warm the SFC transform + template compile once before any test. The first
+// mount of this large (2200+ line) component can, on a loaded machine, exceed
+// vitest's default 5s per-test timeout — which would flake whichever test
+// happens to mount first. Paying that one-time cold cost here (with a generous
+// timeout) keeps every individual test's timer measuring only a warm mount.
+beforeAll(async () => {
+  const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+  shallowMount(ServiceEditorView, {
+    global: {
+      stubs: {
+        AppShell: { template: '<div><slot /></div>' },
+        RouterLink: { template: '<a><slot /></a>' },
+        ServicePrintLayout: true,
+        SongBadge: true,
+        SongSlotPicker: true,
+        ScriptureInput: true,
+      },
+    },
+  }).unmount()
+}, 30000)
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
