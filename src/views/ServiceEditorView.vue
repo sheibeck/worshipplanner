@@ -385,6 +385,32 @@
           </button>
         </div>
 
+        <!-- Tab bar: Music / Roles (Roles tab is editor-only — Phase 16.2 removal decision) -->
+        <div class="flex items-center gap-1 mb-3 border-b border-gray-800 pb-0">
+          <button
+            type="button"
+            class="px-4 py-2 text-sm font-medium rounded-t-md transition-colors -mb-px border-b-2"
+            :class="activeTab === 'music'
+              ? 'text-indigo-300 border-indigo-500 bg-gray-900'
+              : 'text-gray-400 border-transparent hover:text-gray-200 hover:border-gray-600'"
+            @click="activeTab = 'music'"
+          >
+            Music
+          </button>
+          <button
+            v-if="authStore.isEditor"
+            type="button"
+            class="px-4 py-2 text-sm font-medium rounded-t-md transition-colors -mb-px border-b-2"
+            :class="activeTab === 'roles'
+              ? 'text-indigo-300 border-indigo-500 bg-gray-900'
+              : 'text-gray-400 border-transparent hover:text-gray-200 hover:border-gray-600'"
+            @click="activeTab = 'roles'"
+          >
+            Roles
+          </button>
+        </div>
+
+        <div v-show="activeTab === 'music'">
         <!-- Teams configuration -->
         <div class="mb-3 rounded-lg bg-gray-900 border border-gray-800 p-3">
           <div class="flex items-center gap-4">
@@ -803,6 +829,68 @@
             <button type="button" @click="addSlot('HYMN')" class="px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 w-full text-left transition-colors">Hymn</button>
           </div>
         </div>
+        </div>
+
+        <!-- Roles tab: seeded from the quarterly schedule for this service's date, editor-only data (CR-01/02/03/05) -->
+        <div v-show="activeTab === 'roles'">
+          <!-- Non-editor: no roster/quarters data was ever subscribed to (Pitfall 4) — read-only note only -->
+          <div v-if="!authStore.isEditor" class="rounded-lg bg-gray-900 border border-gray-800 p-6 text-center">
+            <p class="text-sm text-gray-400">Who's serving is visible via the shared service link.</p>
+          </div>
+          <template v-else>
+            <!-- Empty state: no quarter covers this service's date -->
+            <div v-if="!hasQuarterForServiceDate" class="rounded-lg bg-gray-900 border border-gray-800 p-4 mb-3">
+              <p class="text-sm text-gray-400">No schedule found for this date — assign roles manually below.</p>
+            </div>
+
+            <div class="space-y-2">
+              <div
+                v-for="assignment in resolvedRoleAssignments"
+                :key="assignment.roleId"
+                class="rounded-lg bg-gray-900 border border-gray-800 p-3"
+              >
+                <div class="flex items-center justify-between gap-3 flex-wrap">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <p class="text-sm font-medium text-gray-100">{{ assignment.roleName }}</p>
+                    <span
+                      v-if="assignment.overriddenPersonIds !== null"
+                      class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-900/40 text-amber-300 border border-amber-800"
+                    >Overridden</span>
+                  </div>
+                  <button
+                    v-if="assignment.overriddenPersonIds !== null"
+                    type="button"
+                    @click="onResetRoleOverride(assignment.roleId)"
+                    class="text-xs text-indigo-400 hover:text-indigo-300 transition-colors flex-shrink-0"
+                  >
+                    Reset to schedule
+                  </button>
+                </div>
+                <p class="text-sm text-gray-300 mt-1">
+                  {{ effectiveNames(assignment).length > 0 ? effectiveNames(assignment).join(', ') : 'Nobody scheduled' }}
+                </p>
+                <!-- Override picker: eligible people are those with this role (mirrors QuarterGrid.vue's hasRole) -->
+                <div class="mt-2 flex flex-wrap gap-3">
+                  <label
+                    v-for="person in eligiblePeople(assignment.roleId)"
+                    :key="person.id"
+                    class="flex items-center gap-1.5 text-xs text-gray-300 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      :checked="assignment.effectivePersonIds.includes(person.id)"
+                      @change="onToggleOverridePerson(assignment, person.id)"
+                      class="h-3.5 w-3.5 rounded border-gray-600 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-gray-900"
+                    />
+                    {{ person.name }}
+                  </label>
+                  <span v-if="eligiblePeople(assignment.roleId).length === 0" class="text-xs text-gray-600 italic">No eligible people have this role</span>
+                </div>
+              </div>
+              <p v-if="resolvedRoleAssignments.length === 0" class="text-sm text-gray-500 italic">No roles configured yet.</p>
+            </div>
+          </template>
+        </div>
 
         <!-- Bottom actions: Print, Share, Delete -->
         <div class="mt-6 pt-4 border-t border-gray-800 flex flex-wrap items-center gap-2 print:hidden">
@@ -870,11 +958,16 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useServiceStore } from '@/stores/services'
 import { useSongStore } from '@/stores/songs'
+import { useRosterStore } from '@/stores/roster'
+import { useQuartersStore } from '@/stores/quarters'
 import { slotLabel, createSlot, reindexSlots } from '@/utils/slotTypes'
 import { scripturesOverlap } from '@/utils/scripture'
 import { getPrimaryKey } from '@/utils/songSearch'
+import { resolveServiceRoleAssignments, findQuarterForDate } from '@/utils/serviceRoles'
+import type { ResolvedRoleAssignment } from '@/utils/serviceRoles'
 import type { Service, ServiceSlot, SongSlot, ScriptureSlot, NonAssignableSlot, HymnSlot, ScriptureRef, SlotKind } from '@/types/service'
 import type { VWType } from '@/types/song'
+import type { Person } from '@/types/roster'
 import AppShell from '@/components/AppShell.vue'
 import SongBadge from '@/components/SongBadge.vue'
 import SongSlotPicker from '@/components/SongSlotPicker.vue'
@@ -892,6 +985,11 @@ const router = useRouter()
 const authStore = useAuthStore()
 const serviceStore = useServiceStore()
 const songStore = useSongStore()
+const rosterStore = useRosterStore()
+const quartersStore = useQuartersStore()
+
+// ── Roles tab state (Task 1: tab bar) ──────────────────────────────────────────
+const activeTab = ref<'music' | 'roles'>('music')
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -1255,6 +1353,18 @@ function initStores() {
   }
   if (!songStore.orgId) {
     songStore.subscribe(orgId)
+  }
+  // Roles tab data (Pitfall 4 / T-17-04-01 / CR-05): /services/:id has no
+  // requiresEditor route guard, so a non-editor viewer can land here — the
+  // editor-only roles/quarters/people collections must never be subscribed to
+  // for a viewer (Phase 16.2 removal decision: no expanded viewer read access).
+  if (authStore.isEditor) {
+    if (!rosterStore.orgId) {
+      rosterStore.subscribe(orgId)
+    }
+    if (!quartersStore.orgId) {
+      quartersStore.subscribe(orgId)
+    }
   }
 }
 
@@ -2089,6 +2199,47 @@ async function onShare() {
   } finally {
     isSharing.value = false
   }
+}
+
+// ── Roles tab (Task 2) ──────────────────────────────────────────────────────────
+// Editor-only: resolvedRoleAssignments/hasQuarterForServiceDate return empty/false
+// for non-editors since rosterStore/quartersStore were never subscribed (Task 1).
+
+const resolvedRoleAssignments = computed<ResolvedRoleAssignment[]>(() => {
+  if (!authStore.isEditor || !localService.value) return []
+  return resolveServiceRoleAssignments(localService.value, quartersStore.quarters, rosterStore.roles)
+})
+
+const hasQuarterForServiceDate = computed(() => {
+  if (!authStore.isEditor || !localService.value) return false
+  return findQuarterForDate(quartersStore.quarters, localService.value.date) !== undefined
+})
+
+function effectiveNames(assignment: ResolvedRoleAssignment): string[] {
+  return assignment.effectivePersonIds.map(
+    (id) => rosterStore.people.find((p) => p.id === id)?.name ?? id,
+  )
+}
+
+// Eligibility mirrors QuarterGrid.vue's hasRole/availableUnassigned (person.roles.includes(roleId))
+function eligiblePeople(roleId: string): Person[] {
+  return rosterStore.activePeople.filter((p) => p.roles.includes(roleId))
+}
+
+async function onToggleOverridePerson(assignment: ResolvedRoleAssignment, personId: string) {
+  if (!localService.value) return
+  const current = new Set(assignment.effectivePersonIds)
+  if (current.has(personId)) {
+    current.delete(personId)
+  } else {
+    current.add(personId)
+  }
+  await serviceStore.setRoleOverride(localService.value.id, assignment.roleId, Array.from(current))
+}
+
+async function onResetRoleOverride(roleId: string) {
+  if (!localService.value) return
+  await serviceStore.clearRoleOverride(localService.value.id, roleId)
 }
 
 // ── Delete ─────────────────────────────────────────────────────────────────────
