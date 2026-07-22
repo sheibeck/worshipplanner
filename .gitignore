@@ -39,6 +39,7 @@ coverage/
 # settings.local.json and worktrees/ are already covered by the global gitignore.
 .claude/settings.json
 .claude/scheduled_tasks.lock
+
 # Graphify: commit the graph data (graph.json — for /gsd-graphify query) and the GRAPH_REPORT.md
 # digest (agents read it to orient before working). Exclude the build working dir, the rendered
 # HTML viz, and the transient diff baseline — agents never read those.
