@@ -27,7 +27,14 @@ vi.mock('firebase/firestore', () => {
     addDoc: vi.fn(() => Promise.resolve({ id: 'new-service-id' })),
     updateDoc: vi.fn(() => Promise.resolve()),
     deleteDoc: vi.fn(() => Promise.resolve()),
+    getDoc: vi.fn(() =>
+      Promise.resolve({
+        exists: () => true,
+        data: () => ({ name: 'Grace Church', slug: 'grace-church' }),
+      }),
+    ),
     setDoc: vi.fn(() => Promise.resolve()),
+    deleteField: vi.fn(() => '__DELETE_FIELD_SENTINEL__'),
     query: vi.fn((ref) => ref),
     orderBy: vi.fn(),
     serverTimestamp: vi.fn(() => ({ seconds: 1000000, nanoseconds: 0 })),
@@ -54,6 +61,38 @@ vi.mock('@/stores/songs', () => ({
           { key: 'G', bpm: 120 },
           { key: 'C', bpm: 110 },
         ],
+      },
+    ],
+  })),
+}))
+
+// Mock useRosterStore — people (for name resolution) + roles (for resolveServiceRoleAssignments)
+vi.mock('@/stores/roster', () => ({
+  useRosterStore: vi.fn(() => ({
+    people: [
+      { id: 'person-1', name: 'Alice Smith', email: 'alice@example.com', phone: '555-1234' },
+      { id: 'person-2', name: 'Bob Jones', email: 'bob@example.com', phone: '555-5678' },
+    ],
+    roles: [
+      { id: 'role-guitar', name: 'Guitar', group: 'band', defaultCount: 1, order: 1 },
+      { id: 'role-sound', name: 'Sound', group: 'tech', defaultCount: 1, order: 2 },
+    ],
+  })),
+}))
+
+// Mock useQuartersStore — quarters array consumed by resolveServiceRoleAssignments
+vi.mock('@/stores/quarters', () => ({
+  useQuartersStore: vi.fn(() => ({
+    quarters: [
+      {
+        id: 'quarter-1',
+        serviceDates: ['2026-03-08'],
+        calendar: {
+          '2026-03-08': {
+            'role-guitar': ['person-1'],
+            'role-sound': ['person-2'],
+          },
+        },
       },
     ],
   })),
@@ -411,6 +450,67 @@ describe('useServiceStore', () => {
     })
   })
 
+  describe('setRoleOverride', () => {
+    it('writes only the scoped roleAssignmentOverrides.{roleId} dot-path key, plus updatedAt', async () => {
+      const { updateDoc, serverTimestamp } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+
+      await store.setRoleOverride('service-1', 'role-guitar', ['person-1', 'person-2'])
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const data = callArgs[1] as unknown as Record<string, unknown>
+      expect(data['roleAssignmentOverrides.role-guitar']).toEqual(['person-1', 'person-2'])
+      expect(data.updatedAt).toBeDefined()
+      expect(serverTimestamp).toHaveBeenCalled()
+      // Exactly the one scoped key + updatedAt — never the bare whole-map key.
+      expect(Object.keys(data).sort()).toEqual(['roleAssignmentOverrides.role-guitar', 'updatedAt'])
+      expect(data.roleAssignmentOverrides).toBeUndefined()
+    })
+
+    it('no-ops when orgId is unset', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      // No subscribe() call — orgId stays null.
+
+      await store.setRoleOverride('service-1', 'role-guitar', ['person-1'])
+
+      expect(updateDoc).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('clearRoleOverride', () => {
+    it('sets the single scoped roleId key to the deleteField sentinel, leaving sibling keys untouched', async () => {
+      const { updateDoc, deleteField, serverTimestamp } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+
+      await store.clearRoleOverride('service-1', 'role-guitar')
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const data = callArgs[1] as unknown as Record<string, unknown>
+      expect(deleteField).toHaveBeenCalled()
+      expect(data['roleAssignmentOverrides.role-guitar']).toBe('__DELETE_FIELD_SENTINEL__')
+      expect(serverTimestamp).toHaveBeenCalled()
+      expect(Object.keys(data).sort()).toEqual(['roleAssignmentOverrides.role-guitar', 'updatedAt'])
+    })
+
+    it('no-ops when orgId is unset', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+
+      await store.clearRoleOverride('service-1', 'role-guitar')
+
+      expect(updateDoc).not.toHaveBeenCalled()
+    })
+  })
+
   describe('createShareToken', () => {
     it('createShareToken returns a 36-character hex string', async () => {
       const { useServiceStore } = await import('../services')
@@ -464,6 +564,86 @@ describe('useServiceStore', () => {
       const snapshotSlots = snapshot.slots as Array<{ kind: string; position: number; bpm?: number | null }>
       const songSlot = snapshotSlots.find((s) => s.position === 0)
       expect(songSlot?.bpm).toBe(120)
+    })
+
+    it('embeds roleAssignments with names-only personNames, resolved from resolveServiceRoleAssignments', async () => {
+      const { setDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+
+      const service = makeService() as unknown as Service
+      await store.createShareToken(service, 'org-1')
+
+      // First setDoc call is the opaque shareTokens/{token} write.
+      const [, data] = vi.mocked(setDoc).mock.calls[0]!
+      const writeData = data as Record<string, unknown>
+      const snapshot = writeData.serviceSnapshot as Record<string, unknown>
+      const roleAssignments = snapshot.roleAssignments as Array<{
+        roleId: string
+        roleName: string
+        group: string
+        personNames: string[]
+      }>
+      expect(roleAssignments).toBeDefined()
+      const guitar = roleAssignments.find((r) => r.roleId === 'role-guitar')
+      const sound = roleAssignments.find((r) => r.roleId === 'role-sound')
+      expect(guitar?.personNames).toEqual(['Alice Smith'])
+      expect(sound?.personNames).toEqual(['Bob Jones'])
+    })
+
+    it('written payload contains no email/phone/pcPersonId keys anywhere (PII guard)', async () => {
+      const { setDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+
+      const service = makeService() as unknown as Service
+      await store.createShareToken(service, 'org-1')
+
+      const [, data] = vi.mocked(setDoc).mock.calls[0]!
+      const serialized = JSON.stringify(data)
+      expect(serialized).not.toMatch(/email/i)
+      expect(serialized).not.toMatch(/phone/i)
+      expect(serialized).not.toMatch(/pcPersonId/i)
+    })
+
+    it('writes a memorable-URL serviceShares/{slug}__service-{date} doc after the opaque token write', async () => {
+      const { setDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+
+      const service = makeService() as unknown as Service
+      await store.createShareToken(service, 'org-1')
+
+      expect(setDoc).toHaveBeenCalledTimes(2)
+      const [docRef, data] = vi.mocked(setDoc).mock.calls[1]!
+      expect((docRef as { path: string }).path).toContain('serviceShares')
+      const writeData = data as Record<string, unknown>
+      expect(writeData.orgId).toBe('org-1')
+      expect(writeData.orgSlug).toBe('grace-church')
+      expect(writeData.token).toBeDefined()
+      expect(writeData.serviceSnapshot).toBeDefined()
+    })
+
+    it('soft-fails: still returns the token when the serviceShares write rejects', async () => {
+      const { setDoc } = await import('firebase/firestore')
+      vi.mocked(setDoc).mockImplementationOnce(() => Promise.resolve()) // shareTokens write succeeds
+      vi.mocked(setDoc).mockImplementationOnce(() => Promise.reject(new Error('serviceShares write failed')))
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+
+      const service = makeService() as unknown as Service
+      const token = await store.createShareToken(service, 'org-1')
+
+      expect(token).toHaveLength(36)
+      expect(token).toMatch(/^[0-9a-f]{36}$/)
+      expect(consoleErrorSpy).toHaveBeenCalled()
+      consoleErrorSpy.mockRestore()
     })
   })
 })
