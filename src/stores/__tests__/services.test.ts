@@ -533,7 +533,9 @@ describe('useServiceStore', () => {
       const service = makeService() as unknown as Service
       const token = await store.createShareToken(service, 'org-1')
 
-      expect(setDoc).toHaveBeenCalledOnce()
+      // createShareToken now also writes the serviceShares memorable-URL doc
+      // (Phase 17 Plan 03) — the opaque shareTokens/{token} write is still first.
+      expect(setDoc).toHaveBeenCalledTimes(2)
       const [docRef, data] = vi.mocked(setDoc).mock.calls[0]!
       expect((docRef as { id: string }).id).toBe(token)
       const writeData = data as Record<string, unknown>
@@ -557,7 +559,9 @@ describe('useServiceStore', () => {
       const service = makeService({ slots }) as unknown as Service
       await store.createShareToken(service, 'org-1')
 
-      expect(setDoc).toHaveBeenCalledOnce()
+      // createShareToken now also writes the serviceShares memorable-URL doc
+      // (Phase 17 Plan 03) — the opaque shareTokens/{token} write is still first.
+      expect(setDoc).toHaveBeenCalledTimes(2)
       const [, data] = vi.mocked(setDoc).mock.calls[0]!
       const writeData = data as Record<string, unknown>
       const snapshot = writeData.serviceSnapshot as Record<string, unknown>
