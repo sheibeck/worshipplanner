@@ -5,8 +5,8 @@ milestone_name: MVP
 current_phase: 17
 current_phase_name: sync-schedule-with-planned-services-add-a-roles-tab-to-servi
 status: executing
-stopped_at: Completed 17-01-PLAN.md
-last_updated: "2026-07-22T13:56:39.308Z"
+stopped_at: Completed 17-02-PLAN.md
+last_updated: "2026-07-22T18:01:38.014Z"
 last_activity: 2026-07-22
 progress:
   total_phases: 12
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 17 (sync-schedule-with-planned-services-add-a-roles-tab-to-servi) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Milestone: v1.0 MVP — SHIPPED 2026-03-05
 Next milestone: v1.1 Tasks & Events (not yet started)
 Status: Ready to execute
@@ -81,6 +81,7 @@ Status: Ready to execute
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 17 P01 | 25min | 2 tasks | 3 files |
+| Phase 17 P02 | ~10min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -131,6 +132,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: [Phase 13]: QuarterShareView reads ONLY the self-contained quarterSnapshot (names pre-resolved) and imports no roster/auth store, so the public route cannot touch org-scoped PII (T-13-10-02/03)
 - [Phase ?]: 17-01: Adopted first-match-wins tie-break for findQuarterForDate when two quarters share a service date (accepted pre-existing edge case)
 - [Phase ?]: 17-01: resolveServiceRoleAssignments stays id-only, never surfaces email/phone (T-17-01-01)
+- [Phase ?]: 17-02: serviceShares Firestore collection mirrors quarterShares exactly (public read; org-editor-scoped create/update/delete; orgId immutable on update) — deterministic {slug}__service-{date} doc id requires editor-scoped write to prevent cross-org overwrite (T-17-02-01/02)
+- [Phase ?]: 17-02: 'service-share' added to RESERVED_SLUGS proactively even though the opaque /share/:token route is reused (consistency with quarter-share reserved word, T-17-02-04)
 
 ### Roadmap Evolution
 
@@ -188,6 +191,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-22
-Last session: 2026-07-22T13:56:39.282Z
-Stopped at: Completed 17-01-PLAN.md
+Last session: 2026-07-22T18:01:37.990Z
+Stopped at: Completed 17-02-PLAN.md
 Resume file: None
