@@ -303,6 +303,7 @@ Plans:
 **Goal:** Make the quarterly schedule genuinely usable for both organizers and volunteers by (a) giving the public share link a matrix view and a memorable URL, (b) letting volunteers find their own dates, (c) unifying volunteer management so the same frequency/availability/pairing data is edited from either the Schedule or the Volunteer screen, (d) fixing pairing to respect per-role frequency, and (e) reworking the schedule editing UX. Builds directly on Phase 15's per-role frequency & co-occurrence model.
 
 **Requirements** (to be formalized in discuss/spec — captured verbatim from request):
+
 - R-01 **Share-link matrix view** — Render the shared schedule as a matrix (roles across the top, dates down the left column). Provide a toggle to switch between the existing list view and the matrix view.
 - R-02 **Memorable share URL** — Support a friendly URL like `/{church-name}/quarter1-2026` instead of an opaque link.
 - R-03 **Filter by name** — Let a viewer filter the schedule by a person's name; filtering hides any date where that person isn't serving a role (so a volunteer sees only the dates they're on).
@@ -324,11 +325,13 @@ Plans:
 Plans:
 
 **Wave 1**
+
 - [x] 16-01-PLAN.md — Frequency data-model relocation (roleFrequency) + quarters store seeding (D-04/05/06)
 - [x] 16-02-PLAN.md — Slug util + orgSlugs/quarterShares Firestore rules + [BLOCKING] rules deploy (R-02)
 - [x] 16-03-PLAN.md — CollapsibleSection component + R-09 Schedule-page UX research note
 
 **Wave 2**
+
 - [x] 16-04-PLAN.md — R-12 scheduler pairing fix honoring per-role cadence (TDD)
 - [x] 16-05-PLAN.md — AvailabilityDrawer: remove date-range, unify frequency, roles editing (R-05/06/08, D-09)
 - [x] 16-06-PLAN.md — Roles-only Volunteer form + badge repoint + roster collapsible (D-07, R-11)
@@ -338,6 +341,7 @@ Plans:
 - [x] 16-10-PLAN.md — Share page matrix + name filter + memorable route (R-01/02/03)
 
 **Wave 3**
+
 - [x] 16-11-PLAN.md — Cleanup: remove deprecated frequency fields (D-04)
 
 ### Phase 16.1: Song list tags & columns customization (INSERTED)
@@ -345,6 +349,7 @@ Plans:
 **Goal:** Simplify and make customizable the Songs screen's tag/theme/column display, and make the app's song-planning conventions self-explanatory. (1) Remove the dedicated "Team" tags concept and fold team tags into general Tags — no separate team-tag category. (2) Show Themes as its own column separate from Tags, and add a settings-cog control that lets each user choose which columns to show/hide so they can tailor the song list to what they care about. (3) The app uses the Vertical Worship 1-2-3 song types but never explains them; add an in-app helper describing how the 1-2-3 methodology is used to plan a service (so churches unfamiliar with it understand the categories), and decide whether to keep them as-is / make them optional when generalizing to churches that don't follow that approach.
 
 **Requirements** (to be formalized in discuss/spec — captured verbatim from request):
+
 - R-01 **Fold Team tags into Tags** — Remove "Team" tags as a distinct category on the Songs screen; team tags become ordinary Tags. Evaluate whether a separate team-tag concept is needed at all.
 - R-02 **Themes as a separate column** — Split Themes out of the Tags column into its own column in the song list.
 - R-03 **Column-visibility settings cog** — Add a settings cog on the song list that lets the user show/hide individual columns to customize the view.
@@ -358,17 +363,44 @@ Plans:
 Plans:
 
 **Wave 1**
+
 - [x] 16.1-01-PLAN.md — Store + PC-import teamTags→tags fold + theme-removal tracking (D-01/D-05/D-14)
 - [x] 16.1-02-PLAN.md — vwModeEnabled church-level flag (auth store) + Settings toggle (D-15/D-16)
 
 **Wave 2**
+
 - [x] 16.1-03-PLAN.md — Suggestions nudge-only + songSearch team: alias (TDD) (D-02/D-03/D-04/D-06)
 - [x] 16.1-04-PLAN.md — Column-visibility store: per-user/org persist + hydrate (D-08/D-09/D-10)
 
 **Wave 3**
+
 - [x] 16.1-05-PLAN.md — SongTable: Themes column + cog + inline theme edit + VW-gated Category + VwExplainer (D-07..D-13/D-16/D-17/D-18)
 - [x] 16.1-06-PLAN.md — SongsView/SongFilters union + SongSlideOver team-tag fold + VW gating (D-01/D-12/D-16)
 - [x] 16.1-07-PLAN.md — SongSlotPicker + ServiceEditorView: fold pills, gate badges, orchestra AI over tags (D-02/D-04/D-11/D-16)
 
 **Wave 4**
+
 - [x] 16.1-08-PLAN.md — Remove Song.teamTags + vue-tsc blast-radius cleanup + full-suite gate (D-01)
+
+### Phase 17: Sync schedule with planned services: add a Roles tab to service plans that seeds each role and its scheduled person from the schedule for that service date, allows per-service overrides, and exposes a public shared service link showing who is serving
+
+**Goal:** Marry the quarterly volunteer schedule to planned services: add a Roles tab to the service editor that seeds each role and its scheduled person from the quarterly schedule for the service date, allows per-service overrides without mutating the schedule (sparse `Service.roleAssignmentOverrides`, resolved live), and exposes a public shared service link (mirroring the Phase 16 quarter share) that shows who is serving — so a planned service carries both music AND people-per-role.
+**Requirements**: CR-01 (Roles tab lists each role), CR-02 (seed scheduled people for the date), CR-03 (per-service override without schedule mutation), CR-04 (public share link shows who is serving), CR-05 (editor-only writes / editor-only in-app read; public link is the only viewer surface) — derived from the phase goal (no formal REQUIREMENTS.md).
+**Depends on:** Phase 16
+**Plans:** 5 plans
+
+Plans:
+
+**Wave 1**
+
+- [ ] 17-01-PLAN.md — Data model (`Service.roleAssignmentOverrides`) + pure `resolveServiceRoleAssignments` resolver (TDD)
+- [ ] 17-02-PLAN.md — `serviceShares` Firestore rules + rules test + memorable `/:slug/service-:date` route + reserved slug + rules deploy
+
+**Wave 2**
+
+- [ ] 17-03-PLAN.md — Services store: scoped-dot-path `setRoleOverride`/`clearRoleOverride` + `createShareToken` names-only `roleAssignments` snapshot + `serviceShares` soft-fail write
+
+**Wave 3**
+
+- [ ] 17-04-PLAN.md — ServiceEditorView Music/Roles tab bar + Roles tab (seeded list, per-role override/clear, empty state, editor-only)
+- [ ] 17-05-PLAN.md — ShareView dual-path public read + names-only "Who's Serving" section

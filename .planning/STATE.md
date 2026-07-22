@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: MVP
 status: planning
-stopped_at: Phase 16.1 context gathered
-last_updated: "2026-07-13T21:14:50.686Z"
-last_activity: 2026-07-13
+stopped_at: Phase 17 planned (5 plans, verification PASSED)
+last_updated: "2026-07-22T00:00:00.000Z"
+last_activity: 2026-07-22
 progress:
   total_phases: 12
   completed_phases: 10
@@ -25,11 +25,11 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 
 ## Current Position
 
-Phase: 999.1 (backlog) — no active phase
-Plan: Not started
+Phase: 17 (Sync schedule with planned services) — PLANNED, ready to execute
+Plan: 5 plans across 3 waves (17-01..17-05); plan-checker VERIFICATION PASSED (0 blockers)
 Milestone: v1.0 MVP — SHIPPED 2026-03-05
 Next milestone: v1.1 Tasks & Events (not yet started)
-Status: No active phase — 16.2 removed (RBAC hardening already satisfied by Phase 7)
+Status: Phase 17 planned via auto mode (research + pattern-map + plan + verify). Next: /gsd-execute-phase 17
 
 ## Performance Metrics
 
@@ -138,6 +138,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - Phase 16 added: Quarterly Schedule share link — matrix view + list/matrix toggle, memorable /{church}/quarterN-YYYY URL, filter-by-name, cross-screen (Schedule ↔ Volunteer) editing of pairings/roles/per-role frequency/unavailable Sundays, remove Schedule's separate frequency + volunteer date-range picker, pairing that honors per-role frequency (paired only on the occurrences the lower-frequency person serves), collapsible sections, calendar-format UX research, and a right-side slide-out group editor with whole-cell hit target. See ROADMAP.md R-01..R-14.
 - Phase 16.1 inserted after Phase 16: Song list tags & columns customization: fold Team tags into Tags, Themes as separate column + column-visibility cog, document 1-2-3 methodology (URGENT)
 - Phase 16.2 inserted then REMOVED (2026-07-13): Admin permissions hardening was found redundant — Phase 7 already enforces viewer read-only at the route (requiresEditor guards), navigation (isEditor-gated sidebar), and Firestore rules (editor-only writes; songs/other collections editor-only). The only net change 16.2 described was EXPANDING viewer read access to Songs/Schedule/Volunteers, which is a feature, not hardening, and was not wanted. Removed from ROADMAP.
+- Phase 17 added: Sync schedule with planned services — add a Roles tab to service plans that seeds each role and its scheduled person from the quarterly schedule for that service date, allows per-service overrides (without mutating the schedule), and exposes a public shared service link (like the Phase 16 schedule share link) showing who is serving. Marries the schedule to services so a planned service carries both music AND people-per-role.
 
 ### Quick Tasks Completed
 
