@@ -486,9 +486,12 @@ Already covered inline above (Patterns 1-4, Data Model Reference, Seeding Join).
 | CR-04 | A public shared service link shows who is serving (mirrors Phase 16 quarter share) | Extend `shareTokens` snapshot + new `serviceShares/{slug}__service-{date}` + new route + new rules block (Shared Service Link section) |
 | CR-05 | Editor-only writes; appropriate read access for the public link and in-app viewers | Existing `isOrgEditor`/`isOrgMember` rules helpers; Roles-tab data-fetch gated to editors in-app per Pitfall 4 |
 
-## Open Questions
+## Open Questions (RESOLVED at plan time — 2026-07-22)
+
+> All three resolved during planning (no discuss-phase run; auto mode). Resolutions are carried in the executable PLAN.md files as noted below.
 
 1. **What happens when two quarters both list the same service date (manually added), or two services share the same date?**
+   - **RESOLVED:** Accepted "first match wins" (deterministic) — documented as an explicit planner assumption in 17-01. No new same-date restriction is added (pre-existing behavior, not a regression this phase introduces).
    - What we know: Neither uniqueness constraint is enforced in code today (`addServiceDate` has no cross-quarter dedup check; `createService`/`NewServiceDialog.vue` has no same-date dedup check).
    - What's unclear: Whether this is an accepted, rare edge case to leave as "first match wins," or whether the planner should add a guard (e.g. warn on quarter creation if a date already exists in another quarter; warn on service creation if a service already exists for that date).
    - Recommendation: Flag to `/gsd-discuss-phase 17`; default to deterministic "prefer the quarter with `status: 'finalized'`, else the most-recently-created" tie-break, and same-date service creation is out of scope to newly restrict (pre-existing behavior, not a regression this phase introduces).
@@ -497,11 +500,13 @@ Already covered inline above (Patterns 1-4, Data Model Reference, Seeding Join).
    - What we know: Firestore rules currently make `roles`/`quarters`/`people` editor-only-read; CLAUDE.md's Phase 16.2 removal note explicitly rejected expanding viewer read access to Schedule/Volunteers as an unwanted feature just 9 days before this phase was added.
    - What's unclear: Whether the intent for THIS phase is different (a scoped, roles-tab-only read) versus the rejected general expansion.
    - Recommendation: Default to editor-only in-app Roles tab (per Pitfall 4); viewers get the read-only info via the NEW public share link instead — this satisfies "anyone with the link can see who is serving" without reopening the Phase 16.2 decision. Confirm in discuss-phase.
+   - **RESOLVED:** Editor-only in-app Roles tab (data gated behind `authStore.isEditor`, not just UI); viewer visibility delivered exclusively via the public share link. Decided across 17-01/17-04 (see their `<assumption_delta_decision>` blocks). Phase 16.2 decision left intact.
 
 3. **Exact URL scheme for the memorable per-service share link.**
    - What we know: The quarter's scheme is `/{slug}/quarter{N}-{year}` (date-range based, since quarters aren't single-date). Services are single-date.
    - What's unclear: Exact preferred path shape — options include `/{slug}/service-{date}` (e.g. `/gracechurch/service-2026-08-02`), or something more human like `/{slug}/{date}` bare (risk: could collide with a future non-numeric static route more easily than a prefixed segment).
    - Recommendation: `/{slug}/service-{date}` (prefixed) is safer for router-priority reasoning and mirrors the `quarter{N}-{year}` prefix convention; confirm exact wording in discuss-phase.
+   - **RESOLVED:** Adopted `/:slug/service-:date` (e.g. `/gracechurch/service-2026-08-02`), backed by `serviceShares/{slug}__service-{date}`. Implemented in 17-02 (route + reserved slug) and 17-05 (public read).
 
 ## Validation Architecture
 
