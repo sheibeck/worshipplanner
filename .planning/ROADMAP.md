@@ -384,11 +384,23 @@ Plans:
 
 ### Phase 17: Sync schedule with planned services: add a Roles tab to service plans that seeds each role and its scheduled person from the schedule for that service date, allows per-service overrides, and exposes a public shared service link showing who is serving
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** Marry the quarterly volunteer schedule to planned services: add a Roles tab to the service editor that seeds each role and its scheduled person from the quarterly schedule for the service date, allows per-service overrides without mutating the schedule (sparse `Service.roleAssignmentOverrides`, resolved live), and exposes a public shared service link (mirroring the Phase 16 quarter share) that shows who is serving — so a planned service carries both music AND people-per-role.
+**Requirements**: CR-01 (Roles tab lists each role), CR-02 (seed scheduled people for the date), CR-03 (per-service override without schedule mutation), CR-04 (public share link shows who is serving), CR-05 (editor-only writes / editor-only in-app read; public link is the only viewer surface) — derived from the phase goal (no formal REQUIREMENTS.md).
 **Depends on:** Phase 16
-**Plans:** 0 plans
+**Plans:** 5 plans
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 17 to break down)
+**Wave 1**
+
+- [ ] 17-01-PLAN.md — Data model (`Service.roleAssignmentOverrides`) + pure `resolveServiceRoleAssignments` resolver (TDD)
+- [ ] 17-02-PLAN.md — `serviceShares` Firestore rules + rules test + memorable `/:slug/service-:date` route + reserved slug + rules deploy
+
+**Wave 2**
+
+- [ ] 17-03-PLAN.md — Services store: scoped-dot-path `setRoleOverride`/`clearRoleOverride` + `createShareToken` names-only `roleAssignments` snapshot + `serviceShares` soft-fail write
+
+**Wave 3**
+
+- [ ] 17-04-PLAN.md — ServiceEditorView Music/Roles tab bar + Roles tab (seeded list, per-role override/clear, empty state, editor-only)
+- [ ] 17-05-PLAN.md — ShareView dual-path public read + names-only "Who's Serving" section
