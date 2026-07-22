@@ -135,9 +135,17 @@ const teamsDisplay = computed(() => {
 
 onMounted(async () => {
   const route = useRoute()
-  const token = route.params.token as string
+  const token = route.params.token as string | undefined
   try {
-    const snap = await getDoc(doc(db, 'shareTokens', token))
+    const snap = token
+      ? await getDoc(doc(db, 'shareTokens', token))
+      : await getDoc(
+          doc(
+            db,
+            'serviceShares',
+            `${route.params.slug as string}__service-${route.params.date as string}`,
+          ),
+        )
     if (!snap.exists()) {
       notFound.value = true
     } else {
