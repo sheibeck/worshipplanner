@@ -1,0 +1,47 @@
+---
+estimated_steps: 19
+estimated_files: 4
+skills_used: []
+---
+
+# T03: Song Lyrics Pinia Store with Firestore Subcollection CRUD
+
+Create the Pinia store for lyrics subcollection CRUD, subscription, and version snapshots.
+
+1. Create src/stores/songLyrics.ts as a new Pinia store (defineStore pattern matching src/stores/songs.ts):
+   - subscribeLyrics(orgId: string, songId: string): subscribe to onSnapshot on organizations/{orgId}/songs/{songId}/lyrics collection, ordered by createdAt desc
+   - Store lyrics docs in a reactive ref (SongLyrics[])
+   - currentLyrics computed: the most recent lyrics doc (first in desc-ordered list) — this is the "active version"
+   - lyricVersions computed: all lyrics docs (for version history display)
+   - saveLyrics(orgId, songId, data): create a NEW doc in the lyrics subcollection (each save is a new version for R004 light versioning)
+   - updateCurrentLyrics(orgId, songId, lyricsId, data): update the current/active lyrics doc in place (for auto-save — only creates new version on explicit "save version" action)
+   - revertToVersion(orgId, songId, versionId): copy that version's data into a new doc (creating a new "current" that is a copy of the old version)
+   - updatePerformanceOrder(orgId, songId, order: string[]): update the performanceOrder field on the Song doc itself (not lyrics subcollection)
+   - unsubscribeLyrics(): cleanup snapshot listener
+
+2. Add performanceOrder field to Song type in src/types/song.ts:
+   - performanceOrder: string[] (optional, default [])
+   - Update UpsertSongInput type accordingly
+
+3. Handle performanceOrder in src/stores/songs.ts subscribe():
+   - Default performanceOrder to [] for legacy docs missing the field (same pattern as tags/removedThemes normalization)
+
+4. Create src/stores/__tests__/songLyrics.test.ts:
+   - Mock firebase/firestore following the exact pattern in src/stores/__tests__/songs.test.ts
+   - Test subscribeLyrics, currentLyrics, saveLyrics, updateCurrentLyrics, revertToVersion, updatePerformanceOrder, unsubscribeLyrics
+
+## Inputs
+
+- `src/stores/songs.ts`
+- `src/stores/__tests__/songs.test.ts`
+- `src/types/songLyrics.ts`
+- `src/types/song.ts`
+
+## Expected Output
+
+- `src/stores/songLyrics.ts`
+- `src/stores/__tests__/songLyrics.test.ts`
+
+## Verification
+
+npx vitest run src/stores/__tests__/songLyrics.test.ts --reporter=verbose
