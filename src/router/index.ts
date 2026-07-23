@@ -94,6 +94,15 @@ const router = createRouter({
       // Appended after all static routes: Vue Router ranks static segments above dynamic
       // ones, so this can never shadow /songs, /volunteers, /schedule, etc. (D-19).
     },
+    {
+      path: '/:slug/service-:date(\\d{4}-\\d{2}-\\d{2})',
+      name: 'service-memorable-share',
+      component: () => import('../views/ShareView.vue'),
+      // Intentionally no meta.requiresAuth — public route for unauthenticated viewers,
+      // mirrors quarter-memorable-share. Appended after all static routes: Vue Router
+      // ranks static segments above dynamic ones, so this can never shadow /songs,
+      // /volunteers, /schedule, etc. (D-19).
+    },
   ],
 })
 

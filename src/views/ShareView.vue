@@ -81,6 +81,22 @@
         <p class="whitespace-pre-wrap text-sm text-gray-700">{{ serviceSnapshot.notes }}</p>
       </div>
 
+      <!-- Who's Serving section (names-only role snapshot; omitted for legacy shares with no roleAssignments) -->
+      <div v-if="serviceSnapshot.roleAssignments?.length" class="mt-6 rounded-lg bg-gray-50 p-4">
+        <h2 class="text-sm font-semibold text-gray-700 mb-2">Who's Serving</h2>
+        <div
+          v-for="role in serviceSnapshot.roleAssignments"
+          :key="role.roleId"
+          class="py-1"
+        >
+          <p class="text-xs text-gray-500 uppercase tracking-wider">{{ role.roleName }}</p>
+          <p v-if="role.personNames?.length > 0" class="text-sm text-gray-800">
+            {{ role.personNames.join(', ') }}
+          </p>
+          <p v-else class="text-gray-400 italic text-sm">[not assigned]</p>
+        </div>
+      </div>
+
       <!-- Footer -->
       <div class="mt-8 pt-4 border-t border-gray-200 text-center text-xs text-gray-400">
         Shared from WorshipPlanner
@@ -135,9 +151,17 @@ const teamsDisplay = computed(() => {
 
 onMounted(async () => {
   const route = useRoute()
-  const token = route.params.token as string
+  const token = route.params.token as string | undefined
   try {
-    const snap = await getDoc(doc(db, 'shareTokens', token))
+    const snap = token
+      ? await getDoc(doc(db, 'shareTokens', token))
+      : await getDoc(
+          doc(
+            db,
+            'serviceShares',
+            `${route.params.slug as string}__service-${route.params.date as string}`,
+          ),
+        )
     if (!snap.exists()) {
       notFound.value = true
     } else {

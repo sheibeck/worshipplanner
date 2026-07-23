@@ -62,6 +62,9 @@ export interface Service {
   updatedAt: Timestamp
   pcExportedAt?: Timestamp | null
   pcPlanId?: string | null
+  /** roleId -> personId[]; absent key = inherit from schedule, present key = override.
+   *  Mirrors Quarter.roleOverridesByDate's sparse-override-map precedent (src/types/roster.ts). */
+  roleAssignmentOverrides?: Record<string, string[]>
 }
 
 export type ServiceInput = Omit<Service, 'id' | 'createdAt' | 'updatedAt'>

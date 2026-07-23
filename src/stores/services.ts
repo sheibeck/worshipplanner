@@ -6,7 +6,9 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  deleteField,
   doc,
+  getDoc,
   setDoc,
   serverTimestamp,
   query,
@@ -15,6 +17,10 @@ import {
 } from 'firebase/firestore'
 import { db } from '@/firebase'
 import { useSongStore } from '@/stores/songs'
+import { useRosterStore } from '@/stores/roster'
+import { useQuartersStore } from '@/stores/quarters'
+import { deriveSlug, claimSlug } from '@/utils/slug'
+import { resolveServiceRoleAssignments } from '@/utils/serviceRoles'
 import { buildSlots } from '@/utils/slotTypes'
 import type { Service } from '@/types/service'
 import type { SongSlot } from '@/types/service'
@@ -134,6 +140,34 @@ export const useServiceStore = defineStore('services', () => {
     await updateService(serviceId, { slots: updatedSlots })
   }
 
+  // Scoped dot-path write — writes ONLY the single roleId's key within
+  // roleAssignmentOverrides, never the whole map, mirroring
+  // quarters.ts::assignPerson's `calendar.${date}.${roleId}` pattern (D-01). This
+  // prevents two editors concurrently overriding different roles on the same
+  // service from clobbering each other (T-17-03-02 / STATE.md T-13-09-02
+  // precedent). The Quarter/schedule itself is never touched by this write.
+  async function setRoleOverride(
+    serviceId: string,
+    roleId: string,
+    personIds: string[],
+  ): Promise<void> {
+    if (!orgId.value) return
+    await updateDoc(doc(db, 'organizations', orgId.value, 'services', serviceId), {
+      [`roleAssignmentOverrides.${roleId}`]: personIds,
+      updatedAt: serverTimestamp(),
+    })
+  }
+
+  // Clears a single role's override via deleteField() on its scoped dot-path key,
+  // leaving every sibling role's override entry (and the schedule) untouched.
+  async function clearRoleOverride(serviceId: string, roleId: string): Promise<void> {
+    if (!orgId.value) return
+    await updateDoc(doc(db, 'organizations', orgId.value, 'services', serviceId), {
+      [`roleAssignmentOverrides.${roleId}`]: deleteField(),
+      updatedAt: serverTimestamp(),
+    })
+  }
+
   async function createShareToken(service: Service, orgIdValue: string): Promise<string> {
     // Generate cryptographically random 36-char hex token
     const array = new Uint8Array(18)
@@ -156,21 +190,70 @@ export const useServiceStore = defineStore('services', () => {
       return slot
     })
 
+    // Who's-serving snapshot (D-04/D-24 PII guard): resolve personId -> name via a
+    // Map ONLY — never embed the raw Person object (no email/phone/pcPersonId).
+    // Mirrors quarters.ts::finalizeAndShare's nameById pattern exactly.
+    const rosterStore = useRosterStore()
+    const quartersStore = useQuartersStore()
+    const nameById = new Map(rosterStore.people.map((p) => [p.id, p.name]))
+    const resolved = resolveServiceRoleAssignments(service, quartersStore.quarters, rosterStore.roles)
+    const roleAssignments = resolved.map((r) => ({
+      roleId: r.roleId,
+      roleName: r.roleName,
+      group: r.group,
+      personNames: r.effectivePersonIds.map((id) => nameById.get(id) ?? id),
+    }))
+
+    const serviceSnapshot = {
+      date: service.date,
+      name: service.name,
+      progression: service.progression,
+      teams: service.teams,
+      slots: slotsWithBpm,
+      sermonPassage: service.sermonPassage,
+      notes: service.notes,
+      status: service.status,
+      roleAssignments,
+    }
+
     await setDoc(doc(db, 'shareTokens', token), {
       serviceId: service.id,
       orgId: orgIdValue,
-      serviceSnapshot: {
-        date: service.date,
-        name: service.name,
-        progression: service.progression,
-        teams: service.teams,
-        slots: slotsWithBpm,
-        sermonPassage: service.sermonPassage,
-        notes: service.notes,
-        status: service.status,
-      },
+      serviceSnapshot,
       createdAt: serverTimestamp(),
     })
+
+    // R-02/D-18: memorable-URL secondary write, mirroring
+    // quarters.ts::finalizeAndShare exactly — resolve (or claim, on first share)
+    // the org's slug, then overwrite serviceShares/{slug}__service-{date} in
+    // place. WR-06: the opaque shareTokens doc above has already succeeded, so
+    // this whole step is soft-fail — any error here is logged and swallowed, the
+    // token is still returned (T-17-03-03).
+    try {
+      const orgRef = doc(db, 'organizations', orgIdValue)
+      const orgSnap = await getDoc(orgRef)
+      const orgData = orgSnap.exists() ? orgSnap.data() : {}
+      let slug = orgData.slug as string | undefined
+      if (!slug) {
+        const derived = deriveSlug((orgData.name as string | undefined) ?? '')
+        const base = derived || 'org'
+        slug = await claimSlug(base, orgIdValue)
+        await updateDoc(orgRef, { slug })
+      }
+
+      await setDoc(doc(db, 'serviceShares', `${slug}__service-${service.date}`), {
+        orgId: orgIdValue,
+        orgSlug: slug,
+        serviceSnapshot,
+        token,
+        updatedAt: serverTimestamp(),
+      })
+    } catch (err) {
+      console.error(
+        'createShareToken: memorable-URL slug/serviceShares write failed — the opaque share link above already succeeded',
+        err,
+      )
+    }
 
     return token
   }
@@ -186,6 +269,8 @@ export const useServiceStore = defineStore('services', () => {
     deleteService,
     assignSongToSlot,
     clearSongFromSlot,
+    setRoleOverride,
+    clearRoleOverride,
     createShareToken,
   }
 })

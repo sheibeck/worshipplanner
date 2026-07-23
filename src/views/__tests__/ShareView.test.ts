@@ -2,10 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { defineComponent } from 'vue'
 
-// Mock vue-router
+// Mock vue-router — params are mutable per-test via mockRouteParams
+const mockRouteParams: Record<string, string | undefined> = { token: 'test-token-123' }
 vi.mock('vue-router', () => ({
   useRoute: vi.fn(() => ({
-    params: { token: 'test-token-123' },
+    params: mockRouteParams,
   })),
 }))
 
@@ -34,13 +35,17 @@ vi.mock('@/utils/slotTypes', () => ({
   }),
 }))
 
-// Mock firebase/firestore — getDoc is controlled per test
+// Mock firebase/firestore — getDoc and doc are controlled/inspected per test
 const mockGetDoc = vi.fn()
-vi.mock('firebase/firestore', () => ({
-  doc: vi.fn((_db: unknown, ...segments: string[]) => ({
+const mockDoc = vi.fn((...args: unknown[]) => {
+  const segments = args.slice(1) as string[]
+  return {
     id: segments[segments.length - 1] ?? 'mock-id',
     path: segments.join('/'),
-  })),
+  }
+})
+vi.mock('firebase/firestore', () => ({
+  doc: (...args: unknown[]) => mockDoc(...args),
   getDoc: (...args: unknown[]) => mockGetDoc(...args),
 }))
 
@@ -98,6 +103,10 @@ async function mountShareView() {
 describe('ShareView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Reset to the opaque-token shape by default; memorable-route tests override this.
+    delete mockRouteParams.slug
+    delete mockRouteParams.date
+    mockRouteParams.token = 'test-token-123'
   })
 
   it('shows loading state initially', async () => {
@@ -141,5 +150,82 @@ describe('ShareView', () => {
     const wrapper = await mountShareView()
     await flushPromises()
     expect(wrapper.text()).toContain('no longer available')
+  })
+
+  it('reads serviceShares/{slug}__service-{date} when no token param is present (memorable route)', async () => {
+    delete mockRouteParams.token
+    mockRouteParams.slug = 'first-church'
+    mockRouteParams.date = '2026-03-08'
+    mockGetDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ serviceSnapshot: mockSnapshot }),
+    })
+    const wrapper = await mountShareView()
+    await flushPromises()
+
+    expect(mockDoc).toHaveBeenCalledWith(
+      expect.anything(),
+      'serviceShares',
+      'first-church__service-2026-03-08',
+    )
+    expect(wrapper.text()).toContain('Amazing Grace')
+  })
+
+  it('renders not-found for a nonexistent memorable share doc (no unhandled error)', async () => {
+    delete mockRouteParams.token
+    mockRouteParams.slug = 'first-church'
+    mockRouteParams.date = '2099-01-01'
+    mockGetDoc.mockResolvedValue({
+      exists: () => false,
+      data: () => null,
+    })
+    const wrapper = await mountShareView()
+    await flushPromises()
+    expect(wrapper.text()).toContain('no longer available')
+  })
+
+  it('renders the Who\'s Serving section with role names and person names', async () => {
+    mockGetDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({
+        serviceSnapshot: {
+          ...mockSnapshot,
+          roleAssignments: [
+            { roleId: 'r1', roleName: 'Worship Leader', group: 'band', personNames: ['Alice Smith'] },
+            { roleId: 'r2', roleName: 'Sound', group: 'tech', personNames: ['Bob Jones', 'Cara Lee'] },
+          ],
+        },
+      }),
+    })
+    const wrapper = await mountShareView()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain("Who's Serving")
+    expect(wrapper.text()).toContain('Worship Leader')
+    expect(wrapper.text()).toContain('Alice Smith')
+    expect(wrapper.text()).toContain('Sound')
+    expect(wrapper.text()).toContain('Bob Jones, Cara Lee')
+  })
+
+  it('omits the Who\'s Serving section when roleAssignments is absent (legacy shares)', async () => {
+    mockGetDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ serviceSnapshot: mockSnapshot }),
+    })
+    const wrapper = await mountShareView()
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain("Who's Serving")
+  })
+
+  it('omits the Who\'s Serving section when roleAssignments is an empty array', async () => {
+    mockGetDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ serviceSnapshot: { ...mockSnapshot, roleAssignments: [] } }),
+    })
+    const wrapper = await mountShareView()
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain("Who's Serving")
   })
 })

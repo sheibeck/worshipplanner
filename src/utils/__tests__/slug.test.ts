@@ -45,7 +45,7 @@ describe('deriveSlug', () => {
 })
 
 describe('RESERVED_SLUGS', () => {
-  it('contains all 12 reserved segments from D-19 (plus renamed /volunteers, /admins routes)', () => {
+  it('contains all 13 reserved segments from D-19 (plus renamed /volunteers, /admins routes, and Phase 17 service-share)', () => {
     const expected = [
       'songs',
       'roster',
@@ -58,9 +58,10 @@ describe('RESERVED_SLUGS', () => {
       'login',
       'share',
       'quarter-share',
+      'service-share',
       'public',
     ]
-    expect(RESERVED_SLUGS.size).toBe(12)
+    expect(RESERVED_SLUGS.size).toBe(13)
     for (const word of expected) {
       expect(RESERVED_SLUGS.has(word)).toBe(true)
     }

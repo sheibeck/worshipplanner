@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
 import { shallowMount } from '@vue/test-utils'
 import type { Service } from '@/types/service'
 import type { Song } from '@/types/song'
+import type { Person, Role, Quarter } from '@/types/roster'
 import type { Timestamp } from 'firebase/firestore'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
@@ -85,6 +86,9 @@ const mockSongs: Song[] = [
   },
 ]
 
+const mockSetRoleOverride = vi.fn(() => Promise.resolve())
+const mockClearRoleOverride = vi.fn(() => Promise.resolve())
+
 vi.mock('@/stores/services', () => ({
   useServiceStore: () => ({
     services: [mockService],
@@ -94,6 +98,8 @@ vi.mock('@/stores/services', () => ({
     updateService: vi.fn(() => Promise.resolve()),
     assignSongToSlot: vi.fn(() => Promise.resolve()),
     clearSongFromSlot: vi.fn(() => Promise.resolve()),
+    setRoleOverride: mockSetRoleOverride,
+    clearRoleOverride: mockClearRoleOverride,
   }),
 }))
 
@@ -105,11 +111,93 @@ vi.mock('@/stores/songs', () => ({
   }),
 }))
 
+// ── Roles tab (Phase 17-04) — mutable per-test mocks ────────────────────────────
+// isEditor/orgId are reassigned per-test (module-level `let`); the factory
+// functions below close over them, so each fresh mount() picks up the current
+// value (mirrors src/views/__tests__/RosterView.test.ts's mockPeople pattern).
+let mockIsEditor = false
+let mockOrgId: string | null = 'org-1'
+
 vi.mock('@/stores/auth', () => ({
   useAuthStore: () => ({
     user: { uid: 'user-1' },
+    isEditor: mockIsEditor,
+    orgId: mockOrgId,
   }),
 }))
+
+const mockRoles: Role[] = [
+  { id: 'role-vox', name: 'Vocals', group: 'vocals', defaultCount: 1, order: 0 },
+  { id: 'role-drums', name: 'Drums', group: 'band', defaultCount: 1, order: 1 },
+]
+
+const mockRosterPeople: Person[] = [
+  {
+    id: 'person-1',
+    name: 'Alice',
+    email: 'alice@example.com',
+    phone: '',
+    active: true,
+    roles: ['role-vox'],
+    pcPersonId: null,
+    createdAt: mockTimestamp,
+    updatedAt: mockTimestamp,
+  },
+  {
+    id: 'person-2',
+    name: 'Bob',
+    email: 'bob@example.com',
+    phone: '',
+    active: true,
+    roles: ['role-drums'],
+    pcPersonId: null,
+    createdAt: mockTimestamp,
+    updatedAt: mockTimestamp,
+  },
+]
+
+let mockQuarters: Quarter[] = []
+let mockRosterOrgId: string | null = null
+let mockQuartersOrgId: string | null = null
+
+vi.mock('@/stores/roster', () => ({
+  useRosterStore: () => ({
+    people: mockRosterPeople,
+    roles: mockRoles,
+    activePeople: mockRosterPeople.filter((p) => p.active),
+    orgId: mockRosterOrgId,
+    subscribe: vi.fn(),
+  }),
+}))
+
+vi.mock('@/stores/quarters', () => ({
+  useQuartersStore: () => ({
+    quarters: mockQuarters,
+    orgId: mockQuartersOrgId,
+    subscribe: vi.fn(),
+  }),
+}))
+
+// Warm the SFC transform + template compile once before any test. The first
+// mount of this large (2200+ line) component can, on a loaded machine, exceed
+// vitest's default 5s per-test timeout — which would flake whichever test
+// happens to mount first. Paying that one-time cold cost here (with a generous
+// timeout) keeps every individual test's timer measuring only a warm mount.
+beforeAll(async () => {
+  const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+  shallowMount(ServiceEditorView, {
+    global: {
+      stubs: {
+        AppShell: { template: '<div><slot /></div>' },
+        RouterLink: { template: '<a><slot /></a>' },
+        ServicePrintLayout: true,
+        SongBadge: true,
+        SongSlotPicker: true,
+        ScriptureInput: true,
+      },
+    },
+  }).unmount()
+}, 30000)
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -166,5 +254,116 @@ describe('ServiceEditorView - Print and Copy for PC buttons', () => {
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
       expect.stringContaining('ORDER OF SERVICE'),
     )
+  })
+})
+
+describe('ServiceEditorView - Roles tab (Phase 17-04)', () => {
+  async function mountView() {
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          RouterLink: { template: '<a><slot /></a>' },
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+        },
+      },
+    })
+  }
+
+  beforeEach(() => {
+    mockIsEditor = false
+    mockOrgId = 'org-1'
+    mockRosterOrgId = null
+    mockQuartersOrgId = null
+    mockQuarters = []
+  })
+
+  it('editor: Roles tab lists seeded role assignments resolved from the quarterly schedule', async () => {
+    mockIsEditor = true
+    mockQuarters = [
+      {
+        id: 'q1',
+        label: 'Q1 2026',
+        year: 2026,
+        quarter: 1,
+        serviceDates: ['2026-03-08'],
+        roleOverridesByDate: {},
+        personQuarterData: {},
+        calendar: { '2026-03-08': { 'role-vox': ['person-1'] } },
+        status: 'finalized',
+        shareToken: null,
+        createdAt: mockTimestamp,
+        updatedAt: mockTimestamp,
+      },
+    ]
+
+    const wrapper = await mountView()
+    const rolesTabBtn = wrapper.findAll('button').find((b) => b.text() === 'Roles')
+    expect(rolesTabBtn?.exists()).toBe(true)
+    await rolesTabBtn!.trigger('click')
+
+    expect(wrapper.text()).toContain('Vocals')
+    expect(wrapper.text()).toContain('Alice')
+    expect(wrapper.text()).toContain('Nobody scheduled') // Drums role has no schedule entry
+  })
+
+  it('editor: override control (checkbox picker) appears, filtered by role eligibility', async () => {
+    mockIsEditor = true
+    mockQuarters = [
+      {
+        id: 'q1',
+        label: 'Q1 2026',
+        year: 2026,
+        quarter: 1,
+        serviceDates: ['2026-03-08'],
+        roleOverridesByDate: {},
+        personQuarterData: {},
+        calendar: { '2026-03-08': { 'role-vox': ['person-1'] } },
+        status: 'finalized',
+        shareToken: null,
+        createdAt: mockTimestamp,
+        updatedAt: mockTimestamp,
+      },
+    ]
+
+    const wrapper = await mountView()
+    const rolesTabBtn = wrapper.findAll('button').find((b) => b.text() === 'Roles')
+    await rolesTabBtn!.trigger('click')
+
+    // Vocals role: only Alice (has role-vox) should be offered as a candidate — Bob (role-drums) should not
+    const aliceLabel = wrapper.findAll('label').find((l) => l.text() === 'Alice')
+    expect(aliceLabel?.exists()).toBe(true)
+
+    // Drums role has no schedule entry, so Bob's checkbox (role-drums eligible) starts
+    // unchecked — toggling it exercises the override control end-to-end.
+    const bobLabel = wrapper.findAll('label').find((l) => l.text() === 'Bob')
+    expect(bobLabel?.exists()).toBe(true)
+    const checkbox = bobLabel!.find('input[type="checkbox"]')
+    expect(checkbox.exists()).toBe(true)
+    await checkbox.setValue(true)
+    expect(mockSetRoleOverride).toHaveBeenCalled()
+  })
+
+  it('non-editor: Roles tab button is hidden and no roster/quarters data is read', async () => {
+    mockIsEditor = false
+
+    const wrapper = await mountView()
+    const rolesTabBtn = wrapper.findAll('button').find((b) => b.text() === 'Roles')
+    expect(rolesTabBtn).toBeUndefined()
+  })
+
+  it('editor: empty state renders when no quarter covers the service date', async () => {
+    mockIsEditor = true
+    mockQuarters = [] // no quarter at all covers '2026-03-08'
+
+    const wrapper = await mountView()
+    const rolesTabBtn = wrapper.findAll('button').find((b) => b.text() === 'Roles')
+    await rolesTabBtn!.trigger('click')
+
+    expect(wrapper.text()).toContain('No schedule found for this date')
   })
 })
