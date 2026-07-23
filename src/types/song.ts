@@ -39,6 +39,8 @@ export interface Song {
   tags: string[] // D-01 user-defined tags (e.g. "Christmas") — folded team tags + user tags (Song.teamTags removed)
   /** Themes the user removed locally; subtracted from PC theme union on re-import (D-14). */
   removedThemes: string[]
+  /** Ordered list of lyric-section IDs defining the live performance/slide sequence. */
+  performanceOrder?: string[]
 }
 
 /**

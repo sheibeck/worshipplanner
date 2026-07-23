@@ -1,0 +1,161 @@
+import { ref, computed } from 'vue'
+import { defineStore } from 'pinia'
+import {
+  collection,
+  onSnapshot,
+  addDoc,
+  updateDoc,
+  doc,
+  getDoc,
+  serverTimestamp,
+  query,
+  orderBy,
+  type Unsubscribe,
+} from 'firebase/firestore'
+import { db } from '@/firebase'
+import type { SongLyrics } from '@/types/songLyrics'
+
+export const useSongLyricsStore = defineStore('songLyrics', () => {
+  const lyrics = ref<SongLyrics[]>([])
+  const isLoading = ref(true)
+
+  let unsubscribeFn: Unsubscribe | null = null
+
+  /** The most recent lyrics doc (first in desc-ordered list) — the "active version". */
+  const currentLyrics = computed<SongLyrics | null>(() =>
+    lyrics.value.length > 0 ? lyrics.value[0]! : null,
+  )
+
+  /** All lyrics docs (for version history display). */
+  const lyricVersions = computed<SongLyrics[]>(() => lyrics.value)
+
+  /**
+   * Subscribe to real-time updates on the lyrics subcollection for a song,
+   * ordered by createdAt desc so the newest version is first.
+   */
+  function subscribeLyrics(orgId: string, songId: string) {
+    if (unsubscribeFn) {
+      unsubscribeFn()
+    }
+    isLoading.value = true
+    const q = query(
+      collection(db, 'organizations', orgId, 'songs', songId, 'lyrics'),
+      orderBy('createdAt', 'desc'),
+    )
+    unsubscribeFn = onSnapshot(q, (snap) => {
+      lyrics.value = snap.docs.map((d) => {
+        const data = d.data() as Record<string, unknown>
+        // Default performanceOrder for docs missing the field
+        if (!Array.isArray(data.performanceOrder)) {
+          data.performanceOrder = []
+        }
+        return { id: d.id, songId, ...data } as SongLyrics
+      })
+      isLoading.value = false
+    })
+  }
+
+  /** Cleanup snapshot listener. */
+  function unsubscribeLyrics() {
+    unsubscribeFn?.()
+    unsubscribeFn = null
+    lyrics.value = []
+    isLoading.value = true
+  }
+
+  /**
+   * Create a NEW doc in the lyrics subcollection.
+   * Each call creates a new version (R004 light versioning).
+   */
+  async function saveLyrics(
+    orgId: string,
+    songId: string,
+    data: Omit<SongLyrics, 'id' | 'songId' | 'createdAt' | 'updatedAt'>,
+  ) {
+    await addDoc(
+      collection(db, 'organizations', orgId, 'songs', songId, 'lyrics'),
+      {
+        ...data,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      },
+    )
+  }
+
+  /**
+   * Update the current/active lyrics doc in place.
+   * Used for auto-save — only creates new version on explicit "save version" action.
+   */
+  async function updateCurrentLyrics(
+    orgId: string,
+    songId: string,
+    lyricsId: string,
+    data: Partial<Omit<SongLyrics, 'id' | 'songId' | 'createdAt' | 'updatedAt'>>,
+  ) {
+    await updateDoc(
+      doc(db, 'organizations', orgId, 'songs', songId, 'lyrics', lyricsId),
+      {
+        ...data,
+        updatedAt: serverTimestamp(),
+      },
+    )
+  }
+
+  /**
+   * Revert to a previous version by copying that version's data into a new doc,
+   * creating a new "current" that is a copy of the old version.
+   */
+  async function revertToVersion(orgId: string, songId: string, versionId: string) {
+    const versionRef = doc(
+      db,
+      'organizations',
+      orgId,
+      'songs',
+      songId,
+      'lyrics',
+      versionId,
+    )
+    const versionSnap = await getDoc(versionRef)
+    if (!versionSnap.exists()) return
+
+    const versionData = versionSnap.data() as Record<string, unknown>
+    // Remove Firestore metadata fields — we want a fresh copy
+    const { createdAt: _ca, updatedAt: _ua, ...rest } = versionData
+
+    await addDoc(
+      collection(db, 'organizations', orgId, 'songs', songId, 'lyrics'),
+      {
+        ...rest,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      },
+    )
+  }
+
+  /**
+   * Update the performanceOrder field on the Song doc itself (not lyrics subcollection).
+   */
+  async function updatePerformanceOrder(
+    orgId: string,
+    songId: string,
+    order: string[],
+  ) {
+    await updateDoc(doc(db, 'organizations', orgId, 'songs', songId), {
+      performanceOrder: order,
+      updatedAt: serverTimestamp(),
+    })
+  }
+
+  return {
+    lyrics,
+    isLoading,
+    currentLyrics,
+    lyricVersions,
+    subscribeLyrics,
+    unsubscribeLyrics,
+    saveLyrics,
+    updateCurrentLyrics,
+    revertToVersion,
+    updatePerformanceOrder,
+  }
+})
