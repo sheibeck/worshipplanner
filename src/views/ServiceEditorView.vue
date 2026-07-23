@@ -1371,6 +1371,24 @@ function initStores() {
   }
 }
 
+// WR-01: authStore.isEditor resolves asynchronously (loadOrgContext runs off
+// the auth-state-changed flow, not synchronously at mount), and /services/:id
+// has no requiresEditor guard forcing waitForRole() first. If a real editor
+// lands directly on this route before isEditor flips true, initStores() ran
+// its one-time check with isEditor still false and never subscribed
+// roster/quarters. Re-run initStores() when isEditor becomes true so the
+// subscription retries once the role resolves; initStores()'s own
+// `if (!rosterStore.orgId)` / `if (!quartersStore.orgId)` guards make this
+// idempotent (no double-subscribe on repeated calls).
+watch(
+  () => authStore.isEditor,
+  (isEditor) => {
+    if (isEditor) {
+      initStores()
+    }
+  },
+)
+
 onMounted(() => {
   initStores()
 
