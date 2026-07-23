@@ -2255,7 +2255,36 @@ async function onToggleOverridePerson(assignment: ResolvedRoleAssignment, person
   } else {
     current.add(personId)
   }
-  await serviceStore.setRoleOverride(localService.value.id, assignment.roleId, Array.from(current))
+  const nextPersonIds = Array.from(current)
+
+  // WR-02: optimistic local update. `assignment.effectivePersonIds` is derived
+  // (via resolvedRoleAssignments) from localService.value, but without this it
+  // only reflects a write once it round-trips through serviceStore.services.
+  // Two rapid clicks on the same role's checkbox group (e.g. selecting two
+  // different people) would otherwise both read the same stale
+  // effectivePersonIds baseline, and the second write would silently clobber
+  // the first. Mutating localService.value synchronously here means a
+  // same-tick second click reads the just-applied state instead.
+  if (!localService.value.roleAssignmentOverrides) {
+    localService.value.roleAssignmentOverrides = {}
+  }
+  const previousOverride = localService.value.roleAssignmentOverrides[assignment.roleId]
+  localService.value.roleAssignmentOverrides[assignment.roleId] = nextPersonIds
+
+  try {
+    await serviceStore.setRoleOverride(localService.value.id, assignment.roleId, nextPersonIds)
+  } catch (err) {
+    // Roll back the optimistic update so the UI doesn't show a state that
+    // was never actually persisted.
+    if (localService.value) {
+      if (previousOverride === undefined) {
+        delete localService.value.roleAssignmentOverrides[assignment.roleId]
+      } else {
+        localService.value.roleAssignmentOverrides[assignment.roleId] = previousOverride
+      }
+    }
+    console.error('Failed to update role override:', err)
+  }
 }
 
 async function onResetRoleOverride(roleId: string) {
