@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
 import { shallowMount } from '@vue/test-utils'
+import { reactive } from 'vue'
 import type { Service } from '@/types/service'
 import type { Song } from '@/types/song'
 import type { Person, Role, Quarter } from '@/types/roster'
@@ -86,7 +87,9 @@ const mockSongs: Song[] = [
   },
 ]
 
-const mockSetRoleOverride = vi.fn(() => Promise.resolve())
+const mockSetRoleOverride = vi.fn(
+  (_serviceId: string, _roleId: string, _personIds: string[]) => Promise.resolve(),
+)
 const mockClearRoleOverride = vi.fn(() => Promise.resolve())
 
 vi.mock('@/stores/services', () => ({
@@ -112,18 +115,19 @@ vi.mock('@/stores/songs', () => ({
 }))
 
 // ── Roles tab (Phase 17-04) — mutable per-test mocks ────────────────────────────
-// isEditor/orgId are reassigned per-test (module-level `let`); the factory
-// functions below close over them, so each fresh mount() picks up the current
-// value (mirrors src/views/__tests__/RosterView.test.ts's mockPeople pattern).
-let mockIsEditor = false
-let mockOrgId: string | null = 'org-1'
+// `mockAuthState` is a Vue `reactive()` object (not a plain module-level `let`),
+// so `watch(() => authStore.isEditor, ...)` inside the component can actually
+// observe a post-mount transition — mirrors how the real Pinia store is
+// reactive. Tests that need to flip isEditor after mount (WR-01 regression)
+// mutate `mockAuthState.isEditor` directly and await a tick.
+const mockAuthState = reactive<{ user: { uid: string }; isEditor: boolean; orgId: string | null }>({
+  user: { uid: 'user-1' },
+  isEditor: false,
+  orgId: 'org-1',
+})
 
 vi.mock('@/stores/auth', () => ({
-  useAuthStore: () => ({
-    user: { uid: 'user-1' },
-    isEditor: mockIsEditor,
-    orgId: mockOrgId,
-  }),
+  useAuthStore: () => mockAuthState,
 }))
 
 const mockRoles: Role[] = [
@@ -154,11 +158,30 @@ const mockRosterPeople: Person[] = [
     createdAt: mockTimestamp,
     updatedAt: mockTimestamp,
   },
+  {
+    id: 'person-3',
+    name: 'Carol',
+    email: 'carol@example.com',
+    phone: '',
+    active: true,
+    // Second role-vox-eligible candidate — needed by the WR-02 rapid-toggle
+    // regression test (two different people toggled for the same role).
+    roles: ['role-vox'],
+    pcPersonId: null,
+    createdAt: mockTimestamp,
+    updatedAt: mockTimestamp,
+  },
 ]
 
 let mockQuarters: Quarter[] = []
 let mockRosterOrgId: string | null = null
 let mockQuartersOrgId: string | null = null
+
+// Shared spies (not recreated per useRosterStore()/useQuartersStore() call) so
+// the WR-01 regression test can assert initStores() re-subscribes once
+// authStore.isEditor flips true after mount.
+const mockRosterSubscribe = vi.fn()
+const mockQuartersSubscribe = vi.fn()
 
 vi.mock('@/stores/roster', () => ({
   useRosterStore: () => ({
@@ -166,7 +189,7 @@ vi.mock('@/stores/roster', () => ({
     roles: mockRoles,
     activePeople: mockRosterPeople.filter((p) => p.active),
     orgId: mockRosterOrgId,
-    subscribe: vi.fn(),
+    subscribe: mockRosterSubscribe,
   }),
 }))
 
@@ -174,7 +197,7 @@ vi.mock('@/stores/quarters', () => ({
   useQuartersStore: () => ({
     quarters: mockQuarters,
     orgId: mockQuartersOrgId,
-    subscribe: vi.fn(),
+    subscribe: mockQuartersSubscribe,
   }),
 }))
 
@@ -275,15 +298,17 @@ describe('ServiceEditorView - Roles tab (Phase 17-04)', () => {
   }
 
   beforeEach(() => {
-    mockIsEditor = false
-    mockOrgId = 'org-1'
+    mockAuthState.isEditor = false
+    mockAuthState.orgId = 'org-1'
     mockRosterOrgId = null
     mockQuartersOrgId = null
     mockQuarters = []
+    mockRosterSubscribe.mockClear()
+    mockQuartersSubscribe.mockClear()
   })
 
   it('editor: Roles tab lists seeded role assignments resolved from the quarterly schedule', async () => {
-    mockIsEditor = true
+    mockAuthState.isEditor = true
     mockQuarters = [
       {
         id: 'q1',
@@ -312,7 +337,7 @@ describe('ServiceEditorView - Roles tab (Phase 17-04)', () => {
   })
 
   it('editor: override control (checkbox picker) appears, filtered by role eligibility', async () => {
-    mockIsEditor = true
+    mockAuthState.isEditor = true
     mockQuarters = [
       {
         id: 'q1',
@@ -349,7 +374,7 @@ describe('ServiceEditorView - Roles tab (Phase 17-04)', () => {
   })
 
   it('non-editor: Roles tab button is hidden and no roster/quarters data is read', async () => {
-    mockIsEditor = false
+    mockAuthState.isEditor = false
 
     const wrapper = await mountView()
     const rolesTabBtn = wrapper.findAll('button').find((b) => b.text() === 'Roles')
@@ -357,7 +382,7 @@ describe('ServiceEditorView - Roles tab (Phase 17-04)', () => {
   })
 
   it('editor: empty state renders when no quarter covers the service date', async () => {
-    mockIsEditor = true
+    mockAuthState.isEditor = true
     mockQuarters = [] // no quarter at all covers '2026-03-08'
 
     const wrapper = await mountView()
@@ -365,5 +390,81 @@ describe('ServiceEditorView - Roles tab (Phase 17-04)', () => {
     await rolesTabBtn!.trigger('click')
 
     expect(wrapper.text()).toContain('No schedule found for this date')
+  })
+
+  // ── WR-01 regression ──────────────────────────────────────────────────────────
+  // initStores() must re-subscribe roster/quarters once authStore.isEditor
+  // resolves to true *after* mount (e.g. a real editor landing directly on
+  // /services/:id before loadOrgContext() finishes) — not just when isEditor
+  // was already true at mount time.
+  it('editor: roster/quarters are subscribed once authStore.isEditor flips true after mount (WR-01)', async () => {
+    // Simulate landing on the page before the role has resolved.
+    mockAuthState.isEditor = false
+
+    await mountView()
+
+    // Not editor yet at mount time — must not have subscribed.
+    expect(mockRosterSubscribe).not.toHaveBeenCalled()
+    expect(mockQuartersSubscribe).not.toHaveBeenCalled()
+
+    // Role resolves asynchronously (mirrors loadOrgContext() completing).
+    mockAuthState.isEditor = true
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(mockRosterSubscribe).toHaveBeenCalledWith('org-1')
+    expect(mockQuartersSubscribe).toHaveBeenCalledWith('org-1')
+  })
+
+  // ── WR-02 regression ──────────────────────────────────────────────────────────
+  // Toggling two different people's checkboxes for the *same* role in quick
+  // succession must not let the second write clobber the first — the
+  // optimistic local update means the second toggle reads the just-applied
+  // state instead of a stale pre-write baseline.
+  it('editor: rapid toggles of two different people for the same role do not clobber each other (WR-02)', async () => {
+    mockAuthState.isEditor = true
+    mockQuarters = [
+      {
+        id: 'q1',
+        label: 'Q1 2026',
+        year: 2026,
+        quarter: 1,
+        serviceDates: ['2026-03-08'],
+        roleOverridesByDate: {},
+        personQuarterData: {},
+        // Nobody scheduled for Vocals yet — both Alice and Carol are role-vox
+        // eligible candidates offered in the checkbox group.
+        calendar: { '2026-03-08': {} },
+        status: 'finalized',
+        shareToken: null,
+        createdAt: mockTimestamp,
+        updatedAt: mockTimestamp,
+      },
+    ]
+
+    const wrapper = await mountView()
+    const rolesTabBtn = wrapper.findAll('button').find((b) => b.text() === 'Roles')
+    await rolesTabBtn!.trigger('click')
+
+    const aliceLabel = wrapper.findAll('label').find((l) => l.text() === 'Alice')
+    const carolLabel = wrapper.findAll('label').find((l) => l.text() === 'Carol')
+    expect(aliceLabel?.exists()).toBe(true)
+    expect(carolLabel?.exists()).toBe(true)
+
+    const aliceCheckbox = aliceLabel!.find('input[type="checkbox"]')
+    const carolCheckbox = carolLabel!.find('input[type="checkbox"]')
+
+    // Toggle Alice, then Carol, for the same role — awaiting each in turn
+    // (this is exactly what the reactive-store round-trip fails to keep up
+    // with pre-fix, since the mocked setRoleOverride never updates
+    // serviceStore.services; only the optimistic local mutation does).
+    await aliceCheckbox.setValue(true)
+    await carolCheckbox.setValue(true)
+
+    // The last write must include BOTH people, not just Carol.
+    const lastCallArgs = mockSetRoleOverride.mock.calls[mockSetRoleOverride.mock.calls.length - 1]
+    expect(lastCallArgs?.[1]).toBe('role-vox')
+    expect(lastCallArgs?.[2]).toEqual(expect.arrayContaining(['person-1', 'person-3']))
+    expect(lastCallArgs?.[2]).toHaveLength(2)
   })
 })
