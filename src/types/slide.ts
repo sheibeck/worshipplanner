@@ -51,9 +51,42 @@ export interface ScriptureSlide extends SlideBase {
 }
 
 /**
+ * A text slide — freeform text content (prayer/message/hymn placeholder slides,
+ * future section-title slides). Backs slots that have no dedicated slide type.
+ */
+export interface TextSlide extends SlideBase {
+  contentKind: 'text'
+  title?: string
+  body: string
+}
+
+/**
  * Discriminated union of all slide variants.
  *
  * Narrow on `contentKind` (and further on shape-specific fields) to access
  * variant-specific properties.
  */
-export type Slide = LyricSlide | CopyrightSlide | ScriptureSlide
+export type Slide = LyricSlide | CopyrightSlide | ScriptureSlide | TextSlide
+
+/**
+ * Wraps a single unified Slide with the service-slot provenance that produced it.
+ * Emitted by the assembly engine — the assembled slideshow is `AssembledSlide[]`,
+ * never a parallel slide hierarchy (D001).
+ */
+export interface AssembledSlide {
+  slide: Slide
+  slotIndex: number
+  slotKind: import('./service').SlotKind
+  section?: import('./service').ServiceSection
+  sourceId: string | null
+}
+
+/**
+ * A section-grouped view of assembled slides for the preview panel.
+ * `section` is `undefined` for legacy slots that predate the section field.
+ */
+export interface AssembledSection {
+  section: import('./service').ServiceSection | undefined
+  label: string
+  slides: AssembledSlide[]
+}
