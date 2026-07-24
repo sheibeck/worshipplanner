@@ -6,11 +6,14 @@ import type {
   ServiceSlot,
   SongSlot,
   ScriptureSlot,
+  NonAssignableSlot,
+  HymnSlot,
 } from '@/types/service'
 import type { SongLyrics } from '@/types/songLyrics'
 import type { ScriptureReading } from '@/types/scriptureReading'
-import type { ScriptureSlide, CopyrightSlide, LyricSlide } from '@/types/slide'
+import type { ScriptureSlide, CopyrightSlide, LyricSlide, TextSlide } from '@/types/slide'
 import type { Timestamp } from 'firebase/firestore'
+import { slotLabel } from '@/utils/slotTypes'
 
 const mockTimestamp = { toDate: () => new Date('2026-01-01') } as unknown as Timestamp
 
@@ -270,5 +273,129 @@ describe('assembleSlideshow — scripture resolution', () => {
     const service = makeService([slot])
     const result = assembleSlideshow(service, makeInputs())
     expect(result).toHaveLength(0)
+  })
+})
+
+describe('assembleSlideshow — text/hymn slots', () => {
+  it('PRAYER slot emits exactly one TextSlide-backed AssembledSlide with sourceId null', () => {
+    const slot: NonAssignableSlot = { kind: 'PRAYER', position: 0 }
+    const service = makeService([slot])
+
+    const result = assembleSlideshow(service, makeInputs())
+
+    expect(result).toHaveLength(1)
+    expect(result[0]!.slide.contentKind).toBe('text')
+    expect(result[0]!.sourceId).toBeNull()
+    expect((result[0]!.slide as TextSlide).title).toBe(slotLabel(slot))
+  })
+
+  it('MESSAGE slot emits exactly one TextSlide-backed AssembledSlide with sourceId null', () => {
+    const slot: NonAssignableSlot = { kind: 'MESSAGE', position: 0 }
+    const service = makeService([slot])
+
+    const result = assembleSlideshow(service, makeInputs())
+
+    expect(result).toHaveLength(1)
+    expect(result[0]!.slide.contentKind).toBe('text')
+    expect(result[0]!.sourceId).toBeNull()
+    expect((result[0]!.slide as TextSlide).title).toBe(slotLabel(slot))
+  })
+
+  it('HYMN slot emits exactly one TextSlide-backed AssembledSlide whose body reflects hymnName and verses', () => {
+    const slot: HymnSlot = { kind: 'HYMN', position: 0, hymnName: 'How Great Thou Art', hymnNumber: '12', verses: '1, 2, 4' }
+    const service = makeService([slot])
+
+    const result = assembleSlideshow(service, makeInputs())
+
+    expect(result).toHaveLength(1)
+    expect(result[0]!.slide.contentKind).toBe('text')
+    expect(result[0]!.sourceId).toBeNull()
+    const body = (result[0]!.slide as TextSlide).body
+    expect(body).toContain('How Great Thou Art')
+    expect(body).toContain('1, 2, 4')
+  })
+
+  it('HYMN slot with no verses reflects hymnName only in body', () => {
+    const slot: HymnSlot = { kind: 'HYMN', position: 0, hymnName: 'Holy, Holy, Holy', hymnNumber: '', verses: '' }
+    const service = makeService([slot])
+
+    const result = assembleSlideshow(service, makeInputs())
+
+    expect((result[0]!.slide as TextSlide).body).toBe('Holy, Holy, Holy')
+  })
+})
+
+describe('assembleSlideshow — reorder ordering (R006)', () => {
+  it('swapping two slots positions reorders the assembled output correspondingly, with no other change', () => {
+    const slotA: NonAssignableSlot = { kind: 'PRAYER', position: 0 }
+    const slotB: NonAssignableSlot = { kind: 'MESSAGE', position: 1 }
+
+    const before = assembleSlideshow(makeService([slotA, slotB]), makeInputs())
+    expect(before.map((s) => s.slotKind)).toEqual(['PRAYER', 'MESSAGE'])
+
+    const swappedA: NonAssignableSlot = { ...slotA, position: 1 }
+    const swappedB: NonAssignableSlot = { ...slotB, position: 0 }
+    const after = assembleSlideshow(makeService([swappedA, swappedB]), makeInputs())
+
+    expect(after.map((s) => s.slotKind)).toEqual(['MESSAGE', 'PRAYER'])
+    // Content is otherwise unchanged — only order differs.
+    expect(after.map((s) => (s.slide as TextSlide).title).sort()).toEqual(
+      before.map((s) => (s.slide as TextSlide).title).sort(),
+    )
+  })
+})
+
+describe('assembleSlideshow — section metadata pass-through', () => {
+  it('a legacy service whose slots all have section === undefined produces AssembledSlides all with section === undefined', () => {
+    const slots: ServiceSlot[] = [
+      { kind: 'PRAYER', position: 0 },
+      { kind: 'MESSAGE', position: 1 },
+    ]
+    const service = makeService(slots)
+
+    const result = assembleSlideshow(service, makeInputs())
+
+    expect(result.length).toBeGreaterThan(0)
+    for (const assembled of result) {
+      expect(assembled.section).toBeUndefined()
+    }
+  })
+
+  it('a mixed service (song + scripture + prayer) spanning worship/message/sending produces correct per-slide section metadata', () => {
+    const songSlotWorship = songSlot({ songId: 'song-1', section: 'worship' })
+    const scriptureSlotWorship = scriptureSlot({ scriptureReadingId: 'reading-1', section: 'worship', position: 1 })
+    const prayerSlotMessage: NonAssignableSlot = { kind: 'PRAYER', position: 2, section: 'message' }
+    const songSlotSending = songSlot({ songId: 'song-2', section: 'sending', position: 3 })
+
+    const lyrics1 = makeSongLyrics()
+    const lyrics2 = makeSongLyrics({
+      songId: 'song-2',
+      sections: [{ id: 'verse-1', label: 'Verse 1', lines: ['Line X'] }],
+      performanceOrder: ['verse-1'],
+    })
+    const reading = makeScriptureReading()
+
+    const inputs = makeInputs({
+      songLyricsById: new Map([['song-1', lyrics1], ['song-2', lyrics2]]),
+      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus']]]),
+      scriptureReadingsById: new Map([['reading-1', reading]]),
+    })
+
+    const service = makeService([songSlotWorship, scriptureSlotWorship, prayerSlotMessage, songSlotSending])
+    const result = assembleSlideshow(service, inputs)
+
+    // song-1: copyright, verse-1, chorus, copyright (4) — worship
+    // reading-1: 2 slides — worship
+    // prayer: 1 slide — message
+    // song-2: copyright, verse-1, copyright (3) — sending
+    expect(result.map((r) => r.section)).toEqual([
+      'worship', 'worship', 'worship', 'worship',
+      'worship', 'worship',
+      'message',
+      'sending', 'sending', 'sending',
+    ])
+    expect(result.filter((r) => r.section === 'worship')).toHaveLength(6)
+    expect(result.filter((r) => r.section === 'message')).toHaveLength(1)
+    expect(result.filter((r) => r.section === 'sending')).toHaveLength(3)
   })
 })
