@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exported_at": "2026-07-23T19:58:10.841Z",
+  "exported_at": "2026-07-23T20:12:25.443Z",
   "requirements": [
     {
       "id": "R001",
@@ -409,8 +409,18 @@
       "slice_id": null,
       "task_id": null,
       "full_content": "# M001: Worship Service Slide Management\n\n**Vision:** A full slide management system for worship services — lyrics, scripture, imported presentations, and media — that auto-assembles from the service order and is approachable for non-technical church volunteers\n\n## Success Criteria\n\n- A volunteer can paste lyrics from SongSelect, build the performance order, add the song to a service, import a sermon PowerPoint, and preview the complete slideshow end to end\n- Reordering service elements causes the slideshow to automatically reorder without manual intervention\n- Media (audio/video) auto-plays in the presentation preview when advancing to a media slide\n- A PPTX file uploaded through the import flow is correctly parsed by the Cloud Function and appears as editable native slides\n- The slide editor is polished and intuitive enough for a non-technical volunteer to use on first attempt without training\n\n## Slices\n\n- [ ] **S01: Song Lyric Slides and Editor** `risk:high` `depends:[]`\n  > After this: Paste CCLI lyrics, see auto-split slides with copyright, arrange performance order with repeats, edit and revert with auto-save\n\n- [ ] **S02: Scripture and Congregational Reading Slides** `risk:medium` `depends:[S01]`\n  > After this: Enter a scripture reference, see auto-pulled ESV text split into slides; toggle congregational mode with Leader/Congregation labels; manually override auto-generated slides\n\n- [ ] **S03: Service Sections and Slide Auto-Assembly** `risk:high` `depends:[S01,S02]`\n  > After this: Create a service with Pre-Service/Worship/Message/Sending sections, add songs and scripture, see slideshow auto-assemble; reorder elements and watch slides follow\n\n- [ ] **S04: PowerPoint Import for Announcements and Sermon** `risk:medium` `depends:[S03]`\n  > After this: Upload a .pptx file, see it parsed into native slides; add announcement and sermon sections to a service with imported slides\n\n- [ ] **S05: Media Attachments and Storage Lifecycle** `risk:medium` `depends:[S01]`\n  > After this: Attach MP3 or video to a slide, see it auto-play in the editor preview; verify 2-week cleanup policy works on old media\n\n- [ ] **S06: Presentation Preview Mode** `risk:low` `depends:[S03,S05]`\n  > After this: Open full-screen preview of a complete service slideshow, advance through all slide types with media playback working\n\n## Boundary Map\n\n### S01 → S02\\n\\nProduces:\\n- Unified slide data model (Firestore schema) with content-kind field\\n- Slide CRUD operations and Pinia store\\n- Auto-save infrastructure (debounced Firestore writes)\\n\\nConsumes:\\n- nothing (first slice)\\n\\n### S01 → S03\\n\\nProduces:\\n- Song lyric slide sequences stored per-song in catalog (live reference target)\\n- Slide rendering components for lyric content type\\n\\nConsumes:\\n- nothing (first slice)\\n\\n### S01 → S05\\n\\nProduces:\\n- Unified slide data model with media attachment fields (audioUrl, videoUrl)\\n- Slide editor component with attachment UI hooks\\n\\nConsumes:\\n- nothing (first slice)\\n\\n### S02 → S03\\n\\nProduces:\\n- Scripture slide generation from ESV API with auto-split\\n- Congregational reading slide variant\\n\\nConsumes:\\n- Unified slide model and CRUD operations from S01\\n\\n### S03 → S04\\n\\nProduces:\\n- Service section model (Pre-Service, Worship, Message, Sending)\\n- Slideshow assembly engine that accepts any slide source\\n- Service element → slide section binding\\n\\nConsumes:\\n- Song lyric slides from S01 (live catalog references)\\n- Scripture slides from S02\\n\\n### S03 → S06\\n\\nProduces:\\n- Assembled slideshow (ordered array of slides from all sources)\\n- Service-to-slideshow binding that auto-updates on reorder\\n\\nConsumes:\\n- Song and scripture slides from S01, S02\\n\\n### S05 → S06\\n\\nProduces:\\n- Media attachment data (Firebase Storage URLs) on slides\\n- Audio/video playback components with auto-play behavior\\n\\nConsumes:\\n- Unified slide model from S01\n",
-      "imported_at": "2026-07-23T19:58:10.739Z",
+      "imported_at": "2026-07-23T20:12:25.343Z",
       "content_hash": "df0d2a3b295a87e72c1ce217c95b2197e19efb75b1690f7e926cdc1393ac6c80"
+    },
+    {
+      "path": "milestones/M001/slices/S01/S01-PLAN.md",
+      "artifact_type": "PLAN",
+      "milestone_id": "M001",
+      "slice_id": "S01",
+      "task_id": null,
+      "full_content": "# S01: Song Lyric Slides and Editor\n\n**Goal:** After this slice: a user can paste CCLI lyrics, see auto-split slides with copyright, arrange performance order with repeats, edit and revert with auto-save\n**Demo:** Paste CCLI lyrics, see auto-split slides with copyright, arrange performance order with repeats, edit and revert with auto-save\n\n## Must-Haves\n\n- R001: CCLI SongSelect paste auto-splits into lyric sections with correct section labels\\n- R002: Copyright info (title, authors, CCLI song number, copyright lines, license number) extracted and displayed\\n- R003: Performance order builder allows adding, removing, reordering sections with repeats via drag-and-drop\\n- R004: Version snapshots created on explicit save, revert to any previous version works\\n- R017: Auto-save with 800ms debounce persists edits as user works, status indicator shows save state\\n- R018: Dark-first polished UI usable by non-technical volunteers on first attempt\\n- R019: Unified Slide type with contentKind discriminator field established\\n- R020: Lyrics stored per-song in catalog subcollection, not per-service copies\n\n## Verification\n\n- Run the task and slice verification checks for this slice.\n\n<tasks>\n- [x] **T01**: CCLI paste parser and core lyric/slide types with 19 passing tests _(M)_\n  Create the foundational types and the CCLI SongSelect paste parser.\n  - Files: `src/types/slide.ts`, `src/types/songLyrics.ts`, `src/utils/ccliParser.ts`, `src/utils/__tests__/ccliParser.test.ts`\n  - Verify: npx vitest run src/utils/__tests__/ccliParser.test.ts --reporter=verbose\n- [x] **T02**: Reusable useAutoSave composable extracted from ServiceEditorView pattern with 12 passing tests _(M)_\n  Extract the auto-save debounce pattern from ServiceEditorView into a reusable composable.\n  - Files: `src/composables/useAutoSave.ts`, `src/composables/__tests__/useAutoSave.test.ts`\n  - Verify: npx vitest run src/composables/__tests__/useAutoSave.test.ts --reporter=verbose\n- [ ] **T03**: Song Lyrics Pinia Store with Firestore Subcollection CRUD _(M)_\n  Create the Pinia store for lyrics subcollection CRUD, subscription, and version snapshots.\n  - Files: `src/stores/songLyrics.ts`, `src/types/song.ts`, `src/stores/songs.ts`, `src/stores/__tests__/songLyrics.test.ts`\n  - Verify: npx vitest run src/stores/__tests__/songLyrics.test.ts --reporter=verbose\n- [ ] **T04**: Lyric Paste Dialog Component _(M)_\n  Create the paste dialog where users paste CCLI SongSelect text and preview parsed sections before confirming.\n  - Files: `src/components/LyricPasteDialog.vue`, `src/components/__tests__/LyricPasteDialog.test.ts`\n  - Verify: npx vitest run src/components/__tests__/LyricPasteDialog.test.ts --reporter=verbose\n- [ ] **T05**: Song Lyric Editor with Auto-Save and Copyright Display _(L)_\n  Create the main lyric editor that displays parsed sections with inline editing, auto-save status, and copyright display.\n  - Files: `src/components/SongLyricEditor.vue`, `src/components/__tests__/SongLyricEditor.test.ts`\n  - Verify: npx vitest run src/components/__tests__/SongLyricEditor.test.ts --reporter=verbose\n- [ ] **T06**: Performance Order Builder with Drag-and-Drop _(M)_\n  Create the performance order builder where users arrange section order with repeats using drag-and-drop.\n  - Files: `src/components/PerformanceOrderBuilder.vue`, `src/components/__tests__/PerformanceOrderBuilder.test.ts`\n  - Verify: npx vitest run src/components/__tests__/PerformanceOrderBuilder.test.ts --reporter=verbose\n- [ ] **T07**: Version History UI and SongSlideOver Lyrics Tab Integration _(L)_\n  Create the version history component and integrate all lyrics UI into SongSlideOver as a tabbed interface.\n  - Files: `src/components/LyricVersionHistory.vue`, `src/components/SongSlideOver.vue`, `src/components/__tests__/LyricVersionHistory.test.ts`, `src/components/__tests__/SongSlideOver.test.ts`\n  - Verify: npx vitest run src/components/__tests__/LyricVersionHistory.test.ts src/components/__tests__/SongSlideOver.test.ts --reporter=verbose\n</tasks>\n\n## Files Likely Touched\n\n- src/types/slide.ts\n- src/types/songLyrics.ts\n- src/utils/ccliParser.ts\n- src/utils/__tests__/ccliParser.test.ts\n- src/composables/useAutoSave.ts\n- src/composables/__tests__/useAutoSave.test.ts\n- src/stores/songLyrics.ts\n- src/types/song.ts\n- src/stores/songs.ts\n- src/stores/__tests__/songLyrics.test.ts\n- src/components/LyricPasteDialog.vue\n- src/components/__tests__/LyricPasteDialog.test.ts\n- src/components/SongLyricEditor.vue\n- src/components/__tests__/SongLyricEditor.test.ts\n- src/components/PerformanceOrderBuilder.vue\n- src/components/__tests__/PerformanceOrderBuilder.test.ts\n- src/components/LyricVersionHistory.vue\n- src/components/SongSlideOver.vue\n- src/components/__tests__/LyricVersionHistory.test.ts\n- src/components/__tests__/SongSlideOver.test.ts\n",
+      "imported_at": "2026-07-23T20:12:25.034Z",
+      "content_hash": "0f143a9654b027ef135bff39fde7352c46928aea677f4a350cbceb486d0a959b"
     },
     {
       "path": "milestones/M001/slices/S01/S01-RESEARCH.md",
@@ -728,19 +738,26 @@
       "milestone_id": "M001",
       "slice_id": "S01",
       "id": "T01",
-      "title": "CCLI Paste Parser and Core Types",
-      "status": "pending",
-      "one_liner": "",
-      "narrative": "",
-      "verification_result": "",
+      "title": "CCLI paste parser and core lyric/slide types with 19 passing tests",
+      "status": "complete",
+      "one_liner": "CCLI paste parser and core lyric/slide types with 19 passing tests",
+      "narrative": "Created four files: src/types/slide.ts (unified Slide type with contentKind discriminator), src/types/songLyrics.ts (LyricSection, CopyrightInfo, SongLyrics, ParsedCCLI interfaces), src/utils/ccliParser.ts (full CCLI SongSelect paste parser handling legacy and 2023+ formats, parenthetical section markers, and edge cases), and src/utils/__tests__/ccliParser.test.ts (19 comprehensive tests). Fixed a bug where the SongSelect terms-of-use boilerplate line was being treated as an author candidate by adding TERMS_LINE_RE detection to isFooterLine() and parseFooter().",
+      "verification_result": "All 19 tests pass via npx vitest run src/utils/__tests__/ccliParser.test.ts --reporter=verbose --pool=threads",
       "duration": "",
-      "completed_at": null,
+      "completed_at": "2026-07-23T20:12:20.097Z",
       "blocker_discovered": false,
-      "deviations": "",
-      "known_issues": "",
-      "key_files": [],
-      "key_decisions": [],
-      "full_summary_md": "",
+      "deviations": "None.",
+      "known_issues": "None.",
+      "key_files": [
+        "src/types/slide.ts",
+        "src/types/songLyrics.ts",
+        "src/utils/ccliParser.ts",
+        "src/utils/__tests__/ccliParser.test.ts"
+      ],
+      "key_decisions": [
+        "Added TERMS_LINE_RE regex to detect and skip the SongSelect terms-of-use boilerplate line in footer parsing"
+      ],
+      "full_summary_md": "---\nid: T01\nparent: S01\nmilestone: M001\nkey_files:\n  - src/types/slide.ts\n  - src/types/songLyrics.ts\n  - src/utils/ccliParser.ts\n  - src/utils/__tests__/ccliParser.test.ts\nkey_decisions:\n  - Added TERMS_LINE_RE regex to detect and skip the SongSelect terms-of-use boilerplate line in footer parsing\nduration: \nverification_result: passed\ncompleted_at: 2026-07-23T20:12:20.093Z\nblocker_discovered: false\n---\n\n# T01: CCLI paste parser and core lyric/slide types with 19 passing tests\n\n**CCLI paste parser and core lyric/slide types with 19 passing tests**\n\n## What Happened\n\nCreated four files: src/types/slide.ts (unified Slide type with contentKind discriminator), src/types/songLyrics.ts (LyricSection, CopyrightInfo, SongLyrics, ParsedCCLI interfaces), src/utils/ccliParser.ts (full CCLI SongSelect paste parser handling legacy and 2023+ formats, parenthetical section markers, and edge cases), and src/utils/__tests__/ccliParser.test.ts (19 comprehensive tests). Fixed a bug where the SongSelect terms-of-use boilerplate line was being treated as an author candidate by adding TERMS_LINE_RE detection to isFooterLine() and parseFooter().\n\n## Verification\n\nAll 19 tests pass via npx vitest run src/utils/__tests__/ccliParser.test.ts --reporter=verbose --pool=threads\n\n## Verification Evidence\n\n| # | Command | Exit Code | Verdict | Duration |\n|---|---------|-----------|---------|----------|\n| 1 | `npx vitest run src/utils/__tests__/ccliParser.test.ts --reporter=verbose --pool=threads` | 0 | 19 passed | 10240ms |\n\n## Deviations\n\nNone.\n\n## Known Issues\n\nNone.\n\n## Files Created/Modified\n\n- `src/types/slide.ts`\n- `src/types/songLyrics.ts`\n- `src/utils/ccliParser.ts`\n- `src/utils/__tests__/ccliParser.test.ts`\n",
       "description": "Create the foundational types and the CCLI SongSelect paste parser.\n\n1. Create src/types/slide.ts with the unified Slide type:\n   - contentKind discriminator field ('lyric' initially, 'scripture'/'imported' in later slices)\n   - Common fields: id, position, contentKind\n   - Lyric-specific fields: sectionId, sectionLabel, lines (string[])\n   - Copyright-specific fields: title, authors, ccliSongNumber, copyrightLines, ccliLicenseNumber\n\n2. Create src/types/songLyrics.ts with:\n   - LyricSection interface: id (slug like 'verse-1', 'chorus'), label (display name like 'Verse 1'), lines (string[])\n   - CopyrightInfo interface: title, authors (string[]), ccliSongNumber, copyrightLines (string[]), ccliLicenseNumber\n   - SongLyrics interface: id, songId, sections (LyricSection[]), copyright (CopyrightInfo), performanceOrder (string[]), createdAt, updatedAt\n   - ParsedCCLI interface (parser output): title, sections (LyricSection[]), copyright (CopyrightInfo)\n\n3. Create src/utils/ccliParser.ts with parseCCLIPaste(rawText: string): ParsedCCLI:\n   - Extract title from first non-blank line\n   - Match section headers with regex: /^(Verse|Chorus|Bridge|Pre-Chorus|Ending|Tag|Misc|Intro)\\s*\\d*$/i\n   - Handle parenthetical section markers like (PRE-CHORUS) and (BRIDGE) as first line of a section\n   - Collect lyric lines between section header and next double-blank-line\n   - Detect footer by 'CCLI Song' prefix; parse both legacy format (pipe-delimited authors, CCLI Song # first) and 2023 format (comma-delimited authors, authors first)\n   - Handle edge cases: Unicode copyright symbol vs ASCII (c), varying spaces before #, missing section numbers (default to 1), multiple copyright lines, empty paste, title-only paste\n   - Generate section IDs as slugified label: 'Verse 1' -> 'verse-1', 'Chorus' -> 'chorus'\n   - Default performanceOrder: sections in definition order, each once\n\n4. Create src/utils/__tests__/ccliParser.test.ts with comprehensive tests:\n   - Legacy format, 2023 format, missing section numbers, Pre-Chorus edge cases, multiple copyright lines, Unicode/ASCII copyright symbols, empty paste, title-only paste, section ID generation",
       "estimate": "M",
       "files": [
@@ -776,19 +793,22 @@
       "milestone_id": "M001",
       "slice_id": "S01",
       "id": "T02",
-      "title": "Auto-Save Composable Extraction",
-      "status": "pending",
-      "one_liner": "",
-      "narrative": "",
-      "verification_result": "",
+      "title": "Reusable useAutoSave composable extracted from ServiceEditorView pattern with 12 passing tests",
+      "status": "complete",
+      "one_liner": "Reusable useAutoSave composable extracted from ServiceEditorView pattern with 12 passing tests",
+      "narrative": "Created src/composables/useAutoSave.ts with deep watcher, configurable debounce (default 800ms), inflight guard, reactive status (idle/pending/saving/saved), flush(), cleanup(), and optional isDirty guard. Created src/composables/__tests__/useAutoSave.test.ts with 12 tests covering all specified behaviors. Committed at d5d7947.",
+      "verification_result": "All 12 tests pass via npx vitest run src/composables/__tests__/useAutoSave.test.ts --reporter=verbose",
       "duration": "",
-      "completed_at": null,
+      "completed_at": "2026-07-23T20:12:24.920Z",
       "blocker_discovered": false,
-      "deviations": "",
-      "known_issues": "",
-      "key_files": [],
+      "deviations": "None.",
+      "known_issues": "None.",
+      "key_files": [
+        "src/composables/useAutoSave.ts",
+        "src/composables/__tests__/useAutoSave.test.ts"
+      ],
       "key_decisions": [],
-      "full_summary_md": "",
+      "full_summary_md": "---\nid: T02\nparent: S01\nmilestone: M001\nkey_files:\n  - src/composables/useAutoSave.ts\n  - src/composables/__tests__/useAutoSave.test.ts\nkey_decisions:\n  - (none)\nduration: \nverification_result: passed\ncompleted_at: 2026-07-23T20:12:24.920Z\nblocker_discovered: false\n---\n\n# T02: Reusable useAutoSave composable extracted from ServiceEditorView pattern with 12 passing tests\n\n**Reusable useAutoSave composable extracted from ServiceEditorView pattern with 12 passing tests**\n\n## What Happened\n\nCreated src/composables/useAutoSave.ts with deep watcher, configurable debounce (default 800ms), inflight guard, reactive status (idle/pending/saving/saved), flush(), cleanup(), and optional isDirty guard. Created src/composables/__tests__/useAutoSave.test.ts with 12 tests covering all specified behaviors. Committed at d5d7947.\n\n## Verification\n\nAll 12 tests pass via npx vitest run src/composables/__tests__/useAutoSave.test.ts --reporter=verbose\n\n## Verification Evidence\n\n| # | Command | Exit Code | Verdict | Duration |\n|---|---------|-----------|---------|----------|\n| 1 | `npx vitest run src/composables/__tests__/useAutoSave.test.ts --reporter=verbose` | 0 | 12 passed | 617158ms |\n\n## Deviations\n\nNone.\n\n## Known Issues\n\nNone.\n\n## Files Created/Modified\n\n- `src/composables/useAutoSave.ts`\n- `src/composables/__tests__/useAutoSave.test.ts`\n",
       "description": "Extract the auto-save debounce pattern from ServiceEditorView into a reusable composable.\n\n1. Create src/composables/useAutoSave.ts:\n   - Accept generic parameters: watchSource (WatchSource), saveFn (async callback), options (debounceMs: number, default 800)\n   - Expose reactive status ref: 'idle' | 'pending' | 'saving' | 'saved'\n   - Implement the same pattern as ServiceEditorView lines 1295-1347:\n     - Deep watcher on watchSource\n     - Skip first trigger (initialized guard)\n     - Set status to 'pending' on change, clear and reset debounce timer\n     - Inflight guard prevents concurrent saves (if saving, reschedule)\n     - On timer fire: call saveFn, set status 'saving' -> 'saved' -> fade to 'idle' after 3s\n   - Expose: status (ref), flush() to force immediate save, cleanup() to clear timers\n   - Accept optional isDirty computed to skip save when clean\n\n2. Create src/composables/__tests__/useAutoSave.test.ts:\n   - Test debounce: rapid changes result in single save after debounce period\n   - Test inflight guard: concurrent saves are prevented\n   - Test status transitions: idle -> pending -> saving -> saved -> idle\n   - Test flush: forces immediate save bypassing debounce\n   - Test cleanup: clears pending timers\n   - Test skip when isDirty is false\n   - Use vi.useFakeTimers() for timer control\n\nNote: Do NOT refactor ServiceEditorView to use this composable in this task.",
       "estimate": "M",
       "files": [
@@ -1154,11 +1174,11 @@
       "gate_id": "Q5",
       "scope": "task",
       "task_id": "T01",
-      "status": "pending",
-      "verdict": null,
-      "rationale": "",
+      "status": "complete",
+      "verdict": "omitted",
+      "rationale": "Failure Modes section left empty — recorded as omitted",
       "findings": "",
-      "evaluated_at": null
+      "evaluated_at": "2026-07-23T20:12:20.341Z"
     },
     {
       "milestone_id": "M001",
@@ -1166,11 +1186,11 @@
       "gate_id": "Q5",
       "scope": "task",
       "task_id": "T02",
-      "status": "pending",
-      "verdict": null,
-      "rationale": "",
+      "status": "complete",
+      "verdict": "omitted",
+      "rationale": "Failure Modes section left empty — recorded as omitted",
       "findings": "",
-      "evaluated_at": null
+      "evaluated_at": "2026-07-23T20:12:25.145Z"
     },
     {
       "milestone_id": "M001",
@@ -1238,11 +1258,11 @@
       "gate_id": "Q6",
       "scope": "task",
       "task_id": "T01",
-      "status": "pending",
-      "verdict": null,
-      "rationale": "",
+      "status": "complete",
+      "verdict": "omitted",
+      "rationale": "Load Profile section left empty — recorded as omitted",
       "findings": "",
-      "evaluated_at": null
+      "evaluated_at": "2026-07-23T20:12:20.343Z"
     },
     {
       "milestone_id": "M001",
@@ -1250,11 +1270,11 @@
       "gate_id": "Q6",
       "scope": "task",
       "task_id": "T02",
-      "status": "pending",
-      "verdict": null,
-      "rationale": "",
+      "status": "complete",
+      "verdict": "omitted",
+      "rationale": "Load Profile section left empty — recorded as omitted",
       "findings": "",
-      "evaluated_at": null
+      "evaluated_at": "2026-07-23T20:12:25.146Z"
     },
     {
       "milestone_id": "M001",
@@ -1322,11 +1342,11 @@
       "gate_id": "Q7",
       "scope": "task",
       "task_id": "T01",
-      "status": "pending",
-      "verdict": null,
-      "rationale": "",
+      "status": "complete",
+      "verdict": "omitted",
+      "rationale": "Negative Tests section left empty — recorded as omitted",
       "findings": "",
-      "evaluated_at": null
+      "evaluated_at": "2026-07-23T20:12:20.348Z"
     },
     {
       "milestone_id": "M001",
@@ -1334,11 +1354,11 @@
       "gate_id": "Q7",
       "scope": "task",
       "task_id": "T02",
-      "status": "pending",
-      "verdict": null,
-      "rationale": "",
+      "status": "complete",
+      "verdict": "omitted",
+      "rationale": "Negative Tests section left empty — recorded as omitted",
       "findings": "",
-      "evaluated_at": null
+      "evaluated_at": "2026-07-23T20:12:25.146Z"
     },
     {
       "milestone_id": "M001",
@@ -1413,6 +1433,29 @@
       "evaluated_at": null
     }
   ],
-  "verification_evidence": [],
+  "verification_evidence": [
+    {
+      "id": 1,
+      "task_id": "T01",
+      "slice_id": "S01",
+      "milestone_id": "M001",
+      "command": "npx vitest run src/utils/__tests__/ccliParser.test.ts --reporter=verbose --pool=threads",
+      "exit_code": 0,
+      "verdict": "19 passed",
+      "duration_ms": 10240,
+      "created_at": "2026-07-23T20:12:20.097Z"
+    },
+    {
+      "id": 2,
+      "task_id": "T02",
+      "slice_id": "S01",
+      "milestone_id": "M001",
+      "command": "npx vitest run src/composables/__tests__/useAutoSave.test.ts --reporter=verbose",
+      "exit_code": 0,
+      "verdict": "12 passed",
+      "duration_ms": 617158,
+      "created_at": "2026-07-23T20:12:24.921Z"
+    }
+  ],
   "milestone_commit_attributions": []
 }
