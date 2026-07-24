@@ -136,10 +136,9 @@ describe('SlideshowPreview', () => {
 
   it('imports no Pinia store', async () => {
     const fs = await import('node:fs')
-    const source = fs.readFileSync(
-      new URL('../SlideshowPreview.vue', import.meta.url),
-      'utf-8',
-    )
+    const path = await import('node:path')
+    const filePath = path.resolve(process.cwd(), 'src/components/SlideshowPreview.vue')
+    const source = fs.readFileSync(filePath, 'utf-8')
     expect(source).not.toMatch(/use\w*Store/)
   })
 })
