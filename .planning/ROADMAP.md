@@ -52,8 +52,14 @@ non-technical church volunteers.
 **Goal:** Create a service with Pre-Service/Worship/Message/Sending sections, add songs and scripture, and see the slideshow auto-assemble; reorder elements and watch slides follow. Produces the service-section model, the slideshow assembly engine (accepts any slide source), and the service-element→slide-section binding that auto-updates on reorder — without breaking existing flat-slot-array services.
 **Depends on:** Phase 18, Phase 19
 **Requirements:** R005, R006, R007, R018 (supporting)
-**Status:** ▶️ **ACTIVE** — research done (`20-RESEARCH.md`); not yet planned. Next action: `/gsd-plan-phase 20`.
-**Plans:** 0 (needs planning)
+**Status:** ▶️ **ACTIVE** — planned (`20-01`..`20-04`). Next action: `/gsd-execute-phase 20`.
+**Plans:** 4 plans (Waves 1→4, sequential layered build)
+
+Plans:
+- [ ] 20-01-PLAN.md — Section data model: ServiceSection + optional slot section, TextSlide/AssembledSlide types, buildSlots defaults (Wave 1)
+- [ ] 20-02-PLAN.md — Slideshow assembly engine (TDD): pure assembleSlideshow(service, inputs) → AssembledSlide[] (Wave 2)
+- [ ] 20-03-PLAN.md — useSlideshowAssembly composable: reactive multi-song assembly + section grouping (Wave 3)
+- [ ] 20-04-PLAN.md — ServiceEditorView section headers + per-slot section control + inline SlideshowPreview + scripture override marker (Wave 4)
 
 ### Phase 21: PowerPoint Import for Announcements and Sermon `risk:medium`
 
