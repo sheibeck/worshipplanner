@@ -159,6 +159,30 @@ describe('ScriptureSlideEditor', () => {
     expect((textarea.element as HTMLTextAreaElement).value).toBe('Edited slide text')
   })
 
+  it('marks a manually edited slide with the override visual-distinction class (Phase 19 carryover gap)', async () => {
+    const wrapper = mountEditor()
+    await wrapper.find('[data-testid="reference-input"]').setValue('Romans 8:28-30')
+    await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
+    await flushPromises()
+
+    // Before any edit: neither slide card carries the override class or badge.
+    expect(wrapper.find('[data-testid="slide-card-0"]').classes()).not.toContain('border-amber-500/70')
+    expect(wrapper.find('[data-testid="slide-card-1"]').classes()).not.toContain('border-amber-500/70')
+    expect(wrapper.find('[data-testid="edited-badge-0"]').exists()).toBe(false)
+
+    const textarea = wrapper.find('[data-testid="slide-textarea-0"]')
+    await textarea.setValue('Edited slide text')
+    await textarea.trigger('input')
+    await wrapper.vm.$nextTick()
+
+    // Edited slide (index 0) gains the override class + badge; the untouched
+    // slide (index 1) still carries neither.
+    expect(wrapper.find('[data-testid="slide-card-0"]').classes()).toContain('border-amber-500/70')
+    expect(wrapper.find('[data-testid="edited-badge-0"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="slide-card-1"]').classes()).not.toContain('border-amber-500/70')
+    expect(wrapper.find('[data-testid="edited-badge-1"]').exists()).toBe(false)
+  })
+
   it('auto-save triggers on slide edits via useAutoSave', async () => {
     const { useAutoSave } = await import('@/composables/useAutoSave')
     mountEditor()
