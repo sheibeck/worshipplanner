@@ -5,8 +5,8 @@ milestone_name: Worship Service Slide Management
 current_phase: 20
 current_phase_name: Service Sections and Slide Auto-Assembly
 status: executing
-stopped_at: Completed 20-03-PLAN.md
-last_updated: "2026-07-24T22:57:24.336Z"
+stopped_at: Paused at 20-04 Task 4 human-verify checkpoint (code tasks 1-3 complete)
+last_updated: "2026-07-24T23:26:08.365Z"
 last_activity: 2026-07-24
 progress:
   total_phases: 18
@@ -102,6 +102,7 @@ Status: Ready to execute
 | Phase 20 P01 | 25min | 3 tasks | 4 files |
 | Phase 20 P02 | 9min | 2 tasks | 2 files |
 | Phase 20 P03 | 33min | 1 tasks | 2 files |
+| Phase 20 P04 | 40min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -168,6 +169,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: [Phase 20-03]: assembledSections places the legacy (undefined-section) group TRAILING after named SERVICE_SECTIONS groups; empty section groups are omitted entirely
 - [Phase ?]: [Phase 20-03]: scriptureSlides store has no orgId field (unlike songs store) — composable owns a local subscribedOrgId guard ref to prevent double-subscription instead
 - [Phase ?]: [Phase 20-03]: songLyricsById reactive Map only grows (never prunes) as songs are removed/re-added from the service — matches the T-20-03-DoS 'only fetch missing songIds' mitigation, harmless since the pure engine only reads entries for songIds in the current service
+- [Phase ?]: [Phase 20-04]: Section headers render as sibling divs in the same flat SortableJS list; Sortable's draggable: '.slot-item' option scopes drag/index math to slot items only, keeping onEnd/reindexSlots (MEM008) untouched
+- [Phase ?]: [Phase 20-04]: Per-slot section select mutates slot.section directly, routed through the existing deep-watch(localService) autosave path used by every other slot field — no new persistence path
 
 ### Roadmap Evolution
 
@@ -225,6 +228,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-24
-Last session: 2026-07-24T22:57:24.306Z
-Stopped at: Completed 20-03-PLAN.md
-Resume file: None
+Last session: 2026-07-24T23:25:58.816Z
+Stopped at: Paused at 20-04 Task 4 human-verify checkpoint (code tasks 1-3 complete)
+Resume file: .planning/phases/20-service-sections-and-slide-auto-assembly/20-04-SUMMARY.md
