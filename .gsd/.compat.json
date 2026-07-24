@@ -1,7 +1,7 @@
 {
   "schema": 2,
   "lastWriter": "gsd-pi",
-  "lastProjectedAt": "2026-07-24T14:25:57.220Z",
+  "lastProjectedAt": "2026-07-24T21:20:32.830Z",
   "projections": {
     "milestones/M001/slices/S01/tasks/T01-PLAN.md": {
       "sha": "b8a647357c95d0bb",
@@ -66,57 +66,100 @@
       ]
     },
     "milestones/M001/slices/S01/S01-PLAN.md": {
-      "sha": "905f642eb9d7275b",
+      "sha": "ee81e2559d4bdf0c",
       "entities": [
         "M001",
         "M001/S01"
       ]
     },
-    "milestones/M001/slices/S02/tasks/T01-PLAN.md": {
-      "sha": "583eb00ca82b6071",
-      "entities": [
-        "M001",
-        "M001/S02",
-        "M001/S02/T01"
-      ]
-    },
-    "milestones/M001/slices/S02/tasks/T02-PLAN.md": {
-      "sha": "067c110ca576d05b",
-      "entities": [
-        "M001",
-        "M001/S02",
-        "M001/S02/T02"
-      ]
-    },
-    "milestones/M001/slices/S02/tasks/T03-PLAN.md": {
-      "sha": "03097d041ee6fbb3",
-      "entities": [
-        "M001",
-        "M001/S02",
-        "M001/S02/T03"
-      ]
-    },
-    "milestones/M001/slices/S02/tasks/T04-PLAN.md": {
-      "sha": "61d9c275ab18d15a",
-      "entities": [
-        "M001",
-        "M001/S02",
-        "M001/S02/T04"
-      ]
-    },
-    "milestones/M001/slices/S02/tasks/T05-PLAN.md": {
-      "sha": "cea97aeec5107c11",
-      "entities": [
-        "M001",
-        "M001/S02",
-        "M001/S02/T05"
-      ]
-    },
     "milestones/M001/slices/S02/S02-PLAN.md": {
-      "sha": "784c8ddf9598ad6d",
+      "sha": "65e0f0ab17381cd1",
       "entities": [
         "M001",
         "M001/S02"
+      ]
+    },
+    "phases/01-worship-service-slide-management/01-ROADMAP.md": {
+      "sha": "cb31d6b117651afd",
+      "entities": [
+        "M001"
+      ]
+    },
+    "phases/01-worship-service-slide-management/01-01-ASSESSMENT.md": {
+      "sha": "2b2a01a8e2f0e9bc",
+      "entities": [
+        "M001",
+        "M001/S01"
+      ]
+    },
+    "phases/01-worship-service-slide-management/01-01-PLAN.md": {
+      "sha": "d9c0b62e47972e58",
+      "entities": [
+        "M001",
+        "M001/S01"
+      ]
+    },
+    "phases/01-worship-service-slide-management/01-01-RESEARCH.md": {
+      "sha": "483417266b48fb9c",
+      "entities": [
+        "M001",
+        "M001/S01"
+      ]
+    },
+    "phases/01-worship-service-slide-management/01-01-SUMMARY.md": {
+      "sha": "46b4ecfb904c68b0",
+      "entities": [
+        "M001",
+        "M001/S01"
+      ]
+    },
+    "phases/01-worship-service-slide-management/01-01-UAT.md": {
+      "sha": "58111823a7c4e22f",
+      "entities": [
+        "M001",
+        "M001/S01"
+      ]
+    },
+    "phases/01-worship-service-slide-management/01-02-ASSESSMENT.md": {
+      "sha": "cc2c0364d8b58b6a",
+      "entities": [
+        "M001",
+        "M001/S02"
+      ]
+    },
+    "phases/01-worship-service-slide-management/01-02-PLAN.md": {
+      "sha": "65e0f0ab17381cd1",
+      "entities": [
+        "M001",
+        "M001/S02"
+      ]
+    },
+    "phases/01-worship-service-slide-management/01-02-RESEARCH.md": {
+      "sha": "5980fa4f0b97bfc8",
+      "entities": [
+        "M001",
+        "M001/S02"
+      ]
+    },
+    "phases/01-worship-service-slide-management/01-02-SUMMARY.md": {
+      "sha": "a941b7a5f337b2c7",
+      "entities": [
+        "M001",
+        "M001/S02"
+      ]
+    },
+    "phases/01-worship-service-slide-management/01-02-UAT.md": {
+      "sha": "afe9e70f1709a2e7",
+      "entities": [
+        "M001",
+        "M001/S02"
+      ]
+    },
+    "phases/01-worship-service-slide-management/01-05-RESEARCH.md": {
+      "sha": "8026287fcd3795a3",
+      "entities": [
+        "M001",
+        "M001/S05"
       ]
     }
   },

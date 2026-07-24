@@ -20,15 +20,15 @@
       "args": [
         "mcp",
         "--session",
-        "gsd-M001-14aa1ad5",
+        "gsd-worshipplanner-5d6e5d38",
         "--identity-scope",
         "project",
         "--identity-key",
-        "gsd-M001-14aa1ad5",
+        "gsd-worshipplanner-5d6e5d38",
         "--identity-project",
-        "gsd-M001-14aa1ad5"
+        "gsd-worshipplanner-5d6e5d38"
       ],
-      "cwd": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001"
+      "cwd": "C:\\projects\\worshipplanner"
     }
   }
 }
