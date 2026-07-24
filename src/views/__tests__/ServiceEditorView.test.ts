@@ -5,6 +5,7 @@ import type { Service } from '@/types/service'
 import type { Song } from '@/types/song'
 import type { Person, Role, Quarter } from '@/types/roster'
 import type { Timestamp } from 'firebase/firestore'
+import SlideshowPreview from '@/components/SlideshowPreview.vue'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -27,6 +28,24 @@ vi.mock('firebase/firestore', () => ({
   getDoc: vi.fn(() => Promise.resolve({ data: () => ({ orgIds: ['org-1'] }) })),
   updateDoc: vi.fn(),
   serverTimestamp: vi.fn(() => ({})),
+  // useSlideshowAssembly's default lyrics loader (20-04) issues a one-shot
+  // getDocs query — stub the whole chain so it resolves to "no lyrics doc"
+  // rather than throwing on undefined firestore query builders.
+  query: vi.fn(),
+  orderBy: vi.fn(),
+  limit: vi.fn(),
+  getDocs: vi.fn(() => Promise.resolve({ empty: true, docs: [] })),
+}))
+
+// useSlideshowAssembly (20-04) reads scripture readings from this store — mirrors
+// the reactive-stub mocking pattern used by ScriptureSlideEditor.test.ts.
+vi.mock('@/stores/scriptureSlides', () => ({
+  useScriptureSlides: () => ({
+    readings: [],
+    isLoading: false,
+    subscribeReadings: vi.fn(),
+    unsubscribeReadings: vi.fn(),
+  }),
 }))
 
 const mockTimestamp = { toDate: () => new Date('2026-03-08') } as unknown as Timestamp
@@ -54,6 +73,11 @@ const mockService: Service = {
   createdAt: mockTimestamp,
   updatedAt: mockTimestamp,
 }
+
+// Mutable per-test services list (20-04 section/preview tests swap in a sectioned
+// fixture) — mirrors the mockQuarters/mockRosterOrgId pattern below: read fresh by
+// useServiceStore() on every mount, so a test can reassign it before mountView().
+let mockServicesList: Service[] = [mockService]
 
 const mockSongs: Song[] = [
   {
@@ -94,7 +118,7 @@ const mockClearRoleOverride = vi.fn(() => Promise.resolve())
 
 vi.mock('@/stores/services', () => ({
   useServiceStore: () => ({
-    services: [mockService],
+    services: mockServicesList,
     isLoading: false,
     orgId: null,
     subscribe: vi.fn(),
@@ -466,5 +490,91 @@ describe('ServiceEditorView - Roles tab (Phase 17-04)', () => {
     expect(lastCallArgs?.[1]).toBe('role-vox')
     expect(lastCallArgs?.[2]).toEqual(expect.arrayContaining(['person-1', 'person-3']))
     expect(lastCallArgs?.[2]).toHaveLength(2)
+  })
+})
+
+// ── Sections and inline slideshow preview (Phase 20-04) ─────────────────────────
+
+function buildSectionedService(): Service {
+  return {
+    ...mockService,
+    slots: [
+      { kind: 'SONG', position: 0, requiredVwType: 1, songId: 'song-1', songTitle: 'Amazing Grace', songKey: 'G', section: 'worship' },
+      { kind: 'SCRIPTURE', position: 1, book: 'Psalms', chapter: 23, verseStart: 1, verseEnd: 6, section: 'worship' },
+      { kind: 'MESSAGE', position: 2, section: 'message' },
+      { kind: 'SONG', position: 3, requiredVwType: 3, songId: null, songTitle: null, songKey: null, section: 'sending' },
+    ],
+  }
+}
+
+describe('ServiceEditorView - Section headers and slideshow preview (Phase 20-04)', () => {
+  async function mountView() {
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          RouterLink: { template: '<a><slot /></a>' },
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+        },
+      },
+    })
+  }
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockServicesList = [mockService]
+  })
+
+  it('renders a section header above the first slot of each defined section', async () => {
+    mockServicesList = [buildSectionedService()]
+    const wrapper = await mountView()
+
+    const headers = wrapper.findAll('[data-testid^="section-header-"]')
+    expect(headers).toHaveLength(3)
+    expect(headers[0]?.text()).toContain('Worship')
+    expect(headers[1]?.text()).toContain('Message')
+    expect(headers[2]?.text()).toContain('Sending')
+  })
+
+  it('renders zero section headers for a legacy service where every slot has section === undefined', async () => {
+    mockServicesList = [mockService] // default fixture: no slot carries a `section` field
+    const wrapper = await mountView()
+
+    expect(wrapper.findAll('[data-testid^="section-header-"]')).toHaveLength(0)
+  })
+
+  it('mounts the SlideshowPreview panel bound to the live assembled sections', async () => {
+    mockServicesList = [buildSectionedService()]
+    const wrapper = await mountView()
+
+    const preview = wrapper.findComponent(SlideshowPreview)
+    expect(preview.exists()).toBe(true)
+    expect(Array.isArray(preview.props('sections'))).toBe(true)
+  })
+
+  it('editor: a per-slot section select is bound to slot.section and mutates it through the existing localService path', async () => {
+    mockServicesList = [buildSectionedService()]
+    const wrapper = await mountView()
+
+    const selects = wrapper.findAll('[data-testid="section-select"]')
+    // 4 slots in buildSectionedService(), one select per slot
+    expect(selects).toHaveLength(4)
+    // slot 3 (SONG, currently 'sending') -> reassign to 'worship'
+    expect((selects[3]?.element as HTMLSelectElement).value).toBe('sending')
+    await selects[3]?.setValue('worship')
+    expect((selects[3]?.element as HTMLSelectElement).value).toBe('worship')
+  })
+
+  it('non-editor: no section select renders', async () => {
+    mockAuthState.isEditor = false
+    mockServicesList = [buildSectionedService()]
+    const wrapper = await mountView()
+
+    expect(wrapper.find('[data-testid="section-select"]').exists()).toBe(false)
   })
 })
