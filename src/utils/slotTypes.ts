@@ -1,4 +1,4 @@
-import type { Progression, ServiceSlot, SongSlot, ScriptureSlot, NonAssignableSlot, HymnSlot, SlotKind } from '@/types/service'
+import type { Progression, ServiceSlot, SongSlot, ScriptureSlot, NonAssignableSlot, HymnSlot, SlotKind, ServiceSection } from '@/types/service'
 import type { VWType } from '@/types/song'
 
 export const PROGRESSION_SLOT_TYPES: Record<Progression, Record<number, VWType>> = {
@@ -41,7 +41,10 @@ export function slotLabel(slot: ServiceSlot, _index?: number | string): string {
  * Factory function to create a new slot of the given kind.
  * Position defaults to 0 — it will be set to the array index via reindexSlots.
  */
-export function createSlot(kind: SlotKind, vwType?: VWType): ServiceSlot {
+export function createSlot(kind: SlotKind, vwType?: VWType, section?: ServiceSection): ServiceSlot {
+  // Omit the `section` key entirely when not provided — preserves the legacy
+  // (section === undefined, key absent) shape for backward compatibility.
+  const sectionFields = section ? { section } : {}
   switch (kind) {
     case 'SONG':
       return {
@@ -51,6 +54,7 @@ export function createSlot(kind: SlotKind, vwType?: VWType): ServiceSlot {
         songId: null,
         songTitle: null,
         songKey: null,
+        ...sectionFields,
       } as SongSlot
     case 'SCRIPTURE':
       return {
@@ -60,13 +64,14 @@ export function createSlot(kind: SlotKind, vwType?: VWType): ServiceSlot {
         chapter: null,
         verseStart: null,
         verseEnd: null,
+        ...sectionFields,
       } as ScriptureSlot
     case 'PRAYER':
-      return { kind: 'PRAYER', position: 0 } as NonAssignableSlot
+      return { kind: 'PRAYER', position: 0, ...sectionFields } as NonAssignableSlot
     case 'MESSAGE':
-      return { kind: 'MESSAGE', position: 0 } as NonAssignableSlot
+      return { kind: 'MESSAGE', position: 0, ...sectionFields } as NonAssignableSlot
     case 'HYMN':
-      return { kind: 'HYMN', position: 0, hymnName: '', hymnNumber: '', verses: '' } as HymnSlot
+      return { kind: 'HYMN', position: 0, hymnName: '', hymnNumber: '', verses: '', ...sectionFields } as HymnSlot
   }
 }
 
@@ -76,6 +81,18 @@ export function createSlot(kind: SlotKind, vwType?: VWType): ServiceSlot {
  */
 export function reindexSlots(slots: ServiceSlot[]): ServiceSlot[] {
   return slots.map((slot, index) => ({ ...slot, position: index }))
+}
+
+/**
+ * Default position -> section mapping for the M001 progression template (D005).
+ * There is no default Pre-Service slot in the template (announcements arrive
+ * in Phase 21) — positions 0-6 are 'worship', 7 (MESSAGE) is 'message',
+ * 8 (sending song) is 'sending'.
+ */
+function defaultSectionForPosition(position: number): ServiceSection {
+  if (position === 7) return 'message'
+  if (position === 8) return 'sending'
+  return 'worship'
 }
 
 export function buildSlots(progression: Progression): ServiceSlot[] {
@@ -88,6 +105,7 @@ export function buildSlots(progression: Progression): ServiceSlot[] {
     songId: null,
     songTitle: null,
     songKey: null,
+    section: defaultSectionForPosition(position),
   })
 
   const scriptureSlot = (position: number): ScriptureSlot => ({
@@ -97,6 +115,7 @@ export function buildSlots(progression: Progression): ServiceSlot[] {
     chapter: null,
     verseStart: null,
     verseEnd: null,
+    section: defaultSectionForPosition(position),
   })
 
   const nonAssignableSlot = (
@@ -105,6 +124,7 @@ export function buildSlots(progression: Progression): ServiceSlot[] {
   ): NonAssignableSlot => ({
     kind,
     position,
+    section: defaultSectionForPosition(position),
   })
 
   return [
