@@ -503,11 +503,22 @@
 
         <!-- Dynamic Service Flow -->
         <div ref="slotContainerRef" class="space-y-1.5">
-          <div
-            v-for="(slot, index) in localService.slots"
-            :key="slot.kind + '-' + slot.position"
-            class="rounded-lg bg-gray-900 border border-gray-800 p-3 flex items-start gap-2"
-          >
+          <template v-for="(slot, index) in localService.slots" :key="slot.kind + '-' + slot.position">
+            <!-- Section divider: non-draggable (excluded from Sortable's `draggable` selector below),
+                 computed per-index from showsSectionHeaderAt(); legacy all-undefined services render none -->
+            <div
+              v-if="showsSectionHeaderAt(index)"
+              class="section-header flex items-center gap-2 pt-3 pb-1 first:pt-0"
+              :data-testid="`section-header-${slot.section}`"
+            >
+              <span class="text-xs font-semibold text-indigo-300 uppercase tracking-wider">{{ SERVICE_SECTION_LABELS[slot.section!] }}</span>
+              <span class="flex-1 border-t border-gray-800"></span>
+            </div>
+
+            <div
+              class="slot-item rounded-lg bg-gray-900 border border-gray-800 p-3 flex items-start gap-2"
+              :data-testid="`slot-${index}`"
+            >
             <!-- Drag handle: editor only -->
             <div v-if="authStore.isEditor" class="cursor-grab active:cursor-grabbing text-gray-600 hover:text-gray-400 drag-handle flex-shrink-0 mt-0.5">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -850,6 +861,19 @@
               </template>
             </div>
 
+            <!-- Section-assignment control: editor only, hidden when exported (D005/R007) -->
+            <select
+              v-if="authStore.isEditor && !isExportedLocked"
+              data-testid="section-select"
+              :value="slot.section ?? ''"
+              @change="onSectionChange(index, ($event.target as HTMLSelectElement).value)"
+              class="rounded-md bg-gray-800 border border-gray-700 text-gray-300 text-xs px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 flex-shrink-0 mt-0.5"
+              title="Section"
+            >
+              <option value="">No section</option>
+              <option v-for="s in SERVICE_SECTIONS" :key="s" :value="s">{{ SERVICE_SECTION_LABELS[s] }}</option>
+            </select>
+
             <!-- Remove button: editor only, hidden when exported -->
             <button
               v-if="authStore.isEditor && !isExportedLocked"
@@ -862,7 +886,8 @@
                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
-          </div>
+            </div>
+          </template>
         </div>
 
         <!-- Add Element button: editor only, hidden when exported -->
@@ -896,6 +921,11 @@
             <button type="button" @click="addSlot('MESSAGE')" class="px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 w-full text-left transition-colors">Message</button>
             <button type="button" @click="addSlot('HYMN')" class="px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 w-full text-left transition-colors">Hymn</button>
           </div>
+        </div>
+
+        <!-- Slideshow preview: inline, live-updating render of the assembled slideshow (R018, R006 visible) -->
+        <div class="mt-3">
+          <SlideshowPreview :sections="assembledSections" />
         </div>
         </div>
 
@@ -1036,7 +1066,8 @@ import { scripturesOverlap } from '@/utils/scripture'
 import { getPrimaryKey } from '@/utils/songSearch'
 import { resolveServiceRoleAssignments, findQuarterForDate } from '@/utils/serviceRoles'
 import type { ResolvedRoleAssignment } from '@/utils/serviceRoles'
-import type { Service, ServiceSlot, SongSlot, ScriptureSlot, NonAssignableSlot, HymnSlot, ScriptureRef, SlotKind } from '@/types/service'
+import { SERVICE_SECTIONS, SERVICE_SECTION_LABELS } from '@/types/service'
+import type { Service, ServiceSlot, SongSlot, ScriptureSlot, NonAssignableSlot, HymnSlot, ScriptureRef, SlotKind, ServiceSection } from '@/types/service'
 import type { VWType } from '@/types/song'
 import type { Person } from '@/types/roster'
 import AppShell from '@/components/AppShell.vue'
@@ -1046,6 +1077,8 @@ import ScriptureInput from '@/components/ScriptureInput.vue'
 import ServicePrintLayout from '@/components/ServicePrintLayout.vue'
 import ScriptureSlideEditor from '@/components/ScriptureSlideEditor.vue'
 import CongregationalEditor from '@/components/CongregationalEditor.vue'
+import SlideshowPreview from '@/components/SlideshowPreview.vue'
+import { useSlideshowAssembly } from '@/composables/useSlideshowAssembly'
 import { formatForPlanningCenter } from '@/utils/planningCenterExport'
 import { fetchServiceTypes, fetchTemplates, fetchServiceTypeTeams, fetchPlans, fetchPlanItems, createPlan, fetchTemplateItems, addSlotAsItem, buildPlanTitle, createItem, updateItem, deleteItem, createPlanTime, fetchPlanNeededPositionTeamIds, fetchTeamPositions, addNeededPosition } from '@/utils/planningCenterApi'
 import { serverTimestamp } from 'firebase/firestore'
@@ -1199,6 +1232,36 @@ const isExportedLocked = computed(() =>
   localService.value?.status === 'exported'
 )
 
+// ── Sections (D005/R007) + live slideshow assembly (R005/R006 visible) ─────────
+
+/**
+ * True when a section divider should render immediately above `slots[index]`:
+ * the slot has a defined section AND it differs from the previous slot's
+ * section. A legacy service (every slot's `section === undefined`) never
+ * satisfies this for any index, so it renders with zero headers (D005 is
+ * additive — no migration).
+ */
+function showsSectionHeaderAt(index: number): boolean {
+  const slots = localService.value?.slots
+  if (!slots) return false
+  const slot = slots[index]
+  if (!slot?.section) return false
+  const prevSection = index > 0 ? slots[index - 1]?.section : undefined
+  return prevSection !== slot.section
+}
+
+/** Editor-only per-slot section assignment — routes through the same localService
+ *  mutation + autosave watcher every other slot field uses (no separate save path). */
+function onSectionChange(index: number, value: string) {
+  if (!localService.value) return
+  const slot = localService.value.slots[index]
+  if (!slot) return
+  slot.section = value === '' ? undefined : (value as ServiceSection)
+}
+
+const orgIdRef = computed(() => authStore.orgId)
+const { assembledSections } = useSlideshowAssembly(localService, orgIdRef)
+
 // ── AI state ───────────────────────────────────────────────────────────────────
 
 // Keyed by slot index — AI-drafted songs awaiting accept/reject
@@ -1223,6 +1286,12 @@ watch(slotContainerRef, (el) => {
   if (el && !sortableInstance) {
     sortableInstance = Sortable.create(el, {
       handle: '.drag-handle',
+      // Scope both drag eligibility AND index counting (oldIndex/newIndex) to
+      // `.slot-item` — section-header divs are siblings in the same flat
+      // container but must stay non-draggable and excluded from the index
+      // math the onEnd handler below relies on (MEM008: onEnd/reindexSlots
+      // logic itself is untouched).
+      draggable: '.slot-item',
       animation: 150,
       ghostClass: 'opacity-30',
       async onEnd(evt) {
