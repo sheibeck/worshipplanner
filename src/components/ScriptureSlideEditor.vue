@@ -63,13 +63,23 @@
         <div
           v-for="(slide, idx) in localSlides"
           :key="slide.id"
-          class="rounded-lg bg-gray-800/50 border border-gray-700/50 p-4"
+          :data-testid="`slide-card-${idx}`"
+          class="rounded-lg bg-gray-800/50 border p-4"
+          :class="overriddenSlides.has(idx) ? 'border-amber-500/70 border-l-4' : 'border-gray-700/50'"
         >
-          <div class="text-xs font-semibold text-indigo-400 uppercase tracking-wider mb-2">
-            Slide {{ idx + 1 }}
-            <span v-if="slide.verseRange" class="ml-1 text-gray-500 normal-case">
-              ({{ slide.verseRange }})
-            </span>
+          <div class="flex items-center justify-between gap-2 mb-2">
+            <div class="text-xs font-semibold text-indigo-400 uppercase tracking-wider">
+              Slide {{ idx + 1 }}
+              <span v-if="slide.verseRange" class="ml-1 text-gray-500 normal-case">
+                ({{ slide.verseRange }})
+              </span>
+            </div>
+            <!-- Override marker: closes the Phase 19 UAT gap — manually edited slides get a visible distinction -->
+            <span
+              v-if="overriddenSlides.has(idx)"
+              :data-testid="`edited-badge-${idx}`"
+              class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-900/40 text-amber-300 border border-amber-800"
+            >Edited</span>
           </div>
           <textarea
             :data-testid="`slide-textarea-${idx}`"
