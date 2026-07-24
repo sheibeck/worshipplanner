@@ -53,12 +53,7 @@ describe('PerformanceOrderBuilder', () => {
     expect(orderItems).toHaveLength(1)
     expect(orderItems[0].text()).toContain('Chorus')
 
-    // Verify emit was captured
     const emitted = wrapper.emitted('update:performanceOrder')
-    console.log('emitted keys:', Object.keys(wrapper.emitted()))
-    // Try alternative event name casing
-    console.log('update:performanceOrder:', wrapper.emitted()['update:performanceOrder'])
-    console.log('update:performance-order:', wrapper.emitted()['update:performance-order'])
     expect(emitted).toBeTruthy()
     expect(emitted![0]).toEqual([['chorus']])
   })
