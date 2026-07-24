@@ -3,17 +3,18 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Worship Service Slide Management
 current_phase: 20
-status: in_progress
-stopped_at: Phases 18 & 19 complete; Phase 20 needs planning (migrated from gsdpi M001)
-last_updated: "2026-07-24T00:00:00.000Z"
+current_phase_name: Service Sections and Slide Auto-Assembly
+status: executing
+stopped_at: Completed 20-01-PLAN.md
+last_updated: "2026-07-24T22:29:14.551Z"
 last_activity: 2026-07-24
-last_activity_desc: Migrated gsdpi milestone M001 into gsd-core as v1.2 (Phases 18-23)
 progress:
-  total_phases: 6
-  completed_phases: 2
-  total_plans: 8
-  completed_plans: 8
-current_phase_name: service-sections-and-slide-auto-assembly
+  total_phases: 18
+  completed_phases: 13
+  total_plans: 84
+  completed_plans: 81
+  percent: 72
+last_activity_desc: Migrated gsdpi milestone M001 into gsd-core as v1.2 (Phases 18-23)
 ---
 
 # Project State
@@ -23,14 +24,14 @@ current_phase_name: service-sections-and-slide-auto-assembly
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 17 — sync-schedule-with-planned-services-add-a-roles-tab-to-servi
+**Current focus:** Phase 20 — Service Sections and Slide Auto-Assembly
 
 ## Current Position
 
-Phase: 20 — Service Sections and Slide Auto-Assembly
-Plan: Not started (research done, needs `/gsd-plan-phase 20`)
+Phase: 20 (Service Sections and Slide Auto-Assembly) — EXECUTING
+Plan: 2 of 4
 Milestone: v1.2 Worship Service Slide Management (Phases 18-23) — IN PROGRESS
-Status: Phases 18 & 19 complete (code shipped); Phase 20 active
+Status: Ready to execute
 
 > **Migration note (2026-07-24):** This milestone was scoped and partially built in gsdpi
 > (`.gsd/` milestone M001, slices S01-S06) and faithfully ported into gsd-core as v1.2.
@@ -98,6 +99,7 @@ Status: Phases 18 & 19 complete (code shipped); Phase 20 active
 | Phase 17 P03 | 20min | 2 tasks | 3 files |
 | Phase 17 P04 | ~40min | 2 tasks | 2 files |
 | Phase 17 P05 | ~25min | 2 tasks | 3 files |
+| Phase 20 P01 | 25min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -156,6 +158,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 17-04: Roles override picker reuses QuarterGrid.vue's person.roles.includes(roleId) eligibility (no hand-rolled eligibility, D-03); toggles write via 17-03's scoped setRoleOverride/clearRoleOverride so the Quarter/schedule is never mutated from the service editor
 - [Phase ?]: [Phase 17] 17-05: ShareView dual-path public read (opaque token vs memorable serviceShares) reads only the snapshot doc, no roster/org/auth store import (T-17-05-01)
 - [Phase ?]: [Phase 17] 17-05: Who's Serving section renders serviceSnapshot.roleAssignments, gracefully omitted for legacy shares with no roleAssignments (T-17-05-03)
+- [Phase ?]: [Phase 20-01]: SERVICE_SECTIONS kept as single source-of-truth array so per-church configurable sections is a localized future change
+- [Phase ?]: [Phase 20-01]: createSlot() omits the section key entirely (conditional spread) rather than section: undefined, preserving byte-identical legacy object shape
 
 ### Roadmap Evolution
 
@@ -212,7 +216,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 
 ## Session Continuity
 
-Last activity: 2026-07-22 — Phase 17 complete
-Last session: 2026-07-22T21:20:01.841Z
-Stopped at: Completed 17-05-PLAN.md — Phase 17 complete (5/5 plans)
+Last activity: 2026-07-24
+Last session: 2026-07-24T22:29:14.521Z
+Stopped at: Completed 20-01-PLAN.md
 Resume file: None

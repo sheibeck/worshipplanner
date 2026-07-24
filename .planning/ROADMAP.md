@@ -17,6 +17,7 @@ presentations, and media — that auto-assembles from the service order and is a
 non-technical church volunteers.
 
 **Milestone success criteria:**
+
 1. A volunteer can paste SongSelect lyrics, build performance order, add the song to a service, import a sermon PowerPoint, and preview the complete slideshow end to end.
 2. Reordering service elements auto-reorders the slideshow with no manual intervention.
 3. Media (audio/video) auto-plays in the presentation preview when advancing to a media slide.
@@ -56,7 +57,8 @@ non-technical church volunteers.
 **Plans:** 4 plans (Waves 1→4, sequential layered build)
 
 Plans:
-- [ ] 20-01-PLAN.md — Section data model: ServiceSection + optional slot section, TextSlide/AssembledSlide types, buildSlots defaults (Wave 1)
+
+- [x] 20-01-PLAN.md — Section data model: ServiceSection + optional slot section, TextSlide/AssembledSlide types, buildSlots defaults (Wave 1)
 - [ ] 20-02-PLAN.md — Slideshow assembly engine (TDD): pure assembleSlideshow(service, inputs) → AssembledSlide[] (Wave 2)
 - [ ] 20-03-PLAN.md — useSlideshowAssembly composable: reactive multi-song assembly + section grouping (Wave 3)
 - [ ] 20-04-PLAN.md — ServiceEditorView section headers + per-slot section control + inline SlideshowPreview + scripture override marker (Wave 4)
@@ -83,7 +85,6 @@ Plans:
 **Depends on:** Phase 20, Phase 22
 **Requirements:** R016, R018 (supporting)
 **Plans:** 0
-
 
 ## Phases
 
