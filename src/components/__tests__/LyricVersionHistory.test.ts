@@ -1,7 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import LyricVersionHistory from '../LyricVersionHistory.vue'
 import type { SongLyrics } from '@/types/songLyrics'
+
+const FIXED_NOW = new Date('2026-06-15T12:00:00Z').getTime()
 
 function makeVersion(overrides: Partial<SongLyrics> & { id: string }): SongLyrics {
   return {
@@ -15,21 +17,26 @@ function makeVersion(overrides: Partial<SongLyrics> & { id: string }): SongLyric
       ccliLicenseNumber: '',
     },
     performanceOrder: [],
-    createdAt: { toMillis: () => Date.now() - 60_000 } as never,
-    updatedAt: { toMillis: () => Date.now() - 60_000 } as never,
+    createdAt: { toMillis: () => FIXED_NOW - 60_000 } as never,
+    updatedAt: { toMillis: () => FIXED_NOW - 60_000 } as never,
     ...overrides,
   }
 }
 
 describe('LyricVersionHistory', () => {
   beforeEach(() => {
-    vi.restoreAllMocks()
+    vi.useFakeTimers()
+    vi.setSystemTime(FIXED_NOW)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('renders version list with timestamps', () => {
     const versions = [
-      makeVersion({ id: 'v1', createdAt: { toMillis: () => Date.now() - 30_000 } as never }),
-      makeVersion({ id: 'v2', createdAt: { toMillis: () => Date.now() - 3_600_000 } as never }),
+      makeVersion({ id: 'v1', createdAt: { toMillis: () => FIXED_NOW - 30_000 } as never }),
+      makeVersion({ id: 'v2', createdAt: { toMillis: () => FIXED_NOW - 3_600_000 } as never }),
     ]
     const wrapper = mount(LyricVersionHistory, {
       props: { versions, currentVersionId: 'v1' },
@@ -114,7 +121,7 @@ describe('LyricVersionHistory', () => {
     const versions = [
       makeVersion({
         id: 'v1',
-        createdAt: { toMillis: () => Date.now() - 3 * 24 * 3_600_000 } as never,
+        createdAt: { toMillis: () => FIXED_NOW - 3 * 24 * 3_600_000 } as never,
       }),
     ]
     const wrapper = mount(LyricVersionHistory, {
