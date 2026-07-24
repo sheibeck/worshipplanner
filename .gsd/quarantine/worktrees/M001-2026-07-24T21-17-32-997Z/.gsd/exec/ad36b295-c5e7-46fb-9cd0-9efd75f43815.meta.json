@@ -1,0 +1,28 @@
+{
+  "id": "ad36b295-c5e7-46fb-9cd0-9efd75f43815",
+  "runtime": "bash",
+  "purpose": "UAT M001/S02/precondition-files (uat-artifact-check)",
+  "metadata": {
+    "kind": "uat_exec",
+    "milestoneId": "M001",
+    "sliceId": "S02",
+    "checkId": "precondition-files",
+    "intent": "uat-artifact-check",
+    "expected": "All key S02 files exist"
+  },
+  "script_chars": 202,
+  "started_at": "2026-07-24T19:33:25.906Z",
+  "finished_at": "2026-07-24T19:33:28.219Z",
+  "exit_code": 0,
+  "signal": null,
+  "timed_out": false,
+  "aborted": false,
+  "force_resolved": false,
+  "duration_ms": 2313,
+  "stdout_bytes": 461,
+  "stderr_bytes": 0,
+  "stdout_truncated": false,
+  "stderr_truncated": false,
+  "stdout_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\ad36b295-c5e7-46fb-9cd0-9efd75f43815.stdout",
+  "stderr_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\ad36b295-c5e7-46fb-9cd0-9efd75f43815.stderr"
+}

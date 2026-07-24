@@ -1,0 +1,28 @@
+{
+  "id": "f161ab0f-2581-419e-b9c8-fe69df1a838f",
+  "runtime": "bash",
+  "purpose": "UAT M001/S02/precond-tests (uat-artifact-check)",
+  "metadata": {
+    "kind": "uat_exec",
+    "milestoneId": "M001",
+    "sliceId": "S02",
+    "checkId": "precond-tests",
+    "intent": "uat-artifact-check",
+    "expected": "71+ new tests, full suite green"
+  },
+  "script_chars": 295,
+  "started_at": "2026-07-24T14:20:49.127Z",
+  "finished_at": "2026-07-24T14:22:37.885Z",
+  "exit_code": 0,
+  "signal": null,
+  "timed_out": false,
+  "aborted": false,
+  "force_resolved": false,
+  "duration_ms": 108758,
+  "stdout_bytes": 2929,
+  "stderr_bytes": 0,
+  "stdout_truncated": false,
+  "stderr_truncated": false,
+  "stdout_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\f161ab0f-2581-419e-b9c8-fe69df1a838f.stdout",
+  "stderr_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\f161ab0f-2581-419e-b9c8-fe69df1a838f.stderr"
+}

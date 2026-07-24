@@ -1,0 +1,20 @@
+{
+  "id": "b16d1c3f-0483-499b-9015-415590e2d265",
+  "runtime": "bash",
+  "purpose": "Check Firestore rules for song subcollections, existing test patterns, and unsaved-changes guard",
+  "script_chars": 730,
+  "started_at": "2026-07-23T19:33:43.198Z",
+  "finished_at": "2026-07-23T19:33:44.109Z",
+  "exit_code": 0,
+  "signal": null,
+  "timed_out": false,
+  "aborted": false,
+  "force_resolved": false,
+  "duration_ms": 911,
+  "stdout_bytes": 7129,
+  "stderr_bytes": 0,
+  "stdout_truncated": false,
+  "stderr_truncated": false,
+  "stdout_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\b16d1c3f-0483-499b-9015-415590e2d265.stdout",
+  "stderr_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\b16d1c3f-0483-499b-9015-415590e2d265.stderr"
+}

@@ -1,0 +1,7 @@
+=== Slide type contentKind discriminator ===
+2: * Unified Slide type with contentKind discriminator.
+15:  contentKind: SlideContentKind
+20:  contentKind: 'lyric'
+28:  contentKind: 'lyric'
+39: * Narrow on `contentKind` (and further on shape-specific fields) to access
+=== audioUrl/videoUrl media fields ===

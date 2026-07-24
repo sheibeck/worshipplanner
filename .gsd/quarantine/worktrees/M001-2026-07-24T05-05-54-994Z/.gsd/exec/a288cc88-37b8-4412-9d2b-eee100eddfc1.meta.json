@@ -1,0 +1,20 @@
+{
+  "id": "a288cc88-37b8-4412-9d2b-eee100eddfc1",
+  "runtime": "bash",
+  "purpose": "Read songs store, SongSlideOver component, ESV API util, and Cloud Functions index",
+  "script_chars": 279,
+  "started_at": "2026-07-23T19:33:11.054Z",
+  "finished_at": "2026-07-23T19:33:11.309Z",
+  "exit_code": 0,
+  "signal": null,
+  "timed_out": false,
+  "aborted": false,
+  "force_resolved": false,
+  "duration_ms": 255,
+  "stdout_bytes": 22323,
+  "stderr_bytes": 0,
+  "stdout_truncated": false,
+  "stderr_truncated": false,
+  "stdout_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\a288cc88-37b8-4412-9d2b-eee100eddfc1.stdout",
+  "stderr_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\a288cc88-37b8-4412-9d2b-eee100eddfc1.stderr"
+}

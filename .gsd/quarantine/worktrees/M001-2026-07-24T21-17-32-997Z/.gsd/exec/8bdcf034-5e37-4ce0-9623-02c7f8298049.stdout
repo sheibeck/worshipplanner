@@ -1,0 +1,30 @@
+=== TC-04: Reading mode persistence ===
+--- Check 1: readingMode stored on slot in Firestore ---
+24:  scriptureReadingId?: string | null
+25:  readingMode?: 'normal' | 'congregational'
+
+--- Check 2: setReadingMode updates Firestore ---
+function setReadingMode(index: number, mode: 'normal' | 'congregational') {
+  if (!localService.value) return
+  const slot = localService.value.slots[index]
+  if (!slot || slot.kind !== 'SCRIPTURE') return
+  localService.value.slots[index] = {
+    ...slot,
+    readingMode: mode,
+  } as ScriptureSlot
+}
+
+// ── Export to PC state ─────────────────────────────────────────────────────────
+
+const isExporting = ref(false)
+const pcExported = ref(false)       // green toast after success
+const exportError = ref<string | null>(null)  // red banner on error
+
+// Export dialog state
+const showExportDialog = ref(false)
+
+--- Check 3: getSlotReadingMode reads from slot ---
+function getSlotReadingMode(slot: ScriptureSlot): 'normal' | 'congregational' {
+  return slot.readingMode ?? 'normal'
+}
+

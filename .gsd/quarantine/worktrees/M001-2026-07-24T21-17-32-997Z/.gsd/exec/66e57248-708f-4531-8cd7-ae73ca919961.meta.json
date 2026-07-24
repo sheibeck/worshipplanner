@@ -1,0 +1,28 @@
+{
+  "id": "66e57248-708f-4531-8cd7-ae73ca919961",
+  "runtime": "node",
+  "purpose": "UAT M001/S01/TC4-browser-history (uat-browser-check)",
+  "metadata": {
+    "kind": "uat_exec",
+    "milestoneId": "M001",
+    "sliceId": "S01",
+    "checkId": "TC4-browser-history",
+    "intent": "uat-browser-check",
+    "expected": "LyricVersionHistory has confirm dialog, revert, current badge, timestamps"
+  },
+  "script_chars": 1405,
+  "started_at": "2026-07-24T13:34:54.881Z",
+  "finished_at": "2026-07-24T13:34:55.000Z",
+  "exit_code": 0,
+  "signal": null,
+  "timed_out": false,
+  "aborted": false,
+  "force_resolved": false,
+  "duration_ms": 119,
+  "stdout_bytes": 157,
+  "stderr_bytes": 0,
+  "stdout_truncated": false,
+  "stderr_truncated": false,
+  "stdout_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\66e57248-708f-4531-8cd7-ae73ca919961.stdout",
+  "stderr_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\66e57248-708f-4531-8cd7-ae73ca919961.stderr"
+}

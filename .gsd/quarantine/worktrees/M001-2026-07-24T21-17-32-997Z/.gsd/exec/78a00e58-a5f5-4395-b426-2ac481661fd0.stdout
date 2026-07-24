@@ -1,0 +1,52 @@
+=== TC-01: Scripture slide creation via ESV fetch ===
+--- Check 1: ScriptureSlideEditor has reference input and fetch button ---
+25:      <!-- Reference input + fetch -->
+28:          v-model="referenceText"
+30:          data-testid="reference-input"
+36:          data-testid="fetch-btn"
+37:          :disabled="!canFetch || isFetching"
+38:          @click="onFetchPassage"
+40:          :class="canFetch && !isFetching
+44:          <svg v-if="isFetching" class="h-3.5 w-3.5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+48:          {{ isFetching ? 'Fetching...' : 'Fetch Passage' }}
+52:      <!-- Fetch error -->
+54:        v-if="fetchError"
+55:        data-testid="fetch-error"
+90:import { fetchPassageText } from '@/utils/esvApi'
+104:const referenceText = ref('')
+105:const isFetching = ref(false)
+106:const fetchError = ref(false)
+110:const parsedRef = computed<ScriptureRef | null>(() => parseScriptureInput(referenceText.value))
+111:const canFetch = computed(() => parsedRef.value !== null)
+114:async function onFetchPassage() {
+118:  isFetching.value = true
+
+--- Check 2: ESV fetch integration in store ---
+53:  async function createReading(
+96:    createReading,
+
+--- Check 3: Auto-split into slides ---
+2:import type { ScriptureSlide } from '@/types/slide'
+29:  const parts = text.split(/\[(\d+)\]/).filter(Boolean)
+42:  return text.split(/\s+/).filter(Boolean).length
+45:function splitBySentences(text: string, threshold: number): string[][] {
+84:export function splitPassage(
+100:    const groups = splitBySentences(trimmed, threshold)
+109:  const slides: ScriptureSlide[] = []
+117:      slides.push(buildSlide(combined, formatVerseRange(currentVerses), ref, slides.length))
+128:    slides.push(buildSlide(combined, formatVerseRange(currentVerses), ref, slides.length))
+131:  return slides
+
+--- Check 4: Auto-save status indicator ---
+7:        v-if="autoSaveStatus === 'pending'"
+13:        v-else-if="autoSaveStatus === 'saving'"
+16:      >Saving...</span>
+18:        v-else-if="autoSaveStatus === 'saved'"
+21:      >Saved &#10003;</span>
+92:import { useAutoSave } from '@/composables/useAutoSave'
+179:const { status: autoSaveStatus, cleanup: cleanupAutoSave } = useAutoSave(
+
+--- Check 5: Slide preview list rendering ---
+62:      <div v-if="localSlides.length > 0" class="space-y-3" data-testid="slides-container">
+64:          v-for="(slide, idx) in localSlides"
+75:            :data-testid="`slide-textarea-${idx}`"

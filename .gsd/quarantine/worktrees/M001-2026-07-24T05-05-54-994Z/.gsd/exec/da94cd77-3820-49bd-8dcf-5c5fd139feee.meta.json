@@ -1,0 +1,20 @@
+{
+  "id": "da94cd77-3820-49bd-8dcf-5c5fd139feee",
+  "runtime": "bash",
+  "purpose": "Run LyricVersionHistory and SongSlideOver tests",
+  "script_chars": 138,
+  "started_at": "2026-07-24T04:53:31.296Z",
+  "finished_at": "2026-07-24T04:53:41.125Z",
+  "exit_code": 0,
+  "signal": null,
+  "timed_out": false,
+  "aborted": false,
+  "force_resolved": false,
+  "duration_ms": 9829,
+  "stdout_bytes": 3224,
+  "stderr_bytes": 0,
+  "stdout_truncated": false,
+  "stderr_truncated": false,
+  "stdout_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\da94cd77-3820-49bd-8dcf-5c5fd139feee.stdout",
+  "stderr_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\da94cd77-3820-49bd-8dcf-5c5fd139feee.stderr"
+}

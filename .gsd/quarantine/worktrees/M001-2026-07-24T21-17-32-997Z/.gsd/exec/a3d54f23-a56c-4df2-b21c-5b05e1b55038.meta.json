@@ -1,0 +1,28 @@
+{
+  "id": "a3d54f23-a56c-4df2-b21c-5b05e1b55038",
+  "runtime": "bash",
+  "purpose": "UAT M001/S02/TC-04-persistence (uat-artifact-check)",
+  "metadata": {
+    "kind": "uat_exec",
+    "milestoneId": "M001",
+    "sliceId": "S02",
+    "checkId": "TC-04-persistence",
+    "intent": "uat-artifact-check",
+    "expected": "localService changes (including readingMode) are persisted via watch/auto-save to Firestore"
+  },
+  "script_chars": 440,
+  "started_at": "2026-07-24T19:37:04.263Z",
+  "finished_at": "2026-07-24T19:37:05.926Z",
+  "exit_code": 0,
+  "signal": null,
+  "timed_out": false,
+  "aborted": false,
+  "force_resolved": false,
+  "duration_ms": 1663,
+  "stdout_bytes": 246,
+  "stderr_bytes": 0,
+  "stdout_truncated": false,
+  "stderr_truncated": false,
+  "stdout_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\a3d54f23-a56c-4df2-b21c-5b05e1b55038.stdout",
+  "stderr_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\a3d54f23-a56c-4df2-b21c-5b05e1b55038.stderr"
+}

@@ -1,19 +1,19 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: MVP
-current_phase: 17
-status: completed
-stopped_at: Completed 17-05-PLAN.md — Phase 17 complete (5/5 plans)
-last_updated: "2026-07-22T21:51:16.207Z"
-last_activity: 2026-07-22
-last_activity_desc: Phase 17 complete
+milestone: v1.2
+milestone_name: Worship Service Slide Management
+current_phase: 20
+status: in_progress
+stopped_at: Phases 18 & 19 complete; Phase 20 needs planning (migrated from gsdpi M001)
+last_updated: "2026-07-24T00:00:00.000Z"
+last_activity: 2026-07-24
+last_activity_desc: Migrated gsdpi milestone M001 into gsd-core as v1.2 (Phases 18-23)
 progress:
-  total_phases: 12
-  completed_phases: 11
-  total_plans: 68
-  completed_plans: 68
-current_phase_name: sync-schedule-with-planned-services-add-a-roles-tab-to-servi
+  total_phases: 6
+  completed_phases: 2
+  total_plans: 8
+  completed_plans: 8
+current_phase_name: service-sections-and-slide-auto-assembly
 ---
 
 # Project State
@@ -27,11 +27,23 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 
 ## Current Position
 
-Phase: 17
-Plan: Not started
-Milestone: v1.0 MVP — SHIPPED 2026-03-05
-Next milestone: v1.1 Tasks & Events (not yet started)
-Status: All phases complete
+Phase: 20 — Service Sections and Slide Auto-Assembly
+Plan: Not started (research done, needs `/gsd-plan-phase 20`)
+Milestone: v1.2 Worship Service Slide Management (Phases 18-23) — IN PROGRESS
+Status: Phases 18 & 19 complete (code shipped); Phase 20 active
+
+> **Migration note (2026-07-24):** This milestone was scoped and partially built in gsdpi
+> (`.gsd/` milestone M001, slices S01-S06) and faithfully ported into gsd-core as v1.2.
+> The gsdpi `.gsd/` store is now legacy/read-only — continue with regular `/gsd-*` commands.
+
+## Milestone v1.2 Decisions (from gsdpi DECISIONS.md D001-D006)
+
+- **D001** (architecture): Unified slide data model — single slide type with content-kind field (lyric, scripture, image, video, text) rather than distinct types per content. Simpler editor/reordering/mental model.
+- **D002** (architecture): Single canonical song lyric version per song; services reference live, not as copies. Eliminates wrong-slides-at-rehearsal; user explicitly rejected per-service copies.
+- **D003** (architecture): PowerPoint (.pptx) as the universal import format; Google Slides/Keynote users export to PowerPoint first. One pipeline, avoids OAuth/protobuf complexity.
+- **D004** (architecture): Server-side PPTX parsing via Firebase Cloud Function. More reliable, no browser memory limits.
+- **D005** (architecture): Four formalized service sections (Pre-Service, Worship, Message, Sending) as default. Clear template; deterministic auto-assembly.
+- **D006** (architecture): Manual copy/paste from CCLI SongSelect with auto-parsing of section markers. CCLI provides no API access (hard constraint).
 
 ## Performance Metrics
 

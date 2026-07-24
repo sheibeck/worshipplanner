@@ -1,0 +1,28 @@
+{
+  "id": "9f4de468-618b-4742-b2bc-42773a03c387",
+  "runtime": "bash",
+  "purpose": "UAT M001/S02/TC-01 (uat-artifact-check)",
+  "metadata": {
+    "kind": "uat_exec",
+    "milestoneId": "M001",
+    "sliceId": "S02",
+    "checkId": "TC-01",
+    "intent": "uat-artifact-check",
+    "expected": "ScriptureSlideEditor has reference input, Fetch button, ESV fetch integration, auto-split into slides, auto-save indicator"
+  },
+  "script_chars": 765,
+  "started_at": "2026-07-24T14:23:40.929Z",
+  "finished_at": "2026-07-24T14:23:41.335Z",
+  "exit_code": 0,
+  "signal": null,
+  "timed_out": false,
+  "aborted": false,
+  "force_resolved": false,
+  "duration_ms": 406,
+  "stdout_bytes": 3527,
+  "stderr_bytes": 0,
+  "stdout_truncated": false,
+  "stderr_truncated": false,
+  "stdout_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\9f4de468-618b-4742-b2bc-42773a03c387.stdout",
+  "stderr_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\9f4de468-618b-4742-b2bc-42773a03c387.stderr"
+}

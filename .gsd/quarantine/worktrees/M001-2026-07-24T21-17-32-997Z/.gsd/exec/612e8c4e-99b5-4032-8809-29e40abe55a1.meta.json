@@ -1,0 +1,28 @@
+{
+  "id": "612e8c4e-99b5-4032-8809-29e40abe55a1",
+  "runtime": "bash",
+  "purpose": "UAT M001/S01/TC1-tests (uat-runtime-check)",
+  "metadata": {
+    "kind": "uat_exec",
+    "milestoneId": "M001",
+    "sliceId": "S01",
+    "checkId": "TC1-tests",
+    "intent": "uat-runtime-check",
+    "expected": "CCLI parser tests pass — validating paste and parse functionality"
+  },
+  "script_chars": 88,
+  "started_at": "2026-07-24T13:29:59.366Z",
+  "finished_at": "2026-07-24T13:30:06.561Z",
+  "exit_code": 0,
+  "signal": null,
+  "timed_out": false,
+  "aborted": false,
+  "force_resolved": false,
+  "duration_ms": 7195,
+  "stdout_bytes": 3394,
+  "stderr_bytes": 0,
+  "stdout_truncated": false,
+  "stderr_truncated": false,
+  "stdout_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\612e8c4e-99b5-4032-8809-29e40abe55a1.stdout",
+  "stderr_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\612e8c4e-99b5-4032-8809-29e40abe55a1.stderr"
+}

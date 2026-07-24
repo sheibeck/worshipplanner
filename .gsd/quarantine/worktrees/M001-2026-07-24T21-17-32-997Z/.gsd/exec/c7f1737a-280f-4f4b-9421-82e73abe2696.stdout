@@ -1,0 +1,4 @@
+LyricPasteDialog-served: PASS
+has-discard-guard: PASS
+has-cancel: PASS
+PASS: Discard guard module verified

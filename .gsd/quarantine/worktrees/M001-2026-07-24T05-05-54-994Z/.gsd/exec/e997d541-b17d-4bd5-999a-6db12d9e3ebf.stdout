@@ -1,0 +1,195 @@
+=== Full Firestore Rules ===
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOrgMember(orgId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid));
+    }
+
+    function isOrgEditor(orgId) {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.role in ['editor', 'admin'];
+    }
+
+    // User profiles - only the owner can read/write their own profile
+    match /users/{uid} {
+      allow read, write: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    // Organizations
+    match /organizations/{orgId} {
+      // Members can read; editors can write
+      allow read: if isOrgMember(orgId);
+      // Editors can update/delete existing orgs
+      allow write: if isOrgEditor(orgId);
+      // Allow authenticated users to create a new org if they are the creator
+      allow create: if isSignedIn() && request.resource.data.createdBy == request.auth.uid;
+
+      // Members subcollection
+      match /members/{uid} {
+        allow read: if isOrgMember(orgId);
+        allow write: if isOrgEditor(orgId);
+        // Allow creator to write their own membership when creating an org or accepting an invite
+        allow create: if isSignedIn() && request.auth.uid == uid;
+      }
+
+      // Invites subcollection
+      match /invites/{email} {
+        allow read: if isOrgEditor(orgId);
+        allow write: if isOrgEditor(orgId);
+        allow delete: if isOrgEditor(orgId) || (isSignedIn() && request.auth.token.email.lower() == email);
+      }
+
+      // Services — viewers can read, only editors write
+      match /services/{docId} {
+        allow read: if isOrgMember(orgId);
+        allow write: if isOrgEditor(orgId);
+      }
+
+      // Songs — editors only (viewers cannot read songs)
+      match /songs/{docId} {
+        allow read, write: if isOrgEditor(orgId);
+      }
+
+      // All other nested collections — editors only
+      match /{collection}/{docId} {
+        allow read, write: if isOrgEditor(orgId);
+      }
+    }
+
+    // inviteLookup — stores pending invite records keyed by normalized email
+    match /inviteLookup/{email} {
+      allow read: if isSignedIn() && request.auth.token.email.lower() == email;
+      allow create: if isSignedIn();
+      allow delete: if isSignedIn() && (
+        request.auth.token.email.lower() == email ||
+        isOrgEditor(resource.data.orgId)
+      );
+    }
+
+    // Share tokens: public read (anyone with token URL), authenticated create only
+    match /shareTokens/{token} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update: if false;
+      // Delete allowed so an org editor can revoke a share when its quarter is deleted
+      // (quarters store deleteQuarter). Scoped to the orgId stored on the token doc so
+      // one org can never revoke another org's link.
+      allow delete: if isOrgEditor(resource.data.orgId);
+    }
+
+    // Org slug claims: public read, org-editor-scoped create-only (first-writer-wins).
+    // Reassignment abandons a slug, never reclaims it — no update/delete allowed. WR-01:
+    // isSignedIn() alone let any authenticated user claim a slug for an arbitrary orgId
+    // (slug-squatting), so create requires the caller to be an editor of the orgId in the
+    // payload.
+    match /orgSlugs/{slug} {
+      allow read: if true;
+      allow create: if isOrgEditor(request.resource.data.orgId);
+      allow update, delete: if false;
+    }
+
+    // Memorable-URL quarter shares: public read, org-editor-scoped create/update
+    // (overwritten in place on every finalize, unlike frozen shareTokens). CR-01: shareId is
+    // a guessable, deterministic string (`${slug}__q${N}-${year}`), so isSignedIn() alone let
+    // any authenticated user of ANY org overwrite another org's public share doc. Both create
+    // and update require the caller to be an editor of the orgId embedded in the doc, and
+    // update additionally forbids changing orgId (no reassigning a share to a different org).
+    match /quarterShares/{shareId} {
+      allow read: if true;
+      allow create: if isOrgEditor(request.resource.data.orgId);
+      allow update: if isOrgEditor(resource.data.orgId)
+                       && request.resource.data.orgId == resource.data.orgId;
+      // Delete allowed so an org editor can revoke the memorable share when its quarter
+      // is deleted (deleteQuarter), scoped to the owning orgId on the doc.
+      allow delete: if isOrgEditor(resource.data.orgId);
+    }
+
+    // Memorable-URL per-service shares: public read, org-editor-scoped create/update
+    // (overwritten in place on every finalize, unlike frozen shareTokens). Mirrors
+    // quarterShares: shareId is a guessable, deterministic string
+    // (`${slug}__service-${date}`), so isSignedIn() alone would let any authenticated
+    // user of ANY org overwrite another org's public share doc. Both create and update
+    // require the caller to be an editor of the orgId embedded in the doc, and update
+    // additionally forbids changing orgId (no reassigning a share to a different org).
+    match /serviceShares/{shareId} {
+      allow read: if true;
+      allow create: if isOrgEditor(request.resource.data.orgId);
+      allow update: if isOrgEditor(resource.data.orgId)
+                       && request.resource.data.orgId == resource.data.orgId;
+      // Delete allowed so an org editor can revoke the memorable share when its service
+      // is deleted, scoped to the owning orgId on the doc.
+      allow delete: if isOrgEditor(resource.data.orgId);
+    }
+
+    // Catch-all: deny everything else
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+=== Composables list ===
+useUnsavedGuard.ts
+
+=== Utils list ===
+__tests__
+appAuth.ts
+claudeApi.ts
+csvImport.ts
+esvApi.ts
+pcSongImport.ts
+planningCenterApi.ts
+planningCenterExport.ts
+quarterDates.ts
+rotationTable.ts
+scheduler.ts
+scripture.ts
+serviceRoles.ts
+slotTypes.ts
+slug.ts
+songSearch.ts
+suggestions.ts
+volunteerCsv.ts
+
+=== Existing test structure ===
+AvailabilityDrawer.test.ts
+AvailabilityRosterTable.test.ts
+CollapsibleSection.test.ts
+CsvImportModal.test.ts
+QuarterGrid.test.ts
+ScriptureInput.test.ts
+ServiceCard.test.ts
+ServicePrintLayout.test.ts
+SongBadge.test.ts
+SongSlideOver.test.ts
+SongTable.test.ts
+---
+QuarterShareView.test.ts
+RosterView.test.ts
+ServiceEditorView.test.ts
+ShareView.test.ts
+TeamView.test.ts
+---
+claudeApi.test.ts
+pcSongImport.test.ts
+planningCenterApi.test.ts
+planningCenterExport.test.ts
+quarterDates.test.ts
+rotationTable.test.ts
+scheduler.test.ts
+scripture.test.ts
+serviceRoles.test.ts
+slotTypes.test.ts
+slug.test.ts
+songSearch.test.ts
+suggestions.test.ts
+volunteerCsv.test.ts

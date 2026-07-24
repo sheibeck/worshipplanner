@@ -1,0 +1,20 @@
+{
+  "id": "6401d7fb-464d-417f-b92b-39d8c871816f",
+  "runtime": "bash",
+  "purpose": "Explore existing song types, service types, and component structure",
+  "script_chars": 540,
+  "started_at": "2026-07-23T19:32:59.653Z",
+  "finished_at": "2026-07-23T19:33:00.240Z",
+  "exit_code": 0,
+  "signal": null,
+  "timed_out": false,
+  "aborted": false,
+  "force_resolved": false,
+  "duration_ms": 587,
+  "stdout_bytes": 7522,
+  "stderr_bytes": 0,
+  "stdout_truncated": false,
+  "stderr_truncated": false,
+  "stdout_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\6401d7fb-464d-417f-b92b-39d8c871816f.stdout",
+  "stderr_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\6401d7fb-464d-417f-b92b-39d8c871816f.stderr"
+}

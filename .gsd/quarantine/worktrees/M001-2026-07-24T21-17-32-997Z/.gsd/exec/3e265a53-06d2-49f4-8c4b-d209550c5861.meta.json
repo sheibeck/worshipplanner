@@ -1,0 +1,28 @@
+{
+  "id": "3e265a53-06d2-49f4-8c4b-d209550c5861",
+  "runtime": "bash",
+  "purpose": "UAT M001/S01/TC4-tests (uat-runtime-check)",
+  "metadata": {
+    "kind": "uat_exec",
+    "milestoneId": "M001",
+    "sliceId": "S01",
+    "checkId": "TC4-tests",
+    "intent": "uat-runtime-check",
+    "expected": "LyricVersionHistory tests pass — validating version display and revert"
+  },
+  "script_chars": 102,
+  "started_at": "2026-07-24T13:30:22.161Z",
+  "finished_at": "2026-07-24T13:30:29.479Z",
+  "exit_code": 0,
+  "signal": null,
+  "timed_out": false,
+  "aborted": false,
+  "force_resolved": false,
+  "duration_ms": 7318,
+  "stdout_bytes": 1778,
+  "stderr_bytes": 0,
+  "stdout_truncated": false,
+  "stderr_truncated": false,
+  "stdout_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\3e265a53-06d2-49f4-8c4b-d209550c5861.stdout",
+  "stderr_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\3e265a53-06d2-49f4-8c4b-d209550c5861.stderr"
+}

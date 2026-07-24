@@ -1,0 +1,28 @@
+{
+  "id": "556076e0-d2cd-47dc-9106-59f8f14cb50c",
+  "runtime": "node",
+  "purpose": "UAT M001/S01/TC2-browser-autosave (uat-browser-check)",
+  "metadata": {
+    "kind": "uat_exec",
+    "milestoneId": "M001",
+    "sliceId": "S01",
+    "checkId": "TC2-browser-autosave",
+    "intent": "uat-browser-check",
+    "expected": "Auto-save composable and lyrics store modules serve correctly with expected APIs"
+  },
+  "script_chars": 1951,
+  "started_at": "2026-07-24T13:34:43.421Z",
+  "finished_at": "2026-07-24T13:34:43.549Z",
+  "exit_code": 0,
+  "signal": null,
+  "timed_out": false,
+  "aborted": false,
+  "force_resolved": false,
+  "duration_ms": 128,
+  "stdout_bytes": 245,
+  "stderr_bytes": 0,
+  "stdout_truncated": false,
+  "stderr_truncated": false,
+  "stdout_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\556076e0-d2cd-47dc-9106-59f8f14cb50c.stdout",
+  "stderr_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\556076e0-d2cd-47dc-9106-59f8f14cb50c.stderr"
+}

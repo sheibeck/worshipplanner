@@ -1,0 +1,28 @@
+{
+  "id": "6c8f961f-21f7-4d9e-adec-3d300967024b",
+  "runtime": "bash",
+  "purpose": "UAT M001/S02/s02-tests (uat-runtime-check)",
+  "metadata": {
+    "kind": "uat_exec",
+    "milestoneId": "M001",
+    "sliceId": "S02",
+    "checkId": "s02-tests",
+    "intent": "uat-runtime-check",
+    "expected": "All S02 tests pass"
+  },
+  "script_chars": 377,
+  "started_at": "2026-07-24T14:24:28.297Z",
+  "finished_at": "2026-07-24T14:24:43.096Z",
+  "exit_code": 0,
+  "signal": null,
+  "timed_out": false,
+  "aborted": false,
+  "force_resolved": false,
+  "duration_ms": 14799,
+  "stdout_bytes": 8436,
+  "stderr_bytes": 0,
+  "stdout_truncated": false,
+  "stderr_truncated": false,
+  "stdout_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\6c8f961f-21f7-4d9e-adec-3d300967024b.stdout",
+  "stderr_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\6c8f961f-21f7-4d9e-adec-3d300967024b.stderr"
+}

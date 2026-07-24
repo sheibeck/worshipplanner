@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "patterns": {
+    "research-slice": {
+      "light": {
+        "success": 0,
+        "fail": 0
+      },
+      "standard": {
+        "success": 2,
+        "fail": 1
+      },
+      "heavy": {
+        "success": 2,
+        "fail": 0
+      }
+    },
+    "execute-task": {
+      "light": {
+        "success": 0,
+        "fail": 0
+      },
+      "standard": {
+        "success": 2,
+        "fail": 1
+      },
+      "heavy": {
+        "success": 13,
+        "fail": 0
+      }
+    },
+    "complete-slice": {
+      "light": {
+        "success": 0,
+        "fail": 0
+      },
+      "standard": {
+        "success": 2,
+        "fail": 1
+      },
+      "heavy": {
+        "success": 0,
+        "fail": 0
+      }
+    },
+    "run-uat": {
+      "light": {
+        "success": 2,
+        "fail": 0
+      },
+      "standard": {
+        "success": 0,
+        "fail": 0
+      },
+      "heavy": {
+        "success": 0,
+        "fail": 0
+      }
+    },
+    "plan-slice": {
+      "light": {
+        "success": 0,
+        "fail": 0
+      },
+      "standard": {
+        "success": 0,
+        "fail": 0
+      },
+      "heavy": {
+        "success": 0,
+        "fail": 1
+      }
+    }
+  },
+  "feedback": [],
+  "updatedAt": "2026-07-24T21:25:47.903Z"
+}

@@ -1,7 +1,7 @@
 {
   "schema": 2,
   "lastWriter": "gsd-pi",
-  "lastProjectedAt": "2026-07-24T21:20:32.830Z",
+  "lastProjectedAt": "2026-07-24T21:26:01.568Z",
   "projections": {
     "milestones/M001/slices/S01/tasks/T01-PLAN.md": {
       "sha": "b8a647357c95d0bb",
@@ -153,6 +153,13 @@
       "entities": [
         "M001",
         "M001/S02"
+      ]
+    },
+    "phases/01-worship-service-slide-management/01-03-RESEARCH.md": {
+      "sha": "d4a4527bb230217d",
+      "entities": [
+        "M001",
+        "M001/S03"
       ]
     },
     "phases/01-worship-service-slide-management/01-05-RESEARCH.md": {

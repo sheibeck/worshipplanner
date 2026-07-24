@@ -1,0 +1,28 @@
+{
+  "id": "c7f1737a-280f-4f4b-9421-82e73abe2696",
+  "runtime": "node",
+  "purpose": "UAT M001/S01/TC5-browser-discard (uat-browser-check)",
+  "metadata": {
+    "kind": "uat_exec",
+    "milestoneId": "M001",
+    "sliceId": "S01",
+    "checkId": "TC5-browser-discard",
+    "intent": "uat-browser-check",
+    "expected": "LyricPasteDialog has discard guard on cancel"
+  },
+  "script_chars": 1167,
+  "started_at": "2026-07-24T13:34:59.398Z",
+  "finished_at": "2026-07-24T13:34:59.523Z",
+  "exit_code": 0,
+  "signal": null,
+  "timed_out": false,
+  "aborted": false,
+  "force_resolved": false,
+  "duration_ms": 125,
+  "stdout_bytes": 107,
+  "stderr_bytes": 0,
+  "stdout_truncated": false,
+  "stderr_truncated": false,
+  "stdout_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\c7f1737a-280f-4f4b-9421-82e73abe2696.stdout",
+  "stderr_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\c7f1737a-280f-4f4b-9421-82e73abe2696.stderr"
+}

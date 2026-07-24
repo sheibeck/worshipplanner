@@ -1,0 +1,17 @@
+
+[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90mC:/projects/worshipplanner/.gsd-worktrees/M001[39m
+
+ [32m✓[39m src/components/__tests__/PerformanceOrderBuilder.test.ts[2m > [22mPerformanceOrderBuilder[2m > [22mrenders available sections as clickable buttons[32m 47[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/PerformanceOrderBuilder.test.ts[2m > [22mPerformanceOrderBuilder[2m > [22mclicking a section adds it to the performance order[32m 23[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/PerformanceOrderBuilder.test.ts[2m > [22mPerformanceOrderBuilder[2m > [22mclicking a section multiple times adds repeats[32m 17[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/PerformanceOrderBuilder.test.ts[2m > [22mPerformanceOrderBuilder[2m > [22mremoving a section from the order emits updated array[32m 16[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/PerformanceOrderBuilder.test.ts[2m > [22mPerformanceOrderBuilder[2m > [22mreset to default restores definition order (each section once)[32m 14[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/PerformanceOrderBuilder.test.ts[2m > [22mPerformanceOrderBuilder[2m > [22mdisplays order items with correct labels[32m 7[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/PerformanceOrderBuilder.test.ts[2m > [22mPerformanceOrderBuilder[2m > [22mshows empty state when no sections are in the order[32m 4[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/PerformanceOrderBuilder.test.ts[2m > [22mPerformanceOrderBuilder[2m > [22mhides reset button when order is empty[32m 5[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m8 passed[39m[22m[90m (8)[39m
+[2m   Start at [22m 00:40:53
+[2m   Duration [22m 3.92s[2m (transform 425ms, setup 0ms, import 677ms, tests 138ms, environment 2.71s)[22m
+

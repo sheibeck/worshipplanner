@@ -3,7 +3,81 @@
 ## Milestones
 
 - ✅ **v1.0 MVP** — Phases 1-4, 6-7 (shipped 2026-03-05)
-- 📋 **v1.1** — Phases 5, 8, 9 (planned)
+- ✅ **v1.1** — Phases 8-17 (Planning Center, song catalog, volunteer scheduling)
+- 🔄 **v1.2 — Worship Service Slide Management** — Phases 18-23 (in progress; migrated from gsdpi M001 2026-07-24)
+
+## v1.2 — Worship Service Slide Management (Phases 18-23)
+
+> Migrated faithfully from gsdpi milestone **M001** on 2026-07-24. Slice→phase map:
+> S01→18, S02→19, S03→20, S04→21, S05→22, S06→23. Requirements: `milestones/v1.2-REQUIREMENTS.md`.
+> Decisions D001-D006 recorded in each phase's CONTEXT.md and in STATE.md.
+
+**Vision:** A full slide management system for worship services — lyrics, scripture, imported
+presentations, and media — that auto-assembles from the service order and is approachable for
+non-technical church volunteers.
+
+**Milestone success criteria:**
+1. A volunteer can paste SongSelect lyrics, build performance order, add the song to a service, import a sermon PowerPoint, and preview the complete slideshow end to end.
+2. Reordering service elements auto-reorders the slideshow with no manual intervention.
+3. Media (audio/video) auto-plays in the presentation preview when advancing to a media slide.
+4. A PPTX uploaded through the import flow is parsed by the Cloud Function and appears as editable native slides.
+5. The slide editor is polished enough for a non-technical volunteer to use on first attempt without training.
+
+- [x] Phase 18: Song Lyric Slides and Editor (7/7 plans) — complete
+- [x] Phase 19: Scripture and Congregational Reading Slides — complete
+- [ ] Phase 20: Service Sections and Slide Auto-Assembly (research done; needs planning) ← **active**
+- [ ] Phase 21: PowerPoint Import for Announcements and Sermon
+- [ ] Phase 22: Media Attachments and Storage Lifecycle (research done)
+- [ ] Phase 23: Presentation Preview Mode
+
+### Phase 18: Song Lyric Slides and Editor `risk:high`
+
+**Goal:** Paste CCLI SongSelect lyrics, see auto-split slides with copyright, arrange the performance order with repeats, and edit/revert with auto-save. Establishes the unified slide data model, slide CRUD + Pinia store, and auto-save infrastructure that later phases consume.
+**Depends on:** — (first slice)
+**Requirements:** R001, R002, R003, R004, R017, R018, R019, R020
+**Status:** ✅ Complete — code built & committed (05ab4bd..c5c1174): CCLI paste parser, `songLyrics` store, lyric editor, performance-order builder, `LyricVersionHistory`, `useAutoSave` composable.
+**Plans:** 7/7 (ported from gsdpi S01 tasks T01-T07)
+
+### Phase 19: Scripture and Congregational Reading Slides `risk:medium`
+
+**Goal:** Enter a scripture reference, see auto-pulled ESV text split into slides; toggle congregational mode with Leader/Congregation labels; manually override auto-generated slides.
+**Depends on:** Phase 18
+**Requirements:** R008, R009, R017 (supporting), R018 (supporting)
+**Status:** ✅ Built & committed (b2df23f..82ad378): `ScriptureSlide`/`ScriptureReading` types, `splitPassage`/`scriptureSplitter`, `scriptureSlides` store, `ScriptureSlideEditor`, `CongregationalEditor`, wired into ServiceEditor. 71/71 unit tests green.
+**Known UAT gap (carried from gsdpi S02, verdict PARTIAL):** overridden scripture slides are tracked in `overriddenSlides` but render no visual distinction (missing conditional CSS class in `ScriptureSlideEditor.vue`) — the manual-override *visual* sub-requirement is unmet. Auto-save + ESV fetch/split + congregational mode all pass. Follow-up noted in `19-03-SUMMARY.md`. Address via a quick fix or fold into Phase 20 UI polish.
+**Plans:** 5/5 (ported from gsdpi S02 tasks T01-T05).
+
+### Phase 20: Service Sections and Slide Auto-Assembly `risk:high`
+
+**Goal:** Create a service with Pre-Service/Worship/Message/Sending sections, add songs and scripture, and see the slideshow auto-assemble; reorder elements and watch slides follow. Produces the service-section model, the slideshow assembly engine (accepts any slide source), and the service-element→slide-section binding that auto-updates on reorder — without breaking existing flat-slot-array services.
+**Depends on:** Phase 18, Phase 19
+**Requirements:** R005, R006, R007, R018 (supporting)
+**Status:** ▶️ **ACTIVE** — research done (`20-RESEARCH.md`); not yet planned. Next action: `/gsd-plan-phase 20`.
+**Plans:** 0 (needs planning)
+
+### Phase 21: PowerPoint Import for Announcements and Sermon `risk:medium`
+
+**Goal:** Upload a .pptx file, see it parsed into native slides via a Firebase Cloud Function; add announcement (Pre-Service) and sermon (Message) sections to a service with imported slides. Image import supported for announcements.
+**Depends on:** Phase 20
+**Requirements:** R010, R011, R012, R017 (supporting), R018 (supporting)
+**Open question:** exact PPTX parsing library for Cloud Functions (resolve during research/planning).
+**Plans:** 0
+
+### Phase 22: Media Attachments and Storage Lifecycle `risk:medium`
+
+**Goal:** Attach MP3 or video to a slide and see it auto-play in the editor preview (auto-play on entry, stop at end, no loop); verify the 2-week Firebase Storage cleanup policy on old media.
+**Depends on:** Phase 18
+**Requirements:** R013, R014, R015
+**Status:** research done (`22-RESEARCH.md`).
+**Plans:** 0
+
+### Phase 23: Presentation Preview Mode `risk:low`
+
+**Goal:** Open a full-screen preview of the complete service slideshow, advance through all slide types with media playback working, degrade gracefully when media is missing.
+**Depends on:** Phase 20, Phase 22
+**Requirements:** R016, R018 (supporting)
+**Plans:** 0
+
 
 ## Phases
 

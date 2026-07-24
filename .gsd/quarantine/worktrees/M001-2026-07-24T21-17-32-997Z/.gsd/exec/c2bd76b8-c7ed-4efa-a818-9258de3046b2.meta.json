@@ -1,0 +1,28 @@
+{
+  "id": "c2bd76b8-c7ed-4efa-a818-9258de3046b2",
+  "runtime": "bash",
+  "purpose": "UAT M001/S02/test-coverage (uat-runtime-check)",
+  "metadata": {
+    "kind": "uat_exec",
+    "milestoneId": "M001",
+    "sliceId": "S02",
+    "checkId": "test-coverage",
+    "intent": "uat-runtime-check",
+    "expected": "Find test files for S02 components"
+  },
+  "script_chars": 392,
+  "started_at": "2026-07-24T19:35:19.559Z",
+  "finished_at": "2026-07-24T19:35:20.325Z",
+  "exit_code": 1,
+  "signal": null,
+  "timed_out": false,
+  "aborted": false,
+  "force_resolved": false,
+  "duration_ms": 766,
+  "stdout_bytes": 8,
+  "stderr_bytes": 0,
+  "stdout_truncated": false,
+  "stderr_truncated": false,
+  "stdout_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\c2bd76b8-c7ed-4efa-a818-9258de3046b2.stdout",
+  "stderr_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\c2bd76b8-c7ed-4efa-a818-9258de3046b2.stderr"
+}

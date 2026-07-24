@@ -1,0 +1,15 @@
+=== TC-05: Empty reference guard ===
+--- v-if guard on edit button ---
+624:                      :modelValue="slotToScriptureRef(slot)"
+635:                      {{ slotToScriptureRef(slot as ScriptureSlot)
+636:                        ? `${slotToScriptureRef(slot as ScriptureSlot)?.book} ${slotToScriptureRef(slot as ScriptureSlot)?.chapter}:${slotToScriptureRef(slot as ScriptureSlot)?.verseStart}${slotToScriptureRef(slot as ScriptureSlot)?.verseEnd ? '-' + slotToScriptureRef(slot as ScriptureSlot)?.verseEnd : ''}`
+642:                      {{ slotToScriptureRef(slot)
+643:                        ? `${slotToScriptureRef(slot)?.book} ${slotToScriptureRef(slot)?.chapter}:${slotToScriptureRef(slot)?.verseStart}${slotToScriptureRef(slot)?.verseEnd ? '-' + slotToScriptureRef(slot)?.verseEnd : ''}`
+
+--- slotToScriptureRef function ---
+1856:function slotToScriptureRef(slot: ScriptureSlot): ScriptureRef | null {
+1857-  if (!slot.book || !slot.chapter || !slot.verseStart || !slot.verseEnd) return null
+1858-  return {
+1859-    book: slot.book,
+1860-    chapter: slot.chapter,
+1861-    verseStart: slot.verseStart,

@@ -1,0 +1,15 @@
+=== TC-06: v-if guard for editor role around scripture section ===
+652-                  v-if="authStore.isEditor && !isExportedLocked && slotToScriptureRef(slot as ScriptureSlot)"
+
+=== TC-06 test: viewer cannot see button ===
+153:  it('does not render "Edit Scripture Slides" button for viewer', () => {
+154-    const wrapper = mount(TestWrapper, {
+155-      props: { slot: makeScriptureSlot(), isEditor: false },
+156-    })
+157-    expect(wrapper.find('[data-testid="edit-scripture-slides-btn"]').exists()).toBe(false)
+158-  })
+159-
+160-  it('does not render "Edit Scripture Slides" button when exported/locked', () => {
+161-    const wrapper = mount(TestWrapper, {
+162-      props: { slot: makeScriptureSlot(), isEditor: true, isExportedLocked: true },
+163-    })

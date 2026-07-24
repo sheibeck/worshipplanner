@@ -1,0 +1,12 @@
+=== TC-02: Manual slide override ===
+--- ScriptureSlideEditor: edit/override behavior ---
+108:const overriddenSlides = ref<Set<number>>(new Set())
+128:    overriddenSlides.value = new Set()
+158:  overriddenSlides.value.add(idx)
+
+--- ScriptureSlide type: override field ---
+
+--- Test: manual override ---
+149:  it('editing a slide textarea updates local state', async () => {
+162:  it('auto-save triggers on slide edits via useAutoSave', async () => {
+244:  it('loads existing reading in edit mode', async () => {

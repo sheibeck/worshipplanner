@@ -1,0 +1,28 @@
+{
+  "id": "f59a6d34-a89d-41c6-ace9-6ca70c666593",
+  "runtime": "bash",
+  "purpose": "UAT M001/S01/check-prereqs (uat-service-start)",
+  "metadata": {
+    "kind": "uat_exec",
+    "milestoneId": "M001",
+    "sliceId": "S01",
+    "checkId": "check-prereqs",
+    "intent": "uat-service-start",
+    "expected": "Prerequisites present"
+  },
+  "script_chars": 477,
+  "started_at": "2026-07-24T13:26:22.164Z",
+  "finished_at": "2026-07-24T13:26:36.328Z",
+  "exit_code": 1,
+  "signal": null,
+  "timed_out": true,
+  "aborted": false,
+  "force_resolved": false,
+  "duration_ms": 14164,
+  "stdout_bytes": 82,
+  "stderr_bytes": 0,
+  "stdout_truncated": false,
+  "stderr_truncated": false,
+  "stdout_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\f59a6d34-a89d-41c6-ace9-6ca70c666593.stdout",
+  "stderr_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\f59a6d34-a89d-41c6-ace9-6ca70c666593.stderr"
+}

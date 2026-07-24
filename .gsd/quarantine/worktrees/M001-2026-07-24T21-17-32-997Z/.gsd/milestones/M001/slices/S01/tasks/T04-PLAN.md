@@ -1,0 +1,48 @@
+---
+estimated_steps: 23
+estimated_files: 2
+skills_used: []
+---
+
+# T04: Lyric Paste Dialog Component
+
+Create the paste dialog where users paste CCLI SongSelect text and preview parsed sections before confirming.
+
+1. Create src/components/LyricPasteDialog.vue:
+   - Modal dialog (Teleport to body, backdrop click to close pattern matching SongSlideOver)
+   - Props: open (boolean), songId (string), orgId (string)
+   - Emits: close, saved (after lyrics are persisted)
+   - Layout:
+     a. Left/top area: textarea for pasting raw CCLI text, placeholder "Paste lyrics from CCLI SongSelect"
+     b. Right/bottom area: live preview of parsed sections (updates reactively as user types/pastes)
+     c. Preview shows: song title (from parse), each section with label and lyric lines, copyright info at bottom
+     d. If parse produces zero sections: show help message "No sections detected — check that you copied the full lyrics from SongSelect"
+   - On confirm/save:
+     a. Call parseCCLIPaste() on the textarea content
+     b. Call songLyricsStore.saveLyrics() with the parsed data
+     c. Call songStore.updateSong() to set performanceOrder to the default order from parsed sections
+     d. Emit 'saved'
+   - On cancel: confirmDiscard guard if textarea has content, then emit 'close'
+   - Dark-first styling: bg-gray-900 modal, bg-gray-800 textarea, gray-100 text, indigo accent buttons
+   - Responsive: stack vertically on small screens, side-by-side on md+
+
+2. Create src/components/__tests__/LyricPasteDialog.test.ts:
+   - Test that pasting text shows parsed preview
+   - Test that confirm button calls saveLyrics with parsed data
+   - Test that cancel with content shows confirm dialog
+   - Test that empty paste disables confirm button
+
+## Inputs
+
+- `src/utils/ccliParser.ts`
+- `src/stores/songLyrics.ts`
+- `src/components/SongSlideOver.vue`
+
+## Expected Output
+
+- `src/components/LyricPasteDialog.vue`
+- `src/components/__tests__/LyricPasteDialog.test.ts`
+
+## Verification
+
+npx vitest run src/components/__tests__/LyricPasteDialog.test.ts --reporter=verbose

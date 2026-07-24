@@ -1,0 +1,10 @@
+# GSD context snapshot (2026-07-24T04:54:22.734Z)
+
+## Top project memories
+- [MEM001] (architecture) Slide data model structure Chose: Unified slide type with content-kind field (lyric, scripture, image, video, text) rather than distinct types per content. Rationale: Simpler for the editor, reordering, and user mental model. One slide is one slide regardless of content. Avoids multiplying UI components for each content type..
+- [MEM002] (architecture) Song lyric versioning strategy Chose: Single canonical version per song in catalog; services reference live, not as copies. Rationale: Eliminates the wrong-slides-at-rehearsal problem from juggling multiple ProPresenter versions. Edit once, every service sees the update. User explicitly rejected per-service copies based on real-worl….
+- [MEM003] (architecture) Slide import format support Chose: PowerPoint (.pptx) as the universal import format; Google Slides and Keynote users export to PowerPoint first. Rationale: One import pipeline instead of three. Both Google Slides and Keynote have built-in PowerPoint export. Avoids OAuth complexity for Google Slides API and proprietary protobuf parsing for Keynote..
+- [MEM004] (architecture) PPTX parsing execution environment Chose: Server-side parsing via Firebase Cloud Function. Rationale: More reliable extraction, no browser memory constraints, handles edge cases better. User priority: least hassle, most reliability..
+- [MEM005] (architecture) Service order structure Chose: Four formalized named sections (Pre-Service, Worship, Message, Sending) as default service structure. Rationale: Gives lay users a clear template rather than a blank canvas. Makes slide auto-assembly deterministic. Starting with structure is better for non-technical users; can be made configurable later..
+- [MEM006] (architecture) Song lyric input method Chose: Manual copy/paste from CCLI SongSelect with auto-parsing of section markers. Rationale: CCLI does not allow API access to anyone. The paste format has reliable section markers (Ve
+…[truncated]

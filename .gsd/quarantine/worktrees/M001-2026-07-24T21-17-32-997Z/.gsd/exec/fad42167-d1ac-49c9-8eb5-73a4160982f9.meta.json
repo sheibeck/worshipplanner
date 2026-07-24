@@ -1,0 +1,28 @@
+{
+  "id": "fad42167-d1ac-49c9-8eb5-73a4160982f9",
+  "runtime": "bash",
+  "purpose": "UAT M001/S01/TC-full-suite (uat-runtime-check)",
+  "metadata": {
+    "kind": "uat_exec",
+    "milestoneId": "M001",
+    "sliceId": "S01",
+    "checkId": "TC-full-suite",
+    "intent": "uat-runtime-check",
+    "expected": "All 8 test files pass with ~100 tests total"
+  },
+  "script_chars": 468,
+  "started_at": "2026-07-24T13:32:03.482Z",
+  "finished_at": "2026-07-24T13:32:25.832Z",
+  "exit_code": 0,
+  "signal": null,
+  "timed_out": false,
+  "aborted": false,
+  "force_resolved": false,
+  "duration_ms": 22350,
+  "stdout_bytes": 929,
+  "stderr_bytes": 0,
+  "stdout_truncated": false,
+  "stderr_truncated": false,
+  "stdout_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\fad42167-d1ac-49c9-8eb5-73a4160982f9.stdout",
+  "stderr_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\fad42167-d1ac-49c9-8eb5-73a4160982f9.stderr"
+}

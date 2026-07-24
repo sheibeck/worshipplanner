@@ -1,0 +1,28 @@
+{
+  "id": "02587371-0278-4074-b49c-2a9d11e51d6b",
+  "runtime": "bash",
+  "purpose": "UAT M001/S01/check-firebase-config (uat-artifact-check)",
+  "metadata": {
+    "kind": "uat_exec",
+    "milestoneId": "M001",
+    "sliceId": "S01",
+    "checkId": "check-firebase-config",
+    "intent": "uat-artifact-check",
+    "expected": "Firebase emulator configuration files"
+  },
+  "script_chars": 144,
+  "started_at": "2026-07-24T13:28:44.465Z",
+  "finished_at": "2026-07-24T13:28:46.482Z",
+  "exit_code": 0,
+  "signal": null,
+  "timed_out": false,
+  "aborted": false,
+  "force_resolved": false,
+  "duration_ms": 2017,
+  "stdout_bytes": 22,
+  "stderr_bytes": 0,
+  "stdout_truncated": false,
+  "stderr_truncated": false,
+  "stdout_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\02587371-0278-4074-b49c-2a9d11e51d6b.stdout",
+  "stderr_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\02587371-0278-4074-b49c-2a9d11e51d6b.stderr"
+}

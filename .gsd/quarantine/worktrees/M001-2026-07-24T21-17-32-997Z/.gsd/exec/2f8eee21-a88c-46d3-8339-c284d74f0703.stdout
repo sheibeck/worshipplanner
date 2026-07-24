@@ -1,0 +1,11 @@
+=== TC-06: Viewer role restriction ===
+--- v-if includes isEditor check ---
+41:              <h1 v-if="!authStore.isEditor" class="text-xl font-semibold text-gray-100">{{ formattedDate }}</h1>
+58:                v-if="authStore.isEditor"
+85:            <template v-if="authStore.isEditor">
+108:              v-if="authStore.isEditor && previousService"
+122:              v-if="authStore.isEditor"
+
+--- authStore.isEditor definition ---
+src/stores/auth.ts:49:  const isEditor = computed(() => userRole.value === 'editor')
+src/stores/auth.ts:318:    isEditor,

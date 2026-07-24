@@ -1,0 +1,20 @@
+{
+  "id": "0f50a63f-8221-4bd2-bfc4-bada47abec0f",
+  "runtime": "bash",
+  "purpose": "Run SongLyricEditor tests attempt 2",
+  "script_chars": 87,
+  "started_at": "2026-07-24T04:38:36.554Z",
+  "finished_at": "2026-07-24T04:38:44.420Z",
+  "exit_code": 0,
+  "signal": null,
+  "timed_out": false,
+  "aborted": false,
+  "force_resolved": false,
+  "duration_ms": 7866,
+  "stdout_bytes": 2551,
+  "stderr_bytes": 0,
+  "stdout_truncated": false,
+  "stderr_truncated": false,
+  "stdout_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\0f50a63f-8221-4bd2-bfc4-bada47abec0f.stdout",
+  "stderr_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\0f50a63f-8221-4bd2-bfc4-bada47abec0f.stderr"
+}

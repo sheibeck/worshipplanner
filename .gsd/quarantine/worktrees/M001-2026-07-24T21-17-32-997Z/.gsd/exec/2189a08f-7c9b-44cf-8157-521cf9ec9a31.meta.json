@@ -1,0 +1,28 @@
+{
+  "id": "2189a08f-7c9b-44cf-8157-521cf9ec9a31",
+  "runtime": "bash",
+  "purpose": "UAT M001/S02/edge-cases (uat-artifact-check)",
+  "metadata": {
+    "kind": "uat_exec",
+    "milestoneId": "M001",
+    "sliceId": "S02",
+    "checkId": "edge-cases",
+    "intent": "uat-artifact-check",
+    "expected": "Long passages split correctly, invalid references show error state, good test coverage"
+  },
+  "script_chars": 605,
+  "started_at": "2026-07-24T19:35:04.594Z",
+  "finished_at": "2026-07-24T19:35:05.127Z",
+  "exit_code": 2,
+  "signal": null,
+  "timed_out": false,
+  "aborted": false,
+  "force_resolved": false,
+  "duration_ms": 533,
+  "stdout_bytes": 968,
+  "stderr_bytes": 0,
+  "stdout_truncated": false,
+  "stderr_truncated": false,
+  "stdout_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\2189a08f-7c9b-44cf-8157-521cf9ec9a31.stdout",
+  "stderr_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\2189a08f-7c9b-44cf-8157-521cf9ec9a31.stderr"
+}

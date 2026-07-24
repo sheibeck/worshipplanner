@@ -1,0 +1,28 @@
+{
+  "id": "390d24db-bbac-4d6f-8a6c-9ff307845095",
+  "runtime": "bash",
+  "purpose": "UAT M001/S02/TC-04-autosave (uat-artifact-check)",
+  "metadata": {
+    "kind": "uat_exec",
+    "milestoneId": "M001",
+    "sliceId": "S02",
+    "checkId": "TC-04-autosave",
+    "intent": "uat-artifact-check",
+    "expected": "Service auto-save persists slot changes including readingMode"
+  },
+  "script_chars": 495,
+  "started_at": "2026-07-24T19:37:18.663Z",
+  "finished_at": "2026-07-24T19:37:19.390Z",
+  "exit_code": 0,
+  "signal": null,
+  "timed_out": false,
+  "aborted": false,
+  "force_resolved": false,
+  "duration_ms": 727,
+  "stdout_bytes": 300,
+  "stderr_bytes": 0,
+  "stdout_truncated": false,
+  "stderr_truncated": false,
+  "stdout_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\390d24db-bbac-4d6f-8a6c-9ff307845095.stdout",
+  "stderr_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\390d24db-bbac-4d6f-8a6c-9ff307845095.stderr"
+}

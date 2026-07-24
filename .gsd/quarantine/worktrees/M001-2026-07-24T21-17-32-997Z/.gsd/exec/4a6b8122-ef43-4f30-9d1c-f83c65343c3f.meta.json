@@ -1,0 +1,28 @@
+{
+  "id": "4a6b8122-ef43-4f30-9d1c-f83c65343c3f",
+  "runtime": "bash",
+  "purpose": "UAT M001/S01/check-logs (uat-service-start)",
+  "metadata": {
+    "kind": "uat_exec",
+    "milestoneId": "M001",
+    "sliceId": "S01",
+    "checkId": "check-logs",
+    "intent": "uat-service-start",
+    "expected": "Log output showing service status"
+  },
+  "script_chars": 162,
+  "started_at": "2026-07-24T13:26:44.760Z",
+  "finished_at": "2026-07-24T13:26:58.559Z",
+  "exit_code": 0,
+  "signal": null,
+  "timed_out": true,
+  "aborted": false,
+  "force_resolved": false,
+  "duration_ms": 13799,
+  "stdout_bytes": 73,
+  "stderr_bytes": 0,
+  "stdout_truncated": false,
+  "stderr_truncated": false,
+  "stdout_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\4a6b8122-ef43-4f30-9d1c-f83c65343c3f.stdout",
+  "stderr_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\4a6b8122-ef43-4f30-9d1c-f83c65343c3f.stderr"
+}

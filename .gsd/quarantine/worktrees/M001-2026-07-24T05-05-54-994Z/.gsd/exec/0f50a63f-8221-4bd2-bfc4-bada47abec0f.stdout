@@ -1,0 +1,22 @@
+
+[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90mC:/projects/worshipplanner/.gsd-worktrees/M001[39m
+
+ [32m✓[39m src/components/__tests__/SongLyricEditor.test.ts[2m > [22mSongLyricEditor[2m > [22msubscribes to lyrics on mount[32m 48[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/SongLyricEditor.test.ts[2m > [22mSongLyricEditor[2m > [22mshows loading state[32m 6[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/SongLyricEditor.test.ts[2m > [22mSongLyricEditor[2m > [22mshows empty state when no lyrics exist[32m 26[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/SongLyricEditor.test.ts[2m > [22mSongLyricEditor[2m > [22mrenders sections from store data[32m 28[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/SongLyricEditor.test.ts[2m > [22mSongLyricEditor[2m > [22mdisplays copyright info[32m 24[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/SongLyricEditor.test.ts[2m > [22mSongLyricEditor[2m > [22mediting a section updates editable state[32m 32[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/SongLyricEditor.test.ts[2m > [22mSongLyricEditor[2m > [22museAutoSave is wired with correct arguments[32m 24[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/SongLyricEditor.test.ts[2m > [22mSongLyricEditor[2m > [22mshows auto-save status indicator for pending[32m 29[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/SongLyricEditor.test.ts[2m > [22mSongLyricEditor[2m > [22mshows auto-save status indicator for saving[32m 35[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/SongLyricEditor.test.ts[2m > [22mSongLyricEditor[2m > [22mshows auto-save status indicator for saved[32m 28[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/SongLyricEditor.test.ts[2m > [22mSongLyricEditor[2m > [22m"Save Version" button calls saveLyrics to create a new version[32m 31[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/SongLyricEditor.test.ts[2m > [22mSongLyricEditor[2m > [22m"Paste New Lyrics" button exists when lyrics are loaded[32m 28[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/SongLyricEditor.test.ts[2m > [22mSongLyricEditor[2m > [22mhides no-lyrics copyright when ccliSongNumber is empty[32m 26[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m13 passed[39m[22m[90m (13)[39m
+[2m   Start at [22m 00:38:40
+[2m   Duration [22m 4.19s[2m (transform 433ms, setup 0ms, import 682ms, tests 370ms, environment 2.73s)[22m
+

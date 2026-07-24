@@ -1,0 +1,51 @@
+=== Running S02-specific tests ===
+ [32m✓[39m src/components/__tests__/CongregationalEditor.test.ts[2m > [22mCongregationalEditor[2m > [22mauto-save save function calls updateReading with congregational data[32m 18[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/CongregationalEditor.test.ts[2m > [22mCongregationalEditor[2m > [22mshows error message when ESV fetch fails[32m 23[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/ScriptureSlideEditor.test.ts[2m > [22mScriptureSlideEditor[2m > [22mclicking fetch calls fetchPassageText with correct query[32m 36[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/ScriptureSlideEditor.test.ts[2m > [22mScriptureSlideEditor[2m > [22mafter fetch, displays split slides with verse range labels[32m 44[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/CongregationalEditor.test.ts[2m > [22mCongregationalEditor[2m > [22mshows save status indicator for each status[32m 59[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/CongregationalEditor.test.ts[2m > [22mCongregationalEditor[2m > [22mcleans up auto-save on unmount[32m 14[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/CongregationalEditor.test.ts[2m > [22mCongregationalEditor[2m > [22mloads existing reading in edit mode with congregationalSections[32m 14[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/CongregationalEditor.test.ts[2m > [22mCongregationalEditor[2m > [22mdoes not show sections or preview when no passage is fetched[32m 3[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/CongregationalEditor.test.ts[2m > [22mCongregationalEditor[2m > [22mpreview labels update after toggling speaker role[32m 23[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/ScriptureSlideEditor.test.ts[2m > [22mScriptureSlideEditor[2m > [22mcalls splitPassage with fetched text and parsed reference[32m 23[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/ScriptureSlideEditor.test.ts[2m > [22mScriptureSlideEditor[2m > [22mediting a slide textarea updates local state[32m 21[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/ScriptureSlideEditor.test.ts[2m > [22mScriptureSlideEditor[2m > [22mauto-save triggers on slide edits via useAutoSave[32m 12[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/ScriptureSlideEditor.test.ts[2m > [22mScriptureSlideEditor[2m > [22mauto-save save function calls updateReading on the store[32m 66[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/ScriptureSlideEditor.test.ts[2m > [22mScriptureSlideEditor[2m > [22mshows error message when ESV fetch fails[32m 9[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/ScriptureSlideEditor.test.ts[2m > [22mScriptureSlideEditor[2m > [22mdoes not show error when fetch succeeds[32m 16[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/ScriptureSlideEditor.test.ts[2m > [22mScriptureSlideEditor[2m > [22mshows save status indicator for each status[32m 74[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/ScriptureSlideEditor.test.ts[2m > [22mScriptureSlideEditor[2m > [22mcreates a new reading on first fetch[32m 23[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/ScriptureSlideEditor.test.ts[2m > [22mScriptureSlideEditor[2m > [22mcleans up auto-save on unmount[32m 11[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/ScriptureSlideEditor.test.ts[2m > [22mScriptureSlideEditor[2m > [22mloads existing reading in edit mode[32m 18[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/scriptureSplitter.test.ts[2m > [22msplitPassage[2m > [22mreturns empty array for empty text[32m 3[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/scriptureSplitter.test.ts[2m > [22msplitPassage[2m > [22mproduces a single slide for a single verse[32m 3[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/scriptureSplitter.test.ts[2m > [22msplitPassage[2m > [22mproduces a single slide for a short passage under the threshold[32m 1[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/scriptureSplitter.test.ts[2m > [22msplitPassage[2m > [22msplits a medium passage into 2-3 slides at verse boundaries[32m 1[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/scriptureSplitter.test.ts[2m > [22msplitPassage[2m > [22msplits a long psalm-length passage into many slides[32m 1[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/scriptureSplitter.test.ts[2m > [22msplitPassage[2m > [22mfalls back to sentence-boundary split when no verse markers exist[32m 1[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/scriptureSplitter.test.ts[2m > [22msplitPassage[2m > [22mrespects custom wordsPerSlide option[32m 1[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/scriptureSplitter.test.ts[2m > [22msplitPassage[2m > [22mgenerates correct verse range labels[32m 1[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/scriptureSplitter.test.ts[2m > [22msplitPassage[2m > [22massigns sequential positions starting from 0[32m 1[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/scriptureSplitter.test.ts[2m > [22msplitPassage[2m > [22mformats reference string correctly for various ref shapes[32m 0[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/scriptureSlides.test.ts[2m > [22museScriptureSlides[2m > [22minitial state[2m > [22mstarts with empty readings array[32m 41[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/scriptureSlides.test.ts[2m > [22museScriptureSlides[2m > [22minitial state[2m > [22mstarts with isLoading true[32m 1[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/scriptureSlides.test.ts[2m > [22museScriptureSlides[2m > [22minitial state[2m > [22mcurrentReading is null initially[32m 1[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/scriptureSlides.test.ts[2m > [22museScriptureSlides[2m > [22msubscribeReadings[2m > [22mcalls onSnapshot on the scriptureReadings collection[32m 2[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/scriptureSlides.test.ts[2m > [22museScriptureSlides[2m > [22msubscribeReadings[2m > [22mpopulates readings from snapshot with { id, ...data } mapping[32m 3[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/scriptureSlides.test.ts[2m > [22museScriptureSlides[2m > [22msubscribeReadings[2m > [22msets isLoading to false after first snapshot[32m 1[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/scriptureSlides.test.ts[2m > [22museScriptureSlides[2m > [22msubscribeReadings[2m > [22mcalling subscribeReadings again unsubscribes previous listener first[32m 1[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/scriptureSlides.test.ts[2m > [22museScriptureSlides[2m > [22mcurrentReading[2m > [22mreturns the first (most recent) reading[32m 1[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/scriptureSlides.test.ts[2m > [22museScriptureSlides[2m > [22mcurrentReading[2m > [22mreturns null when no readings exist[32m 1[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/scriptureSlides.test.ts[2m > [22museScriptureSlides[2m > [22mcreateReading[2m > [22mcalls addDoc with correct path and serverTimestamp[32m 4[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/scriptureSlides.test.ts[2m > [22museScriptureSlides[2m > [22mupdateReading[2m > [22mcalls updateDoc with correct path and serverTimestamp for updatedAt[32m 2[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/scriptureSlides.test.ts[2m > [22museScriptureSlides[2m > [22mgetReading[2m > [22mreturns reading data when doc exists[32m 1[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/scriptureSlides.test.ts[2m > [22museScriptureSlides[2m > [22mgetReading[2m > [22mreturns null when doc does not exist[32m 1[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/scriptureSlides.test.ts[2m > [22museScriptureSlides[2m > [22munsubscribeReadings[2m > [22mcalls the unsubscribe fn and resets state[32m 1[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/scriptureSlides.test.ts[2m > [22museScriptureSlides[2m > [22munsubscribeReadings[2m > [22mis safe to call when no subscription is active[32m 1[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m5 passed[39m[22m[90m (5)[39m
+[2m      Tests [22m [1m[32m71 passed[39m[22m[90m (71)[39m
+[2m   Start at [22m 10:24:31
+[2m   Duration [22m 11.02s[2m (transform 1.23s, setup 0ms, import 3.18s, tests 1.77s, environment 20.40s)[22m
+

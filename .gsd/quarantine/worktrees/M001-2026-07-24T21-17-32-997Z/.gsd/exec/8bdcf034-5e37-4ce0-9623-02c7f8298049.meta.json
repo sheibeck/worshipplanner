@@ -1,0 +1,28 @@
+{
+  "id": "8bdcf034-5e37-4ce0-9623-02c7f8298049",
+  "runtime": "bash",
+  "purpose": "UAT M001/S02/TC-04 (uat-artifact-check)",
+  "metadata": {
+    "kind": "uat_exec",
+    "milestoneId": "M001",
+    "sliceId": "S02",
+    "checkId": "TC-04",
+    "intent": "uat-artifact-check",
+    "expected": "Reading mode is persisted to Firestore on slot and read back on re-expand"
+  },
+  "script_chars": 420,
+  "started_at": "2026-07-24T19:34:53.585Z",
+  "finished_at": "2026-07-24T19:34:53.997Z",
+  "exit_code": 0,
+  "signal": null,
+  "timed_out": false,
+  "aborted": false,
+  "force_resolved": false,
+  "duration_ms": 412,
+  "stdout_bytes": 1140,
+  "stderr_bytes": 0,
+  "stdout_truncated": false,
+  "stderr_truncated": false,
+  "stdout_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\8bdcf034-5e37-4ce0-9623-02c7f8298049.stdout",
+  "stderr_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\8bdcf034-5e37-4ce0-9623-02c7f8298049.stderr"
+}

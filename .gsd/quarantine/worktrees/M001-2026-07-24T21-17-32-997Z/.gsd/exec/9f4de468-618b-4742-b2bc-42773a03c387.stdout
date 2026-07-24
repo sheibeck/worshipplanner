@@ -1,0 +1,65 @@
+=== TC-01: Scripture slide creation via ESV fetch ===
+--- ScriptureSlideEditor: reference input + Fetch button ---
+7:        v-if="autoSaveStatus === 'pending'"
+13:        v-else-if="autoSaveStatus === 'saving'"
+16:      >Saving...</span>
+18:        v-else-if="autoSaveStatus === 'saved'"
+21:      >Saved &#10003;</span>
+28:          v-model="referenceText"
+30:          data-testid="reference-input"
+37:          :disabled="!canFetch || isFetching"
+38:          @click="onFetchPassage"
+40:          :class="canFetch && !isFetching
+44:          <svg v-if="isFetching" class="h-3.5 w-3.5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+48:          {{ isFetching ? 'Fetching...' : 'Fetch Passage' }}
+52:      <!-- Fetch error -->
+90:import { fetchPassageText } from '@/utils/esvApi'
+91:import { splitPassage } from '@/utils/scriptureSplitter'
+104:const referenceText = ref('')
+105:const isFetching = ref(false)
+110:const parsedRef = computed<ScriptureRef | null>(() => parseScriptureInput(referenceText.value))
+111:const canFetch = computed(() => parsedRef.value !== null)
+114:async function onFetchPassage() {
+118:  isFetching.value = true
+124:    const text = await fetchPassageText(query)
+126:    const slides = splitPassage(text, scriptureRef)
+132:        reference: scriptureRef,
+141:        reference: scriptureRef,
+150:    isFetching.value = false
+179:const { status: autoSaveStatus, cleanup: cleanupAutoSave } = useAutoSave(
+189:      const scriptureRef = reading.reference
+190:      referenceText.value = reading.displayReference
+
+--- scriptureSplitter: auto-split logic ---
+2:import type { ScriptureSlide } from '@/types/slide'
+84:export function splitPassage(
+109:  const slides: ScriptureSlide[] = []
+117:      slides.push(buildSlide(combined, formatVerseRange(currentVerses), ref, slides.length))
+128:    slides.push(buildSlide(combined, formatVerseRange(currentVerses), ref, slides.length))
+131:  return slides
+
+--- Store: createReading / fetchPassage pattern ---
+53:  async function createReading(
+96:    createReading,
+
+--- Test: ESV fetch and auto-split ---
+27:const autoSaveStatusRef = ref('idle')
+39:      status: autoSaveStatusRef,
+48:  fetchPassageText: (...args: unknown[]) => mockFetchPassageText(...args),
+53:  splitPassage: (...args: unknown[]) => mockSplitPassage(...args),
+90:    autoSaveStatusRef.value = 'idle'
+96:  it('renders reference input and fetch button', () => {
+99:    expect(wrapper.find('[data-testid="fetch-btn"]').exists()).toBe(true)
+102:  it('fetch button is disabled when reference is empty', () => {
+104:    const btn = wrapper.find('[data-testid="fetch-btn"]')
+108:  it('fetch button is enabled when a valid reference is entered', async () => {
+112:    expect(wrapper.find('[data-testid="fetch-btn"]').attributes('disabled')).toBeUndefined()
+115:  it('clicking fetch calls fetchPassageText with correct query', async () => {
+118:    await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
+124:  it('after fetch, displays split slides with verse range labels', async () => {
+127:    await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
+130:    expect(wrapper.find('[data-testid="slides-container"]').exists()).toBe(true)
+137:  it('calls splitPassage with fetched text and parsed reference', async () => {
+140:    await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
+152:    await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
+162:  it('auto-save triggers on slide edits via useAutoSave', async () => {

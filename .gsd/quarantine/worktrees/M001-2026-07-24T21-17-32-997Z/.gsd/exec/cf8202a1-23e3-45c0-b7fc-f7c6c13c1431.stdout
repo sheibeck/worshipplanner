@@ -1,0 +1,17 @@
+
+[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90mC:/projects/worshipplanner/.gsd-worktrees/M001[39m
+
+ [32m✓[39m src/components/__tests__/SongSlideOver.test.ts[2m > [22mSongSlideOver — save[2m > [22mappends a removed theme to removedThemes on save[32m 107[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/SongSlideOver.test.ts[2m > [22mSongSlideOver — save[2m > [22mmerges a newly removed theme with any previously removedThemes (de-duped)[32m 32[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/SongSlideOver.test.ts[2m > [22mSongSlideOver — save[2m > [22mprunes a re-added theme from removedThemes on save[32m 26[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/SongSlideOver.test.ts[2m > [22mSongSlideOver — save[2m > [22mleaves removedThemes unchanged when the themes set is untouched[32m 24[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/SongSlideOver.test.ts[2m > [22mSongSlideOver — tabs[2m > [22mshows Details and Lyrics tabs in edit mode[32m 20[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/SongSlideOver.test.ts[2m > [22mSongSlideOver — tabs[2m > [22mdoes not show tabs in create mode[32m 18[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/SongSlideOver.test.ts[2m > [22mSongSlideOver — tabs[2m > [22mdefaults to Details tab showing the form fields[32m 15[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/SongSlideOver.test.ts[2m > [22mSongSlideOver — tabs[2m > [22mswitches to Lyrics tab on click[32m 19[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m8 passed[39m[22m[90m (8)[39m
+[2m   Start at [22m 09:31:15
+[2m   Duration [22m 4.83s[2m (transform 1.02s, setup 0ms, import 1.28s, tests 264ms, environment 2.84s)[22m
+

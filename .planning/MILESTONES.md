@@ -1,5 +1,26 @@
 # Milestones
 
+## v1.2 Worship Service Slide Management (In progress — since 2026-07-24)
+
+**Migrated from gsdpi** (milestone M001, slices S01-S06) into gsd-core on 2026-07-24. The
+`.gsd/` store is now legacy/read-only; work continues with regular `/gsd-*` commands.
+
+**Phases:** 18-23 (6). **Requirements:** `milestones/v1.2-REQUIREMENTS.md` (R001-R020 active).
+
+**Delivered so far:**
+- ✅ Phase 18 — Song Lyric Slides and Editor (CCLI paste parser, `songLyrics` store, lyric editor, performance-order builder, version history, `useAutoSave`)
+- ✅ Phase 19 — Scripture and Congregational Reading Slides (ESV auto-pull + auto-split, `scriptureSlides` store, `ScriptureSlideEditor`, `CongregationalEditor`)
+
+**Remaining:**
+- ▶️ Phase 20 — Service Sections and Slide Auto-Assembly (research done; **next: plan**)
+- Phase 21 — PowerPoint Import for Announcements and Sermon
+- Phase 22 — Media Attachments and Storage Lifecycle (research done)
+- Phase 23 — Presentation Preview Mode
+
+**Decisions:** D001-D006 (unified slide model, single canonical song version, PPTX universal import, server-side parsing, four service sections, CCLI paste). See STATE.md.
+
+---
+
 ## v1.0 MVP (Shipped: 2026-03-05)
 
 **Phases completed:** 6 phases (1, 2, 3, 4, 6, 7), 18 plans

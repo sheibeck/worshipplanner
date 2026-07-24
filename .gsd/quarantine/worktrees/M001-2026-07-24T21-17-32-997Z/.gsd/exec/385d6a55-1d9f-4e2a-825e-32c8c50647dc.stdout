@@ -1,0 +1,45 @@
+=== TC-04: Reading mode persistence ===
+--- ServiceEditorView: persistence of readingMode ---
+84:            <!-- Autosave status indicator: editor only -->
+87:                v-if="autosaveStatus === 'pending' || autosaveStatus === 'saving'"
+90:                {{ autosaveStatus === 'saving' ? 'Saving...' : 'Saving soon...' }}
+93:                v-else-if="autosaveStatus === 'saved'"
+102:                Unsaved changes
+111:              title="Undo last save (Ctrl+Z)"
+666:                      {{ expandedScriptureSlots.has(index) ? 'Close Slides Editor' : 'Edit Scripture Slides' }}
+671:                      v-if="expandedScriptureSlots.has(index)"
+698:                    v-if="expandedScriptureSlots.has(index)"
+706:                      :readingId="(slot as ScriptureSlot).scriptureReadingId ?? undefined"
+712:                      :readingId="(slot as ScriptureSlot).scriptureReadingId ?? undefined"
+1114:// ── Autosave state ─────────────────────────────────────────────────────────────
+1115:const previousService = ref<Service | null>(null)   // snapshot before last autosave (for undo)
+1116:const autosaveStatus = ref<'idle' | 'pending' | 'saving' | 'saved'>('idle')
+1117:let autosaveTimer: ReturnType<typeof setTimeout> | null = null
+1118:let autosaveInitialized = false                     // suppress first-load trigger
+1119:let autosaveSaving = false                          // inflight guard — prevents concurrent saves
+1152:const expandedScriptureSlots = ref<Set<number>>(new Set())
+1155:  const next = new Set(expandedScriptureSlots.value)
+1161:  expandedScriptureSlots.value = next
+
+--- Service type: readingMode field ---
+25:  readingMode?: 'normal' | 'congregational'
+
+--- Store: reading mode save ---
+68:  async function updateReading(
+97:    updateReading,
+
+--- Integration test: persistence ---
+55:    readingMode: 'normal',
+73:      return localSlot.value.readingMode ?? 'normal'
+77:      localSlot.value = { ...localSlot.value, readingMode: mode }
+197:      props: { slot: makeScriptureSlot({ readingMode: 'normal' }), isEditor: true },
+206:      props: { slot: makeScriptureSlot({ readingMode: 'congregational' }), isEditor: true },
+215:      props: { slot: makeScriptureSlot({ readingMode: 'normal' }), isEditor: true },
+227:      props: { slot: makeScriptureSlot({ readingMode: 'congregational' }), isEditor: true },
+237:  it('reading mode toggle updates the readingMode on the slot', async () => {
+239:      props: { slot: makeScriptureSlot({ readingMode: 'normal' }), isEditor: true },
+244:    expect(wrapper.vm.localSlot.readingMode).toBe('congregational')
+247:    expect(wrapper.vm.localSlot.readingMode).toBe('normal')
+250:  it('defaults to "normal" mode when readingMode is undefined', async () => {
+252:      props: { slot: makeScriptureSlot({ readingMode: undefined }), isEditor: true },
+267:  it('clicking "Close Slides Editor" collapses the editor panel', async () => {

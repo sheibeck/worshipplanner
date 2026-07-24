@@ -1,0 +1,28 @@
+{
+  "id": "bebdabb9-408c-487f-9911-441e209833f5",
+  "runtime": "bash",
+  "purpose": "UAT M001/S01/TC-edge-no-markers (uat-artifact-check)",
+  "metadata": {
+    "kind": "uat_exec",
+    "milestoneId": "M001",
+    "sliceId": "S01",
+    "checkId": "TC-edge-no-markers",
+    "intent": "uat-artifact-check",
+    "expected": "Parser handles text without CCLI markers as single section"
+  },
+  "script_chars": 270,
+  "started_at": "2026-07-24T13:31:49.357Z",
+  "finished_at": "2026-07-24T13:31:49.609Z",
+  "exit_code": 0,
+  "signal": null,
+  "timed_out": false,
+  "aborted": false,
+  "force_resolved": false,
+  "duration_ms": 252,
+  "stdout_bytes": 203,
+  "stderr_bytes": 0,
+  "stdout_truncated": false,
+  "stderr_truncated": false,
+  "stdout_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\bebdabb9-408c-487f-9911-441e209833f5.stdout",
+  "stderr_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\bebdabb9-408c-487f-9911-441e209833f5.stderr"
+}

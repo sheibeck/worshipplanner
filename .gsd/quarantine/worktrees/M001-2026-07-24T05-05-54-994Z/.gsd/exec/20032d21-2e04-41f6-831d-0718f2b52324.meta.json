@@ -1,0 +1,20 @@
+{
+  "id": "20032d21-2e04-41f6-831d-0718f2b52324",
+  "runtime": "bash",
+  "purpose": "T06 verification — PerformanceOrderBuilder tests",
+  "script_chars": 90,
+  "started_at": "2026-07-24T04:40:50.294Z",
+  "finished_at": "2026-07-24T04:40:57.870Z",
+  "exit_code": 0,
+  "signal": null,
+  "timed_out": false,
+  "aborted": false,
+  "force_resolved": false,
+  "duration_ms": 7576,
+  "stdout_bytes": 1904,
+  "stderr_bytes": 0,
+  "stdout_truncated": false,
+  "stderr_truncated": false,
+  "stdout_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\20032d21-2e04-41f6-831d-0718f2b52324.stdout",
+  "stderr_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\20032d21-2e04-41f6-831d-0718f2b52324.stderr"
+}

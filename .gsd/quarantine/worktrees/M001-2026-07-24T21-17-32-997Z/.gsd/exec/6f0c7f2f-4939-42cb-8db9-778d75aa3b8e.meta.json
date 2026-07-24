@@ -1,0 +1,28 @@
+{
+  "id": "6f0c7f2f-4939-42cb-8db9-778d75aa3b8e",
+  "runtime": "bash",
+  "purpose": "UAT M001/S02/precond-files (uat-artifact-check)",
+  "metadata": {
+    "kind": "uat_exec",
+    "milestoneId": "M001",
+    "sliceId": "S02",
+    "checkId": "precond-files",
+    "intent": "uat-artifact-check",
+    "expected": "All key files present, ScriptureSlide type defined, editors wired into ServiceEditorView"
+  },
+  "script_chars": 888,
+  "started_at": "2026-07-24T14:20:47.783Z",
+  "finished_at": "2026-07-24T14:20:48.104Z",
+  "exit_code": 0,
+  "signal": null,
+  "timed_out": false,
+  "aborted": false,
+  "force_resolved": false,
+  "duration_ms": 321,
+  "stdout_bytes": 1465,
+  "stderr_bytes": 0,
+  "stdout_truncated": false,
+  "stderr_truncated": false,
+  "stdout_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\6f0c7f2f-4939-42cb-8db9-778d75aa3b8e.stdout",
+  "stderr_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\6f0c7f2f-4939-42cb-8db9-778d75aa3b8e.stderr"
+}

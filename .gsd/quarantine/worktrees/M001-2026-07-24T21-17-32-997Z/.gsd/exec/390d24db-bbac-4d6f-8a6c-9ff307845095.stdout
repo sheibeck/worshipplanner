@@ -1,0 +1,8 @@
+=== Check service auto-save mechanism ===
+1252:            await serviceStore.updateService(serviceId.value, { slots: reindexed })
+2275:    await serviceStore.updateService(localService.value.id, {
+2437:    await serviceStore.updateService(id, {
+
+--- Auto-save setup block ---
+
+--- Save function ---

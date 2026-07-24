@@ -1,0 +1,83 @@
+{
+  "schema": 2,
+  "lastWriter": "gsd-pi",
+  "lastProjectedAt": "2026-07-24T05:05:33.940Z",
+  "projections": {
+    "milestones/M001/slices/S01/tasks/T01-PLAN.md": {
+      "sha": "b8a647357c95d0bb",
+      "entities": [
+        "M001",
+        "M001/S01",
+        "M001/S01/T01"
+      ]
+    },
+    "milestones/M001/M001-ROADMAP.md": {
+      "sha": "df0d2a3b295a87e7",
+      "entities": [
+        "M001"
+      ]
+    },
+    "milestones/M001/slices/S01/tasks/T02-PLAN.md": {
+      "sha": "636572d17b25b3a9",
+      "entities": [
+        "M001",
+        "M001/S01",
+        "M001/S01/T02"
+      ]
+    },
+    "milestones/M001/slices/S01/tasks/T03-PLAN.md": {
+      "sha": "d56bc0b9eae92fda",
+      "entities": [
+        "M001",
+        "M001/S01",
+        "M001/S01/T03"
+      ]
+    },
+    "milestones/M001/slices/S01/tasks/T06-PLAN.md": {
+      "sha": "879b52bc73176e20",
+      "entities": [
+        "M001",
+        "M001/S01",
+        "M001/S01/T06"
+      ]
+    },
+    "milestones/M001/slices/S01/tasks/T04-PLAN.md": {
+      "sha": "21f5b5b4145cdd1d",
+      "entities": [
+        "M001",
+        "M001/S01",
+        "M001/S01/T04"
+      ]
+    },
+    "milestones/M001/slices/S01/tasks/T05-PLAN.md": {
+      "sha": "6aad7dfcc5b5c5cf",
+      "entities": [
+        "M001",
+        "M001/S01",
+        "M001/S01/T05"
+      ]
+    },
+    "milestones/M001/slices/S01/tasks/T07-PLAN.md": {
+      "sha": "9d368b2b0af81427",
+      "entities": [
+        "M001",
+        "M001/S01",
+        "M001/S01/T07"
+      ]
+    },
+    "milestones/M001/slices/S01/S01-PLAN.md": {
+      "sha": "89e51e65d80cf96d",
+      "entities": [
+        "M001",
+        "M001/S01"
+      ]
+    }
+  },
+  "planning": {
+    "active": true,
+    "layout": "legacy-milestone-dir",
+    "projections": {},
+    "passthrough": {}
+  },
+  "piVersion": ""
+}

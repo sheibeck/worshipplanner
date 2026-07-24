@@ -1,0 +1,12 @@
+PASS: congregational-editor-testid
+PASS: mode-toggle-testid
+PASS: mode-normal-btn
+PASS: mode-congregational-btn
+PASS: speaker-toggle
+PASS: leader-label
+PASS: congregation-label
+PASS: leader-indigo
+PASS: congregation-amber
+PASS: alternating-default
+
+Overall: ALL PASS

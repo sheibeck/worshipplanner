@@ -1,0 +1,74 @@
+
+[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90mC:/projects/worshipplanner/.gsd-worktrees/M001[39m
+
+ [32m✓[39m src/utils/__tests__/planningCenterApi.test.ts [2m([22m[2m97 tests[22m[2m)[22m[32m 242[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/quarters.test.ts [2m([22m[2m42 tests[22m[2m)[22m[32m 278[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/songs.test.ts [2m([22m[2m86 tests[22m[2m)[22m[33m 764[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/scheduler.test.ts [2m([22m[2m30 tests[22m[2m)[22m[32m 48[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/services.test.ts [2m([22m[2m29 tests[22m[2m)[22m[32m 254[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/roster.test.ts [2m([22m[2m33 tests[22m[2m)[22m[32m 267[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/pcSongImport.test.ts [2m([22m[2m42 tests[22m[2m)[22m[32m 34[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/ScriptureInput.test.ts [2m([22m[2m22 tests[22m[2m)[22m[33m 544[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/suggestions.test.ts [2m([22m[2m26 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m src/views/__tests__/ServiceEditorView.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 5632[2mms[22m[39m
+     [33m[2m✓[22m[39m editor: Roles tab lists seeded role assignments resolved from the quarterly schedule [33m 502[2mms[22m[39m
+     [33m[2m✓[22m[39m editor: override control (checkbox picker) appears, filtered by role eligibility [33m 442[2mms[22m[39m
+     [33m[2m✓[22m[39m editor: roster/quarters are subscribed once authStore.isEditor flips true after mount (WR-01) [33m 600[2mms[22m[39m
+     [33m[2m✓[22m[39m editor: rapid toggles of two different people for the same role do not clobber each other (WR-02) [33m 512[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/AvailabilityDrawer.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 1251[2mms[22m[39m
+     [33m[2m✓[22m[39m renders one tier control (preset row) per held role, populated from roleFrequency with a regular/monthly default for absent roles (D-05/D-06) [33m 312[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/auth.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 51[2mms[22m[39m
+ [31m❯[39m src/views/__tests__/RosterView.test.ts [2m([22m[2m13 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 1073[2mms[22m[39m
+     [32m✓[39m does not render a serve-frequency/cadence control anywhere in the form[32m 241[2mms[22m[39m
+     [32m✓[39m renders the roles checklist and toggles a role on/off[32m 120[2mms[22m[39m
+     [32m✓[39m onSaveVolunteer payload includes only name/email/phone/roles — no frequency fields[32m 94[2mms[22m[39m
+[31m     [31m×[31m wraps Roles config in CollapsibleSection[39m[32m 106[2mms[22m[39m
+     [32m✓[39m hides inactive people by default and shows them when "Show inactive" is toggled on[32m 46[2mms[22m[39m
+     [32m✓[39m renders a Status column with Active/Inactive pills instead of Actions[32m 58[2mms[22m[39m
+     [32m✓[39m does not render a per-row Deactivate button[32m 26[2mms[22m[39m
+     [32m✓[39m shows a Deactivate control for an active person and calls deactivatePerson, not updatePerson[32m 52[2mms[22m[39m
+     [32m✓[39m shows Reactivate and a Delete affordance for an inactive person; clicking Reactivate calls reactivatePerson[32m 104[2mms[22m[39m
+     [32m✓[39m permanently deletes an inactive person from the drawer after confirmation[32m 89[2mms[22m[39m
+     [32m✓[39m does not render the status action section when adding a new volunteer[32m 14[2mms[22m[39m
+     [32m✓[39m sorts alphabetically by name and toggles direction[32m 91[2mms[22m[39m
+     [32m✓[39m has no Frequency column header[32m 15[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/QuarterGrid.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 768[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/songSearch.test.ts [2m([22m[2m32 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/claudeApi.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/CsvImportModal.test.ts [2m([22m[2m35 tests[22m[2m)[22m[32m 54[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/SongTable.test.ts [2m([22m[2m15 tests[22m[2m)[22m[33m 695[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/planningCenterExport.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 116[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/SongLyricEditor.test.ts [2m([22m[2m13 tests[22m[2m)[22m[33m 1256[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/SongSlideOver.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 782[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/ScriptureSlideEditor.test.ts [2m([22m[2m15 tests[22m[2m)[22m[33m 718[2mms[22m[39m
+ [32m✓[39m src/composables/__tests__/useAutoSave.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 42[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/slotTypes.test.ts [2m([22m[2m31 tests[22m[2m)[22m[32m 44[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/volunteerCsv.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m src/views/__tests__/ShareView.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 405[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/rotationTable.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 30[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/AvailabilityRosterTable.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 395[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/scripture.test.ts [2m([22m[2m33 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/serviceRoles.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/ServicePrintLayout.test.ts [2m([22m[2m10 tests[22m[2m)[22m[33m 425[2mms[22m[39m
+ [32m✓[39m src/router/__tests__/router.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 181[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/LyricPasteDialog.test.ts [2m([22m[2m12 tests[22m[2m)[22m[33m 817[2mms[22m[39m
+ [32m✓[39m src/views/__tests__/TeamView.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m src/views/__tests__/QuarterShareView.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 612[2mms[22m[39m
+     [33m[2m✓[22m[39m renders the matrix view by default with roles as columns and dates as rows [33m 344[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/PerformanceOrderBuilder.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 449[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/LyricVersionHistory.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 219[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/scriptureSlides.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 122[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/songLyrics.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 54[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/ccliParser.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 56[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/scriptureSplitter.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/ServiceCard.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 302[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/SongBadge.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 188[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/quarterDates.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/CollapsibleSection.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 175[2mms[22m[39m
+ [32m✓[39m src/utils/__tests__/slug.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m45 passed[39m[22m[90m (46)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m913 passed[39m[22m[90m (914)[39m
+[2m   Start at [22m 09:57:22
+[2m   Duration [22m 108.42s[2m (transform 10.25s, setup 0ms, import 23.43s, tests 19.50s, environment 236.59s)[22m
+

@@ -1,0 +1,28 @@
+{
+  "id": "b67b1e9b-3b35-42ab-b652-d473fe5ae1d8",
+  "runtime": "bash",
+  "purpose": "UAT M001/S02/TC-05-guard (uat-artifact-check)",
+  "metadata": {
+    "kind": "uat_exec",
+    "milestoneId": "M001",
+    "sliceId": "S02",
+    "checkId": "TC-05-guard",
+    "intent": "uat-artifact-check",
+    "expected": "v-if guard on button checks for non-empty scripture reference"
+  },
+  "script_chars": 348,
+  "started_at": "2026-07-24T14:24:22.492Z",
+  "finished_at": "2026-07-24T14:24:22.750Z",
+  "exit_code": 0,
+  "signal": null,
+  "timed_out": false,
+  "aborted": false,
+  "force_resolved": false,
+  "duration_ms": 258,
+  "stdout_bytes": 1630,
+  "stderr_bytes": 0,
+  "stdout_truncated": false,
+  "stderr_truncated": false,
+  "stdout_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\b67b1e9b-3b35-42ab-b652-d473fe5ae1d8.stdout",
+  "stderr_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\b67b1e9b-3b35-42ab-b652-d473fe5ae1d8.stderr"
+}

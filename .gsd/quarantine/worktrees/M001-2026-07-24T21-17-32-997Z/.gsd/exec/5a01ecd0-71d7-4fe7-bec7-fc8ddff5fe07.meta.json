@@ -1,0 +1,28 @@
+{
+  "id": "5a01ecd0-71d7-4fe7-bec7-fc8ddff5fe07",
+  "runtime": "node",
+  "purpose": "UAT M001/S02/browser-TC03-congregational (uat-browser-check)",
+  "metadata": {
+    "kind": "uat_exec",
+    "milestoneId": "M001",
+    "sliceId": "S02",
+    "checkId": "browser-TC03-congregational",
+    "intent": "uat-browser-check",
+    "expected": "All congregational editor UI elements and mode toggle present"
+  },
+  "script_chars": 1180,
+  "started_at": "2026-07-24T19:39:47.916Z",
+  "finished_at": "2026-07-24T19:39:48.255Z",
+  "exit_code": 0,
+  "signal": null,
+  "timed_out": false,
+  "aborted": false,
+  "force_resolved": false,
+  "duration_ms": 339,
+  "stdout_bytes": 267,
+  "stderr_bytes": 0,
+  "stdout_truncated": false,
+  "stderr_truncated": false,
+  "stdout_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\5a01ecd0-71d7-4fe7-bec7-fc8ddff5fe07.stdout",
+  "stderr_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\5a01ecd0-71d7-4fe7-bec7-fc8ddff5fe07.stderr"
+}

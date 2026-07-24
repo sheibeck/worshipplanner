@@ -1,0 +1,28 @@
+{
+  "id": "2f8eee21-a88c-46d3-8339-c284d74f0703",
+  "runtime": "bash",
+  "purpose": "UAT M001/S02/TC-06 (uat-artifact-check)",
+  "metadata": {
+    "kind": "uat_exec",
+    "milestoneId": "M001",
+    "sliceId": "S02",
+    "checkId": "TC-06",
+    "intent": "uat-artifact-check",
+    "expected": "Edit Scripture Slides button gated behind authStore.isEditor"
+  },
+  "script_chars": 252,
+  "started_at": "2026-07-24T19:34:59.233Z",
+  "finished_at": "2026-07-24T19:35:00.262Z",
+  "exit_code": 0,
+  "signal": null,
+  "timed_out": false,
+  "aborted": false,
+  "force_resolved": false,
+  "duration_ms": 1029,
+  "stdout_bytes": 558,
+  "stderr_bytes": 0,
+  "stdout_truncated": false,
+  "stderr_truncated": false,
+  "stdout_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\2f8eee21-a88c-46d3-8339-c284d74f0703.stdout",
+  "stderr_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\2f8eee21-a88c-46d3-8339-c284d74f0703.stderr"
+}

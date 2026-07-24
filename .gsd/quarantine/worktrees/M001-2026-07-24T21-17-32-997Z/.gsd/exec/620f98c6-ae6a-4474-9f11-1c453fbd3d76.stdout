@@ -1,0 +1,29 @@
+
+[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90mC:/projects/worshipplanner/.gsd-worktrees/M001[39m
+
+ [32m✓[39m src/stores/__tests__/songLyrics.test.ts[2m > [22museSongLyricsStore[2m > [22minitial state[2m > [22mstarts with empty lyrics array[32m 69[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/songLyrics.test.ts[2m > [22museSongLyricsStore[2m > [22minitial state[2m > [22mstarts with isLoading true[32m 1[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/songLyrics.test.ts[2m > [22museSongLyricsStore[2m > [22minitial state[2m > [22mcurrentLyrics is null initially[32m 1[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/songLyrics.test.ts[2m > [22museSongLyricsStore[2m > [22minitial state[2m > [22mlyricVersions is empty initially[32m 1[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/songLyrics.test.ts[2m > [22museSongLyricsStore[2m > [22msubscribeLyrics[2m > [22mcalls onSnapshot on the lyrics subcollection[32m 2[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/songLyrics.test.ts[2m > [22museSongLyricsStore[2m > [22msubscribeLyrics[2m > [22mpopulates lyrics from snapshot with { id, songId, ...data } mapping[32m 3[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/songLyrics.test.ts[2m > [22museSongLyricsStore[2m > [22msubscribeLyrics[2m > [22msets isLoading to false after first snapshot[32m 1[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/songLyrics.test.ts[2m > [22museSongLyricsStore[2m > [22msubscribeLyrics[2m > [22mcalling subscribeLyrics again unsubscribes previous listener first[32m 1[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/songLyrics.test.ts[2m > [22museSongLyricsStore[2m > [22msubscribeLyrics[2m > [22mdefaults performanceOrder to [] for docs missing the field[32m 1[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/songLyrics.test.ts[2m > [22museSongLyricsStore[2m > [22mcurrentLyrics[2m > [22mreturns the first (most recent) lyrics doc[32m 1[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/songLyrics.test.ts[2m > [22museSongLyricsStore[2m > [22mcurrentLyrics[2m > [22mreturns null when no lyrics docs exist[32m 1[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/songLyrics.test.ts[2m > [22museSongLyricsStore[2m > [22mlyricVersions[2m > [22mreturns all lyrics docs[32m 1[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/songLyrics.test.ts[2m > [22museSongLyricsStore[2m > [22msaveLyrics[2m > [22mcalls addDoc with correct data and serverTimestamp[32m 2[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/songLyrics.test.ts[2m > [22museSongLyricsStore[2m > [22mupdateCurrentLyrics[2m > [22mcalls updateDoc with partial data and serverTimestamp for updatedAt[32m 1[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/songLyrics.test.ts[2m > [22museSongLyricsStore[2m > [22mupdateCurrentLyrics[2m > [22mdoes not overwrite createdAt[32m 1[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/songLyrics.test.ts[2m > [22museSongLyricsStore[2m > [22mrevertToVersion[2m > [22mreads the version doc and creates a new doc with its data + fresh timestamps[32m 1[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/songLyrics.test.ts[2m > [22museSongLyricsStore[2m > [22mrevertToVersion[2m > [22mdoes nothing when version doc does not exist[32m 1[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/songLyrics.test.ts[2m > [22museSongLyricsStore[2m > [22mupdatePerformanceOrder[2m > [22mcalls updateDoc on the Song doc with the new order and serverTimestamp[32m 1[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/songLyrics.test.ts[2m > [22museSongLyricsStore[2m > [22munsubscribeLyrics[2m > [22mcalls the unsubscribe fn and resets state[32m 1[2mms[22m[39m
+ [32m✓[39m src/stores/__tests__/songLyrics.test.ts[2m > [22museSongLyricsStore[2m > [22munsubscribeLyrics[2m > [22mis safe to call when no subscription is active[32m 2[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m20 passed[39m[22m[90m (20)[39m
+[2m   Start at [22m 09:31:05
+[2m   Duration [22m 6.07s[2m (transform 216ms, setup 0ms, import 405ms, tests 99ms, environment 5.14s)[22m
+

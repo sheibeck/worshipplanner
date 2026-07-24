@@ -1,0 +1,28 @@
+{
+  "id": "98feedb4-e8c3-4a21-9686-153a62ba2115",
+  "runtime": "bash",
+  "purpose": "UAT M001/S02/TC-02-visual (uat-artifact-check)",
+  "metadata": {
+    "kind": "uat_exec",
+    "milestoneId": "M001",
+    "sliceId": "S02",
+    "checkId": "TC-02-visual",
+    "intent": "uat-artifact-check",
+    "expected": "Overridden slides have distinct visual styling"
+  },
+  "script_chars": 306,
+  "started_at": "2026-07-24T19:36:14.953Z",
+  "finished_at": "2026-07-24T19:36:17.107Z",
+  "exit_code": 0,
+  "signal": null,
+  "timed_out": false,
+  "aborted": false,
+  "force_resolved": false,
+  "duration_ms": 2154,
+  "stdout_bytes": 1326,
+  "stderr_bytes": 0,
+  "stdout_truncated": false,
+  "stderr_truncated": false,
+  "stdout_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\98feedb4-e8c3-4a21-9686-153a62ba2115.stdout",
+  "stderr_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\98feedb4-e8c3-4a21-9686-153a62ba2115.stderr"
+}

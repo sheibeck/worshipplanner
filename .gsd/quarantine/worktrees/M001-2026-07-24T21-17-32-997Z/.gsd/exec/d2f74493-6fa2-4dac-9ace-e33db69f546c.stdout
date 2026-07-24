@@ -1,0 +1,4 @@
+status: 200
+has-app-div: true
+has-vite-script: true
+PASS: dev server serves the app shell

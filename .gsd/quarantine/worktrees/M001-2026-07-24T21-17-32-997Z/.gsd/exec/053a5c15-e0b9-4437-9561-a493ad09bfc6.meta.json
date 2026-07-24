@@ -1,0 +1,28 @@
+{
+  "id": "053a5c15-e0b9-4437-9561-a493ad09bfc6",
+  "runtime": "bash",
+  "purpose": "UAT M001/S01/wait-services (uat-service-start)",
+  "metadata": {
+    "kind": "uat_exec",
+    "milestoneId": "M001",
+    "sliceId": "S01",
+    "checkId": "wait-services",
+    "intent": "uat-service-start",
+    "expected": "Both services responding with HTTP 200"
+  },
+  "script_chars": 463,
+  "started_at": "2026-07-24T13:25:33.513Z",
+  "finished_at": "2026-07-24T13:26:10.297Z",
+  "exit_code": 1,
+  "signal": null,
+  "timed_out": true,
+  "aborted": false,
+  "force_resolved": false,
+  "duration_ms": 36784,
+  "stdout_bytes": 18,
+  "stderr_bytes": 0,
+  "stdout_truncated": false,
+  "stderr_truncated": false,
+  "stdout_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\053a5c15-e0b9-4437-9561-a493ad09bfc6.stdout",
+  "stderr_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\053a5c15-e0b9-4437-9561-a493ad09bfc6.stderr"
+}

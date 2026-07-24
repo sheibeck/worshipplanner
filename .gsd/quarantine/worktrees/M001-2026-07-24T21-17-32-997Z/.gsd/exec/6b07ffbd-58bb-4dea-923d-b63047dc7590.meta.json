@@ -1,0 +1,28 @@
+{
+  "id": "6b07ffbd-58bb-4dea-923d-b63047dc7590",
+  "runtime": "bash",
+  "purpose": "UAT M001/S01/TC-artifact-files (uat-artifact-check)",
+  "metadata": {
+    "kind": "uat_exec",
+    "milestoneId": "M001",
+    "sliceId": "S01",
+    "checkId": "TC-artifact-files",
+    "intent": "uat-artifact-check",
+    "expected": "All key files exist"
+  },
+  "script_chars": 392,
+  "started_at": "2026-07-24T13:31:41.519Z",
+  "finished_at": "2026-07-24T13:31:41.605Z",
+  "exit_code": 0,
+  "signal": null,
+  "timed_out": false,
+  "aborted": false,
+  "force_resolved": false,
+  "duration_ms": 86,
+  "stdout_bytes": 336,
+  "stderr_bytes": 0,
+  "stdout_truncated": false,
+  "stderr_truncated": false,
+  "stdout_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\6b07ffbd-58bb-4dea-923d-b63047dc7590.stdout",
+  "stderr_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\6b07ffbd-58bb-4dea-923d-b63047dc7590.stderr"
+}

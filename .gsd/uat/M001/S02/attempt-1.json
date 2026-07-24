@@ -1,0 +1,289 @@
+{
+  "runId": "uat:M001:S02:attempt-1",
+  "attempt": 1,
+  "milestoneId": "M001",
+  "sliceId": "S02",
+  "uatType": "browser-executable",
+  "verdict": "PARTIAL",
+  "gateVerdict": "flag",
+  "evaluatedAt": "2026-07-24T19:40:57.786Z",
+  "worktreeRoot": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001",
+  "browserToolsPresented": true,
+  "modePolicy": {
+    "browserTools": true,
+    "partialEligible": false,
+    "passWithHumanFollowUp": false,
+    "requiredAnyModes": [
+      "browser"
+    ]
+  },
+  "checks": [
+    {
+      "id": "TC-01",
+      "description": "Scripture slide creation via ESV fetch: reference input, fetch button, ESV text fetch, auto-split into slide-sized chunks, auto-save status indicator",
+      "mode": "browser",
+      "result": "PASS",
+      "evidence": [
+        {
+          "kind": "gsd_uat_exec",
+          "ref": "ce7348e5-b1b3-41b1-86db-eee7bb4bb19d"
+        },
+        {
+          "kind": "gsd_uat_exec",
+          "ref": "c192f645-42d7-41a2-9c27-f7455cfba066"
+        },
+        {
+          "kind": "gsd_uat_exec",
+          "ref": "0cc93c55-455a-4a1c-b3a7-aa283d30332d"
+        }
+      ],
+      "notes": "Dev server responds 200. ScriptureSlideEditor has reference-input, fetch-btn, fetch-error, slides-container testids. Uses fetchPassageText from esvApi and splitPassage from scriptureSplitter. Auto-save via useAutoSave shows Saving.../Saved status. 15 component + 10 splitter + 15 store tests pass."
+    },
+    {
+      "id": "TC-02",
+      "description": "Manual slide override: click slide text to edit, slide marked as overridden (visually distinct), auto-save triggers on edit",
+      "mode": "browser",
+      "result": "FAIL",
+      "evidence": [
+        {
+          "kind": "gsd_uat_exec",
+          "ref": "06ced147-0a6c-4796-815b-15eab8bdc0e5"
+        },
+        {
+          "kind": "gsd_uat_exec",
+          "ref": "98feedb4-e8c3-4a21-9686-153a62ba2115"
+        }
+      ],
+      "notes": "Manual editing works via textarea @input → onSlideInput. overriddenSlides ref (Set<number>) tracks edited indices and adds idx on edit. However, template slide card uses static class 'rounded-lg bg-gray-800/50 border border-gray-700/50 p-4' — no conditional class binding on overriddenSlides.has(idx). Visual distinction requirement unmet. Auto-save triggers correctly."
+    },
+    {
+      "id": "TC-03",
+      "description": "Congregational reading mode toggle: switches to CongregationalEditor, Leader/Congregation labels, speaker toggle, distinct styling per role",
+      "mode": "browser",
+      "result": "PASS",
+      "evidence": [
+        {
+          "kind": "gsd_uat_exec",
+          "ref": "5a01ecd0-71d7-4fe7-bec7-fc8ddff5fe07"
+        },
+        {
+          "kind": "gsd_uat_exec",
+          "ref": "feedb136-6e14-47ff-bd23-1598b45bb1ad"
+        },
+        {
+          "kind": "gsd_uat_exec",
+          "ref": "d6b2d878-711c-4fbc-9403-c865330d4c04"
+        }
+      ],
+      "notes": "reading-mode-toggle with Normal/Congregational buttons. CongregationalEditor renders speaker-toggle buttons, Leader/Congregation labels with alternating default (idx%2===0?LEADER:CONGREGATION). Leader uses indigo, Congregation uses amber styling. Preview panel shows distinct labels per speaker. 15 CongregationalEditor tests pass."
+    },
+    {
+      "id": "TC-04",
+      "description": "Reading mode persistence: toggle mode, collapse/re-expand editor, mode and assignments preserved",
+      "mode": "browser",
+      "result": "PASS",
+      "evidence": [
+        {
+          "kind": "gsd_uat_exec",
+          "ref": "8bdcf034-5e37-4ce0-9623-02c7f8298049"
+        },
+        {
+          "kind": "gsd_uat_exec",
+          "ref": "390d24db-bbac-4d6f-8a6c-9ff307845095"
+        }
+      ],
+      "notes": "readingMode typed on ScriptureSlot. setReadingMode updates localService.value.slots[index]. Deep watcher on localService triggers auto-save (800ms debounce) via onSave→serviceStore.updateService. getSlotReadingMode reads persisted readingMode. On re-expand, the slot's persisted readingMode drives which editor renders. 16 integration tests pass."
+    },
+    {
+      "id": "TC-05",
+      "description": "Empty reference guard: Edit Scripture Slides button not visible when no reference entered",
+      "mode": "browser",
+      "result": "PASS",
+      "evidence": [
+        {
+          "kind": "gsd_uat_exec",
+          "ref": "36dace20-cceb-4426-ab6b-d9ac74295182"
+        },
+        {
+          "kind": "gsd_uat_exec",
+          "ref": "f088cd7d-1019-44c2-929e-f907c079c9d4"
+        }
+      ],
+      "notes": "v-if guard requires slotToScriptureRef(slot) which returns null when !slot.book||!slot.chapter||!slot.verseStart||!slot.verseEnd. Entire editor section hidden when reference incomplete."
+    },
+    {
+      "id": "TC-06",
+      "description": "Viewer role restriction: Edit Scripture Slides button not visible for non-editor users",
+      "mode": "browser",
+      "result": "PASS",
+      "evidence": [
+        {
+          "kind": "gsd_uat_exec",
+          "ref": "36dace20-cceb-4426-ab6b-d9ac74295182"
+        },
+        {
+          "kind": "gsd_uat_exec",
+          "ref": "2f8eee21-a88c-46d3-8339-c284d74f0703"
+        }
+      ],
+      "notes": "v-if guard includes authStore.isEditor (computed: userRole.value === 'editor'). Non-editor users cannot see the edit button or editing controls."
+    },
+    {
+      "id": "EDGE-long-passage",
+      "description": "Very long passage (e.g. Psalm 119) splits into many slides without error",
+      "mode": "artifact",
+      "result": "PASS",
+      "evidence": [
+        {
+          "kind": "gsd_uat_exec",
+          "ref": "2189a08f-7c9b-44cf-8157-521cf9ec9a31"
+        }
+      ],
+      "notes": "splitPassage uses DEFAULT_WORDS_PER_SLIDE=50 with sentence-boundary splitting. No upper limit. 10 splitter unit tests pass."
+    },
+    {
+      "id": "EDGE-invalid-ref",
+      "description": "Invalid scripture reference shows error state, not crash",
+      "mode": "artifact",
+      "result": "PASS",
+      "evidence": [
+        {
+          "kind": "gsd_uat_exec",
+          "ref": "78a00e58-a5f5-4395-b426-2ac481661fd0"
+        }
+      ],
+      "notes": "fetchError ref set true in catch block. Template shows error via v-if='fetchError' (data-testid='fetch-error'). canFetch prevents fetch when parseScriptureInput returns null."
+    },
+    {
+      "id": "EDGE-rapid-toggle",
+      "description": "Rapid toggle between Normal/Congregational should not cause duplicate saves or state corruption",
+      "mode": "artifact",
+      "result": "PASS",
+      "evidence": [
+        {
+          "kind": "gsd_uat_exec",
+          "ref": "390d24db-bbac-4d6f-8a6c-9ff307845095"
+        }
+      ],
+      "notes": "setReadingMode is synchronous. Auto-save watcher debounces 800ms with clearTimeout on each change. Only last change within window triggers save. No race condition."
+    }
+  ],
+  "presentation": {
+    "surface": "hybrid",
+    "presentedTools": [
+      "gsd_uat_exec",
+      "gsd_uat_result_save",
+      "gsd_resume",
+      "gsd_milestone_status",
+      "gsd_journal_query",
+      "find",
+      "glob",
+      "grep",
+      "ls",
+      "read",
+      "browser_navigate",
+      "browser_click",
+      "browser_type",
+      "browser_fill_form",
+      "browser_click_ref",
+      "browser_fill_ref",
+      "browser_wait_for",
+      "browser_assert",
+      "browser_verify",
+      "browser_screenshot",
+      "browser_snapshot_refs",
+      "browser_find",
+      "browser_get_console_logs",
+      "browser_get_network_logs",
+      "browser_evaluate",
+      "browser_reload",
+      "browser_batch",
+      "browser_act"
+    ],
+    "blockedTools": [
+      {
+        "name": "edit",
+        "reason": "forbidden during run-uat"
+      },
+      {
+        "name": "write",
+        "reason": "forbidden during run-uat"
+      },
+      {
+        "name": "gsd_exec",
+        "reason": "forbidden during run-uat"
+      },
+      {
+        "name": "gsd_summary_save",
+        "reason": "forbidden during run-uat"
+      },
+      {
+        "name": "gsd_save_gate_result",
+        "reason": "forbidden during run-uat"
+      },
+      {
+        "name": "search-the-web",
+        "reason": "forbidden during run-uat"
+      },
+      {
+        "name": "WebSearch",
+        "reason": "forbidden during run-uat"
+      },
+      {
+        "name": "Bash",
+        "reason": "forbidden during run-uat"
+      },
+      {
+        "name": "Write",
+        "reason": "forbidden during run-uat"
+      },
+      {
+        "name": "Edit",
+        "reason": "forbidden during run-uat"
+      },
+      {
+        "name": "browser_navigate",
+        "reason": "not available in environment"
+      },
+      {
+        "name": "browser_click",
+        "reason": "not available in environment"
+      },
+      {
+        "name": "browser_type",
+        "reason": "not available in environment"
+      },
+      {
+        "name": "browser_screenshot",
+        "reason": "not available in environment"
+      },
+      {
+        "name": "browser_snapshot_refs",
+        "reason": "not available in environment"
+      },
+      {
+        "name": "browser_find",
+        "reason": "not available in environment"
+      },
+      {
+        "name": "browser_assert",
+        "reason": "not available in environment"
+      },
+      {
+        "name": "browser_verify",
+        "reason": "not available in environment"
+      },
+      {
+        "name": "browser_batch",
+        "reason": "not available in environment"
+      },
+      {
+        "name": "browser_act",
+        "reason": "not available in environment"
+      }
+    ],
+    "toolPresentationPlanId": "run-uat/default-v1",
+    "notes": "Browser automation tools not available in this Claude Code environment. All checks ran as artifact+runtime verification via gsd_uat_exec with uat-browser-check intent. Dev server confirmed running at localhost:5173."
+  },
+  "notes": "TC-02 partial fail: overriddenSlides tracking exists but no visual distinction rendered in template. All other TCs pass. 71/71 unit tests green. Browser tools not available — checks ran as artifact+runtime verification via gsd_uat_exec with browser-check intent."
+}

@@ -1,0 +1,52 @@
+{
+  "nodes": [
+    {
+      "id": "milestone:M001",
+      "label": "M001: Worship Service Slide Management",
+      "type": "milestone",
+      "confidence": "EXTRACTED",
+      "sourceFile": "milestones/M001/M001-ROADMAP.md"
+    },
+    {
+      "id": "slice:M001:S01",
+      "label": "S01: Song Lyric Slides and Editor",
+      "type": "slice",
+      "confidence": "EXTRACTED",
+      "sourceFile": "milestones/M001/slices/S01/S01-PLAN.md"
+    },
+    {
+      "id": "slice:M001:S02",
+      "label": "S02: Scripture and Congregational Reading Slides",
+      "type": "slice",
+      "confidence": "EXTRACTED",
+      "sourceFile": "milestones/M001/slices/S02/S02-PLAN.md"
+    },
+    {
+      "id": "slice:M001:S05",
+      "label": "M001/S05",
+      "type": "slice",
+      "confidence": "EXTRACTED"
+    }
+  ],
+  "edges": [
+    {
+      "from": "milestone:M001",
+      "to": "slice:M001:S01",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "milestone:M001",
+      "to": "slice:M001:S02",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    },
+    {
+      "from": "milestone:M001",
+      "to": "slice:M001:S05",
+      "type": "contains",
+      "confidence": "EXTRACTED"
+    }
+  ],
+  "builtAt": "2026-07-24T14:19:52.897Z"
+}

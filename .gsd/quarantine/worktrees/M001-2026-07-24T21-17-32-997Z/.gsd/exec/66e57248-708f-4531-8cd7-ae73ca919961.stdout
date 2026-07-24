@@ -1,0 +1,6 @@
+LyricVersionHistory-served: PASS
+has-confirm-dialog: PASS
+has-revert: PASS
+has-current-badge: PASS
+has-timestamp: PASS
+PASS: Version history module verified

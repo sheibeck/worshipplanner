@@ -1,0 +1,20 @@
+{
+  "id": "cdecddb5-c2eb-4142-9250-c2d3ce47296a",
+  "runtime": "bash",
+  "purpose": "Full test suite regression check",
+  "script_chars": 14,
+  "started_at": "2026-07-24T13:57:18.887Z",
+  "finished_at": "2026-07-24T13:59:11.526Z",
+  "exit_code": 1,
+  "signal": null,
+  "timed_out": false,
+  "aborted": false,
+  "force_resolved": false,
+  "duration_ms": 112639,
+  "stdout_bytes": 8396,
+  "stderr_bytes": 23384,
+  "stdout_truncated": false,
+  "stderr_truncated": false,
+  "stdout_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\cdecddb5-c2eb-4142-9250-c2d3ce47296a.stdout",
+  "stderr_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\cdecddb5-c2eb-4142-9250-c2d3ce47296a.stderr"
+}

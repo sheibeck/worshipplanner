@@ -1,0 +1,21 @@
+
+[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90mC:/projects/worshipplanner/.gsd-worktrees/M001[39m
+
+ [32m✓[39m src/components/__tests__/LyricPasteDialog.test.ts[2m > [22mLyricPasteDialog[2m > [22mrenders nothing when closed[32m 58[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/LyricPasteDialog.test.ts[2m > [22mLyricPasteDialog[2m > [22mrenders textarea and confirm button when open[32m 20[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/LyricPasteDialog.test.ts[2m > [22mLyricPasteDialog[2m > [22mdisables confirm when textarea is empty[32m 10[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/LyricPasteDialog.test.ts[2m > [22mLyricPasteDialog[2m > [22mshows parsed preview when text is pasted[32m 22[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/LyricPasteDialog.test.ts[2m > [22mLyricPasteDialog[2m > [22menables confirm when sections are parsed[32m 12[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/LyricPasteDialog.test.ts[2m > [22mLyricPasteDialog[2m > [22mshows copyright info in preview[32m 11[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/LyricPasteDialog.test.ts[2m > [22mLyricPasteDialog[2m > [22mshows warning when paste has no sections[32m 9[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/LyricPasteDialog.test.ts[2m > [22mLyricPasteDialog[2m > [22mcalls saveLyrics and updateSong on confirm[32m 21[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/LyricPasteDialog.test.ts[2m > [22mLyricPasteDialog[2m > [22memits saved after successful confirm[32m 14[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/LyricPasteDialog.test.ts[2m > [22mLyricPasteDialog[2m > [22mprompts discard on cancel when textarea has content[32m 11[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/LyricPasteDialog.test.ts[2m > [22mLyricPasteDialog[2m > [22memits close on cancel when textarea is empty[32m 6[2mms[22m[39m
+ [32m✓[39m src/components/__tests__/LyricPasteDialog.test.ts[2m > [22mLyricPasteDialog[2m > [22mresets textarea when reopened[32m 47[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m12 passed[39m[22m[90m (12)[39m
+[2m   Start at [22m 09:09:56
+[2m   Duration [22m 4.22s[2m (transform 333ms, setup 0ms, import 578ms, tests 246ms, environment 2.97s)[22m
+

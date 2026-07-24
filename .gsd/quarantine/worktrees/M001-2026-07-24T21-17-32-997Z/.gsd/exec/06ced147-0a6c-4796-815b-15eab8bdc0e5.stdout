@@ -1,0 +1,20 @@
+=== TC-02: Manual slide override ===
+--- Check 1: Editable slide text areas ---
+74:          <textarea
+75:            :data-testid="`slide-textarea-${idx}`"
+79:            @input="onSlideInput(idx, ($event.target as HTMLTextAreaElement).value)"
+80:          ></textarea>
+108:const overriddenSlides = ref<Set<number>>(new Set())
+128:    overriddenSlides.value = new Set()
+158:  overriddenSlides.value.add(idx)
+
+--- Check 2: Override visual distinction ---
+108:const overriddenSlides = ref<Set<number>>(new Set())
+128:    overriddenSlides.value = new Set()
+158:  overriddenSlides.value.add(idx)
+
+--- Check 3: Auto-save on edit ---
+7:        v-if="autoSaveStatus === 'pending'"
+13:        v-else-if="autoSaveStatus === 'saving'"
+18:        v-else-if="autoSaveStatus === 'saved'"
+179:const { status: autoSaveStatus, cleanup: cleanupAutoSave } = useAutoSave(

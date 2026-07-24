@@ -1,0 +1,20 @@
+{
+  "id": "ac06e658-804b-4312-accd-12d5be03bd99",
+  "runtime": "bash",
+  "purpose": "T04 verification: run LyricPasteDialog tests",
+  "script_chars": 83,
+  "started_at": "2026-07-24T04:31:50.284Z",
+  "finished_at": "2026-07-24T04:32:41.452Z",
+  "exit_code": 0,
+  "signal": null,
+  "timed_out": false,
+  "aborted": false,
+  "force_resolved": false,
+  "duration_ms": 51168,
+  "stdout_bytes": 2390,
+  "stderr_bytes": 212,
+  "stdout_truncated": false,
+  "stderr_truncated": false,
+  "stdout_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\ac06e658-804b-4312-accd-12d5be03bd99.stdout",
+  "stderr_path": "C:\\projects\\worshipplanner\\.gsd-worktrees\\M001\\.gsd\\exec\\ac06e658-804b-4312-accd-12d5be03bd99.stderr"
+}

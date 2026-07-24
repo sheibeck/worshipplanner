@@ -1,0 +1,316 @@
+<template>
+  <AppShell>
+    <div class="px-6 py-8">
+      <!-- Batch Quick Assign mode -->
+      <div v-if="batchMode" class="mb-6">
+        <BatchQuickAssign
+          :songs="uncategorizedSongs"
+          @done="batchMode = false"
+        />
+      </div>
+
+      <!-- Normal view -->
+      <template v-else>
+        <!-- Page header -->
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 pb-4 border-b border-gray-800">
+          <div>
+            <h1 class="text-xl font-semibold text-gray-100">Songs</h1>
+            <p class="text-sm text-gray-400 mt-1">
+              {{ songStore.isLoading ? 'Loading...' : `${songStore.visibleSongs.length} song${songStore.visibleSongs.length !== 1 ? 's' : ''}` }}
+            </p>
+          </div>
+          <div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-end gap-2 w-full sm:w-auto [&>*]:w-full sm:[&>*]:w-auto [&>*]:justify-center sm:[&>*]:justify-start">
+            <!-- Batch Assign — visible only when uncategorized songs exist -->
+            <button
+              v-if="uncategorizedSongs.length > 0"
+              @click="batchMode = true"
+              class="inline-flex items-center gap-2 rounded-md border border-amber-700 bg-amber-900/20 px-3 py-2 text-sm font-medium text-amber-300 hover:bg-amber-900/40 hover:text-amber-200 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+              </svg>
+              Batch Assign ({{ uncategorizedSongs.length }})
+            </button>
+            <!-- Show Hidden toggle — only visible when there are hidden songs or panel is open -->
+            <button
+              v-if="hiddenSongs.length > 0 || showHidden"
+              @click="showHidden = !showHidden"
+              class="inline-flex items-center gap-2 rounded-md border border-gray-700 bg-gray-800/50 px-3 py-2 text-sm font-medium text-gray-400 hover:bg-gray-700 hover:text-gray-200 transition-colors"
+            >
+              {{ showHidden ? 'Hide Hidden' : `Hidden (${hiddenSongs.length})` }}
+            </button>
+            <button
+              @click="importModalOpen = true"
+              class="inline-flex items-center gap-2 rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm font-medium text-gray-200 hover:bg-gray-700 hover:text-white transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              Import Songs
+            </button>
+            <button
+              @click="onAddSong"
+              class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              Add Song
+            </button>
+          </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="mb-4">
+          <SongFilters
+            v-model:searchQuery="songStore.searchQuery"
+            v-model:filterVwType="songStore.filterVwType"
+            v-model:filterKey="songStore.filterKey"
+            v-model:tagFilterInclude="songStore.tagFilterInclude"
+            v-model:tagFilterExclude="songStore.tagFilterExclude"
+            @clearTagFilter="songStore.clearTagFilter()"
+            :availableKeys="availableKeys"
+            :availableUserTags="availableUserTags"
+          />
+        </div>
+
+        <!-- Bulk tag action bar (visible when songs are selected) -->
+        <div v-if="selectedSongIds.size > 0" class="mb-4 flex items-center gap-3 p-3 rounded-lg border border-indigo-700 bg-indigo-900/20">
+          <span class="text-sm text-indigo-300 font-medium">{{ selectedSongIds.size }} selected</span>
+          <input
+            v-model="bulkTagInput"
+            type="text"
+            list="sv-existing-user-tags"
+            placeholder="Tag name"
+            class="rounded-md bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 w-40"
+            @keydown.enter="applyBulkTag"
+          />
+          <datalist id="sv-existing-user-tags">
+            <option v-for="t in songStore.allUserTags" :key="t" :value="t" />
+          </datalist>
+          <button
+            type="button"
+            class="px-3 py-1.5 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors disabled:opacity-50"
+            :disabled="!bulkTagInput.trim()"
+            @click="applyBulkTag"
+          >Apply to selected</button>
+          <button
+            type="button"
+            class="px-3 py-1.5 rounded-md text-sm font-medium text-red-300 bg-red-900/20 border border-red-800 hover:bg-red-900/40 transition-colors disabled:opacity-50"
+            :disabled="!bulkTagInput.trim()"
+            @click="removeBulkTag"
+          >Remove from selected</button>
+          <button
+            type="button"
+            class="ml-auto text-xs text-gray-500 hover:text-gray-300 transition-colors"
+            @click="clearBulkSelection"
+          >Clear selection</button>
+        </div>
+
+        <!-- Song table -->
+        <SongTable
+          ref="songTableRef"
+          :songs="songStore.filteredSongs"
+          :loading="songStore.isLoading"
+          @select="onSelectSong"
+          @add="onAddSong"
+          @update:selectedIds="onSelectionUpdate"
+        />
+
+        <!-- Hidden songs panel -->
+        <div v-if="showHidden" class="mt-8 border border-gray-700 rounded-xl overflow-hidden">
+          <div class="px-4 py-3 bg-gray-800 border-b border-gray-700">
+            <h2 class="text-sm font-medium text-gray-300">Hidden Songs ({{ hiddenSongs.length }})</h2>
+            <p class="text-xs text-gray-500 mt-0.5">Hidden from the song list and AI planning. Restore to make them visible again.</p>
+          </div>
+          <div v-if="hiddenSongs.length === 0" class="px-4 py-6 text-center text-sm text-gray-500">
+            No hidden songs
+          </div>
+          <div v-else class="divide-y divide-gray-800">
+            <div
+              v-for="song in hiddenSongs"
+              :key="song.id"
+              class="flex items-center justify-between px-4 py-3 hover:bg-gray-800/40"
+            >
+              <div>
+                <p class="text-sm text-gray-400 line-through">{{ song.title }}</p>
+                <p class="text-xs text-gray-600">{{ song.author || 'Unknown' }}</p>
+              </div>
+              <button
+                @click="onRestoreSong(song)"
+                class="text-xs px-3 py-1.5 rounded-md border border-indigo-700 text-indigo-300 hover:bg-indigo-900/30 transition-colors"
+              >
+                Restore
+              </button>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- Slide-over panel (outside layout content, Teleported to body) -->
+    <SongSlideOver
+      :open="slideOverOpen"
+      :song="selectedSong"
+      @close="slideOverOpen = false"
+      @saved="slideOverOpen = false"
+      @deleted="slideOverOpen = false"
+    />
+
+    <!-- PC import modal -->
+    <PcImportModal
+      :open="importModalOpen"
+      @close="importModalOpen = false"
+      @imported="onImported"
+    />
+  </AppShell>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+import { useSongStore } from '@/stores/songs'
+import type { Song } from '@/types/song'
+import AppShell from '@/components/AppShell.vue'
+import SongFilters from '@/components/SongFilters.vue'
+import SongTable from '@/components/SongTable.vue'
+import SongSlideOver from '@/components/SongSlideOver.vue'
+import BatchQuickAssign from '@/components/BatchQuickAssign.vue'
+import PcImportModal from '@/components/PcImportModal.vue'
+
+const authStore = useAuthStore()
+const songStore = useSongStore()
+const route = useRoute()
+const router = useRouter()
+
+// Slide-over state
+const selectedSong = ref<Song | null>(null)
+const slideOverOpen = ref(false)
+
+// Import modal state
+const importModalOpen = ref(false)
+
+// Batch quick-assign mode
+const batchMode = ref(false)
+
+// Hidden songs toggle + computed
+const showHidden = ref(false)
+const hiddenSongs = computed(() => songStore.songs.filter((s) => s.hidden === true))
+
+async function onRestoreSong(song: Song) {
+  await songStore.restoreSong(song.id)
+}
+
+// Uncategorized songs (for batch assign)
+const uncategorizedSongs = computed(() =>
+  songStore.songs.filter((s) => s.vwTypes.length === 0 && s.hidden !== true),
+)
+
+// Derived filter options from current songs
+const availableKeys = computed(() => {
+  const keys = new Set<string>()
+  songStore.songs.forEach((song) => {
+    // Hidden songs contribute no filter options (same guard as availableUserTags).
+    if (song.hidden === true) return
+    song.arrangements.forEach((arr) => {
+      if (arr.key) keys.add(arr.key)
+    })
+  })
+  return Array.from(keys).sort()
+})
+
+const availableUserTags = computed(() => {
+  const tags = new Set<string>()
+  songStore.songs.forEach((song) => {
+    // Hidden (soft-deleted) songs contribute no metadata to the filter list —
+    // otherwise their tags appear as checkable options that match zero visible songs.
+    if (song.hidden === true) return
+    ;(song.themes ?? []).forEach((t) => tags.add(t))
+    ;(song.tags ?? []).forEach((t) => tags.add(t))
+  })
+  return Array.from(tags).sort()
+})
+
+// ── Bulk tag selection state ───────────────────────────────────────────────────
+
+const selectedSongIds = ref<Set<string>>(new Set())
+const bulkTagInput = ref('')
+const songTableRef = ref<InstanceType<typeof SongTable> | null>(null)
+
+function onSelectionUpdate(ids: Set<string>) {
+  selectedSongIds.value = ids
+}
+
+function clearBulkSelection() {
+  selectedSongIds.value = new Set()
+  songTableRef.value?.clearSelection()
+}
+
+async function applyBulkTag() {
+  const tag = bulkTagInput.value.trim()
+  if (!tag) return
+  const songs = songStore.songs.filter((s) => selectedSongIds.value.has(s.id))
+  await Promise.all(
+    songs.map((song) => {
+      const existingTags = song.tags ?? []
+      if (existingTags.includes(tag)) return Promise.resolve()
+      return songStore.updateSong(song.id, { tags: [...existingTags, tag] })
+    }),
+  )
+  clearBulkSelection()
+  bulkTagInput.value = ''
+}
+
+async function removeBulkTag() {
+  const tag = bulkTagInput.value.trim()
+  if (!tag) return
+  const songs = songStore.songs.filter((s) => selectedSongIds.value.has(s.id))
+  await Promise.all(
+    songs.map((song) => {
+      const existingTags = song.tags ?? []
+      if (!existingTags.includes(tag)) return Promise.resolve()
+      return songStore.updateSong(song.id, { tags: existingTags.filter((t) => t !== tag) })
+    }),
+  )
+  clearBulkSelection()
+  bulkTagInput.value = ''
+}
+
+// Subscribe to Firestore songs collection once orgId is resolved
+function initStore() {
+  const orgId = authStore.orgId
+  if (!orgId) return
+  songStore.subscribe(orgId)
+}
+
+onMounted(async () => {
+  initStore()
+
+  // Check for ?import=true query param — auto-open import modal
+  if (route.query.import === 'true') {
+    importModalOpen.value = true
+    // Clear query param without navigation
+    router.replace({ query: { ...route.query, import: undefined } })
+  }
+})
+
+onUnmounted(() => {
+  songStore.unsubscribeAll()
+})
+
+function onSelectSong(song: Song) {
+  selectedSong.value = song
+  slideOverOpen.value = true
+}
+
+function onAddSong() {
+  selectedSong.value = null
+  slideOverOpen.value = true
+}
+
+function onImported(count: number) {
+  importModalOpen.value = false
+  console.log(`[SongsView] imported ${count} songs`)
+}
+</script>
