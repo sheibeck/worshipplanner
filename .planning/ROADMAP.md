@@ -59,7 +59,7 @@ non-technical church volunteers.
 Plans:
 
 - [x] 20-01-PLAN.md — Section data model: ServiceSection + optional slot section, TextSlide/AssembledSlide types, buildSlots defaults (Wave 1)
-- [ ] 20-02-PLAN.md — Slideshow assembly engine (TDD): pure assembleSlideshow(service, inputs) → AssembledSlide[] (Wave 2)
+- [x] 20-02-PLAN.md — Slideshow assembly engine (TDD): pure assembleSlideshow(service, inputs) → AssembledSlide[] (Wave 2)
 - [ ] 20-03-PLAN.md — useSlideshowAssembly composable: reactive multi-song assembly + section grouping (Wave 3)
 - [ ] 20-04-PLAN.md — ServiceEditorView section headers + per-slot section control + inline SlideshowPreview + scripture override marker (Wave 4)
 

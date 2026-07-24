@@ -5,14 +5,14 @@ milestone_name: Worship Service Slide Management
 current_phase: 20
 current_phase_name: Service Sections and Slide Auto-Assembly
 status: executing
-stopped_at: Completed 20-01-PLAN.md
-last_updated: "2026-07-24T22:29:14.551Z"
+stopped_at: Completed 20-02-PLAN.md
+last_updated: "2026-07-24T22:44:34.245Z"
 last_activity: 2026-07-24
 progress:
   total_phases: 18
   completed_phases: 13
   total_plans: 84
-  completed_plans: 81
+  completed_plans: 82
   percent: 72
 last_activity_desc: Migrated gsdpi milestone M001 into gsd-core as v1.2 (Phases 18-23)
 ---
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 20 (Service Sections and Slide Auto-Assembly) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Milestone: v1.2 Worship Service Slide Management (Phases 18-23) — IN PROGRESS
 Status: Ready to execute
 
@@ -100,6 +100,7 @@ Status: Ready to execute
 | Phase 17 P04 | ~40min | 2 tasks | 2 files |
 | Phase 17 P05 | ~25min | 2 tasks | 3 files |
 | Phase 20 P01 | 25min | 3 tasks | 4 files |
+| Phase 20 P02 | 9min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -160,6 +161,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: [Phase 17] 17-05: Who's Serving section renders serviceSnapshot.roleAssignments, gracefully omitted for legacy shares with no roleAssignments (T-17-05-03)
 - [Phase ?]: [Phase 20-01]: SERVICE_SECTIONS kept as single source-of-truth array so per-church configurable sections is a localized future change
 - [Phase ?]: [Phase 20-01]: createSlot() omits the section key entirely (conditional spread) rather than section: undefined, preserving byte-identical legacy object shape
+- [Phase ?]: [Phase 20-02]: Song order precedence chain implemented as performanceOrderById -> lyrics.performanceOrder -> lyrics.sections stored order (research fallback for missing Song.performanceOrder)
+- [Phase ?]: [Phase 20-02]: AssembledSlide.slotIndex captured as the slot's true array index in service.slots (paired before sorting by position), decoupling provenance from position-value correctness for legacy/malformed data
+- [Phase ?]: [Phase 20-02]: DistributiveOmit<T,K> type pattern introduced because plain Omit over the Slide discriminated union collapses to only common keys
 
 ### Roadmap Evolution
 
@@ -217,6 +221,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-24
-Last session: 2026-07-24T22:29:14.521Z
-Stopped at: Completed 20-01-PLAN.md
+Last session: 2026-07-24T22:44:34.216Z
+Stopped at: Completed 20-02-PLAN.md
 Resume file: None
