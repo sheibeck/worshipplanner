@@ -50,3 +50,33 @@ errors (filtered diff on that filename before/after the task showed no matches).
 
 **Recommendation:** Add an explicit generic to `mockGetReading`'s `vi.fn<...>` declaration (e.g.
 `vi.fn<() => Promise<ScriptureReading | null>>(...)`) in a future test-hygiene pass.
+
+## 20-04: Pre-existing full-suite regression failures, unrelated to this plan
+
+**Discovered during:** Task 3 verification (`npx vitest run`, full-suite regression gate)
+
+**1. `src/views/__tests__/RosterView.test.ts` — stale assertion from a prior unrelated rename commit.**
+`'wraps Roles config in CollapsibleSection'` asserts `wrapper.text()).toContain('Roles config')`, but
+commit `df1ca34 tweak(volunteers): rename "Roles config" tab to "Roles"` (already on `milestone/M001`
+before this plan started — unrelated to Phase 20/RosterView is not in this plan's `files_modified`)
+renamed the tab label and left the test assertion stale. Reproduces identically running the test file
+in isolation with zero Phase-20 changes applied. Not touched — out of scope.
+
+**2. `.gsd/quarantine/worktrees/**` stale copies — untracked GSD housekeeping debris (same pattern
+logged in 20-02/20-03's summaries).** Three quarantine worktree snapshots under
+`.gsd/quarantine/worktrees/` each contain their own frozen copy of `RosterView.test.ts`,
+`ServiceEditorView.test.ts`, and `rules.test.ts`. They fail for reasons unrelated to any Phase 20
+change (the same stale `'Roles config'` assertion above; a Pinia-no-active-instance error because
+those frozen copies predate this plan's `@/stores/scriptureSlides` mock addition; and
+`rules.test.ts` needs a running Firestore emulator on `127.0.0.1:8080`, unavailable in this
+environment). Confined entirely to `.gsd/quarantine/worktrees/**`, not `src/` — out of scope.
+
+**3. `src/rules.test.ts` (real file) — 114 tests report `skipped`, not failed.** Requires a running
+Firestore emulator (`npm run test:rules` per `CLAUDE.md`); the plain `npx vitest run` full-suite
+invocation used for this plan's regression gate does not start one, so the file's own guard skips
+its tests rather than failing. Expected, not a regression.
+
+**Net result:** all Phase-20-04 `files_modified` tests pass (`SlideshowPreview.test.ts` 6/6,
+`ServiceEditorView.test.ts` 14/14 real file, `ScriptureSlideEditor.test.ts` 16/16 real file); the
+only non-skipped failures in the full-suite run are the three items above, all pre-existing and
+unrelated to this plan's changes.
