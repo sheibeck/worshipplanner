@@ -66,8 +66,34 @@
           </div>
         </div>
 
-        <!-- Scrollable body -->
-        <div class="flex-1 overflow-y-auto px-5 py-5 space-y-5">
+        <!-- Tabs (edit mode only) -->
+        <div v-if="!isCreateMode" class="flex border-b border-gray-800 shrink-0 px-5" data-testid="tab-bar">
+          <button
+            type="button"
+            data-testid="tab-details"
+            class="px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px"
+            :class="activeTab === 'details'
+              ? 'text-indigo-400 border-indigo-500'
+              : 'text-gray-400 border-transparent hover:text-gray-300'"
+            @click="activeTab = 'details'"
+          >
+            Details
+          </button>
+          <button
+            type="button"
+            data-testid="tab-lyrics"
+            class="px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px"
+            :class="activeTab === 'lyrics'
+              ? 'text-indigo-400 border-indigo-500'
+              : 'text-gray-400 border-transparent hover:text-gray-300'"
+            @click="activeTab = 'lyrics'"
+          >
+            Lyrics
+          </button>
+        </div>
+
+        <!-- Details tab (also shown always in create mode) -->
+        <div v-if="activeTab === 'details' || isCreateMode" class="flex-1 overflow-y-auto px-5 py-5 space-y-5">
 
           <!-- Title -->
           <div>
@@ -244,6 +270,27 @@
           </div>
 
         </div>
+
+        <!-- Lyrics tab -->
+        <div v-if="activeTab === 'lyrics' && !isCreateMode" class="flex-1 overflow-y-auto px-5 py-5 space-y-6" data-testid="lyrics-tab-content">
+          <SongLyricEditor
+            :song-id="props.song!.id"
+            :org-id="orgId"
+          />
+          <PerformanceOrderBuilder
+            v-if="songLyricsStore.currentLyrics"
+            :sections="songLyricsStore.currentLyrics.sections"
+            :performance-order="songLyricsStore.currentLyrics.performanceOrder"
+            @update:performance-order="onPerformanceOrderUpdate"
+          />
+          <LyricVersionHistory
+            v-if="songLyricsStore.lyricVersions.length > 0"
+            :versions="songLyricsStore.lyricVersions"
+            :current-version-id="songLyricsStore.currentLyrics?.id ?? ''"
+            @revert="onRevertVersion"
+          />
+        </div>
+
       </div>
     </Transition>
   </Teleport>
@@ -253,7 +300,11 @@
 import { ref, computed, watch } from 'vue'
 import { useSongStore } from '@/stores/songs'
 import { useAuthStore } from '@/stores/auth'
+import { useSongLyricsStore } from '@/stores/songLyrics'
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
+import SongLyricEditor from './SongLyricEditor.vue'
+import PerformanceOrderBuilder from './PerformanceOrderBuilder.vue'
+import LyricVersionHistory from './LyricVersionHistory.vue'
 import type { Song, Arrangement, VWType } from '@/types/song'
 
 const props = defineProps<{
@@ -269,6 +320,10 @@ const emit = defineEmits<{
 
 const songStore = useSongStore()
 const authStore = useAuthStore()
+const songLyricsStore = useSongLyricsStore()
+
+const activeTab = ref<'details' | 'lyrics'>('details')
+const orgId = computed(() => authStore.orgId ?? '')
 
 // ── Form state ────────────────────────────────────────────────────────────────
 
@@ -342,6 +397,7 @@ watch(
       userTagInput.value = ''
       titleError.value = false
       showDeleteConfirm.value = false
+      activeTab.value = 'details'
       unsavedGuard.capture()
     }
   },
@@ -504,5 +560,17 @@ async function onDelete() {
   } finally {
     isDeleting.value = false
   }
+}
+
+// ── Lyrics tab helpers ────────────────────────────────────────────────────────
+
+async function onPerformanceOrderUpdate(order: string[]) {
+  if (!props.song) return
+  await songLyricsStore.updatePerformanceOrder(orgId.value, props.song.id, order)
+}
+
+async function onRevertVersion(versionId: string) {
+  if (!props.song) return
+  await songLyricsStore.revertToVersion(orgId.value, props.song.id, versionId)
 }
 </script>

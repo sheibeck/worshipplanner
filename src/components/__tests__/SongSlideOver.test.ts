@@ -25,7 +25,32 @@ let mockVwModeEnabled = true
 vi.mock('@/stores/auth', () => ({
   useAuthStore: () => ({
     get vwModeEnabled() { return mockVwModeEnabled },
+    orgId: 'org-1',
   }),
+}))
+
+vi.mock('@/stores/songLyrics', () => ({
+  useSongLyricsStore: () => ({
+    currentLyrics: null,
+    lyricVersions: [],
+    isLoading: false,
+    subscribeLyrics: vi.fn(),
+    unsubscribeLyrics: vi.fn(),
+    updatePerformanceOrder: vi.fn(),
+    revertToVersion: vi.fn(),
+  }),
+}))
+
+vi.mock('../SongLyricEditor.vue', () => ({
+  default: { name: 'SongLyricEditor', template: '<div data-testid="song-lyric-editor" />', props: ['songId', 'orgId'] },
+}))
+
+vi.mock('../PerformanceOrderBuilder.vue', () => ({
+  default: { name: 'PerformanceOrderBuilder', template: '<div data-testid="performance-order-builder" />', props: ['sections', 'performanceOrder'] },
+}))
+
+vi.mock('../LyricVersionHistory.vue', () => ({
+  default: { name: 'LyricVersionHistory', template: '<div data-testid="lyric-version-history" />', props: ['versions', 'currentVersionId'] },
 }))
 
 function makeSong(overrides: Partial<Song> = {}): Song {
@@ -140,5 +165,42 @@ describe('SongSlideOver — save', () => {
     expect(mockUpdateSong).toHaveBeenCalledTimes(1)
     const [, data] = mockUpdateSong.mock.calls[0]!
     expect(data.removedThemes).toEqual(['Old'])
+  })
+})
+
+describe('SongSlideOver — tabs', () => {
+  beforeEach(() => {
+    mockVwModeEnabled = true
+    mockAddSong.mockClear()
+    mockUpdateSong.mockClear()
+    mockDeleteSong.mockClear()
+  })
+
+  it('shows Details and Lyrics tabs in edit mode', async () => {
+    const song = makeSong()
+    const wrapper = await mountDrawer(song)
+    expect(wrapper.find('[data-testid="tab-details"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="tab-lyrics"]').exists()).toBe(true)
+  })
+
+  it('does not show tabs in create mode', async () => {
+    const wrapper = await mountDrawer(null)
+    expect(wrapper.find('[data-testid="tab-details"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="tab-lyrics"]').exists()).toBe(false)
+  })
+
+  it('defaults to Details tab showing the form fields', async () => {
+    const song = makeSong()
+    const wrapper = await mountDrawer(song)
+    expect(wrapper.find('input[placeholder="Song title"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="lyrics-tab-content"]').exists()).toBe(false)
+  })
+
+  it('switches to Lyrics tab on click', async () => {
+    const song = makeSong()
+    const wrapper = await mountDrawer(song)
+    await wrapper.find('[data-testid="tab-lyrics"]').trigger('click')
+    expect(wrapper.find('[data-testid="lyrics-tab-content"]').exists()).toBe(true)
+    expect(wrapper.find('input[placeholder="Song title"]').exists()).toBe(false)
   })
 })
