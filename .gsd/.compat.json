@@ -1,7 +1,7 @@
 {
   "schema": 2,
   "lastWriter": "gsd-pi",
-  "lastProjectedAt": "2026-07-24T13:20:14.376Z",
+  "lastProjectedAt": "2026-07-24T14:25:57.220Z",
   "projections": {
     "milestones/M001/slices/S01/tasks/T01-PLAN.md": {
       "sha": "b8a647357c95d0bb",
@@ -12,7 +12,7 @@
       ]
     },
     "milestones/M001/M001-ROADMAP.md": {
-      "sha": "144ba556dd786766",
+      "sha": "cb31d6b117651afd",
       "entities": [
         "M001"
       ]
@@ -70,6 +70,53 @@
       "entities": [
         "M001",
         "M001/S01"
+      ]
+    },
+    "milestones/M001/slices/S02/tasks/T01-PLAN.md": {
+      "sha": "583eb00ca82b6071",
+      "entities": [
+        "M001",
+        "M001/S02",
+        "M001/S02/T01"
+      ]
+    },
+    "milestones/M001/slices/S02/tasks/T02-PLAN.md": {
+      "sha": "067c110ca576d05b",
+      "entities": [
+        "M001",
+        "M001/S02",
+        "M001/S02/T02"
+      ]
+    },
+    "milestones/M001/slices/S02/tasks/T03-PLAN.md": {
+      "sha": "03097d041ee6fbb3",
+      "entities": [
+        "M001",
+        "M001/S02",
+        "M001/S02/T03"
+      ]
+    },
+    "milestones/M001/slices/S02/tasks/T04-PLAN.md": {
+      "sha": "61d9c275ab18d15a",
+      "entities": [
+        "M001",
+        "M001/S02",
+        "M001/S02/T04"
+      ]
+    },
+    "milestones/M001/slices/S02/tasks/T05-PLAN.md": {
+      "sha": "cea97aeec5107c11",
+      "entities": [
+        "M001",
+        "M001/S02",
+        "M001/S02/T05"
+      ]
+    },
+    "milestones/M001/slices/S02/S02-PLAN.md": {
+      "sha": "784c8ddf9598ad6d",
+      "entities": [
+        "M001",
+        "M001/S02"
       ]
     }
   },

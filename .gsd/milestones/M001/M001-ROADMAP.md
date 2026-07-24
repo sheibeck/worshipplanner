@@ -15,7 +15,7 @@
 - [x] **S01: Song Lyric Slides and Editor** `risk:high` `depends:[]`
   > After this: Paste CCLI lyrics, see auto-split slides with copyright, arrange performance order with repeats, edit and revert with auto-save
 
-- [ ] **S02: Scripture and Congregational Reading Slides** `risk:medium` `depends:[S01]`
+- [x] **S02: Scripture and Congregational Reading Slides** `risk:medium` `depends:[S01]`
   > After this: Enter a scripture reference, see auto-pulled ESV text split into slides; toggle congregational mode with Leader/Congregation labels; manually override auto-generated slides
 
 - [ ] **S03: Service Sections and Slide Auto-Assembly** `risk:high` `depends:[S01,S02]`
