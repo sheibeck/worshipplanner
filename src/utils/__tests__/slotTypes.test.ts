@@ -255,3 +255,53 @@ describe('createSlot - HYMN', () => {
     expect(slot.verses).toBe('')
   })
 })
+
+describe('buildSlots — default section assignment (D005)', () => {
+  it('1-2-2-3: indices 0-6 are worship, index 7 is message, index 8 is sending', () => {
+    const slots = buildSlots('1-2-2-3')
+    for (let i = 0; i <= 6; i++) {
+      expect(slots[i]!.section).toBe('worship')
+    }
+    expect(slots[7]!.section).toBe('message')
+    expect(slots[8]!.section).toBe('sending')
+  })
+
+  it('1-2-3-3: indices 0-6 are worship, index 7 is message, index 8 is sending', () => {
+    const slots = buildSlots('1-2-3-3')
+    for (let i = 0; i <= 6; i++) {
+      expect(slots[i]!.section).toBe('worship')
+    }
+    expect(slots[7]!.section).toBe('message')
+    expect(slots[8]!.section).toBe('sending')
+  })
+})
+
+describe('createSlot — section parameter', () => {
+  it('createSlot(SONG, 2, sending) returns a SongSlot with section === sending', () => {
+    const slot = createSlot('SONG', 2, 'sending') as SongSlot
+    expect(slot.kind).toBe('SONG')
+    expect(slot.section).toBe('sending')
+  })
+
+  it('createSlot(PRAYER) with no section arg has section === undefined (backward-compatible)', () => {
+    const slot = createSlot('PRAYER') as NonAssignableSlot
+    expect(slot.section).toBeUndefined()
+  })
+})
+
+describe('reindexSlots — preserves section', () => {
+  it('preserves each slot section unchanged, only rewrites position', () => {
+    const slots = [
+      { kind: 'SONG' as const, position: 5, requiredVwType: 1 as const, songId: null, songTitle: null, songKey: null, section: 'sending' as const },
+      { kind: 'PRAYER' as const, position: 2 },
+      { kind: 'MESSAGE' as const, position: 8, section: 'message' as const },
+    ]
+    const reindexed = reindexSlots(slots)
+    expect(reindexed[0]!.position).toBe(0)
+    expect(reindexed[0]!.section).toBe('sending')
+    expect(reindexed[1]!.position).toBe(1)
+    expect(reindexed[1]!.section).toBeUndefined()
+    expect(reindexed[2]!.position).toBe(2)
+    expect(reindexed[2]!.section).toBe('message')
+  })
+})
