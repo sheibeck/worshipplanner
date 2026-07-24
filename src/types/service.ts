@@ -21,6 +21,8 @@ export interface ScriptureSlot {
   chapter: number | null
   verseStart: number | null
   verseEnd: number | null
+  scriptureReadingId?: string | null
+  readingMode?: 'normal' | 'congregational'
 }
 
 export interface NonAssignableSlot {

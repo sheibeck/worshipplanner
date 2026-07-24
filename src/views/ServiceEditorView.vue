@@ -646,6 +646,74 @@
                     </p>
                   </div>
                 </div>
+
+                <!-- Scripture slides editor: editor only, when scripture reference is populated -->
+                <div
+                  v-if="authStore.isEditor && !isExportedLocked && slotToScriptureRef(slot as ScriptureSlot)"
+                  class="mt-2"
+                >
+                  <!-- Toggle + Edit button row -->
+                  <div class="flex items-center gap-3 mb-2">
+                    <button
+                      type="button"
+                      data-testid="edit-scripture-slides-btn"
+                      class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-indigo-400 bg-gray-800 border border-gray-700 hover:bg-gray-700 transition-colors"
+                      @click="toggleScriptureEditor(index)"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                      {{ expandedScriptureSlots.has(index) ? 'Close Slides Editor' : 'Edit Scripture Slides' }}
+                    </button>
+
+                    <!-- Reading mode toggle -->
+                    <div
+                      v-if="expandedScriptureSlots.has(index)"
+                      class="flex items-center gap-1 rounded-md bg-gray-800 border border-gray-700 p-0.5"
+                      data-testid="reading-mode-toggle"
+                    >
+                      <button
+                        type="button"
+                        data-testid="mode-normal"
+                        class="px-2.5 py-1 rounded text-xs font-medium transition-colors"
+                        :class="getSlotReadingMode(slot as ScriptureSlot) === 'normal'
+                          ? 'bg-indigo-600 text-white'
+                          : 'text-gray-400 hover:text-gray-200'"
+                        @click="setReadingMode(index, 'normal')"
+                      >Normal Reading</button>
+                      <button
+                        type="button"
+                        data-testid="mode-congregational"
+                        class="px-2.5 py-1 rounded text-xs font-medium transition-colors"
+                        :class="getSlotReadingMode(slot as ScriptureSlot) === 'congregational'
+                          ? 'bg-indigo-600 text-white'
+                          : 'text-gray-400 hover:text-gray-200'"
+                        @click="setReadingMode(index, 'congregational')"
+                      >Congregational Reading</button>
+                    </div>
+                  </div>
+
+                  <!-- Expanded editor panel -->
+                  <div
+                    v-if="expandedScriptureSlots.has(index)"
+                    class="rounded-lg border border-gray-700 bg-gray-950 overflow-hidden"
+                    style="min-height: 300px"
+                    data-testid="scripture-editor-panel"
+                  >
+                    <ScriptureSlideEditor
+                      v-if="getSlotReadingMode(slot as ScriptureSlot) === 'normal'"
+                      :orgId="authStore.orgId!"
+                      :readingId="(slot as ScriptureSlot).scriptureReadingId ?? undefined"
+                      data-testid="scripture-slide-editor"
+                    />
+                    <CongregationalEditor
+                      v-else
+                      :orgId="authStore.orgId!"
+                      :readingId="(slot as ScriptureSlot).scriptureReadingId ?? undefined"
+                      data-testid="congregational-editor"
+                    />
+                  </div>
+                </div>
               </template>
 
               <!-- PRAYER slot -->
@@ -976,6 +1044,8 @@ import SongBadge from '@/components/SongBadge.vue'
 import SongSlotPicker from '@/components/SongSlotPicker.vue'
 import ScriptureInput from '@/components/ScriptureInput.vue'
 import ServicePrintLayout from '@/components/ServicePrintLayout.vue'
+import ScriptureSlideEditor from '@/components/ScriptureSlideEditor.vue'
+import CongregationalEditor from '@/components/CongregationalEditor.vue'
 import { formatForPlanningCenter } from '@/utils/planningCenterExport'
 import { fetchServiceTypes, fetchTemplates, fetchServiceTypeTeams, fetchPlans, fetchPlanItems, createPlan, fetchTemplateItems, addSlotAsItem, buildPlanTitle, createItem, updateItem, deleteItem, createPlanTime, fetchPlanNeededPositionTeamIds, fetchTeamPositions, addNeededPosition } from '@/utils/planningCenterApi'
 import { serverTimestamp } from 'firebase/firestore'
@@ -1077,6 +1147,33 @@ const deleteConfirmBody = computed(() => {
   const label = pendingSlotKind.value ? elementLabel(pendingSlotKind.value) : 'this element'
   return `This will remove ${label} from the service plan. This cannot be undone.`
 })
+
+// ── Scripture editor expansion state ──────────────────────────────────────────
+const expandedScriptureSlots = ref<Set<number>>(new Set())
+
+function toggleScriptureEditor(index: number) {
+  const next = new Set(expandedScriptureSlots.value)
+  if (next.has(index)) {
+    next.delete(index)
+  } else {
+    next.add(index)
+  }
+  expandedScriptureSlots.value = next
+}
+
+function getSlotReadingMode(slot: ScriptureSlot): 'normal' | 'congregational' {
+  return slot.readingMode ?? 'normal'
+}
+
+function setReadingMode(index: number, mode: 'normal' | 'congregational') {
+  if (!localService.value) return
+  const slot = localService.value.slots[index]
+  if (!slot || slot.kind !== 'SCRIPTURE') return
+  localService.value.slots[index] = {
+    ...slot,
+    readingMode: mode,
+  } as ScriptureSlot
+}
 
 // ── Export to PC state ─────────────────────────────────────────────────────────
 
