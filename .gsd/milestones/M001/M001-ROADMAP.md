@@ -12,7 +12,7 @@
 
 ## Slices
 
-- [ ] **S01: Song Lyric Slides and Editor** `risk:high` `depends:[]`
+- [x] **S01: Song Lyric Slides and Editor** `risk:high` `depends:[]`
   > After this: Paste CCLI lyrics, see auto-split slides with copyright, arrange performance order with repeats, edit and revert with auto-save
 
 - [ ] **S02: Scripture and Congregational Reading Slides** `risk:medium` `depends:[S01]`

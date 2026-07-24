@@ -33,10 +33,27 @@ export interface CopyrightSlide extends SlideBase {
   ccliLicenseNumber: string
 }
 
+export interface CongregationalSection {
+  speaker: 'LEADER' | 'CONGREGATION'
+  text: string
+  verseRange?: string
+}
+
+/** A scripture slide — one chunk of a Bible passage. */
+export interface ScriptureSlide extends SlideBase {
+  contentKind: 'scripture'
+  reference: string
+  bookRef: import('./service').ScriptureRef
+  text: string
+  verseRange: string
+  readingMode: 'normal' | 'congregational'
+  sections?: CongregationalSection[]
+}
+
 /**
  * Discriminated union of all slide variants.
  *
  * Narrow on `contentKind` (and further on shape-specific fields) to access
  * variant-specific properties.
  */
-export type Slide = LyricSlide | CopyrightSlide
+export type Slide = LyricSlide | CopyrightSlide | ScriptureSlide

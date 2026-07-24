@@ -1,7 +1,7 @@
 {
   "schema": 2,
   "lastWriter": "gsd-pi",
-  "lastProjectedAt": "2026-07-23T20:12:25.345Z",
+  "lastProjectedAt": "2026-07-24T13:20:14.376Z",
   "projections": {
     "milestones/M001/slices/S01/tasks/T01-PLAN.md": {
       "sha": "b8a647357c95d0bb",
@@ -12,7 +12,7 @@
       ]
     },
     "milestones/M001/M001-ROADMAP.md": {
-      "sha": "df0d2a3b295a87e7",
+      "sha": "144ba556dd786766",
       "entities": [
         "M001"
       ]
@@ -66,7 +66,7 @@
       ]
     },
     "milestones/M001/slices/S01/S01-PLAN.md": {
-      "sha": "0f143a9654b027ef",
+      "sha": "905f642eb9d7275b",
       "entities": [
         "M001",
         "M001/S01"
