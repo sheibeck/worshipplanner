@@ -37,6 +37,20 @@ Status: Ready to execute
 > (`.gsd/` milestone M001, slices S01-S06) and faithfully ported into gsd-core as v1.2.
 > The gsdpi `.gsd/` store is now legacy/read-only — continue with regular `/gsd-*` commands.
 
+## ⏸ PAUSED — RESUME HERE (2026-07-25, model switch)
+
+Autonomous run (`/gsd-autonomous`, scoped Phases 20-23) paused at a clean boundary for a model switch. **Nothing is mid-flight; working tree is clean; production build is GREEN (`npm run type-check` = 0, `npm run build` passes).**
+
+**Done:** gsdpi→gsd-core migration (v1.2); Phases **20, 21, 22 code-complete** (all plans committed, unit-tested); foundation hardened (lyrics Firestore rule + 94 type errors fixed + import-save undefined fix). Phase 23 UI-SPEC written (`23-UI-SPEC.md`).
+
+**Next actions to finish the milestone (in order):**
+1. **Phase 23 — plan → check → execute.** UI-SPEC + CONTEXT exist; no research (integrates built pieces). Spawn `gsd-planner` (opus) for phase 23 (req R016, R018) consuming `23-UI-SPEC.md` + `23-CONTEXT.md`, then `gsd-plan-checker` (sonnet), then execute plans sequentially with `gsd-executor` (sonnet, main-tree/no-worktree — branch `milestone/M001` diverged). Presentation viewer consumes `useSlideshowAssembly` + `AudioPlayer`/`VideoPlayer`; entry CTA in `SlideshowPreview.vue`.
+2. **Pre-audit hardening batch** (see TODO below) — flip cleanup default to safe; clean `.gsd/quarantine/worktrees/**` test debris; full unit suite green.
+3. **Batch human-verify** P20 + P21 + P22 (+P23) — the deferred visual/e2e checks.
+4. **Milestone lifecycle:** `/gsd-audit-milestone` → `/gsd-complete-milestone v1.2` → `/gsd-cleanup`.
+
+Orchestration note: this run hand-drives the gsd sub-skills by spawning `gsd-planner`/`gsd-plan-checker`/`gsd-executor`/`gsd-ui-researcher` agents directly (Claude Code, sequential main-tree execution). `.env.local` present. A live user session may hold the Firestore/Storage emulator (ports 8080/9199) — executors must NOT run `test:rules` or restart the emulator.
+
 ## Deferred Verification
 
 | Phase | State | Resume |
