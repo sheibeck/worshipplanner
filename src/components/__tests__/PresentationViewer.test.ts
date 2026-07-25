@@ -344,6 +344,30 @@ describe('PresentationViewer', () => {
       expect(body().find('[data-testid="presentation-chrome"]').classes()).toContain('opacity-100')
       expect(body().find('[data-testid="presentation-exit"]').classes()).toContain('opacity-100')
     })
+
+    it('the exit button stays fully opaque and interactive through the idle timeout while isLoading (WR-04)', async () => {
+      mount(PresentationViewer, { props: { slides: [], isLoading: true } })
+      await Promise.resolve()
+
+      await vi.advanceTimersByTimeAsync(3100)
+
+      const exit = body().find('[data-testid="presentation-exit"]')
+      expect(exit.classes()).toContain('opacity-100')
+      expect(exit.classes()).not.toContain('opacity-0')
+      expect(exit.classes()).not.toContain('pointer-events-none')
+    })
+
+    it('the exit button stays fully opaque and interactive through the idle timeout in the empty state (WR-04)', async () => {
+      mount(PresentationViewer, { props: { slides: [] } })
+      await Promise.resolve()
+
+      await vi.advanceTimersByTimeAsync(3100)
+
+      const exit = body().find('[data-testid="presentation-exit"]')
+      expect(exit.classes()).toContain('opacity-100')
+      expect(exit.classes()).not.toContain('opacity-0')
+      expect(exit.classes()).not.toContain('pointer-events-none')
+    })
   })
 
   it('slides: [] and isLoading: true renders presentation-loading with the loading copy, no empty-state', async () => {

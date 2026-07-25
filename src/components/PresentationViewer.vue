@@ -231,7 +231,7 @@
         data-testid="presentation-exit"
         aria-label="Exit presentation (Esc)"
         class="absolute top-6 right-6 p-2.5 min-h-11 min-w-11 text-gray-300 hover:text-white transition-opacity duration-300"
-        :class="chromeVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'"
+        :class="exitVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'"
         @click="exitPresentation"
       >
         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -332,6 +332,17 @@ const videoMutedPlaying = ref(false)
 const hasSlides = computed(() => props.slides.length > 0)
 const isLoadingState = computed(() => !!props.isLoading && props.slides.length === 0)
 const isEmptyState = computed(() => !isLoadingState.value && props.slides.length === 0)
+
+/**
+ * WR-04: the exit button must stay reachable even if the idle-hide timer has
+ * already fired while there is still nothing else on screen to interact
+ * with (assembly taking >3s, or the rare empty/race state) — on a
+ * touch-only device there would otherwise be no way to trigger Escape.
+ * `chromeVisible`'s own value (and its 3s timer) are untouched; this only
+ * overrides what's DISPLAYED while loading/empty.
+ */
+const exitVisible = computed(() => chromeVisible.value || isLoadingState.value || isEmptyState.value)
+
 const currentSlide = computed<AssembledSlide | null>(() => props.slides[currentIndex.value] ?? null)
 const atFirst = computed(() => currentIndex.value <= 0)
 const atLast = computed(() => currentIndex.value >= props.slides.length - 1)
