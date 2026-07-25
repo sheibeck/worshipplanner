@@ -21,15 +21,17 @@ function formatReference(ref: ScriptureRef): string {
 
 function formatVerseRange(verses: Verse[]): string {
   if (verses.length === 0) return ''
-  if (verses.length === 1) return `v. ${verses[0].number}`
-  return `vv. ${verses[0].number}-${verses[verses.length - 1].number}`
+  // Guaranteed present: the checks above narrow this to exactly-1 and 2-or-more.
+  if (verses.length === 1) return `v. ${verses[0]!.number}`
+  return `vv. ${verses[0]!.number}-${verses[verses.length - 1]!.number}`
 }
 
 function parseVerses(text: string): Verse[] {
   const parts = text.split(/\[(\d+)\]/).filter(Boolean)
   const verses: Verse[] = []
   for (let i = 0; i < parts.length; i += 2) {
-    const num = parseInt(parts[i], 10)
+    // i < parts.length is the loop condition, so parts[i] is always in bounds.
+    const num = parseInt(parts[i]!, 10)
     const content = parts[i + 1]?.trim() ?? ''
     if (!isNaN(num) && content) {
       verses.push({ number: num, text: content })

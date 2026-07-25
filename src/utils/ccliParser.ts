@@ -113,13 +113,16 @@ function parseFooter(footerLines: string[], title: string): CopyrightInfo {
   for (const line of footerLines) {
     const songMatch = line.match(CCLI_SONG_RE)
     if (songMatch) {
-      copyright.ccliSongNumber = songMatch[1]
+      // CCLI_SONG_RE's capture group is mandatory (\d+, no '?'), so a match
+      // guarantees group 1 is present; '?? ""' is an unreachable fallback.
+      copyright.ccliSongNumber = songMatch[1] ?? ''
       continue
     }
 
     const licenseMatch = line.match(CCLI_LICENSE_RE)
     if (licenseMatch) {
-      copyright.ccliLicenseNumber = licenseMatch[1]
+      // Same reasoning: CCLI_LICENSE_RE's capture group is mandatory.
+      copyright.ccliLicenseNumber = licenseMatch[1] ?? ''
       continue
     }
 
@@ -181,12 +184,15 @@ export function parseCCLIPaste(rawText: string): ParsedCCLI {
     return empty
   }
 
-  // First non-blank line is the title
-  const title = blocks[0][0].trim()
+  // First non-blank line is the title.
+  // blocks.length === 0 already returned above, so blocks[0] exists; splitBlocks
+  // only ever pushes non-empty arrays, so blocks[0][0] exists too.
+  const firstBlock = blocks[0]!
+  const title = firstBlock[0]!.trim()
 
   // If the title block has only the title line, start sections from block 1.
   // If the title block has more lines, those are part of the first section.
-  const titleBlockRemainder = blocks[0].length > 1 ? blocks[0].slice(1) : []
+  const titleBlockRemainder = firstBlock.length > 1 ? firstBlock.slice(1) : []
 
   const sections: LyricSection[] = []
   const footerLines: string[] = []
@@ -211,16 +217,19 @@ export function parseCCLIPaste(rawText: string): ParsedCCLI {
       continue
     }
 
-    // Check if the first line is a section header
-    const headerMatch = block[0].match(SECTION_HEADER_RE)
+    // Check if the first line is a section header.
+    // remainingBlocks entries are always non-empty (blocks from splitBlocks are
+    // never empty, and titleBlockRemainder is only unshifted when non-empty).
+    const headerMatch = block[0]!.match(SECTION_HEADER_RE)
     if (headerMatch) {
-      const label = normaliseLabel(headerMatch[1], headerMatch[2])
+      // SECTION_HEADER_RE's first group is mandatory, so it's always present on a match.
+      const label = normaliseLabel(headerMatch[1]!, headerMatch[2])
       const lyricLines = block.slice(1).map((l) => l.trim())
 
       // Check if the first lyric line is a parenthetical marker for a sub-section
       // If so, split into two sections
       if (lyricLines.length > 0) {
-        const parenMatch = lyricLines[0].match(PAREN_MARKER_RE)
+        const parenMatch = lyricLines[0]!.match(PAREN_MARKER_RE)
         if (parenMatch) {
           // The header section has no lines (the paren marker starts a new section)
           // Actually, there might be lines between header and paren marker — but
@@ -229,7 +238,8 @@ export function parseCCLIPaste(rawText: string): ParsedCCLI {
           if (lyricLines.length > 1) {
             // First, add the header section with no lines if there are none before paren
             // Then add the paren-marked section
-            const parenLabel = normaliseLabel(parenMatch[1], parenMatch[2])
+            // PAREN_MARKER_RE's first group is mandatory, so it's always present on a match.
+            const parenLabel = normaliseLabel(parenMatch[1]!, parenMatch[2])
             sections.push({
               id: slugify(parenLabel),
               label: parenLabel,
@@ -238,7 +248,8 @@ export function parseCCLIPaste(rawText: string): ParsedCCLI {
           }
           // If only the paren marker and nothing else, just create the paren section
           else {
-            const parenLabel = normaliseLabel(parenMatch[1], parenMatch[2])
+            // PAREN_MARKER_RE's first group is mandatory, so it's always present on a match.
+            const parenLabel = normaliseLabel(parenMatch[1]!, parenMatch[2])
             sections.push({
               id: slugify(parenLabel),
               label: parenLabel,
@@ -257,10 +268,11 @@ export function parseCCLIPaste(rawText: string): ParsedCCLI {
       continue
     }
 
-    // Check if the first line is a parenthetical marker (standalone, no header)
-    const parenMatch = block[0].match(PAREN_MARKER_RE)
+    // Check if the first line is a parenthetical marker (standalone, no header).
+    // block[0] exists — see the remainingBlocks non-empty note above.
+    const parenMatch = block[0]!.match(PAREN_MARKER_RE)
     if (parenMatch) {
-      const label = normaliseLabel(parenMatch[1], parenMatch[2])
+      const label = normaliseLabel(parenMatch[1]!, parenMatch[2])
       sections.push({
         id: slugify(label),
         label,
@@ -273,7 +285,8 @@ export function parseCCLIPaste(rawText: string): ParsedCCLI {
     // This can happen with the title block remainder or unexpected blocks.
     // If there's a previous section, append lines; otherwise create an unnamed section.
     if (sections.length > 0) {
-      const prev = sections[sections.length - 1]
+      // Guaranteed non-empty by the length check above.
+      const prev = sections[sections.length - 1]!
       prev.lines.push(...block.map((l) => l.trim()).filter((l) => l !== ''))
     } else {
       // Unlabeled section at the beginning — rare but handle gracefully
