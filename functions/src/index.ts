@@ -1,4 +1,5 @@
 import { onCall, onRequest, HttpsError, type CallableRequest } from "firebase-functions/v2/https";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 import { defineSecret } from "firebase-functions/params";
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
@@ -198,4 +199,103 @@ export async function parsePptxHandler(
 export const parsePptx = onCall(
   { memory: "1GiB", timeoutSeconds: 120 },
   parsePptxHandler,
+);
+
+// --- cleanupExpiredMedia (R015: 2-week Storage retention) ---------------
+//
+// SAFETY CONTRACT (see 22-03 threat model, T-22-03-01..05):
+// - MEDIA_PATH_GUARD is applied to every candidate BEFORE any delete decision.
+//   Only objects under orgs/{orgId}/media/ are ever eligible; pptx-imports and
+//   every other Storage path are structurally excluded, even when old.
+// - getFiles() is scoped with prefix "orgs/" -- never the bucket root -- as a
+//   second, independent bound on the blast radius.
+// - Age is keyed on the object's native GCS `timeCreated` (server-set at
+//   upload time), NEVER on client-settable custom metadata -- a user cannot
+//   backdate metadata to force-expire another org's media early.
+// - This handler imports NO Firestore API at all. It is structurally
+//   incapable of touching slide documents, slot metadata, or slide text --
+//   it can only ever list/delete Storage objects.
+// - Defaults to dry-run (MEDIA_CLEANUP_DRY_RUN unset or not "true"): scans and
+//   logs what WOULD be deleted, deletes nothing. A human must review a dry-run
+//   before flipping this to live deletion (see the plan's human-verify gate).
+// - Idempotent by age: deletion eligibility depends only on an object's own
+//   timeCreated vs "now", never on prior-run state, so a partially-failed run
+//   is safely retried by the next daily invocation. Per-file deletes are each
+//   wrapped in try/catch so one failure never aborts the whole run.
+
+/** Objects are only eligible for cleanup once older than this many days. */
+export const RETENTION_DAYS = 14;
+
+/**
+ * Hard path guard: matches ONLY object names under orgs/{orgId}/media/.
+ * Anything else (pptx-imports, or any future non-media path) never reaches
+ * the delete decision, regardless of age.
+ */
+export const MEDIA_PATH_GUARD = /^orgs\/[^/]+\/media\//;
+
+export interface CleanupSummary {
+  scannedCount: number;
+  deletedCount: number;
+  dryRun: boolean;
+}
+
+/**
+ * The cleanupExpiredMedia handler body, exported separately from the
+ * `onSchedule` wrapper (mirroring parsePptxHandler/parsePptx) so it can be
+ * unit-tested directly against a mocked bucket.
+ */
+export async function cleanupExpiredMediaHandler(): Promise<CleanupSummary> {
+  const dryRun = process.env.MEDIA_CLEANUP_DRY_RUN === "true";
+  const bucket = getStorage().bucket();
+  const cutoffMs = Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000;
+
+  let scannedCount = 0;
+  let deletedCount = 0;
+
+  const [files] = await bucket.getFiles({
+    prefix: "orgs/",
+    autoPaginate: true,
+  });
+
+  for (const file of files) {
+    // Hard safety gate: never consider anything outside orgs/{orgId}/media/,
+    // no matter how old it is (excludes pptx-imports and any other path).
+    if (!MEDIA_PATH_GUARD.test(file.name)) {
+      continue;
+    }
+
+    scannedCount++;
+
+    const timeCreated = file.metadata?.timeCreated;
+    const createdMs = timeCreated ? new Date(timeCreated).getTime() : NaN;
+    if (Number.isNaN(createdMs) || createdMs > cutoffMs) {
+      // Not old enough yet (or timestamp unreadable -- fail safe, skip it).
+      continue;
+    }
+
+    if (dryRun) {
+      deletedCount++;
+      continue;
+    }
+
+    try {
+      await file.delete();
+      deletedCount++;
+    } catch (err) {
+      // Partial-failure tolerance (T-22-03-03): one bad delete never aborts
+      // the run. Idempotent-by-age means the next daily run retries it.
+      console.error(`cleanupExpiredMedia: failed to delete ${file.name}:`, err);
+    }
+  }
+
+  const summary: CleanupSummary = { scannedCount, deletedCount, dryRun };
+  console.log("cleanupExpiredMedia summary:", summary);
+  return summary;
+}
+
+export const cleanupExpiredMedia = onSchedule(
+  { schedule: "every day 02:00", timeZone: "UTC" },
+  async () => {
+    await cleanupExpiredMediaHandler();
+  },
 );
