@@ -5,15 +5,15 @@ milestone_name: Worship Service Slide Management
 current_phase: 22
 current_phase_name: Media Attachments and Storage Lifecycle
 status: executing
-stopped_at: 22-03-PLAN.md paused at Task 2 human-verify checkpoint (dry-run review pending, blocking-human)
-last_updated: "2026-07-25T17:08:37.020Z"
+stopped_at: 22-04-PLAN.md paused at Task 3 human-verify checkpoint (media/autoplay e2e pending, blocking)
+last_updated: "2026-07-25T17:23:08.157Z"
 last_activity: 2026-07-25
 progress:
   total_phases: 18
-  completed_phases: 15
+  completed_phases: 16
   total_plans: 94
-  completed_plans: 93
-  percent: 83
+  completed_plans: 94
+  percent: 89
 last_activity_desc: Migrated gsdpi milestone M001 into gsd-core as v1.2 (Phases 18-23)
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 22 (Media Attachments and Storage Lifecycle) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Milestone: v1.2 Worship Service Slide Management (Phases 18-23) — IN PROGRESS
 Status: Ready to execute
 
@@ -42,13 +42,15 @@ Status: Ready to execute
 | Phase | State | Resume |
 |-------|-------|--------|
 | 20 | verification_deferred_human | /gsd-verify-work 20 |
-| 21 | verification_deferred_human | /gsd-verify-work 21 |
+| 21 | verification_deferred_human | /gsd-verify-work 21 (import save confirmed live 2026-07-25; remaining: announcements/image, corrupted-file error, source-retention) |
+| 22 | verification_deferred_human | /gsd-verify-work 22 (cleanup dry-run review + media/autoplay e2e) |
 
 **Pre-audit hardening TODO (batch before milestone complete):**
 
-- Fix `src/views/__tests__/ServiceEditorView.test.ts` — fails at mount since 21-01 added the `importedSlides` store subscription without a Pinia mock stub (red test file; runtime fine). See phase 21 deferred-items.md.
-- Run the FULL unit suite green + clean stale `.gsd/quarantine/worktrees/**` debris (3 spurious failures).
-- Batch human-verify P20 (section grouping / live reorder / override marker) + P21 (PPTX e2e: upload docs/example.pptx → native slides, images render, source retained).
+- **[SAFETY] Flip `cleanupExpiredMedia` default to dry-run/disabled** — 22-03 shipped it defaulting to LIVE delete (dry-run requires `MEDIA_CLEANUP_DRY_RUN=true`); a destructive scheduled deleter must default to safe (require an explicit opt-in like `MEDIA_CLEANUP_ENABLED=true` to delete). Update `functions/src/index.ts` + its test. Not deployed + no eligible data yet, so risk is currently nil — but fix before any deploy.
+- ~~Fix `src/views/__tests__/ServiceEditorView.test.ts` — fails at mount since 21-01 added the `importedSlides` store subscription without a Pinia mock stub~~ — **FIXED in 22-04** (`8e3afb2`): added the missing `@/stores/importedSlides` reactive-stub mock; all 14 real tests now pass.
+- Run the FULL unit suite green + clean stale `.gsd/quarantine/worktrees/**` debris (2 remaining spurious failures — stale copies of ServiceEditorView.test.ts inside `.gsd/quarantine/worktrees/**`, not source).
+- Batch human-verify P20 (section grouping / live reorder / override marker) + P21 (PPTX e2e) + P22 (cleanup dry-run + media autoplay).
 
 Phase 20 code is complete + unit-tested (all plans 20-01..20-04 committed). The blocking
 human-verify checkpoint (section grouping, live reorder-follows-slides, scripture override
@@ -152,6 +154,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 22 P01 | 25min | 3 tasks | 8 files |
 | Phase 22 P02 | 20min | 3 tasks | 6 files |
 | Phase 22 P03 | 20min | 1 tasks | 2 files |
+| Phase 22 P04 | ~35min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -235,6 +238,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: storage.rules media cap layered as an additive sibling match block (OR-across-matching-blocks semantics), not a rewrite
 - [Phase ?]: VideoPlayer autoplay-fallback: muted-retry success and muted-retry failure both emit 'autoplay-blocked'; driving layer distinguishes by element muted state, not a second event
 - [Phase ?]: Both AudioPlayer/VideoPlayer explicitly emit 'play' from inside play() on success (in addition to the native @play listener) so imperative callers get the signal even against jsdom media-element test doubles that don't dispatch native events
+- [Phase ?]: [Phase 22-04]: SlotMediaAttachment mutates localService.slots[index] directly (mirrors onSectionChange) so attach/remove rides the EXISTING deep-watch autosave -- no new save path
+- [Phase ?]: [Phase 22-04]: Fixed pre-existing ServiceEditorView.test.ts Pinia crash (missing importedSlides mock since 21-01) as a Rule 3 blocking auto-fix -- it blocked this plan's own required test verification
 
 ### Roadmap Evolution
 
@@ -289,10 +294,11 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - VW slot type enforcement rules should be confirmed with team
 - Planning Center CSV column schema should be validated against an actual export
 - 22-03: dry-run human-verify checkpoint (Task 2) pending before enabling live deletion in cleanupExpiredMedia
+- 22-04: media/autoplay e2e human-verify checkpoint (Task 3) pending before this plan is fully signed off
 
 ## Session Continuity
 
 Last activity: 2026-07-25
-Last session: 2026-07-25T17:08:36.522Z
-Stopped at: 22-03-PLAN.md paused at Task 2 human-verify checkpoint (dry-run review pending, blocking-human)
+Last session: 2026-07-25T17:22:57.110Z
+Stopped at: 22-04-PLAN.md paused at Task 3 human-verify checkpoint (media/autoplay e2e pending, blocking)
 Resume file: None
