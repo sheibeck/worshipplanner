@@ -85,8 +85,12 @@ Plans:
 **Goal:** Attach MP3 or video to a slide and see it auto-play in the editor preview (auto-play on entry, stop at end, no loop); verify the 2-week Firebase Storage cleanup policy on old media.
 **Depends on:** Phase 18
 **Requirements:** R013, R014, R015
-**Status:** research done (`22-RESEARCH.md`).
-**Plans:** 0
+**Status:** planned (`22-RESEARCH.md`, `22-CONTEXT.md`) — 4 plans across 3 waves.
+**Plans:** 4 plans
+- [ ] 22-01-PLAN.md — Media fields on slide/slot model + assembler propagation, `useMediaUpload`, widened storage.rules (Wave 1)
+- [ ] 22-02-PLAN.md — AudioPlayer + VideoPlayer (no-loop, autoplay-block fallback) + SlideshowPreview media rendering (Wave 2)
+- [ ] 22-03-PLAN.md — `cleanupExpiredMedia` scheduled Cloud Function (2-week retention, media-only, dry-run + human-verify) (Wave 2)
+- [ ] 22-04-PLAN.md — Per-slot attach/preview/remove UI wired into ServiceEditor + end-to-end human-verify (Wave 3)
 
 ### Phase 23: Presentation Preview Mode `risk:low`
 
