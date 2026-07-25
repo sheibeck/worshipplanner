@@ -196,6 +196,39 @@ describe('SlideshowPreview', () => {
     expect(plainCard?.text()).toContain('Message')
   })
 
+  it('renders an enabled "Present Slideshow" CTA that emits present exactly once when there are slides', async () => {
+    const sections: AssembledSection[] = [
+      { section: 'worship', label: 'Worship', slides: [textSlide('a')] },
+    ]
+    const wrapper = mount(SlideshowPreview, { props: { sections } })
+
+    const cta = wrapper.find('[data-testid="present-slideshow-cta"]')
+    expect(cta.exists()).toBe(true)
+    expect(cta.attributes('disabled')).toBeUndefined()
+    expect(cta.attributes('title')).toBeUndefined()
+
+    await cta.trigger('click')
+    expect(wrapper.emitted('present')).toHaveLength(1)
+  })
+
+  it('disables the "Present Slideshow" CTA and carries the explanatory title when sections is empty', async () => {
+    const wrapper = mount(SlideshowPreview, { props: { sections: [] } })
+
+    const cta = wrapper.find('[data-testid="present-slideshow-cta"]')
+    expect(cta.exists()).toBe(true)
+    expect(cta.attributes('disabled')).toBeDefined()
+    expect(cta.attributes('title')).toBe('Add songs or scripture to build a slideshow to present.')
+
+    await cta.trigger('click')
+    expect(wrapper.emitted('present')).toBeUndefined()
+  })
+
+  it('still renders the "Slideshow Preview" heading alongside the CTA', () => {
+    const wrapper = mount(SlideshowPreview, { props: { sections: [] } })
+
+    expect(wrapper.find('h3').text()).toBe('Slideshow Preview')
+  })
+
   it('imports no Pinia store', async () => {
     const fs = await import('node:fs')
     const path = await import('node:path')

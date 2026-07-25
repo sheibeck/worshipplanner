@@ -1,7 +1,20 @@
 <template>
   <div class="rounded-lg bg-gray-900 border border-gray-800 overflow-hidden" data-testid="slideshow-preview">
-    <div class="px-4 py-3 border-b border-gray-800">
+    <div class="px-4 py-3 border-b border-gray-800 flex items-center justify-between gap-3">
       <h3 class="text-sm font-semibold text-gray-100">Slideshow Preview</h3>
+      <button
+        type="button"
+        data-testid="present-slideshow-cta"
+        :disabled="!canPresent"
+        :title="canPresent ? undefined : 'Add songs or scripture to build a slideshow to present.'"
+        class="inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        @click="emit('present')"
+      >
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+        </svg>
+        Present Slideshow
+      </button>
     </div>
 
     <div class="max-h-[32rem] overflow-y-auto p-3 space-y-4">
@@ -113,10 +126,20 @@ const props = defineProps<{
   sections: AssembledSection[]
 }>()
 
+const emit = defineEmits<{
+  present: []
+}>()
+
 /** Sections with at least one slide — avoids rendering empty headers. */
 const nonEmptySections = computed(() => props.sections.filter((group) => group.slides.length > 0))
 
 const hasAnySlides = computed(() => nonEmptySections.value.length > 0)
+
+// Exactly equivalent to assembledSlideshow.length > 0 — useSlideshowAssembly
+// groups every assembled slide into either a named SERVICE_SECTIONS group or
+// the trailing Ungrouped group, so nonEmptySections' total slide count always
+// matches assembledSlideshow.length.
+const canPresent = computed(() => hasAnySlides.value)
 
 /**
  * Card content kind, narrowed independently of the raw `contentKind` field —
