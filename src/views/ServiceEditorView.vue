@@ -253,6 +253,15 @@
           </div>
         </Teleport>
 
+        <!-- PPTX/image import modal (Phase 21) -->
+        <PptxImportModal
+          :open="showImportModal"
+          :orgId="authStore.orgId!"
+          :section="importModalSection"
+          @confirmed="onImportConfirmed"
+          @cancel="showImportModal = false"
+        />
+
         <!-- Export dialog -->
         <Teleport to="body">
           <div v-if="showExportDialog" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
@@ -859,6 +868,46 @@
                   <p v-else class="text-sm text-gray-400 italic">Hymn — Empty</p>
                 </div>
               </template>
+
+              <!-- IMPORTED slot (Phase 21) -->
+              <template v-else-if="slot.kind === 'IMPORTED'">
+                <div class="flex items-center justify-between gap-3 mb-1">
+                  <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Imported Slides</p>
+                </div>
+                <p v-if="!(slot as ImportedSlot).importId" class="text-sm text-gray-400 italic">Imported Slides — Empty</p>
+                <template v-else>
+                  <!-- Editor: expand/collapse toggle -->
+                  <div v-if="authStore.isEditor && !isExportedLocked" class="flex items-center gap-3 mb-2">
+                    <button
+                      type="button"
+                      data-testid="edit-imported-slides-btn"
+                      class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-indigo-400 bg-gray-800 border border-gray-700 hover:bg-gray-700 transition-colors"
+                      @click="toggleImportedEditor(index)"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                      {{ expandedImportedSlots.has(index) ? 'Close Slides Editor' : 'Edit Imported Slides' }}
+                    </button>
+                  </div>
+                  <!-- Viewer / read-only note when not expanded -->
+                  <p v-else class="text-sm text-gray-200">Imported Slides</p>
+
+                  <!-- Expanded editor panel -->
+                  <div
+                    v-if="authStore.isEditor && !isExportedLocked && expandedImportedSlots.has(index)"
+                    class="rounded-lg border border-gray-700 bg-gray-950 overflow-hidden"
+                    style="min-height: 300px"
+                    data-testid="imported-editor-panel"
+                  >
+                    <ImportedSlideEditor
+                      :orgId="authStore.orgId!"
+                      :importId="(slot as ImportedSlot).importId ?? undefined"
+                      data-testid="imported-slide-editor"
+                    />
+                  </div>
+                </template>
+              </template>
             </div>
 
             <!-- Section-assignment control: editor only, hidden when exported (D005/R007) -->
@@ -920,6 +969,8 @@
             <button type="button" @click="addSlot('PRAYER')" class="px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 w-full text-left transition-colors">Prayer</button>
             <button type="button" @click="addSlot('MESSAGE')" class="px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 w-full text-left transition-colors">Message</button>
             <button type="button" @click="addSlot('HYMN')" class="px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 w-full text-left transition-colors">Hymn</button>
+            <button type="button" data-testid="add-import-announcements" @click="openImportModal('pre-service')" class="px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 w-full text-left transition-colors">Import PowerPoint / Images (Announcements)</button>
+            <button type="button" data-testid="add-import-sermon" @click="openImportModal('message')" class="px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 w-full text-left transition-colors">Import PowerPoint (Sermon)</button>
           </div>
         </div>
 
@@ -1067,7 +1118,7 @@ import { getPrimaryKey } from '@/utils/songSearch'
 import { resolveServiceRoleAssignments, findQuarterForDate } from '@/utils/serviceRoles'
 import type { ResolvedRoleAssignment } from '@/utils/serviceRoles'
 import { SERVICE_SECTIONS, SERVICE_SECTION_LABELS } from '@/types/service'
-import type { Service, ServiceSlot, SongSlot, ScriptureSlot, NonAssignableSlot, HymnSlot, ScriptureRef, SlotKind, ServiceSection } from '@/types/service'
+import type { Service, ServiceSlot, SongSlot, ScriptureSlot, NonAssignableSlot, HymnSlot, ImportedSlot, ScriptureRef, SlotKind, ServiceSection } from '@/types/service'
 import type { VWType } from '@/types/song'
 import type { Person } from '@/types/roster'
 import AppShell from '@/components/AppShell.vue'
@@ -1077,6 +1128,8 @@ import ScriptureInput from '@/components/ScriptureInput.vue'
 import ServicePrintLayout from '@/components/ServicePrintLayout.vue'
 import ScriptureSlideEditor from '@/components/ScriptureSlideEditor.vue'
 import CongregationalEditor from '@/components/CongregationalEditor.vue'
+import ImportedSlideEditor from '@/components/ImportedSlideEditor.vue'
+import PptxImportModal from '@/components/PptxImportModal.vue'
 import SlideshowPreview from '@/components/SlideshowPreview.vue'
 import { useSlideshowAssembly } from '@/composables/useSlideshowAssembly'
 import { formatForPlanningCenter } from '@/utils/planningCenterExport'
@@ -1206,6 +1259,39 @@ function setReadingMode(index: number, mode: 'normal' | 'congregational') {
     ...slot,
     readingMode: mode,
   } as ScriptureSlot
+}
+
+// ── Imported (PPTX/image) slot state (Phase 21) ───────────────────────────────
+const showImportModal = ref(false)
+const importModalSection = ref<ServiceSection>('pre-service')
+const expandedImportedSlots = ref<Set<number>>(new Set())
+
+function openImportModal(section: ServiceSection) {
+  importModalSection.value = section
+  showImportModal.value = true
+  showAddMenu.value = false
+}
+
+function toggleImportedEditor(index: number) {
+  const next = new Set(expandedImportedSlots.value)
+  if (next.has(index)) {
+    next.delete(index)
+  } else {
+    next.add(index)
+  }
+  expandedImportedSlots.value = next
+}
+
+// On confirm, append a new IMPORTED slot bound to the emitted importId in the
+// emitted section, then reindex — mirroring how SCRIPTURE slots are added.
+// The modal itself never touches localService.value.slots (21-05 key_links).
+function onImportConfirmed(payload: { importId: string; section: ServiceSection }) {
+  if (!localService.value) return
+  const newSlot = createSlot('IMPORTED', undefined, payload.section) as ImportedSlot
+  newSlot.importId = payload.importId
+  localService.value.slots.push(newSlot)
+  localService.value.slots = reindexSlots(localService.value.slots)
+  showImportModal.value = false
 }
 
 // ── Export to PC state ─────────────────────────────────────────────────────────
@@ -1643,6 +1729,9 @@ function isSlotPopulated(slot: ServiceSlot): boolean {
     const s = slot as HymnSlot
     return !!(s.hymnName?.trim() || s.hymnNumber?.trim())
   }
+  if (slot.kind === 'IMPORTED') {
+    return (slot as ImportedSlot).importId != null
+  }
   return false
 }
 
@@ -1671,6 +1760,7 @@ function elementLabel(kind: SlotKind): string {
     case 'HYMN': return 'this hymn'
     case 'MESSAGE': return 'this message'
     case 'PRAYER': return 'this prayer'
+    case 'IMPORTED': return 'this imported deck'
     default: return 'this element'
   }
 }
@@ -2091,7 +2181,12 @@ async function onConfirmExport() {
     const failures: string[] = []
     let planId: string
 
-    // Collect our songs (SONG + HYMN) and scriptures from service slots
+    // Collect our songs (SONG + HYMN) and scriptures from service slots.
+    // IMPORTED slots (Phase 21) have no analogous PC item type and are
+    // intentionally excluded from both buckets below — the 'existing plan'
+    // branch below only ever touches songSlots/scriptureSlots (same as
+    // PRAYER/MESSAGE), so IMPORTED is already skipped there without further
+    // (slot as any) narrowing (RESEARCH Pitfall 2).
     const songSlots = localService.value.slots.filter(s => s.kind === 'SONG' || s.kind === 'HYMN')
     const scriptureSlots = localService.value.slots.filter(s => s.kind === 'SCRIPTURE')
 
@@ -2303,6 +2398,12 @@ async function onConfirmExport() {
         }
       } else {
         for (const slot of localService.value.slots) {
+          // IMPORTED slots reference PPTX/image decks with no analogous PC item
+          // type; skip export entirely rather than falling through
+          // addSlotAsItem's default MESSAGE-item branch and mislabeling it
+          // (RESEARCH Pitfall 2) — no (slot as any) narrowing needed here since
+          // we skip before ever reaching the label-building catch block below.
+          if (slot.kind === 'IMPORTED') continue
           try {
             await addSlotAsItem(appId, secret, serviceTypeId, planId, slot, sequence, songStore.songs, localService.value.sermonPassage)
             sequence++
