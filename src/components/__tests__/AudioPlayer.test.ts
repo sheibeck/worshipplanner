@@ -47,4 +47,51 @@ describe('AudioPlayer', () => {
 
     expect(wrapper.emitted('ended')).toBeTruthy()
   })
+
+  it('default (no chromeless prop) mount still has the controls attribute', () => {
+    const wrapper = mount(AudioPlayer, { props: { src: 'https://example.com/song.mp3' } })
+
+    expect(wrapper.find('audio').attributes('controls')).toBeDefined()
+  })
+
+  it('chromeless: true mount has no controls attribute', () => {
+    const wrapper = mount(AudioPlayer, {
+      props: { src: 'https://example.com/song.mp3', chromeless: true },
+    })
+
+    expect(wrapper.find('audio').attributes('controls')).toBeUndefined()
+  })
+
+  it('chromeless: true wrapper class does not contain the panel classes', () => {
+    const wrapper = mount(AudioPlayer, {
+      props: { src: 'https://example.com/song.mp3', chromeless: true },
+    })
+
+    const panel = wrapper.find('[data-testid="audio-player"]')
+    expect(panel.classes()).not.toContain('bg-gray-800/60')
+    expect(panel.classes()).not.toContain('border-gray-700/50')
+    expect(panel.classes()).not.toContain('p-2')
+  })
+
+  it('chromeless: true suppresses the internal play affordance on autoplay-blocked, default renders it', async () => {
+    window.HTMLMediaElement.prototype.play = vi
+      .fn()
+      .mockRejectedValue(new DOMException('blocked', 'NotAllowedError'))
+
+    const chromelessWrapper = mount(AudioPlayer, {
+      props: { src: 'https://example.com/song.mp3', chromeless: true },
+    })
+    await (chromelessWrapper.vm as unknown as { play: () => Promise<void> }).play()
+    await chromelessWrapper.vm.$nextTick()
+
+    expect(chromelessWrapper.emitted('autoplay-blocked')).toBeTruthy()
+    expect(chromelessWrapper.find('[data-testid="audio-play-affordance"]').exists()).toBe(false)
+
+    const defaultWrapper = mount(AudioPlayer, { props: { src: 'https://example.com/song.mp3' } })
+    await (defaultWrapper.vm as unknown as { play: () => Promise<void> }).play()
+    await defaultWrapper.vm.$nextTick()
+
+    expect(defaultWrapper.emitted('autoplay-blocked')).toBeTruthy()
+    expect(defaultWrapper.find('[data-testid="audio-play-affordance"]').exists()).toBe(true)
+  })
 })
