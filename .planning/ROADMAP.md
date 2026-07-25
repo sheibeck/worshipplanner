@@ -98,7 +98,16 @@ Plans:
 **Goal:** Open a full-screen preview of the complete service slideshow, advance through all slide types with media playback working, degrade gracefully when media is missing.
 **Depends on:** Phase 20, Phase 22
 **Requirements:** R016, R018 (supporting)
-**Plans:** 0
+**Status:** 📋 Planned (`23-01`..`23-05`). Next action: `/gsd-execute-phase 23`.
+**Plans:** 5 plans (Waves 1→5, sequential main-tree build — no worktree isolation)
+
+Plans:
+
+- [ ] 23-01-PLAN.md — Chromeless media primitives: `chromeless` prop on AudioPlayer/VideoPlayer + exposed `isMuted`/`unmute()` (Wave 1)
+- [ ] 23-02-PLAN.md — PresentationViewer shell: Teleport, Fullscreen API + overlay fallback, root-scoped keyboard nav, auto-hiding chrome, loading/empty states, projection-scale rendering for every slide kind (Wave 2)
+- [ ] 23-03-PLAN.md — Media driving: imperative play/pause across transitions, "Media unavailable" degradation, the three autoplay-blocked affordances (Wave 3)
+- [ ] 23-04-PLAN.md — "Present Slideshow" entry CTA + ServiceEditorView wiring + automated phase gate (Wave 4)
+- [ ] 23-05-PLAN.md — Blocking human-verify: real fullscreen, real autoplay, real expired media, projector legibility, overflow judgment calls (Wave 5)
 
 ## Phases
 
