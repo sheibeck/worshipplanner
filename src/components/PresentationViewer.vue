@@ -159,7 +159,7 @@
             ref="videoRef"
             chromeless
             :src="currentVideoUrl"
-            :key="currentVideoUrl"
+            :key="currentVideoKey"
             @error="onMediaError"
             @autoplay-blocked="onVideoAutoplayBlocked"
             @play="videoBlocked = false"
@@ -176,7 +176,7 @@
             ref="audioRef"
             chromeless
             :src="currentAudioUrl"
-            :key="currentAudioUrl"
+            :key="currentAudioKey"
             @error="onMediaError"
             @autoplay-blocked="onAudioAutoplayBlocked"
             @play="audioBlocked = false"
@@ -339,6 +339,20 @@ const atLast = computed(() => currentIndex.value >= props.slides.length - 1)
 const currentAudioUrl = computed<string | null>(() => currentSlide.value?.slide.audioUrl ?? null)
 const currentVideoUrl = computed<string | null>(() => currentSlide.value?.slide.videoUrl ?? null)
 const bodyIsCaption = computed(() => Boolean(currentVideoUrl.value))
+
+/**
+ * Keys the VideoPlayer/AudioPlayer instances on the SLIDE, not just the media
+ * URL (WR-02). Two adjacent slides can carry the identical media URL (e.g.
+ * the same background/intro clip attached to two slots in a row); keying on
+ * URL alone reuses the child instance across such a transition, letting its
+ * internal `muted`/`showPlayAffordance` state leak from the outgoing slide
+ * into the incoming one (e.g. a slide that went through the muted-retry path
+ * would silently stay muted on the next slide with zero on-screen
+ * indication). Including the slide id forces a fresh instance on every
+ * slide change regardless of URL reuse.
+ */
+const currentVideoKey = computed(() => `${currentSlide.value?.slide.id ?? ''}:${currentVideoUrl.value ?? ''}`)
+const currentAudioKey = computed(() => `${currentSlide.value?.slide.id ?? ''}:${currentAudioUrl.value ?? ''}`)
 
 const progressLabel = computed(() => {
   const n = currentIndex.value + 1

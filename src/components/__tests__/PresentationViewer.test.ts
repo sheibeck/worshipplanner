@@ -856,6 +856,39 @@ describe('PresentationViewer', () => {
       expect(body().find('[data-testid="presentation-muted-chip"]').exists()).toBe(false)
     })
 
+    it('two adjacent slides sharing the identical videoUrl still force a fresh VideoPlayer instance, so muted state never leaks across slides (WR-02)', async () => {
+      window.HTMLMediaElement.prototype.play = vi
+        .fn()
+        .mockRejectedValueOnce(new DOMException('blocked', 'NotAllowedError')) // slide 1: unmuted attempt blocked
+        .mockResolvedValueOnce(undefined) // slide 1: muted retry succeeds
+        .mockResolvedValue(undefined) // slide 2 onward: resolves (would also resolve on a REUSED, already-muted element — that's the bug this test catches)
+
+      const sharedUrl = 'https://example.com/shared-clip.mp4'
+      const slides = [videoSlide('v1', sharedUrl), videoSlide('v2', sharedUrl)]
+      mount(PresentationViewer, { props: { slides } })
+      await flushPromises()
+
+      // Slide 1 went through the muted-retry path — muted chip shown, element muted.
+      expect(body().find('[data-testid="presentation-muted-chip"]').exists()).toBe(true)
+      const firstVideoEl = body().find('[data-testid="presentation-video"] video').element as HTMLVideoElement
+      expect(firstVideoEl.muted).toBe(true)
+
+      await body().find('[data-testid="presentation-next"]').trigger('click')
+      await flushPromises()
+
+      // Slide 2 carries the SAME videoUrl. If the child instance were reused
+      // (keyed on URL alone), its internal `muted` ref would still be true
+      // from slide 1 — the video would keep playing silently muted with no
+      // affordance at all (the discriminator never fires because play()
+      // never rejects when already muted). Keying on the slide id as well
+      // forces a fresh instance: a new DOM node, muted reset to false, and no
+      // stale chip.
+      expect(body().find('[data-testid="presentation-muted-chip"]').exists()).toBe(false)
+      const secondVideoEl = body().find('[data-testid="presentation-video"] video').element as HTMLVideoElement
+      expect(secondVideoEl).not.toBe(firstVideoEl)
+      expect(secondVideoEl.muted).toBe(false)
+    })
+
     it('advancing to the next slide clears every degraded-state flag', async () => {
       window.HTMLMediaElement.prototype.play = vi.fn().mockRejectedValue(new DOMException('blocked', 'NotAllowedError'))
       const slides = [videoSlide('v1', 'https://example.com/clip.mp4'), textSlide('t1')]
