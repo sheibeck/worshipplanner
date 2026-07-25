@@ -87,7 +87,8 @@ Plans:
 **Requirements:** R013, R014, R015
 **Status:** planned (`22-RESEARCH.md`, `22-CONTEXT.md`) — 4 plans across 3 waves.
 **Plans:** 4 plans
-- [ ] 22-01-PLAN.md — Media fields on slide/slot model + assembler propagation, `useMediaUpload`, widened storage.rules (Wave 1)
+
+- [x] 22-01-PLAN.md — Media fields on slide/slot model + assembler propagation, `useMediaUpload`, widened storage.rules (Wave 1)
 - [ ] 22-02-PLAN.md — AudioPlayer + VideoPlayer (no-loop, autoplay-block fallback) + SlideshowPreview media rendering (Wave 2)
 - [ ] 22-03-PLAN.md — `cleanupExpiredMedia` scheduled Cloud Function (2-week retention, media-only, dry-run + human-verify) (Wave 2)
 - [ ] 22-04-PLAN.md — Per-slot attach/preview/remove UI wired into ServiceEditor + end-to-end human-verify (Wave 3)

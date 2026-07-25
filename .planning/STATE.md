@@ -2,17 +2,17 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Worship Service Slide Management
-current_phase: 21
-current_phase_name: PowerPoint Import for Announcements and Sermon
-status: verifying
-stopped_at: Completed 21-06-PLAN.md Tasks 1-2; Task 3 (end-to-end human-verify) PENDING
-last_updated: "2026-07-25T16:16:44.905Z"
+current_phase: 22
+current_phase_name: Media Attachments and Storage Lifecycle
+status: executing
+stopped_at: Completed 22-01-PLAN.md
+last_updated: "2026-07-25T16:46:48.466Z"
 last_activity: 2026-07-25
 progress:
   total_phases: 18
   completed_phases: 15
-  total_plans: 90
-  completed_plans: 90
+  total_plans: 94
+  completed_plans: 91
   percent: 83
 last_activity_desc: Migrated gsdpi milestone M001 into gsd-core as v1.2 (Phases 18-23)
 ---
@@ -24,14 +24,14 @@ last_activity_desc: Migrated gsdpi milestone M001 into gsd-core as v1.2 (Phases 
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 21 — PowerPoint Import for Announcements and Sermon
+**Current focus:** Phase 22 — Media Attachments and Storage Lifecycle
 
 ## Current Position
 
-Phase: 21 (PowerPoint Import for Announcements and Sermon) — EXECUTING
-Plan: 6 of 6
+Phase: 22 (Media Attachments and Storage Lifecycle) — EXECUTING
+Plan: 2 of 4
 Milestone: v1.2 Worship Service Slide Management (Phases 18-23) — IN PROGRESS
-Status: Phase complete — ready for verification
+Status: Ready to execute
 
 > **Migration note (2026-07-24):** This milestone was scoped and partially built in gsdpi
 > (`.gsd/` milestone M001, slices S01-S06) and faithfully ported into gsd-core as v1.2.
@@ -42,6 +42,13 @@ Status: Phase complete — ready for verification
 | Phase | State | Resume |
 |-------|-------|--------|
 | 20 | verification_deferred_human | /gsd-verify-work 20 |
+| 21 | verification_deferred_human | /gsd-verify-work 21 |
+
+**Pre-audit hardening TODO (batch before milestone complete):**
+
+- Fix `src/views/__tests__/ServiceEditorView.test.ts` — fails at mount since 21-01 added the `importedSlides` store subscription without a Pinia mock stub (red test file; runtime fine). See phase 21 deferred-items.md.
+- Run the FULL unit suite green + clean stale `.gsd/quarantine/worktrees/**` debris (3 spurious failures).
+- Batch human-verify P20 (section grouping / live reorder / override marker) + P21 (PPTX e2e: upload docs/example.pptx → native slides, images render, source retained).
 
 Phase 20 code is complete + unit-tested (all plans 20-01..20-04 committed). The blocking
 human-verify checkpoint (section grouping, live reorder-follows-slides, scripture override
@@ -135,6 +142,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 21 P04 | 23min | 3 tasks | 3 files |
 | Phase 21 P05 | 25min | 3 tasks | 3 files |
 | Phase 21 P06 | 35min | 2 tasks | 3 files |
+| Phase 22 P01 | 25min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -213,6 +221,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Vue Test Utils Teleport testing pattern established: DOMWrapper over document.body + enableAutoUnmount(afterEach), needed since PptxImportModal (like other codebase modals) teleports to <body>
 - [Phase ?]: [Phase 21-06]: ImportedSlideEditor omits store subscribeDecks/unsubscribeDecks -- useSlideshowAssembly already owns a single org-scoped importedSlides subscription for the whole ServiceEditorView page; a per-editor unsubscribe would tear that down and break the live Slideshow Preview
 - [Phase ?]: [Phase 21-06]: PC-export skips IMPORTED slots via an early continue in the no-template export loop (RESEARCH Pitfall 2); the existing-plan branch already excluded IMPORTED since it only iterates the SONG/HYMN and SCRIPTURE filtered buckets
+- [Phase ?]: Media attaches at ServiceSlot level (not canonical song/scripture/deck), per D002
+- [Phase ?]: Assembler propagates slot media onto only the first emitted slide per slot via a Set<slotIndex> tracker
+- [Phase ?]: storage.rules media cap layered as an additive sibling match block (OR-across-matching-blocks semantics), not a rewrite
 
 ### Roadmap Evolution
 
@@ -270,6 +281,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-25
-Last session: 2026-07-25T16:16:44.873Z
-Stopped at: Completed 21-06-PLAN.md Tasks 1-2; Task 3 (end-to-end human-verify) PENDING
+Last session: 2026-07-25T16:46:48.431Z
+Stopped at: Completed 22-01-PLAN.md
 Resume file: None
