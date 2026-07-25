@@ -1,12 +1,15 @@
 <template>
-  <div class="rounded-md bg-gray-800/60 border border-gray-700/50 p-2" data-testid="audio-player">
+  <div
+    :class="chromeless ? '' : 'rounded-md bg-gray-800/60 border border-gray-700/50 p-2'"
+    data-testid="audio-player"
+  >
     <p v-if="label" class="text-[10px] font-semibold text-indigo-400 uppercase tracking-wider mb-1">
       {{ label }}
     </p>
     <audio
       ref="audioEl"
       :src="src"
-      controls
+      :controls="!chromeless"
       preload="none"
       class="w-full"
       @play="onPlay"
@@ -15,7 +18,7 @@
       @error="onError"
     />
     <button
-      v-if="showPlayAffordance"
+      v-if="showPlayAffordance && !chromeless"
       type="button"
       data-testid="audio-play-affordance"
       class="mt-2 inline-flex items-center gap-1 rounded bg-indigo-600 px-2 py-1 text-xs font-medium text-white hover:bg-indigo-500"
@@ -38,6 +41,7 @@ import { ref } from 'vue'
 defineProps<{
   src: string
   label?: string
+  chromeless?: boolean
 }>()
 
 const emit = defineEmits<{
