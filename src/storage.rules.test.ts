@@ -52,6 +52,11 @@ async function seedMembershipDoc(orgId: string, uid: string, role: string) {
 const SMALL_BYTES = new Uint8Array([1, 2, 3, 4])
 // One byte over the 25MB (26214400 byte) cap in storage.rules.
 const OVER_CAP_BYTES = new Uint8Array(26214401)
+// ~40MB — under the media path's 50MB cap but well over the non-media 25MB cap,
+// proving the media match's raised ceiling actually applies to this path.
+const MEDIA_UNDER_CAP_BYTES = new Uint8Array(40 * 1024 * 1024)
+// One byte over the media path's 50MB (52428800 byte) cap.
+const MEDIA_OVER_CAP_BYTES = new Uint8Array(52428801)
 
 describe('storage.rules — org membership', () => {
   it('allows an org member to write and read an object under their org path', async () => {
@@ -92,6 +97,43 @@ describe('storage.rules — org membership', () => {
     const context = testEnv.authenticatedContext('userA')
     const storage = context.storage()
     const fileRef = ref(storage, 'orgs/orgA/pptx-imports/import3/source.pptx')
+
+    await assertFails(uploadBytes(fileRef, OVER_CAP_BYTES))
+  })
+})
+
+describe('storage.rules — media path', () => {
+  it('allows an org member to upload a ~40MB media file (under the 50MB media cap)', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    const context = testEnv.authenticatedContext('userA')
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgA/media/m1/clip.mp4')
+
+    await assertSucceeds(uploadBytes(fileRef, MEDIA_UNDER_CAP_BYTES))
+  })
+
+  it('denies a member media upload that exceeds the 50MB media cap', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    const context = testEnv.authenticatedContext('userA')
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgA/media/m2/clip.mp4')
+
+    await assertFails(uploadBytes(fileRef, MEDIA_OVER_CAP_BYTES))
+  })
+
+  it('denies a non-member from writing to another org media path', async () => {
+    const context = testEnv.authenticatedContext('userB')
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgA/media/m3/clip.mp4')
+
+    await assertFails(uploadBytes(fileRef, SMALL_BYTES))
+  })
+
+  it('regression: the media match does not loosen the non-media pptx-imports 25MB cap', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    const context = testEnv.authenticatedContext('userA')
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgA/pptx-imports/import4/source.pptx')
 
     await assertFails(uploadBytes(fileRef, OVER_CAP_BYTES))
   })
