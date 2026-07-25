@@ -5,14 +5,14 @@ milestone_name: Worship Service Slide Management
 current_phase: 21
 current_phase_name: PowerPoint Import for Announcements and Sermon
 status: executing
-stopped_at: Completed 21-04-PLAN.md
-last_updated: "2026-07-25T15:42:27.310Z"
+stopped_at: Completed 21-05-PLAN.md
+last_updated: "2026-07-25T16:03:06.670Z"
 last_activity: 2026-07-25
 progress:
   total_phases: 18
   completed_phases: 14
   total_plans: 90
-  completed_plans: 88
+  completed_plans: 89
   percent: 78
 last_activity_desc: Migrated gsdpi milestone M001 into gsd-core as v1.2 (Phases 18-23)
 ---
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 21 (PowerPoint Import for Announcements and Sermon) — EXECUTING
-Plan: 5 of 6
+Plan: 6 of 6
 Milestone: v1.2 Worship Service Slide Management (Phases 18-23) — IN PROGRESS
 Status: Ready to execute
 
@@ -133,6 +133,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 21 P02 | 55min | 3 tasks | 6 files |
 | Phase 21 P03 | 15min | 3 tasks | 7 files |
 | Phase 21 P04 | 23min | 3 tasks | 3 files |
+| Phase 21 P05 | 25min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -207,6 +208,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: officeparser installed as functions/ runtime dependency post-human-approval (2019 pkg creation, 585K weekly downloads, MIT, real repo — [SUS] 'too-new' verdict overridden as a confirmed false positive)
 - [Phase ?]: docs/example.pptx (real user-provided deck) used as the mixed.pptx integration fixture; text-only.pptx/image-only.pptx deferred pending additional human export
 - [Phase ?]: PPTX mixed-content heuristic: 40-char flattened-text threshold decides text-dominant vs image-dominant slide, calibrated against the real mixed.pptx fixture.
+- [Phase ?]: generateImportId() (crypto.randomUUID) scopes only the upload-session Storage path; the deck's real importId comes from importedSlides.createDeck()'s Firestore auto-id on confirm
+- [Phase ?]: Vue Test Utils Teleport testing pattern established: DOMWrapper over document.body + enableAutoUnmount(afterEach), needed since PptxImportModal (like other codebase modals) teleports to <body>
 
 ### Roadmap Evolution
 
@@ -264,6 +267,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-25
-Last session: 2026-07-25T15:42:27.278Z
-Stopped at: Completed 21-04-PLAN.md
+Last session: 2026-07-25T16:02:54.152Z
+Stopped at: Completed 21-05-PLAN.md
 Resume file: None

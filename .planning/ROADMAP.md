@@ -77,7 +77,7 @@ Plans:
 - [x] 21-02-PLAN.md — Firebase Storage + callable Functions bootstrap + org-scoped storage.rules (Wave 1)
 - [x] 21-03-PLAN.md — functions/ Vitest infra + fixtures + gated officeparser install (Wave 1)
 - [x] 21-04-PLAN.md — parsePptx onCall Cloud Function + mapAstToSlides mapping (Wave 2)
-- [ ] 21-05-PLAN.md — Client upload util + step-based PptxImportModal (Wave 3)
+- [x] 21-05-PLAN.md — Client upload util + step-based PptxImportModal (Wave 3)
 - [ ] 21-06-PLAN.md — ImportedSlideEditor + ServiceEditorView wiring + end-to-end verify (Wave 4)
 
 ### Phase 22: Media Attachments and Storage Lifecycle `risk:medium`
