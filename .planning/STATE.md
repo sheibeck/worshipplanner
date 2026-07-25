@@ -68,6 +68,12 @@ A dedicated UI polish phase is planned AFTER v1.2 feature work completes. Captur
 
 - General editor UX polish pass (R018) once all content types (lyrics/scripture/PPTX/media/preview) exist.
 
+**Additional UI-phase notes (user, 2026-07-25, from live testing):**
+- **All slide editing lives in a "Slides" tab** on the service plan (not scattered / bottom-of-page).
+- **Collapsible preview items** to cut scrolling: after importing a PowerPoint, show it in the Slides tab as a **parent node with the slide title**, minimizable; expanding reveals slide content.
+- **Render formatted slides**, not just text — show the actual slide visuals/formatting in the preview (currently text-only).
+- **Insert a slide deck / image / video at ANY point in the service** — NOT limited to Announcements/Sermon sections. Replace the section-scoped "Import PowerPoint (Sermon/Announcements)" actions with a generic **"Add Slide Deck"**, plus separate **"Add Image"**, **"Add Video"**, etc. Imported decks/media become first-class service **items** that can be dragged/reordered like any other slot. (This reworks the Phase 21 section-scoped import model + relates to how Phase 22 media surfaces — capture only, do not re-architect mid-milestone.)
+
 Do NOT action during current milestone build — revisit as a follow-up UI phase (Phase 24 candidate).
 
 ## Milestone v1.2 Decisions (from gsdpi DECISIONS.md D001-D006)
