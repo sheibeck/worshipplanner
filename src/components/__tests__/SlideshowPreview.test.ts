@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import SlideshowPreview from '../SlideshowPreview.vue'
 import type { AssembledSection, AssembledSlide } from '@/types/slide'
@@ -91,6 +91,14 @@ function imageSlide(id: string): AssembledSlide {
 }
 
 describe('SlideshowPreview', () => {
+  beforeEach(() => {
+    // jsdom does not implement HTMLMediaElement.play/pause — stub per test,
+    // since AudioPlayer/VideoPlayer render <audio>/<video> here (no play()
+    // is invoked in these tests, but mounting still exercises the elements).
+    window.HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined)
+    window.HTMLMediaElement.prototype.pause = vi.fn()
+  })
+
   it('renders a labeled divider per section using SERVICE_SECTION_LABELS', () => {
     const sections: AssembledSection[] = [
       { section: 'worship', label: 'Worship', slides: [copyrightSlide('a'), lyricSlide('b')] },
@@ -159,6 +167,33 @@ describe('SlideshowPreview', () => {
     const wrapper = mount(SlideshowPreview, { props: { sections } })
 
     expect(wrapper.find('[data-testid="preview-empty-state"]').exists()).toBe(true)
+  })
+
+  it('renders an AudioPlayer for a slide with audioUrl and a VideoPlayer for a slide with videoUrl, and neither for a slide with no media', () => {
+    const audioSlide = textSlide('audio-slide')
+    audioSlide.slide.audioUrl = 'https://example.com/track.mp3'
+    const videoSlide = imageSlide('video-slide')
+    videoSlide.slide.videoUrl = 'https://example.com/clip.mp4'
+    const plainSlide = textSlide('plain-slide')
+
+    const sections: AssembledSection[] = [
+      { section: 'message', label: 'Message', slides: [audioSlide, videoSlide, plainSlide] },
+    ]
+    const wrapper = mount(SlideshowPreview, { props: { sections } })
+
+    const audioWrappers = wrapper.findAll('[data-testid="preview-slide-audio"]')
+    const videoWrappers = wrapper.findAll('[data-testid="preview-slide-video"]')
+    expect(audioWrappers).toHaveLength(1)
+    expect(videoWrappers).toHaveLength(1)
+    expect(audioWrappers[0]?.find('audio').attributes('src')).toBe('https://example.com/track.mp3')
+    expect(videoWrappers[0]?.find('video').attributes('src')).toBe('https://example.com/clip.mp4')
+
+    // The plain slide's card still renders its text content, with no player wrapper.
+    const cards = wrapper.findAll('[data-testid="preview-slide"]')
+    const plainCard = cards[2]
+    expect(plainCard?.find('[data-testid="preview-slide-audio"]').exists()).toBe(false)
+    expect(plainCard?.find('[data-testid="preview-slide-video"]').exists()).toBe(false)
+    expect(plainCard?.text()).toContain('Message')
   })
 
   it('imports no Pinia store', async () => {

@@ -70,6 +70,15 @@
               </p>
               <p class="text-sm text-gray-200 whitespace-pre-line">{{ (assembled.slide as TextSlide).body }}</p>
             </template>
+
+            <!-- Attached media (Phase 22, R013/R014) — rendered below the slide's
+                 own content, and only when the assembled slide carries a URL. -->
+            <div v-if="assembled.slide.videoUrl" data-testid="preview-slide-video" class="mt-2">
+              <VideoPlayer :src="assembled.slide.videoUrl" />
+            </div>
+            <div v-if="assembled.slide.audioUrl" data-testid="preview-slide-audio" class="mt-2">
+              <AudioPlayer :src="assembled.slide.audioUrl" />
+            </div>
           </div>
         </div>
       </template>
@@ -97,6 +106,8 @@ import type {
   TextSlide,
   ImageSlide,
 } from '@/types/slide'
+import AudioPlayer from './AudioPlayer.vue'
+import VideoPlayer from './VideoPlayer.vue'
 
 const props = defineProps<{
   sections: AssembledSection[]
