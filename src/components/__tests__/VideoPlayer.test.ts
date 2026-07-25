@@ -67,4 +67,115 @@ describe('VideoPlayer', () => {
 
     expect(wrapper.emitted('ended')).toBeTruthy()
   })
+
+  it('default (no chromeless prop) mount still has the controls attribute', () => {
+    const wrapper = mount(VideoPlayer, { props: { src: 'https://example.com/clip.mp4' } })
+
+    expect(wrapper.find('video').attributes('controls')).toBeDefined()
+  })
+
+  it('chromeless: true mount has no controls attribute', () => {
+    const wrapper = mount(VideoPlayer, {
+      props: { src: 'https://example.com/clip.mp4', chromeless: true },
+    })
+
+    expect(wrapper.find('video').attributes('controls')).toBeUndefined()
+  })
+
+  it('chromeless: true video class contains max-h-[80vh] and not max-h-48', () => {
+    const wrapper = mount(VideoPlayer, {
+      props: { src: 'https://example.com/clip.mp4', chromeless: true },
+    })
+
+    const video = wrapper.find('video')
+    expect(video.classes()).toContain('max-h-[80vh]')
+    expect(video.classes()).not.toContain('max-h-48')
+  })
+
+  it('chromeless: true wrapper class does not contain the panel classes', () => {
+    const wrapper = mount(VideoPlayer, {
+      props: { src: 'https://example.com/clip.mp4', chromeless: true },
+    })
+
+    const panel = wrapper.find('[data-testid="video-player"]')
+    expect(panel.classes()).not.toContain('bg-gray-800/60')
+  })
+
+  it('exposes isMuted true after a muted retry SUCCEEDS', async () => {
+    window.HTMLMediaElement.prototype.play = vi
+      .fn()
+      .mockRejectedValueOnce(new DOMException('blocked', 'NotAllowedError'))
+      .mockResolvedValueOnce(undefined)
+    const wrapper = mount(VideoPlayer, { props: { src: 'https://example.com/clip.mp4' } })
+
+    await (wrapper.vm as unknown as { play: () => Promise<void> }).play()
+    await wrapper.vm.$nextTick()
+
+    expect((wrapper.vm as unknown as { isMuted: boolean }).isMuted).toBe(true)
+    expect((wrapper.find('video').element as HTMLVideoElement).muted).toBe(true)
+  })
+
+  it('exposes isMuted false after both play attempts FAIL (hard block)', async () => {
+    window.HTMLMediaElement.prototype.play = vi
+      .fn()
+      .mockRejectedValue(new DOMException('blocked', 'NotAllowedError'))
+    const wrapper = mount(VideoPlayer, { props: { src: 'https://example.com/clip.mp4' } })
+
+    await (wrapper.vm as unknown as { play: () => Promise<void> }).play()
+    await wrapper.vm.$nextTick()
+
+    expect((wrapper.vm as unknown as { isMuted: boolean }).isMuted).toBe(false)
+  })
+
+  it('unmute() clears the muted flag and re-plays when play() resolves', async () => {
+    window.HTMLMediaElement.prototype.play = vi
+      .fn()
+      .mockRejectedValueOnce(new DOMException('blocked', 'NotAllowedError'))
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+    const wrapper = mount(VideoPlayer, { props: { src: 'https://example.com/clip.mp4' } })
+
+    await (wrapper.vm as unknown as { play: () => Promise<void> }).play()
+    await wrapper.vm.$nextTick()
+    expect((wrapper.vm as unknown as { isMuted: boolean }).isMuted).toBe(true)
+
+    await (wrapper.vm as unknown as { unmute: () => Promise<void> }).unmute()
+    await wrapper.vm.$nextTick()
+
+    expect((wrapper.vm as unknown as { isMuted: boolean }).isMuted).toBe(false)
+  })
+
+  it('unmute() re-blocks and re-emits autoplay-blocked when the re-attempt rejects with NotAllowedError', async () => {
+    window.HTMLMediaElement.prototype.play = vi
+      .fn()
+      .mockRejectedValueOnce(new DOMException('blocked', 'NotAllowedError'))
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new DOMException('blocked', 'NotAllowedError'))
+    const wrapper = mount(VideoPlayer, { props: { src: 'https://example.com/clip.mp4' } })
+
+    await (wrapper.vm as unknown as { play: () => Promise<void> }).play()
+    await wrapper.vm.$nextTick()
+    expect((wrapper.vm as unknown as { isMuted: boolean }).isMuted).toBe(true)
+
+    await (wrapper.vm as unknown as { unmute: () => Promise<void> }).unmute()
+    await wrapper.vm.$nextTick()
+
+    expect((wrapper.vm as unknown as { isMuted: boolean }).isMuted).toBe(true)
+    expect(wrapper.emitted('autoplay-blocked')?.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('chromeless: true with a hard block emits autoplay-blocked but not video-play-affordance', async () => {
+    window.HTMLMediaElement.prototype.play = vi
+      .fn()
+      .mockRejectedValue(new DOMException('blocked', 'NotAllowedError'))
+    const wrapper = mount(VideoPlayer, {
+      props: { src: 'https://example.com/clip.mp4', chromeless: true },
+    })
+
+    await (wrapper.vm as unknown as { play: () => Promise<void> }).play()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.emitted('autoplay-blocked')).toBeTruthy()
+    expect(wrapper.find('[data-testid="video-play-affordance"]').exists()).toBe(false)
+  })
 })
