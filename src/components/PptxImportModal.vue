@@ -312,14 +312,16 @@ async function importPptx(file: File) {
           position,
           contentKind: 'image',
           imageUrl,
-          altText: rawSlide.altText,
+          // Firestore rejects `undefined` field values, so only include altText when present.
+          ...(rawSlide.altText !== undefined && { altText: rawSlide.altText }),
         })
       } else {
         mapped.push({
           id: crypto.randomUUID(),
           position,
           contentKind: 'text',
-          title: rawSlide.title,
+          // Firestore rejects `undefined` field values, so only include title when present.
+          ...(rawSlide.title !== undefined && { title: rawSlide.title }),
           body: rawSlide.body,
         })
       }

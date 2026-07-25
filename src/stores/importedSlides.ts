@@ -13,6 +13,7 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore'
 import { db } from '@/firebase'
+import { stripUndefined } from '@/utils/stripUndefined'
 import type { ImportedDeck } from '@/types/importedDeck'
 
 /**
@@ -58,7 +59,8 @@ export const useImportedSlides = defineStore('importedSlides', () => {
     const docRef = await addDoc(
       collection(db, 'organizations', orgId, 'importedSlides'),
       {
-        ...data,
+        // stripUndefined: Firestore rejects any `undefined` field (e.g. title-less slides).
+        ...stripUndefined(data),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       },
@@ -74,7 +76,9 @@ export const useImportedSlides = defineStore('importedSlides', () => {
     await updateDoc(
       doc(db, 'organizations', orgId, 'importedSlides', importId),
       {
-        ...data,
+        // stripUndefined: guards the edit path (ImportedSlideEditor) from the same
+        // "Unsupported field value: undefined" Firestore rejection as the import path.
+        ...stripUndefined(data),
         updatedAt: serverTimestamp(),
       },
     )
