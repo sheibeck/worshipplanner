@@ -32,6 +32,14 @@ that Phases 25–27 build on. The `ui-plan-gate` correctly reports `frontend: fa
 <decisions>
 ## Implementation Decisions
 
+- **D-01 — `ServiceSlot` gets a stable `id`** Add `id: string` to every `ServiceSlot` variant, lazily backfilled on read; slide groups anchor to `slotId` rather than to `position` or a content key. Locked.
+- **D-02 — Materialize group structure; keep text a live reference** The group (which slides exist, their order, audio, labels, notes) is persisted per service; song and scripture TEXT is never copied and continues to resolve live from the canonical record. Locked.
+- **D-03 — Deleting a plan item deletes its slide group, behind a confirm** No orphans and no unanchored bucket; the delete is gated by a warning naming what will be lost. Locked.
+- **D-04 — Audio precedence: slide beats group** Per-slide audio overrides the group bed for that slide and the bed resumes afterwards; `loop` is a per-slide flag only. Claude's discretion, stated.
+- **D-05 — Phase 22 media migrates lazily** Slot `audioUrl`/`videoUrl` move onto the group bed on read, idempotently; the legacy fields stay readable but deprecated. Claude's discretion, stated.
+
+The full rationale for each follows.
+
 ### D-01 — `ServiceSlot` gets a stable `id` *(locked)*
 
 Add `id: string` to `ServiceSlot`, lazily backfilled when an existing service is read. Slide groups

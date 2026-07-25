@@ -169,11 +169,25 @@ audio are independent of it.
 **Plans:** 6 plans
 
 Plans:
+**Wave 1**
+
 - [ ] 24-01-PLAN.md — Slot identity (`ServiceSlot.id`, backfill) and the slide-group type contract
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 24-02-PLAN.md — `slideGroups` Pinia store: deterministic-id CRUD, atomic D-05 media migration
 - [ ] 24-03-PLAN.md — Pure materializer: derive-from-source plus kind-specific reconciliation
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 24-04-PLAN.md — Assembler reads stored groups; two-level audio precedence, bed and loop
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 24-05-PLAN.md — Composable wiring: subscribe, lazy materialize/migrate, zero writes on reorder
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
 - [ ] 24-06-PLAN.md — ServiceEditorView: id backfill, R029 delete cascade + warning, bed-targeted media
 
 ### Phase 25: Slides Tab Shell — Plan Rail and Slide Grid `risk:medium`
