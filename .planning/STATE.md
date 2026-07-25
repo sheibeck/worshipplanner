@@ -48,6 +48,18 @@ human-verify checkpoint (section grouping, live reorder-follows-slides, scriptur
 marker) was deferred by the user to a batch visual-verify at milestone end. Autonomous
 continued to Phase 21 per explicit user choice (2026-07-24).
 
+## Deferred UI Follow-up (post-milestone — user request 2026-07-25)
+
+A dedicated UI polish phase is planned AFTER v1.2 feature work completes. Captured items:
+- **SlideshowPreview should be its own TAB** in the service editor screen (currently pushed to
+  the bottom of the service page — move it into a tab, like the Music/Roles tab bar).
+- **Empty sections not visible:** the Pre-Service section doesn't render because it has no
+  elements — decide whether to show empty section headers/placeholders so all four sections
+  (Pre-Service/Worship/Message/Sending) are always visible.
+- General editor UX polish pass (R018) once all content types (lyrics/scripture/PPTX/media/preview) exist.
+
+Do NOT action during current milestone build — revisit as a follow-up UI phase (Phase 24 candidate).
+
 ## Milestone v1.2 Decisions (from gsdpi DECISIONS.md D001-D006)
 
 - **D001** (architecture): Unified slide data model — single slide type with content-kind field (lyric, scripture, image, video, text) rather than distinct types per content. Simpler editor/reordering/mental model.
