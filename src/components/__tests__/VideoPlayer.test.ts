@@ -40,7 +40,9 @@ describe('VideoPlayer', () => {
     await wrapper.vm.$nextTick()
 
     expect(playMock).toHaveBeenCalledTimes(2)
-    expect(wrapper.find('video').attributes('muted')).toBeDefined()
+    // Vue sets `muted` as a DOM property (not a reflected attribute) on media
+    // elements, so assert against the element's IDL property.
+    expect((wrapper.find('video').element as HTMLVideoElement).muted).toBe(true)
     expect(wrapper.emitted('autoplay-blocked')).toBeTruthy()
     expect(wrapper.find('[data-testid="video-play-affordance"]').exists()).toBe(false)
   })
