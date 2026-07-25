@@ -5,14 +5,14 @@ milestone_name: Worship Service Slide Management
 current_phase: 22
 current_phase_name: Media Attachments and Storage Lifecycle
 status: executing
-stopped_at: Completed 22-01-PLAN.md
-last_updated: "2026-07-25T16:46:48.466Z"
+stopped_at: Completed 22-02-PLAN.md
+last_updated: "2026-07-25T17:02:13.624Z"
 last_activity: 2026-07-25
 progress:
   total_phases: 18
   completed_phases: 15
   total_plans: 94
-  completed_plans: 91
+  completed_plans: 92
   percent: 83
 last_activity_desc: Migrated gsdpi milestone M001 into gsd-core as v1.2 (Phases 18-23)
 ---
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 22 (Media Attachments and Storage Lifecycle) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Milestone: v1.2 Worship Service Slide Management (Phases 18-23) — IN PROGRESS
 Status: Ready to execute
 
@@ -69,6 +69,7 @@ A dedicated UI polish phase is planned AFTER v1.2 feature work completes. Captur
 - General editor UX polish pass (R018) once all content types (lyrics/scripture/PPTX/media/preview) exist.
 
 **Additional UI-phase notes (user, 2026-07-25, from live testing):**
+
 - **All slide editing lives in a "Slides" tab** on the service plan (not scattered / bottom-of-page).
 - **Collapsible preview items** to cut scrolling: after importing a PowerPoint, show it in the Slides tab as a **parent node with the slide title**, minimizable; expanding reveals slide content.
 - **Render formatted slides**, not just text — show the actual slide visuals/formatting in the preview (currently text-only).
@@ -149,6 +150,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 21 P05 | 25min | 3 tasks | 3 files |
 | Phase 21 P06 | 35min | 2 tasks | 3 files |
 | Phase 22 P01 | 25min | 3 tasks | 8 files |
+| Phase 22 P02 | 20min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -230,6 +232,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Media attaches at ServiceSlot level (not canonical song/scripture/deck), per D002
 - [Phase ?]: Assembler propagates slot media onto only the first emitted slide per slot via a Set<slotIndex> tracker
 - [Phase ?]: storage.rules media cap layered as an additive sibling match block (OR-across-matching-blocks semantics), not a rewrite
+- [Phase ?]: VideoPlayer autoplay-fallback: muted-retry success and muted-retry failure both emit 'autoplay-blocked'; driving layer distinguishes by element muted state, not a second event
+- [Phase ?]: Both AudioPlayer/VideoPlayer explicitly emit 'play' from inside play() on success (in addition to the native @play listener) so imperative callers get the signal even against jsdom media-element test doubles that don't dispatch native events
 
 ### Roadmap Evolution
 
@@ -287,6 +291,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-25
-Last session: 2026-07-25T16:46:48.431Z
-Stopped at: Completed 22-01-PLAN.md
+Last session: 2026-07-25T17:02:13.588Z
+Stopped at: Completed 22-02-PLAN.md
 Resume file: None
