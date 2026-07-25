@@ -4,7 +4,8 @@
 
 - ✅ **v1.0 MVP** — Phases 1-4, 6-7 (shipped 2026-03-05)
 - ✅ **v1.1** — Phases 8-17 (Planning Center, song catalog, volunteer scheduling)
-- 🔄 **v1.2 — Worship Service Slide Management** — Phases 18-23 (in progress; migrated from gsdpi M001 2026-07-24)
+- 🔄 **v1.2 — Worship Service Slide Management** — Phases 18-23 (code-complete; human-verify batch outstanding; migrated from gsdpi M001 2026-07-24)
+- 🔄 **v1.3 — Slides Tab Rework** — Phases 24-28 (in progress; separates slide editing from the service plan)
 
 ## v1.2 — Worship Service Slide Management (Phases 18-23)
 
@@ -121,6 +122,79 @@ Plans:
 **Wave 5** *(blocked on Wave 4 completion)*
 
 - [x] 23-05-PLAN.md — Blocking human-verify: real fullscreen, real autoplay, real expired media, projector legibility, overflow judgment calls (Wave 5)
+
+## v1.3 — Slides Tab Rework (Phases 24-28)
+
+> Opened 2026-07-25 while v1.2 is code-complete but its human-verify batch is still outstanding.
+> v1.2's phase directories and its `## Deferred Verification` ledger are deliberately NOT archived
+> yet — archiving would break the `/gsd-verify-work 20..23` resume paths. v1.2 gets formally
+> completed after the batch verification, which now covers v1.2 + v1.3 together.
+>
+> **Design source of truth:** `docs/design/slides-tab.dc.html` (Claude Design project
+> "Worship Planner Slideshow Design", `e8e6c287-3e88-402f-88e1-7ad6d5101fa2`). That single remote
+> file is cumulative and overwritten per turn — **re-pull before planning each phase.**
+> See `docs/design/README.md` for the turn map and the mockup-vs-instruction deltas.
+
+**Vision:** Slide editing stops being intermixed with the service plan. It moves to its own Slides
+tab that *mirrors* the order of service rather than duplicating it — so reordering a song once, on
+the Service Order tab, reorders its slides too. Slides become loosely coupled to the service:
+groups are owned by plan items (order + membership follow the plan), while slide content, media and
+audio are independent of it.
+
+**Milestone success criteria:**
+
+1. A leader edits every kind of slide from the Slides tab alone; no slide editing remains on the Service Order tab.
+2. Reordering or moving an element on the Service Order tab reorders its slide group with no second manual reorder.
+3. A slide deck, image, video or audio file can be attached at any point in the service, and an individual slide inside a deck can carry its own audio.
+4. Slides whose plan item disappears surface as orphaned/unanchored rather than vanishing silently.
+5. The song lyrics editor presents one scroll surface and one list that IS the slide order.
+
+**Locked decisions for this milestone (user, 2026-07-25):**
+
+- **D007** — Slide text is **read-only** in the Edit Slide drawer, with an "Edit in song" link to the song's Lyrics tab. Preserves D002 (single canonical lyric version; no per-service copies). The mockup's "editing here only affects this slide" caption is superseded.
+- **D008** — The group/slide audio model **replaces** Phase 22's slot-level media. Existing slot media migrates onto its group. Adds a per-slide scope toggle (this slide / whole group) and a loop-until-next-slide flag, neither of which Phase 22 had.
+- **D009** — The first tab is renamed **"Service Order"** (mockup still says "Music" — instruction wins) and reverts to its production behaviour at `origin/master` @ `9f3700f`.
+
+- [ ] Phase 24: Slide Group Model and Migration ← **active**
+- [ ] Phase 25: Slides Tab Shell — Plan Rail and Slide Grid
+- [ ] Phase 26: Edit Slide Drawer
+- [ ] Phase 27: Service Order Tab — Rename and Strip Slide Editing
+- [ ] Phase 28: Song Lyrics Editor Rework
+
+### Phase 24: Slide Group Model and Migration `risk:high`
+
+**Goal:** Introduce slide groups owned by service plan items — order and membership mirror the plan, while slide content, media and audio stay independent. Handle unanchored and orphaned groups. Replace Phase 22's slot-level media with group-level and per-slide audio (scope + loop). Migrate existing services without data loss.
+**Depends on:** Phase 20, Phase 22, Phase 23
+**Requirements:** R028, R029, R030, R018 (supporting)
+**Plans:** 0
+
+### Phase 25: Slides Tab Shell — Plan Rail and Slide Grid `risk:medium`
+
+**Goal:** Add the Slides tab: a service-plan rail that mirrors plan order (not draggable — reordering happens on Service Order), with kind badges, slide counts, group-music indicators and an UNANCHORED block for orphans; plus the slide grid for the selected group with cards, badges, labels, audio chips, a drop target for PPTX/images/video, and the group and page-level header actions.
+**Depends on:** Phase 24
+**Requirements:** R031, R032, R018 (supporting)
+**Plans:** 0
+
+### Phase 26: Edit Slide Drawer `risk:medium`
+
+**Goal:** Build the Edit Slide drawer in both states — closed, and open floating over the page with nothing underneath reflowing. Carries the slide preview, label, read-only slide text with an "Edit in song" link, slide audio with scope toggle and loop flag, operator-only notes, and delete.
+**Depends on:** Phase 25
+**Requirements:** R033, R018 (supporting)
+**Plans:** 0
+
+### Phase 27: Service Order Tab — Rename and Strip Slide Editing `risk:medium`
+
+**Goal:** Rename the Music tab to "Service Order" and remove every slide-editing surface added to it during Phases 18-23, returning it to its production behaviour at `origin/master` @ `9f3700f`. Slide editing then exists only on the Slides tab. Runs after 25-26 so the functionality has a new home before it leaves the old one.
+**Depends on:** Phase 25, Phase 26
+**Requirements:** R034, R018 (supporting)
+**Plans:** 0
+
+### Phase 28: Song Lyrics Editor Rework `risk:low`
+
+**Goal:** Rework the song lyrics editor so it presents one scroll surface and one list that IS the slide order — eliminating the nested scrollbar and the duplicated Available-Sections / Performance-Order lists from Phase 18. Design Turn 2 offers options 2a and 2b; exactly one is chosen at this phase's discuss step.
+**Depends on:** — (independent of 24-27; sequenced last)
+**Requirements:** R035, R018 (supporting)
+**Plans:** 0
 
 ## Phases
 

@@ -1,20 +1,20 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.2
-milestone_name: Worship Service Slide Management
-current_phase: 23
-current_phase_name: Presentation Preview Mode
-status: executing
-stopped_at: Completed 23-04-PLAN.md
-last_updated: "2026-07-25T19:25:47.550Z"
+milestone: v1.3
+milestone_name: Slides Tab Rework
+current_phase: 24
+current_phase_name: Slide Group Model and Migration
+status: planning
+stopped_at: v1.3 opened — Phases 24-28 added to ROADMAP, ready to plan Phase 24
+last_updated: "2026-07-25T19:30:00.000Z"
 last_activity: 2026-07-25
 progress:
-  total_phases: 18
-  completed_phases: 16
-  total_plans: 99
-  completed_plans: 98
-  percent: 89
-last_activity_desc: Phase 23 planned — research, validation strategy, pattern map, 5 plans (checker PASSED)
+  total_phases: 5
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
+last_activity_desc: Opened v1.3 Slides Tab Rework (Phases 24-28) from the Claude Design import; v1.2 left code-complete with its verification ledger intact
 ---
 
 # Project State
@@ -24,7 +24,14 @@ last_activity_desc: Phase 23 planned — research, validation strategy, pattern 
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 23 — Presentation Preview Mode
+**Current focus:** Phase 24 — Slide Group Model and Migration (v1.3 Slides Tab Rework)
+
+> **v1.2 → v1.3 handoff (2026-07-25).** v1.2 is code-complete (Phases 18-23, all plans committed)
+> but its human-verify batch is still outstanding. v1.2 was deliberately **not** archived: running
+> `/gsd-complete-milestone` would fire `phases.clear`, moving `.planning/phases/18-*..23-*` into
+> `milestones/v1.2-phases/` and breaking the `/gsd-verify-work 20..23` resume paths recorded below.
+> Only the STATE frontmatter was switched to v1.3 so the roadmap parser scopes to Phases 24-28.
+> The Deferred Verification table below still governs v1.2 and now covers v1.2 + v1.3 together.
 
 ## Current Position
 
