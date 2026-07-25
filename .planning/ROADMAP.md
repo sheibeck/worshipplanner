@@ -98,7 +98,7 @@ Plans:
 **Goal:** Open a full-screen preview of the complete service slideshow, advance through all slide types with media playback working, degrade gracefully when media is missing.
 **Depends on:** Phase 20, Phase 22
 **Requirements:** R016, R018 (supporting)
-**Status:** 📋 Planned (`23-01`..`23-05`). Next action: `/gsd-execute-phase 23`.
+**Status:** ⏭ Executed — code-complete, human-verify deferred to the milestone batch. All 5 plans committed; code review run (0 critical / 6 warning, all 6 fixed with regression tests); `type-check` 0, `build` 0, no source regressions. Next action: `/gsd-verify-work 23`.
 **Plans:** 5 plans (Waves 1→5, sequential main-tree build — no worktree isolation)
 
 Plans:
