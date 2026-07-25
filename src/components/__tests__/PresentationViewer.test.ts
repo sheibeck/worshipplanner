@@ -595,6 +595,64 @@ describe('PresentationViewer', () => {
       expect(lastPlayIdx).toBeGreaterThan(lastPauseIdx)
     })
 
+    // Regression test for WR-01 (see IN-02): a realistic test double whose
+    // play() returns a promise that stays pending until either (a) the
+    // element's pause() is called on it before it settles — which rejects it
+    // with an AbortError, matching real browser behavior for "the play()
+    // request was interrupted by a call to pause()" — or (b) the test lets it
+    // resolve explicitly. Unlike the always-synchronously-resolving mocks
+    // used elsewhere in this suite, this reproduces the actual race WR-01
+    // fixes: pauseCurrentMedia() (called at the top of every goToIndex())
+    // pausing the OUTGOING slide's element while its play() is still pending.
+    function createInterruptiblePlayPause() {
+      const pendingRejectors = new Map<HTMLMediaElement, (err: unknown) => void>()
+      const play = vi.fn(function (this: HTMLMediaElement) {
+        return new Promise<void>((_resolve, reject) => {
+          pendingRejectors.set(this, reject)
+        })
+      })
+      const pause = vi.fn(function (this: HTMLMediaElement) {
+        const reject = pendingRejectors.get(this)
+        if (reject) {
+          pendingRejectors.delete(this)
+          reject(new DOMException('The play() request was interrupted by a call to pause().', 'AbortError'))
+        }
+      })
+      return { play, pause }
+    }
+
+    it('pause()-interrupting a still-pending play() during rapid navigation never surfaces as an unhandled rejection (WR-01)', async () => {
+      const { play, pause } = createInterruptiblePlayPause()
+      window.HTMLMediaElement.prototype.play = play
+      window.HTMLMediaElement.prototype.pause = pause
+
+      const unhandledRejections: unknown[] = []
+      const onUnhandledRejection = (reason: unknown) => {
+        unhandledRejections.push(reason)
+      }
+      process.on('unhandledRejection', onUnhandledRejection)
+
+      try {
+        const slides = [
+          videoSlide('v1', 'https://example.com/clip1.mp4'),
+          videoSlide('v2', 'https://example.com/clip2.mp4'),
+        ]
+        mount(PresentationViewer, { props: { slides } })
+        await flushPromises()
+
+        // Rapid navigation: the first slide's play() is still pending (our
+        // double never auto-resolves) when goToIndex() calls pause() on it.
+        await body().find('[data-testid="presentation-next"]').trigger('click')
+        await flushPromises()
+        // Give Node's microtask queue a turn to flag any unhandled rejection.
+        await new Promise((resolve) => setTimeout(resolve, 0))
+
+        expect(unhandledRejections).toHaveLength(0)
+      } finally {
+        process.off('unhandledRejection', onUnhandledRejection)
+      }
+    })
+
     it('advancing from a media-carrying slide onto a sibling with no media calls pause and issues no further play', async () => {
       const calls: string[] = []
       window.HTMLMediaElement.prototype.play = vi.fn().mockImplementation(function playImpl() {

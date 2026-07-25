@@ -73,6 +73,15 @@ describe('AudioPlayer', () => {
     expect(panel.classes()).not.toContain('p-2')
   })
 
+  it('play() resolves silently (no throw, no autoplay-blocked) when the underlying play() rejects with AbortError (pause-interrupted, WR-01)', async () => {
+    window.HTMLMediaElement.prototype.play = vi.fn().mockRejectedValue(new DOMException('interrupted', 'AbortError'))
+    const wrapper = mount(AudioPlayer, { props: { src: 'https://example.com/song.mp3' } })
+
+    await expect((wrapper.vm as unknown as { play: () => Promise<void> }).play()).resolves.toBeUndefined()
+    expect(wrapper.emitted('autoplay-blocked')).toBeFalsy()
+    expect(wrapper.find('[data-testid="audio-play-affordance"]').exists()).toBe(false)
+  })
+
   it('chromeless: true suppresses the internal play affordance on autoplay-blocked, default renders it', async () => {
     window.HTMLMediaElement.prototype.play = vi
       .fn()

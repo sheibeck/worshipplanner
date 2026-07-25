@@ -74,8 +74,19 @@ function onError(event: Event): void {
   emit('error', event)
 }
 
-function isNotAllowedError(err: unknown): boolean {
-  return err instanceof DOMException && err.name === 'NotAllowedError'
+/**
+ * `NotAllowedError` (autoplay policy) and `AbortError` (the play() request
+ * was interrupted by a same-element `pause()` call, per the HTML media spec
+ * — see WR-01) are both expected, silent outcomes here: the presentation
+ * driver calls `pauseCurrentMedia()` at the start of every navigation, which
+ * can legitimately race a still-pending `play()` on this exact element.
+ */
+function isExpectedPlaybackRejection(err: unknown): boolean {
+  return err instanceof DOMException && (err.name === 'NotAllowedError' || err.name === 'AbortError')
+}
+
+function isAbortError(err: unknown): boolean {
+  return err instanceof DOMException && err.name === 'AbortError'
 }
 
 async function play(): Promise<void> {
@@ -90,11 +101,14 @@ async function play(): Promise<void> {
     emit('play')
     return
   } catch (err) {
-    if (!isNotAllowedError(err)) throw err
+    if (!isExpectedPlaybackRejection(err)) throw err
+    // Interrupted by pause() — the driver is tearing this instance down
+    // (navigation/exit/unmount); no retry, no affordance, resolve silently.
+    if (isAbortError(err)) return
   }
 
-  // First rejection: retry once muted, since browsers generally permit muted
-  // autoplay even when unmuted playback is blocked.
+  // First rejection was NotAllowedError: retry once muted, since browsers
+  // generally permit muted autoplay even when unmuted playback is blocked.
   muted.value = true
   try {
     await el.play()
@@ -102,7 +116,8 @@ async function play(): Promise<void> {
     // the driving layer (Phase 23) can show a "tap to unmute" affordance.
     emit('autoplay-blocked')
   } catch (err) {
-    if (!isNotAllowedError(err)) throw err
+    if (!isExpectedPlaybackRejection(err)) throw err
+    if (isAbortError(err)) return
     // Both attempts failed — nothing is playing. Clear the muted flag so this
     // is the discriminator between "muted retry succeeded" (muted stays true,
     // silently playing) and "hard block" (muted false, nothing playing), and
@@ -133,7 +148,8 @@ async function unmute(): Promise<void> {
   try {
     await videoEl.value?.play()
   } catch (err) {
-    if (!isNotAllowedError(err)) throw err
+    if (!isExpectedPlaybackRejection(err)) throw err
+    if (isAbortError(err)) return
     muted.value = true
     emit('autoplay-blocked')
   }

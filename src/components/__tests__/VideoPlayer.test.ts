@@ -164,6 +164,26 @@ describe('VideoPlayer', () => {
     expect(wrapper.emitted('autoplay-blocked')?.length).toBeGreaterThanOrEqual(2)
   })
 
+  it('play() resolves silently (no throw, no autoplay-blocked) when the underlying play() rejects with AbortError (pause-interrupted, WR-01)', async () => {
+    window.HTMLMediaElement.prototype.play = vi.fn().mockRejectedValue(new DOMException('interrupted', 'AbortError'))
+    const wrapper = mount(VideoPlayer, { props: { src: 'https://example.com/clip.mp4' } })
+
+    await expect((wrapper.vm as unknown as { play: () => Promise<void> }).play()).resolves.toBeUndefined()
+    expect(wrapper.emitted('autoplay-blocked')).toBeFalsy()
+    expect(wrapper.find('[data-testid="video-play-affordance"]').exists()).toBe(false)
+  })
+
+  it('play() resolves silently when the MUTED-RETRY play() rejects with AbortError (WR-01)', async () => {
+    window.HTMLMediaElement.prototype.play = vi
+      .fn()
+      .mockRejectedValueOnce(new DOMException('blocked', 'NotAllowedError'))
+      .mockRejectedValueOnce(new DOMException('interrupted', 'AbortError'))
+    const wrapper = mount(VideoPlayer, { props: { src: 'https://example.com/clip.mp4' } })
+
+    await expect((wrapper.vm as unknown as { play: () => Promise<void> }).play()).resolves.toBeUndefined()
+    expect(wrapper.find('[data-testid="video-play-affordance"]').exists()).toBe(false)
+  })
+
   it('chromeless: true with a hard block emits autoplay-blocked but not video-play-affordance', async () => {
     window.HTMLMediaElement.prototype.play = vi
       .fn()
