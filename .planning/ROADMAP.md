@@ -74,7 +74,7 @@ Plans:
 Plans:
 
 - [x] 21-01-PLAN.md — Slide/slot type model + importedSlides store + IMPORTED assembly & preview (Wave 1)
-- [ ] 21-02-PLAN.md — Firebase Storage + callable Functions bootstrap + org-scoped storage.rules (Wave 1)
+- [x] 21-02-PLAN.md — Firebase Storage + callable Functions bootstrap + org-scoped storage.rules (Wave 1)
 - [ ] 21-03-PLAN.md — functions/ Vitest infra + fixtures + gated officeparser install (Wave 1)
 - [ ] 21-04-PLAN.md — parsePptx onCall Cloud Function + mapAstToSlides mapping (Wave 2)
 - [ ] 21-05-PLAN.md — Client upload util + step-based PptxImportModal (Wave 3)

@@ -5,14 +5,14 @@ milestone_name: Worship Service Slide Management
 current_phase: 21
 current_phase_name: PowerPoint Import for Announcements and Sermon
 status: executing
-stopped_at: Completed 21-01-PLAN.md
-last_updated: "2026-07-25T03:39:43.765Z"
-last_activity: 2026-07-24
+stopped_at: Completed 21-02-PLAN.md
+last_updated: "2026-07-25T04:02:12.372Z"
+last_activity: 2026-07-25
 progress:
   total_phases: 18
   completed_phases: 14
   total_plans: 90
-  completed_plans: 85
+  completed_plans: 86
   percent: 78
 last_activity_desc: Migrated gsdpi milestone M001 into gsd-core as v1.2 (Phases 18-23)
 ---
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 21 (PowerPoint Import for Announcements and Sermon) — EXECUTING
-Plan: 2 of 6
+Plan: 3 of 6
 Milestone: v1.2 Worship Service Slide Management (Phases 18-23) — IN PROGRESS
 Status: Ready to execute
 
@@ -115,6 +115,7 @@ continued to Phase 21 per explicit user choice (2026-07-24).
 | Phase 20 P03 | 33min | 1 tasks | 2 files |
 | Phase 20 P04 | 40min | 3 tasks | 5 files |
 | Phase 21 P01 | 25min | 3 tasks | 10 files |
+| Phase 21 P02 | 55min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -184,6 +185,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: [Phase 20-04]: Section headers render as sibling divs in the same flat SortableJS list; Sortable's draggable: '.slot-item' option scopes drag/index math to slot items only, keeping onEnd/reindexSlots (MEM008) untouched
 - [Phase ?]: [Phase 20-04]: Per-slot section select mutates slot.section directly, routed through the existing deep-watch(localService) autosave path used by every other slot field — no new persistence path
 - [Phase ?]: IMPORTED slot mirrors SCRIPTURE exactly (deck-by-id, forEach-emit, tolerate null/unresolved id)
+- [Phase ?]: storage.rules uses generic orgs/{orgId} path (not PPTX-specific) so Phase 22 media attachments reuse the same rule
+- [Phase ?]: Removed firebase.json emulators.singleProjectMode:false; pinned --project test-project on test:rules instead, fixing cross-service firestore.exists() checks in storage.rules under the emulator
 
 ### Roadmap Evolution
 
@@ -240,7 +243,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 
 ## Session Continuity
 
-Last activity: 2026-07-24
-Last session: 2026-07-25T03:39:43.729Z
-Stopped at: Completed 21-01-PLAN.md
+Last activity: 2026-07-25
+Last session: 2026-07-25T04:02:12.339Z
+Stopped at: Completed 21-02-PLAN.md
 Resume file: None
