@@ -1,7 +1,10 @@
-import { onRequest } from "firebase-functions/v2/https";
+import { onCall, onRequest, HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
+import { getFirestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
+import { parsePptxBuffer, type MappedSlide } from "./pptxParser";
 
 // Server-held secrets (Google Secret Manager). Set once with:
 //   firebase functions:secrets:set CLAUDE_API_KEY
@@ -120,4 +123,79 @@ export const api = onRequest(
       res.status(502).json({ error: "Upstream request failed" });
     }
   },
+);
+
+interface ParsePptxRequestData {
+  orgId?: string;
+  importId?: string;
+  storagePath?: string;
+}
+
+/**
+ * The parsePptx handler body, exported separately from the `onCall` wrapper
+ * so tests can invoke it directly with a fake CallableRequest without needing
+ * the full Firebase Functions test harness.
+ *
+ * Security contract (21-04 threat model T-21-04-01/T-21-04-04):
+ * - Requires Firebase Auth (request.auth).
+ * - storagePath must be prefixed with the caller-claimed orgs/{orgId}/pptx-imports/.
+ * - request.auth.uid's org membership is independently re-verified via a
+ *   Firestore read (organizations/{orgId}/members/{uid}) -- the client-declared
+ *   orgId is never trusted alone, matching firestore.rules' isOrgMember pattern.
+ * - Returns Storage PATHS for extracted images (never signed URLs); the client
+ *   resolves getDownloadURL() under storage.rules' org gate.
+ * - On any parse failure, throws a friendly HttpsError and never deletes the
+ *   source object at storagePath -- this function never issues a delete call
+ *   at all, on any path (CONTEXT D004 / 21-RESEARCH.md Pitfall 5).
+ */
+export async function parsePptxHandler(
+  request: CallableRequest<ParsePptxRequestData>,
+): Promise<{ slides: MappedSlide[] }> {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Sign in required.");
+  }
+
+  const { orgId, importId, storagePath } = request.data ?? {};
+  if (!orgId || !importId || !storagePath) {
+    throw new HttpsError(
+      "invalid-argument",
+      "orgId, importId, and storagePath are all required.",
+    );
+  }
+
+  // Defense in depth: the storage path must live under this org's own prefix.
+  if (!storagePath.startsWith(`orgs/${orgId}/pptx-imports/`)) {
+    throw new HttpsError("permission-denied", "Invalid storage path for this organization.");
+  }
+
+  // Independent org-membership check -- never trust the client-declared orgId
+  // alone, even though storage.rules also enforces this at the Storage layer.
+  const memberDoc = await getFirestore()
+    .collection("organizations")
+    .doc(orgId)
+    .collection("members")
+    .doc(request.auth.uid)
+    .get();
+  if (!memberDoc.exists) {
+    throw new HttpsError("permission-denied", "You are not a member of this organization.");
+  }
+
+  try {
+    const bucket = getStorage().bucket();
+    const [buffer] = await bucket.file(storagePath).download();
+    const slides = await parsePptxBuffer(buffer, orgId, importId);
+    return { slides };
+  } catch (err) {
+    console.error("parsePptx failed:", err);
+    throw new HttpsError(
+      "invalid-argument",
+      "We couldn't read this file — try re-exporting from PowerPoint.",
+    );
+    // storagePath is never deleted here, on this or any other path.
+  }
+}
+
+export const parsePptx = onCall(
+  { memory: "1GiB", timeoutSeconds: 120 },
+  parsePptxHandler,
 );

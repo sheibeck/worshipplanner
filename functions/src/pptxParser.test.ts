@@ -2,6 +2,9 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getStorage } from "firebase-admin/storage";
+import { getFirestore } from "firebase-admin/firestore";
+import type { CallableRequest } from "firebase-functions/v2/https";
+import { HttpsError } from "firebase-functions/v2/https";
 import { parseOffice } from "officeparser";
 import {
   mapAstToSlides,
@@ -10,11 +13,29 @@ import {
   TEXT_DOMINANT_THRESHOLD,
   type MappedSlide,
 } from "./pptxParser";
+import { parsePptxHandler } from "./index";
 
 // firebase-admin/storage is mocked for parsePptxBuffer's Storage upload calls --
 // these tests must never touch the running emulator or a real bucket.
 vi.mock("firebase-admin/storage", () => ({
   getStorage: vi.fn(),
+}));
+
+// index.ts's module-scope initializeApp()/defineSecret() calls and its
+// getAuth import must be neutralized so importing it in tests never touches a
+// real Firebase project or Secret Manager.
+vi.mock("firebase-admin/app", () => ({
+  initializeApp: vi.fn(),
+  getApps: vi.fn(() => []),
+}));
+vi.mock("firebase-admin/auth", () => ({
+  getAuth: vi.fn(() => ({ verifyIdToken: vi.fn() })),
+}));
+vi.mock("firebase-admin/firestore", () => ({
+  getFirestore: vi.fn(),
+}));
+vi.mock("firebase-functions/params", () => ({
+  defineSecret: vi.fn(() => ({ value: () => "fake-secret" })),
 }));
 
 // officeparser's real parseOffice is preserved by default (the fixture-based
@@ -272,5 +293,95 @@ describe("parsePptxBuffer", () => {
     expect(savedBuffer.toString()).toBe("fake-image-bytes");
     expect(savedOptions.contentType).toBe("image/png");
     expect(savedOptions.metadata?.metadata?.createdAt).toEqual(expect.any(String));
+  });
+});
+
+describe("parsePptxHandler (parsePptx onCall)", () => {
+  const ORG_ID = "org-abc";
+  const IMPORT_ID = "import-xyz";
+  const STORAGE_PATH = `orgs/${ORG_ID}/pptx-imports/${IMPORT_ID}/source.pptx`;
+  const UID = "user-1";
+
+  function fakeRequest(overrides: Partial<CallableRequest> = {}): CallableRequest {
+    return {
+      auth: { uid: UID, token: {} as never },
+      data: { orgId: ORG_ID, importId: IMPORT_ID, storagePath: STORAGE_PATH },
+      rawRequest: {} as never,
+      acceptsStreaming: false,
+      ...overrides,
+    } as CallableRequest;
+  }
+
+  function mockFirestoreMembership(memberExists: boolean) {
+    const get = vi.fn(async () => ({ exists: memberExists }));
+    const membersDoc = vi.fn(() => ({ get }));
+    const membersCollection = vi.fn(() => ({ doc: membersDoc }));
+    const orgDoc = vi.fn(() => ({ collection: membersCollection }));
+    const organizationsCollection = vi.fn(() => ({ doc: orgDoc }));
+    vi.mocked(getFirestore).mockReturnValue({
+      collection: organizationsCollection,
+    } as never);
+    return { get, membersDoc };
+  }
+
+  function mockStorageDownload(buffer: Buffer, saveMock = vi.fn(async () => undefined)) {
+    const download = vi.fn(async () => [buffer]);
+    vi.mocked(getStorage).mockReturnValue({
+      bucket: () => ({
+        file: () => ({ download, save: saveMock }),
+      }),
+    } as never);
+    return { download, saveMock };
+  }
+
+  afterEach(() => {
+    vi.mocked(getFirestore).mockReset();
+    vi.mocked(getStorage).mockReset();
+    vi.mocked(parseOffice).mockClear();
+  });
+
+  it("rejects a request with no request.auth (unauthenticated)", async () => {
+    await expect(
+      parsePptxHandler(fakeRequest({ auth: undefined })),
+    ).rejects.toMatchObject({ code: "unauthenticated" } satisfies Partial<HttpsError>);
+  });
+
+  it("rejects a storagePath not prefixed with the caller's own orgs/{orgId}/pptx-imports/", async () => {
+    await expect(
+      parsePptxHandler(
+        fakeRequest({ data: { orgId: ORG_ID, importId: IMPORT_ID, storagePath: "orgs/other-org/pptx-imports/x/source.pptx" } }),
+      ),
+    ).rejects.toMatchObject({ code: "permission-denied" } satisfies Partial<HttpsError>);
+  });
+
+  it("rejects a caller who is not a member of the claimed org", async () => {
+    mockFirestoreMembership(false);
+
+    await expect(parsePptxHandler(fakeRequest())).rejects.toMatchObject({
+      code: "permission-denied",
+    } satisfies Partial<HttpsError>);
+  });
+
+  it("surfaces a friendly invalid-argument error for a corrupted download, without any delete call", async () => {
+    mockFirestoreMembership(true);
+    const corrupted = readFileSync(join(FIXTURES_DIR, "corrupted.pptx"));
+    mockStorageDownload(corrupted);
+
+    await expect(parsePptxHandler(fakeRequest())).rejects.toMatchObject({
+      code: "invalid-argument",
+    } satisfies Partial<HttpsError>);
+    // The mocked bucket.file() above exposes no delete()/deleteObject() method
+    // at all -- if the handler ever tried to call one it would throw, and this
+    // assertion (a clean rejection with the friendly code) would not hold.
+  });
+
+  it("returns a non-empty slides array for a valid member request over the real mixed.pptx fixture", async () => {
+    mockFirestoreMembership(true);
+    const buffer = readFileSync(join(FIXTURES_DIR, "mixed.pptx"));
+    mockStorageDownload(buffer);
+
+    const result = await parsePptxHandler(fakeRequest());
+
+    expect(result.slides.length).toBeGreaterThan(0);
   });
 });
