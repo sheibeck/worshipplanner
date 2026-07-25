@@ -163,7 +163,7 @@ audio are independent of it.
 
 ### Phase 24: Slide Group Model and Migration `risk:high`
 
-**Goal:** Introduce slide groups owned by service plan items — order and membership mirror the plan, while slide content, media and audio stay independent. Handle unanchored and orphaned groups. Replace Phase 22's slot-level media with group-level and per-slide audio (scope + loop). Migrate existing services without data loss.
+**Goal:** Introduce slide groups owned by service plan items — order and membership mirror the plan, while slide structure, media and audio stay independent. Give `ServiceSlot` a stable `id` to anchor groups to. Materialize group structure per service while keeping song/scripture text a live reference. Deleting a plan item deletes its group behind a warning + confirm. Replace Phase 22's slot-level media with group-level and per-slide audio (scope + loop). Migrate existing services without data loss.
 **Depends on:** Phase 20, Phase 22, Phase 23
 **Requirements:** R028, R029, R030, R018 (supporting)
 **Plans:** 0
