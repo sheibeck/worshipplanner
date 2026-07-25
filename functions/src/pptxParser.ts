@@ -9,6 +9,9 @@
  * If those app-side shapes change, update MappedTextSlide/MappedImageSlide here too.
  */
 
+import { getStorage } from "firebase-admin/storage";
+import { parseOffice } from "officeparser";
+
 export interface MappedTextSlide {
   contentKind: "text";
   title?: string;
@@ -129,4 +132,106 @@ export async function mapAstToSlides(
   }
 
   return result;
+}
+
+/**
+ * Thrown when a buffer cannot be parsed as a valid .pptx -- either it fails
+ * the leading zip-signature check, or officeparser itself throws while
+ * decompressing/parsing. index.ts converts this into a friendly HttpsError.
+ * Never thrown or caught in a way that triggers deletion of the source file.
+ */
+export class PptxParseError extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
+    this.name = "PptxParseError";
+  }
+}
+
+/**
+ * A .pptx (OOXML) file is a ZIP archive. Every valid ZIP -- local file header,
+ * empty archive, or spanned archive -- begins with the two bytes 'P' 'K'
+ * (0x50 0x4B). Rejecting anything else here means a renamed/non-pptx file
+ * (e.g. corrupted.pptx, not-a-pptx.txt) never reaches officeparser at all.
+ */
+function hasZipSignature(buffer: Buffer): boolean {
+  return buffer.length >= 4 && buffer[0] === 0x50 && buffer[1] === 0x4b;
+}
+
+/**
+ * Validates, parses, and maps a .pptx buffer into native slides, uploading any
+ * extracted images to org-scoped Storage along the way.
+ *
+ * Never deletes the source object -- this function has no knowledge of the
+ * source's Storage path at all, and only ever writes new image objects under
+ * orgs/{orgId}/pptx-imports/{importId}/images/. On any failure (bad
+ * signature, officeparser throwing), a typed PptxParseError propagates for
+ * index.ts to convert into a friendly HttpsError.
+ */
+export async function parsePptxBuffer(
+  buffer: Buffer,
+  orgId: string,
+  importId: string,
+): Promise<MappedSlide[]> {
+  if (!hasZipSignature(buffer)) {
+    throw new PptxParseError(
+      "File is not a valid .pptx (missing ZIP signature) -- it may be corrupted or mis-declared.",
+    );
+  }
+
+  let ast;
+  try {
+    // OCR is never enabled -- this phase only needs text/image extraction, and
+    // officeparser's OCR path pulls in a heavy tesseract.js dependency for a
+    // capability this phase does not use (21-RESEARCH.md Pitfall 3).
+    ast = await parseOffice(buffer, {
+      extractAttachments: true,
+      fileType: "pptx",
+      ignoreNotes: true,
+    });
+  } catch (err) {
+    throw new PptxParseError("officeparser failed to parse the .pptx buffer.", { cause: err });
+  }
+
+  const attachmentsByName = new Map<string, { data: string; mimeType: string; extension: string }>();
+  for (const attachment of ast.attachments ?? []) {
+    attachmentsByName.set(attachment.name, {
+      data: attachment.data,
+      mimeType: attachment.mimeType,
+      extension: attachment.extension,
+    });
+  }
+
+  const bucket = getStorage().bucket();
+  let uploadIndex = 0;
+
+  const resolveImagePath: ImagePathResolver = async (attachmentName) => {
+    const attachment = attachmentsByName.get(attachmentName);
+    const extension = attachment?.extension ?? "png";
+    const path = `orgs/${orgId}/pptx-imports/${importId}/images/${uploadIndex}.${extension}`;
+    uploadIndex += 1;
+
+    if (attachment) {
+      const imageBuffer = Buffer.from(attachment.data, "base64");
+      await bucket.file(path).save(imageBuffer, {
+        contentType: attachment.mimeType,
+        metadata: {
+          // Custom metadata (not the GCS-reserved top-level fields) -- Phase
+          // 22's retention sweep reads this to age out old imports without a
+          // follow-up migration (21-RESEARCH.md Pitfall 5).
+          metadata: {
+            createdAt: new Date().toISOString(),
+          },
+        },
+      });
+    }
+
+    return path;
+  };
+
+  // officeparser's real per-node-type metadata unions (SlideMetadata,
+  // ImageMetadata, ...) are far more specific than the loose, test-friendly
+  // MinimalOfficeAst shape mapAstToSlides accepts; the fields this function
+  // actually reads (type/text/children/metadata.attachmentName/altText) are
+  // all present on the real AST at runtime, so this narrowing cast is safe.
+  return mapAstToSlides(ast as unknown as MinimalOfficeAst, resolveImagePath);
 }
