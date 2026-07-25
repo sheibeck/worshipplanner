@@ -4,7 +4,30 @@
 
 Verbatim export of `Slides Tab.dc.html` from the Claude Design project
 **"Worship Planner Slideshow Design"** (`e8e6c287-3e88-402f-88e1-7ad6d5101fa2`),
-pulled 2026-07-25. Source of truth for the Phase 24 Slides-tab rework.
+pulled 2026-07-25. Source of truth for the v1.3 Slides-tab rework.
+
+**The single remote file is cumulative across design turns and is overwritten in
+place — re-pull before planning any phase against it.** As of this export it holds
+two turns, newest first:
+
+| Turn | Screen | Options |
+|------|--------|---------|
+| **Turn 2** | Song lyrics editor (`Edit Song` → Lyrics tab) | `2a` and `2b` — **a choice, not both** |
+| **Turn 1** | Slides tab | `1a`, drawn in **two states** (drawer closed / `State 2 — Edit Slide open`) |
+
+**Turn 1 — Slides tab.** Plan rail · slide grid · Edit Slide drawer. The rail mirrors
+plan order and is *not* draggable — reordering happens on the Service Order tab. The
+drawer "floats over the page; nothing underneath reflows."
+
+**Turn 2 — Song lyrics editor.** Reworks the Phase 18 `SongLyricEditor.vue` +
+`PerformanceOrderBuilder.vue` pair. Both options "kill the nested scrollbar and the
+duplicate Available-Sections / Performance-Order lists: one scroll surface, one list
+that IS the order."
+- `2a` — one list of section cards, drag to reorder; the section list *is* the slide
+  order; cards collapse to a one-line summary; repeats render as linked `CHORUS` rows.
+- `2b` — "Switch to Sections to reorder" (a mode toggle rather than one always-drag list).
+
+`2a` vs `2b` is an **open decision** to settle at that phase's discuss step.
 
 It is a **Design Canvas mockup**, not runnable app code. It loads a generic
 `support.js` runtime (~72 KB, `// GENERATED from dc-runtime/src/*.ts`) that

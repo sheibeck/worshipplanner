@@ -22,7 +22,196 @@
 
 <section style="display:flex; flex-direction:column; gap:20px; padding:40px;">
   <div style="display:flex; align-items:baseline; gap:14px; color:#e9e9ed; font-size:15px; letter-spacing:.14em; text-transform:uppercase;">
-    <span>Slides tab — implementation spec</span>
+    <span>Turn 2 — Song lyrics editor</span>
+    <span style="font-size:13px; letter-spacing:0; text-transform:none; color:#8a90a8;">Both kill the nested scrollbar and the duplicate Available-Sections / Performance-Order lists: one scroll surface, one list that IS the order. Compare <a href="#2a">2a</a> and <a href="#2b">2b</a>.</span>
+  </div>
+
+  <div style="display:flex; flex-wrap:wrap; gap:40px; align-items:flex-start;">
+
+    <!-- ============ OPTION 2A ============ -->
+    <div id="2a" style="display:flex; flex-direction:column; gap:10px;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="display:inline-flex; align-items:center; justify-content:center; min-width:30px; height:24px; padding:0 8px; border-radius:6px; background:#7c5cff; color:#fff; font-size:13px; font-weight:600;">2a</span>
+        <span style="color:#e9e9ed; font-size:14px; font-weight:500;">One list of section cards — drag to reorder</span>
+      </div>
+      <div style="width:520px; height:940px; background:#141726; border:1px solid #232842; border-radius:10px; overflow:hidden; color:#e9e9ed; display:flex; flex-direction:column; box-shadow:-24px 0 48px rgba(0,0,0,.45);">
+        <div style="padding:16px 20px 0; display:flex; align-items:center; gap:10px;">
+          <span style="font-size:17px; font-weight:500;">Edit Song</span>
+          <div style="margin-left:auto; display:flex; align-items:center; gap:9px;">
+            <button style="padding:8px 15px; border-radius:7px; background:transparent; border:1px solid #2d3350; color:#c3c8dc; font-size:12.5px; font-family:inherit;">Cancel</button>
+            <button style="padding:8px 17px; border-radius:7px; background:#7c5cff; border:1px solid #8b6dff; color:#fff; font-size:12.5px; font-weight:500; font-family:inherit;">Save</button>
+            <span style="font-size:15px; color:#7c8099;">✕</span>
+          </div>
+        </div>
+        <div style="display:flex; gap:4px; padding:14px 20px 0; border-bottom:1px solid #232842;">
+          <div style="padding:9px 12px; font-size:13px; color:#8a90a8;">Details</div>
+          <div style="padding:9px 12px; font-size:13px; color:#cfc7ff; border-bottom:2px solid #7c5cff; font-weight:500;">Lyrics</div>
+        </div>
+
+        <div style="padding:14px 20px 10px; display:flex; align-items:center; gap:8px;">
+          <div style="font-size:13px; font-weight:500;">Sections</div>
+          <span style="font-size:11px; color:#7c8099;">this order is the slide order</span>
+          <div style="margin-left:auto; display:flex; gap:7px;">
+            <button style="padding:6px 11px; border-radius:6px; background:transparent; border:1px solid #2d3350; color:#c3c8dc; font-size:11.5px; font-family:inherit;">Paste lyrics</button>
+            <button style="padding:6px 11px; border-radius:6px; background:transparent; border:1px solid #2d3350; color:#c3c8dc; font-size:11.5px; font-family:inherit;">History</button>
+          </div>
+        </div>
+
+        <div style="flex:1; min-height:0; overflow-y:auto; padding:0 20px 20px; display:flex; flex-direction:column; gap:10px;">
+
+          <div style="border:1px solid #3a3270; border-radius:8px; background:#181c2c;">
+            <div style="display:flex; align-items:center; gap:8px; padding:9px 11px;">
+              <span style="color:#4a5070; font-size:12px;">⣿</span>
+              <span style="padding:2px 8px; border-radius:5px; background:#241f45; border:1px solid #3a3270; color:#b3a9e8; font-size:10px; letter-spacing:.1em;">CHORUS ⌄</span>
+              <span style="font-size:10.5px; color:#7c8099;">4 lines</span>
+              <div style="margin-left:auto; display:flex; align-items:center; gap:9px; color:#7c8099; font-size:11.5px;">
+                <span>Duplicate</span><span>Remove</span><span style="font-size:12px;">⌃</span>
+              </div>
+            </div>
+            <div style="margin:0 11px 11px; padding:10px 12px; border-radius:7px; background:#0f1220; border:1px solid #2d3350; font-family:ui-monospace, monospace; font-size:12px; line-height:1.65; color:#e9e9ed;">Bless the Lord O my soul O my soul<br>Worship His holy name<br>Sing like never before O my soul<br>I’ll worship Your holy name</div>
+          </div>
+
+          <div style="border:1px solid #262b45; border-radius:8px; background:#151827; display:flex; align-items:center; gap:8px; padding:11px;">
+            <span style="color:#4a5070; font-size:12px;">⣿</span>
+            <span style="padding:2px 8px; border-radius:5px; background:#241f45; border:1px solid #3a3270; color:#b3a9e8; font-size:10px; letter-spacing:.1em;">VERSE 1</span>
+            <span style="font-size:11.5px; color:#8a90a8; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">The sun comes up it’s a new day dawning…</span>
+            <span style="margin-left:auto; font-size:10.5px; color:#7c8099;">5 lines</span>
+            <span style="font-size:12px; color:#7c8099;">⌄</span>
+          </div>
+
+          <div style="border:1px solid #262b45; border-radius:8px; background:#151827; display:flex; align-items:center; gap:8px; padding:11px;">
+            <span style="color:#4a5070; font-size:12px;">⣿</span>
+            <span style="padding:2px 8px; border-radius:5px; background:#1e2033; border:1px solid #313656; color:#a0a6bd; font-size:10px; letter-spacing:.1em;">CHORUS</span>
+            <span style="font-size:11.5px; color:#8a90a8;">repeat — follows the Chorus above</span>
+            <span style="margin-left:auto; font-size:10.5px; color:#7c8099;">linked</span>
+            <span style="font-size:12px; color:#7c8099;">⌄</span>
+          </div>
+
+          <div style="border:1px solid #262b45; border-radius:8px; background:#151827; display:flex; align-items:center; gap:8px; padding:11px;">
+            <span style="color:#4a5070; font-size:12px;">⣿</span>
+            <span style="padding:2px 8px; border-radius:5px; background:#241f45; border:1px solid #3a3270; color:#b3a9e8; font-size:10px; letter-spacing:.1em;">VERSE 2</span>
+            <span style="font-size:11.5px; color:#8a90a8; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">You’re rich in love and You’re slow to anger…</span>
+            <span style="margin-left:auto; font-size:10.5px; color:#7c8099;">4 lines</span>
+            <span style="font-size:12px; color:#7c8099;">⌄</span>
+          </div>
+
+          <div style="border:1px solid #262b45; border-radius:8px; background:#151827; display:flex; align-items:center; gap:8px; padding:11px;">
+            <span style="color:#4a5070; font-size:12px;">⣿</span>
+            <span style="padding:2px 8px; border-radius:5px; background:#241f45; border:1px solid #3a3270; color:#b3a9e8; font-size:10px; letter-spacing:.1em;">VERSE 3</span>
+            <span style="font-size:11.5px; color:#8a90a8; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">And on that day when my strength is failing…</span>
+            <span style="margin-left:auto; font-size:10.5px; color:#7c8099;">4 lines</span>
+            <span style="font-size:12px; color:#7c8099;">⌄</span>
+          </div>
+
+          <div style="border:1px solid #262b45; border-radius:8px; background:#151827; display:flex; align-items:center; gap:8px; padding:11px;">
+            <span style="color:#4a5070; font-size:12px;">⣿</span>
+            <span style="padding:2px 8px; border-radius:5px; background:#241f45; border:1px solid #3a3270; color:#b3a9e8; font-size:10px; letter-spacing:.1em;">TAG</span>
+            <span style="font-size:11.5px; color:#8a90a8; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">Worship Your holy name…</span>
+            <span style="margin-left:auto; font-size:10.5px; color:#7c8099;">2 lines</span>
+            <span style="font-size:12px; color:#7c8099;">⌄</span>
+          </div>
+
+          <div style="border:1px solid #262b45; border-radius:8px; background:#151827; display:flex; align-items:center; gap:8px; padding:11px;">
+            <span style="color:#4a5070; font-size:12px;">⣿</span>
+            <span style="padding:2px 8px; border-radius:5px; background:#241f45; border:1px solid #3a3270; color:#b3a9e8; font-size:10px; letter-spacing:.1em;">ENDING</span>
+            <span style="font-size:11.5px; color:#8a90a8; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">Sing like never before O my soul…</span>
+            <span style="margin-left:auto; font-size:10.5px; color:#7c8099;">2 lines</span>
+            <span style="font-size:12px; color:#7c8099;">⌄</span>
+          </div>
+
+          <div style="border:1px dashed #2d3350; border-radius:8px; padding:12px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <span style="font-size:11.5px; color:#9aa0b8;">＋ Add section</span>
+            <span style="padding:5px 10px; border-radius:6px; border:1px solid #2d3350; color:#c3c8dc; font-size:11px;">Verse</span>
+            <span style="padding:5px 10px; border-radius:6px; border:1px solid #2d3350; color:#c3c8dc; font-size:11px;">Chorus</span>
+            <span style="padding:5px 10px; border-radius:6px; border:1px solid #2d3350; color:#c3c8dc; font-size:11px;">Bridge</span>
+            <span style="padding:5px 10px; border-radius:6px; border:1px solid #2d3350; color:#c3c8dc; font-size:11px;">Tag</span>
+            <span style="padding:5px 10px; border-radius:6px; border:1px solid #2d3350; color:#c3c8dc; font-size:11px;">Ending</span>
+          </div>
+
+          <div style="font-size:11px; color:#6b7189; line-height:1.55;">7 sections · used as the slide order for this song in every service. A repeat reuses the original words — edit once, both update.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ OPTION 2B ============ -->
+    <div id="2b" style="display:flex; flex-direction:column; gap:10px;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="display:inline-flex; align-items:center; justify-content:center; min-width:30px; height:24px; padding:0 8px; border-radius:6px; background:#7c5cff; color:#fff; font-size:13px; font-weight:600;">2b</span>
+        <span style="color:#e9e9ed; font-size:14px; font-weight:500;">Type it like a lyric sheet — labels parsed live</span>
+      </div>
+      <div style="width:520px; height:940px; background:#141726; border:1px solid #232842; border-radius:10px; overflow:hidden; color:#e9e9ed; display:flex; flex-direction:column; box-shadow:-24px 0 48px rgba(0,0,0,.45);">
+        <div style="padding:16px 20px 0; display:flex; align-items:center; gap:10px;">
+          <span style="font-size:17px; font-weight:500;">Edit Song</span>
+          <div style="margin-left:auto; display:flex; align-items:center; gap:9px;">
+            <button style="padding:8px 15px; border-radius:7px; background:transparent; border:1px solid #2d3350; color:#c3c8dc; font-size:12.5px; font-family:inherit;">Cancel</button>
+            <button style="padding:8px 17px; border-radius:7px; background:#7c5cff; border:1px solid #8b6dff; color:#fff; font-size:12.5px; font-weight:500; font-family:inherit;">Save</button>
+            <span style="font-size:15px; color:#7c8099;">✕</span>
+          </div>
+        </div>
+        <div style="display:flex; gap:4px; padding:14px 20px 0; border-bottom:1px solid #232842;">
+          <div style="padding:9px 12px; font-size:13px; color:#8a90a8;">Details</div>
+          <div style="padding:9px 12px; font-size:13px; color:#cfc7ff; border-bottom:2px solid #7c5cff; font-weight:500;">Lyrics</div>
+        </div>
+
+        <div style="padding:14px 20px 10px; display:flex; align-items:center; gap:10px;">
+          <div style="display:flex; border:1px solid #2d3350; border-radius:6px; overflow:hidden;">
+            <div style="padding:6px 11px; font-size:11.5px; color:#9aa0b8;">Sections</div>
+            <div style="padding:6px 11px; font-size:11.5px; background:#26234a; color:#cfc7ff;">Lyric sheet</div>
+          </div>
+          <div style="margin-left:auto; display:flex; gap:7px;">
+            <button style="padding:6px 11px; border-radius:6px; background:transparent; border:1px solid #2d3350; color:#c3c8dc; font-size:11.5px; font-family:inherit;">History</button>
+          </div>
+        </div>
+
+        <div style="padding:0 20px 10px; font-size:11px; color:#7c8099; line-height:1.55;">Paste the whole song. Put a section name on its own line — Chorus, Verse 2, Bridge, Tag, Ending. Repeat a section by naming it again.</div>
+
+        <div style="flex:1; min-height:0; overflow-y:auto; margin:0 20px; padding:12px 14px; border-radius:8px; background:#0f1220; border:1px solid #2d3350; font-family:ui-monospace, monospace; font-size:12px; line-height:1.7;">
+          <div style="color:#b3a9e8;">Chorus</div>
+          <div style="color:#e9e9ed;">Bless the Lord O my soul O my soul<br>Worship His holy name<br>Sing like never before O my soul<br>I’ll worship Your holy name</div>
+          <div style="height:12px;"></div>
+          <div style="color:#b3a9e8;">Verse 1</div>
+          <div style="color:#e9e9ed;">The sun comes up it’s a new day dawning<br>It’s time to sing Your song again<br>Whatever may pass and whatever lies before me<br>Let me be singing when the evening comes</div>
+          <div style="height:12px;"></div>
+          <div style="color:#b3a9e8;">Chorus</div>
+          <div style="height:12px;"></div>
+          <div style="color:#b3a9e8;">Verse 2</div>
+          <div style="color:#e9e9ed;">You’re rich in love and You’re slow to anger<br>Your name is great and Your heart is kind<br>For all Your goodness I will keep on singing<br>Ten thousand reasons for my heart to find</div>
+          <div style="height:12px;"></div>
+          <div style="color:#b3a9e8;">Verse 3</div>
+          <div style="color:#e9e9ed;">And on that day when my strength is failing<br>The end draws near and my time has come<br>Still my soul will sing Your praise unending</div>
+          <div style="height:12px;"></div>
+          <div style="color:#b3a9e8;">Tag</div>
+          <div style="color:#e9e9ed;">Worship Your holy name<br>Lord I’ll worship Your holy name</div>
+          <div style="height:12px;"></div>
+          <div style="color:#b3a9e8;">Ending</div>
+          <div style="color:#e9e9ed;">Sing like never before O my soul<span style="display:inline-block; width:1px; height:14px; background:#7c5cff; vertical-align:-3px; margin-left:1px;"></span></div>
+        </div>
+
+        <div style="padding:12px 20px 18px; display:flex; flex-direction:column; gap:8px; border-top:1px solid #232842; margin-top:12px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:11.5px; color:#9aa0b8;">Slide order found</span>
+            <span style="font-size:11px; color:#63d68f;">✓ 7 sections</span>
+            <span style="margin-left:auto; font-size:11.5px; color:#9184d9;">Switch to Sections to reorder</span>
+          </div>
+          <div style="display:flex; flex-wrap:wrap; gap:6px;">
+            <span style="padding:4px 9px; border-radius:5px; background:#241f45; border:1px solid #3a3270; color:#cfc7ff; font-size:10.5px;">1 Chorus</span>
+            <span style="padding:4px 9px; border-radius:5px; background:#241f45; border:1px solid #3a3270; color:#cfc7ff; font-size:10.5px;">2 Verse 1</span>
+            <span style="padding:4px 9px; border-radius:5px; background:#1e2033; border:1px solid #313656; color:#a0a6bd; font-size:10.5px;">3 Chorus ↺</span>
+            <span style="padding:4px 9px; border-radius:5px; background:#241f45; border:1px solid #3a3270; color:#cfc7ff; font-size:10.5px;">4 Verse 2</span>
+            <span style="padding:4px 9px; border-radius:5px; background:#241f45; border:1px solid #3a3270; color:#cfc7ff; font-size:10.5px;">5 Verse 3</span>
+            <span style="padding:4px 9px; border-radius:5px; background:#241f45; border:1px solid #3a3270; color:#cfc7ff; font-size:10.5px;">6 Tag</span>
+            <span style="padding:4px 9px; border-radius:5px; background:#241f45; border:1px solid #3a3270; color:#cfc7ff; font-size:10.5px;">7 Ending</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<section style="display:flex; flex-direction:column; gap:20px; padding:40px;">
+  <div style="display:flex; align-items:baseline; gap:14px; color:#e9e9ed; font-size:15px; letter-spacing:.14em; text-transform:uppercase;">
+    <span>Turn 1 — Slides tab</span>
     <span style="font-size:13px; letter-spacing:0; text-transform:none; color:#8a90a8;">Groups are owned by plan items (order + membership mirror the service plan); slide content, media and audio are independent.</span>
   </div>
 
@@ -32,8 +221,13 @@
     <div id="1a" style="display:flex; flex-direction:column; gap:10px;">
       <div style="display:flex; align-items:center; gap:10px;">
         <span style="display:inline-flex; align-items:center; justify-content:center; min-width:30px; height:24px; padding:0 8px; border-radius:6px; background:#7c5cff; color:#fff; font-size:13px; font-weight:600;">1a</span>
-        <span style="color:#e9e9ed; font-size:14px; font-weight:500;">Plan rail · slide grid · Edit Slide drawer</span>
+        <span style="color:#e9e9ed; font-size:14px; font-weight:500;">Plan rail · slide grid · Edit Slide drawer — two states</span>
         <span style="color:#8a90a8; font-size:13px;">Rail mirrors the plan order and is not draggable here — reordering happens in Music.</span>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:9px; margin-top:6px;">
+        <span style="padding:2px 8px; border-radius:5px; background:#241f45; border:1px solid #3a3270; color:#b3a9e8; font-size:11px;">State 1 — default</span>
+        <span style="color:#8a90a8; font-size:12.5px;">Slides tab as it opens: context header actions, Grid/List toggle, per-group Add / Import into this group, and the drop target.</span>
       </div>
 
       <div style="width:1460px; height:940px; display:flex; background:#10131f; border:1px solid #262b45; border-radius:10px; overflow:hidden; color:#e9e9ed; position:relative;">
@@ -116,11 +310,15 @@
 
             <!-- slide grid -->
             <div style="flex:1; min-width:0; display:flex; flex-direction:column;">
-              <div style="display:flex; align-items:center; gap:10px; padding:13px 20px; border-bottom:1px solid #232842;">
+              <div style="display:flex; align-items:center; gap:10px 12px; padding:13px 20px; border-bottom:1px solid #232842; flex-wrap:wrap;">
                 <div style="font-size:13px; font-weight:500;">Song — This Is Our God</div>
                 <span style="padding:2px 8px; border-radius:5px; background:#241f45; border:1px solid #3a3270; color:#b3a9e8; font-size:10px;">group 3 of 9 · follows plan</span>
-                <span style="font-size:10.5px; color:#7c8099;">Lyrics come from the song’s Lyrics tab</span>
-                <div style="margin-left:auto; display:flex; gap:7px;">
+                <span style="font-size:10.5px; color:#9aa0b8;">Plays 1 → 6, left to right then down</span>
+                <div style="margin-left:auto; display:flex; align-items:center; gap:7px;">
+                  <div style="display:flex; border:1px solid #2d3350; border-radius:6px; overflow:hidden; margin-right:3px;">
+                    <div style="padding:6px 10px; font-size:11.5px; background:#26234a; color:#cfc7ff;">Grid</div>
+                    <div style="padding:6px 10px; font-size:11.5px; color:#9aa0b8;">List</div>
+                  </div>
                   <button style="padding:6px 11px; border-radius:6px; background:transparent; border:1px solid #2d3350; color:#c3c8dc; font-size:11.5px; font-family:inherit;">＋ Add slide</button>
                   <button style="padding:6px 11px; border-radius:6px; background:transparent; border:1px solid #2d3350; color:#c3c8dc; font-size:11.5px; font-family:inherit;">⇪ Import into this group</button>
                 </div>
@@ -144,7 +342,147 @@
                     <div style="{{ s.previewStyle }}">
                       <div style="font-size:11.5px; line-height:1.45; color:#e9e9ed; text-wrap:pretty;">{{ s.body }}</div>
                       <div style="position:absolute; top:7px; left:8px; font-size:9px; letter-spacing:.1em; color:#8f86c9;">{{ s.badge }}</div>
-                      <div style="position:absolute; bottom:7px; right:9px; font-size:9px; color:#6b7189;">{{ s.n }}</div>
+                      <div style="position:absolute; top:6px; right:7px; min-width:19px; height:19px; padding:0 5px; border-radius:5px; background:#241f45; border:1px solid #3a3270; color:#cfc7ff; font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center;">{{ s.n }}</div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:7px; padding:8px 9px;">
+                      <span style="font-size:11px; color:#c3c8dc;">{{ s.label }}</span>
+                      <sc-if value="{{ s.audio }}" hint-placeholder-val="{{ true }}">
+                        <span style="margin-left:auto; font-size:9.5px; padding:2px 6px; border-radius:5px; background:#241f45; color:#b3a9e8;">♪ {{ s.audio }}</span>
+                      </sc-if>
+                    </div>
+                  </div>
+                </sc-for>
+                <div style="height:150px; border:1px dashed #2d3350; border-radius:9px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; color:#7c8099;">
+                  <div style="font-size:19px;">＋</div>
+                  <div style="font-size:11px;">Drop PPTX, images, video</div>
+                  <div style="font-size:10px; color:#5f667f;">appends to this group</div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+      <div style="display:flex; align-items:center; gap:9px; margin-top:6px;">
+        <span style="padding:2px 8px; border-radius:5px; background:#241f45; border:1px solid #3a3270; color:#b3a9e8; font-size:11px;">State 2 — Edit Slide open</span>
+        <span style="color:#8a90a8; font-size:12.5px;">The existing right-side drawer floats over the page; nothing underneath reflows.</span>
+      </div>
+
+      <div style="width:1460px; height:940px; display:flex; background:#10131f; border:1px solid #262b45; border-radius:10px; overflow:hidden; color:#e9e9ed; position:relative;">
+
+        <!-- sidebar -->
+        <div style="width:210px; flex:none; background:#141726; border-right:1px solid #232842; display:flex; flex-direction:column; padding:16px 0;">
+          <div style="padding:0 16px 14px;">
+            <div style="font-size:14px; font-weight:600;">Worship Planner</div>
+            <div style="font-size:10px; color:#5f667f; margin-top:2px;">vd59e3de</div>
+          </div>
+          <div style="padding:10px 16px; border-top:1px solid #232842; border-bottom:1px solid #232842; font-size:12px; color:#9aa0b8;">Berean Baptist Church</div>
+          <div style="display:flex; flex-direction:column; padding:12px 10px; gap:2px;">
+            <div style="padding:9px 12px; border-radius:7px; font-size:13px; color:#9aa0b8;">Dashboard</div>
+            <div style="padding:9px 12px; border-radius:7px; font-size:13px; background:#26234a; color:#cfc7ff; font-weight:500;">Services</div>
+            <div style="padding:9px 12px; border-radius:7px; font-size:13px; color:#9aa0b8;">Songs</div>
+            <div style="margin:8px 12px; height:1px; background:#232842;"></div>
+            <div style="padding:9px 12px; border-radius:7px; font-size:13px; color:#9aa0b8;">Schedule</div>
+            <div style="padding:9px 12px; border-radius:7px; font-size:13px; color:#9aa0b8;">Volunteers</div>
+            <div style="margin:8px 12px; height:1px; background:#232842;"></div>
+            <div style="padding:9px 12px; border-radius:7px; font-size:13px; color:#9aa0b8;">Admins</div>
+            <div style="padding:9px 12px; border-radius:7px; font-size:13px; color:#9aa0b8;">Settings</div>
+          </div>
+          <div style="margin-top:auto; padding:14px 16px; border-top:1px solid #232842; display:flex; align-items:center; gap:10px;">
+            <div style="width:28px; height:28px; border-radius:50%; background:#3b2f7a; color:#cfc7ff; font-size:11px; display:flex; align-items:center; justify-content:center;">SH</div>
+            <div style="font-size:11px; line-height:1.35;"><div>Sterling Heibeck</div><div style="color:#6b7189;">sheibeck@gmail.com</div></div>
+          </div>
+        </div>
+
+        <!-- main -->
+        <div style="flex:1; display:flex; flex-direction:column; min-width:0;">
+          <div style="padding:18px 24px 0;">
+            <div style="font-size:12px; color:#8a90a8; margin-bottom:10px;">‹ Back to Services</div>
+            <div style="display:flex; align-items:center; gap:12px;">
+              <div style="font-size:22px; font-weight:600;">Sunday, July 26, 2026</div>
+              <span style="padding:3px 9px; border-radius:6px; background:#14311f; border:1px solid #1f5c36; color:#63d68f; font-size:11px;">✓ Exported</span>
+              <div style="margin-left:auto; display:flex; gap:8px;">
+                <button style="padding:8px 13px; border-radius:7px; background:transparent; border:1px solid #2d3350; color:#c3c8dc; font-size:12px; font-family:inherit;">Generate missing slides</button>
+                <button style="padding:8px 13px; border-radius:7px; background:transparent; border:1px solid #2d3350; color:#c3c8dc; font-size:12px; font-family:inherit;">⇪ Import</button>
+                <button style="padding:8px 13px; border-radius:7px; background:transparent; border:1px solid #9184d9; color:#c9c1f5; font-size:12px; font-family:inherit;">▶ Present</button>
+                <button style="padding:8px 15px; border-radius:7px; background:#7c5cff; border:1px solid #8b6dff; color:#fff; font-size:12px; font-weight:500; font-family:inherit;">Save</button>
+              </div>
+            </div>
+            <div style="display:flex; gap:4px; margin-top:16px; border-bottom:1px solid #232842;">
+              <div style="padding:9px 14px; font-size:13px; color:#8a90a8;">Music</div>
+              <div style="padding:9px 14px; font-size:13px; color:#8a90a8;">Roles</div>
+              <div style="padding:9px 14px; font-size:13px; color:#cfc7ff; border-bottom:2px solid #7c5cff; font-weight:500;">Slides</div>
+            </div>
+          </div>
+
+          <div style="flex:1; display:flex; min-height:0;">
+
+            <!-- plan rail -->
+            <div style="width:262px; flex:none; border-right:1px solid #232842; display:flex; flex-direction:column; min-height:0;">
+              <div style="padding:14px 16px 10px; display:flex; align-items:center; gap:8px;">
+                <span style="font-size:10px; letter-spacing:.14em; color:#6b7189;">SERVICE PLAN</span>
+                <span style="margin-left:auto; font-size:10px; color:#7c8099;">order locked ⇄ Music</span>
+              </div>
+              <div style="flex:1; overflow:hidden; display:flex; flex-direction:column; gap:4px; padding:0 10px 14px;">
+                <sc-for list="{{ groups }}" as="g" hint-placeholder-count="8">
+                  <div onClick="{{ selectGroup }}" data-i="{{ g.i }}" style="{{ g.railStyle }}" style-hover="background:#1b1f33;">
+                    <div style="display:flex; align-items:center; gap:7px;">
+                      <span style="{{ g.kindStyle }}">{{ g.kind }}</span>
+                      <span style="margin-left:auto; font-size:10px; color:#7c8099;">{{ g.count }}</span>
+                    </div>
+                    <div style="font-size:12.5px; color:#dcdfea; margin-top:4px; line-height:1.3;">{{ g.title }}</div>
+                    <div style="display:flex; align-items:center; gap:6px; margin-top:5px;">
+                      <sc-if value="{{ g.bed }}" hint-placeholder-val="{{ true }}">
+                        <span style="font-size:10px; color:#8f86c9;">♪ group music: {{ g.bed }}</span>
+                      </sc-if>
+                    </div>
+                  </div>
+                </sc-for>
+                <div style="margin-top:8px; padding:9px 11px; border:1px dashed #4a3a5e; border-radius:8px; background:#1d1526;">
+                  <div style="font-size:10px; letter-spacing:.12em; color:#c98fb8;">UNANCHORED</div>
+                  <div style="font-size:12px; color:#c8c2d6; margin-top:4px;">Pre-service loop · 6 slides</div>
+                  <div style="font-size:11px; color:#a08cb0; margin-top:3px;">Orphaned: “Offering” (2) — reassign</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- slide grid -->
+            <div style="flex:1; min-width:0; display:flex; flex-direction:column;">
+              <div style="display:flex; align-items:center; gap:10px 12px; padding:13px 20px; border-bottom:1px solid #232842; flex-wrap:wrap;">
+                <div style="font-size:13px; font-weight:500;">Song — This Is Our God</div>
+                <span style="padding:2px 8px; border-radius:5px; background:#241f45; border:1px solid #3a3270; color:#b3a9e8; font-size:10px;">group 3 of 9 · follows plan</span>
+                <span style="font-size:10.5px; color:#9aa0b8;">Plays 1 → 6, left to right then down</span>
+                <div style="margin-left:auto; display:flex; align-items:center; gap:7px;">
+                  <div style="display:flex; border:1px solid #2d3350; border-radius:6px; overflow:hidden; margin-right:3px;">
+                    <div style="padding:6px 10px; font-size:11.5px; background:#26234a; color:#cfc7ff;">Grid</div>
+                    <div style="padding:6px 10px; font-size:11.5px; color:#9aa0b8;">List</div>
+                  </div>
+                  <button style="padding:6px 11px; border-radius:6px; background:transparent; border:1px solid #2d3350; color:#c3c8dc; font-size:11.5px; font-family:inherit;">＋ Add slide</button>
+                  <button style="padding:6px 11px; border-radius:6px; background:transparent; border:1px solid #2d3350; color:#c3c8dc; font-size:11.5px; font-family:inherit;">⇪ Import into this group</button>
+                </div>
+              </div>
+
+              <div style="padding:14px 20px 0;">
+                <div style="display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:8px; background:#171b2b; border:1px solid #262b45;">
+                  <span style="font-size:11px; color:#8f86c9;">♪ Music for this group</span>
+                  <span style="font-size:11.5px; color:#dcdfea;">pad_Cmaj_soft.mp3</span>
+                  <span style="font-size:10.5px; color:#7c8099;">plays across all 6 slides</span>
+                  <div style="margin-left:auto; display:flex; gap:6px;">
+                    <button style="width:26px; height:26px; border-radius:6px; background:transparent; border:1px solid #2d3350; color:#c3c8dc; font-size:10px; font-family:inherit;">▶</button>
+                    <button style="width:26px; height:26px; border-radius:6px; background:transparent; border:1px solid #2d3350; color:#c3c8dc; font-size:10px; font-family:inherit;">✕</button>
+                  </div>
+                </div>
+              </div>
+
+              <div style="flex:1; overflow:hidden; padding:14px 20px 18px 20px; display:grid; grid-template-columns:repeat(3, 1fr); gap:14px; align-content:start; align-items:start;">
+                <sc-for list="{{ slides }}" as="s" hint-placeholder-count="6">
+                  <div style="{{ s.cardStyle }}">
+                    <div style="{{ s.previewStyle }}">
+                      <div style="font-size:11.5px; line-height:1.45; color:#e9e9ed; text-wrap:pretty;">{{ s.body }}</div>
+                      <div style="position:absolute; top:7px; left:8px; font-size:9px; letter-spacing:.1em; color:#8f86c9;">{{ s.badge }}</div>
+                      <div style="position:absolute; top:6px; right:7px; min-width:19px; height:19px; padding:0 5px; border-radius:5px; background:#241f45; border:1px solid #3a3270; color:#cfc7ff; font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center;">{{ s.n }}</div>
                     </div>
                     <div style="display:flex; align-items:center; gap:7px; padding:8px 9px;">
                       <span style="font-size:11px; color:#c3c8dc;">{{ s.label }}</span>
