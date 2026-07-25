@@ -74,6 +74,22 @@ function textSlide(id: string): AssembledSlide {
   }
 }
 
+function imageSlide(id: string): AssembledSlide {
+  return {
+    slide: {
+      id,
+      position: 4,
+      contentKind: 'image',
+      imageUrl: 'https://example.com/announcement.png',
+      altText: 'Announcement slide',
+    },
+    slotIndex: 3,
+    slotKind: 'IMPORTED',
+    section: 'pre-service',
+    sourceId: 'deck-1',
+  }
+}
+
 describe('SlideshowPreview', () => {
   it('renders a labeled divider per section using SERVICE_SECTION_LABELS', () => {
     const sections: AssembledSection[] = [
@@ -105,6 +121,17 @@ describe('SlideshowPreview', () => {
     expect(wrapper.text()).toContain('Amazing grace, how sweet the sound') // lyric line
     expect(wrapper.text()).toContain('Romans 8:28-30') // scripture reference
     expect(wrapper.text()).toContain('Message') // text title/body
+  })
+
+  it('renders an img element with the correct src for an image slide', () => {
+    const sections: AssembledSection[] = [
+      { section: 'pre-service', label: 'Pre-Service', slides: [imageSlide('e')] },
+    ]
+    const wrapper = mount(SlideshowPreview, { props: { sections } })
+
+    const img = wrapper.find('img')
+    expect(img.exists()).toBe(true)
+    expect(img.attributes('src')).toBe('https://example.com/announcement.png')
   })
 
   it('renders an undefined-section group under an "Ungrouped" heading', () => {

@@ -8,10 +8,12 @@ import type {
   ScriptureSlot,
   NonAssignableSlot,
   HymnSlot,
+  ImportedSlot,
 } from '@/types/service'
 import type { SongLyrics } from '@/types/songLyrics'
 import type { ScriptureReading } from '@/types/scriptureReading'
-import type { ScriptureSlide, CopyrightSlide, LyricSlide, TextSlide } from '@/types/slide'
+import type { ImportedDeck } from '@/types/importedDeck'
+import type { ScriptureSlide, CopyrightSlide, LyricSlide, TextSlide, ImageSlide } from '@/types/slide'
 import type { Timestamp } from 'firebase/firestore'
 import { slotLabel } from '@/utils/slotTypes'
 
@@ -86,11 +88,27 @@ function makeScriptureReading(overrides: Partial<ScriptureReading> = {}): Script
   }
 }
 
+function makeImportedDeck(overrides: Partial<ImportedDeck> = {}): ImportedDeck {
+  return {
+    id: 'deck-1',
+    sourceFileName: 'announcements.pptx',
+    section: 'pre-service',
+    slides: [
+      { id: 'is-1', position: 0, contentKind: 'text', title: 'Welcome', body: 'Welcome to church' } as TextSlide,
+      { id: 'is-2', position: 1, contentKind: 'image', imageUrl: 'https://example.com/a.png', altText: 'slide 2' } as ImageSlide,
+    ],
+    createdAt: mockTimestamp,
+    updatedAt: mockTimestamp,
+    ...overrides,
+  }
+}
+
 function makeInputs(overrides: Partial<AssemblyInputs> = {}): AssemblyInputs {
   return {
     songLyricsById: new Map(),
     performanceOrderById: new Map(),
     scriptureReadingsById: new Map(),
+    importedDecksById: new Map(),
     ...overrides,
   }
 }
@@ -115,6 +133,15 @@ function scriptureSlot(overrides: Partial<ScriptureSlot> = {}): ScriptureSlot {
     chapter: null,
     verseStart: null,
     verseEnd: null,
+    ...overrides,
+  }
+}
+
+function importedSlot(overrides: Partial<ImportedSlot> = {}): ImportedSlot {
+  return {
+    kind: 'IMPORTED',
+    position: 0,
+    importId: null,
     ...overrides,
   }
 }
@@ -270,6 +297,71 @@ describe('assembleSlideshow — scripture resolution', () => {
 
   it('a SCRIPTURE slot whose scriptureReadingId is absent from scriptureReadingsById contributes nothing', () => {
     const slot = scriptureSlot({ scriptureReadingId: 'unloaded-reading' })
+    const service = makeService([slot])
+    const result = assembleSlideshow(service, makeInputs())
+    expect(result).toHaveLength(0)
+  })
+})
+
+describe('assembleSlideshow — imported deck resolution', () => {
+  it('emits one AssembledSlide per deck.slides entry, in deck order, with slotKind IMPORTED and sourceId equal to importId', () => {
+    const slot = importedSlot({ importId: 'deck-1' })
+    const service = makeService([slot])
+    const deck = makeImportedDeck()
+    const inputs = makeInputs({
+      importedDecksById: new Map([['deck-1', deck]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result).toHaveLength(deck.slides.length)
+    expect(result[0]!.slotKind).toBe('IMPORTED')
+    expect(result[0]!.sourceId).toBe('deck-1')
+    expect(result[1]!.sourceId).toBe('deck-1')
+  })
+
+  it('mixed text+image deck slides pass their contentKind through unchanged, in order', () => {
+    const slot = importedSlot({ importId: 'deck-1' })
+    const service = makeService([slot])
+    const deck = makeImportedDeck()
+    const inputs = makeInputs({
+      importedDecksById: new Map([['deck-1', deck]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result[0]!.slide.contentKind).toBe('text')
+    expect((result[0]!.slide as TextSlide).body).toBe('Welcome to church')
+    expect(result[1]!.slide.contentKind).toBe('image')
+    expect((result[1]!.slide as ImageSlide).imageUrl).toBe('https://example.com/a.png')
+  })
+
+  it('every emitted slide from an imported slot carries slotIndex, slotKind, and section', () => {
+    const slot = importedSlot({ importId: 'deck-1', section: 'pre-service' })
+    const service = makeService([slot])
+    const deck = makeImportedDeck()
+    const inputs = makeInputs({
+      importedDecksById: new Map([['deck-1', deck]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    for (const assembled of result) {
+      expect(assembled.slotIndex).toBe(0)
+      expect(assembled.slotKind).toBe('IMPORTED')
+      expect(assembled.section).toBe('pre-service')
+    }
+  })
+
+  it('an IMPORTED slot with importId null contributes nothing', () => {
+    const slot = importedSlot({ importId: null })
+    const service = makeService([slot])
+    const result = assembleSlideshow(service, makeInputs())
+    expect(result).toHaveLength(0)
+  })
+
+  it('an IMPORTED slot whose importId is absent from importedDecksById contributes nothing', () => {
+    const slot = importedSlot({ importId: 'unloaded-deck' })
     const service = makeService([slot])
     const result = assembleSlideshow(service, makeInputs())
     expect(result).toHaveLength(0)
