@@ -112,7 +112,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 23-03-PLAN.md — Media driving: imperative play/pause across transitions, "Media unavailable" degradation, the three autoplay-blocked affordances (Wave 3)
+- [x] 23-03-PLAN.md — Media driving: imperative play/pause across transitions, "Media unavailable" degradation, the three autoplay-blocked affordances (Wave 3)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 

@@ -5,14 +5,14 @@ milestone_name: Worship Service Slide Management
 current_phase: 23
 current_phase_name: Presentation Preview Mode
 status: executing
-stopped_at: Completed 23-02-PLAN.md
-last_updated: "2026-07-25T18:35:54.326Z"
+stopped_at: Completed 23-03-PLAN.md
+last_updated: "2026-07-25T19:03:13.219Z"
 last_activity: 2026-07-25
 progress:
   total_phases: 18
   completed_phases: 16
   total_plans: 99
-  completed_plans: 96
+  completed_plans: 97
   percent: 89
 last_activity_desc: Phase 23 planned — research, validation strategy, pattern map, 5 plans (checker PASSED)
 ---
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 23 (Presentation Preview Mode) — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 Milestone: v1.2 Worship Service Slide Management (Phases 18-23) — IN PROGRESS
 Status: Ready to execute
 
@@ -176,6 +176,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 22 P04 | ~35min | 2 tasks | 4 files |
 | Phase 23 P01 | 8min | 2 tasks | 4 files |
 | Phase 23 P02 | 15min | 2 tasks | 2 files |
+| Phase 23 P03 | 20min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -266,6 +267,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 23-02: PresentationViewer congregational-scripture empty/undefined sections falls back to normal-mode text rendering (planner assumption adopted verbatim)
 - [Phase ?]: 23-02: PresentationViewer loading state gated on isLoading && slides.length===0 so a background refetch mid-show never re-covers an already-rendered presentation
 - [Phase ?]: 23-02: exitPresentation() guarded with a local hasExited boolean so Escape + a browser-driven fullscreenchange cannot double-emit exit
+- [Phase ?]: PresentationViewer media layer: pauseCurrentMedia() moved to onBeforeUnmount (Vue nulls child refs before parent onUnmounted runs); bodyIsCaption caption-swap applies to Body-role slides only, not the Display-role copyright title
 
 ### Roadmap Evolution
 
@@ -325,6 +327,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-25
-Last session: 2026-07-25T18:35:54.292Z
-Stopped at: Completed 23-02-PLAN.md
+Last session: 2026-07-25T19:03:13.187Z
+Stopped at: Completed 23-03-PLAN.md
 Resume file: None
