@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Worship Service Slide Management
-current_phase: 22
-current_phase_name: Media Attachments and Storage Lifecycle
-status: executing
-stopped_at: 22-04-PLAN.md paused at Task 3 human-verify checkpoint (media/autoplay e2e pending, blocking)
-last_updated: "2026-07-25T17:23:08.157Z"
+current_phase: 23
+current_phase_name: Presentation Preview Mode
+status: ready-to-execute
+stopped_at: Phase 23 planned (5 plans, waves 1-5) — ready to execute
+last_updated: "2026-07-25T00:00:00.000Z"
 last_activity: 2026-07-25
 progress:
   total_phases: 18
   completed_phases: 16
-  total_plans: 94
+  total_plans: 99
   completed_plans: 94
   percent: 89
-last_activity_desc: Migrated gsdpi milestone M001 into gsd-core as v1.2 (Phases 18-23)
+last_activity_desc: Phase 23 planned — research, validation strategy, pattern map, 5 plans (checker PASSED)
 ---
 
 # Project State
@@ -24,14 +24,17 @@ last_activity_desc: Migrated gsdpi milestone M001 into gsd-core as v1.2 (Phases 
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 22 — Media Attachments and Storage Lifecycle
+**Current focus:** Phase 23 — Presentation Preview Mode
 
 ## Current Position
 
-Phase: 22 (Media Attachments and Storage Lifecycle) — EXECUTING
-Plan: 4 of 4
+Phase: 23 (Presentation Preview Mode) — PLANNED
+Plan: 0 of 5
 Milestone: v1.2 Worship Service Slide Management (Phases 18-23) — IN PROGRESS
 Status: Ready to execute
+
+Phase 22 is code-complete (4/4 plans committed); only its deferred human-verify remains — see
+## Deferred Verification below.
 
 > **Migration note (2026-07-24):** This milestone was scoped and partially built in gsdpi
 > (`.gsd/` milestone M001, slices S01-S06) and faithfully ported into gsd-core as v1.2.

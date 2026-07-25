@@ -102,11 +102,24 @@ Plans:
 **Plans:** 5 plans (Waves 1→5, sequential main-tree build — no worktree isolation)
 
 Plans:
+**Wave 1**
 
 - [ ] 23-01-PLAN.md — Chromeless media primitives: `chromeless` prop on AudioPlayer/VideoPlayer + exposed `isMuted`/`unmute()` (Wave 1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 23-02-PLAN.md — PresentationViewer shell: Teleport, Fullscreen API + overlay fallback, root-scoped keyboard nav, auto-hiding chrome, loading/empty states, projection-scale rendering for every slide kind (Wave 2)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 23-03-PLAN.md — Media driving: imperative play/pause across transitions, "Media unavailable" degradation, the three autoplay-blocked affordances (Wave 3)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 23-04-PLAN.md — "Present Slideshow" entry CTA + ServiceEditorView wiring + automated phase gate (Wave 4)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
 - [ ] 23-05-PLAN.md — Blocking human-verify: real fullscreen, real autoplay, real expired media, projector legibility, overflow judgment calls (Wave 5)
 
 ## Phases
