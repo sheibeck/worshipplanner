@@ -3,7 +3,7 @@ import type { VWType } from './song'
 
 export type Progression = '1-2-2-3' | '1-2-3-3'
 export type ServiceStatus = 'draft' | 'planned' | 'exported'
-export type SlotKind = 'SONG' | 'SCRIPTURE' | 'PRAYER' | 'MESSAGE' | 'HYMN'
+export type SlotKind = 'SONG' | 'SCRIPTURE' | 'PRAYER' | 'MESSAGE' | 'HYMN' | 'IMPORTED'
 
 /**
  * Formalized service sections (D005). Exactly these four members — no others.
@@ -60,7 +60,19 @@ export interface HymnSlot {
   section?: ServiceSection
 }
 
-export type ServiceSlot = SongSlot | ScriptureSlot | NonAssignableSlot | HymnSlot
+/**
+ * A slot referencing a persisted imported PPTX/image deck (Phase 21).
+ * Mirrors ScriptureSlot's reference-by-id shape — the deck itself lives in
+ * the importedSlides store, keyed by `importId`.
+ */
+export interface ImportedSlot {
+  kind: 'IMPORTED'
+  position: number
+  importId: string | null
+  section?: ServiceSection
+}
+
+export type ServiceSlot = SongSlot | ScriptureSlot | NonAssignableSlot | HymnSlot | ImportedSlot
 
 export interface ScriptureRef {
   book: string

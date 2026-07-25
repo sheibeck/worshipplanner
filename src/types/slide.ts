@@ -61,12 +61,23 @@ export interface TextSlide extends SlideBase {
 }
 
 /**
+ * An image slide — a single imported image (from a parsed PPTX slide or a
+ * direct image upload). Backs the IMPORTED slot kind (Phase 21) alongside
+ * TextSlide within an ImportedDeck.
+ */
+export interface ImageSlide extends SlideBase {
+  contentKind: 'image'
+  imageUrl: string
+  altText?: string
+}
+
+/**
  * Discriminated union of all slide variants.
  *
  * Narrow on `contentKind` (and further on shape-specific fields) to access
  * variant-specific properties.
  */
-export type Slide = LyricSlide | CopyrightSlide | ScriptureSlide | TextSlide
+export type Slide = LyricSlide | CopyrightSlide | ScriptureSlide | TextSlide | ImageSlide
 
 /**
  * Wraps a single unified Slide with the service-slot provenance that produced it.

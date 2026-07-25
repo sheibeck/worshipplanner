@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { PROGRESSION_SLOT_TYPES, buildSlots, createSlot, reindexSlots, slotLabel } from '@/utils/slotTypes'
-import type { SongSlot, ScriptureSlot, NonAssignableSlot, HymnSlot } from '@/types/service'
+import type { SongSlot, ScriptureSlot, NonAssignableSlot, HymnSlot, ImportedSlot } from '@/types/service'
 
 describe('PROGRESSION_SLOT_TYPES', () => {
   it('maps 1-2-2-3 progression correctly', () => {
@@ -183,6 +183,25 @@ describe('createSlot', () => {
     expect(slot.kind).toBe('MESSAGE')
     expect(slot.position).toBe(0)
   })
+
+  it('creates an IMPORTED slot with importId null and position 0', () => {
+    const slot = createSlot('IMPORTED') as ImportedSlot
+    expect(slot.kind).toBe('IMPORTED')
+    expect(slot.position).toBe(0)
+    expect(slot.importId).toBeNull()
+  })
+
+  it('creates an IMPORTED slot with a section when passed', () => {
+    const slot = createSlot('IMPORTED', undefined, 'pre-service') as ImportedSlot
+    expect(slot.kind).toBe('IMPORTED')
+    expect(slot.section).toBe('pre-service')
+  })
+
+  it('creates an IMPORTED slot omitting the section key when no section is passed', () => {
+    const slot = createSlot('IMPORTED') as ImportedSlot
+    expect(slot.section).toBeUndefined()
+    expect('section' in slot).toBe(false)
+  })
 })
 
 describe('reindexSlots', () => {
@@ -242,6 +261,11 @@ describe('slotLabel', () => {
   it('returns "Hymn" for a HYMN slot', () => {
     const slot: HymnSlot = { kind: 'HYMN', position: 4, hymnName: '', hymnNumber: '', verses: '' }
     expect(slotLabel(slot, 4)).toBe('Hymn')
+  })
+
+  it('returns "Imported Slides" for an IMPORTED slot', () => {
+    const slot: ImportedSlot = { kind: 'IMPORTED', position: 0, importId: null }
+    expect(slotLabel(slot, 0)).toBe('Imported Slides')
   })
 })
 
