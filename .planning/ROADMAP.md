@@ -104,7 +104,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 23-01-PLAN.md — Chromeless media primitives: `chromeless` prop on AudioPlayer/VideoPlayer + exposed `isMuted`/`unmute()` (Wave 1)
+- [x] 23-01-PLAN.md — Chromeless media primitives: `chromeless` prop on AudioPlayer/VideoPlayer + exposed `isMuted`/`unmute()` (Wave 1)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 

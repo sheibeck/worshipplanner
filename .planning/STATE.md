@@ -4,15 +4,15 @@ milestone: v1.2
 milestone_name: Worship Service Slide Management
 current_phase: 23
 current_phase_name: Presentation Preview Mode
-status: ready-to-execute
-stopped_at: Phase 23 planned (5 plans, waves 1-5) — ready to execute
-last_updated: "2026-07-25T00:00:00.000Z"
+status: executing
+stopped_at: Completed 23-01-PLAN.md
+last_updated: "2026-07-25T18:23:30.966Z"
 last_activity: 2026-07-25
 progress:
   total_phases: 18
   completed_phases: 16
   total_plans: 99
-  completed_plans: 94
+  completed_plans: 95
   percent: 89
 last_activity_desc: Phase 23 planned — research, validation strategy, pattern map, 5 plans (checker PASSED)
 ---
@@ -28,12 +28,13 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 
 ## Current Position
 
-Phase: 23 (Presentation Preview Mode) — PLANNED
-Plan: 0 of 5
+Phase: 23 (Presentation Preview Mode) — EXECUTING
+Plan: 2 of 5
 Milestone: v1.2 Worship Service Slide Management (Phases 18-23) — IN PROGRESS
 Status: Ready to execute
 
 Phase 22 is code-complete (4/4 plans committed); only its deferred human-verify remains — see
+
 ## Deferred Verification below.
 
 > **Migration note (2026-07-24):** This milestone was scoped and partially built in gsdpi
@@ -47,6 +48,7 @@ Autonomous run (`/gsd-autonomous`, scoped Phases 20-23) paused at a clean bounda
 **Done:** gsdpi→gsd-core migration (v1.2); Phases **20, 21, 22 code-complete** (all plans committed, unit-tested); foundation hardened (lyrics Firestore rule + 94 type errors fixed + import-save undefined fix). Phase 23 UI-SPEC written (`23-UI-SPEC.md`).
 
 **Next actions to finish the milestone (in order):**
+
 1. **Phase 23 — plan → check → execute.** UI-SPEC + CONTEXT exist; no research (integrates built pieces). Spawn `gsd-planner` (opus) for phase 23 (req R016, R018) consuming `23-UI-SPEC.md` + `23-CONTEXT.md`, then `gsd-plan-checker` (sonnet), then execute plans sequentially with `gsd-executor` (sonnet, main-tree/no-worktree — branch `milestone/M001` diverged). Presentation viewer consumes `useSlideshowAssembly` + `AudioPlayer`/`VideoPlayer`; entry CTA in `SlideshowPreview.vue`.
 2. **Pre-audit hardening batch** (see TODO below) — flip cleanup default to safe; clean `.gsd/quarantine/worktrees/**` test debris; full unit suite green.
 3. **Batch human-verify** P20 + P21 + P22 (+P23) — the deferred visual/e2e checks.
@@ -172,6 +174,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 22 P02 | 20min | 3 tasks | 6 files |
 | Phase 22 P03 | 20min | 1 tasks | 2 files |
 | Phase 22 P04 | ~35min | 2 tasks | 4 files |
+| Phase 23 P01 | 8min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -257,6 +260,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Both AudioPlayer/VideoPlayer explicitly emit 'play' from inside play() on success (in addition to the native @play listener) so imperative callers get the signal even against jsdom media-element test doubles that don't dispatch native events
 - [Phase ?]: [Phase 22-04]: SlotMediaAttachment mutates localService.slots[index] directly (mirrors onSectionChange) so attach/remove rides the EXISTING deep-watch autosave -- no new save path
 - [Phase ?]: [Phase 22-04]: Fixed pre-existing ServiceEditorView.test.ts Pinia crash (missing importedSlides mock since 21-01) as a Rule 3 blocking auto-fix -- it blocked this plan's own required test verification
+- [Phase ?]: 23-01: muted.value=false set as first statement of VideoPlayer play()'s hard-failure branch, making isMuted the true discriminator between muted-retry-success and hard-block autoplay-blocked emissions
+- [Phase ?]: 23-01: unmute() never rethrows NotAllowedError -- restores muted=true and re-emits autoplay-blocked instead, matching play()'s existing convention
 
 ### Roadmap Evolution
 
@@ -316,6 +321,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-25
-Last session: 2026-07-25T17:22:57.110Z
-Stopped at: 22-04-PLAN.md paused at Task 3 human-verify checkpoint (media/autoplay e2e pending, blocking)
+Last session: 2026-07-25T18:23:30.927Z
+Stopped at: Completed 23-01-PLAN.md
 Resume file: None
