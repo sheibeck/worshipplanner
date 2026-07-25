@@ -166,7 +166,15 @@ audio are independent of it.
 **Goal:** Introduce slide groups owned by service plan items — order and membership mirror the plan, while slide structure, media and audio stay independent. Give `ServiceSlot` a stable `id` to anchor groups to. Materialize group structure per service while keeping song/scripture text a live reference. Deleting a plan item deletes its group behind a warning + confirm. Replace Phase 22's slot-level media with group-level and per-slide audio (scope + loop). Migrate existing services without data loss.
 **Depends on:** Phase 20, Phase 22, Phase 23
 **Requirements:** R028, R029, R030, R018 (supporting)
-**Plans:** 0
+**Plans:** 6 plans
+
+Plans:
+- [ ] 24-01-PLAN.md — Slot identity (`ServiceSlot.id`, backfill) and the slide-group type contract
+- [ ] 24-02-PLAN.md — `slideGroups` Pinia store: deterministic-id CRUD, atomic D-05 media migration
+- [ ] 24-03-PLAN.md — Pure materializer: derive-from-source plus kind-specific reconciliation
+- [ ] 24-04-PLAN.md — Assembler reads stored groups; two-level audio precedence, bed and loop
+- [ ] 24-05-PLAN.md — Composable wiring: subscribe, lazy materialize/migrate, zero writes on reorder
+- [ ] 24-06-PLAN.md — ServiceEditorView: id backfill, R029 delete cascade + warning, bed-targeted media
 
 ### Phase 25: Slides Tab Shell — Plan Rail and Slide Grid `risk:medium`
 
