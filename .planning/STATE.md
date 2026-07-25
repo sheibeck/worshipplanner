@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Worship Service Slide Management
-current_phase: 20
-current_phase_name: Service Sections and Slide Auto-Assembly
+current_phase: 21
+current_phase_name: PowerPoint Import for Announcements and Sermon
 status: executing
-stopped_at: Paused at 20-04 Task 4 human-verify checkpoint (code tasks 1-3 complete)
-last_updated: "2026-07-24T23:26:08.365Z"
+stopped_at: Completed 21-01-PLAN.md
+last_updated: "2026-07-25T03:39:43.765Z"
 last_activity: 2026-07-24
 progress:
   total_phases: 18
-  completed_phases: 13
-  total_plans: 84
-  completed_plans: 83
-  percent: 72
+  completed_phases: 14
+  total_plans: 90
+  completed_plans: 85
+  percent: 78
 last_activity_desc: Migrated gsdpi milestone M001 into gsd-core as v1.2 (Phases 18-23)
 ---
 
@@ -24,18 +24,29 @@ last_activity_desc: Migrated gsdpi milestone M001 into gsd-core as v1.2 (Phases 
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 20 — Service Sections and Slide Auto-Assembly
+**Current focus:** Phase 21 — PowerPoint Import for Announcements and Sermon
 
 ## Current Position
 
-Phase: 20 (Service Sections and Slide Auto-Assembly) — EXECUTING
-Plan: 4 of 4
+Phase: 21 (PowerPoint Import for Announcements and Sermon) — EXECUTING
+Plan: 2 of 6
 Milestone: v1.2 Worship Service Slide Management (Phases 18-23) — IN PROGRESS
 Status: Ready to execute
 
 > **Migration note (2026-07-24):** This milestone was scoped and partially built in gsdpi
 > (`.gsd/` milestone M001, slices S01-S06) and faithfully ported into gsd-core as v1.2.
 > The gsdpi `.gsd/` store is now legacy/read-only — continue with regular `/gsd-*` commands.
+
+## Deferred Verification
+
+| Phase | State | Resume |
+|-------|-------|--------|
+| 20 | verification_deferred_human | /gsd-verify-work 20 |
+
+Phase 20 code is complete + unit-tested (all plans 20-01..20-04 committed). The blocking
+human-verify checkpoint (section grouping, live reorder-follows-slides, scripture override
+marker) was deferred by the user to a batch visual-verify at milestone end. Autonomous
+continued to Phase 21 per explicit user choice (2026-07-24).
 
 ## Milestone v1.2 Decisions (from gsdpi DECISIONS.md D001-D006)
 
@@ -103,6 +114,7 @@ Status: Ready to execute
 | Phase 20 P02 | 9min | 2 tasks | 2 files |
 | Phase 20 P03 | 33min | 1 tasks | 2 files |
 | Phase 20 P04 | 40min | 3 tasks | 5 files |
+| Phase 21 P01 | 25min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -171,6 +183,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: [Phase 20-03]: songLyricsById reactive Map only grows (never prunes) as songs are removed/re-added from the service — matches the T-20-03-DoS 'only fetch missing songIds' mitigation, harmless since the pure engine only reads entries for songIds in the current service
 - [Phase ?]: [Phase 20-04]: Section headers render as sibling divs in the same flat SortableJS list; Sortable's draggable: '.slot-item' option scopes drag/index math to slot items only, keeping onEnd/reindexSlots (MEM008) untouched
 - [Phase ?]: [Phase 20-04]: Per-slot section select mutates slot.section directly, routed through the existing deep-watch(localService) autosave path used by every other slot field — no new persistence path
+- [Phase ?]: IMPORTED slot mirrors SCRIPTURE exactly (deck-by-id, forEach-emit, tolerate null/unresolved id)
 
 ### Roadmap Evolution
 
@@ -228,6 +241,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-24
-Last session: 2026-07-24T23:25:58.816Z
-Stopped at: Paused at 20-04 Task 4 human-verify checkpoint (code tasks 1-3 complete)
-Resume file: .planning/phases/20-service-sections-and-slide-auto-assembly/20-04-SUMMARY.md
+Last session: 2026-07-25T03:39:43.729Z
+Stopped at: Completed 21-01-PLAN.md
+Resume file: None
