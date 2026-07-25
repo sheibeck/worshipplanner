@@ -1,0 +1,4 @@
+This is not a valid ZIP/OOXML archive. It intentionally lacks the PK\x03\x04 zip
+signature at offset 0, so any parser attempting to open it as a .pptx must fail
+fast with a friendly error rather than crash. Used by pptxParser.test.ts's
+"invalid file" error-path test (21-04).

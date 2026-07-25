@@ -5,7 +5,8 @@
   "scripts": {
     "build": "tsc",
     "serve": "npm run build && firebase emulators:start --only functions",
-    "deploy": "firebase deploy --only functions"
+    "deploy": "firebase deploy --only functions",
+    "test": "vitest run"
   },
   "engines": {
     "node": "22"
@@ -15,6 +16,7 @@
     "firebase-functions": "^7.2.5"
   },
   "devDependencies": {
-    "typescript": "~5.7.0"
+    "typescript": "~5.7.0",
+    "vitest": "^4.1.10"
   }
 }

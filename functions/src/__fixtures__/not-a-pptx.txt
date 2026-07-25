@@ -1,0 +1,5 @@
+This is a plain text file, not a PowerPoint deck. It represents a mis-declared
+upload (a client incorrectly labeling a non-.pptx file as .pptx, or a user
+renaming an arbitrary file's extension). Used by pptxParser.test.ts's
+error-path tests (21-04) to confirm the parser rejects non-OOXML content with
+the friendly "we couldn't read this file" error rather than crashing.
