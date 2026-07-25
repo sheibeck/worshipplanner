@@ -295,6 +295,70 @@ describe('PresentationViewer', () => {
     expect(wrapper.emitted('exit')).toBeTruthy()
   })
 
+  it('the teleported viewer root carries role="dialog" and aria-modal="true" (WR-06)', async () => {
+    const slides: AssembledSlide[] = [lyricSlide('a')]
+    mount(PresentationViewer, { props: { slides } })
+    await Promise.resolve()
+
+    const viewer = body().find('[data-testid="presentation-viewer"]')
+    expect(viewer.attributes('role')).toBe('dialog')
+    expect(viewer.attributes('aria-modal')).toBe('true')
+  })
+
+  describe('focus trap (WR-06)', () => {
+    it('Tab on the last focusable element wraps focus to the first', async () => {
+      const slides: AssembledSlide[] = [lyricSlide('a'), copyrightSlide('b')]
+      mount(PresentationViewer, { props: { slides } })
+      await Promise.resolve()
+
+      const exitEl = body().find('[data-testid="presentation-exit"]').element as HTMLElement
+      const nextEl = body().find('[data-testid="presentation-next"]').element as HTMLElement
+      nextEl.focus()
+      expect(document.activeElement).toBe(nextEl)
+
+      const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
+      const preventDefaultSpy = vi.spyOn(event, 'preventDefault')
+      body().find('[data-testid="presentation-viewer"]').element.dispatchEvent(event)
+
+      expect(preventDefaultSpy).toHaveBeenCalled()
+      expect(document.activeElement).toBe(exitEl)
+    })
+
+    it('Shift+Tab on the first focusable element wraps focus to the last', async () => {
+      const slides: AssembledSlide[] = [lyricSlide('a'), copyrightSlide('b')]
+      mount(PresentationViewer, { props: { slides } })
+      await Promise.resolve()
+
+      const exitEl = body().find('[data-testid="presentation-exit"]').element as HTMLElement
+      const nextEl = body().find('[data-testid="presentation-next"]').element as HTMLElement
+      exitEl.focus()
+      expect(document.activeElement).toBe(exitEl)
+
+      const event = new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true })
+      const preventDefaultSpy = vi.spyOn(event, 'preventDefault')
+      body().find('[data-testid="presentation-viewer"]').element.dispatchEvent(event)
+
+      expect(preventDefaultSpy).toHaveBeenCalled()
+      expect(document.activeElement).toBe(nextEl)
+    })
+
+    it('with only one focusable element (both nav buttons disabled), Tab keeps focus on it rather than escaping the viewer', async () => {
+      const slides: AssembledSlide[] = [withoutSection(lyricSlide('a'))]
+      mount(PresentationViewer, { props: { slides } })
+      await Promise.resolve()
+
+      const exitEl = body().find('[data-testid="presentation-exit"]').element as HTMLElement
+      exitEl.focus()
+
+      const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
+      const preventDefaultSpy = vi.spyOn(event, 'preventDefault')
+      body().find('[data-testid="presentation-viewer"]').element.dispatchEvent(event)
+
+      expect(preventDefaultSpy).toHaveBeenCalled()
+      expect(document.activeElement).toBe(exitEl)
+    })
+  })
+
   it('with requestFullscreen mocked to reject, the viewer still renders its slide and chrome and emits no error', async () => {
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const slides: AssembledSlide[] = [lyricSlide('a')]

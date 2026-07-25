@@ -3,6 +3,9 @@
     <div
       ref="viewerRoot"
       tabindex="-1"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Presentation"
       data-testid="presentation-viewer"
       class="fixed inset-0 z-50 bg-black outline-none flex items-center justify-center"
       @keydown="handleKeydown"
@@ -535,6 +538,46 @@ function registerActivity() {
 
 // ── Keyboard — bound on the viewer root only, never window/document ──────────
 
+/**
+ * WR-06: the viewer is teleported to `document.body` and covers the
+ * viewport visually, but the rest of the app remains in the DOM behind it
+ * (hidden only visually, not removed) — without a focus trap, Tab could walk
+ * keyboard focus straight past the viewer's own buttons into that
+ * still-present app content. Queries only the viewer's own currently-enabled
+ * focusable elements (prev/next are excluded via `:not([disabled])` when at
+ * either end of the show).
+ */
+function getFocusableElements(): HTMLElement[] {
+  const root = viewerRoot.value
+  if (!root) return []
+  return Array.from(
+    root.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    ),
+  )
+}
+
+function trapFocus(e: KeyboardEvent) {
+  const focusable = getFocusableElements()
+  if (focusable.length === 0) return
+  const first = focusable[0]
+  const last = focusable[focusable.length - 1]
+  const active = document.activeElement as HTMLElement | null
+  const activeIsTracked = active !== null && focusable.includes(active)
+
+  if (e.shiftKey) {
+    if (!activeIsTracked || active === first) {
+      e.preventDefault()
+      last.focus()
+    }
+  } else {
+    if (!activeIsTracked || active === last) {
+      e.preventDefault()
+      first.focus()
+    }
+  }
+}
+
 function handleKeydown(e: KeyboardEvent) {
   registerActivity()
   switch (e.key) {
@@ -549,6 +592,9 @@ function handleKeydown(e: KeyboardEvent) {
       break
     case 'Escape':
       exitPresentation()
+      break
+    case 'Tab':
+      trapFocus(e)
       break
   }
 }
