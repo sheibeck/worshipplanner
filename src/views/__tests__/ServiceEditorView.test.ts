@@ -48,6 +48,19 @@ vi.mock('@/stores/scriptureSlides', () => ({
   }),
 }))
 
+// useSlideshowAssembly (21-01) also reads imported decks from this store —
+// unmocked, useImportedSlides() calls getActivePinia() against a Pinia
+// instance this test never installs, crashing ServiceEditorView's setup().
+// Same reactive-stub pattern as the scriptureSlides mock above.
+vi.mock('@/stores/importedSlides', () => ({
+  useImportedSlides: () => ({
+    decks: [],
+    isLoading: false,
+    subscribeDecks: vi.fn(),
+    unsubscribeDecks: vi.fn(),
+  }),
+}))
+
 const mockTimestamp = { toDate: () => new Date('2026-03-08') } as unknown as Timestamp
 
 const mockService: Service = {

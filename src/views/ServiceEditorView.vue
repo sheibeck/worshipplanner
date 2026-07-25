@@ -908,6 +908,19 @@
                   </div>
                 </template>
               </template>
+
+              <!-- Per-slot media attach/preview/remove (Phase 22, R013/R014): editor only,
+                   hidden when exported, matching sibling slot controls. Collapsed/compact so
+                   it doesn't crowd the slot row; mutation rides the existing localService
+                   deep-watch autosave via onSlotAudioUrlChange/onSlotVideoUrlChange above. -->
+              <SlotMediaAttachment
+                v-if="authStore.isEditor && !isExportedLocked"
+                :orgId="authStore.orgId!"
+                :audioUrl="slot.audioUrl"
+                :videoUrl="slot.videoUrl"
+                @update:audioUrl="(url) => onSlotAudioUrlChange(index, url)"
+                @update:videoUrl="(url) => onSlotVideoUrlChange(index, url)"
+              />
             </div>
 
             <!-- Section-assignment control: editor only, hidden when exported (D005/R007) -->
@@ -1129,6 +1142,7 @@ import ServicePrintLayout from '@/components/ServicePrintLayout.vue'
 import ScriptureSlideEditor from '@/components/ScriptureSlideEditor.vue'
 import CongregationalEditor from '@/components/CongregationalEditor.vue'
 import ImportedSlideEditor from '@/components/ImportedSlideEditor.vue'
+import SlotMediaAttachment from '@/components/SlotMediaAttachment.vue'
 import PptxImportModal from '@/components/PptxImportModal.vue'
 import SlideshowPreview from '@/components/SlideshowPreview.vue'
 import { useSlideshowAssembly } from '@/composables/useSlideshowAssembly'
@@ -1343,6 +1357,24 @@ function onSectionChange(index: number, value: string) {
   const slot = localService.value.slots[index]
   if (!slot) return
   slot.section = value === '' ? undefined : (value as ServiceSection)
+}
+
+/** Editor-only per-slot media attach/remove (Phase 22, R013/R014) — routes
+ *  through the same localService mutation + autosave watcher as every other
+ *  slot field (onSectionChange above); SlotMediaAttachment never persists
+ *  anything itself. */
+function onSlotAudioUrlChange(index: number, url: string | undefined) {
+  if (!localService.value) return
+  const slot = localService.value.slots[index]
+  if (!slot) return
+  slot.audioUrl = url
+}
+
+function onSlotVideoUrlChange(index: number, url: string | undefined) {
+  if (!localService.value) return
+  const slot = localService.value.slots[index]
+  if (!slot) return
+  slot.videoUrl = url
 }
 
 const orgIdRef = computed(() => authStore.orgId)
