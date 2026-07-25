@@ -560,8 +560,8 @@ function getFocusableElements(): HTMLElement[] {
 function trapFocus(e: KeyboardEvent) {
   const focusable = getFocusableElements()
   if (focusable.length === 0) return
-  const first = focusable[0]
-  const last = focusable[focusable.length - 1]
+  const first = focusable[0] as HTMLElement
+  const last = focusable[focusable.length - 1] as HTMLElement
   const active = document.activeElement as HTMLElement | null
   const activeIsTracked = active !== null && focusable.includes(active)
 
