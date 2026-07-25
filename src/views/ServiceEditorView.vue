@@ -989,7 +989,13 @@
 
         <!-- Slideshow preview: inline, live-updating render of the assembled slideshow (R018, R006 visible) -->
         <div class="mt-3">
-          <SlideshowPreview :sections="assembledSections" />
+          <SlideshowPreview :sections="assembledSections" @present="presenting = true" />
+          <PresentationViewer
+            v-if="presenting"
+            :slides="assembledSlideshow"
+            :is-loading="slideshowLoading"
+            @exit="presenting = false"
+          />
         </div>
         </div>
 
@@ -1145,6 +1151,7 @@ import ImportedSlideEditor from '@/components/ImportedSlideEditor.vue'
 import SlotMediaAttachment from '@/components/SlotMediaAttachment.vue'
 import PptxImportModal from '@/components/PptxImportModal.vue'
 import SlideshowPreview from '@/components/SlideshowPreview.vue'
+import PresentationViewer from '@/components/PresentationViewer.vue'
 import { useSlideshowAssembly } from '@/composables/useSlideshowAssembly'
 import { formatForPlanningCenter } from '@/utils/planningCenterExport'
 import { fetchServiceTypes, fetchTemplates, fetchServiceTypeTeams, fetchPlans, fetchPlanItems, createPlan, fetchTemplateItems, addSlotAsItem, buildPlanTitle, createItem, updateItem, deleteItem, createPlanTime, fetchPlanNeededPositionTeamIds, fetchTeamPositions, addNeededPosition } from '@/utils/planningCenterApi'
@@ -1378,7 +1385,8 @@ function onSlotVideoUrlChange(index: number, url: string | undefined) {
 }
 
 const orgIdRef = computed(() => authStore.orgId)
-const { assembledSections } = useSlideshowAssembly(localService, orgIdRef)
+const { assembledSections, assembledSlideshow, isLoading: slideshowLoading } = useSlideshowAssembly(localService, orgIdRef)
+const presenting = ref(false)
 
 // ── AI state ───────────────────────────────────────────────────────────────────
 

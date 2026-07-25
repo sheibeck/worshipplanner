@@ -6,6 +6,7 @@ import type { Song } from '@/types/song'
 import type { Person, Role, Quarter } from '@/types/roster'
 import type { Timestamp } from 'firebase/firestore'
 import SlideshowPreview from '@/components/SlideshowPreview.vue'
+import PresentationViewer from '@/components/PresentationViewer.vue'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -532,6 +533,13 @@ describe('ServiceEditorView - Section headers and slideshow preview (Phase 20-04
           SongBadge: true,
           SongSlotPicker: true,
           ScriptureInput: true,
+          // props declared so wrapper.props('slides') resolves in the
+          // array-identity test below — a bare template stub would treat
+          // :slides/:is-loading as fallthrough attrs instead of tracked props.
+          PresentationViewer: {
+            props: ['slides', 'isLoading'],
+            template: '<div data-testid="presentation-viewer-stub" />',
+          },
         },
       },
     })
@@ -568,6 +576,46 @@ describe('ServiceEditorView - Section headers and slideshow preview (Phase 20-04
     const preview = wrapper.findComponent(SlideshowPreview)
     expect(preview.exists()).toBe(true)
     expect(Array.isArray(preview.props('sections'))).toBe(true)
+  })
+
+  it('does not mount PresentationViewer on initial render', async () => {
+    mockServicesList = [buildSectionedService()]
+    const wrapper = await mountView()
+
+    expect(wrapper.find('[data-testid="presentation-viewer-stub"]').exists()).toBe(false)
+  })
+
+  it('mounts PresentationViewer when SlideshowPreview emits present, and unmounts it when PresentationViewer emits exit', async () => {
+    mockServicesList = [buildSectionedService()]
+    const wrapper = await mountView()
+
+    await wrapper.findComponent(SlideshowPreview).vm.$emit('present')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('[data-testid="presentation-viewer-stub"]').exists()).toBe(true)
+
+    await wrapper.findComponent(PresentationViewer).vm.$emit('exit')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('[data-testid="presentation-viewer-stub"]').exists()).toBe(false)
+  })
+
+  it('passes the same assembledSlideshow array instance to PresentationViewer across re-renders, confirming it is not rebuilt locally', async () => {
+    mockServicesList = [buildSectionedService()]
+    const wrapper = await mountView()
+
+    await wrapper.findComponent(SlideshowPreview).vm.$emit('present')
+    await wrapper.vm.$nextTick()
+
+    const viewer = wrapper.findComponent(PresentationViewer)
+    expect(viewer.exists()).toBe(true)
+    const firstSlides = viewer.props('slides')
+    expect(Array.isArray(firstSlides)).toBe(true)
+
+    // Force a re-render with no underlying data change — a locally rebuilt
+    // (re-flattened) array would produce a new reference here; the
+    // composable's memoized `assembledSlideshow` computed does not.
+    await wrapper.vm.$nextTick()
+    const secondSlides = wrapper.findComponent(PresentationViewer).props('slides')
+    expect(secondSlides).toBe(firstSlides)
   })
 
   it('editor: a per-slot section select is bound to slot.section and mutates it through the existing localService path', async () => {
