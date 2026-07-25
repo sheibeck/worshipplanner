@@ -116,7 +116,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 23-04-PLAN.md — "Present Slideshow" entry CTA + ServiceEditorView wiring + automated phase gate (Wave 4)
+- [x] 23-04-PLAN.md — "Present Slideshow" entry CTA + ServiceEditorView wiring + automated phase gate (Wave 4)
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
