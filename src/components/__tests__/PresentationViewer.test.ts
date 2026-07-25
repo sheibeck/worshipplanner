@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mount, DOMWrapper, enableAutoUnmount } from '@vue/test-utils'
+import { mount, flushPromises, DOMWrapper, enableAutoUnmount } from '@vue/test-utils'
 import PresentationViewer from '../PresentationViewer.vue'
 import type { AssembledSlide } from '@/types/slide'
 
@@ -491,5 +491,328 @@ describe('PresentationViewer', () => {
     expect(slideContainer.find('i').exists()).toBe(false)
     expect(slideContainer.text()).toContain('<script>alert(1)</script>')
     expect(slideContainer.text()).toContain('<b>bold</b>')
+  })
+
+  // ── Task 1: mount the chromeless players and drive play/pause across transitions ──
+
+  function videoSlide(id: string, url: string): AssembledSlide {
+    return {
+      slide: {
+        id,
+        position: 5,
+        contentKind: 'text',
+        body: `Video slide ${id}`,
+        videoUrl: url,
+      },
+      slotIndex: 4,
+      slotKind: 'IMPORTED',
+      section: 'worship',
+      sourceId: 'video-1',
+    }
+  }
+
+  function audioSlide(id: string, url: string): AssembledSlide {
+    return {
+      slide: {
+        id,
+        position: 6,
+        contentKind: 'text',
+        body: `Audio slide ${id}`,
+        audioUrl: url,
+      },
+      slotIndex: 5,
+      slotKind: 'IMPORTED',
+      section: 'worship',
+      sourceId: 'audio-1',
+    }
+  }
+
+  describe('media playback', () => {
+    beforeEach(() => {
+      // jsdom does not implement HTMLMediaElement.play/pause — stub per test.
+      window.HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined)
+      window.HTMLMediaElement.prototype.pause = vi.fn()
+    })
+
+    it('a slide with videoUrl renders presentation-video containing a chromeless VideoPlayer with the correct src', async () => {
+      mount(PresentationViewer, { props: { slides: [videoSlide('v1', 'https://example.com/clip.mp4')] } })
+      await flushPromises()
+
+      const wrapper = body().find('[data-testid="presentation-video"]')
+      expect(wrapper.exists()).toBe(true)
+      const video = wrapper.find('video')
+      expect(video.attributes('src')).toBe('https://example.com/clip.mp4')
+      expect(video.attributes('controls')).toBeUndefined()
+    })
+
+    it('a slide with audioUrl renders presentation-audio containing a chromeless AudioPlayer occupying no layout space', async () => {
+      mount(PresentationViewer, { props: { slides: [audioSlide('a1', 'https://example.com/clip.mp3')] } })
+      await flushPromises()
+
+      const wrapper = body().find('[data-testid="presentation-audio"]')
+      expect(wrapper.exists()).toBe(true)
+      expect(wrapper.classes()).toContain('h-0')
+      const audio = wrapper.find('audio')
+      expect(audio.attributes('controls')).toBeUndefined()
+    })
+
+    it('a slide with neither url renders neither media wrapper', async () => {
+      mount(PresentationViewer, { props: { slides: [textSlide('t1')] } })
+      await flushPromises()
+
+      expect(body().find('[data-testid="presentation-video"]').exists()).toBe(false)
+      expect(body().find('[data-testid="presentation-audio"]').exists()).toBe(false)
+    })
+
+    it('mounting on a media-carrying first slide calls play once after the DOM settles', async () => {
+      mount(PresentationViewer, { props: { slides: [videoSlide('v1', 'https://example.com/clip.mp4')] } })
+      await flushPromises()
+
+      expect(window.HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(1)
+    })
+
+    it('advancing from a media-carrying slide to another calls pause before the incoming play (ordered)', async () => {
+      const calls: string[] = []
+      window.HTMLMediaElement.prototype.play = vi.fn().mockImplementation(function playImpl() {
+        calls.push('play')
+        return Promise.resolve()
+      })
+      window.HTMLMediaElement.prototype.pause = vi.fn().mockImplementation(function pauseImpl() {
+        calls.push('pause')
+      })
+
+      const slides = [videoSlide('v1', 'https://example.com/clip1.mp4'), videoSlide('v2', 'https://example.com/clip2.mp4')]
+      mount(PresentationViewer, { props: { slides } })
+      await flushPromises()
+      calls.length = 0 // discard the initial mount play
+
+      await body().find('[data-testid="presentation-next"]').trigger('click')
+      await flushPromises()
+
+      const lastPauseIdx = calls.lastIndexOf('pause')
+      const lastPlayIdx = calls.lastIndexOf('play')
+      expect(lastPauseIdx).toBeGreaterThanOrEqual(0)
+      expect(lastPlayIdx).toBeGreaterThan(lastPauseIdx)
+    })
+
+    it('advancing from a media-carrying slide onto a sibling with no media calls pause and issues no further play', async () => {
+      const calls: string[] = []
+      window.HTMLMediaElement.prototype.play = vi.fn().mockImplementation(function playImpl() {
+        calls.push('play')
+        return Promise.resolve()
+      })
+      window.HTMLMediaElement.prototype.pause = vi.fn().mockImplementation(function pauseImpl() {
+        calls.push('pause')
+      })
+
+      const slides = [videoSlide('v1', 'https://example.com/clip1.mp4'), textSlide('t1')]
+      mount(PresentationViewer, { props: { slides } })
+      await flushPromises()
+      calls.length = 0
+
+      await body().find('[data-testid="presentation-next"]').trigger('click')
+      await flushPromises()
+
+      expect(calls).toEqual(['pause'])
+    })
+
+    it('going back (ArrowLeft) obeys the same pause-then-play ordering', async () => {
+      const calls: string[] = []
+      window.HTMLMediaElement.prototype.play = vi.fn().mockImplementation(function playImpl() {
+        calls.push('play')
+        return Promise.resolve()
+      })
+      window.HTMLMediaElement.prototype.pause = vi.fn().mockImplementation(function pauseImpl() {
+        calls.push('pause')
+      })
+
+      const slides = [videoSlide('v1', 'https://example.com/clip1.mp4'), videoSlide('v2', 'https://example.com/clip2.mp4')]
+      mount(PresentationViewer, { props: { slides } })
+      await flushPromises()
+      await body().find('[data-testid="presentation-next"]').trigger('click')
+      await flushPromises()
+      calls.length = 0
+
+      await body().find('[data-testid="presentation-viewer"]').trigger('keydown', { key: 'ArrowLeft' })
+      await flushPromises()
+
+      const lastPauseIdx = calls.lastIndexOf('pause')
+      const lastPlayIdx = calls.lastIndexOf('play')
+      expect(lastPauseIdx).toBeGreaterThanOrEqual(0)
+      expect(lastPlayIdx).toBeGreaterThan(lastPauseIdx)
+    })
+
+    it('clicking presentation-exit calls pause', async () => {
+      mount(PresentationViewer, { props: { slides: [videoSlide('v1', 'https://example.com/clip.mp4')] } })
+      await flushPromises()
+      ;(window.HTMLMediaElement.prototype.pause as ReturnType<typeof vi.fn>).mockClear()
+
+      await body().find('[data-testid="presentation-exit"]').trigger('click')
+
+      expect(window.HTMLMediaElement.prototype.pause).toHaveBeenCalled()
+    })
+
+    it('unmounting the viewer calls pause', async () => {
+      const wrapper = mount(PresentationViewer, { props: { slides: [videoSlide('v1', 'https://example.com/clip.mp4')] } })
+      await flushPromises()
+      ;(window.HTMLMediaElement.prototype.pause as ReturnType<typeof vi.fn>).mockClear()
+
+      wrapper.unmount()
+
+      expect(window.HTMLMediaElement.prototype.pause).toHaveBeenCalled()
+    })
+
+    it('a video-carrying slide renders presentation-body at text-2xl (caption), not text-5xl; an audio-only slide renders text-5xl', async () => {
+      mount(PresentationViewer, {
+        props: {
+          slides: [videoSlide('v1', 'https://example.com/clip.mp4'), audioSlide('a1', 'https://example.com/clip.mp3')],
+        },
+      })
+      await flushPromises()
+
+      const videoSlideBody = body().find('[data-testid="presentation-body"]')
+      expect(videoSlideBody.classes()).toContain('text-2xl')
+      expect(videoSlideBody.classes()).not.toContain('text-5xl')
+
+      await body().find('[data-testid="presentation-next"]').trigger('click')
+      await flushPromises()
+
+      const audioSlideBody = body().find('[data-testid="presentation-body"]')
+      expect(audioSlideBody.classes()).toContain('text-5xl')
+    })
+  })
+
+  // ── Task 2: graceful degradation — media-unavailable notice, blocked affordances ──
+
+  describe('media degradation', () => {
+    beforeEach(() => {
+      window.HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined)
+      window.HTMLMediaElement.prototype.pause = vi.fn()
+    })
+
+    it('triggering error on the video removes presentation-video, shows the media-unavailable notice, and leaves the body unchanged', async () => {
+      mount(PresentationViewer, { props: { slides: [videoSlide('v1', 'https://example.com/clip.mp4')] } })
+      await flushPromises()
+
+      await body().find('[data-testid="presentation-video"] video').trigger('error')
+      await flushPromises()
+
+      expect(body().find('[data-testid="presentation-video"]').exists()).toBe(false)
+      expect(body().find('[data-testid="presentation-media-unavailable"]').text()).toBe('Media unavailable')
+      expect(body().find('[data-testid="presentation-body"]').text()).toContain('Video slide v1')
+    })
+
+    it('triggering error on the audio removes presentation-audio and shows the same notice', async () => {
+      mount(PresentationViewer, { props: { slides: [audioSlide('a1', 'https://example.com/clip.mp3')] } })
+      await flushPromises()
+
+      await body().find('[data-testid="presentation-audio"] audio').trigger('error')
+      await flushPromises()
+
+      expect(body().find('[data-testid="presentation-audio"]').exists()).toBe(false)
+      expect(body().find('[data-testid="presentation-media-unavailable"]').text()).toBe('Media unavailable')
+    })
+
+    it('after a media error, ArrowRight still advances', async () => {
+      const slides = [videoSlide('v1', 'https://example.com/clip.mp4'), textSlide('t1')]
+      mount(PresentationViewer, { props: { slides } })
+      await flushPromises()
+
+      await body().find('[data-testid="presentation-video"] video').trigger('error')
+      await flushPromises()
+
+      await body().find('[data-testid="presentation-viewer"]').trigger('keydown', { key: 'ArrowRight' })
+      await flushPromises()
+
+      expect(slideText()).toContain('Please stand for the reading of the Word.')
+    })
+
+    describe('media-unavailable notice not part of auto-hiding chrome', () => {
+      beforeEach(() => {
+        vi.useFakeTimers()
+      })
+      afterEach(() => {
+        vi.useRealTimers()
+      })
+
+      it('presentation-media-unavailable does not carry opacity-0 after the idle timer fires, while presentation-chrome does', async () => {
+        mount(PresentationViewer, { props: { slides: [videoSlide('v1', 'https://example.com/clip.mp4')] } })
+        await Promise.resolve()
+        await Promise.resolve()
+
+        await body().find('[data-testid="presentation-video"] video').trigger('error')
+        await Promise.resolve()
+
+        await vi.advanceTimersByTimeAsync(3100)
+
+        expect(body().find('[data-testid="presentation-media-unavailable"]').classes()).not.toContain('opacity-0')
+        expect(body().find('[data-testid="presentation-chrome"]').classes()).toContain('opacity-0')
+      })
+    })
+
+    it('play rejecting with NotAllowedError on an audio slide renders the audio affordance; clicking it calls play() again', async () => {
+      window.HTMLMediaElement.prototype.play = vi.fn().mockRejectedValue(new DOMException('blocked', 'NotAllowedError'))
+      mount(PresentationViewer, { props: { slides: [audioSlide('a1', 'https://example.com/clip.mp3')] } })
+      await flushPromises()
+
+      const affordance = body().find('[data-testid="presentation-audio-affordance"]')
+      expect(affordance.exists()).toBe(true)
+      expect(affordance.text()).toBe('Tap to play audio')
+
+      const callsBefore = (window.HTMLMediaElement.prototype.play as ReturnType<typeof vi.fn>).mock.calls.length
+      await affordance.trigger('click')
+      await flushPromises()
+
+      expect((window.HTMLMediaElement.prototype.play as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(
+        callsBefore,
+      )
+    })
+
+    it('play rejecting once then resolving on a video slide shows the muted chip, not the hard-block affordance; clicking it unmutes', async () => {
+      window.HTMLMediaElement.prototype.play = vi
+        .fn()
+        .mockRejectedValueOnce(new DOMException('blocked', 'NotAllowedError'))
+        .mockResolvedValue(undefined)
+      mount(PresentationViewer, { props: { slides: [videoSlide('v1', 'https://example.com/clip.mp4')] } })
+      await flushPromises()
+
+      const chip = body().find('[data-testid="presentation-muted-chip"]')
+      expect(chip.exists()).toBe(true)
+      expect(chip.text()).toBe('Playing muted — tap to unmute')
+      expect(body().find('[data-testid="presentation-video-affordance"]').exists()).toBe(false)
+
+      await chip.trigger('click')
+      await flushPromises()
+
+      expect((body().find('[data-testid="presentation-video"] video').element as HTMLVideoElement).muted).toBe(false)
+    })
+
+    it('play always rejecting on a video slide shows the hard-block affordance, not the muted chip', async () => {
+      window.HTMLMediaElement.prototype.play = vi.fn().mockRejectedValue(new DOMException('blocked', 'NotAllowedError'))
+      mount(PresentationViewer, { props: { slides: [videoSlide('v1', 'https://example.com/clip.mp4')] } })
+      await flushPromises()
+
+      const affordance = body().find('[data-testid="presentation-video-affordance"]')
+      expect(affordance.exists()).toBe(true)
+      expect(affordance.text()).toBe('Tap to play video')
+      expect(body().find('[data-testid="presentation-muted-chip"]').exists()).toBe(false)
+    })
+
+    it('advancing to the next slide clears every degraded-state flag', async () => {
+      window.HTMLMediaElement.prototype.play = vi.fn().mockRejectedValue(new DOMException('blocked', 'NotAllowedError'))
+      const slides = [videoSlide('v1', 'https://example.com/clip.mp4'), textSlide('t1')]
+      mount(PresentationViewer, { props: { slides } })
+      await flushPromises()
+
+      expect(body().find('[data-testid="presentation-video-affordance"]').exists()).toBe(true)
+
+      await body().find('[data-testid="presentation-next"]').trigger('click')
+      await flushPromises()
+
+      expect(body().find('[data-testid="presentation-media-unavailable"]').exists()).toBe(false)
+      expect(body().find('[data-testid="presentation-audio-affordance"]').exists()).toBe(false)
+      expect(body().find('[data-testid="presentation-video-affordance"]').exists()).toBe(false)
+      expect(body().find('[data-testid="presentation-muted-chip"]').exists()).toBe(false)
+    })
   })
 })

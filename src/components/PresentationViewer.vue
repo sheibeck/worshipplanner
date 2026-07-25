@@ -51,7 +51,8 @@
           </p>
           <p
             data-testid="presentation-body"
-            class="text-5xl font-normal leading-[1.4] text-gray-100 whitespace-pre-line"
+            class="text-gray-100 whitespace-pre-line"
+            :class="bodyIsCaption ? 'text-2xl font-semibold leading-[1.3]' : 'text-5xl font-normal leading-[1.4]'"
           >
             {{ (currentSlide.slide as LyricSlide).lines.join('\n') }}
           </p>
@@ -111,7 +112,8 @@
           <p
             v-else
             data-testid="presentation-body"
-            class="text-5xl font-normal leading-[1.4] text-gray-100 whitespace-pre-line"
+            class="text-gray-100 whitespace-pre-line"
+            :class="bodyIsCaption ? 'text-2xl font-semibold leading-[1.3]' : 'text-5xl font-normal leading-[1.4]'"
           >
             {{ (currentSlide.slide as ScriptureSlide).text }}
           </p>
@@ -128,7 +130,8 @@
           </p>
           <p
             data-testid="presentation-body"
-            class="text-5xl font-normal leading-[1.4] text-gray-100 whitespace-pre-line"
+            class="text-gray-100 whitespace-pre-line"
+            :class="bodyIsCaption ? 'text-2xl font-semibold leading-[1.3]' : 'text-5xl font-normal leading-[1.4]'"
           >
             {{ (currentSlide.slide as TextSlide).body }}
           </p>
@@ -143,6 +146,83 @@
             class="max-h-[80vh] max-w-full object-contain"
           />
         </template>
+
+        <!-- Attached video (Phase 22/23, R013/R014) — chromeless, imperatively
+             driven. Rendered after the slide's own text so the video becomes the
+             dominant element while the text drops to a caption (bodyIsCaption). -->
+        <div
+          v-if="currentVideoUrl && !mediaFailed"
+          data-testid="presentation-video"
+          class="w-full flex justify-center mt-8"
+        >
+          <VideoPlayer
+            ref="videoRef"
+            chromeless
+            :src="currentVideoUrl"
+            :key="currentVideoUrl"
+            @error="onMediaError"
+            @autoplay-blocked="onVideoAutoplayBlocked"
+            @play="videoBlocked = false"
+          />
+        </div>
+
+        <!-- Attached audio — zero-size wrapper, occupies no layout space. -->
+        <div
+          v-if="currentAudioUrl && !mediaFailed"
+          data-testid="presentation-audio"
+          class="absolute h-0 w-0 overflow-hidden"
+        >
+          <AudioPlayer
+            ref="audioRef"
+            chromeless
+            :src="currentAudioUrl"
+            :key="currentAudioUrl"
+            @error="onMediaError"
+            @autoplay-blocked="onAudioAutoplayBlocked"
+            @play="audioBlocked = false"
+          />
+        </div>
+
+        <!-- Media-unavailable notice — deliberately NOT bound to chrome
+             auto-hide; it reports slide state, not navigation affordance. -->
+        <p
+          v-if="mediaFailed"
+          data-testid="presentation-media-unavailable"
+          class="absolute bottom-20 left-6 text-xs text-gray-500 leading-[1.4]"
+        >
+          Media unavailable
+        </p>
+
+        <!-- Autoplay-blocked affordances -->
+        <button
+          v-if="audioBlocked"
+          type="button"
+          data-testid="presentation-audio-affordance"
+          class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-lg bg-indigo-600 hover:bg-indigo-500 px-8 py-4 text-4xl font-semibold text-white"
+          @click="audioRef?.play()"
+        >
+          Tap to play audio
+        </button>
+
+        <button
+          v-if="videoBlocked"
+          type="button"
+          data-testid="presentation-video-affordance"
+          class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-lg bg-indigo-600 hover:bg-indigo-500 px-8 py-4 text-4xl font-semibold text-white"
+          @click="videoRef?.play()"
+        >
+          Tap to play video
+        </button>
+
+        <button
+          v-if="videoMutedPlaying"
+          type="button"
+          data-testid="presentation-muted-chip"
+          class="absolute bottom-20 right-6 rounded-full bg-amber-900/40 px-4 py-2 text-sm font-medium text-amber-300"
+          @click="onUnmuteClick"
+        >
+          Playing muted — tap to unmute
+        </button>
       </div>
 
       <!-- Exit button — always present (never hidden by v-if), only fades opacity. -->
@@ -204,7 +284,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, onUnmounted, nextTick } from 'vue'
 import type {
   AssembledSlide,
   Slide,
@@ -215,6 +295,8 @@ import type {
   ImageSlide,
 } from '@/types/slide'
 import { SERVICE_SECTION_LABELS } from '@/types/service'
+import AudioPlayer from './AudioPlayer.vue'
+import VideoPlayer from './VideoPlayer.vue'
 
 const props = defineProps<{
   slides: AssembledSlide[]
@@ -234,6 +316,17 @@ const isTrueFullscreen = ref(false)
 let chromeTimer: ReturnType<typeof setTimeout> | null = null
 let hasExited = false
 
+const audioRef = ref<InstanceType<typeof AudioPlayer> | null>(null)
+const videoRef = ref<InstanceType<typeof VideoPlayer> | null>(null)
+
+// Per-slide degraded-state flags. All reset on every slide change
+// (resetMediaState, called from goToIndex) so one slide's degraded state
+// never leaks onto the next.
+const mediaFailed = ref(false)
+const audioBlocked = ref(false)
+const videoBlocked = ref(false)
+const videoMutedPlaying = ref(false)
+
 // ── Computed ─────────────────────────────────────────────────────────────────
 
 const hasSlides = computed(() => props.slides.length > 0)
@@ -242,6 +335,10 @@ const isEmptyState = computed(() => !isLoadingState.value && props.slides.length
 const currentSlide = computed<AssembledSlide | null>(() => props.slides[currentIndex.value] ?? null)
 const atFirst = computed(() => currentIndex.value <= 0)
 const atLast = computed(() => currentIndex.value >= props.slides.length - 1)
+
+const currentAudioUrl = computed<string | null>(() => currentSlide.value?.slide.audioUrl ?? null)
+const currentVideoUrl = computed<string | null>(() => currentSlide.value?.slide.videoUrl ?? null)
+const bodyIsCaption = computed(() => Boolean(currentVideoUrl.value))
 
 const progressLabel = computed(() => {
   const n = currentIndex.value + 1
@@ -292,16 +389,94 @@ watch(
   },
 )
 
+// ── Media driving — imperative play/pause only; the players expose no attribute that triggers unattended playback ──
+
+/** No-op on a slide with no mounted media (optional-chained). */
+function pauseCurrentMedia() {
+  audioRef.value?.pause()
+  videoRef.value?.pause()
+}
+
+/**
+ * Both play() calls are async and their rejections are already handled
+ * inside the players (autoplay-blocked handling lives there) — do not await
+ * them here and do not attach a catch that would swallow anything other
+ * than the NotAllowedError the players already handle internally.
+ */
+function playCurrentMedia() {
+  void videoRef.value?.play()
+  void audioRef.value?.play()
+}
+
+/** Every per-slide media state resets on each slide change so one slide's
+ * degraded state never leaks onto the next. */
+function resetMediaState() {
+  mediaFailed.value = false
+  audioBlocked.value = false
+  videoBlocked.value = false
+  videoMutedPlaying.value = false
+}
+
+/**
+ * Pausing the outgoing slide's media BEFORE the index write is the whole
+ * point (T-23-08) — never move this after the assignment, and never rely on
+ * unmount to stop playback.
+ */
+async function goToIndex(next: number) {
+  if (next === currentIndex.value) return
+  if (next < 0 || next > props.slides.length - 1) return
+  pauseCurrentMedia()
+  resetMediaState()
+  currentIndex.value = next
+  await nextTick()
+  playCurrentMedia()
+}
+
 // ── Navigation — stop at both ends, never wrap ────────────────────────────────
 
 function goNext() {
   if (atLast.value) return
-  currentIndex.value += 1
+  void goToIndex(currentIndex.value + 1)
 }
 
 function goPrev() {
   if (atFirst.value) return
-  currentIndex.value -= 1
+  void goToIndex(currentIndex.value - 1)
+}
+
+// ── Media event handlers ──────────────────────────────────────────────────────
+
+/** A media file removed by the Phase 22 two-week retention cleanup is an
+ * expected state, not a failure — no console output, no re-fetch, no
+ * navigation change. */
+function onMediaError() {
+  mediaFailed.value = true
+}
+
+function onAudioAutoplayBlocked() {
+  audioBlocked.value = true
+}
+
+/**
+ * VideoPlayer emits the same 'autoplay-blocked' event for both the muted-retry
+ * success and the hard-block cases (per the locked STATE.md decision) — the
+ * two are told apart here by reading the exposed `isMuted` accessor rather
+ * than a second event.
+ */
+function onVideoAutoplayBlocked() {
+  const stillMuted = videoRef.value?.isMuted === true
+  if (stillMuted) {
+    videoMutedPlaying.value = true
+    videoBlocked.value = false
+  } else {
+    videoBlocked.value = true
+    videoMutedPlaying.value = false
+  }
+}
+
+function onUnmuteClick() {
+  void videoRef.value?.unmute()
+  videoMutedPlaying.value = false
 }
 
 // ── Auto-hiding chrome ─────────────────────────────────────────────────────────
@@ -359,6 +534,7 @@ function handleFullscreenChange() {
 
 function exitPresentation() {
   if (hasExited) return
+  pauseCurrentMedia()
   if (document.fullscreenElement) {
     document.exitFullscreen().catch(() => {
       // Exiting fullscreen can itself reject in some contexts — never block exit on it.
@@ -368,11 +544,22 @@ function exitPresentation() {
   emit('exit')
 }
 
-onMounted(() => {
+onMounted(async () => {
   viewerRoot.value?.focus()
   registerActivity()
   document.addEventListener('fullscreenchange', handleFullscreenChange)
   enterPresentation()
+  await nextTick()
+  playCurrentMedia()
+})
+
+// pauseCurrentMedia() must run in onBeforeUnmount, not onUnmounted: Vue nulls
+// out child template refs via a post-flush callback queued BEFORE this
+// component's own onUnmounted runs, so by the time onUnmounted fires,
+// videoRef/audioRef are already null and pause() would silently no-op.
+// onBeforeUnmount runs synchronously, top-down, before any of that teardown.
+onBeforeUnmount(() => {
+  pauseCurrentMedia()
 })
 
 onUnmounted(() => {
