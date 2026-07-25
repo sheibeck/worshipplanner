@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<style>
+  body { margin:0; background:#0a0c14; font-family:Inter, system-ui, sans-serif; -webkit-font-smoothing:antialiased; }
+  a { color:#9184d9; text-decoration:none; }
+  a:hover { color:#b3a9e8; }
+  *::-webkit-scrollbar { width:8px; height:8px; }
+  *::-webkit-scrollbar-thumb { background:#2a2f4a; border-radius:8px; }
+</style>
+</helmet>
+
+<section style="display:flex; flex-direction:column; gap:20px; padding:40px;">
+  <div style="display:flex; align-items:baseline; gap:14px; color:#e9e9ed; font-size:15px; letter-spacing:.14em; text-transform:uppercase;">
+    <span>Slides tab — implementation spec</span>
+    <span style="font-size:13px; letter-spacing:0; text-transform:none; color:#8a90a8;">Groups are owned by plan items (order + membership mirror the service plan); slide content, media and audio are independent.</span>
+  </div>
+
+  <div style="display:flex; flex-wrap:wrap; gap:40px; align-items:flex-start;">
+
+    <!-- ============ OPTION 1A ============ -->
+    <div id="1a" style="display:flex; flex-direction:column; gap:10px;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="display:inline-flex; align-items:center; justify-content:center; min-width:30px; height:24px; padding:0 8px; border-radius:6px; background:#7c5cff; color:#fff; font-size:13px; font-weight:600;">1a</span>
+        <span style="color:#e9e9ed; font-size:14px; font-weight:500;">Plan rail · slide grid · Edit Slide drawer</span>
+        <span style="color:#8a90a8; font-size:13px;">Rail mirrors the plan order and is not draggable here — reordering happens in Music.</span>
+      </div>
+
+      <div style="width:1460px; height:940px; display:flex; background:#10131f; border:1px solid #262b45; border-radius:10px; overflow:hidden; color:#e9e9ed; position:relative;">
+
+        <!-- sidebar -->
+        <div style="width:210px; flex:none; background:#141726; border-right:1px solid #232842; display:flex; flex-direction:column; padding:16px 0;">
+          <div style="padding:0 16px 14px;">
+            <div style="font-size:14px; font-weight:600;">Worship Planner</div>
+            <div style="font-size:10px; color:#5f667f; margin-top:2px;">vd59e3de</div>
+          </div>
+          <div style="padding:10px 16px; border-top:1px solid #232842; border-bottom:1px solid #232842; font-size:12px; color:#9aa0b8;">Berean Baptist Church</div>
+          <div style="display:flex; flex-direction:column; padding:12px 10px; gap:2px;">
+            <div style="padding:9px 12px; border-radius:7px; font-size:13px; color:#9aa0b8;">Dashboard</div>
+            <div style="padding:9px 12px; border-radius:7px; font-size:13px; background:#26234a; color:#cfc7ff; font-weight:500;">Services</div>
+            <div style="padding:9px 12px; border-radius:7px; font-size:13px; color:#9aa0b8;">Songs</div>
+            <div style="margin:8px 12px; height:1px; background:#232842;"></div>
+            <div style="padding:9px 12px; border-radius:7px; font-size:13px; color:#9aa0b8;">Schedule</div>
+            <div style="padding:9px 12px; border-radius:7px; font-size:13px; color:#9aa0b8;">Volunteers</div>
+            <div style="margin:8px 12px; height:1px; background:#232842;"></div>
+            <div style="padding:9px 12px; border-radius:7px; font-size:13px; color:#9aa0b8;">Admins</div>
+            <div style="padding:9px 12px; border-radius:7px; font-size:13px; color:#9aa0b8;">Settings</div>
+          </div>
+          <div style="margin-top:auto; padding:14px 16px; border-top:1px solid #232842; display:flex; align-items:center; gap:10px;">
+            <div style="width:28px; height:28px; border-radius:50%; background:#3b2f7a; color:#cfc7ff; font-size:11px; display:flex; align-items:center; justify-content:center;">SH</div>
+            <div style="font-size:11px; line-height:1.35;"><div>Sterling Heibeck</div><div style="color:#6b7189;">sheibeck@gmail.com</div></div>
+          </div>
+        </div>
+
+        <!-- main -->
+        <div style="flex:1; display:flex; flex-direction:column; min-width:0;">
+          <div style="padding:18px 24px 0;">
+            <div style="font-size:12px; color:#8a90a8; margin-bottom:10px;">‹ Back to Services</div>
+            <div style="display:flex; align-items:center; gap:12px;">
+              <div style="font-size:22px; font-weight:600;">Sunday, July 26, 2026</div>
+              <span style="padding:3px 9px; border-radius:6px; background:#14311f; border:1px solid #1f5c36; color:#63d68f; font-size:11px;">✓ Exported</span>
+              <div style="margin-left:auto; display:flex; gap:8px;">
+                <button style="padding:8px 13px; border-radius:7px; background:transparent; border:1px solid #2d3350; color:#c3c8dc; font-size:12px; font-family:inherit;">Generate missing slides</button>
+                <button style="padding:8px 13px; border-radius:7px; background:transparent; border:1px solid #2d3350; color:#c3c8dc; font-size:12px; font-family:inherit;">⇪ Import</button>
+                <button style="padding:8px 13px; border-radius:7px; background:transparent; border:1px solid #9184d9; color:#c9c1f5; font-size:12px; font-family:inherit;">▶ Present</button>
+                <button style="padding:8px 15px; border-radius:7px; background:#7c5cff; border:1px solid #8b6dff; color:#fff; font-size:12px; font-weight:500; font-family:inherit;">Save</button>
+              </div>
+            </div>
+            <div style="display:flex; gap:4px; margin-top:16px; border-bottom:1px solid #232842;">
+              <div style="padding:9px 14px; font-size:13px; color:#8a90a8;">Music</div>
+              <div style="padding:9px 14px; font-size:13px; color:#8a90a8;">Roles</div>
+              <div style="padding:9px 14px; font-size:13px; color:#cfc7ff; border-bottom:2px solid #7c5cff; font-weight:500;">Slides</div>
+            </div>
+          </div>
+
+          <div style="flex:1; display:flex; min-height:0;">
+
+            <!-- plan rail -->
+            <div style="width:262px; flex:none; border-right:1px solid #232842; display:flex; flex-direction:column; min-height:0;">
+              <div style="padding:14px 16px 10px; display:flex; align-items:center; gap:8px;">
+                <span style="font-size:10px; letter-spacing:.14em; color:#6b7189;">SERVICE PLAN</span>
+                <span style="margin-left:auto; font-size:10px; color:#7c8099;">order locked ⇄ Music</span>
+              </div>
+              <div style="flex:1; overflow:hidden; display:flex; flex-direction:column; gap:4px; padding:0 10px 14px;">
+                <sc-for list="{{ groups }}" as="g" hint-placeholder-count="8">
+                  <div onClick="{{ selectGroup }}" data-i="{{ g.i }}" style="{{ g.railStyle }}" style-hover="background:#1b1f33;">
+                    <div style="display:flex; align-items:center; gap:7px;">
+                      <span style="{{ g.kindStyle }}">{{ g.kind }}</span>
+                      <span style="margin-left:auto; font-size:10px; color:#7c8099;">{{ g.count }}</span>
+                    </div>
+                    <div style="font-size:12.5px; color:#dcdfea; margin-top:4px; line-height:1.3;">{{ g.title }}</div>
+                    <div style="display:flex; align-items:center; gap:6px; margin-top:5px;">
+                      <sc-if value="{{ g.bed }}" hint-placeholder-val="{{ true }}">
+                        <span style="font-size:10px; color:#8f86c9;">♪ group music: {{ g.bed }}</span>
+                      </sc-if>
+                    </div>
+                  </div>
+                </sc-for>
+                <div style="margin-top:8px; padding:9px 11px; border:1px dashed #4a3a5e; border-radius:8px; background:#1d1526;">
+                  <div style="font-size:10px; letter-spacing:.12em; color:#c98fb8;">UNANCHORED</div>
+                  <div style="font-size:12px; color:#c8c2d6; margin-top:4px;">Pre-service loop · 6 slides</div>
+                  <div style="font-size:11px; color:#a08cb0; margin-top:3px;">Orphaned: “Offering” (2) — reassign</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- slide grid -->
+            <div style="flex:1; min-width:0; display:flex; flex-direction:column;">
+              <div style="display:flex; align-items:center; gap:10px; padding:13px 20px; border-bottom:1px solid #232842;">
+                <div style="font-size:13px; font-weight:500;">Song — This Is Our God</div>
+                <span style="padding:2px 8px; border-radius:5px; background:#241f45; border:1px solid #3a3270; color:#b3a9e8; font-size:10px;">group 3 of 9 · follows plan</span>
+                <span style="font-size:10.5px; color:#7c8099;">Lyrics come from the song’s Lyrics tab</span>
+                <div style="margin-left:auto; display:flex; gap:7px;">
+                  <button style="padding:6px 11px; border-radius:6px; background:transparent; border:1px solid #2d3350; color:#c3c8dc; font-size:11.5px; font-family:inherit;">＋ Add slide</button>
+                  <button style="padding:6px 11px; border-radius:6px; background:transparent; border:1px solid #2d3350; color:#c3c8dc; font-size:11.5px; font-family:inherit;">⇪ Import into this group</button>
+                </div>
+              </div>
+
+              <div style="padding:14px 20px 0;">
+                <div style="display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:8px; background:#171b2b; border:1px solid #262b45;">
+                  <span style="font-size:11px; color:#8f86c9;">♪ Music for this group</span>
+                  <span style="font-size:11.5px; color:#dcdfea;">pad_Cmaj_soft.mp3</span>
+                  <span style="font-size:10.5px; color:#7c8099;">plays across all 6 slides</span>
+                  <div style="margin-left:auto; display:flex; gap:6px;">
+                    <button style="width:26px; height:26px; border-radius:6px; background:transparent; border:1px solid #2d3350; color:#c3c8dc; font-size:10px; font-family:inherit;">▶</button>
+                    <button style="width:26px; height:26px; border-radius:6px; background:transparent; border:1px solid #2d3350; color:#c3c8dc; font-size:10px; font-family:inherit;">✕</button>
+                  </div>
+                </div>
+              </div>
+
+              <div style="flex:1; overflow:hidden; padding:14px 20px 18px 20px; display:grid; grid-template-columns:repeat(3, 1fr); gap:14px; align-content:start; align-items:start;">
+                <sc-for list="{{ slides }}" as="s" hint-placeholder-count="6">
+                  <div style="{{ s.cardStyle }}">
+                    <div style="{{ s.previewStyle }}">
+                      <div style="font-size:11.5px; line-height:1.45; color:#e9e9ed; text-wrap:pretty;">{{ s.body }}</div>
+                      <div style="position:absolute; top:7px; left:8px; font-size:9px; letter-spacing:.1em; color:#8f86c9;">{{ s.badge }}</div>
+                      <div style="position:absolute; bottom:7px; right:9px; font-size:9px; color:#6b7189;">{{ s.n }}</div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:7px; padding:8px 9px;">
+                      <span style="font-size:11px; color:#c3c8dc;">{{ s.label }}</span>
+                      <sc-if value="{{ s.audio }}" hint-placeholder-val="{{ true }}">
+                        <span style="margin-left:auto; font-size:9.5px; padding:2px 6px; border-radius:5px; background:#241f45; color:#b3a9e8;">♪ {{ s.audio }}</span>
+                      </sc-if>
+                    </div>
+                  </div>
+                </sc-for>
+                <div style="height:150px; border:1px dashed #2d3350; border-radius:9px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; color:#7c8099;">
+                  <div style="font-size:19px;">＋</div>
+                  <div style="font-size:11px;">Drop PPTX, images, video</div>
+                  <div style="font-size:10px; color:#5f667f;">appends to this group</div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <div style="position:absolute; inset:0; background:rgba(8,9,15,.5);"></div>
+
+        <!-- Edit Slide drawer — the same drawer used for Edit Song -->
+        <div style="position:absolute; top:0; right:0; bottom:0; width:452px; background:#141726; border-left:1px solid #232842; box-shadow:-24px 0 48px rgba(0,0,0,.45); display:flex; flex-direction:column;">
+          <div style="padding:16px 20px; display:flex; align-items:center; gap:10px;">
+            <span style="font-size:17px; font-weight:500;">Edit Slide</span>
+            <div style="margin-left:auto; display:flex; align-items:center; gap:9px;">
+              <button style="padding:8px 15px; border-radius:7px; background:transparent; border:1px solid #2d3350; color:#c3c8dc; font-size:12.5px; font-family:inherit;">Cancel</button>
+              <button style="padding:8px 17px; border-radius:7px; background:#7c5cff; border:1px solid #8b6dff; color:#fff; font-size:12.5px; font-weight:500; font-family:inherit;">Save</button>
+              <span style="font-size:15px; color:#7c8099;">✕</span>
+            </div>
+          </div>
+
+          <div style="padding:4px 20px 20px; display:flex; flex-direction:column; gap:15px; overflow:hidden;">
+            <div style="display:flex; align-items:center; gap:8px; font-size:11.5px; color:#9aa0b8;">
+              <span style="padding:2px 7px; border-radius:5px; background:#241f45; border:1px solid #3a3270; color:#b3a9e8; font-size:9.5px; letter-spacing:.1em;">SONG</span>
+              <span>This Is Our God · slide 3 of 6</span>
+            </div>
+
+            <div style="aspect-ratio:16/9; border-radius:8px; background:#0c0e17; border:1px solid #2d3350; display:flex; align-items:center; justify-content:center; padding:22px;">
+              <div style="font-size:13px; color:#e9e9ed; line-height:1.5; text-align:center; text-wrap:pretty;">This is our God, this is who He is<br>He is for us</div>
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <div style="font-size:11.5px; color:#9aa0b8;">Slide Label</div>
+              <div style="padding:10px 12px; border-radius:7px; background:#1a1e30; border:1px solid #2d3350; font-size:13px; color:#e9e9ed;">Chorus</div>
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <div style="font-size:11.5px; color:#9aa0b8;">Slide Text</div>
+              <div style="min-height:70px; border-radius:7px; background:#1a1e30; border:1px solid #2d3350; padding:10px 12px; font-size:12.5px; color:#e9e9ed; line-height:1.5;">This is our God, this is who He is<br>He is for us</div>
+              <div style="font-size:11px; color:#6b7189;">From the song’s Lyrics tab · editing here only affects this slide</div>
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:7px;">
+              <div style="font-size:11.5px; color:#9aa0b8;">Slide Audio</div>
+              <div style="display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:7px; background:#1a1e30; border:1px solid #2d3350;">
+                <span style="font-size:12.5px; color:#e9e9ed;">swell_intro.wav</span>
+                <span style="font-size:11px; color:#7c8099;">0:12</span>
+                <span style="margin-left:auto; font-size:11.5px; color:#c05a7a;">Remove</span>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:6px;">
+                <div style="font-size:11.5px; color:#9aa0b8;">Play this audio for</div>
+                <div style="display:flex; gap:7px;">
+                  <div style="flex:1; padding:9px; border-radius:7px; background:#7c5cff; border:1px solid #8b6dff; color:#fff; font-size:11.5px; text-align:center;">This slide only</div>
+                  <div style="flex:1; padding:9px; border-radius:7px; background:transparent; border:1px solid #2d3350; color:#c3c8dc; font-size:11.5px; text-align:center;">All slides in this group</div>
+                </div>
+                <div style="font-size:11.5px; color:#9aa0b8;">▣ Loop until the next slide</div>
+              </div>
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <div style="font-size:11.5px; color:#9aa0b8;">Notes <span style="color:#6b7189;">(operator only)</span></div>
+              <div style="min-height:44px; border-radius:7px; background:#1a1e30; border:1px solid #2d3350; padding:10px 12px; font-size:12.5px; color:#6b7189;">Hold on chorus for the repeat…</div>
+            </div>
+
+            <div style="font-size:11.5px; color:#c05a7a;">Delete Slide</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const KIND = {
+  SONG: "background:#241f45; border:1px solid #3a3270; color:#b3a9e8;",
+  SCRIPTURE: "background:#132a33; border:1px solid #1f4a58; color:#7fc3d6;",
+  PRAYER: "background:#1e2033; border:1px solid #313656; color:#a0a6bd;",
+  MESSAGE: "background:#2b1f2e; border:1px solid #52354f; color:#d29ec4;",
+  SECTION: "background:#1e2033; border:1px solid #313656; color:#a0a6bd;"
+};
+const kindStyle = k => "padding:2px 7px; border-radius:5px; font-size:9.5px; letter-spacing:.1em; " + (KIND[k] || KIND.SECTION);
+const preview = bg =>
+  "position:relative; height:138px; background:" + bg + "; border-bottom:1px solid #262b45; padding:22px 14px 16px; display:flex; align-items:center; justify-content:center; text-align:center; overflow:hidden;";
+
+class Component extends DCLogic {
+  state = { sel: 2 };
+
+  renderVals() {
+    const plan = [
+      { kind: "SONG", title: "Crucified with Christ", count: "5 slides", bed: null },
+      { kind: "SCRIPTURE", title: "Psalms 78:1-12", count: "2 slides", bed: null },
+      { kind: "SONG", title: "This Is Our God", count: "6 slides", bed: "pad_Cmaj_soft" },
+      { kind: "SCRIPTURE", title: "Deuteronomy 6:1-9", count: "2 slides", bed: null },
+      { kind: "PRAYER", title: "Prayer", count: "1 slide", bed: "quiet_bed" },
+      { kind: "SONG", title: "O Lord My Rock And My Redeemer", count: "4 slides", bed: null },
+      { kind: "SONG", title: "Great I Am", count: "4 slides", bed: null },
+      { kind: "MESSAGE", title: "Message — Entrusted", count: "3 slides (PPTX)", bed: null }
+    ];
+
+    const groups = plan.map((g, i) => ({
+      ...g, i,
+      kindStyle: kindStyle(g.kind),
+      railStyle: "padding:9px 11px; border-radius:8px; cursor:pointer; border:1px solid " +
+        (i === this.state.sel ? "#3a3270; background:#1e1b38;" : "transparent; background:#151827;")
+    }));
+
+    const slides = [
+      { n: "1", badge: "TITLE", label: "Title card", body: "This Is Our God", audio: null, bg: "#141826", align: "center" },
+      { n: "2", badge: "VERSE 1", label: "Verse 1", body: "Come all you weary, come all you thirsty…", audio: null, bg: "#0c0e17", align: "flex-end" },
+      { n: "3", badge: "CHORUS", label: "Chorus", body: "This is our God, this is who He is — He is for us", audio: "swell_intro", bg: "#0c0e17", align: "flex-end", sel: true },
+      { n: "4", badge: "VERSE 2", label: "Verse 2", body: "Come all you sinners, come find His mercy…", audio: null, bg: "#0c0e17", align: "flex-end" },
+      { n: "5", badge: "IMAGE", label: "Sunrise still", body: "", audio: null, bg: "#1b2033", align: "center" },
+      { n: "6", badge: "VIDEO", label: "Transition · 0:08", body: "▶", audio: "audio", bg: "#141826", align: "center" }
+    ].map(s => ({
+      ...s,
+      cardStyle: "border-radius:9px; overflow:hidden; background:#171b2b; border:1px solid " + (s.sel ? "#7c5cff;" : "#262b45;") + " cursor:pointer;",
+      previewStyle: preview(s.bg)
+    }));
+
+    return {
+      groups, slides,
+      selectGroup: e => {
+        const i = Number(e.currentTarget.dataset.i);
+        if (!Number.isNaN(i)) this.setState({ sel: i });
+      }
+    };
+  }
+}
+
+</script>
+</body>
+</html>
