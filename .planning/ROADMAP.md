@@ -68,8 +68,16 @@ Plans:
 **Goal:** Upload a .pptx file, see it parsed into native slides via a Firebase Cloud Function; add announcement (Pre-Service) and sermon (Message) sections to a service with imported slides. Image import supported for announcements.
 **Depends on:** Phase 20
 **Requirements:** R010, R011, R012, R017 (supporting), R018 (supporting)
-**Open question:** exact PPTX parsing library for Cloud Functions (resolve during research/planning).
-**Plans:** 0
+**Resolved:** PPTX parsing library is `officeparser` (server-side, in a `parsePptx` onCall Cloud Function) — selected in 21-RESEARCH.md; install gated behind a human-verify legitimacy checkpoint.
+**Plans:** 6 plans
+
+Plans:
+- [ ] 21-01-PLAN.md — Slide/slot type model + importedSlides store + IMPORTED assembly & preview (Wave 1)
+- [ ] 21-02-PLAN.md — Firebase Storage + callable Functions bootstrap + org-scoped storage.rules (Wave 1)
+- [ ] 21-03-PLAN.md — functions/ Vitest infra + fixtures + gated officeparser install (Wave 1)
+- [ ] 21-04-PLAN.md — parsePptx onCall Cloud Function + mapAstToSlides mapping (Wave 2)
+- [ ] 21-05-PLAN.md — Client upload util + step-based PptxImportModal (Wave 3)
+- [ ] 21-06-PLAN.md — ImportedSlideEditor + ServiceEditorView wiring + end-to-end verify (Wave 4)
 
 ### Phase 22: Media Attachments and Storage Lifecycle `risk:medium`
 
