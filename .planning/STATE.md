@@ -28,33 +28,47 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 
 ## Current Position
 
-Phase: 23 (Presentation Preview Mode) — EXECUTING
-Plan: 5 of 5
+Phase: 23 (Presentation Preview Mode) — CODE-COMPLETE, human-verify deferred
+Plan: 5 of 5 (23-01..23-04 executed; 23-05 is the deferred human-verify checkpoint)
 Milestone: v1.2 Worship Service Slide Management (Phases 18-23) — IN PROGRESS
-Status: Ready to execute
+Status: All v1.2 feature code is written. Remaining: pre-audit hardening → batch human-verify → milestone lifecycle.
 
-Phase 22 is code-complete (4/4 plans committed); only its deferred human-verify remains — see
-
-## Deferred Verification below.
+Phases 20, 21, 22 and 23 are all code-complete; only their deferred human-verify checkpoints remain
+(see the Deferred Verification table below).
 
 > **Migration note (2026-07-24):** This milestone was scoped and partially built in gsdpi
 > (`.gsd/` milestone M001, slices S01-S06) and faithfully ported into gsd-core as v1.2.
 > The gsdpi `.gsd/` store is now legacy/read-only — continue with regular `/gsd-*` commands.
 
-## ⏸ PAUSED — RESUME HERE (2026-07-25, model switch)
+## ⏸ RESUME HERE (2026-07-25 — Phase 23 code-complete, all v1.2 feature work done)
 
-Autonomous run (`/gsd-autonomous`, scoped Phases 20-23) paused at a clean boundary for a model switch. **Nothing is mid-flight; working tree is clean; production build is GREEN (`npm run type-check` = 0, `npm run build` passes).**
+`/gsd-autonomous --from 23` completed Phase 23's automated work. **Nothing is mid-flight; working
+tree is clean; production build is GREEN (`npm run type-check` = 0, `npm run build` = 0).**
 
-**Done:** gsdpi→gsd-core migration (v1.2); Phases **20, 21, 22 code-complete** (all plans committed, unit-tested); foundation hardened (lyrics Firestore rule + 94 type errors fixed + import-save undefined fix). Phase 23 UI-SPEC written (`23-UI-SPEC.md`).
+**Done:** gsdpi→gsd-core migration (v1.2); Phases **20, 21, 22, 23 all code-complete** (every plan
+committed and unit-tested); foundation hardened (lyrics Firestore rule + 94 type errors fixed +
+import-save undefined fix). Phase 23 shipped `PresentationViewer.vue`, the `chromeless` media-player
+mode with an `isMuted`/`unmute()` accessor, imperative media driving with three degraded states, and
+the "Present Slideshow" CTA wired through `ServiceEditorView`.
 
 **Next actions to finish the milestone (in order):**
 
-1. **Phase 23 — plan → check → execute.** UI-SPEC + CONTEXT exist; no research (integrates built pieces). Spawn `gsd-planner` (opus) for phase 23 (req R016, R018) consuming `23-UI-SPEC.md` + `23-CONTEXT.md`, then `gsd-plan-checker` (sonnet), then execute plans sequentially with `gsd-executor` (sonnet, main-tree/no-worktree — branch `milestone/M001` diverged). Presentation viewer consumes `useSlideshowAssembly` + `AudioPlayer`/`VideoPlayer`; entry CTA in `SlideshowPreview.vue`.
-2. **Pre-audit hardening batch** (see TODO below) — flip cleanup default to safe; clean `.gsd/quarantine/worktrees/**` test debris; full unit suite green.
-3. **Batch human-verify** P20 + P21 + P22 (+P23) — the deferred visual/e2e checks.
+1. **Pre-audit hardening batch** (see TODO below) — flip the `cleanupExpiredMedia` default to safe;
+   clean `.gsd/quarantine/worktrees/**` test debris; fix the stale `RosterView.test.ts` assertion;
+   get the full unit suite green.
+2. **Batch human-verify** P20 + P21 + P22 + P23 — the deferred visual/e2e/projector checks. Doing
+   all four in one sitting is worthwhile: P20's section grouping, P22's media autoplay and P23's
+   projector legibility all want the same real-projector trip.
+3. **Phases 18 and 19** are implemented but were never verified and are outside this run's `--from 23`
+   scope — decide whether they need a verification pass before the audit.
 4. **Milestone lifecycle:** `/gsd-audit-milestone` → `/gsd-complete-milestone v1.2` → `/gsd-cleanup`.
 
-Orchestration note: this run hand-drives the gsd sub-skills by spawning `gsd-planner`/`gsd-plan-checker`/`gsd-executor`/`gsd-ui-researcher` agents directly (Claude Code, sequential main-tree execution). `.env.local` present. A live user session may hold the Firestore/Storage emulator (ports 8080/9199) — executors must NOT run `test:rules` or restart the emulator.
+Orchestration note: `workflow.verifier` is `false` in `.planning/config.json`, so no phase produces a
+`VERIFICATION.md` — goal-backward verification for the whole milestone happens at
+`/gsd-audit-milestone`. Worktree isolation auto-degrades to sequential main-tree execution because
+HEAD diverged from `origin/HEAD` (#683) — branch `milestone/M001`. `.env.local` present. A live user
+session may hold the Firestore/Storage emulator (ports 8080/9199) — executors must NOT run
+`test:rules` or restart the emulator.
 
 ## Deferred Verification
 
@@ -63,13 +77,17 @@ Orchestration note: this run hand-drives the gsd sub-skills by spawning `gsd-pla
 | 20 | verification_deferred_human | /gsd-verify-work 20 |
 | 21 | verification_deferred_human | /gsd-verify-work 21 (import save confirmed live 2026-07-25; remaining: announcements/image, corrupted-file error, source-retention) |
 | 22 | verification_deferred_human | /gsd-verify-work 22 (cleanup dry-run review + media/autoplay e2e) |
+| 23 | verification_deferred_human | /gsd-verify-work 23 (real fullscreen + Esc-sync, real autoplay policy + held-key rapid advance, expired-media degradation, projector legibility, iPad Safari, and the two open overflow judgment calls — see 23-05-SUMMARY.md) |
 
 **Pre-audit hardening TODO (batch before milestone complete):**
 
 - **[SAFETY] Flip `cleanupExpiredMedia` default to dry-run/disabled** — 22-03 shipped it defaulting to LIVE delete (dry-run requires `MEDIA_CLEANUP_DRY_RUN=true`); a destructive scheduled deleter must default to safe (require an explicit opt-in like `MEDIA_CLEANUP_ENABLED=true` to delete). Update `functions/src/index.ts` + its test. Not deployed + no eligible data yet, so risk is currently nil — but fix before any deploy.
 - ~~Fix `src/views/__tests__/ServiceEditorView.test.ts` — fails at mount since 21-01 added the `importedSlides` store subscription without a Pinia mock stub~~ — **FIXED in 22-04** (`8e3afb2`): added the missing `@/stores/importedSlides` reactive-stub mock; all 14 real tests now pass.
-- Run the FULL unit suite green + clean stale `.gsd/quarantine/worktrees/**` debris (2 remaining spurious failures — stale copies of ServiceEditorView.test.ts inside `.gsd/quarantine/worktrees/**`, not source).
-- Batch human-verify P20 (section grouping / live reorder / override marker) + P21 (PPTX e2e) + P22 (cleanup dry-run + media autoplay).
+- Run the FULL unit suite green + clean stale `.gsd/quarantine/worktrees/**` debris. Measured on `milestone/M001` at the end of Phase 23 (`npx vitest run src/`): **2993 pass / 32 fail**, and every one of the 32 is pre-existing —
+  - `.gsd/quarantine/worktrees/**` stale duplicates (23 tests across 6 files) — delete the debris.
+  - `src/storage.rules.test.ts` (8 tests) — needs the Storage emulator, which is deliberately not started during autonomous runs. Verify separately when no live session holds ports 8080/9199.
+  - **NEW — `src/views/__tests__/RosterView.test.ts` (1 test, "wraps Roles config in CollapsibleSection")** — stale assertion expecting the string `"Roles config"`; commit `df1ca34` renamed that tab to `"Roles"` and the test was never updated. One-word fix; unrelated to Phases 18-23, so it was deliberately NOT patched mid-phase.
+- Batch human-verify P20 (section grouping / live reorder / override marker) + P21 (PPTX e2e) + P22 (cleanup dry-run + media autoplay) + P23 (fullscreen / autoplay / projector — see 23-05-SUMMARY.md).
 
 Phase 20 code is complete + unit-tested (all plans 20-01..20-04 committed). The blocking
 human-verify checkpoint (section grouping, live reorder-follows-slides, scripture override

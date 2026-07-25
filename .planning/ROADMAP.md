@@ -120,7 +120,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 23-05-PLAN.md — Blocking human-verify: real fullscreen, real autoplay, real expired media, projector legibility, overflow judgment calls (Wave 5)
+- [x] 23-05-PLAN.md — Blocking human-verify: real fullscreen, real autoplay, real expired media, projector legibility, overflow judgment calls (Wave 5)
 
 ## Phases
 
