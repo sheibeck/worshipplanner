@@ -114,6 +114,46 @@ A dedicated UI polish phase is planned AFTER v1.2 feature work completes. Captur
 - **Render formatted slides**, not just text — show the actual slide visuals/formatting in the preview (currently text-only).
 - **Insert a slide deck / image / video at ANY point in the service** — NOT limited to Announcements/Sermon sections. Replace the section-scoped "Import PowerPoint (Sermon/Announcements)" actions with a generic **"Add Slide Deck"**, plus separate **"Add Image"**, **"Add Video"**, etc. Imported decks/media become first-class service **items** that can be dragged/reordered like any other slot. (This reworks the Phase 21 section-scoped import model + relates to how Phase 22 media surfaces — capture only, do not re-architect mid-milestone.)
 
+### ★ Phase 24 core shape (user, 2026-07-25, end of Phase 23) — the organizing idea
+
+This supersedes and unifies most of the captured items above. **Slide functionality keeps getting
+tied to the service plan itself; it should be its own surface that MIRRORS the order of service
+rather than duplicating it.**
+
+**Tab structure** — three tabs in the service editor:
+
+| Tab | Was | Contains |
+|-----|-----|----------|
+| **Service** | renamed from "Music" | the order of service (the existing slot list) |
+| **Roles** | unchanged | Phase 17 role assignments |
+| **Slides** | NEW | **ALL** slide editing, nothing scattered elsewhere |
+
+**The Slides tab mirrors the order of service.** It shows the same service sections
+(Pre-Service / Worship / Message / Sending) and, inside each, whatever the user put into the
+slideshow — slides, music, videos, imported decks. Because it *mirrors* rather than *copies*,
+reordering the service or moving a song on the **Service** tab must NOT require a second manual
+reorder on the **Slides** tab. One reorder, both views follow. This is the whole point of the
+restructure.
+
+**In the Slides tab the user can:**
+
+- attach music, video, or a slide deck at any point,
+- import a PowerPoint,
+- **attach music to an individual slide *inside* a deck** — not to a service slot, but to one
+  specific slide within one specific deck.
+
+> ⚠ **Architectural conflict to resolve at Phase 24 planning time.** That last bullet directly
+> contradicts a Phase 22 decision now in the codebase: *"Media attaches at ServiceSlot level (not
+> canonical song/scripture/deck), per D002"*, implemented as `SlotMediaAttachment` mutating
+> `localService.slots[index]` and propagated by the assembler onto only the first emitted slide per
+> slot. Per-slide-within-a-deck media needs an attachment point the current model does not have.
+> Decide deliberately: extend the slide model with its own media field (slide loosely coupled to the
+> service, which is what the user described), or keep slot-level media and add a deck-slide override
+> layer. Do not let this get decided by accident during implementation.
+
+The slide is **loosely coupled** to the service — that phrasing is the user's and is the design
+constraint to hold onto.
+
 Do NOT action during current milestone build — revisit as a follow-up UI phase (Phase 24 candidate).
 
 ## Milestone v1.2 Decisions (from gsdpi DECISIONS.md D001-D006)
