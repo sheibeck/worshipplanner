@@ -68,6 +68,11 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
 
   const assembled: AssembledSlide[] = []
   let globalPosition = 0
+  // Tracks which slots have already had their (first-emitted-slide-only) media
+  // attached, keyed by slotIndex — a slot's audioUrl/videoUrl land on only the
+  // FIRST AssembledSlide it produces (e.g. the leading copyright slide for a
+  // SONG), never on subsequent slides of a multi-slide slot.
+  const slotsWithMediaAttached = new Set<number>()
 
   const emit = (
     slot: ServiceSlot,
@@ -77,6 +82,11 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
     localSeq: number,
   ): void => {
     const slide = { ...content, id: `${slotIndex}:${localSeq}`, position: globalPosition } as Slide
+    if (!slotsWithMediaAttached.has(slotIndex)) {
+      slotsWithMediaAttached.add(slotIndex)
+      if (slot.audioUrl) slide.audioUrl = slot.audioUrl
+      if (slot.videoUrl) slide.videoUrl = slot.videoUrl
+    }
     assembled.push({
       slide,
       slotIndex,

@@ -437,6 +437,55 @@ describe('assembleSlideshow — reorder ordering (R006)', () => {
   })
 })
 
+describe('assembleSlideshow — media propagation (R013/R014)', () => {
+  it('a SONG slot with audioUrl set carries it ONLY on the first emitted (leading copyright) slide', () => {
+    const slot = songSlot({ songId: 'song-1', audioUrl: 'https://example.com/track.mp3' })
+    const service = makeService([slot])
+    const lyrics = makeSongLyrics()
+    const inputs = makeInputs({
+      songLyricsById: new Map([['song-1', lyrics]]),
+      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus']]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result).toHaveLength(4)
+    expect(result[0]!.slide.audioUrl).toBe('https://example.com/track.mp3')
+    expect(result[1]!.slide.audioUrl).toBeUndefined()
+    expect(result[2]!.slide.audioUrl).toBeUndefined()
+    expect(result[3]!.slide.audioUrl).toBeUndefined()
+    expect(result[0]!.slide.videoUrl).toBeUndefined()
+  })
+
+  it('a slot with no media produces slides whose audioUrl and videoUrl are both undefined', () => {
+    const slot = songSlot({ songId: 'song-1' })
+    const service = makeService([slot])
+    const lyrics = makeSongLyrics()
+    const inputs = makeInputs({
+      songLyricsById: new Map([['song-1', lyrics]]),
+      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus']]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    for (const assembled of result) {
+      expect(assembled.slide.audioUrl).toBeUndefined()
+      expect(assembled.slide.videoUrl).toBeUndefined()
+    }
+  })
+
+  it('a single-slide MESSAGE slot with videoUrl set carries it on its one emitted slide', () => {
+    const slot: NonAssignableSlot = { kind: 'MESSAGE', position: 0, videoUrl: 'https://example.com/announcement.mp4' }
+    const service = makeService([slot])
+
+    const result = assembleSlideshow(service, makeInputs())
+
+    expect(result).toHaveLength(1)
+    expect(result[0]!.slide.videoUrl).toBe('https://example.com/announcement.mp4')
+    expect(result[0]!.slide.audioUrl).toBeUndefined()
+  })
+})
+
 describe('assembleSlideshow — section metadata pass-through', () => {
   it('a legacy service whose slots all have section === undefined produces AssembledSlides all with section === undefined', () => {
     const slots: ServiceSlot[] = [

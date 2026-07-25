@@ -21,7 +21,21 @@ export const SERVICE_SECTION_LABELS: Record<ServiceSection, string> = {
   sending: 'Sending',
 }
 
-export interface SongSlot {
+/**
+ * Media-attachment fields mixed into every `ServiceSlot` variant (Phase 22,
+ * R013/R014). Media attaches at the SLOT level — service-scoped — and is
+ * deliberately NOT part of the canonical song/scripture/deck content (D002):
+ * an announcement video attached to one Sunday's slot must not follow the
+ * song into every other service that references it. `slideshowAssembler`
+ * copies these onto the first `AssembledSlide.slide` it emits for the slot
+ * (see `SlideBase.audioUrl`/`videoUrl`).
+ */
+export interface MediaAttachableSlot {
+  audioUrl?: string
+  videoUrl?: string
+}
+
+export interface SongSlot extends MediaAttachableSlot {
   kind: 'SONG'
   position: number
   requiredVwType: VWType
@@ -31,7 +45,7 @@ export interface SongSlot {
   section?: ServiceSection
 }
 
-export interface ScriptureSlot {
+export interface ScriptureSlot extends MediaAttachableSlot {
   kind: 'SCRIPTURE'
   position: number
   book: string | null
@@ -43,7 +57,7 @@ export interface ScriptureSlot {
   section?: ServiceSection
 }
 
-export interface NonAssignableSlot {
+export interface NonAssignableSlot extends MediaAttachableSlot {
   kind: 'PRAYER' | 'MESSAGE'
   position: number
   linkUrl?: string
@@ -51,7 +65,7 @@ export interface NonAssignableSlot {
   section?: ServiceSection
 }
 
-export interface HymnSlot {
+export interface HymnSlot extends MediaAttachableSlot {
   kind: 'HYMN'
   position: number
   hymnName: string
@@ -65,7 +79,7 @@ export interface HymnSlot {
  * Mirrors ScriptureSlot's reference-by-id shape — the deck itself lives in
  * the importedSlides store, keyed by `importId`.
  */
-export interface ImportedSlot {
+export interface ImportedSlot extends MediaAttachableSlot {
   kind: 'IMPORTED'
   position: number
   importId: string | null

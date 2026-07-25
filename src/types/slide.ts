@@ -13,6 +13,14 @@ export interface SlideBase {
   id: string
   position: number
   contentKind: SlideContentKind
+  /**
+   * Render carriers for a slot's attached media (Phase 22, R013/R014).
+   * The assembler fills these from `ServiceSlot`'s `MediaAttachableSlot`
+   * fields on the first slide it emits for that slot — they are never
+   * persisted standalone on the (ephemeral, regenerated) assembled slide.
+   */
+  audioUrl?: string
+  videoUrl?: string
 }
 
 /** A lyric slide — one section of a song's lyrics. */
