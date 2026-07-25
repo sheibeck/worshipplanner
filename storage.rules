@@ -1,0 +1,24 @@
+rules_version = '2';
+
+// Org-scoped Storage access control, mirroring firestore.rules' isOrgMember pattern.
+// The generic orgs/{orgId} prefix is intentional (not PPTX-specific) so Phase 22's media
+// attachments and any future Storage-backed feature can reuse this same rule.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /orgs/{orgId}/{allPaths=**} {
+      // Cross-service read: resolves the caller's membership doc in Firestore, the same
+      // check firestore.rules' isOrgMember(orgId) performs for Firestore access.
+      allow read: if request.auth != null
+                     && firestore.exists(
+                          /databases/(default)/documents/organizations/$(orgId)/members/$(request.auth.uid));
+
+      // Same membership condition for write, plus a per-upload size ceiling. 25MB
+      // (26214400 bytes) is the researched starting cap for this milestone's PPTX
+      // imports (21-RESEARCH.md Open Question 3) — tunable, not a hard product limit.
+      allow write: if request.auth != null
+                      && firestore.exists(
+                           /databases/(default)/documents/organizations/$(orgId)/members/$(request.auth.uid))
+                      && request.resource.size < 26214400;
+    }
+  }
+}
