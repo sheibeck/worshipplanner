@@ -4,16 +4,16 @@ milestone: v1.2
 milestone_name: Worship Service Slide Management
 current_phase: 21
 current_phase_name: PowerPoint Import for Announcements and Sermon
-status: executing
-stopped_at: Completed 21-05-PLAN.md
-last_updated: "2026-07-25T16:03:06.670Z"
+status: verifying
+stopped_at: Completed 21-06-PLAN.md Tasks 1-2; Task 3 (end-to-end human-verify) PENDING
+last_updated: "2026-07-25T16:16:44.905Z"
 last_activity: 2026-07-25
 progress:
   total_phases: 18
-  completed_phases: 14
+  completed_phases: 15
   total_plans: 90
-  completed_plans: 89
-  percent: 78
+  completed_plans: 90
+  percent: 83
 last_activity_desc: Migrated gsdpi milestone M001 into gsd-core as v1.2 (Phases 18-23)
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 Phase: 21 (PowerPoint Import for Announcements and Sermon) — EXECUTING
 Plan: 6 of 6
 Milestone: v1.2 Worship Service Slide Management (Phases 18-23) — IN PROGRESS
-Status: Ready to execute
+Status: Phase complete — ready for verification
 
 > **Migration note (2026-07-24):** This milestone was scoped and partially built in gsdpi
 > (`.gsd/` milestone M001, slices S01-S06) and faithfully ported into gsd-core as v1.2.
@@ -134,6 +134,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 21 P03 | 15min | 3 tasks | 7 files |
 | Phase 21 P04 | 23min | 3 tasks | 3 files |
 | Phase 21 P05 | 25min | 3 tasks | 3 files |
+| Phase 21 P06 | 35min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -210,6 +211,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: PPTX mixed-content heuristic: 40-char flattened-text threshold decides text-dominant vs image-dominant slide, calibrated against the real mixed.pptx fixture.
 - [Phase ?]: generateImportId() (crypto.randomUUID) scopes only the upload-session Storage path; the deck's real importId comes from importedSlides.createDeck()'s Firestore auto-id on confirm
 - [Phase ?]: Vue Test Utils Teleport testing pattern established: DOMWrapper over document.body + enableAutoUnmount(afterEach), needed since PptxImportModal (like other codebase modals) teleports to <body>
+- [Phase ?]: [Phase 21-06]: ImportedSlideEditor omits store subscribeDecks/unsubscribeDecks -- useSlideshowAssembly already owns a single org-scoped importedSlides subscription for the whole ServiceEditorView page; a per-editor unsubscribe would tear that down and break the live Slideshow Preview
+- [Phase ?]: [Phase 21-06]: PC-export skips IMPORTED slots via an early continue in the no-template export loop (RESEARCH Pitfall 2); the existing-plan branch already excluded IMPORTED since it only iterates the SONG/HYMN and SCRIPTURE filtered buckets
 
 ### Roadmap Evolution
 
@@ -267,6 +270,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-25
-Last session: 2026-07-25T16:02:54.152Z
-Stopped at: Completed 21-05-PLAN.md
+Last session: 2026-07-25T16:16:44.873Z
+Stopped at: Completed 21-06-PLAN.md Tasks 1-2; Task 3 (end-to-end human-verify) PENDING
 Resume file: None
