@@ -14,11 +14,11 @@ describe('splitPassage', () => {
     const text = '[28] And we know that for those who love God all things work together for good.'
     const slides = splitPassage(text, ref)
     expect(slides).toHaveLength(1)
-    expect(slides[0].contentKind).toBe('scripture')
-    expect(slides[0].verseRange).toBe('v. 28')
-    expect(slides[0].text).toContain('And we know')
-    expect(slides[0].readingMode).toBe('normal')
-    expect(slides[0].reference).toBe('Romans 8:28-39')
+    expect(slides[0]!.contentKind).toBe('scripture')
+    expect(slides[0]!.verseRange).toBe('v. 28')
+    expect(slides[0]!.text).toContain('And we know')
+    expect(slides[0]!.readingMode).toBe('normal')
+    expect(slides[0]!.reference).toBe('Romans 8:28-39')
   })
 
   it('produces a single slide for a short passage under the threshold', () => {
@@ -27,7 +27,7 @@ describe('splitPassage', () => {
       '[29] For those whom he foreknew he also predestined.'
     const slides = splitPassage(text, ref)
     expect(slides).toHaveLength(1)
-    expect(slides[0].verseRange).toBe('vv. 28-29')
+    expect(slides[0]!.verseRange).toBe('vv. 28-29')
   })
 
   it('splits a medium passage into 2-3 slides at verse boundaries', () => {
@@ -52,8 +52,8 @@ describe('splitPassage', () => {
     const psalmRef: ScriptureRef = { book: 'Psalm', chapter: 119, verseStart: 1, verseEnd: 20 }
     const slides = splitPassage(verses, psalmRef, { wordsPerSlide: 50 })
     expect(slides.length).toBeGreaterThanOrEqual(4)
-    expect(slides[0].position).toBe(0)
-    expect(slides[slides.length - 1].position).toBe(slides.length - 1)
+    expect(slides[0]!.position).toBe(0)
+    expect(slides[slides.length - 1]!.position).toBe(slides.length - 1)
   })
 
   it('falls back to sentence-boundary split when no verse markers exist', () => {
@@ -109,12 +109,12 @@ describe('splitPassage', () => {
     const range: ScriptureRef = { book: 'Romans', chapter: 8, verseStart: 28, verseEnd: 39 }
 
     const slides1 = splitPassage('[1] Test.', chapterOnly)
-    expect(slides1[0].reference).toBe('Psalm 23')
+    expect(slides1[0]!.reference).toBe('Psalm 23')
 
     const slides2 = splitPassage('[16] Test.', singleVerse)
-    expect(slides2[0].reference).toBe('John 3:16')
+    expect(slides2[0]!.reference).toBe('John 3:16')
 
     const slides3 = splitPassage('[28] Test.', range)
-    expect(slides3[0].reference).toBe('Romans 8:28-39')
+    expect(slides3[0]!.reference).toBe('Romans 8:28-39')
   })
 })

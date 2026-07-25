@@ -44,15 +44,15 @@ describe('parseCCLIPaste', () => {
 
     expect(result.title).toBe('Amazing Grace')
     expect(result.sections).toHaveLength(2)
-    expect(result.sections[0].id).toBe('verse-1')
-    expect(result.sections[0].label).toBe('Verse 1')
-    expect(result.sections[0].lines).toEqual([
+    expect(result.sections[0]!.id).toBe('verse-1')
+    expect(result.sections[0]!.label).toBe('Verse 1')
+    expect(result.sections[0]!.lines).toEqual([
       'How sweet the sound',
       'That saved someone like me',
     ])
-    expect(result.sections[1].id).toBe('chorus')
-    expect(result.sections[1].label).toBe('Chorus')
-    expect(result.sections[1].lines).toEqual([
+    expect(result.sections[1]!.id).toBe('chorus')
+    expect(result.sections[1]!.label).toBe('Chorus')
+    expect(result.sections[1]!.lines).toEqual([
       'Grace grace grace',
       'How wonderful',
     ])
@@ -86,8 +86,8 @@ describe('parseCCLIPaste', () => {
 
     expect(result.title).toBe('Test Song 2023')
     expect(result.sections).toHaveLength(2)
-    expect(result.sections[0].id).toBe('verse-1')
-    expect(result.sections[1].id).toBe('verse-2')
+    expect(result.sections[0]!.id).toBe('verse-1')
+    expect(result.sections[1]!.id).toBe('verse-2')
     expect(result.copyright.authors).toEqual(['Author Alpha', 'Author Beta'])
     expect(result.copyright.ccliSongNumber).toBe('654321')
     expect(result.copyright.ccliLicenseNumber).toBe('11111')
@@ -107,10 +107,10 @@ describe('parseCCLIPaste', () => {
     const result = parseCCLIPaste(input)
 
     expect(result.sections).toHaveLength(2)
-    expect(result.sections[0].id).toBe('verse')
-    expect(result.sections[0].label).toBe('Verse')
-    expect(result.sections[1].id).toBe('chorus')
-    expect(result.sections[1].label).toBe('Chorus')
+    expect(result.sections[0]!.id).toBe('verse')
+    expect(result.sections[0]!.label).toBe('Verse')
+    expect(result.sections[1]!.id).toBe('chorus')
+    expect(result.sections[1]!.label).toBe('Chorus')
   })
 
   it('handles Pre-Chorus as a standalone section header', () => {
@@ -130,11 +130,11 @@ describe('parseCCLIPaste', () => {
     const result = parseCCLIPaste(input)
 
     expect(result.sections).toHaveLength(3)
-    expect(result.sections[0].id).toBe('verse-1')
-    expect(result.sections[1].id).toBe('pre-chorus')
-    expect(result.sections[1].label).toBe('Pre-Chorus')
-    expect(result.sections[1].lines).toEqual(['Building up here'])
-    expect(result.sections[2].id).toBe('chorus')
+    expect(result.sections[0]!.id).toBe('verse-1')
+    expect(result.sections[1]!.id).toBe('pre-chorus')
+    expect(result.sections[1]!.label).toBe('Pre-Chorus')
+    expect(result.sections[1]!.lines).toEqual(['Building up here'])
+    expect(result.sections[2]!.id).toBe('chorus')
   })
 
   it('handles parenthetical section marker as first lyric line', () => {
@@ -150,9 +150,9 @@ describe('parseCCLIPaste', () => {
     const result = parseCCLIPaste(input)
 
     expect(result.sections).toHaveLength(1)
-    expect(result.sections[0].id).toBe('pre-chorus')
-    expect(result.sections[0].label).toBe('Pre-Chorus')
-    expect(result.sections[0].lines).toEqual([
+    expect(result.sections[0]!.id).toBe('pre-chorus')
+    expect(result.sections[0]!.label).toBe('Pre-Chorus')
+    expect(result.sections[0]!.lines).toEqual([
       'Building up to the chorus',
       'Getting louder now',
     ])
@@ -170,9 +170,9 @@ describe('parseCCLIPaste', () => {
     const result = parseCCLIPaste(input)
 
     expect(result.sections).toHaveLength(1)
-    expect(result.sections[0].id).toBe('bridge')
-    expect(result.sections[0].label).toBe('Bridge')
-    expect(result.sections[0].lines).toEqual([
+    expect(result.sections[0]!.id).toBe('bridge')
+    expect(result.sections[0]!.label).toBe('Bridge')
+    expect(result.sections[0]!.lines).toEqual([
       'Bridge lyric line one',
       'Bridge lyric line two',
     ])
@@ -307,10 +307,10 @@ describe('parseCCLIPaste', () => {
     const result = parseCCLIPaste(input)
 
     expect(result.sections).toHaveLength(3)
-    expect(result.sections[1].id).toBe('tag')
-    expect(result.sections[1].label).toBe('Tag')
-    expect(result.sections[2].id).toBe('misc-1')
-    expect(result.sections[2].label).toBe('Misc 1')
+    expect(result.sections[1]!.id).toBe('tag')
+    expect(result.sections[1]!.label).toBe('Tag')
+    expect(result.sections[2]!.id).toBe('misc-1')
+    expect(result.sections[2]!.label).toBe('Misc 1')
   })
 
   it('handles Intro section type', () => {
@@ -327,8 +327,8 @@ describe('parseCCLIPaste', () => {
     const result = parseCCLIPaste(input)
 
     expect(result.sections).toHaveLength(2)
-    expect(result.sections[0].id).toBe('intro')
-    expect(result.sections[0].label).toBe('Intro')
+    expect(result.sections[0]!.id).toBe('intro')
+    expect(result.sections[0]!.label).toBe('Intro')
   })
 
   it('handles Windows-style line endings (CRLF)', () => {
@@ -338,7 +338,7 @@ describe('parseCCLIPaste', () => {
 
     expect(result.title).toBe('Test Song')
     expect(result.sections).toHaveLength(1)
-    expect(result.sections[0].lines).toEqual(['Line one', 'Line two'])
+    expect(result.sections[0]!.lines).toEqual(['Line one', 'Line two'])
   })
 
   it('case-insensitive section header matching', () => {
@@ -358,9 +358,9 @@ describe('parseCCLIPaste', () => {
     const result = parseCCLIPaste(input)
 
     expect(result.sections).toHaveLength(3)
-    expect(result.sections[0].label).toBe('Verse 1')
-    expect(result.sections[1].label).toBe('Chorus')
-    expect(result.sections[2].label).toBe('Bridge')
+    expect(result.sections[0]!.label).toBe('Verse 1')
+    expect(result.sections[1]!.label).toBe('Chorus')
+    expect(result.sections[2]!.label).toBe('Bridge')
   })
 
   it('skips the SongSelect usage terms line in footer', () => {

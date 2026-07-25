@@ -3,10 +3,11 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { ref, reactive, computed } from 'vue'
 import CongregationalEditor from '../CongregationalEditor.vue'
 import type { ScriptureSlide, CongregationalSection } from '@/types/slide'
+import type { ScriptureReading } from '@/types/scriptureReading'
 
 const mockCreateReading = vi.fn(() => Promise.resolve('new-reading-id'))
 const mockUpdateReading = vi.fn(() => Promise.resolve())
-const mockGetReading = vi.fn(() => Promise.resolve(null))
+const mockGetReading = vi.fn<() => Promise<ScriptureReading | null>>(() => Promise.resolve(null))
 const mockSubscribeReadings = vi.fn()
 const mockUnsubscribeReadings = vi.fn()
 
@@ -248,8 +249,8 @@ describe('CongregationalEditor', () => {
         { speaker: 'LEADER', text: 'Give thanks to the LORD', verseRange: 'v. 1' },
         { speaker: 'CONGREGATION', text: 'for his steadfast love', verseRange: 'v. 2' },
       ],
-      createdAt: { seconds: 1000000, nanoseconds: 0 },
-      updatedAt: { seconds: 1000000, nanoseconds: 0 },
+      createdAt: { seconds: 1000000, nanoseconds: 0 } as never,
+      updatedAt: { seconds: 1000000, nanoseconds: 0 } as never,
     })
 
     const wrapper = mountEditor({ readingId: 'existing-reading' })

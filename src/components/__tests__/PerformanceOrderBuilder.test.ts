@@ -34,9 +34,9 @@ describe('PerformanceOrderBuilder', () => {
 
     const buttons = wrapper.findAll('[data-role="add-section"]')
     expect(buttons).toHaveLength(3)
-    expect(buttons[0].text()).toBe('Verse 1')
-    expect(buttons[1].text()).toBe('Chorus')
-    expect(buttons[2].text()).toBe('Verse 2')
+    expect(buttons[0]!.text()).toBe('Verse 1')
+    expect(buttons[1]!.text()).toBe('Chorus')
+    expect(buttons[2]!.text()).toBe('Verse 2')
   })
 
   it('clicking a section adds it to the performance order', async () => {
@@ -51,7 +51,7 @@ describe('PerformanceOrderBuilder', () => {
     // Check DOM updated (proves handler ran and reactive state changed)
     const orderItems = wrapper.findAll('[data-role="order-item"]')
     expect(orderItems).toHaveLength(1)
-    expect(orderItems[0].text()).toContain('Chorus')
+    expect(orderItems[0]!.text()).toContain('Chorus')
 
     const emitted = wrapper.emitted('update:performanceOrder')
     expect(emitted).toBeTruthy()
@@ -89,7 +89,7 @@ describe('PerformanceOrderBuilder', () => {
 
     // Remove the second item (chorus)
     const removeButtons = wrapper.findAll('[data-role="remove-section"]')
-    await removeButtons[1].trigger('click')
+    await removeButtons[1]!.trigger('click')
 
     const emitted = wrapper.emitted('update:performanceOrder')
     expect(emitted).toBeTruthy()
@@ -121,8 +121,8 @@ describe('PerformanceOrderBuilder', () => {
 
     const items = wrapper.findAll('[data-role="order-item"]')
     expect(items).toHaveLength(2)
-    expect(items[0].text()).toContain('Chorus')
-    expect(items[1].text()).toContain('Verse 1')
+    expect(items[0]!.text()).toContain('Chorus')
+    expect(items[1]!.text()).toContain('Verse 1')
   })
 
   it('shows empty state when no sections are in the order', () => {

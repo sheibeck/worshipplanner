@@ -3,10 +3,11 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { ref, reactive, computed } from 'vue'
 import ScriptureSlideEditor from '../ScriptureSlideEditor.vue'
 import type { ScriptureSlide } from '@/types/slide'
+import type { ScriptureReading } from '@/types/scriptureReading'
 
 const mockCreateReading = vi.fn(() => Promise.resolve('new-reading-id'))
 const mockUpdateReading = vi.fn(() => Promise.resolve())
-const mockGetReading = vi.fn(() => Promise.resolve(null))
+const mockGetReading = vi.fn<() => Promise<ScriptureReading | null>>(() => Promise.resolve(null))
 const mockSubscribeReadings = vi.fn()
 const mockUnsubscribeReadings = vi.fn()
 
@@ -273,8 +274,8 @@ describe('ScriptureSlideEditor', () => {
       rawText: '[16] For God so loved...',
       readingMode: 'normal',
       slides: makeSampleSlides(),
-      createdAt: { seconds: 1000000, nanoseconds: 0 },
-      updatedAt: { seconds: 1000000, nanoseconds: 0 },
+      createdAt: { seconds: 1000000, nanoseconds: 0 } as never,
+      updatedAt: { seconds: 1000000, nanoseconds: 0 } as never,
     })
 
     const wrapper = mountEditor({ readingId: 'existing-reading' })

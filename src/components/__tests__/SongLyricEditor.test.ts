@@ -163,7 +163,7 @@ describe('SongLyricEditor', () => {
   it('shows auto-save status indicator for pending', async () => {
     mockIsLoading.value = false
     mockCurrentLyrics.value = makeLyrics()
-    const { _statusRef } = await import('@/composables/useAutoSave') as { _statusRef: ReturnType<typeof ref<string>> }
+    const { _statusRef } = await import('@/composables/useAutoSave') as unknown as { _statusRef: ReturnType<typeof ref<string>> }
     _statusRef.value = 'pending'
     const wrapper = await mountEditor()
     await flushPromises()
@@ -174,7 +174,7 @@ describe('SongLyricEditor', () => {
   it('shows auto-save status indicator for saving', async () => {
     mockIsLoading.value = false
     mockCurrentLyrics.value = makeLyrics()
-    const { _statusRef } = await import('@/composables/useAutoSave') as { _statusRef: ReturnType<typeof ref<string>> }
+    const { _statusRef } = await import('@/composables/useAutoSave') as unknown as { _statusRef: ReturnType<typeof ref<string>> }
     _statusRef.value = 'saving'
     const wrapper = await mountEditor()
     await flushPromises()
@@ -186,7 +186,7 @@ describe('SongLyricEditor', () => {
   it('shows auto-save status indicator for saved', async () => {
     mockIsLoading.value = false
     mockCurrentLyrics.value = makeLyrics()
-    const { _statusRef } = await import('@/composables/useAutoSave') as { _statusRef: ReturnType<typeof ref<string>> }
+    const { _statusRef } = await import('@/composables/useAutoSave') as unknown as { _statusRef: ReturnType<typeof ref<string>> }
     _statusRef.value = 'saved'
     const wrapper = await mountEditor()
     await flushPromises()
