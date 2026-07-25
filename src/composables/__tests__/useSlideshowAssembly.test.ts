@@ -5,6 +5,7 @@ import type { Service, ServiceSlot, HymnSlot, SongSlot, ScriptureSlot } from '@/
 import type { SongLyrics } from '@/types/songLyrics'
 import type { ScriptureReading } from '@/types/scriptureReading'
 import type { Song } from '@/types/song'
+import type { ImportedDeck } from '@/types/importedDeck'
 
 // --- Stubbed scriptureSlides store (D001/D005 pattern used by ScriptureSlideEditor.test.ts) ---
 const mockSubscribeReadings = vi.fn()
@@ -21,6 +22,23 @@ vi.mock('@/stores/scriptureSlides', () => ({
       createReading: vi.fn(),
       updateReading: vi.fn(),
       getReading: vi.fn(),
+    }),
+}))
+
+// --- Stubbed importedSlides store (Phase 21, mirrors the scriptureSlides stub above) ---
+const mockSubscribeDecks = vi.fn()
+const importedState = reactive<{ decks: ImportedDeck[] }>({ decks: [] })
+
+vi.mock('@/stores/importedSlides', () => ({
+  useImportedSlides: () =>
+    reactive({
+      decks: importedState.decks,
+      isLoading: false,
+      subscribeDecks: mockSubscribeDecks,
+      unsubscribeDecks: vi.fn(),
+      createDeck: vi.fn(),
+      updateDeck: vi.fn(),
+      getDeck: vi.fn(),
     }),
 }))
 
@@ -109,6 +127,7 @@ describe('useSlideshowAssembly', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     scriptureState.readings = []
+    importedState.decks = []
     songsState.songs = []
   })
 
@@ -245,6 +264,8 @@ describe('useSlideshowAssembly', () => {
 
     expect(mockSubscribeReadings).toHaveBeenCalledTimes(1)
     expect(mockSubscribeReadings).toHaveBeenCalledWith('org-1')
+    expect(mockSubscribeDecks).toHaveBeenCalledTimes(1)
+    expect(mockSubscribeDecks).toHaveBeenCalledWith('org-1')
     expect(assembledSlideshow.value).toHaveLength(1)
     expect(assembledSlideshow.value[0]!.slide).toMatchObject({ text: 'For God so loved the world...' })
 
@@ -252,6 +273,34 @@ describe('useSlideshowAssembly', () => {
     service.value = makeService([scriptureSlot({ position: 0, scriptureReadingId: 'reading-1' })])
     await nextTick()
     expect(mockSubscribeReadings).toHaveBeenCalledTimes(1)
+    expect(mockSubscribeDecks).toHaveBeenCalledTimes(1)
+  })
+
+  it('derives importedDecksById from the importedSlides store and expands an IMPORTED slot', async () => {
+    importedState.decks = [
+      {
+        id: 'deck-1',
+        sourceFileName: 'announcements.pptx',
+        section: 'pre-service',
+        slides: [
+          { id: 'orig-id', position: 0, contentKind: 'text', title: 'Welcome', body: 'Welcome everyone' },
+        ],
+        createdAt: {} as never,
+        updatedAt: {} as never,
+      },
+    ]
+
+    const service = ref<Service | null>(
+      makeService([{ kind: 'IMPORTED', position: 0, importId: 'deck-1', section: 'pre-service' }]),
+    )
+
+    const { assembledSlideshow } = useSlideshowAssembly(service, 'org-1')
+    await nextTick()
+
+    expect(assembledSlideshow.value).toHaveLength(1)
+    expect(assembledSlideshow.value[0]!.slotKind).toBe('IMPORTED')
+    expect(assembledSlideshow.value[0]!.sourceId).toBe('deck-1')
+    expect(assembledSlideshow.value[0]!.slide).toMatchObject({ body: 'Welcome everyone' })
   })
 
   it('assembledSections groups slides by section in SERVICE_SECTIONS order, plus an undefined-section group', async () => {

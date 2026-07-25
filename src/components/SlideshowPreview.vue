@@ -54,6 +54,15 @@
               </p>
             </template>
 
+            <!-- Image slide (imported PPTX/image deck) -->
+            <template v-else-if="cardKind(assembled.slide) === 'image'">
+              <img
+                :src="(assembled.slide as ImageSlide).imageUrl"
+                :alt="(assembled.slide as ImageSlide).altText ?? ''"
+                class="w-full rounded object-contain max-h-48"
+              />
+            </template>
+
             <!-- Text slide (prayer/message/hymn placeholder) -->
             <template v-else>
               <p v-if="(assembled.slide as TextSlide).title" class="text-[10px] font-semibold text-indigo-400 uppercase tracking-wider mb-1">
@@ -86,6 +95,7 @@ import type {
   CopyrightSlide,
   ScriptureSlide,
   TextSlide,
+  ImageSlide,
 } from '@/types/slide'
 
 const props = defineProps<{
@@ -102,7 +112,7 @@ const hasAnySlides = computed(() => nonEmptySections.value.length > 0)
  * LyricSlide and CopyrightSlide both carry `contentKind: 'lyric'` (D001) and
  * are distinguished by shape (`sectionId` only present on LyricSlide).
  */
-type CardKind = 'lyric' | 'copyright' | 'scripture' | 'text'
+type CardKind = 'lyric' | 'copyright' | 'scripture' | 'text' | 'image'
 
 function cardKind(slide: Slide): CardKind {
   if (slide.contentKind === 'lyric') {

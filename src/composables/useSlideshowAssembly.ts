@@ -15,6 +15,7 @@ import { ref, reactive, computed, watch, onUnmounted, type Ref, type ComputedRef
 import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore'
 import { db } from '@/firebase'
 import { useScriptureSlides } from '@/stores/scriptureSlides'
+import { useImportedSlides } from '@/stores/importedSlides'
 import { useSongStore } from '@/stores/songs'
 import { assembleSlideshow } from '@/utils/slideshowAssembler'
 import { SERVICE_SECTIONS, SERVICE_SECTION_LABELS, type Service } from '@/types/service'
@@ -70,6 +71,7 @@ export function useSlideshowAssembly(
   options?: UseSlideshowAssemblyOptions,
 ): UseSlideshowAssemblyReturn {
   const scriptureStore = useScriptureSlides()
+  const importedStore = useImportedSlides()
   const songStore = useSongStore()
   const loadLyrics = options?.lyricsLoader ?? defaultLyricsLoader
 
@@ -77,13 +79,14 @@ export function useSlideshowAssembly(
     typeof orgId === 'string' ? orgId : orgId.value,
   )
 
-  // --- scripture readings: subscribe once per org, guard against double-subscribe ---
+  // --- scripture readings / imported decks: subscribe once per org, guard against double-subscribe ---
   const subscribedOrgId = ref<string | null>(null)
   const stopOrgWatch = watch(
     resolvedOrgId,
     (id) => {
       if (id && subscribedOrgId.value !== id) {
         scriptureStore.subscribeReadings(id)
+        importedStore.subscribeDecks(id)
         subscribedOrgId.value = id
       }
     },
@@ -94,6 +97,14 @@ export function useSlideshowAssembly(
     const map = new Map<string, (typeof scriptureStore.readings)[number]>()
     for (const reading of scriptureStore.readings) {
       map.set(reading.id, reading)
+    }
+    return map
+  })
+
+  const importedDecksById = computed(() => {
+    const map = new Map<string, (typeof importedStore.decks)[number]>()
+    for (const deck of importedStore.decks) {
+      map.set(deck.id, deck)
     }
     return map
   })
@@ -155,6 +166,7 @@ export function useSlideshowAssembly(
       songLyricsById,
       performanceOrderById: performanceOrderById.value,
       scriptureReadingsById: scriptureReadingsById.value,
+      importedDecksById: importedDecksById.value,
     })
   })
 

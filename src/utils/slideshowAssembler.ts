@@ -14,6 +14,7 @@ import type { Service, ServiceSlot } from '@/types/service'
 import type { AssembledSlide, Slide, LyricSlide, CopyrightSlide, TextSlide } from '@/types/slide'
 import type { SongLyrics } from '@/types/songLyrics'
 import type { ScriptureReading } from '@/types/scriptureReading'
+import type { ImportedDeck } from '@/types/importedDeck'
 import { slotLabel } from './slotTypes'
 
 /** Content maps the assembly engine resolves slots against. Pre-loaded by the caller. */
@@ -21,6 +22,7 @@ export interface AssemblyInputs {
   songLyricsById: Map<string, SongLyrics>
   performanceOrderById: Map<string, string[]>
   scriptureReadingsById: Map<string, ScriptureReading>
+  importedDecksById: Map<string, ImportedDeck>
 }
 
 /** A Slide variant's fields minus the id/position this engine assigns on emit. */
@@ -122,6 +124,18 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
         reading.slides.forEach((innerSlide, localSeq) => {
           const { id: _id, position: _position, ...rest } = innerSlide
           emit(slot, index, rest, slot.scriptureReadingId!, localSeq)
+        })
+        break
+      }
+
+      case 'IMPORTED': {
+        if (!slot.importId) break
+        const deck: ImportedDeck | undefined = inputs.importedDecksById.get(slot.importId)
+        if (!deck) break
+
+        deck.slides.forEach((innerSlide, localSeq) => {
+          const { id: _id, position: _position, ...rest } = innerSlide
+          emit(slot, index, rest, slot.importId!, localSeq)
         })
         break
       }
