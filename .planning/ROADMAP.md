@@ -108,7 +108,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 23-02-PLAN.md — PresentationViewer shell: Teleport, Fullscreen API + overlay fallback, root-scoped keyboard nav, auto-hiding chrome, loading/empty states, projection-scale rendering for every slide kind (Wave 2)
+- [x] 23-02-PLAN.md — PresentationViewer shell: Teleport, Fullscreen API + overlay fallback, root-scoped keyboard nav, auto-hiding chrome, loading/empty states, projection-scale rendering for every slide kind (Wave 2)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
