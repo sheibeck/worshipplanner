@@ -349,7 +349,14 @@ const atLast = computed(() => currentIndex.value >= props.slides.length - 1)
 
 const currentAudioUrl = computed<string | null>(() => currentSlide.value?.slide.audioUrl ?? null)
 const currentVideoUrl = computed<string | null>(() => currentSlide.value?.slide.videoUrl ?? null)
-const bodyIsCaption = computed(() => Boolean(currentVideoUrl.value))
+/**
+ * WR-05: demote the slide's own text to caption scale only while a video is
+ * ACTUALLY rendered — not merely attached. Gating on `currentVideoUrl.value`
+ * alone left the text stuck at caption scale even after the video errored
+ * out and its wrapper was removed (`v-if="currentVideoUrl && !mediaFailed"`),
+ * since `currentVideoUrl` itself doesn't change when only the video fails.
+ */
+const bodyIsCaption = computed(() => Boolean(currentVideoUrl.value) && !mediaFailed.value)
 
 /**
  * Keys the VideoPlayer/AudioPlayer instances on the SLIDE, not just the media

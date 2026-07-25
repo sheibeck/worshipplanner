@@ -784,6 +784,28 @@ describe('PresentationViewer', () => {
       expect(body().find('[data-testid="presentation-body"]').text()).toContain('Video slide v1')
     })
 
+    it('the slide body reverts from caption scale to full Body scale once the attached video errors out (WR-05)', async () => {
+      mount(PresentationViewer, { props: { slides: [videoSlide('v1', 'https://example.com/clip.mp4')] } })
+      await flushPromises()
+
+      // While the video is actually rendering, the slide's own text is
+      // demoted to caption scale (text-2xl).
+      const bodyBeforeError = body().find('[data-testid="presentation-body"]')
+      expect(bodyBeforeError.classes()).toContain('text-2xl')
+      expect(bodyBeforeError.classes()).not.toContain('text-5xl')
+
+      await body().find('[data-testid="presentation-video"] video').trigger('error')
+      await flushPromises()
+
+      // currentVideoUrl itself hasn't changed (the slide still "carries"
+      // videoUrl) — only whether it actually rendered has. Once the video
+      // wrapper is removed, the text must return to full Body scale rather
+      // than staying stuck at caption scale with no dominant content at all.
+      const bodyAfterError = body().find('[data-testid="presentation-body"]')
+      expect(bodyAfterError.classes()).toContain('text-5xl')
+      expect(bodyAfterError.classes()).not.toContain('text-2xl')
+    })
+
     it('triggering error on the audio removes presentation-audio and shows the same notice', async () => {
       mount(PresentationViewer, { props: { slides: [audioSlide('a1', 'https://example.com/clip.mp3')] } })
       await flushPromises()
