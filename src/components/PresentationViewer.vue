@@ -395,11 +395,23 @@ const isCongregational = computed(() => {
 })
 
 // A live edit that shortens the show cannot leave currentIndex out of range.
+// Clamping must route through the same pause/reset/play lifecycle as
+// goToIndex() (WR-03) — otherwise the OLD slide's degraded-state flags
+// (mediaFailed/audioBlocked/videoBlocked/videoMutedPlaying) leak onto the
+// clamped-to slide (e.g. a stale `mediaFailed` suppresses perfectly-fine
+// media on the new slide), and nothing ever calls .play() on whatever media
+// element Vue mounts for the new slide.
 watch(
   () => props.slides.length,
-  (len) => {
-    if (currentIndex.value > len - 1) currentIndex.value = Math.max(0, len - 1)
-    if (currentIndex.value < 0) currentIndex.value = 0
+  async (len) => {
+    const clamped = Math.min(Math.max(currentIndex.value, 0), Math.max(0, len - 1))
+    if (clamped !== currentIndex.value) {
+      pauseCurrentMedia()
+      resetMediaState()
+      currentIndex.value = clamped
+      await nextTick()
+      playCurrentMedia()
+    }
   },
 )
 

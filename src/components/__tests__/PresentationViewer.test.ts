@@ -906,4 +906,53 @@ describe('PresentationViewer', () => {
       expect(body().find('[data-testid="presentation-muted-chip"]').exists()).toBe(false)
     })
   })
+
+  // ── WR-03: the slides-length watcher must route through the same
+  //    pause/reset/play lifecycle as goToIndex() when a live edit clamps
+  //    currentIndex onto a different slide while presenting ──
+  describe('slides-length watcher (live edit clamp)', () => {
+    beforeEach(() => {
+      window.HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined)
+      window.HTMLMediaElement.prototype.pause = vi.fn()
+    })
+
+    it('clamping currentIndex when a live edit shortens the show resets stale degraded-state flags and plays the clamped-to slide media (WR-03)', async () => {
+      const slides = [
+        textSlide('t1'),
+        videoSlide('v2', 'https://example.com/clip2.mp4'),
+        videoSlide('v3', 'https://example.com/clip3.mp4'),
+      ]
+      const wrapper = mount(PresentationViewer, { props: { slides } })
+      await flushPromises()
+
+      await body().find('[data-testid="presentation-next"]').trigger('click')
+      await flushPromises()
+      await body().find('[data-testid="presentation-next"]').trigger('click')
+      await flushPromises()
+      expect(slideText()).toContain('Video slide v3')
+
+      // v3's media fails — sets the stale mediaFailed flag this watcher must clear.
+      await body().find('[data-testid="presentation-video"] video').trigger('error')
+      await flushPromises()
+      expect(body().find('[data-testid="presentation-media-unavailable"]').exists()).toBe(true)
+
+      const playCallsBefore = (window.HTMLMediaElement.prototype.play as ReturnType<typeof vi.fn>).mock.calls.length
+
+      // Live edit shortens the show to 2 slides — index 2 (v3) no longer
+      // exists; the watcher must clamp currentIndex to 1 (v2) THROUGH the
+      // pause/reset/play lifecycle, not via a bare assignment.
+      await wrapper.setProps({ slides: slides.slice(0, 2) })
+      await flushPromises()
+
+      expect(slideText()).toContain('Video slide v2')
+      // The stale mediaFailed flag from v3 must not suppress v2's fine media.
+      expect(body().find('[data-testid="presentation-media-unavailable"]').exists()).toBe(false)
+      expect(body().find('[data-testid="presentation-video"]').exists()).toBe(true)
+      // And the clamped-to slide's media must actually be driven (played),
+      // not left silently unplayed.
+      expect((window.HTMLMediaElement.prototype.play as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(
+        playCallsBefore,
+      )
+    })
+  })
 })
