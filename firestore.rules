@@ -54,8 +54,17 @@ service cloud.firestore {
       }
 
       // Songs — editors only (viewers cannot read songs)
-      match /songs/{docId} {
+      match /songs/{songId} {
         allow read, write: if isOrgEditor(orgId);
+
+        // Lyrics versions subcollection (Phase 18) — editors only.
+        // Required explicitly: the /{collection}/{docId} catch-all below only
+        // matches single-segment subcollections directly under the org, so this
+        // deeper path would otherwise fall through to the global deny-all,
+        // breaking the Lyrics tab and slideshow auto-assembly with permission-denied.
+        match /lyrics/{lyricsId} {
+          allow read, write: if isOrgEditor(orgId);
+        }
       }
 
       // All other nested collections — editors only

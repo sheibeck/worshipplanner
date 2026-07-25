@@ -539,6 +539,41 @@ describe('Editor/Viewer RBAC', () => {
     await assertFails(getDoc(doc(db, 'organizations', 'orgA', 'songs', 'song1')))
   })
 
+  // Phase 18 lyrics subcollection (songs/{songId}/lyrics/{lyricsId}) — a DEEP path that the
+  // single-segment /{collection}/{docId} catch-all does NOT cover, so it needs its own rule.
+  // Regression: the rule was missing on first ship, so production/emulator denied the read and
+  // crashed the Lyrics tab + slideshow auto-assembly with permission-denied. These tests fail
+  // if the explicit match /lyrics/{lyricsId} rule is ever removed again.
+  it('editor can read lyrics subcollection (songs/{songId}/lyrics/{lyricsId})', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('organizations/orgA/songs/song1/lyrics/v1', { slides: [], updatedAt: new Date() })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertSucceeds(getDoc(doc(db, 'organizations', 'orgA', 'songs', 'song1', 'lyrics', 'v1')))
+  })
+
+  it('editor can write lyrics subcollection', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertSucceeds(
+      setDoc(doc(db, 'organizations', 'orgA', 'songs', 'song1', 'lyrics', 'v1'), {
+        slides: [],
+        updatedAt: new Date(),
+      }),
+    )
+  })
+
+  it('non-member cannot read lyrics subcollection', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('organizations/orgA/songs/song1/lyrics/v1', { slides: [], updatedAt: new Date() })
+    // userB is a member of orgB only, never orgA
+    await seedMembershipDoc('orgB', 'userB', 'editor')
+    const context = testEnv.authenticatedContext('userB')
+    const db = context.firestore()
+    await assertFails(getDoc(doc(db, 'organizations', 'orgA', 'songs', 'song1', 'lyrics', 'v1')))
+  })
+
   it('viewer can read services collection', async () => {
     await seedMembershipDoc('orgA', 'userA', 'viewer')
     await seedDoc('organizations/orgA/services/svc1', { date: '2026-03-07' })
