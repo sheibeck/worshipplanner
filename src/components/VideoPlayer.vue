@@ -1,21 +1,24 @@
 <template>
-  <div class="rounded-md bg-gray-800/60 border border-gray-700/50 p-2" data-testid="video-player">
+  <div
+    :class="chromeless ? '' : 'rounded-md bg-gray-800/60 border border-gray-700/50 p-2'"
+    data-testid="video-player"
+  >
     <video
       ref="videoEl"
       :src="src"
       :poster="poster"
       :muted="muted"
-      controls
+      :controls="!chromeless"
       preload="none"
       playsinline
-      class="w-full rounded max-h-48"
+      :class="chromeless ? 'w-full rounded object-contain max-h-[80vh]' : 'w-full rounded max-h-48'"
       @play="onPlay"
       @pause="onPause"
       @ended="onEnded"
       @error="onError"
     />
     <button
-      v-if="showPlayAffordance"
+      v-if="showPlayAffordance && !chromeless"
       type="button"
       data-testid="video-play-affordance"
       class="mt-2 inline-flex items-center gap-1 rounded bg-indigo-600 px-2 py-1 text-xs font-medium text-white hover:bg-indigo-500"
@@ -27,7 +30,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 
 /**
  * Reusable video playback component (R014). Sources MP4/WebM/MOV via native
@@ -40,6 +43,7 @@ import { ref } from 'vue'
 defineProps<{
   src: string
   poster?: string
+  chromeless?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -99,6 +103,11 @@ async function play(): Promise<void> {
     emit('autoplay-blocked')
   } catch (err) {
     if (!isNotAllowedError(err)) throw err
+    // Both attempts failed — nothing is playing. Clear the muted flag so this
+    // is the discriminator between "muted retry succeeded" (muted stays true,
+    // silently playing) and "hard block" (muted false, nothing playing), and
+    // so a later user-gesture retry starts with sound rather than silently.
+    muted.value = false
     emit('autoplay-blocked')
     showPlayAffordance.value = true
   }
@@ -113,5 +122,22 @@ async function retryPlay(): Promise<void> {
   await play()
 }
 
-defineExpose({ play, pause })
+/**
+ * Called by the presentation driver's "tap to unmute" affordance (Phase 23).
+ * Clears the muted flag and re-attempts playback; if the browser still
+ * blocks it, restores the muted flag and re-emits autoplay-blocked rather
+ * than throwing.
+ */
+async function unmute(): Promise<void> {
+  muted.value = false
+  try {
+    await videoEl.value?.play()
+  } catch (err) {
+    if (!isNotAllowedError(err)) throw err
+    muted.value = true
+    emit('autoplay-blocked')
+  }
+}
+
+defineExpose({ play, pause, isMuted: computed(() => muted.value), unmute })
 </script>
