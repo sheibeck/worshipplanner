@@ -9,8 +9,7 @@ import type { Timestamp } from 'firebase/firestore'
 const mockTimestamp = { toDate: () => new Date('2026-01-01') } as unknown as Timestamp
 
 function makeSlot(overrides: Partial<ServiceSlot> & { kind: ServiceSlot['kind']; id: string; position: number }): ServiceSlot {
-  const base = { kind: 'PRAYER' as const, id: 'x', position: 0 }
-  return { ...base, ...overrides } as ServiceSlot
+  return { ...overrides } as ServiceSlot
 }
 
 function makeAssembled(slotIndex: number, id: string): AssembledSlide {

@@ -7,7 +7,7 @@ import type { AssembledSlide } from '@/types/slide'
 import type { SlideGroup } from '@/types/slideGroup'
 
 function makeSlot(overrides: Partial<ServiceSlot> & { kind: ServiceSlot['kind']; id: string; position: number }): ServiceSlot {
-  return { kind: 'PRAYER', ...overrides } as ServiceSlot
+  return { ...overrides } as ServiceSlot
 }
 
 function makeAssembled(slotIndex: number, id: string): AssembledSlide {

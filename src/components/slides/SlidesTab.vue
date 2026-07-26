@@ -19,8 +19,8 @@
 /**
  * Panel mounted inside `ServiceEditorView`'s new Slides tab (Phase 25 Task 2).
  * Every input arrives as a prop — this component reads no store and calls
- * no composable. `ServiceEditorView` is the SOLE owner of
- * `useSlideshowAssembly()`; a second invocation anywhere under
+ * no composable. `ServiceEditorView` is the SOLE owner of the page's
+ * assembly composable; a second invocation anywhere under
  * `src/components/slides/` would run a second set of materialize/reconcile
  * watchers against the same Firestore documents (T-25-03-02).
  *
@@ -43,9 +43,22 @@
 import { ref, computed, watch } from 'vue'
 import type { ServiceSlot } from '@/types/service'
 import type { AssembledSlide } from '@/types/slide'
-import type { SlideGroup } from '@/types/slideGroup'
-import type { PendingReconciliation } from '@/composables/useSlideshowAssembly'
+import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
 import SlidePlanRail from './SlidePlanRail.vue'
+
+/**
+ * Mirrors the assembly composable's own confirm-required-reconciliation
+ * shape exactly (a deliberate LOCAL duplicate, not an import from that
+ * module — nothing under `src/components/slides/` may import or call the
+ * page's assembly composable itself, per this plan's prohibitions). Phase
+ * 26 owns the confirm dialog this shape feeds; this plan only carries it
+ * through as a prop.
+ */
+interface PendingReconciliation {
+  slotId: string
+  proposed: GroupSlideEntry[]
+  loss?: { customizedEntries: number; withAudio: number; withNotes: number }
+}
 
 const props = defineProps<{
   slots: ServiceSlot[]

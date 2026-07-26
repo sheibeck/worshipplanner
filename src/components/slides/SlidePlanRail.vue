@@ -69,7 +69,7 @@
  *
  * Reads no store and calls no composable: every input arrives as a prop
  * from `SlidesTab.vue`, which itself receives assembled data from
- * `ServiceEditorView.vue`, the page's sole owner of `useSlideshowAssembly()`.
+ * `ServiceEditorView.vue`, the page's sole owner of the assembly composable.
  */
 import { computed } from 'vue'
 import type { ServiceSlot } from '@/types/service'
