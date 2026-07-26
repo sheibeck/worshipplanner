@@ -31,6 +31,7 @@
       <div class="flex-1 overflow-y-auto px-6 py-4">
         <div
           v-if="cards.length > 0"
+          ref="cardsContainerRef"
           class="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4"
           data-testid="slide-grid-cards"
         >
@@ -40,6 +41,7 @@
             :assembled-slide="card.assembledSlide"
             :number="card.number"
             :selected="card.assembledSlide.slide.id === selectedSlideId"
+            :reorderable="canReorder"
             @select="emit('select', $event)"
           />
         </div>
@@ -54,17 +56,16 @@
 
 <script setup lang="ts">
 /**
- * Presentational-plus-write-controls slide grid (Phase 25 Task 2, 25-04).
- * Renders the SELECTED plan item's slides as cards, in play order, and the
- * three-line header the mockup and 25-CONTEXT.md § Specific Ideas describe
- * verbatim.
+ * Presentational-plus-write-controls slide grid (Phase 25 Tasks 2/3). Renders
+ * the SELECTED plan item's slides as cards, in play order, and the three-line
+ * header the mockup and 25-CONTEXT.md § Specific Ideas describe verbatim.
  *
- * Every input still arrives as a prop from `SlidesTab.vue` and this
- * component still calls no `useSlideshowAssembly` composable directly — but
- * per 25-05 it DOES import the `slideGroups` Pinia store directly to issue
- * the ＋ Add slide write this task adds, exactly as every other slide-group
- * mutation in the codebase does (never the `localService` deep-watch
- * autosave).
+ * Every input still arrives as a prop from `SlidesTab.vue` and this component
+ * still calls no `useSlideshowAssembly` composable directly — but per 25-05 it
+ * DOES import the `slideGroups` Pinia store directly to issue the two writes
+ * this plan adds (append-a-slide, drag-reorder), exactly as every other
+ * slide-group mutation in the codebase does (never the `localService`
+ * deep-watch autosave).
  *
  * Filters `assembledSlideshow` by the selected plan item's ARRAY index
  * (`slotArrayIndex`), never by `groupId` — `groupId` is only set on the
@@ -74,10 +75,10 @@
  *
  * Ships no Grid/List toggle (D-09), no apply/reject/confirm affordance for a
  * pending reconciliation (Phase 26 owns that dialog, R033) and no drop tile
- * (25-06). The `group` prop is still accepted and threaded through unused —
- * reserved for 25-05 Task 3's drag-reorder and 25-06's group-music control.
+ * (25-06).
  */
-import { computed } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
+import Sortable from 'sortablejs'
 import type { ServiceSlot } from '@/types/service'
 import type { AssembledSlide } from '@/types/slide'
 import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
@@ -97,14 +98,14 @@ const props = defineProps<{
   totalPlanItems: number
   assembledSlideshow: AssembledSlide[]
   selectedSlideId: string | null
-  /** The group document for the selected plan item, if materialized. Threaded through for 25-05 Task 3/25-06. */
+  /** The group document for the selected plan item, if materialized. */
   group: SlideGroup | null
   pendingReconciliations: PendingReconciliation[]
-  /** Gates every write control this component renders (add-slide button, and 25-05 Task 3's drag grip). */
+  /** Gates every write control this component renders (add-slide button, drag grip/Sortable instance). */
   isEditor: boolean
   /** Org id — needed to call the `slideGroups` store's write actions directly. */
   orgId: string
-  /** On-demand group materializer (25-05 Task 1) — resolves a slot's group entries and stored source signature, creating the group first if it doesn't exist yet. Resolved before every append so a plan item with no group yet can still receive a slide (R032). */
+  /** On-demand group materializer (25-05 Task 1) — resolved before every append so a plan item with no group yet can still receive a slide (R032). */
   ensureGroupMaterialized: (slotId: string) => Promise<EnsureGroupMaterializedResult | undefined>
 }>()
 
@@ -192,4 +193,80 @@ async function onAddSlide(): Promise<void> {
     console.error('Failed to add slide:', err)
   }
 }
+
+// --- Task 3: drag-reorder within the selected group (D-11) ---
+//
+// Reuses the exact SortableJS pattern already established in
+// `ServiceEditorView.vue`'s slot list: `handle`/`draggable` scoping, the
+// DOM-revert-before-Vue-re-render trick (prevents the snap-back flash), and
+// splice-and-reindex. The instance exists only while there is a stored group
+// to write to AND the caller can write — a group with no stored document has
+// no `slides` array to reorder, and would reject at the store.
+const cardsContainerRef = ref<HTMLElement | null>(null)
+let sortableInstance: Sortable | null = null
+
+const canReorder = computed(() => props.isEditor && props.group !== null)
+
+function destroySortable(): void {
+  sortableInstance?.destroy()
+  sortableInstance = null
+}
+
+watch(
+  [cardsContainerRef, canReorder],
+  ([el, allowed]) => {
+    if (el && allowed && !sortableInstance) {
+      sortableInstance = Sortable.create(el, {
+        handle: '.drag-handle',
+        // Scope both drag eligibility AND the old/new index arithmetic to
+        // `.slide-card` — this is what keeps 25-07's drop tile (a sibling in
+        // the same grid container) from shifting every index by one.
+        draggable: '.slide-card',
+        animation: 150,
+        ghostClass: 'opacity-30',
+        async onEnd(evt) {
+          if (evt.oldIndex == null || evt.newIndex == null) return
+          if (evt.oldIndex === evt.newIndex) return
+          // Revert SortableJS's DOM move so Vue's reactive render is the
+          // single source of truth — prevents the snap-back flash. Not
+          // incidental code; do not remove.
+          const parent = evt.item.parentNode
+          if (parent) {
+            const ref = parent.children[evt.oldIndex]
+            parent.insertBefore(evt.item, evt.oldIndex < evt.newIndex ? (ref?.nextSibling ?? null) : (ref ?? null))
+          }
+
+          // Read the current group and slot id from PROPS at call time —
+          // never from values captured when the instance was created — since
+          // the same container instance serves whichever group is selected.
+          const currentGroup = props.group
+          const currentSlot = props.selectedSlot
+          if (!currentGroup || !currentSlot) return
+
+          const sorted = [...currentGroup.slides].sort((a, b) => a.order - b.order)
+          const moved = sorted.splice(evt.oldIndex, 1)[0]
+          if (!moved) return
+          sorted.splice(evt.newIndex, 0, moved)
+          const reordered = sorted.map((entry, i) => ({ ...entry, order: i }))
+
+          try {
+            await slideGroupsStore.replaceGroupSlides(
+              props.orgId,
+              currentSlot.id,
+              reordered,
+              currentGroup.sourceSignature,
+            )
+          } catch (err) {
+            console.error('Failed to reorder slides:', err)
+          }
+        },
+      })
+    } else if ((!el || !allowed) && sortableInstance) {
+      destroySortable()
+    }
+  },
+  { flush: 'post' },
+)
+
+onUnmounted(destroySortable)
 </script>

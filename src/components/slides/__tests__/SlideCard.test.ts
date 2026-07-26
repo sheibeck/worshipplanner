@@ -12,12 +12,13 @@ function makeAssembled(overrides: Partial<AssembledSlide> & { slide: AssembledSl
   } as AssembledSlide
 }
 
-function mountCard(props: { assembledSlide: AssembledSlide; number?: number; selected?: boolean }) {
+function mountCard(props: { assembledSlide: AssembledSlide; number?: number; selected?: boolean; reorderable?: boolean }) {
   return mount(SlideCard, {
     props: {
       assembledSlide: props.assembledSlide,
       number: props.number ?? 1,
       selected: props.selected ?? false,
+      reorderable: props.reorderable ?? false,
     },
   })
 }
@@ -191,6 +192,31 @@ describe('SlideCard', () => {
     expect(unselected.classes()).not.toContain('border-indigo-500')
     expect(selected.attributes('data-selected')).toBe('true')
     expect(unselected.attributes('data-selected')).toBe('false')
+  })
+
+  it('renders the drag grip only when reorderable, and clicking it does not emit selection', async () => {
+    const assembled = makeAssembled({
+      slide: { id: 'grip-1', position: 0, contentKind: 'text', body: 'body' },
+    })
+    const reorderable = mountCard({ assembledSlide: assembled, reorderable: true })
+    const notReorderable = mountCard({ assembledSlide: assembled, reorderable: false })
+    expect(reorderable.find('[data-testid="slide-card-drag-handle"]').exists()).toBe(true)
+    expect(notReorderable.find('[data-testid="slide-card-drag-handle"]').exists()).toBe(false)
+
+    await reorderable.get('[data-testid="slide-card-drag-handle"]').trigger('click')
+    expect(reorderable.emitted('select')).toBeUndefined()
+  })
+
+  it('gives the drag grip an accessible name describing which slide it moves', () => {
+    const assembled = makeAssembled({
+      slide: { id: 'grip-2', position: 0, contentKind: 'text', title: 'Welcome', body: 'body' },
+    })
+    const wrapper = mountCard({ assembledSlide: assembled, reorderable: true })
+    const grip = wrapper.get('[data-testid="slide-card-drag-handle"]')
+    expect(grip.attributes('aria-label')).toBe('Reorder slide')
+    const describedBy = grip.attributes('aria-describedby')
+    expect(describedBy).toBeTruthy()
+    expect(wrapper.find(`#${describedBy}`).exists()).toBe(true)
   })
 
   it('clamps long body text inside a fixed-height preview region', () => {

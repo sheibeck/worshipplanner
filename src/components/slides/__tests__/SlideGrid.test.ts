@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import type { Options as SortableOptions } from 'sortablejs'
 import SlideGrid from '../SlideGrid.vue'
 import SlideCard from '../SlideCard.vue'
 import type { ServiceSlot } from '@/types/service'
@@ -7,12 +8,24 @@ import type { AssembledSlide } from '@/types/slide'
 import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
 import type { PendingReconciliation, EnsureGroupMaterializedResult } from '../slideDisplay'
 
-// --- 25-05 Task 2: SlideGrid calls the slideGroups store directly (add-slide) ---
+// --- 25-05: SlideGrid calls the slideGroups store directly (add-slide, drag-reorder) ---
 const mockReplaceGroupSlides = vi.fn().mockResolvedValue(undefined)
 vi.mock('@/stores/slideGroups', () => ({
   useSlideGroups: () => ({
     replaceGroupSlides: mockReplaceGroupSlides,
   }),
+}))
+
+// --- 25-05 Task 3: capture the options passed to Sortable.create so onEnd can be invoked directly ---
+let capturedSortableOptions: SortableOptions | undefined
+const mockSortableDestroy = vi.fn()
+vi.mock('sortablejs', () => ({
+  default: {
+    create: vi.fn((_el: HTMLElement, options: SortableOptions) => {
+      capturedSortableOptions = options
+      return { destroy: mockSortableDestroy }
+    }),
+  },
 }))
 
 function makeSlot(overrides: Partial<ServiceSlot> & { kind: ServiceSlot['kind']; id: string; position: number }): ServiceSlot {
@@ -26,6 +39,17 @@ function makeAssembled(slotIndex: number, id: string, slotKind: AssembledSlide['
     slotKind,
     sourceId: null,
   } as AssembledSlide
+}
+
+function makeGroup(overrides: Partial<SlideGroup> & { slides: GroupSlideEntry[] }): SlideGroup {
+  return {
+    id: 'slot-1',
+    slotId: 'slot-1',
+    serviceId: 'service-1',
+    createdAt: {} as never,
+    updatedAt: {} as never,
+    ...overrides,
+  }
 }
 
 function mountGrid(props: {
@@ -60,6 +84,8 @@ function mountGrid(props: {
 
 beforeEach(() => {
   mockReplaceGroupSlides.mockClear()
+  mockSortableDestroy.mockClear()
+  capturedSortableOptions = undefined
 })
 
 describe('SlideGrid', () => {
@@ -268,6 +294,98 @@ describe('SlideGrid', () => {
       await Promise.resolve()
 
       expect(wrapper.findAllComponents(SlideCard)).toHaveLength(1)
+    })
+  })
+
+  // --- Task 3: drag-reorder within the selected group (D-11) ---
+  describe('drag-reorder (Task 3)', () => {
+    function simulateDragEnd(oldIndex: number, newIndex: number) {
+      const parent = document.createElement('div')
+      const children = Array.from({ length: 4 }, () => document.createElement('div'))
+      children.forEach((c) => parent.appendChild(c))
+      const item = children[oldIndex]!
+      return capturedSortableOptions!.onEnd!({ oldIndex, newIndex, item } as never)
+    }
+
+    it('renders the grip for an editor with a stored group and does not render it for a viewer', () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const group = makeGroup({ slides: [{ id: 'e1', order: 0, sourceRef: { kind: 'text' } }] })
+      const assembledSlideshow = [makeAssembled(0, 'e1')]
+      const editorWrapper = mountGrid({ selectedSlot: slot, assembledSlideshow, group, isEditor: true })
+      const viewerWrapper = mountGrid({ selectedSlot: slot, assembledSlideshow, group, isEditor: false })
+      expect(editorWrapper.find('[data-testid="slide-card-drag-handle"]').exists()).toBe(true)
+      expect(viewerWrapper.find('[data-testid="slide-card-drag-handle"]').exists()).toBe(false)
+    })
+
+    it('does not render the grip when the group has no stored document', () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const assembledSlideshow = [makeAssembled(0, 'e1')]
+      const wrapper = mountGrid({ selectedSlot: slot, assembledSlideshow, group: null, isEditor: true })
+      expect(wrapper.find('[data-testid="slide-card-drag-handle"]').exists()).toBe(false)
+    })
+
+    it('clicking the grip does not emit card selection, while clicking the card body does', async () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const group = makeGroup({ slides: [{ id: 'e1', order: 0, sourceRef: { kind: 'text' } }] })
+      const assembledSlideshow = [makeAssembled(0, 'e1')]
+      const wrapper = mountGrid({ selectedSlot: slot, assembledSlideshow, group, isEditor: true })
+
+      await wrapper.get('[data-testid="slide-card-drag-handle"]').trigger('click')
+      expect(wrapper.emitted('select')).toBeUndefined()
+
+      await wrapper.get('[data-testid="slide-card-e1"]').trigger('click')
+      expect(wrapper.emitted('select')).toEqual([['e1']])
+    })
+
+    it('persists a drag end in new entry order, renumbered from zero, with the signature passed through unchanged', async () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const group = makeGroup({
+        sourceSignature: 'sig-xyz',
+        slides: [
+          { id: 'e1', order: 0, sourceRef: { kind: 'text' } },
+          { id: 'e2', order: 1, sourceRef: { kind: 'text' } },
+          { id: 'e3', order: 2, sourceRef: { kind: 'text' } },
+        ],
+      })
+      const assembledSlideshow = [makeAssembled(0, 'e1'), makeAssembled(0, 'e2'), makeAssembled(0, 'e3')]
+      mountGrid({ selectedSlot: slot, assembledSlideshow, group, isEditor: true })
+      await Promise.resolve()
+      await Promise.resolve()
+
+      expect(capturedSortableOptions).toBeDefined()
+      await simulateDragEnd(0, 2)
+      await Promise.resolve()
+
+      expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+      const [orgIdArg, slotIdArg, slidesArg, sigArg] = mockReplaceGroupSlides.mock.calls[0]!
+      expect(orgIdArg).toBe('org-1')
+      expect(slotIdArg).toBe('slot-1')
+      const slides = slidesArg as GroupSlideEntry[]
+      expect(slides.map((e) => e.id)).toEqual(['e2', 'e3', 'e1'])
+      expect(slides.map((e) => e.order)).toEqual([0, 1, 2])
+      expect(sigArg).toBe('sig-xyz')
+    })
+
+    it('issues no write when the drag ends at its starting index', async () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const group = makeGroup({ slides: [{ id: 'e1', order: 0, sourceRef: { kind: 'text' } }] })
+      const assembledSlideshow = [makeAssembled(0, 'e1')]
+      mountGrid({ selectedSlot: slot, assembledSlideshow, group, isEditor: true })
+      await Promise.resolve()
+      await Promise.resolve()
+
+      await simulateDragEnd(0, 0)
+      await Promise.resolve()
+
+      expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
+    })
+
+    it('gives the grip an accessible name', () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const group = makeGroup({ slides: [{ id: 'e1', order: 0, sourceRef: { kind: 'text' } }] })
+      const assembledSlideshow = [makeAssembled(0, 'e1')]
+      const wrapper = mountGrid({ selectedSlot: slot, assembledSlideshow, group, isEditor: true })
+      expect(wrapper.get('[data-testid="slide-card-drag-handle"]').attributes('aria-label')).toBe('Reorder slide')
     })
   })
 })
