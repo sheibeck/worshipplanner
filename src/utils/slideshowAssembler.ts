@@ -25,7 +25,7 @@
  *    a pre-materialization render cannot churn Vue keys across recomputes.
  */
 import type { Service, ServiceSlot } from '@/types/service'
-import type { AssembledSlide, Slide, LyricSlide, CopyrightSlide, TextSlide } from '@/types/slide'
+import type { AssembledSlide, Slide, LyricSlide, CopyrightSlide, TextSlide, VideoSlide } from '@/types/slide'
 import type { SongLyrics } from '@/types/songLyrics'
 import type { ScriptureReading } from '@/types/scriptureReading'
 import type { ImportedDeck } from '@/types/importedDeck'
@@ -103,6 +103,9 @@ function sourceIdForRef(ref: SourceRef): string | null {
     case 'imported':
       return ref.importId
     case 'text':
+    case 'video':
+      // A dropped video has no canonical record behind it (D-17) — same
+      // no-canonical-record convention as the `text` case.
       return null
   }
 }
@@ -159,8 +162,30 @@ function resolveEntryContent(
       return rest
     }
 
-    case 'text':
+    case 'text': {
+      // A ref carrying its own authored body (D-17: a user-added blank slide)
+      // wins over the slot-derived fallback. An authored body with no title
+      // is valid; a ref with no authored body at all falls through unchanged
+      // to today's slot-derived behavior.
+      if (ref.body !== undefined) {
+        const content: Omit<TextSlide, 'id' | 'position'> = {
+          contentKind: 'text',
+          ...(ref.title !== undefined ? { title: ref.title } : {}),
+          body: ref.body,
+        }
+        return content
+      }
       return buildTextContentForSlot(slot)
+    }
+
+    case 'video': {
+      const content: Omit<VideoSlide, 'id' | 'position'> = {
+        contentKind: 'video',
+        videoSrc: ref.videoSrc,
+        ...(ref.originalFileName !== undefined ? { originalFileName: ref.originalFileName } : {}),
+      }
+      return content
+    }
   }
 }
 
@@ -178,7 +203,14 @@ function resolveEntryMedia(group: SlideGroup, entry: GroupSlideEntry): ResolvedG
   // group's bed. `audioFromBed` is true only in the fallback case.
   const audioFromBed = !entry.audioUrl && !!group.bedAudioUrl
   const resolvedAudioUrl = entry.audioUrl ?? group.bedAudioUrl
-  // Video has no per-slide layer (Pattern 4) — it is always the group bed.
+  // The BED layer (this function) is still the only per-slide MEDIA-CARRIER
+  // layer for video — a group bed video plays across every slide in the
+  // group, resolved here exactly as before. A video SLIDE (D-17,
+  // `VideoSlide`/`SourceRef` kind `video`) is a separate concept: its own
+  // source lives on the slide's `videoSrc` field, resolved by
+  // `resolveEntryContent`, not through this bed carrier. The two coexist
+  // without collision because they use different field names — see
+  // `VideoSlide`'s doc comment in `src/types/slide.ts`.
   const videoFromBed = !!group.bedVideoUrl
 
   const media: ResolvedGroupMedia = { audioFromBed, videoFromBed }

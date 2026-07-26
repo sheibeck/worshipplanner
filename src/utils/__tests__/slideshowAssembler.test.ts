@@ -13,7 +13,7 @@ import type {
 import type { SongLyrics } from '@/types/songLyrics'
 import type { ScriptureReading } from '@/types/scriptureReading'
 import type { ImportedDeck } from '@/types/importedDeck'
-import type { ScriptureSlide, CopyrightSlide, LyricSlide, TextSlide, ImageSlide } from '@/types/slide'
+import type { ScriptureSlide, CopyrightSlide, LyricSlide, TextSlide, ImageSlide, VideoSlide } from '@/types/slide'
 import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
 import type { Timestamp } from 'firebase/firestore'
 import { slotLabel } from '@/utils/slotTypes'
@@ -1024,5 +1024,97 @@ describe('assembleSlideshow — D-04 two-level audio precedence and video bed (R
     expect(result[2]!.slide.audioUrl).toBeUndefined()
     expect(result[3]!.slide.audioUrl).toBeUndefined()
     expect(result[0]!.audioFromBed).toBeUndefined()
+  })
+})
+
+describe('assembleSlideshow — D-17 video entries and authored text entries', () => {
+  it('a group entry with a video source ref assembles to one slide whose content kind is video and whose own source equals the stored entry source', () => {
+    const slot = scriptureSlot({ id: 'slot-scripture-0', scriptureReadingId: 'reading-1' })
+    const service = makeService([slot])
+    const reading = makeScriptureReading()
+    const videoEntry = makeGroupSlideEntry({
+      id: 'entry-video',
+      order: 0,
+      sourceRef: { kind: 'video', videoSrc: 'https://example.com/dropped.mp4' },
+    })
+    const group = makeSlideGroup({ id: 'slot-scripture-0', slotId: 'slot-scripture-0', slides: [videoEntry] })
+    const inputs = makeInputs({
+      scriptureReadingsById: new Map([['reading-1', reading]]),
+      groupsBySlotId: new Map([['slot-scripture-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result).toHaveLength(1)
+    expect(result[0]!.slide.contentKind).toBe('video')
+    expect((result[0]!.slide as VideoSlide).videoSrc).toBe('https://example.com/dropped.mp4')
+    expect(result[0]!.slide.id).toBe('entry-video')
+    expect(result[0]!.sourceId).toBeNull()
+  })
+
+  it('a group with BOTH a bed video and a video entry assembles the video entry with its own source intact, and the bed still reaches videoUrl', () => {
+    const slot = scriptureSlot({ id: 'slot-scripture-0', scriptureReadingId: 'reading-1' })
+    const service = makeService([slot])
+    const reading = makeScriptureReading()
+    const videoEntry = makeGroupSlideEntry({
+      id: 'entry-video',
+      order: 0,
+      sourceRef: { kind: 'video', videoSrc: 'https://example.com/own-footage.mp4' },
+    })
+    const group = makeSlideGroup({
+      id: 'slot-scripture-0',
+      slotId: 'slot-scripture-0',
+      slides: [videoEntry],
+      bedVideoUrl: 'https://example.com/bed.mp4',
+    })
+    const inputs = makeInputs({
+      scriptureReadingsById: new Map([['reading-1', reading]]),
+      groupsBySlotId: new Map([['slot-scripture-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result).toHaveLength(1)
+    expect((result[0]!.slide as VideoSlide).videoSrc).toBe('https://example.com/own-footage.mp4')
+    expect(result[0]!.slide.videoUrl).toBe('https://example.com/bed.mp4')
+    expect(result[0]!.videoFromBed).toBe(true)
+  })
+
+  it('a text entry with authored title and body on a SONG slot assembles that title and body', () => {
+    const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+    const service = makeService([slot])
+    const lyrics = makeSongLyrics()
+    const authoredEntry = makeGroupSlideEntry({
+      id: 'entry-authored',
+      order: 0,
+      sourceRef: { kind: 'text', title: 'My Slide', body: 'My authored words' },
+    })
+    const group = makeSlideGroup({ id: 'slot-song-0', slotId: 'slot-song-0', slides: [authoredEntry] })
+    const inputs = makeInputs({
+      songLyricsById: new Map([['song-1', lyrics]]),
+      groupsBySlotId: new Map([['slot-song-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result).toHaveLength(1)
+    expect(result[0]!.slide.contentKind).toBe('text')
+    expect((result[0]!.slide as TextSlide).title).toBe('My Slide')
+    expect((result[0]!.slide as TextSlide).body).toBe('My authored words')
+  })
+
+  it('a text entry with no authored content on a PRAYER slot assembles exactly what it does today', () => {
+    const slot: NonAssignableSlot = { kind: 'PRAYER', id: 'slot-prayer-0', position: 0 }
+    const service = makeService([slot])
+    const plainEntry = makeGroupSlideEntry({ id: 'entry-plain', order: 0, sourceRef: { kind: 'text' } })
+    const group = makeSlideGroup({ id: 'slot-prayer-0', slotId: 'slot-prayer-0', slides: [plainEntry] })
+    const inputs = makeInputs({ groupsBySlotId: new Map([['slot-prayer-0', group]]) })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result).toHaveLength(1)
+    expect(result[0]!.slide.contentKind).toBe('text')
+    expect((result[0]!.slide as TextSlide).title).toBe(slotLabel(slot))
+    expect((result[0]!.slide as TextSlide).body).toBe(slotLabel(slot))
   })
 })

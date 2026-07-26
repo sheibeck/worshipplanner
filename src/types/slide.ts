@@ -92,12 +92,31 @@ export interface ImageSlide extends SlideBase {
 }
 
 /**
+ * A video slide — a single dropped video, appended to a `SlideGroup` as its
+ * own entry (D-17, R032). Its own source lives on `videoSrc`, deliberately
+ * NOT `videoUrl` — `SlideBase.videoUrl` is the group-BED carrier that
+ * `resolveEntryMedia` fills from `group.bedVideoUrl`, and `emitFromGroup`
+ * conditionally spreads that carrier over the resolved content. If a video
+ * slide's own source used the same key, a group that ALSO has a bed video
+ * would silently overwrite the slide's own footage with the bed's. Do not
+ * "tidy" these two field names together.
+ *
+ * `ImportedDeck.slides` is deliberately NOT widened to include this type —
+ * PPTX decks contain no video (D-17).
+ */
+export interface VideoSlide extends SlideBase {
+  contentKind: 'video'
+  videoSrc: string
+  originalFileName?: string
+}
+
+/**
  * Discriminated union of all slide variants.
  *
  * Narrow on `contentKind` (and further on shape-specific fields) to access
  * variant-specific properties.
  */
-export type Slide = LyricSlide | CopyrightSlide | ScriptureSlide | TextSlide | ImageSlide
+export type Slide = LyricSlide | CopyrightSlide | ScriptureSlide | TextSlide | ImageSlide | VideoSlide
 
 /**
  * Wraps a single unified Slide with the service-slot provenance that produced it.

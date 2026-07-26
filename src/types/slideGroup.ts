@@ -74,13 +74,27 @@ export interface GroupSlideEntry {
  * BEFORE and AFTER a song's lyric sections, so a song group needs two entries
  * that carry no `sectionId`. Encoding them as `kind: 'copyright'` keeps song
  * reconciliation's diff-by-`sectionId` from ever seeing a section-less entry.
+ *
+ * The `video` member (D-17) is unlike every other member here: it references
+ * no canonical record. A dropped video has no document behind it — the
+ * storage URL itself IS the reference, carried on `videoSrc` (same field name
+ * as `VideoSlide`'s own-source field, deliberately distinct from the
+ * `SlideBase.videoUrl` bed carrier — see `src/types/slide.ts`).
+ *
+ * The `text` member is widened with optional authored `title`/`body` (D-17
+ * ripple) so a user-added blank slide (`＋ Add slide` on a SONG/SCRIPTURE/
+ * IMPORTED group) has somewhere to store its own words — today a `text` entry
+ * carries nothing and its content derives entirely from the owning slot,
+ * which stays correct for the auto-derived PRAYER/MESSAGE/HYMN entry. Both
+ * fields are optional so every entry written before this change stays valid.
  */
 export type SourceRef =
   | { kind: 'lyric'; songId: string; sectionId: string }
   | { kind: 'copyright'; songId: string }
   | { kind: 'scripture'; scriptureReadingId: string; innerSlideId: string }
   | { kind: 'imported'; importId: string; innerSlideId: string }
-  | { kind: 'text' }
+  | { kind: 'text'; title?: string; body?: string }
+  | { kind: 'video'; videoSrc: string; originalFileName?: string }
 
 /** The shape the store's create action accepts before it stamps server timestamps. */
 export type SlideGroupInput = Omit<SlideGroup, 'createdAt' | 'updatedAt'>
