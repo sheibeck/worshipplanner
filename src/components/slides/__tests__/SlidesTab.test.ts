@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { shallowMount } from '@vue/test-utils'
 import SlidesTab from '../SlidesTab.vue'
 import SlidePlanRail from '../SlidePlanRail.vue'
+import SlideGrid from '../SlideGrid.vue'
 import type { ServiceSlot } from '@/types/service'
 import type { AssembledSlide } from '@/types/slide'
 import type { SlideGroup } from '@/types/slideGroup'
@@ -137,5 +138,80 @@ describe('SlidesTab', () => {
     const rail = wrapper.findComponent(SlidePlanRail)
     expect(rail.exists()).toBe(true)
     expect(rail.props('slots')).toEqual(slots)
+  })
+
+  describe('grid wiring (Task 3)', () => {
+    it('mounts the grid with the selected plan item and its array index in the slots array', async () => {
+      const slots: ServiceSlot[] = [
+        makeSlot({ kind: 'PRAYER', id: 'slot-a', position: 0 }),
+        makeSlot({ kind: 'PRAYER', id: 'slot-b', position: 1 }),
+      ]
+      const wrapper = mountTab({ slots })
+      await wrapper.vm.$nextTick()
+      const grid = wrapper.findComponent(SlideGrid)
+      expect(grid.exists()).toBe(true)
+      expect(grid.props('selectedSlot')).toMatchObject({ id: 'slot-a' })
+      expect(grid.props('slotArrayIndex')).toBe(0)
+    })
+
+    it('computes the array index and one-based position independently when array order and position order differ', async () => {
+      // Array order: a, b, c — position order: b (0), a (1), c (2).
+      const slots: ServiceSlot[] = [
+        makeSlot({ kind: 'PRAYER', id: 'slot-a', position: 1 }), // array index 0
+        makeSlot({ kind: 'PRAYER', id: 'slot-b', position: 0 }), // array index 1
+        makeSlot({ kind: 'PRAYER', id: 'slot-c', position: 2 }), // array index 2
+      ]
+      const wrapper = mountTab({ slots })
+      await wrapper.vm.$nextTick()
+      wrapper.findComponent(SlidePlanRail).vm.$emit('select', 'slot-a')
+      await wrapper.vm.$nextTick()
+
+      const grid = wrapper.findComponent(SlideGrid)
+      // slot-a is array index 0, but second in plan-position order (b=1st, a=2nd).
+      expect(grid.props('slotArrayIndex')).toBe(0)
+      expect(grid.props('position')).toBe(2)
+      expect(grid.props('slotArrayIndex')).not.toBe(grid.props('position'))
+    })
+
+    it("emits from the grid's card selection and passes that id back down as the selected slide", async () => {
+      const slots: ServiceSlot[] = [makeSlot({ kind: 'PRAYER', id: 'slot-a', position: 0 })]
+      const assembledSlideshow: AssembledSlide[] = [makeAssembled(0, 'slide-1')]
+      const wrapper = mountTab({ slots, assembledSlideshow })
+      await wrapper.vm.$nextTick()
+
+      wrapper.findComponent(SlideGrid).vm.$emit('select', 'slide-1')
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.findComponent(SlideGrid).props('selectedSlideId')).toBe('slide-1')
+    })
+
+    it("changes the grid's plan item and clears the selected slide id when the rail selection changes", async () => {
+      const slots: ServiceSlot[] = [
+        makeSlot({ kind: 'PRAYER', id: 'slot-a', position: 0 }),
+        makeSlot({ kind: 'PRAYER', id: 'slot-b', position: 1 }),
+      ]
+      const assembledSlideshow: AssembledSlide[] = [makeAssembled(0, 'slide-1')]
+      const wrapper = mountTab({ slots, assembledSlideshow })
+      await wrapper.vm.$nextTick()
+
+      wrapper.findComponent(SlideGrid).vm.$emit('select', 'slide-1')
+      await wrapper.vm.$nextTick()
+      expect(wrapper.findComponent(SlideGrid).props('selectedSlideId')).toBe('slide-1')
+
+      wrapper.findComponent(SlidePlanRail).vm.$emit('select', 'slot-b')
+      await wrapper.vm.$nextTick()
+
+      const grid = wrapper.findComponent(SlideGrid)
+      expect(grid.props('selectedSlot')).toMatchObject({ id: 'slot-b' })
+      expect(grid.props('selectedSlideId')).toBeNull()
+    })
+
+    it('renders the grid without throwing when there are no plan items', async () => {
+      const wrapper = mountTab({ slots: [] })
+      await wrapper.vm.$nextTick()
+      const grid = wrapper.findComponent(SlideGrid)
+      expect(grid.exists()).toBe(true)
+      expect(grid.props('selectedSlot')).toBeNull()
+    })
   })
 })

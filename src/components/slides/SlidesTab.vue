@@ -8,10 +8,23 @@
       :groups-loading="groupsLoading"
       @select="onSelectSlot"
     />
-    <!-- 25-04 fills this column with the slide grid for `selectedSlotId`,
-         keyed on `selectedSlideId` for card-selection accent and eventually
-         the seam Phase 26's Edit Slide drawer opens against (D-12). -->
-    <div class="flex-1 min-w-0 overflow-y-auto" data-testid="slides-tab-content" />
+    <!-- The grid for `selectedSlotId`, keyed on `selectedSlideId` for
+         card-selection accent and eventually the seam Phase 26's Edit Slide
+         drawer opens against (D-12). -->
+    <div class="min-w-0 flex-1 overflow-y-auto" data-testid="slides-tab-content">
+      <SlideGrid
+        :selected-slot="selectedSlot"
+        :slot-array-index="selectedSlotArrayIndex"
+        :position="selectedSlotPosition"
+        :total-plan-items="orderedSlots.length"
+        :assembled-slideshow="assembledSlideshow"
+        :selected-slide-id="selectedSlideId"
+        :group="selectedGroup"
+        :pending-reconciliations="pendingReconciliations"
+        :is-editor="isEditor"
+        @select="onSelectSlide"
+      />
+    </div>
   </div>
 </template>
 
@@ -43,22 +56,10 @@
 import { ref, computed, watch } from 'vue'
 import type { ServiceSlot } from '@/types/service'
 import type { AssembledSlide } from '@/types/slide'
-import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
+import type { SlideGroup } from '@/types/slideGroup'
 import SlidePlanRail from './SlidePlanRail.vue'
-
-/**
- * Mirrors the assembly composable's own confirm-required-reconciliation
- * shape exactly (a deliberate LOCAL duplicate, not an import from that
- * module — nothing under `src/components/slides/` may import or call the
- * page's assembly composable itself, per this plan's prohibitions). Phase
- * 26 owns the confirm dialog this shape feeds; this plan only carries it
- * through as a prop.
- */
-interface PendingReconciliation {
-  slotId: string
-  proposed: GroupSlideEntry[]
-  loss?: { customizedEntries: number; withAudio: number; withNotes: number }
-}
+import SlideGrid from './SlideGrid.vue'
+import type { PendingReconciliation } from './slideDisplay'
 
 const props = defineProps<{
   slots: ServiceSlot[]
@@ -130,6 +131,33 @@ watch(selectedGroupSlideIds, (ids) => {
 function onSelectSlot(slotId: string): void {
   selectedSlotId.value = slotId
 }
+
+function onSelectSlide(slideId: string): void {
+  selectedSlideId.value = slideId
+}
+
+/** The full selected plan item, or null when nothing is selected (e.g. an empty service). */
+const selectedSlot = computed<ServiceSlot | null>(
+  () => orderedSlots.value.find((s) => s.id === selectedSlotId.value) ?? null,
+)
+
+/**
+ * The selected plan item's one-based position among the plan items, in
+ * plan order — computed independently from `selectedSlotArrayIndex` (the
+ * raw array index). They coincide for a well-formed service and diverge for
+ * one whose stored `position` values have drifted from array order;
+ * conflating the two would show the grid's header the wrong position while
+ * still filtering the correct slides, or vice versa.
+ */
+const selectedSlotPosition = computed(() => {
+  const index = orderedSlots.value.findIndex((s) => s.id === selectedSlotId.value)
+  return index < 0 ? 0 : index + 1
+})
+
+const selectedGroup = computed<SlideGroup | null>(() => {
+  if (selectedSlotId.value === null) return null
+  return props.groupsBySlotId.get(selectedSlotId.value) ?? null
+})
 
 defineExpose({ selectedSlotId, selectedSlideId })
 </script>
