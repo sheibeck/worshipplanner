@@ -1,0 +1,183 @@
+import { describe, it, expect } from 'vitest'
+import { KIND_BADGE_CLASSES, slotDisplayTitle, slideContentLabel, bedAudioLabel } from '../slideDisplay'
+import type { ServiceSlot, SlotKind } from '@/types/service'
+import type { Slide } from '@/types/slide'
+
+const ALL_KINDS: SlotKind[] = ['SONG', 'SCRIPTURE', 'PRAYER', 'MESSAGE', 'HYMN', 'IMPORTED']
+
+describe('slideDisplay', () => {
+  describe('KIND_BADGE_CLASSES', () => {
+    it('has a non-empty literal class string for every slot kind', () => {
+      for (const kind of ALL_KINDS) {
+        expect(KIND_BADGE_CLASSES[kind]).toBeTruthy()
+        expect(typeof KIND_BADGE_CLASSES[kind]).toBe('string')
+        expect(KIND_BADGE_CLASSES[kind].length).toBeGreaterThan(0)
+      }
+    })
+
+    it('never interpolates the kind into the class string (static map only)', () => {
+      // Every value must be a plain literal — none should contain a
+      // template-string artifact like "${" or the kind's own lowercase form
+      // glued into a class name that a purge-scanner couldn't find verbatim.
+      for (const kind of ALL_KINDS) {
+        expect(KIND_BADGE_CLASSES[kind]).not.toContain('${')
+      }
+    })
+  })
+
+  describe('slotDisplayTitle', () => {
+    it('returns the song title for a SONG slot', () => {
+      const slot: ServiceSlot = {
+        kind: 'SONG',
+        id: 'slot-song',
+        position: 0,
+        requiredVwType: 1,
+        songId: 'song-1',
+        songTitle: 'Amazing Grace',
+        songKey: 'G',
+      }
+      expect(slotDisplayTitle(slot)).toBe('Amazing Grace')
+    })
+
+    it('falls back to the per-kind label when a SONG slot has no song assigned', () => {
+      const slot: ServiceSlot = {
+        kind: 'SONG',
+        id: 'slot-song-empty',
+        position: 0,
+        requiredVwType: 1,
+        songId: null,
+        songTitle: null,
+        songKey: null,
+      }
+      expect(slotDisplayTitle(slot)).toBe('Song')
+    })
+
+    it('returns a readable passage reference for a SCRIPTURE slot', () => {
+      const slot: ServiceSlot = {
+        kind: 'SCRIPTURE',
+        id: 'slot-scripture',
+        position: 1,
+        book: 'Psalms',
+        chapter: 23,
+        verseStart: 1,
+        verseEnd: 6,
+      }
+      expect(slotDisplayTitle(slot)).toBe('Psalms 23:1-6')
+    })
+
+    it('omits the range dash for a single-verse SCRIPTURE slot', () => {
+      const slot: ServiceSlot = {
+        kind: 'SCRIPTURE',
+        id: 'slot-scripture-single',
+        position: 1,
+        book: 'John',
+        chapter: 3,
+        verseStart: 16,
+        verseEnd: 16,
+      }
+      expect(slotDisplayTitle(slot)).toBe('John 3:16')
+    })
+
+    it('falls back to the per-kind label for an empty SCRIPTURE slot', () => {
+      const slot: ServiceSlot = {
+        kind: 'SCRIPTURE',
+        id: 'slot-scripture-empty',
+        position: 1,
+        book: null,
+        chapter: null,
+        verseStart: null,
+        verseEnd: null,
+      }
+      expect(slotDisplayTitle(slot)).toBe('Scripture Reading')
+    })
+
+    it('returns the hymn name for a HYMN slot', () => {
+      const slot: ServiceSlot = {
+        kind: 'HYMN',
+        id: 'slot-hymn',
+        position: 2,
+        hymnName: 'Holy, Holy, Holy',
+        hymnNumber: '1',
+        verses: '1,2,3',
+      }
+      expect(slotDisplayTitle(slot)).toBe('Holy, Holy, Holy')
+    })
+
+    it('falls back to the per-kind label for an empty HYMN slot', () => {
+      const slot: ServiceSlot = {
+        kind: 'HYMN',
+        id: 'slot-hymn-empty',
+        position: 2,
+        hymnName: '',
+        hymnNumber: '',
+        verses: '',
+      }
+      expect(slotDisplayTitle(slot)).toBe('Hymn')
+    })
+
+    it('returns the per-kind label for PRAYER, MESSAGE and IMPORTED slots', () => {
+      const prayer: ServiceSlot = { kind: 'PRAYER', id: 'slot-prayer', position: 3 }
+      const message: ServiceSlot = { kind: 'MESSAGE', id: 'slot-message', position: 4 }
+      const imported: ServiceSlot = { kind: 'IMPORTED', id: 'slot-imported', position: 5, importId: null }
+      expect(slotDisplayTitle(prayer)).toBe('Prayer')
+      expect(slotDisplayTitle(message)).toBe('Message')
+      expect(slotDisplayTitle(imported)).toBe('Imported Slides')
+    })
+  })
+
+  describe('slideContentLabel', () => {
+    it('returns the uppercased section label for a lyric slide', () => {
+      const slide = {
+        id: 's1',
+        position: 0,
+        contentKind: 'lyric',
+        sectionId: 'sec-1',
+        sectionLabel: 'Verse 1',
+        lines: ['line'],
+      } as Slide
+      expect(slideContentLabel(slide)).toBe('VERSE 1')
+    })
+
+    it('returns TITLE for a copyright slide (lyric contentKind, no sectionId)', () => {
+      const slide = {
+        id: 's2',
+        position: 0,
+        contentKind: 'lyric',
+        title: 'Amazing Grace',
+        authors: ['John Newton'],
+        ccliSongNumber: '1',
+        copyrightLines: [],
+        ccliLicenseNumber: '1',
+      } as Slide
+      expect(slideContentLabel(slide)).toBe('TITLE')
+    })
+
+    it('returns SCRIPTURE, IMAGE and VIDEO for their respective content kinds', () => {
+      const scripture = { id: 's3', position: 0, contentKind: 'scripture' } as Slide
+      const image = { id: 's4', position: 0, contentKind: 'image' } as Slide
+      const video = { id: 's5', position: 0, contentKind: 'video' } as Slide
+      expect(slideContentLabel(scripture)).toBe('SCRIPTURE')
+      expect(slideContentLabel(image)).toBe('IMAGE')
+      expect(slideContentLabel(video)).toBe('VIDEO')
+    })
+
+    it('returns the uppercased title for a text slide with a title, TEXT otherwise', () => {
+      const withTitle = { id: 's6', position: 0, contentKind: 'text', title: 'Welcome', body: '' } as Slide
+      const withoutTitle = { id: 's7', position: 0, contentKind: 'text', body: '' } as Slide
+      expect(slideContentLabel(withTitle)).toBe('WELCOME')
+      expect(slideContentLabel(withoutTitle)).toBe('TEXT')
+    })
+  })
+
+  describe('bedAudioLabel', () => {
+    it('extracts the filename from a Firebase Storage download URL', () => {
+      const url =
+        'https://firebasestorage.googleapis.com/v0/b/bucket/o/orgs%2Forg1%2Fmedia%2Fid1%2Fpad_Cmaj_soft.mp3?alt=media&token=abc'
+      expect(bedAudioLabel(url)).toBe('pad_Cmaj_soft.mp3')
+    })
+
+    it('falls back to a generic label for a malformed URL', () => {
+      expect(bedAudioLabel('%')).toBe('Group music')
+    })
+  })
+})
