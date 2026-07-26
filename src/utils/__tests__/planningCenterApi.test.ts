@@ -532,6 +532,7 @@ describe('addSlotAsItem', () => {
     defaultFetchResponse()
     const slot: SongSlot = {
       kind: 'SONG',
+      id: 'slot-song-0',
       position: 0,
       requiredVwType: 1,
       songId: 'song-1',
@@ -570,6 +571,7 @@ describe('addSlotAsItem', () => {
     }]
     const slot: SongSlot = {
       kind: 'SONG',
+      id: 'slot-song-0',
       position: 0,
       requiredVwType: 1,
       songId: 'song-1',
@@ -627,6 +629,7 @@ describe('addSlotAsItem', () => {
     }]
     const slot: SongSlot = {
       kind: 'SONG',
+      id: 'slot-song-0',
       position: 0,
       requiredVwType: 1,
       songId: 'song-1',
@@ -665,6 +668,7 @@ describe('addSlotAsItem', () => {
     }]
     const slot: SongSlot = {
       kind: 'SONG',
+      id: 'slot-song-0',
       position: 0,
       requiredVwType: 1,
       songId: 'song-1',
@@ -709,6 +713,7 @@ describe('addSlotAsItem', () => {
     }]
     const slot: SongSlot = {
       kind: 'SONG',
+      id: 'slot-song-0',
       position: 0,
       requiredVwType: 1,
       songId: 'song-1',
@@ -737,6 +742,7 @@ describe('addSlotAsItem', () => {
     defaultFetchResponse()
     const slot: HymnSlot = {
       kind: 'HYMN',
+      id: 'slot-hymn-1',
       position: 1,
       hymnName: 'Be Thou My Vision',
       hymnNumber: '382',
@@ -754,6 +760,7 @@ describe('addSlotAsItem', () => {
     defaultFetchResponse()
     const slot: HymnSlot = {
       kind: 'HYMN',
+      id: 'slot-hymn-1',
       position: 1,
       hymnName: 'Amazing Grace',
       hymnNumber: '337',
@@ -772,6 +779,7 @@ describe('addSlotAsItem', () => {
     defaultFetchResponse()
     const slot: HymnSlot = {
       kind: 'HYMN',
+      id: 'slot-hymn-1',
       position: 1,
       hymnName: 'Holy Holy Holy',
       hymnNumber: '',
@@ -790,6 +798,7 @@ describe('addSlotAsItem', () => {
     vi.mocked(fetchPassageText).mockResolvedValueOnce('For God so loved the world...')
     const slot: ScriptureSlot = {
       kind: 'SCRIPTURE',
+      id: 'slot-scripture-2',
       position: 2,
       book: 'John',
       chapter: 3,
@@ -808,7 +817,7 @@ describe('addSlotAsItem', () => {
 
   it('maps PRAYER slot to regular item with title "Prayer"', async () => {
     defaultFetchResponse()
-    const slot: NonAssignableSlot = { kind: 'PRAYER', position: 3 }
+    const slot: NonAssignableSlot = { kind: 'PRAYER', id: 'slot-prayer-3', position: 3 }
 
     await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 3, [])
 
@@ -820,7 +829,7 @@ describe('addSlotAsItem', () => {
 
   it('maps MESSAGE slot to regular item with title "Message" and no description when sermonPassage is null', async () => {
     defaultFetchResponse()
-    const slot: NonAssignableSlot = { kind: 'MESSAGE', position: 4 }
+    const slot: NonAssignableSlot = { kind: 'MESSAGE', id: 'slot-message-4', position: 4 }
 
     await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 4, [], null)
 
@@ -833,7 +842,7 @@ describe('addSlotAsItem', () => {
 
   it('maps MESSAGE slot with sermonPassage to regular item with formatted passage as description', async () => {
     defaultFetchResponse()
-    const slot: NonAssignableSlot = { kind: 'MESSAGE', position: 4 }
+    const slot: NonAssignableSlot = { kind: 'MESSAGE', id: 'slot-message-4', position: 4 }
     const sermonPassage: ScriptureRef = { book: 'Romans', chapter: 8, verseStart: 1, verseEnd: 11 }
 
     await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 4, [], sermonPassage)
@@ -847,6 +856,7 @@ describe('addSlotAsItem', () => {
   it('skips SONG slots with null songId (does not call fetch)', async () => {
     const slot: SongSlot = {
       kind: 'SONG',
+      id: 'slot-song-0',
       position: 0,
       requiredVwType: 1,
       songId: null,
@@ -865,6 +875,7 @@ describe('addSlotAsItem', () => {
     vi.mocked(fetchPassageText).mockRejectedValueOnce(new Error('ESV API error'))
     const slot: ScriptureSlot = {
       kind: 'SCRIPTURE',
+      id: 'slot-scripture-2',
       position: 2,
       book: 'Psalms',
       chapter: 23,
@@ -900,6 +911,7 @@ describe('addSlotAsItem', () => {
     }]
     const slot: SongSlot = {
       kind: 'SONG',
+      id: 'slot-song-0',
       position: 0,
       requiredVwType: 1,
       songId: 'song-1',
@@ -986,6 +998,7 @@ describe('addSlotAsItem', () => {
     }]
     const slot: SongSlot = {
       kind: 'SONG',
+      id: 'slot-song-0',
       position: 0,
       requiredVwType: 1,
       songId: 'song-1',

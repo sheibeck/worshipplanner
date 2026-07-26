@@ -140,15 +140,15 @@ const mockService: Service = {
   teams: ['Choir', 'Orchestra'],
   status: 'draft',
   slots: [
-    { kind: 'SONG', position: 0, requiredVwType: 1, songId: 'song-0', songTitle: 'Come Thou Fount', songKey: 'G' },
-    { kind: 'SCRIPTURE', position: 1, book: 'Psalms', chapter: 23, verseStart: 1, verseEnd: 6 },
-    { kind: 'SONG', position: 2, requiredVwType: 2, songId: 'song-2', songTitle: 'Great Is Thy Faithfulness', songKey: 'D' },
-    { kind: 'PRAYER', position: 3 },
-    { kind: 'SCRIPTURE', position: 4, book: 'John', chapter: 3, verseStart: 16, verseEnd: 17 },
-    { kind: 'SONG', position: 5, requiredVwType: 2, songId: 'song-5', songTitle: 'Holy Holy Holy', songKey: 'Eb' },
-    { kind: 'SONG', position: 6, requiredVwType: 3, songId: 'song-6', songTitle: 'How Great Thou Art', songKey: 'A' },
-    { kind: 'MESSAGE', position: 7 },
-    { kind: 'SONG', position: 8, requiredVwType: 3, songId: 'song-8', songTitle: 'Doxology', songKey: 'G' },
+    { kind: 'SONG', id: 'slot-0', position: 0, requiredVwType: 1, songId: 'song-0', songTitle: 'Come Thou Fount', songKey: 'G' },
+    { kind: 'SCRIPTURE', id: 'slot-1', position: 1, book: 'Psalms', chapter: 23, verseStart: 1, verseEnd: 6 },
+    { kind: 'SONG', id: 'slot-2', position: 2, requiredVwType: 2, songId: 'song-2', songTitle: 'Great Is Thy Faithfulness', songKey: 'D' },
+    { kind: 'PRAYER', id: 'slot-3', position: 3 },
+    { kind: 'SCRIPTURE', id: 'slot-4', position: 4, book: 'John', chapter: 3, verseStart: 16, verseEnd: 17 },
+    { kind: 'SONG', id: 'slot-5', position: 5, requiredVwType: 2, songId: 'song-5', songTitle: 'Holy Holy Holy', songKey: 'Eb' },
+    { kind: 'SONG', id: 'slot-6', position: 6, requiredVwType: 3, songId: 'song-6', songTitle: 'How Great Thou Art', songKey: 'A' },
+    { kind: 'MESSAGE', id: 'slot-7', position: 7 },
+    { kind: 'SONG', id: 'slot-8', position: 8, requiredVwType: 3, songId: 'song-8', songTitle: 'Doxology', songKey: 'G' },
   ],
   sermonPassage: { book: 'Romans', chapter: 8, verseStart: 1, verseEnd: 11 },
   notes: 'Communion Sunday — extended prayer time',
@@ -247,7 +247,7 @@ describe('formatForPlanningCenter - HYMN slots', () => {
     const serviceWithHymn: Service = {
       ...mockService,
       slots: [
-        { kind: 'HYMN', position: 0, hymnName: 'Amazing Grace', hymnNumber: '337', verses: '1, 3, 4' },
+        { kind: 'HYMN', id: 'slot-hymn-0', position: 0, hymnName: 'Amazing Grace', hymnNumber: '337', verses: '1, 3, 4' },
       ],
     }
     const result = formatForPlanningCenter(serviceWithHymn, mockSongs)
@@ -258,7 +258,7 @@ describe('formatForPlanningCenter - HYMN slots', () => {
     const serviceWithEmptyHymn: Service = {
       ...mockService,
       slots: [
-        { kind: 'HYMN', position: 0, hymnName: '', hymnNumber: '', verses: '' },
+        { kind: 'HYMN', id: 'slot-hymn-0', position: 0, hymnName: '', hymnNumber: '', verses: '' },
       ],
     }
     const result = formatForPlanningCenter(serviceWithEmptyHymn, mockSongs)

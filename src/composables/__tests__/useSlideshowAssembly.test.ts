@@ -73,6 +73,7 @@ function makeService(slots: ServiceSlot[]): Service {
 function hymnSlot(overrides: Partial<HymnSlot>): HymnSlot {
   return {
     kind: 'HYMN',
+    id: 'slot-hymn-0',
     position: 0,
     hymnName: 'Untitled',
     hymnNumber: '',
@@ -84,6 +85,7 @@ function hymnSlot(overrides: Partial<HymnSlot>): HymnSlot {
 function songSlot(overrides: Partial<SongSlot>): SongSlot {
   return {
     kind: 'SONG',
+    id: 'slot-song-0',
     position: 0,
     requiredVwType: 1,
     songId: null,
@@ -96,6 +98,7 @@ function songSlot(overrides: Partial<SongSlot>): SongSlot {
 function scriptureSlot(overrides: Partial<ScriptureSlot>): ScriptureSlot {
   return {
     kind: 'SCRIPTURE',
+    id: 'slot-scripture-0',
     position: 0,
     book: null,
     chapter: null,
@@ -291,7 +294,7 @@ describe('useSlideshowAssembly', () => {
     ]
 
     const service = ref<Service | null>(
-      makeService([{ kind: 'IMPORTED', position: 0, importId: 'deck-1', section: 'pre-service' }]),
+      makeService([{ kind: 'IMPORTED', id: 'slot-imported-0', position: 0, importId: 'deck-1', section: 'pre-service' }]),
     )
 
     const { assembledSlideshow } = useSlideshowAssembly(service, 'org-1')

@@ -2,12 +2,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import type { Service } from '@/types/service'
 
-// Mock crypto.getRandomValues for deterministic token generation
+// Mock crypto.getRandomValues for deterministic token generation, and
+// crypto.randomUUID (Phase 24, D-01) so createSlot()/buildSlots()'s slot-id
+// minting doesn't throw "crypto.randomUUID is not a function" now that
+// createService's buildSlots() call requires it.
+let uuidCounter = 0
 vi.stubGlobal('crypto', {
   getRandomValues: vi.fn((arr: Uint8Array) => {
     for (let i = 0; i < arr.length; i++) arr[i] = i + 1
     return arr
   }),
+  randomUUID: vi.fn(() => `mock-uuid-${++uuidCounter}`),
 })
 
 // Track onSnapshot callbacks and unsubscribe fns

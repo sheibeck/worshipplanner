@@ -116,6 +116,7 @@ function makeInputs(overrides: Partial<AssemblyInputs> = {}): AssemblyInputs {
 function songSlot(overrides: Partial<SongSlot> = {}): SongSlot {
   return {
     kind: 'SONG',
+    id: 'slot-song-0',
     position: 0,
     requiredVwType: 1,
     songId: null,
@@ -128,6 +129,7 @@ function songSlot(overrides: Partial<SongSlot> = {}): SongSlot {
 function scriptureSlot(overrides: Partial<ScriptureSlot> = {}): ScriptureSlot {
   return {
     kind: 'SCRIPTURE',
+    id: 'slot-scripture-0',
     position: 0,
     book: null,
     chapter: null,
@@ -140,6 +142,7 @@ function scriptureSlot(overrides: Partial<ScriptureSlot> = {}): ScriptureSlot {
 function importedSlot(overrides: Partial<ImportedSlot> = {}): ImportedSlot {
   return {
     kind: 'IMPORTED',
+    id: 'slot-imported-0',
     position: 0,
     importId: null,
     ...overrides,
@@ -370,7 +373,7 @@ describe('assembleSlideshow — imported deck resolution', () => {
 
 describe('assembleSlideshow — text/hymn slots', () => {
   it('PRAYER slot emits exactly one TextSlide-backed AssembledSlide with sourceId null', () => {
-    const slot: NonAssignableSlot = { kind: 'PRAYER', position: 0 }
+    const slot: NonAssignableSlot = { kind: 'PRAYER', id: 'slot-prayer-0', position: 0 }
     const service = makeService([slot])
 
     const result = assembleSlideshow(service, makeInputs())
@@ -382,7 +385,7 @@ describe('assembleSlideshow — text/hymn slots', () => {
   })
 
   it('MESSAGE slot emits exactly one TextSlide-backed AssembledSlide with sourceId null', () => {
-    const slot: NonAssignableSlot = { kind: 'MESSAGE', position: 0 }
+    const slot: NonAssignableSlot = { kind: 'MESSAGE', id: 'slot-message-0', position: 0 }
     const service = makeService([slot])
 
     const result = assembleSlideshow(service, makeInputs())
@@ -394,7 +397,7 @@ describe('assembleSlideshow — text/hymn slots', () => {
   })
 
   it('HYMN slot emits exactly one TextSlide-backed AssembledSlide whose body reflects hymnName and verses', () => {
-    const slot: HymnSlot = { kind: 'HYMN', position: 0, hymnName: 'How Great Thou Art', hymnNumber: '12', verses: '1, 2, 4' }
+    const slot: HymnSlot = { kind: 'HYMN', id: 'slot-hymn-0', position: 0, hymnName: 'How Great Thou Art', hymnNumber: '12', verses: '1, 2, 4' }
     const service = makeService([slot])
 
     const result = assembleSlideshow(service, makeInputs())
@@ -408,7 +411,7 @@ describe('assembleSlideshow — text/hymn slots', () => {
   })
 
   it('HYMN slot with no verses reflects hymnName only in body', () => {
-    const slot: HymnSlot = { kind: 'HYMN', position: 0, hymnName: 'Holy, Holy, Holy', hymnNumber: '', verses: '' }
+    const slot: HymnSlot = { kind: 'HYMN', id: 'slot-hymn-0', position: 0, hymnName: 'Holy, Holy, Holy', hymnNumber: '', verses: '' }
     const service = makeService([slot])
 
     const result = assembleSlideshow(service, makeInputs())
@@ -419,8 +422,8 @@ describe('assembleSlideshow — text/hymn slots', () => {
 
 describe('assembleSlideshow — reorder ordering (R006)', () => {
   it('swapping two slots positions reorders the assembled output correspondingly, with no other change', () => {
-    const slotA: NonAssignableSlot = { kind: 'PRAYER', position: 0 }
-    const slotB: NonAssignableSlot = { kind: 'MESSAGE', position: 1 }
+    const slotA: NonAssignableSlot = { kind: 'PRAYER', id: 'slot-prayer-0', position: 0 }
+    const slotB: NonAssignableSlot = { kind: 'MESSAGE', id: 'slot-message-1', position: 1 }
 
     const before = assembleSlideshow(makeService([slotA, slotB]), makeInputs())
     expect(before.map((s) => s.slotKind)).toEqual(['PRAYER', 'MESSAGE'])
@@ -475,7 +478,7 @@ describe('assembleSlideshow — media propagation (R013/R014)', () => {
   })
 
   it('a single-slide MESSAGE slot with videoUrl set carries it on its one emitted slide', () => {
-    const slot: NonAssignableSlot = { kind: 'MESSAGE', position: 0, videoUrl: 'https://example.com/announcement.mp4' }
+    const slot: NonAssignableSlot = { kind: 'MESSAGE', id: 'slot-message-0', position: 0, videoUrl: 'https://example.com/announcement.mp4' }
     const service = makeService([slot])
 
     const result = assembleSlideshow(service, makeInputs())
@@ -489,8 +492,8 @@ describe('assembleSlideshow — media propagation (R013/R014)', () => {
 describe('assembleSlideshow — section metadata pass-through', () => {
   it('a legacy service whose slots all have section === undefined produces AssembledSlides all with section === undefined', () => {
     const slots: ServiceSlot[] = [
-      { kind: 'PRAYER', position: 0 },
-      { kind: 'MESSAGE', position: 1 },
+      { kind: 'PRAYER', id: 'slot-prayer-0', position: 0 },
+      { kind: 'MESSAGE', id: 'slot-message-1', position: 1 },
     ]
     const service = makeService(slots)
 
@@ -505,7 +508,7 @@ describe('assembleSlideshow — section metadata pass-through', () => {
   it('a mixed service (song + scripture + prayer) spanning worship/message/sending produces correct per-slide section metadata', () => {
     const songSlotWorship = songSlot({ songId: 'song-1', section: 'worship' })
     const scriptureSlotWorship = scriptureSlot({ scriptureReadingId: 'reading-1', section: 'worship', position: 1 })
-    const prayerSlotMessage: NonAssignableSlot = { kind: 'PRAYER', position: 2, section: 'message' }
+    const prayerSlotMessage: NonAssignableSlot = { kind: 'PRAYER', id: 'slot-prayer-2', position: 2, section: 'message' }
     const songSlotSending = songSlot({ songId: 'song-2', section: 'sending', position: 3 })
 
     const lyrics1 = makeSongLyrics()

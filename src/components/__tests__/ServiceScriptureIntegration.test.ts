@@ -47,6 +47,7 @@ const CongregationalEditorStub = defineComponent({
 function makeScriptureSlot(overrides: Partial<ScriptureSlot> = {}): ScriptureSlot {
   return {
     kind: 'SCRIPTURE',
+    id: 'slot-scripture-0',
     position: 0,
     book: 'Romans',
     chapter: 8,
