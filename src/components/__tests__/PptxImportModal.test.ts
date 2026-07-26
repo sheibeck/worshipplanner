@@ -262,4 +262,74 @@ describe('PptxImportModal', () => {
     expect(wrapper.emitted('cancel')).toBeTruthy()
     expect(mockCreateDeck).not.toHaveBeenCalled()
   })
+
+  // ── 25-07 Task 1: additive external drop-zone entry point (D-15) ──────────
+  describe('external drop-zone entry point (25-07 Task 1)', () => {
+    it('importPptxFile advances into the upload step, calling the same importPptx path as the file input', async () => {
+      const uploadDeferred = createDeferred<string>()
+      mockUploadPptx.mockReturnValueOnce(uploadDeferred.promise)
+
+      const wrapper = mountModal()
+      const file = new File(['fake pptx bytes'], 'dropped.pptx', {
+        type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      })
+      wrapper.vm.importPptxFile(file)
+      await wrapper.vm.$nextTick()
+
+      expect(body().find('[data-testid="step-uploading"]').exists()).toBe(true)
+      expect(mockUploadPptx).toHaveBeenCalledWith('org-1', 'import-abc', file, expect.any(Function))
+    })
+
+    it('importImageFiles advances into the upload step and reaches preview, calling the same importImages path', async () => {
+      mockUploadImage.mockImplementation((...args: unknown[]) => {
+        const [orgId, importId, , index] = args as [string, string, File, number]
+        return Promise.resolve(`orgs/${orgId}/pptx-imports/${importId}/images/${index}.png`)
+      })
+      mockResolveImageUrl.mockImplementation((...args: unknown[]) => {
+        const [path] = args as [string]
+        return Promise.resolve(`https://example.com/${path}`)
+      })
+
+      const wrapper = mountModal()
+      const file = new File(['a'], 'dropped.png', { type: 'image/png' })
+      wrapper.vm.importImageFiles([file])
+      await flushPromises()
+
+      expect(body().find('[data-testid="step-preview"]').exists()).toBe(true)
+      expect(mockUploadImage).toHaveBeenCalledWith('org-1', 'import-abc', file, 0)
+    })
+
+    it('calling the entry point while mid-upload starts nothing and leaves the step unchanged', async () => {
+      const uploadDeferred = createDeferred<string>()
+      mockUploadPptx.mockReturnValueOnce(uploadDeferred.promise)
+
+      const wrapper = mountModal()
+      const file = new File(['fake pptx bytes'], 'dropped.pptx')
+      wrapper.vm.importPptxFile(file)
+      await wrapper.vm.$nextTick()
+      expect(mockUploadPptx).toHaveBeenCalledTimes(1)
+      expect(body().find('[data-testid="step-uploading"]').exists()).toBe(true)
+
+      const secondFile = new File(['more bytes'], 'second.pptx')
+      wrapper.vm.importPptxFile(secondFile)
+      await wrapper.vm.$nextTick()
+
+      // Still mid-upload from the first call; the second call started nothing.
+      expect(mockUploadPptx).toHaveBeenCalledTimes(1)
+      expect(body().find('[data-testid="step-uploading"]').exists()).toBe(true)
+    })
+
+    it("the modal's own file inputs still work with the entry point present", async () => {
+      mockUploadPptx.mockResolvedValueOnce('orgs/org-1/pptx-imports/import-abc/source.pptx')
+      mockParsePptxCallable.mockResolvedValueOnce({ data: { slides: [] } })
+
+      mountModal()
+      const file = new File(['bytes'], 'deck.pptx')
+      const input = body().find('[data-testid="pptx-file-input"]').element as HTMLInputElement
+      setInputFiles(input, [file])
+      await flushPromises()
+
+      expect(body().find('[data-testid="step-preview"]').exists()).toBe(true)
+    })
+  })
 })
