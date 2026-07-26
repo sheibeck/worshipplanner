@@ -8,6 +8,7 @@ import type { Timestamp } from 'firebase/firestore'
 import type { SlideGroup } from '@/types/slideGroup'
 import SlideshowPreview from '@/components/SlideshowPreview.vue'
 import PresentationViewer from '@/components/PresentationViewer.vue'
+import SlotMediaAttachment from '@/components/SlotMediaAttachment.vue'
 
 // Every test in this file mounts ServiceEditorView (a large component with a
 // live autosave debounce timer + Sortable instance) but historically never
@@ -85,10 +86,10 @@ vi.mock('@/stores/importedSlides', () => ({
 const mockSlideGroupsState = reactive<{ groups: SlideGroup[] }>({ groups: [] })
 const mockSubscribeGroups = vi.fn()
 const mockUnsubscribeGroups = vi.fn()
-const mockMaterializeGroupIfMissing = vi.fn(() => Promise.resolve(true))
-const mockDeleteGroup = vi.fn(() => Promise.resolve())
-const mockSetGroupBedMedia = vi.fn(() => Promise.resolve())
-const mockReplaceGroupSlides = vi.fn(() => Promise.resolve())
+const mockMaterializeGroupIfMissing = vi.fn((_orgId: string, _input: unknown) => Promise.resolve(true))
+const mockDeleteGroup = vi.fn((_orgId: string, _slotId: string) => Promise.resolve())
+const mockSetGroupBedMedia = vi.fn((_orgId: string, _slotId: string, _patch: unknown) => Promise.resolve())
+const mockReplaceGroupSlides = vi.fn((_orgId: string, _slotId: string, _slides: unknown, _sig?: string) => Promise.resolve())
 
 vi.mock('@/stores/slideGroups', () => ({
   useSlideGroups: () => ({
@@ -1096,5 +1097,145 @@ describe('ServiceEditorView - slot delete cascades to its group (Phase 24-06 Tas
     expect(wrapper.findAll('[data-testid="section-select"]')).toHaveLength(9)
 
     errSpy.mockRestore()
+  })
+})
+
+// ── Slot media control retargeted at the group bed (Phase 24-06 Task 3) ────────
+
+describe('ServiceEditorView - slot media control retargeted at the group bed (Phase 24-06 Task 3)', () => {
+  async function mountView() {
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          RouterLink: { template: '<a><slot /></a>' },
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+        },
+      },
+    })
+  }
+
+  function buildGroup(slotId: string, overrides: Partial<SlideGroup> = {}): SlideGroup {
+    return {
+      id: slotId,
+      slotId,
+      serviceId: 'service-1',
+      slides: [],
+      createdAt: mockTimestamp,
+      updatedAt: mockTimestamp,
+      ...overrides,
+    }
+  }
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockServicesList = [mockService]
+    mockUpdateService.mockClear()
+  })
+
+  it('attaching audio calls setGroupBedMedia for that slot\'s group with the new url', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const control = wrapper.findComponent(SlotMediaAttachment)
+    expect(control.exists()).toBe(true)
+    await control.vm.$emit('update:audioUrl', 'https://example.com/new-audio.mp3')
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    expect(mockSetGroupBedMedia).toHaveBeenCalledWith('org-1', 'slot-0', {
+      serviceId: 'service-1',
+      bedAudioUrl: 'https://example.com/new-audio.mp3',
+    })
+  })
+
+  it('attaching video calls setGroupBedMedia for the bed video field', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const control = wrapper.findComponent(SlotMediaAttachment)
+    await control.vm.$emit('update:videoUrl', 'https://example.com/new-video.mp4')
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    expect(mockSetGroupBedMedia).toHaveBeenCalledWith('org-1', 'slot-0', {
+      serviceId: 'service-1',
+      bedVideoUrl: 'https://example.com/new-video.mp4',
+    })
+  })
+
+  it('removing audio passes the explicit clear flag rather than an undefined url', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const control = wrapper.findComponent(SlotMediaAttachment)
+    await control.vm.$emit('update:audioUrl', undefined)
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    expect(mockSetGroupBedMedia).toHaveBeenCalledWith('org-1', 'slot-0', {
+      serviceId: 'service-1',
+      clearAudio: true,
+    })
+    // Never called with an explicit undefined bedAudioUrl standing in for clear.
+    const call = mockSetGroupBedMedia.mock.calls[0]![2] as Record<string, unknown>
+    expect('bedAudioUrl' in call).toBe(false)
+  })
+
+  it('an attach or remove leaves the slot object in localService unmodified (no autosave fires)', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const control = wrapper.findComponent(SlotMediaAttachment)
+    await control.vm.$emit('update:audioUrl', 'https://example.com/new-audio.mp3')
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    // A slot mutation would flip isDirty (rendering "Unsaved changes") and,
+    // after the debounce, call the whole-document autosave — neither should
+    // happen, since the write went through the scoped slideGroups path.
+    expect(wrapper.text()).not.toContain('Unsaved changes')
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    expect(mockUpdateService).not.toHaveBeenCalled()
+  })
+
+  it('the control displays urls from the group bed, not the deprecated slot fields', async () => {
+    mockSlideGroupsState.groups = [
+      buildGroup('slot-0', {
+        bedAudioUrl: 'https://example.com/persisted-audio.mp3',
+        bedVideoUrl: 'https://example.com/persisted-video.mp4',
+      }),
+    ]
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const control = wrapper.findComponent(SlotMediaAttachment)
+    expect(control.props('audioUrl')).toBe('https://example.com/persisted-audio.mp3')
+    expect(control.props('videoUrl')).toBe('https://example.com/persisted-video.mp4')
+  })
+
+  it('attaching to a slot whose group has not materialized yet succeeds without throwing', async () => {
+    mockSlideGroupsState.groups = [] // no group at all for slot-0 yet
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const control = wrapper.findComponent(SlotMediaAttachment)
+    // $emit itself is synchronous and void; the assertion is that neither the
+    // emit nor the async handler it triggers throws (a throw would surface
+    // as an unhandled rejection / failed test), and that the store call
+    // still goes through even with no existing group for this slot.
+    control.vm.$emit('update:audioUrl', 'https://example.com/first-audio.mp3')
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    expect(mockSetGroupBedMedia).toHaveBeenCalledWith('org-1', 'slot-0', {
+      serviceId: 'service-1',
+      bedAudioUrl: 'https://example.com/first-audio.mp3',
+    })
   })
 })
