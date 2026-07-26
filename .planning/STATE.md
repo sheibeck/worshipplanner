@@ -4,16 +4,16 @@ milestone: v1.3
 milestone_name: Slides Tab Rework
 current_phase: 24
 current_phase_name: Slide Group Model and Migration
-status: planning
-stopped_at: v1.3 opened — Phases 24-28 added to ROADMAP, ready to plan Phase 24
-last_updated: "2026-07-25T19:30:00.000Z"
+status: executing
+stopped_at: Completed 24-01-PLAN.md
+last_updated: "2026-07-26T01:44:24.631Z"
 last_activity: 2026-07-25
 progress:
-  total_phases: 5
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_phases: 17
+  completed_phases: 11
+  total_plans: 74
+  completed_plans: 69
+  percent: 65
 last_activity_desc: Opened v1.3 Slides Tab Rework (Phases 24-28) from the Claude Design import; v1.2 left code-complete with its verification ledger intact
 ---
 
@@ -24,7 +24,7 @@ last_activity_desc: Opened v1.3 Slides Tab Rework (Phases 24-28) from the Claude
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 24 — Slide Group Model and Migration (v1.3 Slides Tab Rework)
+**Current focus:** Phase 24 — Slide Group Model and Migration
 
 > **v1.2 → v1.3 handoff (2026-07-25).** v1.2 is code-complete (Phases 18-23, all plans committed)
 > but its human-verify batch is still outstanding. v1.2 was deliberately **not** archived: running
@@ -35,10 +35,10 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 
 ## Current Position
 
-Phase: 23 (Presentation Preview Mode) — CODE-COMPLETE, human-verify deferred
-Plan: 5 of 5 (23-01..23-04 executed; 23-05 is the deferred human-verify checkpoint)
+Phase: 24 (Slide Group Model and Migration) — EXECUTING
+Plan: 2 of 6
 Milestone: v1.2 Worship Service Slide Management (Phases 18-23) — IN PROGRESS
-Status: All v1.2 feature code is written. Remaining: pre-audit hardening → batch human-verify → milestone lifecycle.
+Status: Ready to execute
 
 Phases 20, 21, 22 and 23 are all code-complete; only their deferred human-verify checkpoints remain
 (see the Deferred Verification table below).
@@ -63,11 +63,14 @@ the "Present Slideshow" CTA wired through `ServiceEditorView`.
 1. **Pre-audit hardening batch** (see TODO below) — flip the `cleanupExpiredMedia` default to safe;
    clean `.gsd/quarantine/worktrees/**` test debris; fix the stale `RosterView.test.ts` assertion;
    get the full unit suite green.
+
 2. **Batch human-verify** P20 + P21 + P22 + P23 — the deferred visual/e2e/projector checks. Doing
    all four in one sitting is worthwhile: P20's section grouping, P22's media autoplay and P23's
    projector legibility all want the same real-projector trip.
+
 3. **Phases 18 and 19** are implemented but were never verified and are outside this run's `--from 23`
    scope — decide whether they need a verification pass before the audit.
+
 4. **Milestone lifecycle:** `/gsd-audit-milestone` → `/gsd-complete-milestone v1.2` → `/gsd-cleanup`.
 
 Orchestration note: `workflow.verifier` is `false` in `.planning/config.json`, so no phase produces a
@@ -243,6 +246,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 23 P02 | 15min | 2 tasks | 2 files |
 | Phase 23 P03 | 20min | 2 tasks | 2 files |
 | Phase 23 P04 | 25min | 3 tasks | 4 files |
+| Phase 24 P01 | 78min | 3 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -336,6 +340,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: PresentationViewer media layer: pauseCurrentMedia() moved to onBeforeUnmount (Vue nulls child refs before parent onUnmounted runs); bodyIsCaption caption-swap applies to Body-role slides only, not the Display-role copyright title
 - [Phase ?]: [Phase 23-04]: SlideshowPreview canPresent computed aliases hasAnySlides (no new prop) - equivalence to assembledSlideshow.length > 0 verified against useSlideshowAssembly grouping
 - [Phase ?]: [Phase 23-04]: ServiceEditorView widens existing useSlideshowAssembly destructure to add assembledSlideshow/isLoading instead of re-flattening assembledSections - no new ordering logic
+- [Phase ?]: [Phase 24-01]: SourceRef gets a fifth 'copyright' kind member so song groups' leading/trailing copyright entries never abuse sectionId
+- [Phase ?]: [Phase 24-01]: backfillSlotIds(service, reference?) two-argument form corrects RESEARCH.md's single-argument design -- reusing the reference's id at the same array index (kind-guarded) keeps the remote-merge JSON.stringify comparison stable across snapshots
 
 ### Roadmap Evolution
 
@@ -395,6 +401,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-25
-Last session: 2026-07-25T19:25:47.513Z
-Stopped at: Completed 23-04-PLAN.md
+Last session: 2026-07-26T01:44:24.549Z
+Stopped at: Completed 24-01-PLAN.md
 Resume file: None

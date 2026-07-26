@@ -171,7 +171,7 @@ audio are independent of it.
 Plans:
 **Wave 1**
 
-- [ ] 24-01-PLAN.md — Slot identity (`ServiceSlot.id`, backfill) and the slide-group type contract
+- [x] 24-01-PLAN.md — Slot identity (`ServiceSlot.id`, backfill) and the slide-group type contract
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
