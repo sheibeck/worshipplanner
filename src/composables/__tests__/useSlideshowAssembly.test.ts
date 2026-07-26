@@ -654,6 +654,90 @@ describe('useSlideshowAssembly', () => {
       expect(slides.some((e) => e.sourceRef.kind === 'lyric' && e.sourceRef.sectionId === 'v2')).toBe(true)
     })
 
+    // --- CR-01 regression: reassigning a SONG slot's songId is a source-
+    // identity swap, not a section-level edit — it must never blend the old
+    // song's copyright/lyric entries with the new song's.
+    it('an uncustomized group replaces wholesale when slot.songId changes to a different song, with no stale entries from the old song', async () => {
+      songsState.songs = [{ id: 'song-a', performanceOrder: ['v1'] } as Song, { id: 'song-b', performanceOrder: ['v1'] } as Song]
+      const fakeLyricsLoader = vi.fn(async (_orgId: string, songId: string) => makeLyrics(songId))
+
+      slideGroupsState.groups = [
+        {
+          id: 'slot-song-swap',
+          slotId: 'slot-song-swap',
+          serviceId: 'service-1',
+          slides: [
+            { id: 'cr-1', order: 0, sourceRef: { kind: 'copyright', songId: 'song-a' } },
+            { id: 'ly-v1', order: 1, sourceRef: { kind: 'lyric', songId: 'song-a', sectionId: 'v1' } },
+            { id: 'cr-2', order: 2, sourceRef: { kind: 'copyright', songId: 'song-a' } },
+          ],
+          createdAt: {} as never,
+          updatedAt: {} as never,
+        },
+      ]
+
+      // The slot now points at song-b — the user picked a different song for the same slot.
+      const service = ref<Service | null>(
+        makeService([songSlot({ position: 0, id: 'slot-song-swap', songId: 'song-b' })]),
+      )
+      useSlideshowAssembly(service, 'org-1', { canWrite: true, lyricsLoader: fakeLyricsLoader })
+      await nextTick()
+      await vi.waitFor(() => expect(fakeLyricsLoader).toHaveBeenCalled())
+      await nextTick()
+      await nextTick()
+
+      expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+      const [, slotIdArg, slidesArg] = mockReplaceGroupSlides.mock.calls[0]!
+      expect(slotIdArg).toBe('slot-song-swap')
+      const slides = slidesArg as GroupSlideEntry[]
+      for (const entry of slides) {
+        if (entry.sourceRef.kind === 'lyric' || entry.sourceRef.kind === 'copyright') {
+          expect(entry.sourceRef.songId).toBe('song-b')
+        }
+      }
+    })
+
+    it('a customized group requires confirm (zero writes) when slot.songId changes to a different song', async () => {
+      songsState.songs = [{ id: 'song-a', performanceOrder: ['v1'] } as Song, { id: 'song-b', performanceOrder: ['v1'] } as Song]
+      const fakeLyricsLoader = vi.fn(async (_orgId: string, songId: string) => makeLyrics(songId))
+
+      slideGroupsState.groups = [
+        {
+          id: 'slot-song-swap-2',
+          slotId: 'slot-song-swap-2',
+          serviceId: 'service-1',
+          slides: [
+            { id: 'cr-1', order: 0, sourceRef: { kind: 'copyright', songId: 'song-a' } },
+            {
+              id: 'ly-v1',
+              order: 1,
+              sourceRef: { kind: 'lyric', songId: 'song-a', sectionId: 'v1' },
+              label: 'Custom Label',
+            },
+            { id: 'cr-2', order: 2, sourceRef: { kind: 'copyright', songId: 'song-a' } },
+          ],
+          createdAt: {} as never,
+          updatedAt: {} as never,
+        },
+      ]
+
+      const service = ref<Service | null>(
+        makeService([songSlot({ position: 0, id: 'slot-song-swap-2', songId: 'song-b' })]),
+      )
+      const { pendingReconciliations } = useSlideshowAssembly(service, 'org-1', {
+        canWrite: true,
+        lyricsLoader: fakeLyricsLoader,
+      })
+      await nextTick()
+      await vi.waitFor(() => expect(fakeLyricsLoader).toHaveBeenCalled())
+      await nextTick()
+      await nextTick()
+
+      expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
+      expect(pendingReconciliations.value).toHaveLength(1)
+      expect(pendingReconciliations.value[0]!.slotId).toBe('slot-song-swap-2')
+    })
+
     it('a customized scripture group with a diverged signature issues zero writes and populates pendingReconciliations', async () => {
       scriptureState.readings = [
         {

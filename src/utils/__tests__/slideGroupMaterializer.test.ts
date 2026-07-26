@@ -513,6 +513,96 @@ describe('reconcileSongGroup', () => {
 
     expect(result.slides.map((e) => e.order)).toEqual(result.slides.map((_, i) => i))
   })
+
+  // --- CR-01 regression: a songId change is a source-IDENTITY swap, not a
+  // section-level edit — it must never run through the additive merge above,
+  // which would blend the old song's copyright/lyric entries with the new
+  // song's. Routed through the same signature+customization confirm gate
+  // reconcileUnstableIdGroup uses for scripture/imported groups.
+  describe('song identity swap (CR-01)', () => {
+    const songBLyrics = () =>
+      makeSongLyrics({
+        songId: 'song-b',
+        sections: [{ id: 'verse-1-b', label: 'Verse 1', lines: ['Song B line'] }],
+      })
+
+    it('an uncustomized group is replaced wholesale when slot.songId changes to a different song', () => {
+      const slot = songSlot({ id: 'slot-1', songId: 'song-b' })
+      const group = makeStoredSongGroup(twoSectionStoredSlides) // all entries reference song-1
+      const lyrics = songBLyrics()
+      const inputs = makeInputs({
+        songLyricsById: new Map([['song-b', lyrics]]),
+        performanceOrderById: new Map([['song-b', ['verse-1-b']]]),
+      })
+
+      const result = reconcileSongGroup(group, slot, inputs)
+
+      expect(result.needsConfirm).toBe(false)
+      expect(result.changed).toBe(true)
+      // Every entry references ONLY the new song — no blended song-1 leftovers.
+      for (const entry of result.slides) {
+        if (entry.sourceRef.kind === 'lyric' || entry.sourceRef.kind === 'copyright') {
+          expect(entry.sourceRef.songId).toBe('song-b')
+        }
+      }
+      expect(result.slides.some((e) => e.sourceRef.kind === 'lyric' && e.sourceRef.sectionId === 'verse-1-b')).toBe(
+        true,
+      )
+    })
+
+    it('a customized group requires confirm when slot.songId changes to a different song, and the stored slides are left untouched', () => {
+      const slot = songSlot({ id: 'slot-1', songId: 'song-b' })
+      const group = makeStoredSongGroup([
+        { id: 'e-copyright-lead', order: 0, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+        {
+          id: 'e-verse-1',
+          order: 1,
+          sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+          label: 'Custom Verse Label',
+          audioUrl: 'https://example.com/verse.mp3',
+        },
+        { id: 'e-copyright-trail', order: 2, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+      ])
+      const lyrics = songBLyrics()
+      const inputs = makeInputs({
+        songLyricsById: new Map([['song-b', lyrics]]),
+        performanceOrderById: new Map([['song-b', ['verse-1-b']]]),
+      })
+
+      const result = reconcileSongGroup(group, slot, inputs)
+
+      expect(result.needsConfirm).toBe(true)
+      expect(result.changed).toBe(false)
+      expect(result.slides).toEqual(group.slides)
+      expect(result.proposed).toBeDefined()
+      expect(result.proposed!.every((e) => e.sourceRef.kind !== 'lyric' || e.sourceRef.songId === 'song-b')).toBe(
+        true,
+      )
+      expect(result.loss).toEqual({ customizedEntries: 1, withAudio: 1, withNotes: 0 })
+    })
+
+    it('a SONG slot whose songId changes must not retain the previous song copyright or produce unresolvable lyric entries referencing the old song', () => {
+      // The exact CR-01 reproduction: an uncustomized group materialized for
+      // Song A, then the user picks Song B for the same slot. The additive
+      // merge's "retained-but-unresolvable" rule must never fire here — the
+      // whole group is replaced, so no song-1-referencing entry survives.
+      const slot = songSlot({ id: 'slot-1', songId: 'song-b' })
+      const group = makeStoredSongGroup(twoSectionStoredSlides) // song-1 copyright + 2 lyric entries
+      const lyrics = songBLyrics()
+      const inputs = makeInputs({
+        songLyricsById: new Map([['song-b', lyrics]]),
+        performanceOrderById: new Map([['song-b', ['verse-1-b']]]),
+      })
+
+      const result = reconcileSongGroup(group, slot, inputs)
+
+      const staleSongOneEntries = result.slides.filter(
+        (e) =>
+          (e.sourceRef.kind === 'lyric' || e.sourceRef.kind === 'copyright') && e.sourceRef.songId === 'song-1',
+      )
+      expect(staleSongOneEntries).toHaveLength(0)
+    })
+  })
 })
 
 describe('reconcileScriptureGroup', () => {
@@ -687,5 +777,38 @@ describe('reconcileGroup dispatcher', () => {
     expect(result.needsConfirm).toBe(false)
     expect(result.changed).toBe(false)
     expect(result.slides).toEqual(group.slides)
+  })
+
+  it('CR-01: a SONG slot with a customized group surfaces needsConfirm through reconcileGroup when songId changes to a different song', () => {
+    const slot = songSlot({ id: 'slot-1', songId: 'song-b' })
+    const group = makeGroup({
+      id: 'slot-1',
+      slotId: 'slot-1',
+      slides: [
+        { id: 'e-copyright-lead', order: 0, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+        {
+          id: 'e-verse-1',
+          order: 1,
+          sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+          label: 'Custom Verse Label',
+        },
+        { id: 'e-copyright-trail', order: 2, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+      ],
+    })
+    const lyrics = makeSongLyrics({
+      songId: 'song-b',
+      sections: [{ id: 'verse-1-b', label: 'Verse 1', lines: ['Song B line'] }],
+    })
+    const inputs = makeInputs({
+      songLyricsById: new Map([['song-b', lyrics]]),
+      performanceOrderById: new Map([['song-b', ['verse-1-b']]]),
+    })
+
+    const result = reconcileGroup(group, slot, inputs)
+
+    expect(result.needsConfirm).toBe(true)
+    expect(result.changed).toBe(false)
+    expect(result.slides).toEqual(group.slides)
+    expect(result.proposed).toBeDefined()
   })
 })

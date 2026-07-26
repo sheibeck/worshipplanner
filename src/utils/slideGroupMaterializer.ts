@@ -205,16 +205,47 @@ function isCopyrightEntry(
  * consequence of the source changing shape. The leading/trailing `copyright`
  * entries are matched by kind and position, never by `sectionId`, and are
  * never duplicated.
+ *
+ * A full song-IDENTITY swap (CR-01) is detected FIRST, before any of the
+ * above additive logic runs: if the group's stored lyric/copyright entries
+ * reference a `songId` different from the slot's CURRENT `songId`, the slot
+ * was reassigned to a different song entirely — a source-identity change,
+ * not a section-level edit within the same song. The additive by-sectionId
+ * merge is only valid for edits WITHIN the same song; running it across a
+ * song swap would blend the old song's copyright/lyric entries with the new
+ * song's (every old entry's `sectionId` looks "unresolvable" against the new
+ * song and gets retained forever). This case is routed through the same
+ * signature+customization confirm gate `reconcileUnstableIdGroup` uses for
+ * scripture/imported groups: an uncustomized group replaces silently, a
+ * customized one requires confirm.
  */
-export function reconcileSongGroup(
-  group: SlideGroup,
-  slot: SongSlot,
-  inputs: AssemblyInputs,
-): { slides: GroupSlideEntry[]; changed: boolean } {
+export function reconcileSongGroup(group: SlideGroup, slot: SongSlot, inputs: AssemblyInputs): ReconcileResult {
   const songId = slot.songId
-  if (!songId) return { slides: group.slides, changed: false }
+  if (!songId) return { needsConfirm: false, changed: false, slides: group.slides }
+
+  const storedSongIds = new Set(
+    group.slides
+      .filter(
+        (e): e is GroupSlideEntry & { sourceRef: Extract<SourceRef, { kind: 'lyric' | 'copyright' }> } =>
+          e.sourceRef.kind === 'lyric' || e.sourceRef.kind === 'copyright',
+      )
+      .map((e) => e.sourceRef.songId),
+  )
+  if (storedSongIds.size > 0 && !storedSongIds.has(songId)) {
+    if (!hasCustomization(group)) {
+      return { needsConfirm: false, changed: true, slides: deriveGroupEntries(slot, inputs) }
+    }
+    return {
+      needsConfirm: true,
+      changed: false,
+      slides: group.slides,
+      proposed: deriveGroupEntries(slot, inputs),
+      loss: computeLoss(group),
+    }
+  }
+
   const lyrics = inputs.songLyricsById.get(songId)
-  if (!lyrics) return { slides: group.slides, changed: false }
+  if (!lyrics) return { needsConfirm: false, changed: false, slides: group.slides }
 
   const freshOrder = resolveSongOrder(songId, lyrics, inputs).filter((sectionId) =>
     lyrics.sections.some((section) => section.id === sectionId),
@@ -265,7 +296,9 @@ export function reconcileSongGroup(
     merged.length !== group.slides.length ||
     merged.some((entry, index) => JSON.stringify(entry) !== JSON.stringify(group.slides[index]))
 
-  return changed ? { slides: merged, changed: true } : { slides: group.slides, changed: false }
+  return changed
+    ? { needsConfirm: false, changed: true, slides: merged }
+    : { needsConfirm: false, changed: false, slides: group.slides }
 }
 
 /** Result shape shared by every reconciler, dispatched via {@link reconcileGroup}. */
@@ -344,17 +377,17 @@ export function reconcileImportedGroup(group: SlideGroup, slot: ImportedSlot, in
 
 /**
  * Single entry point dispatching on `slot.kind` — the composable in 24-05
- * calls only this. SONG routes to the additive merge (never confirm-gated);
+ * calls only this. SONG routes to the additive merge for edits WITHIN the
+ * same song (never confirm-gated for those), but confirm-gates a full
+ * song-identity swap exactly like the unstable-id kinds (CR-01);
  * SCRIPTURE/IMPORTED route to the signature-detected, confirm-gated path; a
  * `text`-kind slot (PRAYER/MESSAGE/HYMN) has no reconcilable source and
  * returns the stored slides with both flags false.
  */
 export function reconcileGroup(group: SlideGroup, slot: ServiceSlot, inputs: AssemblyInputs): ReconcileResult {
   switch (slot.kind) {
-    case 'SONG': {
-      const { slides, changed } = reconcileSongGroup(group, slot, inputs)
-      return { needsConfirm: false, changed, slides }
-    }
+    case 'SONG':
+      return reconcileSongGroup(group, slot, inputs)
     case 'SCRIPTURE':
       return reconcileScriptureGroup(group, slot, inputs)
     case 'IMPORTED':
