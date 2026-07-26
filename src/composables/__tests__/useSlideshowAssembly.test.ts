@@ -6,6 +6,7 @@ import type { SongLyrics } from '@/types/songLyrics'
 import type { ScriptureReading } from '@/types/scriptureReading'
 import type { Song } from '@/types/song'
 import type { ImportedDeck } from '@/types/importedDeck'
+import type { SlideGroup } from '@/types/slideGroup'
 
 // --- Stubbed scriptureSlides store (D001/D005 pattern used by ScriptureSlideEditor.test.ts) ---
 const mockSubscribeReadings = vi.fn()
@@ -54,23 +55,35 @@ vi.mock('@/stores/songs', () => ({
     }),
 }))
 
-// --- Stubbed slideGroups store (24-04) — the composable now reads
-// groupsBySlotId; the store's real subscription is wired in 24-05, so every
-// test in this file exercises assembleSlideshow's no-group fallback path
-// with an empty map, unmocked this would call getActivePinia() against a
-// Pinia instance this test file never installs.
+// --- Stubbed slideGroups store (24-02/24-04, wired live in 24-05) ---
+// Real reactive state so subscribeGroups/materializeGroupIfMissing/
+// replaceGroupSlides call-tracking and groupsBySlotId derivation all behave
+// like the real Pinia store, without ever installing a real Pinia instance
+// (this file's other stores follow the same convention).
+const mockSubscribeGroups = vi.fn()
+const mockUnsubscribeGroups = vi.fn()
+const mockMaterializeGroupIfMissing = vi.fn().mockResolvedValue(true)
+const mockDeleteGroup = vi.fn()
+const mockSetGroupBedMedia = vi.fn()
+const mockReplaceGroupSlides = vi.fn().mockResolvedValue(undefined)
+const slideGroupsState = reactive<{ groups: SlideGroup[] }>({ groups: [] })
+
 vi.mock('@/stores/slideGroups', () => ({
   useSlideGroups: () =>
     reactive({
-      groups: [],
+      groups: slideGroupsState.groups,
       isLoading: false,
-      groupsBySlotId: computed(() => new Map()),
-      subscribeGroups: vi.fn(),
-      unsubscribeGroups: vi.fn(),
-      materializeGroupIfMissing: vi.fn(),
-      deleteGroup: vi.fn(),
-      setGroupBedMedia: vi.fn(),
-      replaceGroupSlides: vi.fn(),
+      groupsBySlotId: computed(() => {
+        const map = new Map<string, SlideGroup>()
+        for (const group of slideGroupsState.groups) map.set(group.slotId, group)
+        return map
+      }),
+      subscribeGroups: mockSubscribeGroups,
+      unsubscribeGroups: mockUnsubscribeGroups,
+      materializeGroupIfMissing: mockMaterializeGroupIfMissing,
+      deleteGroup: mockDeleteGroup,
+      setGroupBedMedia: mockSetGroupBedMedia,
+      replaceGroupSlides: mockReplaceGroupSlides,
     }),
 }))
 
@@ -152,6 +165,7 @@ describe('useSlideshowAssembly', () => {
     scriptureState.readings = []
     importedState.decks = []
     songsState.songs = []
+    slideGroupsState.groups = []
   })
 
   it('reorders assembledSlideshow when service slots are reordered (R006)', async () => {
@@ -366,5 +380,46 @@ describe('useSlideshowAssembly', () => {
     await nextTick()
     expect(assembledSlideshow.value).toEqual([])
     expect(assembledSections.value).toEqual([])
+  })
+
+  // --- Task 1: slideGroups subscription rides the existing org watcher ---
+  describe('slideGroups subscription (Task 1)', () => {
+    it('calls subscribeGroups exactly once alongside scripture/imported on first org id resolution', async () => {
+      const service = ref<Service | null>(makeService([hymnSlot({ position: 0 })]))
+      useSlideshowAssembly(service, 'org-1')
+      await nextTick()
+
+      expect(mockSubscribeGroups).toHaveBeenCalledTimes(1)
+      expect(mockSubscribeGroups).toHaveBeenCalledWith('org-1')
+    })
+
+    it('does not re-subscribe slideGroups for a repeated identical org id', async () => {
+      const service = ref<Service | null>(makeService([hymnSlot({ position: 0 })]))
+      useSlideshowAssembly(service, 'org-1')
+      await nextTick()
+      expect(mockSubscribeGroups).toHaveBeenCalledTimes(1)
+
+      service.value = makeService([hymnSlot({ position: 0, hymnName: 'Renamed' })])
+      await nextTick()
+      expect(mockSubscribeGroups).toHaveBeenCalledTimes(1)
+    })
+
+    it('exposes groupsBySlotId re-derived from the store', async () => {
+      slideGroupsState.groups = [
+        {
+          id: 'slot-hymn-0',
+          slotId: 'slot-hymn-0',
+          serviceId: 'service-1',
+          slides: [],
+          createdAt: {} as never,
+          updatedAt: {} as never,
+        },
+      ]
+      const service = ref<Service | null>(makeService([hymnSlot({ position: 0, id: 'slot-hymn-0' })]))
+      const { groupsBySlotId } = useSlideshowAssembly(service, 'org-1')
+      await nextTick()
+
+      expect(groupsBySlotId.value.has('slot-hymn-0')).toBe(true)
+    })
   })
 })
