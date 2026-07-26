@@ -909,17 +909,20 @@
                 </template>
               </template>
 
-              <!-- Per-slot media attach/preview/remove (Phase 22, R013/R014): editor only,
-                   hidden when exported, matching sibling slot controls. Collapsed/compact so
-                   it doesn't crowd the slot row; mutation rides the existing localService
-                   deep-watch autosave via onSlotAudioUrlChange/onSlotVideoUrlChange above. -->
+              <!-- Per-slot media attach/preview/remove (Phase 22, R013/R014 — retargeted
+                   at the group bed in Phase 24-06, R030): editor only, hidden when exported,
+                   matching sibling slot controls. Collapsed/compact so it doesn't crowd the
+                   slot row; the displayed urls read the anchored group's bed (groupsBySlotId)
+                   and the write goes straight to slideGroups via setGroupBedMedia
+                   (onSlotBedAudioChange/onSlotBedVideoChange below) — a deliberately separate,
+                   scoped write path, NOT the localService deep-watch autosave. -->
               <SlotMediaAttachment
                 v-if="authStore.isEditor && !isExportedLocked"
                 :orgId="authStore.orgId!"
-                :audioUrl="slot.audioUrl"
-                :videoUrl="slot.videoUrl"
-                @update:audioUrl="(url) => onSlotAudioUrlChange(index, url)"
-                @update:videoUrl="(url) => onSlotVideoUrlChange(index, url)"
+                :audioUrl="groupsBySlotId.get(slot.id)?.bedAudioUrl"
+                :videoUrl="groupsBySlotId.get(slot.id)?.bedVideoUrl"
+                @update:audioUrl="(url) => onSlotBedAudioChange(index, url)"
+                @update:videoUrl="(url) => onSlotBedVideoChange(index, url)"
               />
             </div>
 
@@ -1395,22 +1398,41 @@ function onSectionChange(index: number, value: string) {
   slot.section = value === '' ? undefined : (value as ServiceSection)
 }
 
-/** Editor-only per-slot media attach/remove (Phase 22, R013/R014) — routes
- *  through the same localService mutation + autosave watcher as every other
- *  slot field (onSectionChange above); SlotMediaAttachment never persists
- *  anything itself. */
-function onSlotAudioUrlChange(index: number, url: string | undefined) {
-  if (!localService.value) return
-  const slot = localService.value.slots[index]
-  if (!slot) return
-  slot.audioUrl = url
+/** Editor-only per-slot media attach/remove (Phase 22, R013/R014 — retargeted
+ *  at the group bed in Phase 24-06, R030/Pitfall 1). These no longer mutate
+ *  localService.slots[index].audioUrl/videoUrl or ride its deep-watch
+ *  autosave — SlotMediaAttachment's emitted url is written straight to the
+ *  anchored group's bed via the slideGroups store's scoped write
+ *  (setGroupBedMedia), a deliberately separate write path from the
+ *  whole-document autosave. A removed url passes the explicit clear flag
+ *  rather than an undefined bed field, since stripUndefined() would
+ *  otherwise erase that intent before it reached Firestore.
+ *  SlotMediaAttachment itself never persists anything — it stays a dumb
+ *  emit-only control (unchanged in this phase). */
+async function onSlotBedAudioChange(index: number, url: string | undefined) {
+  const slot = localService.value?.slots[index]
+  if (!localService.value || !slot || !authStore.orgId) return
+  try {
+    await slideGroupsStore.setGroupBedMedia(authStore.orgId, slot.id, {
+      serviceId: localService.value.id,
+      ...(url !== undefined ? { bedAudioUrl: url } : { clearAudio: true }),
+    })
+  } catch (err) {
+    console.error('Failed to update slot bed audio:', err)
+  }
 }
 
-function onSlotVideoUrlChange(index: number, url: string | undefined) {
-  if (!localService.value) return
-  const slot = localService.value.slots[index]
-  if (!slot) return
-  slot.videoUrl = url
+async function onSlotBedVideoChange(index: number, url: string | undefined) {
+  const slot = localService.value?.slots[index]
+  if (!localService.value || !slot || !authStore.orgId) return
+  try {
+    await slideGroupsStore.setGroupBedMedia(authStore.orgId, slot.id, {
+      serviceId: localService.value.id,
+      ...(url !== undefined ? { bedVideoUrl: url } : { clearVideo: true }),
+    })
+  } catch (err) {
+    console.error('Failed to update slot bed video:', err)
+  }
 }
 
 const orgIdRef = computed(() => authStore.orgId)
