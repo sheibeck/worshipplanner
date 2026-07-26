@@ -5,14 +5,14 @@ milestone_name: Slides Tab Rework
 current_phase: 25
 current_phase_name: Slides Tab Shell — Plan Rail and Slide Grid
 status: executing
-stopped_at: "Completed 25-03-PLAN.md (Slides tab shell: plan rail, SlidesTab selection contract, third tab in ServiceEditorView)"
-last_updated: "2026-07-26T20:47:41.740Z"
+stopped_at: Completed 25-02-PLAN.md (bed-video deletion, video-slide rendering in Present mode + Slideshow Preview)
+last_updated: "2026-07-26T21:27:28.585Z"
 last_activity: 2026-07-26
 progress:
   total_phases: 17
   completed_phases: 12
   total_plans: 81
-  completed_plans: 76
+  completed_plans: 77
   percent: 71
 last_activity_desc: Opened v1.3 Slides Tab Rework (Phases 24-28) from the Claude Design import; v1.2 left code-complete with its verification ledger intact
 ---
@@ -36,7 +36,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 25 (Slides Tab Shell — Plan Rail and Slide Grid) — EXECUTING
-Plan: 3 of 7
+Plan: 4 of 7
 Milestone: v1.3 Slides Tab Rework (Phases 24-28) — IN PROGRESS
 Status: Ready to execute
 
@@ -267,6 +267,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 24 P06 | 26min | 3 tasks | 2 files |
 | Phase 25 P01 | 35min | 3 tasks | 7 files |
 | Phase 25 P03 | 2.5h | 3 tasks | 8 files |
+| Phase 25 P02 | ~45min | 3 tasks | 16 files |
 
 ## Accumulated Context
 
@@ -378,6 +379,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: [Phase 25-01]: isNonDerivableEntry (video kind, or authored text kind) is the single predicate hasCustomization/computeLoss consult to gate reconciliation deletion of user-appended entries
 - [Phase ?]: 25-03: SlidePlanRail receives raw (unsorted) slots and sorts internally, carrying original array index so counts stay aligned with AssembledSlide.slotIndex
 - [Phase ?]: 25-03: PendingReconciliation shape duplicated locally in SlidesTab.vue rather than imported from useSlideshowAssembly, to satisfy the plan's no-composable-reference verification gate
+- [Phase ?]: [Phase 25-02]: bedVideoUrl/videoFromBed/SlideBase.videoUrl deleted end-to-end (D-18) -- bed is audio-only; currentVideoUrl/currentVideoKey resolve purely from a video slide's own videoSrc with no group-continuity branch
+- [Phase ?]: [Phase 25-02]: bodyIsCaption removed from PresentationViewer as dead code -- video can never coexist with a text-bearing slide once video is slide-only, so the caption-demotion path was provably inert
+- [Phase ?]: [Phase 25-02]: SlotMediaAttachment.vue's video attach affordance removed beyond the plan's stated file scope -- leaving it wired to an unbound update:videoUrl after ServiceEditorView drops the listener would silently discard uploaded video files with no error
 
 ### Roadmap Evolution
 
@@ -437,6 +441,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-26
-Last session: 2026-07-26T20:47:41.691Z
-Stopped at: Completed 25-03-PLAN.md (Slides tab shell: plan rail, SlidesTab selection contract, third tab in ServiceEditorView)
+Last session: 2026-07-26T21:27:28.540Z
+Stopped at: Completed 25-02-PLAN.md (bed-video deletion, video-slide rendering in Present mode + Slideshow Preview)
 Resume file: None
