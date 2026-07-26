@@ -1131,6 +1131,7 @@ import { useServiceStore } from '@/stores/services'
 import { useSongStore } from '@/stores/songs'
 import { useRosterStore } from '@/stores/roster'
 import { useQuartersStore } from '@/stores/quarters'
+import { useSlideGroups } from '@/stores/slideGroups'
 import { slotLabel, createSlot, reindexSlots, backfillSlotIds } from '@/utils/slotTypes'
 import { scripturesOverlap } from '@/utils/scripture'
 import { getPrimaryKey } from '@/utils/songSearch'
@@ -1167,6 +1168,11 @@ const serviceStore = useServiceStore()
 const songStore = useSongStore()
 const rosterStore = useRosterStore()
 const quartersStore = useQuartersStore()
+// R029/D-03 cascade target (Task 2) and the group-bed write target (Task 3).
+// Reads for the delete-warning copy and the media control's display values
+// go through useSlideshowAssembly's re-exposed groupsBySlotId below; this
+// direct store handle is only for the two scoped write actions.
+const slideGroupsStore = useSlideGroups()
 
 // ── Roles tab state (Task 1: tab bar) ──────────────────────────────────────────
 const activeTab = ref<'music' | 'roles'>('music')
@@ -1247,12 +1253,35 @@ const deleteConfirmHeading = computed(() =>
     ? 'Remove this item?'                        // clear-song path keeps existing wording
     : 'Remove this element from the plan?'        // D-16 remove-element wording
 )
+// R029/D-03: the remove-element confirm body must name the TRUE loss —
+// the live group's real slide count and whichever attached artefacts are
+// genuinely present (a group bed audio, a group bed video, per-slide audio,
+// or operator notes) — never a generic "this cannot be undone" alone, and
+// never an invented/rounded number. A slot with no group names zero slides
+// and makes no attached-media claim.
 const deleteConfirmBody = computed(() => {
   if (pendingDeleteIsClear.value) {
     return 'This will delete the assigned song, scripture, or content from the plan. This cannot be undone.'
   }
   const label = pendingSlotKind.value ? elementLabel(pendingSlotKind.value) : 'this element'
-  return `This will remove ${label} from the service plan. This cannot be undone.`
+  const slotId = pendingDeleteIndex.value != null
+    ? localService.value?.slots[pendingDeleteIndex.value]?.id
+    : undefined
+  const group = slotId ? groupsBySlotId.value.get(slotId) : undefined
+  const slideCount = group?.slides.length ?? 0
+  const slideWord = slideCount === 1 ? 'slide' : 'slides'
+
+  const attachments: string[] = []
+  if (group?.bedAudioUrl) attachments.push('attached audio')
+  if (group?.bedVideoUrl) attachments.push('attached video')
+  if (group?.slides.some((s) => !!s.audioUrl)) attachments.push('per-slide audio')
+  if (group?.slides.some((s) => !!s.notes?.trim())) attachments.push('operator notes')
+
+  const mediaClause = attachments.length > 0
+    ? ` along with its ${attachments.join(', ')}`
+    : ', with no attached audio, video, or notes'
+
+  return `This will remove ${label} and its ${slideCount} ${slideWord}${mediaClause}. This cannot be undone.`
 })
 
 // ── Scripture editor expansion state ──────────────────────────────────────────
@@ -1821,17 +1850,39 @@ function elementLabel(kind: SlotKind): string {
   }
 }
 
-function confirmSlotDelete() {
+async function confirmSlotDelete() {
   if (pendingDeleteIndex.value == null) return
+  const index = pendingDeleteIndex.value
   if (pendingDeleteIsClear.value) {
-    // Clear-song path
-    const slot = localService.value?.slots[pendingDeleteIndex.value]
+    // Clear-song path (D-14/D-15): empties a SONG slot's assignment — this
+    // is NOT a remove-element delete, so no group is deleted here (R029
+    // scopes the cascade to actually removing the plan item).
+    const slot = localService.value?.slots[index]
     if (slot?.kind === 'SONG') {
       const updated: SongSlot = { ...slot as SongSlot, songId: null, songTitle: null, songKey: null }
-      localService.value!.slots[pendingDeleteIndex.value] = updated
+      localService.value!.slots[index] = updated
     }
   } else {
-    performRemoveSlot(pendingDeleteIndex.value)
+    // Remove-element path (R029/D-03): resolve the slot's own id BEFORE the
+    // splice — after performRemoveSlot the anchor is gone. The group delete
+    // is awaited FIRST; a failed delete must not leave the slot removed
+    // locally while its group lingers, so on failure we leave the slot in
+    // place and surface the failure the same way onToggleRoleOverride does
+    // (console.error, no user-facing banner for this scoped-write class of
+    // failure) rather than silently diverging local from remote.
+    const slotId = localService.value?.slots[index]?.id
+    try {
+      if (slotId && authStore.orgId) {
+        await slideGroupsStore.deleteGroup(authStore.orgId, slotId)
+      }
+      performRemoveSlot(index)
+    } catch (err) {
+      console.error('Failed to delete slide group for removed slot:', err)
+      showSlotDeleteConfirm.value = false
+      pendingDeleteIndex.value = null
+      pendingDeleteIsClear.value = false
+      return
+    }
   }
   showSlotDeleteConfirm.value = false
   pendingDeleteIndex.value = null
