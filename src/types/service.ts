@@ -31,6 +31,14 @@ export const SERVICE_SECTION_LABELS: Record<ServiceSection, string> = {
  * (see `SlideBase.audioUrl`/`videoUrl`).
  */
 export interface MediaAttachableSlot {
+  /**
+   * Stable slot identity (D-01, Phase 24). Minted by `createSlot()`/
+   * `buildSlots()` for brand-new slots and by `backfillSlotIds()` for legacy
+   * documents read before this field existed. This is the anchor every
+   * `slideGroups/{slotId}` document is keyed on — never array index or
+   * `position`, both of which a drag-reorder rewrites.
+   */
+  id: string
   audioUrl?: string
   videoUrl?: string
 }
