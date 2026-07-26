@@ -154,4 +154,132 @@ describe('useSlideGroups', () => {
       expect(store.groupsBySlotId.get('slot-b')?.id).toBe('slot-b')
     })
   })
+
+  describe('materializeGroupIfMissing', () => {
+    it('performs no write and resolves false when the doc already exists', async () => {
+      const { getDoc, setDoc } = await import('firebase/firestore')
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => true,
+        id: 'slot-1',
+        data: () => makeGroupDoc(),
+      } as ReturnType<typeof getDoc> extends Promise<infer T> ? T : never)
+
+      const { useSlideGroups } = await import('../slideGroups')
+      const store = useSlideGroups()
+
+      const created = await store.materializeGroupIfMissing('org-1', {
+        id: 'slot-1',
+        serviceId: 'service-1',
+        slotId: 'slot-1',
+        slides: [],
+      })
+
+      expect(created).toBe(false)
+      expect(setDoc).not.toHaveBeenCalled()
+    })
+
+    it('calls setDoc exactly once against the slot-id path when absent and resolves true', async () => {
+      const { getDoc, setDoc, doc: docFn } = await import('firebase/firestore')
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => false,
+        id: 'slot-1',
+        data: () => undefined,
+      } as ReturnType<typeof getDoc> extends Promise<infer T> ? T : never)
+
+      const { useSlideGroups } = await import('../slideGroups')
+      const store = useSlideGroups()
+
+      const created = await store.materializeGroupIfMissing('org-1', {
+        id: 'slot-1',
+        serviceId: 'service-1',
+        slotId: 'slot-1',
+        slides: [],
+      })
+
+      expect(created).toBe(true)
+      expect(setDoc).toHaveBeenCalledOnce()
+      expect(docFn).toHaveBeenCalledWith(
+        expect.anything(),
+        'organizations',
+        'org-1',
+        'slideGroups',
+        'slot-1',
+      )
+    })
+
+    it('two awaited calls in sequence produce exactly one setDoc call (idempotency)', async () => {
+      const { getDoc, setDoc } = await import('firebase/firestore')
+      vi.mocked(getDoc)
+        .mockResolvedValueOnce({
+          exists: () => false,
+          id: 'slot-1',
+          data: () => undefined,
+        } as ReturnType<typeof getDoc> extends Promise<infer T> ? T : never)
+        .mockResolvedValueOnce({
+          exists: () => true,
+          id: 'slot-1',
+          data: () => makeGroupDoc(),
+        } as ReturnType<typeof getDoc> extends Promise<infer T> ? T : never)
+
+      const { useSlideGroups } = await import('../slideGroups')
+      const store = useSlideGroups()
+
+      const input = { id: 'slot-1', serviceId: 'service-1', slotId: 'slot-1', slides: [] }
+      const first = await store.materializeGroupIfMissing('org-1', input)
+      const second = await store.materializeGroupIfMissing('org-1', input)
+
+      expect(first).toBe(true)
+      expect(second).toBe(false)
+      expect(setDoc).toHaveBeenCalledOnce()
+    })
+
+    it('carries a Phase 22 slot bedAudioUrl/bedVideoUrl onto the single setDoc payload', async () => {
+      const { getDoc, setDoc } = await import('firebase/firestore')
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => false,
+        id: 'slot-1',
+        data: () => undefined,
+      } as ReturnType<typeof getDoc> extends Promise<infer T> ? T : never)
+
+      const { useSlideGroups } = await import('../slideGroups')
+      const store = useSlideGroups()
+
+      await store.materializeGroupIfMissing('org-1', {
+        id: 'slot-1',
+        serviceId: 'service-1',
+        slotId: 'slot-1',
+        slides: [],
+        bedAudioUrl: 'https://example.com/bed.mp3',
+        bedVideoUrl: 'https://example.com/bed.mp4',
+      })
+
+      const callArgs = vi.mocked(setDoc).mock.calls[0]!
+      const payload = callArgs[1] as Record<string, unknown>
+      expect(payload.bedAudioUrl).toBe('https://example.com/bed.mp3')
+      expect(payload.bedVideoUrl).toBe('https://example.com/bed.mp4')
+    })
+
+    it('produces no bedAudioUrl key at all when the field is absent (stripUndefined)', async () => {
+      const { getDoc, setDoc } = await import('firebase/firestore')
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => false,
+        id: 'slot-1',
+        data: () => undefined,
+      } as ReturnType<typeof getDoc> extends Promise<infer T> ? T : never)
+
+      const { useSlideGroups } = await import('../slideGroups')
+      const store = useSlideGroups()
+
+      await store.materializeGroupIfMissing('org-1', {
+        id: 'slot-1',
+        serviceId: 'service-1',
+        slotId: 'slot-1',
+        slides: [],
+      })
+
+      const callArgs = vi.mocked(setDoc).mock.calls[0]!
+      const payload = callArgs[1] as Record<string, unknown>
+      expect('bedAudioUrl' in payload).toBe(false)
+    })
+  })
 })
