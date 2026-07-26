@@ -195,7 +195,37 @@ Plans:
 **Goal:** Add the Slides tab: a service-plan rail that mirrors plan order (not draggable — reordering happens on Service Order), with kind badges, slide counts, group-music indicators and an UNANCHORED block for orphans; plus the slide grid for the selected group with cards, badges, labels, audio chips, a drop target for PPTX/images/video, and the group and page-level header actions.
 **Depends on:** Phase 24
 **Requirements:** R031, R032, R018 (supporting)
-**Plans:** 0
+**Plans:** 7 plans
+
+> **Goal-vs-decisions note.** The goal prose above predates Phase 24's discuss and Phase 25's
+> `25-CONTEXT.md`. Where they disagree, the locked decisions win: there is **no** UNANCHORED block
+> (D-01), **no** page-level Import button (D-02) and **no** Generate-missing-slides button (D-03);
+> "page-level header actions" means the existing Present/Save header. Owner decision **D-17**
+> (2026-07-26) adds a real `VideoSlide` type so a dropped video appends a slide, while audio remains
+> the group bed.
+
+Plans:
+**Wave 1**
+
+- [ ] 25-01-PLAN.md — D-17 data model: `VideoSlide`, video/authored-text source refs, reconciliation retention
+- [ ] 25-03-PLAN.md — Slides tab shell: shared display module, plan rail, selection contract, third tab
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 25-02-PLAN.md — D-17 rendering: video slide in PresentationViewer and SlideshowPreview
+- [ ] 25-04-PLAN.md — Slide grid and cards: slot-index filtering, D-10 content, D-12 selection seam
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 25-05-PLAN.md — On-demand group materialization, add slide (D-16), drag-reorder (D-11)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 25-06-PLAN.md — Group music control: bed audio attach, preview, remove (D-14 audio half)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 25-07-PLAN.md — Drop target and import: modal reuse (D-15), four-kind routing (D-13/D-14/D-17)
 
 ### Phase 26: Edit Slide Drawer `risk:medium`
 
