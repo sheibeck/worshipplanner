@@ -12,7 +12,7 @@
  * `AudioPlayer`/`VideoPlayer` child components on this id (Phase 23's WR-02
  * contract).
  */
-import type { ServiceSlot, SongSlot } from '@/types/service'
+import type { ServiceSlot, SongSlot, ScriptureSlot, ImportedSlot } from '@/types/service'
 import type { SlideGroup, GroupSlideEntry, SourceRef, SlideGroupInput } from '@/types/slideGroup'
 import type { AssemblyInputs } from '@/utils/slideshowAssembler'
 import type { SongLyrics } from '@/types/songLyrics'
@@ -266,4 +266,102 @@ export function reconcileSongGroup(
     merged.some((entry, index) => JSON.stringify(entry) !== JSON.stringify(group.slides[index]))
 
   return changed ? { slides: merged, changed: true } : { slides: group.slides, changed: false }
+}
+
+/** Result shape shared by every reconciler, dispatched via {@link reconcileGroup}. */
+export interface ReconcileResult {
+  needsConfirm: boolean
+  changed: boolean
+  slides: GroupSlideEntry[]
+  proposed?: GroupSlideEntry[]
+  loss?: { customizedEntries: number; withAudio: number; withNotes: number }
+}
+
+function computeLoss(group: SlideGroup): { customizedEntries: number; withAudio: number; withNotes: number } {
+  let customizedEntries = 0
+  let withAudio = 0
+  let withNotes = 0
+  for (const entry of group.slides) {
+    if (entry.label || entry.notes || entry.audioUrl) customizedEntries++
+    if (entry.audioUrl) withAudio++
+    if (entry.notes) withNotes++
+  }
+  return { customizedEntries, withAudio, withNotes }
+}
+
+/**
+ * Shared three-branch shape for the two unstable-id source kinds (scripture,
+ * imported deck): compare the stored `sourceSignature`; if unchanged, no
+ * work. If diverged and the group has no customization, replace silently
+ * (nothing user-authored to lose). If diverged and the group IS customized,
+ * return the stored slides untouched, `needsConfirm: true`, and a `proposed`
+ * list + `loss` summary the Phase 26 confirm dialog can render.
+ */
+function reconcileUnstableIdGroup(
+  group: SlideGroup,
+  slot: ScriptureSlot | ImportedSlot,
+  inputs: AssemblyInputs,
+): ReconcileResult {
+  const freshSignature = sourceSignature(slot, inputs)
+  if (freshSignature === group.sourceSignature) {
+    return { needsConfirm: false, changed: false, slides: group.slides }
+  }
+
+  if (!hasCustomization(group)) {
+    return { needsConfirm: false, changed: true, slides: deriveGroupEntries(slot, inputs) }
+  }
+
+  return {
+    needsConfirm: true,
+    changed: false,
+    slides: group.slides,
+    proposed: deriveGroupEntries(slot, inputs),
+    loss: computeLoss(group),
+  }
+}
+
+/**
+ * Scripture inner slide ids are purely positional (`id: \`scripture-${position}\``,
+ * minted in `src/utils/scriptureSplitter.ts::buildSlide`) and are reassigned
+ * wholesale by every re-split of the passage — there is no content-stable key
+ * to diff against. Matching on them would silently attach a user's audio/
+ * notes to the wrong text, so this function never diffs by id; it compares
+ * the stored `sourceSignature` and gates on customization instead.
+ */
+export function reconcileScriptureGroup(group: SlideGroup, slot: ScriptureSlot, inputs: AssemblyInputs): ReconcileResult {
+  return reconcileUnstableIdGroup(group, slot, inputs)
+}
+
+/**
+ * Imported-deck slide ids are minted fresh via `crypto.randomUUID()` per
+ * import (`src/components/PptxImportModal.vue`, at import-confirm time) — a
+ * re-import has zero id relationship to the previous deck. This function
+ * never diffs by id either, for the same reason as the scripture reconciler.
+ */
+export function reconcileImportedGroup(group: SlideGroup, slot: ImportedSlot, inputs: AssemblyInputs): ReconcileResult {
+  return reconcileUnstableIdGroup(group, slot, inputs)
+}
+
+/**
+ * Single entry point dispatching on `slot.kind` — the composable in 24-05
+ * calls only this. SONG routes to the additive merge (never confirm-gated);
+ * SCRIPTURE/IMPORTED route to the signature-detected, confirm-gated path; a
+ * `text`-kind slot (PRAYER/MESSAGE/HYMN) has no reconcilable source and
+ * returns the stored slides with both flags false.
+ */
+export function reconcileGroup(group: SlideGroup, slot: ServiceSlot, inputs: AssemblyInputs): ReconcileResult {
+  switch (slot.kind) {
+    case 'SONG': {
+      const { slides, changed } = reconcileSongGroup(group, slot, inputs)
+      return { needsConfirm: false, changed, slides }
+    }
+    case 'SCRIPTURE':
+      return reconcileScriptureGroup(group, slot, inputs)
+    case 'IMPORTED':
+      return reconcileImportedGroup(group, slot, inputs)
+    case 'PRAYER':
+    case 'MESSAGE':
+    case 'HYMN':
+      return { needsConfirm: false, changed: false, slides: group.slides }
+  }
 }
