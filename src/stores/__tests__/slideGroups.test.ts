@@ -282,4 +282,155 @@ describe('useSlideGroups', () => {
       expect('bedAudioUrl' in payload).toBe(false)
     })
   })
+
+  describe('deleteGroup', () => {
+    it('calls deleteDoc against the slot-id path', async () => {
+      const { deleteDoc, doc: docFn } = await import('firebase/firestore')
+      const { useSlideGroups } = await import('../slideGroups')
+      const store = useSlideGroups()
+
+      await store.deleteGroup('org-1', 'slot-1')
+
+      expect(deleteDoc).toHaveBeenCalledOnce()
+      expect(docFn).toHaveBeenCalledWith(
+        expect.anything(),
+        'organizations',
+        'org-1',
+        'slideGroups',
+        'slot-1',
+      )
+    })
+
+    it('resolves even when the document does not exist (deleteDoc no-op)', async () => {
+      const { deleteDoc } = await import('firebase/firestore')
+      vi.mocked(deleteDoc).mockResolvedValueOnce(undefined)
+      const { useSlideGroups } = await import('../slideGroups')
+      const store = useSlideGroups()
+
+      await expect(store.deleteGroup('org-1', 'missing-slot')).resolves.toBeUndefined()
+    })
+  })
+
+  describe('setGroupBedMedia', () => {
+    it('issues an updateDoc touching only the bed field(s) and updatedAt against an existing group', async () => {
+      const { getDoc, updateDoc } = await import('firebase/firestore')
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => true,
+        id: 'slot-1',
+        data: () => makeGroupDoc(),
+      } as ReturnType<typeof getDoc> extends Promise<infer T> ? T : never)
+
+      const { useSlideGroups } = await import('../slideGroups')
+      const store = useSlideGroups()
+
+      await store.setGroupBedMedia('org-1', 'slot-1', {
+        serviceId: 'service-1',
+        bedAudioUrl: 'https://example.com/bed.mp3',
+      })
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const payload = callArgs[1] as unknown as Record<string, unknown>
+      expect(payload.bedAudioUrl).toBe('https://example.com/bed.mp3')
+      expect(payload.updatedAt).toBeDefined()
+      expect('bedVideoUrl' in payload).toBe(false)
+      expect('slides' in payload).toBe(false)
+    })
+
+    it('passes the deleteField() sentinel (not undefined or null) when clearAudio is true', async () => {
+      const { getDoc, updateDoc, deleteField } = await import('firebase/firestore')
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => true,
+        id: 'slot-1',
+        data: () => makeGroupDoc({ bedAudioUrl: 'https://example.com/old.mp3' }),
+      } as ReturnType<typeof getDoc> extends Promise<infer T> ? T : never)
+
+      const { useSlideGroups } = await import('../slideGroups')
+      const store = useSlideGroups()
+
+      await store.setGroupBedMedia('org-1', 'slot-1', {
+        serviceId: 'service-1',
+        clearAudio: true,
+      })
+
+      expect(deleteField).toHaveBeenCalled()
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const payload = callArgs[1] as unknown as Record<string, unknown>
+      expect(payload.bedAudioUrl).toBe('__deleteField__')
+      expect(payload.bedAudioUrl).not.toBeUndefined()
+      expect(payload.bedAudioUrl).not.toBeNull()
+    })
+
+    it('creates a skeleton document with slides: [] when the group does not exist yet', async () => {
+      const { getDoc, setDoc } = await import('firebase/firestore')
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => false,
+        id: 'slot-1',
+        data: () => undefined,
+      } as ReturnType<typeof getDoc> extends Promise<infer T> ? T : never)
+
+      const { useSlideGroups } = await import('../slideGroups')
+      const store = useSlideGroups()
+
+      await expect(
+        store.setGroupBedMedia('org-1', 'slot-1', {
+          serviceId: 'service-1',
+          bedVideoUrl: 'https://example.com/bed.mp4',
+        }),
+      ).resolves.toBeUndefined()
+
+      expect(setDoc).toHaveBeenCalledOnce()
+      const callArgs = vi.mocked(setDoc).mock.calls[0]!
+      const payload = callArgs[1] as Record<string, unknown>
+      expect(payload.slides).toEqual([])
+      expect(payload.bedVideoUrl).toBe('https://example.com/bed.mp4')
+      expect(payload.serviceId).toBe('service-1')
+    })
+  })
+
+  describe('replaceGroupSlides', () => {
+    it('writes slides and sourceSignature together with updatedAt, touching no bed field', async () => {
+      const { updateDoc, doc: docFn } = await import('firebase/firestore')
+      const { useSlideGroups } = await import('../slideGroups')
+      const store = useSlideGroups()
+
+      const slides = [
+        {
+          id: 'gs-1',
+          order: 0,
+          sourceRef: { kind: 'lyric' as const, songId: 'song-1', sectionId: 'verse-1' },
+        },
+      ]
+
+      await store.replaceGroupSlides('org-1', 'slot-1', slides, 'sig-abc')
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      expect(docFn).toHaveBeenCalledWith(
+        expect.anything(),
+        'organizations',
+        'org-1',
+        'slideGroups',
+        'slot-1',
+      )
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const payload = callArgs[1] as unknown as Record<string, unknown>
+      expect(payload.slides).toEqual(slides)
+      expect(payload.sourceSignature).toBe('sig-abc')
+      expect(payload.updatedAt).toBeDefined()
+      expect('bedAudioUrl' in payload).toBe(false)
+      expect('bedVideoUrl' in payload).toBe(false)
+    })
+
+    it('omits sourceSignature key entirely when not provided', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useSlideGroups } = await import('../slideGroups')
+      const store = useSlideGroups()
+
+      await store.replaceGroupSlides('org-1', 'slot-1', [])
+
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const payload = callArgs[1] as unknown as Record<string, unknown>
+      expect('sourceSignature' in payload).toBe(false)
+    })
+  })
 })
