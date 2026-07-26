@@ -5,14 +5,14 @@ milestone_name: Slides Tab Rework
 current_phase: 25
 current_phase_name: Slides Tab Shell — Plan Rail and Slide Grid
 status: executing
-stopped_at: Completed 25-05-PLAN.md
-last_updated: "2026-07-26T23:02:03.486Z"
+stopped_at: Completed 25-06-PLAN.md
+last_updated: "2026-07-26T23:29:57.305Z"
 last_activity: 2026-07-26
 progress:
   total_phases: 17
   completed_phases: 12
   total_plans: 81
-  completed_plans: 79
+  completed_plans: 80
   percent: 71
 last_activity_desc: Opened v1.3 Slides Tab Rework (Phases 24-28) from the Claude Design import; v1.2 left code-complete with its verification ledger intact
 ---
@@ -36,7 +36,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 25 (Slides Tab Shell — Plan Rail and Slide Grid) — EXECUTING
-Plan: 6 of 7
+Plan: 7 of 7
 Milestone: v1.3 Slides Tab Rework (Phases 24-28) — IN PROGRESS
 Status: Ready to execute
 
@@ -313,6 +313,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 25 P02 | ~45min | 3 tasks | 16 files |
 | Phase 25 P04 | ~2h | 3 tasks | 8 files |
 | Phase 25 P05 | ~2h | 3 tasks | 11 files |
+| Phase 25 P06 | ~50min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -431,6 +432,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: ensureGroupMaterialized returns the entries it wrote rather than expecting the caller to re-read groupsBySlotId, since the store write lags a Firestore snapshot round trip
 - [Phase ?]: SlideGrid add-slide handler always calls ensureGroupMaterialized first (even when a stored group already exists) to avoid appending to a stale entries list
 - [Phase ?]: SlideGrid imports useSlideGroups() directly for its two write actions while never importing useSlideshowAssembly itself
+- [Phase ?]: [Phase 25-06]: SlideGroupMusicControl emits two distinct events (attach/remove) rather than a v-model-style update:audioUrl
+- [Phase ?]: [Phase 25-06]: No on-demand materialization added to the group-music write path -- setGroupBedMedia's existing merging skeleton-create (Phase 24 WR-01) already covers a plan item with no group document yet
+- [Phase ?]: [Phase 25-06]: Preview control is a chromeless AudioPlayer plus a custom icon-only button carrying the UI-SPEC's aria-label -- native audio controls cannot carry a custom accessible name
 
 ### Roadmap Evolution
 
@@ -490,6 +494,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-26
-Last session: 2026-07-26T23:02:03.433Z
-Stopped at: Completed 25-05-PLAN.md
+Last session: 2026-07-26T23:29:57.270Z
+Stopped at: Completed 25-06-PLAN.md
 Resume file: None
