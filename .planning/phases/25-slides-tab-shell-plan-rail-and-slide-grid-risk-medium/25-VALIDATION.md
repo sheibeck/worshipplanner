@@ -62,7 +62,11 @@ The failing **test count** flaps run-to-run (30 → 51 observed) purely from the
 
 | Req | Behavior | Test Type | Automated Command | File Exists |
 |-----|----------|-----------|-------------------|-------------|
-| D-17 | `VideoSlide` exists in the `Slide` union; assembler emits it; `PresentationViewer` renders a video SLIDE distinctly from bed video **without regressing Phase 23** | unit | `npx vitest run src/utils/__tests__/slideshowAssembler.test.ts src/components/__tests__/PresentationViewer.test.ts` | ✅ extend |
+| D-17 | `VideoSlide` exists in the `Slide` union; assembler emits it; `PresentationViewer` and `SlideshowPreview` each render a video slide | unit | `npx vitest run src/utils/__tests__/slideshowAssembler.test.ts src/components/__tests__/PresentationViewer.test.ts src/components/__tests__/SlideshowPreview.test.ts` | ✅ extend |
+| D-18 | **Bed video does not exist.** `git grep -n "bedVideoUrl\|videoFromBed" src/` returns nothing. A slot carrying legacy `videoUrl` yields no bed field and no emitted slide (dropped, not migrated) | unit + grep | `npx vitest run src/utils/ src/stores/` | ✅ extend |
+| D-18 | Bed **audio** is unaffected: precedence, `audioFromBed`, and cross-group continuity all still pass with assertions **unmodified** | unit | `npx vitest run src/components/__tests__/PresentationViewer.test.ts -t "bed"` | ✅ extend |
+| D-19 | Dead legacy-media fallbacks removed: `git grep -n "displaySlotAudioUrl\|displaySlotVideoUrl" src/` returns nothing | unit + grep | `npx vitest run src/views/__tests__/ServiceEditorView.test.ts` | ✅ extend |
+| D-19 | **Boundary guard:** the lazy `ServiceSlot.id` backfill still runs on load — services are real production data and this is the one legacy path that stays | unit | `npx vitest run src/views/__tests__/ServiceEditorView.test.ts -t "backfill"` | ✅ extend |
 | R031 | Rail renders groups in plan order; auto-selects first (D-05); zero-slide groups show count `0` (D-08); empty service shows the D-07 empty state | unit | `npx vitest run src/components/slides/__tests__/PlanRail.test.ts` | ❌ Wave 0 |
 | R031 | Grid renders the selected group's cards; card click sets `selectedSlideId` (D-12); drag-reorder writes via `replaceGroupSlides` (D-11) | unit | `npx vitest run src/components/slides/__tests__/SlideGrid.test.ts` | ❌ Wave 0 |
 | R032 | PPTX import appends `GroupSlideEntry` items to the **selected group**, NOT a new plan item | unit | `npx vitest run src/components/slides/__tests__/SlideGrid.test.ts -t "import"` | ❌ Wave 0 |
@@ -99,7 +103,7 @@ The failing **test count** flaps run-to-run (30 → 51 observed) purely from the
 | Behavior | Requirement | Why Manual | Test Instructions |
 |----------|-------------|------------|-------------------|
 | Real drag-and-drop of a file from the OS onto the grid | R032 | jsdom cannot produce a genuine OS `DataTransfer` with real `File` payloads; unit tests can only synthesize the event | Drag `docs/example.pptx` and `docs/example.mp3` (both present in the working tree) onto the slide grid; confirm PPTX appends slides and MP3 sets the group bed |
-| Video slide playback on a real projector | D-17 | Requires real display hardware and codec support | Append a video slide, enter Present mode, confirm it plays and does not regress Phase 23's bed-video behavior |
+| Video slide playback on a real projector | D-17 | Requires real display hardware and codec support | Append a video slide, enter Present mode, confirm it plays as the slide. Also confirm a group with an audio bed still plays that audio continuously across its slides (bed audio is kept; bed video is removed per D-18). |
 | Visual density / spacing against the design contract | R018 | Pixel judgment | Compare against `docs/design/slides-tab.dc.html` Turn 1 State 1 |
 
 ---
