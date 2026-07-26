@@ -217,7 +217,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 25-05-PLAN.md — On-demand group materialization, add slide (D-16), drag-reorder (D-11)
+- [x] 25-05-PLAN.md — On-demand group materialization, add slide (D-16), drag-reorder (D-11)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
