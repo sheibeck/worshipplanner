@@ -5,6 +5,9 @@ import {
   buildInitialGroup,
   hasCustomization,
   reconcileSongGroup,
+  reconcileScriptureGroup,
+  reconcileImportedGroup,
+  reconcileGroup,
 } from '@/utils/slideGroupMaterializer'
 import type { AssemblyInputs } from '@/utils/slideshowAssembler'
 import type { SongSlot, ScriptureSlot, NonAssignableSlot, HymnSlot, ImportedSlot } from '@/types/service'
@@ -508,5 +511,180 @@ describe('reconcileSongGroup', () => {
     const result = reconcileSongGroup(group, slot, inputs)
 
     expect(result.slides.map((e) => e.order)).toEqual(result.slides.map((_, i) => i))
+  })
+})
+
+describe('reconcileScriptureGroup', () => {
+  function makeInSyncScriptureGroup(slot: ScriptureSlot, inputs: AssemblyInputs): SlideGroup {
+    return makeGroup({
+      sourceSignature: sourceSignature(slot, inputs),
+      slides: deriveGroupEntries(slot, inputs),
+    })
+  }
+
+  it('an unchanged signature returns needsConfirm false, changed false, stored entries untouched', () => {
+    const slot = scriptureSlot({ scriptureReadingId: 'reading-1' })
+    const reading = makeScriptureReading()
+    const inputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', reading]]) })
+    const group = makeInSyncScriptureGroup(slot, inputs)
+
+    const result = reconcileScriptureGroup(group, slot, inputs)
+
+    expect(result.needsConfirm).toBe(false)
+    expect(result.changed).toBe(false)
+    expect(result.slides).toEqual(group.slides)
+  })
+
+  it('a diverged signature on an uncustomized group returns fresh entries with needsConfirm false, changed true', () => {
+    const slot = scriptureSlot({ scriptureReadingId: 'reading-1' })
+    const reading = makeScriptureReading()
+    const inputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', reading]]) })
+    const group = makeInSyncScriptureGroup(slot, inputs)
+
+    const widenedReading = makeScriptureReading({
+      slides: [
+        makeScriptureSlide({ id: 'ss-1', position: 0, verseRange: '16', text: 'For God so loved the world' }),
+        makeScriptureSlide({ id: 'ss-2', position: 1, verseRange: '17', text: 'that he gave his only Son' }),
+        makeScriptureSlide({ id: 'ss-3', position: 2, verseRange: '18', text: 'that whoever believes in him' }),
+      ],
+    })
+    const widenedInputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', widenedReading]]) })
+
+    const result = reconcileScriptureGroup(group, slot, widenedInputs)
+
+    expect(result.needsConfirm).toBe(false)
+    expect(result.changed).toBe(true)
+    expect(result.slides).toHaveLength(3)
+  })
+
+  it('a diverged signature on a customized group returns needsConfirm true, stored entries unchanged, plus a proposed list and loss summary', () => {
+    const slot = scriptureSlot({ scriptureReadingId: 'reading-1' })
+    const reading = makeScriptureReading()
+    const inputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', reading]]) })
+    const group = makeInSyncScriptureGroup(slot, inputs)
+    group.slides[0]!.audioUrl = 'https://example.com/slide-audio.mp3'
+
+    const widenedReading = makeScriptureReading({
+      slides: [
+        makeScriptureSlide({ id: 'ss-1', position: 0, verseRange: '16', text: 'For God so loved the world' }),
+        makeScriptureSlide({ id: 'ss-2', position: 1, verseRange: '17', text: 'that he gave his only Son' }),
+        makeScriptureSlide({ id: 'ss-3', position: 2, verseRange: '18', text: 'that whoever believes in him' }),
+      ],
+    })
+    const widenedInputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', widenedReading]]) })
+
+    const result = reconcileScriptureGroup(group, slot, widenedInputs)
+
+    expect(result.needsConfirm).toBe(true)
+    expect(result.changed).toBe(false)
+    expect(result.slides).toEqual(group.slides)
+    expect(result.proposed).toHaveLength(3)
+    expect(result.loss?.customizedEntries).toBe(1)
+    expect(result.loss?.withAudio).toBe(1)
+  })
+
+  it('detects divergence when slide count is unchanged but text changed', () => {
+    const slot = scriptureSlot({ scriptureReadingId: 'reading-1' })
+    const reading = makeScriptureReading()
+    const inputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', reading]]) })
+    const group = makeInSyncScriptureGroup(slot, inputs)
+
+    const editedReading = makeScriptureReading({
+      slides: [
+        makeScriptureSlide({ id: 'ss-1', position: 0, verseRange: '16', text: 'A completely different verse text' }),
+        makeScriptureSlide({ id: 'ss-2', position: 1, verseRange: '17', text: 'that he gave his only Son' }),
+      ],
+    })
+    const editedInputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', editedReading]]) })
+
+    const result = reconcileScriptureGroup(group, slot, editedInputs)
+
+    expect(result.changed).toBe(true)
+  })
+})
+
+describe('reconcileImportedGroup', () => {
+  it('behaves identically to the scripture reconciler, differing only in source kind', () => {
+    const slot = importedSlot({ importId: 'deck-1' })
+    const deck = makeImportedDeck()
+    const inputs = makeInputs({ importedDecksById: new Map([['deck-1', deck]]) })
+    const group = makeGroup({ sourceSignature: sourceSignature(slot, inputs), slides: deriveGroupEntries(slot, inputs) })
+
+    const inSync = reconcileImportedGroup(group, slot, inputs)
+    expect(inSync.needsConfirm).toBe(false)
+    expect(inSync.changed).toBe(false)
+
+    const widenedDeck = makeImportedDeck({
+      slides: [
+        { id: 'is-1', position: 0, contentKind: 'text', title: 'Welcome', body: 'Welcome to church' } as TextSlide,
+        { id: 'is-2', position: 1, contentKind: 'image', imageUrl: 'https://example.com/a.png', altText: 'slide 2' } as ImageSlide,
+        { id: 'is-3', position: 2, contentKind: 'text', title: 'Announcement', body: 'New announcement' } as TextSlide,
+      ],
+    })
+    const widenedInputs = makeInputs({ importedDecksById: new Map([['deck-1', widenedDeck]]) })
+
+    const uncustomized = reconcileImportedGroup(group, slot, widenedInputs)
+    expect(uncustomized.needsConfirm).toBe(false)
+    expect(uncustomized.changed).toBe(true)
+    expect(uncustomized.slides).toHaveLength(3)
+
+    const customizedGroup: SlideGroup = {
+      ...group,
+      slides: group.slides.map((e, i) => (i === 0 ? { ...e, label: 'Custom' } : e)),
+    }
+    const customized = reconcileImportedGroup(customizedGroup, slot, widenedInputs)
+    expect(customized.needsConfirm).toBe(true)
+    expect(customized.proposed).toHaveLength(3)
+  })
+})
+
+describe('reconcileGroup dispatcher', () => {
+  it('dispatches SONG to the additive path (never confirm-gated)', () => {
+    const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
+    const lyrics = makeSongLyrics()
+    const inputs = makeInputs({
+      songLyricsById: new Map([['song-1', lyrics]]),
+      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus']]]),
+    })
+    const group = makeGroup({ id: 'slot-1', slotId: 'slot-1', slides: deriveGroupEntries(slot, inputs) })
+
+    const result = reconcileGroup(group, slot, inputs)
+
+    expect(result.needsConfirm).toBe(false)
+  })
+
+  it('dispatches SCRIPTURE and IMPORTED to the confirm-gated path', () => {
+    const scripture = scriptureSlot({ scriptureReadingId: 'reading-1' })
+    const reading = makeScriptureReading()
+    const scriptureInputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', reading]]) })
+    const scriptureGroup = makeGroup({
+      sourceSignature: sourceSignature(scripture, scriptureInputs),
+      slides: deriveGroupEntries(scripture, scriptureInputs),
+    })
+    const scriptureResult = reconcileGroup(scriptureGroup, scripture, scriptureInputs)
+    expect(scriptureResult.needsConfirm).toBe(false)
+    expect(scriptureResult.changed).toBe(false)
+
+    const deck = makeImportedDeck()
+    const imported = importedSlot({ importId: 'deck-1' })
+    const importedInputs = makeInputs({ importedDecksById: new Map([['deck-1', deck]]) })
+    const importedGroup = makeGroup({
+      sourceSignature: sourceSignature(imported, importedInputs),
+      slides: deriveGroupEntries(imported, importedInputs),
+    })
+    const importedResult = reconcileGroup(importedGroup, imported, importedInputs)
+    expect(importedResult.needsConfirm).toBe(false)
+    expect(importedResult.changed).toBe(false)
+  })
+
+  it('a text-kind slot returns the stored slides with both flags false', () => {
+    const slot: NonAssignableSlot = { kind: 'PRAYER', id: 'slot-prayer-0', position: 0 }
+    const group = makeGroup({ slides: [{ id: 'e1', order: 0, sourceRef: { kind: 'text' } }] })
+
+    const result = reconcileGroup(group, slot, makeInputs())
+
+    expect(result.needsConfirm).toBe(false)
+    expect(result.changed).toBe(false)
+    expect(result.slides).toEqual(group.slides)
   })
 })
