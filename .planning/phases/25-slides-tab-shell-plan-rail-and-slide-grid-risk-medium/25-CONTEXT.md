@@ -124,6 +124,86 @@ selected group" — it does not require any of the three cut items.
 
   **Planning guidance:** give the type/model work its own plan and wave, landing BEFORE the drop
   target that depends on it. Do not bury it inside a UI plan.
+
+- **D-18 — There is NO bed video. Video is slide-only; only audio can be a group bed.**
+  *(user, 2026-07-26, mid-execution of Phase 25 Wave 1 — supersedes part of Phase 24 D-05 and
+  narrows D-17)*
+
+  > "We won't ever have a bed video where a video plays over a whole group of slides. We can do that
+  > for audio, but a video slide will only ever be a slide and will never play over a group of
+  > slides." — user
+
+  **This removes a capability Phase 24 built.** `SlideGroup.bedVideoUrl` and the whole
+  `videoFromBed` render path are deleted, not deprecated. The group bed becomes **audio-only**.
+
+  **Legacy data:** a Phase 22 slot-level `videoUrl` is **dropped, not migrated** (user: *"This is
+  greenfield work and isn't even in production yet"*). Phase 24 D-05's
+  `...(slot.videoUrl ? { bedVideoUrl: slot.videoUrl } : {})` line is removed outright. The
+  deprecated `MediaAttachableSlot.videoUrl` field stays readable for type compatibility but nothing
+  migrates or renders it. This is the one place where a deliberate data drop is authorized, and it
+  is authorized only because nothing is deployed.
+
+  **Surfaces to strip (verified 2026-07-26, 10 source + 5 test files):**
+  - `src/types/slideGroup.ts` — remove `bedVideoUrl`
+  - `src/types/slide.ts` — remove `SlideBase.videoUrl` (the bed carrier) and `videoFromBed`
+  - `src/utils/slideshowAssembler.ts` — remove `videoFromBed` computation and the bed-video branch of `resolveEntryMedia`
+  - `src/utils/slideGroupMaterializer.ts` — remove the D-05 slot-video migration line; `hasCustomization` no longer considers bed video
+  - `src/stores/slideGroups.ts` — `setGroupBedMedia` becomes audio-only (drop `bedVideoUrl` / `clearVideo`)
+  - `src/components/PresentationViewer.vue` — remove the `videoFromBed` bed-video block
+  - `src/views/ServiceEditorView.vue` — remove `displaySlotVideoUrl`, the `'attached video'` delete-warning line, and the `bedVideoUrl` write path
+  - tests: `PresentationViewer.test.ts` (`bedVideoSlide` helpers), `slideGroups.test.ts`,
+    `slideGroupMaterializer.test.ts`, `slideshowAssembler.test.ts`, `ServiceEditorView.test.ts`
+
+  **Consequence for D-17:** `VideoSlide.videoSrc` keeps its distinct field name (it is unambiguous
+  and already shipped in 25-01), but the doc-comment rationale about colliding with a bed carrier is
+  now obsolete — rewrite it rather than leaving a comment that describes a model that no longer
+  exists.
+
+  **Consequence for Phase 23:** `PresentationViewer`'s bed-video path was code-complete with human
+  verification still outstanding. That path is now being *removed*, so there is nothing left to
+  regress — the earlier "do not regress bed video" acceptance criterion is void and must be replaced
+  with "bed video no longer renders anywhere."
+
+  **Sequencing:** removal and video-slide rendering MUST land in the SAME plan. Splitting them would
+  leave an intermediate commit in which both media models are live — exactly the dual-model state
+  Phase 24 was designed to end.
+
+- **D-19 — No legacy compatibility for ANY slide-related work. Delete it, don't deprecate it.**
+  *(user, 2026-07-26, mid-execution of Phase 25 — generalizes D-18)*
+
+  > "There is no need to keep legacy behavior for any work related to adding slides. That work has
+  > never been used or seen by anyone yet. So, we don't need to migrate anything or keep any old
+  > data." — user
+
+  ### The boundary (read this before deleting anything)
+
+  **GREENFIELD — drop all legacy handling, migrations, fallbacks and deprecated fields:**
+  everything introduced from **Phase 18 onward** — slide groups, slide/group media, the slideshow
+  assembler, PPTX import, scripture slides, presentation/preview surfaces. None of it has ever been
+  deployed or seen by a user.
+
+  **PRODUCTION — legacy handling MUST be preserved:** `Service` and `ServiceSlot` themselves. The
+  service planner shipped in **v1.0 (2026-03-05)** and was human-verified against a real Planning
+  Center account, so real slot documents exist in the wild. In particular **Phase 24 D-01's
+  lazy `ServiceSlot.id` backfill-on-read STAYS** — removing it would break every existing service.
+
+  ### Authorized deletions under D-19
+
+  - Phase 24 **D-05's lazy media migration** (slot `audioUrl`/`videoUrl` → group bed) — delete the
+    whole path, not just the video half.
+  - The Phase 24 code-review **WR-02 fallback** helpers `displaySlotAudioUrl` / `displaySlotVideoUrl`
+    in `ServiceEditorView.vue`, which exist solely to read the deprecated slot-level fields. WR-02
+    was a correct fix *given* a legacy model; with no legacy data the fallback is dead code.
+  - The deprecated **`MediaAttachableSlot.audioUrl` / `videoUrl`** fields themselves, once nothing
+    reads them.
+  - Any "tolerate half-migrated documents" branch in the materializer or store.
+
+  ### Rule going forward (Phases 26-28)
+
+  Do not write migration paths, deprecation shims, or read-time fallbacks for slide-area data.
+  Change the model directly and update the tests. If a change would need a migration to protect real
+  users, that is a signal it has crossed into `Service`/`ServiceSlot` territory — stop and check the
+  boundary above rather than assuming greenfield.
 - **D-15 — Reuse `PptxImportModal.vue`** from Phase 21 for the PPTX path rather than creating a
   second import implementation.
 - **D-16 — Imports append at the END of the selected group** — R032's exact words ("imports and
