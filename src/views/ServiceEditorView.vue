@@ -912,15 +912,16 @@
               <!-- Per-slot media attach/preview/remove (Phase 22, R013/R014 — retargeted
                    at the group bed in Phase 24-06, R030): editor only, hidden when exported,
                    matching sibling slot controls. Collapsed/compact so it doesn't crowd the
-                   slot row; the displayed urls read the anchored group's bed (groupsBySlotId)
+                   slot row; the displayed urls read the anchored group's bed first, falling
+                   back to the slot's own deprecated field when no group exists yet (WR-02)
                    and the write goes straight to slideGroups via setGroupBedMedia
                    (onSlotBedAudioChange/onSlotBedVideoChange below) — a deliberately separate,
                    scoped write path, NOT the localService deep-watch autosave. -->
               <SlotMediaAttachment
                 v-if="authStore.isEditor && !isExportedLocked"
                 :orgId="authStore.orgId!"
-                :audioUrl="groupsBySlotId.get(slot.id)?.bedAudioUrl"
-                :videoUrl="groupsBySlotId.get(slot.id)?.bedVideoUrl"
+                :audioUrl="displaySlotAudioUrl(slot)"
+                :videoUrl="displaySlotVideoUrl(slot)"
                 @update:audioUrl="(url) => onSlotBedAudioChange(index, url)"
                 @update:videoUrl="(url) => onSlotBedVideoChange(index, url)"
               />
@@ -1396,6 +1397,26 @@ function onSectionChange(index: number, value: string) {
   const slot = localService.value.slots[index]
   if (!slot) return
   slot.section = value === '' ? undefined : (value as ServiceSection)
+}
+
+/**
+ * WR-02: the media control's bound value reads ONLY the materialized group's
+ * bed field, never the slot's own deprecated `audioUrl`/`videoUrl`
+ * (`MediaAttachableSlot`). For any slot whose group hasn't materialized yet
+ * — every slot viewed by a non-editor (`canWrite` gates materialization to
+ * `[]` for viewers), and any SONG/SCRIPTURE/IMPORTED slot whose source isn't
+ * assigned yet — the control would render as if no media is attached even
+ * though the legacy field on the slot document still carries a real URL.
+ * Falls back to the slot's own legacy field when no group exists yet,
+ * mirroring the read-precedence already used elsewhere in this phase (group
+ * value first, slot legacy value second).
+ */
+function displaySlotAudioUrl(slot: ServiceSlot): string | undefined {
+  return groupsBySlotId.value.get(slot.id)?.bedAudioUrl ?? slot.audioUrl
+}
+
+function displaySlotVideoUrl(slot: ServiceSlot): string | undefined {
+  return groupsBySlotId.value.get(slot.id)?.bedVideoUrl ?? slot.videoUrl
 }
 
 /** Editor-only per-slot media attach/remove (Phase 22, R013/R014 — retargeted
