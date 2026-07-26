@@ -39,8 +39,6 @@ export interface SlideGroup {
   slotId: string
   /** Group-level audio bed (migrated from Phase 22's `MediaAttachableSlot.audioUrl`, D-05). */
   bedAudioUrl?: string
-  /** Group-level video bed — video has no per-slide layer (Pattern 4). */
-  bedVideoUrl?: string
   /** Opaque signature of the source content this group was last materialized/reconciled against. */
   sourceSignature?: string
   slides: GroupSlideEntry[]
@@ -78,8 +76,8 @@ export interface GroupSlideEntry {
  * The `video` member (D-17) is unlike every other member here: it references
  * no canonical record. A dropped video has no document behind it — the
  * storage URL itself IS the reference, carried on `videoSrc` (same field name
- * as `VideoSlide`'s own-source field, deliberately distinct from the
- * `SlideBase.videoUrl` bed carrier — see `src/types/slide.ts`).
+ * as `VideoSlide`'s own-source field). Video is slide-only (D-18) — there is
+ * no group bed video, so there is nothing for this field to collide with.
  *
  * The `text` member is widened with optional authored `title`/`body` (D-17
  * ripple) so a user-added blank slide (`＋ Add slide` on a SONG/SCRIPTURE/

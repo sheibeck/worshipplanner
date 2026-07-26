@@ -15,8 +15,10 @@
  *    that group's stored structure against LIVE canonical content resolved
  *    through each entry's `sourceRef` (D-02) — editing a song's lyrics
  *    changes the assembled text with no group write. Slide ids equal the
- *    stored `GroupSlideEntry.id`, never recomputed (Phase 23 WR-02). Audio/
- *    video resolve via D-04's two-level precedence (`resolveEntryMedia`).
+ *    stored `GroupSlideEntry.id`, never recomputed (Phase 23 WR-02). Audio
+ *    resolves via D-04's two-level precedence (`resolveEntryMedia`); video
+ *    has no bed layer (D-18) and resolves only from a video slide's own
+ *    `sourceRef` in `resolveEntryContent`.
  * 2. A slot with NO materialized group yet falls back to deriving the
  *    slideshow directly from the slot's own source (today's pre-Phase-24
  *    behaviour), so the app stays coherent before 24-05/24-06 wire up
@@ -189,13 +191,11 @@ function resolveEntryContent(
   }
 }
 
-/** D-04 two-level audio precedence + bed-only video resolution for one group entry. */
+/** D-04 two-level audio precedence for one group entry. Video has no bed layer (D-18) — a video slide's own source resolves through `resolveEntryContent`, not here. */
 interface ResolvedGroupMedia {
   audioUrl?: string
-  videoUrl?: string
   audioLoop?: boolean
   audioFromBed: boolean
-  videoFromBed: boolean
 }
 
 function resolveEntryMedia(group: SlideGroup, entry: GroupSlideEntry): ResolvedGroupMedia {
@@ -203,19 +203,9 @@ function resolveEntryMedia(group: SlideGroup, entry: GroupSlideEntry): ResolvedG
   // group's bed. `audioFromBed` is true only in the fallback case.
   const audioFromBed = !entry.audioUrl && !!group.bedAudioUrl
   const resolvedAudioUrl = entry.audioUrl ?? group.bedAudioUrl
-  // The BED layer (this function) is still the only per-slide MEDIA-CARRIER
-  // layer for video — a group bed video plays across every slide in the
-  // group, resolved here exactly as before. A video SLIDE (D-17,
-  // `VideoSlide`/`SourceRef` kind `video`) is a separate concept: its own
-  // source lives on the slide's `videoSrc` field, resolved by
-  // `resolveEntryContent`, not through this bed carrier. The two coexist
-  // without collision because they use different field names — see
-  // `VideoSlide`'s doc comment in `src/types/slide.ts`.
-  const videoFromBed = !!group.bedVideoUrl
 
-  const media: ResolvedGroupMedia = { audioFromBed, videoFromBed }
+  const media: ResolvedGroupMedia = { audioFromBed }
   if (resolvedAudioUrl) media.audioUrl = resolvedAudioUrl
-  if (group.bedVideoUrl) media.videoUrl = group.bedVideoUrl
   // A group bed never loops (D-04) — audioLoop is copied ONLY when the audio
   // came from the entry itself, never when it resolved from the bed.
   if (!audioFromBed && entry.audioUrl && entry.audioLoop) media.audioLoop = true
@@ -256,7 +246,8 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
     if (!slotsWithMediaAttached.has(slotIndex)) {
       slotsWithMediaAttached.add(slotIndex)
       if (slot.audioUrl) slide.audioUrl = slot.audioUrl
-      if (slot.videoUrl) slide.videoUrl = slot.videoUrl
+      // A legacy slot-level videoUrl is dropped, not migrated (D-18/D-19) —
+      // there is no bed-video carrier left on SlideBase to assign it to.
     }
     assembled.push({
       slide,
@@ -283,7 +274,6 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
       id: entry.id,
       position: globalPosition,
       ...(media.audioUrl ? { audioUrl: media.audioUrl } : {}),
-      ...(media.videoUrl ? { videoUrl: media.videoUrl } : {}),
       ...(media.audioLoop ? { audioLoop: true } : {}),
     } as Slide
     assembled.push({
@@ -295,7 +285,6 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
       groupId: group.id,
       groupSlideId: entry.id,
       audioFromBed: media.audioFromBed,
-      videoFromBed: media.videoFromBed,
     })
     globalPosition += 1
   }

@@ -86,10 +86,10 @@ export const useSlideGroups = defineStore('slideGroups', () => {
    * RESEARCH.md's "Don't Hand-Roll" section rules those out as unnecessary
    * complexity for a race whose worst case is an overwrite.
    *
-   * The caller supplies the already-migrated D-05 bed (bedAudioUrl/bedVideoUrl,
-   * read from the slot's deprecated Phase 22 audioUrl/videoUrl) inside `input` —
-   * it lands in this SAME `setDoc` as the slides, so a group can never exist in
-   * a half-migrated state.
+   * The caller supplies the already-migrated D-05 bed (bedAudioUrl, read from
+   * the slot's deprecated Phase 22 audioUrl) inside `input` — it lands in this
+   * SAME `setDoc` as the slides, so a group can never exist in a half-migrated
+   * state. The bed is audio-only (D-18) — there is no video bed field to migrate.
    */
   async function materializeGroupIfMissing(
     orgId: string,
@@ -119,18 +119,17 @@ export const useSlideGroups = defineStore('slideGroups', () => {
   interface BedMediaPatch {
     serviceId: string
     bedAudioUrl?: string
-    bedVideoUrl?: string
     clearAudio?: boolean
-    clearVideo?: boolean
   }
 
   /**
    * Scoped bed-media write (mirrors services.ts::setRoleOverride's scoped
-   * dot-path precedent) — touches only the bed field(s) being changed plus
-   * `updatedAt`, never the whole document. Explicit `clearAudio`/`clearVideo`
-   * flags are used (rather than "an undefined url means clear") because
-   * `stripUndefined()` would otherwise erase that intent before it reached
-   * Firestore — `deleteField()` is the only way to actually remove a field.
+   * dot-path precedent) — touches only the bed field being changed plus
+   * `updatedAt`, never the whole document. The bed is audio-only (D-18) — no
+   * bed video path exists. An explicit `clearAudio` flag is used (rather than
+   * "an undefined url means clear") because `stripUndefined()` would
+   * otherwise erase that intent before it reached Firestore —
+   * `deleteField()` is the only way to actually remove a field.
    *
    * If the group has not materialized yet, creates a skeleton document
    * (`slotId`, `serviceId`, `slides: []`, the supplied bed field, both server
@@ -160,8 +159,6 @@ export const useSlideGroups = defineStore('slideGroups', () => {
       const update: Record<string, unknown> = { updatedAt: serverTimestamp() }
       if (patch.clearAudio) update.bedAudioUrl = deleteField()
       else if (patch.bedAudioUrl !== undefined) update.bedAudioUrl = patch.bedAudioUrl
-      if (patch.clearVideo) update.bedVideoUrl = deleteField()
-      else if (patch.bedVideoUrl !== undefined) update.bedVideoUrl = patch.bedVideoUrl
       await updateDoc(ref, update)
       return
     }
@@ -175,7 +172,6 @@ export const useSlideGroups = defineStore('slideGroups', () => {
           serviceId: patch.serviceId,
           slides: [],
           bedAudioUrl: patch.bedAudioUrl,
-          bedVideoUrl: patch.bedVideoUrl,
         }),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),

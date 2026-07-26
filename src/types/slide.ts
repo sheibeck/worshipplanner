@@ -14,18 +14,17 @@ export interface SlideBase {
   position: number
   contentKind: SlideContentKind
   /**
-   * Render carriers for attached media (Phase 22 R013/R014, refactored Phase 24
+   * Render carrier for attached audio (Phase 22 R013/R014, refactored Phase 24
    * D-04). For a slide resolved from a stored `SlideGroup` entry, `audioUrl`
    * is filled by two-level precedence — the entry's OWN audio first, falling
-   * back to the group's `bedAudioUrl` — and `videoUrl` always comes from the
-   * group's `bedVideoUrl` (video has no per-slide layer). For a slot with no
-   * materialized group yet, the deprecated slot-level `audioUrl`/`videoUrl`
-   * fields still land on only the first emitted slide (the pre-Phase-24
-   * behaviour), preserved for data that has not migrated. Never persisted
-   * standalone on the (ephemeral, regenerated) assembled slide.
+   * back to the group's `bedAudioUrl`. The bed is audio-only (D-18) — video is
+   * slide-only and never has a bed carrier. For a slot with no materialized
+   * group yet, the deprecated slot-level `audioUrl` field still lands on only
+   * the first emitted slide (the pre-Phase-24 behaviour), preserved for data
+   * that has not migrated. Never persisted standalone on the (ephemeral,
+   * regenerated) assembled slide.
    */
   audioUrl?: string
-  videoUrl?: string
   /**
    * Per-slide audio loop flag (D-04, R030). Copied ONLY from a
    * `GroupSlideEntry.audioLoop` when this slide's audio resolved from that
@@ -93,13 +92,9 @@ export interface ImageSlide extends SlideBase {
 
 /**
  * A video slide — a single dropped video, appended to a `SlideGroup` as its
- * own entry (D-17, R032). Its own source lives on `videoSrc`, deliberately
- * NOT `videoUrl` — `SlideBase.videoUrl` is the group-BED carrier that
- * `resolveEntryMedia` fills from `group.bedVideoUrl`, and `emitFromGroup`
- * conditionally spreads that carrier over the resolved content. If a video
- * slide's own source used the same key, a group that ALSO has a bed video
- * would silently overwrite the slide's own footage with the bed's. Do not
- * "tidy" these two field names together.
+ * own entry (D-17, R032). Its own source lives on `videoSrc`. Video is
+ * slide-only (D-18) — there is no group bed video, so `videoSrc` names this
+ * slide's own footage with nothing to collide with.
  *
  * `ImportedDeck.slides` is deliberately NOT widened to include this type —
  * PPTX decks contain no video (D-17).
@@ -149,8 +144,6 @@ export interface AssembledSlide {
    * transitions within that group (R030).
    */
   audioFromBed?: boolean
-  /** True when `slide.videoUrl` was resolved from the group's `bedVideoUrl`. */
-  videoFromBed?: boolean
 }
 
 /**

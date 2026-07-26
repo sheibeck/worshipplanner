@@ -156,11 +156,13 @@ export function sourceSignature(slot: ServiceSlot, inputs: AssemblyInputs): stri
 /**
  * Builds the input a group is first materialized from. Sets `id`/`slotId` to
  * `slot.id` (D-01's anchor), derives `slides`, computes `sourceSignature`,
- * and performs the D-05 migration: copies the slot's deprecated `audioUrl`/
- * `videoUrl` onto `bedAudioUrl`/`bedVideoUrl`, omitting each key entirely
- * (conditional spread, matching `createSlot()`'s discipline) when the slot
- * field is absent. It READS those deprecated slot fields; it never clears or
- * rewrites them, so a half-migrated organization can never lose media.
+ * and performs the D-05 migration's audio half: copies the slot's deprecated
+ * `audioUrl` onto `bedAudioUrl`, omitting the key entirely (conditional
+ * spread, matching `createSlot()`'s discipline) when the slot field is
+ * absent. It READS that deprecated slot field; it never clears or rewrites
+ * it, so a half-migrated organization can never lose audio. The video half of
+ * D-05 is gone: a legacy slot `videoUrl` is dropped, not migrated (D-18/D-19)
+ * — there is no video bed field left to migrate it onto.
  */
 export function buildInitialGroup(slot: ServiceSlot, serviceId: string, inputs: AssemblyInputs): SlideGroupInput {
   const signature = sourceSignature(slot, inputs)
@@ -171,7 +173,6 @@ export function buildInitialGroup(slot: ServiceSlot, serviceId: string, inputs: 
     slides: deriveGroupEntries(slot, inputs),
     ...(signature !== undefined ? { sourceSignature: signature } : {}),
     ...(slot.audioUrl ? { bedAudioUrl: slot.audioUrl } : {}),
-    ...(slot.videoUrl ? { bedVideoUrl: slot.videoUrl } : {}),
   }
 }
 
@@ -206,7 +207,7 @@ function isNonDerivableEntry(entry: GroupSlideEntry): boolean {
  * confirm and no trace.
  */
 export function hasCustomization(group: SlideGroup): boolean {
-  if (group.bedAudioUrl || group.bedVideoUrl) return true
+  if (group.bedAudioUrl) return true
   return group.slides.some(
     (entry) => !!entry.label || !!entry.notes || !!entry.audioUrl || isNonDerivableEntry(entry),
   )

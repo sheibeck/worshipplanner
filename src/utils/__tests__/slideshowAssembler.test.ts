@@ -480,10 +480,9 @@ describe('assembleSlideshow — media propagation (R013/R014)', () => {
     expect(result[1]!.slide.audioUrl).toBeUndefined()
     expect(result[2]!.slide.audioUrl).toBeUndefined()
     expect(result[3]!.slide.audioUrl).toBeUndefined()
-    expect(result[0]!.slide.videoUrl).toBeUndefined()
   })
 
-  it('a slot with no media produces slides whose audioUrl and videoUrl are both undefined', () => {
+  it('a slot with no media produces slides whose audioUrl is undefined', () => {
     const slot = songSlot({ songId: 'song-1' })
     const service = makeService([slot])
     const lyrics = makeSongLyrics()
@@ -496,18 +495,22 @@ describe('assembleSlideshow — media propagation (R013/R014)', () => {
 
     for (const assembled of result) {
       expect(assembled.slide.audioUrl).toBeUndefined()
-      expect(assembled.slide.videoUrl).toBeUndefined()
     }
   })
 
-  it('a single-slide MESSAGE slot with videoUrl set carries it on its one emitted slide', () => {
-    const slot: NonAssignableSlot = { kind: 'MESSAGE', id: 'slot-message-0', position: 0, videoUrl: 'https://example.com/announcement.mp4' }
+  it('a legacy slot-level videoUrl (Phase 22) is dropped, not carried onto the emitted slide (D-18/D-19)', () => {
+    const slot: NonAssignableSlot = {
+      kind: 'MESSAGE',
+      id: 'slot-message-0',
+      position: 0,
+      videoUrl: 'https://example.com/announcement.mp4',
+    }
     const service = makeService([slot])
 
     const result = assembleSlideshow(service, makeInputs())
 
     expect(result).toHaveLength(1)
-    expect(result[0]!.slide.videoUrl).toBe('https://example.com/announcement.mp4')
+    expect('videoUrl' in result[0]!.slide).toBe(false)
     expect(result[0]!.slide.audioUrl).toBeUndefined()
   })
 })
@@ -816,7 +819,7 @@ describe('assembleSlideshow — stored group resolution (D-02, R028)', () => {
   })
 })
 
-describe('assembleSlideshow — D-04 two-level audio precedence and video bed (R030)', () => {
+describe('assembleSlideshow — D-04 two-level audio precedence (R030)', () => {
   it("an entry with its own audioUrl resolves to that url even when the group has a bed", () => {
     const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
     const service = makeService([slot])
@@ -974,39 +977,6 @@ describe('assembleSlideshow — D-04 two-level audio precedence and video bed (R
     expect('audioUrl' in result[0]!.slide).toBe(false)
   })
 
-  it('bedVideoUrl resolves onto every entry in the group and videoFromBed is true on each', () => {
-    const slot = scriptureSlot({ id: 'slot-scripture-0', scriptureReadingId: 'reading-1' })
-    const service = makeService([slot])
-    const reading = makeScriptureReading()
-    const entries: GroupSlideEntry[] = [
-      makeGroupSlideEntry({
-        id: 'e1',
-        order: 0,
-        sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'ss-1' },
-      }),
-      makeGroupSlideEntry({
-        id: 'e2',
-        order: 1,
-        sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'ss-2' },
-      }),
-    ]
-    const group = makeSlideGroup({
-      id: 'slot-scripture-0',
-      slotId: 'slot-scripture-0',
-      slides: entries,
-      bedVideoUrl: 'https://example.com/bed.mp4',
-    })
-    const inputs = makeInputs({
-      scriptureReadingsById: new Map([['reading-1', reading]]),
-      groupsBySlotId: new Map([['slot-scripture-0', group]]),
-    })
-
-    const result = assembleSlideshow(service, inputs)
-
-    expect(result.every((r) => r.slide.videoUrl === 'https://example.com/bed.mp4')).toBe(true)
-    expect(result.every((r) => r.videoFromBed === true)).toBe(true)
-  })
-
   it('a slot with no group still attaches its deprecated media to only its first emitted slide (fallback path unaffected by D-04)', () => {
     const slot = songSlot({ id: 'slot-song-0', songId: 'song-1', audioUrl: 'https://example.com/legacy.mp3' })
     const service = makeService([slot])
@@ -1024,6 +994,24 @@ describe('assembleSlideshow — D-04 two-level audio precedence and video bed (R
     expect(result[2]!.slide.audioUrl).toBeUndefined()
     expect(result[3]!.slide.audioUrl).toBeUndefined()
     expect(result[0]!.audioFromBed).toBeUndefined()
+  })
+
+  it('a legacy slot videoUrl (Phase 22, un-migrated) is ignored entirely — no slide carries a videoUrl (D-18/D-19: dropped, not migrated)', () => {
+    const slot = songSlot({
+      id: 'slot-song-0',
+      songId: 'song-1',
+      videoUrl: 'https://example.com/legacy.mp4',
+    })
+    const service = makeService([slot])
+    const lyrics = makeSongLyrics()
+    const inputs = makeInputs({
+      songLyricsById: new Map([['song-1', lyrics]]),
+      performanceOrderById: new Map([['song-1', ['verse-1']]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result.every((r) => !('videoUrl' in r.slide))).toBe(true)
   })
 })
 
@@ -1052,7 +1040,7 @@ describe('assembleSlideshow — D-17 video entries and authored text entries', (
     expect(result[0]!.sourceId).toBeNull()
   })
 
-  it('a group with BOTH a bed video and a video entry assembles the video entry with its own source intact, and the bed still reaches videoUrl', () => {
+  it('a video entry in a group that ALSO has an audio bed assembles the video entry with its own source intact and the bed audio unaffected', () => {
     const slot = scriptureSlot({ id: 'slot-scripture-0', scriptureReadingId: 'reading-1' })
     const service = makeService([slot])
     const reading = makeScriptureReading()
@@ -1065,7 +1053,7 @@ describe('assembleSlideshow — D-17 video entries and authored text entries', (
       id: 'slot-scripture-0',
       slotId: 'slot-scripture-0',
       slides: [videoEntry],
-      bedVideoUrl: 'https://example.com/bed.mp4',
+      bedAudioUrl: 'https://example.com/bed.mp3',
     })
     const inputs = makeInputs({
       scriptureReadingsById: new Map([['reading-1', reading]]),
@@ -1076,8 +1064,8 @@ describe('assembleSlideshow — D-17 video entries and authored text entries', (
 
     expect(result).toHaveLength(1)
     expect((result[0]!.slide as VideoSlide).videoSrc).toBe('https://example.com/own-footage.mp4')
-    expect(result[0]!.slide.videoUrl).toBe('https://example.com/bed.mp4')
-    expect(result[0]!.videoFromBed).toBe(true)
+    expect(result[0]!.slide.audioUrl).toBe('https://example.com/bed.mp3')
+    expect(result[0]!.audioFromBed).toBe(true)
   })
 
   it('a text entry with authored title and body on a SONG slot assembles that title and body', () => {

@@ -233,7 +233,7 @@ describe('useSlideGroups', () => {
       expect(setDoc).toHaveBeenCalledOnce()
     })
 
-    it('carries a Phase 22 slot bedAudioUrl/bedVideoUrl onto the single setDoc payload', async () => {
+    it('carries a Phase 22 slot bedAudioUrl onto the single setDoc payload', async () => {
       const { getDoc, setDoc } = await import('firebase/firestore')
       vi.mocked(getDoc).mockResolvedValueOnce({
         exists: () => false,
@@ -250,13 +250,11 @@ describe('useSlideGroups', () => {
         slotId: 'slot-1',
         slides: [],
         bedAudioUrl: 'https://example.com/bed.mp3',
-        bedVideoUrl: 'https://example.com/bed.mp4',
       })
 
       const callArgs = vi.mocked(setDoc).mock.calls[0]!
       const payload = callArgs[1] as Record<string, unknown>
       expect(payload.bedAudioUrl).toBe('https://example.com/bed.mp3')
-      expect(payload.bedVideoUrl).toBe('https://example.com/bed.mp4')
     })
 
     it('produces no bedAudioUrl key at all when the field is absent (stripUndefined)', async () => {
@@ -333,7 +331,7 @@ describe('useSlideGroups', () => {
       const payload = callArgs[1] as unknown as Record<string, unknown>
       expect(payload.bedAudioUrl).toBe('https://example.com/bed.mp3')
       expect(payload.updatedAt).toBeDefined()
-      expect('bedVideoUrl' in payload).toBe(false)
+      expect(Object.keys(payload).filter((k) => k.toLowerCase().includes('video'))).toEqual([])
       expect('slides' in payload).toBe(false)
     })
 
@@ -375,7 +373,7 @@ describe('useSlideGroups', () => {
       await expect(
         store.setGroupBedMedia('org-1', 'slot-1', {
           serviceId: 'service-1',
-          bedVideoUrl: 'https://example.com/bed.mp4',
+          bedAudioUrl: 'https://example.com/bed.mp3',
         }),
       ).resolves.toBeUndefined()
 
@@ -383,7 +381,7 @@ describe('useSlideGroups', () => {
       const callArgs = vi.mocked(setDoc).mock.calls[0]!
       const payload = callArgs[1] as Record<string, unknown>
       expect(payload.slides).toEqual([])
-      expect(payload.bedVideoUrl).toBe('https://example.com/bed.mp4')
+      expect(payload.bedAudioUrl).toBe('https://example.com/bed.mp3')
       expect(payload.serviceId).toBe('service-1')
     })
 
@@ -441,8 +439,7 @@ describe('useSlideGroups', () => {
       expect(payload.slides).toEqual(slides)
       expect(payload.sourceSignature).toBe('sig-abc')
       expect(payload.updatedAt).toBeDefined()
-      expect('bedAudioUrl' in payload).toBe(false)
-      expect('bedVideoUrl' in payload).toBe(false)
+      expect(Object.keys(payload).filter((k) => k.toLowerCase().includes('bed'))).toEqual([])
     })
 
     it('omits sourceSignature key entirely when not provided', async () => {
