@@ -961,4 +961,139 @@ describe('useSlideshowAssembly', () => {
       expect(pendingReconciliations.value).toHaveLength(0)
     })
   })
+
+  // --- Task 3 (25-01): end-to-end guard that a dropped video survives a live
+  // reconciliation tick. This is the highest-consequence regression this
+  // phase can produce: a video a user dropped disappearing on the next lyric
+  // edit or re-split passage. Adds no production code — asserts on what the
+  // store received (mockReplaceGroupSlides args) and on pendingReconciliations,
+  // not on internal composable state.
+  describe('D-17 — dropped video survives reconciliation (25-01 Task 3)', () => {
+    it('a song group holding a video entry keeps that entry in the slide list passed to replaceGroupSlides after a lyric change triggers reconciliation', async () => {
+      songsState.songs = [{ id: 'song-a', performanceOrder: ['v1', 'v2'] } as Song]
+      const twoSectionLyrics: SongLyrics = {
+        id: 'lyrics-song-a',
+        songId: 'song-a',
+        sections: [
+          { id: 'v1', label: 'Verse 1', lines: ['song-a line 1'] },
+          { id: 'v2', label: 'Verse 2', lines: ['song-a line 2'] },
+        ],
+        copyright: {
+          title: 'song-a Title',
+          authors: ['Author'],
+          ccliSongNumber: '123',
+          copyrightLines: ['(c) 2026'],
+          ccliLicenseNumber: 'LIC-1',
+        },
+        performanceOrder: ['v1', 'v2'],
+        createdAt: {} as never,
+        updatedAt: {} as never,
+      }
+      const fakeLyricsLoader = vi.fn(async () => twoSectionLyrics)
+
+      // Stored group is missing 'v2' (the lyric section just added) and
+      // carries a video entry a user dropped onto this song group.
+      slideGroupsState.groups = [
+        {
+          id: 'slot-song-video',
+          slotId: 'slot-song-video',
+          serviceId: 'service-1',
+          slides: [
+            { id: 'cr-1', order: 0, sourceRef: { kind: 'copyright', songId: 'song-a' } },
+            { id: 'ly-v1', order: 1, sourceRef: { kind: 'lyric', songId: 'song-a', sectionId: 'v1' } },
+            {
+              id: 'entry-video',
+              order: 2,
+              sourceRef: { kind: 'video', videoSrc: 'https://example.com/dropped.mp4' },
+            },
+            { id: 'cr-2', order: 3, sourceRef: { kind: 'copyright', songId: 'song-a' } },
+          ],
+          createdAt: {} as never,
+          updatedAt: {} as never,
+        },
+      ]
+
+      const service = ref<Service | null>(
+        makeService([songSlot({ position: 0, id: 'slot-song-video', songId: 'song-a' })]),
+      )
+      useSlideshowAssembly(service, 'org-1', { canWrite: true, lyricsLoader: fakeLyricsLoader })
+      await nextTick()
+      await vi.waitFor(() => expect(fakeLyricsLoader).toHaveBeenCalled())
+      await nextTick()
+      await nextTick()
+
+      expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+      const [, slotIdArg, slidesArg] = mockReplaceGroupSlides.mock.calls[0]!
+      expect(slotIdArg).toBe('slot-song-video')
+      const slides = slidesArg as GroupSlideEntry[]
+      const videoEntry = slides.find((e) => e.id === 'entry-video')
+      expect(videoEntry).toBeDefined()
+      expect(videoEntry?.sourceRef).toEqual({ kind: 'video', videoSrc: 'https://example.com/dropped.mp4' })
+    })
+
+    it('a customized scripture group with a video entry and a diverged source issues zero writes, surfaces a pending reconciliation, and the assembled output still shows the video slide', async () => {
+      scriptureState.readings = [
+        {
+          id: 'reading-1',
+          reference: { book: 'John', chapter: 3 },
+          displayReference: 'John 3',
+          rawText: 'text',
+          readingMode: 'normal',
+          slides: [
+            {
+              id: 'orig-id',
+              position: 0,
+              contentKind: 'scripture',
+              reference: 'John 3:16',
+              bookRef: { book: 'John', chapter: 3 },
+              text: 'New verse text',
+              verseRange: '16',
+              readingMode: 'normal',
+            },
+          ],
+          createdAt: {} as never,
+          updatedAt: {} as never,
+        },
+      ]
+      slideGroupsState.groups = [
+        {
+          id: 'slot-scripture-video',
+          slotId: 'slot-scripture-video',
+          serviceId: 'service-1',
+          sourceSignature: '1:Old verse text',
+          slides: [
+            {
+              id: 'ss-1',
+              order: 0,
+              sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'orig-id' },
+            },
+            {
+              id: 'entry-video',
+              order: 1,
+              sourceRef: { kind: 'video', videoSrc: 'https://example.com/dropped.mp4' },
+            },
+          ],
+          createdAt: {} as never,
+          updatedAt: {} as never,
+        },
+      ]
+
+      const service = ref<Service | null>(
+        makeService([scriptureSlot({ position: 0, id: 'slot-scripture-video', scriptureReadingId: 'reading-1' })]),
+      )
+      const { pendingReconciliations, assembledSlideshow } = useSlideshowAssembly(service, 'org-1', {
+        canWrite: true,
+      })
+      await nextTick()
+      await nextTick()
+
+      expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
+      expect(pendingReconciliations.value).toHaveLength(1)
+      expect(pendingReconciliations.value[0]!.slotId).toBe('slot-scripture-video')
+
+      const videoSlide = assembledSlideshow.value.find((s) => s.slide.contentKind === 'video')
+      expect(videoSlide).toBeDefined()
+      expect(videoSlide!.slide.id).toBe('entry-video')
+    })
+  })
 })
