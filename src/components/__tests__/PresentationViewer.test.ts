@@ -583,14 +583,18 @@ describe('PresentationViewer', () => {
 
   // ── Task 1: mount the chromeless players and drive play/pause across transitions ──
 
+  /**
+   * A genuine VideoSlide (D-17/D-18) — video is slide-only and has no bed,
+   * so a video slide's own `videoSrc` is its entire content; unlike the
+   * pre-D-18 fixture, it carries no `body` text (VideoSlide has none).
+   */
   function videoSlide(id: string, url: string): AssembledSlide {
     return {
       slide: {
         id,
         position: 5,
-        contentKind: 'text',
-        body: `Video slide ${id}`,
-        videoUrl: url,
+        contentKind: 'video',
+        videoSrc: url,
       },
       slotIndex: 4,
       slotKind: 'IMPORTED',
@@ -633,25 +637,6 @@ describe('PresentationViewer', () => {
       groupId,
       groupSlideId: id,
       audioFromBed: true,
-    }
-  }
-
-  function bedVideoSlide(id: string, groupId: string, url: string): AssembledSlide {
-    return {
-      slide: {
-        id,
-        position: 5,
-        contentKind: 'text',
-        body: `Bed video slide ${id}`,
-        videoUrl: url,
-      },
-      slotIndex: 4,
-      slotKind: 'IMPORTED',
-      section: 'worship',
-      sourceId: 'video-1',
-      groupId,
-      groupSlideId: id,
-      videoFromBed: true,
     }
   }
 
@@ -898,9 +883,9 @@ describe('PresentationViewer', () => {
       expect(secondAudioEl).toBe(firstAudioEl)
     })
 
-    it('advancing between two bed-carrying video slides of the SAME group leaves the VideoPlayer key unchanged', async () => {
-      const sharedUrl = 'https://example.com/bed.mp4'
-      const slides = [bedVideoSlide('v1', 'group-1', sharedUrl), bedVideoSlide('v2', 'group-1', sharedUrl)]
+    it('advancing between two DIFFERENT video slides always forces a fresh VideoPlayer instance (video has no bed continuity, D-18)', async () => {
+      const sharedUrl = 'https://example.com/clip.mp4'
+      const slides = [videoSlide('v1', sharedUrl), videoSlide('v2', sharedUrl)]
       mount(PresentationViewer, { props: { slides } })
       await flushPromises()
 
@@ -910,7 +895,7 @@ describe('PresentationViewer', () => {
       await flushPromises()
 
       const secondVideoEl = body().find('[data-testid="presentation-video"] video').element as HTMLVideoElement
-      expect(secondVideoEl).toBe(firstVideoEl)
+      expect(secondVideoEl).not.toBe(firstVideoEl)
     })
 
     it('advancing between two slides with PER-SLIDE audio (no groupId) still forces a fresh AudioPlayer instance', async () => {
@@ -942,23 +927,13 @@ describe('PresentationViewer', () => {
       expect(secondAudioEl).not.toBe(firstAudioEl)
     })
 
-    it('a video-carrying slide renders presentation-body at text-2xl (caption), not text-5xl; an audio-only slide renders text-5xl', async () => {
+    it('an audio-only slide renders its body at full text-5xl scale (no caption demotion — video is slide-only under D-18, so no slide ever has both a body and an attached video to demote it)', async () => {
       mount(PresentationViewer, {
-        props: {
-          slides: [videoSlide('v1', 'https://example.com/clip.mp4'), audioSlide('a1', 'https://example.com/clip.mp3')],
-        },
+        props: { slides: [audioSlide('a1', 'https://example.com/clip.mp3')] },
       })
       await flushPromises()
 
-      const videoSlideBody = body().find('[data-testid="presentation-body"]')
-      expect(videoSlideBody.classes()).toContain('text-2xl')
-      expect(videoSlideBody.classes()).not.toContain('text-5xl')
-
-      await body().find('[data-testid="presentation-next"]').trigger('click')
-      await flushPromises()
-
-      const audioSlideBody = body().find('[data-testid="presentation-body"]')
-      expect(audioSlideBody.classes()).toContain('text-5xl')
+      expect(body().find('[data-testid="presentation-body"]').classes()).toContain('text-5xl')
     })
   })
 
@@ -970,7 +945,7 @@ describe('PresentationViewer', () => {
       window.HTMLMediaElement.prototype.pause = vi.fn()
     })
 
-    it('triggering error on the video removes presentation-video, shows the media-unavailable notice, and leaves the body unchanged', async () => {
+    it('triggering error on the video removes presentation-video and shows the media-unavailable notice (D-17/D-18: a video slide has no other content to fall back to)', async () => {
       mount(PresentationViewer, { props: { slides: [videoSlide('v1', 'https://example.com/clip.mp4')] } })
       await flushPromises()
 
@@ -979,29 +954,6 @@ describe('PresentationViewer', () => {
 
       expect(body().find('[data-testid="presentation-video"]').exists()).toBe(false)
       expect(body().find('[data-testid="presentation-media-unavailable"]').text()).toBe('Media unavailable')
-      expect(body().find('[data-testid="presentation-body"]').text()).toContain('Video slide v1')
-    })
-
-    it('the slide body reverts from caption scale to full Body scale once the attached video errors out (WR-05)', async () => {
-      mount(PresentationViewer, { props: { slides: [videoSlide('v1', 'https://example.com/clip.mp4')] } })
-      await flushPromises()
-
-      // While the video is actually rendering, the slide's own text is
-      // demoted to caption scale (text-2xl).
-      const bodyBeforeError = body().find('[data-testid="presentation-body"]')
-      expect(bodyBeforeError.classes()).toContain('text-2xl')
-      expect(bodyBeforeError.classes()).not.toContain('text-5xl')
-
-      await body().find('[data-testid="presentation-video"] video').trigger('error')
-      await flushPromises()
-
-      // currentVideoUrl itself hasn't changed (the slide still "carries"
-      // videoUrl) — only whether it actually rendered has. Once the video
-      // wrapper is removed, the text must return to full Body scale rather
-      // than staying stuck at caption scale with no dominant content at all.
-      const bodyAfterError = body().find('[data-testid="presentation-body"]')
-      expect(bodyAfterError.classes()).toContain('text-5xl')
-      expect(bodyAfterError.classes()).not.toContain('text-2xl')
     })
 
     it('triggering error on the audio removes presentation-audio and shows the same notice', async () => {
@@ -1173,7 +1125,9 @@ describe('PresentationViewer', () => {
       await flushPromises()
       await body().find('[data-testid="presentation-next"]').trigger('click')
       await flushPromises()
-      expect(slideText()).toContain('Video slide v3')
+      expect(body().find('[data-testid="presentation-video"] video').attributes('src')).toBe(
+        'https://example.com/clip3.mp4',
+      )
 
       // v3's media fails — sets the stale mediaFailed flag this watcher must clear.
       await body().find('[data-testid="presentation-video"] video').trigger('error')
@@ -1188,7 +1142,9 @@ describe('PresentationViewer', () => {
       await wrapper.setProps({ slides: slides.slice(0, 2) })
       await flushPromises()
 
-      expect(slideText()).toContain('Video slide v2')
+      expect(body().find('[data-testid="presentation-video"] video').attributes('src')).toBe(
+        'https://example.com/clip2.mp4',
+      )
       // The stale mediaFailed flag from v3 must not suppress v2's fine media.
       expect(body().find('[data-testid="presentation-media-unavailable"]').exists()).toBe(false)
       expect(body().find('[data-testid="presentation-video"]').exists()).toBe(true)

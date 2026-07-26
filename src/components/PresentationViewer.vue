@@ -54,8 +54,7 @@
           </p>
           <p
             data-testid="presentation-body"
-            class="text-gray-100 whitespace-pre-line"
-            :class="bodyIsCaption ? 'text-2xl font-semibold leading-[1.3]' : 'text-5xl font-normal leading-[1.4]'"
+            class="text-gray-100 whitespace-pre-line text-5xl font-normal leading-[1.4]"
           >
             {{ (currentSlide.slide as LyricSlide).lines.join('\n') }}
           </p>
@@ -115,8 +114,7 @@
           <p
             v-else
             data-testid="presentation-body"
-            class="text-gray-100 whitespace-pre-line"
-            :class="bodyIsCaption ? 'text-2xl font-semibold leading-[1.3]' : 'text-5xl font-normal leading-[1.4]'"
+            class="text-gray-100 whitespace-pre-line text-5xl font-normal leading-[1.4]"
           >
             {{ (currentSlide.slide as ScriptureSlide).text }}
           </p>
@@ -133,8 +131,7 @@
           </p>
           <p
             data-testid="presentation-body"
-            class="text-gray-100 whitespace-pre-line"
-            :class="bodyIsCaption ? 'text-2xl font-semibold leading-[1.3]' : 'text-5xl font-normal leading-[1.4]'"
+            class="text-gray-100 whitespace-pre-line text-5xl font-normal leading-[1.4]"
           >
             {{ (currentSlide.slide as TextSlide).body }}
           </p>
@@ -150,9 +147,12 @@
           />
         </template>
 
-        <!-- Attached video (Phase 22/23, R013/R014) — chromeless, imperatively
-             driven. Rendered after the slide's own text so the video becomes the
-             dominant element while the text drops to a caption (bodyIsCaption). -->
+        <!-- Video slide's own source (D-17/D-18) — chromeless, imperatively
+             driven, reusing the same videoRef/play/pause/error/autoplay-blocked
+             wiring the pre-D-18 bed video used. A video slide has no separate
+             per-kind template branch above: video is slide-only (never a bed),
+             so this is the video slide's entire visual content — nothing else
+             on a video slide competes with it for the screen. -->
         <div
           v-if="currentVideoUrl && !mediaFailed"
           data-testid="presentation-video"
@@ -297,6 +297,7 @@ import type {
   ScriptureSlide,
   TextSlide,
   ImageSlide,
+  VideoSlide,
 } from '@/types/slide'
 import { SERVICE_SECTION_LABELS } from '@/types/service'
 import AudioPlayer from './AudioPlayer.vue'
@@ -352,44 +353,51 @@ const atFirst = computed(() => currentIndex.value <= 0)
 const atLast = computed(() => currentIndex.value >= props.slides.length - 1)
 
 const currentAudioUrl = computed<string | null>(() => currentSlide.value?.slide.audioUrl ?? null)
-const currentVideoUrl = computed<string | null>(() => currentSlide.value?.slide.videoUrl ?? null)
 /**
- * WR-05: demote the slide's own text to caption scale only while a video is
- * ACTUALLY rendered — not merely attached. Gating on `currentVideoUrl.value`
- * alone left the text stuck at caption scale even after the video errored
- * out and its wrapper was removed (`v-if="currentVideoUrl && !mediaFailed"`),
- * since `currentVideoUrl` itself doesn't change when only the video fails.
+ * A video slide's own source (D-17/D-18) — video has no bed layer, so this
+ * resolves ONLY from the current slide's own `videoSrc` when it IS a video
+ * slide. There is nothing else for a video slide to render (see the
+ * template), so this is never truthy at the same time as any body-rendering
+ * slide kind.
  */
-const bodyIsCaption = computed(() => Boolean(currentVideoUrl.value) && !mediaFailed.value)
+const currentVideoUrl = computed<string | null>(() => {
+  const slide = currentSlide.value?.slide
+  return slide?.contentKind === 'video' ? (slide as VideoSlide).videoSrc : null
+})
 
 /**
- * Keys the VideoPlayer/AudioPlayer instances on the SLIDE, not just the media
- * URL (WR-02). Two adjacent slides can carry the identical media URL (e.g.
- * the same background/intro clip attached to two slots in a row); keying on
- * URL alone reuses the child instance across such a transition, letting its
- * internal `muted`/`showPlayAffordance` state leak from the outgoing slide
- * into the incoming one (e.g. a slide that went through the muted-retry path
- * would silently stay muted on the next slide with zero on-screen
- * indication). Including the slide id forces a fresh instance on every
+ * Keys the VideoPlayer instance on the SLIDE (WR-02) so switching between two
+ * video slides always remounts the player — even two adjacent video slides
+ * sharing an identical `videoSrc` must not reuse the child instance, or a
+ * slide that went through the muted-retry path would silently stay muted on
+ * the next one with zero on-screen indication.
+ *
+ * Unlike `currentAudioKey`, this needs no group-continuity branch: video has
+ * no bed (D-18), so a video slide is always its own single-slide unit — there
+ * is no "plays across the group" case for video to preserve a continuous
+ * instance for. Every video slide gets a fresh per-slide key.
+ */
+const currentVideoKey = computed(() => `${currentSlide.value?.slide.id ?? ''}:${currentVideoUrl.value ?? ''}`)
+
+/**
+ * Keys the AudioPlayer instance on the SLIDE, not just the media URL (WR-02).
+ * Two adjacent slides can carry the identical audio URL (e.g. the same
+ * background/intro clip attached to two slots in a row); keying on URL alone
+ * reuses the child instance across such a transition, letting its internal
+ * `muted`/`showPlayAffordance` state leak from the outgoing slide into the
+ * incoming one. Including the slide id forces a fresh instance on every
  * slide change regardless of URL reuse.
  *
- * Phase 24 (R030/D-04) splits this in two: PER-SLIDE media still forces a
+ * Phase 24 (R030/D-04) splits this in two: PER-SLIDE audio still forces a
  * fresh child on every slide change (the WR-02 guarantee above, unchanged).
- * But a GROUP BED (`audioFromBed`/`videoFromBed` true, with a `groupId`) is
- * deliberately kept as ONE continuous instance across every slide of that
- * group — that continuity is what R030 means by a bed that "plays across
- * the group": advancing from one bed-carrying slide to the next bed-carrying
- * slide of the SAME group must not remount the player. A slide with no
- * `groupId` (pre-migration data) always falls through to the per-slide key,
+ * But a GROUP BED (`audioFromBed` true, with a `groupId`) is deliberately
+ * kept as ONE continuous instance across every slide of that group — that
+ * continuity is what R030 means by a bed that "plays across the group":
+ * advancing from one bed-carrying slide to the next bed-carrying slide of the
+ * SAME group must not remount the player. A slide with no `groupId`
+ * (pre-migration data) always falls through to the per-slide key,
  * byte-identical to the pre-Phase-24 formula.
  */
-const currentVideoKey = computed(() => {
-  const current = currentSlide.value
-  if (current?.videoFromBed && current.groupId) {
-    return `group:${current.groupId}:${currentVideoUrl.value ?? ''}`
-  }
-  return `${current?.slide.id ?? ''}:${currentVideoUrl.value ?? ''}`
-})
 const currentAudioKey = computed(() => {
   const current = currentSlide.value
   if (current?.audioFromBed && current.groupId) {
@@ -414,7 +422,7 @@ const progressLabel = computed(() => {
  * distinguished by shape (`sectionId` only present on LyricSlide). Reused
  * verbatim from SlideshowPreview.vue's `cardKind()` helper.
  */
-type CardKind = 'lyric' | 'copyright' | 'scripture' | 'text' | 'image'
+type CardKind = 'lyric' | 'copyright' | 'scripture' | 'text' | 'image' | 'video'
 
 function cardKind(slide: Slide): CardKind {
   if (slide.contentKind === 'lyric') {
