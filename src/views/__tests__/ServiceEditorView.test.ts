@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from 'vitest'
-import { shallowMount, enableAutoUnmount } from '@vue/test-utils'
+import { shallowMount, enableAutoUnmount, DOMWrapper } from '@vue/test-utils'
 import { reactive } from 'vue'
 import type { Service } from '@/types/service'
 import type { Song } from '@/types/song'
 import type { Person, Role, Quarter } from '@/types/roster'
 import type { Timestamp } from 'firebase/firestore'
+import type { SlideGroup } from '@/types/slideGroup'
 import SlideshowPreview from '@/components/SlideshowPreview.vue'
 import PresentationViewer from '@/components/PresentationViewer.vue'
 
@@ -74,20 +75,36 @@ vi.mock('@/stores/importedSlides', () => ({
   }),
 }))
 
-// useSlideshowAssembly (24-04) also reads groupsBySlotId from this store —
-// unmocked, useSlideGroups() calls getActivePinia() against a Pinia instance
-// this test never installs. Same reactive-stub pattern as the two mocks above.
+// useSlideshowAssembly (24-04) also reads groupsBySlotId from this store, and
+// ServiceEditorView itself (24-06) calls deleteGroup/setGroupBedMedia
+// directly — unmocked, useSlideGroups() calls getActivePinia() against a
+// Pinia instance this test never installs. Stateful (not a static stub) so
+// the Phase 24-06 delete-cascade and media-retarget tests can control which
+// groups exist and inspect what was written — mirrors the reactive-stub
+// pattern in src/composables/__tests__/useSlideshowAssembly.test.ts.
+const mockSlideGroupsState = reactive<{ groups: SlideGroup[] }>({ groups: [] })
+const mockSubscribeGroups = vi.fn()
+const mockUnsubscribeGroups = vi.fn()
+const mockMaterializeGroupIfMissing = vi.fn(() => Promise.resolve(true))
+const mockDeleteGroup = vi.fn(() => Promise.resolve())
+const mockSetGroupBedMedia = vi.fn(() => Promise.resolve())
+const mockReplaceGroupSlides = vi.fn(() => Promise.resolve())
+
 vi.mock('@/stores/slideGroups', () => ({
   useSlideGroups: () => ({
-    groups: [],
+    groups: mockSlideGroupsState.groups,
     isLoading: false,
-    groupsBySlotId: new Map(),
-    subscribeGroups: vi.fn(),
-    unsubscribeGroups: vi.fn(),
-    materializeGroupIfMissing: vi.fn(),
-    deleteGroup: vi.fn(),
-    setGroupBedMedia: vi.fn(),
-    replaceGroupSlides: vi.fn(),
+    get groupsBySlotId() {
+      const map = new Map<string, SlideGroup>()
+      for (const group of mockSlideGroupsState.groups) map.set(group.slotId, group)
+      return map
+    },
+    subscribeGroups: mockSubscribeGroups,
+    unsubscribeGroups: mockUnsubscribeGroups,
+    materializeGroupIfMissing: mockMaterializeGroupIfMissing,
+    deleteGroup: mockDeleteGroup,
+    setGroupBedMedia: mockSetGroupBedMedia,
+    replaceGroupSlides: mockReplaceGroupSlides,
   }),
 }))
 
@@ -160,7 +177,7 @@ const mockSetRoleOverride = vi.fn(
 const mockClearRoleOverride = vi.fn(() => Promise.resolve())
 // Hoisted (not created fresh per useServiceStore() call) so the Phase 24-06
 // backfill tests below can inspect what the autosave path actually persisted.
-const mockUpdateService = vi.fn(() => Promise.resolve())
+const mockUpdateService = vi.fn((_id: string, _data: unknown) => Promise.resolve())
 
 vi.mock('@/stores/services', () => ({
   useServiceStore: () => ({
@@ -270,6 +287,19 @@ vi.mock('@/stores/quarters', () => ({
     subscribe: mockQuartersSubscribe,
   }),
 }))
+
+// Reset the stateful slideGroups mock before every test so a test that
+// populates `mockSlideGroupsState.groups` never leaks into a later one that
+// assumes the default empty-groups state.
+beforeEach(() => {
+  mockSlideGroupsState.groups = []
+  mockSubscribeGroups.mockClear()
+  mockUnsubscribeGroups.mockClear()
+  mockMaterializeGroupIfMissing.mockClear()
+  mockDeleteGroup.mockClear()
+  mockSetGroupBedMedia.mockClear()
+  mockReplaceGroupSlides.mockClear()
+})
 
 // Warm the SFC transform + template compile once before any test. The first
 // mount of this large (2200+ line) component can, on a loaded machine, exceed
@@ -814,5 +844,257 @@ describe('ServiceEditorView - slot id backfill on load (Phase 24-06 Task 1)', ()
     const secondIds = secondPayload.slots.map((s) => s.id)
 
     expect(secondIds).toEqual(firstIds)
+  })
+})
+
+// ── Slot delete cascades to its group (Phase 24-06 Task 2, R029) ───────────────
+
+describe('ServiceEditorView - slot delete cascades to its group (Phase 24-06 Task 2, R029)', () => {
+  async function mountView() {
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          RouterLink: { template: '<a><slot /></a>' },
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+          // shallowMount auto-stubs <Teleport> (its default `shallow` behavior
+          // treats ANY non-root component — including Vue's built-in Teleport
+          // — as stubbable, discarding its children) UNLESS explicitly opted
+          // out here. Without this, the slot-delete confirm dialog's content
+          // never reaches document.body and every assertion below silently
+          // finds nothing.
+          teleport: false,
+        },
+      },
+    })
+  }
+
+  // The slot-delete confirm dialog renders via <Teleport to="body"> — Vue
+  // Test Utils' documented pattern for asserting against teleported content
+  // (see src/components/__tests__/PptxImportModal.test.ts).
+  function body() {
+    return new DOMWrapper(document.body)
+  }
+
+  function buildGroup(slotId: string, overrides: Partial<SlideGroup> = {}): SlideGroup {
+    return {
+      id: slotId,
+      slotId,
+      serviceId: 'service-1',
+      slides: [],
+      createdAt: mockTimestamp,
+      updatedAt: mockTimestamp,
+      ...overrides,
+    }
+  }
+
+  async function openDeleteConfirm(wrapper: Awaited<ReturnType<typeof mountView>>, index: number) {
+    const removeButtons = wrapper.findAll('[title="Remove element"]')
+    await removeButtons[index]!.trigger('click')
+    await wrapper.vm.$nextTick()
+  }
+
+  function confirmButton() {
+    return body().findAll('button').find((b) => b.text() === 'Remove')
+  }
+
+  function cancelButton() {
+    return body().findAll('button').find((b) => b.text() === 'Cancel')
+  }
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockServicesList = [mockService]
+    mockUpdateService.mockClear()
+  })
+
+  it('confirming a remove-element delete calls deleteGroup with the slot id BEFORE the splice', async () => {
+    let resolveDelete!: () => void
+    mockDeleteGroup.mockImplementationOnce(() => new Promise<void>((resolve) => { resolveDelete = resolve }))
+
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    await openDeleteConfirm(wrapper, 0)
+
+    await confirmButton()!.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    // deleteGroup has been called, but its promise is still pending — the
+    // splice must not have happened yet.
+    expect(mockDeleteGroup).toHaveBeenCalledWith('org-1', 'slot-0')
+    expect(wrapper.findAll('[data-testid="section-select"]')).toHaveLength(9)
+
+    resolveDelete()
+    await Promise.resolve()
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.findAll('[data-testid="section-select"]')).toHaveLength(8)
+  })
+
+  it('cancelling calls neither deleteGroup nor the splice, leaving the slot list unchanged', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    await openDeleteConfirm(wrapper, 0)
+
+    await cancelButton()!.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    expect(mockDeleteGroup).not.toHaveBeenCalled()
+    expect(wrapper.findAll('[data-testid="section-select"]')).toHaveLength(9)
+  })
+
+  it('names the true slide count and attached audio for a group with six slides and bed audio', async () => {
+    mockSlideGroupsState.groups = [
+      buildGroup('slot-0', {
+        bedAudioUrl: 'https://example.com/bed.mp3',
+        slides: Array.from({ length: 6 }, (_, i) => ({
+          id: `slide-${i}`,
+          order: i,
+          sourceRef: { kind: 'text' } as const,
+        })),
+      }),
+    ]
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    await openDeleteConfirm(wrapper, 0)
+
+    const dialogText = body().text()
+    expect(dialogText).toContain('6')
+    expect(dialogText).toContain('attached audio')
+  })
+
+  it('names operator notes and per-slide audio when present, with no group bed', async () => {
+    mockSlideGroupsState.groups = [
+      buildGroup('slot-0', {
+        slides: [
+          { id: 'slide-0', order: 0, sourceRef: { kind: 'text' }, notes: 'watch the tempo change' },
+          { id: 'slide-1', order: 1, sourceRef: { kind: 'text' }, audioUrl: 'https://example.com/slide-audio.mp3' },
+        ],
+      }),
+    ]
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    await openDeleteConfirm(wrapper, 0)
+
+    const dialogText = body().text()
+    expect(dialogText).toContain('operator notes')
+    expect(dialogText).toContain('per-slide audio')
+  })
+
+  it('makes no attached-media claim for a group with no media and no notes', async () => {
+    mockSlideGroupsState.groups = [
+      buildGroup('slot-0', { slides: [{ id: 'slide-0', order: 0, sourceRef: { kind: 'text' } }] }),
+    ]
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    await openDeleteConfirm(wrapper, 0)
+
+    const dialogText = body().text()
+    expect(dialogText).toContain('with no attached audio, video, or notes')
+  })
+
+  it('names zero slides and still completes the delete when the slot has no group', async () => {
+    mockSlideGroupsState.groups = [] // no group at all for slot-0
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    await openDeleteConfirm(wrapper, 0)
+
+    expect(body().text()).toContain('0 slides')
+
+    await confirmButton()!.trigger('click')
+    await Promise.resolve()
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    expect(mockDeleteGroup).toHaveBeenCalledWith('org-1', 'slot-0')
+    expect(wrapper.findAll('[data-testid="section-select"]')).toHaveLength(8)
+  })
+
+  it('deleting one of two slots referencing the same song calls deleteGroup exactly once, with that slot id', async () => {
+    mockServicesList = [{
+      ...mockService,
+      slots: [
+        { kind: 'SONG', id: 'dup-a', position: 0, requiredVwType: 1, songId: 'song-1', songTitle: 'Amazing Grace', songKey: 'G' },
+        { kind: 'SONG', id: 'dup-b', position: 1, requiredVwType: 2, songId: 'song-1', songTitle: 'Amazing Grace', songKey: 'G' },
+      ],
+    }]
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    await openDeleteConfirm(wrapper, 0)
+
+    await confirmButton()!.trigger('click')
+    await Promise.resolve()
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    expect(mockDeleteGroup).toHaveBeenCalledTimes(1)
+    expect(mockDeleteGroup).toHaveBeenCalledWith('org-1', 'dup-a')
+  })
+
+  it('deleting a middle slot leaves the surviving slots ids unchanged after reindexSlots', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    // Absorb the autosave watcher's first-ever trigger (see the Task 1 tests'
+    // comment for why this is needed in this synchronous-mock environment)
+    // with an edit unrelated to the slot this test deletes.
+    const selects = wrapper.findAll('[data-testid="section-select"]')
+    await selects[8]!.setValue('sending')
+
+    // Delete the middle slot: index 4 (slot-4).
+    await openDeleteConfirm(wrapper, 4)
+    await confirmButton()!.trigger('click')
+    await Promise.resolve()
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    await new Promise((resolve) => setTimeout(resolve, 900))
+
+    expect(mockUpdateService).toHaveBeenCalledTimes(1)
+    const payload = mockUpdateService.mock.calls[0]![1] as { slots: Array<{ id?: string; position: number }> }
+    expect(payload.slots.map((s) => s.id)).toEqual([
+      'slot-0', 'slot-1', 'slot-2', 'slot-3', 'slot-5', 'slot-6', 'slot-7', 'slot-8',
+    ])
+    expect(payload.slots.map((s) => s.position)).toEqual([0, 1, 2, 3, 4, 5, 6, 7])
+  })
+
+  it('the clear-song branch calls deleteGroup zero times', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const clearSongBtn = wrapper.find('[title="Remove song"]')
+    expect(clearSongBtn.exists()).toBe(true)
+    await clearSongBtn.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    await confirmButton()!.trigger('click')
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    expect(mockDeleteGroup).not.toHaveBeenCalled()
+  })
+
+  it('a failed group delete leaves the slot in place (T-24-06-02)', async () => {
+    mockDeleteGroup.mockRejectedValueOnce(new Error('network error'))
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    await openDeleteConfirm(wrapper, 0)
+
+    await confirmButton()!.trigger('click')
+    await Promise.resolve()
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.findAll('[data-testid="section-select"]')).toHaveLength(9)
+
+    errSpy.mockRestore()
   })
 })
