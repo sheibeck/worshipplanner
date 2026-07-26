@@ -106,6 +106,94 @@ export const useSlideGroups = defineStore('slideGroups', () => {
     return true
   }
 
+  /**
+   * The R029 cascade target: 24-06's slot-delete handler calls this alongside
+   * removing the slot from `service.slots`. Firestore's `deleteDoc` on a
+   * missing document is a no-op (resolves without error), so no existence
+   * guard is added here — do not add a defensive `getDoc` before this call.
+   */
+  async function deleteGroup(orgId: string, slotId: string): Promise<void> {
+    await deleteDoc(doc(db, 'organizations', orgId, 'slideGroups', slotId))
+  }
+
+  interface BedMediaPatch {
+    serviceId: string
+    bedAudioUrl?: string
+    bedVideoUrl?: string
+    clearAudio?: boolean
+    clearVideo?: boolean
+  }
+
+  /**
+   * Scoped bed-media write (mirrors services.ts::setRoleOverride's scoped
+   * dot-path precedent) — touches only the bed field(s) being changed plus
+   * `updatedAt`, never the whole document. Explicit `clearAudio`/`clearVideo`
+   * flags are used (rather than "an undefined url means clear") because
+   * `stripUndefined()` would otherwise erase that intent before it reached
+   * Firestore — `deleteField()` is the only way to actually remove a field.
+   *
+   * If the group has not materialized yet, creates a skeleton document
+   * (`slotId`, `serviceId`, `slides: []`, the supplied bed field, both server
+   * timestamps) so attaching media to a slot with no group yet cannot throw.
+   */
+  async function setGroupBedMedia(
+    orgId: string,
+    slotId: string,
+    patch: BedMediaPatch,
+  ): Promise<void> {
+    const ref = doc(db, 'organizations', orgId, 'slideGroups', slotId)
+    const existing = await getDoc(ref)
+
+    if (existing.exists()) {
+      const update: Record<string, unknown> = { updatedAt: serverTimestamp() }
+      if (patch.clearAudio) update.bedAudioUrl = deleteField()
+      else if (patch.bedAudioUrl !== undefined) update.bedAudioUrl = patch.bedAudioUrl
+      if (patch.clearVideo) update.bedVideoUrl = deleteField()
+      else if (patch.bedVideoUrl !== undefined) update.bedVideoUrl = patch.bedVideoUrl
+      await updateDoc(ref, update)
+      return
+    }
+
+    await setDoc(ref, {
+      ...stripUndefined({
+        id: slotId,
+        slotId,
+        serviceId: patch.serviceId,
+        slides: [],
+        bedAudioUrl: patch.bedAudioUrl,
+        bedVideoUrl: patch.bedVideoUrl,
+      }),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    })
+  }
+
+  /**
+   * The apply half of reconciliation — writes only `slides`/`sourceSignature`/
+   * `updatedAt`, never a bed field. The decision of WHETHER to apply a
+   * reconciled slide list lives in 24-03's pure functions and 24-05's
+   * composable, never here.
+   *
+   * Open Question 1 (RESEARCH.md) resolved: a `GroupSlideEntry` whose
+   * `audioScope` is `'group'` is persisted by the Phase 26 UI as a write to
+   * the PARENT group's `bedAudioUrl` (via `setGroupBedMedia`) with the
+   * entry's own `audioUrl` cleared. The stored `audioScope` value exists only
+   * so the drawer can round-trip the toggle's visual state — the assembler
+   * never interprets it.
+   */
+  async function replaceGroupSlides(
+    orgId: string,
+    slotId: string,
+    slides: GroupSlideEntry[],
+    sourceSignature?: string,
+  ): Promise<void> {
+    const ref = doc(db, 'organizations', orgId, 'slideGroups', slotId)
+    await updateDoc(ref, {
+      ...stripUndefined({ slides, sourceSignature }),
+      updatedAt: serverTimestamp(),
+    })
+  }
+
   return {
     groups,
     isLoading,
@@ -113,5 +201,8 @@ export const useSlideGroups = defineStore('slideGroups', () => {
     subscribeGroups,
     unsubscribeGroups,
     materializeGroupIfMissing,
+    deleteGroup,
+    setGroupBedMedia,
+    replaceGroupSlides,
   }
 })
