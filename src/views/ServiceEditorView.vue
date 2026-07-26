@@ -1131,7 +1131,7 @@ import { useServiceStore } from '@/stores/services'
 import { useSongStore } from '@/stores/songs'
 import { useRosterStore } from '@/stores/roster'
 import { useQuartersStore } from '@/stores/quarters'
-import { slotLabel, createSlot, reindexSlots } from '@/utils/slotTypes'
+import { slotLabel, createSlot, reindexSlots, backfillSlotIds } from '@/utils/slotTypes'
 import { scripturesOverlap } from '@/utils/scripture'
 import { getPrimaryKey } from '@/utils/songSearch'
 import { resolveServiceRoleAssignments, findQuarterForDate } from '@/utils/serviceRoles'
@@ -1548,9 +1548,14 @@ watch(
     if (!found) return
 
     if (!localService.value) {
-      // Initial load: populate from store
-      localService.value = JSON.parse(JSON.stringify(found))
-      originalService.value = JSON.parse(JSON.stringify(found))
+      // Initial load: populate from store, backfilling any missing slot ids
+      // (D-01/R028) first. Both refs get the SAME backfilled value — if
+      // originalService missed the ids, the JSON-stringified comparison
+      // behind isDirty would never match again and the dirty indicator would
+      // be permanently wrong.
+      const backfilled = backfillSlotIds(found)
+      localService.value = JSON.parse(JSON.stringify(backfilled))
+      originalService.value = JSON.parse(JSON.stringify(backfilled))
       // Reset autosave state when service first loads (or re-loads)
       autosaveInitialized = false
       previousService.value = null
@@ -1560,7 +1565,13 @@ watch(
       // This is what makes two simultaneous viewers see each other's changes.
       // Guard: skip if the remote version matches what we already have (avoid
       // spurious re-renders after our own save completes).
-      const remoteJson = JSON.stringify(found)
+      // Backfill against the CURRENT local service (not a fresh one) so an
+      // id already held locally is reused rather than regenerated — a
+      // one-argument backfill would mint a fresh id on every snapshot and
+      // this comparison would never stabilize, re-anchoring every group on
+      // every remote merge (R028).
+      const backfilled = backfillSlotIds(found, localService.value)
+      const remoteJson = JSON.stringify(backfilled)
       const localJson = JSON.stringify(localService.value)
       if (remoteJson !== localJson) {
         localService.value = JSON.parse(remoteJson)
