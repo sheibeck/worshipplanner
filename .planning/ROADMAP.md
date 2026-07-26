@@ -180,7 +180,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 24-04-PLAN.md — Assembler reads stored groups; two-level audio precedence, bed and loop
+- [x] 24-04-PLAN.md — Assembler reads stored groups; two-level audio precedence, bed and loop
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
