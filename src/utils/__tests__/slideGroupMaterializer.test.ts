@@ -729,6 +729,143 @@ describe('reconcileImportedGroup', () => {
   })
 })
 
+describe('D-17 — reconciliation carries video and authored-text entries through', () => {
+  function makeStoredSongGroup(slides: SlideGroup['slides']): SlideGroup {
+    return makeGroup({ id: 'slot-1', slotId: 'slot-1', slides })
+  }
+
+  const twoSectionStoredSlides: SlideGroup['slides'] = [
+    { id: 'e-copyright-lead', order: 0, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+    { id: 'e-verse-1', order: 1, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' } },
+    { id: 'e-chorus', order: 2, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'chorus' } },
+    { id: 'e-copyright-trail', order: 3, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+  ]
+
+  const threeSectionLyrics = () =>
+    makeSongLyrics({
+      sections: [
+        { id: 'verse-1', label: 'Verse 1', lines: ['Line A'] },
+        { id: 'chorus', label: 'Chorus', lines: ['Line C'] },
+        { id: 'bridge', label: 'Bridge', lines: ['Line D'] },
+      ],
+    })
+
+  it('a song group holding a video entry keeps that entry (original id/source) after a reconciliation triggered by an added lyric section, positioned after the lyric run and before the trailing copyright', () => {
+    const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
+    const group = makeStoredSongGroup([
+      ...twoSectionStoredSlides.slice(0, 3),
+      { id: 'e-video', order: 3, sourceRef: { kind: 'video', videoSrc: 'https://example.com/dropped.mp4' } },
+      { ...twoSectionStoredSlides[3]!, order: 4 },
+    ])
+    const lyrics = threeSectionLyrics()
+    const inputs = makeInputs({
+      songLyricsById: new Map([['song-1', lyrics]]),
+      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus', 'bridge']]]),
+    })
+
+    const result = reconcileSongGroup(group, slot, inputs)
+
+    const videoEntry = result.slides.find((e) => e.id === 'e-video')
+    expect(videoEntry).toBeDefined()
+    expect(videoEntry?.sourceRef).toEqual({ kind: 'video', videoSrc: 'https://example.com/dropped.mp4' })
+
+    const videoIndex = result.slides.findIndex((e) => e.id === 'e-video')
+    const bridgeIndex = result.slides.findIndex(
+      (e) => e.sourceRef.kind === 'lyric' && e.sourceRef.sectionId === 'bridge',
+    )
+    const trailingCopyrightIndex = result.slides.length - 1
+    expect(videoIndex).toBeGreaterThan(bridgeIndex)
+    expect(videoIndex).toBeLessThan(trailingCopyrightIndex)
+    expect(result.slides[trailingCopyrightIndex]!.sourceRef.kind).toBe('copyright')
+  })
+
+  it('a user-authored text entry survives the same song reconciliation', () => {
+    const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
+    const group = makeStoredSongGroup([
+      ...twoSectionStoredSlides.slice(0, 3),
+      { id: 'e-authored', order: 3, sourceRef: { kind: 'text', title: 'My Slide', body: 'My words' } },
+      { ...twoSectionStoredSlides[3]!, order: 4 },
+    ])
+    const lyrics = threeSectionLyrics()
+    const inputs = makeInputs({
+      songLyricsById: new Map([['song-1', lyrics]]),
+      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus', 'bridge']]]),
+    })
+
+    const result = reconcileSongGroup(group, slot, inputs)
+
+    const authoredEntry = result.slides.find((e) => e.id === 'e-authored')
+    expect(authoredEntry).toBeDefined()
+    expect(authoredEntry?.sourceRef).toEqual({ kind: 'text', title: 'My Slide', body: 'My words' })
+  })
+
+  it('a group with neither video nor authored text reconciles to exactly the same result as before this change', () => {
+    const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
+    const group = makeStoredSongGroup(twoSectionStoredSlides)
+    const lyrics = threeSectionLyrics()
+    const inputs = makeInputs({
+      songLyricsById: new Map([['song-1', lyrics]]),
+      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus', 'bridge']]]),
+    })
+
+    const result = reconcileSongGroup(group, slot, inputs)
+
+    expect(result.changed).toBe(true)
+    expect(result.slides).toHaveLength(5)
+    expect(result.slides.map((e) => e.sourceRef.kind)).toEqual([
+      'copyright',
+      'lyric',
+      'lyric',
+      'lyric',
+      'copyright',
+    ])
+  })
+
+  it('a scripture group whose only user work is a video entry reports as customized', () => {
+    const slot = scriptureSlot({ scriptureReadingId: 'reading-1' })
+    const reading = makeScriptureReading()
+    const inputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', reading]]) })
+    const group = makeGroup({
+      sourceSignature: sourceSignature(slot, inputs),
+      slides: [
+        ...deriveGroupEntries(slot, inputs),
+        { id: 'e-video', order: 99, sourceRef: { kind: 'video', videoSrc: 'https://example.com/dropped.mp4' } },
+      ],
+    })
+
+    expect(hasCustomization(group)).toBe(true)
+  })
+
+  it('that same group with a diverged signature returns the confirm-required outcome with the stored slides untouched, and the loss summary counts the video entry', () => {
+    const slot = scriptureSlot({ scriptureReadingId: 'reading-1' })
+    const reading = makeScriptureReading()
+    const inputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', reading]]) })
+    const group = makeGroup({
+      sourceSignature: sourceSignature(slot, inputs),
+      slides: [
+        ...deriveGroupEntries(slot, inputs),
+        { id: 'e-video', order: 99, sourceRef: { kind: 'video', videoSrc: 'https://example.com/dropped.mp4' } },
+      ],
+    })
+
+    const widenedReading = makeScriptureReading({
+      slides: [
+        makeScriptureSlide({ id: 'ss-1', position: 0, verseRange: '16', text: 'For God so loved the world' }),
+        makeScriptureSlide({ id: 'ss-2', position: 1, verseRange: '17', text: 'that he gave his only Son' }),
+        makeScriptureSlide({ id: 'ss-3', position: 2, verseRange: '18', text: 'that whoever believes in him' }),
+      ],
+    })
+    const widenedInputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', widenedReading]]) })
+
+    const result = reconcileScriptureGroup(group, slot, widenedInputs)
+
+    expect(result.needsConfirm).toBe(true)
+    expect(result.changed).toBe(false)
+    expect(result.slides).toEqual(group.slides)
+    expect(result.loss?.customizedEntries).toBe(1)
+  })
+})
+
 describe('reconcileGroup dispatcher', () => {
   it('dispatches SONG to the additive path (never confirm-gated)', () => {
     const slot = songSlot({ id: 'slot-1', songId: 'song-1' })

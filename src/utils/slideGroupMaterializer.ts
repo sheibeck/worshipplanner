@@ -175,10 +175,41 @@ export function buildInitialGroup(slot: ServiceSlot, serviceId: string, inputs: 
   }
 }
 
-/** Gates the reconciliation confirm (Phase 26 dialog) — true when there is user-authored work to potentially lose. */
+/**
+ * True when an entry's `sourceRef` is NOT something the current slot config
+ * would ever regenerate on its own (D-17 ripple). No slot kind derives a
+ * `video` entry — it only ever arrives by user action (a drop, in 25-06) — so
+ * a video entry is always non-derivable. A `text` entry carrying authored
+ * content (title and/or body) is likewise non-derivable: `deriveGroupEntries`
+ * only ever mints a content-free `{ kind: 'text' }` ref for PRAYER/MESSAGE/
+ * HYMN, so an authored one can only exist because a user added it.
+ *
+ * This is the predicate `hasCustomization` and `computeLoss` both consult so
+ * a re-split scripture passage or a re-imported deck can never silently
+ * delete a user's dropped video or hand-authored slide.
+ */
+function isNonDerivableEntry(entry: GroupSlideEntry): boolean {
+  const ref = entry.sourceRef
+  if (ref.kind === 'video') return true
+  if (ref.kind === 'text' && (ref.title !== undefined || ref.body !== undefined)) return true
+  return false
+}
+
+/**
+ * Gates the reconciliation confirm (Phase 26 dialog) — true when there is
+ * user-authored work to potentially lose. This looks like a cosmetic
+ * predicate but is in fact the deletion gate: `reconcileUnstableIdGroup`
+ * consults it before replacing a scripture or imported group's slides
+ * wholesale with a fresh derivation. Without counting non-derivable entries
+ * (D-17: a video entry, or a text entry with authored content), a re-split
+ * passage or a re-imported deck would delete a user's dropped video with no
+ * confirm and no trace.
+ */
 export function hasCustomization(group: SlideGroup): boolean {
   if (group.bedAudioUrl || group.bedVideoUrl) return true
-  return group.slides.some((entry) => !!entry.label || !!entry.notes || !!entry.audioUrl)
+  return group.slides.some(
+    (entry) => !!entry.label || !!entry.notes || !!entry.audioUrl || isNonDerivableEntry(entry),
+  )
 }
 
 function isLyricEntry(
@@ -286,6 +317,19 @@ export function reconcileSongGroup(group: SlideGroup, slot: SongSlot, inputs: As
     }
   }
 
+  // D-17: any entry whose sourceRef is neither lyric nor copyright (a video
+  // entry appended by a drop, or a user-authored text entry) is not part of
+  // the lyric/copyright rebuild above and would otherwise silently disappear.
+  // Carry each through by value, preserving stored relative order, appended
+  // after the retained-but-unresolvable lyric run and before the trailing
+  // copyright entry — the exact position the rule above already uses.
+  const otherEntries = group.slides.filter(
+    (entry) => entry.sourceRef.kind !== 'lyric' && entry.sourceRef.kind !== 'copyright',
+  )
+  for (const entry of otherEntries) {
+    merged.push({ ...entry, order: order++ })
+  }
+
   merged.push(
     trailingCopyright
       ? { ...trailingCopyright, order: order++ }
@@ -315,7 +359,10 @@ function computeLoss(group: SlideGroup): { customizedEntries: number; withAudio:
   let withAudio = 0
   let withNotes = 0
   for (const entry of group.slides) {
-    if (entry.label || entry.notes || entry.audioUrl) customizedEntries++
+    // Counts non-derivable entries (D-17: a video entry, or authored text) as
+    // user work too, so the count a confirm dialog shows can never read zero
+    // while a video entry is at stake.
+    if (entry.label || entry.notes || entry.audioUrl || isNonDerivableEntry(entry)) customizedEntries++
     if (entry.audioUrl) withAudio++
     if (entry.notes) withNotes++
   }
