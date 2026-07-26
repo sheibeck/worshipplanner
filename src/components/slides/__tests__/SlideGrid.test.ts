@@ -1,10 +1,10 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import SlideGrid from '../SlideGrid.vue'
 import SlideCard from '../SlideCard.vue'
 import type { ServiceSlot } from '@/types/service'
 import type { AssembledSlide } from '@/types/slide'
-import type { PendingReconciliation } from '../slideDisplay'
+import type { PendingReconciliation, EnsureGroupMaterializedResult } from '../slideDisplay'
 
 function makeSlot(overrides: Partial<ServiceSlot> & { kind: ServiceSlot['kind']; id: string; position: number }): ServiceSlot {
   return { ...overrides } as ServiceSlot
@@ -27,6 +27,7 @@ function mountGrid(props: {
   assembledSlideshow?: AssembledSlide[]
   selectedSlideId?: string | null
   pendingReconciliations?: PendingReconciliation[]
+  ensureGroupMaterialized?: (slotId: string) => Promise<EnsureGroupMaterializedResult | undefined>
 }) {
   return mount(SlideGrid, {
     props: {
@@ -39,6 +40,7 @@ function mountGrid(props: {
       group: null,
       pendingReconciliations: props.pendingReconciliations ?? [],
       isEditor: true,
+      ensureGroupMaterialized: props.ensureGroupMaterialized ?? vi.fn().mockResolvedValue(undefined),
     },
   })
 }

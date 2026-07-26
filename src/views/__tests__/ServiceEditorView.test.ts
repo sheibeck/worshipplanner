@@ -1330,6 +1330,14 @@ describe('ServiceEditorView - Slides tab (Phase 25-03)', () => {
     expect(slidesTab.props('isEditor')).toBe(true)
   })
 
+  it('passes the on-demand group materializer down to the slides panel (25-05 Task 1)', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const slidesTab = wrapper.findComponent(SlidesTab)
+    expect(slidesTab.props('ensureGroupMaterialized')).toBeInstanceOf(Function)
+  })
+
   it('the slides panel is told it is active only while the Slides tab is selected', async () => {
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()

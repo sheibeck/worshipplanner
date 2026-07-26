@@ -22,6 +22,7 @@
         :group="selectedGroup"
         :pending-reconciliations="pendingReconciliations"
         :is-editor="isEditor"
+        :ensure-group-materialized="ensureGroupMaterialized"
         @select="onSelectSlide"
       />
     </div>
@@ -59,7 +60,7 @@ import type { AssembledSlide } from '@/types/slide'
 import type { SlideGroup } from '@/types/slideGroup'
 import SlidePlanRail from './SlidePlanRail.vue'
 import SlideGrid from './SlideGrid.vue'
-import type { PendingReconciliation } from './slideDisplay'
+import type { PendingReconciliation, EnsureGroupMaterializedResult } from './slideDisplay'
 
 const props = defineProps<{
   slots: ServiceSlot[]
@@ -72,6 +73,8 @@ const props = defineProps<{
   groupsLoading: boolean
   /** True while the Slides tab is the visible one in `ServiceEditorView`. */
   active: boolean
+  /** On-demand group materializer (25-05 Task 1), threaded down to the grid unused by this component itself. */
+  ensureGroupMaterialized: (slotId: string) => Promise<EnsureGroupMaterializedResult | undefined>
 }>()
 
 const selectedSlotId = ref<string | null>(null)

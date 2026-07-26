@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { shallowMount } from '@vue/test-utils'
 import SlidesTab from '../SlidesTab.vue'
 import SlidePlanRail from '../SlidePlanRail.vue'
@@ -38,6 +38,7 @@ function mountTab(props: {
       isEditor: true,
       groupsLoading: false,
       active: props.active ?? true,
+      ensureGroupMaterialized: vi.fn().mockResolvedValue(undefined),
     },
   })
 }
@@ -212,6 +213,27 @@ describe('SlidesTab', () => {
       const grid = wrapper.findComponent(SlideGrid)
       expect(grid.exists()).toBe(true)
       expect(grid.props('selectedSlot')).toBeNull()
+    })
+
+    it('passes ensureGroupMaterialized through to the grid unchanged (25-05 Task 1)', async () => {
+      const ensureGroupMaterialized = vi.fn().mockResolvedValue(undefined)
+      const wrapper = shallowMount(SlidesTab, {
+        props: {
+          slots: [makeSlot({ kind: 'PRAYER', id: 'slot-a', position: 0 })],
+          serviceId: 'service-1',
+          orgId: 'org-1',
+          assembledSlideshow: [],
+          groupsBySlotId: new Map(),
+          pendingReconciliations: [],
+          isEditor: true,
+          groupsLoading: false,
+          active: true,
+          ensureGroupMaterialized,
+        },
+      })
+      await wrapper.vm.$nextTick()
+      const grid = wrapper.findComponent(SlideGrid)
+      expect(grid.props('ensureGroupMaterialized')).toBe(ensureGroupMaterialized)
     })
   })
 })

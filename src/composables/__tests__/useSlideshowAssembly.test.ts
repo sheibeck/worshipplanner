@@ -1092,4 +1092,97 @@ describe('useSlideshowAssembly', () => {
       expect(videoSlide!.slide.id).toBe('entry-video')
     })
   })
+
+  // --- 25-05 Task 1: on-demand materialization for an explicit user write ---
+  describe('ensureGroupMaterialized (25-05 Task 1)', () => {
+    it('resolves with the existing group\'s entries and signature and calls no store create action when a group already exists', async () => {
+      slideGroupsState.groups = [
+        {
+          id: 'slot-hymn-a',
+          slotId: 'slot-hymn-a',
+          serviceId: 'service-1',
+          sourceSignature: 'sig-1',
+          slides: [{ id: 'existing-1', order: 0, sourceRef: { kind: 'text' } }],
+          createdAt: {} as never,
+          updatedAt: {} as never,
+        },
+      ]
+      const service = ref<Service | null>(makeService([hymnSlot({ position: 0, id: 'slot-hymn-a' })]))
+      const { ensureGroupMaterialized } = useSlideshowAssembly(service, 'org-1', { canWrite: true })
+      await nextTick()
+
+      const result = await ensureGroupMaterialized('slot-hymn-a')
+      expect(mockMaterializeGroupIfMissing).not.toHaveBeenCalled()
+      expect(result?.entries).toEqual([{ id: 'existing-1', order: 0, sourceRef: { kind: 'text' } }])
+      expect(result?.sourceSignature).toBe('sig-1')
+    })
+
+    it('creates the group and resolves with the derived entries when no group exists yet', async () => {
+      const service = ref<Service | null>(
+        makeService([hymnSlot({ position: 0, id: 'slot-hymn-b', hymnName: 'Hymn B' })]),
+      )
+      const { ensureGroupMaterialized } = useSlideshowAssembly(service, 'org-1', { canWrite: true })
+      await nextTick()
+
+      const result = await ensureGroupMaterialized('slot-hymn-b')
+      expect(mockMaterializeGroupIfMissing).toHaveBeenCalledTimes(1)
+      const [orgIdArg, input] = mockMaterializeGroupIfMissing.mock.calls[0]!
+      expect(orgIdArg).toBe('org-1')
+      expect((input as SlideGroup).slotId).toBe('slot-hymn-b')
+      expect(result?.entries).toEqual((input as SlideGroup).slides)
+      expect(result?.entries.length).toBeGreaterThan(0)
+    })
+
+    it('still creates a group for a slot whose source derives zero slides, resolving with an empty entry list', async () => {
+      const service = ref<Service | null>(
+        makeService([songSlot({ position: 0, id: 'slot-song-empty', songId: null })]),
+      )
+      const { ensureGroupMaterialized } = useSlideshowAssembly(service, 'org-1', { canWrite: true })
+      await nextTick()
+
+      const result = await ensureGroupMaterialized('slot-song-empty')
+      expect(mockMaterializeGroupIfMissing).toHaveBeenCalledTimes(1)
+      expect(result?.entries).toEqual([])
+    })
+
+    it('resolves without writing when the caller is not an editor', async () => {
+      const service = ref<Service | null>(makeService([hymnSlot({ position: 0, id: 'slot-hymn-c' })]))
+      const { ensureGroupMaterialized } = useSlideshowAssembly(service, 'org-1', { canWrite: false })
+      await nextTick()
+
+      const result = await ensureGroupMaterialized('slot-hymn-c')
+      expect(mockMaterializeGroupIfMissing).not.toHaveBeenCalled()
+      expect(result).toBeUndefined()
+    })
+
+    it('resolves undefined for a slot id that does not exist on the service', async () => {
+      const service = ref<Service | null>(makeService([hymnSlot({ position: 0, id: 'slot-hymn-d' })]))
+      const { ensureGroupMaterialized } = useSlideshowAssembly(service, 'org-1', { canWrite: true })
+      await nextTick()
+      await nextTick()
+      // The automatic watcher (Task 2, unrelated to this test) may already
+      // have materialized `slot-hymn-d` itself by this point — clear so only
+      // this test's own call against a NONEXISTENT slot id is asserted on.
+      mockMaterializeGroupIfMissing.mockClear()
+
+      const result = await ensureGroupMaterialized('slot-does-not-exist')
+      expect(result).toBeUndefined()
+      expect(mockMaterializeGroupIfMissing).not.toHaveBeenCalled()
+    })
+
+    it('issues at most one create for two concurrent calls on the same slot', async () => {
+      const service = ref<Service | null>(
+        makeService([hymnSlot({ position: 0, id: 'slot-hymn-e', hymnName: 'Hymn E' })]),
+      )
+      const { ensureGroupMaterialized } = useSlideshowAssembly(service, 'org-1', { canWrite: true })
+      await nextTick()
+
+      const [resultA, resultB] = await Promise.all([
+        ensureGroupMaterialized('slot-hymn-e'),
+        ensureGroupMaterialized('slot-hymn-e'),
+      ])
+      expect(mockMaterializeGroupIfMissing).toHaveBeenCalledTimes(1)
+      expect(resultA?.entries).toEqual(resultB?.entries)
+    })
+  })
 })

@@ -46,7 +46,7 @@
 
 <script setup lang="ts">
 /**
- * Presentational, prop-driven slide grid (Phase 25 Task 2). Renders the
+ * Presentational, prop-driven slide grid (Phase 25 Task 2, 25-04). Renders the
  * SELECTED plan item's slides as cards, in play order, and the three-line
  * header the mockup and 25-CONTEXT.md § Specific Ideas describe verbatim.
  *
@@ -60,8 +60,11 @@
  *
  * Ships no Grid/List toggle (D-09), no apply/reject/confirm affordance for a
  * pending reconciliation (Phase 26 owns that dialog, R033) and no drop tile
- * (25-06). The `group` and `isEditor` props are threaded through unused for
- * 25-05/25-06's group-header actions and group-music control.
+ * (25-06). The `group` and `isEditor` props are accepted and threaded through
+ * unused — reserved for 25-05/25-06's group-header actions and group-music
+ * control. `ensureGroupMaterialized` (25-05 Task 1) is likewise threaded
+ * through from `SlidesTab.vue` unused here — Task 2 is where this component
+ * first calls it.
  */
 import { computed } from 'vue'
 import type { ServiceSlot } from '@/types/service'
@@ -69,7 +72,7 @@ import type { AssembledSlide } from '@/types/slide'
 import type { SlideGroup } from '@/types/slideGroup'
 import { slotLabel } from '@/utils/slotTypes'
 import SlideCard from './SlideCard.vue'
-import { slotDisplayTitle, type PendingReconciliation } from './slideDisplay'
+import { slotDisplayTitle, type PendingReconciliation, type EnsureGroupMaterializedResult } from './slideDisplay'
 
 const props = defineProps<{
   /** The currently-selected plan item, or null when no plan item is selected. */
@@ -85,8 +88,10 @@ const props = defineProps<{
   /** The group document for the selected plan item, if materialized. Threaded through for 25-05/25-06. */
   group: SlideGroup | null
   pendingReconciliations: PendingReconciliation[]
-  /** Threaded through for 25-05/25-06's write controls; this plan ships none. */
+  /** Threaded through for 25-05/25-06's write controls; this plan ships none yet. */
   isEditor: boolean
+  /** On-demand group materializer (25-05 Task 1) — resolves a slot's group entries and stored source signature, creating the group first if it doesn't exist yet. Threaded through unused here; Task 2 adds the first caller (＋ Add slide). */
+  ensureGroupMaterialized: (slotId: string) => Promise<EnsureGroupMaterializedResult | undefined>
 }>()
 
 const emit = defineEmits<{

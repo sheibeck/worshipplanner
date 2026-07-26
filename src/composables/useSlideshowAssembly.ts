@@ -77,6 +77,20 @@ export interface PendingReconciliation {
   loss?: { customizedEntries: number; withAudio: number; withNotes: number }
 }
 
+/**
+ * Result of an on-demand materialization (25-05 Task 1): the group's current
+ * slide entries plus its stored source signature. Returned by value rather
+ * than left for the caller to re-derive from `groupsBySlotId`, because the
+ * store's write does not update that map until the Firestore snapshot round
+ * trip lands — a caller that re-read the map immediately after calling
+ * `ensureGroupMaterialized` would see an empty (or stale) list and append to
+ * it, destroying the entries this call just wrote.
+ */
+export interface EnsureGroupMaterializedResult {
+  entries: GroupSlideEntry[]
+  sourceSignature?: string
+}
+
 export interface UseSlideshowAssemblyReturn {
   assembledSlideshow: ComputedRef<AssembledSlide[]>
   assembledSections: ComputedRef<AssembledSection[]>
@@ -85,6 +99,20 @@ export interface UseSlideshowAssemblyReturn {
   groupsBySlotId: ComputedRef<Map<string, SlideGroup>>
   /** Confirm-required reconciliations awaiting the Phase 26 dialog — this phase ships the state, not the dialog. */
   pendingReconciliations: ComputedRef<PendingReconciliation[]>
+  /**
+   * On-demand group materializer (25-05 Task 1): resolves to `{ entries,
+   * sourceSignature }` for `slotId`'s group, creating it first if it does not
+   * exist yet — including when the derived input has ZERO slides, unlike the
+   * automatic `materializeCandidates` watcher below (that skip implements
+   * Phase 24 D-02's "groups are always populated" rule for AUTOMATIC
+   * materialization; this function only ever runs because a user just asked
+   * to put something into this plan item, R032). Resolves `undefined` when it
+   * cannot act (no service, no org, no such slot, or the caller cannot
+   * write). Every write path in 25-05/25-06/25-07 (add slide, drag-reorder,
+   * import, drop) resolves the group through this first rather than calling
+   * the store directly.
+   */
+  ensureGroupMaterialized: (slotId: string) => Promise<EnsureGroupMaterializedResult | undefined>
 }
 
 /**
@@ -287,6 +315,58 @@ export function useSlideshowAssembly(
     { immediate: true },
   )
 
+  // --- 25-05 Task 1: on-demand materialization for an explicit user write ---
+  //
+  // Concurrent calls for the SAME slot are deduped through `ensureInFlight` so
+  // at most one create is issued and every caller resolves the same result.
+  // Also participates in the shared `materializingSlotIds` guard so the
+  // automatic watcher above cannot fire a second create for a slot this
+  // function is already materializing — belt and braces on top of the
+  // store's deterministic doc id, which already makes the worst case of the
+  // reverse race (the automatic watcher already in flight when this function
+  // is called) a harmless overwrite rather than two divergent documents.
+  const ensureInFlight = new Map<string, Promise<EnsureGroupMaterializedResult | undefined>>()
+
+  async function ensureGroupMaterialized(slotId: string): Promise<EnsureGroupMaterializedResult | undefined> {
+    const svc = service.value
+    const orgId = resolvedOrgId.value
+    if (!svc || !orgId || !canWrite.value) return undefined
+    const slot = svc.slots.find((s) => s.id === slotId)
+    if (!slot) return undefined
+
+    const existing = slideGroupsStore.groupsBySlotId.get(slotId)
+    if (existing) {
+      return { entries: existing.slides, sourceSignature: existing.sourceSignature }
+    }
+
+    const inFlight = ensureInFlight.get(slotId)
+    if (inFlight) return inFlight
+
+    const promise = (async (): Promise<EnsureGroupMaterializedResult | undefined> => {
+      materializingSlotIds.add(slotId)
+      try {
+        const inputs: AssemblyInputs = {
+          songLyricsById,
+          performanceOrderById: performanceOrderById.value,
+          scriptureReadingsById: scriptureReadingsById.value,
+          importedDecksById: importedDecksById.value,
+          groupsBySlotId: slideGroupsStore.groupsBySlotId,
+        }
+        // Deliberately does NOT skip a zero-slide derivation the way
+        // `materializationCandidates` does above — see this function's own
+        // doc comment on `UseSlideshowAssemblyReturn.ensureGroupMaterialized`.
+        const input = buildInitialGroup(slot, svc.id, inputs)
+        await slideGroupsStore.materializeGroupIfMissing(orgId, input)
+        return { entries: input.slides, sourceSignature: input.sourceSignature }
+      } finally {
+        materializingSlotIds.delete(slotId)
+        ensureInFlight.delete(slotId)
+      }
+    })()
+    ensureInFlight.set(slotId, promise)
+    return promise
+  }
+
   // --- Task 3: trigger reconciliation, apply the additive result, surface the confirm-required ones ---
   //
   // Same synchronous-decision / async-effect split as materialization above,
@@ -416,5 +496,6 @@ export function useSlideshowAssembly(
     isLoading,
     groupsBySlotId,
     pendingReconciliations,
+    ensureGroupMaterialized,
   }
 }

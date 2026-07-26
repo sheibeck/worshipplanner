@@ -1093,6 +1093,7 @@
             :is-editor="authStore.isEditor"
             :groups-loading="slideGroupsStore.isLoading"
             :active="activeTab === 'slides'"
+            :ensure-group-materialized="ensureGroupMaterialized"
           />
         </div>
 
@@ -1479,6 +1480,7 @@ const {
   isLoading: slideshowLoading,
   groupsBySlotId,
   pendingReconciliations,
+  ensureGroupMaterialized,
 } = useSlideshowAssembly(localService, orgIdRef, { canWrite: computed(() => authStore.isEditor) })
 const presenting = ref(false)
 

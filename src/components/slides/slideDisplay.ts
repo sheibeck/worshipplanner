@@ -146,6 +146,18 @@ export interface PendingReconciliation {
 }
 
 /**
+ * Result shape of `useSlideshowAssembly`'s `ensureGroupMaterialized` (25-05
+ * Task 1) — mirrored here BY VALUE rather than imported, for the same reason
+ * `PendingReconciliation` is: nothing under `src/components/slides/` may
+ * import the assembly composable itself. `SlidesTab.vue` and `SlideGrid.vue`
+ * both type their `ensureGroupMaterialized` prop against this shape.
+ */
+export interface EnsureGroupMaterializedResult {
+  entries: GroupSlideEntry[]
+  sourceSignature?: string
+}
+
+/**
  * Extracts a human-readable filename from a Firebase Storage download URL
  * (`useMediaUpload`'s upload path is `orgs/{orgId}/media/{mediaId}/{fileName}`).
  * Used by the rail's group-music line to name the bed (25-UI-SPEC.md
