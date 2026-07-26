@@ -22,13 +22,13 @@ export const SERVICE_SECTION_LABELS: Record<ServiceSection, string> = {
 }
 
 /**
- * Media-attachment fields mixed into every `ServiceSlot` variant (Phase 22,
- * R013/R014). Media attaches at the SLOT level — service-scoped — and is
- * deliberately NOT part of the canonical song/scripture/deck content (D002):
- * an announcement video attached to one Sunday's slot must not follow the
- * song into every other service that references it. `slideshowAssembler`
- * copies these onto the first `AssembledSlide.slide` it emits for the slot
- * (see `SlideBase.audioUrl`/`videoUrl`).
+ * Mixed into every `ServiceSlot` variant to carry the slot's stable identity.
+ * Originally named for the Phase 22 slot-level media fields it also carried
+ * (R013/R014) — those fields were deleted under D-19 (the slide area has
+ * never shipped, so there was no legacy media worth preserving; media now
+ * lives exclusively on the `slideGroups/{slotId}` group bed, written via
+ * `setGroupBedMedia`). The interface name is kept because `id` is still what
+ * every `ServiceSlot` union member needs.
  */
 export interface MediaAttachableSlot {
   /**
@@ -39,8 +39,6 @@ export interface MediaAttachableSlot {
    * `position`, both of which a drag-reorder rewrites.
    */
   id: string
-  audioUrl?: string
-  videoUrl?: string
 }
 
 export interface SongSlot extends MediaAttachableSlot {

@@ -227,11 +227,6 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
 
   const assembled: AssembledSlide[] = []
   let globalPosition = 0
-  // Fallback-path-only bookkeeping: a slot with no materialized group yet
-  // keeps the pre-Phase-24 first-emitted-slide-only media rule (D-04
-  // REPLACES this rule on the group path — it is not extended there), so a
-  // not-yet-migrated service keeps behaving exactly as it did before.
-  const slotsWithMediaAttached = new Set<number>()
 
   const emitFallback = (
     slot: ServiceSlot,
@@ -242,13 +237,10 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
   ): void => {
     // Fallback ids derive from the slot's stable id (not the slot's array
     // index), so a pre-materialization render is stable across recomputes.
+    // No legacy slot-level audioUrl/videoUrl carry-over here (D-19) — the
+    // slide area has never shipped, so there is no legacy media to honor;
+    // a slot with no materialized group yet simply renders with no media.
     const slide = { ...content, id: `${slot.id}:${localSeq}`, position: globalPosition } as Slide
-    if (!slotsWithMediaAttached.has(slotIndex)) {
-      slotsWithMediaAttached.add(slotIndex)
-      if (slot.audioUrl) slide.audioUrl = slot.audioUrl
-      // A legacy slot-level videoUrl is dropped, not migrated (D-18/D-19) —
-      // there is no bed-video carrier left on SlideBase to assign it to.
-    }
     assembled.push({
       slide,
       slotIndex,

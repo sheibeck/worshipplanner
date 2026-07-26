@@ -86,10 +86,10 @@ export const useSlideGroups = defineStore('slideGroups', () => {
    * RESEARCH.md's "Don't Hand-Roll" section rules those out as unnecessary
    * complexity for a race whose worst case is an overwrite.
    *
-   * The caller supplies the already-migrated D-05 bed (bedAudioUrl, read from
-   * the slot's deprecated Phase 22 audioUrl) inside `input` — it lands in this
-   * SAME `setDoc` as the slides, so a group can never exist in a half-migrated
-   * state. The bed is audio-only (D-18) — there is no video bed field to migrate.
+   * `input` carries no bed by default (D-19 — the slot-media migration is
+   * gone; a freshly materialized group always starts with no bed) and lands
+   * in this SAME `setDoc` as the slides. The bed is audio-only (D-18) —
+   * there is no video bed field.
    */
   async function materializeGroupIfMissing(
     orgId: string,

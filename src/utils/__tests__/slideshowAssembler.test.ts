@@ -464,25 +464,7 @@ describe('assembleSlideshow — reorder ordering (R006)', () => {
 })
 
 describe('assembleSlideshow — media propagation (R013/R014)', () => {
-  it('a SONG slot with audioUrl set carries it ONLY on the first emitted (leading copyright) slide', () => {
-    const slot = songSlot({ songId: 'song-1', audioUrl: 'https://example.com/track.mp3' })
-    const service = makeService([slot])
-    const lyrics = makeSongLyrics()
-    const inputs = makeInputs({
-      songLyricsById: new Map([['song-1', lyrics]]),
-      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus']]]),
-    })
-
-    const result = assembleSlideshow(service, inputs)
-
-    expect(result).toHaveLength(4)
-    expect(result[0]!.slide.audioUrl).toBe('https://example.com/track.mp3')
-    expect(result[1]!.slide.audioUrl).toBeUndefined()
-    expect(result[2]!.slide.audioUrl).toBeUndefined()
-    expect(result[3]!.slide.audioUrl).toBeUndefined()
-  })
-
-  it('a slot with no media produces slides whose audioUrl is undefined', () => {
+  it('a slot with no group produces slides whose audioUrl is undefined (D-19: no legacy slot-media fallback)', () => {
     const slot = songSlot({ songId: 'song-1' })
     const service = makeService([slot])
     const lyrics = makeSongLyrics()
@@ -493,25 +475,10 @@ describe('assembleSlideshow — media propagation (R013/R014)', () => {
 
     const result = assembleSlideshow(service, inputs)
 
+    expect(result).toHaveLength(4)
     for (const assembled of result) {
       expect(assembled.slide.audioUrl).toBeUndefined()
     }
-  })
-
-  it('a legacy slot-level videoUrl (Phase 22) is dropped, not carried onto the emitted slide (D-18/D-19)', () => {
-    const slot: NonAssignableSlot = {
-      kind: 'MESSAGE',
-      id: 'slot-message-0',
-      position: 0,
-      videoUrl: 'https://example.com/announcement.mp4',
-    }
-    const service = makeService([slot])
-
-    const result = assembleSlideshow(service, makeInputs())
-
-    expect(result).toHaveLength(1)
-    expect('videoUrl' in result[0]!.slide).toBe(false)
-    expect(result[0]!.slide.audioUrl).toBeUndefined()
   })
 })
 
@@ -977,8 +944,8 @@ describe('assembleSlideshow — D-04 two-level audio precedence (R030)', () => {
     expect('audioUrl' in result[0]!.slide).toBe(false)
   })
 
-  it('a slot with no group still attaches its deprecated media to only its first emitted slide (fallback path unaffected by D-04)', () => {
-    const slot = songSlot({ id: 'slot-song-0', songId: 'song-1', audioUrl: 'https://example.com/legacy.mp3' })
+  it('a slot with no group emits slides with no audioUrl at all (D-19: no legacy slot-media fallback exists to attach)', () => {
+    const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
     const service = makeService([slot])
     const lyrics = makeSongLyrics()
     const inputs = makeInputs({
@@ -989,29 +956,10 @@ describe('assembleSlideshow — D-04 two-level audio precedence (R030)', () => {
     const result = assembleSlideshow(service, inputs)
 
     expect(result).toHaveLength(4)
-    expect(result[0]!.slide.audioUrl).toBe('https://example.com/legacy.mp3')
-    expect(result[1]!.slide.audioUrl).toBeUndefined()
-    expect(result[2]!.slide.audioUrl).toBeUndefined()
-    expect(result[3]!.slide.audioUrl).toBeUndefined()
+    for (const assembled of result) {
+      expect('audioUrl' in assembled.slide).toBe(false)
+    }
     expect(result[0]!.audioFromBed).toBeUndefined()
-  })
-
-  it('a legacy slot videoUrl (Phase 22, un-migrated) is ignored entirely — no slide carries a videoUrl (D-18/D-19: dropped, not migrated)', () => {
-    const slot = songSlot({
-      id: 'slot-song-0',
-      songId: 'song-1',
-      videoUrl: 'https://example.com/legacy.mp4',
-    })
-    const service = makeService([slot])
-    const lyrics = makeSongLyrics()
-    const inputs = makeInputs({
-      songLyricsById: new Map([['song-1', lyrics]]),
-      performanceOrderById: new Map([['song-1', ['verse-1']]]),
-    })
-
-    const result = assembleSlideshow(service, inputs)
-
-    expect(result.every((r) => !('videoUrl' in r.slide))).toBe(true)
   })
 })
 

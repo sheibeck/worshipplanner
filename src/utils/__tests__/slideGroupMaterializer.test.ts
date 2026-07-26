@@ -270,27 +270,7 @@ describe('deriveGroupEntries — PRAYER/MESSAGE/HYMN', () => {
 })
 
 describe('buildInitialGroup', () => {
-  it('copies audioUrl onto bedAudioUrl when present', () => {
-    const slot = songSlot({
-      id: 'slot-1',
-      songId: 'song-1',
-      audioUrl: 'https://example.com/a.mp3',
-    })
-    const lyrics = makeSongLyrics()
-    const inputs = makeInputs({
-      songLyricsById: new Map([['song-1', lyrics]]),
-      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus']]]),
-    })
-
-    const group = buildInitialGroup(slot, 'svc-1', inputs)
-
-    expect(group.bedAudioUrl).toBe('https://example.com/a.mp3')
-    expect(group.id).toBe('slot-1')
-    expect(group.slotId).toBe('slot-1')
-    expect(group.serviceId).toBe('svc-1')
-  })
-
-  it('omits bedAudioUrl entirely when the slot has none', () => {
+  it('never sets bedAudioUrl — no legacy slot-media migration exists under D-19', () => {
     const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
     const lyrics = makeSongLyrics()
     const inputs = makeInputs({
@@ -301,37 +281,9 @@ describe('buildInitialGroup', () => {
     const group = buildInitialGroup(slot, 'svc-1', inputs)
 
     expect('bedAudioUrl' in group).toBe(false)
-  })
-
-  it("does not clear or rewrite the slot's deprecated audioUrl field", () => {
-    const slot = songSlot({ id: 'slot-1', songId: 'song-1', audioUrl: 'https://example.com/a.mp3' })
-    const lyrics = makeSongLyrics()
-    const inputs = makeInputs({
-      songLyricsById: new Map([['song-1', lyrics]]),
-      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus']]]),
-    })
-
-    buildInitialGroup(slot, 'svc-1', inputs)
-
-    expect(slot.audioUrl).toBe('https://example.com/a.mp3')
-  })
-
-  it('a legacy slot videoUrl (Phase 22, un-migrated) produces no bed field on the materialized group (D-18/D-19: dropped, not migrated)', () => {
-    const slot = songSlot({
-      id: 'slot-1',
-      songId: 'song-1',
-      videoUrl: 'https://example.com/a.mp4',
-    })
-    const lyrics = makeSongLyrics()
-    const inputs = makeInputs({
-      songLyricsById: new Map([['song-1', lyrics]]),
-      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus']]]),
-    })
-
-    const group = buildInitialGroup(slot, 'svc-1', inputs)
-
-    expect(Object.keys(group).filter((k) => k.toLowerCase().includes('video'))).toEqual([])
-    expect(group.slides.every((entry) => entry.sourceRef.kind !== 'video')).toBe(true)
+    expect(group.id).toBe('slot-1')
+    expect(group.slotId).toBe('slot-1')
+    expect(group.serviceId).toBe('svc-1')
   })
 })
 

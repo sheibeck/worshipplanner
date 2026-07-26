@@ -512,22 +512,18 @@ describe('useSlideshowAssembly', () => {
       expect(mockMaterializeGroupIfMissing).not.toHaveBeenCalled()
     })
 
-    it('a SONG slot with songId null produces no call; assigning a song later produces exactly one call carrying bedAudioUrl', async () => {
+    it('a SONG slot with songId null produces no call; assigning a song later produces exactly one call carrying no bed (D-19: no legacy slot-media migration)', async () => {
       const fakeLyricsLoader = vi.fn(async (_orgId: string, songId: string) => makeLyrics(songId))
       songsState.songs = [{ id: 'song-a', performanceOrder: ['v1'] } as Song]
       const service = ref<Service | null>(
-        makeService([
-          songSlot({ position: 0, id: 'slot-song-a', songId: null, audioUrl: 'https://cdn/bed.mp3' }),
-        ]),
+        makeService([songSlot({ position: 0, id: 'slot-song-a', songId: null })]),
       )
       useSlideshowAssembly(service, 'org-1', { canWrite: true, lyricsLoader: fakeLyricsLoader })
       await nextTick()
       await nextTick()
       expect(mockMaterializeGroupIfMissing).not.toHaveBeenCalled()
 
-      service.value = makeService([
-        songSlot({ position: 0, id: 'slot-song-a', songId: 'song-a', audioUrl: 'https://cdn/bed.mp3' }),
-      ])
+      service.value = makeService([songSlot({ position: 0, id: 'slot-song-a', songId: 'song-a' })])
       await nextTick()
       await vi.waitFor(() => expect(fakeLyricsLoader).toHaveBeenCalled())
       await nextTick()
@@ -536,7 +532,7 @@ describe('useSlideshowAssembly', () => {
       expect(mockMaterializeGroupIfMissing).toHaveBeenCalledTimes(1)
       const [, input] = mockMaterializeGroupIfMissing.mock.calls[0]!
       expect((input as SlideGroup).slotId).toBe('slot-song-a')
-      expect((input as SlideGroup).bedAudioUrl).toBe('https://cdn/bed.mp3')
+      expect('bedAudioUrl' in (input as SlideGroup)).toBe(false)
     })
 
     it('reordering slots after materialization settles issues zero further materialization calls', async () => {

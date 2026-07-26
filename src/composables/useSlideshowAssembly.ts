@@ -212,7 +212,7 @@ export function useSlideshowAssembly(
   // of the Map captured at setup time.
   const groupsBySlotId = computed<Map<string, SlideGroup>>(() => slideGroupsStore.groupsBySlotId)
 
-  // --- Task 2: lazy materialization (D-05 migration), zero writes on reorder ---
+  // --- Task 2: lazy materialization, zero writes on reorder ---
   //
   // `materializationCandidates` is a fully SYNCHRONOUS computed that decides
   // WHAT needs materializing. This matters: an async function body passed to
@@ -252,9 +252,7 @@ export function useSlideshowAssembly(
       // A source resolving to zero slides (a SONG slot with no song
       // assigned, or lyrics not yet loaded) materializes NO group — D-02's
       // "groups are always populated" is satisfied by not creating a
-      // document at all, not by creating an empty one. The slot's
-      // deprecated Phase-22 media stays readable on the slot in this
-      // window and is picked up the moment the source resolves.
+      // document at all, not by creating an empty one.
       if (input.slides.length === 0) continue
 
       candidates.push({ slotId: slot.id, orgId, input })

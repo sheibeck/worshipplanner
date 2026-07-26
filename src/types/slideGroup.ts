@@ -37,7 +37,7 @@ export interface SlideGroup {
   serviceId: string
   /** Redundant with `id`, kept explicit for query readability and the delete cascade. */
   slotId: string
-  /** Group-level audio bed (migrated from Phase 22's `MediaAttachableSlot.audioUrl`, D-05). */
+  /** Group-level audio bed, set via `setGroupBedMedia` (D-18); no legacy slot-media migration feeds this (D-19). */
   bedAudioUrl?: string
   /** Opaque signature of the source content this group was last materialized/reconciled against. */
   sourceSignature?: string

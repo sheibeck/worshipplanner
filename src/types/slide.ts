@@ -19,10 +19,9 @@ export interface SlideBase {
    * is filled by two-level precedence — the entry's OWN audio first, falling
    * back to the group's `bedAudioUrl`. The bed is audio-only (D-18) — video is
    * slide-only and never has a bed carrier. For a slot with no materialized
-   * group yet, the deprecated slot-level `audioUrl` field still lands on only
-   * the first emitted slide (the pre-Phase-24 behaviour), preserved for data
-   * that has not migrated. Never persisted standalone on the (ephemeral,
-   * regenerated) assembled slide.
+   * group yet, this is simply unset — there is no legacy slot-level media
+   * fallback (D-19: the slide area has never shipped). Never persisted
+   * standalone on the (ephemeral, regenerated) assembled slide.
    */
   audioUrl?: string
   /**

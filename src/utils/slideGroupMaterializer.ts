@@ -155,14 +155,12 @@ export function sourceSignature(slot: ServiceSlot, inputs: AssemblyInputs): stri
 
 /**
  * Builds the input a group is first materialized from. Sets `id`/`slotId` to
- * `slot.id` (D-01's anchor), derives `slides`, computes `sourceSignature`,
- * and performs the D-05 migration's audio half: copies the slot's deprecated
- * `audioUrl` onto `bedAudioUrl`, omitting the key entirely (conditional
- * spread, matching `createSlot()`'s discipline) when the slot field is
- * absent. It READS that deprecated slot field; it never clears or rewrites
- * it, so a half-migrated organization can never lose audio. The video half of
- * D-05 is gone: a legacy slot `videoUrl` is dropped, not migrated (D-18/D-19)
- * — there is no video bed field left to migrate it onto.
+ * `slot.id` (D-01's anchor), derives `slides`, and computes `sourceSignature`.
+ * The D-05 slot-media migration (copying a legacy slot `audioUrl`/`videoUrl`
+ * onto the group bed) is gone entirely under D-19 — the slide area has never
+ * been deployed, so there is no legacy slot media to carry forward. A newly
+ * materialized group always starts with no bed; `setGroupBedMedia` is the
+ * only way one is ever set.
  */
 export function buildInitialGroup(slot: ServiceSlot, serviceId: string, inputs: AssemblyInputs): SlideGroupInput {
   const signature = sourceSignature(slot, inputs)
@@ -172,7 +170,6 @@ export function buildInitialGroup(slot: ServiceSlot, serviceId: string, inputs: 
     serviceId,
     slides: deriveGroupEntries(slot, inputs),
     ...(signature !== undefined ? { sourceSignature: signature } : {}),
-    ...(slot.audioUrl ? { bedAudioUrl: slot.audioUrl } : {}),
   }
 }
 

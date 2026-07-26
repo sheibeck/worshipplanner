@@ -1206,7 +1206,7 @@ describe('ServiceEditorView - slot media control retargeted at the group bed (Ph
     expect(mockUpdateService).not.toHaveBeenCalled()
   })
 
-  it('the control displays the url from the group bed, not the deprecated slot field', async () => {
+  it('the control displays the url from the group bed', async () => {
     mockSlideGroupsState.groups = [
       buildGroup('slot-0', {
         bedAudioUrl: 'https://example.com/persisted-audio.mp3',
@@ -1219,61 +1219,13 @@ describe('ServiceEditorView - slot media control retargeted at the group bed (Ph
     expect(control.props('audioUrl')).toBe('https://example.com/persisted-audio.mp3')
   })
 
-  // WR-02 regression: before the group materializes, the control must fall
-  // back to the slot's own deprecated audioUrl rather than render as if no
-  // media is attached at all.
-  it('falls back to the slot\'s own deprecated audioUrl when no group has materialized yet (WR-02)', async () => {
+  it('shows no attached media for a slot whose group has not materialized yet (D-19: no legacy slot-media fallback)', async () => {
     mockSlideGroupsState.groups = [] // no group at all for slot-0 yet
-    mockServicesList = [{
-      ...mockService,
-      slots: [
-        {
-          kind: 'SONG',
-          id: 'slot-0',
-          position: 0,
-          requiredVwType: 1,
-          songId: 'song-1',
-          songTitle: 'Amazing Grace',
-          songKey: 'G',
-          audioUrl: 'https://example.com/legacy-audio.mp3',
-        },
-        ...mockService.slots.slice(1),
-      ],
-    }]
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
 
     const control = wrapper.findComponent(SlotMediaAttachment)
-    expect(control.props('audioUrl')).toBe('https://example.com/legacy-audio.mp3')
-  })
-
-  it('prefers the materialized group bed over the slot\'s deprecated fields when both are present', async () => {
-    mockSlideGroupsState.groups = [
-      buildGroup('slot-0', {
-        bedAudioUrl: 'https://example.com/group-audio.mp3',
-      }),
-    ]
-    mockServicesList = [{
-      ...mockService,
-      slots: [
-        {
-          kind: 'SONG',
-          id: 'slot-0',
-          position: 0,
-          requiredVwType: 1,
-          songId: 'song-1',
-          songTitle: 'Amazing Grace',
-          songKey: 'G',
-          audioUrl: 'https://example.com/legacy-audio.mp3',
-        },
-        ...mockService.slots.slice(1),
-      ],
-    }]
-    const wrapper = await mountView()
-    await wrapper.vm.$nextTick()
-
-    const control = wrapper.findComponent(SlotMediaAttachment)
-    expect(control.props('audioUrl')).toBe('https://example.com/group-audio.mp3')
+    expect(control.props('audioUrl')).toBeUndefined()
   })
 
   it('attaching to a slot whose group has not materialized yet succeeds without throwing', async () => {

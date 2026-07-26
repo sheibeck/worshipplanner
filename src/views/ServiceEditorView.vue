@@ -928,11 +928,11 @@
                    retargeted at the group bed in Phase 24-06, R030; audio-only per D-18):
                    editor only, hidden when exported, matching sibling slot controls.
                    Collapsed/compact so it doesn't crowd the slot row; the displayed url
-                   reads the anchored group's bed first, falling back to the slot's own
-                   deprecated field when no group exists yet (WR-02) and the write goes
-                   straight to slideGroups via setGroupBedMedia (onSlotBedAudioChange
-                   below) — a deliberately separate, scoped write path, NOT the
-                   localService deep-watch autosave. -->
+                   reads ONLY the anchored group's bed (D-19: no legacy slot-level
+                   fallback) and the write goes straight to slideGroups via
+                   setGroupBedMedia (onSlotBedAudioChange below) — a deliberately
+                   separate, scoped write path, NOT the localService deep-watch
+                   autosave. -->
               <SlotMediaAttachment
                 v-if="authStore.isEditor && !isExportedLocked"
                 :orgId="authStore.orgId!"
@@ -1438,20 +1438,14 @@ function onSectionChange(index: number, value: string) {
 }
 
 /**
- * WR-02: the media control's bound value reads ONLY the materialized group's
- * bed field, never the slot's own deprecated `audioUrl` (`MediaAttachableSlot`).
- * For any slot whose group hasn't materialized yet — every slot viewed by a
- * non-editor (`canWrite` gates materialization to `[]` for viewers), and any
- * SONG/SCRIPTURE/IMPORTED slot whose source isn't assigned yet — the control
- * would render as if no media is attached even though the legacy field on the
- * slot document still carries a real URL. Falls back to the slot's own
- * legacy field when no group exists yet, mirroring the read-precedence
- * already used elsewhere in this phase (group value first, slot legacy value
- * second). Audio-only (D-18/D-19) — there is no video-bed equivalent; a
- * legacy slot-level `videoUrl` is dropped, not read or migrated.
+ * The media control's bound value reads ONLY the materialized group's bed
+ * field (D-19: no legacy fallback for slide-area data — the slide area has
+ * never shipped, so there is no deprecated slot-level `audioUrl` worth
+ * reading). A slot whose group hasn't materialized yet simply shows no
+ * attached media, exactly like a slot that never had any.
  */
 function displaySlotAudioUrl(slot: ServiceSlot): string | undefined {
-  return groupsBySlotId.value.get(slot.id)?.bedAudioUrl ?? slot.audioUrl
+  return groupsBySlotId.value.get(slot.id)?.bedAudioUrl
 }
 
 /** Editor-only per-slot group-BED audio attach/remove (Phase 22, R013/R014 —
