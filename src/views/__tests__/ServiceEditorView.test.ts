@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
-import { shallowMount } from '@vue/test-utils'
+import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from 'vitest'
+import { shallowMount, enableAutoUnmount } from '@vue/test-utils'
 import { reactive } from 'vue'
 import type { Service } from '@/types/service'
 import type { Song } from '@/types/song'
@@ -7,6 +7,18 @@ import type { Person, Role, Quarter } from '@/types/roster'
 import type { Timestamp } from 'firebase/firestore'
 import SlideshowPreview from '@/components/SlideshowPreview.vue'
 import PresentationViewer from '@/components/PresentationViewer.vue'
+
+// Every test in this file mounts ServiceEditorView (a large component with a
+// live autosave debounce timer + Sortable instance) but historically never
+// unmounted the wrapper. Left un-unmounted, a test that mutates localService
+// without waiting out the 800ms autosave debounce leaves a REAL timer running
+// in the background — which can fire during a LATER test's own wait window
+// and pollute the shared `mockUpdateService` spy's call count (Phase 24-06
+// discovery: this blocked the new backfill tests' own call-count assertions,
+// Rule 3). `enableAutoUnmount` runs `wrapper.unmount()` after every test,
+// which triggers ServiceEditorView's existing `onUnmounted` cleanup
+// (clearTimeout(autosaveTimer), sortableInstance?.destroy()).
+enableAutoUnmount(afterEach)
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -146,6 +158,9 @@ const mockSetRoleOverride = vi.fn(
   (_serviceId: string, _roleId: string, _personIds: string[]) => Promise.resolve(),
 )
 const mockClearRoleOverride = vi.fn(() => Promise.resolve())
+// Hoisted (not created fresh per useServiceStore() call) so the Phase 24-06
+// backfill tests below can inspect what the autosave path actually persisted.
+const mockUpdateService = vi.fn(() => Promise.resolve())
 
 vi.mock('@/stores/services', () => ({
   useServiceStore: () => ({
@@ -153,7 +168,7 @@ vi.mock('@/stores/services', () => ({
     isLoading: false,
     orgId: null,
     subscribe: vi.fn(),
-    updateService: vi.fn(() => Promise.resolve()),
+    updateService: mockUpdateService,
     assignSongToSlot: vi.fn(() => Promise.resolve()),
     clearSongFromSlot: vi.fn(() => Promise.resolve()),
     setRoleOverride: mockSetRoleOverride,
@@ -654,5 +669,150 @@ describe('ServiceEditorView - Section headers and slideshow preview (Phase 20-04
     const wrapper = await mountView()
 
     expect(wrapper.find('[data-testid="section-select"]').exists()).toBe(false)
+  })
+})
+
+// ── Slot id backfill on load (Phase 24-06 Task 1, R028) ─────────────────────────
+
+describe('ServiceEditorView - slot id backfill on load (Phase 24-06 Task 1)', () => {
+  async function mountView() {
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          RouterLink: { template: '<a><slot /></a>' },
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+        },
+      },
+    })
+  }
+
+  // Simulates a pre-Phase-24 Firestore document: every slot lacks `id`. Real
+  // legacy documents predate the TS type change, so bypassing it here with a
+  // cast is the honest way to reproduce that shape.
+  function buildLegacyService(): Service {
+    return {
+      ...mockService,
+      slots: mockService.slots.map((slot) => {
+        const clone: Record<string, unknown> = { ...(slot as unknown as Record<string, unknown>) }
+        delete clone.id
+        return clone
+      }),
+    } as unknown as Service
+  }
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockUpdateService.mockClear()
+  })
+
+  it('legacy (id-less) service loads with isDirty false and schedules no autosave through the debounce window', async () => {
+    mockServicesList = [buildLegacyService()]
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    // If the backfill didn't apply identically to BOTH localService and
+    // originalService, the JSON.stringify comparison behind isDirty would
+    // mismatch immediately on load, rendering the "Unsaved changes" badge.
+    expect(wrapper.text()).not.toContain('Unsaved changes')
+
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    expect(mockUpdateService).not.toHaveBeenCalled()
+  })
+
+  it('a service whose slots already have ids is untouched (no false dirty, no id churn)', async () => {
+    mockServicesList = [{ ...mockService }] // default fixture: every slot already carries an id
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.text()).not.toContain('Unsaved changes')
+
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    expect(mockUpdateService).not.toHaveBeenCalled()
+  })
+
+  it('backfilled ids are identical across localService and originalService and persist through the next real save', async () => {
+    mockServicesList = [buildLegacyService()]
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    // Trigger an explicit edit so isDirty flips true and autosave schedules —
+    // the same section-select idiom used by the Phase 20-04 tests above.
+    const selects = wrapper.findAll('[data-testid="section-select"]')
+    expect(selects.length).toBeGreaterThan(1)
+    // The autosave watcher's very FIRST deep-watch trigger is always consumed
+    // by the `autosaveInitialized` guard (by design — see the watcher's own
+    // comment). In production that first trigger is the load event itself;
+    // here it's this throwaway edit instead, because the mock store resolves
+    // synchronously so the load watcher's `{ immediate: true }` fires and
+    // assigns `localService.value` BEFORE the autosave watcher is even
+    // created (it's declared later in the script) — so the load reassignment
+    // has no watcher yet to consume it. The SECOND edit below is the one
+    // this test actually asserts against.
+    await selects[0]!.setValue('worship')
+    await selects[1]!.setValue('message')
+
+    await new Promise((resolve) => setTimeout(resolve, 900))
+
+    expect(mockUpdateService).toHaveBeenCalledTimes(1)
+    const payload = mockUpdateService.mock.calls[0]![1] as { slots: Array<{ id?: string }> }
+    const ids = payload.slots.map((s) => s.id)
+    // Every slot got a real, non-empty id...
+    expect(ids.every((id) => typeof id === 'string' && id.length > 0)).toBe(true)
+    // ...and none of them collide — proving isDirty stayed false pre-edit
+    // (see previous test) is only possible if localService/originalService
+    // held byte-identical ids at load, and that those ids survive untouched
+    // into the very next legitimate save.
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  it('a second identical id-less remote snapshot does not change previously backfilled ids (R028 remote-merge stability)', async () => {
+    const reactiveServices = reactive([buildLegacyService()])
+    mockServicesList = reactiveServices as unknown as Service[]
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    // First save: a throwaway edit absorbs the autosave watcher's very first
+    // trigger (the `autosaveInitialized` guard — see the previous test's
+    // comment for why that's this edit rather than the load event in this
+    // synchronous-mock environment); the second edit is the real one this
+    // save's ids are captured from.
+    let selects = wrapper.findAll('[data-testid="section-select"]')
+    await selects[0]!.setValue('worship')
+    await selects[1]!.setValue('message')
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    expect(mockUpdateService).toHaveBeenCalledTimes(1)
+    const firstPayload = mockUpdateService.mock.calls[0]![1] as { slots: Array<{ id?: string }> }
+    const firstIds = firstPayload.slots.map((s) => s.id)
+    // Guard against a vacuous pass: without backfill every id would be
+    // `undefined`, and `[undefined, ...] === [undefined, ...]` would trivially
+    // satisfy the final equality check below without ever proving a real id
+    // was minted and reused.
+    expect(firstIds.every((id) => typeof id === 'string' && id.length > 0)).toBe(true)
+
+    // Simulate a second remote snapshot of the SAME still-id-less document
+    // (e.g. a stale re-emission) — the remote-merge branch must reuse the
+    // ids already held locally, not mint fresh ones. The reassignment inside
+    // the load watcher resets `autosaveInitialized = false` and ALSO fires
+    // the autosave watcher itself (a top-level ref reassignment always
+    // triggers regardless of deep), so that reset is consumed by the merge
+    // event itself — no extra throwaway edit is needed here.
+    reactiveServices[0] = buildLegacyService()
+    await wrapper.vm.$nextTick()
+
+    // Third edit + save: the ids captured this time must match the first.
+    selects = wrapper.findAll('[data-testid="section-select"]')
+    await selects[2]!.setValue('sending')
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    expect(mockUpdateService).toHaveBeenCalledTimes(2)
+    const secondPayload = mockUpdateService.mock.calls[1]![1] as { slots: Array<{ id?: string }> }
+    const secondIds = secondPayload.slots.map((s) => s.id)
+
+    expect(secondIds).toEqual(firstIds)
   })
 })
