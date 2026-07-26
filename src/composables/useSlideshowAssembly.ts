@@ -19,11 +19,11 @@ import { useImportedSlides } from '@/stores/importedSlides'
 import { useSongStore } from '@/stores/songs'
 import { useSlideGroups } from '@/stores/slideGroups'
 import { assembleSlideshow, type AssemblyInputs } from '@/utils/slideshowAssembler'
-import { buildInitialGroup } from '@/utils/slideGroupMaterializer'
+import { buildInitialGroup, reconcileGroup, sourceSignature, type ReconcileResult } from '@/utils/slideGroupMaterializer'
 import { SERVICE_SECTIONS, SERVICE_SECTION_LABELS, type Service } from '@/types/service'
 import type { AssembledSlide, AssembledSection } from '@/types/slide'
 import type { SongLyrics } from '@/types/songLyrics'
-import type { SlideGroup, SlideGroupInput } from '@/types/slideGroup'
+import type { SlideGroup, SlideGroupInput, GroupSlideEntry } from '@/types/slideGroup'
 
 /** Loads the current (newest) lyrics doc for a song. Injectable for tests. */
 export type LyricsLoader = (orgId: string, songId: string) => Promise<SongLyrics | null>
@@ -65,12 +65,26 @@ export interface UseSlideshowAssemblyOptions {
   canWrite?: Ref<boolean> | ComputedRef<boolean> | boolean
 }
 
+/**
+ * A confirm-required reconciliation (Task 3, D-02): a source diverged against
+ * a customized group, so nothing was written — the Phase 26 confirm dialog
+ * renders against this entry instead. Deduplicated by `slotId` (a Map, not an
+ * array) so a repeated watcher tick can never append a second entry.
+ */
+export interface PendingReconciliation {
+  slotId: string
+  proposed: GroupSlideEntry[]
+  loss?: { customizedEntries: number; withAudio: number; withNotes: number }
+}
+
 export interface UseSlideshowAssemblyReturn {
   assembledSlideshow: ComputedRef<AssembledSlide[]>
   assembledSections: ComputedRef<AssembledSection[]>
   isLoading: Ref<boolean>
   /** Re-exposed from the `slideGroups` store so consumers (24-06's delete warning) don't subscribe a second time. */
   groupsBySlotId: ComputedRef<Map<string, SlideGroup>>
+  /** Confirm-required reconciliations awaiting the Phase 26 dialog — this phase ships the state, not the dialog. */
+  pendingReconciliations: ComputedRef<PendingReconciliation[]>
 }
 
 /**
@@ -87,10 +101,6 @@ export function useSlideshowAssembly(
   const scriptureStore = useScriptureSlides()
   const importedStore = useImportedSlides()
   const songStore = useSongStore()
-  // The store's own subscription (subscribeGroups) is wired in 24-05; until
-  // then groupsBySlotId is legitimately empty and assembleSlideshow's
-  // fallback path produces today's output, so the app is coherent at every
-  // commit between here and 24-05/24-06.
   const slideGroupsStore = useSlideGroups()
   const loadLyrics = options?.lyricsLoader ?? defaultLyricsLoader
 
@@ -279,6 +289,100 @@ export function useSlideshowAssembly(
     { immediate: true },
   )
 
+  // --- Task 3: trigger reconciliation, apply the additive result, surface the confirm-required ones ---
+  //
+  // Same synchronous-decision / async-effect split as materialization above,
+  // for the same reason (async watch bodies only track pre-await reads).
+  interface ReconciliationOutcome {
+    slotId: string
+    orgId: string
+    group: SlideGroup
+    result: ReconcileResult
+    /** Precomputed here (synchronously, inside the tracked computed) rather than re-derived in the async apply step. */
+    freshSignature?: string
+  }
+
+  const reconciliationOutcomes = computed<ReconciliationOutcome[]>(() => {
+    const svc = service.value
+    const orgId = resolvedOrgId.value
+    if (!svc || !orgId || !canWrite.value) return []
+
+    const inputs: AssemblyInputs = {
+      songLyricsById,
+      performanceOrderById: performanceOrderById.value,
+      scriptureReadingsById: scriptureReadingsById.value,
+      importedDecksById: importedDecksById.value,
+      groupsBySlotId: slideGroupsStore.groupsBySlotId,
+    }
+
+    const outcomes: ReconciliationOutcome[] = []
+    for (const slot of svc.slots) {
+      const group = slideGroupsStore.groupsBySlotId.get(slot.id)
+      if (!group) continue
+      const result = reconcileGroup(group, slot, inputs)
+      if (!result.changed && !result.needsConfirm) continue
+      outcomes.push({
+        slotId: slot.id,
+        orgId,
+        group,
+        result,
+        freshSignature: sourceSignature(slot, inputs),
+      })
+    }
+    return outcomes
+  })
+
+  // Reactive, keyed by slotId (Task 3's "surface the confirm-required ones").
+  // A Map dedupes by construction — re-setting the same key on a later
+  // watcher tick is a no-op-shaped overwrite, never a second entry.
+  const pendingReconciliationsMap = reactive(new Map<string, PendingReconciliation>())
+
+  // Applied-outcome guard: since a mocked/just-written store doesn't
+  // necessarily produce a NEW `SlideGroup` object on every recompute, this
+  // tracks the exact stored group object reference already reconciled for a
+  // slot, so a repeated watcher tick against the SAME unreconciled stored
+  // state never re-issues `replaceGroupSlides` a second time. Only a genuine
+  // new stored group (a fresh onSnapshot after the write lands) clears it.
+  const appliedGroupRefForSlot = new Map<string, SlideGroup>()
+
+  async function applyReconciliationOutcomes(outcomes: ReconciliationOutcome[]) {
+    for (const outcome of outcomes) {
+      if (outcome.result.needsConfirm) {
+        if (!pendingReconciliationsMap.has(outcome.slotId)) {
+          pendingReconciliationsMap.set(outcome.slotId, {
+            slotId: outcome.slotId,
+            proposed: outcome.result.proposed ?? [],
+            loss: outcome.result.loss,
+          })
+        }
+        continue
+      }
+
+      if (!outcome.result.changed) continue
+      if (appliedGroupRefForSlot.get(outcome.slotId) === outcome.group) continue
+      appliedGroupRefForSlot.set(outcome.slotId, outcome.group)
+
+      await slideGroupsStore.replaceGroupSlides(
+        outcome.orgId,
+        outcome.slotId,
+        outcome.result.slides,
+        outcome.freshSignature,
+      )
+    }
+  }
+
+  const stopReconcileWatch = watch(
+    reconciliationOutcomes,
+    (outcomes) => {
+      void applyReconciliationOutcomes(outcomes)
+    },
+    { immediate: true },
+  )
+
+  const pendingReconciliations = computed<PendingReconciliation[]>(() =>
+    Array.from(pendingReconciliationsMap.values()),
+  )
+
   const assembledSections = computed<AssembledSection[]>(() => {
     const slides = assembledSlideshow.value
     const groups: AssembledSection[] = []
@@ -303,6 +407,7 @@ export function useSlideshowAssembly(
     stopOrgWatch()
     stopLyricsWatch()
     stopMaterializeWatch()
+    stopReconcileWatch()
   }
 
   onUnmounted(cleanup)
@@ -312,5 +417,6 @@ export function useSlideshowAssembly(
     assembledSections,
     isLoading,
     groupsBySlotId,
+    pendingReconciliations,
   }
 }
