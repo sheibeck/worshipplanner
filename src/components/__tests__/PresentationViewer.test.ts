@@ -615,6 +615,63 @@ describe('PresentationViewer', () => {
     }
   }
 
+  // ── Phase 24 (R030/D-04): group-bed-resolved fixtures ──────────────────────
+
+  function bedAudioSlide(id: string, groupId: string, url: string): AssembledSlide {
+    return {
+      slide: {
+        id,
+        position: 6,
+        contentKind: 'text',
+        body: `Bed audio slide ${id}`,
+        audioUrl: url,
+      },
+      slotIndex: 5,
+      slotKind: 'IMPORTED',
+      section: 'worship',
+      sourceId: 'audio-1',
+      groupId,
+      groupSlideId: id,
+      audioFromBed: true,
+    }
+  }
+
+  function bedVideoSlide(id: string, groupId: string, url: string): AssembledSlide {
+    return {
+      slide: {
+        id,
+        position: 5,
+        contentKind: 'text',
+        body: `Bed video slide ${id}`,
+        videoUrl: url,
+      },
+      slotIndex: 4,
+      slotKind: 'IMPORTED',
+      section: 'worship',
+      sourceId: 'video-1',
+      groupId,
+      groupSlideId: id,
+      videoFromBed: true,
+    }
+  }
+
+  function loopingAudioSlide(id: string, url: string): AssembledSlide {
+    return {
+      slide: {
+        id,
+        position: 6,
+        contentKind: 'text',
+        body: `Looping audio slide ${id}`,
+        audioUrl: url,
+        audioLoop: true,
+      },
+      slotIndex: 5,
+      slotKind: 'IMPORTED',
+      section: 'worship',
+      sourceId: 'audio-1',
+    }
+  }
+
   describe('media playback', () => {
     beforeEach(() => {
       // jsdom does not implement HTMLMediaElement.play/pause — stub per test.
@@ -806,6 +863,83 @@ describe('PresentationViewer', () => {
       wrapper.unmount()
 
       expect(window.HTMLMediaElement.prototype.pause).toHaveBeenCalled()
+    })
+
+    // ── Task 3 (Phase 24, R030/D-04): loop pass-through + group-bed keying ──
+
+    it("passes the current slide's audioLoop through to AudioPlayer, rendering the native loop attribute", async () => {
+      mount(PresentationViewer, {
+        props: { slides: [loopingAudioSlide('a1', 'https://example.com/clip.mp3')] },
+      })
+      await flushPromises()
+
+      expect(body().find('[data-testid="presentation-audio"] audio').attributes('loop')).toBeDefined()
+    })
+
+    it('a slide with no audioLoop renders the AudioPlayer with no loop attribute', async () => {
+      mount(PresentationViewer, { props: { slides: [audioSlide('a1', 'https://example.com/clip.mp3')] } })
+      await flushPromises()
+
+      expect(body().find('[data-testid="presentation-audio"] audio').attributes('loop')).toBeUndefined()
+    })
+
+    it('advancing between two bed-carrying audio slides of the SAME group leaves the AudioPlayer key unchanged, so the bed keeps playing (R030)', async () => {
+      const sharedUrl = 'https://example.com/bed.mp3'
+      const slides = [bedAudioSlide('a1', 'group-1', sharedUrl), bedAudioSlide('a2', 'group-1', sharedUrl)]
+      mount(PresentationViewer, { props: { slides } })
+      await flushPromises()
+
+      const firstAudioEl = body().find('[data-testid="presentation-audio"] audio').element as HTMLAudioElement
+
+      await body().find('[data-testid="presentation-next"]').trigger('click')
+      await flushPromises()
+
+      const secondAudioEl = body().find('[data-testid="presentation-audio"] audio').element as HTMLAudioElement
+      expect(secondAudioEl).toBe(firstAudioEl)
+    })
+
+    it('advancing between two bed-carrying video slides of the SAME group leaves the VideoPlayer key unchanged', async () => {
+      const sharedUrl = 'https://example.com/bed.mp4'
+      const slides = [bedVideoSlide('v1', 'group-1', sharedUrl), bedVideoSlide('v2', 'group-1', sharedUrl)]
+      mount(PresentationViewer, { props: { slides } })
+      await flushPromises()
+
+      const firstVideoEl = body().find('[data-testid="presentation-video"] video').element as HTMLVideoElement
+
+      await body().find('[data-testid="presentation-next"]').trigger('click')
+      await flushPromises()
+
+      const secondVideoEl = body().find('[data-testid="presentation-video"] video').element as HTMLVideoElement
+      expect(secondVideoEl).toBe(firstVideoEl)
+    })
+
+    it('advancing between two slides with PER-SLIDE audio (no groupId) still forces a fresh AudioPlayer instance', async () => {
+      const slides = [audioSlide('a1', 'https://example.com/clip1.mp3'), audioSlide('a2', 'https://example.com/clip2.mp3')]
+      mount(PresentationViewer, { props: { slides } })
+      await flushPromises()
+
+      const firstAudioEl = body().find('[data-testid="presentation-audio"] audio').element as HTMLAudioElement
+
+      await body().find('[data-testid="presentation-next"]').trigger('click')
+      await flushPromises()
+
+      const secondAudioEl = body().find('[data-testid="presentation-audio"] audio').element as HTMLAudioElement
+      expect(secondAudioEl).not.toBe(firstAudioEl)
+    })
+
+    it('two adjacent PER-SLIDE-audio slides sharing the identical url with no groupId still force a fresh AudioPlayer instance (byte-identical to the pre-refactor key formula)', async () => {
+      const sharedUrl = 'https://example.com/shared-clip.mp3'
+      const slides = [audioSlide('a1', sharedUrl), audioSlide('a2', sharedUrl)]
+      mount(PresentationViewer, { props: { slides } })
+      await flushPromises()
+
+      const firstAudioEl = body().find('[data-testid="presentation-audio"] audio').element as HTMLAudioElement
+
+      await body().find('[data-testid="presentation-next"]').trigger('click')
+      await flushPromises()
+
+      const secondAudioEl = body().find('[data-testid="presentation-audio"] audio').element as HTMLAudioElement
+      expect(secondAudioEl).not.toBe(firstAudioEl)
     })
 
     it('a video-carrying slide renders presentation-body at text-2xl (caption), not text-5xl; an audio-only slide renders text-5xl', async () => {

@@ -10,6 +10,7 @@
       ref="audioEl"
       :src="src"
       :controls="!chromeless"
+      :loop="loop"
       preload="none"
       class="w-full"
       @play="onPlay"
@@ -33,15 +34,19 @@
 import { ref } from 'vue'
 
 /**
- * Reusable audio playback component (R013). Never loops (stop-at-end), no
- * `autoplay` attribute — Phase 23's presentation driver calls the exposed
- * `play()` on slide entry. Gracefully surfaces a play affordance when the
- * browser's autoplay policy rejects an unattended play() call.
+ * Reusable audio playback component (R013). Looping is opt-in per slide
+ * (Phase 24, D-04) via the `loop` prop — a slide's OWN audio may loop, but a
+ * slide-group bed never does (the assembler never sets `audioLoop` on a
+ * bed-resolved slide). No `autoplay` attribute — Phase 23's presentation
+ * driver calls the exposed `play()` on slide entry. Gracefully surfaces a
+ * play affordance when the browser's autoplay policy rejects an unattended
+ * play() call.
  */
 defineProps<{
   src: string
   label?: string
   chromeless?: boolean
+  loop?: boolean
 }>()
 
 const emit = defineEmits<{

@@ -19,6 +19,18 @@ describe('AudioPlayer', () => {
     expect(audio.attributes('loop')).toBeUndefined()
   })
 
+  it('loop: true renders an <audio> element with the loop attribute set', () => {
+    const wrapper = mount(AudioPlayer, { props: { src: 'https://example.com/song.mp3', loop: true } })
+
+    expect(wrapper.find('audio').attributes('loop')).toBeDefined()
+  })
+
+  it('loop absent (default) renders an <audio> element with no loop attribute', () => {
+    const wrapper = mount(AudioPlayer, { props: { src: 'https://example.com/song.mp3' } })
+
+    expect(wrapper.find('audio').attributes('loop')).toBeUndefined()
+  })
+
   it('emits play when the exposed play() resolves', async () => {
     const wrapper = mount(AudioPlayer, { props: { src: 'https://example.com/song.mp3' } })
 

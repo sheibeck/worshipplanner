@@ -179,6 +179,7 @@
             ref="audioRef"
             chromeless
             :src="currentAudioUrl"
+            :loop="currentSlide?.slide.audioLoop"
             :key="currentAudioKey"
             @error="onMediaError"
             @autoplay-blocked="onAudioAutoplayBlocked"
@@ -371,9 +372,31 @@ const bodyIsCaption = computed(() => Boolean(currentVideoUrl.value) && !mediaFai
  * would silently stay muted on the next slide with zero on-screen
  * indication). Including the slide id forces a fresh instance on every
  * slide change regardless of URL reuse.
+ *
+ * Phase 24 (R030/D-04) splits this in two: PER-SLIDE media still forces a
+ * fresh child on every slide change (the WR-02 guarantee above, unchanged).
+ * But a GROUP BED (`audioFromBed`/`videoFromBed` true, with a `groupId`) is
+ * deliberately kept as ONE continuous instance across every slide of that
+ * group — that continuity is what R030 means by a bed that "plays across
+ * the group": advancing from one bed-carrying slide to the next bed-carrying
+ * slide of the SAME group must not remount the player. A slide with no
+ * `groupId` (pre-migration data) always falls through to the per-slide key,
+ * byte-identical to the pre-Phase-24 formula.
  */
-const currentVideoKey = computed(() => `${currentSlide.value?.slide.id ?? ''}:${currentVideoUrl.value ?? ''}`)
-const currentAudioKey = computed(() => `${currentSlide.value?.slide.id ?? ''}:${currentAudioUrl.value ?? ''}`)
+const currentVideoKey = computed(() => {
+  const current = currentSlide.value
+  if (current?.videoFromBed && current.groupId) {
+    return `group:${current.groupId}:${currentVideoUrl.value ?? ''}`
+  }
+  return `${current?.slide.id ?? ''}:${currentVideoUrl.value ?? ''}`
+})
+const currentAudioKey = computed(() => {
+  const current = currentSlide.value
+  if (current?.audioFromBed && current.groupId) {
+    return `group:${current.groupId}:${currentAudioUrl.value ?? ''}`
+  }
+  return `${current?.slide.id ?? ''}:${currentAudioUrl.value ?? ''}`
+})
 
 const progressLabel = computed(() => {
   const n = currentIndex.value + 1
