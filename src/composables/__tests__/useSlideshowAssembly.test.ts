@@ -54,6 +54,26 @@ vi.mock('@/stores/songs', () => ({
     }),
 }))
 
+// --- Stubbed slideGroups store (24-04) — the composable now reads
+// groupsBySlotId; the store's real subscription is wired in 24-05, so every
+// test in this file exercises assembleSlideshow's no-group fallback path
+// with an empty map, unmocked this would call getActivePinia() against a
+// Pinia instance this test file never installs.
+vi.mock('@/stores/slideGroups', () => ({
+  useSlideGroups: () =>
+    reactive({
+      groups: [],
+      isLoading: false,
+      groupsBySlotId: computed(() => new Map()),
+      subscribeGroups: vi.fn(),
+      unsubscribeGroups: vi.fn(),
+      materializeGroupIfMissing: vi.fn(),
+      deleteGroup: vi.fn(),
+      setGroupBedMedia: vi.fn(),
+      replaceGroupSlides: vi.fn(),
+    }),
+}))
+
 function makeService(slots: ServiceSlot[]): Service {
   return {
     id: 'service-1',

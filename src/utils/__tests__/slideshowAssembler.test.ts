@@ -14,6 +14,7 @@ import type { SongLyrics } from '@/types/songLyrics'
 import type { ScriptureReading } from '@/types/scriptureReading'
 import type { ImportedDeck } from '@/types/importedDeck'
 import type { ScriptureSlide, CopyrightSlide, LyricSlide, TextSlide, ImageSlide } from '@/types/slide'
+import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
 import type { Timestamp } from 'firebase/firestore'
 import { slotLabel } from '@/utils/slotTypes'
 
@@ -109,6 +110,28 @@ function makeInputs(overrides: Partial<AssemblyInputs> = {}): AssemblyInputs {
     performanceOrderById: new Map(),
     scriptureReadingsById: new Map(),
     importedDecksById: new Map(),
+    groupsBySlotId: new Map(),
+    ...overrides,
+  }
+}
+
+function makeSlideGroup(overrides: Partial<SlideGroup> = {}): SlideGroup {
+  return {
+    id: 'group-1',
+    serviceId: 'svc-1',
+    slotId: 'group-1',
+    slides: [],
+    createdAt: mockTimestamp,
+    updatedAt: mockTimestamp,
+    ...overrides,
+  }
+}
+
+function makeGroupSlideEntry(overrides: Partial<GroupSlideEntry> = {}): GroupSlideEntry {
+  return {
+    id: 'entry-1',
+    order: 0,
+    sourceRef: { kind: 'text' },
     ...overrides,
   }
 }
@@ -541,5 +564,465 @@ describe('assembleSlideshow — section metadata pass-through', () => {
     expect(result.filter((r) => r.section === 'worship')).toHaveLength(6)
     expect(result.filter((r) => r.section === 'message')).toHaveLength(1)
     expect(result.filter((r) => r.section === 'sending')).toHaveLength(3)
+  })
+})
+
+describe('assembleSlideshow — stored group resolution (D-02, R028)', () => {
+  it('with a group present for a slot, output slide ids equal the group entry ids in order-order', () => {
+    const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+    const service = makeService([slot])
+    const lyrics = makeSongLyrics()
+    const chorusEntry = makeGroupSlideEntry({
+      id: 'entry-chorus',
+      order: 1,
+      sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'chorus' },
+    })
+    const verseEntry = makeGroupSlideEntry({
+      id: 'entry-verse',
+      order: 0,
+      sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+    })
+    const group = makeSlideGroup({ id: 'slot-song-0', slotId: 'slot-song-0', slides: [chorusEntry, verseEntry] })
+    const inputs = makeInputs({
+      songLyricsById: new Map([['song-1', lyrics]]),
+      groupsBySlotId: new Map([['slot-song-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result.map((r) => r.slide.id)).toEqual(['entry-verse', 'entry-chorus'])
+    expect((result[0]!.slide as LyricSlide).sectionId).toBe('verse-1')
+    expect((result[1]!.slide as LyricSlide).sectionId).toBe('chorus')
+  })
+
+  it('a lyric sourceRef resolves its text from songLyricsById at assembly time — editing lyrics changes assembled text with no group write', () => {
+    const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+    const service = makeService([slot])
+    const entry = makeGroupSlideEntry({
+      id: 'entry-1',
+      order: 0,
+      sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+    })
+    const group = makeSlideGroup({ id: 'slot-song-0', slotId: 'slot-song-0', slides: [entry] })
+    const originalSlides = group.slides
+
+    const lyricsV1 = makeSongLyrics()
+    const resultV1 = assembleSlideshow(
+      service,
+      makeInputs({ songLyricsById: new Map([['song-1', lyricsV1]]), groupsBySlotId: new Map([['slot-song-0', group]]) }),
+    )
+    expect((resultV1[0]!.slide as LyricSlide).lines).toEqual(['Line A', 'Line B'])
+
+    const lyricsV2 = makeSongLyrics({
+      sections: [
+        { id: 'verse-1', label: 'Verse 1', lines: ['Edited Line'] },
+        { id: 'chorus', label: 'Chorus', lines: ['Line C'] },
+      ],
+    })
+    const resultV2 = assembleSlideshow(
+      service,
+      makeInputs({ songLyricsById: new Map([['song-1', lyricsV2]]), groupsBySlotId: new Map([['slot-song-0', group]]) }),
+    )
+    expect((resultV2[0]!.slide as LyricSlide).lines).toEqual(['Edited Line'])
+    // The stored group itself is never written to.
+    expect(group.slides).toBe(originalSlides)
+  })
+
+  it('a copyright sourceRef resolves to the same copyright content the current implementation builds', () => {
+    const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+    const service = makeService([slot])
+    const lyrics = makeSongLyrics()
+    const entry = makeGroupSlideEntry({ id: 'entry-copy', order: 0, sourceRef: { kind: 'copyright', songId: 'song-1' } })
+    const group = makeSlideGroup({ id: 'slot-song-0', slotId: 'slot-song-0', slides: [entry] })
+    const inputs = makeInputs({
+      songLyricsById: new Map([['song-1', lyrics]]),
+      groupsBySlotId: new Map([['slot-song-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result).toHaveLength(1)
+    expect(result[0]!.slide.id).toBe('entry-copy')
+    expect((result[0]!.slide as CopyrightSlide).title).toBe('Amazing Grace')
+  })
+
+  it('a scripture sourceRef resolves its inner slide by innerSlideId', () => {
+    const slot = scriptureSlot({ id: 'slot-scripture-0', scriptureReadingId: 'reading-1' })
+    const service = makeService([slot])
+    const reading = makeScriptureReading()
+    const entry = makeGroupSlideEntry({
+      id: 'entry-scripture',
+      order: 0,
+      sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'ss-2' },
+    })
+    const group = makeSlideGroup({ id: 'slot-scripture-0', slotId: 'slot-scripture-0', slides: [entry] })
+    const inputs = makeInputs({
+      scriptureReadingsById: new Map([['reading-1', reading]]),
+      groupsBySlotId: new Map([['slot-scripture-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result).toHaveLength(1)
+    expect(result[0]!.slide.id).toBe('entry-scripture')
+    expect((result[0]!.slide as ScriptureSlide).verseRange).toBe('17')
+  })
+
+  it('an imported sourceRef resolves its inner slide by innerSlideId', () => {
+    const slot = importedSlot({ id: 'slot-imported-0', importId: 'deck-1' })
+    const service = makeService([slot])
+    const deck = makeImportedDeck()
+    const entry = makeGroupSlideEntry({
+      id: 'entry-imported',
+      order: 0,
+      sourceRef: { kind: 'imported', importId: 'deck-1', innerSlideId: 'is-2' },
+    })
+    const group = makeSlideGroup({ id: 'slot-imported-0', slotId: 'slot-imported-0', slides: [entry] })
+    const inputs = makeInputs({
+      importedDecksById: new Map([['deck-1', deck]]),
+      groupsBySlotId: new Map([['slot-imported-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result).toHaveLength(1)
+    expect(result[0]!.slide.id).toBe('entry-imported')
+    expect(result[0]!.slide.contentKind).toBe('image')
+    expect((result[0]!.slide as ImageSlide).imageUrl).toBe('https://example.com/a.png')
+  })
+
+  it('an entry whose source no longer resolves is omitted from the assembled output while the stored group is untouched', () => {
+    const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+    const service = makeService([slot])
+    const lyrics = makeSongLyrics()
+    const resolvingEntry = makeGroupSlideEntry({
+      id: 'entry-resolves',
+      order: 0,
+      sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+    })
+    const goneEntry = makeGroupSlideEntry({
+      id: 'entry-gone',
+      order: 1,
+      sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'removed-section' },
+    })
+    const group = makeSlideGroup({ id: 'slot-song-0', slotId: 'slot-song-0', slides: [resolvingEntry, goneEntry] })
+    const originalSlides = group.slides
+    const inputs = makeInputs({
+      songLyricsById: new Map([['song-1', lyrics]]),
+      groupsBySlotId: new Map([['slot-song-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result).toHaveLength(1)
+    expect(result[0]!.slide.id).toBe('entry-resolves')
+    expect(group.slides).toBe(originalSlides)
+    expect(group.slides).toHaveLength(2)
+  })
+
+  it('a slot with no group in groupsBySlotId still assembles via fallback derivation, with slide ids stable across two successive calls', () => {
+    const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+    const service = makeService([slot])
+    const lyrics = makeSongLyrics()
+    const inputs = makeInputs({
+      songLyricsById: new Map([['song-1', lyrics]]),
+      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus']]]),
+    })
+
+    const result1 = assembleSlideshow(service, inputs)
+    const result2 = assembleSlideshow(service, inputs)
+
+    expect(result1.map((r) => r.slide.id)).toEqual(result2.map((r) => r.slide.id))
+    expect(result1[0]!.groupId).toBeUndefined()
+    expect(result1[0]!.groupSlideId).toBeUndefined()
+  })
+
+  it('AssembledSlide carries groupId and groupSlideId when the slide came from a stored group', () => {
+    const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+    const service = makeService([slot])
+    const lyrics = makeSongLyrics()
+    const entry = makeGroupSlideEntry({
+      id: 'entry-1',
+      order: 0,
+      sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+    })
+    const group = makeSlideGroup({ id: 'slot-song-0', slotId: 'slot-song-0', slides: [entry] })
+    const inputs = makeInputs({
+      songLyricsById: new Map([['song-1', lyrics]]),
+      groupsBySlotId: new Map([['slot-song-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result[0]!.groupId).toBe('slot-song-0')
+    expect(result[0]!.groupSlideId).toBe('entry-1')
+  })
+
+  it('emits strictly in slot position order across slots, and entry.order order within a group', () => {
+    const slotSong = songSlot({ id: 'slot-a', songId: 'song-1', position: 1 })
+    const slotPrayer: NonAssignableSlot = { kind: 'PRAYER', id: 'slot-b', position: 0 }
+    const service = makeService([slotSong, slotPrayer])
+    const lyrics = makeSongLyrics()
+    const chorusEntry = makeGroupSlideEntry({
+      id: 'e-chorus',
+      order: 1,
+      sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'chorus' },
+    })
+    const verseEntry = makeGroupSlideEntry({
+      id: 'e-verse',
+      order: 0,
+      sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+    })
+    const group = makeSlideGroup({ id: 'slot-a', slotId: 'slot-a', slides: [chorusEntry, verseEntry] })
+    const inputs = makeInputs({
+      songLyricsById: new Map([['song-1', lyrics]]),
+      groupsBySlotId: new Map([['slot-a', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    // slot-b (position 0, PRAYER, fallback) emits first; slot-a's group
+    // entries follow, ordered by entry.order (verse before chorus) despite
+    // being stored chorus-first in the group.
+    expect(result.map((r) => r.slide.id)).toEqual(['slot-b:0', 'e-verse', 'e-chorus'])
+  })
+
+  it("changing a slot's position changes group order in the output while leaving every GroupSlideEntry.order value untouched", () => {
+    const slotSong = songSlot({ id: 'slot-song', songId: 'song-1', position: 0 })
+    const slotPrayer: NonAssignableSlot = { kind: 'PRAYER', id: 'slot-prayer', position: 1 }
+    const lyrics = makeSongLyrics()
+    const entry = makeGroupSlideEntry({
+      id: 'e-verse',
+      order: 0,
+      sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+    })
+    const group = makeSlideGroup({ id: 'slot-song', slotId: 'slot-song', slides: [entry] })
+    const inputs = makeInputs({
+      songLyricsById: new Map([['song-1', lyrics]]),
+      groupsBySlotId: new Map([['slot-song', group]]),
+    })
+
+    const before = assembleSlideshow(makeService([slotSong, slotPrayer]), inputs)
+    expect(before.map((r) => r.slide.id)).toEqual(['e-verse', 'slot-prayer:0'])
+
+    const reorderedService = makeService([
+      { ...slotSong, position: 1 },
+      { ...slotPrayer, position: 0 },
+    ])
+    const after = assembleSlideshow(reorderedService, inputs)
+
+    expect(after.map((r) => r.slide.id)).toEqual(['slot-prayer:0', 'e-verse'])
+    expect(group.slides[0]!.order).toBe(0)
+  })
+})
+
+describe('assembleSlideshow — D-04 two-level audio precedence and video bed (R030)', () => {
+  it("an entry with its own audioUrl resolves to that url even when the group has a bed", () => {
+    const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+    const service = makeService([slot])
+    const lyrics = makeSongLyrics()
+    const entry = makeGroupSlideEntry({
+      id: 'entry-1',
+      order: 0,
+      sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+      audioUrl: 'https://example.com/own.mp3',
+    })
+    const group = makeSlideGroup({
+      id: 'slot-song-0',
+      slotId: 'slot-song-0',
+      slides: [entry],
+      bedAudioUrl: 'https://example.com/bed.mp3',
+    })
+    const inputs = makeInputs({
+      songLyricsById: new Map([['song-1', lyrics]]),
+      groupsBySlotId: new Map([['slot-song-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result[0]!.slide.audioUrl).toBe('https://example.com/own.mp3')
+    expect(result[0]!.audioFromBed).toBe(false)
+  })
+
+  it('an entry with no audioUrl in a group with a bed resolves to the bed url', () => {
+    const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+    const service = makeService([slot])
+    const lyrics = makeSongLyrics()
+    const entry = makeGroupSlideEntry({
+      id: 'entry-1',
+      order: 0,
+      sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+    })
+    const group = makeSlideGroup({
+      id: 'slot-song-0',
+      slotId: 'slot-song-0',
+      slides: [entry],
+      bedAudioUrl: 'https://example.com/bed.mp3',
+    })
+    const inputs = makeInputs({
+      songLyricsById: new Map([['song-1', lyrics]]),
+      groupsBySlotId: new Map([['slot-song-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result[0]!.slide.audioUrl).toBe('https://example.com/bed.mp3')
+    expect(result[0]!.audioFromBed).toBe(true)
+  })
+
+  it('three consecutive entries where only the middle carries its own audio emit bed, own, bed', () => {
+    const slot = scriptureSlot({ id: 'slot-scripture-0', scriptureReadingId: 'reading-1' })
+    const service = makeService([slot])
+    const reading = makeScriptureReading({
+      slides: [
+        makeScriptureSlide({ id: 'ss-1', position: 0, verseRange: '16' }),
+        makeScriptureSlide({ id: 'ss-2', position: 1, verseRange: '17' }),
+        makeScriptureSlide({ id: 'ss-3', position: 2, verseRange: '18' }),
+      ],
+    })
+    const entries: GroupSlideEntry[] = [
+      makeGroupSlideEntry({
+        id: 'e1',
+        order: 0,
+        sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'ss-1' },
+      }),
+      makeGroupSlideEntry({
+        id: 'e2',
+        order: 1,
+        sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'ss-2' },
+        audioUrl: 'https://example.com/own.mp3',
+      }),
+      makeGroupSlideEntry({
+        id: 'e3',
+        order: 2,
+        sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'ss-3' },
+      }),
+    ]
+    const group = makeSlideGroup({
+      id: 'slot-scripture-0',
+      slotId: 'slot-scripture-0',
+      slides: entries,
+      bedAudioUrl: 'https://example.com/bed.mp3',
+    })
+    const inputs = makeInputs({
+      scriptureReadingsById: new Map([['reading-1', reading]]),
+      groupsBySlotId: new Map([['slot-scripture-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result.map((r) => r.slide.audioUrl)).toEqual([
+      'https://example.com/bed.mp3',
+      'https://example.com/own.mp3',
+      'https://example.com/bed.mp3',
+    ])
+    expect(result.map((r) => r.audioFromBed)).toEqual([true, false, true])
+  })
+
+  it('audioLoop is copied only when the entry itself set it; a bed-resolved slide never carries audioLoop even when a sibling entry set it', () => {
+    const slot = scriptureSlot({ id: 'slot-scripture-0', scriptureReadingId: 'reading-1' })
+    const service = makeService([slot])
+    const reading = makeScriptureReading()
+    const entries: GroupSlideEntry[] = [
+      makeGroupSlideEntry({
+        id: 'e1',
+        order: 0,
+        sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'ss-1' },
+        audioUrl: 'https://example.com/own.mp3',
+        audioLoop: true,
+      }),
+      makeGroupSlideEntry({
+        id: 'e2',
+        order: 1,
+        sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'ss-2' },
+      }),
+    ]
+    const group = makeSlideGroup({
+      id: 'slot-scripture-0',
+      slotId: 'slot-scripture-0',
+      slides: entries,
+      bedAudioUrl: 'https://example.com/bed.mp3',
+    })
+    const inputs = makeInputs({
+      scriptureReadingsById: new Map([['reading-1', reading]]),
+      groupsBySlotId: new Map([['slot-scripture-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result[0]!.slide.audioLoop).toBe(true)
+    expect('audioLoop' in result[1]!.slide).toBe(false)
+  })
+
+  it('a group with no bed and no per-slide audio on any entry emits slides with no audioUrl key at all', () => {
+    const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+    const service = makeService([slot])
+    const lyrics = makeSongLyrics()
+    const entry = makeGroupSlideEntry({
+      id: 'e1',
+      order: 0,
+      sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+    })
+    const group = makeSlideGroup({ id: 'slot-song-0', slotId: 'slot-song-0', slides: [entry] })
+    const inputs = makeInputs({
+      songLyricsById: new Map([['song-1', lyrics]]),
+      groupsBySlotId: new Map([['slot-song-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect('audioUrl' in result[0]!.slide).toBe(false)
+  })
+
+  it('bedVideoUrl resolves onto every entry in the group and videoFromBed is true on each', () => {
+    const slot = scriptureSlot({ id: 'slot-scripture-0', scriptureReadingId: 'reading-1' })
+    const service = makeService([slot])
+    const reading = makeScriptureReading()
+    const entries: GroupSlideEntry[] = [
+      makeGroupSlideEntry({
+        id: 'e1',
+        order: 0,
+        sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'ss-1' },
+      }),
+      makeGroupSlideEntry({
+        id: 'e2',
+        order: 1,
+        sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'ss-2' },
+      }),
+    ]
+    const group = makeSlideGroup({
+      id: 'slot-scripture-0',
+      slotId: 'slot-scripture-0',
+      slides: entries,
+      bedVideoUrl: 'https://example.com/bed.mp4',
+    })
+    const inputs = makeInputs({
+      scriptureReadingsById: new Map([['reading-1', reading]]),
+      groupsBySlotId: new Map([['slot-scripture-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result.every((r) => r.slide.videoUrl === 'https://example.com/bed.mp4')).toBe(true)
+    expect(result.every((r) => r.videoFromBed === true)).toBe(true)
+  })
+
+  it('a slot with no group still attaches its deprecated media to only its first emitted slide (fallback path unaffected by D-04)', () => {
+    const slot = songSlot({ id: 'slot-song-0', songId: 'song-1', audioUrl: 'https://example.com/legacy.mp3' })
+    const service = makeService([slot])
+    const lyrics = makeSongLyrics()
+    const inputs = makeInputs({
+      songLyricsById: new Map([['song-1', lyrics]]),
+      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus']]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result).toHaveLength(4)
+    expect(result[0]!.slide.audioUrl).toBe('https://example.com/legacy.mp3')
+    expect(result[1]!.slide.audioUrl).toBeUndefined()
+    expect(result[2]!.slide.audioUrl).toBeUndefined()
+    expect(result[3]!.slide.audioUrl).toBeUndefined()
+    expect(result[0]!.audioFromBed).toBeUndefined()
   })
 })

@@ -94,6 +94,7 @@ function makeInputs(overrides: Partial<AssemblyInputs> = {}): AssemblyInputs {
     performanceOrderById: new Map(),
     scriptureReadingsById: new Map(),
     importedDecksById: new Map(),
+    groupsBySlotId: new Map(),
     ...overrides,
   }
 }

@@ -1,20 +1,35 @@
 /**
- * Slideshow auto-assembly engine (R005).
+ * Slideshow auto-assembly engine (R005, refactored Phase 24 D-02/D-04).
  *
  * `assembleSlideshow` is a PURE function: it takes a Service and pre-loaded
  * content maps and returns a flat, ordered `AssembledSlide[]`. It performs no
  * Firestore reads and touches no Pinia store or Vue reactivity — callers
- * (the reactive composable in 20-03) are responsible for loading the content
- * maps and re-invoking this function when inputs change. Because output order
- * is derived solely from `service.slots` sorted by `position`, reordering the
- * input slots deterministically reorders the output (the R006 contract,
- * proven at this pure-function layer).
+ * (the reactive composable in 20-03/24-04) are responsible for loading the
+ * content maps and re-invoking this function when inputs change. Because
+ * output order is derived solely from `service.slots` sorted by `position`
+ * (and, within a slot, `GroupSlideEntry.order`), reordering the input slots
+ * deterministically reorders the output (the R006 contract).
+ *
+ * Two resolution paths, per slot:
+ * 1. A slot with a materialized `SlideGroup` (`inputs.groupsBySlotId`) joins
+ *    that group's stored structure against LIVE canonical content resolved
+ *    through each entry's `sourceRef` (D-02) — editing a song's lyrics
+ *    changes the assembled text with no group write. Slide ids equal the
+ *    stored `GroupSlideEntry.id`, never recomputed (Phase 23 WR-02). Audio/
+ *    video resolve via D-04's two-level precedence (`resolveEntryMedia`).
+ * 2. A slot with NO materialized group yet falls back to deriving the
+ *    slideshow directly from the slot's own source (today's pre-Phase-24
+ *    behaviour), so the app stays coherent before 24-05/24-06 wire up
+ *    reactive group subscription and lazy materialization. Fallback slide
+ *    ids are derived from the slot's stable `id` (not slot array index), so
+ *    a pre-materialization render cannot churn Vue keys across recomputes.
  */
 import type { Service, ServiceSlot } from '@/types/service'
 import type { AssembledSlide, Slide, LyricSlide, CopyrightSlide, TextSlide } from '@/types/slide'
 import type { SongLyrics } from '@/types/songLyrics'
 import type { ScriptureReading } from '@/types/scriptureReading'
 import type { ImportedDeck } from '@/types/importedDeck'
+import type { SlideGroup, GroupSlideEntry, SourceRef } from '@/types/slideGroup'
 import { slotLabel } from './slotTypes'
 
 /** Content maps the assembly engine resolves slots against. Pre-loaded by the caller. */
@@ -23,6 +38,13 @@ export interface AssemblyInputs {
   performanceOrderById: Map<string, string[]>
   scriptureReadingsById: Map<string, ScriptureReading>
   importedDecksById: Map<string, ImportedDeck>
+  /**
+   * Stored slide-group structure keyed by the anchoring `ServiceSlot.id`
+   * (D-01). REQUIRED — an empty map is the legitimate "no groups
+   * materialized yet" state and every slot falls through to the fallback
+   * derivation path, producing today's output.
+   */
+  groupsBySlotId: Map<string, SlideGroup>
 }
 
 /** A Slide variant's fields minus the id/position this engine assigns on emit. */
@@ -53,6 +75,121 @@ function buildCopyrightSlideContent(lyrics: SongLyrics): Omit<CopyrightSlide, 'i
   }
 }
 
+/** The `text`-kind entry has no fields of its own — its content depends on
+ * which text-backed slot kind (PRAYER/MESSAGE/HYMN) owns the group. */
+function buildTextContentForSlot(slot: ServiceSlot): Omit<TextSlide, 'id' | 'position'> | undefined {
+  switch (slot.kind) {
+    case 'PRAYER':
+    case 'MESSAGE':
+      return { contentKind: 'text', title: slotLabel(slot), body: slotLabel(slot) }
+    case 'HYMN': {
+      const body = slot.verses ? `${slot.hymnName}\n\n${slot.verses}` : slot.hymnName
+      return { contentKind: 'text', title: slotLabel(slot), body }
+    }
+    default:
+      return undefined
+  }
+}
+
+/** The canonical id a group-resolved slide's `sourceId` derives from, mirroring
+ * the fallback path's `sourceId` semantics (songId/scriptureReadingId/importId/null). */
+function sourceIdForRef(ref: SourceRef): string | null {
+  switch (ref.kind) {
+    case 'lyric':
+    case 'copyright':
+      return ref.songId
+    case 'scripture':
+      return ref.scriptureReadingId
+    case 'imported':
+      return ref.importId
+    case 'text':
+      return null
+  }
+}
+
+/**
+ * Resolves a stored `GroupSlideEntry`'s content against LIVE canonical
+ * sources (D-02). Returns `undefined` when the entry's source no longer
+ * resolves — the caller OMITS such an entry from the assembled output rather
+ * than substituting a placeholder, because the assembled slideshow feeds a
+ * live projector. The entry remains stored, unaffected.
+ */
+function resolveEntryContent(
+  slot: ServiceSlot,
+  entry: GroupSlideEntry,
+  inputs: AssemblyInputs,
+): SlideContent | undefined {
+  const ref = entry.sourceRef
+  switch (ref.kind) {
+    case 'lyric': {
+      const lyrics = inputs.songLyricsById.get(ref.songId)
+      if (!lyrics) return undefined
+      const section = lyrics.sections.find((s) => s.id === ref.sectionId)
+      if (!section) return undefined
+      const content: Omit<LyricSlide, 'id' | 'position'> = {
+        contentKind: 'lyric',
+        sectionId: section.id,
+        sectionLabel: section.label,
+        lines: section.lines,
+      }
+      return content
+    }
+
+    case 'copyright': {
+      const lyrics = inputs.songLyricsById.get(ref.songId)
+      if (!lyrics) return undefined
+      return buildCopyrightSlideContent(lyrics)
+    }
+
+    case 'scripture': {
+      const reading = inputs.scriptureReadingsById.get(ref.scriptureReadingId)
+      if (!reading) return undefined
+      const innerSlide = reading.slides.find((s) => s.id === ref.innerSlideId)
+      if (!innerSlide) return undefined
+      const { id: _id, position: _position, ...rest } = innerSlide
+      return rest
+    }
+
+    case 'imported': {
+      const deck = inputs.importedDecksById.get(ref.importId)
+      if (!deck) return undefined
+      const innerSlide = deck.slides.find((s) => s.id === ref.innerSlideId)
+      if (!innerSlide) return undefined
+      const { id: _id, position: _position, ...rest } = innerSlide
+      return rest
+    }
+
+    case 'text':
+      return buildTextContentForSlot(slot)
+  }
+}
+
+/** D-04 two-level audio precedence + bed-only video resolution for one group entry. */
+interface ResolvedGroupMedia {
+  audioUrl?: string
+  videoUrl?: string
+  audioLoop?: boolean
+  audioFromBed: boolean
+  videoFromBed: boolean
+}
+
+function resolveEntryMedia(group: SlideGroup, entry: GroupSlideEntry): ResolvedGroupMedia {
+  // Effective audio: the entry's OWN audio wins; otherwise fall back to the
+  // group's bed. `audioFromBed` is true only in the fallback case.
+  const audioFromBed = !entry.audioUrl && !!group.bedAudioUrl
+  const resolvedAudioUrl = entry.audioUrl ?? group.bedAudioUrl
+  // Video has no per-slide layer (Pattern 4) — it is always the group bed.
+  const videoFromBed = !!group.bedVideoUrl
+
+  const media: ResolvedGroupMedia = { audioFromBed, videoFromBed }
+  if (resolvedAudioUrl) media.audioUrl = resolvedAudioUrl
+  if (group.bedVideoUrl) media.videoUrl = group.bedVideoUrl
+  // A group bed never loops (D-04) — audioLoop is copied ONLY when the audio
+  // came from the entry itself, never when it resolved from the bed.
+  if (!audioFromBed && entry.audioUrl && entry.audioLoop) media.audioLoop = true
+  return media
+}
+
 /**
  * Walks `service.slots` sorted ascending by `position` and resolves each slot
  * into zero or more `AssembledSlide`s, flattening the result into a single
@@ -68,20 +205,22 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
 
   const assembled: AssembledSlide[] = []
   let globalPosition = 0
-  // Tracks which slots have already had their (first-emitted-slide-only) media
-  // attached, keyed by slotIndex — a slot's audioUrl/videoUrl land on only the
-  // FIRST AssembledSlide it produces (e.g. the leading copyright slide for a
-  // SONG), never on subsequent slides of a multi-slide slot.
+  // Fallback-path-only bookkeeping: a slot with no materialized group yet
+  // keeps the pre-Phase-24 first-emitted-slide-only media rule (D-04
+  // REPLACES this rule on the group path — it is not extended there), so a
+  // not-yet-migrated service keeps behaving exactly as it did before.
   const slotsWithMediaAttached = new Set<number>()
 
-  const emit = (
+  const emitFallback = (
     slot: ServiceSlot,
     slotIndex: number,
     content: SlideContent,
     sourceId: string | null,
     localSeq: number,
   ): void => {
-    const slide = { ...content, id: `${slotIndex}:${localSeq}`, position: globalPosition } as Slide
+    // Fallback ids derive from the slot's stable id (not the slot's array
+    // index), so a pre-materialization render is stable across recomputes.
+    const slide = { ...content, id: `${slot.id}:${localSeq}`, position: globalPosition } as Slide
     if (!slotsWithMediaAttached.has(slotIndex)) {
       slotsWithMediaAttached.add(slotIndex)
       if (slot.audioUrl) slide.audioUrl = slot.audioUrl
@@ -97,7 +236,51 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
     globalPosition += 1
   }
 
+  const emitFromGroup = (
+    slot: ServiceSlot,
+    slotIndex: number,
+    group: SlideGroup,
+    entry: GroupSlideEntry,
+    content: SlideContent,
+  ): void => {
+    const media = resolveEntryMedia(group, entry)
+    const slide = {
+      ...content,
+      // Never recompute — the stored GroupSlideEntry.id IS the slide id
+      // (Phase 23 WR-02 keys media children on it).
+      id: entry.id,
+      position: globalPosition,
+      ...(media.audioUrl ? { audioUrl: media.audioUrl } : {}),
+      ...(media.videoUrl ? { videoUrl: media.videoUrl } : {}),
+      ...(media.audioLoop ? { audioLoop: true } : {}),
+    } as Slide
+    assembled.push({
+      slide,
+      slotIndex,
+      slotKind: slot.kind,
+      section: slot.section,
+      sourceId: sourceIdForRef(entry.sourceRef),
+      groupId: group.id,
+      groupSlideId: entry.id,
+      audioFromBed: media.audioFromBed,
+      videoFromBed: media.videoFromBed,
+    })
+    globalPosition += 1
+  }
+
   for (const { slot, index } of sorted) {
+    const group = inputs.groupsBySlotId.get(slot.id)
+    if (group) {
+      const orderedEntries = [...group.slides].sort((a, b) => a.order - b.order)
+      for (const entry of orderedEntries) {
+        const content = resolveEntryContent(slot, entry, inputs)
+        if (!content) continue // Entry's source no longer resolves — omitted, not placeholder'd.
+        emitFromGroup(slot, index, group, entry, content)
+      }
+      continue
+    }
+
+    // No stored group for this slot yet — fall back to today's per-kind derivation.
     switch (slot.kind) {
       case 'SONG': {
         if (!slot.songId) break
@@ -108,7 +291,7 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
         const copyrightContent = buildCopyrightSlideContent(lyrics)
 
         let localSeq = 0
-        emit(slot, index, copyrightContent, slot.songId, localSeq++)
+        emitFallback(slot, index, copyrightContent, slot.songId, localSeq++)
 
         for (const sectionId of order) {
           const section = lyrics.sections.find((s) => s.id === sectionId)
@@ -119,10 +302,10 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
             sectionLabel: section.label,
             lines: section.lines,
           }
-          emit(slot, index, lyricContent, slot.songId, localSeq++)
+          emitFallback(slot, index, lyricContent, slot.songId, localSeq++)
         }
 
-        emit(slot, index, copyrightContent, slot.songId, localSeq++)
+        emitFallback(slot, index, copyrightContent, slot.songId, localSeq++)
         break
       }
 
@@ -133,7 +316,7 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
 
         reading.slides.forEach((innerSlide, localSeq) => {
           const { id: _id, position: _position, ...rest } = innerSlide
-          emit(slot, index, rest, slot.scriptureReadingId!, localSeq)
+          emitFallback(slot, index, rest, slot.scriptureReadingId!, localSeq)
         })
         break
       }
@@ -145,7 +328,7 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
 
         deck.slides.forEach((innerSlide, localSeq) => {
           const { id: _id, position: _position, ...rest } = innerSlide
-          emit(slot, index, rest, slot.importId!, localSeq)
+          emitFallback(slot, index, rest, slot.importId!, localSeq)
         })
         break
       }
@@ -157,7 +340,7 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
           title: slotLabel(slot),
           body: slotLabel(slot),
         }
-        emit(slot, index, content, null, 0)
+        emitFallback(slot, index, content, null, 0)
         break
       }
 
@@ -168,7 +351,7 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
           title: slotLabel(slot),
           body,
         }
-        emit(slot, index, content, null, 0)
+        emitFallback(slot, index, content, null, 0)
         break
       }
     }

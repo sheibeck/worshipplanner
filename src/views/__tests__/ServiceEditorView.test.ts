@@ -62,6 +62,23 @@ vi.mock('@/stores/importedSlides', () => ({
   }),
 }))
 
+// useSlideshowAssembly (24-04) also reads groupsBySlotId from this store —
+// unmocked, useSlideGroups() calls getActivePinia() against a Pinia instance
+// this test never installs. Same reactive-stub pattern as the two mocks above.
+vi.mock('@/stores/slideGroups', () => ({
+  useSlideGroups: () => ({
+    groups: [],
+    isLoading: false,
+    groupsBySlotId: new Map(),
+    subscribeGroups: vi.fn(),
+    unsubscribeGroups: vi.fn(),
+    materializeGroupIfMissing: vi.fn(),
+    deleteGroup: vi.fn(),
+    setGroupBedMedia: vi.fn(),
+    replaceGroupSlides: vi.fn(),
+  }),
+}))
+
 const mockTimestamp = { toDate: () => new Date('2026-03-08') } as unknown as Timestamp
 
 const mockService: Service = {

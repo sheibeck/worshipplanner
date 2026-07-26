@@ -17,6 +17,7 @@ import { db } from '@/firebase'
 import { useScriptureSlides } from '@/stores/scriptureSlides'
 import { useImportedSlides } from '@/stores/importedSlides'
 import { useSongStore } from '@/stores/songs'
+import { useSlideGroups } from '@/stores/slideGroups'
 import { assembleSlideshow } from '@/utils/slideshowAssembler'
 import { SERVICE_SECTIONS, SERVICE_SECTION_LABELS, type Service } from '@/types/service'
 import type { AssembledSlide, AssembledSection } from '@/types/slide'
@@ -73,6 +74,11 @@ export function useSlideshowAssembly(
   const scriptureStore = useScriptureSlides()
   const importedStore = useImportedSlides()
   const songStore = useSongStore()
+  // The store's own subscription (subscribeGroups) is wired in 24-05; until
+  // then groupsBySlotId is legitimately empty and assembleSlideshow's
+  // fallback path produces today's output, so the app is coherent at every
+  // commit between here and 24-05/24-06.
+  const slideGroupsStore = useSlideGroups()
   const loadLyrics = options?.lyricsLoader ?? defaultLyricsLoader
 
   const resolvedOrgId = computed<string | null>(() =>
@@ -167,6 +173,7 @@ export function useSlideshowAssembly(
       performanceOrderById: performanceOrderById.value,
       scriptureReadingsById: scriptureReadingsById.value,
       importedDecksById: importedDecksById.value,
+      groupsBySlotId: slideGroupsStore.groupsBySlotId,
     })
   })
 

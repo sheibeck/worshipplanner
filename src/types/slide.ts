@@ -14,13 +14,25 @@ export interface SlideBase {
   position: number
   contentKind: SlideContentKind
   /**
-   * Render carriers for a slot's attached media (Phase 22, R013/R014).
-   * The assembler fills these from `ServiceSlot`'s `MediaAttachableSlot`
-   * fields on the first slide it emits for that slot — they are never
-   * persisted standalone on the (ephemeral, regenerated) assembled slide.
+   * Render carriers for attached media (Phase 22 R013/R014, refactored Phase 24
+   * D-04). For a slide resolved from a stored `SlideGroup` entry, `audioUrl`
+   * is filled by two-level precedence — the entry's OWN audio first, falling
+   * back to the group's `bedAudioUrl` — and `videoUrl` always comes from the
+   * group's `bedVideoUrl` (video has no per-slide layer). For a slot with no
+   * materialized group yet, the deprecated slot-level `audioUrl`/`videoUrl`
+   * fields still land on only the first emitted slide (the pre-Phase-24
+   * behaviour), preserved for data that has not migrated. Never persisted
+   * standalone on the (ephemeral, regenerated) assembled slide.
    */
   audioUrl?: string
   videoUrl?: string
+  /**
+   * Per-slide audio loop flag (D-04, R030). Copied ONLY from a
+   * `GroupSlideEntry.audioLoop` when this slide's audio resolved from that
+   * entry itself — never set when the audio resolved from the group's bed,
+   * because a bed never loops.
+   */
+  audioLoop?: boolean
 }
 
 /** A lyric slide — one section of a song's lyrics. */
@@ -98,6 +110,28 @@ export interface AssembledSlide {
   slotKind: import('./service').SlotKind
   section?: import('./service').ServiceSection
   sourceId: string | null
+  /**
+   * Set when this slide was resolved from a stored `SlideGroup` entry — the
+   * group's Firestore doc id (equals the anchoring `ServiceSlot.id`, D-01).
+   * Absent on the no-group fallback derivation path.
+   */
+  groupId?: string
+  /**
+   * Equals the stored `GroupSlideEntry.id` this slide was resolved from.
+   * Never recomputed from slot index or emission order — Phase 23's WR-02
+   * keys `PresentationViewer`'s media children on this id. Absent on the
+   * fallback path.
+   */
+  groupSlideId?: string
+  /**
+   * True when `slide.audioUrl` was resolved from the group's `bedAudioUrl`
+   * rather than the entry's own audio (D-04) — lets `PresentationViewer` key
+   * its `AudioPlayer` to the GROUP so a bed keeps playing across slide
+   * transitions within that group (R030).
+   */
+  audioFromBed?: boolean
+  /** True when `slide.videoUrl` was resolved from the group's `bedVideoUrl`. */
+  videoFromBed?: boolean
 }
 
 /**
