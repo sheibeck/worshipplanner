@@ -56,6 +56,49 @@ Phases 20, 21, 22 and 23 are all code-complete; only their deferred human-verify
 |-------|-------|-------------|-------|
 | 24 Slide Group Model and Migration | 6/6 | 1 critical + 2 warning, all fixed | See `24-REVIEW.md` / `24-REVIEW-FIX.md` |
 
+## ★ v1.3 STANDING DECISIONS — apply to every remaining phase (25-28)
+
+Captured from the user mid-run on 2026-07-26. Full text and rationale live in
+`.planning/phases/25-slides-tab-shell-plan-rail-and-slide-grid-risk-medium/25-CONTEXT.md` as
+**D-18** and **D-19**. Recorded here because later phases read STATE.md, not Phase 25's context.
+
+### No bed video — video is slide-only (D-18)
+
+> "We won't ever have a bed video where a video plays over a whole group of slides. We can do that for
+> audio, but a video slide will only ever be a slide and will never play over a group of slides."
+
+`SlideGroup.bedVideoUrl`, `SlideBase.videoUrl`, `videoFromBed` and all bed-video rendering were
+**deleted** in 25-02 (not deprecated). The group bed is **audio-only**. Group-bed AUDIO and per-slide
+audio (with slide-beats-bed precedence and cross-group continuity) are kept, wanted features.
+
+### No legacy compatibility anywhere in the slide area (D-19)
+
+> "There is no need to keep legacy behavior for any work related to adding slides. That work has never
+> been used or seen by anyone yet. So, we don't need to migrate anything or keep any old data."
+
+> "for Phase 28 we can also skip any migration of data. We haven't used that in production either,
+> so it's all greenfield." *(user, 2026-07-26 — extends D-19 explicitly to Phase 28)*
+
+**Do NOT write migrations, deprecation shims, or read-time fallbacks for slide-area or song-lyrics
+data.** Change the model directly and update the tests.
+
+#### The boundary — check this before deleting anything
+
+| Side | Scope | Rule |
+|------|-------|------|
+| **GREENFIELD** — delete freely | Everything from **Phase 18 onward**: slide groups, slide/group media, slideshow assembler, PPTX import, scripture slides, presentation/preview surfaces, **and the Phase 18 song-lyrics / performance-order structures Phase 28 reworks** | Never deployed, never seen by a user. No migration, no fallback, no deprecated field. |
+| **PRODUCTION** — must preserve | `Service` / `ServiceSlot`, and the `Song` catalog records themselves | Shipped in **v1.0 (2026-03-05)**, human-verified against a real Planning Center account. Real data exists. |
+
+Notably **Phase 24 D-01's lazy `ServiceSlot.id` backfill-on-read STAYS** — it guards real service
+documents and is the one legacy path explicitly on the keep side.
+
+For **Phase 28**: `Song` records and the catalog are production data; `Song.lyrics` and
+`performanceOrder` as *structured by Phase 18* are greenfield and may be reshaped without migration.
+
+Already actioned under D-19 (in 25-02 + its follow-up): the D-05 slot→group media migration, the
+WR-02 `displaySlotAudioUrl`/`displaySlotVideoUrl` fallbacks, `MediaAttachableSlot.audioUrl`/`videoUrl`,
+and `SlotMediaAttachment.vue`'s video-attach affordance are all deleted.
+
 > **Migration note (2026-07-24):** This milestone was scoped and partially built in gsdpi
 > (`.gsd/` milestone M001, slices S01-S06) and faithfully ported into gsd-core as v1.2.
 > The gsdpi `.gsd/` store is now legacy/read-only — continue with regular `/gsd-*` commands.
