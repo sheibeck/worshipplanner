@@ -20,7 +20,28 @@
           data-testid="slide-grid-add-slide"
           @click="onAddSlide"
         >＋ Add slide</button>
+        <button
+          v-if="isEditor"
+          type="button"
+          class="inline-flex items-center gap-1.5 rounded-md border border-gray-700 bg-gray-800 px-2.5 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:bg-gray-700"
+          data-testid="slide-grid-import"
+          @click="openImportModal"
+        >⇪ Import into this group</button>
       </div>
+
+      <!-- The grid's OWN import-modal instance (25-07 Task 3, D-15/D-16) —
+           NOT the instance/handler in `ServiceEditorView.vue`, which creates
+           a brand-new IMPORTED plan item. This instance's `confirmed`
+           handler instead appends the deck's slides to the SELECTED group
+           and never touches the plan/rail. -->
+      <PptxImportModal
+        ref="importModalRef"
+        :open="showImportModal"
+        :org-id="orgId"
+        :section="importSection"
+        @confirmed="onImportConfirmed"
+        @cancel="showImportModal = false"
+      />
 
       <!-- Group music bar (25-06, R032) — between the grid header and the
            card grid, per the UI-SPEC's layout reference. Emit-only control;
@@ -44,7 +65,37 @@
         data-testid="slide-grid-reconciliation-notice"
       >{{ reconciliationNotice }}</div>
 
-      <div class="flex-1 overflow-y-auto px-6 py-4">
+      <div
+        v-if="rejectionNotice"
+        class="mx-6 mt-3 rounded-md border border-red-800 bg-red-900/20 px-3 py-2 text-[12px] text-red-300"
+        data-testid="slide-grid-rejection-notice"
+      >{{ rejectionNotice }}</div>
+
+      <div
+        v-if="mediaUploadError"
+        class="mx-6 mt-3 text-[12px] text-red-400"
+        data-testid="slide-grid-media-error"
+      >{{ mediaUploadError }}</div>
+      <div
+        v-else-if="mediaUploadInProgress"
+        class="mx-6 mt-3 text-[12px] text-indigo-400"
+        data-testid="slide-grid-media-progress"
+      >Uploading... {{ Math.round(mediaUploadProgress) }}%</div>
+
+      <!-- Grid-wide dragover highlight (D-13) — applied to the WHOLE content
+           area, not only the drop tile, so the target isn't a pixel hunt.
+           Guarded against the constant child-element dragleave events that
+           fire while moving across cards inside the container via a depth
+           counter, and gated on the drag actually carrying files. -->
+      <div
+        class="flex-1 overflow-y-auto px-6 py-4 transition-colors"
+        :class="isDragOver ? 'rounded-md border-2 border-indigo-500/50 bg-indigo-950/10' : 'border-2 border-transparent'"
+        data-testid="slide-grid-drop-area"
+        @dragenter="onGridDragEnter"
+        @dragover="onGridDragOver"
+        @dragleave="onGridDragLeave"
+        @drop="onGridDrop"
+      >
         <div
           v-if="cards.length > 0"
           ref="cardsContainerRef"
@@ -60,11 +111,17 @@
             :reorderable="canReorder"
             @select="emit('select', $event)"
           />
+          <!-- Always the LAST grid item (D-13) — deliberately NOT given the
+               `.slide-card` class SortableJS is scoped to. -->
+          <SlideDropTarget v-if="isEditor" @drop="onFilesDropped" />
         </div>
-        <div v-else class="px-1 py-8" data-testid="slide-grid-empty-state">
-          <p class="text-sm font-medium text-gray-300">No slides in this group yet</p>
-          <p class="mt-1 text-xs text-gray-500">Add a slide, or drop a file below.</p>
-        </div>
+        <template v-else>
+          <div class="px-1 py-8" data-testid="slide-grid-empty-state">
+            <p class="text-sm font-medium text-gray-300">No slides in this group yet</p>
+            <p class="mt-1 text-xs text-gray-500">Add a slide, or drop a file below.</p>
+          </div>
+          <SlideDropTarget v-if="isEditor" @drop="onFilesDropped" />
+        </template>
       </div>
     </template>
   </div>
@@ -90,18 +147,29 @@
  * the fallback-path slides being shown are already real and correct.
  *
  * Ships no Grid/List toggle (D-09), no apply/reject/confirm affordance for a
- * pending reconciliation (Phase 26 owns that dialog, R033) and no drop tile
- * (25-06).
+ * pending reconciliation (Phase 26 owns that dialog, R033).
+ *
+ * 25-07 adds the drop tile (always the grid's last item, D-13), a whole-grid
+ * dragover highlight, and the four accepted-kind persistence paths (PPTX and
+ * image import append via the reused `PptxImportModal.vue`, video appends its
+ * own slide, audio sets the group's bed) — see `dropRouting.ts` for the pure
+ * classification/resolution the drop path routes every file through.
  */
-import { ref, computed, watch, onUnmounted } from 'vue'
+import { ref, computed, watch, onUnmounted, nextTick } from 'vue'
 import Sortable from 'sortablejs'
-import type { ServiceSlot } from '@/types/service'
+import type { ServiceSlot, ServiceSection } from '@/types/service'
+import { SERVICE_SECTIONS } from '@/types/service'
 import type { AssembledSlide } from '@/types/slide'
 import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
 import { useSlideGroups } from '@/stores/slideGroups'
+import { useImportedSlides } from '@/stores/importedSlides'
+import { useMediaUpload } from '@/composables/useMediaUpload'
 import { slotLabel } from '@/utils/slotTypes'
 import SlideCard from './SlideCard.vue'
 import SlideGroupMusicControl from './SlideGroupMusicControl.vue'
+import SlideDropTarget from './SlideDropTarget.vue'
+import PptxImportModal from '@/components/PptxImportModal.vue'
+import { resolveDrop, UNSUPPORTED_FILE_MESSAGE } from './dropRouting'
 import { slotDisplayTitle, type PendingReconciliation, type EnsureGroupMaterializedResult } from './slideDisplay'
 
 const props = defineProps<{
@@ -133,6 +201,14 @@ const emit = defineEmits<{
 }>()
 
 const slideGroupsStore = useSlideGroups()
+const importedSlidesStore = useImportedSlides()
+
+// One shared upload composable for both drop-triggered media paths (video
+// append, audio bed) — a single drop is handled sequentially (videos then
+// audio, never concurrently), so a single instance's reactive
+// progress/error/isUploading is unambiguous at any moment. Reused verbatim,
+// per the UI-SPEC's "do not author new copy" instruction.
+const { progress: mediaUploadProgress, error: mediaUploadError, isUploading: mediaUploadInProgress, uploadMedia, reset: resetMediaUpload } = useMediaUpload()
 
 /**
  * The group title line, collapsed to just the kind label (e.g. "Prayer")
@@ -250,6 +326,199 @@ async function onAddSlide(): Promise<void> {
   }
 }
 
+// --- 25-07: drop target + import action — four persistence paths (R032) ---
+//
+// The grid's OWN modal instance (mounted above), never `ServiceEditorView`'s.
+// Its `section` prop is satisfied by the selected plan item's own section,
+// falling back to the first `SERVICE_SECTIONS` entry — the section only sets
+// the created deck's own `section` field and has NO bearing on which group
+// the entries land in (Pattern 4).
+const showImportModal = ref(false)
+const importModalRef = ref<InstanceType<typeof PptxImportModal> | null>(null)
+const importSection = computed<ServiceSection>(
+  () => props.selectedSlot?.section ?? SERVICE_SECTIONS[0] ?? 'pre-service',
+)
+
+function openImportModal(): void {
+  showImportModal.value = true
+}
+
+// PPTX/image drop — opens the modal (which resets to idle on open) then
+// hands it the already-dropped file(s) via the 25-07 Task 1 entry point.
+// Awaiting `nextTick()` between the two ensures the modal's own
+// reset-on-open watcher has already run before the entry point sets its
+// upload-in-progress state, so the reset can never clobber an import that
+// just started.
+async function importDeckFile(file: File): Promise<void> {
+  showImportModal.value = true
+  await nextTick()
+  importModalRef.value?.importPptxFile(file)
+}
+
+async function importImageFilesDropped(files: File[]): Promise<void> {
+  showImportModal.value = true
+  await nextTick()
+  importModalRef.value?.importImageFiles(files)
+}
+
+// Confirming an import appends one group entry per inner slide in the
+// created deck, in deck order, at the end of the selected group — never a
+// new plan item, never the slot factory/reindexer (Pattern 4, D-16).
+async function onImportConfirmed(payload: { importId: string; section: ServiceSection }): Promise<void> {
+  showImportModal.value = false
+  if (!props.selectedSlot) return
+  const slotId = props.selectedSlot.id
+  try {
+    const deck = await importedSlidesStore.getDeck(props.orgId, payload.importId)
+    if (!deck) return
+    const resolved = await props.ensureGroupMaterialized(slotId)
+    if (!resolved) return
+    const { entries, sourceSignature } = resolved
+    const startOrder = entries.length > 0 ? Math.max(...entries.map((e) => e.order)) + 1 : 0
+    const newEntries: GroupSlideEntry[] = deck.slides.map((innerSlide, i) => ({
+      id: crypto.randomUUID(),
+      order: startOrder + i,
+      sourceRef: { kind: 'imported', importId: payload.importId, innerSlideId: innerSlide.id },
+    }))
+    await slideGroupsStore.replaceGroupSlides(props.orgId, slotId, [...entries, ...newEntries], sourceSignature)
+  } catch (err) {
+    console.error('Failed to append imported deck to group:', err)
+  }
+}
+
+// Video drop (D-17's payoff) — appends one entry PER video, in drop order,
+// carrying the video's own uploaded source and file name. NOT the group bed
+// — 25-RESEARCH.md's stale recommendation must not be followed here. A
+// failed upload appends nothing and leaves the group untouched: entries are
+// only persisted once, in a single `replaceGroupSlides` call after every
+// upload in this drop has resolved.
+async function appendVideoEntries(files: File[]): Promise<void> {
+  if (!props.selectedSlot || files.length === 0) return
+  const slotId = props.selectedSlot.id
+  try {
+    const resolved = await props.ensureGroupMaterialized(slotId)
+    if (!resolved) return
+    let entries = resolved.entries
+    const sourceSignature = resolved.sourceSignature
+    resetMediaUpload()
+    for (const file of files) {
+      const url = await uploadMedia(file, props.orgId)
+      const nextOrder = entries.length > 0 ? Math.max(...entries.map((e) => e.order)) + 1 : 0
+      const newEntry: GroupSlideEntry = {
+        id: crypto.randomUUID(),
+        order: nextOrder,
+        sourceRef: { kind: 'video', videoSrc: url, originalFileName: file.name },
+      }
+      entries = [...entries, newEntry]
+    }
+    await slideGroupsStore.replaceGroupSlides(props.orgId, slotId, entries, sourceSignature)
+  } catch (err) {
+    console.error('Failed to append dropped video:', err)
+  }
+}
+
+// Audio drop — sets the selected group's music bed (D-14/D-18) and appends
+// NOTHING. Reuses 25-06's bed write path directly; no materialization step
+// is needed here for the same reason `onAttachGroupMusic` needs none —
+// `setGroupBedMedia`'s own merging skeleton-create already covers a plan
+// item with no group document yet.
+async function attachDroppedAudio(file: File): Promise<void> {
+  if (!props.selectedSlot) return
+  try {
+    resetMediaUpload()
+    const url = await uploadMedia(file, props.orgId)
+    await slideGroupsStore.setGroupBedMedia(props.orgId, props.selectedSlot.id, {
+      serviceId: props.serviceId,
+      bedAudioUrl: url,
+    })
+  } catch (err) {
+    console.error('Failed to attach dropped audio:', err)
+  }
+}
+
+// Inline rejection notice — the phase's one backstop-status UI
+// consideration. Cleared after a short interval; also cleared on unmount so
+// no timer leaks past this component's lifetime (mirrors the autosave-timer
+// gotcha already documented elsewhere in this codebase).
+const rejectionNotice = ref<string | null>(null)
+let rejectionTimeout: ReturnType<typeof setTimeout> | null = null
+
+function showRejectionNotice(): void {
+  rejectionNotice.value = UNSUPPORTED_FILE_MESSAGE
+  if (rejectionTimeout) clearTimeout(rejectionTimeout)
+  rejectionTimeout = setTimeout(() => {
+    rejectionNotice.value = null
+  }, 4000)
+}
+
+// The single dispatch point BOTH drop entry points (the tile's own `drop`
+// emit and the whole-grid container's native `drop` event, below) route
+// through — so they cannot diverge (25-07 Task 2 key link).
+async function onFilesDropped(files: File[]): Promise<void> {
+  const resolved = resolveDrop(files)
+
+  if (resolved.skipped.length > 0) {
+    showRejectionNotice()
+  }
+
+  if (resolved.deck) {
+    await importDeckFile(resolved.deck)
+  } else if (resolved.images.length > 0) {
+    await importImageFilesDropped(resolved.images)
+  }
+
+  if (resolved.videos.length > 0) {
+    await appendVideoEntries(resolved.videos)
+  }
+
+  if (resolved.audio) {
+    await attachDroppedAudio(resolved.audio)
+  }
+}
+
+// --- Whole-grid dragover highlight (D-13) ---
+//
+// A depth counter, not a boolean, guards against the constant child-element
+// dragleave events that fire while the pointer moves across cards inside the
+// container — a naive leave handler flickers the highlight off and on.
+// Gated on the drag actually carrying files: `dataTransfer.types` (not
+// `.files`, which is empty until drop fires) is the only file-presence
+// signal available during dragenter/dragover.
+const isDragOver = ref(false)
+let dragDepth = 0
+
+function dragCarriesFiles(event: DragEvent): boolean {
+  return Array.from(event.dataTransfer?.types ?? []).includes('Files')
+}
+
+function onGridDragEnter(event: DragEvent): void {
+  if (!dragCarriesFiles(event)) return
+  event.preventDefault()
+  dragDepth += 1
+  isDragOver.value = true
+}
+
+function onGridDragOver(event: DragEvent): void {
+  if (!dragCarriesFiles(event)) return
+  // Must preventDefault on dragover too — a drop event only fires on an
+  // element whose dragover handler prevented default.
+  event.preventDefault()
+}
+
+function onGridDragLeave(event: DragEvent): void {
+  if (!dragCarriesFiles(event)) return
+  dragDepth = Math.max(0, dragDepth - 1)
+  if (dragDepth === 0) isDragOver.value = false
+}
+
+function onGridDrop(event: DragEvent): void {
+  event.preventDefault()
+  dragDepth = 0
+  isDragOver.value = false
+  const files = Array.from(event.dataTransfer?.files ?? [])
+  if (files.length > 0) void onFilesDropped(files)
+}
+
 // --- Task 3: drag-reorder within the selected group (D-11) ---
 //
 // Reuses the exact SortableJS pattern already established in
@@ -324,5 +593,8 @@ watch(
   { flush: 'post' },
 )
 
-onUnmounted(destroySortable)
+onUnmounted(() => {
+  destroySortable()
+  if (rejectionTimeout) clearTimeout(rejectionTimeout)
+})
 </script>
