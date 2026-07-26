@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { deriveGroupEntries, sourceSignature, buildInitialGroup, hasCustomization } from '@/utils/slideGroupMaterializer'
+import {
+  deriveGroupEntries,
+  sourceSignature,
+  buildInitialGroup,
+  hasCustomization,
+  reconcileSongGroup,
+} from '@/utils/slideGroupMaterializer'
 import type { AssemblyInputs } from '@/utils/slideshowAssembler'
 import type { SongSlot, ScriptureSlot, NonAssignableSlot, HymnSlot, ImportedSlot } from '@/types/service'
 import type { SongLyrics } from '@/types/songLyrics'
@@ -355,5 +361,152 @@ describe('hasCustomization', () => {
   it('is true when the group has a bedVideoUrl', () => {
     const group = makeGroup({ bedVideoUrl: 'https://example.com/bed.mp4', slides: [] })
     expect(hasCustomization(group)).toBe(true)
+  })
+})
+
+describe('reconcileSongGroup', () => {
+  function makeStoredSongGroup(slides: SlideGroup['slides']): SlideGroup {
+    return makeGroup({ id: 'slot-1', slotId: 'slot-1', slides })
+  }
+
+  const twoSectionStoredSlides: SlideGroup['slides'] = [
+    { id: 'e-copyright-lead', order: 0, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+    { id: 'e-verse-1', order: 1, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' } },
+    { id: 'e-chorus', order: 2, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'chorus' } },
+    { id: 'e-copyright-trail', order: 3, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+  ]
+
+  const threeSectionLyrics = () =>
+    makeSongLyrics({
+      sections: [
+        { id: 'verse-1', label: 'Verse 1', lines: ['Line A'] },
+        { id: 'chorus', label: 'Chorus', lines: ['Line C'] },
+        { id: 'bridge', label: 'Bridge', lines: ['Line D'] },
+      ],
+    })
+
+  it('a song that gains a Bridge yields stored entries untouched plus a new lyric entry for it', () => {
+    const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
+    const group = makeStoredSongGroup(twoSectionStoredSlides)
+    const lyrics = threeSectionLyrics()
+    const inputs = makeInputs({
+      songLyricsById: new Map([['song-1', lyrics]]),
+      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus', 'bridge']]]),
+    })
+
+    const result = reconcileSongGroup(group, slot, inputs)
+
+    expect(result.changed).toBe(true)
+    expect(result.slides).toHaveLength(5)
+    for (const storedId of ['e-copyright-lead', 'e-verse-1', 'e-chorus', 'e-copyright-trail']) {
+      expect(result.slides.some((e) => e.id === storedId)).toBe(true)
+    }
+    const bridgeEntry = result.slides.find(
+      (e) => e.sourceRef.kind === 'lyric' && e.sourceRef.sectionId === 'bridge',
+    )
+    expect(bridgeEntry).toBeDefined()
+  })
+
+  it('an entry with a label and audioUrl survives reconciliation with an unrelated new verse (Pitfall 4 regression)', () => {
+    const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
+    const group = makeStoredSongGroup([
+      { id: 'e-copyright-lead', order: 0, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+      {
+        id: 'e-verse-1',
+        order: 1,
+        sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+        label: 'Custom Verse Label',
+        audioUrl: 'https://example.com/verse.mp3',
+      },
+      { id: 'e-chorus', order: 2, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'chorus' } },
+      { id: 'e-copyright-trail', order: 3, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+    ])
+    const lyrics = threeSectionLyrics()
+    const inputs = makeInputs({
+      songLyricsById: new Map([['song-1', lyrics]]),
+      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus', 'bridge']]]),
+    })
+
+    const result = reconcileSongGroup(group, slot, inputs)
+
+    const verseEntry = result.slides.find((e) => e.id === 'e-verse-1')
+    expect(verseEntry?.label).toBe('Custom Verse Label')
+    expect(verseEntry?.audioUrl).toBe('https://example.com/verse.mp3')
+    expect(result.slides.some((e) => e.sourceRef.kind === 'lyric' && e.sourceRef.sectionId === 'bridge')).toBe(true)
+  })
+
+  it('an entry whose sectionId no longer resolves is retained with its label/notes intact', () => {
+    const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
+    const group = makeStoredSongGroup([
+      { id: 'e-copyright-lead', order: 0, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+      { id: 'e-verse-1', order: 1, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' } },
+      {
+        id: 'e-chorus',
+        order: 2,
+        sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'chorus' },
+        label: 'Keep Me',
+        notes: 'Old note',
+      },
+      { id: 'e-copyright-trail', order: 3, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+    ])
+    // 'chorus' section removed from the song's stored sections entirely.
+    const lyrics = makeSongLyrics({
+      sections: [{ id: 'verse-1', label: 'Verse 1', lines: ['Line A'] }],
+      performanceOrder: ['verse-1'],
+    })
+    const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
+
+    const result = reconcileSongGroup(group, slot, inputs)
+
+    const chorusEntry = result.slides.find((e) => e.id === 'e-chorus')
+    expect(chorusEntry).toBeDefined()
+    expect(chorusEntry?.label).toBe('Keep Me')
+    expect(chorusEntry?.notes).toBe('Old note')
+  })
+
+  it('reconciling an already-in-sync group returns changed: false and an entry list deep-equal to the stored one', () => {
+    const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
+    const group = makeStoredSongGroup(twoSectionStoredSlides)
+    const lyrics = makeSongLyrics()
+    const inputs = makeInputs({
+      songLyricsById: new Map([['song-1', lyrics]]),
+      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus']]]),
+    })
+
+    const result = reconcileSongGroup(group, slot, inputs)
+
+    expect(result.changed).toBe(false)
+    expect(result.slides).toEqual(group.slides)
+  })
+
+  it('never duplicates the two copyright entries — exactly one leading, one trailing', () => {
+    const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
+    const group = makeStoredSongGroup(twoSectionStoredSlides)
+    const lyrics = threeSectionLyrics()
+    const inputs = makeInputs({
+      songLyricsById: new Map([['song-1', lyrics]]),
+      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus', 'bridge']]]),
+    })
+
+    const result = reconcileSongGroup(group, slot, inputs)
+
+    const copyrightEntries = result.slides.filter((e) => e.sourceRef.kind === 'copyright')
+    expect(copyrightEntries).toHaveLength(2)
+    expect(result.slides[0]!.sourceRef.kind).toBe('copyright')
+    expect(result.slides[result.slides.length - 1]!.sourceRef.kind).toBe('copyright')
+  })
+
+  it('order values on the returned list are contiguous from 0', () => {
+    const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
+    const group = makeStoredSongGroup(twoSectionStoredSlides)
+    const lyrics = threeSectionLyrics()
+    const inputs = makeInputs({
+      songLyricsById: new Map([['song-1', lyrics]]),
+      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus', 'bridge']]]),
+    })
+
+    const result = reconcileSongGroup(group, slot, inputs)
+
+    expect(result.slides.map((e) => e.order)).toEqual(result.slides.map((_, i) => i))
   })
 })
