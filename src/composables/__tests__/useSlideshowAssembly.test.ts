@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { ref, reactive, computed, nextTick } from 'vue'
-import { useSlideshowAssembly } from '@/composables/useSlideshowAssembly'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { ref, reactive, computed, nextTick, effectScope, type EffectScope } from 'vue'
+import { useSlideshowAssembly as useSlideshowAssemblyImpl } from '@/composables/useSlideshowAssembly'
 import type { Service, ServiceSlot, HymnSlot, SongSlot, ScriptureSlot } from '@/types/service'
 import type { SongLyrics } from '@/types/songLyrics'
 import type { ScriptureReading } from '@/types/scriptureReading'
@@ -62,11 +62,19 @@ vi.mock('@/stores/songs', () => ({
 // (this file's other stores follow the same convention).
 const mockSubscribeGroups = vi.fn()
 const mockUnsubscribeGroups = vi.fn()
-const mockMaterializeGroupIfMissing = vi.fn().mockResolvedValue(true)
+const slideGroupsState = reactive<{ groups: SlideGroup[] }>({ groups: [] })
+// materializeGroupIfMissing's mock pushes the created group into
+// slideGroupsState.groups — mirroring the real store's onSnapshot round-trip
+// after a real Firestore write lands, so a materialized slot stops appearing
+// as a "missing group" candidate on the next reactive recompute (exactly the
+// condition the reorder-issues-zero-writes tests below depend on).
+const mockMaterializeGroupIfMissing = vi.fn(async (_orgId: string, input: SlideGroup) => {
+  slideGroupsState.groups.push({ ...input, createdAt: {} as never, updatedAt: {} as never })
+  return true
+})
 const mockDeleteGroup = vi.fn()
 const mockSetGroupBedMedia = vi.fn()
 const mockReplaceGroupSlides = vi.fn().mockResolvedValue(undefined)
-const slideGroupsState = reactive<{ groups: SlideGroup[] }>({ groups: [] })
 
 vi.mock('@/stores/slideGroups', () => ({
   useSlideGroups: () =>
@@ -86,6 +94,35 @@ vi.mock('@/stores/slideGroups', () => ({
       replaceGroupSlides: mockReplaceGroupSlides,
     }),
 }))
+
+// Every call site below invokes the composable directly (not through a
+// mounted component), so `onUnmounted(cleanup)` inside it never actually
+// registers (Vue warns "no active component instance") and its internal
+// `watch()`es would otherwise keep running for the rest of the test file,
+// recomputing against the module-level mock state (`slideGroupsState`,
+// `scriptureState`, `importedState`) that later tests' `beforeEach` mutates.
+// Task 2's materialization writes are the first thing in this suite whose
+// re-triggering is actually OBSERVABLE (a call count), so that latent leak
+// needs fixing here: wrap every invocation in its own `effectScope`, whose
+// `.stop()` disposes every `watch`/`computed` created inside — independent
+// of `onUnmounted` — and tear every scope down after each test.
+const activeScopes: EffectScope[] = []
+
+function useSlideshowAssembly(
+  ...args: Parameters<typeof useSlideshowAssemblyImpl>
+): ReturnType<typeof useSlideshowAssemblyImpl> {
+  const scope = effectScope()
+  let result!: ReturnType<typeof useSlideshowAssemblyImpl>
+  scope.run(() => {
+    result = useSlideshowAssemblyImpl(...args)
+  })
+  activeScopes.push(scope)
+  return result
+}
+
+afterEach(() => {
+  activeScopes.splice(0).forEach((scope) => scope.stop())
+})
 
 function makeService(slots: ServiceSlot[]): Service {
   return {
@@ -420,6 +457,136 @@ describe('useSlideshowAssembly', () => {
       await nextTick()
 
       expect(groupsBySlotId.value.has('slot-hymn-0')).toBe(true)
+    })
+  })
+
+  // --- Task 2: lazy materialization + D-05 media migration, zero writes on reorder ---
+  describe('lazy materialization (Task 2)', () => {
+    it('materializes one group per slot with a resolving source when canWrite is true', async () => {
+      const service = ref<Service | null>(
+        makeService([
+          hymnSlot({ position: 0, id: 'slot-hymn-a', hymnName: 'Hymn A' }),
+          hymnSlot({ position: 1, id: 'slot-hymn-b', hymnName: 'Hymn B' }),
+        ]),
+      )
+      useSlideshowAssembly(service, 'org-1', { canWrite: true })
+      await nextTick()
+      await nextTick()
+
+      expect(mockMaterializeGroupIfMissing).toHaveBeenCalledTimes(2)
+      const slotIds = mockMaterializeGroupIfMissing.mock.calls.map((call) => (call[1] as SlideGroup).slotId).sort()
+      expect(slotIds).toEqual(['slot-hymn-a', 'slot-hymn-b'])
+    })
+
+    it('canWrite defaulting to false (option omitted) issues zero materialization calls', async () => {
+      const service = ref<Service | null>(makeService([hymnSlot({ position: 0 })]))
+      useSlideshowAssembly(service, 'org-1')
+      await nextTick()
+      await nextTick()
+      expect(mockMaterializeGroupIfMissing).not.toHaveBeenCalled()
+    })
+
+    it('canWrite explicitly false issues zero materialization calls', async () => {
+      const service = ref<Service | null>(makeService([hymnSlot({ position: 0 })]))
+      useSlideshowAssembly(service, 'org-1', { canWrite: false })
+      await nextTick()
+      await nextTick()
+      expect(mockMaterializeGroupIfMissing).not.toHaveBeenCalled()
+    })
+
+    it('a slot that already has a materialized group triggers no call', async () => {
+      slideGroupsState.groups = [
+        {
+          id: 'slot-hymn-a',
+          slotId: 'slot-hymn-a',
+          serviceId: 'service-1',
+          slides: [{ id: 'existing', order: 0, sourceRef: { kind: 'text' } }],
+          createdAt: {} as never,
+          updatedAt: {} as never,
+        },
+      ]
+      const service = ref<Service | null>(makeService([hymnSlot({ position: 0, id: 'slot-hymn-a' })]))
+      useSlideshowAssembly(service, 'org-1', { canWrite: true })
+      await nextTick()
+      await nextTick()
+      expect(mockMaterializeGroupIfMissing).not.toHaveBeenCalled()
+    })
+
+    it('a SONG slot with songId null produces no call; assigning a song later produces exactly one call carrying bedAudioUrl', async () => {
+      const fakeLyricsLoader = vi.fn(async (_orgId: string, songId: string) => makeLyrics(songId))
+      songsState.songs = [{ id: 'song-a', performanceOrder: ['v1'] } as Song]
+      const service = ref<Service | null>(
+        makeService([
+          songSlot({ position: 0, id: 'slot-song-a', songId: null, audioUrl: 'https://cdn/bed.mp3' }),
+        ]),
+      )
+      useSlideshowAssembly(service, 'org-1', { canWrite: true, lyricsLoader: fakeLyricsLoader })
+      await nextTick()
+      await nextTick()
+      expect(mockMaterializeGroupIfMissing).not.toHaveBeenCalled()
+
+      service.value = makeService([
+        songSlot({ position: 0, id: 'slot-song-a', songId: 'song-a', audioUrl: 'https://cdn/bed.mp3' }),
+      ])
+      await nextTick()
+      await vi.waitFor(() => expect(fakeLyricsLoader).toHaveBeenCalled())
+      await nextTick()
+      await nextTick()
+
+      expect(mockMaterializeGroupIfMissing).toHaveBeenCalledTimes(1)
+      const [, input] = mockMaterializeGroupIfMissing.mock.calls[0]!
+      expect((input as SlideGroup).slotId).toBe('slot-song-a')
+      expect((input as SlideGroup).bedAudioUrl).toBe('https://cdn/bed.mp3')
+    })
+
+    it('reordering slots after materialization settles issues zero further materialization calls', async () => {
+      const service = ref<Service | null>(
+        makeService([
+          hymnSlot({ position: 0, id: 'slot-hymn-a', hymnName: 'Hymn A' }),
+          hymnSlot({ position: 1, id: 'slot-hymn-b', hymnName: 'Hymn B' }),
+        ]),
+      )
+      useSlideshowAssembly(service, 'org-1', { canWrite: true })
+      await nextTick()
+      await nextTick()
+      expect(mockMaterializeGroupIfMissing).toHaveBeenCalledTimes(2)
+
+      mockMaterializeGroupIfMissing.mockClear()
+      service.value = makeService([
+        hymnSlot({ position: 1, id: 'slot-hymn-a', hymnName: 'Hymn A' }),
+        hymnSlot({ position: 0, id: 'slot-hymn-b', hymnName: 'Hymn B' }),
+      ])
+      await nextTick()
+      await nextTick()
+      expect(mockMaterializeGroupIfMissing).not.toHaveBeenCalled()
+    })
+
+    it('the same song assigned to two different slots produces two calls with two distinct slotId values', async () => {
+      songsState.songs = [{ id: 'song-a', performanceOrder: ['v1'] } as Song]
+      const fakeLyricsLoader = vi.fn(async () => makeLyrics('song-a'))
+      const service = ref<Service | null>(
+        makeService([
+          songSlot({ position: 0, id: 'slot-song-a', songId: 'song-a' }),
+          songSlot({ position: 1, id: 'slot-song-b', songId: 'song-a' }),
+        ]),
+      )
+      useSlideshowAssembly(service, 'org-1', { canWrite: true, lyricsLoader: fakeLyricsLoader })
+      await nextTick()
+      await vi.waitFor(() => expect(fakeLyricsLoader).toHaveBeenCalled())
+      await nextTick()
+      await nextTick()
+
+      expect(mockMaterializeGroupIfMissing).toHaveBeenCalledTimes(2)
+      const slotIds = mockMaterializeGroupIfMissing.mock.calls.map((call) => (call[1] as SlideGroup).slotId).sort()
+      expect(slotIds).toEqual(['slot-song-a', 'slot-song-b'])
+    })
+
+    it('a service with zero slots triggers zero materialization calls', async () => {
+      const service = ref<Service | null>(makeService([]))
+      useSlideshowAssembly(service, 'org-1', { canWrite: true })
+      await nextTick()
+      await nextTick()
+      expect(mockMaterializeGroupIfMissing).not.toHaveBeenCalled()
     })
   })
 })
