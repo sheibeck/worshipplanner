@@ -4,8 +4,8 @@ milestone: v1.3
 milestone_name: Slides Tab Rework
 current_phase: 24
 current_phase_name: Slide Group Model and Migration
-status: verifying
-stopped_at: Completed 24-06-PLAN.md (final plan of Phase 24)
+status: planning
+stopped_at: Phase 24 code-complete (6/6 plans + code review fixes); starting Phase 25
 last_updated: "2026-07-26T04:29:10.690Z"
 last_activity: 2026-07-26
 progress:
@@ -35,13 +35,26 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 
 ## Current Position
 
-Phase: 24 (Slide Group Model and Migration) — EXECUTING
-Plan: 6 of 6
-Milestone: v1.2 Worship Service Slide Management (Phases 18-23) — IN PROGRESS
-Status: Phase complete — ready for verification
+Phase: 24 (Slide Group Model and Migration) — CODE-COMPLETE
+Plan: 6 of 6 (24-01..24-06 all executed; code review run, 3 findings fixed)
+Milestone: v1.3 Slides Tab Rework (Phases 24-28) — IN PROGRESS
+Status: Phase 24 code-complete. Next: Phase 25 (Slides Tab Shell).
 
 Phases 20, 21, 22 and 23 are all code-complete; only their deferred human-verify checkpoints remain
 (see the Deferred Verification table below).
+
+> **Phase-completion convention (confirmed by user 2026-07-26).** `workflow.verifier` is `false`, so
+> no phase produces a `VERIFICATION.md` and `gsd-tools query phase.complete <N>` therefore refuses to
+> run (`verification is incomplete`). ROADMAP checkboxes for Phases 20-28 stay `- [ ]` by design;
+> phase completion is settled in one pass at `/gsd-audit-milestone`. Do NOT flip `workflow.verifier`
+> to work around this, and do NOT treat the unchecked boxes as unfinished work — cross-check against
+> the per-phase SUMMARY files and the code-complete record below.
+
+### v1.3 code-complete record
+
+| Phase | Plans | Code review | Notes |
+|-------|-------|-------------|-------|
+| 24 Slide Group Model and Migration | 6/6 | 1 critical + 2 warning, all fixed | See `24-REVIEW.md` / `24-REVIEW-FIX.md` |
 
 > **Migration note (2026-07-24):** This milestone was scoped and partially built in gsdpi
 > (`.gsd/` milestone M001, slices S01-S06) and faithfully ported into gsd-core as v1.2.
