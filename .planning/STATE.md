@@ -5,14 +5,14 @@ milestone_name: Slides Tab Rework
 current_phase: 25
 current_phase_name: Slides Tab Shell — Plan Rail and Slide Grid
 status: executing
-stopped_at: Completed 25-02-PLAN.md (bed-video deletion, video-slide rendering in Present mode + Slideshow Preview)
-last_updated: "2026-07-26T21:27:28.585Z"
+stopped_at: Completed 25-04-PLAN.md
+last_updated: "2026-07-26T22:23:46.759Z"
 last_activity: 2026-07-26
 progress:
   total_phases: 17
   completed_phases: 12
   total_plans: 81
-  completed_plans: 77
+  completed_plans: 78
   percent: 71
 last_activity_desc: Opened v1.3 Slides Tab Rework (Phases 24-28) from the Claude Design import; v1.2 left code-complete with its verification ledger intact
 ---
@@ -36,7 +36,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 25 (Slides Tab Shell — Plan Rail and Slide Grid) — EXECUTING
-Plan: 4 of 7
+Plan: 5 of 7
 Milestone: v1.3 Slides Tab Rework (Phases 24-28) — IN PROGRESS
 Status: Ready to execute
 
@@ -311,6 +311,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 25 P01 | 35min | 3 tasks | 7 files |
 | Phase 25 P03 | 2.5h | 3 tasks | 8 files |
 | Phase 25 P02 | ~45min | 3 tasks | 16 files |
+| Phase 25 P04 | ~2h | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -425,6 +426,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: [Phase 25-02]: bedVideoUrl/videoFromBed/SlideBase.videoUrl deleted end-to-end (D-18) -- bed is audio-only; currentVideoUrl/currentVideoKey resolve purely from a video slide's own videoSrc with no group-continuity branch
 - [Phase ?]: [Phase 25-02]: bodyIsCaption removed from PresentationViewer as dead code -- video can never coexist with a text-bearing slide once video is slide-only, so the caption-demotion path was provably inert
 - [Phase ?]: [Phase 25-02]: SlotMediaAttachment.vue's video attach affordance removed beyond the plan's stated file scope -- leaving it wired to an unbound update:videoUrl after ServiceEditorView drops the listener would silently discard uploaded video files with no error
+- [Phase ?]: Centralized PendingReconciliation and added slideBodyText/slideFooterLabel to shared slideDisplay.ts rather than duplicating per-component narrowing
 
 ### Roadmap Evolution
 
@@ -484,6 +486,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-26
-Last session: 2026-07-26T21:27:28.540Z
-Stopped at: Completed 25-02-PLAN.md (bed-video deletion, video-slide rendering in Present mode + Slideshow Preview)
+Last session: 2026-07-26T22:23:46.723Z
+Stopped at: Completed 25-04-PLAN.md
 Resume file: None

@@ -213,7 +213,7 @@ Plans:
 **Wave 2** *(blocked on Wave 1 completion)*
 
 - [x] 25-02-PLAN.md — D-17 rendering: video slide in PresentationViewer and SlideshowPreview
-- [ ] 25-04-PLAN.md — Slide grid and cards: slot-index filtering, D-10 content, D-12 selection seam
+- [x] 25-04-PLAN.md — Slide grid and cards: slot-index filtering, D-10 content, D-12 selection seam
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
