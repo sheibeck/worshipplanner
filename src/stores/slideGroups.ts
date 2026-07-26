@@ -135,6 +135,18 @@ export const useSlideGroups = defineStore('slideGroups', () => {
    * If the group has not materialized yet, creates a skeleton document
    * (`slotId`, `serviceId`, `slides: []`, the supplied bed field, both server
    * timestamps) so attaching media to a slot with no group yet cannot throw.
+   *
+   * WR-01: this skeleton create races `materializeGroupIfMissing` — both
+   * functions independently `getDoc` the same not-yet-existing doc and, on
+   * absence, `setDoc`. If a user attaches bed media in the same round-trip
+   * window as first materialization, whichever write lands last would win
+   * outright under a plain (non-merge) `setDoc`, and since this skeleton's
+   * payload always carries `slides: []`, landing after materialization's
+   * fully-populated write would silently reset the group's real derived
+   * `slides` back to empty. `{ merge: true }` makes this create idempotent
+   * against that race: a concurrently-landing `materializeGroupIfMissing`
+   * write's `slides` field is preserved rather than clobbered by this
+   * skeleton's empty array.
    */
   async function setGroupBedMedia(
     orgId: string,
@@ -154,18 +166,22 @@ export const useSlideGroups = defineStore('slideGroups', () => {
       return
     }
 
-    await setDoc(ref, {
-      ...stripUndefined({
-        id: slotId,
-        slotId,
-        serviceId: patch.serviceId,
-        slides: [],
-        bedAudioUrl: patch.bedAudioUrl,
-        bedVideoUrl: patch.bedVideoUrl,
-      }),
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    })
+    await setDoc(
+      ref,
+      {
+        ...stripUndefined({
+          id: slotId,
+          slotId,
+          serviceId: patch.serviceId,
+          slides: [],
+          bedAudioUrl: patch.bedAudioUrl,
+          bedVideoUrl: patch.bedVideoUrl,
+        }),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    )
   }
 
   /**

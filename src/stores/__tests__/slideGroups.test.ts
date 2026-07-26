@@ -386,6 +386,30 @@ describe('useSlideGroups', () => {
       expect(payload.bedVideoUrl).toBe('https://example.com/bed.mp4')
       expect(payload.serviceId).toBe('service-1')
     })
+
+    // WR-01: the skeleton-create setDoc must be a merge write, so a
+    // concurrently-landing materializeGroupIfMissing write's populated
+    // `slides` field is never clobbered back to an empty array.
+    it('creates the skeleton document with { merge: true } so a racing materialize write is not clobbered', async () => {
+      const { getDoc, setDoc } = await import('firebase/firestore')
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => false,
+        id: 'slot-1',
+        data: () => undefined,
+      } as ReturnType<typeof getDoc> extends Promise<infer T> ? T : never)
+
+      const { useSlideGroups } = await import('../slideGroups')
+      const store = useSlideGroups()
+
+      await store.setGroupBedMedia('org-1', 'slot-1', {
+        serviceId: 'service-1',
+        bedAudioUrl: 'https://example.com/bed.mp3',
+      })
+
+      expect(setDoc).toHaveBeenCalledOnce()
+      const callArgs = vi.mocked(setDoc).mock.calls[0]!
+      expect(callArgs[2]).toEqual({ merge: true })
+    })
   })
 
   describe('replaceGroupSlides', () => {
