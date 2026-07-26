@@ -131,12 +131,13 @@ export function slideFooterLabel(slide: Slide): string {
 }
 
 /**
- * A confirm-required reconciliation (`useSlideshowAssembly`'s own shape,
- * mirrored here — never imported from that composable; nothing under
- * `src/components/slides/` may import or call it, per 25-04's hard
- * constraints). Defined once here so `SlidesTab.vue` and `SlideGrid.vue`
- * share a single local copy instead of each duplicating it (25-03 duplicated
- * it directly in `SlidesTab.vue`; 25-04 centralizes it here).
+ * A confirm-required reconciliation — mirrors the page's assembly
+ * composable's own shape exactly, but is never imported from it; nothing
+ * under `src/components/slides/` may import or call that composable, per
+ * 25-04's hard constraints. Defined once here so `SlidesTab.vue` and
+ * `SlideGrid.vue` share a single local copy instead of each duplicating it
+ * (25-03 duplicated it directly in `SlidesTab.vue`; 25-04 centralizes it
+ * here).
  */
 export interface PendingReconciliation {
   slotId: string
