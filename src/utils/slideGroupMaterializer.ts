@@ -12,8 +12,8 @@
  * `AudioPlayer`/`VideoPlayer` child components on this id (Phase 23's WR-02
  * contract).
  */
-import type { ServiceSlot } from '@/types/service'
-import type { SlideGroup, GroupSlideEntry, SlideGroupInput } from '@/types/slideGroup'
+import type { ServiceSlot, SongSlot } from '@/types/service'
+import type { SlideGroup, GroupSlideEntry, SourceRef, SlideGroupInput } from '@/types/slideGroup'
 import type { AssemblyInputs } from '@/utils/slideshowAssembler'
 import type { SongLyrics } from '@/types/songLyrics'
 
@@ -179,4 +179,91 @@ export function buildInitialGroup(slot: ServiceSlot, serviceId: string, inputs: 
 export function hasCustomization(group: SlideGroup): boolean {
   if (group.bedAudioUrl || group.bedVideoUrl) return true
   return group.slides.some((entry) => !!entry.label || !!entry.notes || !!entry.audioUrl)
+}
+
+function isLyricEntry(
+  entry: GroupSlideEntry,
+): entry is GroupSlideEntry & { sourceRef: Extract<SourceRef, { kind: 'lyric' }> } {
+  return entry.sourceRef.kind === 'lyric'
+}
+
+function isCopyrightEntry(
+  entry: GroupSlideEntry,
+): entry is GroupSlideEntry & { sourceRef: Extract<SourceRef, { kind: 'copyright' }> } {
+  return entry.sourceRef.kind === 'copyright'
+}
+
+/**
+ * Additive-only song reconciliation (D-02, RESEARCH.md Pattern 3 strategy 1
+ * / Pitfall 4): diffs the fresh resolved section order against the stored
+ * entries by `sourceRef.sectionId` — the ONE content-stable key available for
+ * songs, since `ccliParser.ts` mints ids by slugifying labels. A section
+ * newly present in the source is INSERTED; a stored entry whose section
+ * still resolves is KEPT BY VALUE (never rebuilt — only `order` may be
+ * renumbered); a stored entry whose section no longer resolves is RETAINED,
+ * never deleted — removing it is a Phase 26 user action, never an automatic
+ * consequence of the source changing shape. The leading/trailing `copyright`
+ * entries are matched by kind and position, never by `sectionId`, and are
+ * never duplicated.
+ */
+export function reconcileSongGroup(
+  group: SlideGroup,
+  slot: SongSlot,
+  inputs: AssemblyInputs,
+): { slides: GroupSlideEntry[]; changed: boolean } {
+  const songId = slot.songId
+  if (!songId) return { slides: group.slides, changed: false }
+  const lyrics = inputs.songLyricsById.get(songId)
+  if (!lyrics) return { slides: group.slides, changed: false }
+
+  const freshOrder = resolveSongOrder(songId, lyrics, inputs).filter((sectionId) =>
+    lyrics.sections.some((section) => section.id === sectionId),
+  )
+  const freshSectionIds = new Set(freshOrder)
+
+  const storedLyricEntries = group.slides.filter(isLyricEntry)
+  const storedBySectionId = new Map(storedLyricEntries.map((entry) => [entry.sourceRef.sectionId, entry]))
+
+  const storedCopyrightEntries = group.slides.filter(isCopyrightEntry).sort((a, b) => a.order - b.order)
+  const leadingCopyright = storedCopyrightEntries[0]
+  const trailingCopyright =
+    storedCopyrightEntries.length >= 2 ? storedCopyrightEntries[storedCopyrightEntries.length - 1] : undefined
+
+  const merged: GroupSlideEntry[] = []
+  let order = 0
+
+  merged.push(
+    leadingCopyright
+      ? { ...leadingCopyright, order: order++ }
+      : { id: crypto.randomUUID(), order: order++, sourceRef: { kind: 'copyright', songId } },
+  )
+
+  for (const sectionId of freshOrder) {
+    const stored = storedBySectionId.get(sectionId)
+    merged.push(
+      stored
+        ? { ...stored, order: order++ }
+        : { id: crypto.randomUUID(), order: order++, sourceRef: { kind: 'lyric', songId, sectionId } },
+    )
+  }
+
+  // Retained-but-unresolvable entries — kept relative to each other, appended
+  // after the resolvable run and before the trailing copyright (Pitfall 4).
+  for (const entry of storedLyricEntries) {
+    if (!freshSectionIds.has(entry.sourceRef.sectionId)) {
+      merged.push({ ...entry, order: order++ })
+    }
+  }
+
+  merged.push(
+    trailingCopyright
+      ? { ...trailingCopyright, order: order++ }
+      : { id: crypto.randomUUID(), order: order++, sourceRef: { kind: 'copyright', songId } },
+  )
+
+  const changed =
+    merged.length !== group.slides.length ||
+    merged.some((entry, index) => JSON.stringify(entry) !== JSON.stringify(group.slides[index]))
+
+  return changed ? { slides: merged, changed: true } : { slides: group.slides, changed: false }
 }
