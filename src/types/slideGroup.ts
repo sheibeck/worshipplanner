@@ -1,0 +1,86 @@
+import type { Timestamp } from 'firebase/firestore'
+
+/**
+ * A persisted slide group (Phase 24, D-01/D-02/D-04) — the structure, order,
+ * audio, labels and notes a service's plan item (`ServiceSlot`) has been
+ * given, anchored to that slot's stable `id`. Lives at
+ * `organizations/{orgId}/slideGroups/{slotId}` — one document per slot, keyed
+ * by the SAME id as the slot it anchors to.
+ *
+ * Load-bearing invariants:
+ * 1. `SlideGroup.id === SlideGroup.slotId === the anchoring ServiceSlot.id`.
+ *    This is the deterministic Firestore doc id every later plan in this
+ *    phase relies on — groups anchor to `slot.id`, never to array index or
+ *    `position`, so a drag-reorder on the Service Order tab can never
+ *    re-point a group at the wrong plan item (D-01).
+ * 2. `GroupSlideEntry.id` is minted ONCE (`crypto.randomUUID()`) at
+ *    materialization and is NEVER regenerated afterward. Phase 23's WR-02
+ *    contract keys `PresentationViewer`'s per-slide `AudioPlayer`/
+ *    `VideoPlayer` child component instances on this id specifically so a
+ *    reorder or reconciliation never leaks stale muted/blocked media state
+ *    from one slide onto another.
+ * 3. Slide TEXT is never stored on this document — it resolves LIVE from
+ *    the canonical song / scripture / imported-deck record via `sourceRef`
+ *    (D-02). Editing a song's lyrics updates every service referencing it;
+ *    there is no per-service text override and no "Generate missing slides"
+ *    step, because groups are always populated from the live source.
+ *
+ * `slides` is an EMBEDDED ARRAY field on this document, NOT a nested
+ * Firestore subcollection — a nested `slideGroups/{slotId}/slides/{id}`
+ * subcollection would fall through the existing `firestore.rules` generic
+ * single-segment catch-all to a global deny, forcing a rules change this
+ * phase is forbidden from testing (see RESEARCH.md Pattern 4/5).
+ */
+export interface SlideGroup {
+  /** Equals `slotId` and the anchoring `ServiceSlot.id` — the Firestore doc id. */
+  id: string
+  serviceId: string
+  /** Redundant with `id`, kept explicit for query readability and the delete cascade. */
+  slotId: string
+  /** Group-level audio bed (migrated from Phase 22's `MediaAttachableSlot.audioUrl`, D-05). */
+  bedAudioUrl?: string
+  /** Group-level video bed — video has no per-slide layer (Pattern 4). */
+  bedVideoUrl?: string
+  /** Opaque signature of the source content this group was last materialized/reconciled against. */
+  sourceSignature?: string
+  slides: GroupSlideEntry[]
+  createdAt: Timestamp
+  updatedAt: Timestamp
+}
+
+/**
+ * One slide within a `SlideGroup`. `id` is minted once and never regenerated
+ * (see invariant 2 above) — it is the id `PresentationViewer` keys media
+ * components on.
+ */
+export interface GroupSlideEntry {
+  id: string
+  order: number
+  sourceRef: SourceRef
+  label?: string
+  notes?: string
+  /** Per-slide audio (R030) — audio only, there is no per-slide video layer. */
+  audioUrl?: string
+  /** UI toggle: apply this slide's audio to just this slide, or set it as the group's bed. */
+  audioScope?: 'slide' | 'group'
+  /** D-04: loop is a per-slide flag only — a group bed never loops. */
+  audioLoop?: boolean
+}
+
+/**
+ * Discriminated union of every kind of content a `GroupSlideEntry` can point
+ * at, narrowed on `kind`. The `copyright` member is a planner addition to
+ * research's four-member shape: `assembleSlideshow` emits a copyright slide
+ * BEFORE and AFTER a song's lyric sections, so a song group needs two entries
+ * that carry no `sectionId`. Encoding them as `kind: 'copyright'` keeps song
+ * reconciliation's diff-by-`sectionId` from ever seeing a section-less entry.
+ */
+export type SourceRef =
+  | { kind: 'lyric'; songId: string; sectionId: string }
+  | { kind: 'copyright'; songId: string }
+  | { kind: 'scripture'; scriptureReadingId: string; innerSlideId: string }
+  | { kind: 'imported'; importId: string; innerSlideId: string }
+  | { kind: 'text' }
+
+/** The shape the store's create action accepts before it stamps server timestamps. */
+export type SlideGroupInput = Omit<SlideGroup, 'createdAt' | 'updatedAt'>
