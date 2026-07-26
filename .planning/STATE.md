@@ -5,14 +5,14 @@ milestone_name: Slides Tab Rework
 current_phase: 25
 current_phase_name: Slides Tab Shell — Plan Rail and Slide Grid
 status: executing
-stopped_at: Completed 25-01-PLAN.md (VideoSlide type + authored-text SourceRef + reconciliation retention)
-last_updated: "2026-07-26T20:12:05.191Z"
+stopped_at: "Completed 25-03-PLAN.md (Slides tab shell: plan rail, SlidesTab selection contract, third tab in ServiceEditorView)"
+last_updated: "2026-07-26T20:47:41.740Z"
 last_activity: 2026-07-26
 progress:
   total_phases: 17
   completed_phases: 12
   total_plans: 81
-  completed_plans: 75
+  completed_plans: 76
   percent: 71
 last_activity_desc: Opened v1.3 Slides Tab Rework (Phases 24-28) from the Claude Design import; v1.2 left code-complete with its verification ledger intact
 ---
@@ -36,7 +36,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 25 (Slides Tab Shell — Plan Rail and Slide Grid) — EXECUTING
-Plan: 2 of 7
+Plan: 3 of 7
 Milestone: v1.3 Slides Tab Rework (Phases 24-28) — IN PROGRESS
 Status: Ready to execute
 
@@ -266,6 +266,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 24 P05 | 14min | 3 tasks | 3 files |
 | Phase 24 P06 | 26min | 3 tasks | 2 files |
 | Phase 25 P01 | 35min | 3 tasks | 7 files |
+| Phase 25 P03 | 2.5h | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -375,6 +376,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: [Phase 24-06]: confirmSlotDelete resolves the slot id BEFORE the splice, awaits slideGroupsStore.deleteGroup first, and leaves the slot in place on a failed delete (T-24-06-02)
 - [Phase ?]: [Phase 25-01]: VideoSlide's own-source field named videoSrc (not videoUrl) to avoid colliding with SlideBase.videoUrl's group-bed carrier role in emitFromGroup's spread
 - [Phase ?]: [Phase 25-01]: isNonDerivableEntry (video kind, or authored text kind) is the single predicate hasCustomization/computeLoss consult to gate reconciliation deletion of user-appended entries
+- [Phase ?]: 25-03: SlidePlanRail receives raw (unsorted) slots and sorts internally, carrying original array index so counts stay aligned with AssembledSlide.slotIndex
+- [Phase ?]: 25-03: PendingReconciliation shape duplicated locally in SlidesTab.vue rather than imported from useSlideshowAssembly, to satisfy the plan's no-composable-reference verification gate
 
 ### Roadmap Evolution
 
@@ -434,6 +437,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-26
-Last session: 2026-07-26T20:12:05.046Z
-Stopped at: Completed 25-01-PLAN.md (VideoSlide type + authored-text SourceRef + reconciliation retention)
+Last session: 2026-07-26T20:47:41.691Z
+Stopped at: Completed 25-03-PLAN.md (Slides tab shell: plan rail, SlidesTab selection contract, third tab in ServiceEditorView)
 Resume file: None

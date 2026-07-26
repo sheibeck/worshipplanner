@@ -208,7 +208,7 @@ Plans:
 **Wave 1**
 
 - [x] 25-01-PLAN.md — D-17 data model: `VideoSlide`, video/authored-text source refs, reconciliation retention
-- [ ] 25-03-PLAN.md — Slides tab shell: shared display module, plan rail, selection contract, third tab
+- [x] 25-03-PLAN.md — Slides tab shell: shared display module, plan rail, selection contract, third tab
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
