@@ -22,6 +22,7 @@ import { assembleSlideshow } from '@/utils/slideshowAssembler'
 import { SERVICE_SECTIONS, SERVICE_SECTION_LABELS, type Service } from '@/types/service'
 import type { AssembledSlide, AssembledSection } from '@/types/slide'
 import type { SongLyrics } from '@/types/songLyrics'
+import type { SlideGroup } from '@/types/slideGroup'
 
 /** Loads the current (newest) lyrics doc for a song. Injectable for tests. */
 export type LyricsLoader = (orgId: string, songId: string) => Promise<SongLyrics | null>
@@ -52,12 +53,23 @@ async function defaultLyricsLoader(orgId: string, songId: string): Promise<SongL
 export interface UseSlideshowAssemblyOptions {
   /** Injectable lyrics loader — defaults to a real Firestore `getDocs` query. */
   lyricsLoader?: LyricsLoader
+  /**
+   * Whether this consumer is allowed to write slide groups (materialize/
+   * reconcile). Defaults to `false` — the `/services/:id` route has no
+   * editor guard (Phase 17 gated viewer safety at the store/UI level, not
+   * the route), so a viewer must never attempt a write Firestore's
+   * `isOrgEditor(orgId)` rule would deny anyway. The single call site
+   * (`ServiceEditorView.vue`) supplies `authStore.isEditor`.
+   */
+  canWrite?: Ref<boolean> | ComputedRef<boolean> | boolean
 }
 
 export interface UseSlideshowAssemblyReturn {
   assembledSlideshow: ComputedRef<AssembledSlide[]>
   assembledSections: ComputedRef<AssembledSection[]>
   isLoading: Ref<boolean>
+  /** Re-exposed from the `slideGroups` store so consumers (24-06's delete warning) don't subscribe a second time. */
+  groupsBySlotId: ComputedRef<Map<string, SlideGroup>>
 }
 
 /**
@@ -81,11 +93,17 @@ export function useSlideshowAssembly(
   const slideGroupsStore = useSlideGroups()
   const loadLyrics = options?.lyricsLoader ?? defaultLyricsLoader
 
+  const canWrite = computed<boolean>(() => {
+    const cw = options?.canWrite
+    if (cw === undefined) return false
+    return typeof cw === 'boolean' ? cw : cw.value
+  })
+
   const resolvedOrgId = computed<string | null>(() =>
     typeof orgId === 'string' ? orgId : orgId.value,
   )
 
-  // --- scripture readings / imported decks: subscribe once per org, guard against double-subscribe ---
+  // --- scripture readings / imported decks / slide groups: subscribe once per org, guard against double-subscribe ---
   const subscribedOrgId = ref<string | null>(null)
   const stopOrgWatch = watch(
     resolvedOrgId,
@@ -93,6 +111,7 @@ export function useSlideshowAssembly(
       if (id && subscribedOrgId.value !== id) {
         scriptureStore.subscribeReadings(id)
         importedStore.subscribeDecks(id)
+        slideGroupsStore.subscribeGroups(id)
         subscribedOrgId.value = id
       }
     },
@@ -177,6 +196,11 @@ export function useSlideshowAssembly(
     })
   })
 
+  // Re-exposed as its own computed (not the raw unwrapped store value) so
+  // consumers see a live-updating ComputedRef rather than a one-time snapshot
+  // of the Map captured at setup time.
+  const groupsBySlotId = computed<Map<string, SlideGroup>>(() => slideGroupsStore.groupsBySlotId)
+
   const assembledSections = computed<AssembledSection[]>(() => {
     const slides = assembledSlideshow.value
     const groups: AssembledSection[] = []
@@ -204,5 +228,10 @@ export function useSlideshowAssembly(
 
   onUnmounted(cleanup)
 
-  return { assembledSlideshow, assembledSections, isLoading }
+  return {
+    assembledSlideshow,
+    assembledSections,
+    isLoading,
+    groupsBySlotId,
+  }
 }

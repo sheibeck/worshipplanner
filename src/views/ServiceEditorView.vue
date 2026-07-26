@@ -1385,7 +1385,12 @@ function onSlotVideoUrlChange(index: number, url: string | undefined) {
 }
 
 const orgIdRef = computed(() => authStore.orgId)
-const { assembledSections, assembledSlideshow, isLoading: slideshowLoading } = useSlideshowAssembly(localService, orgIdRef)
+const {
+  assembledSections,
+  assembledSlideshow,
+  isLoading: slideshowLoading,
+  groupsBySlotId,
+} = useSlideshowAssembly(localService, orgIdRef, { canWrite: computed(() => authStore.isEditor) })
 const presenting = ref(false)
 
 // ── AI state ───────────────────────────────────────────────────────────────────
