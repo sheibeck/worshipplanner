@@ -9,6 +9,7 @@
  */
 import type { ServiceSlot, SlotKind } from '@/types/service'
 import type { Slide } from '@/types/slide'
+import type { GroupSlideEntry } from '@/types/slideGroup'
 import { slotLabel } from '@/utils/slotTypes'
 
 /**
@@ -83,6 +84,64 @@ export function slideContentLabel(slide: Slide): string {
     case 'video':
       return 'VIDEO'
   }
+}
+
+/**
+ * Main preview-body text for one assembled slide — 25-04's `SlideCard` reads
+ * this rather than re-deriving it, so the lyric/copyright shape-narrowing
+ * (both share `contentKind: 'lyric'` and are told apart only by the presence
+ * of `sectionId`) is never duplicated a third time (`SlideshowPreview.vue`
+ * and `PresentationViewer.vue` each already carry their own local copy).
+ * Image slides render their own `<img>` in the card and don't consume this
+ * string; it is still defined for every kind so the switch stays exhaustive.
+ */
+export function slideBodyText(slide: Slide): string {
+  switch (slide.contentKind) {
+    case 'lyric':
+      return 'sectionId' in slide ? slide.lines.join('\n') : slide.title
+    case 'scripture':
+      return `${slide.reference}\n${slide.text}`
+    case 'text':
+      return slide.body
+    case 'image':
+      return slide.altText ?? ''
+    case 'video':
+      return slide.originalFileName ? `Video: ${slide.originalFileName}` : 'Video'
+  }
+}
+
+/**
+ * Readable (non-eyebrow, natural-case) footer label for one assembled slide —
+ * distinct from `slideContentLabel`'s small uppercase eyebrow text over the
+ * preview. Feeds the card footer's label line (D-10).
+ */
+export function slideFooterLabel(slide: Slide): string {
+  switch (slide.contentKind) {
+    case 'lyric':
+      return 'sectionId' in slide ? slide.sectionLabel : slide.title
+    case 'scripture':
+      return slide.reference
+    case 'text':
+      return slide.title && slide.title.trim() ? slide.title : 'Text'
+    case 'image':
+      return 'Image'
+    case 'video':
+      return slide.originalFileName ?? 'Video'
+  }
+}
+
+/**
+ * A confirm-required reconciliation (`useSlideshowAssembly`'s own shape,
+ * mirrored here — never imported from that composable; nothing under
+ * `src/components/slides/` may import or call it, per 25-04's hard
+ * constraints). Defined once here so `SlidesTab.vue` and `SlideGrid.vue`
+ * share a single local copy instead of each duplicating it (25-03 duplicated
+ * it directly in `SlidesTab.vue`; 25-04 centralizes it here).
+ */
+export interface PendingReconciliation {
+  slotId: string
+  proposed: GroupSlideEntry[]
+  loss?: { customizedEntries: number; withAudio: number; withNotes: number }
 }
 
 /**

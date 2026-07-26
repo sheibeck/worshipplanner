@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { KIND_BADGE_CLASSES, slotDisplayTitle, slideContentLabel, bedAudioLabel } from '../slideDisplay'
+import {
+  KIND_BADGE_CLASSES,
+  slotDisplayTitle,
+  slideContentLabel,
+  slideBodyText,
+  slideFooterLabel,
+  bedAudioLabel,
+} from '../slideDisplay'
 import type { ServiceSlot, SlotKind } from '@/types/service'
 import type { Slide } from '@/types/slide'
 
@@ -166,6 +173,103 @@ describe('slideDisplay', () => {
       const withoutTitle = { id: 's7', position: 0, contentKind: 'text', body: '' } as Slide
       expect(slideContentLabel(withTitle)).toBe('WELCOME')
       expect(slideContentLabel(withoutTitle)).toBe('TEXT')
+    })
+  })
+
+  describe('slideBodyText', () => {
+    it('returns joined lines for a lyric slide and the title for a copyright slide', () => {
+      const lyric = {
+        id: 's1',
+        position: 0,
+        contentKind: 'lyric',
+        sectionId: 'sec-1',
+        sectionLabel: 'Verse 1',
+        lines: ['Line one', 'Line two'],
+      } as Slide
+      const copyright = {
+        id: 's2',
+        position: 0,
+        contentKind: 'lyric',
+        title: 'Amazing Grace',
+        authors: [],
+        ccliSongNumber: '1',
+        copyrightLines: [],
+        ccliLicenseNumber: '1',
+      } as Slide
+      expect(slideBodyText(lyric)).toBe('Line one\nLine two')
+      expect(slideBodyText(copyright)).toBe('Amazing Grace')
+    })
+
+    it('combines the reference and text for a scripture slide', () => {
+      const scripture = {
+        id: 's3',
+        position: 0,
+        contentKind: 'scripture',
+        reference: 'Psalms 23:1-6',
+        text: 'The LORD is my shepherd',
+      } as Slide
+      expect(slideBodyText(scripture)).toBe('Psalms 23:1-6\nThe LORD is my shepherd')
+    })
+
+    it('returns the body for a text slide', () => {
+      const text = { id: 's4', position: 0, contentKind: 'text', body: 'Please stand.' } as Slide
+      expect(slideBodyText(text)).toBe('Please stand.')
+    })
+
+    it("names the file for a video slide when it has one, falling back to 'Video'", () => {
+      const withFile = { id: 's5', position: 0, contentKind: 'video', videoSrc: 'x', originalFileName: 'clip.mp4' } as Slide
+      const withoutFile = { id: 's6', position: 0, contentKind: 'video', videoSrc: 'x' } as Slide
+      expect(slideBodyText(withFile)).toBe('Video: clip.mp4')
+      expect(slideBodyText(withoutFile)).toBe('Video')
+    })
+  })
+
+  describe('slideFooterLabel', () => {
+    it('returns the natural-case section label / title for lyric and copyright slides', () => {
+      const lyric = {
+        id: 's1',
+        position: 0,
+        contentKind: 'lyric',
+        sectionId: 'sec-1',
+        sectionLabel: 'Verse 1',
+        lines: [],
+      } as Slide
+      const copyright = {
+        id: 's2',
+        position: 0,
+        contentKind: 'lyric',
+        title: 'Amazing Grace',
+        authors: [],
+        ccliSongNumber: '1',
+        copyrightLines: [],
+        ccliLicenseNumber: '1',
+      } as Slide
+      expect(slideFooterLabel(lyric)).toBe('Verse 1')
+      expect(slideFooterLabel(copyright)).toBe('Amazing Grace')
+    })
+
+    it('returns the reference for a scripture slide', () => {
+      const scripture = { id: 's3', position: 0, contentKind: 'scripture', reference: 'John 3:16' } as Slide
+      expect(slideFooterLabel(scripture)).toBe('John 3:16')
+    })
+
+    it("returns the title for a text slide, 'Text' otherwise", () => {
+      const withTitle = { id: 's4', position: 0, contentKind: 'text', title: 'Welcome', body: '' } as Slide
+      const withoutTitle = { id: 's5', position: 0, contentKind: 'text', body: '' } as Slide
+      expect(slideFooterLabel(withTitle)).toBe('Welcome')
+      expect(slideFooterLabel(withoutTitle)).toBe('Text')
+    })
+
+    it("returns 'Image' for an image slide", () => {
+      const image = { id: 's6', position: 0, contentKind: 'image' } as Slide
+      expect(slideFooterLabel(image)).toBe('Image')
+    })
+
+    it("names the file for a video slide when it has one, falling back to 'Video'", () => {
+      const withFile = { id: 's7', position: 0, contentKind: 'video', videoSrc: 'x', originalFileName: 'clip.mp4' } as Slide
+      const withoutFile = { id: 's8', position: 0, contentKind: 'video', videoSrc: 'x' } as Slide
+      expect(slideFooterLabel(withFile)).toBe('clip.mp4')
+      expect(slideFooterLabel(withoutFile)).toBe('Video')
     })
   })
 
