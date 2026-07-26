@@ -58,12 +58,12 @@ describe('SlotMediaAttachment', () => {
 
   it('a rejected upload renders media-upload-error and emits NO update event', async () => {
     mockUploadMedia.mockImplementation(() => {
-      errorRef.value = 'Unsupported file type "text/plain" — only audio or video files can be attached.'
+      errorRef.value = 'Unsupported file type "text/plain" — only audio files can be attached.'
       return Promise.reject(new Error('Unsupported file type'))
     })
     const wrapper = mount(SlotMediaAttachment, { props: { orgId: 'org-1' } })
 
-    await selectFile(wrapper, 'attach-video-input', makeFile('notes.txt', 'text/plain'))
+    await selectFile(wrapper, 'attach-audio-input', makeFile('notes.txt', 'text/plain'))
     await Promise.resolve()
     await Promise.resolve()
 
@@ -71,7 +71,6 @@ describe('SlotMediaAttachment', () => {
     expect(errorEl.exists()).toBe(true)
     expect(errorEl.text()).toContain('Unsupported file type')
     expect(wrapper.emitted('update:audioUrl')).toBeUndefined()
-    expect(wrapper.emitted('update:videoUrl')).toBeUndefined()
   })
 
   it('with audioUrl prop set, renders an AudioPlayer preview and remove-audio; clicking remove emits update:audioUrl cleared', async () => {
@@ -88,12 +87,11 @@ describe('SlotMediaAttachment', () => {
     expect(wrapper.emitted('update:audioUrl')).toEqual([[undefined]])
   })
 
-  it('with videoUrl prop set, renders a VideoPlayer preview', () => {
-    const wrapper = mount(SlotMediaAttachment, {
-      props: { orgId: 'org-1', videoUrl: 'https://storage.example.com/existing.mp4' },
-    })
+  it('renders no video attach input and no video preview — the bed is audio-only (D-18)', () => {
+    const wrapper = mount(SlotMediaAttachment, { props: { orgId: 'org-1' } })
 
-    expect(wrapper.find('[data-testid="video-player"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="attach-video-input"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="video-player"]').exists()).toBe(false)
   })
 
   it('shows an upload progress indicator while isUploading is true', async () => {

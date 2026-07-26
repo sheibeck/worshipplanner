@@ -966,7 +966,7 @@ describe('ServiceEditorView - slot delete cascades to its group (Phase 24-06 Tas
     expect(wrapper.findAll('[data-testid="section-select"]')).toHaveLength(9)
   })
 
-  it('names the true slide count and attached audio for a group with six slides and bed audio', async () => {
+  it('names the true slide count and attached audio for a group with six slides and bed audio, and never claims attached video (D-18)', async () => {
     mockSlideGroupsState.groups = [
       buildGroup('slot-0', {
         bedAudioUrl: 'https://example.com/bed.mp3',
@@ -984,6 +984,7 @@ describe('ServiceEditorView - slot delete cascades to its group (Phase 24-06 Tas
     const dialogText = body().text()
     expect(dialogText).toContain('6')
     expect(dialogText).toContain('attached audio')
+    expect(dialogText).not.toContain('attached video')
   })
 
   it('names operator notes and per-slide audio when present, with no group bed', async () => {
@@ -1013,7 +1014,7 @@ describe('ServiceEditorView - slot delete cascades to its group (Phase 24-06 Tas
     await openDeleteConfirm(wrapper, 0)
 
     const dialogText = body().text()
-    expect(dialogText).toContain('with no attached audio, video, or notes')
+    expect(dialogText).toContain('with no attached audio or notes')
   })
 
   it('names zero slides and still completes the delete when the slot has no group', async () => {
@@ -1170,21 +1171,6 @@ describe('ServiceEditorView - slot media control retargeted at the group bed (Ph
     })
   })
 
-  it('attaching video calls setGroupBedMedia for the bed video field', async () => {
-    const wrapper = await mountView()
-    await wrapper.vm.$nextTick()
-
-    const control = wrapper.findComponent(SlotMediaAttachment)
-    await control.vm.$emit('update:videoUrl', 'https://example.com/new-video.mp4')
-    await Promise.resolve()
-    await wrapper.vm.$nextTick()
-
-    expect(mockSetGroupBedMedia).toHaveBeenCalledWith('org-1', 'slot-0', {
-      serviceId: 'service-1',
-      bedVideoUrl: 'https://example.com/new-video.mp4',
-    })
-  })
-
   it('removing audio passes the explicit clear flag rather than an undefined url', async () => {
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
@@ -1220,11 +1206,10 @@ describe('ServiceEditorView - slot media control retargeted at the group bed (Ph
     expect(mockUpdateService).not.toHaveBeenCalled()
   })
 
-  it('the control displays urls from the group bed, not the deprecated slot fields', async () => {
+  it('the control displays the url from the group bed, not the deprecated slot field', async () => {
     mockSlideGroupsState.groups = [
       buildGroup('slot-0', {
         bedAudioUrl: 'https://example.com/persisted-audio.mp3',
-        bedVideoUrl: 'https://example.com/persisted-video.mp4',
       }),
     ]
     const wrapper = await mountView()
@@ -1232,13 +1217,12 @@ describe('ServiceEditorView - slot media control retargeted at the group bed (Ph
 
     const control = wrapper.findComponent(SlotMediaAttachment)
     expect(control.props('audioUrl')).toBe('https://example.com/persisted-audio.mp3')
-    expect(control.props('videoUrl')).toBe('https://example.com/persisted-video.mp4')
   })
 
   // WR-02 regression: before the group materializes, the control must fall
-  // back to the slot's own deprecated audioUrl/videoUrl rather than render as
-  // if no media is attached at all.
-  it('falls back to the slot\'s own deprecated audioUrl/videoUrl when no group has materialized yet (WR-02)', async () => {
+  // back to the slot's own deprecated audioUrl rather than render as if no
+  // media is attached at all.
+  it('falls back to the slot\'s own deprecated audioUrl when no group has materialized yet (WR-02)', async () => {
     mockSlideGroupsState.groups = [] // no group at all for slot-0 yet
     mockServicesList = [{
       ...mockService,
@@ -1252,7 +1236,6 @@ describe('ServiceEditorView - slot media control retargeted at the group bed (Ph
           songTitle: 'Amazing Grace',
           songKey: 'G',
           audioUrl: 'https://example.com/legacy-audio.mp3',
-          videoUrl: 'https://example.com/legacy-video.mp4',
         },
         ...mockService.slots.slice(1),
       ],
@@ -1262,7 +1245,6 @@ describe('ServiceEditorView - slot media control retargeted at the group bed (Ph
 
     const control = wrapper.findComponent(SlotMediaAttachment)
     expect(control.props('audioUrl')).toBe('https://example.com/legacy-audio.mp3')
-    expect(control.props('videoUrl')).toBe('https://example.com/legacy-video.mp4')
   })
 
   it('prefers the materialized group bed over the slot\'s deprecated fields when both are present', async () => {

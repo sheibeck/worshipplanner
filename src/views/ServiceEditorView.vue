@@ -924,21 +924,20 @@
                 </template>
               </template>
 
-              <!-- Per-slot media attach/preview/remove (Phase 22, R013/R014 — retargeted
-                   at the group bed in Phase 24-06, R030): editor only, hidden when exported,
-                   matching sibling slot controls. Collapsed/compact so it doesn't crowd the
-                   slot row; the displayed urls read the anchored group's bed first, falling
-                   back to the slot's own deprecated field when no group exists yet (WR-02)
-                   and the write goes straight to slideGroups via setGroupBedMedia
-                   (onSlotBedAudioChange/onSlotBedVideoChange below) — a deliberately separate,
-                   scoped write path, NOT the localService deep-watch autosave. -->
+              <!-- Per-slot group-BED audio attach/preview/remove (Phase 22, R013/R014 —
+                   retargeted at the group bed in Phase 24-06, R030; audio-only per D-18):
+                   editor only, hidden when exported, matching sibling slot controls.
+                   Collapsed/compact so it doesn't crowd the slot row; the displayed url
+                   reads the anchored group's bed first, falling back to the slot's own
+                   deprecated field when no group exists yet (WR-02) and the write goes
+                   straight to slideGroups via setGroupBedMedia (onSlotBedAudioChange
+                   below) — a deliberately separate, scoped write path, NOT the
+                   localService deep-watch autosave. -->
               <SlotMediaAttachment
                 v-if="authStore.isEditor && !isExportedLocked"
                 :orgId="authStore.orgId!"
                 :audioUrl="displaySlotAudioUrl(slot)"
-                :videoUrl="displaySlotVideoUrl(slot)"
                 @update:audioUrl="(url) => onSlotBedAudioChange(index, url)"
-                @update:videoUrl="(url) => onSlotBedVideoChange(index, url)"
               />
             </div>
 
@@ -1297,10 +1296,12 @@ const deleteConfirmHeading = computed(() =>
 )
 // R029/D-03: the remove-element confirm body must name the TRUE loss —
 // the live group's real slide count and whichever attached artefacts are
-// genuinely present (a group bed audio, a group bed video, per-slide audio,
-// or operator notes) — never a generic "this cannot be undone" alone, and
-// never an invented/rounded number. A slot with no group names zero slides
-// and makes no attached-media claim.
+// genuinely present (a group bed audio, per-slide audio, or operator notes)
+// — never a generic "this cannot be undone" alone, and never an
+// invented/rounded number. A slot with no group names zero slides and makes
+// no attached-media claim. There is no bed video to name (D-18) — the bed is
+// audio-only, and a video slide is just one of the group's own slides,
+// already counted in slideCount.
 const deleteConfirmBody = computed(() => {
   if (pendingDeleteIsClear.value) {
     return 'This will delete the assigned song, scripture, or content from the plan. This cannot be undone.'
@@ -1315,13 +1316,12 @@ const deleteConfirmBody = computed(() => {
 
   const attachments: string[] = []
   if (group?.bedAudioUrl) attachments.push('attached audio')
-  if (group?.bedVideoUrl) attachments.push('attached video')
   if (group?.slides.some((s) => !!s.audioUrl)) attachments.push('per-slide audio')
   if (group?.slides.some((s) => !!s.notes?.trim())) attachments.push('operator notes')
 
   const mediaClause = attachments.length > 0
     ? ` along with its ${attachments.join(', ')}`
-    : ', with no attached audio, video, or notes'
+    : ', with no attached audio or notes'
 
   return `This will remove ${label} and its ${slideCount} ${slideWord}${mediaClause}. This cannot be undone.`
 })
@@ -1439,30 +1439,27 @@ function onSectionChange(index: number, value: string) {
 
 /**
  * WR-02: the media control's bound value reads ONLY the materialized group's
- * bed field, never the slot's own deprecated `audioUrl`/`videoUrl`
- * (`MediaAttachableSlot`). For any slot whose group hasn't materialized yet
- * — every slot viewed by a non-editor (`canWrite` gates materialization to
- * `[]` for viewers), and any SONG/SCRIPTURE/IMPORTED slot whose source isn't
- * assigned yet — the control would render as if no media is attached even
- * though the legacy field on the slot document still carries a real URL.
- * Falls back to the slot's own legacy field when no group exists yet,
- * mirroring the read-precedence already used elsewhere in this phase (group
- * value first, slot legacy value second).
+ * bed field, never the slot's own deprecated `audioUrl` (`MediaAttachableSlot`).
+ * For any slot whose group hasn't materialized yet — every slot viewed by a
+ * non-editor (`canWrite` gates materialization to `[]` for viewers), and any
+ * SONG/SCRIPTURE/IMPORTED slot whose source isn't assigned yet — the control
+ * would render as if no media is attached even though the legacy field on the
+ * slot document still carries a real URL. Falls back to the slot's own
+ * legacy field when no group exists yet, mirroring the read-precedence
+ * already used elsewhere in this phase (group value first, slot legacy value
+ * second). Audio-only (D-18/D-19) — there is no video-bed equivalent; a
+ * legacy slot-level `videoUrl` is dropped, not read or migrated.
  */
 function displaySlotAudioUrl(slot: ServiceSlot): string | undefined {
   return groupsBySlotId.value.get(slot.id)?.bedAudioUrl ?? slot.audioUrl
 }
 
-function displaySlotVideoUrl(slot: ServiceSlot): string | undefined {
-  return groupsBySlotId.value.get(slot.id)?.bedVideoUrl ?? slot.videoUrl
-}
-
-/** Editor-only per-slot media attach/remove (Phase 22, R013/R014 — retargeted
- *  at the group bed in Phase 24-06, R030/Pitfall 1). These no longer mutate
- *  localService.slots[index].audioUrl/videoUrl or ride its deep-watch
- *  autosave — SlotMediaAttachment's emitted url is written straight to the
- *  anchored group's bed via the slideGroups store's scoped write
- *  (setGroupBedMedia), a deliberately separate write path from the
+/** Editor-only per-slot group-BED audio attach/remove (Phase 22, R013/R014 —
+ *  retargeted at the group bed in Phase 24-06, R030/Pitfall 1; audio-only per
+ *  D-18). This no longer mutates localService.slots[index].audioUrl or rides
+ *  its deep-watch autosave — SlotMediaAttachment's emitted url is written
+ *  straight to the anchored group's bed via the slideGroups store's scoped
+ *  write (setGroupBedMedia), a deliberately separate write path from the
  *  whole-document autosave. A removed url passes the explicit clear flag
  *  rather than an undefined bed field, since stripUndefined() would
  *  otherwise erase that intent before it reached Firestore.
@@ -1478,19 +1475,6 @@ async function onSlotBedAudioChange(index: number, url: string | undefined) {
     })
   } catch (err) {
     console.error('Failed to update slot bed audio:', err)
-  }
-}
-
-async function onSlotBedVideoChange(index: number, url: string | undefined) {
-  const slot = localService.value?.slots[index]
-  if (!localService.value || !slot || !authStore.orgId) return
-  try {
-    await slideGroupsStore.setGroupBedMedia(authStore.orgId, slot.id, {
-      serviceId: localService.value.id,
-      ...(url !== undefined ? { bedVideoUrl: url } : { clearVideo: true }),
-    })
-  } catch (err) {
-    console.error('Failed to update slot bed video:', err)
   }
 }
 

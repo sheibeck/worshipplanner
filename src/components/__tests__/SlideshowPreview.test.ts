@@ -90,6 +90,22 @@ function imageSlide(id: string): AssembledSlide {
   }
 }
 
+/** A genuine VideoSlide (D-17/D-18) — video is slide-only, never a bed. */
+function videoSlide(id: string): AssembledSlide {
+  return {
+    slide: {
+      id,
+      position: 5,
+      contentKind: 'video',
+      videoSrc: 'https://example.com/clip.mp4',
+    },
+    slotIndex: 4,
+    slotKind: 'IMPORTED',
+    section: 'pre-service',
+    sourceId: 'video-1',
+  }
+}
+
 describe('SlideshowPreview', () => {
   beforeEach(() => {
     // jsdom does not implement HTMLMediaElement.play/pause — stub per test,
@@ -169,31 +185,48 @@ describe('SlideshowPreview', () => {
     expect(wrapper.find('[data-testid="preview-empty-state"]').exists()).toBe(true)
   })
 
-  it('renders an AudioPlayer for a slide with audioUrl and a VideoPlayer for a slide with videoUrl, and neither for a slide with no media', () => {
+  it('renders an AudioPlayer for a slide with audioUrl, and neither for a slide with no media (D-18: video has no attached-media path — see the video-card test below)', () => {
     const audioSlide = textSlide('audio-slide')
     audioSlide.slide.audioUrl = 'https://example.com/track.mp3'
-    const videoSlide = imageSlide('video-slide')
-    videoSlide.slide.videoUrl = 'https://example.com/clip.mp4'
     const plainSlide = textSlide('plain-slide')
 
     const sections: AssembledSection[] = [
-      { section: 'message', label: 'Message', slides: [audioSlide, videoSlide, plainSlide] },
+      { section: 'message', label: 'Message', slides: [audioSlide, plainSlide] },
     ]
     const wrapper = mount(SlideshowPreview, { props: { sections } })
 
     const audioWrappers = wrapper.findAll('[data-testid="preview-slide-audio"]')
-    const videoWrappers = wrapper.findAll('[data-testid="preview-slide-video"]')
     expect(audioWrappers).toHaveLength(1)
-    expect(videoWrappers).toHaveLength(1)
     expect(audioWrappers[0]?.find('audio').attributes('src')).toBe('https://example.com/track.mp3')
-    expect(videoWrappers[0]?.find('video').attributes('src')).toBe('https://example.com/clip.mp4')
 
     // The plain slide's card still renders its text content, with no player wrapper.
     const cards = wrapper.findAll('[data-testid="preview-slide"]')
-    const plainCard = cards[2]
+    const plainCard = cards[1]
     expect(plainCard?.find('[data-testid="preview-slide-audio"]').exists()).toBe(false)
-    expect(plainCard?.find('[data-testid="preview-slide-video"]').exists()).toBe(false)
     expect(plainCard?.text()).toContain('Message')
+  })
+
+  it('renders a video card for a video slide, bound to its own videoSrc — identifiable as video without playing it (D-17/D-18)', () => {
+    const sections: AssembledSection[] = [
+      { section: 'pre-service', label: 'Pre-Service', slides: [videoSlide('v1')] },
+    ]
+    const wrapper = mount(SlideshowPreview, { props: { sections } })
+
+    const videoCard = wrapper.find('[data-testid="preview-slide-video"]')
+    expect(videoCard.exists()).toBe(true)
+    expect(videoCard.find('video').attributes('src')).toBe('https://example.com/clip.mp4')
+    expect(wrapper.find('[data-testid="preview-slide"]').text()).toContain('Video')
+  })
+
+  it('a text slide still renders its title and body unchanged alongside a video slide (D-18 collateral safety)', () => {
+    const sections: AssembledSection[] = [
+      { section: 'message', label: 'Message', slides: [videoSlide('v1'), textSlide('t1')] },
+    ]
+    const wrapper = mount(SlideshowPreview, { props: { sections } })
+
+    const cards = wrapper.findAll('[data-testid="preview-slide"]')
+    expect(cards[1]?.text()).toContain('Message')
+    expect(cards[1]?.find('[data-testid="preview-slide-video"]').exists()).toBe(false)
   })
 
   it('renders an enabled "Present Slideshow" CTA that emits present exactly once when there are slides', async () => {

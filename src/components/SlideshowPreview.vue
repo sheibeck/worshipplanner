@@ -76,6 +76,16 @@
               />
             </template>
 
+            <!-- Video slide (D-17/D-18) — video is slide-only, never a bed;
+                 identified via the eyebrow label without autoplaying it in
+                 the preview list. -->
+            <template v-else-if="cardKind(assembled.slide) === 'video'">
+              <p class="text-[10px] font-semibold text-indigo-400 uppercase tracking-wider mb-1">Video</p>
+              <div data-testid="preview-slide-video">
+                <VideoPlayer :src="(assembled.slide as VideoSlide).videoSrc" />
+              </div>
+            </template>
+
             <!-- Text slide (prayer/message/hymn placeholder) -->
             <template v-else>
               <p v-if="(assembled.slide as TextSlide).title" class="text-[10px] font-semibold text-indigo-400 uppercase tracking-wider mb-1">
@@ -84,11 +94,11 @@
               <p class="text-sm text-gray-200 whitespace-pre-line">{{ (assembled.slide as TextSlide).body }}</p>
             </template>
 
-            <!-- Attached media (Phase 22, R013/R014) — rendered below the slide's
-                 own content, and only when the assembled slide carries a URL. -->
-            <div v-if="assembled.slide.videoUrl" data-testid="preview-slide-video" class="mt-2">
-              <VideoPlayer :src="assembled.slide.videoUrl" />
-            </div>
+            <!-- Attached audio bed/per-slide media (Phase 22/24, R013/R014,
+                 D-04) — rendered below the slide's own content, only when the
+                 assembled slide carries a URL. Video has no equivalent
+                 attached-media path (D-18): a video slide's own source is
+                 rendered above, in its own card branch. -->
             <div v-if="assembled.slide.audioUrl" data-testid="preview-slide-audio" class="mt-2">
               <AudioPlayer :src="assembled.slide.audioUrl" />
             </div>
@@ -118,6 +128,7 @@ import type {
   ScriptureSlide,
   TextSlide,
   ImageSlide,
+  VideoSlide,
 } from '@/types/slide'
 import AudioPlayer from './AudioPlayer.vue'
 import VideoPlayer from './VideoPlayer.vue'
@@ -146,7 +157,7 @@ const canPresent = computed(() => hasAnySlides.value)
  * LyricSlide and CopyrightSlide both carry `contentKind: 'lyric'` (D001) and
  * are distinguished by shape (`sectionId` only present on LyricSlide).
  */
-type CardKind = 'lyric' | 'copyright' | 'scripture' | 'text' | 'image'
+type CardKind = 'lyric' | 'copyright' | 'scripture' | 'text' | 'image' | 'video'
 
 function cardKind(slide: Slide): CardKind {
   if (slide.contentKind === 'lyric') {
