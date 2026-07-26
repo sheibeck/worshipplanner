@@ -187,6 +187,14 @@ Slide-card content-kind label (`TITLE`/`VERSE 1`/`CHORUS`/`IMAGE`/`VIDEO`, top-l
 | Secondary action (per group) | `⇪ Import into this group` — opens `PptxImportModal.vue` (D-15), appends at the end (D-16) |
 | Drop tile heading | `Drop PPTX, images, video, or audio` |
 | Drop tile subtext | `PPTX, image, and video appends a slide · audio sets this group's music` (D-14 — the one behavioral difference from the mockup's copy) |
+
+> ⚠ **Prerequisite for the "video appends a slide" half of this copy — see 25-CONTEXT.md D-17.**
+> At the time this spec was written the codebase had **no `VideoSlide` type**: `SlideContentKind`
+> lists `'video'`, but the `Slide` union has no video variant and video existed only as
+> `SlideGroup.bedVideoUrl`. The owner decided (2026-07-26) to add a real `VideoSlide` rather than
+> degrade video to a bed, so this copy stands as written — but the type work is a hard prerequisite
+> and must land in an earlier wave than the drop target. Do not ship this copy against a model that
+> cannot honor it.
 | Rail empty state heading (D-07) | `Nothing planned yet` |
 | Rail empty state body | `Add songs, scripture, and other elements on the Service Order tab — they'll show up here automatically.` |
 | Grid empty state heading (D-08, zero-slide group) | `No slides in this group yet` |

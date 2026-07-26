@@ -91,7 +91,39 @@ selected group" — it does not require any of the three cut items.
   highlight is added so the drop isn't a pixel hunt.
 - **D-14 — Accept PPTX, images, video AND audio.** R032 names audio explicitly. Audio is special:
   it attaches as the **group bed**, it does not append a slide. The mockup's tile copy is extended
-  accordingly.
+  accordingly. **See D-17 — video is NOT symmetrical with audio.**
+
+- **D-17 — Add a real `VideoSlide` type; dropped video appends a slide.** *(added 2026-07-26,
+  owner decision, after 25-RESEARCH.md surfaced the gap)*
+
+  **The gap.** Phase 25 research found that the codebase cannot express a video slide.
+  `SlideContentKind` (`src/types/slide.ts:9`) lists `'video'` as a string member, but **no
+  `VideoSlide` interface exists** — the actual union is
+  `Slide = LyricSlide | CopyrightSlide | ScriptureSlide | TextSlide | ImageSlide` (line 100), and
+  `ImportedDeck.slides` is `(TextSlide | ImageSlide)[]`. Video today is a **group-bed-only** concept:
+  `SlideGroup.bedVideoUrl` (`src/types/slideGroup.ts:43`) exists and `PresentationViewer` already
+  renders it. So the UI-SPEC's approved drop-tile copy ("video appends a slide") was unbuildable
+  as written.
+
+  **The decision.** Introduce a genuine `VideoSlide` variant rather than degrading video to a bed.
+  Dropped video **appends a video slide** to the selected group, symmetrical with images — NOT
+  symmetrical with audio (audio remains bed-only per D-14).
+
+  **Acknowledged cost.** This is a data-model change of the kind Phase 24 owned, landing inside a
+  `risk:medium` UI phase. The owner was shown this trade-off explicitly and chose it. It ripples into
+  at minimum:
+  - `src/types/slide.ts` — the `VideoSlide` interface + its place in the `Slide` union
+  - `src/types/slideGroup.ts` — `GroupSlideEntry` must be able to carry a video entry
+  - `src/utils/slideGroupMaterializer.ts` — derive/reconcile must tolerate video entries
+  - `src/utils/slideshowAssembler.ts` — emit video slides into `AssembledSlide`
+  - `src/components/PresentationViewer.vue` — render a video SLIDE distinctly from the existing bed
+    video (Phase 23 is code-complete with human-verify still outstanding — **do not regress it**)
+
+  `ImportedDeck.slides` is deliberately NOT widened: PPTX decks contain no video, so the deck type
+  stays `(TextSlide | ImageSlide)[]`.
+
+  **Planning guidance:** give the type/model work its own plan and wave, landing BEFORE the drop
+  target that depends on it. Do not bury it inside a UI plan.
 - **D-15 — Reuse `PptxImportModal.vue`** from Phase 21 for the PPTX path rather than creating a
   second import implementation.
 - **D-16 — Imports append at the END of the selected group** — R032's exact words ("imports and
