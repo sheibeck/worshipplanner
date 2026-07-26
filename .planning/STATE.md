@@ -5,14 +5,14 @@ milestone_name: Slides Tab Rework
 current_phase: 24
 current_phase_name: Slide Group Model and Migration
 status: executing
-stopped_at: Completed 24-01-PLAN.md
-last_updated: "2026-07-26T01:44:24.631Z"
+stopped_at: Completed 24-02-PLAN.md
+last_updated: "2026-07-26T02:08:26.456Z"
 last_activity: 2026-07-25
 progress:
   total_phases: 17
   completed_phases: 11
   total_plans: 74
-  completed_plans: 69
+  completed_plans: 70
   percent: 65
 last_activity_desc: Opened v1.3 Slides Tab Rework (Phases 24-28) from the Claude Design import; v1.2 left code-complete with its verification ledger intact
 ---
@@ -36,7 +36,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 24 (Slide Group Model and Migration) — EXECUTING
-Plan: 2 of 6
+Plan: 3 of 6
 Milestone: v1.2 Worship Service Slide Management (Phases 18-23) — IN PROGRESS
 Status: Ready to execute
 
@@ -247,6 +247,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 23 P03 | 20min | 2 tasks | 2 files |
 | Phase 23 P04 | 25min | 3 tasks | 4 files |
 | Phase 24 P01 | 78min | 3 tasks | 13 files |
+| Phase 24 P02 | 17min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -342,6 +343,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: [Phase 23-04]: ServiceEditorView widens existing useSlideshowAssembly destructure to add assembledSlideshow/isLoading instead of re-flattening assembledSections - no new ordering logic
 - [Phase ?]: [Phase 24-01]: SourceRef gets a fifth 'copyright' kind member so song groups' leading/trailing copyright entries never abuse sectionId
 - [Phase ?]: [Phase 24-01]: backfillSlotIds(service, reference?) two-argument form corrects RESEARCH.md's single-argument design -- reusing the reference's id at the same array index (kind-guarded) keeps the remote-merge JSON.stringify comparison stable across snapshots
+- [Phase ?]: [Phase 24-02]: materializeGroupIfMissing writes id/slotId/serviceId/slides + timestamps in one setDoc, never addDoc (deterministic doc id = slot id, per-tab race is a harmless overwrite)
+- [Phase ?]: [Phase 24-02]: setGroupBedMedia uses explicit clearAudio/clearVideo flags mapped to deleteField() rather than undefined-means-clear, since stripUndefined() would otherwise erase that intent before Firestore sees it
+- [Phase ?]: [Phase 24-02]: RESEARCH.md Open Question 1 resolved -- audioScope:'group' writes directly to bedAudioUrl via setGroupBedMedia; stored audioScope is UI-round-trip-only, the assembler never interprets it
 
 ### Roadmap Evolution
 
@@ -401,6 +405,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-25
-Last session: 2026-07-26T01:44:24.549Z
-Stopped at: Completed 24-01-PLAN.md
+Last session: 2026-07-26T02:08:26.376Z
+Stopped at: Completed 24-02-PLAN.md
 Resume file: None

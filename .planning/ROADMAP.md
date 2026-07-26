@@ -175,7 +175,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 24-02-PLAN.md — `slideGroups` Pinia store: deterministic-id CRUD, atomic D-05 media migration
+- [x] 24-02-PLAN.md — `slideGroups` Pinia store: deterministic-id CRUD, atomic D-05 media migration
 - [ ] 24-03-PLAN.md — Pure materializer: derive-from-source plus kind-specific reconciliation
 
 **Wave 3** *(blocked on Wave 2 completion)*
