@@ -3,16 +3,28 @@ import { mount } from '@vue/test-utils'
 import type { Options as SortableOptions } from 'sortablejs'
 import SlideGrid from '../SlideGrid.vue'
 import SlideCard from '../SlideCard.vue'
+import SlideGroupMusicControl from '../SlideGroupMusicControl.vue'
 import type { ServiceSlot } from '@/types/service'
 import type { AssembledSlide } from '@/types/slide'
 import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
 import type { PendingReconciliation, EnsureGroupMaterializedResult } from '../slideDisplay'
 
 // --- 25-05: SlideGrid calls the slideGroups store directly (add-slide, drag-reorder) ---
+// --- 25-06 Task 2: also calls setGroupBedMedia directly for the group music bar ---
 const mockReplaceGroupSlides = vi.fn().mockResolvedValue(undefined)
+const mockSetGroupBedMedia = vi.fn().mockResolvedValue(undefined)
 vi.mock('@/stores/slideGroups', () => ({
   useSlideGroups: () => ({
     replaceGroupSlides: mockReplaceGroupSlides,
+    setGroupBedMedia: mockSetGroupBedMedia,
+  }),
+}))
+
+// --- 25-06 Task 2: SlideGrid must NEVER touch the service store's write path ---
+const mockUpdateService = vi.fn().mockResolvedValue(undefined)
+vi.mock('@/stores/services', () => ({
+  useServices: () => ({
+    updateService: mockUpdateService,
   }),
 }))
 
@@ -63,6 +75,7 @@ function mountGrid(props: {
   group?: SlideGroup | null
   isEditor?: boolean
   orgId?: string
+  serviceId?: string
   ensureGroupMaterialized?: (slotId: string) => Promise<EnsureGroupMaterializedResult | undefined>
 }) {
   return mount(SlideGrid, {
@@ -77,6 +90,7 @@ function mountGrid(props: {
       pendingReconciliations: props.pendingReconciliations ?? [],
       isEditor: props.isEditor ?? true,
       orgId: props.orgId ?? 'org-1',
+      serviceId: props.serviceId ?? 'service-1',
       ensureGroupMaterialized: props.ensureGroupMaterialized ?? vi.fn().mockResolvedValue(undefined),
     },
   })
@@ -84,6 +98,8 @@ function mountGrid(props: {
 
 beforeEach(() => {
   mockReplaceGroupSlides.mockClear()
+  mockSetGroupBedMedia.mockClear()
+  mockUpdateService.mockClear()
   mockSortableDestroy.mockClear()
   capturedSortableOptions = undefined
 })
@@ -386,6 +402,106 @@ describe('SlideGrid', () => {
       const assembledSlideshow = [makeAssembled(0, 'e1')]
       const wrapper = mountGrid({ selectedSlot: slot, assembledSlideshow, group, isEditor: true })
       expect(wrapper.get('[data-testid="slide-card-drag-handle"]').attributes('aria-label')).toBe('Reorder slide')
+    })
+  })
+
+  // --- 25-06 Task 2: group music bar mount + bed persistence ---
+  describe('group music bar (25-06 Task 2)', () => {
+    it('renders the music control between the header and the card grid, receiving the bed audio and slide count', () => {
+      const slot = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: 'X', songKey: null, requiredVwType: 1 } as never)
+      const group = makeGroup({
+        bedAudioUrl: 'https://storage.example.com/pad.mp3',
+        slides: [{ id: 'e1', order: 0, sourceRef: { kind: 'text' } }],
+      })
+      const assembledSlideshow = [makeAssembled(0, 'e1'), makeAssembled(0, 'e2')]
+      const wrapper = mountGrid({ selectedSlot: slot, assembledSlideshow, group })
+
+      const html = wrapper.html()
+      const headerIndex = html.indexOf('slide-grid-title')
+      const musicIndex = html.indexOf('slide-group-music-control')
+      const cardsIndex = html.indexOf('slide-grid-cards')
+      expect(headerIndex).toBeGreaterThan(-1)
+      expect(musicIndex).toBeGreaterThan(headerIndex)
+      expect(cardsIndex).toBeGreaterThan(musicIndex)
+
+      const musicControl = wrapper.findComponent(SlideGroupMusicControl)
+      expect(musicControl.props('audioUrl')).toBe('https://storage.example.com/pad.mp3')
+      expect(musicControl.props('slideCount')).toBe(2)
+    })
+
+    it('writes an emitted URL to the selected group bed via the scoped write, with the selected slot id', async () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const wrapper = mountGrid({ selectedSlot: slot, serviceId: 'service-9' })
+
+      await wrapper.findComponent(SlideGroupMusicControl).vm.$emit('attach', 'https://storage.example.com/new.mp3')
+      await Promise.resolve()
+
+      expect(mockSetGroupBedMedia).toHaveBeenCalledTimes(1)
+      expect(mockSetGroupBedMedia).toHaveBeenCalledWith('org-1', 'slot-1', {
+        serviceId: 'service-9',
+        bedAudioUrl: 'https://storage.example.com/new.mp3',
+      })
+    })
+
+    it('writes an emitted clear using the explicit clear flag rather than an undefined URL', async () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const wrapper = mountGrid({ selectedSlot: slot, serviceId: 'service-9' })
+
+      await wrapper.findComponent(SlideGroupMusicControl).vm.$emit('remove')
+      await Promise.resolve()
+
+      expect(mockSetGroupBedMedia).toHaveBeenCalledTimes(1)
+      const [, , patch] = mockSetGroupBedMedia.mock.calls[0]!
+      expect(patch).toEqual({ serviceId: 'service-9', clearAudio: true })
+      expect('bedAudioUrl' in patch).toBe(false)
+    })
+
+    it('attaching music to a plan item with no group document yet still writes, with no materialization call made', async () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const ensureGroupMaterialized = vi.fn().mockResolvedValue({ entries: [], sourceSignature: undefined })
+      const wrapper = mountGrid({ selectedSlot: slot, group: null, ensureGroupMaterialized })
+
+      await wrapper.findComponent(SlideGroupMusicControl).vm.$emit('attach', 'https://storage.example.com/new.mp3')
+      await Promise.resolve()
+
+      expect(mockSetGroupBedMedia).toHaveBeenCalledTimes(1)
+      expect(ensureGroupMaterialized).not.toHaveBeenCalled()
+    })
+
+    it('switching the selected plan item switches which bed audio the control receives', async () => {
+      const slotA = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const groupA = makeGroup({ id: 'slot-1', slotId: 'slot-1', bedAudioUrl: 'https://storage.example.com/a.mp3', slides: [] })
+      const wrapper = mountGrid({ selectedSlot: slotA, group: groupA })
+      expect(wrapper.findComponent(SlideGroupMusicControl).props('audioUrl')).toBe('https://storage.example.com/a.mp3')
+
+      const slotB = makeSlot({ kind: 'PRAYER', id: 'slot-2', position: 1 })
+      const groupB = makeGroup({ id: 'slot-2', slotId: 'slot-2', bedAudioUrl: 'https://storage.example.com/b.mp3', slides: [] })
+      await wrapper.setProps({ selectedSlot: slotB, group: groupB })
+
+      expect(wrapper.findComponent(SlideGroupMusicControl).props('audioUrl')).toBe('https://storage.example.com/b.mp3')
+    })
+
+    it('never calls the service store update action from either the attach or the remove path', async () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const wrapper = mountGrid({ selectedSlot: slot })
+
+      await wrapper.findComponent(SlideGroupMusicControl).vm.$emit('attach', 'https://storage.example.com/new.mp3')
+      await wrapper.findComponent(SlideGroupMusicControl).vm.$emit('remove')
+      await Promise.resolve()
+
+      expect(mockUpdateService).not.toHaveBeenCalled()
+    })
+
+    it('does not throw when the bed write rejects', async () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      mockSetGroupBedMedia.mockRejectedValueOnce(new Error('write failed'))
+      const wrapper = mountGrid({ selectedSlot: slot })
+
+      expect(() => {
+        wrapper.findComponent(SlideGroupMusicControl).vm.$emit('attach', 'https://storage.example.com/new.mp3')
+      }).not.toThrow()
+      await Promise.resolve()
+      await Promise.resolve()
     })
   })
 })

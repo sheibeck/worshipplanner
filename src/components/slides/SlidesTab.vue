@@ -23,6 +23,7 @@
         :pending-reconciliations="pendingReconciliations"
         :is-editor="isEditor"
         :org-id="orgId"
+        :service-id="serviceId"
         :ensure-group-materialized="ensureGroupMaterialized"
         @select="onSelectSlide"
       />

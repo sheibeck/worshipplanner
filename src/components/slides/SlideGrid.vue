@@ -22,6 +22,22 @@
         >＋ Add slide</button>
       </div>
 
+      <!-- Group music bar (25-06, R032) — between the grid header and the
+           card grid, per the UI-SPEC's layout reference. Emit-only control;
+           this component intercepts both events and writes the selected
+           group's bed via the slideGroups store's scoped write, exactly as
+           `ServiceEditorView.vue` already does for `SlotMediaAttachment`. -->
+      <div class="px-6 pt-3">
+        <SlideGroupMusicControl
+          :audio-url="group?.bedAudioUrl"
+          :slide-count="cards.length"
+          :org-id="orgId"
+          :is-editor="isEditor"
+          @attach="onAttachGroupMusic"
+          @remove="onRemoveGroupMusic"
+        />
+      </div>
+
       <div
         v-if="reconciliationNotice"
         class="mx-6 mt-3 rounded-md border border-amber-800 bg-amber-900/20 px-3 py-2 text-[12px] text-amber-300"
@@ -85,6 +101,7 @@ import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
 import { useSlideGroups } from '@/stores/slideGroups'
 import { slotLabel } from '@/utils/slotTypes'
 import SlideCard from './SlideCard.vue'
+import SlideGroupMusicControl from './SlideGroupMusicControl.vue'
 import { slotDisplayTitle, type PendingReconciliation, type EnsureGroupMaterializedResult } from './slideDisplay'
 
 const props = defineProps<{
@@ -101,10 +118,12 @@ const props = defineProps<{
   /** The group document for the selected plan item, if materialized. */
   group: SlideGroup | null
   pendingReconciliations: PendingReconciliation[]
-  /** Gates every write control this component renders (add-slide button, drag grip/Sortable instance). */
+  /** Gates every write control this component renders (add-slide button, drag grip/Sortable instance, group-music add/remove). */
   isEditor: boolean
   /** Org id — needed to call the `slideGroups` store's write actions directly. */
   orgId: string
+  /** Service id — required by `setGroupBedMedia`'s skeleton-create payload when the group has not materialized yet. */
+  serviceId: string
   /** On-demand group materializer (25-05 Task 1) — resolved before every append so a plan item with no group yet can still receive a slide (R032). */
   ensureGroupMaterialized: (slotId: string) => Promise<EnsureGroupMaterializedResult | undefined>
 }>()
@@ -160,6 +179,43 @@ const reconciliationNotice = computed<string | null>(() => {
   const noun = count === 1 ? 'slide' : 'slides'
   return `${count} ${noun} may need review before this group updates.`
 })
+
+// --- 25-06 Task 2: group music bar attach/remove — the bed write path ---
+//
+// No on-demand materialization step is needed here, unlike every
+// slide-appending path above: `setGroupBedMedia` already creates a skeleton
+// group document when none exists, and it does so with a merging write
+// (`{ merge: true }`) specifically so a concurrently-landing
+// `ensureGroupMaterialized`/`materializeGroupIfMissing` call cannot be
+// clobbered (WR-01). Adding a redundant materialization call here would only
+// reintroduce that race, not prevent it.
+async function onAttachGroupMusic(url: string): Promise<void> {
+  if (!props.selectedSlot) return
+  try {
+    await slideGroupsStore.setGroupBedMedia(props.orgId, props.selectedSlot.id, {
+      serviceId: props.serviceId,
+      bedAudioUrl: url,
+    })
+  } catch (err) {
+    console.error('Failed to attach group music:', err)
+  }
+}
+
+// The explicit `clearAudio` flag is used rather than an undefined url —
+// `stripUndefined()` would otherwise erase that intent before it reached
+// Firestore, and `deleteField()` is the only way to actually remove the
+// field (mirrors `ServiceEditorView.vue`'s existing `onSlotBedAudioChange`).
+async function onRemoveGroupMusic(): Promise<void> {
+  if (!props.selectedSlot) return
+  try {
+    await slideGroupsStore.setGroupBedMedia(props.orgId, props.selectedSlot.id, {
+      serviceId: props.serviceId,
+      clearAudio: true,
+    })
+  } catch (err) {
+    console.error('Failed to remove group music:', err)
+  }
+}
 
 // --- Task 2: ＋ Add slide, appended at the end of the selected group (D-16) ---
 //
