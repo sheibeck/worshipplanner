@@ -215,7 +215,7 @@ describe('SlidesTab', () => {
       expect(grid.props('selectedSlot')).toBeNull()
     })
 
-    it('passes ensureGroupMaterialized through to the grid unchanged (25-05 Task 1)', async () => {
+    it('passes ensureGroupMaterialized and orgId through to the grid unchanged (25-05 Tasks 1/2)', async () => {
       const ensureGroupMaterialized = vi.fn().mockResolvedValue(undefined)
       const wrapper = shallowMount(SlidesTab, {
         props: {
@@ -234,6 +234,7 @@ describe('SlidesTab', () => {
       await wrapper.vm.$nextTick()
       const grid = wrapper.findComponent(SlideGrid)
       expect(grid.props('ensureGroupMaterialized')).toBe(ensureGroupMaterialized)
+      expect(grid.props('orgId')).toBe('org-1')
     })
   })
 })

@@ -1,10 +1,19 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import SlideGrid from '../SlideGrid.vue'
 import SlideCard from '../SlideCard.vue'
 import type { ServiceSlot } from '@/types/service'
 import type { AssembledSlide } from '@/types/slide'
+import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
 import type { PendingReconciliation, EnsureGroupMaterializedResult } from '../slideDisplay'
+
+// --- 25-05 Task 2: SlideGrid calls the slideGroups store directly (add-slide) ---
+const mockReplaceGroupSlides = vi.fn().mockResolvedValue(undefined)
+vi.mock('@/stores/slideGroups', () => ({
+  useSlideGroups: () => ({
+    replaceGroupSlides: mockReplaceGroupSlides,
+  }),
+}))
 
 function makeSlot(overrides: Partial<ServiceSlot> & { kind: ServiceSlot['kind']; id: string; position: number }): ServiceSlot {
   return { ...overrides } as ServiceSlot
@@ -27,6 +36,9 @@ function mountGrid(props: {
   assembledSlideshow?: AssembledSlide[]
   selectedSlideId?: string | null
   pendingReconciliations?: PendingReconciliation[]
+  group?: SlideGroup | null
+  isEditor?: boolean
+  orgId?: string
   ensureGroupMaterialized?: (slotId: string) => Promise<EnsureGroupMaterializedResult | undefined>
 }) {
   return mount(SlideGrid, {
@@ -37,13 +49,18 @@ function mountGrid(props: {
       totalPlanItems: props.totalPlanItems ?? 1,
       assembledSlideshow: props.assembledSlideshow ?? [],
       selectedSlideId: props.selectedSlideId ?? null,
-      group: null,
+      group: props.group ?? null,
       pendingReconciliations: props.pendingReconciliations ?? [],
-      isEditor: true,
+      isEditor: props.isEditor ?? true,
+      orgId: props.orgId ?? 'org-1',
       ensureGroupMaterialized: props.ensureGroupMaterialized ?? vi.fn().mockResolvedValue(undefined),
     },
   })
 }
+
+beforeEach(() => {
+  mockReplaceGroupSlides.mockClear()
+})
 
 describe('SlideGrid', () => {
   it('renders one card per assembled slide matching the selected slot array index, and none for other slots', () => {
@@ -148,5 +165,109 @@ describe('SlideGrid', () => {
     const text = wrapper.text()
     expect(text).not.toContain('Grid')
     expect(text).not.toContain('List')
+  })
+
+  // --- Task 2: ＋ Add slide, appended at the end of the selected group (D-16) ---
+  describe('add-slide control (Task 2)', () => {
+    it('renders the add-slide control for an editor and not for a viewer', () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const editorWrapper = mountGrid({ selectedSlot: slot, isEditor: true })
+      const viewerWrapper = mountGrid({ selectedSlot: slot, isEditor: false })
+      expect(editorWrapper.find('[data-testid="slide-grid-add-slide"]').exists()).toBe(true)
+      expect(viewerWrapper.find('[data-testid="slide-grid-add-slide"]').exists()).toBe(false)
+    })
+
+    it('appends exactly one new entry, in the existing entries plus one, and computes order one past the highest', async () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const existingEntries: GroupSlideEntry[] = [
+        { id: 'e1', order: 0, sourceRef: { kind: 'text' } },
+        { id: 'e2', order: 2, sourceRef: { kind: 'text' } },
+      ]
+      const ensureGroupMaterialized = vi.fn().mockResolvedValue({
+        entries: existingEntries,
+        sourceSignature: 'sig-abc',
+      })
+      const wrapper = mountGrid({ selectedSlot: slot, ensureGroupMaterialized })
+      await wrapper.get('[data-testid="slide-grid-add-slide"]').trigger('click')
+      await Promise.resolve()
+      await Promise.resolve()
+
+      expect(ensureGroupMaterialized).toHaveBeenCalledWith('slot-1')
+      expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+      const [orgIdArg, slotIdArg, slidesArg, sigArg] = mockReplaceGroupSlides.mock.calls[0]!
+      expect(orgIdArg).toBe('org-1')
+      expect(slotIdArg).toBe('slot-1')
+      const slides = slidesArg as GroupSlideEntry[]
+      expect(slides).toHaveLength(3)
+      expect(slides[0]).toBe(existingEntries[0])
+      expect(slides[1]).toBe(existingEntries[1])
+      expect(slides[2]!.order).toBe(3)
+      expect(sigArg).toBe('sig-abc')
+    })
+
+    it('computes order zero for an empty group', async () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const ensureGroupMaterialized = vi.fn().mockResolvedValue({ entries: [], sourceSignature: undefined })
+      const wrapper = mountGrid({ selectedSlot: slot, ensureGroupMaterialized })
+      await wrapper.get('[data-testid="slide-grid-add-slide"]').trigger('click')
+      await Promise.resolve()
+      await Promise.resolve()
+
+      const [, , slidesArg] = mockReplaceGroupSlides.mock.calls[0]!
+      const slides = slidesArg as GroupSlideEntry[]
+      expect(slides).toHaveLength(1)
+      expect(slides[0]!.order).toBe(0)
+    })
+
+    it("gives the new entry its own authored text source ref", async () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const ensureGroupMaterialized = vi.fn().mockResolvedValue({ entries: [], sourceSignature: undefined })
+      const wrapper = mountGrid({ selectedSlot: slot, ensureGroupMaterialized })
+      await wrapper.get('[data-testid="slide-grid-add-slide"]').trigger('click')
+      await Promise.resolve()
+      await Promise.resolve()
+
+      const [, , slidesArg] = mockReplaceGroupSlides.mock.calls[0]!
+      const slides = slidesArg as GroupSlideEntry[]
+      expect(slides[0]!.sourceRef.kind).toBe('text')
+      expect(slides[0]!.id).toBeTruthy()
+      if (slides[0]!.sourceRef.kind === 'text') {
+        expect(slides[0]!.sourceRef.body).toBeDefined()
+      }
+    })
+
+    it('awaits the on-demand materializer before calling the slide-replacing action when the plan item has no group yet', async () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const callOrder: string[] = []
+      const ensureGroupMaterialized = vi.fn().mockImplementation(async () => {
+        callOrder.push('materialize')
+        return { entries: [], sourceSignature: undefined }
+      })
+      mockReplaceGroupSlides.mockImplementationOnce(async () => {
+        callOrder.push('replace')
+      })
+      const wrapper = mountGrid({ selectedSlot: slot, group: null, ensureGroupMaterialized })
+      await wrapper.get('[data-testid="slide-grid-add-slide"]').trigger('click')
+      await Promise.resolve()
+      await Promise.resolve()
+
+      expect(callOrder).toEqual(['materialize', 'replace'])
+    })
+
+    it('does not throw and leaves the grid unchanged when the write rejects', async () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const assembledSlideshow = [makeAssembled(0, 'c1')]
+      const ensureGroupMaterialized = vi.fn().mockResolvedValue({ entries: [], sourceSignature: undefined })
+      mockReplaceGroupSlides.mockRejectedValueOnce(new Error('write failed'))
+      const wrapper = mountGrid({ selectedSlot: slot, assembledSlideshow, ensureGroupMaterialized })
+
+      await expect(
+        wrapper.get('[data-testid="slide-grid-add-slide"]').trigger('click'),
+      ).resolves.not.toThrow()
+      await Promise.resolve()
+      await Promise.resolve()
+
+      expect(wrapper.findAllComponents(SlideCard)).toHaveLength(1)
+    })
   })
 })

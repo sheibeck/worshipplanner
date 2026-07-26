@@ -22,6 +22,7 @@
         :group="selectedGroup"
         :pending-reconciliations="pendingReconciliations"
         :is-editor="isEditor"
+        :org-id="orgId"
         :ensure-group-materialized="ensureGroupMaterialized"
         @select="onSelectSlide"
       />

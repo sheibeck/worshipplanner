@@ -12,6 +12,14 @@
           class="text-[10.5px] text-gray-500"
           data-testid="slide-grid-reading-order"
         >Plays 1 &rarr; {{ cards.length }}, left to right then down</span>
+
+        <button
+          v-if="isEditor"
+          type="button"
+          class="ml-auto inline-flex items-center gap-1.5 rounded-md border border-gray-700 bg-gray-800 px-2.5 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:bg-gray-700"
+          data-testid="slide-grid-add-slide"
+          @click="onAddSlide"
+        >＋ Add slide</button>
       </div>
 
       <div
@@ -46,30 +54,34 @@
 
 <script setup lang="ts">
 /**
- * Presentational, prop-driven slide grid (Phase 25 Task 2, 25-04). Renders the
- * SELECTED plan item's slides as cards, in play order, and the three-line
- * header the mockup and 25-CONTEXT.md § Specific Ideas describe verbatim.
+ * Presentational-plus-write-controls slide grid (Phase 25 Task 2, 25-04).
+ * Renders the SELECTED plan item's slides as cards, in play order, and the
+ * three-line header the mockup and 25-CONTEXT.md § Specific Ideas describe
+ * verbatim.
  *
- * Reads no store and calls no composable — every input arrives as a prop
- * from `SlidesTab.vue`. Filters `assembledSlideshow` by the selected plan
- * item's ARRAY index (`slotArrayIndex`), never by `groupId` — `groupId` is
- * only set on the group-resolved emission path and is absent for the entire
- * window before a group's Firestore snapshot lands (25-RESEARCH.md
- * Pitfall 2), even though the fallback-path slides being shown are already
- * real and correct.
+ * Every input still arrives as a prop from `SlidesTab.vue` and this
+ * component still calls no `useSlideshowAssembly` composable directly — but
+ * per 25-05 it DOES import the `slideGroups` Pinia store directly to issue
+ * the ＋ Add slide write this task adds, exactly as every other slide-group
+ * mutation in the codebase does (never the `localService` deep-watch
+ * autosave).
+ *
+ * Filters `assembledSlideshow` by the selected plan item's ARRAY index
+ * (`slotArrayIndex`), never by `groupId` — `groupId` is only set on the
+ * group-resolved emission path and is absent for the entire window before a
+ * group's Firestore snapshot lands (25-RESEARCH.md Pitfall 2), even though
+ * the fallback-path slides being shown are already real and correct.
  *
  * Ships no Grid/List toggle (D-09), no apply/reject/confirm affordance for a
  * pending reconciliation (Phase 26 owns that dialog, R033) and no drop tile
- * (25-06). The `group` and `isEditor` props are accepted and threaded through
- * unused — reserved for 25-05/25-06's group-header actions and group-music
- * control. `ensureGroupMaterialized` (25-05 Task 1) is likewise threaded
- * through from `SlidesTab.vue` unused here — Task 2 is where this component
- * first calls it.
+ * (25-06). The `group` prop is still accepted and threaded through unused —
+ * reserved for 25-05 Task 3's drag-reorder and 25-06's group-music control.
  */
 import { computed } from 'vue'
 import type { ServiceSlot } from '@/types/service'
 import type { AssembledSlide } from '@/types/slide'
-import type { SlideGroup } from '@/types/slideGroup'
+import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
+import { useSlideGroups } from '@/stores/slideGroups'
 import { slotLabel } from '@/utils/slotTypes'
 import SlideCard from './SlideCard.vue'
 import { slotDisplayTitle, type PendingReconciliation, type EnsureGroupMaterializedResult } from './slideDisplay'
@@ -85,18 +97,22 @@ const props = defineProps<{
   totalPlanItems: number
   assembledSlideshow: AssembledSlide[]
   selectedSlideId: string | null
-  /** The group document for the selected plan item, if materialized. Threaded through for 25-05/25-06. */
+  /** The group document for the selected plan item, if materialized. Threaded through for 25-05 Task 3/25-06. */
   group: SlideGroup | null
   pendingReconciliations: PendingReconciliation[]
-  /** Threaded through for 25-05/25-06's write controls; this plan ships none yet. */
+  /** Gates every write control this component renders (add-slide button, and 25-05 Task 3's drag grip). */
   isEditor: boolean
-  /** On-demand group materializer (25-05 Task 1) — resolves a slot's group entries and stored source signature, creating the group first if it doesn't exist yet. Threaded through unused here; Task 2 adds the first caller (＋ Add slide). */
+  /** Org id — needed to call the `slideGroups` store's write actions directly. */
+  orgId: string
+  /** On-demand group materializer (25-05 Task 1) — resolves a slot's group entries and stored source signature, creating the group first if it doesn't exist yet. Resolved before every append so a plan item with no group yet can still receive a slide (R032). */
   ensureGroupMaterialized: (slotId: string) => Promise<EnsureGroupMaterializedResult | undefined>
 }>()
 
 const emit = defineEmits<{
   select: [slideId: string]
 }>()
+
+const slideGroupsStore = useSlideGroups()
 
 /**
  * The group title line, collapsed to just the kind label (e.g. "Prayer")
@@ -143,4 +159,37 @@ const reconciliationNotice = computed<string | null>(() => {
   const noun = count === 1 ? 'slide' : 'slides'
   return `${count} ${noun} may need review before this group updates.`
 })
+
+// --- Task 2: ＋ Add slide, appended at the end of the selected group (D-16) ---
+//
+// Always resolves the group through `ensureGroupMaterialized` first — even
+// when `props.group` already reflects a stored document — rather than
+// reading `props.group.slides` directly. That prop lags a Firestore
+// snapshot round trip behind a just-issued write, so reading it here instead
+// of the freshly-returned entries would risk appending to (and persisting) a
+// stale list on rapid repeated clicks.
+async function onAddSlide(): Promise<void> {
+  if (!props.selectedSlot) return
+  const slotId = props.selectedSlot.id
+  try {
+    const resolved = await props.ensureGroupMaterialized(slotId)
+    if (!resolved) return
+    const { entries, sourceSignature } = resolved
+    const nextOrder = entries.length > 0 ? Math.max(...entries.map((e) => e.order)) + 1 : 0
+    const newEntry: GroupSlideEntry = {
+      id: crypto.randomUUID(),
+      order: nextOrder,
+      // A `text` ref with no authored content resolves from the owning slot
+      // (nothing at all on a SONG/SCRIPTURE/IMPORTED plan item) — 25-01's
+      // widened `text` SourceRef exists so a hand-added blank slide can carry
+      // its own words instead. Body stays empty (Phase 26's drawer is where
+      // it's actually written); the short default title is what keeps the
+      // new card from looking blank in the grid.
+      sourceRef: { kind: 'text', title: 'New slide', body: '' },
+    }
+    await slideGroupsStore.replaceGroupSlides(props.orgId, slotId, [...entries, newEntry], sourceSignature)
+  } catch (err) {
+    console.error('Failed to add slide:', err)
+  }
+}
 </script>
