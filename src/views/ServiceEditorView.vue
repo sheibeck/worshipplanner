@@ -417,6 +417,21 @@
           >
             Roles
           </button>
+          <!-- Slides tab: visible to viewers as well as editors (R031) — not
+               gated like Roles above. Write controls inside the panel are
+               gated separately by the editor flag SlidesTab receives. Label
+               stays "Slides" here; the rename to "Service Order" is Phase 27
+               (UI-SPEC Mockup Correction 5). -->
+          <button
+            type="button"
+            class="px-4 py-2 text-sm font-medium rounded-t-md transition-colors -mb-px border-b-2"
+            :class="activeTab === 'slides'
+              ? 'text-indigo-300 border-indigo-500 bg-gray-900'
+              : 'text-gray-400 border-transparent hover:text-gray-200 hover:border-gray-600'"
+            @click="activeTab = 'slides'"
+          >
+            Slides
+          </button>
         </div>
 
         <div v-show="activeTab === 'music'">
@@ -1064,6 +1079,24 @@
           </template>
         </div>
 
+        <!-- Slides tab: the service-plan rail and (25-04) the slide grid.
+             ServiceEditorView is the SOLE owner of useSlideshowAssembly() —
+             SlidesTab and everything under it are prop-driven. -->
+        <div v-show="activeTab === 'slides'">
+          <SlidesTab
+            v-if="localService"
+            :slots="localService.slots"
+            :service-id="localService.id"
+            :org-id="authStore.orgId!"
+            :assembled-slideshow="assembledSlideshow"
+            :groups-by-slot-id="groupsBySlotId"
+            :pending-reconciliations="pendingReconciliations"
+            :is-editor="authStore.isEditor"
+            :groups-loading="slideGroupsStore.isLoading"
+            :active="activeTab === 'slides'"
+          />
+        </div>
+
         <!-- Bottom actions: Print, Share, Delete -->
         <div class="mt-6 pt-4 border-t border-gray-800 flex flex-wrap items-center gap-2 print:hidden">
           <!-- Print button -->
@@ -1157,6 +1190,7 @@ import SlotMediaAttachment from '@/components/SlotMediaAttachment.vue'
 import PptxImportModal from '@/components/PptxImportModal.vue'
 import SlideshowPreview from '@/components/SlideshowPreview.vue'
 import PresentationViewer from '@/components/PresentationViewer.vue'
+import SlidesTab from '@/components/slides/SlidesTab.vue'
 import { useSlideshowAssembly } from '@/composables/useSlideshowAssembly'
 import { formatForPlanningCenter } from '@/utils/planningCenterExport'
 import { fetchServiceTypes, fetchTemplates, fetchServiceTypeTeams, fetchPlans, fetchPlanItems, createPlan, fetchTemplateItems, addSlotAsItem, buildPlanTitle, createItem, updateItem, deleteItem, createPlanTime, fetchPlanNeededPositionTeamIds, fetchTeamPositions, addNeededPosition } from '@/utils/planningCenterApi'
@@ -1179,7 +1213,11 @@ const quartersStore = useQuartersStore()
 const slideGroupsStore = useSlideGroups()
 
 // ── Roles tab state (Task 1: tab bar) ──────────────────────────────────────────
-const activeTab = ref<'music' | 'roles'>('music')
+// Widened to add the Slides tab (Phase 25-03). Default value is unchanged —
+// the editor still opens on the music tab; D-05's auto-selection is about
+// which GROUP is selected once the Slides tab itself is opened, not about
+// which tab opens first.
+const activeTab = ref<'music' | 'roles' | 'slides'>('music')
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -1462,6 +1500,7 @@ const {
   assembledSlideshow,
   isLoading: slideshowLoading,
   groupsBySlotId,
+  pendingReconciliations,
 } = useSlideshowAssembly(localService, orgIdRef, { canWrite: computed(() => authStore.isEditor) })
 const presenting = ref(false)
 

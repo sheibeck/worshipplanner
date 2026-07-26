@@ -9,6 +9,7 @@ import type { SlideGroup } from '@/types/slideGroup'
 import SlideshowPreview from '@/components/SlideshowPreview.vue'
 import PresentationViewer from '@/components/PresentationViewer.vue'
 import SlotMediaAttachment from '@/components/SlotMediaAttachment.vue'
+import SlidesTab from '@/components/slides/SlidesTab.vue'
 
 // Every test in this file mounts ServiceEditorView (a large component with a
 // live autosave debounce timer + Sortable instance) but historically never
@@ -108,6 +109,21 @@ vi.mock('@/stores/slideGroups', () => ({
     replaceGroupSlides: mockReplaceGroupSlides,
   }),
 }))
+
+/**
+ * Walks an element's ancestor chain checking for an inline `display: none`
+ * (how `v-show` toggles visibility) — VTU's own `isVisible()` does not
+ * reliably reflect an ancestor's inline style in this jsdom environment, so
+ * the Slides-tab panel-visibility tests (Phase 25-03) check directly.
+ */
+function isVShowHidden(wrapper: { element: Element }): boolean {
+  let el: HTMLElement | null = wrapper.element as HTMLElement
+  while (el) {
+    if (el.style?.display === 'none') return true
+    el = el.parentElement
+  }
+  return false
+}
 
 const mockTimestamp = { toDate: () => new Date('2026-03-08') } as unknown as Timestamp
 
@@ -1296,5 +1312,125 @@ describe('ServiceEditorView - slot media control retargeted at the group bed (Ph
       serviceId: 'service-1',
       bedAudioUrl: 'https://example.com/first-audio.mp3',
     })
+  })
+})
+
+// ── Slides tab: third tab button and panel (Phase 25-03) ────────────────────────
+
+describe('ServiceEditorView - Slides tab (Phase 25-03)', () => {
+  async function mountView() {
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          RouterLink: { template: '<a><slot /></a>' },
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+        },
+      },
+    })
+  }
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockServicesList = [mockService]
+  })
+
+  it('renders three tab buttons, the third reading Slides', async () => {
+    const wrapper = await mountView()
+    const tabButtons = wrapper.findAll('button').filter((b) => ['Music', 'Roles', 'Slides'].includes(b.text()))
+    expect(tabButtons.map((b) => b.text())).toEqual(['Music', 'Roles', 'Slides'])
+  })
+
+  it('viewer: the Slides button is present while the Roles button is not', async () => {
+    mockAuthState.isEditor = false
+    const wrapper = await mountView()
+    const slidesBtn = wrapper.findAll('button').find((b) => b.text() === 'Slides')
+    const rolesBtn = wrapper.findAll('button').find((b) => b.text() === 'Roles')
+    expect(slidesBtn?.exists()).toBe(true)
+    expect(rolesBtn).toBeUndefined()
+  })
+
+  it('clicking Slides shows the slides panel and hides the music panel', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    expect(isVShowHidden(wrapper.findComponent(SlideshowPreview))).toBe(false)
+
+    const slidesBtn = wrapper.findAll('button').find((b) => b.text() === 'Slides')
+    expect(slidesBtn?.exists()).toBe(true)
+    await slidesBtn!.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    expect(isVShowHidden(wrapper.findComponent(SlidesTab))).toBe(false)
+    expect(isVShowHidden(wrapper.findComponent(SlideshowPreview))).toBe(true)
+  })
+
+  it('the default active tab is unchanged (still opens on Music)', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    expect(isVShowHidden(wrapper.findComponent(SlideshowPreview))).toBe(false)
+  })
+
+  it('the slides panel receives the assembled slideshow, the groups map and the pending reconciliations as props', async () => {
+    mockSlideGroupsState.groups = [
+      { id: 'slot-0', slotId: 'slot-0', serviceId: 'service-1', slides: [], createdAt: mockTimestamp, updatedAt: mockTimestamp },
+    ]
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const slidesTab = wrapper.findComponent(SlidesTab)
+    expect(slidesTab.exists()).toBe(true)
+    expect(slidesTab.props('assembledSlideshow')).toBeDefined()
+    expect(Array.isArray(slidesTab.props('assembledSlideshow'))).toBe(true)
+    expect(slidesTab.props('groupsBySlotId')).toBeInstanceOf(Map)
+    expect((slidesTab.props('groupsBySlotId') as Map<string, unknown>).has('slot-0')).toBe(true)
+    expect(slidesTab.props('pendingReconciliations')).toBeDefined()
+    expect(Array.isArray(slidesTab.props('pendingReconciliations'))).toBe(true)
+    expect(slidesTab.props('slots')).toEqual(mockService.slots)
+    expect(slidesTab.props('serviceId')).toBe('service-1')
+    expect(slidesTab.props('isEditor')).toBe(true)
+  })
+
+  it('the slides panel is told it is active only while the Slides tab is selected', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    let slidesTab = wrapper.findComponent(SlidesTab)
+    expect(slidesTab.props('active')).toBe(false)
+
+    const slidesBtn = wrapper.findAll('button').find((b) => b.text() === 'Slides')
+    await slidesBtn!.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    slidesTab = wrapper.findComponent(SlidesTab)
+    expect(slidesTab.props('active')).toBe(true)
+
+    const musicBtn = wrapper.findAll('button').find((b) => b.text() === 'Music')
+    await musicBtn!.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    slidesTab = wrapper.findComponent(SlidesTab)
+    expect(slidesTab.props('active')).toBe(false)
+  })
+
+  it('renders no page-level import control and no generate-missing-slides control anywhere on the page', async () => {
+    const wrapper = await mountView()
+    const text = wrapper.text()
+    expect(text).not.toContain('Generate missing slides')
+    // The existing per-item "Import PowerPoint" menu entries are unrelated
+    // page-level actions this phase does not touch — only a NEW page-level
+    // "⇪ Import" header button (D-02) is prohibited.
+    expect(wrapper.find('[data-testid="page-level-import"]').exists()).toBe(false)
+  })
+
+  it('the first tab button still reads Music', async () => {
+    const wrapper = await mountView()
+    const firstTabBtn = wrapper.findAll('button').filter((b) => ['Music', 'Roles', 'Slides'].includes(b.text()))[0]
+    expect(firstTabBtn?.text()).toBe('Music')
   })
 })
