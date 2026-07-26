@@ -188,7 +188,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 24-06-PLAN.md — ServiceEditorView: id backfill, R029 delete cascade + warning, bed-targeted media
+- [x] 24-06-PLAN.md — ServiceEditorView: id backfill, R029 delete cascade + warning, bed-targeted media
 
 ### Phase 25: Slides Tab Shell — Plan Rail and Slide Grid `risk:medium`
 

@@ -4,16 +4,16 @@ milestone: v1.3
 milestone_name: Slides Tab Rework
 current_phase: 24
 current_phase_name: Slide Group Model and Migration
-status: executing
-stopped_at: Completed 24-05-PLAN.md
-last_updated: "2026-07-26T03:29:53.751Z"
-last_activity: 2026-07-25
+status: verifying
+stopped_at: Completed 24-06-PLAN.md (final plan of Phase 24)
+last_updated: "2026-07-26T04:29:10.690Z"
+last_activity: 2026-07-26
 progress:
   total_phases: 17
-  completed_phases: 11
+  completed_phases: 12
   total_plans: 74
-  completed_plans: 73
-  percent: 65
+  completed_plans: 74
+  percent: 71
 last_activity_desc: Opened v1.3 Slides Tab Rework (Phases 24-28) from the Claude Design import; v1.2 left code-complete with its verification ledger intact
 ---
 
@@ -38,7 +38,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 Phase: 24 (Slide Group Model and Migration) — EXECUTING
 Plan: 6 of 6
 Milestone: v1.2 Worship Service Slide Management (Phases 18-23) — IN PROGRESS
-Status: Ready to execute
+Status: Phase complete — ready for verification
 
 Phases 20, 21, 22 and 23 are all code-complete; only their deferred human-verify checkpoints remain
 (see the Deferred Verification table below).
@@ -251,6 +251,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 24 P03 | 8min | 3 tasks | 2 files |
 | Phase 24 P04 | 23min | 3 tasks | 11 files |
 | Phase 24 P05 | 14min | 3 tasks | 3 files |
+| Phase 24 P06 | 26min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -356,6 +357,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: [Phase 24-05]: materializationCandidates/reconciliationOutcomes split into a synchronous computed (decision) + watch callback (async effect) -- an async watchEffect body only tracks reads before its first await
 - [Phase ?]: [Phase 24-05]: SONG slot with no song assigned materializes NO group (buildInitialGroup resolves to zero slides) rather than an empty one, per D-02
 - [Phase ?]: [Phase 24-05]: fixed a test-isolation leak (onUnmounted never fires for direct composable calls) by wrapping each test's useSlideshowAssembly() in its own effectScope, stopped in afterEach
+- [Phase ?]: [Phase 24-06]: shallowMount auto-stubs <Teleport> unless stubs: { teleport: false } is set explicitly -- required to assert against a Teleported dialog under shallowMount
+- [Phase ?]: [Phase 24-06]: confirmSlotDelete resolves the slot id BEFORE the splice, awaits slideGroupsStore.deleteGroup first, and leaves the slot in place on a failed delete (T-24-06-02)
 
 ### Roadmap Evolution
 
@@ -414,7 +417,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 
 ## Session Continuity
 
-Last activity: 2026-07-25
-Last session: 2026-07-26T03:29:53.720Z
-Stopped at: Completed 24-05-PLAN.md
+Last activity: 2026-07-26
+Last session: 2026-07-26T04:29:10.652Z
+Stopped at: Completed 24-06-PLAN.md (final plan of Phase 24)
 Resume file: None
