@@ -5,14 +5,14 @@ milestone_name: Slides Tab Rework
 current_phase: 24
 current_phase_name: Slide Group Model and Migration
 status: executing
-stopped_at: Completed 24-04-PLAN.md
-last_updated: "2026-07-26T02:50:14.300Z"
+stopped_at: Completed 24-05-PLAN.md
+last_updated: "2026-07-26T03:29:53.751Z"
 last_activity: 2026-07-25
 progress:
   total_phases: 17
   completed_phases: 11
   total_plans: 74
-  completed_plans: 72
+  completed_plans: 73
   percent: 65
 last_activity_desc: Opened v1.3 Slides Tab Rework (Phases 24-28) from the Claude Design import; v1.2 left code-complete with its verification ledger intact
 ---
@@ -36,7 +36,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 24 (Slide Group Model and Migration) — EXECUTING
-Plan: 5 of 6
+Plan: 6 of 6
 Milestone: v1.2 Worship Service Slide Management (Phases 18-23) — IN PROGRESS
 Status: Ready to execute
 
@@ -250,6 +250,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 24 P02 | 17min | 3 tasks | 2 files |
 | Phase 24 P03 | 8min | 3 tasks | 2 files |
 | Phase 24 P04 | 23min | 3 tasks | 11 files |
+| Phase 24 P05 | 14min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -352,6 +353,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: [Phase 24-03]: retained-but-unresolvable song-lyric entries appended after the resolvable run in original relative order (not interleaved) -- avoids a generic LCS-style merge RESEARCH.md warns against
 - [Phase ?]: [Phase 24-04]: Tasks 1+2 (group join + D-04 audio precedence) combined into one commit since both edit the same emitFromGroup loop body
 - [Phase ?]: [Phase 24-04]: Fallback-path slide ids now derive from the slot's stable id rather than array index, so a pre-materialization render cannot churn Vue keys
+- [Phase ?]: [Phase 24-05]: materializationCandidates/reconciliationOutcomes split into a synchronous computed (decision) + watch callback (async effect) -- an async watchEffect body only tracks reads before its first await
+- [Phase ?]: [Phase 24-05]: SONG slot with no song assigned materializes NO group (buildInitialGroup resolves to zero slides) rather than an empty one, per D-02
+- [Phase ?]: [Phase 24-05]: fixed a test-isolation leak (onUnmounted never fires for direct composable calls) by wrapping each test's useSlideshowAssembly() in its own effectScope, stopped in afterEach
 
 ### Roadmap Evolution
 
@@ -411,6 +415,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-25
-Last session: 2026-07-26T02:50:14.270Z
-Stopped at: Completed 24-04-PLAN.md
+Last session: 2026-07-26T03:29:53.720Z
+Stopped at: Completed 24-05-PLAN.md
 Resume file: None

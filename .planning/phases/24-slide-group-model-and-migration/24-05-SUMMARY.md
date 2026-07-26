@@ -175,3 +175,7 @@ None -- no external service configuration required.
 ---
 *Phase: 24-slide-group-model-and-migration*
 *Completed: 2026-07-25*
+
+## Self-Check: PASSED
+
+All claimed files found on disk (`src/composables/useSlideshowAssembly.ts`, `src/composables/__tests__/useSlideshowAssembly.test.ts`, `src/views/ServiceEditorView.vue`, this SUMMARY). All claimed commits found in git log (`abc4a62`, `2ae7025`, `da84fe7`, `bf156d7`, `799fe76`, `7454969`, `23debbf`).
