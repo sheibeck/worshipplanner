@@ -5,14 +5,14 @@ milestone_name: Slides Tab Rework
 current_phase: 27
 current_phase_name: Service Order Tab — Rename and Strip Slide Editing
 status: executing
-stopped_at: Completed 27-01-PLAN.md
-last_updated: "2026-07-27T11:51:50.338Z"
+stopped_at: Completed 27-02-PLAN.md
+last_updated: "2026-07-27T12:00:44.340Z"
 last_activity: 2026-07-27
 progress:
   total_phases: 17
   completed_phases: 14
   total_plans: 95
-  completed_plans: 91
+  completed_plans: 92
   percent: 82
 last_activity_desc: Opened v1.3 Slides Tab Rework (Phases 24-28) from the Claude Design import; v1.2 left code-complete with its verification ledger intact
 ---
@@ -36,7 +36,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 27 (Service Order Tab — Rename and Strip Slide Editing) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Milestone: v1.3 Slides Tab Rework (Phases 24-28) — IN PROGRESS
 Status: Ready to execute
 
@@ -377,6 +377,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 26 P08 | 50min | 3 tasks | 2 files |
 | Phase 26 P09 | 55 | 3 tasks | 8 files |
 | Phase 27 P01 | 5min | 1 tasks | 0 files |
+| Phase 27 P02 | 25min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -522,6 +523,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 26-09: Duplicate's selection-follows-copy is success-gated -- the drawer emits 'duplicate' (and SlidesTab.vue moves the selection) only after replaceGroupSlides resolves, so a rejected write never leaves the panel pointed at an entry that was never created
 - [Phase ?]: 26-09: deleteSlideConfirmBody lives in the pure slideDisplay module (not inline in EditSlideDrawer.vue), keyed on the entry's OWN audio/notes only -- never the group's shared bed music
 - [Phase ?]: D-05: Present Slideshow moves to the Slides tab (27-01 checkpoint resolved 2026-07-27)
+- [Phase ?]: 27-02: Renamed ServiceEditorView's first tab (label + activeTab union) from Music to service-order (D-03, D009); four unrelated views with same-named activeTab refs left untouched
 
 ### Roadmap Evolution
 
@@ -581,6 +583,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-27
-Last session: 2026-07-27T11:51:50.291Z
-Stopped at: Completed 27-01-PLAN.md
+Last session: 2026-07-27T12:00:44.287Z
+Stopped at: Completed 27-02-PLAN.md
 Resume file: None

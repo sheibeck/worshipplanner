@@ -100,3 +100,9 @@ None - no external service configuration required.
 ---
 *Phase: 27-service-order-tab-rename-and-strip-slide-editing-risk-medium*
 *Completed: 2026-07-27*
+
+## Self-Check: PASSED
+
+- FOUND: 27-01-SUMMARY.md (this file)
+- CONFIRMED: `git status --porcelain src/` empty at time of decision recording (NO-SOURCE-CHANGES)
+- CONFIRMED: D-05 present verbatim in 27-CONTEXT.md (commit bddabf9)
