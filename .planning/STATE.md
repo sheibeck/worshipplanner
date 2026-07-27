@@ -2,17 +2,17 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Slides Tab Rework
-current_phase: 25
-current_phase_name: Slides Tab Shell — Plan Rail and Slide Grid
-status: verifying
-stopped_at: Completed 25-07-PLAN.md (Phase 25 final plan -- all 7 plans complete)
-last_updated: "2026-07-27T00:03:22.478Z"
+current_phase: 26
+current_phase_name: Edit Slide Drawer
+status: executing
+stopped_at: Completed 26-01-PLAN.md
+last_updated: "2026-07-27T02:33:59.456Z"
 last_activity: 2026-07-26
 progress:
   total_phases: 17
   completed_phases: 13
-  total_plans: 81
-  completed_plans: 81
+  total_plans: 90
+  completed_plans: 82
   percent: 76
 last_activity_desc: Opened v1.3 Slides Tab Rework (Phases 24-28) from the Claude Design import; v1.2 left code-complete with its verification ledger intact
 ---
@@ -24,7 +24,7 @@ last_activity_desc: Opened v1.3 Slides Tab Rework (Phases 24-28) from the Claude
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 25 — Slides Tab Shell — Plan Rail and Slide Grid
+**Current focus:** Phase 26 — Edit Slide Drawer
 
 > **v1.2 → v1.3 handoff (2026-07-25).** v1.2 is code-complete (Phases 18-23, all plans committed)
 > but its human-verify batch is still outstanding. v1.2 was deliberately **not** archived: running
@@ -35,10 +35,10 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 
 ## Current Position
 
-Phase: 25 (Slides Tab Shell — Plan Rail and Slide Grid) — EXECUTING
-Plan: 7 of 7
+Phase: 26 (Edit Slide Drawer) — EXECUTING
+Plan: 2 of 9
 Milestone: v1.3 Slides Tab Rework (Phases 24-28) — IN PROGRESS
-Status: Phase complete — ready for verification
+Status: Ready to execute
 
 Phases 20, 21, 22 and 23 are all code-complete; only their deferred human-verify checkpoints remain
 (see the Deferred Verification table below).
@@ -64,9 +64,11 @@ and all slide-area legacy paths (D-18/D-19); `ensureGroupMaterialized`; within-g
 a four-kind drop target (PPTX/image/video append slides · audio sets the group bed).
 
 **Two Phase 25 items to confirm at batch human-verify:**
+
 - Real OS drag-and-drop of a file onto the grid — jsdom cannot produce a genuine `DataTransfer` with
   real `File` payloads, so this is manual-only. `docs/example.pptx` and `docs/example.mp3` are in the
   tree as fixtures. See `25-07-SUMMARY.md` `<human-check>`.
+
 - **Behavioral decision (25-REVIEW-FIX WR-01):** a video slide now **suppresses the group's bed audio**
   for its own duration, with the bed resuming on the next slide that has none — applying Phase 24
   D-04's "slide beats group" precedence to video. Confirm this is the wanted behavior.
@@ -338,6 +340,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 25 P05 | ~2h | 3 tasks | 11 files |
 | Phase 25 P06 | ~50min | 2 tasks | 5 files |
 | Phase 25 P07 | ~2.5h | 3 tasks | 8 files |
+| Phase 26 P01 | 6min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -464,6 +467,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: [Phase 25-07]: SlideGrid mounts its OWN PptxImportModal instance with its OWN confirmed handler, never ServiceEditorView's, which creates a brand-new IMPORTED plan item (D-16 forbids that here)
 - [Phase ?]: [Phase 25-07]: Video drop batches all of a drop's videos into ONE replaceGroupSlides call after every upload resolves (not one write per video), appending its own slide never the bed (D-17)
 - [Phase ?]: [Phase 25-07]: Audio drop reuses 25-06's setGroupBedMedia write path directly with no materialization call, appending nothing (D-14/D-18)
+- [Phase ?]: [Phase 26-01]: ReconcileResult.songSwap populated ids-only in the pure materializer; title resolution deferred to 26-04 where the song catalog is already in scope
+- [Phase ?]: [Phase 26-01]: SlideGroup.dismissedSignature is a second, distinct field from sourceSignature -- never collapsed into one comparison (D-07)
+- [Phase ?]: [Phase 26-01]: dismissReconciliation has no transaction/CAS -- a lost race between two declines of the same divergence is harmless
 
 ### Roadmap Evolution
 
@@ -523,6 +529,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-26
-Last session: 2026-07-27T00:03:22.437Z
-Stopped at: Completed 25-07-PLAN.md (Phase 25 final plan -- all 7 plans complete)
+Last session: 2026-07-27T02:33:59.412Z
+Stopped at: Completed 26-01-PLAN.md
 Resume file: None
