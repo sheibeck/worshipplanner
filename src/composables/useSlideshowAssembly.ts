@@ -452,6 +452,22 @@ export function useSlideshowAssembly(
   async function applyReconciliationOutcomes(outcomes: ReconciliationOutcome[]) {
     for (const outcome of outcomes) {
       if (outcome.result.needsConfirm) {
+        // D-07: a divergence identical to the one the user already declined
+        // for this group must not surface again. Compared against the
+        // group's RECORDED DECLINED value (`dismissedSignature`), never
+        // `sourceSignature` (what was last WRITTEN) — those two fields mean
+        // different things, and reusing the wrong one would suppress
+        // legitimate updates too. A FURTHER source change naturally produces
+        // a different `freshSignature`, so re-prompting after a later change
+        // requires no extra code and no expiry — do not add a timestamp or
+        // counter here.
+        if (
+          outcome.group.dismissedSignature !== undefined &&
+          outcome.freshSignature === outcome.group.dismissedSignature
+        ) {
+          continue
+        }
+
         if (!pendingReconciliationsMap.has(outcome.slotId)) {
           const songSwap = outcome.result.songSwap
           pendingReconciliationsMap.set(outcome.slotId, {

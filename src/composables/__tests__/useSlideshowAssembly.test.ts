@@ -1212,6 +1212,139 @@ describe('useSlideshowAssembly', () => {
     })
   })
 
+  // --- 26-04 Task 2: a declined divergence stops surfacing, until it changes again ---
+  describe('durable decline suppression (26-04 Task 2)', () => {
+    function customizedScriptureGroup(overrides: Partial<SlideGroup>): SlideGroup {
+      return {
+        id: 'slot-scripture-decline',
+        slotId: 'slot-scripture-decline',
+        serviceId: 'service-1',
+        sourceSignature: '1:Old verse text',
+        slides: [
+          {
+            id: 'ss-1',
+            order: 0,
+            sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'orig-id' },
+            label: 'Custom label',
+          },
+        ],
+        createdAt: {} as never,
+        updatedAt: {} as never,
+        ...overrides,
+      }
+    }
+
+    function readingWithText(text: string): ScriptureReading[] {
+      return [
+        {
+          id: 'reading-1',
+          reference: { book: 'John', chapter: 3 },
+          displayReference: 'John 3',
+          rawText: 'text',
+          readingMode: 'normal',
+          slides: [
+            {
+              id: 'orig-id',
+              position: 0,
+              contentKind: 'scripture',
+              reference: 'John 3:16',
+              bookRef: { book: 'John', chapter: 3 },
+              text,
+              verseRange: '16',
+              readingMode: 'normal',
+            },
+          ],
+          createdAt: {} as never,
+          updatedAt: {} as never,
+        },
+      ]
+    }
+
+    it('a group whose recorded declined value equals the current divergence surfaces no pending entry', async () => {
+      scriptureState.readings = readingWithText('New verse text')
+      slideGroupsState.groups = [customizedScriptureGroup({ dismissedSignature: '1:New verse text' })]
+
+      const service = ref<Service | null>(
+        makeService([scriptureSlot({ position: 0, id: 'slot-scripture-decline', scriptureReadingId: 'reading-1' })]),
+      )
+      const { pendingReconciliations } = useSlideshowAssembly(service, 'org-1', { canWrite: true })
+      await nextTick()
+      await nextTick()
+
+      expect(pendingReconciliations.value).toHaveLength(0)
+      expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
+    })
+
+    it('a group whose recorded declined value differs from the current divergence surfaces normally', async () => {
+      scriptureState.readings = readingWithText('New verse text')
+      slideGroupsState.groups = [customizedScriptureGroup({ dismissedSignature: '1:Some other divergence' })]
+
+      const service = ref<Service | null>(
+        makeService([scriptureSlot({ position: 0, id: 'slot-scripture-decline', scriptureReadingId: 'reading-1' })]),
+      )
+      const { pendingReconciliations } = useSlideshowAssembly(service, 'org-1', { canWrite: true })
+      await nextTick()
+      await nextTick()
+
+      expect(pendingReconciliations.value).toHaveLength(1)
+    })
+
+    it('a group with no recorded decline surfaces normally', async () => {
+      scriptureState.readings = readingWithText('New verse text')
+      slideGroupsState.groups = [customizedScriptureGroup({})]
+
+      const service = ref<Service | null>(
+        makeService([scriptureSlot({ position: 0, id: 'slot-scripture-decline', scriptureReadingId: 'reading-1' })]),
+      )
+      const { pendingReconciliations } = useSlideshowAssembly(service, 'org-1', { canWrite: true })
+      await nextTick()
+      await nextTick()
+
+      expect(pendingReconciliations.value).toHaveLength(1)
+    })
+
+    it('a group whose recorded decline matches surfaces again once the source changes to a FURTHER different divergence', async () => {
+      scriptureState.readings = readingWithText('New verse text')
+      slideGroupsState.groups = [customizedScriptureGroup({ dismissedSignature: '1:New verse text' })]
+
+      const service = ref<Service | null>(
+        makeService([scriptureSlot({ position: 0, id: 'slot-scripture-decline', scriptureReadingId: 'reading-1' })]),
+      )
+      const { pendingReconciliations } = useSlideshowAssembly(service, 'org-1', { canWrite: true })
+      await nextTick()
+      await nextTick()
+      expect(pendingReconciliations.value).toHaveLength(0)
+
+      // A further source change: the declined divergence is now stale. Mutated
+      // IN PLACE (not reassigned) — the mock store's `readings` property
+      // captured a reactive proxy over this SAME raw array at composable
+      // setup time; reassigning the outer `scriptureState.readings` binding
+      // here would silently stop being visible to that already-constructed
+      // mock, since it would swap in an entirely different raw array the mock
+      // never re-reads.
+      scriptureState.readings[0]!.slides[0]!.text = 'Yet another verse text'
+      await nextTick()
+      await nextTick()
+
+      expect(pendingReconciliations.value).toHaveLength(1)
+    })
+
+    it('suppression never issues a write; the group stays completely untouched', async () => {
+      scriptureState.readings = readingWithText('New verse text')
+      slideGroupsState.groups = [customizedScriptureGroup({ dismissedSignature: '1:New verse text' })]
+
+      const service = ref<Service | null>(
+        makeService([scriptureSlot({ position: 0, id: 'slot-scripture-decline', scriptureReadingId: 'reading-1' })]),
+      )
+      useSlideshowAssembly(service, 'org-1', { canWrite: true })
+      await nextTick()
+      await nextTick()
+
+      expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
+      expect(mockSetGroupBedMedia).not.toHaveBeenCalled()
+    })
+  })
+
   // --- Task 3 (25-01): end-to-end guard that a dropped video survives a live
   // reconciliation tick. This is the highest-consequence regression this
   // phase can produce: a video a user dropped disappearing on the next lyric
