@@ -1160,7 +1160,7 @@ describe('ServiceEditorView - Slides tab (Phase 25-03)', () => {
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
 
-    expect(isVShowHidden(wrapper.findComponent(SlideshowPreview))).toBe(false)
+    expect(isVShowHidden(wrapper.find('[data-testid="service-order-panel"]'))).toBe(false)
 
     const slidesBtn = wrapper.findAll('button').find((b) => b.text() === 'Slides')
     expect(slidesBtn?.exists()).toBe(true)
@@ -1168,13 +1168,13 @@ describe('ServiceEditorView - Slides tab (Phase 25-03)', () => {
     await wrapper.vm.$nextTick()
 
     expect(isVShowHidden(wrapper.findComponent(SlidesTab))).toBe(false)
-    expect(isVShowHidden(wrapper.findComponent(SlideshowPreview))).toBe(true)
+    expect(isVShowHidden(wrapper.find('[data-testid="service-order-panel"]'))).toBe(true)
   })
 
   it('the default active tab is unchanged (still opens on Service Order)', async () => {
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
-    expect(isVShowHidden(wrapper.findComponent(SlideshowPreview))).toBe(false)
+    expect(isVShowHidden(wrapper.find('[data-testid="service-order-panel"]'))).toBe(false)
   })
 
   it('the slides panel receives the assembled slideshow, the groups map and the pending reconciliations as props', async () => {
@@ -1290,14 +1290,14 @@ describe('ServiceEditorView - Edit in scripture plumbing (Phase 26-03)', () => {
     const slidesBtn = wrapper.findAll('button').find((b) => b.text() === 'Slides')
     await slidesBtn!.trigger('click')
     await wrapper.vm.$nextTick()
-    expect(isVShowHidden(wrapper.findComponent(SlideshowPreview))).toBe(true)
+    expect(isVShowHidden(wrapper.find('[data-testid="service-order-panel"]'))).toBe(true)
 
     // slot-1 is the populated SCRIPTURE plan item (raw array index 1).
     await wrapper.findComponent(SlidesTab).vm.$emit('navigate-to-scripture-editor', 1)
     await wrapper.vm.$nextTick()
     await wrapper.vm.$nextTick()
 
-    expect(isVShowHidden(wrapper.findComponent(SlideshowPreview))).toBe(false)
+    expect(isVShowHidden(wrapper.find('[data-testid="service-order-panel"]'))).toBe(false)
     const panel = wrapper.find('[data-scripture-panel-index="1"]')
     expect(panel.exists()).toBe(true)
   })
