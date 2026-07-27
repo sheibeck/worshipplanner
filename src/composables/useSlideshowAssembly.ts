@@ -440,11 +440,18 @@ export function useSlideshowAssembly(
       if (appliedGroupRefForSlot.get(outcome.slotId) === outcome.group) continue
       appliedGroupRefForSlot.set(outcome.slotId, outcome.group)
 
+      // CR-02: `outcome.group.slides` is the snapshot this reconciliation was
+      // computed FROM — passed through as `baseSlides` so a concurrent
+      // SlideGrid.vue write (add-slide/import/video-append/reorder) that
+      // lands between this computation and this write is detected and merged
+      // rather than silently overwritten. See `replaceGroupSlides`'s doc
+      // comment in `src/stores/slideGroups.ts`.
       await slideGroupsStore.replaceGroupSlides(
         outcome.orgId,
         outcome.slotId,
         outcome.result.slides,
         outcome.freshSignature,
+        outcome.group.slides,
       )
     }
   }

@@ -8,6 +8,7 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  runTransaction,
   serverTimestamp,
   query,
   orderBy,
@@ -214,18 +215,88 @@ export const useSlideGroups = defineStore('slideGroups', () => {
    * entry's own `audioUrl` cleared. The stored `audioScope` value exists only
    * so the drawer can round-trip the toggle's visual state — the assembler
    * never interprets it.
+   *
+   * CR-02: every call site (add-slide, import, video-append, drag-reorder in
+   * `SlideGrid.vue`, and the reconciliation watcher in
+   * `useSlideshowAssembly.ts`) reads a LOCAL snapshot of the group's current
+   * `entries`/`slides` BEFORE computing its own next `slides` array, with no
+   * shared in-process lock across those independent call sites. A plain
+   * `updateDoc` here is therefore a last-write-wins race — a fast
+   * double-click on "+ Add slide", or an append racing a drag-reorder, would
+   * silently discard whichever write lands first.
+   *
+   * `baseSlides` — the snapshot the CALLER actually started from before
+   * computing `slides` — turns this into a `runTransaction` compare-and-swap:
+   * inside the transaction we read the LIVE document and diff it against
+   * `baseSlides` by entry id. Any entry present on the live document but
+   * absent from BOTH `baseSlides` and the caller's own `slides` payload was
+   * added by a different, concurrent write that landed after this caller
+   * read `baseSlides` — it is re-appended onto the caller's payload instead
+   * of being silently overwritten. This closes both the append-vs-append race
+   * (two callers computing the same "append one entry" delta from the same
+   * stale base) and the append-vs-reorder race (a reorder's full-array
+   * overwrite landing after a concurrent append), because whichever write
+   * loses the commit race re-derives against the OTHER write's already-landed
+   * result rather than blindly replacing it.
+   *
+   * This intentionally does not attempt to reconcile concurrent DELETIONS (no
+   * delete-a-slide path exists yet — Phase 26) and does not re-derive a
+   * drag-reorder's index math against a changed live array — it only
+   * guarantees a concurrently-ADDED entry always survives, which is the exact
+   * data-loss CR-02 flagged. `baseSlides` is optional: omitting it keeps the
+   * previous plain-overwrite behavior for any caller that has not been
+   * updated to track a base snapshot.
    */
   async function replaceGroupSlides(
     orgId: string,
     slotId: string,
     slides: GroupSlideEntry[],
     sourceSignature?: string,
+    baseSlides?: GroupSlideEntry[],
   ): Promise<void> {
     const ref = doc(db, 'organizations', orgId, 'slideGroups', slotId)
-    await updateDoc(ref, {
-      ...stripUndefined({ slides, sourceSignature }),
-      updatedAt: serverTimestamp(),
+
+    if (!baseSlides) {
+      await updateDoc(ref, {
+        ...stripUndefined({ slides, sourceSignature }),
+        updatedAt: serverTimestamp(),
+      })
+      return
+    }
+
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref)
+      const liveSlides = (snap.exists() ? (snap.data() as Record<string, unknown>).slides : undefined) as
+        | GroupSlideEntry[]
+        | undefined
+      const merged = mergeConcurrentlyAddedEntries(baseSlides, liveSlides ?? [], slides)
+      tx.update(ref, {
+        ...stripUndefined({ slides: merged, sourceSignature }),
+        updatedAt: serverTimestamp(),
+      })
     })
+  }
+
+  /**
+   * CR-02 helper: entries present on the LIVE document but absent from both
+   * the caller's own snapshot (`base`) and its computed payload (`next`) were
+   * added by a concurrent write that landed after `base` was read — append
+   * them rather than let `next`'s write silently erase them. Reassigns
+   * `order` to trail whatever `next` already contains so the recovered
+   * entries sort after it; ids are never regenerated (invariant 2,
+   * `slideGroup.ts`).
+   */
+  function mergeConcurrentlyAddedEntries(
+    base: GroupSlideEntry[],
+    live: GroupSlideEntry[],
+    next: GroupSlideEntry[],
+  ): GroupSlideEntry[] {
+    const baseIds = new Set(base.map((e) => e.id))
+    const nextIds = new Set(next.map((e) => e.id))
+    const concurrentlyAdded = live.filter((e) => !baseIds.has(e.id) && !nextIds.has(e.id))
+    if (concurrentlyAdded.length === 0) return next
+    const maxOrder = next.reduce((max, e) => Math.max(max, e.order), -1)
+    return [...next, ...concurrentlyAdded.map((entry, i) => ({ ...entry, order: maxOrder + 1 + i }))]
   }
 
   return {

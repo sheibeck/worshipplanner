@@ -320,7 +320,11 @@ async function onAddSlide(): Promise<void> {
       // new card from looking blank in the grid.
       sourceRef: { kind: 'text', title: 'New slide', body: '' },
     }
-    await slideGroupsStore.replaceGroupSlides(props.orgId, slotId, [...entries, newEntry], sourceSignature)
+    // CR-02: `entries` is the snapshot this append was computed FROM — passed
+    // through as `baseSlides` so a concurrent write (a double-click's other
+    // call, or a drag-reorder landing first) is detected and merged rather
+    // than silently overwritten. See `replaceGroupSlides`'s doc comment.
+    await slideGroupsStore.replaceGroupSlides(props.orgId, slotId, [...entries, newEntry], sourceSignature, entries)
   } catch (err) {
     console.error('Failed to add slide:', err)
   }
@@ -380,7 +384,8 @@ async function onImportConfirmed(payload: { importId: string; section: ServiceSe
       order: startOrder + i,
       sourceRef: { kind: 'imported', importId: payload.importId, innerSlideId: innerSlide.id },
     }))
-    await slideGroupsStore.replaceGroupSlides(props.orgId, slotId, [...entries, ...newEntries], sourceSignature)
+    // CR-02: see `onAddSlide` — `entries` is this append's base snapshot.
+    await slideGroupsStore.replaceGroupSlides(props.orgId, slotId, [...entries, ...newEntries], sourceSignature, entries)
   } catch (err) {
     console.error('Failed to append imported deck to group:', err)
   }
@@ -398,6 +403,12 @@ async function appendVideoEntries(files: File[]): Promise<void> {
   try {
     const resolved = await props.ensureGroupMaterialized(slotId)
     if (!resolved) return
+    // CR-02: `baseEntries` is the snapshot this whole drop's appends were
+    // computed FROM (captured once, before the loop below builds up its own
+    // running `entries` value) — passed through to `replaceGroupSlides` as
+    // `baseSlides` so a concurrent write is detected and merged rather than
+    // silently overwritten.
+    const baseEntries = resolved.entries
     let entries = resolved.entries
     const sourceSignature = resolved.sourceSignature
     resetMediaUpload()
@@ -411,7 +422,7 @@ async function appendVideoEntries(files: File[]): Promise<void> {
       }
       entries = [...entries, newEntry]
     }
-    await slideGroupsStore.replaceGroupSlides(props.orgId, slotId, entries, sourceSignature)
+    await slideGroupsStore.replaceGroupSlides(props.orgId, slotId, entries, sourceSignature, baseEntries)
   } catch (err) {
     console.error('Failed to append dropped video:', err)
   }
@@ -575,11 +586,17 @@ watch(
           const reordered = sorted.map((entry, i) => ({ ...entry, order: i }))
 
           try {
+            // CR-02: `currentGroup.slides` (read from props above, same as
+            // `sorted`/`reordered` were derived from) is this write's base
+            // snapshot — passed through so a concurrent append that lands
+            // between this read and this write is detected and merged rather
+            // than silently overwritten by the reorder's full-array replace.
             await slideGroupsStore.replaceGroupSlides(
               props.orgId,
               currentSlot.id,
               reordered,
               currentGroup.sourceSignature,
+              currentGroup.slides,
             )
           } catch (err) {
             console.error('Failed to reorder slides:', err)

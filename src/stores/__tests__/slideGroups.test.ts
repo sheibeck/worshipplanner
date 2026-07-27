@@ -7,6 +7,15 @@ let snapshotCallback:
 const mockUnsubscribe = vi.fn()
 
 vi.mock('firebase/firestore', () => {
+  const getDocMock = vi.fn((_ref?: unknown) =>
+    Promise.resolve({
+      exists: () => false,
+      id: 'mock-id',
+      data: () => undefined,
+    }),
+  )
+  const updateDocMock = vi.fn((_ref?: unknown, _data?: unknown) => Promise.resolve())
+
   return {
     getFirestore: vi.fn(() => ({})),
     collection: vi.fn((_db: unknown, ...segments: string[]) => ({ path: segments.join('/') })),
@@ -24,15 +33,21 @@ vi.mock('firebase/firestore', () => {
       },
     ),
     setDoc: vi.fn(() => Promise.resolve()),
-    updateDoc: vi.fn(() => Promise.resolve()),
+    updateDoc: updateDocMock,
     deleteDoc: vi.fn(() => Promise.resolve()),
-    getDoc: vi.fn(() =>
-      Promise.resolve({
-        exists: () => false,
-        id: 'mock-id',
-        data: () => undefined,
-      }),
-    ),
+    getDoc: getDocMock,
+    // CR-02: `runTransaction`'s `tx.get`/`tx.update` delegate straight to the
+    // SAME `getDoc`/`updateDoc` mock instances returned above, so existing
+    // tests that drive `getDoc`'s resolved value via `mockResolvedValueOnce`
+    // and assert against `updateDoc`'s recorded calls keep working
+    // unmodified for the transaction path too.
+    runTransaction: vi.fn(async (_db: unknown, updateFunction: (tx: unknown) => Promise<void>) => {
+      const tx = {
+        get: (ref: unknown) => getDocMock(ref),
+        update: (ref: unknown, data: unknown) => updateDocMock(ref, data),
+      }
+      return updateFunction(tx)
+    }),
     query: vi.fn((ref: unknown) => ref),
     orderBy: vi.fn(),
     serverTimestamp: vi.fn(() => ({ seconds: 1000000, nanoseconds: 0 })),
@@ -536,6 +551,117 @@ describe('useSlideGroups', () => {
       const callArgs = vi.mocked(updateDoc).mock.calls[0]!
       const payload = callArgs[1] as unknown as Record<string, unknown>
       expect('sourceSignature' in payload).toBe(false)
+    })
+
+    // CR-02: with no `baseSlides` argument, behavior is byte-identical to the
+    // pre-fix plain overwrite — no transaction is used at all. This is the
+    // legacy fast path any not-yet-updated caller keeps getting.
+    it('with no baseSlides, uses a plain updateDoc and never opens a transaction', async () => {
+      const { updateDoc, runTransaction } = await import('firebase/firestore')
+      const { useSlideGroups } = await import('../slideGroups')
+      const store = useSlideGroups()
+
+      await store.replaceGroupSlides(
+        'org-1',
+        'slot-1',
+        [{ id: 'e1', order: 0, sourceRef: { kind: 'text' } }],
+        'sig-1',
+      )
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      expect(runTransaction).not.toHaveBeenCalled()
+    })
+
+    it('with baseSlides and no concurrent change, writes the caller\'s slides unmodified via a transaction', async () => {
+      const { getDoc, updateDoc, runTransaction } = await import('firebase/firestore')
+      const base = [{ id: 'e1', order: 0, sourceRef: { kind: 'text' as const } }]
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => true,
+        id: 'slot-1',
+        data: () => ({ slides: base }),
+      } as ReturnType<typeof getDoc> extends Promise<infer T> ? T : never)
+
+      const { useSlideGroups } = await import('../slideGroups')
+      const store = useSlideGroups()
+
+      const next = [...base, { id: 'e2', order: 1, sourceRef: { kind: 'text' as const } }]
+      await store.replaceGroupSlides('org-1', 'slot-1', next, 'sig-2', base)
+
+      expect(runTransaction).toHaveBeenCalledOnce()
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const payload = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+      expect((payload.slides as { id: string }[]).map((e) => e.id)).toEqual(['e1', 'e2'])
+      expect(payload.sourceSignature).toBe('sig-2')
+    })
+
+    // CR-02 regression (WR-02's required coverage): two callers read the SAME
+    // stale `base` before either write lands — mirrors a fast double-click on
+    // "+ Add slide", or two independent append call sites (add-slide,
+    // import, video-append) overlapping. The "other" caller's write commits
+    // first (so the live document now carries its new entry); this caller's
+    // own write, computed from the same stale base, must not erase it.
+    it('a concurrently-added entry (live but unknown to this caller) survives instead of being overwritten', async () => {
+      const { getDoc, updateDoc } = await import('firebase/firestore')
+      const base = [{ id: 'e1', order: 0, sourceRef: { kind: 'text' as const } }]
+      const liveAfterOtherCallersWrite = [
+        ...base,
+        { id: 'e-from-other-caller', order: 1, sourceRef: { kind: 'text' as const } },
+      ]
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => true,
+        id: 'slot-1',
+        data: () => ({ slides: liveAfterOtherCallersWrite }),
+      } as ReturnType<typeof getDoc> extends Promise<infer T> ? T : never)
+
+      const { useSlideGroups } = await import('../slideGroups')
+      const store = useSlideGroups()
+
+      // This caller's own append, computed from the SAME stale `base` — it
+      // never saw the other caller's entry.
+      const thisCallersNext = [...base, { id: 'e-from-this-caller', order: 1, sourceRef: { kind: 'text' as const } }]
+      await store.replaceGroupSlides('org-1', 'slot-1', thisCallersNext, undefined, base)
+
+      const payload = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+      const ids = (payload.slides as { id: string }[]).map((e) => e.id)
+      expect(ids).toContain('e-from-other-caller')
+      expect(ids).toContain('e-from-this-caller')
+      expect(ids).toContain('e1')
+      expect(ids).toHaveLength(3)
+    })
+
+    // CR-02 regression: the append-vs-reorder case named explicitly in the
+    // review. A drag-reorder computes its full-array overwrite entirely from
+    // `base` (what props.group.slides held at drag-end) with no knowledge of
+    // an entry appended elsewhere between that read and this write landing.
+    it("a drag-reorder's full-array overwrite still recovers a concurrently-appended entry it never knew about", async () => {
+      const { getDoc, updateDoc } = await import('firebase/firestore')
+      const base = [
+        { id: 'e1', order: 0, sourceRef: { kind: 'text' as const } },
+        { id: 'e2', order: 1, sourceRef: { kind: 'text' as const } },
+      ]
+      const liveWithConcurrentAppend = [
+        ...base,
+        { id: 'e3-appended-elsewhere', order: 2, sourceRef: { kind: 'text' as const } },
+      ]
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => true,
+        id: 'slot-1',
+        data: () => ({ slides: liveWithConcurrentAppend }),
+      } as ReturnType<typeof getDoc> extends Promise<infer T> ? T : never)
+
+      const { useSlideGroups } = await import('../slideGroups')
+      const store = useSlideGroups()
+
+      // Reorder swaps e1/e2 — computed entirely from `base`.
+      const reordered = [
+        { id: 'e2', order: 0, sourceRef: { kind: 'text' as const } },
+        { id: 'e1', order: 1, sourceRef: { kind: 'text' as const } },
+      ]
+      await store.replaceGroupSlides('org-1', 'slot-1', reordered, undefined, base)
+
+      const payload = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+      const ids = (payload.slides as { id: string }[]).map((e) => e.id)
+      expect(ids).toEqual(['e2', 'e1', 'e3-appended-elsewhere'])
     })
   })
 })

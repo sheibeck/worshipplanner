@@ -326,7 +326,7 @@ describe('SlideGrid', () => {
 
       expect(ensureGroupMaterialized).toHaveBeenCalledWith('slot-1')
       expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
-      const [orgIdArg, slotIdArg, slidesArg, sigArg] = mockReplaceGroupSlides.mock.calls[0]!
+      const [orgIdArg, slotIdArg, slidesArg, sigArg, baseSlidesArg] = mockReplaceGroupSlides.mock.calls[0]!
       expect(orgIdArg).toBe('org-1')
       expect(slotIdArg).toBe('slot-1')
       const slides = slidesArg as GroupSlideEntry[]
@@ -335,6 +335,10 @@ describe('SlideGrid', () => {
       expect(slides[1]).toBe(existingEntries[1])
       expect(slides[2]!.order).toBe(3)
       expect(sigArg).toBe('sig-abc')
+      // CR-02: the pre-append snapshot is passed through as `baseSlides` so
+      // the store can detect and merge a concurrent write instead of
+      // silently overwriting it — see `replaceGroupSlides`'s doc comment.
+      expect(baseSlidesArg).toBe(existingEntries)
     })
 
     it('computes order zero for an empty group', async () => {
@@ -463,13 +467,19 @@ describe('SlideGrid', () => {
       await Promise.resolve()
 
       expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
-      const [orgIdArg, slotIdArg, slidesArg, sigArg] = mockReplaceGroupSlides.mock.calls[0]!
+      const [orgIdArg, slotIdArg, slidesArg, sigArg, baseSlidesArg] = mockReplaceGroupSlides.mock.calls[0]!
       expect(orgIdArg).toBe('org-1')
       expect(slotIdArg).toBe('slot-1')
       const slides = slidesArg as GroupSlideEntry[]
       expect(slides.map((e) => e.id)).toEqual(['e2', 'e3', 'e1'])
       expect(slides.map((e) => e.order)).toEqual([0, 1, 2])
       expect(sigArg).toBe('sig-xyz')
+      // CR-02: the pre-reorder group snapshot is passed through as
+      // `baseSlides` so a concurrent append landing between this read and
+      // this write is detected and merged, not silently overwritten. (Vue
+      // wraps the prop in a reactive proxy, so this compares by value, not
+      // reference.)
+      expect(baseSlidesArg).toEqual(group.slides)
     })
 
     it('issues no write when the drag ends at its starting index', async () => {
