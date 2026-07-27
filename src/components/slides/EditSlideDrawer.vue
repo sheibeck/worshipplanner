@@ -297,6 +297,48 @@
               data-testid="drawer-notes-input"
             ></textarea>
           </div>
+
+          <!-- Phase 26-09: footer action row — Duplicate (left) and Delete
+               Slide (right), above a border-t divider (26-UI-SPEC.md §
+               "Duplicate and Delete Slide"), matching SongSlideOver.vue's own
+               "Delete Song" block placement convention. -->
+          <div v-if="isEditor" class="border-t border-gray-800 pt-4" data-testid="drawer-footer-actions">
+            <div v-if="!showDeleteConfirm" class="flex items-center justify-between">
+              <button
+                type="button"
+                class="px-3 py-1.5 rounded-md text-sm font-medium border border-gray-700 text-gray-300 hover:bg-gray-800 transition-colors"
+                data-testid="drawer-duplicate"
+                @click="onDuplicate"
+              >Duplicate</button>
+              <button
+                type="button"
+                class="text-sm text-red-400 hover:text-red-300 transition-colors"
+                data-testid="drawer-delete-trigger"
+                @click="onDeleteTrigger"
+              >Delete Slide</button>
+            </div>
+            <!-- Inline confirm block (Task 3) — matches SongSlideOver.vue's own
+                 delete-confirm shell/button pair verbatim. NOT a separate
+                 dialog. -->
+            <div v-else class="rounded-lg bg-red-900/20 border border-red-800 p-4" data-testid="drawer-delete-confirm">
+              <p class="text-sm text-gray-200 mb-3" data-testid="drawer-delete-confirm-body">{{ deleteConfirmBody }}</p>
+              <div class="flex gap-2">
+                <button
+                  type="button"
+                  class="px-3 py-1.5 rounded-md text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors"
+                  data-testid="drawer-delete-cancel"
+                  @click="onCancelDelete"
+                >Cancel</button>
+                <button
+                  type="button"
+                  class="px-3 py-1.5 rounded-md text-sm font-medium text-white bg-red-700 hover:bg-red-600 transition-colors"
+                  :disabled="isDeleting"
+                  data-testid="drawer-delete-confirm-button"
+                  @click="onConfirmDelete"
+                >{{ isDeleting ? 'Deleting...' : 'Delete' }}</button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </Transition>
@@ -326,7 +368,7 @@ import type { ServiceSlot } from '@/types/service'
 import type { AssembledSlide, ImageSlide, CopyrightSlide, ScriptureSlide } from '@/types/slide'
 import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
 import { useSlideGroups } from '@/stores/slideGroups'
-import { KIND_BADGE_CLASSES, slotDisplayTitle, slideBodyText, bedAudioLabel } from './slideDisplay'
+import { KIND_BADGE_CLASSES, slotDisplayTitle, slideBodyText, bedAudioLabel, deleteSlideConfirmBody } from './slideDisplay'
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import { buildSongEditLink, type SongEditTab } from '@/utils/songEditLink'
 import { useMediaUpload } from '@/composables/useMediaUpload'
@@ -353,6 +395,8 @@ const emit = defineEmits<{
   close: []
   /** Phase 26-07, D-15: a scripture slide's route away is a same-page request, not a navigation — `SlidesTab.vue` relays it to `ServiceEditorView` via 26-03's plumbing. */
   'edit-in-scripture': []
+  /** Phase 26-09 Task 2: carries the freshly-minted copy's id, only once the write has actually succeeded — `SlidesTab.vue` relays it into `selectSlideById` so the panel follows the copy. */
+  duplicate: [entryId: string]
 }>()
 
 const slideGroupsStore = useSlideGroups()
@@ -910,4 +954,87 @@ onUnmounted(() => {
   // component's own teardown).
   void flushAll()
 })
+
+// ── Phase 26-09 Task 2: Duplicate — insert a copy directly after the original ──
+
+/**
+ * Mints a FRESH id for the copy (D-04, this plan's key_links) — never the
+ * original's, and never derived from label/source/position:
+ * `PresentationViewer.vue` keys its per-slide `AudioPlayer`/`VideoPlayer` on
+ * this id (invariant 2, `src/types/slideGroup.ts`), so two entries sharing
+ * one id would collide there. `base` is read FRESH from `props.group.slides`
+ * at the moment this runs (never a snapshot from mount), matching every
+ * other write this drawer makes. The copy is inserted directly after the
+ * original and every entry's `order` is renumbered contiguous, following the
+ * same discipline `SlideGrid.vue`'s own append (`onAddSlide`) uses.
+ *
+ * The selection moves to the copy only AFTER the write succeeds (T-26-09-04)
+ * — emitting `duplicate` eagerly, before the write lands, would leave the
+ * panel pointed at an entry that was never actually created if the write is
+ * rejected. Task 1's reconciliation fix is what makes this copy survivable
+ * once it lands; this function is what actually creates it.
+ */
+async function onDuplicate(): Promise<void> {
+  if (!props.group || !props.entry) return
+  const base = props.group.slides
+  const originalIndex = base.findIndex((e) => e.id === props.entry!.id)
+  if (originalIndex < 0) return
+  const copyId = crypto.randomUUID()
+  const copy: GroupSlideEntry = { ...base[originalIndex]!, id: copyId }
+  const withCopy = [...base.slice(0, originalIndex + 1), copy, ...base.slice(originalIndex + 1)]
+  const renumbered = withCopy.map((e, i) => ({ ...e, order: i }))
+  try {
+    await slideGroupsStore.replaceGroupSlides(props.orgId, props.group.slotId, renumbered, props.group.sourceSignature, base)
+    emit('duplicate', copyId)
+  } catch (err) {
+    console.error('Failed to duplicate slide:', err)
+  }
+}
+
+// ── Phase 26-09 Task 3: Delete — behind an inline confirm naming what's lost ──
+
+const showDeleteConfirm = ref(false)
+const isDeleting = ref(false)
+
+/**
+ * The delete warning's exact wording (26-UI-SPEC.md's four-variant table,
+ * Phase 24 D-03 precedent) — built by the pure display module from THIS
+ * entry alone (its own audio/notes, never the group's shared bed music).
+ */
+const deleteConfirmBody = computed(() => (props.entry ? deleteSlideConfirmBody(props.entry) : ''))
+
+function onDeleteTrigger(): void {
+  showDeleteConfirm.value = true
+}
+
+function onCancelDelete(): void {
+  showDeleteConfirm.value = false
+}
+
+/**
+ * Filters the entry out and renumbers the rest contiguous, writing through
+ * the same fresh-base helper every other write in this drawer uses. The
+ * group's shared bed music (`setGroupBedMedia`) is never called here — a
+ * slide delete touches only `slides`, never the group's own `bedAudioUrl`.
+ * No close-handling is added for the post-delete case: `SlidesTab.vue`'s
+ * existing `selectedGroupSlideIds` watch already clears `selectedSlideId`
+ * (and with it, `drawerOpen`) the moment it stops resolving against the
+ * selected slot's assembled slides — adding a second close path here would
+ * fight that seam, not complement it.
+ */
+async function onConfirmDelete(): Promise<void> {
+  if (!props.group || !props.entry) return
+  const entryId = props.entry.id
+  const base = props.group.slides
+  const filtered = base.filter((e) => e.id !== entryId).map((e, i) => ({ ...e, order: i }))
+  isDeleting.value = true
+  try {
+    await slideGroupsStore.replaceGroupSlides(props.orgId, props.group.slotId, filtered, props.group.sourceSignature, base)
+    showDeleteConfirm.value = false
+  } catch (err) {
+    console.error('Failed to delete slide:', err)
+  } finally {
+    isDeleting.value = false
+  }
+}
 </script>

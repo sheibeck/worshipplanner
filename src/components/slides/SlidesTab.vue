@@ -45,6 +45,7 @@
       :is-editor="isEditor"
       @close="onDrawerClose"
       @edit-in-scripture="requestEditInScripture"
+      @duplicate="selectSlideById"
     />
   </div>
 </template>
@@ -210,7 +211,7 @@ function onDrawerClose(): void {
   drawerOpen.value = false
 }
 
-/** A future action (e.g. duplicate) can move the selection onto an entry it just created, by id. */
+/** Moves the selection onto an entry just created by id — bound directly to the drawer's `duplicate` emit (26-09 Task 2), which only fires once the copy's write has actually succeeded. */
 function selectSlideById(slideId: string): void {
   selectedSlideId.value = slideId
   drawerOpen.value = true

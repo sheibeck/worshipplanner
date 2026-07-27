@@ -515,4 +515,26 @@ describe('SlidesTab', () => {
       expect(grid.props('totalPlanItems')).toBe(1)
     })
   })
+
+  describe('Duplicate follows the copy (Phase 26-09 Task 2)', () => {
+    it("selects the new entry and shows it in the panel when the drawer's duplicate event fires", async () => {
+      const slots: ServiceSlot[] = [makeSlot({ kind: 'SONG', id: 'slot-a', position: 0 })]
+      const entryOne = makeEntry({ id: 'entry-1' })
+      const entryCopy = makeEntry({ id: 'entry-copy' })
+      const group = makeGroup({ id: 'slot-a', slotId: 'slot-a', slides: [entryOne, entryCopy] })
+      const assembledSlideshow: AssembledSlide[] = [makeAssembled(0, 'entry-1'), makeAssembled(0, 'entry-copy')]
+      const wrapper = mountTab({ slots, assembledSlideshow, groupsBySlotId: new Map([['slot-a', group]]) })
+      await wrapper.vm.$nextTick()
+
+      wrapper.findComponent(SlideGrid).vm.$emit('select', 'entry-1')
+      await wrapper.vm.$nextTick()
+
+      wrapper.findComponent(EditSlideDrawer).vm.$emit('duplicate', 'entry-copy')
+      await wrapper.vm.$nextTick()
+
+      const drawer = wrapper.findComponent(EditSlideDrawer)
+      expect(drawer.props('open')).toBe(true)
+      expect(drawer.props('entry')).toEqual(entryCopy)
+    })
+  })
 })

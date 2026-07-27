@@ -1045,3 +1045,284 @@ describe('EditSlideDrawer (Phase 26-08 Task 3 — a missing audio file says so)'
   })
 })
 
+describe('EditSlideDrawer (Phase 26-09 Task 2 — Duplicate, follows the copy)', () => {
+  beforeEach(() => {
+    mockReplaceGroupSlides.mockReset()
+    mockReplaceGroupSlides.mockResolvedValue(undefined)
+  })
+
+  it('renders the footer row with the copy action left of the delete trigger, above a divider', () => {
+    mountDrawer()
+    const footer = body().find('[data-testid="drawer-footer-actions"]')
+    expect(footer.exists()).toBe(true)
+    expect(footer.classes()).toContain('border-t')
+
+    const duplicate = body().find('[data-testid="drawer-duplicate"]')
+    const deleteTrigger = body().find('[data-testid="drawer-delete-trigger"]')
+    expect(duplicate.exists()).toBe(true)
+    expect(deleteTrigger.exists()).toBe(true)
+
+    const footerHtml = footer.html()
+    expect(footerHtml.indexOf('drawer-duplicate')).toBeLessThan(footerHtml.indexOf('drawer-delete-trigger'))
+  })
+
+  it('copies a slide: the written array has one more entry, positioned directly after the original', async () => {
+    const entryOne = makeEntry({ id: 'entry-1', order: 0 })
+    const entryTwo = makeEntry({ id: 'entry-2', order: 1 })
+    const group = makeGroup({ slides: [entryOne, entryTwo] })
+    mountDrawer({ entry: entryOne, group })
+
+    await body().find('[data-testid="drawer-duplicate"]').trigger('click')
+    await flushPromises()
+
+    expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+    const written = mockReplaceGroupSlides.mock.calls[0]![2] as GroupSlideEntry[]
+    expect(written).toHaveLength(3)
+    expect(written[0]!.id).toBe('entry-1')
+    expect(written[1]!.id).not.toBe('entry-1')
+    expect(written[1]!.id).not.toBe('entry-2')
+    expect(written[2]!.id).toBe('entry-2')
+  })
+
+  it("the copy's id differs from the original's and from every other entry's", async () => {
+    const entryOne = makeEntry({ id: 'entry-1', order: 0 })
+    const entryTwo = makeEntry({ id: 'entry-2', order: 1 })
+    const group = makeGroup({ slides: [entryOne, entryTwo] })
+    mountDrawer({ entry: entryOne, group })
+
+    await body().find('[data-testid="drawer-duplicate"]').trigger('click')
+    await flushPromises()
+
+    const written = mockReplaceGroupSlides.mock.calls[0]![2] as GroupSlideEntry[]
+    const ids = written.map((e) => e.id)
+    expect(new Set(ids).size).toBe(3)
+  })
+
+  it("the copy carries the original's label, notes, audio, scope, loop and source reference", async () => {
+    const entryOne = makeEntry({
+      id: 'entry-1',
+      order: 0,
+      label: 'My label',
+      notes: 'My notes',
+      audioUrl: 'https://example.com/a.mp3',
+      audioScope: 'slide',
+      audioLoop: true,
+      sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'sec-1' },
+    })
+    const group = makeGroup({ slides: [entryOne] })
+    mountDrawer({ entry: entryOne, group })
+
+    await body().find('[data-testid="drawer-duplicate"]').trigger('click')
+    await flushPromises()
+
+    const written = mockReplaceGroupSlides.mock.calls[0]![2] as GroupSlideEntry[]
+    const copy = written.find((e) => e.id !== 'entry-1')
+    expect(copy?.label).toBe('My label')
+    expect(copy?.notes).toBe('My notes')
+    expect(copy?.audioUrl).toBe('https://example.com/a.mp3')
+    expect(copy?.audioScope).toBe('slide')
+    expect(copy?.audioLoop).toBe(true)
+    expect(copy?.sourceRef).toEqual({ kind: 'lyric', songId: 'song-1', sectionId: 'sec-1' })
+  })
+
+  it("every entry's order is contiguous after the write", async () => {
+    const entryOne = makeEntry({ id: 'entry-1', order: 0 })
+    const entryTwo = makeEntry({ id: 'entry-2', order: 1 })
+    const entryThree = makeEntry({ id: 'entry-3', order: 2 })
+    const group = makeGroup({ slides: [entryOne, entryTwo, entryThree] })
+    mountDrawer({ entry: entryTwo, group })
+
+    await body().find('[data-testid="drawer-duplicate"]').trigger('click')
+    await flushPromises()
+
+    const written = mockReplaceGroupSlides.mock.calls[0]![2] as GroupSlideEntry[]
+    expect(written.map((e) => e.order)).toEqual(written.map((_, i) => i))
+  })
+
+  it('passes the base snapshot reflecting the group\'s slides at write time, not at mount', async () => {
+    const entryOne = makeEntry({ id: 'entry-1', order: 0 })
+    const wrapper = mountDrawer({ entry: entryOne, group: makeGroup({ slides: [entryOne] }) })
+
+    const entryTwo = makeEntry({ id: 'entry-2', order: 1 })
+    const updatedGroup = makeGroup({ slides: [entryOne, entryTwo] })
+    await wrapper.setProps({ group: updatedGroup })
+
+    await body().find('[data-testid="drawer-duplicate"]').trigger('click')
+    await flushPromises()
+
+    const baseSlides = mockReplaceGroupSlides.mock.calls[0]![4] as GroupSlideEntry[]
+    expect(baseSlides).toStrictEqual(updatedGroup.slides)
+  })
+
+  it("moves the panel's selection to the copy on a successful write (emits duplicate with the new id)", async () => {
+    const entryOne = makeEntry({ id: 'entry-1', order: 0 })
+    const group = makeGroup({ slides: [entryOne] })
+    const wrapper = mountDrawer({ entry: entryOne, group })
+
+    await body().find('[data-testid="drawer-duplicate"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.emitted('duplicate')).toBeTruthy()
+    const written = mockReplaceGroupSlides.mock.calls[0]![2] as GroupSlideEntry[]
+    const copyId = written.find((e) => e.id !== 'entry-1')!.id
+    expect(wrapper.emitted('duplicate')![0]).toEqual([copyId])
+  })
+
+  it('reports a rejected write and does not move the selection to a non-existent entry', async () => {
+    mockReplaceGroupSlides.mockRejectedValueOnce(new Error('write failed'))
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const entryOne = makeEntry({ id: 'entry-1', order: 0 })
+    const wrapper = mountDrawer({ entry: entryOne, group: makeGroup({ slides: [entryOne] }) })
+
+    await body().find('[data-testid="drawer-duplicate"]').trigger('click')
+    await flushPromises()
+
+    expect(consoleErrorSpy).toHaveBeenCalled()
+    expect(wrapper.emitted('duplicate')).toBeFalsy()
+    consoleErrorSpy.mockRestore()
+  })
+
+  it('does not render the copy action for a user without write capability', () => {
+    mountDrawer({ isEditor: false })
+    expect(body().find('[data-testid="drawer-duplicate"]').exists()).toBe(false)
+  })
+})
+
+describe('EditSlideDrawer (Phase 26-09 Task 3 — Delete, behind a warning naming what goes with it)', () => {
+  beforeEach(() => {
+    mockReplaceGroupSlides.mockReset()
+    mockReplaceGroupSlides.mockResolvedValue(undefined)
+    mockSetGroupBedMedia.mockClear()
+  })
+
+  it('activating the delete trigger reveals the inline confirm block with the correct wording, and no separate dialog element exists', async () => {
+    const entry = makeEntry({ id: 'entry-1', audioUrl: 'https://example.com/a.mp3', notes: 'Some note' })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+
+    expect(body().find('[data-testid="drawer-delete-confirm"]').exists()).toBe(false)
+    await body().find('[data-testid="drawer-delete-trigger"]').trigger('click')
+
+    const confirm = body().find('[data-testid="drawer-delete-confirm"]')
+    expect(confirm.exists()).toBe(true)
+    expect(body().find('[data-testid="drawer-delete-confirm-body"]').text()).toBe(
+      'Deleting this slide also removes its attached audio and operator notes. This cannot be undone.',
+    )
+    // No separate modal/dialog element — this is an inline block inside the panel.
+    expect(document.body.querySelectorAll('[role="dialog"]').length).toBe(0)
+  })
+
+  it('shows the audio-only wording', async () => {
+    const entry = makeEntry({ id: 'entry-1', audioUrl: 'https://example.com/a.mp3' })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+    await body().find('[data-testid="drawer-delete-trigger"]').trigger('click')
+    expect(body().find('[data-testid="drawer-delete-confirm-body"]').text()).toBe(
+      'Deleting this slide also removes its attached audio. This cannot be undone.',
+    )
+  })
+
+  it('shows the notes-only wording', async () => {
+    const entry = makeEntry({ id: 'entry-1', notes: 'Some note' })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+    await body().find('[data-testid="drawer-delete-trigger"]').trigger('click')
+    expect(body().find('[data-testid="drawer-delete-confirm-body"]').text()).toBe(
+      'Deleting this slide also removes its operator notes. This cannot be undone.',
+    )
+  })
+
+  it('shows the plain wording when neither audio nor notes are present', async () => {
+    const entry = makeEntry({ id: 'entry-1' })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+    await body().find('[data-testid="drawer-delete-trigger"]').trigger('click')
+    expect(body().find('[data-testid="drawer-delete-confirm-body"]').text()).toBe('Delete this slide? This cannot be undone.')
+  })
+
+  it('never names the group\'s shared bed music in the warning', async () => {
+    const entry = makeEntry({ id: 'entry-1', audioUrl: 'https://example.com/a.mp3', notes: 'note' })
+    const group = makeGroup({ slides: [entry], bedAudioUrl: 'https://example.com/bed.mp3' })
+    mountDrawer({ entry, group })
+    await body().find('[data-testid="drawer-delete-trigger"]').trigger('click')
+    const text = body().find('[data-testid="drawer-delete-confirm-body"]').text().toLowerCase()
+    expect(text).not.toContain('group')
+    expect(text).not.toContain('bed')
+    expect(text).not.toContain('shared')
+  })
+
+  it('cancelling returns the panel to normal and deletes nothing', async () => {
+    const entry = makeEntry({ id: 'entry-1' })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+    await body().find('[data-testid="drawer-delete-trigger"]').trigger('click')
+    expect(body().find('[data-testid="drawer-delete-confirm"]').exists()).toBe(true)
+
+    await body().find('[data-testid="drawer-delete-cancel"]').trigger('click')
+
+    expect(body().find('[data-testid="drawer-delete-confirm"]').exists()).toBe(false)
+    expect(body().find('[data-testid="drawer-delete-trigger"]').exists()).toBe(true)
+    expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
+  })
+
+  it('confirming removes only that entry from the written array and renumbers the rest contiguous, every other entry unchanged by value', async () => {
+    const entryOne = makeEntry({ id: 'entry-1', order: 0, label: 'Keep me' })
+    const entryTwo = makeEntry({ id: 'entry-2', order: 1 })
+    const entryThree = makeEntry({ id: 'entry-3', order: 2 })
+    const group = makeGroup({ slides: [entryOne, entryTwo, entryThree] })
+    mountDrawer({ entry: entryTwo, group })
+
+    await body().find('[data-testid="drawer-delete-trigger"]').trigger('click')
+    await body().find('[data-testid="drawer-delete-confirm-button"]').trigger('click')
+    await flushPromises()
+
+    expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+    const written = mockReplaceGroupSlides.mock.calls[0]![2] as GroupSlideEntry[]
+    expect(written.map((e) => e.id)).toEqual(['entry-1', 'entry-3'])
+    expect(written.map((e) => e.order)).toEqual([0, 1])
+    expect(written[0]!.label).toBe('Keep me')
+  })
+
+  it('passes the base snapshot reflecting the group\'s slides at write time', async () => {
+    const entryOne = makeEntry({ id: 'entry-1', order: 0 })
+    const wrapper = mountDrawer({ entry: entryOne, group: makeGroup({ slides: [entryOne] }) })
+
+    const entryTwo = makeEntry({ id: 'entry-2', order: 1 })
+    const updatedGroup = makeGroup({ slides: [entryOne, entryTwo] })
+    await wrapper.setProps({ group: updatedGroup })
+
+    await body().find('[data-testid="drawer-delete-trigger"]').trigger('click')
+    await body().find('[data-testid="drawer-delete-confirm-button"]').trigger('click')
+    await flushPromises()
+
+    const baseSlides = mockReplaceGroupSlides.mock.calls[0]![4] as GroupSlideEntry[]
+    expect(baseSlides).toStrictEqual(updatedGroup.slides)
+  })
+
+  it('never calls the group-bed write during a delete', async () => {
+    const entry = makeEntry({ id: 'entry-1' })
+    const group = makeGroup({ slides: [entry], bedAudioUrl: 'https://example.com/bed.mp3' })
+    mountDrawer({ entry, group })
+
+    await body().find('[data-testid="drawer-delete-trigger"]').trigger('click')
+    await body().find('[data-testid="drawer-delete-confirm-button"]').trigger('click')
+    await flushPromises()
+
+    expect(mockSetGroupBedMedia).not.toHaveBeenCalled()
+  })
+
+  it('reports a rejected write and leaves the entry in place', async () => {
+    mockReplaceGroupSlides.mockRejectedValueOnce(new Error('write failed'))
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const entry = makeEntry({ id: 'entry-1' })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+
+    await body().find('[data-testid="drawer-delete-trigger"]').trigger('click')
+    await body().find('[data-testid="drawer-delete-confirm-button"]').trigger('click')
+    await flushPromises()
+
+    expect(consoleErrorSpy).toHaveBeenCalled()
+    consoleErrorSpy.mockRestore()
+  })
+
+  it('does not render the delete trigger for a user without write capability', () => {
+    mountDrawer({ isEditor: false })
+    expect(body().find('[data-testid="drawer-delete-trigger"]').exists()).toBe(false)
+  })
+})
+
