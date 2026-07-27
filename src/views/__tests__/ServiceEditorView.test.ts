@@ -1511,3 +1511,99 @@ describe('ServiceEditorView - Edit in scripture plumbing (Phase 26-03)', () => {
     expect(wrapper.find('[data-scripture-panel-index="4"]').exists()).toBe(false)
   })
 })
+
+// ── No deck-editing or deck-import surface on the Service Order tab (Phase 27-03, R034) ──
+// The imported-deck editor and both section-scoped PowerPoint/image import actions are
+// removed from this tab (deck import now lives on the Slides tab, Phase 25-07). The
+// imported plan item's own row — its heading and empty-state wording — is service
+// structure and stays; only its slide-editing half leaves.
+
+describe('ServiceEditorView - no deck editing or deck import on the Service Order tab (Phase 27-03)', () => {
+  const importedSlidesService: Service = {
+    ...mockService,
+    slots: [
+      ...mockService.slots,
+      { kind: 'IMPORTED', id: 'slot-imported-with-id', position: 9, importId: 'import-1' },
+      { kind: 'IMPORTED', id: 'slot-imported-empty', position: 10, importId: null },
+    ],
+  }
+
+  async function mountView() {
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          RouterLink: { template: '<a><slot /></a>' },
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+        },
+      },
+    })
+  }
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockServicesList = [importedSlidesService]
+  })
+
+  it('offers no way to expand or view an imported deck editor', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('[data-testid="edit-imported-slides-btn"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="imported-editor-panel"]').exists()).toBe(false)
+  })
+
+  it('offers no PowerPoint/image import action in the Add Element menu, and the modal it opened is gone', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const addElementBtn = wrapper.findAll('button').find((b) => b.text() === 'Add Element')
+    expect(addElementBtn?.exists()).toBe(true)
+    await addElementBtn!.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('[data-testid="add-import-announcements"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="add-import-sermon"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Import PowerPoint')
+  })
+
+  it('still offers the five non-import Add Element entries', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const addElementBtn = wrapper.findAll('button').find((b) => b.text() === 'Add Element')
+    await addElementBtn!.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    const menuLabels = wrapper.findAll('button').map((b) => b.text())
+    expect(menuLabels).toEqual(expect.arrayContaining(['Song', 'Scripture Reading', 'Prayer', 'Message', 'Hymn']))
+  })
+
+  it('an existing imported plan item with a deck still renders its heading', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.text()).toContain('Imported Slides')
+  })
+
+  it('an existing imported plan item with no deck still renders its empty-state wording', async () => {
+    mockServicesList = [
+      {
+        ...mockService,
+        slots: [
+          ...mockService.slots,
+          { kind: 'IMPORTED', id: 'slot-imported-empty-only', position: 9, importId: null },
+        ],
+      },
+    ]
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.text()).toContain('Imported Slides — Empty')
+  })
+})
