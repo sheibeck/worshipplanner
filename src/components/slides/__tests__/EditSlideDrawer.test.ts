@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
+import { ref } from 'vue'
 import { mount, flushPromises, DOMWrapper, enableAutoUnmount } from '@vue/test-utils'
 import EditSlideDrawer from '../EditSlideDrawer.vue'
 import type { ServiceSlot } from '@/types/service'
@@ -8,11 +9,14 @@ import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
 // --- 26-05 Task 3: the drawer calls the slideGroups store directly for its
 // fresh-base label/notes writes (Pattern 2/Pitfall 2). Mocked here so Task 1's
 // shell-only tests never touch Firestore, and Task 3 controls the mock's
-// resolved/rejected behavior per test. ---
+// resolved/rejected behavior per test. 26-08 adds `setGroupBedMedia` — the
+// same group-bed write path `SlideGrid.vue`'s music bar already uses. ---
 const mockReplaceGroupSlides = vi.fn().mockResolvedValue(undefined)
+const mockSetGroupBedMedia = vi.fn().mockResolvedValue(undefined)
 vi.mock('@/stores/slideGroups', () => ({
   useSlideGroups: () => ({
     replaceGroupSlides: mockReplaceGroupSlides,
+    setGroupBedMedia: mockSetGroupBedMedia,
   }),
 }))
 
@@ -21,6 +25,29 @@ vi.mock('@/stores/slideGroups', () => ({
 const mockRouterPush = vi.fn().mockResolvedValue(undefined)
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: mockRouterPush }),
+}))
+
+// --- 26-08 Task 1: audio file attach goes through the existing upload
+// composable (never a second uploader) — mocked here exactly like
+// SlideGroupMusicControl.test.ts's own convention, so these tests never touch
+// real Firebase Storage. ---
+const audioUploadProgressRef = ref(0)
+const audioUploadErrorRef = ref<string | null>(null)
+const audioUploadIsUploadingRef = ref(false)
+const mockUploadAudioMedia = vi.fn<(file: File, orgId: string) => Promise<string>>()
+const mockResetAudioUpload = vi.fn(() => {
+  audioUploadProgressRef.value = 0
+  audioUploadErrorRef.value = null
+  audioUploadIsUploadingRef.value = false
+})
+vi.mock('@/composables/useMediaUpload', () => ({
+  useMediaUpload: () => ({
+    progress: audioUploadProgressRef,
+    error: audioUploadErrorRef,
+    isUploading: audioUploadIsUploadingRef,
+    uploadMedia: mockUploadAudioMedia,
+    reset: mockResetAudioUpload,
+  }),
 }))
 
 // Teleported content — established codebase convention (26-RESEARCH.md Pitfall 3).
@@ -149,6 +176,17 @@ function makeVideoFixtures() {
       slide: { id: 'entry-1', position: 0, contentKind: 'video', videoSrc: 'https://example.com/a.mp4' } as never,
     }),
   }
+}
+
+function makeAudioFile(name = 'new.mp3'): File {
+  return new File(['fake-bytes'], name, { type: 'audio/mpeg' })
+}
+
+async function selectAudioAttachFile(file: File = makeAudioFile()) {
+  const input = body().find('[data-testid="audio-attach-input"]')
+  Object.defineProperty(input.element, 'files', { value: [file], configurable: true })
+  await input.trigger('change')
+  await flushPromises()
 }
 
 function mountDrawer(props: Partial<InstanceType<typeof EditSlideDrawer>['$props']> = {}) {
@@ -733,6 +771,277 @@ describe('EditSlideDrawer (Phase 26-07 Task 3 — routes away, guarded)', () => 
       expect(body().find('[data-testid="drawer-edit-in-song-link"]').exists()).toBe(false)
       expect(body().find('[data-testid="drawer-edit-in-scripture-link"]').exists()).toBe(false)
     }
+  })
+})
+
+describe('EditSlideDrawer (Phase 26-08 Task 1 — audio scope and its two write routes)', () => {
+  beforeEach(() => {
+    mockReplaceGroupSlides.mockReset()
+    mockReplaceGroupSlides.mockResolvedValue(undefined)
+    mockSetGroupBedMedia.mockReset()
+    mockSetGroupBedMedia.mockResolvedValue(undefined)
+    mockUploadAudioMedia.mockReset()
+    mockResetAudioUpload.mockClear()
+    audioUploadProgressRef.value = 0
+    audioUploadErrorRef.value = null
+    audioUploadIsUploadingRef.value = false
+  })
+
+  it('shows the scope choice defaulted to this-slide-only and an attach affordance when nothing is attached', () => {
+    const entry = makeEntry({ id: 'entry-1' })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+
+    expect(body().find('[data-testid="audio-scope-choice"]').exists()).toBe(true)
+    expect(body().find('[data-testid="audio-scope-slide"]').classes()).toContain('bg-indigo-600')
+    expect(body().find('[data-testid="audio-scope-group"]').classes()).not.toContain('bg-indigo-600')
+    expect(body().find('[data-testid="audio-attach-input"]').exists()).toBe(true)
+    expect(body().find('[data-testid="audio-file-row"]').exists()).toBe(false)
+  })
+
+  it("shows the slide's own audio file with a remove control, and the scope reads as this slide only", () => {
+    const entry = makeEntry({ id: 'entry-1', audioUrl: 'https://example.com/orgs/org-1/media/m1/song.mp3', audioScope: 'slide' })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+
+    expect(body().find('[data-testid="audio-file-row"]').exists()).toBe(true)
+    expect(body().find('[data-testid="audio-file-name"]').text()).toBe('song.mp3')
+    expect(body().find('[data-testid="audio-remove"]').exists()).toBe(true)
+    expect(body().find('[data-testid="audio-scope-slide"]').classes()).toContain('bg-indigo-600')
+    expect(body().find('[data-testid="audio-shared-caption"]').exists()).toBe(false)
+  })
+
+  it("shows the group's shared music with the shared caption, and the scope reads as the whole group", () => {
+    const entry = makeEntry({ id: 'entry-1', audioScope: 'group' })
+    const group = makeGroup({ slides: [entry], bedAudioUrl: 'https://example.com/orgs/org-1/media/m1/bed.mp3' })
+    mountDrawer({ entry, group })
+
+    expect(body().find('[data-testid="audio-file-row"]').exists()).toBe(true)
+    expect(body().find('[data-testid="audio-file-name"]').text()).toBe('bed.mp3')
+    expect(body().find('[data-testid="audio-shared-caption"]').text()).toBe('Shared with every other slide in this group')
+    expect(body().find('[data-testid="audio-scope-group"]').classes()).toContain('bg-indigo-600')
+  })
+
+  it('attaches a file with this-slide-only chosen: the per-entry write carries the URL and the stamped scope, and the group-music write is not called', async () => {
+    const entry = makeEntry({ id: 'entry-1' })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+    mockUploadAudioMedia.mockResolvedValueOnce('https://example.com/orgs/org-1/media/m1/new.mp3')
+
+    await selectAudioAttachFile()
+
+    expect(mockSetGroupBedMedia).not.toHaveBeenCalled()
+    expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+    const written = mockReplaceGroupSlides.mock.calls[0]![2] as GroupSlideEntry[]
+    const writtenEntry = written.find((e) => e.id === 'entry-1')!
+    expect(writtenEntry.audioUrl).toBe('https://example.com/orgs/org-1/media/m1/new.mp3')
+    expect(writtenEntry.audioScope).toBe('slide')
+  })
+
+  it("attaches a file with the whole group chosen: the group-music write carries the URL, and the per-entry write stamps the scope without setting the entry's own audio", async () => {
+    const entry = makeEntry({ id: 'entry-1' })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+    mockUploadAudioMedia.mockResolvedValueOnce('https://example.com/orgs/org-1/media/m1/new.mp3')
+
+    await body().find('[data-testid="audio-scope-group"]').trigger('click')
+    await selectAudioAttachFile()
+
+    expect(mockSetGroupBedMedia).toHaveBeenCalledWith('org-1', 'slot-1', {
+      serviceId: 'service-1',
+      bedAudioUrl: 'https://example.com/orgs/org-1/media/m1/new.mp3',
+    })
+    expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+    const written = mockReplaceGroupSlides.mock.calls[0]![2] as GroupSlideEntry[]
+    const writtenEntry = written.find((e) => e.id === 'entry-1')!
+    expect(writtenEntry.audioUrl).toBeUndefined()
+    expect(writtenEntry.audioScope).toBe('group')
+  })
+
+  it('changes the scope choice with a file already attached and moves nothing', async () => {
+    const entry = makeEntry({ id: 'entry-1', audioUrl: 'https://example.com/orgs/org-1/media/m1/song.mp3', audioScope: 'slide' })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+
+    await body().find('[data-testid="audio-scope-group"]').trigger('click')
+
+    expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
+    expect(mockSetGroupBedMedia).not.toHaveBeenCalled()
+    expect(body().find('[data-testid="audio-file-row"]').exists()).toBe(true)
+    expect(body().find('[data-testid="audio-file-name"]').text()).toBe('song.mp3')
+  })
+
+  it('removes the slide\'s own audio: the written entry has no audio key at all, and the group-music write is not called', async () => {
+    const entry = makeEntry({ id: 'entry-1', audioUrl: 'https://example.com/orgs/org-1/media/m1/song.mp3', audioScope: 'slide' })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+
+    await body().find('[data-testid="audio-remove"]').trigger('click')
+    await flushPromises()
+
+    expect(mockSetGroupBedMedia).not.toHaveBeenCalled()
+    expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+    const written = mockReplaceGroupSlides.mock.calls[0]![2] as GroupSlideEntry[]
+    const writtenEntry = written.find((e) => e.id === 'entry-1')!
+    expect('audioUrl' in writtenEntry).toBe(false)
+  })
+
+  it("removes while the group's music is shown: the group-music write uses the explicit clear flag", async () => {
+    const entry = makeEntry({ id: 'entry-1', audioScope: 'group' })
+    const group = makeGroup({ slides: [entry], bedAudioUrl: 'https://example.com/orgs/org-1/media/m1/bed.mp3' })
+    mountDrawer({ entry, group })
+
+    await body().find('[data-testid="audio-remove"]').trigger('click')
+    await flushPromises()
+
+    expect(mockSetGroupBedMedia).toHaveBeenCalledWith('org-1', 'slot-1', { serviceId: 'service-1', clearAudio: true })
+    expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
+  })
+
+  it('forces an upload failure: the error renders and no write occurs', async () => {
+    const entry = makeEntry({ id: 'entry-1' })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+    mockUploadAudioMedia.mockImplementationOnce(() => {
+      audioUploadErrorRef.value = 'Unsupported file type "text/plain" — only audio or video files can be attached.'
+      return Promise.reject(new Error('Unsupported file type.'))
+    })
+
+    await selectAudioAttachFile()
+
+    expect(body().find('[data-testid="audio-upload-error"]').text()).toBe('Unsupported file type "text/plain" — only audio or video files can be attached.')
+    expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
+    expect(mockSetGroupBedMedia).not.toHaveBeenCalled()
+  })
+
+  it('renders no attach, scope or remove control for a user without write capability, while an attached file still previews', () => {
+    const entry = makeEntry({ id: 'entry-1', audioUrl: 'https://example.com/orgs/org-1/media/m1/song.mp3' })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }), isEditor: false })
+
+    expect(body().find('[data-testid="audio-attach-input"]').exists()).toBe(false)
+    expect(body().find('[data-testid="audio-scope-choice"]').exists()).toBe(false)
+    expect(body().find('[data-testid="audio-remove"]').exists()).toBe(false)
+    expect(body().find('[data-testid="audio-file-row"]').exists()).toBe(true)
+    expect(body().find('[data-testid="audio-file-name"]').text()).toBe('song.mp3')
+  })
+})
+
+describe('EditSlideDrawer (Phase 26-08 Task 2 — loop where it means something, no audio at all on a video slide)', () => {
+  beforeEach(() => {
+    mockReplaceGroupSlides.mockReset()
+    mockReplaceGroupSlides.mockResolvedValue(undefined)
+    mockSetGroupBedMedia.mockReset()
+    mockSetGroupBedMedia.mockResolvedValue(undefined)
+  })
+
+  it("shows the loop control enabled and reflecting the entry's stored flag with the slide's own audio", () => {
+    const entry = makeEntry({ id: 'entry-1', audioUrl: 'https://example.com/orgs/org-1/media/m1/song.mp3', audioLoop: true })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+
+    const checkbox = body().find('[data-testid="audio-loop-checkbox"]').element as HTMLInputElement
+    expect(checkbox.checked).toBe(true)
+    expect(checkbox.disabled).toBe(false)
+  })
+
+  it('toggling the loop control persists immediately, with no debounce, touching only this entry', async () => {
+    const entryOne = makeEntry({ id: 'entry-1', audioUrl: 'https://example.com/orgs/org-1/media/m1/song.mp3', audioLoop: false })
+    const entryTwo = makeEntry({ id: 'entry-2', label: 'Untouched' })
+    mountDrawer({ entry: entryOne, group: makeGroup({ slides: [entryOne, entryTwo] }) })
+
+    await body().find('[data-testid="audio-loop-checkbox"]').setValue(true)
+
+    expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+    const written = mockReplaceGroupSlides.mock.calls[0]![2] as GroupSlideEntry[]
+    expect(written.find((e) => e.id === 'entry-1')?.audioLoop).toBe(true)
+    expect(written.find((e) => e.id === 'entry-2')).toEqual(entryTwo)
+  })
+
+  it('shows the loop control unavailable and unchecked with the explanatory note in the whole-group state', () => {
+    const entry = makeEntry({ id: 'entry-1' })
+    const group = makeGroup({ slides: [entry], bedAudioUrl: 'https://example.com/orgs/org-1/media/m1/bed.mp3' })
+    mountDrawer({ entry, group })
+
+    const checkbox = body().find('[data-testid="audio-loop-checkbox"]').element as HTMLInputElement
+    expect(checkbox.checked).toBe(false)
+    expect(checkbox.disabled).toBe(true)
+    expect(body().find('[data-testid="audio-loop-disabled-note"]').text()).toBe("Group music doesn't loop — it plays continuously across the group.")
+  })
+
+  it('issues no write when the unavailable loop control is toggled', async () => {
+    const entry = makeEntry({ id: 'entry-1' })
+    const group = makeGroup({ slides: [entry], bedAudioUrl: 'https://example.com/orgs/org-1/media/m1/bed.mp3' })
+    mountDrawer({ entry, group })
+
+    await body().find('[data-testid="audio-loop-checkbox"]').trigger('change')
+
+    expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
+  })
+
+  it('renders no audio section at all for a video slide — no scope choice, no attach affordance, no loop control', () => {
+    const { entry, assembledSlide } = makeVideoFixtures()
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+
+    expect(body().find('[data-testid="drawer-audio-section"]').exists()).toBe(false)
+    expect(body().find('[data-testid="audio-scope-choice"]').exists()).toBe(false)
+    expect(body().find('[data-testid="audio-attach-input"]').exists()).toBe(false)
+    expect(body().find('[data-testid="audio-loop-checkbox"]').exists()).toBe(false)
+  })
+
+  it('renders no video attachment control anywhere in the panel', () => {
+    const entry = makeEntry({ id: 'entry-1' })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+    expect(document.body.querySelectorAll('input[accept*="video"]').length).toBe(0)
+    expect(body().text()).not.toMatch(/group.*video/i)
+  })
+})
+
+describe('EditSlideDrawer (Phase 26-08 Task 3 — a missing audio file says so)', () => {
+  beforeEach(() => {
+    mockReplaceGroupSlides.mockReset()
+    mockReplaceGroupSlides.mockResolvedValue(undefined)
+    mockSetGroupBedMedia.mockReset()
+    mockSetGroupBedMedia.mockResolvedValue(undefined)
+  })
+
+  it('shows a file name derived from the stored address', () => {
+    const entry = makeEntry({ id: 'entry-1', audioUrl: 'https://example.com/orgs/org-1/media/m1/track.mp3' })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+
+    expect(body().find('[data-testid="audio-file-name"]').text()).toBe('track.mp3')
+  })
+
+  it('marks the file unavailable when the browser reports it cannot load, and keeps the remove control', async () => {
+    const entry = makeEntry({ id: 'entry-1', audioUrl: 'https://example.com/orgs/org-1/media/m1/track.mp3' })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+
+    await body().find('audio').trigger('error')
+
+    expect(body().find('[data-testid="audio-unavailable"]').exists()).toBe(true)
+    expect(body().find('[data-testid="audio-remove"]').exists()).toBe(true)
+  })
+
+  it('clears the unavailable marker when the attached file changes', async () => {
+    const entry = makeEntry({ id: 'entry-1', audioUrl: 'https://example.com/orgs/org-1/media/m1/track.mp3' })
+    const wrapper = mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+    await body().find('audio').trigger('error')
+    expect(body().find('[data-testid="audio-unavailable"]').exists()).toBe(true)
+
+    const updatedEntry = makeEntry({ id: 'entry-1', audioUrl: 'https://example.com/orgs/org-1/media/m1/other.mp3' })
+    await wrapper.setProps({ entry: updatedEntry, group: makeGroup({ slides: [updatedEntry] }) })
+
+    expect(body().find('[data-testid="audio-unavailable"]').exists()).toBe(false)
+  })
+
+  it('clears the unavailable marker when the edited slide changes', async () => {
+    const entryOne = makeEntry({ id: 'entry-1', audioUrl: 'https://example.com/orgs/org-1/media/m1/track.mp3' })
+    const entryTwo = makeEntry({ id: 'entry-2', audioUrl: 'https://example.com/orgs/org-1/media/m1/track.mp3' })
+    const wrapper = mountDrawer({ entry: entryOne, group: makeGroup({ slides: [entryOne, entryTwo] }) })
+    await body().find('audio').trigger('error')
+    expect(body().find('[data-testid="audio-unavailable"]').exists()).toBe(true)
+
+    await wrapper.setProps({ entry: entryTwo })
+
+    expect(body().find('[data-testid="audio-unavailable"]').exists()).toBe(false)
+  })
+
+  it('renders no duration element when the browser has reported none', () => {
+    const entry = makeEntry({ id: 'entry-1', audioUrl: 'https://example.com/orgs/org-1/media/m1/track.mp3' })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+
+    expect(body().find('[data-testid="audio-duration"]').exists()).toBe(false)
   })
 })
 
