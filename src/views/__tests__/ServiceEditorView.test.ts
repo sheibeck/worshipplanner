@@ -1276,8 +1276,8 @@ describe('ServiceEditorView - Slides tab (Phase 25-03)', () => {
 
   it('renders three tab buttons, the third reading Slides', async () => {
     const wrapper = await mountView()
-    const tabButtons = wrapper.findAll('button').filter((b) => ['Music', 'Roles', 'Slides'].includes(b.text()))
-    expect(tabButtons.map((b) => b.text())).toEqual(['Music', 'Roles', 'Slides'])
+    const tabButtons = wrapper.findAll('button').filter((b) => ['Service Order', 'Roles', 'Slides'].includes(b.text()))
+    expect(tabButtons.map((b) => b.text())).toEqual(['Service Order', 'Roles', 'Slides'])
   })
 
   it('viewer: the Slides button is present while the Roles button is not', async () => {
@@ -1289,7 +1289,7 @@ describe('ServiceEditorView - Slides tab (Phase 25-03)', () => {
     expect(rolesBtn).toBeUndefined()
   })
 
-  it('clicking Slides shows the slides panel and hides the music panel', async () => {
+  it('clicking Slides shows the slides panel and hides the service order panel', async () => {
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
 
@@ -1304,7 +1304,7 @@ describe('ServiceEditorView - Slides tab (Phase 25-03)', () => {
     expect(isVShowHidden(wrapper.findComponent(SlideshowPreview))).toBe(true)
   })
 
-  it('the default active tab is unchanged (still opens on Music)', async () => {
+  it('the default active tab is unchanged (still opens on Service Order)', async () => {
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
     expect(isVShowHidden(wrapper.findComponent(SlideshowPreview))).toBe(false)
@@ -1352,8 +1352,8 @@ describe('ServiceEditorView - Slides tab (Phase 25-03)', () => {
     slidesTab = wrapper.findComponent(SlidesTab)
     expect(slidesTab.props('active')).toBe(true)
 
-    const musicBtn = wrapper.findAll('button').find((b) => b.text() === 'Music')
-    await musicBtn!.trigger('click')
+    const serviceOrderBtn = wrapper.findAll('button').find((b) => b.text() === 'Service Order')
+    await serviceOrderBtn!.trigger('click')
     await wrapper.vm.$nextTick()
 
     slidesTab = wrapper.findComponent(SlidesTab)
@@ -1370,10 +1370,19 @@ describe('ServiceEditorView - Slides tab (Phase 25-03)', () => {
     expect(wrapper.find('[data-testid="page-level-import"]').exists()).toBe(false)
   })
 
-  it('the first tab button still reads Music', async () => {
+  it('the first tab button still reads Service Order', async () => {
     const wrapper = await mountView()
-    const firstTabBtn = wrapper.findAll('button').filter((b) => ['Music', 'Roles', 'Slides'].includes(b.text()))[0]
-    expect(firstTabBtn?.text()).toBe('Music')
+    const firstTabBtn = wrapper.findAll('button').filter((b) => ['Service Order', 'Roles', 'Slides'].includes(b.text()))[0]
+    expect(firstTabBtn?.text()).toBe('Service Order')
+  })
+
+  it('the first tab panel is reachable by a stable data-testid seam (27-02)', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const panel = wrapper.find('[data-testid="service-order-panel"]')
+    expect(panel.exists()).toBe(true)
+    expect(isVShowHidden(panel)).toBe(false)
   })
 })
 
@@ -1406,7 +1415,7 @@ describe('ServiceEditorView - Edit in scripture plumbing (Phase 26-03)', () => {
     mockServicesList = [mockService]
   })
 
-  it('switches to the Music tab and expands the requested scripture plan item\'s editor', async () => {
+  it('switches to the Service Order tab and expands the requested scripture plan item\'s editor', async () => {
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
 
