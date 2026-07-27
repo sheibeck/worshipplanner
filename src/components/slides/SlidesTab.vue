@@ -28,6 +28,23 @@
         @select="onSelectSlide"
       />
     </div>
+    <!-- Phase 26-05: the Edit Slide drawer — a SIBLING of the grid, not
+         nested inside it (26-RESEARCH.md's component diagram). Follows
+         `selectedSlideId` (D-03): it never closes on a selection change,
+         only on its own `close` emit. -->
+    <EditSlideDrawer
+      :open="drawerOpen"
+      :entry="selectedEntry"
+      :group="selectedGroup"
+      :plan-item="selectedSlot"
+      :assembled-slide="selectedAssembledSlide"
+      :position="selectedSlidePosition"
+      :total="selectedSlideTotal"
+      :org-id="orgId"
+      :service-id="serviceId"
+      :is-editor="isEditor"
+      @close="onDrawerClose"
+    />
   </div>
 </template>
 
@@ -62,13 +79,26 @@
  * (26-RESEARCH.md Pitfall 5). `requestEditInScripture` emits
  * `navigate-to-scripture-editor` carrying the selected plan item's raw array
  * index, the one upward channel a page-level action can travel through.
+ *
+ * Edit Slide drawer seam (Phase 26-05, R033): `selectedEntry` resolves
+ * `selectedSlideId` against the selected group's stored slides by a DIRECT id
+ * lookup — for a materialized group, `AssembledSlide.slide.id` equals
+ * `GroupSlideEntry.id` verbatim (26-RESEARCH.md Pattern 1), so no mapping
+ * layer exists or is needed. A selection with no matching entry (the
+ * pre-materialization fallback-id window, Pitfall 1) resolves to `null` and
+ * the drawer renders nothing — not a loading state. `drawerOpen` is set true
+ * on every slide selection (including re-selecting the same slide after a
+ * close) and false only by the drawer's own `close` emit; it is NEVER cleared
+ * by a selection change, so the drawer follows the selection instead of
+ * closing and reopening (D-03).
  */
 import { ref, computed, watch } from 'vue'
 import type { ServiceSlot } from '@/types/service'
 import type { AssembledSlide } from '@/types/slide'
-import type { SlideGroup } from '@/types/slideGroup'
+import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
 import SlidePlanRail from './SlidePlanRail.vue'
 import SlideGrid from './SlideGrid.vue'
+import EditSlideDrawer from './EditSlideDrawer.vue'
 import type { PendingReconciliation, EnsureGroupMaterializedResult } from './slideDisplay'
 
 const props = defineProps<{
@@ -122,6 +152,15 @@ watch(selectedSlotId, () => {
   selectedSlideId.value = null
 })
 
+// Whenever the slide selection itself disappears (slot change above, or the
+// dangling-selection watch below), the drawer has nothing left to show —
+// close it. This is the ONLY place besides the drawer's own `close` emit
+// that sets `drawerOpen` false; a selection CHANGE to a still-valid slide
+// never touches it (D-03).
+watch(selectedSlideId, (id) => {
+  if (id === null) drawerOpen.value = false
+})
+
 // The array index of the selected slot within the RAW (unsorted) `slots`
 // prop — this is what `AssembledSlide.slotIndex` matches (see
 // SlidePlanRail's own count logic for why position and array index can
@@ -149,8 +188,27 @@ function onSelectSlot(slotId: string): void {
   selectedSlotId.value = slotId
 }
 
+// True whenever a slide has been selected and the drawer hasn't been
+// explicitly closed since. Set on every selection (including re-selecting
+// the same slide after a close) and cleared only by the drawer's own `close`
+// emit or by the selection itself disappearing (below) — never by a
+// selection CHANGE, so the drawer follows the selection instead of closing
+// and reopening (D-03).
+const drawerOpen = ref(false)
+
 function onSelectSlide(slideId: string): void {
   selectedSlideId.value = slideId
+  drawerOpen.value = true
+}
+
+function onDrawerClose(): void {
+  drawerOpen.value = false
+}
+
+/** A future action (e.g. duplicate) can move the selection onto an entry it just created, by id. */
+function selectSlideById(slideId: string): void {
+  selectedSlideId.value = slideId
+  drawerOpen.value = true
 }
 
 /** The full selected plan item, or null when nothing is selected (e.g. an empty service). */
@@ -177,6 +235,44 @@ const selectedGroup = computed<SlideGroup | null>(() => {
 })
 
 /**
+ * The selected slide resolved to its stored entry (Phase 26-05 seam) — a
+ * DIRECT id lookup against `selectedGroup.slides`, with no mapping step. For
+ * a materialized group `AssembledSlide.slide.id` equals `GroupSlideEntry.id`
+ * verbatim (26-RESEARCH.md Pattern 1, verified against
+ * `slideshowAssembler.ts`'s `emitFromGroup`). Resolves to `null` — treated by
+ * the drawer as "nothing selected," never a loading state — for the
+ * pre-materialization fallback-id window where a selected slide's synthetic
+ * id has no `GroupSlideEntry` counterpart yet (Pitfall 1); do not "fix" that
+ * window with a spinner.
+ */
+const selectedEntry = computed<GroupSlideEntry | null>(() => {
+  if (!selectedGroup.value || selectedSlideId.value === null) return null
+  return selectedGroup.value.slides.find((e) => e.id === selectedSlideId.value) ?? null
+})
+
+/**
+ * The selected group's assembled slides, in the SAME order/filter the grid
+ * itself applies (`SlideGrid.vue`'s own `cards` computed) — so the drawer's
+ * position/total can never disagree with the grid's own card numbering.
+ */
+const selectedGroupAssembledSlides = computed<AssembledSlide[]>(() => {
+  if (selectedSlotArrayIndex.value < 0) return []
+  return props.assembledSlideshow.filter((assembled) => assembled.slotIndex === selectedSlotArrayIndex.value)
+})
+
+const selectedAssembledSlide = computed<AssembledSlide | null>(() => {
+  if (selectedSlideId.value === null) return null
+  return selectedGroupAssembledSlides.value.find((a) => a.slide.id === selectedSlideId.value) ?? null
+})
+
+const selectedSlidePosition = computed(() => {
+  const index = selectedGroupAssembledSlides.value.findIndex((a) => a.slide.id === selectedSlideId.value)
+  return index < 0 ? 0 : index + 1
+})
+
+const selectedSlideTotal = computed(() => selectedGroupAssembledSlides.value.length)
+
+/**
  * Relays a request to reveal the selected plan item's scripture editor up to
  * `ServiceEditorView` (D-15). Emits nothing when no plan item is selected.
  * Uses the raw ARRAY index (`selectedSlotArrayIndex`), not the plan
@@ -189,5 +285,5 @@ function requestEditInScripture(): void {
   emit('navigate-to-scripture-editor', selectedSlotArrayIndex.value)
 }
 
-defineExpose({ selectedSlotId, selectedSlideId, requestEditInScripture })
+defineExpose({ selectedSlotId, selectedSlideId, requestEditInScripture, selectSlideById })
 </script>
