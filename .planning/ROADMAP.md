@@ -258,7 +258,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 26-08-PLAN.md — Slide Audio: scope routing, loop flag, video omission, unavailable state (D-09..D-12)
+- [x] 26-08-PLAN.md — Slide Audio: scope routing, loop flag, video omission, unavailable state (D-09..D-12)
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
