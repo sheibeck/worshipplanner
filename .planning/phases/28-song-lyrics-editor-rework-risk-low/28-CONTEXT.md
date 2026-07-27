@@ -137,7 +137,13 @@ not mandated); how "add section" and the repeat/link affordance are presented; a
 ## Specific Ideas
 
 - Verbatim labels from the Turn 2 mockup: `＋ Add section`, `✓ 7 sections`, `Paste lyrics`,
-  `Lyric sheet`, `Remove`, `Duplicate`, and the per-row summary form `CHORUS ⌄` / `4 lines`.
+  `Remove`, `Duplicate`, and the per-row summary form `CHORUS ⌄` / `4 lines`.
+
+  > **Correction (2026-07-27, caught during planning).** An earlier draft of this list also included
+  > **`Lyric sheet`**. That label is the second segment of **2b's mode toggle** — the deferred option —
+  > so building it would build 2b. It is **excluded**. The label list above was drawn across both mockup
+  > panels; `✓ N sections`, the `1..N` numbering and the `↺` repeat glyph also sit in the 2b panel, but
+  > those are wanted and are explicitly folded into 2a by D-01, so they ship.
 - The linked-repeat row reads `3 Chorus ↺` with a `linked` marker — D-02 makes that label literally
   true rather than decorative.
 - R035's success condition is concrete and testable: **no nested scrollbar, and exactly one list**.
