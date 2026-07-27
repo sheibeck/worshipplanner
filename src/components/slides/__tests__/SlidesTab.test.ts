@@ -464,6 +464,31 @@ describe('SlidesTab', () => {
       expect(drawer.props('entry')).toEqual(entryTwo)
     })
 
+    it("relays the drawer's edit-in-scripture request through requestEditInScripture (Phase 26-07 Task 3), emitting the plan item's raw array index", async () => {
+      // Array order: b, a — position order: a (0), b (1). Selection auto-lands
+      // on slot-a (plan-position 0), whose raw array index is 1.
+      const slots: ServiceSlot[] = [
+        makeSlot({ kind: 'SCRIPTURE', id: 'slot-b', position: 1 }),
+        makeSlot({ kind: 'SCRIPTURE', id: 'slot-a', position: 0 }),
+      ]
+      const entry = makeEntry({ id: 'entry-1', sourceRef: { kind: 'scripture', scriptureReadingId: 'read-1', innerSlideId: 'inner-1' } })
+      const group = makeGroup({ id: 'slot-a', slotId: 'slot-a', slides: [entry] })
+      const assembledSlideshow: AssembledSlide[] = [
+        { slide: { id: 'entry-1', position: 0, contentKind: 'scripture', reference: 'John 3:16', bookRef: {}, text: 'For God so loved', verseRange: '16', readingMode: 'normal' } as never, slotIndex: 1, slotKind: 'SCRIPTURE', sourceId: null },
+      ]
+      const wrapper = mountTab({ slots, assembledSlideshow, groupsBySlotId: new Map([['slot-a', group]]) })
+      await wrapper.vm.$nextTick()
+
+      wrapper.findComponent(SlideGrid).vm.$emit('select', 'entry-1')
+      await wrapper.vm.$nextTick()
+
+      wrapper.findComponent(EditSlideDrawer).vm.$emit('edit-in-scripture')
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.emitted('navigate-to-scripture-editor')).toBeTruthy()
+      expect(wrapper.emitted('navigate-to-scripture-editor')![0]).toEqual([1])
+    })
+
     it('leaves every prop the grid received before this change unchanged', async () => {
       const slots: ServiceSlot[] = [makeSlot({ kind: 'PRAYER', id: 'slot-a', position: 0 })]
       const ensureGroupMaterialized = vi.fn().mockResolvedValue(undefined)

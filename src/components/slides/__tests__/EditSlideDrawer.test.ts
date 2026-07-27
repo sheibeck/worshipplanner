@@ -619,3 +619,120 @@ describe('EditSlideDrawer (Phase 26-07 Task 2 — hand-written slide edited here
   })
 })
 
+describe('EditSlideDrawer (Phase 26-07 Task 3 — routes away, guarded)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    mockReplaceGroupSlides.mockReset()
+    mockReplaceGroupSlides.mockResolvedValue(undefined)
+    mockRouterPush.mockClear()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it("pushes the song destination with that song's id and the lyrics tab for a lyric-section slide", async () => {
+    const { entry, assembledSlide } = makeLyricFixtures()
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+
+    await body().find('[data-testid="drawer-edit-in-song-link"]').trigger('click')
+
+    expect(mockRouterPush).toHaveBeenCalledWith({ name: 'songs', query: { edit: 'song-1', tab: 'lyrics' } })
+  })
+
+  it('pushes the same destination on the details tab for a copyright slide', async () => {
+    const { entry, assembledSlide } = makeCopyrightFixtures()
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+
+    await body().find('[data-testid="drawer-edit-in-song-link"]').trigger('click')
+
+    expect(mockRouterPush).toHaveBeenCalledWith({ name: 'songs', query: { edit: 'song-1', tab: 'details' } })
+  })
+
+  it('emits a request (not a navigation) for a scripture slide', async () => {
+    const { entry, assembledSlide } = makeScriptureFixtures()
+    const wrapper = mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+
+    await body().find('[data-testid="drawer-edit-in-scripture-link"]').trigger('click')
+
+    expect(mockRouterPush).not.toHaveBeenCalled()
+    expect(wrapper.emitted('edit-in-scripture')).toBeTruthy()
+  })
+
+  it('offers no route for an imported slide, a video slide, or a hand-written slide', () => {
+    for (const fixtures of [makeImportedTextFixtures(), makeImportedImageFixtures(), makeVideoFixtures(), makeAuthoredTextFixtures()]) {
+      mountDrawer({ entry: fixtures.entry, assembledSlide: fixtures.assembledSlide, group: makeGroup({ slides: [fixtures.entry] }) })
+      expect(body().find('[data-testid="drawer-edit-in-song-link"]').exists()).toBe(false)
+      expect(body().find('[data-testid="drawer-edit-in-scripture-link"]').exists()).toBe(false)
+    }
+  })
+
+  it('proceeds immediately, with no confirmation, when nothing is pending', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm')
+    const { entry, assembledSlide } = makeLyricFixtures()
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+
+    await body().find('[data-testid="drawer-edit-in-song-link"]').trigger('click')
+
+    expect(confirmSpy).not.toHaveBeenCalled()
+    expect(mockRouterPush).toHaveBeenCalledTimes(1)
+    confirmSpy.mockRestore()
+  })
+
+  it('typing then following a route, declining the confirmation: nothing navigates and the pending write still lands', async () => {
+    const { entry, assembledSlide } = makeLyricFixtures()
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+
+    await body().find('[data-testid="drawer-label-input"]').setValue('Changed label')
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+
+    await body().find('[data-testid="drawer-edit-in-song-link"]').trigger('click')
+
+    expect(confirmSpy).toHaveBeenCalledWith('You have unsaved changes. Discard them?')
+    expect(mockRouterPush).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(800)
+    expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+    confirmSpy.mockRestore()
+  })
+
+  it('typing then following a route, accepting the confirmation: navigation happens and no write lands afterward', async () => {
+    const { entry, assembledSlide } = makeLyricFixtures()
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+
+    await body().find('[data-testid="drawer-label-input"]').setValue('Changed label')
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    await body().find('[data-testid="drawer-edit-in-song-link"]').trigger('click')
+
+    expect(mockRouterPush).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(800)
+    await flushPromises()
+    expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
+    confirmSpy.mockRestore()
+  })
+
+  it("uses the existing guard's exact wording, introducing no new confirmation string", async () => {
+    const { entry, assembledSlide } = makeScriptureFixtures()
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+
+    await body().find('[data-testid="drawer-label-input"]').setValue('Changed label')
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    await body().find('[data-testid="drawer-edit-in-scripture-link"]').trigger('click')
+
+    expect(confirmSpy).toHaveBeenCalledTimes(1)
+    expect(confirmSpy).toHaveBeenCalledWith('You have unsaved changes. Discard them?')
+    confirmSpy.mockRestore()
+  })
+
+  it('renders neither route for a user without write capability', () => {
+    for (const fixtures of [makeLyricFixtures(), makeCopyrightFixtures(), makeScriptureFixtures()]) {
+      mountDrawer({ entry: fixtures.entry, assembledSlide: fixtures.assembledSlide, group: makeGroup({ slides: [fixtures.entry] }), isEditor: false })
+      expect(body().find('[data-testid="drawer-edit-in-song-link"]').exists()).toBe(false)
+      expect(body().find('[data-testid="drawer-edit-in-scripture-link"]').exists()).toBe(false)
+    }
+  })
+})
+

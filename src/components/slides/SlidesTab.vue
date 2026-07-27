@@ -44,6 +44,7 @@
       :service-id="serviceId"
       :is-editor="isEditor"
       @close="onDrawerClose"
+      @edit-in-scripture="requestEditInScripture"
     />
   </div>
 </template>
@@ -79,6 +80,10 @@
  * (26-RESEARCH.md Pitfall 5). `requestEditInScripture` emits
  * `navigate-to-scripture-editor` carrying the selected plan item's raw array
  * index, the one upward channel a page-level action can travel through.
+ * Phase 26-07 wires the drawer's own "Edit in scripture" affordance to this
+ * exact function via its `edit-in-scripture` emit — the drawer never reaches
+ * page state directly, it only asks this component to make the same request
+ * it already exposes.
  *
  * Edit Slide drawer seam (Phase 26-05, R033): `selectedEntry` resolves
  * `selectedSlideId` against the selected group's stored slides by a DIRECT id
