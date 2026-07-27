@@ -266,10 +266,21 @@ Plans:
 
 ### Phase 27: Service Order Tab — Rename and Strip Slide Editing `risk:medium`
 
-**Goal:** Rename the Music tab to "Service Order" and remove every slide-editing surface added to it during Phases 18-23, returning it to its production behaviour at `origin/master` @ `9f3700f`. Slide editing then exists only on the Slides tab. Runs after 25-26 so the functionality has a new home before it leaves the old one.
+**Goal:** Rename the Music tab to "Service Order" and strip the slide-editing surfaces added to it during Phases 18-23, so slide editing lives only on the Slides tab. **Narrowed by 27-CONTEXT D-01:** scripture passage/reading-mode editing and the section-assignment control are service-order content and STAY — this is a targeted strip, not a revert to `9f3700f`, since most of the file's growth is Phase 24-26 work that must survive.
 **Depends on:** Phase 25, Phase 26
 **Requirements:** R034, R018 (supporting)
-**Plans:** 0
+**Plans:** 5 plans
+
+Plans:
+- [ ] 27-01-PLAN.md — Decision checkpoint: where "Present Slideshow" lives after the strip (its only trigger is the panel being removed, and the Slides tab has no replacement)
+- [ ] 27-02-PLAN.md — Rename the first tab and its internal value to Service Order (D-03), plus a stable panel test seam
+- [ ] 27-03-PLAN.md — Strip the imported-deck editor and both section-scoped PPTX import surfaces; delete `ImportedSlideEditor`
+- [ ] 27-04-PLAN.md — Strip the per-plan-item media control and its view-level helpers; delete `SlotMediaAttachment`
+- [ ] 27-05-PLAN.md — Apply the 27-01 decision to the slideshow preview, re-seat the test probes, run the phase-wide gate
+
+**Wave 1** — 27-01 (checkpoint, no source files) · 27-02 (rename)
+**Wave 2** — 27-03 · **Wave 3** — 27-04 · **Wave 4** — 27-05
+*(Waves 2-4 are strictly sequential: every plan edits `ServiceEditorView.vue`.)*
 
 ### Phase 28: Song Lyrics Editor Rework `risk:low`
 
