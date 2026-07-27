@@ -91,6 +91,32 @@ editing — the same reasoning as D-01. It stays on the Service Order tab.
 
 Stated rather than asked, so the planner does not have to invent it. Overridable.
 
+### D-05 — "Present Slideshow" MOVES to the Slides tab *(locked; user decision 2026-07-27, resolves the 27-01 checkpoint)*
+
+**The gap, found during planning:** `SlideshowPreview` carries the **only** trigger for Phase 23's
+`PresentationViewer` (`@present` → `presenting = true`). Verified: `PresentationViewer` is imported by
+exactly one file, and `grep -ri "present" src/components/slides/` returns only prose comments — the
+Slides tab has **no** present affordance. Stripping `SlideshowPreview` would therefore remove the
+ability to present at all.
+
+This is the SECOND instance of the same class of problem as D-01: the ROADMAP's claim that Phase 27
+"runs after 25-26 so the functionality has a new home before it leaves the old one" is false for both
+scripture editing and presenting.
+
+**Decision:** add a **`▶ Present` CTA to the Slides tab**, matching the mockup's page-header treatment,
+and remove `SlideshowPreview` (and its preview list) from the Service Order tab.
+
+**Consequence — this phase is no longer a pure removal.** Phase 27 now builds one small affordance.
+That is a deliberate, user-approved exception to the "do not build anything new" rule; it does NOT
+license building anything else.
+
+**Constraints on the move:**
+- `PresentationViewer.vue` and `PresentationViewer.test.ts` must NOT be deleted or have their
+  assertions disturbed — Phase 23 is code-complete with an **outstanding human-verify checkpoint**.
+- Reuse the existing `presenting` flag and viewer mount rather than introducing a second mechanism.
+- The CTA's enabled/disabled condition should follow the existing `canPresent` logic
+  (Phase 23-04 aliased it to `hasAnySlides`) rather than inventing a new predicate.
+
 ### Claude's Discretion
 
 How far to mechanically align the remaining tab with `9f3700f` (a literal revert is NOT wanted — Phases
