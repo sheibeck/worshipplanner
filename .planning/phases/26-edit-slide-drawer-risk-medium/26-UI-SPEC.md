@@ -98,6 +98,25 @@ already-shipped cuts. Where they disagree, **the decisions win** — restated as
 
 ---
 
+## Visual hierarchy — primary focal point
+
+Resolves `gsd-ui-checker` Dimension 2 FLAG (2026-07-26), mirroring Phase 25's convention.
+
+**While the drawer is open, the drawer IS the visual anchor.** Phase 25's grid — the anchor when the
+drawer is closed — becomes secondary: still fully visible and still interactive (there is deliberately
+no scrim, per D-03, so the user can click a different slide card and have the drawer follow), but no
+longer the thing the eye lands on.
+
+Within the drawer, top-of-scan is the **preview thumbnail**, which answers "which slide am I editing?"
+before any field is read. Reading order: preview → `Slide Label` → `Slide Text` → `Slide Audio` →
+`Notes` → the `Duplicate` / `Delete Slide` actions, with destructive actions last and lowest-contrast.
+
+The selected card in the grid keeps its accent treatment while the drawer is open, so the pairing
+between "what's highlighted in the grid" and "what's in the drawer" stays legible without a scrim to
+enforce it. That pairing is the one hierarchy relationship this screen state must make obvious.
+
+---
+
 ## Spacing Scale
 
 Inherited verbatim from Phase 25 — same tokens, same exceptions, same developer approval. Do not
@@ -108,16 +127,26 @@ re-derive:
 | xs | 4px | Icon-to-text gaps (`gap-1`) |
 | sm | 8px | Compact inline spacing (`gap-2`) |
 | card | 12px | Field block internal padding, drawer section gaps as an app-wide exception (`p-3`) |
-| md | 16px | Drawer horizontal padding (`px-5` ≈ 20px is the actual SongSlideOver value, kept for 1:1 reuse — see note below), section gap (`space-y-5` = 20px) |
-| lg | 24px | Not used inside the drawer this phase |
+| md | 16px | **Drawer horizontal and vertical padding (`px-4 py-4`)** and **section gap (`space-y-4`)** |
+| lg | 24px | Drawer header/footer separation from the scrolling body (`space-y-6` where a stronger break is wanted) |
 
-**Declared, deliberate exception — reuse over idealization.** `SongSlideOver.vue`'s own padding is
-`px-5 py-4` (20px/16px) and its body uses `space-y-5` (20px), not a clean 16px/24px pair from the
-idealized scale. Phase 26 reuses those exact values for the Edit Slide drawer BECAUSE it is
-literally the same component pattern (D-01) — introducing a different padding rhythm here would
-make the drawer visually inconsistent with the panel pattern it is copying. This is the same
-"established-reuse beats idealized-scale" reasoning Phase 25 used for its own 12px/6px exceptions
-below, which this phase also inherits unchanged:
+**No 20px in this spec.** An earlier draft proposed reusing `SongSlideOver.vue`'s literal `px-5` /
+`space-y-5` (20px) on a "1:1 component reuse" argument. `gsd-ui-checker` correctly blocked it as a
+NEW off-scale value distinct from Phase 25's two owner-approved exceptions, and the evidence did not
+support granting a third:
+
+| Class | Measured usage in `src/**/*.vue` |
+|---|---|
+| `px-5` | 8 uses across 4 files |
+| `space-y-5` | 4 uses |
+| `gap-1.5` (for comparison — approved) | **36 uses across 16 files** |
+
+The reuse argument was also factually wrong for section gaps: `SongSlideOver.vue` uses `space-y-6`,
+not `space-y-5`. So the drawer conforms to the already-approved **16px / 24px** tokens instead. This
+needed no new owner sign-off, which is the point — an exception is for a convention the codebase
+genuinely has, not for one component's incidental values.
+
+The two inherited Phase 25 exceptions below stand unchanged:
 
 ### ✅ DEVELOPER-APPROVED EXCEPTION (Spacing — 6px `gap-1.5`, inherited from Phase 25)
 
@@ -450,16 +479,30 @@ Not applicable — no shadcn, no component registry of any kind used in this pro
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS *(expect a re-flag against the ≤2-weight/≤4-size defaults —
-      resolution is the inherited Phase 25 developer sign-off restated above, not a redesign)*
-- [ ] Dimension 5 Spacing: PASS *(expect a re-flag against the 6px `gap-1.5` default — same inherited
-      resolution)*
-- [ ] Dimension 6 Registry Safety: PASS
+Reviewed by `gsd-ui-checker` 2026-07-26; both findings resolved same day.
 
-**Approval:** pending
+- [x] Dimension 1 Copywriting: **PASS**
+- [x] Dimension 2 Visuals: **PASS** — was FLAG (no explicit focal point declared for this screen
+      state). Fixed: see "Visual hierarchy — primary focal point" above.
+- [x] Dimension 3 Color: **PASS**
+- [x] Dimension 4 Typography: **PASS (inherited approved exception)** — the checker correctly verified
+      this spec introduces NO new sizes or weights beyond Phase 25's owner-approved set, and passed it
+      without re-litigating.
+- [x] Dimension 5 Spacing: **PASS** — was BLOCK, and the block was **correct**. An earlier draft
+      self-declared a NEW 20px (`px-5` / `space-y-5`) exception on a "1:1 reuse of `SongSlideOver`"
+      argument. Measurement showed 8 uses across 4 files (vs 36 across 16 for the approved
+      `gap-1.5`), and `SongSlideOver.vue` actually uses `space-y-6`, so the reuse claim was wrong for
+      section gaps. **Resolved by conforming to the approved 16px/24px tokens**, not by requesting a
+      third exception. See the "No 20px in this spec" note in *Spacing Scale*.
+- [x] Dimension 6 Registry Safety: **PASS**
+
+**Compliance check against 26-CONTEXT.md D-01..D-16, the carried-forward cut list, and milestone
+D-18/D-19:** all verified by the checker line by line, no drift. The four flagged researcher judgment
+calls (no scrim on the drawer; keying the Slide Text matrix on `sourceRef.kind`; a scrimmed
+non-dismissible reconciliation modal; `PendingReconciliation` lacking song-name fields) were each
+assessed sound.
+
+**Approval:** APPROVED — 2026-07-26.
 
 > **Note for the checker, planner, and executors:** the Typography and Spacing exceptions in this
 > spec are NOT new requests — they are Phase 25's ALREADY-APPROVED exceptions, restated here because
