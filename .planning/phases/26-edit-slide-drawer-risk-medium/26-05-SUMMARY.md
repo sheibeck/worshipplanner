@@ -214,6 +214,7 @@ status: complete
    - `a3a3096` (feat) — `selectedEntry`/`drawerOpen`/`onDrawerClose`/`selectSlideById`, drawer mounted as a grid sibling
 3. **Task 3: Label and notes apply live, through a fresh-base write**
    - `2cbb987` (test) — dedicated tests for debounce collapsing, per-entry write scoping, the fresh-base CAS guarantee, entry-switch flush, saving/saved/failure status, write-capability gating, and persisted-value re-sync (implementation for this task was authored alongside Task 1's shell in the same component build — see Deviations)
+   - `bc1bfb2` (fix) — type-check fix in the same test file (Promise executor typing)
 
 **Plan metadata:** (this commit) — SUMMARY.md, STATE.md, ROADMAP.md, REQUIREMENTS.md
 
@@ -246,7 +247,7 @@ status: complete
 - **Issue:** `new Promise((resolve) => { resolveWrite = resolve })` typed `resolveWrite` as `(value: unknown) => void` (the executor's inferred `resolve` signature) against a declared `() => void`, failing `vue-tsc --build`.
 - **Fix:** Typed the Promise explicitly as `Promise<void>` so `resolve` narrows to `() => void`.
 - **Files modified:** `src/components/slides/__tests__/EditSlideDrawer.test.ts`
-- **Commit:** `2cbb987`
+- **Commit:** `bc1bfb2`
 
 ### Process deviation (documented, not a Rule 1-4 fix)
 
@@ -280,3 +281,4 @@ None — no external service configuration required.
 - FOUND: c75f6e3 (test)
 - FOUND: a3a3096 (feat)
 - FOUND: 2cbb987 (test)
+- FOUND: bc1bfb2 (fix)
