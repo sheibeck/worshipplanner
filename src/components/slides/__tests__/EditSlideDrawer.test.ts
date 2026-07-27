@@ -514,3 +514,108 @@ describe('EditSlideDrawer (Phase 26-07 Task 1 — per-kind Slide Text)', () => {
   })
 })
 
+describe('EditSlideDrawer (Phase 26-07 Task 2 — hand-written slide edited here)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    mockReplaceGroupSlides.mockReset()
+    mockReplaceGroupSlides.mockResolvedValue(undefined)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it("renders the hand-written slide's editable field with its current text", () => {
+    const { entry, assembledSlide } = makeAuthoredTextFixtures('Current body')
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+    expect((body().find('[data-testid="drawer-slide-text-editable"]').element as HTMLTextAreaElement).value).toBe('Current body')
+  })
+
+  it('writes exactly once after the debounce period following a single edit, replacing only the body on the source ref', async () => {
+    const entryOne = makeEntry({ id: 'entry-1', sourceRef: { kind: 'text', title: 'New slide', body: '' } })
+    const entryTwo = makeEntry({ id: 'entry-2', label: 'Untouched', sourceRef: { kind: 'text', title: 'Other', body: 'Other body' } })
+    const assembledSlide = makeAssembled({ slide: { id: 'entry-1', position: 0, contentKind: 'text', body: '' } as never })
+    mountDrawer({ entry: entryOne, assembledSlide, group: makeGroup({ slides: [entryOne, entryTwo] }) })
+
+    await body().find('[data-testid="drawer-slide-text-editable"]').setValue('New body text')
+    expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(800)
+    expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+
+    const written = mockReplaceGroupSlides.mock.calls[0]![2] as GroupSlideEntry[]
+    const writtenOne = written.find((e) => e.id === 'entry-1')!
+    expect(writtenOne.sourceRef).toEqual({ kind: 'text', title: 'New slide', body: 'New body text' })
+    expect(writtenOne.order).toBe(entryOne.order)
+    expect(written.find((e) => e.id === 'entry-2')).toEqual(entryTwo)
+  })
+
+  it("preserves the source ref's other members (the short default title) across the write", async () => {
+    const entry = makeEntry({ id: 'entry-1', sourceRef: { kind: 'text', title: 'New slide', body: '' } })
+    const assembledSlide = makeAssembled({ slide: { id: 'entry-1', position: 0, contentKind: 'text', body: '' } as never })
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+
+    await body().find('[data-testid="drawer-slide-text-editable"]').setValue('Body only changed')
+    await vi.advanceTimersByTimeAsync(800)
+
+    const written = mockReplaceGroupSlides.mock.calls[0]![2] as GroupSlideEntry[]
+    const writtenEntry = written.find((e) => e.id === 'entry-1')!
+    expect(writtenEntry.sourceRef.kind).toBe('text')
+    expect((writtenEntry.sourceRef as { title?: string }).title).toBe('New slide')
+  })
+
+  it('never re-mints the entry id or order while editing', async () => {
+    const entry = makeEntry({ id: 'entry-1', order: 3, sourceRef: { kind: 'text', title: 'New slide', body: '' } })
+    const assembledSlide = makeAssembled({ slide: { id: 'entry-1', position: 0, contentKind: 'text', body: '' } as never })
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+
+    await body().find('[data-testid="drawer-slide-text-editable"]').setValue('Changed')
+    await vi.advanceTimersByTimeAsync(800)
+
+    const written = mockReplaceGroupSlides.mock.calls[0]![2] as GroupSlideEntry[]
+    const writtenEntry = written.find((e) => e.id === 'entry-1')!
+    expect(writtenEntry.id).toBe('entry-1')
+    expect(writtenEntry.order).toBe(3)
+  })
+
+  it('flushes a pending body write when the edited entry switches mid-edit', async () => {
+    const entryOne = makeEntry({ id: 'entry-1', sourceRef: { kind: 'text', title: 'New slide', body: '' } })
+    const entryTwo = makeEntry({ id: 'entry-2', sourceRef: { kind: 'text', title: 'Other', body: 'Other body' } })
+    const assembledSlide = makeAssembled({ slide: { id: 'entry-1', position: 0, contentKind: 'text', body: '' } as never })
+    const wrapper = mountDrawer({ entry: entryOne, assembledSlide, group: makeGroup({ slides: [entryOne, entryTwo] }) })
+
+    await body().find('[data-testid="drawer-slide-text-editable"]').setValue('Changed before leaving')
+    await wrapper.setProps({
+      entry: entryTwo,
+      assembledSlide: makeAssembled({ slide: { id: 'entry-2', position: 0, contentKind: 'text', body: 'Other body' } as never }),
+    })
+    await flushPromises()
+
+    expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+    const written = mockReplaceGroupSlides.mock.calls[0]![2] as GroupSlideEntry[]
+    expect((written.find((e) => e.id === 'entry-1')!.sourceRef as { body?: string }).body).toBe('Changed before leaving')
+  })
+
+  it('surfaces a failure (never a false saved state) on a rejected write, and does not revert the typed value', async () => {
+    mockReplaceGroupSlides.mockRejectedValueOnce(new Error('write failed'))
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { entry, assembledSlide } = makeAuthoredTextFixtures('')
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+
+    await body().find('[data-testid="drawer-slide-text-editable"]').setValue('Changed')
+    await vi.advanceTimersByTimeAsync(800)
+    await flushPromises()
+
+    expect(body().find('[data-testid="drawer-status"]').text()).not.toBe('Saved')
+    expect((body().find('[data-testid="drawer-slide-text-editable"]').element as HTMLTextAreaElement).value).toBe('Changed')
+    consoleErrorSpy.mockRestore()
+  })
+
+  it('renders no editable field for a user without write capability, while the text still reads', () => {
+    const { entry, assembledSlide } = makeAuthoredTextFixtures('Read me')
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }), isEditor: false })
+    expect(body().find('[data-testid="drawer-slide-text-editable"]').exists()).toBe(false)
+    expect(body().find('[data-testid="drawer-slide-text-readonly"]').text()).toBe('Read me')
+  })
+})
+
