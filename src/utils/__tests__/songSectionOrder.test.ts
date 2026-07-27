@@ -8,6 +8,7 @@ import {
   mintSectionId,
   moveRow,
   normalizeLyricOrder,
+  normalizeParsedSections,
   removeRow,
   uniqueSectionLabel,
 } from '@/utils/songSectionOrder'
@@ -243,5 +244,104 @@ describe('uniqueSectionLabel', () => {
 describe('ADD_SECTION_KINDS', () => {
   it('holds the five quick-add kinds in mockup order', () => {
     expect(ADD_SECTION_KINDS).toEqual(['Verse', 'Chorus', 'Bridge', 'Tag', 'Ending'])
+  })
+})
+
+describe('normalizeParsedSections', () => {
+  it('normalises a repeat marker (second Chorus block has no lines) into one pooled section referenced twice', () => {
+    const parsed = {
+      sections: [
+        { id: 'chorus', label: 'Chorus', lines: ['Grace grace', 'How wonderful', 'Amazing', 'Sweet'] },
+        { id: 'verse-1', label: 'Verse 1', lines: ['How sweet', 'The sound'] },
+        { id: 'chorus', label: 'Chorus', lines: [] },
+      ],
+    }
+
+    const result = normalizeParsedSections(parsed)
+
+    expect(result.sections).toHaveLength(2)
+    expect(result.performanceOrder).toHaveLength(3)
+    expect(result.performanceOrder[0]).toBe(result.performanceOrder[2])
+    expect(result.performanceOrder[0]).toBe('chorus')
+    expect(result.performanceOrder[1]).toBe('verse-1')
+  })
+
+  it('normalises two Chorus blocks with IDENTICAL lines into one pooled section, two order entries', () => {
+    const lines = ['Grace grace', 'How wonderful']
+    const parsed = {
+      sections: [
+        { id: 'chorus', label: 'Chorus', lines: [...lines] },
+        { id: 'chorus', label: 'Chorus', lines: [...lines] },
+      ],
+    }
+
+    const result = normalizeParsedSections(parsed)
+
+    expect(result.sections).toHaveLength(1)
+    expect(result.performanceOrder).toEqual(['chorus', 'chorus'])
+  })
+
+  it('treats trailing-whitespace-only differences as identical (repeat), not distinct', () => {
+    const parsed = {
+      sections: [
+        { id: 'chorus', label: 'Chorus', lines: ['Grace grace  ', 'How wonderful'] },
+        { id: 'chorus', label: 'Chorus', lines: ['Grace grace', 'How wonderful  '] },
+      ],
+    }
+
+    const result = normalizeParsedSections(parsed)
+    expect(result.sections).toHaveLength(1)
+    expect(result.performanceOrder).toEqual(['chorus', 'chorus'])
+  })
+
+  it('keeps two Chorus blocks with DIFFERENT non-empty lines as two distinct pooled sections', () => {
+    const parsed = {
+      sections: [
+        { id: 'chorus', label: 'Chorus', lines: ['Grace grace', 'How wonderful'] },
+        { id: 'chorus', label: 'Chorus', lines: ['Totally different', 'Second set of words'] },
+      ],
+    }
+
+    const result = normalizeParsedSections(parsed)
+
+    expect(result.sections).toHaveLength(2)
+    expect(result.sections[0]?.label).toBe('Chorus')
+    expect(result.sections[1]?.label).toBe('Chorus')
+    expect(result.sections[0]?.id).not.toBe(result.sections[1]?.id)
+    expect(result.performanceOrder).toHaveLength(2)
+    expect(result.performanceOrder[0]).toBe(result.sections[0]?.id)
+    expect(result.performanceOrder[1]).toBe(result.sections[1]?.id)
+  })
+
+  it('passes through a parse result with no repeated ids unchanged', () => {
+    const parsed = {
+      sections: [
+        { id: 'verse-1', label: 'Verse 1', lines: ['a', 'b'] },
+        { id: 'chorus', label: 'Chorus', lines: ['c', 'd'] },
+        { id: 'bridge', label: 'Bridge', lines: ['e'] },
+      ],
+    }
+
+    const result = normalizeParsedSections(parsed)
+
+    expect(result.sections).toEqual(parsed.sections)
+    expect(result.performanceOrder).toEqual(['verse-1', 'chorus', 'bridge'])
+  })
+
+  it('returns a pair that already satisfies the pool/order invariants', () => {
+    const parsed = {
+      sections: [
+        { id: 'chorus', label: 'Chorus', lines: ['Grace grace', 'How wonderful'] },
+        { id: 'verse-1', label: 'Verse 1', lines: ['How sweet', 'The sound'] },
+        { id: 'chorus', label: 'Chorus', lines: [] },
+        { id: 'chorus', label: 'Chorus', lines: ['Totally different'] },
+      ],
+    }
+
+    const result = normalizeParsedSections(parsed)
+    const renormalized = normalizeLyricOrder(result.sections, result.performanceOrder)
+
+    expect(renormalized.sections).toEqual(result.sections)
+    expect(renormalized.performanceOrder).toEqual(result.performanceOrder)
   })
 })
