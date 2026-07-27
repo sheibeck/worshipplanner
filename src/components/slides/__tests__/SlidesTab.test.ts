@@ -516,6 +516,33 @@ describe('SlidesTab', () => {
     })
   })
 
+  describe('Present CTA (D-05, Phase 27-05, WR-01)', () => {
+    it('renders the Present button', () => {
+      const wrapper = mountTab({ slots: [] })
+      expect(wrapper.find('[data-testid="present-slideshow-cta"]').exists()).toBe(true)
+    })
+
+    it('disables the Present button when there are no assembled slides, and enables it once there are', async () => {
+      const wrapper = mountTab({ slots: [], assembledSlideshow: [] })
+      await wrapper.vm.$nextTick()
+      expect(wrapper.find('[data-testid="present-slideshow-cta"]').attributes('disabled')).toBeDefined()
+
+      await wrapper.setProps({ assembledSlideshow: [makeAssembled(0, 'slide-1')] })
+      await wrapper.vm.$nextTick()
+      expect(wrapper.find('[data-testid="present-slideshow-cta"]').attributes('disabled')).toBeUndefined()
+    })
+
+    it('emits present exactly once when clicked while enabled', async () => {
+      const wrapper = mountTab({ slots: [], assembledSlideshow: [makeAssembled(0, 'slide-1')] })
+      await wrapper.vm.$nextTick()
+
+      await wrapper.find('[data-testid="present-slideshow-cta"]').trigger('click')
+
+      expect(wrapper.emitted('present')).toBeTruthy()
+      expect(wrapper.emitted('present')).toHaveLength(1)
+    })
+  })
+
   describe('Duplicate follows the copy (Phase 26-09 Task 2)', () => {
     it("selects the new entry and shows it in the panel when the drawer's duplicate event fires", async () => {
       const slots: ServiceSlot[] = [makeSlot({ kind: 'SONG', id: 'slot-a', position: 0 })]
