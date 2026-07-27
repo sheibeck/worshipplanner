@@ -1376,3 +1376,129 @@ describe('ServiceEditorView - Slides tab (Phase 25-03)', () => {
     expect(firstTabBtn?.text()).toBe('Music')
   })
 })
+
+// ── "Edit in scripture" plumbing (Phase 26-03, D-15) ────────────────────────────
+// The drawer built in 26-05/26-07 relays a request up through SlidesTab's
+// `navigate-to-scripture-editor` event. Here the SlidesTab is shallow-mount
+// stubbed, so tests emit that event directly on the stub — the same seam a
+// real drawer will use once wired.
+
+describe('ServiceEditorView - Edit in scripture plumbing (Phase 26-03)', () => {
+  async function mountView() {
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          RouterLink: { template: '<a><slot /></a>' },
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+        },
+      },
+    })
+  }
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockServicesList = [mockService]
+  })
+
+  it('switches to the Music tab and expands the requested scripture plan item\'s editor', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    // Start on the Slides tab so the tab switch is observable.
+    const slidesBtn = wrapper.findAll('button').find((b) => b.text() === 'Slides')
+    await slidesBtn!.trigger('click')
+    await wrapper.vm.$nextTick()
+    expect(isVShowHidden(wrapper.findComponent(SlideshowPreview))).toBe(true)
+
+    // slot-1 is the populated SCRIPTURE plan item (raw array index 1).
+    await wrapper.findComponent(SlidesTab).vm.$emit('navigate-to-scripture-editor', 1)
+    await wrapper.vm.$nextTick()
+    await wrapper.vm.$nextTick()
+
+    expect(isVShowHidden(wrapper.findComponent(SlideshowPreview))).toBe(false)
+    const panel = wrapper.find('[data-scripture-panel-index="1"]')
+    expect(panel.exists()).toBe(true)
+  })
+
+  it('asking twice never collapses the editor — the second request is a no-op, not a toggle', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    await wrapper.findComponent(SlidesTab).vm.$emit('navigate-to-scripture-editor', 1)
+    await wrapper.vm.$nextTick()
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('[data-scripture-panel-index="1"]').exists()).toBe(true)
+
+    await wrapper.findComponent(SlidesTab).vm.$emit('navigate-to-scripture-editor', 1)
+    await wrapper.vm.$nextTick()
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('[data-scripture-panel-index="1"]').exists()).toBe(true)
+  })
+
+  it('the existing hand-operated button still opens then closes on alternate clicks', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const btn = wrapper.find('[data-testid="edit-scripture-slides-btn"]')
+    expect(btn.exists()).toBe(true)
+
+    await btn.trigger('click')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('[data-testid="scripture-editor-panel"]').exists()).toBe(true)
+
+    await btn.trigger('click')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('[data-testid="scripture-editor-panel"]').exists()).toBe(false)
+  })
+
+  it('an out-of-range index changes nothing and does not throw', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    expect(() => wrapper.findComponent(SlidesTab).vm.$emit('navigate-to-scripture-editor', 999)).not.toThrow()
+    await wrapper.vm.$nextTick()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('[data-testid="scripture-editor-panel"]').exists()).toBe(false)
+  })
+
+  it('a request naming a non-scripture plan item changes nothing', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    // slot-0 is a SONG plan item.
+    await wrapper.findComponent(SlidesTab).vm.$emit('navigate-to-scripture-editor', 0)
+    await wrapper.vm.$nextTick()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('[data-testid="scripture-editor-panel"]').exists()).toBe(false)
+  })
+
+  it('expanding one plan item\'s editor never expands or collapses another\'s', async () => {
+    // Make both slot-1 and slot-4 populated scripture items so two panels can exist.
+    const twoScriptureService: Service = {
+      ...mockService,
+      slots: mockService.slots.map((slot) =>
+        slot.id === 'slot-4'
+          ? { ...slot, book: 'John', chapter: 3, verseStart: 16, verseEnd: 16 }
+          : slot,
+      ),
+    }
+    mockServicesList = [twoScriptureService]
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    await wrapper.findComponent(SlidesTab).vm.$emit('navigate-to-scripture-editor', 1)
+    await wrapper.vm.$nextTick()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('[data-scripture-panel-index="1"]').exists()).toBe(true)
+    expect(wrapper.find('[data-scripture-panel-index="4"]').exists()).toBe(false)
+  })
+})
