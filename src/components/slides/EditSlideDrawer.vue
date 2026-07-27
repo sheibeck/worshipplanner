@@ -185,6 +185,108 @@
             </template>
           </div>
 
+          <!-- Phase 26-08: Slide Audio — omitted entirely for a video slide
+               (D-12, a hard v-if, never a disabled-looking block): the video
+               carries its own audio and already suppresses the group's bed
+               for its own duration (25-REVIEW-FIX WR-01), so offering a
+               second audio attachment here would recreate the exact
+               conflict the model was built to prevent. -->
+          <div v-if="!isVideo" data-testid="drawer-audio-section">
+            <label class="block text-xs font-medium text-gray-400 mb-1">Slide Audio</label>
+
+            <!-- Scope choice (D-09): governs which write route the NEXT
+                 attach takes. Rendered in every audio state (not just
+                 "nothing attached") so it can still be changed ahead of a
+                 future attach — changing it here never moves an
+                 already-attached file (26-UI-SPEC.md § Slide Audio, last
+                 paragraph). -->
+            <div v-if="isEditor" class="flex flex-wrap items-center gap-2 mb-2" data-testid="audio-scope-choice">
+              <span class="text-[11px] text-gray-500">Play this audio for</span>
+              <button
+                type="button"
+                class="px-2.5 py-1 rounded-md text-xs font-medium border transition-colors"
+                :class="scopeChoice === 'slide' ? AUDIO_SCOPE_ACTIVE_CLASS : AUDIO_SCOPE_INACTIVE_CLASS"
+                data-testid="audio-scope-slide"
+                @click="scopeChoice = 'slide'"
+              >This slide only</button>
+              <button
+                type="button"
+                class="px-2.5 py-1 rounded-md text-xs font-medium border transition-colors"
+                :class="scopeChoice === 'group' ? AUDIO_SCOPE_ACTIVE_CLASS : AUDIO_SCOPE_INACTIVE_CLASS"
+                data-testid="audio-scope-group"
+                @click="scopeChoice = 'group'"
+              >All slides in this group</button>
+            </div>
+
+            <!-- File row: whichever audio actually covers this slide right
+                 now (the slide's own audio wins over the group bed, D-10).
+                 Rendered regardless of isEditor so a viewer still hears/sees
+                 what's attached — only the Remove control below is gated. -->
+            <div v-if="audioState" class="rounded-md bg-gray-800 border border-gray-700 p-2" data-testid="audio-file-row">
+              <div class="flex flex-wrap items-center gap-1.5">
+                <span class="min-w-0 flex-1 truncate text-[13px] text-gray-200" data-testid="audio-file-name">{{ attachedAudioFileName }}</span>
+                <!-- The shared AudioPlayer does not preload and reports no
+                     duration today (26-UI-SPEC.md § Slide Audio) — this stays
+                     unset rather than a placeholder/zero; see the ref's own
+                     comment below. -->
+                <span v-if="audioDurationText" class="text-[11px] text-gray-500" data-testid="audio-duration">{{ audioDurationText }}</span>
+                <span v-if="audioFailed" class="text-[11px] font-medium text-red-400" data-testid="audio-unavailable">Unavailable</span>
+                <button
+                  v-if="isEditor"
+                  type="button"
+                  class="text-xs text-gray-500 hover:text-red-400 transition-colors"
+                  data-testid="audio-remove"
+                  @click="onRemoveAudio"
+                >Remove</button>
+              </div>
+              <p v-if="audioState === 'group'" class="mt-1 text-[11px] text-gray-500" data-testid="audio-shared-caption">Shared with every other slide in this group</p>
+              <!-- This drawer's OWN failure ref/handler (26-RESEARCH.md
+                   Pitfall 6) — AudioPlayer itself renders no degraded-state
+                   text of its own, it only emits `error`; the "Unavailable"
+                   badge above is this panel's responsibility, mirroring
+                   PresentationViewer.vue's mediaFailed pattern, not a prop on
+                   the shared player. -->
+              <AudioPlayer chromeless :src="attachedAudioUrl" :loop="loopChecked" @error="onAudioError" />
+            </div>
+
+            <!-- Attach affordance: only where nothing covers this slide yet
+                 — SlotMediaAttachment.vue's own empty-state markup, reused
+                 verbatim (same copy, same file input) rather than a second
+                 upload UI. -->
+            <div v-else-if="isEditor" class="flex items-center gap-1.5" data-testid="audio-attach">
+              <label class="text-[11px] font-medium text-gray-400">Audio</label>
+              <input
+                type="file"
+                accept="audio/*"
+                data-testid="audio-attach-input"
+                class="text-[11px] text-gray-400 file:mr-1 file:rounded file:border-0 file:bg-gray-700 file:px-2 file:py-0.5 file:text-gray-200 w-40"
+                @change="onAudioFileSelected"
+              />
+            </div>
+
+            <p v-if="audioUploadIsUploading" data-testid="audio-upload-progress" class="mt-1 text-[11px] text-indigo-400">
+              Uploading... {{ Math.round(audioUploadProgress) }}%
+            </p>
+            <p v-if="audioUploadError" data-testid="audio-upload-error" class="mt-1 text-[11px] text-red-400">{{ audioUploadError }}</p>
+
+            <!-- Loop (D-11): meaningful only where audio actually plays —
+                 omitted entirely in the "nothing attached" state. -->
+            <div v-if="audioState" class="mt-2 flex items-start gap-1.5" data-testid="audio-loop-row">
+              <input
+                id="edit-slide-drawer-audio-loop"
+                type="checkbox"
+                :checked="loopChecked"
+                :disabled="loopDisabled"
+                data-testid="audio-loop-checkbox"
+                @change="onLoopToggle"
+              />
+              <div>
+                <label for="edit-slide-drawer-audio-loop" class="text-xs text-gray-300">&#9635; Loop until the next slide</label>
+                <p v-if="loopDisabled" class="text-[11px] text-gray-500" data-testid="audio-loop-disabled-note">Group music doesn't loop — it plays continuously across the group.</p>
+              </div>
+            </div>
+          </div>
+
           <div v-if="isEditor">
             <label class="block text-xs font-medium text-gray-400 mb-1" for="edit-slide-drawer-notes">Notes (operator only)</label>
             <textarea
@@ -224,9 +326,11 @@ import type { ServiceSlot } from '@/types/service'
 import type { AssembledSlide, ImageSlide, CopyrightSlide, ScriptureSlide } from '@/types/slide'
 import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
 import { useSlideGroups } from '@/stores/slideGroups'
-import { KIND_BADGE_CLASSES, slotDisplayTitle, slideBodyText } from './slideDisplay'
+import { KIND_BADGE_CLASSES, slotDisplayTitle, slideBodyText, bedAudioLabel } from './slideDisplay'
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import { buildSongEditLink, type SongEditTab } from '@/utils/songEditLink'
+import { useMediaUpload } from '@/composables/useMediaUpload'
+import AudioPlayer from '../AudioPlayer.vue'
 
 const props = defineProps<{
   open: boolean
@@ -356,6 +460,177 @@ const importedText = computed(() => {
 const SONG_TEXT_CAPTION = "From the song's Lyrics tab — editing there updates every service using this song."
 const SCRIPTURE_TEXT_CAPTION = 'Pulled from the passage reference — editing the reference updates this slide.'
 const IMPORTED_TEXT_CAPTION = 'From the imported file — re-import to change it.'
+
+// ── Phase 26-08: Slide Audio — scope, loop, and the video omission (D-09..D-12) ──
+
+/** Reserved accent (26-UI-SPEC.md § Color) — applied to exactly the selected scope pill, never the inactive one. Static class maps, never a built string (Tailwind v4 purge safety). */
+const AUDIO_SCOPE_ACTIVE_CLASS = 'bg-indigo-600 border-indigo-500 text-white'
+const AUDIO_SCOPE_INACTIVE_CLASS = 'border-gray-700 text-gray-300'
+
+/**
+ * The user's pending choice for the NEXT attach (D-09) — reset from the
+ * entry's stored `audioScope` whenever the edited entry changes (see
+ * `resetLocalFields`), defaulting to `'slide'` when unset (26-UI-SPEC.md's
+ * declared default). Changing this NEVER moves an already-attached file —
+ * it only governs which write route a future attach takes.
+ */
+const scopeChoice = ref<'slide' | 'group'>('slide')
+
+/**
+ * Which audio actually covers this slide right now, in the assembler's own
+ * precedence order (D-10: a slide's own audio wins while it is up) —
+ * independent of `scopeChoice`, which is only the pending choice for a
+ * FUTURE attach. `null` means neither exists yet ("nothing attached").
+ */
+const audioState = computed<'slide' | 'group' | null>(() => {
+  if (props.entry?.audioUrl) return 'slide'
+  if (props.group?.bedAudioUrl) return 'group'
+  return null
+})
+
+const attachedAudioUrl = computed(() => {
+  if (audioState.value === 'slide') return props.entry?.audioUrl ?? ''
+  if (audioState.value === 'group') return props.group?.bedAudioUrl ?? ''
+  return ''
+})
+
+/** Derived from the stored address (not anything held only in memory) so a reload still shows a name — same helper the group music bar already uses. */
+const attachedAudioFileName = computed(() => (attachedAudioUrl.value ? bedAudioLabel(attachedAudioUrl.value) : ''))
+
+/**
+ * The shared `AudioPlayer` does not preload (`preload="none"`) and exposes no
+ * duration today — this stays permanently unset in this component rather
+ * than a placeholder or a zero (26-UI-SPEC.md § Slide Audio: "record if this
+ * turns out to be always absent in practice, rather than changing the shared
+ * player to obtain it" — see Known Stubs in the plan's SUMMARY). Kept as a
+ * real ref, not a hardcoded `false`, so a future duration source can
+ * populate it without touching the template.
+ */
+const audioDurationText = ref<string | null>(null)
+
+const loopChecked = computed(() => audioState.value === 'slide' && !!props.entry?.audioLoop)
+/** D-11: a group bed never loops — disabled and unchecked whenever the group's shared music is what's shown. */
+const loopDisabled = computed(() => audioState.value === 'group')
+
+function onLoopToggle(event: Event): void {
+  // Belt-and-suspenders alongside the DOM `disabled` attribute — a group-bed
+  // state must never be able to issue a loop write, no matter how the event
+  // arrived.
+  if (audioState.value !== 'slide' || !props.group || !props.entry) return
+  const checked = (event.target as HTMLInputElement).checked
+  const entryId = props.entry.id
+  const base = props.group.slides
+  const next = base.map((e) => (e.id === entryId ? { ...e, audioLoop: checked } : e))
+  void slideGroupsStore.replaceGroupSlides(props.orgId, props.group.slotId, next, props.group.sourceSignature, base)
+}
+
+/** This drawer's OWN failure state (26-RESEARCH.md Pitfall 6) — `AudioPlayer` is a deliberately dumb primitive that only emits `error`, it renders no degraded-state text of its own. Reset whenever the attached file or the edited slide changes, so a stale failure never sticks to a different file (see the two watchers below). */
+const audioFailed = ref(false)
+
+function onAudioError(): void {
+  audioFailed.value = true
+}
+
+watch(attachedAudioUrl, () => {
+  audioFailed.value = false
+})
+watch(
+  () => props.entry?.id,
+  () => {
+    audioFailed.value = false
+  },
+)
+
+const {
+  progress: audioUploadProgress,
+  error: audioUploadError,
+  isUploading: audioUploadIsUploading,
+  uploadMedia: uploadAudioMedia,
+  reset: resetAudioUpload,
+} = useMediaUpload()
+
+/** This-slide-only attach (D-09): writes the entry's own `audioUrl` through the fresh-base helper and stamps the entry's scope for round-trip display. */
+async function attachSlideAudio(url: string): Promise<void> {
+  if (!props.group || !props.entry) return
+  const entryId = props.entry.id
+  const base = props.group.slides
+  const next = base.map((e) => (e.id === entryId ? { ...e, audioUrl: url, audioScope: 'slide' as const } : e))
+  await slideGroupsStore.replaceGroupSlides(props.orgId, props.group.slotId, next, props.group.sourceSignature, base)
+}
+
+/**
+ * Whole-group attach (D-09): writes the GROUP'S shared music via the same
+ * `setGroupBedMedia` the grid's own music bar uses — never a per-entry copy
+ * of the URL — then stamps this entry's `audioScope` for round-trip display
+ * only, leaving `audioUrl` unset (attach only ever runs from the "nothing
+ * attached" state, so there is nothing to unset here).
+ */
+async function attachGroupAudio(url: string): Promise<void> {
+  if (!props.group || !props.entry) return
+  await slideGroupsStore.setGroupBedMedia(props.orgId, props.group.slotId, {
+    serviceId: props.serviceId,
+    bedAudioUrl: url,
+  })
+  const entryId = props.entry.id
+  const base = props.group.slides
+  const next = base.map((e) => (e.id === entryId ? { ...e, audioScope: 'group' as const } : e))
+  await slideGroupsStore.replaceGroupSlides(props.orgId, props.group.slotId, next, props.group.sourceSignature, base)
+}
+
+async function onAudioFileSelected(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+
+  resetAudioUpload()
+  try {
+    const url = await uploadAudioMedia(file, props.orgId)
+    if (scopeChoice.value === 'group') {
+      await attachGroupAudio(url)
+    } else {
+      await attachSlideAudio(url)
+    }
+  } catch {
+    // uploadAudioMedia already set the composable's reactive `error` —
+    // surfaced via audio-upload-error above. Deliberately no write on
+    // failure, so a failed upload can never clear or overwrite an existing
+    // attachment (matches SlideGroupMusicControl.vue/SlotMediaAttachment.vue's
+    // identical no-emit-on-failure contract).
+  }
+}
+
+/** Targets whichever audio is actually shown right now (`audioState`), never `scopeChoice` — Remove always acts on what's covering the slide, not on the pending choice for a future attach. */
+async function onRemoveAudio(): Promise<void> {
+  if (audioState.value === 'slide') {
+    await removeSlideAudio()
+  } else if (audioState.value === 'group') {
+    await removeGroupAudio()
+  }
+}
+
+/** Writes the entry WITHOUT the `audioUrl` key (never the key set to `undefined`, per this plan's key_links) — leaves the group's shared music untouched. */
+async function removeSlideAudio(): Promise<void> {
+  if (!props.group || !props.entry) return
+  const entryId = props.entry.id
+  const base = props.group.slides
+  const next = base.map((e) => {
+    if (e.id !== entryId) return e
+    const rest = { ...e }
+    delete rest.audioUrl
+    return rest
+  })
+  await slideGroupsStore.replaceGroupSlides(props.orgId, props.group.slotId, next, props.group.sourceSignature, base)
+}
+
+/** Clears the GROUP'S bed via the explicit `clearAudio` flag — an undefined URL is not a clear, since `stripUndefined()` would strip that intent before Firestore ever saw it (mirrors `SlideGrid.vue`'s own `onRemoveGroupMusic`). */
+async function removeGroupAudio(): Promise<void> {
+  if (!props.group) return
+  await slideGroupsStore.setGroupBedMedia(props.orgId, props.group.slotId, {
+    serviceId: props.serviceId,
+    clearAudio: true,
+  })
+}
 
 // ── Task 3: label/notes/body fields, applied live through a fresh-base write ──
 
@@ -514,6 +789,10 @@ function resetLocalFields(entry: GroupSlideEntry | null): void {
   localLabel.value = entry?.label ?? ''
   localNotes.value = entry?.notes ?? ''
   localBody.value = entry?.sourceRef.kind === 'text' ? (entry.sourceRef.body ?? '') : ''
+  // 26-08: the pending scope choice for a FUTURE attach — restored from the
+  // entry's own stored value so a reload shows the right pill selected
+  // (26-UI-SPEC.md's declared default of 'slide' when unset).
+  scopeChoice.value = entry?.audioScope ?? 'slide'
   void nextTick().then(() => {
     syncing = false
   })
