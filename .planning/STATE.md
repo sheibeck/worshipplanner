@@ -56,6 +56,31 @@ Phases 20, 21, 22 and 23 are all code-complete; only their deferred human-verify
 |-------|-------|-------------|-------|
 | 24 Slide Group Model and Migration | 6/6 | 1 critical + 2 warning, all fixed | See `24-REVIEW.md` / `24-REVIEW-FIX.md` |
 | 25 Slides Tab Shell — Plan Rail and Slide Grid | 7/7 | 2 critical + 2 warning, all fixed | See `25-REVIEW.md` / `25-REVIEW-FIX.md`. Also carries the mid-phase D-18/D-19 model deletion. |
+| 26 Edit Slide Drawer | 9/9 | 3 critical + 1 warning, all fixed | See `26-REVIEW.md` / `26-REVIEW-FIX.md`. **Closed Phase 24+25's deferred reconciliation-confirm debt.** |
+
+**Phase 26 shipped:** `EditSlideDrawer.vue` (scrimless floating panel that follows the grid selection),
+`ReconcileConfirmModal.vue`, per-kind slide text keyed on `sourceRef.kind`, "Edit in song" via a new
+`songEditLink.ts` query convention (`/songs` had no per-song route), "Edit in scripture" via new
+`SlideGrid → SlidesTab → ServiceEditorView` relay plus an expand-only entry point, slide audio with
+scope + loop, `Duplicate`, and delete behind a warning naming what is lost.
+
+**Phase 26 closed the reconciliation debt** Phases 24 and 25 both deferred: `SlideGroup.dismissedSignature`
++ `dismissReconciliation` give a per-divergence durable dismissal, and `ReconcileResult.songSwap` carries
+the old/new song ids so the song-identity-swap confirm (Phase 24's CR-01 blocker) can name both songs.
+The Phase 25 limitation where a diverged group was stuck showing a passive banner is resolved.
+
+**Latent defect found and fixed during Phase 26 (26-09 Task 1):** `reconcileSongGroup` indexed stored
+lyric entries into a `Map` keyed by `sectionId`, so a *duplicated* lyric entry would have been silently
+dropped on the next additive reconciliation — with no confirm gate, because the additive path has none.
+Fixed (`storedBySectionId` is now an array) before `Duplicate` shipped.
+
+**Phase 26 items for batch human-verify:** drawer floats with no reflow underneath (R033); the grid stays
+clickable with the drawer open (no scrim, D-03); whether the reconciliation warning is concrete enough
+WITHOUT a diff (D-06 — the user traded the diff away, so this is the accepted-trade-off check); and both
+"Edit in song" / "Edit in scripture" links landing correctly.
+
+**Known Phase 26 stub:** `audioDurationText` is permanently unset — the shared `AudioPlayer.vue` uses
+`preload="none"` and exposes no duration signal. Documented rather than worked around.
 
 **Phase 25 shipped:** the third **Slides** tab in `ServiceEditorView`; `src/components/slides/`
 (`SlidesTab`, `SlidePlanRail`, `SlideGrid`, `SlideCard`, `SlideDropTarget`, `SlideGroupMusicControl`,
