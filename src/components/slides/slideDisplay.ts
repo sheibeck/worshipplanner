@@ -216,6 +216,31 @@ export function reconciliationConfirmCopy(
 }
 
 /**
+ * The Edit Slide drawer's delete-confirm body (26-UI-SPEC.md § "Duplicate and
+ * Delete Slide", Phase 24 D-03 precedent) — the four wordings, reproduced
+ * verbatim, branching on whether THIS entry (never the group) has its own
+ * attached audio and/or operator notes. `entry.audioUrl` is the entry's OWN
+ * per-slide audio, distinct from the group's shared bed music
+ * (`SlideGroup.bedAudioUrl`) — deleting a slide never touches the bed, and
+ * this wording must never imply otherwise by naming media that belongs to
+ * the group instead of the slide.
+ */
+export function deleteSlideConfirmBody(entry: GroupSlideEntry): string {
+  const hasAudio = !!entry.audioUrl
+  const hasNotes = !!entry.notes
+  if (hasAudio && hasNotes) {
+    return 'Deleting this slide also removes its attached audio and operator notes. This cannot be undone.'
+  }
+  if (hasAudio) {
+    return 'Deleting this slide also removes its attached audio. This cannot be undone.'
+  }
+  if (hasNotes) {
+    return 'Deleting this slide also removes its operator notes. This cannot be undone.'
+  }
+  return 'Delete this slide? This cannot be undone.'
+}
+
+/**
  * Extracts a human-readable filename from a Firebase Storage download URL
  * (`useMediaUpload`'s upload path is `orgs/{orgId}/media/{mediaId}/{fileName}`).
  * Used by the rail's group-music line to name the bed (25-UI-SPEC.md

@@ -7,6 +7,7 @@ import {
   slideFooterLabel,
   bedAudioLabel,
   reconciliationConfirmCopy,
+  deleteSlideConfirmBody,
   type PendingReconciliation,
 } from '../slideDisplay'
 import type { ServiceSlot, SlotKind, SongSlot } from '@/types/service'
@@ -417,6 +418,51 @@ describe('slideDisplay', () => {
       }
       expect(heading).not.toContain('\n')
       expect(body).not.toContain('\n')
+    })
+  })
+
+  describe('deleteSlideConfirmBody (Phase 26-09 Task 3)', () => {
+    function makeEntry(overrides: Partial<GroupSlideEntry> = {}): GroupSlideEntry {
+      return { id: 'entry-1', order: 0, sourceRef: { kind: 'text' }, ...overrides }
+    }
+
+    it('names both attached audio and operator notes when both are present', () => {
+      const entry = makeEntry({ audioUrl: 'https://example.com/a.mp3', notes: 'Some note' })
+      expect(deleteSlideConfirmBody(entry)).toBe(
+        'Deleting this slide also removes its attached audio and operator notes. This cannot be undone.',
+      )
+    })
+
+    it('names only attached audio when notes are absent', () => {
+      const entry = makeEntry({ audioUrl: 'https://example.com/a.mp3' })
+      expect(deleteSlideConfirmBody(entry)).toBe(
+        'Deleting this slide also removes its attached audio. This cannot be undone.',
+      )
+    })
+
+    it('names only operator notes when audio is absent', () => {
+      const entry = makeEntry({ notes: 'Some note' })
+      expect(deleteSlideConfirmBody(entry)).toBe(
+        'Deleting this slide also removes its operator notes. This cannot be undone.',
+      )
+    })
+
+    it('states the plain case when neither is present', () => {
+      const entry = makeEntry()
+      expect(deleteSlideConfirmBody(entry)).toBe('Delete this slide? This cannot be undone.')
+    })
+
+    it('treats an empty-string notes value the same as absent (never a false positive)', () => {
+      const entry = makeEntry({ notes: '' })
+      expect(deleteSlideConfirmBody(entry)).toBe('Delete this slide? This cannot be undone.')
+    })
+
+    it('never names the group\'s shared bed music — only the entry\'s own audioUrl', () => {
+      const entry = makeEntry()
+      const body = deleteSlideConfirmBody(entry)
+      expect(body.toLowerCase()).not.toContain('group')
+      expect(body.toLowerCase()).not.toContain('bed')
+      expect(body.toLowerCase()).not.toContain('shared')
     })
   })
 })
