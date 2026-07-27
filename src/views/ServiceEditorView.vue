@@ -394,17 +394,17 @@
           </button>
         </div>
 
-        <!-- Tab bar: Music / Roles (Roles tab is editor-only — Phase 16.2 removal decision) -->
+        <!-- Tab bar: Service Order / Roles (Roles tab is editor-only — Phase 16.2 removal decision) -->
         <div class="flex items-center gap-1 mb-3 border-b border-gray-800 pb-0">
           <button
             type="button"
             class="px-4 py-2 text-sm font-medium rounded-t-md transition-colors -mb-px border-b-2"
-            :class="activeTab === 'music'
+            :class="activeTab === 'service-order'
               ? 'text-indigo-300 border-indigo-500 bg-gray-900'
               : 'text-gray-400 border-transparent hover:text-gray-200 hover:border-gray-600'"
-            @click="activeTab = 'music'"
+            @click="activeTab = 'service-order'"
           >
-            Music
+            Service Order
           </button>
           <button
             v-if="authStore.isEditor"
@@ -420,8 +420,8 @@
           <!-- Slides tab: visible to viewers as well as editors (R031) — not
                gated like Roles above. Write controls inside the panel are
                gated separately by the editor flag SlidesTab receives. Label
-               stays "Slides" here; the rename to "Service Order" is Phase 27
-               (UI-SPEC Mockup Correction 5). -->
+               stays "Slides" here; the first tab was renamed to
+               "Service Order" in Phase 27 (UI-SPEC Mockup Correction 5). -->
           <button
             type="button"
             class="px-4 py-2 text-sm font-medium rounded-t-md transition-colors -mb-px border-b-2"
@@ -434,7 +434,7 @@
           </button>
         </div>
 
-        <div v-show="activeTab === 'music'">
+        <div v-show="activeTab === 'service-order'" data-testid="service-order-panel">
         <!-- Teams configuration -->
         <div class="mb-3 rounded-lg bg-gray-900 border border-gray-800 p-3">
           <div class="flex items-center gap-4">
@@ -1216,10 +1216,10 @@ const slideGroupsStore = useSlideGroups()
 
 // ── Roles tab state (Task 1: tab bar) ──────────────────────────────────────────
 // Widened to add the Slides tab (Phase 25-03). Default value is unchanged —
-// the editor still opens on the music tab; D-05's auto-selection is about
-// which GROUP is selected once the Slides tab itself is opened, not about
-// which tab opens first.
-const activeTab = ref<'music' | 'roles' | 'slides'>('music')
+// the editor still opens on the Service Order tab (renamed from 'music' in
+// Phase 27, D-03); D-05's auto-selection is about which GROUP is selected
+// once the Slides tab itself is opened, not about which tab opens first.
+const activeTab = ref<'service-order' | 'roles' | 'slides'>('service-order')
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -1374,7 +1374,7 @@ function expandScriptureEditor(index: number): void {
 async function handleNavigateToScriptureEditor(index: number): Promise<void> {
   const slot = localService.value?.slots[index]
   if (!slot || slot.kind !== 'SCRIPTURE') return
-  activeTab.value = 'music'
+  activeTab.value = 'service-order'
   expandScriptureEditor(index)
   await nextTick()
   const panel = document.querySelector(`[data-scripture-panel-index="${index}"]`)
