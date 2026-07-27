@@ -16,6 +16,13 @@ vi.mock('@/stores/slideGroups', () => ({
   }),
 }))
 
+// --- 26-07 Task 3: "Edit in song" is a real navigation via 26-02's link
+// contract — mocked here so the drawer's own tests never touch a real router. ---
+const mockRouterPush = vi.fn().mockResolvedValue(undefined)
+vi.mock('vue-router', () => ({
+  useRouter: () => ({ push: mockRouterPush }),
+}))
+
 // Teleported content — established codebase convention (26-RESEARCH.md Pitfall 3).
 enableAutoUnmount(afterEach)
 
@@ -54,6 +61,94 @@ function makeAssembled(overrides: Partial<AssembledSlide> = {}): AssembledSlide 
     sourceId: null,
     ...overrides,
   } as AssembledSlide
+}
+
+// --- 26-07 Task 1: one entry + assembled-slide pair per `sourceRef.kind`,
+// deliberately keeping the ENTRY's source kind and the SLIDE's content kind
+// independently controllable — the exact split the per-kind matrix hinges on. ---
+function makeLyricFixtures() {
+  return {
+    entry: makeEntry({ id: 'entry-1', sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'sec-1' } }),
+    assembledSlide: makeAssembled({
+      slide: { id: 'entry-1', position: 0, contentKind: 'lyric', sectionId: 'sec-1', sectionLabel: 'Verse 1', lines: ['Line one', 'Line two'] } as never,
+    }),
+  }
+}
+
+function makeCopyrightFixtures() {
+  return {
+    entry: makeEntry({ id: 'entry-1', sourceRef: { kind: 'copyright', songId: 'song-1' } }),
+    assembledSlide: makeAssembled({
+      slide: {
+        id: 'entry-1',
+        position: 0,
+        contentKind: 'lyric',
+        title: 'This Is Our God',
+        authors: ['Author A', 'Author B'],
+        ccliSongNumber: '1234567',
+        copyrightLines: ['© 2020 Some Publisher'],
+        ccliLicenseNumber: '7654321',
+      } as never,
+    }),
+  }
+}
+
+function makeScriptureFixtures() {
+  return {
+    entry: makeEntry({ id: 'entry-1', sourceRef: { kind: 'scripture', scriptureReadingId: 'read-1', innerSlideId: 'inner-1' } }),
+    assembledSlide: makeAssembled({
+      slotKind: 'SCRIPTURE',
+      slide: {
+        id: 'entry-1',
+        position: 0,
+        contentKind: 'scripture',
+        reference: 'John 3:16',
+        bookRef: { book: 'John', chapter: 3 },
+        text: 'For God so loved the world',
+        verseRange: '16',
+        readingMode: 'normal',
+      } as never,
+    }),
+  }
+}
+
+function makeImportedTextFixtures() {
+  return {
+    entry: makeEntry({ id: 'entry-1', sourceRef: { kind: 'imported', importId: 'import-1', innerSlideId: 'inner-1' } }),
+    assembledSlide: makeAssembled({
+      slotKind: 'IMPORTED',
+      slide: { id: 'entry-1', position: 0, contentKind: 'text', body: 'Imported paragraph text' } as never,
+    }),
+  }
+}
+
+function makeImportedImageFixtures() {
+  return {
+    entry: makeEntry({ id: 'entry-1', sourceRef: { kind: 'imported', importId: 'import-1', innerSlideId: 'inner-2' } }),
+    assembledSlide: makeAssembled({
+      slotKind: 'IMPORTED',
+      slide: { id: 'entry-1', position: 0, contentKind: 'image', imageUrl: 'https://example.com/a.png', altText: 'A slide' } as never,
+    }),
+  }
+}
+
+function makeAuthoredTextFixtures(body = 'Authored body') {
+  return {
+    entry: makeEntry({ id: 'entry-1', sourceRef: { kind: 'text', title: 'New slide', body } }),
+    assembledSlide: makeAssembled({
+      slide: { id: 'entry-1', position: 0, contentKind: 'text', body } as never,
+    }),
+  }
+}
+
+function makeVideoFixtures() {
+  return {
+    entry: makeEntry({ id: 'entry-1', sourceRef: { kind: 'video', videoSrc: 'https://example.com/a.mp4' } }),
+    assembledSlide: makeAssembled({
+      slotKind: 'IMPORTED',
+      slide: { id: 'entry-1', position: 0, contentKind: 'video', videoSrc: 'https://example.com/a.mp4' } as never,
+    }),
+  }
 }
 
 function mountDrawer(props: Partial<InstanceType<typeof EditSlideDrawer>['$props']> = {}) {
@@ -330,3 +425,92 @@ describe('EditSlideDrawer (Phase 26-05 Task 3 — label/notes live-apply)', () =
     expect((body().find('[data-testid="drawer-label-input"]').element as HTMLInputElement).value).toBe('Updated elsewhere')
   })
 })
+
+describe('EditSlideDrawer (Phase 26-07 Task 1 — per-kind Slide Text)', () => {
+  it.each([
+    { name: 'lyric', fixtures: makeLyricFixtures(), expectedCaption: "From the song's Lyrics tab — editing there updates every service using this song." },
+    { name: 'copyright', fixtures: makeCopyrightFixtures(), expectedCaption: "From the song's Lyrics tab — editing there updates every service using this song." },
+    { name: 'scripture', fixtures: makeScriptureFixtures(), expectedCaption: 'Pulled from the passage reference — editing the reference updates this slide.' },
+    { name: 'imported (text)', fixtures: makeImportedTextFixtures(), expectedCaption: 'From the imported file — re-import to change it.' },
+  ])('renders the matrix treatment and caption for a $name-kind entry', ({ fixtures, expectedCaption }) => {
+    mountDrawer({ entry: fixtures.entry, assembledSlide: fixtures.assembledSlide, group: makeGroup({ slides: [fixtures.entry] }) })
+    expect(body().find('[data-testid="drawer-slide-text-readonly"]').exists() || body().find('[data-testid="drawer-copyright-block"]').exists()).toBe(true)
+    expect(body().find('[data-testid="drawer-slide-text-caption"]').text()).toBe(expectedCaption)
+  })
+
+  it('renders the lyric-section slide read-only with its lines', () => {
+    const { entry, assembledSlide } = makeLyricFixtures()
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+    expect(body().find('[data-testid="drawer-slide-text-readonly"]').text()).toBe('Line one\nLine two')
+    expect(body().find('[data-testid="drawer-slide-text-editable"]').exists()).toBe(false)
+  })
+
+  it('renders the copyright slide read-only with title/authors/CCLI#/license#, from the resolved slide', () => {
+    const { entry, assembledSlide } = makeCopyrightFixtures()
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+    expect(body().find('[data-testid="drawer-copyright-title"]').text()).toBe('This Is Our God')
+    expect(body().find('[data-testid="drawer-copyright-authors"]').text()).toBe('Author A, Author B')
+    expect(body().find('[data-testid="drawer-copyright-ccli"]').text()).toBe('1234567')
+    expect(body().find('[data-testid="drawer-copyright-license"]').text()).toBe('7654321')
+  })
+
+  it('renders the scripture slide read-only with its passage text', () => {
+    const { entry, assembledSlide } = makeScriptureFixtures()
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+    expect(body().find('[data-testid="drawer-slide-text-readonly"]').text()).toBe('For God so loved the world')
+  })
+
+  it('renders an imported slide whose resolved content is TEXT as read-only text (by its shared source kind)', () => {
+    const { entry, assembledSlide } = makeImportedTextFixtures()
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+    expect(body().find('[data-testid="drawer-slide-text-readonly"]').text()).toBe('Imported paragraph text')
+  })
+
+  it('renders an imported slide whose resolved content is a PICTURE as the picture alone, with no separate words block (by its shared source kind)', () => {
+    const { entry, assembledSlide } = makeImportedImageFixtures()
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+    expect(body().find('[data-testid="drawer-preview-image"]').exists()).toBe(true)
+    expect(body().find('[data-testid="drawer-slide-text-readonly"]').exists()).toBe(false)
+    expect(body().find('[data-testid="drawer-slide-text-caption"]').exists()).toBe(false)
+  })
+
+  it('renders no Slide Text section at all for a video slide', () => {
+    const { entry, assembledSlide } = makeVideoFixtures()
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+    expect(body().find('[data-testid="drawer-slide-text-section"]').exists()).toBe(false)
+  })
+
+  it('renders an editable field, not a read-only block, for a hand-written slide', () => {
+    const { entry, assembledSlide } = makeAuthoredTextFixtures('My own words')
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+    expect(body().find('[data-testid="drawer-slide-text-editable"]').exists()).toBe(true)
+    expect((body().find('[data-testid="drawer-slide-text-editable"]').element as HTMLTextAreaElement).value).toBe('My own words')
+  })
+
+  it('renders no caption clause about affecting only this slide or only this service, for any read-only kind', () => {
+    for (const fixtures of [makeLyricFixtures(), makeCopyrightFixtures(), makeScriptureFixtures(), makeImportedTextFixtures()]) {
+      mountDrawer({ entry: fixtures.entry, assembledSlide: fixtures.assembledSlide, group: makeGroup({ slides: [fixtures.entry] }) })
+      const caption = body().find('[data-testid="drawer-slide-text-caption"]').text()
+      expect(caption).not.toMatch(/only this (slide|service)/i)
+    }
+  })
+
+  it('renders no override, unlink, or copy-for-this-service control for any kind', () => {
+    for (const fixtures of [
+      makeLyricFixtures(),
+      makeCopyrightFixtures(),
+      makeScriptureFixtures(),
+      makeImportedTextFixtures(),
+      makeImportedImageFixtures(),
+      makeAuthoredTextFixtures(),
+      makeVideoFixtures(),
+    ]) {
+      mountDrawer({ entry: fixtures.entry, assembledSlide: fixtures.assembledSlide, group: makeGroup({ slides: [fixtures.entry] }) })
+      const text = body().text()
+      expect(text).not.toMatch(/unlink/i)
+      expect(text).not.toMatch(/override/i)
+      expect(text).not.toMatch(/copy.*this service/i)
+    }
+  })
+})
+
