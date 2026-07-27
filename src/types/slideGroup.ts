@@ -41,6 +41,20 @@ export interface SlideGroup {
   bedAudioUrl?: string
   /** Opaque signature of the source content this group was last materialized/reconciled against. */
   sourceSignature?: string
+  /**
+   * Opaque signature of the source divergence the user last DECLINED via the
+   * reconciliation confirm dialog's `Dismiss` action (D-07). Deliberately a
+   * SECOND field, distinct from `sourceSignature` (what was last WRITTEN):
+   * collapsing them into one field would make an applied update
+   * indistinguishable from a declined one the next time the same value is
+   * compared, so a decline would wrongly suppress a legitimate later update.
+   * Absent on every existing document — that absence IS the correct
+   * "never declined" state, with no migration or backfill needed (D-19). A
+   * FRESH divergence (a new `sourceSignature` mismatch computing a DIFFERENT
+   * current signature than this field's value) must re-prompt; only the
+   * SAME unchanged divergence stays silenced.
+   */
+  dismissedSignature?: string
   slides: GroupSlideEntry[]
   createdAt: Timestamp
   updatedAt: Timestamp

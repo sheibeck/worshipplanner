@@ -204,6 +204,28 @@ export const useSlideGroups = defineStore('slideGroups', () => {
   }
 
   /**
+   * Records a declined reconciliation update (D-07) — a scoped single-field
+   * write mirroring `setGroupBedMedia`'s shape exactly: touches only
+   * `dismissedSignature` and `updatedAt`, never the whole document, never
+   * `slides` or the bed. A decline changes nothing about the group's content;
+   * it only records the decision so the same unchanged divergence does not
+   * re-prompt on the next load.
+   *
+   * No transaction, no compare-and-swap (RESEARCH.md Open Question 1): two
+   * tabs declining the SAME divergence write the same value, so a lost race
+   * is harmless. A decline racing a concurrent "Apply" from another tab is
+   * self-correcting without any special handling — the next reconciliation
+   * recomputes the CURRENT divergence from the CURRENT stored state and
+   * compares it against the group's (now-changed) `sourceSignature`; a stale
+   * `dismissedSignature` simply won't match the new signature either, so it
+   * suppresses nothing it shouldn't. Do not "harden" this with a transaction.
+   */
+  async function dismissReconciliation(orgId: string, slotId: string, signature: string): Promise<void> {
+    const ref = doc(db, 'organizations', orgId, 'slideGroups', slotId)
+    await updateDoc(ref, { dismissedSignature: signature, updatedAt: serverTimestamp() })
+  }
+
+  /**
    * The apply half of reconciliation — writes only `slides`/`sourceSignature`/
    * `updatedAt`, never a bed field. The decision of WHETHER to apply a
    * reconciled slide list lives in 24-03's pure functions and 24-05's
@@ -308,6 +330,7 @@ export const useSlideGroups = defineStore('slideGroups', () => {
     materializeGroupIfMissing,
     deleteGroup,
     setGroupBedMedia,
+    dismissReconciliation,
     replaceGroupSlides,
   }
 })
