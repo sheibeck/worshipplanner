@@ -277,7 +277,7 @@ Plans:
 - [x] 27-02-PLAN.md — Rename the first tab and its internal value to Service Order (D-03), plus a stable panel test seam
 - [x] 27-03-PLAN.md — Strip the imported-deck editor and both section-scoped PPTX import surfaces; delete `ImportedSlideEditor`
 - [x] 27-04-PLAN.md — Strip the per-plan-item media control and its view-level helpers; delete `SlotMediaAttachment`
-- [ ] 27-05-PLAN.md — Apply the 27-01 decision to the slideshow preview, re-seat the test probes, run the phase-wide gate
+- [x] 27-05-PLAN.md — Apply the 27-01 decision to the slideshow preview, re-seat the test probes, run the phase-wide gate
 
 **Wave 1** — 27-01 (checkpoint, no source files) · 27-02 (rename)
 **Wave 2** — 27-03 · **Wave 3** — 27-04 · **Wave 4** — 27-05

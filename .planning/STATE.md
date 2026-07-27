@@ -4,16 +4,16 @@ milestone: v1.3
 milestone_name: Slides Tab Rework
 current_phase: 27
 current_phase_name: Service Order Tab — Rename and Strip Slide Editing
-status: executing
-stopped_at: Completed 27-04-PLAN.md
-last_updated: "2026-07-27T12:39:08.997Z"
+status: verifying
+stopped_at: Completed 27-05-PLAN.md (final plan of Phase 27)
+last_updated: "2026-07-27T13:10:59.096Z"
 last_activity: 2026-07-27
 progress:
   total_phases: 17
-  completed_phases: 14
+  completed_phases: 15
   total_plans: 95
-  completed_plans: 94
-  percent: 82
+  completed_plans: 95
+  percent: 88
 last_activity_desc: Opened v1.3 Slides Tab Rework (Phases 24-28) from the Claude Design import; v1.2 left code-complete with its verification ledger intact
 ---
 
@@ -38,7 +38,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 Phase: 27 (Service Order Tab — Rename and Strip Slide Editing) — EXECUTING
 Plan: 5 of 5
 Milestone: v1.3 Slides Tab Rework (Phases 24-28) — IN PROGRESS
-Status: Ready to execute
+Status: Phase complete — ready for verification
 
 Phases 20, 21, 22 and 23 are all code-complete; only their deferred human-verify checkpoints remain
 (see the Deferred Verification table below).
@@ -380,6 +380,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 27 P02 | 25min | 2 tasks | 2 files |
 | Phase 27 P03 | 15min | 3 tasks | 5 files |
 | Phase 27 P04 | 20min | 2 tasks | 7 files |
+| Phase 27 P05 | 55min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -528,6 +529,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 27-02: Renamed ServiceEditorView's first tab (label + activeTab union) from Music to service-order (D-03, D009); four unrelated views with same-named activeTab refs left untouched
 - [Phase ?]: 27-03: Removed the IMPORTED slot branch's whole editor-toggle-plus-viewer-note half (not just the button+panel) since the interfaces block's two-halves framing places the viewer-only note in the leaving (slide-editing) half
 - [Phase ?]: 27-04: Removed the per-plan-item SlotMediaAttachment control, its view-level read/write helpers, and the orphaned component; reworded the slideGroupsStore setup comment and five prose references naming the deleted file, leaving the group-bed audio write path itself (setGroupBedMedia) untouched for the Slides tab's SlideGroupMusicControl/SlideGrid callers
+- [Phase ?]: D-05 implemented verbatim: Present Slideshow relocated to the Slides tab (new CTA in SlidesTab.vue), reusing the existing presenting flag and PresentationViewer mount; SlideshowPreview removed from the Service Order tab and deleted (D-02/D-19).
+- [Phase ?]: Phase 27 closed: full unit suite failing FILE SET verified unchanged at the 10-file baseline (8 quarantine debris + storage.rules.test.ts + RosterView.test.ts); type-check and build both green.
 
 ### Roadmap Evolution
 
@@ -587,6 +590,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-27
-Last session: 2026-07-27T12:39:08.952Z
-Stopped at: Completed 27-04-PLAN.md
+Last session: 2026-07-27T13:10:59.055Z
+Stopped at: Completed 27-05-PLAN.md (final plan of Phase 27)
 Resume file: None
