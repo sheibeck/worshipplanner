@@ -75,6 +75,21 @@ export interface PendingReconciliation {
   slotId: string
   proposed: GroupSlideEntry[]
   loss?: { customizedEntries: number; withAudio: number; withNotes: number }
+  /**
+   * The divergence this pending entry was computed against (26-04) —
+   * precomputed here from the outcome's own `freshSignature` rather than
+   * left for the confirm dialog to recompute later against possibly-changed
+   * state. `Apply` must write THIS value, not a freshly-recomputed one.
+   */
+  freshSignature?: string
+  /**
+   * Populated ONLY for a song-identity-swap reconciliation (D-08) — both
+   * titles resolved from the song catalogue HERE, the one layer that already
+   * holds it; the pure reconciler below never resolves a title. Absent for
+   * every other confirm-required reconciliation (scripture, imported).
+   */
+  oldSongTitle?: string
+  newSongTitle?: string
 }
 
 /**
@@ -423,14 +438,33 @@ export function useSlideshowAssembly(
   // new stored group (a fresh onSnapshot after the write lands) clears it.
   const appliedGroupRefForSlot = new Map<string, SlideGroup>()
 
+  /**
+   * Resolves a song's title from the catalogue already in scope at this
+   * layer (D-08) — the pure reconciler below has no catalogue access and
+   * must never resolve one itself. A miss (the song has since been deleted)
+   * falls back to a plain generic label rather than an id or an empty
+   * string, so the dialog never renders a raw identifier or empty quotes.
+   */
+  function resolveSongTitle(songId: string): string {
+    return songStore.songs.find((s) => s.id === songId)?.title ?? 'Unknown Song'
+  }
+
   async function applyReconciliationOutcomes(outcomes: ReconciliationOutcome[]) {
     for (const outcome of outcomes) {
       if (outcome.result.needsConfirm) {
         if (!pendingReconciliationsMap.has(outcome.slotId)) {
+          const songSwap = outcome.result.songSwap
           pendingReconciliationsMap.set(outcome.slotId, {
             slotId: outcome.slotId,
             proposed: outcome.result.proposed ?? [],
             loss: outcome.result.loss,
+            freshSignature: outcome.freshSignature,
+            ...(songSwap
+              ? {
+                  oldSongTitle: resolveSongTitle(songSwap.oldSongId),
+                  newSongTitle: resolveSongTitle(songSwap.newSongId),
+                }
+              : {}),
           })
         }
         continue

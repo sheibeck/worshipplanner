@@ -958,6 +958,260 @@ describe('useSlideshowAssembly', () => {
     })
   })
 
+  // --- 26-04 Task 1: pending entry carries the divergence + song titles ---
+  describe('PendingReconciliation widening — divergence and song titles (26-04 Task 1)', () => {
+    it('a confirm-required reconciliation stores the current divergence value on the pending entry', async () => {
+      scriptureState.readings = [
+        {
+          id: 'reading-1',
+          reference: { book: 'John', chapter: 3 },
+          displayReference: 'John 3',
+          rawText: 'text',
+          readingMode: 'normal',
+          slides: [
+            {
+              id: 'orig-id',
+              position: 0,
+              contentKind: 'scripture',
+              reference: 'John 3:16',
+              bookRef: { book: 'John', chapter: 3 },
+              text: 'New verse text',
+              verseRange: '16',
+              readingMode: 'normal',
+            },
+          ],
+          createdAt: {} as never,
+          updatedAt: {} as never,
+        },
+      ]
+      slideGroupsState.groups = [
+        {
+          id: 'slot-scripture-fresh',
+          slotId: 'slot-scripture-fresh',
+          serviceId: 'service-1',
+          sourceSignature: '1:Old verse text',
+          slides: [
+            {
+              id: 'ss-1',
+              order: 0,
+              sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'orig-id' },
+              label: 'Custom label',
+            },
+          ],
+          createdAt: {} as never,
+          updatedAt: {} as never,
+        },
+      ]
+
+      const service = ref<Service | null>(
+        makeService([scriptureSlot({ position: 0, id: 'slot-scripture-fresh', scriptureReadingId: 'reading-1' })]),
+      )
+      const { pendingReconciliations } = useSlideshowAssembly(service, 'org-1', { canWrite: true })
+      await nextTick()
+      await nextTick()
+
+      expect(pendingReconciliations.value).toHaveLength(1)
+      expect(pendingReconciliations.value[0]!.freshSignature).toBe('1:New verse text')
+    })
+
+    it('a confirm-required SONG REASSIGNMENT stores both the old and new song titles resolved from the catalogue', async () => {
+      songsState.songs = [
+        { id: 'song-a', title: 'Old Song Title', performanceOrder: ['v1'] } as Song,
+        { id: 'song-b', title: 'New Song Title', performanceOrder: ['v1'] } as Song,
+      ]
+      const fakeLyricsLoader = vi.fn(async (_orgId: string, songId: string) => makeLyrics(songId))
+
+      slideGroupsState.groups = [
+        {
+          id: 'slot-song-swap-titled',
+          slotId: 'slot-song-swap-titled',
+          serviceId: 'service-1',
+          slides: [
+            { id: 'cr-1', order: 0, sourceRef: { kind: 'copyright', songId: 'song-a' } },
+            {
+              id: 'ly-v1',
+              order: 1,
+              sourceRef: { kind: 'lyric', songId: 'song-a', sectionId: 'v1' },
+              label: 'Custom Label',
+            },
+            { id: 'cr-2', order: 2, sourceRef: { kind: 'copyright', songId: 'song-a' } },
+          ],
+          createdAt: {} as never,
+          updatedAt: {} as never,
+        },
+      ]
+
+      const service = ref<Service | null>(
+        makeService([songSlot({ position: 0, id: 'slot-song-swap-titled', songId: 'song-b' })]),
+      )
+      const { pendingReconciliations } = useSlideshowAssembly(service, 'org-1', {
+        canWrite: true,
+        lyricsLoader: fakeLyricsLoader,
+      })
+      await nextTick()
+      await vi.waitFor(() => expect(fakeLyricsLoader).toHaveBeenCalled())
+      await nextTick()
+      await nextTick()
+
+      expect(pendingReconciliations.value).toHaveLength(1)
+      expect(pendingReconciliations.value[0]!.oldSongTitle).toBe('Old Song Title')
+      expect(pendingReconciliations.value[0]!.newSongTitle).toBe('New Song Title')
+    })
+
+    it('a confirm-required SONG REASSIGNMENT with the old song absent from the catalogue stores a generic label, never an id or empty value', async () => {
+      // song-a (the OLD, stored song) has been deleted from the catalogue.
+      songsState.songs = [{ id: 'song-b', title: 'New Song Title', performanceOrder: ['v1'] } as Song]
+      const fakeLyricsLoader = vi.fn(async (_orgId: string, songId: string) => makeLyrics(songId))
+
+      slideGroupsState.groups = [
+        {
+          id: 'slot-song-swap-missing',
+          slotId: 'slot-song-swap-missing',
+          serviceId: 'service-1',
+          slides: [
+            { id: 'cr-1', order: 0, sourceRef: { kind: 'copyright', songId: 'song-a' } },
+            {
+              id: 'ly-v1',
+              order: 1,
+              sourceRef: { kind: 'lyric', songId: 'song-a', sectionId: 'v1' },
+              label: 'Custom Label',
+            },
+            { id: 'cr-2', order: 2, sourceRef: { kind: 'copyright', songId: 'song-a' } },
+          ],
+          createdAt: {} as never,
+          updatedAt: {} as never,
+        },
+      ]
+
+      const service = ref<Service | null>(
+        makeService([songSlot({ position: 0, id: 'slot-song-swap-missing', songId: 'song-b' })]),
+      )
+      const { pendingReconciliations } = useSlideshowAssembly(service, 'org-1', {
+        canWrite: true,
+        lyricsLoader: fakeLyricsLoader,
+      })
+      await nextTick()
+      await vi.waitFor(() => expect(fakeLyricsLoader).toHaveBeenCalled())
+      await nextTick()
+      await nextTick()
+
+      expect(pendingReconciliations.value).toHaveLength(1)
+      expect(pendingReconciliations.value[0]!.oldSongTitle).toBe('Unknown Song')
+      expect(pendingReconciliations.value[0]!.oldSongTitle).not.toBe('song-a')
+      expect(pendingReconciliations.value[0]!.oldSongTitle).not.toBe('')
+      expect(pendingReconciliations.value[0]!.newSongTitle).toBe('New Song Title')
+    })
+
+    it('a confirm-required SCRIPTURE reconciliation stores no song titles', async () => {
+      scriptureState.readings = [
+        {
+          id: 'reading-1',
+          reference: { book: 'John', chapter: 3 },
+          displayReference: 'John 3',
+          rawText: 'text',
+          readingMode: 'normal',
+          slides: [
+            {
+              id: 'orig-id',
+              position: 0,
+              contentKind: 'scripture',
+              reference: 'John 3:16',
+              bookRef: { book: 'John', chapter: 3 },
+              text: 'New verse text',
+              verseRange: '16',
+              readingMode: 'normal',
+            },
+          ],
+          createdAt: {} as never,
+          updatedAt: {} as never,
+        },
+      ]
+      slideGroupsState.groups = [
+        {
+          id: 'slot-scripture-no-titles',
+          slotId: 'slot-scripture-no-titles',
+          serviceId: 'service-1',
+          sourceSignature: '1:Old verse text',
+          slides: [
+            {
+              id: 'ss-1',
+              order: 0,
+              sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'orig-id' },
+              label: 'Custom label',
+            },
+          ],
+          createdAt: {} as never,
+          updatedAt: {} as never,
+        },
+      ]
+
+      const service = ref<Service | null>(
+        makeService([scriptureSlot({ position: 0, id: 'slot-scripture-no-titles', scriptureReadingId: 'reading-1' })]),
+      )
+      const { pendingReconciliations } = useSlideshowAssembly(service, 'org-1', { canWrite: true })
+      await nextTick()
+      await nextTick()
+
+      expect(pendingReconciliations.value).toHaveLength(1)
+      expect(pendingReconciliations.value[0]!.oldSongTitle).toBeUndefined()
+      expect(pendingReconciliations.value[0]!.newSongTitle).toBeUndefined()
+    })
+
+    it('the automatic-apply path still writes without any pending entry appearing', async () => {
+      scriptureState.readings = [
+        {
+          id: 'reading-1',
+          reference: { book: 'John', chapter: 3 },
+          displayReference: 'John 3',
+          rawText: 'text',
+          readingMode: 'normal',
+          slides: [
+            {
+              id: 'orig-id',
+              position: 0,
+              contentKind: 'scripture',
+              reference: 'John 3:16',
+              bookRef: { book: 'John', chapter: 3 },
+              text: 'New verse text',
+              verseRange: '16',
+              readingMode: 'normal',
+            },
+          ],
+          createdAt: {} as never,
+          updatedAt: {} as never,
+        },
+      ]
+      // Uncustomized group — no label/notes/audio — so this reconciles automatically.
+      slideGroupsState.groups = [
+        {
+          id: 'slot-scripture-auto',
+          slotId: 'slot-scripture-auto',
+          serviceId: 'service-1',
+          sourceSignature: '1:Old verse text',
+          slides: [
+            {
+              id: 'ss-1',
+              order: 0,
+              sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'orig-id' },
+            },
+          ],
+          createdAt: {} as never,
+          updatedAt: {} as never,
+        },
+      ]
+
+      const service = ref<Service | null>(
+        makeService([scriptureSlot({ position: 0, id: 'slot-scripture-auto', scriptureReadingId: 'reading-1' })]),
+      )
+      const { pendingReconciliations } = useSlideshowAssembly(service, 'org-1', { canWrite: true })
+      await nextTick()
+      await nextTick()
+
+      expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+      expect(pendingReconciliations.value).toHaveLength(0)
+    })
+  })
+
   // --- Task 3 (25-01): end-to-end guard that a dropped video survives a live
   // reconciliation tick. This is the highest-consequence regression this
   // phase can produce: a video a user dropped disappearing on the next lyric

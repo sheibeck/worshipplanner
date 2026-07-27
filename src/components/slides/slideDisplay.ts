@@ -138,11 +138,22 @@ export function slideFooterLabel(slide: Slide): string {
  * `SlideGrid.vue` share a single local copy instead of each duplicating it
  * (25-03 duplicated it directly in `SlidesTab.vue`; 25-04 centralizes it
  * here).
+ *
+ * 26-04 widens this identically to the composable's own copy (`freshSignature`,
+ * `oldSongTitle`, `newSongTitle`) — the two are kept in step deliberately, not
+ * accidentally: the reconciliation confirm dialog under this folder reads the
+ * widened fields directly off this LOCAL copy, and would otherwise have
+ * nothing to read.
  */
 export interface PendingReconciliation {
   slotId: string
   proposed: GroupSlideEntry[]
   loss?: { customizedEntries: number; withAudio: number; withNotes: number }
+  /** The divergence this pending entry was computed against — `Apply` writes THIS value, never a recomputed one. */
+  freshSignature?: string
+  /** Populated only for a song-identity-swap reconciliation (D-08); resolved one layer up, never in the pure reconciler. */
+  oldSongTitle?: string
+  newSongTitle?: string
 }
 
 /**
