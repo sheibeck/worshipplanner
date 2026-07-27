@@ -259,3 +259,78 @@ export function uniqueSectionLabel(kind: string, existingLabels: readonly string
   }
   return `${kind} ${suffix}`
 }
+
+/**
+ * Compares two line arrays for the "repeat marker" test: empty incoming
+ * lines always count as a repeat; otherwise the arrays must be
+ * value-equal after trimming each line, so trailing-whitespace
+ * differences in a CCLI paste don't split one section into two pooled
+ * entries.
+ */
+function linesAreEquivalent(pooledLines: string[], incomingLines: string[]): boolean {
+  if (incomingLines.length === 0) return true
+
+  const trimmedIncoming = incomingLines.map((line) => line.trim())
+  const trimmedPooled = pooledLines.map((line) => line.trim())
+  if (trimmedIncoming.length !== trimmedPooled.length) return false
+
+  return trimmedIncoming.every((line, index) => line === trimmedPooled[index])
+}
+
+/**
+ * Normalises freshly-parsed CCLI sections into the pool/order model.
+ *
+ * This is the ONLY collision guard over `ccliParser.ts`'s unguarded
+ * `slugify(label)` ids — that parser mints ids with no uniqueness check
+ * across four mint sites, so two `Chorus` markers in one paste arrive as
+ * two `LyricSection` objects both carrying id `chorus`. This function
+ * resolves that collision:
+ *
+ * - Id not yet pooled: pool the section, append its id to the order.
+ * - Id already pooled and the incoming lines are empty or value-equal
+ *   (after trimming) to the pooled section's lines: a REPEAT MARKER —
+ *   append the pooled id again, add nothing to the pool (D-02).
+ * - Id already pooled and the incoming lines differ and are non-empty:
+ *   two sections that merely share a label — mint a fresh id, pool the
+ *   incoming section under it (keeping its original label), append the
+ *   new id to the order.
+ *
+ * Accepts anything carrying a `sections` array (a bare array wrapper, or
+ * a full `ParsedCCLI`) so this module never needs to import from
+ * `ccliParser.ts` itself. The returned pair already satisfies the
+ * pool/order invariants — feeding it to `normalizeLyricOrder` changes
+ * nothing. Never mutates its argument.
+ */
+export function normalizeParsedSections(parsed: { sections: LyricSection[] }): {
+  sections: LyricSection[]
+  performanceOrder: string[]
+} {
+  const pool: LyricSection[] = []
+  const poolById = new Map<string, LyricSection>()
+  const order: string[] = []
+
+  for (const incoming of parsed.sections) {
+    const existing = poolById.get(incoming.id)
+
+    if (!existing) {
+      poolById.set(incoming.id, incoming)
+      pool.push(incoming)
+      order.push(incoming.id)
+      continue
+    }
+
+    if (linesAreEquivalent(existing.lines, incoming.lines)) {
+      order.push(existing.id)
+      continue
+    }
+
+    const existingIds = pool.map((section) => section.id)
+    const newId = mintSectionId(incoming.label, existingIds)
+    const distinctSection: LyricSection = { ...incoming, id: newId }
+    poolById.set(newId, distinctSection)
+    pool.push(distinctSection)
+    order.push(newId)
+  }
+
+  return { sections: pool, performanceOrder: order }
+}
