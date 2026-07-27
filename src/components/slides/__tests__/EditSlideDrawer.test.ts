@@ -285,7 +285,9 @@ describe('EditSlideDrawer (Phase 26-05 Task 3 — label/notes live-apply)', () =
 
   it('shows a saving state during the write and a saved state after it resolves', async () => {
     let resolveWrite: () => void = () => {}
-    mockReplaceGroupSlides.mockImplementationOnce(() => new Promise((resolve) => { resolveWrite = resolve }))
+    mockReplaceGroupSlides.mockImplementationOnce(
+      () => new Promise<void>((resolve) => { resolveWrite = resolve }),
+    )
     mountDrawer({ entry: makeEntry({ id: 'entry-1', label: '' }) })
 
     await body().find('[data-testid="drawer-label-input"]').setValue('Changed')
