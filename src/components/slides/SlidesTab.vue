@@ -55,6 +55,13 @@
  *    changes shape the moment its group materializes (a slot-derived
  *    fallback id gives way to the stored entry id). Fixing the id-minting
  *    scheme itself is Phase 23's WR-02 contract, not this component's job.
+ *
+ * "Edit in scripture" relay (Phase 26-03, D-15): `ServiceEditorView`'s tab
+ * state and its per-plan-item scripture-editor expansion set are local state
+ * it alone owns — nothing under this component may reach them directly
+ * (26-RESEARCH.md Pitfall 5). `requestEditInScripture` emits
+ * `navigate-to-scripture-editor` carrying the selected plan item's raw array
+ * index, the one upward channel a page-level action can travel through.
  */
 import { ref, computed, watch } from 'vue'
 import type { ServiceSlot } from '@/types/service'
@@ -77,6 +84,11 @@ const props = defineProps<{
   active: boolean
   /** On-demand group materializer (25-05 Task 1), threaded down to the grid unused by this component itself. */
   ensureGroupMaterialized: (slotId: string) => Promise<EnsureGroupMaterializedResult | undefined>
+}>()
+
+const emit = defineEmits<{
+  /** D-15's "Edit in scripture" request, carrying the plan item's raw array index. */
+  (e: 'navigate-to-scripture-editor', slotArrayIndex: number): void
 }>()
 
 const selectedSlotId = ref<string | null>(null)
@@ -164,5 +176,18 @@ const selectedGroup = computed<SlideGroup | null>(() => {
   return props.groupsBySlotId.get(selectedSlotId.value) ?? null
 })
 
-defineExpose({ selectedSlotId, selectedSlideId })
+/**
+ * Relays a request to reveal the selected plan item's scripture editor up to
+ * `ServiceEditorView` (D-15). Emits nothing when no plan item is selected.
+ * Uses the raw ARRAY index (`selectedSlotArrayIndex`), not the plan
+ * position that sits next to it — the two can diverge (see
+ * `selectedSlotPosition` above), and the page's expansion state and the
+ * assembled slides are both keyed on the array index.
+ */
+function requestEditInScripture(): void {
+  if (selectedSlotArrayIndex.value < 0) return
+  emit('navigate-to-scripture-editor', selectedSlotArrayIndex.value)
+}
+
+defineExpose({ selectedSlotId, selectedSlideId, requestEditInScripture })
 </script>
