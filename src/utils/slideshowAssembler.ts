@@ -198,7 +198,24 @@ interface ResolvedGroupMedia {
   audioFromBed: boolean
 }
 
+/**
+ * WR-01 behavioral decision (confirm at human-verify): a `video`-kind entry
+ * NEVER resolves the group's bed audio, even when it has no `entry.audioUrl`
+ * of its own and the group DOES have a `bedAudioUrl`. This extends D-04's
+ * "slide beats group" precedence to video — a dropped video slide carries its
+ * own soundtrack inside `videoSrc` (rendered by `PresentationViewer`'s own
+ * `VideoPlayer`, unmuted by default), so layering the group's `AudioPlayer`
+ * underneath it would play two unrelated audio sources at once with no
+ * on-screen indication. The bed is not paused/stopped globally — it simply
+ * resolves normally on whatever slide follows, since this function runs
+ * independently per entry with no cross-entry state, matching D-18's framing
+ * of a video slide as a self-contained unit.
+ */
 function resolveEntryMedia(group: SlideGroup, entry: GroupSlideEntry): ResolvedGroupMedia {
+  if (entry.sourceRef.kind === 'video') {
+    return { audioFromBed: false }
+  }
+
   // Effective audio: the entry's OWN audio wins; otherwise fall back to the
   // group's bed. `audioFromBed` is true only in the fallback case.
   const audioFromBed = !entry.audioUrl && !!group.bedAudioUrl

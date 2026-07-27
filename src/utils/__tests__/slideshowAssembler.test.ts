@@ -988,7 +988,7 @@ describe('assembleSlideshow — D-17 video entries and authored text entries', (
     expect(result[0]!.sourceId).toBeNull()
   })
 
-  it('a video entry in a group that ALSO has an audio bed assembles the video entry with its own source intact and the bed audio unaffected', () => {
+  it('WR-01: a video entry in a group that ALSO has an audio bed suppresses the bed — the video keeps its own source, no audioUrl is emitted, and the group\'s own bedAudioUrl field is unaffected', () => {
     const slot = scriptureSlot({ id: 'slot-scripture-0', scriptureReadingId: 'reading-1' })
     const service = makeService([slot])
     const reading = makeScriptureReading()
@@ -1012,8 +1012,47 @@ describe('assembleSlideshow — D-17 video entries and authored text entries', (
 
     expect(result).toHaveLength(1)
     expect((result[0]!.slide as VideoSlide).videoSrc).toBe('https://example.com/own-footage.mp4')
-    expect(result[0]!.slide.audioUrl).toBe('https://example.com/bed.mp3')
-    expect(result[0]!.audioFromBed).toBe(true)
+    expect('audioUrl' in result[0]!.slide).toBe(false)
+    expect(result[0]!.audioFromBed).toBe(false)
+    expect(group.bedAudioUrl).toBe('https://example.com/bed.mp3')
+  })
+
+  it('WR-01: the bed resumes on the next (non-video) slide immediately after a video entry suppressed it', () => {
+    const slot = scriptureSlot({ id: 'slot-scripture-0', scriptureReadingId: 'reading-1' })
+    const service = makeService([slot])
+    const reading = makeScriptureReading({
+      slides: [
+        makeScriptureSlide({ id: 'ss-1', position: 0, verseRange: '1' }),
+      ],
+    })
+    const videoEntry = makeGroupSlideEntry({
+      id: 'entry-video',
+      order: 0,
+      sourceRef: { kind: 'video', videoSrc: 'https://example.com/own-footage.mp4' },
+    })
+    const scriptureEntry = makeGroupSlideEntry({
+      id: 'entry-scripture',
+      order: 1,
+      sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'ss-1' },
+    })
+    const group = makeSlideGroup({
+      id: 'slot-scripture-0',
+      slotId: 'slot-scripture-0',
+      slides: [videoEntry, scriptureEntry],
+      bedAudioUrl: 'https://example.com/bed.mp3',
+    })
+    const inputs = makeInputs({
+      scriptureReadingsById: new Map([['reading-1', reading]]),
+      groupsBySlotId: new Map([['slot-scripture-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result).toHaveLength(2)
+    expect('audioUrl' in result[0]!.slide).toBe(false)
+    expect(result[0]!.audioFromBed).toBe(false)
+    expect(result[1]!.slide.audioUrl).toBe('https://example.com/bed.mp3')
+    expect(result[1]!.audioFromBed).toBe(true)
   })
 
   it('a text entry with authored title and body on a SONG slot assembles that title and body', () => {
