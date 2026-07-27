@@ -336,8 +336,14 @@ onMounted(async () => {
   // Check for ?import=true query param — auto-open import modal
   if (route.query.import === 'true') {
     importModalOpen.value = true
-    // Clear query param without navigation
-    router.replace({ query: { ...route.query, import: undefined } })
+    // Clear query param without navigation. WR-01: AWAITED — `route.query`
+    // does not update until this navigation resolves, so if a song-edit
+    // request is ALSO present in the query, resolveSongEditRequest()'s own
+    // synchronous clearSongEditQueryParam() call below must not read a
+    // pre-clear route.query snapshot and race this replace (whichever one's
+    // navigation resolved last would otherwise win, silently dropping the
+    // other's clear).
+    await router.replace({ query: { ...route.query, import: undefined } })
   }
 
   resolveSongEditRequest()
