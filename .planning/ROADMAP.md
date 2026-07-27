@@ -225,7 +225,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 25-07-PLAN.md — Drop target and import: modal reuse (D-15), four-kind routing (D-13/D-14/D-17)
+- [x] 25-07-PLAN.md — Drop target and import: modal reuse (D-15), four-kind routing (D-13/D-14/D-17)
 
 ### Phase 26: Edit Slide Drawer `risk:medium`
 
