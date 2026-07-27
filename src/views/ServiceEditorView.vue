@@ -734,6 +734,7 @@
                     class="rounded-lg border border-gray-700 bg-gray-950 overflow-hidden"
                     style="min-height: 300px"
                     data-testid="scripture-editor-panel"
+                    :data-scripture-panel-index="index"
                   >
                     <ScriptureSlideEditor
                       v-if="getSlotReadingMode(slot as ScriptureSlot) === 'normal'"
@@ -1094,6 +1095,7 @@
             :groups-loading="slideGroupsStore.isLoading"
             :active="activeTab === 'slides'"
             :ensure-group-materialized="ensureGroupMaterialized"
+            @navigate-to-scripture-editor="handleNavigateToScriptureEditor"
           />
         </div>
 
@@ -1338,6 +1340,45 @@ function toggleScriptureEditor(index: number) {
     next.add(index)
   }
   expandedScriptureSlots.value = next
+}
+
+/**
+ * Expand-only sibling of `toggleScriptureEditor` (D-15, 26-RESEARCH.md
+ * Pitfall 5 / Assumptions Log A2): the toggle above is a strict add-or-remove
+ * and its own button depends on the remove half, so a second click on an
+ * arriving "Edit in scripture" request must never repurpose it — reusing the
+ * toggle would close an already-open editor on a second request. This adds
+ * the index and never removes it; calling it repeatedly on an
+ * already-expanded index is a no-op.
+ */
+function expandScriptureEditor(index: number): void {
+  const slot = localService.value?.slots[index]
+  if (!slot || slot.kind !== 'SCRIPTURE') return
+  if (expandedScriptureSlots.value.has(index)) return
+  const next = new Set(expandedScriptureSlots.value)
+  next.add(index)
+  expandedScriptureSlots.value = next
+}
+
+/**
+ * Handles the "Edit in scripture" request relayed up through SlidesTab's
+ * `navigate-to-scripture-editor` event (T-26-03-01: validates the index
+ * against the current plan item list and its kind before touching any
+ * state, so an unhonourable request — out of range, or naming a non-
+ * scripture plan item — is a no-op rather than switching tabs or expanding
+ * an unrelated row). Switches to the tab that owns the scripture editor,
+ * expands (never toggles) the requested plan item's editor, then brings its
+ * panel into view. This does not focus or scroll into the editor itself —
+ * only its containing panel.
+ */
+async function handleNavigateToScriptureEditor(index: number): Promise<void> {
+  const slot = localService.value?.slots[index]
+  if (!slot || slot.kind !== 'SCRIPTURE') return
+  activeTab.value = 'music'
+  expandScriptureEditor(index)
+  await nextTick()
+  const panel = document.querySelector(`[data-scripture-panel-index="${index}"]`)
+  panel?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' })
 }
 
 function getSlotReadingMode(slot: ScriptureSlot): 'normal' | 'congregational' {
