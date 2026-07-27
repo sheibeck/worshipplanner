@@ -254,7 +254,7 @@ Plans:
 **Wave 3** *(blocked on Wave 2 completion)*
 
 - [x] 26-06-PLAN.md — Reconcile confirm modal and the notice that opens it (R029, D-05..D-08)
-- [ ] 26-07-PLAN.md — Slide Text per source kind, both routes away, unsaved guard (D-13/D-14/D-15/D-16)
+- [x] 26-07-PLAN.md — Slide Text per source kind, both routes away, unsaved guard (D-13/D-14/D-15/D-16)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
