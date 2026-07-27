@@ -253,15 +253,6 @@
           </div>
         </Teleport>
 
-        <!-- PPTX/image import modal (Phase 21) -->
-        <PptxImportModal
-          :open="showImportModal"
-          :orgId="authStore.orgId!"
-          :section="importModalSection"
-          @confirmed="onImportConfirmed"
-          @cancel="showImportModal = false"
-        />
-
         <!-- Export dialog -->
         <Teleport to="body">
           <div v-if="showExportDialog" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
@@ -891,38 +882,6 @@
                   <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Imported Slides</p>
                 </div>
                 <p v-if="!(slot as ImportedSlot).importId" class="text-sm text-gray-400 italic">Imported Slides — Empty</p>
-                <template v-else>
-                  <!-- Editor: expand/collapse toggle -->
-                  <div v-if="authStore.isEditor && !isExportedLocked" class="flex items-center gap-3 mb-2">
-                    <button
-                      type="button"
-                      data-testid="edit-imported-slides-btn"
-                      class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-indigo-400 bg-gray-800 border border-gray-700 hover:bg-gray-700 transition-colors"
-                      @click="toggleImportedEditor(index)"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                      {{ expandedImportedSlots.has(index) ? 'Close Slides Editor' : 'Edit Imported Slides' }}
-                    </button>
-                  </div>
-                  <!-- Viewer / read-only note when not expanded -->
-                  <p v-else class="text-sm text-gray-200">Imported Slides</p>
-
-                  <!-- Expanded editor panel -->
-                  <div
-                    v-if="authStore.isEditor && !isExportedLocked && expandedImportedSlots.has(index)"
-                    class="rounded-lg border border-gray-700 bg-gray-950 overflow-hidden"
-                    style="min-height: 300px"
-                    data-testid="imported-editor-panel"
-                  >
-                    <ImportedSlideEditor
-                      :orgId="authStore.orgId!"
-                      :importId="(slot as ImportedSlot).importId ?? undefined"
-                      data-testid="imported-slide-editor"
-                    />
-                  </div>
-                </template>
               </template>
 
               <!-- Per-slot group-BED audio attach/preview/remove (Phase 22, R013/R014 —
@@ -1001,8 +960,6 @@
             <button type="button" @click="addSlot('PRAYER')" class="px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 w-full text-left transition-colors">Prayer</button>
             <button type="button" @click="addSlot('MESSAGE')" class="px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 w-full text-left transition-colors">Message</button>
             <button type="button" @click="addSlot('HYMN')" class="px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 w-full text-left transition-colors">Hymn</button>
-            <button type="button" data-testid="add-import-announcements" @click="openImportModal('pre-service')" class="px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 w-full text-left transition-colors">Import PowerPoint / Images (Announcements)</button>
-            <button type="button" data-testid="add-import-sermon" @click="openImportModal('message')" class="px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 w-full text-left transition-colors">Import PowerPoint (Sermon)</button>
           </div>
         </div>
 
@@ -1187,9 +1144,7 @@ import ScriptureInput from '@/components/ScriptureInput.vue'
 import ServicePrintLayout from '@/components/ServicePrintLayout.vue'
 import ScriptureSlideEditor from '@/components/ScriptureSlideEditor.vue'
 import CongregationalEditor from '@/components/CongregationalEditor.vue'
-import ImportedSlideEditor from '@/components/ImportedSlideEditor.vue'
 import SlotMediaAttachment from '@/components/SlotMediaAttachment.vue'
-import PptxImportModal from '@/components/PptxImportModal.vue'
 import SlideshowPreview from '@/components/SlideshowPreview.vue'
 import PresentationViewer from '@/components/PresentationViewer.vue'
 import SlidesTab from '@/components/slides/SlidesTab.vue'
@@ -1393,39 +1348,6 @@ function setReadingMode(index: number, mode: 'normal' | 'congregational') {
     ...slot,
     readingMode: mode,
   } as ScriptureSlot
-}
-
-// ── Imported (PPTX/image) slot state (Phase 21) ───────────────────────────────
-const showImportModal = ref(false)
-const importModalSection = ref<ServiceSection>('pre-service')
-const expandedImportedSlots = ref<Set<number>>(new Set())
-
-function openImportModal(section: ServiceSection) {
-  importModalSection.value = section
-  showImportModal.value = true
-  showAddMenu.value = false
-}
-
-function toggleImportedEditor(index: number) {
-  const next = new Set(expandedImportedSlots.value)
-  if (next.has(index)) {
-    next.delete(index)
-  } else {
-    next.add(index)
-  }
-  expandedImportedSlots.value = next
-}
-
-// On confirm, append a new IMPORTED slot bound to the emitted importId in the
-// emitted section, then reindex — mirroring how SCRIPTURE slots are added.
-// The modal itself never touches localService.value.slots (21-05 key_links).
-function onImportConfirmed(payload: { importId: string; section: ServiceSection }) {
-  if (!localService.value) return
-  const newSlot = createSlot('IMPORTED', undefined, payload.section) as ImportedSlot
-  newSlot.importId = payload.importId
-  localService.value.slots.push(newSlot)
-  localService.value.slots = reindexSlots(localService.value.slots)
-  showImportModal.value = false
 }
 
 // ── Export to PC state ─────────────────────────────────────────────────────────
