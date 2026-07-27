@@ -722,5 +722,100 @@ describe('useSlideGroups', () => {
       const ids = (payload.slides as { id: string }[]).map((e) => e.id)
       expect(ids).toEqual(['e2', 'e1', 'e3-appended-elsewhere'])
     })
+
+    // Task 3 (26-01): pins the exact write shape every Edit Slide drawer
+    // field-write uses (label, notes, audio, loop, duplicate, delete) --
+    // a read-modify-write that changes ONE field on ONE entry, leaving the
+    // rest of the array identical. Distinct from the append/reorder shapes
+    // covered above. This describe block's name is the validation strategy's
+    // compare-and-swap filter target (26-VALIDATION.md CAS row).
+    describe('compare-and-swap — single-field slide edit (drawer write shape)', () => {
+      it('an uncontended single-field edit with a current base snapshot persists exactly the caller\'s array', async () => {
+        const { getDoc, updateDoc } = await import('firebase/firestore')
+        const base = [
+          { id: 'e1', order: 0, sourceRef: { kind: 'text' as const }, label: 'Old label' },
+          { id: 'e2', order: 1, sourceRef: { kind: 'text' as const } },
+        ]
+        // Live document is unchanged from base -- the uncontended case.
+        vi.mocked(getDoc).mockResolvedValueOnce({
+          exists: () => true,
+          id: 'slot-1',
+          data: () => ({ slides: base }),
+        } as ReturnType<typeof getDoc> extends Promise<infer T> ? T : never)
+
+        const { useSlideGroups } = await import('../slideGroups')
+        const store = useSlideGroups()
+
+        // Edit ONE field on ONE entry; everything else stays identical.
+        const edited = [{ ...base[0]!, label: 'New label' }, base[1]!]
+        await store.replaceGroupSlides('org-1', 'slot-1', edited, undefined, base)
+
+        const payload = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+        expect(payload.slides).toEqual(edited)
+      })
+
+      it('a single-field edit with a concurrently-added entry persists the edit PLUS that entry, id intact and ordered last', async () => {
+        const { getDoc, updateDoc } = await import('firebase/firestore')
+        const base = [
+          { id: 'e1', order: 0, sourceRef: { kind: 'text' as const }, label: 'Old label' },
+          { id: 'e2', order: 1, sourceRef: { kind: 'text' as const } },
+        ]
+        // Another writer concurrently appended e3 -- absent from base AND
+        // from this caller's own computed payload.
+        const liveWithConcurrentAppend = [
+          ...base,
+          { id: 'e3-appended-elsewhere', order: 2, sourceRef: { kind: 'text' as const } },
+        ]
+        vi.mocked(getDoc).mockResolvedValueOnce({
+          exists: () => true,
+          id: 'slot-1',
+          data: () => ({ slides: liveWithConcurrentAppend }),
+        } as ReturnType<typeof getDoc> extends Promise<infer T> ? T : never)
+
+        const { useSlideGroups } = await import('../slideGroups')
+        const store = useSlideGroups()
+
+        const edited = [{ ...base[0]!, label: 'New label' }, base[1]!]
+        await store.replaceGroupSlides('org-1', 'slot-1', edited, undefined, base)
+
+        const payload = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+        const slides = payload.slides as { id: string; order: number; label?: string }[]
+        expect(slides.map((e) => e.id)).toEqual(['e1', 'e2', 'e3-appended-elsewhere'])
+        expect(slides.find((e) => e.id === 'e1')?.label).toBe('New label')
+        // The recovered entry keeps its own id and is ordered after the
+        // caller's own entries.
+        expect(slides[slides.length - 1]!.id).toBe('e3-appended-elsewhere')
+        expect(slides[slides.length - 1]!.order).toBeGreaterThan(slides[0]!.order)
+        expect(slides[slides.length - 1]!.order).toBeGreaterThan(slides[1]!.order)
+      })
+
+      // Negative control: the exact same contended situation, but with NO
+      // base snapshot passed -- this is the behaviour every drawer write must
+      // avoid by always passing a FRESH base, never a captured-at-open one
+      // (research Pitfall 2). Stated explicitly here so the reason is pinned
+      // in the suite, not only in prose.
+      it('the SAME contended situation with NO base snapshot falls back to a plain overwrite and DISCARDS the concurrently-added entry', async () => {
+        const { updateDoc, getDoc } = await import('firebase/firestore')
+        const base = [
+          { id: 'e1', order: 0, sourceRef: { kind: 'text' as const }, label: 'Old label' },
+          { id: 'e2', order: 1, sourceRef: { kind: 'text' as const } },
+        ]
+
+        const { useSlideGroups } = await import('../slideGroups')
+        const store = useSlideGroups()
+
+        const edited = [{ ...base[0]!, label: 'New label' }, base[1]!]
+        // No baseSlides argument -- omitting it is the mistake this test pins.
+        await store.replaceGroupSlides('org-1', 'slot-1', edited, undefined)
+
+        // No CAS path was even entered -- getDoc (used by the transaction
+        // read) is never called on the no-baseSlides fast path.
+        expect(getDoc).not.toHaveBeenCalled()
+        const payload = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+        const ids = (payload.slides as { id: string }[]).map((e) => e.id)
+        expect(ids).toEqual(['e1', 'e2'])
+        expect(ids).not.toContain('e3-appended-elsewhere')
+      })
+    })
   })
 })
