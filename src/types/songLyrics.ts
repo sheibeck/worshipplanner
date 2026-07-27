@@ -1,6 +1,16 @@
 import type { Timestamp } from 'firebase/firestore'
 
-/** A single section of song lyrics (e.g. Verse 1, Chorus). */
+/**
+ * A single section of song lyrics (e.g. Verse 1, Chorus).
+ *
+ * A member of the canonical POOL (`SongLyrics.sections` / `ParsedCCLI.sections`) —
+ * each `id` appears at most once across a document's pool. A section shown more
+ * than once in the slide order is a REFERENCE to this same pooled entry, not a
+ * copy (D-02): edit its `lines` once and every occurrence in
+ * `SongLyrics.performanceOrder` reflects the edit. See `src/utils/songSectionOrder.ts`
+ * for the pure helpers that derive rows from and safely mutate the
+ * pool/order pair.
+ */
 export interface LyricSection {
   /** Slugified label — e.g. 'verse-1', 'chorus'. */
   id: string
@@ -26,9 +36,23 @@ export interface CopyrightInfo {
 export interface SongLyrics {
   id: string
   songId: string
+  /**
+   * An unordered POOL of canonical section text — not a running order. Each
+   * `LyricSection.id` in this array is unique. `performanceOrder` is what
+   * decides the order (and repetition) sections appear in; this array never
+   * repeats an id.
+   */
   sections: LyricSection[]
   copyright: CopyrightInfo
-  /** Ordered list of section IDs defining the playback sequence. */
+  /**
+   * The single ordered list of section-id references, and the slide order
+   * itself (D-01/D-03 — there is no second list). A repeated id means the
+   * same section shown again — a reference, so editing that section's text
+   * changes every place it appears (D-02). Every id here resolves to a
+   * pooled `sections` entry, and every pooled section is referenced at
+   * least once; `src/utils/songSectionOrder.ts::normalizeLyricOrder`
+   * enforces both directions of that invariant.
+   */
   performanceOrder: string[]
   createdAt: Timestamp
   updatedAt: Timestamp
