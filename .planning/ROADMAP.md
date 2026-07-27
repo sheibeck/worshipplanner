@@ -285,10 +285,37 @@ Plans:
 
 ### Phase 28: Song Lyrics Editor Rework `risk:low`
 
-**Goal:** Rework the song lyrics editor so it presents one scroll surface and one list that IS the slide order — eliminating the nested scrollbar and the duplicated Available-Sections / Performance-Order lists from Phase 18. Design Turn 2 offers options 2a and 2b; exactly one is chosen at this phase's discuss step.
+**Goal:** Rework the song lyrics editor so it presents one scroll surface and one list that IS the slide order — eliminating the nested scrollbar and the duplicated Available-Sections / Performance-Order lists from Phase 18. Design Turn 2's option **2a** is chosen (28-CONTEXT D-01): one always-draggable list of section cards, collapsible to a one-line summary, with repeats rendered as linked rows. Option 2b (the mode toggle) is deferred.
 **Depends on:** — (independent of 24-27; sequenced last)
 **Requirements:** R035, R018 (supporting)
-**Plans:** 0
+**Plans:** 6 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 28-01-PLAN.md — Section-order model: pool/order invariants and pure row helpers
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 28-02-PLAN.md — One canonical order source; the second list and second order field both deleted
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 28-03-PLAN.md — Repeat-safe song reconciliation (the 26-09 follow-through)
+
+**Wave 4** *(blocked on Wave 2)*
+
+- [ ] 28-04-PLAN.md — The one-list editor: one scroll surface, numbered rows, collapse, linked repeats
+
+**Wave 5** *(blocked on Wave 4)*
+
+- [ ] 28-05-PLAN.md — Row actions: drag reorder by handle, Duplicate, Remove, ＋ Add section
+
+**Wave 6** *(blocked on Waves 3 and 5)*
+
+- [ ] 28-06-PLAN.md — R035 acceptance block and the phase gate
+
+*(Waves 3-6 are strictly sequential: every plan from 28-03 on edits a file an earlier wave owns.)*
 
 ## Phases
 
