@@ -231,8 +231,38 @@ Plans:
 
 **Goal:** Build the Edit Slide drawer in both states — closed, and open floating over the page with nothing underneath reflowing. Carries the slide preview, label, read-only slide text with an "Edit in song" link, slide audio with scope toggle and loop flag, operator-only notes, and delete.
 **Depends on:** Phase 25
-**Requirements:** R033, R018 (supporting)
-**Plans:** 0
+**Requirements:** R033, R029 (deferred confirm-flow debt), R018 (supporting)
+**Plans:** 9 plans
+
+> **Scope note.** Phase 26 also closes the cross-phase debt Phases 24 and 25 both deferred: the
+> reconciliation confirm dialog (R029). Per `26-CONTEXT.md` D-06 there is **no** diff view; per D-04
+> the mockup's `Tag`/`Details` affordances stay deferred; per D-13 there is **no** per-service slide
+> text override. Milestone D-18 (no bed video) and D-19 (no legacy paths in the slide area) bind here.
+
+Plans:
+**Wave 1**
+
+- [ ] 26-01-PLAN.md — Reconciliation data model: song-swap report (D-08), durable decline field (D-07), CAS shape
+- [ ] 26-02-PLAN.md — Song editor navigation target: link contract, opening tab, arrival handling (D-14/D-15)
+- [ ] 26-03-PLAN.md — Scripture editor navigation plumbing: expand-only entry point and relay (D-15)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 26-04-PLAN.md — Pending-update threading, durable-decline suppression, warning copy (D-06/D-07/D-08)
+- [ ] 26-05-PLAN.md — Drawer shell, selection seam, fresh-base writes, label and notes (D-01/D-02/D-03)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 26-06-PLAN.md — Reconcile confirm modal and the notice that opens it (R029, D-05..D-08)
+- [ ] 26-07-PLAN.md — Slide Text per source kind, both routes away, unsaved guard (D-13/D-14/D-15/D-16)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 26-08-PLAN.md — Slide Audio: scope routing, loop flag, video omission, unavailable state (D-09..D-12)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 26-09-PLAN.md — Duplicate and delete, plus duplicate-tolerant song reconciliation (D-04)
 
 ### Phase 27: Service Order Tab — Rename and Strip Slide Editing `risk:medium`
 
