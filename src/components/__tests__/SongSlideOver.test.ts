@@ -78,9 +78,9 @@ function makeSong(overrides: Partial<Song> = {}): Song {
 // The drawer's watch(() => props.open, ...) seeds form state from a false->true
 // transition (mirrors real usage — SongsView mounts it once with open=false and
 // flips it true on edit-click). Mount closed, then open it so that seeding runs.
-async function mountDrawer(song: Song | null) {
+async function mountDrawer(song: Song | null, initialTab?: 'details' | 'lyrics') {
   const wrapper = mount(SongSlideOver, {
-    props: { open: false, song },
+    props: { open: false, song, initialTab },
     global: {
       // Render Teleport's default slot in place — content actually teleported to
       // document.body isn't reachable via wrapper.find/findAll.
@@ -202,5 +202,68 @@ describe('SongSlideOver — tabs', () => {
     await wrapper.find('[data-testid="tab-lyrics"]').trigger('click')
     expect(wrapper.find('[data-testid="lyrics-tab-content"]').exists()).toBe(true)
     expect(wrapper.find('input[placeholder="Song title"]').exists()).toBe(false)
+  })
+})
+
+// Task 2 (26-02): an opening-tab input, read inside the SAME watcher that resets
+// the tab on every open — a value applied anywhere else is discarded, since that
+// watcher unconditionally resets the tab today.
+describe('SongSlideOver — opening tab (initialTab prop)', () => {
+  beforeEach(() => {
+    mockVwModeEnabled = true
+    mockAddSong.mockClear()
+    mockUpdateSong.mockClear()
+    mockDeleteSong.mockClear()
+  })
+
+  it('opens on Details when no opening tab is supplied (unchanged default)', async () => {
+    const song = makeSong()
+    const wrapper = await mountDrawer(song)
+    expect(wrapper.find('input[placeholder="Song title"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="lyrics-tab-content"]').exists()).toBe(false)
+  })
+
+  it('opens on Lyrics when the lyrics tab is requested', async () => {
+    const song = makeSong()
+    const wrapper = await mountDrawer(song, 'lyrics')
+    expect(wrapper.find('[data-testid="lyrics-tab-content"]').exists()).toBe(true)
+    expect(wrapper.find('input[placeholder="Song title"]').exists()).toBe(false)
+  })
+
+  it('opens on Details when the details tab is explicitly requested', async () => {
+    const song = makeSong()
+    const wrapper = await mountDrawer(song, 'details')
+    expect(wrapper.find('input[placeholder="Song title"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="lyrics-tab-content"]').exists()).toBe(false)
+  })
+
+  it('honours a newly requested tab on close-then-reopen rather than the previous request', async () => {
+    const song = makeSong()
+    const wrapper = await mountDrawer(song, 'lyrics')
+    expect(wrapper.find('[data-testid="lyrics-tab-content"]').exists()).toBe(true)
+
+    await wrapper.setProps({ open: false })
+    await wrapper.setProps({ initialTab: 'details' })
+    await wrapper.setProps({ open: true })
+
+    expect(wrapper.find('input[placeholder="Song title"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="lyrics-tab-content"]').exists()).toBe(false)
+  })
+
+  it('still allows a manual tab click after opening on a requested tab', async () => {
+    const song = makeSong()
+    const wrapper = await mountDrawer(song, 'lyrics')
+    expect(wrapper.find('[data-testid="lyrics-tab-content"]').exists()).toBe(true)
+
+    await wrapper.find('[data-testid="tab-details"]').trigger('click')
+
+    expect(wrapper.find('input[placeholder="Song title"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="lyrics-tab-content"]').exists()).toBe(false)
+  })
+
+  it('leaves create mode unaffected — no tab bar even with an opening tab requested', async () => {
+    const wrapper = await mountDrawer(null, 'lyrics')
+    expect(wrapper.find('[data-testid="tab-bar"]').exists()).toBe(false)
+    expect(wrapper.find('input[placeholder="Song title"]').exists()).toBe(true)
   })
 })
