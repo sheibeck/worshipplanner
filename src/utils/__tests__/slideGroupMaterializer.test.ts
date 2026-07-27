@@ -641,6 +641,131 @@ describe('reconcileSongGroup', () => {
       expect(staleSongOneEntries).toHaveLength(0)
     })
   })
+
+  // Phase 26-09 Task 1: a copied song-section slide (the panel's Duplicate
+  // action, Task 2) stores TWO entries referencing the SAME sectionId. This
+  // additive merge must keep BOTH — the pre-26-09 behavior collapsed a
+  // repeated sectionId to its last-seen entry, which would silently swallow
+  // the copy on the very next reconciliation, with no confirm gate, because
+  // this path never confirm-gates.
+  describe('duplicate-tolerant merge (Phase 26-09 Task 1)', () => {
+    function storedSlidesWithDuplicateVerse(): SlideGroup['slides'] {
+      return [
+        { id: 'e-copyright-lead', order: 0, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+        { id: 'e-verse-1', order: 1, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' } },
+        {
+          id: 'e-verse-1-copy',
+          order: 2,
+          sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+          label: 'Copy label',
+          notes: 'Copy note',
+          audioUrl: 'https://example.com/copy.mp3',
+          audioLoop: true,
+        },
+        { id: 'e-chorus', order: 3, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'chorus' } },
+        { id: 'e-copyright-trail', order: 4, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+      ]
+    }
+
+    it('keeps BOTH stored entries for the same song section, in stored order, each with its own id', () => {
+      const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
+      const group = makeStoredSongGroup(storedSlidesWithDuplicateVerse())
+      const lyrics = makeSongLyrics()
+      const inputs = makeInputs({
+        songLyricsById: new Map([['song-1', lyrics]]),
+        performanceOrderById: new Map([['song-1', ['verse-1', 'chorus']]]),
+      })
+
+      const result = reconcileSongGroup(group, slot, inputs)
+
+      const verseEntries = result.slides.filter(
+        (e) => e.sourceRef.kind === 'lyric' && e.sourceRef.sectionId === 'verse-1',
+      )
+      expect(verseEntries).toHaveLength(2)
+      expect(verseEntries.map((e) => e.id)).toEqual(['e-verse-1', 'e-verse-1-copy'])
+      expect(new Set(verseEntries.map((e) => e.id)).size).toBe(2)
+    })
+
+    it('the surviving copies keep their own label, notes, audio and loop values', () => {
+      const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
+      const group = makeStoredSongGroup(storedSlidesWithDuplicateVerse())
+      const lyrics = makeSongLyrics()
+      const inputs = makeInputs({
+        songLyricsById: new Map([['song-1', lyrics]]),
+        performanceOrderById: new Map([['song-1', ['verse-1', 'chorus']]]),
+      })
+
+      const result = reconcileSongGroup(group, slot, inputs)
+
+      const copyEntry = result.slides.find((e) => e.id === 'e-verse-1-copy')
+      expect(copyEntry?.label).toBe('Copy label')
+      expect(copyEntry?.notes).toBe('Copy note')
+      expect(copyEntry?.audioUrl).toBe('https://example.com/copy.mp3')
+      expect(copyEntry?.audioLoop).toBe(true)
+
+      const originalEntry = result.slides.find((e) => e.id === 'e-verse-1')
+      expect(originalEntry?.label).toBeUndefined()
+    })
+
+    it('one entry per section still behaves exactly as before this change', () => {
+      const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
+      const group = makeStoredSongGroup(twoSectionStoredSlides)
+      const lyrics = makeSongLyrics()
+      const inputs = makeInputs({
+        songLyricsById: new Map([['song-1', lyrics]]),
+        performanceOrderById: new Map([['song-1', ['verse-1', 'chorus']]]),
+      })
+
+      const result = reconcileSongGroup(group, slot, inputs)
+
+      expect(result.changed).toBe(false)
+      expect(result.slides).toEqual(group.slides)
+    })
+
+    it('order values stay contiguous from 0 across a duplicated section, an inserted section, and a retained-unresolvable one', () => {
+      const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
+      const group = makeStoredSongGroup([
+        { id: 'e-copyright-lead', order: 0, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+        { id: 'e-verse-1', order: 1, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' } },
+        { id: 'e-verse-1-copy', order: 2, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' } },
+        {
+          id: 'e-outro',
+          order: 3,
+          sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'outro' },
+          label: 'Keep me',
+        },
+        { id: 'e-copyright-trail', order: 4, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+      ])
+      // 'outro' no longer resolves; 'bridge' is newly present.
+      const lyrics = makeSongLyrics({
+        sections: [
+          { id: 'verse-1', label: 'Verse 1', lines: ['Line A'] },
+          { id: 'bridge', label: 'Bridge', lines: ['Line D'] },
+        ],
+      })
+      const inputs = makeInputs({
+        songLyricsById: new Map([['song-1', lyrics]]),
+        performanceOrderById: new Map([['song-1', ['verse-1', 'bridge']]]),
+      })
+
+      const result = reconcileSongGroup(group, slot, inputs)
+
+      expect(result.slides.map((e) => e.order)).toEqual(result.slides.map((_, i) => i))
+      const verseEntries = result.slides.filter(
+        (e) => e.sourceRef.kind === 'lyric' && e.sourceRef.sectionId === 'verse-1',
+      )
+      expect(verseEntries).toHaveLength(2)
+      const bridgeEntry = result.slides.find(
+        (e) => e.sourceRef.kind === 'lyric' && e.sourceRef.sectionId === 'bridge',
+      )
+      expect(bridgeEntry).toBeDefined()
+      const outroEntry = result.slides.find((e) => e.id === 'e-outro')
+      expect(outroEntry).toBeDefined()
+      expect(outroEntry?.label).toBe('Keep me')
+      const copyrightEntries = result.slides.filter((e) => e.sourceRef.kind === 'copyright')
+      expect(copyrightEntries).toHaveLength(2)
+    })
+  })
 })
 
 describe('reconcileScriptureGroup', () => {

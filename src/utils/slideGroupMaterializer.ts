@@ -288,7 +288,25 @@ export function reconcileSongGroup(group: SlideGroup, slot: SongSlot, inputs: As
   const freshSectionIds = new Set(freshOrder)
 
   const storedLyricEntries = group.slides.filter(isLyricEntry)
-  const storedBySectionId = new Map(storedLyricEntries.map((entry) => [entry.sourceRef.sectionId, entry]))
+  // Phase 26-09 Task 1: indexed as an ARRAY per sectionId, never collapsed to
+  // a single entry. The panel's Duplicate action (26-09 Task 2) can create a
+  // SECOND stored entry referencing the SAME sectionId (a copy of a
+  // song-section slide) — the pre-26-09 map kept only the LAST entry seen for
+  // a repeated key, so a copy would be silently swallowed the very next time
+  // this song's sections changed, with no confirm gate, because this additive
+  // merge never confirm-gates (it is the same path a plain within-song edit
+  // takes). Every stored entry for a section is kept, in stored order, and
+  // the rebuild below re-emits all of them for that section in that order —
+  // never just the first or the last.
+  const storedBySectionId = new Map<string, GroupSlideEntry[]>()
+  for (const entry of storedLyricEntries) {
+    const existing = storedBySectionId.get(entry.sourceRef.sectionId)
+    if (existing) {
+      existing.push(entry)
+    } else {
+      storedBySectionId.set(entry.sourceRef.sectionId, [entry])
+    }
+  }
 
   const storedCopyrightEntries = group.slides.filter(isCopyrightEntry).sort((a, b) => a.order - b.order)
   const leadingCopyright = storedCopyrightEntries[0]
@@ -306,11 +324,13 @@ export function reconcileSongGroup(group: SlideGroup, slot: SongSlot, inputs: As
 
   for (const sectionId of freshOrder) {
     const stored = storedBySectionId.get(sectionId)
-    merged.push(
-      stored
-        ? { ...stored, order: order++ }
-        : { id: crypto.randomUUID(), order: order++, sourceRef: { kind: 'lyric', songId, sectionId } },
-    )
+    if (stored) {
+      for (const entry of stored) {
+        merged.push({ ...entry, order: order++ })
+      }
+    } else {
+      merged.push({ id: crypto.randomUUID(), order: order++, sourceRef: { kind: 'lyric', songId, sectionId } })
+    }
   }
 
   // Retained-but-unresolvable entries — kept relative to each other, appended
