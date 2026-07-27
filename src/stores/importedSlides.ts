@@ -76,7 +76,7 @@ export const useImportedSlides = defineStore('importedSlides', () => {
     await updateDoc(
       doc(db, 'organizations', orgId, 'importedSlides', importId),
       {
-        // stripUndefined: guards the edit path (ImportedSlideEditor) from the same
+        // stripUndefined: guards deck-slide updates from the same
         // "Unsupported field value: undefined" Firestore rejection as the import path.
         ...stripUndefined(data),
         updatedAt: serverTimestamp(),
