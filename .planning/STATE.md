@@ -2,17 +2,17 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Slides Tab Rework
-current_phase: 26
-current_phase_name: Edit Slide Drawer
-status: verifying
-stopped_at: Completed 26-09-PLAN.md (Phase 26 all 9 plans executed -- ready for verification)
-last_updated: "2026-07-27T07:11:35.904Z"
+current_phase: 27
+current_phase_name: Service Order Tab — Rename and Strip Slide Editing
+status: executing
+stopped_at: Completed 27-01-PLAN.md
+last_updated: "2026-07-27T11:51:50.338Z"
 last_activity: 2026-07-27
 progress:
   total_phases: 17
   completed_phases: 14
-  total_plans: 90
-  completed_plans: 90
+  total_plans: 95
+  completed_plans: 91
   percent: 82
 last_activity_desc: Opened v1.3 Slides Tab Rework (Phases 24-28) from the Claude Design import; v1.2 left code-complete with its verification ledger intact
 ---
@@ -24,7 +24,7 @@ last_activity_desc: Opened v1.3 Slides Tab Rework (Phases 24-28) from the Claude
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 26 — Edit Slide Drawer
+**Current focus:** Phase 27 — Service Order Tab — Rename and Strip Slide Editing
 
 > **v1.2 → v1.3 handoff (2026-07-25).** v1.2 is code-complete (Phases 18-23, all plans committed)
 > but its human-verify batch is still outstanding. v1.2 was deliberately **not** archived: running
@@ -35,10 +35,10 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 
 ## Current Position
 
-Phase: 26 (Edit Slide Drawer) — EXECUTING
-Plan: 9 of 9
+Phase: 27 (Service Order Tab — Rename and Strip Slide Editing) — EXECUTING
+Plan: 2 of 5
 Milestone: v1.3 Slides Tab Rework (Phases 24-28) — IN PROGRESS
-Status: Phase complete — ready for verification
+Status: Ready to execute
 
 Phases 20, 21, 22 and 23 are all code-complete; only their deferred human-verify checkpoints remain
 (see the Deferred Verification table below).
@@ -65,7 +65,9 @@ Phases 20, 21, 22 and 23 are all code-complete; only their deferred human-verify
 scope + loop, `Duplicate`, and delete behind a warning naming what is lost.
 
 **Phase 26 closed the reconciliation debt** Phases 24 and 25 both deferred: `SlideGroup.dismissedSignature`
+
 + `dismissReconciliation` give a per-divergence durable dismissal, and `ReconcileResult.songSwap` carries
+
 the old/new song ids so the song-identity-swap confirm (Phase 24's CR-01 blocker) can name both songs.
 The Phase 25 limitation where a diverged group was stuck showing a passive banner is resolved.
 
@@ -374,6 +376,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 26 P07 | 55min | 3 tasks | 4 files |
 | Phase 26 P08 | 50min | 3 tasks | 2 files |
 | Phase 26 P09 | 55 | 3 tasks | 8 files |
+| Phase 27 P01 | 5min | 1 tasks | 0 files |
 
 ## Accumulated Context
 
@@ -518,6 +521,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 26-09: reconcileSongGroup's per-section index widened from Map<sectionId, entry> to Map<sectionId, entry[]> so a duplicated song-section slide survives the next within-song reconciliation instead of being silently dropped (landed before Duplicate shipped)
 - [Phase ?]: 26-09: Duplicate's selection-follows-copy is success-gated -- the drawer emits 'duplicate' (and SlidesTab.vue moves the selection) only after replaceGroupSlides resolves, so a rejected write never leaves the panel pointed at an entry that was never created
 - [Phase ?]: 26-09: deleteSlideConfirmBody lives in the pure slideDisplay module (not inline in EditSlideDrawer.vue), keyed on the entry's OWN audio/notes only -- never the group's shared bed music
+- [Phase ?]: D-05: Present Slideshow moves to the Slides tab (27-01 checkpoint resolved 2026-07-27)
 
 ### Roadmap Evolution
 
@@ -577,6 +581,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-27
-Last session: 2026-07-27T07:11:35.843Z
-Stopped at: Completed 26-09-PLAN.md (Phase 26 all 9 plans executed -- ready for verification)
+Last session: 2026-07-27T11:51:50.291Z
+Stopped at: Completed 27-01-PLAN.md
 Resume file: None

@@ -272,7 +272,8 @@ Plans:
 **Plans:** 5 plans
 
 Plans:
-- [ ] 27-01-PLAN.md — Decision checkpoint: where "Present Slideshow" lives after the strip (its only trigger is the panel being removed, and the Slides tab has no replacement)
+
+- [x] 27-01-PLAN.md — Decision checkpoint: where "Present Slideshow" lives after the strip (its only trigger is the panel being removed, and the Slides tab has no replacement)
 - [ ] 27-02-PLAN.md — Rename the first tab and its internal value to Service Order (D-03), plus a stable panel test seam
 - [ ] 27-03-PLAN.md — Strip the imported-deck editor and both section-scoped PPTX import surfaces; delete `ImportedSlideEditor`
 - [ ] 27-04-PLAN.md — Strip the per-plan-item media control and its view-level helpers; delete `SlotMediaAttachment`
