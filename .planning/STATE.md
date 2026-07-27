@@ -57,6 +57,31 @@ Phases 20, 21, 22 and 23 are all code-complete; only their deferred human-verify
 | 24 Slide Group Model and Migration | 6/6 | 1 critical + 2 warning, all fixed | See `24-REVIEW.md` / `24-REVIEW-FIX.md` |
 | 25 Slides Tab Shell — Plan Rail and Slide Grid | 7/7 | 2 critical + 2 warning, all fixed | See `25-REVIEW.md` / `25-REVIEW-FIX.md`. Also carries the mid-phase D-18/D-19 model deletion. |
 | 26 Edit Slide Drawer | 9/9 | 3 critical + 1 warning, all fixed | See `26-REVIEW.md` / `26-REVIEW-FIX.md`. **Closed Phase 24+25's deferred reconciliation-confirm debt.** |
+| 27 Service Order Tab — Rename and Strip Slide Editing | 5/5 | **0 critical**, 1 warning fixed | See `27-REVIEW.md` / `27-REVIEW-FIX.md`. Clean removal — reviewer traced all load-bearing paths end to end. |
+
+**Phase 27 shipped:** first tab renamed **Music → Service Order** (label AND the `activeTab` union value,
+now `'service-order' | 'roles' | 'slides'`); the deck editor, both PPTX-import menu entries, the per-slot
+media control and the slideshow preview stripped off it; `ImportedSlideEditor`, `SlotMediaAttachment` and
+`SlideshowPreview` deleted with their tests (D-02/D-19); and the `▶ Present` CTA moved to the Slides tab.
+
+**Two ROADMAP premises proved false during Phase 27** — it claimed the phase "runs after 25-26 so the
+functionality has a new home before it leaves the old one." That was wrong twice, and both were caught
+before anything broke:
+- **Scripture editing (D-01):** Phase 26's "Edit in scripture" link navigates *back* to this tab.
+  Resolved by keeping `ScriptureSlideEditor` on Service Order — choosing the passage and reading mode is
+  service-order content, not slide editing.
+- **Presenting (D-05, user decision):** `SlideshowPreview` carried the ONLY trigger for Phase 23's
+  `PresentationViewer`, and the Slides tab had no present affordance. Resolved by moving `▶ Present` to
+  the Slides tab — the one new affordance Phase 27 was authorized to build.
+
+**Phase 27 kept deliberately** (verified intact by review): Phase 24 D-01's lazy `ServiceSlot.id`
+backfill (production data), the section-assignment `<select>` (D-04), the group delete cascade + warning,
+the `expandScriptureEditor` / `handleNavigateToScriptureEditor` relay, the group-bed audio write path,
+and autosave. `PptxImportModal.vue` survived (`SlideGrid` imports it) as did `PresentationViewer`.
+
+**Known pre-existing dead code, deliberately NOT touched:** `isSlotPopulated` in `ServiceEditorView.vue`
+has been unreachable since Phase 12-05. Out of scope for a removal phase that had already closed —
+flagged in `27-REVIEW.md` as IN-01 for a future cleanup.
 
 **Phase 26 shipped:** `EditSlideDrawer.vue` (scrimless floating panel that follows the grid selection),
 `ReconcileConfirmModal.vue`, per-kind slide text keyed on `sourceRef.kind`, "Edit in song" via a new
