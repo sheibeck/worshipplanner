@@ -150,10 +150,9 @@ function makeGroup(overrides: Partial<SlideGroup> = {}): SlideGroup {
 describe('deriveGroupEntries — SONG', () => {
   it('derives copyright, lyric, lyric, copyright in order for a 2-section song', () => {
     const slot = songSlot({ songId: 'song-1' })
-    const lyrics = makeSongLyrics()
+    const lyrics = makeSongLyrics({ performanceOrder: ['verse-1', 'chorus'] })
     const inputs = makeInputs({
       songLyricsById: new Map([['song-1', lyrics]]),
-      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus']]]),
     })
 
     const entries = deriveGroupEntries(slot, inputs)
@@ -176,10 +175,9 @@ describe('deriveGroupEntries — SONG', () => {
 
   it('no derived entry contains slide text', () => {
     const slot = songSlot({ songId: 'song-1' })
-    const lyrics = makeSongLyrics()
+    const lyrics = makeSongLyrics({ performanceOrder: ['verse-1', 'chorus'] })
     const inputs = makeInputs({
       songLyricsById: new Map([['song-1', lyrics]]),
-      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus']]]),
     })
 
     const entries = deriveGroupEntries(slot, inputs)
@@ -272,10 +270,9 @@ describe('deriveGroupEntries — PRAYER/MESSAGE/HYMN', () => {
 describe('buildInitialGroup', () => {
   it('never sets bedAudioUrl — no legacy slot-media migration exists under D-19', () => {
     const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
-    const lyrics = makeSongLyrics()
+    const lyrics = makeSongLyrics({ performanceOrder: ['verse-1', 'chorus'] })
     const inputs = makeInputs({
       songLyricsById: new Map([['song-1', lyrics]]),
-      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus']]]),
     })
 
     const group = buildInitialGroup(slot, 'svc-1', inputs)
@@ -356,6 +353,7 @@ describe('reconcileSongGroup', () => {
         { id: 'chorus', label: 'Chorus', lines: ['Line C'] },
         { id: 'bridge', label: 'Bridge', lines: ['Line D'] },
       ],
+      performanceOrder: ['verse-1', 'chorus', 'bridge'],
     })
 
   it('a song that gains a Bridge yields stored entries untouched plus a new lyric entry for it', () => {
@@ -364,7 +362,6 @@ describe('reconcileSongGroup', () => {
     const lyrics = threeSectionLyrics()
     const inputs = makeInputs({
       songLyricsById: new Map([['song-1', lyrics]]),
-      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus', 'bridge']]]),
     })
 
     const result = reconcileSongGroup(group, slot, inputs)
@@ -397,7 +394,6 @@ describe('reconcileSongGroup', () => {
     const lyrics = threeSectionLyrics()
     const inputs = makeInputs({
       songLyricsById: new Map([['song-1', lyrics]]),
-      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus', 'bridge']]]),
     })
 
     const result = reconcileSongGroup(group, slot, inputs)
@@ -443,7 +439,6 @@ describe('reconcileSongGroup', () => {
     const lyrics = threeSectionLyrics()
     const inputs = makeInputs({
       songLyricsById: new Map([['song-1', lyrics]]),
-      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus', 'bridge']]]),
     })
 
     const result = reconcileSongGroup(group, slot, inputs)
@@ -465,10 +460,9 @@ describe('reconcileSongGroup', () => {
   it('reconciling an already-in-sync group returns changed: false and an entry list deep-equal to the stored one', () => {
     const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
     const group = makeStoredSongGroup(twoSectionStoredSlides)
-    const lyrics = makeSongLyrics()
+    const lyrics = makeSongLyrics({ performanceOrder: ['verse-1', 'chorus'] })
     const inputs = makeInputs({
       songLyricsById: new Map([['song-1', lyrics]]),
-      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus']]]),
     })
 
     const result = reconcileSongGroup(group, slot, inputs)
@@ -483,7 +477,6 @@ describe('reconcileSongGroup', () => {
     const lyrics = threeSectionLyrics()
     const inputs = makeInputs({
       songLyricsById: new Map([['song-1', lyrics]]),
-      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus', 'bridge']]]),
     })
 
     const result = reconcileSongGroup(group, slot, inputs)
@@ -500,7 +493,6 @@ describe('reconcileSongGroup', () => {
     const lyrics = threeSectionLyrics()
     const inputs = makeInputs({
       songLyricsById: new Map([['song-1', lyrics]]),
-      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus', 'bridge']]]),
     })
 
     const result = reconcileSongGroup(group, slot, inputs)
@@ -518,6 +510,7 @@ describe('reconcileSongGroup', () => {
       makeSongLyrics({
         songId: 'song-b',
         sections: [{ id: 'verse-1-b', label: 'Verse 1', lines: ['Song B line'] }],
+        performanceOrder: ['verse-1-b'],
       })
 
     it('an uncustomized group is replaced wholesale when slot.songId changes to a different song', () => {
@@ -526,7 +519,6 @@ describe('reconcileSongGroup', () => {
       const lyrics = songBLyrics()
       const inputs = makeInputs({
         songLyricsById: new Map([['song-b', lyrics]]),
-        performanceOrderById: new Map([['song-b', ['verse-1-b']]]),
       })
 
       const result = reconcileSongGroup(group, slot, inputs)
@@ -560,7 +552,6 @@ describe('reconcileSongGroup', () => {
       const lyrics = songBLyrics()
       const inputs = makeInputs({
         songLyricsById: new Map([['song-b', lyrics]]),
-        performanceOrderById: new Map([['song-b', ['verse-1-b']]]),
       })
 
       const result = reconcileSongGroup(group, slot, inputs)
@@ -594,7 +585,6 @@ describe('reconcileSongGroup', () => {
       const lyrics = songBLyrics()
       const inputs = makeInputs({
         songLyricsById: new Map([['song-b', lyrics]]),
-        performanceOrderById: new Map([['song-b', ['verse-1-b']]]),
       })
 
       const result = reconcileSongGroup(group, slot, inputs)
@@ -609,7 +599,6 @@ describe('reconcileSongGroup', () => {
       const lyrics = songBLyrics()
       const inputs = makeInputs({
         songLyricsById: new Map([['song-b', lyrics]]),
-        performanceOrderById: new Map([['song-b', ['verse-1-b']]]),
       })
 
       const result = reconcileSongGroup(group, slot, inputs)
@@ -629,7 +618,6 @@ describe('reconcileSongGroup', () => {
       const lyrics = songBLyrics()
       const inputs = makeInputs({
         songLyricsById: new Map([['song-b', lyrics]]),
-        performanceOrderById: new Map([['song-b', ['verse-1-b']]]),
       })
 
       const result = reconcileSongGroup(group, slot, inputs)
@@ -670,10 +658,9 @@ describe('reconcileSongGroup', () => {
     it('keeps BOTH stored entries for the same song section, in stored order, each with its own id', () => {
       const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
       const group = makeStoredSongGroup(storedSlidesWithDuplicateVerse())
-      const lyrics = makeSongLyrics()
+      const lyrics = makeSongLyrics({ performanceOrder: ['verse-1', 'chorus'] })
       const inputs = makeInputs({
         songLyricsById: new Map([['song-1', lyrics]]),
-        performanceOrderById: new Map([['song-1', ['verse-1', 'chorus']]]),
       })
 
       const result = reconcileSongGroup(group, slot, inputs)
@@ -689,10 +676,9 @@ describe('reconcileSongGroup', () => {
     it('the surviving copies keep their own label, notes, audio and loop values', () => {
       const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
       const group = makeStoredSongGroup(storedSlidesWithDuplicateVerse())
-      const lyrics = makeSongLyrics()
+      const lyrics = makeSongLyrics({ performanceOrder: ['verse-1', 'chorus'] })
       const inputs = makeInputs({
         songLyricsById: new Map([['song-1', lyrics]]),
-        performanceOrderById: new Map([['song-1', ['verse-1', 'chorus']]]),
       })
 
       const result = reconcileSongGroup(group, slot, inputs)
@@ -710,10 +696,9 @@ describe('reconcileSongGroup', () => {
     it('one entry per section still behaves exactly as before this change', () => {
       const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
       const group = makeStoredSongGroup(twoSectionStoredSlides)
-      const lyrics = makeSongLyrics()
+      const lyrics = makeSongLyrics({ performanceOrder: ['verse-1', 'chorus'] })
       const inputs = makeInputs({
         songLyricsById: new Map([['song-1', lyrics]]),
-        performanceOrderById: new Map([['song-1', ['verse-1', 'chorus']]]),
       })
 
       const result = reconcileSongGroup(group, slot, inputs)
@@ -742,10 +727,10 @@ describe('reconcileSongGroup', () => {
           { id: 'verse-1', label: 'Verse 1', lines: ['Line A'] },
           { id: 'bridge', label: 'Bridge', lines: ['Line D'] },
         ],
+        performanceOrder: ['verse-1', 'bridge'],
       })
       const inputs = makeInputs({
         songLyricsById: new Map([['song-1', lyrics]]),
-        performanceOrderById: new Map([['song-1', ['verse-1', 'bridge']]]),
       })
 
       const result = reconcileSongGroup(group, slot, inputs)
@@ -914,6 +899,7 @@ describe('D-17 — reconciliation carries video and authored-text entries throug
         { id: 'chorus', label: 'Chorus', lines: ['Line C'] },
         { id: 'bridge', label: 'Bridge', lines: ['Line D'] },
       ],
+      performanceOrder: ['verse-1', 'chorus', 'bridge'],
     })
 
   it('a song group holding a video entry keeps that entry (original id/source) after a reconciliation triggered by an added lyric section, positioned after the lyric run and before the trailing copyright', () => {
@@ -926,7 +912,6 @@ describe('D-17 — reconciliation carries video and authored-text entries throug
     const lyrics = threeSectionLyrics()
     const inputs = makeInputs({
       songLyricsById: new Map([['song-1', lyrics]]),
-      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus', 'bridge']]]),
     })
 
     const result = reconcileSongGroup(group, slot, inputs)
@@ -955,7 +940,6 @@ describe('D-17 — reconciliation carries video and authored-text entries throug
     const lyrics = threeSectionLyrics()
     const inputs = makeInputs({
       songLyricsById: new Map([['song-1', lyrics]]),
-      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus', 'bridge']]]),
     })
 
     const result = reconcileSongGroup(group, slot, inputs)
@@ -971,7 +955,6 @@ describe('D-17 — reconciliation carries video and authored-text entries throug
     const lyrics = threeSectionLyrics()
     const inputs = makeInputs({
       songLyricsById: new Map([['song-1', lyrics]]),
-      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus', 'bridge']]]),
     })
 
     const result = reconcileSongGroup(group, slot, inputs)
@@ -1035,10 +1018,9 @@ describe('D-17 — reconciliation carries video and authored-text entries throug
 describe('reconcileGroup dispatcher', () => {
   it('dispatches SONG to the additive path (never confirm-gated)', () => {
     const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
-    const lyrics = makeSongLyrics()
+    const lyrics = makeSongLyrics({ performanceOrder: ['verse-1', 'chorus'] })
     const inputs = makeInputs({
       songLyricsById: new Map([['song-1', lyrics]]),
-      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus']]]),
     })
     const group = makeGroup({ id: 'slot-1', slotId: 'slot-1', slides: deriveGroupEntries(slot, inputs) })
 
@@ -1101,10 +1083,10 @@ describe('reconcileGroup dispatcher', () => {
     const lyrics = makeSongLyrics({
       songId: 'song-b',
       sections: [{ id: 'verse-1-b', label: 'Verse 1', lines: ['Song B line'] }],
+      performanceOrder: ['verse-1-b'],
     })
     const inputs = makeInputs({
       songLyricsById: new Map([['song-b', lyrics]]),
-      performanceOrderById: new Map([['song-b', ['verse-1-b']]]),
     })
 
     const result = reconcileGroup(group, slot, inputs)

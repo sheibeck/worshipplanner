@@ -256,8 +256,8 @@ describe('useSlideshowAssembly', () => {
 
   it('gathers current lyrics for EVERY distinct song in the service, not just one', async () => {
     songsState.songs = [
-      { id: 'song-a', performanceOrder: ['v1'] } as Song,
-      { id: 'song-b', performanceOrder: ['v1'] } as Song,
+      { id: 'song-a' } as Song,
+      { id: 'song-b' } as Song,
     ]
 
     const fakeLyricsLoader = vi.fn(async (_orgId: string, songId: string) => makeLyrics(songId))
@@ -514,7 +514,7 @@ describe('useSlideshowAssembly', () => {
 
     it('a SONG slot with songId null produces no call; assigning a song later produces exactly one call carrying no bed (D-19: no legacy slot-media migration)', async () => {
       const fakeLyricsLoader = vi.fn(async (_orgId: string, songId: string) => makeLyrics(songId))
-      songsState.songs = [{ id: 'song-a', performanceOrder: ['v1'] } as Song]
+      songsState.songs = [{ id: 'song-a' } as Song]
       const service = ref<Service | null>(
         makeService([songSlot({ position: 0, id: 'slot-song-a', songId: null })]),
       )
@@ -558,7 +558,7 @@ describe('useSlideshowAssembly', () => {
     })
 
     it('the same song assigned to two different slots produces two calls with two distinct slotId values', async () => {
-      songsState.songs = [{ id: 'song-a', performanceOrder: ['v1'] } as Song]
+      songsState.songs = [{ id: 'song-a' } as Song]
       const fakeLyricsLoader = vi.fn(async () => makeLyrics('song-a'))
       const service = ref<Service | null>(
         makeService([
@@ -589,7 +589,7 @@ describe('useSlideshowAssembly', () => {
   // --- Task 3: trigger reconciliation, apply the additive result, surface confirm-required ones ---
   describe('reconciliation (Task 3)', () => {
     it('a song group whose source gained a section reconciles automatically, preserving the pre-existing customized entry', async () => {
-      songsState.songs = [{ id: 'song-a', performanceOrder: ['v1', 'v2'] } as Song]
+      songsState.songs = [{ id: 'song-a' } as Song]
       const twoSectionLyrics: SongLyrics = {
         id: 'lyrics-song-a',
         songId: 'song-a',
@@ -654,7 +654,7 @@ describe('useSlideshowAssembly', () => {
     // identity swap, not a section-level edit — it must never blend the old
     // song's copyright/lyric entries with the new song's.
     it('an uncustomized group replaces wholesale when slot.songId changes to a different song, with no stale entries from the old song', async () => {
-      songsState.songs = [{ id: 'song-a', performanceOrder: ['v1'] } as Song, { id: 'song-b', performanceOrder: ['v1'] } as Song]
+      songsState.songs = [{ id: 'song-a' } as Song, { id: 'song-b' } as Song]
       const fakeLyricsLoader = vi.fn(async (_orgId: string, songId: string) => makeLyrics(songId))
 
       slideGroupsState.groups = [
@@ -694,7 +694,7 @@ describe('useSlideshowAssembly', () => {
     })
 
     it('a customized group requires confirm (zero writes) when slot.songId changes to a different song', async () => {
-      songsState.songs = [{ id: 'song-a', performanceOrder: ['v1'] } as Song, { id: 'song-b', performanceOrder: ['v1'] } as Song]
+      songsState.songs = [{ id: 'song-a' } as Song, { id: 'song-b' } as Song]
       const fakeLyricsLoader = vi.fn(async (_orgId: string, songId: string) => makeLyrics(songId))
 
       slideGroupsState.groups = [
@@ -1016,8 +1016,8 @@ describe('useSlideshowAssembly', () => {
 
     it('a confirm-required SONG REASSIGNMENT stores both the old and new song titles resolved from the catalogue', async () => {
       songsState.songs = [
-        { id: 'song-a', title: 'Old Song Title', performanceOrder: ['v1'] } as Song,
-        { id: 'song-b', title: 'New Song Title', performanceOrder: ['v1'] } as Song,
+        { id: 'song-a', title: 'Old Song Title' } as Song,
+        { id: 'song-b', title: 'New Song Title' } as Song,
       ]
       const fakeLyricsLoader = vi.fn(async (_orgId: string, songId: string) => makeLyrics(songId))
 
@@ -1060,7 +1060,7 @@ describe('useSlideshowAssembly', () => {
 
     it('a confirm-required SONG REASSIGNMENT with the old song absent from the catalogue stores a generic label, never an id or empty value', async () => {
       // song-a (the OLD, stored song) has been deleted from the catalogue.
-      songsState.songs = [{ id: 'song-b', title: 'New Song Title', performanceOrder: ['v1'] } as Song]
+      songsState.songs = [{ id: 'song-b', title: 'New Song Title' } as Song]
       const fakeLyricsLoader = vi.fn(async (_orgId: string, songId: string) => makeLyrics(songId))
 
       slideGroupsState.groups = [
@@ -1468,7 +1468,7 @@ describe('useSlideshowAssembly', () => {
   // not on internal composable state.
   describe('D-17 — dropped video survives reconciliation (25-01 Task 3)', () => {
     it('a song group holding a video entry keeps that entry in the slide list passed to replaceGroupSlides after a lyric change triggers reconciliation', async () => {
-      songsState.songs = [{ id: 'song-a', performanceOrder: ['v1', 'v2'] } as Song]
+      songsState.songs = [{ id: 'song-a' } as Song]
       const twoSectionLyrics: SongLyrics = {
         id: 'lyrics-song-a',
         songId: 'song-a',

@@ -176,10 +176,9 @@ describe('assembleSlideshow — song resolution', () => {
   it('emits leading copyright, ordered section slides, trailing copyright for a 2-section song', () => {
     const slot = songSlot({ songId: 'song-1', songTitle: 'Amazing Grace', songKey: 'G' })
     const service = makeService([slot])
-    const lyrics = makeSongLyrics()
+    const lyrics = makeSongLyrics({ performanceOrder: ['verse-1', 'chorus'] })
     const inputs = makeInputs({
       songLyricsById: new Map([['song-1', lyrics]]),
-      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus']]]),
     })
 
     const result = assembleSlideshow(service, inputs)
@@ -195,10 +194,9 @@ describe('assembleSlideshow — song resolution', () => {
   it('every emitted slide from a song slot carries slotIndex, slotKind, section, and sourceId', () => {
     const slot = songSlot({ songId: 'song-1', section: 'worship' })
     const service = makeService([slot])
-    const lyrics = makeSongLyrics()
+    const lyrics = makeSongLyrics({ performanceOrder: ['verse-1', 'chorus'] })
     const inputs = makeInputs({
       songLyricsById: new Map([['song-1', lyrics]]),
-      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus']]]),
     })
 
     const result = assembleSlideshow(service, inputs)
@@ -225,27 +223,12 @@ describe('assembleSlideshow — song resolution', () => {
     expect((result[2]!.slide as LyricSlide).sectionId).toBe('verse-1')
   })
 
-  it('falls back to lyrics.sections stored order when both performanceOrderById and lyrics.performanceOrder are empty', () => {
-    const slot = songSlot({ songId: 'song-1' })
-    const service = makeService([slot])
-    const lyrics = makeSongLyrics({ performanceOrder: [] })
-    const inputs = makeInputs({
-      songLyricsById: new Map([['song-1', lyrics]]),
-    })
-
-    const result = assembleSlideshow(service, inputs)
-
-    expect((result[1]!.slide as LyricSlide).sectionId).toBe('verse-1')
-    expect((result[2]!.slide as LyricSlide).sectionId).toBe('chorus')
-  })
-
   it('skips order entries that do not resolve to a known lyrics.section, without throwing', () => {
     const slot = songSlot({ songId: 'song-1' })
     const service = makeService([slot])
-    const lyrics = makeSongLyrics()
+    const lyrics = makeSongLyrics({ performanceOrder: ['verse-1', 'bogus-section', 'chorus'] })
     const inputs = makeInputs({
       songLyricsById: new Map([['song-1', lyrics]]),
-      performanceOrderById: new Map([['song-1', ['verse-1', 'bogus-section', 'chorus']]]),
     })
 
     expect(() => assembleSlideshow(service, inputs)).not.toThrow()
@@ -467,10 +450,9 @@ describe('assembleSlideshow — media propagation (R013/R014)', () => {
   it('a slot with no group produces slides whose audioUrl is undefined (D-19: no legacy slot-media fallback)', () => {
     const slot = songSlot({ songId: 'song-1' })
     const service = makeService([slot])
-    const lyrics = makeSongLyrics()
+    const lyrics = makeSongLyrics({ performanceOrder: ['verse-1', 'chorus'] })
     const inputs = makeInputs({
       songLyricsById: new Map([['song-1', lyrics]]),
-      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus']]]),
     })
 
     const result = assembleSlideshow(service, inputs)
@@ -504,7 +486,7 @@ describe('assembleSlideshow — section metadata pass-through', () => {
     const prayerSlotMessage: NonAssignableSlot = { kind: 'PRAYER', id: 'slot-prayer-2', position: 2, section: 'message' }
     const songSlotSending = songSlot({ songId: 'song-2', section: 'sending', position: 3 })
 
-    const lyrics1 = makeSongLyrics()
+    const lyrics1 = makeSongLyrics({ performanceOrder: ['verse-1', 'chorus'] })
     const lyrics2 = makeSongLyrics({
       songId: 'song-2',
       sections: [{ id: 'verse-1', label: 'Verse 1', lines: ['Line X'] }],
@@ -514,7 +496,6 @@ describe('assembleSlideshow — section metadata pass-through', () => {
 
     const inputs = makeInputs({
       songLyricsById: new Map([['song-1', lyrics1], ['song-2', lyrics2]]),
-      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus']]]),
       scriptureReadingsById: new Map([['reading-1', reading]]),
     })
 
@@ -693,10 +674,9 @@ describe('assembleSlideshow — stored group resolution (D-02, R028)', () => {
   it('a slot with no group in groupsBySlotId still assembles via fallback derivation, with slide ids stable across two successive calls', () => {
     const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
     const service = makeService([slot])
-    const lyrics = makeSongLyrics()
+    const lyrics = makeSongLyrics({ performanceOrder: ['verse-1', 'chorus'] })
     const inputs = makeInputs({
       songLyricsById: new Map([['song-1', lyrics]]),
-      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus']]]),
     })
 
     const result1 = assembleSlideshow(service, inputs)
@@ -947,10 +927,9 @@ describe('assembleSlideshow — D-04 two-level audio precedence (R030)', () => {
   it('a slot with no group emits slides with no audioUrl at all (D-19: no legacy slot-media fallback exists to attach)', () => {
     const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
     const service = makeService([slot])
-    const lyrics = makeSongLyrics()
+    const lyrics = makeSongLyrics({ performanceOrder: ['verse-1', 'chorus'] })
     const inputs = makeInputs({
       songLyricsById: new Map([['song-1', lyrics]]),
-      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus']]]),
     })
 
     const result = assembleSlideshow(service, inputs)
