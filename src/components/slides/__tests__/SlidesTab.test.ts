@@ -3,9 +3,29 @@ import { shallowMount } from '@vue/test-utils'
 import SlidesTab from '../SlidesTab.vue'
 import SlidePlanRail from '../SlidePlanRail.vue'
 import SlideGrid from '../SlideGrid.vue'
+import EditSlideDrawer from '../EditSlideDrawer.vue'
 import type { ServiceSlot } from '@/types/service'
 import type { AssembledSlide } from '@/types/slide'
-import type { SlideGroup } from '@/types/slideGroup'
+import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
+
+function makeEntry(overrides: Partial<GroupSlideEntry> & { id: string }): GroupSlideEntry {
+  return {
+    order: 0,
+    sourceRef: { kind: 'text', title: 'New slide', body: '' },
+    ...overrides,
+  }
+}
+
+function makeGroup(overrides: Partial<SlideGroup> & { slides: GroupSlideEntry[] }): SlideGroup {
+  return {
+    id: 'slot-1',
+    slotId: 'slot-1',
+    serviceId: 'service-1',
+    createdAt: {} as never,
+    updatedAt: {} as never,
+    ...overrides,
+  }
+}
 
 function makeSlot(overrides: Partial<ServiceSlot> & { kind: ServiceSlot['kind']; id: string; position: number }): ServiceSlot {
   return { ...overrides } as ServiceSlot
@@ -293,6 +313,181 @@ describe('SlidesTab', () => {
       const wrapper = mountTab({ slots })
       const vm = wrapper.vm as unknown as { requestEditInScripture: unknown }
       expect(typeof vm.requestEditInScripture).toBe('function')
+    })
+  })
+
+  describe('Edit Slide drawer wiring (Phase 26-05 Task 2)', () => {
+    it('resolves the selected slide to its stored entry by a direct id lookup and mounts the drawer with it', async () => {
+      const slots: ServiceSlot[] = [makeSlot({ kind: 'SONG', id: 'slot-a', position: 0 })]
+      const entryOne = makeEntry({ id: 'entry-1', label: 'First' })
+      const entryTwo = makeEntry({ id: 'entry-2', label: 'Second' })
+      const group = makeGroup({ id: 'slot-a', slotId: 'slot-a', slides: [entryOne, entryTwo] })
+      const assembledSlideshow: AssembledSlide[] = [makeAssembled(0, 'entry-1'), makeAssembled(0, 'entry-2')]
+      const wrapper = mountTab({
+        slots,
+        assembledSlideshow,
+        groupsBySlotId: new Map([['slot-a', group]]),
+      })
+      await wrapper.vm.$nextTick()
+
+      wrapper.findComponent(SlideGrid).vm.$emit('select', 'entry-1')
+      await wrapper.vm.$nextTick()
+
+      const drawer = wrapper.findComponent(EditSlideDrawer)
+      expect(drawer.exists()).toBe(true)
+      expect(drawer.props('open')).toBe(true)
+      expect(drawer.props('entry')).toEqual(entryOne)
+    })
+
+    it('resolves to nothing (and the drawer does not open) when the selected slide id has no matching stored entry', async () => {
+      const slots: ServiceSlot[] = [makeSlot({ kind: 'SONG', id: 'slot-a', position: 0 })]
+      const group = makeGroup({ id: 'slot-a', slotId: 'slot-a', slides: [makeEntry({ id: 'entry-1' })] })
+      // The fallback-path id has no corresponding GroupSlideEntry (26-RESEARCH.md Pitfall 1).
+      const assembledSlideshow: AssembledSlide[] = [makeAssembled(0, 'slot-a:0')]
+      const wrapper = mountTab({
+        slots,
+        assembledSlideshow,
+        groupsBySlotId: new Map([['slot-a', group]]),
+      })
+      await wrapper.vm.$nextTick()
+
+      wrapper.findComponent(SlideGrid).vm.$emit('select', 'slot-a:0')
+      await wrapper.vm.$nextTick()
+
+      const drawer = wrapper.findComponent(EditSlideDrawer)
+      expect(drawer.props('entry')).toBeNull()
+    })
+
+    it('swaps to the second entry and stays open when a different slide is selected while open', async () => {
+      const slots: ServiceSlot[] = [makeSlot({ kind: 'SONG', id: 'slot-a', position: 0 })]
+      const entryOne = makeEntry({ id: 'entry-1' })
+      const entryTwo = makeEntry({ id: 'entry-2' })
+      const group = makeGroup({ id: 'slot-a', slotId: 'slot-a', slides: [entryOne, entryTwo] })
+      const assembledSlideshow: AssembledSlide[] = [makeAssembled(0, 'entry-1'), makeAssembled(0, 'entry-2')]
+      const wrapper = mountTab({ slots, assembledSlideshow, groupsBySlotId: new Map([['slot-a', group]]) })
+      await wrapper.vm.$nextTick()
+
+      wrapper.findComponent(SlideGrid).vm.$emit('select', 'entry-1')
+      await wrapper.vm.$nextTick()
+      wrapper.findComponent(SlideGrid).vm.$emit('select', 'entry-2')
+      await wrapper.vm.$nextTick()
+
+      const drawer = wrapper.findComponent(EditSlideDrawer)
+      expect(drawer.props('open')).toBe(true)
+      expect(drawer.props('entry')).toEqual(entryTwo)
+    })
+
+    it('reopens the drawer when the same slide is re-selected after it was closed', async () => {
+      const slots: ServiceSlot[] = [makeSlot({ kind: 'SONG', id: 'slot-a', position: 0 })]
+      const entryOne = makeEntry({ id: 'entry-1' })
+      const group = makeGroup({ id: 'slot-a', slotId: 'slot-a', slides: [entryOne] })
+      const assembledSlideshow: AssembledSlide[] = [makeAssembled(0, 'entry-1')]
+      const wrapper = mountTab({ slots, assembledSlideshow, groupsBySlotId: new Map([['slot-a', group]]) })
+      await wrapper.vm.$nextTick()
+
+      wrapper.findComponent(SlideGrid).vm.$emit('select', 'entry-1')
+      await wrapper.vm.$nextTick()
+      expect(wrapper.findComponent(EditSlideDrawer).props('open')).toBe(true)
+
+      wrapper.findComponent(EditSlideDrawer).vm.$emit('close')
+      await wrapper.vm.$nextTick()
+      expect(wrapper.findComponent(EditSlideDrawer).props('open')).toBe(false)
+
+      wrapper.findComponent(SlideGrid).vm.$emit('select', 'entry-1')
+      await wrapper.vm.$nextTick()
+      expect(wrapper.findComponent(EditSlideDrawer).props('open')).toBe(true)
+      expect(wrapper.findComponent(EditSlideDrawer).props('entry')).toEqual(entryOne)
+    })
+
+    it('closes the drawer (via the existing seam) when the selected plan item changes', async () => {
+      const slots: ServiceSlot[] = [
+        makeSlot({ kind: 'SONG', id: 'slot-a', position: 0 }),
+        makeSlot({ kind: 'SONG', id: 'slot-b', position: 1 }),
+      ]
+      const entryOne = makeEntry({ id: 'entry-1' })
+      const group = makeGroup({ id: 'slot-a', slotId: 'slot-a', slides: [entryOne] })
+      const assembledSlideshow: AssembledSlide[] = [makeAssembled(0, 'entry-1')]
+      const wrapper = mountTab({ slots, assembledSlideshow, groupsBySlotId: new Map([['slot-a', group]]) })
+      await wrapper.vm.$nextTick()
+
+      wrapper.findComponent(SlideGrid).vm.$emit('select', 'entry-1')
+      await wrapper.vm.$nextTick()
+      expect(wrapper.findComponent(EditSlideDrawer).props('open')).toBe(true)
+
+      wrapper.findComponent(SlidePlanRail).vm.$emit('select', 'slot-b')
+      await wrapper.vm.$nextTick()
+
+      const drawer = wrapper.findComponent(EditSlideDrawer)
+      expect(drawer.props('entry')).toBeNull()
+    })
+
+    it("passes the selected slide's correct one-based position and the group's total", async () => {
+      const slots: ServiceSlot[] = [makeSlot({ kind: 'SONG', id: 'slot-a', position: 0 })]
+      const entries = [
+        makeEntry({ id: 'entry-1' }),
+        makeEntry({ id: 'entry-2' }),
+        makeEntry({ id: 'entry-3' }),
+      ]
+      const group = makeGroup({ id: 'slot-a', slotId: 'slot-a', slides: entries })
+      const assembledSlideshow: AssembledSlide[] = [
+        makeAssembled(0, 'entry-1'),
+        makeAssembled(0, 'entry-2'),
+        makeAssembled(0, 'entry-3'),
+      ]
+      const wrapper = mountTab({ slots, assembledSlideshow, groupsBySlotId: new Map([['slot-a', group]]) })
+      await wrapper.vm.$nextTick()
+
+      wrapper.findComponent(SlideGrid).vm.$emit('select', 'entry-2')
+      await wrapper.vm.$nextTick()
+
+      const drawer = wrapper.findComponent(EditSlideDrawer)
+      expect(drawer.props('position')).toBe(2)
+      expect(drawer.props('total')).toBe(3)
+    })
+
+    it('moves the selection and opens the drawer when the exposed select-by-id function is invoked', async () => {
+      const slots: ServiceSlot[] = [makeSlot({ kind: 'SONG', id: 'slot-a', position: 0 })]
+      const entryOne = makeEntry({ id: 'entry-1' })
+      const entryTwo = makeEntry({ id: 'entry-2' })
+      const group = makeGroup({ id: 'slot-a', slotId: 'slot-a', slides: [entryOne, entryTwo] })
+      const assembledSlideshow: AssembledSlide[] = [makeAssembled(0, 'entry-1'), makeAssembled(0, 'entry-2')]
+      const wrapper = mountTab({ slots, assembledSlideshow, groupsBySlotId: new Map([['slot-a', group]]) })
+      await wrapper.vm.$nextTick()
+
+      const vm = wrapper.vm as unknown as { selectSlideById: (id: string) => void }
+      expect(typeof vm.selectSlideById).toBe('function')
+      vm.selectSlideById('entry-2')
+      await wrapper.vm.$nextTick()
+
+      const drawer = wrapper.findComponent(EditSlideDrawer)
+      expect(drawer.props('open')).toBe(true)
+      expect(drawer.props('entry')).toEqual(entryTwo)
+    })
+
+    it('leaves every prop the grid received before this change unchanged', async () => {
+      const slots: ServiceSlot[] = [makeSlot({ kind: 'PRAYER', id: 'slot-a', position: 0 })]
+      const ensureGroupMaterialized = vi.fn().mockResolvedValue(undefined)
+      const wrapper = shallowMount(SlidesTab, {
+        props: {
+          slots,
+          serviceId: 'service-1',
+          orgId: 'org-1',
+          assembledSlideshow: [],
+          groupsBySlotId: new Map(),
+          pendingReconciliations: [],
+          isEditor: true,
+          groupsLoading: false,
+          active: true,
+          ensureGroupMaterialized,
+        },
+      })
+      await wrapper.vm.$nextTick()
+      const grid = wrapper.findComponent(SlideGrid)
+      expect(grid.props('orgId')).toBe('org-1')
+      expect(grid.props('serviceId')).toBe('service-1')
+      expect(grid.props('isEditor')).toBe(true)
+      expect(grid.props('ensureGroupMaterialized')).toBe(ensureGroupMaterialized)
+      expect(grid.props('totalPlanItems')).toBe(1)
     })
   })
 })
