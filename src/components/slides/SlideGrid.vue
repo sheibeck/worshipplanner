@@ -46,8 +46,9 @@
       <!-- Group music bar (25-06, R032) — between the grid header and the
            card grid, per the UI-SPEC's layout reference. Emit-only control;
            this component intercepts both events and writes the selected
-           group's bed via the slideGroups store's scoped write, exactly as
-           `ServiceEditorView.vue` already does for `SlotMediaAttachment`. -->
+           group's bed via the slideGroups store's scoped write (the sole
+           surviving attach/remove surface for group-bed audio; the Service
+           Order tab's equivalent control was removed in Phase 27-04). -->
       <div class="px-6 pt-3">
         <SlideGroupMusicControl
           :audio-url="group?.bedAudioUrl"

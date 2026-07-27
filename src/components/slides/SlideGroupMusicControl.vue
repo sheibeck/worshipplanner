@@ -74,21 +74,20 @@
 
 <script setup lang="ts">
 /**
- * Group-level audio bed control (Phase 25 Task 1, R032) — modelled closely on
- * `src/components/SlotMediaAttachment.vue` but scoped to the SELECTED GROUP
- * rather than a slot, and audio-only per D-14 (group music is never a slide;
- * dropped video is a slide, that path is 25-07's).
+ * Group-level audio bed control (Phase 25 Task 1, R032) — scoped to the
+ * SELECTED GROUP rather than a service slot, and audio-only per D-14 (group
+ * music is never a slide; dropped video is a slide, that path is 25-07's).
+ * This is the sole surviving attach/remove surface for group-bed audio — the
+ * Service Order tab's per-slot equivalent was removed in Phase 27-04.
  *
- * Emit-only, exactly like its analog: uploads through `useMediaUpload` and
- * emits the resulting URL via `attach`, or emits `remove` for a plain,
- * unconfirmed clear. This component performs NO Firestore write itself —
- * `SlideGrid.vue` (Task 2) intercepts both events and calls the slideGroups
- * store's scoped bed write, exactly as `ServiceEditorView.vue` already does
- * for `SlotMediaAttachment`.
+ * Emit-only: uploads through `useMediaUpload` and emits the resulting URL via
+ * `attach`, or emits `remove` for a plain, unconfirmed clear. This component
+ * performs NO Firestore write itself — `SlideGrid.vue` (Task 2) intercepts
+ * both events and calls the slideGroups store's scoped bed write.
  *
  * A failed upload sets the composable's reactive `error` and emits NOTHING —
- * reproducing the analog's deliberate no-emit-on-failure contract so a failed
- * upload can never clear an existing group bed attachment (T-25-06-03).
+ * a failed upload can never clear an existing group bed attachment
+ * (T-25-06-03).
  */
 import { ref, computed } from 'vue'
 import { useMediaUpload } from '@/composables/useMediaUpload'

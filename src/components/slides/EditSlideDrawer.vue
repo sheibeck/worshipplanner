@@ -250,9 +250,9 @@
             </div>
 
             <!-- Attach affordance: only where nothing covers this slide yet
-                 — SlotMediaAttachment.vue's own empty-state markup, reused
-                 verbatim (same copy, same file input) rather than a second
-                 upload UI. -->
+                 — the same empty-state markup pattern used by every other
+                 audio-attach control in the slides area (same copy, same
+                 file input) rather than a second upload UI. -->
             <div v-else-if="isEditor" class="flex items-center gap-1.5" data-testid="audio-attach">
               <label class="text-[11px] font-medium text-gray-400">Audio</label>
               <input
@@ -639,8 +639,8 @@ async function onAudioFileSelected(event: Event): Promise<void> {
     // uploadAudioMedia already set the composable's reactive `error` —
     // surfaced via audio-upload-error above. Deliberately no write on
     // failure, so a failed upload can never clear or overwrite an existing
-    // attachment (matches SlideGroupMusicControl.vue/SlotMediaAttachment.vue's
-    // identical no-emit-on-failure contract).
+    // attachment (matches SlideGroupMusicControl.vue's identical
+    // no-emit-on-failure contract).
   }
 }
 
