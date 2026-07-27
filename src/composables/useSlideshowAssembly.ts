@@ -395,6 +395,15 @@ export function useSlideshowAssembly(
     freshSignature?: string
   }
 
+  // Reactive, keyed by slotId (Task 3's "surface the confirm-required ones").
+  // A Map dedupes by construction — re-setting the same key on a later
+  // watcher tick is a no-op-shaped overwrite, never a second entry. Declared
+  // BEFORE `reconciliationOutcomes` below (CR-03) so that computed's filter
+  // can consult it: an outcome that is no longer `needsConfirm`/`changed`
+  // must still be let through, EXACTLY ONCE, if a stale map entry exists for
+  // its slot, so `applyReconciliationOutcomes` gets a chance to prune it.
+  const pendingReconciliationsMap = reactive(new Map<string, PendingReconciliation>())
+
   const reconciliationOutcomes = computed<ReconciliationOutcome[]>(() => {
     const svc = service.value
     const orgId = resolvedOrgId.value
@@ -413,7 +422,15 @@ export function useSlideshowAssembly(
       const group = slideGroupsStore.groupsBySlotId.get(slot.id)
       if (!group) continue
       const result = reconcileGroup(group, slot, inputs)
-      if (!result.changed && !result.needsConfirm) continue
+      // CR-03: normally a slot with nothing to do (no confirm needed, no
+      // change to apply) is skipped entirely. But if a STALE pending entry
+      // is still sitting in the map for this slot (e.g. the user just
+      // resolved it via Apply, which writes directly through the store and
+      // bypasses this computable's own watcher), this outcome must still be
+      // emitted once so `applyReconciliationOutcomes` can prune the map --
+      // otherwise the stale entry, and the banner it drives, would never be
+      // reconsidered and would persist indefinitely.
+      if (!result.changed && !result.needsConfirm && !pendingReconciliationsMap.has(slot.id)) continue
       outcomes.push({
         slotId: slot.id,
         orgId,
@@ -424,11 +441,6 @@ export function useSlideshowAssembly(
     }
     return outcomes
   })
-
-  // Reactive, keyed by slotId (Task 3's "surface the confirm-required ones").
-  // A Map dedupes by construction — re-setting the same key on a later
-  // watcher tick is a no-op-shaped overwrite, never a second entry.
-  const pendingReconciliationsMap = reactive(new Map<string, PendingReconciliation>())
 
   // Applied-outcome guard: since a mocked/just-written store doesn't
   // necessarily produce a NEW `SlideGroup` object on every recompute, this
@@ -465,6 +477,15 @@ export function useSlideshowAssembly(
           outcome.group.dismissedSignature !== undefined &&
           outcome.freshSignature === outcome.group.dismissedSignature
         ) {
+          // CR-03: this slot's divergence is suppressed by a durable decline
+          // (D-07) -- the STORED decision, `dismissedSignature`, is what
+          // governs re-prompting, never this in-memory map. Pruning the map
+          // entry here only clears a UI-visibility cache; it does NOT
+          // "un-dismiss" anything, since a genuinely NEW divergence produces
+          // a different `freshSignature` that will not match
+          // `dismissedSignature` and will re-populate the map on its own,
+          // exactly as D-07 requires.
+          pendingReconciliationsMap.delete(outcome.slotId)
           continue
         }
 
@@ -486,9 +507,23 @@ export function useSlideshowAssembly(
         continue
       }
 
-      if (!outcome.result.changed) continue
+      // CR-03: once a slot's outcome is no longer `needsConfirm` AND is
+      // unchanged (already in sync with the source -- e.g. right after an
+      // Apply's write has round-tripped back), any pending banner entry for
+      // it is stale and must be pruned so the banner cannot persist past its
+      // own resolution.
+      if (!outcome.result.changed) {
+        pendingReconciliationsMap.delete(outcome.slotId)
+        continue
+      }
       if (appliedGroupRefForSlot.get(outcome.slotId) === outcome.group) continue
       appliedGroupRefForSlot.set(outcome.slotId, outcome.group)
+      // CR-03: this outcome is about to be applied (written) -- clear any
+      // stale pending-reconciliation entry now rather than waiting for a
+      // later tick, so a user who re-triggers "Review" -> "Apply" from an
+      // already-stale dialog cannot read back the map's now-outdated
+      // `proposed` list before the write below has had a chance to land.
+      pendingReconciliationsMap.delete(outcome.slotId)
 
       // CR-02: `outcome.group.slides` is the snapshot this reconciliation was
       // computed FROM — passed through as `baseSlides` so a concurrent

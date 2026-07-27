@@ -1345,6 +1345,121 @@ describe('useSlideshowAssembly', () => {
     })
   })
 
+  // CR-03 regression: `pendingReconciliationsMap` must be pruned once an
+  // outcome is no longer `needsConfirm`, on BOTH resolution paths (Dismiss
+  // and Apply) — not just suppressed from being re-added on the next tick.
+  // The existing "durable decline suppression" tests above only ever
+  // pre-seed `dismissedSignature` BEFORE the composable's first mount, which
+  // cannot catch a stale map entry set on an EARLIER tick of the SAME
+  // mounted instance — these tests dismiss/apply live, within one lifecycle.
+  describe('CR-03 — pending-reconciliation map pruned after resolution', () => {
+    function customizedScriptureGroup(overrides: Partial<SlideGroup>): SlideGroup {
+      return {
+        id: 'slot-scripture-decline',
+        slotId: 'slot-scripture-decline',
+        serviceId: 'service-1',
+        sourceSignature: '1:Old verse text',
+        slides: [
+          {
+            id: 'ss-1',
+            order: 0,
+            sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'orig-id' },
+            label: 'Custom label',
+          },
+        ],
+        createdAt: {} as never,
+        updatedAt: {} as never,
+        ...overrides,
+      }
+    }
+
+    function readingWithText(text: string): ScriptureReading[] {
+      return [
+        {
+          id: 'reading-1',
+          reference: { book: 'John', chapter: 3 },
+          displayReference: 'John 3',
+          rawText: 'text',
+          readingMode: 'normal',
+          slides: [
+            {
+              id: 'orig-id',
+              position: 0,
+              contentKind: 'scripture',
+              reference: 'John 3:16',
+              bookRef: { book: 'John', chapter: 3 },
+              text,
+              verseRange: '16',
+              readingMode: 'normal',
+            },
+          ],
+          createdAt: {} as never,
+          updatedAt: {} as never,
+        },
+      ]
+    }
+
+    it('a pending reconciliation is pruned once a LIVE Dismiss round-trips back within the same mounted instance', async () => {
+      scriptureState.readings = readingWithText('New verse text')
+      const group = customizedScriptureGroup({})
+      slideGroupsState.groups = [group]
+
+      const service = ref<Service | null>(
+        makeService([scriptureSlot({ position: 0, id: 'slot-scripture-decline', scriptureReadingId: 'reading-1' })]),
+      )
+      const { pendingReconciliations } = useSlideshowAssembly(service, 'org-1', { canWrite: true })
+      await nextTick()
+      await nextTick()
+
+      expect(pendingReconciliations.value).toHaveLength(1)
+      const freshSignature = pendingReconciliations.value[0]!.freshSignature
+
+      // Simulate the store round-trip after `SlideGrid.vue`'s
+      // `onDismissReconciliation` write commits: the SAME mounted composable
+      // instance now sees `dismissedSignature` matching the divergence it
+      // already surfaced on the previous tick. Before the CR-03 fix, the
+      // `dismissedSignature` guard's bare `continue` suppressed the outcome
+      // from being RE-added but never removed the stale entry already set —
+      // the banner would persist forever.
+      slideGroupsState.groups = [{ ...group, dismissedSignature: freshSignature }]
+      await nextTick()
+      await nextTick()
+
+      expect(pendingReconciliations.value).toHaveLength(0)
+    })
+
+    it('a pending reconciliation is pruned once a LIVE Apply round-trips back, so re-opening Review cannot read stale proposed content', async () => {
+      scriptureState.readings = readingWithText('New verse text')
+      const group = customizedScriptureGroup({})
+      slideGroupsState.groups = [group]
+
+      const service = ref<Service | null>(
+        makeService([scriptureSlot({ position: 0, id: 'slot-scripture-decline', scriptureReadingId: 'reading-1' })]),
+      )
+      const { pendingReconciliations } = useSlideshowAssembly(service, 'org-1', { canWrite: true })
+      await nextTick()
+      await nextTick()
+
+      expect(pendingReconciliations.value).toHaveLength(1)
+      const freshSignature = pendingReconciliations.value[0]!.freshSignature
+
+      // Simulate `SlideGrid.vue`'s `onApplyReconciliation`: it writes
+      // `slides`/`sourceSignature` DIRECTLY via the store, bypassing this
+      // composable's own watcher entirely. Once that round-trips back, the
+      // group's `sourceSignature` now matches the derived signature, so
+      // `reconcileGroup` returns `changed: false, needsConfirm: false`
+      // (already in sync) — before the CR-03 fix, this outcome fell through
+      // both branches in `applyReconciliationOutcomes` without ever pruning
+      // the stale map entry, leaving the banner (and its now-stale
+      // `proposed` list) visible after the user had already resolved it.
+      slideGroupsState.groups = [{ ...group, sourceSignature: freshSignature, slides: [] }]
+      await nextTick()
+      await nextTick()
+
+      expect(pendingReconciliations.value).toHaveLength(0)
+    })
+  })
+
   // --- Task 3 (25-01): end-to-end guard that a dropped video survives a live
   // reconciliation tick. This is the highest-consequence regression this
   // phase can produce: a video a user dropped disappearing on the next lyric
