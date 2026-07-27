@@ -884,21 +884,6 @@
                 <p v-if="!(slot as ImportedSlot).importId" class="text-sm text-gray-400 italic">Imported Slides — Empty</p>
               </template>
 
-              <!-- Per-slot group-BED audio attach/preview/remove (Phase 22, R013/R014 —
-                   retargeted at the group bed in Phase 24-06, R030; audio-only per D-18):
-                   editor only, hidden when exported, matching sibling slot controls.
-                   Collapsed/compact so it doesn't crowd the slot row; the displayed url
-                   reads ONLY the anchored group's bed (D-19: no legacy slot-level
-                   fallback) and the write goes straight to slideGroups via
-                   setGroupBedMedia (onSlotBedAudioChange below) — a deliberately
-                   separate, scoped write path, NOT the localService deep-watch
-                   autosave. -->
-              <SlotMediaAttachment
-                v-if="authStore.isEditor && !isExportedLocked"
-                :orgId="authStore.orgId!"
-                :audioUrl="displaySlotAudioUrl(slot)"
-                @update:audioUrl="(url) => onSlotBedAudioChange(index, url)"
-              />
             </div>
 
             <!-- Section-assignment control: editor only, hidden when exported (D005/R007) -->
@@ -1144,7 +1129,6 @@ import ScriptureInput from '@/components/ScriptureInput.vue'
 import ServicePrintLayout from '@/components/ServicePrintLayout.vue'
 import ScriptureSlideEditor from '@/components/ScriptureSlideEditor.vue'
 import CongregationalEditor from '@/components/CongregationalEditor.vue'
-import SlotMediaAttachment from '@/components/SlotMediaAttachment.vue'
 import SlideshowPreview from '@/components/SlideshowPreview.vue'
 import PresentationViewer from '@/components/PresentationViewer.vue'
 import SlidesTab from '@/components/slides/SlidesTab.vue'
@@ -1163,10 +1147,11 @@ const serviceStore = useServiceStore()
 const songStore = useSongStore()
 const rosterStore = useRosterStore()
 const quartersStore = useQuartersStore()
-// R029/D-03 cascade target (Task 2) and the group-bed write target (Task 3).
-// Reads for the delete-warning copy and the media control's display values
-// go through useSlideshowAssembly's re-exposed groupsBySlotId below; this
-// direct store handle is only for the two scoped write actions.
+// R029/D-03 cascade target — the group delete cascade's scoped write action.
+// Reads for the delete-warning copy go through useSlideshowAssembly's
+// re-exposed groupsBySlotId below; the group-bed audio write (setGroupBedMedia)
+// now lives entirely on the Slides tab (SlideGroupMusicControl.vue, SlideGrid.vue) —
+// this view no longer wraps it (Phase 27-04).
 const slideGroupsStore = useSlideGroups()
 
 // ── Roles tab state (Task 1: tab bar) ──────────────────────────────────────────
@@ -1399,41 +1384,6 @@ function onSectionChange(index: number, value: string) {
   const slot = localService.value.slots[index]
   if (!slot) return
   slot.section = value === '' ? undefined : (value as ServiceSection)
-}
-
-/**
- * The media control's bound value reads ONLY the materialized group's bed
- * field (D-19: no legacy fallback for slide-area data — the slide area has
- * never shipped, so there is no deprecated slot-level `audioUrl` worth
- * reading). A slot whose group hasn't materialized yet simply shows no
- * attached media, exactly like a slot that never had any.
- */
-function displaySlotAudioUrl(slot: ServiceSlot): string | undefined {
-  return groupsBySlotId.value.get(slot.id)?.bedAudioUrl
-}
-
-/** Editor-only per-slot group-BED audio attach/remove (Phase 22, R013/R014 —
- *  retargeted at the group bed in Phase 24-06, R030/Pitfall 1; audio-only per
- *  D-18). This no longer mutates localService.slots[index].audioUrl or rides
- *  its deep-watch autosave — SlotMediaAttachment's emitted url is written
- *  straight to the anchored group's bed via the slideGroups store's scoped
- *  write (setGroupBedMedia), a deliberately separate write path from the
- *  whole-document autosave. A removed url passes the explicit clear flag
- *  rather than an undefined bed field, since stripUndefined() would
- *  otherwise erase that intent before it reached Firestore.
- *  SlotMediaAttachment itself never persists anything — it stays a dumb
- *  emit-only control (unchanged in this phase). */
-async function onSlotBedAudioChange(index: number, url: string | undefined) {
-  const slot = localService.value?.slots[index]
-  if (!localService.value || !slot || !authStore.orgId) return
-  try {
-    await slideGroupsStore.setGroupBedMedia(authStore.orgId, slot.id, {
-      serviceId: localService.value.id,
-      ...(url !== undefined ? { bedAudioUrl: url } : { clearAudio: true }),
-    })
-  } catch (err) {
-    console.error('Failed to update slot bed audio:', err)
-  }
 }
 
 const orgIdRef = computed(() => authStore.orgId)
