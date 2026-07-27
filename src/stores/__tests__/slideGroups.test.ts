@@ -723,6 +723,73 @@ describe('useSlideGroups', () => {
       expect(ids).toEqual(['e2', 'e1', 'e3-appended-elsewhere'])
     })
 
+    // CR-02 regression: a concurrent DELETION must not be resurrected by a
+    // slower stale-base write. `live` lacks an id that `base`/`next` both
+    // still carry (a debounced field-edit's `next` is always derived by
+    // mapping over `base`, so it still contains the entry another writer's
+    // delete-slide transaction already committed removing).
+    it('a concurrently-deleted entry (missing from live, still present in base/next) is stripped, not resurrected', async () => {
+      const { getDoc, updateDoc } = await import('firebase/firestore')
+      const base = [
+        { id: 'e1', order: 0, sourceRef: { kind: 'text' as const }, label: 'Old label' },
+        { id: 'e2', order: 1, sourceRef: { kind: 'text' as const } },
+      ]
+      // Another writer deleted e2 -- its own transaction, using a fresh
+      // base, already committed. The live document no longer carries it.
+      const liveAfterConcurrentDelete = [base[0]!]
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => true,
+        id: 'slot-1',
+        data: () => ({ slides: liveAfterConcurrentDelete }),
+      } as ReturnType<typeof getDoc> extends Promise<infer T> ? T : never)
+
+      const { useSlideGroups } = await import('../slideGroups')
+      const store = useSlideGroups()
+
+      // This caller's own write is unrelated to e2 -- a label edit on e1,
+      // computed from the STALE `base` (which still has e2 in it, since it
+      // hasn't yet observed the delete).
+      const thisCallersNext = [{ ...base[0]!, label: 'New label' }, base[1]!]
+      await store.replaceGroupSlides('org-1', 'slot-1', thisCallersNext, undefined, base)
+
+      const payload = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+      const slides = payload.slides as { id: string; label?: string }[]
+      const ids = slides.map((e) => e.id)
+      expect(ids).toContain('e1')
+      expect(ids).not.toContain('e2')
+      expect(ids).toHaveLength(1)
+      expect(slides.find((e) => e.id === 'e1')?.label).toBe('New label')
+    })
+
+    // CR-02 regression: this caller's OWN intentional delete (the entry is
+    // absent from `next`, whether or not `live` still carries it) must never
+    // be treated as a "concurrent deletion to strip" -- that filter only
+    // applies to entries THIS caller's `next` still carries.
+    it("this caller's own intentional delete is preserved even when live still carries the entry", async () => {
+      const { getDoc, updateDoc } = await import('firebase/firestore')
+      const base = [
+        { id: 'e1', order: 0, sourceRef: { kind: 'text' as const } },
+        { id: 'e2', order: 1, sourceRef: { kind: 'text' as const } },
+      ]
+      // Live is unchanged from base -- no concurrent writer touched anything.
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => true,
+        id: 'slot-1',
+        data: () => ({ slides: base }),
+      } as ReturnType<typeof getDoc> extends Promise<infer T> ? T : never)
+
+      const { useSlideGroups } = await import('../slideGroups')
+      const store = useSlideGroups()
+
+      // This caller explicitly deletes e2 -- absent from its own `next`.
+      const thisCallersNext = [base[0]!]
+      await store.replaceGroupSlides('org-1', 'slot-1', thisCallersNext, undefined, base)
+
+      const payload = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+      const ids = (payload.slides as { id: string }[]).map((e) => e.id)
+      expect(ids).toEqual(['e1'])
+    })
+
     // Task 3 (26-01): pins the exact write shape every Edit Slide drawer
     // field-write uses (label, notes, audio, loop, duplicate, delete) --
     // a read-modify-write that changes ONE field on ONE entry, leaving the

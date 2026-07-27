@@ -261,13 +261,19 @@ export const useSlideGroups = defineStore('slideGroups', () => {
    * loses the commit race re-derives against the OTHER write's already-landed
    * result rather than blindly replacing it.
    *
-   * This intentionally does not attempt to reconcile concurrent DELETIONS (no
-   * delete-a-slide path exists yet — Phase 26) and does not re-derive a
-   * drag-reorder's index math against a changed live array — it only
-   * guarantees a concurrently-ADDED entry always survives, which is the exact
-   * data-loss CR-02 flagged. `baseSlides` is optional: omitting it keeps the
-   * previous plain-overwrite behavior for any caller that has not been
-   * updated to track a base snapshot.
+   * 26-REVIEW CR-02: this also reconciles a concurrent DELETION (Phase 26
+   * ships the first delete-a-slide path, `EditSlideDrawer.vue`'s Delete Slide
+   * action). `mergeConcurrentlyAddedEntries` strips any entry that this
+   * caller's stale `next` still carries (derived from `base`, which had not
+   * yet observed the deletion) but that is absent from the live document —
+   * without this, a slower stale-base write (e.g. a debounced label/notes
+   * edit scheduled before the delete, committing after it) would silently
+   * resurrect the slide the user explicitly deleted. This does not re-derive
+   * a drag-reorder's index math against a changed live array — reordering
+   * still only recovers/strips entries by id, never recomputes positions
+   * against a live array it never saw. `baseSlides` is optional: omitting it
+   * keeps the previous plain-overwrite behavior for any caller that has not
+   * been updated to track a base snapshot.
    */
   async function replaceGroupSlides(
     orgId: string,
@@ -307,6 +313,20 @@ export const useSlideGroups = defineStore('slideGroups', () => {
    * `order` to trail whatever `next` already contains so the recovered
    * entries sort after it; ids are never regenerated (invariant 2,
    * `slideGroup.ts`).
+   *
+   * CR-02 fix: this function must ALSO recognize a concurrent *deletion*, not
+   * just a concurrent addition. `next` is always derived from `base`
+   * (`base.map(...)` / `base.filter(...)`), so a caller whose own write has
+   * nothing to do with a given entry still carries that entry in `next`
+   * (present in both `base` and `next`) even after a different writer has
+   * since deleted it (absent from `live`). Left unchecked, this caller's
+   * commit would resurrect the deleted entry. An entry present in `base` AND
+   * still present in `next` (this caller did not itself intend to remove it)
+   * but MISSING from `live` (a concurrent writer's delete already landed) is
+   * therefore stripped before the concurrently-added entries are appended. An
+   * entry this caller itself intentionally removed (present in `base`,
+   * absent from `next`) is untouched by this filter either way — it was
+   * never a candidate for resurrection in the first place.
    */
   function mergeConcurrentlyAddedEntries(
     base: GroupSlideEntry[],
@@ -314,11 +334,21 @@ export const useSlideGroups = defineStore('slideGroups', () => {
     next: GroupSlideEntry[],
   ): GroupSlideEntry[] {
     const baseIds = new Set(base.map((e) => e.id))
+    const liveIds = new Set(live.map((e) => e.id))
     const nextIds = new Set(next.map((e) => e.id))
+
+    // Drop any entry this caller's `next` still carries only because it was
+    // derived from a now-stale `base` — a concurrent writer already deleted
+    // it (absent from `live`) before this caller's own write landed.
+    const withoutConcurrentlyDeleted = next.filter((e) => !baseIds.has(e.id) || liveIds.has(e.id))
+
     const concurrentlyAdded = live.filter((e) => !baseIds.has(e.id) && !nextIds.has(e.id))
-    if (concurrentlyAdded.length === 0) return next
-    const maxOrder = next.reduce((max, e) => Math.max(max, e.order), -1)
-    return [...next, ...concurrentlyAdded.map((entry, i) => ({ ...entry, order: maxOrder + 1 + i }))]
+    if (concurrentlyAdded.length === 0) return withoutConcurrentlyDeleted
+    const maxOrder = withoutConcurrentlyDeleted.reduce((max, e) => Math.max(max, e.order), -1)
+    return [
+      ...withoutConcurrentlyDeleted,
+      ...concurrentlyAdded.map((entry, i) => ({ ...entry, order: maxOrder + 1 + i })),
+    ]
   }
 
   return {
