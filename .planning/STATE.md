@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Slides Tab Rework
-current_phase: 27
-current_phase_name: Service Order Tab — Rename and Strip Slide Editing
-status: verifying
+current_phase: 28
+current_phase_name: Song Lyrics Editor Rework
+status: executing
 stopped_at: Completed 27-05-PLAN.md (final plan of Phase 27)
-last_updated: "2026-07-27T13:10:59.096Z"
+last_updated: "2026-07-27T16:46:47.133Z"
 last_activity: 2026-07-27
 progress:
   total_phases: 17
   completed_phases: 15
-  total_plans: 95
+  total_plans: 101
   completed_plans: 95
   percent: 88
 last_activity_desc: Opened v1.3 Slides Tab Rework (Phases 24-28) from the Claude Design import; v1.2 left code-complete with its verification ledger intact
@@ -24,7 +24,7 @@ last_activity_desc: Opened v1.3 Slides Tab Rework (Phases 24-28) from the Claude
 See: .planning/PROJECT.md (updated 2026-03-05)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 27 — Service Order Tab — Rename and Strip Slide Editing
+**Current focus:** Phase 28 — Song Lyrics Editor Rework
 
 > **v1.2 → v1.3 handoff (2026-07-25).** v1.2 is code-complete (Phases 18-23, all plans committed)
 > but its human-verify batch is still outstanding. v1.2 was deliberately **not** archived: running
@@ -35,10 +35,10 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 
 ## Current Position
 
-Phase: 27 (Service Order Tab — Rename and Strip Slide Editing) — EXECUTING
-Plan: 5 of 5
+Phase: 28 (Song Lyrics Editor Rework) — EXECUTING
+Plan: 1 of 6
 Milestone: v1.3 Slides Tab Rework (Phases 24-28) — IN PROGRESS
-Status: Phase complete — ready for verification
+Status: Executing Phase 28
 
 Phases 20, 21, 22 and 23 are all code-complete; only their deferred human-verify checkpoints remain
 (see the Deferred Verification table below).
@@ -67,9 +67,11 @@ media control and the slideshow preview stripped off it; `ImportedSlideEditor`, 
 **Two ROADMAP premises proved false during Phase 27** — it claimed the phase "runs after 25-26 so the
 functionality has a new home before it leaves the old one." That was wrong twice, and both were caught
 before anything broke:
+
 - **Scripture editing (D-01):** Phase 26's "Edit in scripture" link navigates *back* to this tab.
   Resolved by keeping `ScriptureSlideEditor` on Service Order — choosing the passage and reading mode is
   service-order content, not slide editing.
+
 - **Presenting (D-05, user decision):** `SlideshowPreview` carried the ONLY trigger for Phase 23's
   `PresentationViewer`, and the Slides tab had no present affordance. Resolved by moving `▶ Present` to
   the Slides tab — the one new affordance Phase 27 was authorized to build.

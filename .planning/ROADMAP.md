@@ -293,7 +293,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 28-01-PLAN.md — Section-order model: pool/order invariants and pure row helpers
+- [x] 28-01-PLAN.md — Section-order model: pool/order invariants and pure row helpers
 
 **Wave 2** *(blocked on Wave 1)*
 
