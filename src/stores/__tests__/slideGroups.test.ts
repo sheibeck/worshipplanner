@@ -279,6 +279,90 @@ describe('useSlideGroups', () => {
       const payload = callArgs[1] as Record<string, unknown>
       expect('bedAudioUrl' in payload).toBe(false)
     })
+
+    // CR-01: the other half of the WR-01 race. setGroupBedMedia's own
+    // skeleton-create was made a merge write specifically because it races
+    // this function; this function's create must be a merge write too, or a
+    // concurrently-landing bed-media skeleton's bedAudioUrl is wiped by this
+    // function's full-document overwrite.
+    it('creates the group with { merge: true } so a racing bed-media skeleton write is not clobbered', async () => {
+      const { getDoc, setDoc } = await import('firebase/firestore')
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => false,
+        id: 'slot-1',
+        data: () => undefined,
+      } as ReturnType<typeof getDoc> extends Promise<infer T> ? T : never)
+
+      const { useSlideGroups } = await import('../slideGroups')
+      const store = useSlideGroups()
+
+      await store.materializeGroupIfMissing('org-1', {
+        id: 'slot-1',
+        serviceId: 'service-1',
+        slotId: 'slot-1',
+        slides: [{ id: 'gs-1', order: 0, sourceRef: { kind: 'text' } }],
+      })
+
+      expect(setDoc).toHaveBeenCalledOnce()
+      const callArgs = vi.mocked(setDoc).mock.calls[0]!
+      expect(callArgs[2]).toEqual({ merge: true })
+      const payload = callArgs[1] as Record<string, unknown>
+      // Never claims the bed field — a concurrently-landed setGroupBedMedia
+      // skeleton's bedAudioUrl survives this merge write precisely because
+      // this payload omits the key entirely.
+      expect('bedAudioUrl' in payload).toBe(false)
+    })
+
+    // CR-01 reverse-order reproduction: setGroupBedMedia's own merging
+    // skeleton-create (Phase 24 WR-01) lands FIRST, materializeGroupIfMissing
+    // lands SECOND. Both independently saw the document absent before either
+    // write landed (two sequential getDoc-absent reads), matching the race
+    // window the review describes. Both creates being merge writes is the
+    // mechanism that guarantees the first write's bedAudioUrl survives the
+    // second: the second payload never carries a bedAudioUrl key at all.
+    it('reverse-order race: a setGroupBedMedia skeleton landing before materializeGroupIfMissing is not erased', async () => {
+      const { getDoc, setDoc } = await import('firebase/firestore')
+      vi.mocked(getDoc)
+        .mockResolvedValueOnce({
+          exists: () => false,
+          id: 'slot-1',
+          data: () => undefined,
+        } as ReturnType<typeof getDoc> extends Promise<infer T> ? T : never)
+        .mockResolvedValueOnce({
+          exists: () => false,
+          id: 'slot-1',
+          data: () => undefined,
+        } as ReturnType<typeof getDoc> extends Promise<infer T> ? T : never)
+
+      const { useSlideGroups } = await import('../slideGroups')
+      const store = useSlideGroups()
+
+      // setGroupBedMedia's skeleton-create lands first.
+      await store.setGroupBedMedia('org-1', 'slot-1', {
+        serviceId: 'service-1',
+        bedAudioUrl: 'https://example.com/bed.mp3',
+      })
+      // materializeGroupIfMissing lands second, with the group's real derived slides.
+      await store.materializeGroupIfMissing('org-1', {
+        id: 'slot-1',
+        serviceId: 'service-1',
+        slotId: 'slot-1',
+        slides: [{ id: 'gs-1', order: 0, sourceRef: { kind: 'text' } }],
+      })
+
+      expect(setDoc).toHaveBeenCalledTimes(2)
+      const firstCall = vi.mocked(setDoc).mock.calls[0]!
+      const secondCall = vi.mocked(setDoc).mock.calls[1]!
+      // Both writes are merge writes — the mechanism CR-01 relies on.
+      expect(firstCall[2]).toEqual({ merge: true })
+      expect(secondCall[2]).toEqual({ merge: true })
+      // The second (materialize) write's payload never carries a bedAudioUrl
+      // key, so Firestore's merge semantics leave the first write's
+      // bedAudioUrl field on the live document untouched by this call.
+      const secondPayload = secondCall[1] as Record<string, unknown>
+      expect('bedAudioUrl' in secondPayload).toBe(false)
+      expect((secondPayload.slides as unknown[]).length).toBe(1)
+    })
   })
 
   describe('deleteGroup', () => {

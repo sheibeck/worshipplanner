@@ -90,6 +90,24 @@ export const useSlideGroups = defineStore('slideGroups', () => {
    * gone; a freshly materialized group always starts with no bed) and lands
    * in this SAME `setDoc` as the slides. The bed is audio-only (D-18) —
    * there is no video bed field.
+   *
+   * CR-01 (asymmetric WR-01 fix): this create is now ALSO `{ merge: true }`.
+   * `setGroupBedMedia`'s skeleton-create was made a merge write specifically
+   * because it races this function — both independently `getDoc` the same
+   * not-yet-existing doc and, on absence, `setDoc`. Only guarding
+   * `setGroupBedMedia`'s half left this function's plain, non-merge `setDoc`
+   * able to win the race and silently erase a `bedAudioUrl` a user had JUST
+   * attached (a concurrently-landing bed-media skeleton write's `bedAudioUrl`
+   * key, which is absent from `input`, would otherwise be wiped by a full
+   * replace). Since this branch only ever runs when `getDoc` found NO
+   * existing document, `merge: true` is a no-op in the ordinary
+   * (non-racing) case — it changes behavior ONLY inside the race window.
+   * `slides` (and every other key `input` carries) IS present in this
+   * payload, so merge does not preserve a stale `slides` array here — Firestore
+   * merge only preserves EXISTING top-level keys the incoming payload omits;
+   * `slides` is always authoritatively replaced by `input.slides` because the
+   * key is always present in this write. Only `bedAudioUrl` (absent from
+   * `input`, D-19) can ever survive from a racing write.
    */
   async function materializeGroupIfMissing(
     orgId: string,
@@ -98,11 +116,15 @@ export const useSlideGroups = defineStore('slideGroups', () => {
     const ref = doc(db, 'organizations', orgId, 'slideGroups', input.slotId)
     const existing = await getDoc(ref)
     if (existing.exists()) return false
-    await setDoc(ref, {
-      ...stripUndefined(input),
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    })
+    await setDoc(
+      ref,
+      {
+        ...stripUndefined(input),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    )
     return true
   }
 
