@@ -152,6 +152,7 @@
     <SongSlideOver
       :open="slideOverOpen"
       :song="selectedSong"
+      :initial-tab="requestedTab"
       @close="slideOverOpen = false"
       @saved="slideOverOpen = false"
       @deleted="slideOverOpen = false"
@@ -167,11 +168,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useSongStore } from '@/stores/songs'
 import type { Song } from '@/types/song'
+import { parseSongEditRequest, clearSongEditRequest, type SongEditTab } from '@/utils/songEditLink'
 import AppShell from '@/components/AppShell.vue'
 import SongFilters from '@/components/SongFilters.vue'
 import SongTable from '@/components/SongTable.vue'
@@ -187,6 +189,10 @@ const router = useRouter()
 // Slide-over state
 const selectedSong = ref<Song | null>(null)
 const slideOverOpen = ref(false)
+// 26-02: tab requested by an arriving "Edit in song" link (undefined for every
+// other opening path, so the editor falls back to its own Details default).
+const requestedTab = ref<SongEditTab | undefined>(undefined)
+let stopSongEditWatch: (() => void) | null = null
 
 // Import modal state
 const importModalOpen = ref(false)
@@ -284,6 +290,46 @@ function initStore() {
   songStore.subscribe(orgId)
 }
 
+// 26-02 (D-14/D-15): honour an arriving "Edit in song" link — `?edit=<songId>`
+// with an optional `?tab=`. The song catalogue is a live subscription, so the
+// requested song is very often not loaded yet at mount. Resolve immediately if
+// possible; otherwise watch the catalogue until it appears, then stop watching
+// so the request can only ever be honoured once. A song id that never appears
+// (stale/bad link) simply never opens anything — the list stays usable.
+function openSongEditRequest(song: Song, tab: SongEditTab | undefined) {
+  selectedSong.value = song
+  requestedTab.value = tab
+  slideOverOpen.value = true
+}
+
+function clearSongEditQueryParam() {
+  router.replace({ query: clearSongEditRequest(route.query) })
+}
+
+function resolveSongEditRequest() {
+  const request = parseSongEditRequest(route.query)
+  if (!request) return
+
+  const existing = songStore.songs.find((s) => s.id === request.songId)
+  if (existing) {
+    openSongEditRequest(existing, request.tab)
+    clearSongEditQueryParam()
+    return
+  }
+
+  stopSongEditWatch = watch(
+    () => songStore.songs,
+    (songs) => {
+      const found = songs.find((s) => s.id === request.songId)
+      if (!found) return
+      openSongEditRequest(found, request.tab)
+      clearSongEditQueryParam()
+      stopSongEditWatch?.()
+      stopSongEditWatch = null
+    },
+  )
+}
+
 onMounted(async () => {
   initStore()
 
@@ -293,19 +339,25 @@ onMounted(async () => {
     // Clear query param without navigation
     router.replace({ query: { ...route.query, import: undefined } })
   }
+
+  resolveSongEditRequest()
 })
 
 onUnmounted(() => {
   songStore.unsubscribeAll()
+  stopSongEditWatch?.()
+  stopSongEditWatch = null
 })
 
 function onSelectSong(song: Song) {
   selectedSong.value = song
+  requestedTab.value = undefined
   slideOverOpen.value = true
 }
 
 function onAddSong() {
   selectedSong.value = null
+  requestedTab.value = undefined
   slideOverOpen.value = true
 }
 
