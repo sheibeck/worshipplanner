@@ -336,6 +336,31 @@ async function onDismissReconciliation(): Promise<void> {
   }
 }
 
+// --- Task 3: the dialog cannot outlive the decision it is about ---
+//
+// Two ways an open dialog can end up stale: another tab declines or applies
+// the SAME divergence, so it stops surfacing in `pendingReconciliations`; or
+// the user changes the selected plan item while the dialog is still open,
+// which would otherwise leave it showing a DIFFERENT group's decision. No
+// existing multi-tab-race pattern exists elsewhere in this codebase to copy
+// (26-UI-SPEC.md's flagged backstop) — covered by these explicit watchers and
+// by tests, not assumed to just work. `ReconcileConfirmModal.vue`'s own
+// render-conditional-on-pending guard is the backstop underneath this one.
+watch(pendingForSelected, (pending) => {
+  if (!pending && showReconcileModal.value) {
+    showReconcileModal.value = false
+  }
+})
+
+watch(
+  () => props.selectedSlot?.id,
+  () => {
+    if (showReconcileModal.value) {
+      showReconcileModal.value = false
+    }
+  },
+)
+
 // --- 25-06 Task 2: group music bar attach/remove — the bed write path ---
 //
 // No on-demand materialization step is needed here, unlike every

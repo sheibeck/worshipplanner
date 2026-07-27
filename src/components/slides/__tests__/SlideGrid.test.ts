@@ -1108,4 +1108,65 @@ describe('SlideGrid', () => {
       expect(wrapper.find('[data-testid="slide-grid-reconciliation-review"]').exists()).toBe(false)
     })
   })
+
+  // --- Task 3: the dialog cannot outlive the decision it is about ---
+  describe('reconciliation dialog self-closes when its subject disappears (26-06 Task 3)', () => {
+    it('closes and makes no write when the pending update for the selected slot disappears while open', async () => {
+      const slot = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: 'X', songKey: null, requiredVwType: 1 } as never)
+      const pending: PendingReconciliation = { slotId: 'slot-1', proposed: [], freshSignature: 'sig-fresh' }
+      const wrapper = mountGrid({ selectedSlot: slot, pendingReconciliations: [pending] })
+
+      await wrapper.get('[data-testid="slide-grid-reconciliation-review"]').trigger('click')
+      expect(wrapper.findComponent(ReconcileConfirmModal).props('open')).toBe(true)
+
+      await wrapper.setProps({ pendingReconciliations: [] })
+
+      expect(wrapper.findComponent(ReconcileConfirmModal).props('open')).toBe(false)
+      expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
+      expect(mockDismissReconciliation).not.toHaveBeenCalled()
+    })
+
+    it('closes when the selected plan item changes while the dialog is open', async () => {
+      const slotA = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: 'X', songKey: null, requiredVwType: 1 } as never)
+      const slotB = makeSlot({ kind: 'PRAYER', id: 'slot-2', position: 1 })
+      const pendingA: PendingReconciliation = { slotId: 'slot-1', proposed: [], freshSignature: 'sig-fresh' }
+      const wrapper = mountGrid({ selectedSlot: slotA, pendingReconciliations: [pendingA] })
+
+      await wrapper.get('[data-testid="slide-grid-reconciliation-review"]').trigger('click')
+      expect(wrapper.findComponent(ReconcileConfirmModal).props('open')).toBe(true)
+
+      await wrapper.setProps({ selectedSlot: slotB })
+
+      expect(wrapper.findComponent(ReconcileConfirmModal).props('open')).toBe(false)
+    })
+
+    it('after a self-close, neither intent can still be triggered', async () => {
+      const slot = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: 'X', songKey: null, requiredVwType: 1 } as never)
+      const pending: PendingReconciliation = { slotId: 'slot-1', proposed: [], freshSignature: 'sig-fresh' }
+      const wrapper = mountGrid({ selectedSlot: slot, pendingReconciliations: [pending] })
+
+      await wrapper.get('[data-testid="slide-grid-reconciliation-review"]').trigger('click')
+      await wrapper.setProps({ pendingReconciliations: [] })
+
+      await wrapper.findComponent(ReconcileConfirmModal).vm.$emit('apply')
+      await wrapper.findComponent(ReconcileConfirmModal).vm.$emit('dismiss')
+      await Promise.resolve()
+
+      expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
+      expect(mockDismissReconciliation).not.toHaveBeenCalled()
+    })
+
+    it('a pending update that disappears leaves the group slides and bed untouched', async () => {
+      const slot = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: 'X', songKey: null, requiredVwType: 1 } as never)
+      const pending: PendingReconciliation = { slotId: 'slot-1', proposed: [], freshSignature: 'sig-fresh' }
+      const wrapper = mountGrid({ selectedSlot: slot, pendingReconciliations: [pending] })
+
+      await wrapper.get('[data-testid="slide-grid-reconciliation-review"]').trigger('click')
+      await wrapper.setProps({ pendingReconciliations: [] })
+      await Promise.resolve()
+
+      expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
+      expect(mockSetGroupBedMedia).not.toHaveBeenCalled()
+    })
+  })
 })
