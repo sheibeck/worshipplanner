@@ -169,6 +169,53 @@ export interface EnsureGroupMaterializedResult {
 }
 
 /**
+ * Builds the reconciliation confirm dialog's heading and body (D-05..D-08,
+ * 26-UI-SPEC.md § "Reconciliation Confirm Modal") — the exact two copy tables
+ * there, reproduced verbatim, never paraphrased. D-06 traded away a diff
+ * view; this wording's concreteness (exact counts and kinds of what's at
+ * risk) is the ENTIRE compensation for that trade-off, so do not "improve"
+ * it later by adding a diff, a per-slide list, or a before-and-after — that
+ * would silently re-introduce what the user explicitly declined.
+ *
+ * Branches on whether `pending` carries BOTH song titles (D-08, populated
+ * only for a song-identity-swap reconciliation): with them, the
+ * song-reassignment copy; without them, the generic copy naming `slot`'s
+ * display title.
+ */
+export function reconciliationConfirmCopy(
+  pending: PendingReconciliation,
+  slot: ServiceSlot,
+): { heading: string; body: string } {
+  // The count falls back to the number of proposed slides when `loss` is
+  // absent altogether — the same fallback the passive banner already uses —
+  // rather than ever reading zero.
+  const count = pending.loss?.customizedEntries ?? pending.proposed.length
+  const slideWord = count === 1 ? 'slide' : 'slides'
+
+  // Mirrors ServiceEditorView.vue's `deleteConfirmBody` (D-03 precedent):
+  // include a phrase only for a kind whose count is non-zero, join the
+  // included ones, and drop the whole "including" clause when neither is at
+  // risk — never emit an empty or zero-valued phrase.
+  const mediaParts: string[] = []
+  if (pending.loss?.withAudio) mediaParts.push(`${pending.loss.withAudio} with attached audio`)
+  if (pending.loss?.withNotes) mediaParts.push(`${pending.loss.withNotes} with operator notes`)
+  const mediaClause = mediaParts.length > 0 ? `, including ${mediaParts.join(', ')}` : ''
+
+  if (pending.oldSongTitle && pending.newSongTitle) {
+    return {
+      heading: `Replace "${pending.oldSongTitle}" with "${pending.newSongTitle}"?`,
+      body: `This group's slides currently come from "${pending.oldSongTitle}". Applying the update will switch them to "${pending.newSongTitle}" and replace ${count} ${slideWord} you added${mediaClause}. This cannot be undone.`,
+    }
+  }
+
+  const title = slotDisplayTitle(slot)
+  return {
+    heading: `Update this group's slides?`,
+    body: `"${title}"'s source content has changed since these slides were generated. Applying the update will replace ${count} ${slideWord} you added${mediaClause}. This cannot be undone.`,
+  }
+}
+
+/**
  * Extracts a human-readable filename from a Firebase Storage download URL
  * (`useMediaUpload`'s upload path is `orgs/{orgId}/media/{mediaId}/{fileName}`).
  * Used by the rail's group-music line to name the bed (25-UI-SPEC.md

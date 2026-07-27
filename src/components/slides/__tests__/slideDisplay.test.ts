@@ -6,9 +6,12 @@ import {
   slideBodyText,
   slideFooterLabel,
   bedAudioLabel,
+  reconciliationConfirmCopy,
+  type PendingReconciliation,
 } from '../slideDisplay'
-import type { ServiceSlot, SlotKind } from '@/types/service'
+import type { ServiceSlot, SlotKind, SongSlot } from '@/types/service'
 import type { Slide } from '@/types/slide'
+import type { GroupSlideEntry } from '@/types/slideGroup'
 
 const ALL_KINDS: SlotKind[] = ['SONG', 'SCRIPTURE', 'PRAYER', 'MESSAGE', 'HYMN', 'IMPORTED']
 
@@ -282,6 +285,138 @@ describe('slideDisplay', () => {
 
     it('falls back to a generic label for a malformed URL', () => {
       expect(bedAudioLabel('%')).toBe('Group music')
+    })
+  })
+
+  // --- 26-04 Task 3: the reconciliation confirm dialog's warning wording ---
+  describe('reconciliationConfirmCopy', () => {
+    function proposedEntries(count: number): GroupSlideEntry[] {
+      return Array.from({ length: count }, (_, i) => ({
+        id: `proposed-${i}`,
+        order: i,
+        sourceRef: { kind: 'text' as const },
+      }))
+    }
+
+    function scriptureSlot(): ServiceSlot {
+      return {
+        kind: 'SCRIPTURE',
+        id: 'slot-scripture',
+        position: 0,
+        book: 'Psalms',
+        chapter: 23,
+        verseStart: 1,
+        verseEnd: 6,
+      }
+    }
+
+    function songSlot(): SongSlot {
+      return {
+        kind: 'SONG',
+        id: 'slot-song',
+        position: 0,
+        requiredVwType: 1,
+        songId: 'song-b',
+        songTitle: 'New Song Title',
+        songKey: null,
+      }
+    }
+
+    it('produces the generic heading and body naming the plan item and both media counts for several slides', () => {
+      const pending: PendingReconciliation = {
+        slotId: 'slot-scripture',
+        proposed: proposedEntries(3),
+        loss: { customizedEntries: 3, withAudio: 1, withNotes: 2 },
+      }
+      const { heading, body } = reconciliationConfirmCopy(pending, scriptureSlot())
+
+      expect(heading).toBe("Update this group's slides?")
+      expect(body).toBe(
+        '"Psalms 23:1-6"\'s source content has changed since these slides were generated. Applying the update will replace 3 slides you added, including 1 with attached audio, 2 with operator notes. This cannot be undone.',
+      )
+    })
+
+    it('produces the song-reassignment heading and body naming the old and the new song', () => {
+      const pending: PendingReconciliation = {
+        slotId: 'slot-song',
+        proposed: proposedEntries(2),
+        loss: { customizedEntries: 2, withAudio: 0, withNotes: 0 },
+        oldSongTitle: 'Old Song Title',
+        newSongTitle: 'New Song Title',
+      }
+      const { heading, body } = reconciliationConfirmCopy(pending, songSlot())
+
+      expect(heading).toBe('Replace "Old Song Title" with "New Song Title"?')
+      expect(body).toBe(
+        'This group\'s slides currently come from "Old Song Title". Applying the update will switch them to "New Song Title" and replace 2 slides you added. This cannot be undone.',
+      )
+    })
+
+    it('uses the singular form for exactly one slide and the plural form for more than one', () => {
+      const singular: PendingReconciliation = {
+        slotId: 'slot-scripture',
+        proposed: proposedEntries(1),
+        loss: { customizedEntries: 1, withAudio: 0, withNotes: 0 },
+      }
+      const plural: PendingReconciliation = {
+        slotId: 'slot-scripture',
+        proposed: proposedEntries(2),
+        loss: { customizedEntries: 2, withAudio: 0, withNotes: 0 },
+      }
+      expect(reconciliationConfirmCopy(singular, scriptureSlot()).body).toContain('replace 1 slide you added')
+      expect(reconciliationConfirmCopy(plural, scriptureSlot()).body).toContain('replace 2 slides you added')
+    })
+
+    it('names only the non-zero media kind when only one is non-zero', () => {
+      const audioOnly: PendingReconciliation = {
+        slotId: 'slot-scripture',
+        proposed: proposedEntries(3),
+        loss: { customizedEntries: 3, withAudio: 1, withNotes: 0 },
+      }
+      const notesOnly: PendingReconciliation = {
+        slotId: 'slot-scripture',
+        proposed: proposedEntries(3),
+        loss: { customizedEntries: 3, withAudio: 0, withNotes: 2 },
+      }
+      expect(reconciliationConfirmCopy(audioOnly, scriptureSlot()).body).toBe(
+        '"Psalms 23:1-6"\'s source content has changed since these slides were generated. Applying the update will replace 3 slides you added, including 1 with attached audio. This cannot be undone.',
+      )
+      expect(reconciliationConfirmCopy(notesOnly, scriptureSlot()).body).toBe(
+        '"Psalms 23:1-6"\'s source content has changed since these slides were generated. Applying the update will replace 3 slides you added, including 2 with operator notes. This cannot be undone.',
+      )
+    })
+
+    it('drops the "including" clause entirely when neither attached audio nor operator notes are at risk', () => {
+      const pending: PendingReconciliation = {
+        slotId: 'slot-scripture',
+        proposed: proposedEntries(2),
+        loss: { customizedEntries: 2, withAudio: 0, withNotes: 0 },
+      }
+      expect(reconciliationConfirmCopy(pending, scriptureSlot()).body).toBe(
+        '"Psalms 23:1-6"\'s source content has changed since these slides were generated. Applying the update will replace 2 slides you added. This cannot be undone.',
+      )
+    })
+
+    it('falls back to the number of proposed slides when loss counts are missing altogether', () => {
+      const pending: PendingReconciliation = {
+        slotId: 'slot-scripture',
+        proposed: proposedEntries(4),
+      }
+      expect(reconciliationConfirmCopy(pending, scriptureSlot()).body).toContain('replace 4 slides you added')
+    })
+
+    it('never builds a per-slide list, a diff, or a before-and-after — only counts and kinds', () => {
+      const pending: PendingReconciliation = {
+        slotId: 'slot-scripture',
+        proposed: proposedEntries(3),
+        loss: { customizedEntries: 3, withAudio: 1, withNotes: 1 },
+      }
+      const { heading, body } = reconciliationConfirmCopy(pending, scriptureSlot())
+      for (const entry of pending.proposed) {
+        expect(body).not.toContain(entry.id)
+      }
+      expect(heading).not.toContain('\n')
+      expect(body).not.toContain('\n')
     })
   })
 })
