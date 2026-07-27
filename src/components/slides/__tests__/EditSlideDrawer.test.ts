@@ -416,6 +416,42 @@ describe('EditSlideDrawer (Phase 26-05 Task 3 — label/notes live-apply)', () =
     expect(written.find((e) => e.id === 'entry-1')?.label).toBe('Changed before leaving')
   })
 
+  it('CR-01 regression: flushing a Label edit and a Notes edit on the SAME entry together (switching entries before either debounce fires) commits BOTH edits, not just one', async () => {
+    const entryOne = makeEntry({ id: 'entry-1', label: 'Original label', notes: 'Original notes' })
+    const entryTwo = makeEntry({ id: 'entry-2', label: 'Other' })
+    const group = makeGroup({ slides: [entryOne, entryTwo] })
+    const wrapper = mountDrawer({ entry: entryOne, group })
+
+    await body().find('[data-testid="drawer-label-input"]').setValue('New label')
+    await body().find('[data-testid="drawer-notes-input"]').setValue('New notes')
+
+    // `flushAll` must await the label flush before starting the notes flush,
+    // so the notes write's `writeField` reads a base that already reflects
+    // the label write's result — exactly what the store's own snapshot
+    // round-trip would deliver between the two sequential awaits in real use.
+    // Simulate that round-trip here: resolving the FIRST (label) write updates
+    // the live `group` prop before the SECOND (notes) write reads it.
+    mockReplaceGroupSlides.mockImplementationOnce(async () => {
+      const withLabelApplied = { ...entryOne, label: 'New label' }
+      await wrapper.setProps({ group: makeGroup({ slides: [withLabelApplied, entryTwo] }) })
+    })
+
+    // Switching to a different entry before the 800ms debounce fires triggers
+    // `flushAll`, which must flush both the pending label and notes writes.
+    await wrapper.setProps({ entry: entryTwo })
+    await flushPromises()
+
+    expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(2)
+    // The SECOND write to land (notes) is the one whose `next` must carry
+    // BOTH edits — under the old parallel `Promise.all` bug, this write's
+    // `next` was computed from the pre-label-write base and would silently
+    // discard the label edit.
+    const secondWriteNext = mockReplaceGroupSlides.mock.calls[1]![2] as GroupSlideEntry[]
+    const written = secondWriteNext.find((e) => e.id === 'entry-1')
+    expect(written?.label).toBe('New label')
+    expect(written?.notes).toBe('New notes')
+  })
+
   it('shows a saving state during the write and a saved state after it resolves', async () => {
     let resolveWrite: () => void = () => {}
     mockReplaceGroupSlides.mockImplementationOnce(

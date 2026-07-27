@@ -809,7 +809,17 @@ async function flushField(field: FieldName): Promise<void> {
 }
 
 async function flushAll(): Promise<void> {
-  await Promise.all([flushField('label'), flushField('notes'), flushField('body')])
+  // CR-01: sequential, NOT Promise.all. Each `writeField` call reads
+  // `props.group.slides` fresh at the moment it runs — if two fields'
+  // debounces both fired concurrently, both would read the exact same
+  // stale base and each write's `next` would silently clobber the other's
+  // field with the stale value. Awaiting each flush in turn means the
+  // second flush's `writeField` reads the post-commit base the first
+  // flush just wrote (props.group updates from the store's own snapshot
+  // round-trip before the next await resumes), so both edits survive.
+  await flushField('label')
+  await flushField('notes')
+  await flushField('body')
 }
 
 /**
