@@ -437,6 +437,31 @@ describe('reconcileSongGroup', () => {
     expect(chorusEntry?.notes).toBe('Old note')
   })
 
+  it('D-08: a within-song section change (same song) never reports a swap', () => {
+    const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
+    const group = makeStoredSongGroup(twoSectionStoredSlides)
+    const lyrics = threeSectionLyrics()
+    const inputs = makeInputs({
+      songLyricsById: new Map([['song-1', lyrics]]),
+      performanceOrderById: new Map([['song-1', ['verse-1', 'chorus', 'bridge']]]),
+    })
+
+    const result = reconcileSongGroup(group, slot, inputs)
+
+    expect(result.songSwap).toBeUndefined()
+  })
+
+  it('D-08: a song plan item with no song assigned returns the unchanged result with no swap detail', () => {
+    const slot = songSlot({ id: 'slot-1', songId: null })
+    const group = makeStoredSongGroup(twoSectionStoredSlides)
+    const inputs = makeInputs()
+
+    const result = reconcileSongGroup(group, slot, inputs)
+
+    expect(result).toEqual({ needsConfirm: false, changed: false, slides: group.slides })
+    expect(result.songSwap).toBeUndefined()
+  })
+
   it('reconciling an already-in-sync group returns changed: false and an entry list deep-equal to the stored one', () => {
     const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
     const group = makeStoredSongGroup(twoSectionStoredSlides)
@@ -550,6 +575,50 @@ describe('reconcileSongGroup', () => {
       expect(result.loss).toEqual({ customizedEntries: 1, withAudio: 1, withNotes: 0 })
     })
 
+    // D-08: the reconciler must name the OLD and NEW song on a customized
+    // identity swap — the confirm dialog's copy needs both ids to render
+    // "This plan item was reassigned from Song A to Song B" (26-RESEARCH.md
+    // Pattern 3, "The D-08 song-name gap").
+    it('D-08: a customized song-identity swap reports old song A and new song B on songSwap', () => {
+      const slot = songSlot({ id: 'slot-1', songId: 'song-b' })
+      const group = makeStoredSongGroup([
+        { id: 'e-copyright-lead', order: 0, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+        {
+          id: 'e-verse-1',
+          order: 1,
+          sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+          label: 'Custom Verse Label',
+        },
+        { id: 'e-copyright-trail', order: 2, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+      ])
+      const lyrics = songBLyrics()
+      const inputs = makeInputs({
+        songLyricsById: new Map([['song-b', lyrics]]),
+        performanceOrderById: new Map([['song-b', ['verse-1-b']]]),
+      })
+
+      const result = reconcileSongGroup(group, slot, inputs)
+
+      expect(result.needsConfirm).toBe(true)
+      expect(result.songSwap).toEqual({ oldSongId: 'song-1', newSongId: 'song-b' })
+    })
+
+    it('D-08: an UNcustomized song-identity swap replaces silently and reports no swap detail', () => {
+      const slot = songSlot({ id: 'slot-1', songId: 'song-b' })
+      const group = makeStoredSongGroup(twoSectionStoredSlides) // uncustomized — no label/notes/audio
+      const lyrics = songBLyrics()
+      const inputs = makeInputs({
+        songLyricsById: new Map([['song-b', lyrics]]),
+        performanceOrderById: new Map([['song-b', ['verse-1-b']]]),
+      })
+
+      const result = reconcileSongGroup(group, slot, inputs)
+
+      expect(result.needsConfirm).toBe(false)
+      expect(result.changed).toBe(true)
+      expect(result.songSwap).toBeUndefined()
+    })
+
     it('a SONG slot whose songId changes must not retain the previous song copyright or produce unresolvable lyric entries referencing the old song', () => {
       // The exact CR-01 reproduction: an uncustomized group materialized for
       // Song A, then the user picks Song B for the same slot. The additive
@@ -641,6 +710,9 @@ describe('reconcileScriptureGroup', () => {
     expect(result.proposed).toHaveLength(3)
     expect(result.loss?.customizedEntries).toBe(1)
     expect(result.loss?.withAudio).toBe(1)
+    // D-08 field is specific to song identity — a confirmation-required
+    // scripture group must never report a swap.
+    expect(result.songSwap).toBeUndefined()
   })
 
   it('detects divergence when slide count is unchanged but text changed', () => {

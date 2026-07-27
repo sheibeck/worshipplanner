@@ -264,12 +264,18 @@ export function reconcileSongGroup(group: SlideGroup, slot: SongSlot, inputs: As
     if (!hasCustomization(group)) {
       return { needsConfirm: false, changed: true, slides: deriveGroupEntries(slot, inputs) }
     }
+    // storedSongIds is a Set built by mapping group.slides in stored order, so
+    // Set iteration order is insertion order — the first value is "the first
+    // id in stored order" per the action's stated tie-break for a
+    // multi-song-blended group (a prior bug's leftovers).
+    const oldSongId = storedSongIds.values().next().value as string
     return {
       needsConfirm: true,
       changed: false,
       slides: group.slides,
       proposed: deriveGroupEntries(slot, inputs),
       loss: computeLoss(group),
+      songSwap: { oldSongId, newSongId: songId },
     }
   }
 
@@ -350,6 +356,17 @@ export interface ReconcileResult {
   slides: GroupSlideEntry[]
   proposed?: GroupSlideEntry[]
   loss?: { customizedEntries: number; withAudio: number; withNotes: number }
+  /**
+   * Populated ONLY on a customized song-identity swap (D-08) — the one branch
+   * of `reconcileSongGroup` that already holds both the old (stored) and new
+   * (slot-assigned) song ids in scope at the moment it decides a confirmation
+   * is required. Ids only: this module is pure and has no song-catalog access,
+   * so title resolution is 26-04's job, one layer up. Every other reconciler
+   * branch (uncustomized swap, within-song edits, scripture/imported confirm)
+   * leaves this undefined — there is either nothing to confirm or the swap is
+   * not a song-identity change.
+   */
+  songSwap?: { oldSongId: string; newSongId: string }
 }
 
 function computeLoss(group: SlideGroup): { customizedEntries: number; withAudio: number; withNotes: number } {
