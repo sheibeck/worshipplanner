@@ -243,7 +243,7 @@ Plans:
 **Wave 1**
 
 - [x] 26-01-PLAN.md — Reconciliation data model: song-swap report (D-08), durable decline field (D-07), CAS shape
-- [ ] 26-02-PLAN.md — Song editor navigation target: link contract, opening tab, arrival handling (D-14/D-15)
+- [x] 26-02-PLAN.md — Song editor navigation target: link contract, opening tab, arrival handling (D-14/D-15)
 - [ ] 26-03-PLAN.md — Scripture editor navigation plumbing: expand-only entry point and relay (D-15)
 
 **Wave 2** *(blocked on Wave 1 completion)*

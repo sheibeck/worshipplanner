@@ -5,14 +5,14 @@ milestone_name: Slides Tab Rework
 current_phase: 26
 current_phase_name: Edit Slide Drawer
 status: executing
-stopped_at: Completed 26-01-PLAN.md
-last_updated: "2026-07-27T02:33:59.456Z"
+stopped_at: Completed 26-02-PLAN.md
+last_updated: "2026-07-27T02:55:04.955Z"
 last_activity: 2026-07-26
 progress:
   total_phases: 17
   completed_phases: 13
   total_plans: 90
-  completed_plans: 82
+  completed_plans: 83
   percent: 76
 last_activity_desc: Opened v1.3 Slides Tab Rework (Phases 24-28) from the Claude Design import; v1.2 left code-complete with its verification ledger intact
 ---
@@ -36,7 +36,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 26 (Edit Slide Drawer) — EXECUTING
-Plan: 2 of 9
+Plan: 3 of 9
 Milestone: v1.3 Slides Tab Rework (Phases 24-28) — IN PROGRESS
 Status: Ready to execute
 
@@ -341,6 +341,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 25 P06 | ~50min | 2 tasks | 5 files |
 | Phase 25 P07 | ~2.5h | 3 tasks | 8 files |
 | Phase 26 P01 | 6min | 3 tasks | 5 files |
+| Phase 26 P02 | 35min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -470,6 +471,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: [Phase 26-01]: ReconcileResult.songSwap populated ids-only in the pure materializer; title resolution deferred to 26-04 where the song catalog is already in scope
 - [Phase ?]: [Phase 26-01]: SlideGroup.dismissedSignature is a second, distinct field from sourceSignature -- never collapsed into one comparison (D-07)
 - [Phase ?]: [Phase 26-01]: dismissReconciliation has no transaction/CAS -- a lost race between two declines of the same divergence is harmless
+- [Phase ?]: 26-02: songEditLink.ts owns the whole query-param link convention (builder/parser/clearer), imports nothing from Vue/router/store
+- [Phase ?]: 26-02: opening-tab input applied inside SongSlideOver's existing open-watcher (only place a requested tab survives its unconditional reset)
+- [Phase ?]: 26-02: Task 3 (SongsView arrival handling) deliberately has no new test file per its own plan instruction — verified via type-check/build + human-check, documented in SUMMARY
 
 ### Roadmap Evolution
 
@@ -529,6 +533,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-26
-Last session: 2026-07-27T02:33:59.412Z
-Stopped at: Completed 26-01-PLAN.md
+Last session: 2026-07-27T02:55:04.920Z
+Stopped at: Completed 26-02-PLAN.md
 Resume file: None
