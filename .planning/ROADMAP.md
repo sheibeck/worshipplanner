@@ -262,7 +262,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 26-09-PLAN.md — Duplicate and delete, plus duplicate-tolerant song reconciliation (D-04)
+- [x] 26-09-PLAN.md — Duplicate and delete, plus duplicate-tolerant song reconciliation (D-04)
 
 ### Phase 27: Service Order Tab — Rename and Strip Slide Editing `risk:medium`
 

@@ -4,16 +4,16 @@ milestone: v1.3
 milestone_name: Slides Tab Rework
 current_phase: 26
 current_phase_name: Edit Slide Drawer
-status: executing
-stopped_at: Completed 26-08-PLAN.md
-last_updated: "2026-07-27T06:33:06.244Z"
+status: verifying
+stopped_at: Completed 26-09-PLAN.md (Phase 26 all 9 plans executed -- ready for verification)
+last_updated: "2026-07-27T07:11:35.904Z"
 last_activity: 2026-07-27
 progress:
   total_phases: 17
-  completed_phases: 13
+  completed_phases: 14
   total_plans: 90
-  completed_plans: 89
-  percent: 76
+  completed_plans: 90
+  percent: 82
 last_activity_desc: Opened v1.3 Slides Tab Rework (Phases 24-28) from the Claude Design import; v1.2 left code-complete with its verification ledger intact
 ---
 
@@ -38,7 +38,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 Phase: 26 (Edit Slide Drawer) — EXECUTING
 Plan: 9 of 9
 Milestone: v1.3 Slides Tab Rework (Phases 24-28) — IN PROGRESS
-Status: Ready to execute
+Status: Phase complete — ready for verification
 
 Phases 20, 21, 22 and 23 are all code-complete; only their deferred human-verify checkpoints remain
 (see the Deferred Verification table below).
@@ -348,6 +348,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 26 P06 | 35min | 3 tasks | 4 files |
 | Phase 26 P07 | 55min | 3 tasks | 4 files |
 | Phase 26 P08 | 50min | 3 tasks | 2 files |
+| Phase 26 P09 | 55 | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -489,6 +490,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 26-07: Slide Text section keyed on GroupSlideEntry.sourceRef.kind (never Slide.contentKind) per D-15's six-row matrix; hand-written slide body writes through 26-05's fresh-base helper extended to a nested sourceRef.body field; both edit-in-song/edit-in-scripture routes guarded by useUnsavedGuard with cancel-before-navigate (not flush) so the confirmation is truthful
 - [Phase ?]: 26-08: Slide Audio's scope pill renders in every audio state (not just 'nothing attached'), since whichever route was taken on attach always stamps entry.audioScope to match the state currently shown
 - [Phase ?]: 26-08: audioState (what's shown) and scopeChoice (what's chosen next) kept as two independent computed values — Remove always acts on audioState, attach always acts on scopeChoice
+- [Phase ?]: 26-09: reconcileSongGroup's per-section index widened from Map<sectionId, entry> to Map<sectionId, entry[]> so a duplicated song-section slide survives the next within-song reconciliation instead of being silently dropped (landed before Duplicate shipped)
+- [Phase ?]: 26-09: Duplicate's selection-follows-copy is success-gated -- the drawer emits 'duplicate' (and SlidesTab.vue moves the selection) only after replaceGroupSlides resolves, so a rejected write never leaves the panel pointed at an entry that was never created
+- [Phase ?]: 26-09: deleteSlideConfirmBody lives in the pure slideDisplay module (not inline in EditSlideDrawer.vue), keyed on the entry's OWN audio/notes only -- never the group's shared bed music
 
 ### Roadmap Evolution
 
@@ -548,6 +552,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-27
-Last session: 2026-07-27T06:33:06.155Z
-Stopped at: Completed 26-08-PLAN.md
+Last session: 2026-07-27T07:11:35.843Z
+Stopped at: Completed 26-09-PLAN.md (Phase 26 all 9 plans executed -- ready for verification)
 Resume file: None
