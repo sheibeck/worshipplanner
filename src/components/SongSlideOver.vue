@@ -306,10 +306,13 @@ import SongLyricEditor from './SongLyricEditor.vue'
 import PerformanceOrderBuilder from './PerformanceOrderBuilder.vue'
 import LyricVersionHistory from './LyricVersionHistory.vue'
 import type { Song, Arrangement, VWType } from '@/types/song'
+import type { SongEditTab } from '@/utils/songEditLink'
 
 const props = defineProps<{
   open: boolean
   song: Song | null
+  /** Tab to open on (26-02's arriving-link seam). Falls back to 'details' when absent — the default is unchanged. */
+  initialTab?: SongEditTab
 }>()
 
 const emit = defineEmits<{
@@ -397,7 +400,9 @@ watch(
       userTagInput.value = ''
       titleError.value = false
       showDeleteConfirm.value = false
-      activeTab.value = 'details'
+      // 26-02: prefer the requested opening tab; fall back to the existing default
+      // when none is supplied so this remains a no-op for every other caller.
+      activeTab.value = props.initialTab ?? 'details'
       unsavedGuard.capture()
     }
   },
