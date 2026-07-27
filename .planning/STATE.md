@@ -55,6 +55,29 @@ Phases 20, 21, 22 and 23 are all code-complete; only their deferred human-verify
 | Phase | Plans | Code review | Notes |
 |-------|-------|-------------|-------|
 | 24 Slide Group Model and Migration | 6/6 | 1 critical + 2 warning, all fixed | See `24-REVIEW.md` / `24-REVIEW-FIX.md` |
+| 25 Slides Tab Shell — Plan Rail and Slide Grid | 7/7 | 2 critical + 2 warning, all fixed | See `25-REVIEW.md` / `25-REVIEW-FIX.md`. Also carries the mid-phase D-18/D-19 model deletion. |
+
+**Phase 25 shipped:** the third **Slides** tab in `ServiceEditorView`; `src/components/slides/`
+(`SlidesTab`, `SlidePlanRail`, `SlideGrid`, `SlideCard`, `SlideDropTarget`, `SlideGroupMusicControl`,
+`slideDisplay.ts`, `dropRouting.ts`); a real `VideoSlide` type (D-17); deletion of the bed-video model
+and all slide-area legacy paths (D-18/D-19); `ensureGroupMaterialized`; within-group drag-reorder; and
+a four-kind drop target (PPTX/image/video append slides · audio sets the group bed).
+
+**Two Phase 25 items to confirm at batch human-verify:**
+- Real OS drag-and-drop of a file onto the grid — jsdom cannot produce a genuine `DataTransfer` with
+  real `File` payloads, so this is manual-only. `docs/example.pptx` and `docs/example.mp3` are in the
+  tree as fixtures. See `25-07-SUMMARY.md` `<human-check>`.
+- **Behavioral decision (25-REVIEW-FIX WR-01):** a video slide now **suppresses the group's bed audio**
+  for its own duration, with the bed resuming on the next slide that has none — applying Phase 24
+  D-04's "slide beats group" precedence to video. Confirm this is the wanted behavior.
+
+**Known Phase 25 limitation (deliberate, documented in `25-05-SUMMARY.md`):** if a user hand-adds
+slides to a plan item and THEN assigns a scripture passage or deck to it, the group's signature
+diverges and the hand-added entry counts as customization, so reconciliation routes to the
+confirm-required path — whose dialog is Phase 26. Until Phase 26 ships, such a group shows the passive
+banner and no source slides. This is correct under Phase 24 D-02 ("never silently drop a user's added
+slide"), not a bug. Also: no keyboard reordering (SortableJS doesn't provide it) — flagged, not
+silently omitted.
 
 ## ★ v1.3 STANDING DECISIONS — apply to every remaining phase (25-28)
 
