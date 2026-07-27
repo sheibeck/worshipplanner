@@ -948,16 +948,6 @@
           </div>
         </div>
 
-        <!-- Slideshow preview: inline, live-updating render of the assembled slideshow (R018, R006 visible) -->
-        <div class="mt-3">
-          <SlideshowPreview :sections="assembledSections" @present="presenting = true" />
-          <PresentationViewer
-            v-if="presenting"
-            :slides="assembledSlideshow"
-            :is-loading="slideshowLoading"
-            @exit="presenting = false"
-          />
-        </div>
         </div>
 
         <!-- Roles tab: seeded from the quarterly schedule for this service's date, editor-only data (CR-01/02/03/05) -->
@@ -1023,7 +1013,10 @@
 
         <!-- Slides tab: the service-plan rail and (25-04) the slide grid.
              ServiceEditorView is the SOLE owner of useSlideshowAssembly() —
-             SlidesTab and everything under it are prop-driven. -->
+             SlidesTab and everything under it are prop-driven. The tab's own
+             "▶ Present" CTA (D-05) sets the `presenting` flag below, reusing
+             the same PresentationViewer mount the Service Order tab used to
+             own via SlideshowPreview (removed, 27-05). -->
         <div v-show="activeTab === 'slides'">
           <SlidesTab
             v-if="localService"
@@ -1038,6 +1031,13 @@
             :active="activeTab === 'slides'"
             :ensure-group-materialized="ensureGroupMaterialized"
             @navigate-to-scripture-editor="handleNavigateToScriptureEditor"
+            @present="presenting = true"
+          />
+          <PresentationViewer
+            v-if="presenting"
+            :slides="assembledSlideshow"
+            :is-loading="slideshowLoading"
+            @exit="presenting = false"
           />
         </div>
 
@@ -1129,7 +1129,6 @@ import ScriptureInput from '@/components/ScriptureInput.vue'
 import ServicePrintLayout from '@/components/ServicePrintLayout.vue'
 import ScriptureSlideEditor from '@/components/ScriptureSlideEditor.vue'
 import CongregationalEditor from '@/components/CongregationalEditor.vue'
-import SlideshowPreview from '@/components/SlideshowPreview.vue'
 import PresentationViewer from '@/components/PresentationViewer.vue'
 import SlidesTab from '@/components/slides/SlidesTab.vue'
 import { useSlideshowAssembly } from '@/composables/useSlideshowAssembly'
@@ -1388,7 +1387,6 @@ function onSectionChange(index: number, value: string) {
 
 const orgIdRef = computed(() => authStore.orgId)
 const {
-  assembledSections,
   assembledSlideshow,
   isLoading: slideshowLoading,
   groupsBySlotId,

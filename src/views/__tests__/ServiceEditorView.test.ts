@@ -6,7 +6,6 @@ import type { Song } from '@/types/song'
 import type { Person, Role, Quarter } from '@/types/roster'
 import type { Timestamp } from 'firebase/firestore'
 import type { SlideGroup } from '@/types/slideGroup'
-import SlideshowPreview from '@/components/SlideshowPreview.vue'
 import PresentationViewer from '@/components/PresentationViewer.vue'
 import SlidesTab from '@/components/slides/SlidesTab.vue'
 
@@ -647,15 +646,6 @@ describe('ServiceEditorView - Section headers and slideshow preview (Phase 20-04
     expect(wrapper.findAll('[data-testid^="section-header-"]')).toHaveLength(0)
   })
 
-  it('mounts the SlideshowPreview panel bound to the live assembled sections', async () => {
-    mockServicesList = [buildSectionedService()]
-    const wrapper = await mountView()
-
-    const preview = wrapper.findComponent(SlideshowPreview)
-    expect(preview.exists()).toBe(true)
-    expect(Array.isArray(preview.props('sections'))).toBe(true)
-  })
-
   it('does not mount PresentationViewer on initial render', async () => {
     mockServicesList = [buildSectionedService()]
     const wrapper = await mountView()
@@ -663,11 +653,11 @@ describe('ServiceEditorView - Section headers and slideshow preview (Phase 20-04
     expect(wrapper.find('[data-testid="presentation-viewer-stub"]').exists()).toBe(false)
   })
 
-  it('mounts PresentationViewer when SlideshowPreview emits present, and unmounts it when PresentationViewer emits exit', async () => {
+  it('mounts PresentationViewer when the Slides tab emits present (D-05), and unmounts it when PresentationViewer emits exit', async () => {
     mockServicesList = [buildSectionedService()]
     const wrapper = await mountView()
 
-    await wrapper.findComponent(SlideshowPreview).vm.$emit('present')
+    await wrapper.findComponent(SlidesTab).vm.$emit('present')
     await wrapper.vm.$nextTick()
     expect(wrapper.find('[data-testid="presentation-viewer-stub"]').exists()).toBe(true)
 
@@ -680,7 +670,7 @@ describe('ServiceEditorView - Section headers and slideshow preview (Phase 20-04
     mockServicesList = [buildSectionedService()]
     const wrapper = await mountView()
 
-    await wrapper.findComponent(SlideshowPreview).vm.$emit('present')
+    await wrapper.findComponent(SlidesTab).vm.$emit('present')
     await wrapper.vm.$nextTick()
 
     const viewer = wrapper.findComponent(PresentationViewer)

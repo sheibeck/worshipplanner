@@ -1,32 +1,55 @@
 <template>
-  <div class="flex h-full min-h-0" data-testid="slides-tab">
-    <SlidePlanRail
-      :slots="slots"
-      :assembled-slideshow="assembledSlideshow"
-      :groups-by-slot-id="groupsBySlotId"
-      :selected-slot-id="selectedSlotId"
-      :groups-loading="groupsLoading"
-      @select="onSelectSlot"
-    />
-    <!-- The grid for `selectedSlotId`, keyed on `selectedSlideId` for
-         card-selection accent and eventually the seam Phase 26's Edit Slide
-         drawer opens against (D-12). -->
-    <div class="min-w-0 flex-1 overflow-y-auto" data-testid="slides-tab-content">
-      <SlideGrid
-        :selected-slot="selectedSlot"
-        :slot-array-index="selectedSlotArrayIndex"
-        :position="selectedSlotPosition"
-        :total-plan-items="orderedSlots.length"
+  <div class="flex h-full min-h-0 flex-col" data-testid="slides-tab">
+    <!-- Present entry point (D-05, Phase 27-05): the only trigger for
+         Phase 23's PresentationViewer since SlideshowPreview was removed
+         from the Service Order tab. Mirrors the mockup's page-header
+         treatment (docs/design/slides-tab.dc.html) — a bordered, low-emphasis
+         "▶ Present" button — but lives on this tab since presenting now
+         belongs alongside the slide content it presents. Disabled/enabled
+         state follows the same canPresent/hasAnySlides condition
+         SlideshowPreview's own present control used (Phase 23-04): whether
+         there is anything assembled to present at all. -->
+    <div class="flex items-center justify-end gap-2 border-b border-gray-800 px-3 py-2 flex-none">
+      <button
+        type="button"
+        data-testid="present-slideshow-cta"
+        :disabled="!canPresent"
+        :title="canPresent ? undefined : 'Add songs or scripture to build a slideshow to present.'"
+        class="inline-flex items-center gap-1.5 rounded-md border border-indigo-400/60 px-3 py-1.5 text-xs font-medium text-indigo-300 transition-colors hover:bg-indigo-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+        @click="emit('present')"
+      >
+        <span aria-hidden="true">&#9654;</span> Present
+      </button>
+    </div>
+    <div class="flex flex-1 min-h-0">
+      <SlidePlanRail
+        :slots="slots"
         :assembled-slideshow="assembledSlideshow"
-        :selected-slide-id="selectedSlideId"
-        :group="selectedGroup"
-        :pending-reconciliations="pendingReconciliations"
-        :is-editor="isEditor"
-        :org-id="orgId"
-        :service-id="serviceId"
-        :ensure-group-materialized="ensureGroupMaterialized"
-        @select="onSelectSlide"
+        :groups-by-slot-id="groupsBySlotId"
+        :selected-slot-id="selectedSlotId"
+        :groups-loading="groupsLoading"
+        @select="onSelectSlot"
       />
+      <!-- The grid for `selectedSlotId`, keyed on `selectedSlideId` for
+           card-selection accent and eventually the seam Phase 26's Edit Slide
+           drawer opens against (D-12). -->
+      <div class="min-w-0 flex-1 overflow-y-auto" data-testid="slides-tab-content">
+        <SlideGrid
+          :selected-slot="selectedSlot"
+          :slot-array-index="selectedSlotArrayIndex"
+          :position="selectedSlotPosition"
+          :total-plan-items="orderedSlots.length"
+          :assembled-slideshow="assembledSlideshow"
+          :selected-slide-id="selectedSlideId"
+          :group="selectedGroup"
+          :pending-reconciliations="pendingReconciliations"
+          :is-editor="isEditor"
+          :org-id="orgId"
+          :service-id="serviceId"
+          :ensure-group-materialized="ensureGroupMaterialized"
+          @select="onSelectSlide"
+        />
+      </div>
     </div>
     <!-- Phase 26-05: the Edit Slide drawer — a SIBLING of the grid, not
          nested inside it (26-RESEARCH.md's component diagram). Follows
@@ -125,10 +148,23 @@ const props = defineProps<{
 const emit = defineEmits<{
   /** D-15's "Edit in scripture" request, carrying the plan item's raw array index. */
   (e: 'navigate-to-scripture-editor', slotArrayIndex: number): void
+  /** D-05 (Phase 27-05): request to start presenting. `ServiceEditorView` owns
+   *  the `presenting` flag and the `PresentationViewer` mount; this component
+   *  only asks for it, exactly as SlideshowPreview's own `present` emit did. */
+  (e: 'present'): void
 }>()
 
 const selectedSlotId = ref<string | null>(null)
 const selectedSlideId = ref<string | null>(null)
+
+/**
+ * Whether there is anything assembled to present — the same condition
+ * SlideshowPreview's own `canPresent` (aliased to `hasAnySlides`, Phase
+ * 23-04) used, restated directly against `assembledSlideshow` rather than
+ * reintroducing the `AssembledSection[]` grouping that only existed to
+ * render the removed preview list.
+ */
+const canPresent = computed(() => props.assembledSlideshow.length > 0)
 
 /** Plan (position) order — must match the rail's own ordering exactly. */
 const orderedSlots = computed(() => [...props.slots].sort((a, b) => a.position - b.position))

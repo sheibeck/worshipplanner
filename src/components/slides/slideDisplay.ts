@@ -90,8 +90,8 @@ export function slideContentLabel(slide: Slide): string {
  * Main preview-body text for one assembled slide — 25-04's `SlideCard` reads
  * this rather than re-deriving it, so the lyric/copyright shape-narrowing
  * (both share `contentKind: 'lyric'` and are told apart only by the presence
- * of `sectionId`) is never duplicated a third time (`SlideshowPreview.vue`
- * and `PresentationViewer.vue` each already carry their own local copy).
+ * of `sectionId`) is never duplicated a third time (`PresentationViewer.vue`
+ * already carries its own local copy).
  * Image slides render their own `<img>` in the card and don't consume this
  * string; it is still defined for every kind so the switch stays exhaustive.
  */
