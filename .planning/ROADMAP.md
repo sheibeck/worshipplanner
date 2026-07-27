@@ -248,7 +248,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 26-04-PLAN.md — Pending-update threading, durable-decline suppression, warning copy (D-06/D-07/D-08)
+- [x] 26-04-PLAN.md — Pending-update threading, durable-decline suppression, warning copy (D-06/D-07/D-08)
 - [ ] 26-05-PLAN.md — Drawer shell, selection seam, fresh-base writes, label and notes (D-01/D-02/D-03)
 
 **Wave 3** *(blocked on Wave 2 completion)*
