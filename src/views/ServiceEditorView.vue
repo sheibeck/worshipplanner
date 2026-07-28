@@ -517,22 +517,50 @@
         </div>
 
         <!-- Dynamic Service Flow -->
-        <div ref="slotContainerRef" class="space-y-1.5">
-          <template v-for="(slot, index) in localService.slots" :key="slot.kind + '-' + slot.position">
-            <!-- Section divider: non-draggable (excluded from Sortable's `draggable` selector below),
-                 computed per-index from showsSectionHeaderAt(); legacy all-undefined services render none -->
+        <div class="space-y-1.5">
+          <template v-for="group in slotSectionGroups" :key="group.key">
+            <!-- Section header: rendered unconditionally once per real section (UI-SPEC §1) —
+                 never rendered for the trailing ungrouped bucket, which has no header. Structurally
+                 a sibling of the section's list container, not a member of it, so it is excluded from
+                 that section's Sortable instance without relying on a `draggable` selector. -->
             <div
-              v-if="showsSectionHeaderAt(index)"
+              v-if="group.label"
               class="section-header flex items-center gap-2 pt-3 pb-1 first:pt-0"
-              :data-testid="`section-header-${slot.section}`"
+              :data-testid="`section-header-${group.key}`"
             >
-              <span class="text-xs font-semibold text-indigo-300 uppercase tracking-wider">{{ SERVICE_SECTION_LABELS[slot.section!] }}</span>
+              <span class="text-xs font-semibold text-indigo-300 uppercase tracking-wider">{{ group.label }}</span>
               <span class="flex-1 border-t border-gray-800"></span>
             </div>
 
+            <!-- Section list container: always rendered — populated or not — so it is always a live
+                 Sortable drop target (UI-SPEC §1/§2). One Sortable instance is created per container
+                 (Task 2); the ungrouped container gets no header and no `data-section`. -->
+            <div
+              :ref="el => setSectionListRef(group.key, el as Element | null)"
+              class="space-y-1.5 rounded-lg transition-colors"
+              :class="{ 'bg-indigo-950/20': dragOverSection === group.key }"
+              :data-testid="`section-list-${group.key}`"
+              :data-section="group.label ? group.key : undefined"
+              role="list"
+              :aria-label="group.label ? `${group.label} items` : 'Ungrouped items'"
+            >
+              <!-- Empty-section placeholder: also the live drop target (UI-SPEC §2). Excluded from
+                   the `draggable: '.slot-item'` selector, so Sortable never treats it as a member. -->
+              <div
+                v-if="group.entries.length === 0"
+                class="rounded-lg border border-dashed border-gray-800 p-4 text-center"
+                :class="{ 'bg-indigo-950/20': dragOverSection === group.key }"
+                :data-testid="`section-empty-${group.key}`"
+              >
+                <p class="text-sm text-gray-500">No items yet</p>
+                <p class="mt-1 text-xs text-gray-600">Drag an item here, or set its Section to {{ group.label }}.</p>
+              </div>
+
+              <template v-for="{ slot, index } in group.entries" :key="slot.id">
             <div
               class="slot-item rounded-lg bg-gray-900 border border-gray-800 p-3 flex items-start gap-2"
               :data-testid="`slot-${index}`"
+              :data-slot-id="slot.id"
             >
             <!-- Drag handle: editor only -->
             <div v-if="authStore.isEditor" class="cursor-grab active:cursor-grabbing text-gray-600 hover:text-gray-400 drag-handle flex-shrink-0 mt-0.5">
@@ -912,6 +940,8 @@
               </svg>
             </button>
             </div>
+              </template>
+            </div>
           </template>
         </div>
 
@@ -1105,7 +1135,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick, type ComponentPublicInstance } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useServiceStore } from '@/stores/services'
@@ -1113,7 +1143,7 @@ import { useSongStore } from '@/stores/songs'
 import { useRosterStore } from '@/stores/roster'
 import { useQuartersStore } from '@/stores/quarters'
 import { useSlideGroups } from '@/stores/slideGroups'
-import { slotLabel, createSlot, reindexSlots, backfillSlotIds } from '@/utils/slotTypes'
+import { slotLabel, createSlot, reindexSlots, backfillSlotIds, groupBySection, flattenBySection, orderSlotsBySection } from '@/utils/slotTypes'
 import { scripturesOverlap } from '@/utils/scripture'
 import { getPrimaryKey } from '@/utils/songSearch'
 import { resolveServiceRoleAssignments, findQuarterForDate } from '@/utils/serviceRoles'
@@ -1358,31 +1388,71 @@ const isExportedLocked = computed(() =>
   localService.value?.status === 'exported'
 )
 
-// ── Sections (D005/R007) + live slideshow assembly (R005/R006 visible) ─────────
+// ── Sections (D005/R007/R043/R044) + live slideshow assembly (R005/R006 visible) ─
 
 /**
- * True when a section divider should render immediately above `slots[index]`:
- * the slot has a defined section AND it differs from the previous slot's
- * section. A legacy service (every slot's `section === undefined`) never
- * satisfies this for any index, so it renders with zero headers (D005 is
- * additive — no migration).
+ * `{ slot, index }` pairs (index = the slot's ABSOLUTE position in
+ * `localService.slots`) grouped into `SERVICE_SECTIONS`-ordered buckets plus
+ * a trailing `legacy`/ungrouped bucket, per `groupBySection` (29-02). The
+ * ABSOLUTE index is what every existing per-slot handler in the template
+ * (onClearSong, removeSlot, onSectionChange, aiDraftSongs, the scripture
+ * panel, slotLabel, data-testid="slot-{index}") already keys on — grouping
+ * for render never renumbers it to a per-section ordinal.
  */
-function showsSectionHeaderAt(index: number): boolean {
-  const slots = localService.value?.slots
-  if (!slots) return false
-  const slot = slots[index]
-  if (!slot?.section) return false
-  const prevSection = index > 0 ? slots[index - 1]?.section : undefined
-  return prevSection !== slot.section
+const slotsBySection = computed(() => {
+  const slots = localService.value?.slots ?? []
+  return groupBySection(
+    slots.map((slot, index) => ({ slot, index })),
+    (entry) => entry.slot.section,
+  )
+})
+
+/** One render group per `SERVICE_SECTIONS` member (always present, `label` set), plus a
+ *  trailing ungrouped group (key `'ungrouped'`, `label: null`, no header) ONLY when legacy
+ *  slots exist — matches `useSlideshowAssembly.ts`'s shipped "Ungrouped" placement. */
+const slotSectionGroups = computed(() => {
+  const grouped = slotsBySection.value
+  const groups: Array<{ key: ServiceSection | 'ungrouped'; label: string | null; entries: { slot: ServiceSlot; index: number }[] }> =
+    SERVICE_SECTIONS.map((section) => ({
+      key: section,
+      label: SERVICE_SECTION_LABELS[section],
+      entries: grouped.sections[section],
+    }))
+  if (grouped.legacy.length > 0) {
+    groups.push({ key: 'ungrouped', label: null, entries: grouped.legacy })
+  }
+  return groups
+})
+
+/** Highlight ref for the section a cross-section drag is currently hovering (UI-SPEC §3).
+ *  Set by Sortable's `onMove` and cleared in `onEnd` — both wired in Task 2. Declared here
+ *  because the template's `:class` binding on every section container reads it. */
+const dragOverSection = ref<ServiceSection | 'ungrouped' | null>(null)
+
+/** Ref-callback populating the per-section container element map Task 2's Sortable
+ *  lifecycle watcher consumes. Declared here because the template wires the callback;
+ *  Task 2 owns the watcher that turns this map into `Sortable.create` calls. */
+const sectionListEls = ref(new Map<ServiceSection | 'ungrouped', HTMLElement>())
+function setSectionListRef(key: ServiceSection | 'ungrouped', el: Element | ComponentPublicInstance | null): void {
+  const htmlEl = el as HTMLElement | null
+  if (htmlEl) {
+    sectionListEls.value.set(key, htmlEl)
+  } else {
+    sectionListEls.value.delete(key)
+  }
 }
 
 /** Editor-only per-slot section assignment — routes through the same localService
- *  mutation + autosave watcher every other slot field uses (no separate save path). */
+ *  mutation + autosave watcher every other slot field uses (no separate save path).
+ *  Re-orders section-major (29-03/R044) so a section change through the dropdown
+ *  produces the same array shape a drag does — the array order the editor renders and
+ *  the array order that gets persisted can never disagree. */
 function onSectionChange(index: number, value: string) {
   if (!localService.value) return
   const slot = localService.value.slots[index]
   if (!slot) return
   slot.section = value === '' ? undefined : (value as ServiceSection)
+  localService.value.slots = reindexSlots(orderSlotsBySection(localService.value.slots))
 }
 
 const orgIdRef = computed(() => authStore.orgId)
@@ -1763,9 +1833,13 @@ function toggleTeam(team: string) {
 
 function addSlot(kind: SlotKind, vwType?: VWType) {
   if (!localService.value) return
-  const newSlot = createSlot(kind, vwType)
+  // New slot inherits the current last slot's section — on a fully sectioned
+  // service it lands at the end of that section rather than in the ungrouped
+  // bucket. `createSlot` omits the `section` key entirely when this is
+  // `undefined` (a legacy, section-less service), preserving today's shape.
+  const newSlot = createSlot(kind, vwType, localService.value.slots.at(-1)?.section)
   localService.value.slots.push(newSlot)
-  localService.value.slots = reindexSlots(localService.value.slots)
+  localService.value.slots = reindexSlots(orderSlotsBySection(localService.value.slots))
   showAddMenu.value = false
 }
 
@@ -1798,7 +1872,7 @@ function isSlotPopulated(slot: ServiceSlot): boolean {
 function performRemoveSlot(index: number) {
   if (!localService.value) return
   localService.value.slots.splice(index, 1)
-  localService.value.slots = reindexSlots(localService.value.slots)
+  localService.value.slots = reindexSlots(orderSlotsBySection(localService.value.slots))
 }
 
 function removeSlot(index: number) {
@@ -2691,7 +2765,7 @@ async function onSave() {
       sermonTopic: data.sermonTopic ?? '',
       notes: data.notes,
       status: data.status,
-      slots: reindexSlots(data.slots),
+      slots: reindexSlots(orderSlotsBySection(data.slots)),
     })
 
     // Mark current local state as clean (don't overwrite localService — user may still be typing)

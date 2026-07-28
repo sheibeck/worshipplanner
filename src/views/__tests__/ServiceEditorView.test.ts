@@ -693,22 +693,99 @@ describe('ServiceEditorView - Section headers and slideshow preview (Phase 20-04
     mockServicesList = [mockService]
   })
 
-  it('renders a section header above the first slot of each defined section', async () => {
-    mockServicesList = [buildSectionedService()]
+  // Restated for 29-03: headers are no longer conditional on "does this section have a
+  // slot" (showsSectionHeaderAt was deleted) — every SERVICE_SECTIONS member renders its
+  // own header unconditionally, in fixed SERVICE_SECTIONS order, whether or not it holds
+  // items (R043).
+  it('renders all four section headers unconditionally, in SERVICE_SECTIONS order (29-03)', async () => {
+    mockServicesList = [buildSectionedService()] // no Pre-Service slot — still renders that header
     const wrapper = await mountView()
 
     const headers = wrapper.findAll('[data-testid^="section-header-"]')
-    expect(headers).toHaveLength(3)
-    expect(headers[0]?.text()).toContain('Worship')
-    expect(headers[1]?.text()).toContain('Message')
-    expect(headers[2]?.text()).toContain('Sending')
+    expect(headers).toHaveLength(4)
+    expect(headers[0]?.text()).toContain('Pre-Service')
+    expect(headers[1]?.text()).toContain('Worship')
+    expect(headers[2]?.text()).toContain('Message')
+    expect(headers[3]?.text()).toContain('Sending')
   })
 
-  it('renders zero section headers for a legacy service where every slot has section === undefined', async () => {
+  it('renders all four section headers, with placeholders, and routes every slot into the trailing ungrouped container for a legacy service (29-03)', async () => {
     mockServicesList = [mockService] // default fixture: no slot carries a `section` field
     const wrapper = await mountView()
 
-    expect(wrapper.findAll('[data-testid^="section-header-"]')).toHaveLength(0)
+    const headers = wrapper.findAll('[data-testid^="section-header-"]')
+    expect(headers).toHaveLength(4)
+    for (const section of ['pre-service', 'worship', 'message', 'sending']) {
+      expect(wrapper.find(`[data-testid="section-empty-${section}"]`).exists()).toBe(true)
+      expect(wrapper.find(`[data-testid="section-list-${section}"] .slot-item`).exists()).toBe(false)
+    }
+    const ungrouped = wrapper.find('[data-testid="section-list-ungrouped"]')
+    expect(ungrouped.exists()).toBe(true)
+    expect(ungrouped.findAll('.slot-item')).toHaveLength(mockService.slots.length)
+  })
+
+  it('renders an empty-section placeholder as a live drop target for a section with no slots (29-03)', async () => {
+    mockServicesList = [buildSectionedService()] // no Pre-Service slot
+    const wrapper = await mountView()
+
+    const preServiceList = wrapper.find('[data-testid="section-list-pre-service"]')
+    expect(preServiceList.exists()).toBe(true)
+    const placeholder = preServiceList.find('[data-testid="section-empty-pre-service"]')
+    expect(placeholder.exists()).toBe(true)
+    expect(placeholder.text()).toContain('No items yet')
+  })
+
+  it('every slot card carries data-slot-id equal to its slot.id, in section-major id order across containers (29-03)', async () => {
+    mockServicesList = [makeSectionedService()] // s1..s8 already section-major: pre-service, worship x3, message x2, sending x2
+    const wrapper = await mountView()
+
+    const cards = wrapper.findAll('.slot-item')
+    expect(cards.map((c) => c.attributes('data-slot-id'))).toEqual(['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8'])
+  })
+
+  it("changing a slot's section via the select moves its card into the target section's container and renumbers positions section-major (29-03)", async () => {
+    mockAuthState.isEditor = true
+    mockServicesList = [buildSectionedService()] // slot-0/1 worship, slot-2 message, slot-3 sending
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    // slot-3 (currently 'sending') -> reassign to 'worship'. It should now render inside
+    // the worship container, after the two existing worship cards.
+    const selects = wrapper.findAll('[data-testid="section-select"]')
+    await selects[3]?.setValue('worship')
+    await wrapper.vm.$nextTick()
+
+    const worshipCards = wrapper.find('[data-testid="section-list-worship"]').findAll('.slot-item')
+    expect(worshipCards.map((c) => c.attributes('data-slot-id'))).toEqual(['slot-0', 'slot-1', 'slot-3'])
+    expect(wrapper.find('[data-testid="section-list-sending"]').find('.slot-item').exists()).toBe(false)
+
+    // Section-major reindex (onSectionChange composes reindexSlots(orderSlotsBySection(...))):
+    // the array's absolute index now runs 0..3 in the NEW order — moved slot-3 becomes array
+    // index 2 (worship's third card), and message's now-lone slot-2 becomes array index 3.
+    // Each card's `data-testid="slot-{index}"` reflects that renumbered absolute index directly,
+    // without needing to wait on the (separately covered) debounced autosave write.
+    expect(worshipCards.map((c) => c.attributes('data-testid'))).toEqual(['slot-0', 'slot-1', 'slot-2'])
+    const messageCards = wrapper.find('[data-testid="section-list-message"]').findAll('.slot-item')
+    expect(messageCards.map((c) => c.attributes('data-slot-id'))).toEqual(['slot-2'])
+    expect(messageCards.map((c) => c.attributes('data-testid'))).toEqual(['slot-3'])
+  })
+
+  it('adding a slot inherits the section of the current last slot, landing at the end of that section rather than in the ungrouped container (29-03)', async () => {
+    mockAuthState.isEditor = true
+    mockServicesList = [buildSectionedService()] // last slot (slot-3) is 'sending'
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const addElementBtn = wrapper.findAll('button').find((b) => b.text() === 'Add Element')
+    await addElementBtn!.trigger('click')
+    await wrapper.vm.$nextTick()
+    const songBtn = wrapper.findAll('button').find((b) => b.text() === 'Song')
+    await songBtn!.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    const sendingCards = wrapper.find('[data-testid="section-list-sending"]').findAll('.slot-item')
+    expect(sendingCards).toHaveLength(2)
+    expect(wrapper.find('[data-testid="section-list-ungrouped"]').exists()).toBe(false)
   })
 
   it('does not mount PresentationViewer on initial render', async () => {
@@ -906,7 +983,12 @@ describe('ServiceEditorView - slot id backfill on load (Phase 24-06 Task 1)', ()
     reactiveServices[0] = buildLegacyService()
     await wrapper.vm.$nextTick()
 
-    // Third edit + save: the ids captured this time must match the first.
+    // Third edit + save: the ids captured this time must match the first — as a SET, not
+    // as an ordered array. Assigning slot-2 a section now also reorders the array
+    // section-major (29-03: onSectionChange reindexes via orderSlotsBySection), so slot-2
+    // legitimately moves to the front; what R028 actually guarantees is that no id is
+    // dropped or re-minted across the stale remote merge, not that array order is stable
+    // across an unrelated ordering change this same edit triggers.
     selects = wrapper.findAll('[data-testid="section-select"]')
     await selects[2]!.setValue('sending')
     await new Promise((resolve) => setTimeout(resolve, 900))
@@ -914,7 +996,7 @@ describe('ServiceEditorView - slot id backfill on load (Phase 24-06 Task 1)', ()
     const secondPayload = mockUpdateService.mock.calls[1]![1] as { slots: Array<{ id?: string }> }
     const secondIds = secondPayload.slots.map((s) => s.id)
 
-    expect(secondIds).toEqual(firstIds)
+    expect([...secondIds].sort()).toEqual([...firstIds].sort())
   })
 })
 
@@ -1114,13 +1196,16 @@ describe('ServiceEditorView - slot delete cascades to its group (Phase 24-06 Tas
     await wrapper.vm.$nextTick()
 
     // Absorb the autosave watcher's first-ever trigger (see the Task 1 tests'
-    // comment for why this is needed in this synchronous-mock environment)
-    // with an edit unrelated to the slot this test deletes.
+    // comment for why this is needed in this synchronous-mock environment) with an edit
+    // on slot-8. Since 29-03 onSectionChange reorders section-major, this ALSO moves
+    // slot-8 to the front of the render (ahead of the still-ungrouped slot-0..slot-7) —
+    // the remove-button index below accounts for that reordering.
     const selects = wrapper.findAll('[data-testid="section-select"]')
     await selects[8]!.setValue('sending')
 
-    // Delete the middle slot: index 4 (slot-4).
-    await openDeleteConfirm(wrapper, 4)
+    // Post-reorder remove-button order is [slot-8, slot-0, slot-1, slot-2, slot-3, slot-4,
+    // slot-5, slot-6, slot-7] — slot-4 (this test's target) is now at button index 5.
+    await openDeleteConfirm(wrapper, 5)
     await confirmButton()!.trigger('click')
     await Promise.resolve()
     await Promise.resolve()
@@ -1131,7 +1216,7 @@ describe('ServiceEditorView - slot delete cascades to its group (Phase 24-06 Tas
     expect(mockUpdateService).toHaveBeenCalledTimes(1)
     const payload = mockUpdateService.mock.calls[0]![1] as { slots: Array<{ id?: string; position: number }> }
     expect(payload.slots.map((s) => s.id)).toEqual([
-      'slot-0', 'slot-1', 'slot-2', 'slot-3', 'slot-5', 'slot-6', 'slot-7', 'slot-8',
+      'slot-8', 'slot-0', 'slot-1', 'slot-2', 'slot-3', 'slot-5', 'slot-6', 'slot-7',
     ])
     expect(payload.slots.map((s) => s.position)).toEqual([0, 1, 2, 3, 4, 5, 6, 7])
   })
