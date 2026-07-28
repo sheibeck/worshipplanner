@@ -223,6 +223,27 @@
         <span class="text-emerald-400">&#10003; {{ sectionRows.length }} sections</span>
         &middot; used as the slide order for this song in every service. A repeat reuses the original words &mdash; edit once, both update.
       </p>
+
+      <!-- Copyright (read-only) — restored (28-06); dropped without a decision
+           in 28-04. Lives inside the single scroll region so R035's
+           one-scroll-surface property still holds. -->
+      <div
+        v-if="currentLyrics.copyright.ccliSongNumber"
+        data-testid="copyright-display"
+        class="mt-4 space-y-1 border-t border-gray-800 pt-4"
+      >
+        <div class="text-sm font-medium text-gray-200">{{ currentLyrics.copyright.title }}</div>
+        <div class="text-xs text-gray-500">{{ currentLyrics.copyright.authors.join(', ') }}</div>
+        <div
+          v-for="(line, i) in currentLyrics.copyright.copyrightLines"
+          :key="i"
+          class="text-xs text-gray-500"
+        >{{ line }}</div>
+        <div class="text-xs text-gray-500">CCLI Song # {{ currentLyrics.copyright.ccliSongNumber }}</div>
+        <div v-if="currentLyrics.copyright.ccliLicenseNumber" class="text-xs text-gray-500">
+          CCLI License # {{ currentLyrics.copyright.ccliLicenseNumber }}
+        </div>
+      </div>
     </div>
 
     <!-- Paste dialog -->

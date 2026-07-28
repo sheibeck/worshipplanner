@@ -854,6 +854,35 @@ describe('SongLyricEditor', () => {
     }))
   })
 
+  // ── 28-06: restore the CCLI copyright display dropped in 28-04 ─────────────
+
+  it('shows the copyright display, inside the single scroll region, when ccliSongNumber is present', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    const scroller = wrapper.find('[data-testid="lyrics-scroll-region"]')
+    const copyright = scroller.find('[data-testid="copyright-display"]')
+    expect(copyright.exists()).toBe(true)
+    expect(copyright.text()).toContain('Amazing Grace')
+    expect(copyright.text()).toContain('John Newton')
+    expect(copyright.text()).toContain('© 2023 Test Publisher')
+    expect(copyright.text()).toContain('CCLI Song # 12345')
+    expect(copyright.text()).toContain('CCLI License # 99999')
+  })
+
+  it('hides the copyright display when ccliSongNumber is absent', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics({
+      copyright: { ...SAMPLE_COPYRIGHT, ccliSongNumber: '' },
+    })
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="copyright-display"]').exists()).toBe(false)
+  })
+
   it('Add section saves once with both fields', async () => {
     mockIsLoading.value = false
     mockCurrentLyrics.value = makeLyrics()
