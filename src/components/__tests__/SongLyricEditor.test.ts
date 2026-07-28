@@ -346,6 +346,49 @@ describe('SongLyricEditor', () => {
     expect(sharedText.text()).toContain('New chorus line two')
   })
 
+  it('a trailing newline in the textarea does not persist a spurious blank line (WR-02)', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+    const saveFn = await saveFnFor(wrapper)
+
+    const rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    await rows[0]!.find('[data-testid^="row-toggle-"]').trigger('click')
+    const textarea = rows[0]!.find('[data-testid="row-textarea-verse-1"]')
+    // Simulates pressing Enter after the last line — the textarea's raw
+    // value ends in '\n'.
+    await textarea.setValue('Line one\nLine two\n')
+
+    mockUpdateCurrentLyrics.mockClear()
+    await saveFn()
+
+    expect(mockUpdateCurrentLyrics).toHaveBeenCalledTimes(1)
+    const call = mockUpdateCurrentLyrics.mock.calls[0] as unknown as [string, string, string, { sections: LyricSection[] }]
+    const verse1 = call[3].sections.find((s) => s.id === 'verse-1')
+    expect(verse1?.lines).toEqual(['Line one', 'Line two'])
+  })
+
+  it('clearing a textarea entirely still stores a single empty line, not zero lines (WR-02 guard does not over-strip)', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+    const saveFn = await saveFnFor(wrapper)
+
+    const rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    await rows[0]!.find('[data-testid^="row-toggle-"]').trigger('click')
+    const textarea = rows[0]!.find('[data-testid="row-textarea-verse-1"]')
+    await textarea.setValue('')
+
+    mockUpdateCurrentLyrics.mockClear()
+    await saveFn()
+
+    const call = mockUpdateCurrentLyrics.mock.calls[0] as unknown as [string, string, string, { sections: LyricSection[] }]
+    const verse1 = call[3].sections.find((s) => s.id === 'verse-1')
+    expect(verse1?.lines).toEqual([''])
+  })
+
   it("the closing note's count equals the number of rows", async () => {
     mockIsLoading.value = false
     mockCurrentLyrics.value = makeRepeatLyrics()

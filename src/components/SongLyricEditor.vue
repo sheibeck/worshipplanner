@@ -370,9 +370,18 @@ watch(
   { immediate: true },
 )
 
+// WR-02: a textarea value ending in a newline (Enter after the last line, or
+// a paste with a trailing newline) produces a trailing empty-string element
+// from `split('\n')`. That empty line is not cosmetic here — it renders as a
+// blank line on the projected slide. Strip exactly one trailing empty
+// element (the artifact of how textareas serialize), not all trailing
+// blanks — a user may legitimately want internal blank-line spacing.
 function onSectionInput(sectionId: string, value: string) {
   const section = editableState.sections.find((s) => s.id === sectionId)
-  if (section) section.lines = value.split('\n')
+  if (!section) return
+  const lines = value.split('\n')
+  if (lines.length > 1 && lines[lines.length - 1] === '') lines.pop()
+  section.lines = lines
 }
 
 /**
