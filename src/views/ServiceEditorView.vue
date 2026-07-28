@@ -95,6 +95,15 @@
               >
                 Saved
               </span>
+              <!-- UI-SPEC §5: minimal, transient reorder-failure text — no toast, no
+                   modal, no aria-live (Phase 32's persistent status indicator owns that). -->
+              <span
+                v-else-if="autosaveStatus === 'error'"
+                class="text-xs text-red-400"
+                data-testid="autosave-error"
+              >
+                Couldn't save this order — reverted. Try dragging again.
+              </span>
               <span
                 v-else-if="isDirty"
                 class="text-xs text-amber-400"
@@ -1239,7 +1248,7 @@ const pcCopied = ref(false)
 
 // ── Autosave state ─────────────────────────────────────────────────────────────
 const previousService = ref<Service | null>(null)   // snapshot before last autosave (for undo)
-const autosaveStatus = ref<'idle' | 'pending' | 'saving' | 'saved'>('idle')
+const autosaveStatus = ref<'idle' | 'pending' | 'saving' | 'saved' | 'error'>('idle')
 let autosaveTimer: ReturnType<typeof setTimeout> | null = null
 let autosaveInitialized = false                     // suppress first-load trigger
 let autosaveSaving = false                          // inflight guard — prevents concurrent saves
@@ -1542,6 +1551,10 @@ async function onSlotSortEnd(evt: Sortable.SortableEvent): Promise<void> {
   const toBucket = bucketForKey(grouped, toKey)
   toBucket.splice(newDraggableIndex, 0, moved)
 
+  // Pre-drag snapshot (the array REFERENCE is enough — the reindex below assigns a
+  // fresh array rather than mutating in place) — restored on a rejected write so the
+  // editor never displays an order that was never persisted (T-29-09).
+  const preDragSlots = localService.value.slots
   const reindexed = reindexSlots(flattenBySection(grouped))
   localService.value.slots = reindexed
 
@@ -1562,6 +1575,15 @@ async function onSlotSortEnd(evt: Sortable.SortableEvent): Promise<void> {
     setTimeout(() => {
       if (autosaveStatus.value === 'saved') autosaveStatus.value = 'idle'
     }, 3000)
+  } catch (err) {
+    // Revert to the pre-drag snapshot — the UI must never keep showing an order that
+    // was rejected. Leave `originalService` untouched so `isDirty` still reflects
+    // reality (the revert makes local match what's actually persisted again).
+    if (localService.value) {
+      localService.value.slots = preDragSlots
+    }
+    autosaveStatus.value = 'error'
+    console.error('[ServiceEditorView] reorder save failed:', err)
   } finally {
     autosaveSaving = false
   }

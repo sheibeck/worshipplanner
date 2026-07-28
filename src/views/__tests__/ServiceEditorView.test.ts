@@ -1871,4 +1871,45 @@ describe('ServiceEditorView - Phase 29 reorder repro', () => {
 
     expect(mockSlotSortableDestroy).toHaveBeenCalledTimes(instanceCount)
   })
+
+  // ── Save-failure revert and the 'error' autosave state (Task 3, T-29-09) ─────
+  it('reverts to the pre-drag id sequence and surfaces the UI-SPEC §5 message when the reorder write rejects, logging once via the bracketed-module convention', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockUpdateService.mockRejectedValueOnce(new Error('network error'))
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    await simulateSlotDrag(wrapper, { fromSection: 'worship', fromPos: 0, toSection: 'worship', toPos: 2 })
+
+    // Reverted: the write failed, so the editor must show the exact pre-drag id
+    // sequence — never an order that was never persisted.
+    const cards = wrapper.findAll('.slot-item')
+    expect(cards.map((c) => c.attributes('data-slot-id'))).toEqual(['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8'])
+
+    const errorMsg = wrapper.find('[data-testid="autosave-error"]')
+    expect(errorMsg.exists()).toBe(true)
+    expect(errorMsg.text()).toBe("Couldn't save this order — reverted. Try dragging again.")
+
+    expect(errSpy).toHaveBeenCalledTimes(1)
+    expect(errSpy).toHaveBeenCalledWith('[ServiceEditorView] reorder save failed:', expect.any(Error))
+
+    errSpy.mockRestore()
+  })
+
+  it('a subsequent successful reorder clears the error state', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockUpdateService.mockRejectedValueOnce(new Error('network error'))
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    await simulateSlotDrag(wrapper, { fromSection: 'worship', fromPos: 0, toSection: 'worship', toPos: 2 })
+    expect(wrapper.find('[data-testid="autosave-error"]').exists()).toBe(true)
+
+    // Same move again — this time the write resolves (mockUpdateService's default
+    // implementation, not overridden a second time).
+    await simulateSlotDrag(wrapper, { fromSection: 'worship', fromPos: 0, toSection: 'worship', toPos: 2 })
+    expect(wrapper.find('[data-testid="autosave-error"]').exists()).toBe(false)
+
+    errSpy.mockRestore()
+  })
 })
