@@ -1530,3 +1530,185 @@ describe('ServiceEditorView - no deck editing or deck import on the Service Orde
   })
 })
 
+// ── Reorder repro (Phase 29-01, R044) ────────────────────────────────────────
+// Builds the FAILING reproduction of the reported ZTXcpNRcJTalEQp42fTx symptom
+// (Sending mid-list, Message last, Worship appearing twice) before any source
+// fix lands. Every fixture below includes section-header nodes as REAL
+// siblings of the slot items — exactly as ServiceEditorView.vue renders them —
+// and every index handed to `onEnd` is derived from that live DOM by
+// `simulateSlotDrag`, never hand-passed. This is deliberate: the pre-existing
+// tests above (and SlideGrid.test.ts's pre-29-01 shape) pass with the three
+// defects still present precisely because their fixtures have no header
+// siblings and their indices are typed in by hand. Every assertion below
+// reads `slot.id` identity, never position/index.
+describe('ServiceEditorView - Phase 29 reorder repro', () => {
+  async function mountView() {
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          RouterLink: { template: '<a><slot /></a>' },
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+        },
+      },
+    })
+  }
+
+  /** Resolves the container that holds `section`'s `.slot-item` nodes —
+   *  prefers a scoped per-section container (the 29-03 shape); falls back to
+   *  the single flat container that holds every `.slot-item` today. */
+  function resolveSectionContainer(wrapper: Awaited<ReturnType<typeof mountView>>, section: string): HTMLElement {
+    const scoped = wrapper.find(`[data-testid="section-list-${section}"]`)
+    if (scoped.exists()) return scoped.element as HTMLElement
+    const anySlotItem = wrapper.find('.slot-item')
+    if (!anySlotItem.exists()) throw new Error('simulateSlotDrag: no .slot-item found in the rendered DOM')
+    return anySlotItem.element.parentElement as HTMLElement
+  }
+
+  /** The `.slot-item` element children of `container` that belong to
+   *  `section` — scanned as the siblings between `section-header-{section}`
+   *  and the next `.section-header` (today's flat render), or every
+   *  `.slot-item` child when the container has no header siblings at all
+   *  (the 29-03 per-section shape). */
+  function sectionSlotItems(container: HTMLElement, section: string): HTMLElement[] {
+    const children = Array.from(container.children) as HTMLElement[]
+    const headerIndex = children.findIndex((c) => c.dataset.testid === `section-header-${section}`)
+    if (headerIndex === -1) {
+      return children.filter((c) => c.classList.contains('slot-item'))
+    }
+    const items: HTMLElement[] = []
+    for (let i = headerIndex + 1; i < children.length; i++) {
+      const child = children[i]!
+      if (child.classList.contains('section-header')) break
+      if (child.classList.contains('slot-item')) items.push(child)
+    }
+    return items
+  }
+
+  function elementIndex(container: HTMLElement, node: HTMLElement): number {
+    return Array.from(container.children).indexOf(node)
+  }
+
+  function draggableIndex(container: HTMLElement, node: HTMLElement): number {
+    return Array.from(container.children)
+      .filter((c) => (c as HTMLElement).classList.contains('slot-item'))
+      .indexOf(node)
+  }
+
+  /**
+   * Derives BOTH SortableJS index pairs from the LIVE rendered DOM and
+   * invokes the matching capture's `onEnd` directly — never accepts a
+   * hand-passed index. Works unchanged whether the source/destination
+   * containers are today's single flat list (headers as siblings) or the
+   * per-section containers 29-03 introduces.
+   */
+  async function simulateSlotDrag(
+    wrapper: Awaited<ReturnType<typeof mountView>>,
+    { fromSection, fromPos, toSection, toPos }: { fromSection: string; fromPos: number; toSection: string; toPos: number },
+  ): Promise<void> {
+    const fromContainer = resolveSectionContainer(wrapper, fromSection)
+    const toContainer = resolveSectionContainer(wrapper, toSection)
+
+    const fromItems = sectionSlotItems(fromContainer, fromSection)
+    const item = fromItems[fromPos]
+    if (!item) throw new Error(`simulateSlotDrag: no slot-item at ${fromSection}[${fromPos}]`)
+
+    const oldIndex = elementIndex(fromContainer, item)
+    const oldDraggableIndex = draggableIndex(fromContainer, item)
+
+    // Destination items EXCLUDING the dragged node itself (relevant for a
+    // within-section move, where `item` is still one of `toSection`'s
+    // current children) — `toPos` indexes into this post-removal ordering,
+    // matching the splice-out/splice-in mental model the fix itself uses.
+    const toItemsExcludingSelf = sectionSlotItems(toContainer, toSection).filter((el) => el !== item)
+    const destAnchor = toItemsExcludingSelf[toPos] ?? null
+
+    let newIndex: number
+    let newDraggableIndex: number
+    if (destAnchor) {
+      newIndex = elementIndex(toContainer, destAnchor)
+      newDraggableIndex = draggableIndex(toContainer, destAnchor)
+    } else if (toItemsExcludingSelf.length > 0) {
+      // Past the last existing item in the destination section — land one
+      // position after it.
+      const lastEl = toItemsExcludingSelf[toItemsExcludingSelf.length - 1]!
+      newIndex = elementIndex(toContainer, lastEl) + 1
+      newDraggableIndex = draggableIndex(toContainer, lastEl) + 1
+    } else {
+      // Destination section has no OTHER items — land immediately after its
+      // header. Not exercised by either repro test below (both target a
+      // non-empty section), kept correct for reuse by later plans.
+      const headerEl = Array.from(toContainer.children).find(
+        (c) => (c as HTMLElement).dataset.testid === `section-header-${toSection}`,
+      ) as HTMLElement | undefined
+      newIndex = headerEl ? elementIndex(toContainer, headerEl) + 1 : 0
+      newDraggableIndex = 0
+    }
+
+    const capture = captureForSection(fromSection) ?? flatCapture()
+    if (!capture) throw new Error(`simulateSlotDrag: no Sortable capture resolved for section "${fromSection}"`)
+
+    await capture.options.onEnd!({
+      oldIndex,
+      newIndex,
+      oldDraggableIndex,
+      newDraggableIndex,
+      item,
+      from: fromContainer,
+      to: toContainer,
+    } as never)
+    await flushPromises()
+  }
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockServicesList = [makeSectionedService()]
+    mockUpdateService.mockClear()
+    resetSortableCaptures()
+  })
+
+  it.fails('lands a service item exactly where it was dropped (R044 — repro, unfix pending)', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    // Worship is [s2, s3, s4] — drag s4 (worship position 2) to the first
+    // position of the message section (currently [s5, s6]).
+    await simulateSlotDrag(wrapper, { fromSection: 'worship', fromPos: 2, toSection: 'message', toPos: 0 })
+
+    expect(mockUpdateService).toHaveBeenCalledTimes(1)
+    const payload = mockUpdateService.mock.calls[0]![1] as { slots: Array<{ id: string; section?: string }> }
+    const ids = payload.slots.map((s) => s.id)
+
+    // Source removed from worship, inserted at the front of message — every
+    // other section's internal order and the section-major ordering itself
+    // are otherwise untouched.
+    expect(ids).toEqual(['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8'])
+    expect(payload.slots.map((s) => s.section)).toEqual([
+      'pre-service', 'worship', 'worship', 'message', 'message', 'message', 'sending', 'sending',
+    ])
+    // Pins the "Worship appeared twice" symptom directly: no id may repeat.
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  it.fails('moves an item within its own section to a non-adjacent position (R044 — repro, unfix pending)', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    // Worship is [s2, s3, s4] — drag s2 (position 0) to the last position —
+    // the single-step DOM revert only undoes one adjacent step, so a
+    // multi-position move is where DOM and persisted state diverge.
+    await simulateSlotDrag(wrapper, { fromSection: 'worship', fromPos: 0, toSection: 'worship', toPos: 2 })
+
+    expect(mockUpdateService).toHaveBeenCalledTimes(1)
+    const payload = mockUpdateService.mock.calls[0]![1] as { slots: Array<{ id: string }> }
+    const ids = payload.slots.map((s) => s.id)
+
+    expect(ids).toEqual(['s1', 's3', 's4', 's2', 's5', 's6', 's7', 's8'])
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+})
