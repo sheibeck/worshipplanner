@@ -5,15 +5,15 @@ milestone_name: Service and Slides
 current_phase: 29
 current_phase_name: Order Structure — Stable Reordering & Post-Service
 status: planning
-stopped_at: Completed 29-01-PLAN.md
-last_updated: "2026-07-28T22:08:16.320Z"
+stopped_at: Completed 29-04-PLAN.md
+last_updated: "2026-07-28T22:35:00.000Z"
 last_activity: 2026-07-28
-last_activity_desc: ROADMAP.md created for v1.4 (Phases 29-37); REQUIREMENTS.md traceability filled, 34/34 requirements mapped, 0 unmapped
+last_activity_desc: 29-04 fixed SlideGrid's reorder/append defects (R049, R050) — draggable-scoped indices, D-16 revert removed, one appendToGroup contract shared by every append path, inline reorder-failure surface
 progress:
   total_phases: 9
   completed_phases: 0
   total_plans: 5
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -567,6 +567,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 28 P06 | ~55min | 3 tasks | 3 files |
 | Phase 29 P02 | 15min | 2 tasks | 2 files |
 | Phase 29 P01 | 45min | 3 tasks | 2 files |
+| Phase 29 P04 | 55min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -728,6 +729,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: R035's acceptance block mounts SongSlideOver + SongLyricEditor together, unstubbed, since the nested-scrollbar defect only appears once panel and editor are mounted together — proven at the composed level, not just per-component.
 - [Phase ?]: 29-02: orderSlotsBySection/groupBySection/flattenBySection are total, SERVICE_SECTIONS-driven, identity-preserving; defaultSectionForPosition audited as position-keyed, no change needed for post-service
 - [Phase ?]: makeSectionedService() and Sortable capture accessors placed at module scope so Task 1/Task 2 land as separate, independently-verifiable commits (29-01)
+- [Phase ?]: 29-04: R050's live mechanism was SlideGrid's own array-order/order-value divergence (closed by a shared appendToGroup sort-append-renumber contract), not slideGroupMaterializer.ts's trailing-copyright placement — that placement is correct, Phase-35-owned SONG-group behavior and was left untouched.
+- [Phase ?]: 29-04: added destroySortable() to the reorder-failure catch block (Rule 2) so the :key-driven gridRenderNonce re-render doesn't leave a stale Sortable instance bound to a discarded DOM node, which would otherwise silently disable real drag-and-drop after any single reorder failure.
 
 ### Roadmap Evolution
 
@@ -788,7 +791,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 
 ## Session Continuity
 
-Last activity: 2026-07-28 — v1.4 ROADMAP.md created (Phases 29-37); REQUIREMENTS.md traceability filled (34/34 mapped, 0 unmapped)
-Last session: 2026-07-28T22:08:16.290Z
-Stopped at: Completed 29-01-PLAN.md
+Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
+Last session: 2026-07-28T22:35:00.000Z
+Stopped at: Completed 29-04-PLAN.md
 Resume file: None
