@@ -89,16 +89,90 @@ vi.mock('@/composables/useMediaUpload', () => ({
 }))
 
 // --- 25-05 Task 3: capture the options passed to Sortable.create so onEnd can be invoked directly ---
+// --- 29-01: widened to a many-instance capture (array of { el, options }) so a
+// test can read the REAL container SlideGrid rendered (the element the mock
+// captured, which holds the drop tile as a non-.slide-card sibling) rather than
+// a synthetic fixture with no sibling at all. `capturedSortableOptions` (the
+// single most-recent options object) is kept working unchanged for the
+// existing Task-3 drag tests below, which never needed the container itself.
+interface SortableCapture {
+  el: HTMLElement
+  options: SortableOptions
+}
+let sortableCaptures: SortableCapture[] = []
 let capturedSortableOptions: SortableOptions | undefined
 const mockSortableDestroy = vi.fn()
 vi.mock('sortablejs', () => ({
   default: {
-    create: vi.fn((_el: HTMLElement, options: SortableOptions) => {
+    create: vi.fn((el: HTMLElement, options: SortableOptions) => {
+      sortableCaptures.push({ el, options })
       capturedSortableOptions = options
       return { destroy: mockSortableDestroy }
     }),
   },
 }))
+
+function latestCapture(): SortableCapture | undefined {
+  return sortableCaptures[sortableCaptures.length - 1]
+}
+
+/**
+ * Reads the REAL container SlideGrid rendered (the element the mock
+ * captured, which holds the drop tile as a non-`.slide-card` sibling) and
+ * derives BOTH SortableJS index pairs from it — never a hand-passed index.
+ * `oldIndex`/`newIndex` count every element child (the tile included);
+ * `oldDraggableIndex`/`newDraggableIndex` count only `.slide-card` children
+ * (29-01, replaces the old `simulateDragEnd`, whose synthetic four-bare-div
+ * parent had no non-card sibling at all — exactly why it could go green with
+ * the bug present).
+ */
+function simulateCardDrag(fromPos: number, toPos: number) {
+  const capture = latestCapture()
+  if (!capture) throw new Error('simulateCardDrag: no Sortable capture resolved')
+  const container = capture.el
+  const cardEls = Array.from(container.children).filter((c) =>
+    (c as HTMLElement).classList.contains('slide-card'),
+  ) as HTMLElement[]
+  const item = cardEls[fromPos]
+  if (!item) throw new Error(`simulateCardDrag: no .slide-card at position ${fromPos}`)
+
+  const elementIndex = (node: HTMLElement) => Array.from(container.children).indexOf(node)
+  const draggableIndex = (node: HTMLElement) => cardEls.indexOf(node)
+
+  const oldIndex = elementIndex(item)
+  const oldDraggableIndex = draggableIndex(item)
+
+  // Destination cards EXCLUDING the dragged card itself — `toPos` indexes
+  // into this post-removal ordering, matching the splice-out/splice-in
+  // mental model the handler itself uses.
+  const cardsExcludingSelf = cardEls.filter((c) => c !== item)
+  const destAnchor = cardsExcludingSelf[toPos] ?? null
+
+  let newIndex: number
+  let newDraggableIndex: number
+  if (destAnchor) {
+    newIndex = elementIndex(destAnchor)
+    newDraggableIndex = draggableIndex(destAnchor)
+  } else if (cardsExcludingSelf.length > 0) {
+    const lastEl = cardsExcludingSelf[cardsExcludingSelf.length - 1]!
+    newIndex = elementIndex(lastEl) + 1
+    newDraggableIndex = draggableIndex(lastEl) + 1
+  } else {
+    // Only card in the group — nowhere else to land.
+    newIndex = oldIndex
+    newDraggableIndex = oldDraggableIndex
+  }
+
+  return capture.options.onEnd!({
+    oldIndex,
+    newIndex,
+    oldDraggableIndex,
+    newDraggableIndex,
+    item,
+    from: container,
+    to: container,
+  } as never)
+}
 
 function makeFile(name: string, type: string): File {
   return new File(['bytes'], name, { type })
@@ -177,6 +251,7 @@ beforeEach(() => {
   mockUpdateService.mockClear()
   mockSortableDestroy.mockClear()
   capturedSortableOptions = undefined
+  sortableCaptures = []
 
   mockGetDeck.mockReset()
   mockCreateDeck.mockReset()
@@ -414,14 +489,6 @@ describe('SlideGrid', () => {
 
   // --- Task 3: drag-reorder within the selected group (D-11) ---
   describe('drag-reorder (Task 3)', () => {
-    function simulateDragEnd(oldIndex: number, newIndex: number) {
-      const parent = document.createElement('div')
-      const children = Array.from({ length: 4 }, () => document.createElement('div'))
-      children.forEach((c) => parent.appendChild(c))
-      const item = children[oldIndex]!
-      return capturedSortableOptions!.onEnd!({ oldIndex, newIndex, item } as never)
-    }
-
     it('renders the grip for an editor with a stored group and does not render it for a viewer', () => {
       const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
       const group = makeGroup({ slides: [{ id: 'e1', order: 0, sourceRef: { kind: 'text' } }] })
@@ -468,7 +535,7 @@ describe('SlideGrid', () => {
       await Promise.resolve()
 
       expect(capturedSortableOptions).toBeDefined()
-      await simulateDragEnd(0, 2)
+      await simulateCardDrag(0, 2)
       await Promise.resolve()
 
       expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
@@ -495,7 +562,7 @@ describe('SlideGrid', () => {
       await Promise.resolve()
       await Promise.resolve()
 
-      await simulateDragEnd(0, 0)
+      await simulateCardDrag(0, 0)
       await Promise.resolve()
 
       expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
@@ -1168,5 +1235,110 @@ describe('SlideGrid', () => {
       expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
       expect(mockSetGroupBedMedia).not.toHaveBeenCalled()
     })
+  })
+})
+
+// ── Reorder repro (Phase 29-01, R049/R050) ───────────────────────────────────
+// Builds the FAILING reproduction before any source fix lands. Every scenario
+// below reads the REAL container SlideGrid rendered via `simulateCardDrag`
+// (module-scope, shared with the `drag-reorder (Task 3)` describe above) —
+// never a synthetic parent with no drop-tile sibling — and every index handed
+// to `onEnd` is derived from that live DOM, never hand-passed. Every
+// assertion reads `entry.id` identity, never position/index.
+describe('SlideGrid - Phase 29 reorder repro', () => {
+  // NOT an `it.fails` — see the Deviations section of 29-01-SUMMARY.md. This
+  // scenario was originally written as a repro (R049) mirroring the
+  // `ServiceEditorView.vue` header-offset defect, but SlideGrid's drop tile
+  // is ALWAYS the container's last child (never interspersed between cards
+  // the way section headers sit between service slots), so `oldIndex`/
+  // `newIndex` and `oldDraggableIndex`/`newDraggableIndex` are numerically
+  // IDENTICAL for any interior drag — there is no header-offset-shaped defect
+  // reachable here. The assertion below passes against today's unfixed code;
+  // kept as a real regression guard (and the R049 index-source fix is still
+  // applied in 29-04, matching `ServiceEditorView.vue`, for symmetry and to
+  // guard the one genuine divergence case: dragging a card past the drop
+  // tile — not exercised by this fixture).
+  it('drags a slide to the position it was dropped in (R049)', async () => {
+    const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+    const group = makeGroup({
+      sourceSignature: 'sig-abc',
+      slides: [
+        { id: 'e1', order: 0, sourceRef: { kind: 'text' } },
+        { id: 'e2', order: 1, sourceRef: { kind: 'text' } },
+        { id: 'e3', order: 2, sourceRef: { kind: 'text' } },
+        { id: 'e4', order: 3, sourceRef: { kind: 'text' } },
+      ],
+    })
+    const assembledSlideshow = [
+      makeAssembled(0, 'e1'),
+      makeAssembled(0, 'e2'),
+      makeAssembled(0, 'e3'),
+      makeAssembled(0, 'e4'),
+    ]
+    mountGrid({ selectedSlot: slot, assembledSlideshow, group, isEditor: true })
+    await Promise.resolve()
+    await Promise.resolve()
+
+    // Drag entry index 3 (e4) to the first position.
+    await simulateCardDrag(3, 0)
+    await Promise.resolve()
+
+    expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+    const [, , slidesArg] = mockReplaceGroupSlides.mock.calls[0]!
+    const slides = slidesArg as GroupSlideEntry[]
+    expect(slides.map((e) => e.id)).toEqual(['e4', 'e1', 'e2', 'e3'])
+    expect(slides.map((e) => e.order)).toEqual([0, 1, 2, 3])
+  })
+
+  it.fails('appends a new slide at the true end of the group with contiguous orders (R050 — repro, unfix pending)', async () => {
+    const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+    // ARRAY order disagrees with the `order` field values — a group that
+    // already fell out of sync (e.g. from a prior reorder or reconciliation),
+    // exactly the shape `onAddSlide`'s `Math.max(...)`-derived `nextOrder`
+    // does not defend against.
+    const existingEntries: GroupSlideEntry[] = [
+      { id: 'e1', order: 0, sourceRef: { kind: 'text' } },
+      { id: 'e3', order: 2, sourceRef: { kind: 'text' } },
+      { id: 'e2', order: 1, sourceRef: { kind: 'text' } },
+    ]
+    const ensureGroupMaterialized = vi.fn().mockResolvedValue({
+      entries: existingEntries,
+      sourceSignature: 'sig-abc',
+    })
+    const wrapper = mountGrid({ selectedSlot: slot, ensureGroupMaterialized })
+    await wrapper.get('[data-testid="slide-grid-add-slide"]').trigger('click')
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+    const [, , slidesArg] = mockReplaceGroupSlides.mock.calls[0]!
+    const slides = slidesArg as GroupSlideEntry[]
+    const newId = slides[slides.length - 1]!.id
+    expect(slides.map((e) => e.id)).toEqual(['e1', 'e2', 'e3', newId])
+    expect(slides.map((e) => e.order)).toEqual([0, 1, 2, 3])
+  })
+
+  it.fails('reorder failure surfaces and does not leave the grid showing an unsaved order (R049 — pending)', async () => {
+    const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+    const group = makeGroup({
+      sourceSignature: 'sig-xyz',
+      slides: [
+        { id: 'e1', order: 0, sourceRef: { kind: 'text' } },
+        { id: 'e2', order: 1, sourceRef: { kind: 'text' } },
+      ],
+    })
+    const assembledSlideshow = [makeAssembled(0, 'e1'), makeAssembled(0, 'e2')]
+    mockReplaceGroupSlides.mockRejectedValueOnce(new Error('write failed'))
+    const wrapper = mountGrid({ selectedSlot: slot, assembledSlideshow, group, isEditor: true })
+    await Promise.resolve()
+    await Promise.resolve()
+
+    await simulateCardDrag(0, 1)
+    await Promise.resolve()
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    // 29-04's territory — this testid does not exist yet.
+    expect(wrapper.find('[data-testid="slide-grid-reorder-error"]').exists()).toBe(true)
   })
 })
