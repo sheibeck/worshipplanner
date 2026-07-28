@@ -214,7 +214,37 @@ and `SlotMediaAttachment.vue`'s video-attach affordance are all deleted.
 > (`.gsd/` milestone M001, slices S01-S06) and faithfully ported into gsd-core as v1.2.
 > The gsdpi `.gsd/` store is now legacy/read-only — continue with regular `/gsd-*` commands.
 
-## ⏸ RESUME HERE (2026-07-25 — Phase 23 code-complete, all v1.2 feature work done)
+## ⏸ RESUME HERE (2026-07-28 — v1.3 Phases 24-28 ALL code-complete; milestone deliberately NOT archived)
+
+`/gsd-autonomous --from 24 --to 28` completed every phase of v1.3. **Nothing is mid-flight; working tree
+is clean; `npm run type-check` = 0, `npm run build` green, `npx vitest run src/` = 3581 passing with the
+failing FILE SET unchanged at the documented 10-file baseline.** 200 commits since `fd1eda2`.
+
+**Cross-phase integration check: PASS** (`.planning/v1.3-INTEGRATION-CHECK.md`) — the full E2E flow
+(service → Slides tab → rail → materialize → grid → drawer → edit/duplicate/delete → drag-reorder →
+four-kind drop → Present → `PresentationViewer`) was traced in code, every seam wired, R028-R035 all
+mapped. No third lost capability beyond the two Phase 27 caught.
+
+> **⚠ WHY THIS MILESTONE IS NOT ARCHIVED (user decision, 2026-07-28).** `/gsd-complete-milestone` fires
+> `phases.clear`, which moves phase directories into `milestones/` and **breaks the `/gsd-verify-work`
+> resume paths recorded in the Deferred Verification table below** — five of them are still outstanding
+> (P20-23 from v1.2, P28 from v1.3). Archiving is deliberately deferred until after the human-verify
+> batch. Do NOT run `/gsd-complete-milestone` or `/gsd-cleanup` before then.
+
+**Next actions, in order:**
+
+1. **Batch human-verify** — P20 + P21 + P22 + P23 (v1.2) and P28 (v1.3). Each phase's `-SUMMARY.md`
+   carries its own `<human-check>` items; the Deferred Verification table below has the resume commands.
+   Several want the same real-projector trip, so one sitting covers a lot.
+2. **Also worth a look during that pass** (from v1.3's reviews, none blocking):
+   - the video-slide-suppresses-bed-audio behavior (25-REVIEW-FIX WR-01) — confirm it is what you want
+   - whether the reconciliation warning reads clearly enough WITHOUT a diff (26 D-06 was your trade-off)
+   - real OS drag-and-drop onto the slide grid — jsdom cannot test it; `docs/example.pptx` /
+     `docs/example.mp3` are in the tree as fixtures
+3. **Phases 18 and 19** are implemented but were never verified — decide whether they need a pass.
+4. **Then** the lifecycle: `/gsd-audit-milestone` → `/gsd-complete-milestone` → `/gsd-cleanup`.
+
+### Superseded resume note (2026-07-25 — Phase 23)
 
 `/gsd-autonomous --from 23` completed Phase 23's automated work. **Nothing is mid-flight; working
 tree is clean; production build is GREEN (`npm run type-check` = 0, `npm run build` = 0).**
@@ -259,7 +289,13 @@ session may hold the Firestore/Storage emulator (ports 8080/9199) — executors 
 
 **Pre-audit hardening TODO (batch before milestone complete):**
 
-- **[SAFETY] Flip `cleanupExpiredMedia` default to dry-run/disabled** — 22-03 shipped it defaulting to LIVE delete (dry-run requires `MEDIA_CLEANUP_DRY_RUN=true`); a destructive scheduled deleter must default to safe (require an explicit opt-in like `MEDIA_CLEANUP_ENABLED=true` to delete). Update `functions/src/index.ts` + its test. Not deployed + no eligible data yet, so risk is currently nil — but fix before any deploy.
+- ~~**[SAFETY] Flip `cleanupExpiredMedia` default to dry-run/disabled**~~ — **DONE 2026-07-28** (`9f1b881`).
+  Gate inverted: deletion now requires an explicit `MEDIA_CLEANUP_ENABLED="true"`; unset/empty/`"false"`/a
+  typo all leave it a dry run, and `MEDIA_CLEANUP_DRY_RUN` is no longer read at all. Worth noting what was
+  found: the doc comment above the gate **claimed the opposite of the code** ("Defaults to dry-run
+  (MEDIA_CLEANUP_DRY_RUN unset or not 'true')") while `dryRun = process.env.MEDIA_CLEANUP_DRY_RUN === "true"`
+  meant unset → LIVE delete on a daily 02:00 UTC schedule. The old test encoded the unsafe default too
+  (unset → expects a real delete). Three fail-safe regression guards added; 26/26 functions tests pass.
 - ~~Fix `src/views/__tests__/ServiceEditorView.test.ts` — fails at mount since 21-01 added the `importedSlides` store subscription without a Pinia mock stub~~ — **FIXED in 22-04** (`8e3afb2`): added the missing `@/stores/importedSlides` reactive-stub mock; all 14 real tests now pass.
 - Run the FULL unit suite green + clean stale `.gsd/quarantine/worktrees/**` debris. Measured on `milestone/M001` after Phase 23 + its code-review fixes (`npx vitest run src/`): **3018 pass / 44 fail**, and every one of the 44 is pre-existing —
   - `.gsd/quarantine/worktrees/**` stale duplicates (35 tests across 6 files) — delete the debris. Note the count is *unstable* run-to-run (32 → 44 total across two runs an hour apart, entirely from the two quarantined `rules.test.ts` copies flapping against the emulator); the real-source failure set never moved.
