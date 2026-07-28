@@ -1,6 +1,16 @@
 import { describe, it, expect } from 'vitest'
-import { PROGRESSION_SLOT_TYPES, buildSlots, createSlot, reindexSlots, slotLabel, backfillSlotIds } from '@/utils/slotTypes'
-import type { SongSlot, ScriptureSlot, NonAssignableSlot, HymnSlot, ImportedSlot, Service } from '@/types/service'
+import {
+  PROGRESSION_SLOT_TYPES,
+  buildSlots,
+  createSlot,
+  reindexSlots,
+  slotLabel,
+  backfillSlotIds,
+  groupBySection,
+  flattenBySection,
+  orderSlotsBySection,
+} from '@/utils/slotTypes'
+import { SERVICE_SECTIONS, type SongSlot, type ScriptureSlot, type NonAssignableSlot, type HymnSlot, type ImportedSlot, type Service, type ServiceSlot } from '@/types/service'
 
 describe('PROGRESSION_SLOT_TYPES', () => {
   it('maps 1-2-2-3 progression correctly', () => {
@@ -438,5 +448,137 @@ describe('backfillSlotIds', () => {
     const local = makeService([])
     const result = backfillSlotIds(remote, local)
     expect(result.slots[0]!.id.length).toBeGreaterThan(0)
+  })
+})
+
+describe('groupBySection', () => {
+  it('groups four sectioned slots in scrambled order into SERVICE_SECTIONS-ordered buckets, preserving within-bucket relative order', () => {
+    const slots: ServiceSlot[] = [
+      { kind: 'SONG', id: 's-sending', position: 0, requiredVwType: 1, songId: null, songTitle: null, songKey: null, section: 'sending' },
+      { kind: 'PRAYER', id: 's-worship-1', position: 1, section: 'worship' },
+      { kind: 'MESSAGE', id: 's-message', position: 2, section: 'message' },
+      { kind: 'PRAYER', id: 's-worship-2', position: 3, section: 'worship' },
+    ]
+    const grouped = groupBySection(slots, (s) => s.section)
+    expect(grouped.sections['pre-service']).toEqual([])
+    expect(grouped.sections['worship'].map((s) => s.id)).toEqual(['s-worship-1', 's-worship-2'])
+    expect(grouped.sections['message'].map((s) => s.id)).toEqual(['s-message'])
+    expect(grouped.sections['sending'].map((s) => s.id)).toEqual(['s-sending'])
+    expect(grouped.legacy).toEqual([])
+  })
+
+  it('routes every slot to the trailing legacy bucket, in input order, when all slots lack a section', () => {
+    const slots: ServiceSlot[] = [
+      { kind: 'PRAYER', id: 's-1', position: 0 },
+      { kind: 'MESSAGE', id: 's-2', position: 1 },
+      { kind: 'PRAYER', id: 's-3', position: 2 },
+    ]
+    const grouped = groupBySection(slots, (s) => s.section)
+    for (const section of SERVICE_SECTIONS) {
+      expect(grouped.sections[section]).toEqual([])
+    }
+    expect(grouped.legacy.map((s) => s.id)).toEqual(['s-1', 's-2', 's-3'])
+  })
+
+  it('mixed input: section-less slots go to the legacy bucket, sectioned slots stay untouched in their own bucket', () => {
+    const slots: ServiceSlot[] = [
+      { kind: 'PRAYER', id: 's-legacy-1', position: 0 },
+      { kind: 'MESSAGE', id: 's-message', position: 1, section: 'message' },
+      { kind: 'PRAYER', id: 's-legacy-2', position: 2 },
+    ]
+    const grouped = groupBySection(slots, (s) => s.section)
+    expect(grouped.sections['message'].map((s) => s.id)).toEqual(['s-message'])
+    expect(grouped.legacy.map((s) => s.id)).toEqual(['s-legacy-1', 's-legacy-2'])
+  })
+
+  it('routes a section value outside SERVICE_SECTIONS to legacy rather than dropping the slot (production-data safety)', () => {
+    const slots: ServiceSlot[] = [
+      { kind: 'PRAYER', id: 's-unknown', position: 0, section: 'not-a-real-section' as ServiceSlot['section'] },
+    ]
+    const grouped = groupBySection(slots, (s) => s.section)
+    for (const section of SERVICE_SECTIONS) {
+      expect(grouped.sections[section]).toEqual([])
+    }
+    expect(grouped.legacy.map((s) => s.id)).toEqual(['s-unknown'])
+  })
+})
+
+describe('flattenBySection', () => {
+  it('concatenates the section buckets in SERVICE_SECTIONS order, then the legacy bucket last', () => {
+    const slots: ServiceSlot[] = [
+      { kind: 'SONG', id: 's-sending', position: 0, requiredVwType: 1, songId: null, songTitle: null, songKey: null, section: 'sending' },
+      { kind: 'PRAYER', id: 's-legacy', position: 1 },
+      { kind: 'MESSAGE', id: 's-message', position: 2, section: 'message' },
+      { kind: 'PRAYER', id: 's-worship', position: 3, section: 'worship' },
+    ]
+    const grouped = groupBySection(slots, (s) => s.section)
+    const flattened = flattenBySection(grouped)
+    expect(flattened.map((s) => s.id)).toEqual(['s-worship', 's-message', 's-sending', 's-legacy'])
+  })
+
+  it('every SERVICE_SECTIONS key is present even when empty, and flattening an all-legacy input yields legacy in input order', () => {
+    const slots: ServiceSlot[] = [
+      { kind: 'PRAYER', id: 's-1', position: 0 },
+      { kind: 'MESSAGE', id: 's-2', position: 1 },
+    ]
+    const grouped = groupBySection(slots, (s) => s.section)
+    expect(Object.keys(grouped.sections).sort()).toEqual([...SERVICE_SECTIONS].sort())
+    expect(flattenBySection(grouped).map((s) => s.id)).toEqual(['s-1', 's-2'])
+  })
+})
+
+describe('orderSlotsBySection', () => {
+  it('reorders an interleaved array (worship, sending, worship, message) into section-major order by id', () => {
+    const worship1: ServiceSlot = { kind: 'SONG', id: 'w-1', position: 0, requiredVwType: 1, songId: null, songTitle: null, songKey: null, section: 'worship' }
+    const sending1: ServiceSlot = { kind: 'PRAYER', id: 'se-1', position: 1, section: 'sending' }
+    const worship2: ServiceSlot = { kind: 'PRAYER', id: 'w-2', position: 2, section: 'worship' }
+    const message1: ServiceSlot = { kind: 'MESSAGE', id: 'm-1', position: 3, section: 'message' }
+    const input = [worship1, sending1, worship2, message1]
+
+    const result = orderSlotsBySection(input)
+
+    expect(result.map((s) => s.id)).toEqual(['w-1', 'w-2', 'm-1', 'se-1'])
+  })
+
+  it('returns the SAME array reference (identity, not a copy) when the input is already section-major', () => {
+    const slots: ServiceSlot[] = [
+      { kind: 'SONG', id: 'w-1', position: 0, requiredVwType: 1, songId: null, songTitle: null, songKey: null, section: 'worship' },
+      { kind: 'MESSAGE', id: 'm-1', position: 1, section: 'message' },
+      { kind: 'PRAYER', id: 'se-1', position: 2, section: 'sending' },
+    ]
+
+    const result = orderSlotsBySection(slots)
+
+    expect(result).toBe(slots)
+  })
+
+  it('is a total, reference-preserving permutation — never adds, drops, mutates, or re-mints a slot', () => {
+    const slotSending: ServiceSlot = { kind: 'SONG', id: 'a', position: 0, requiredVwType: 1, songId: null, songTitle: null, songKey: null, section: 'sending' }
+    const slotWorship1: ServiceSlot = { kind: 'PRAYER', id: 'b', position: 1, section: 'worship' }
+    const slotLegacy: ServiceSlot = { kind: 'MESSAGE', id: 'c', position: 2 } // legacy — no section
+    const slotMessage: ServiceSlot = { kind: 'PRAYER', id: 'd', position: 3, section: 'message' }
+    const slotWorship2: ServiceSlot = { kind: 'SONG', id: 'e', position: 4, requiredVwType: 2, songId: null, songTitle: null, songKey: null, section: 'worship' }
+    const slots: ServiceSlot[] = [slotSending, slotWorship1, slotLegacy, slotMessage, slotWorship2]
+
+    const result = orderSlotsBySection(slots)
+
+    // Total: output ids are exactly a permutation of input ids.
+    expect(result).toHaveLength(slots.length)
+    expect(new Set(result.map((s) => s.id))).toEqual(new Set(slots.map((s) => s.id)))
+    expect(result.map((s) => s.id).sort()).toEqual(slots.map((s) => s.id).sort())
+
+    // Reference-preserving: every slot object in the output is the SAME object
+    // reference as the corresponding input slot — nothing was cloned or rebuilt.
+    for (const slot of slots) {
+      expect(result).toContain(slot)
+    }
+
+    // Explicit expected section-major sequence, asserted with toBe per-element
+    // to prove reference identity at each position (not just membership).
+    expect(result[0]).toBe(slotWorship1) // worship
+    expect(result[1]).toBe(slotWorship2) // worship
+    expect(result[2]).toBe(slotMessage) // message
+    expect(result[3]).toBe(slotSending) // sending
+    expect(result[4]).toBe(slotLegacy) // legacy, trailing
   })
 })
