@@ -1290,6 +1290,90 @@ describe('SlideGrid - Phase 29 reorder repro', () => {
     expect(slides.map((e) => e.order)).toEqual([0, 1, 2, 3])
   })
 
+  it('persists the correct entry even when the un-prefixed index pair is deliberately wrong (T-29-11)', async () => {
+    const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+    const group = makeGroup({
+      sourceSignature: 'sig-guard-1',
+      slides: [
+        { id: 'e1', order: 0, sourceRef: { kind: 'text' } },
+        { id: 'e2', order: 1, sourceRef: { kind: 'text' } },
+        { id: 'e3', order: 2, sourceRef: { kind: 'text' } },
+      ],
+    })
+    const assembledSlideshow = [makeAssembled(0, 'e1'), makeAssembled(0, 'e2'), makeAssembled(0, 'e3')]
+    mountGrid({ selectedSlot: slot, assembledSlideshow, group, isEditor: true })
+    await Promise.resolve()
+    await Promise.resolve()
+
+    const capture = latestCapture()
+    if (!capture) throw new Error('no Sortable capture resolved')
+    // `oldIndex`/`newIndex` are deliberately WRONG — if the handler read
+    // them instead of the draggable-scoped pair, this would be a no-op
+    // (99 === 99) or splice out of range. `oldDraggableIndex`/
+    // `newDraggableIndex` are the real "move e1 to the end" pair; only they
+    // must be honoured.
+    await capture.options.onEnd!({
+      oldIndex: 99,
+      newIndex: 99,
+      oldDraggableIndex: 0,
+      newDraggableIndex: 2,
+      item: capture.el.children[0],
+      from: capture.el,
+      to: capture.el,
+    } as never)
+    await Promise.resolve()
+
+    expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+    const [, , slidesArg] = mockReplaceGroupSlides.mock.calls[0]!
+    const slides = slidesArg as GroupSlideEntry[]
+    expect(slides.map((e) => e.id)).toEqual(['e2', 'e3', 'e1'])
+    expect(slides.map((e) => e.order)).toEqual([0, 1, 2])
+  })
+
+  it('persists the correct entry when a non-card sibling sits BEFORE the cards in the container (T-29-11)', async () => {
+    const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+    const group = makeGroup({
+      sourceSignature: 'sig-guard-2',
+      slides: [
+        { id: 'e1', order: 0, sourceRef: { kind: 'text' } },
+        { id: 'e2', order: 1, sourceRef: { kind: 'text' } },
+        { id: 'e3', order: 2, sourceRef: { kind: 'text' } },
+      ],
+    })
+    const assembledSlideshow = [makeAssembled(0, 'e1'), makeAssembled(0, 'e2'), makeAssembled(0, 'e3')]
+    mountGrid({ selectedSlot: slot, assembledSlideshow, group, isEditor: true })
+    await Promise.resolve()
+    await Promise.resolve()
+
+    const capture = latestCapture()
+    if (!capture) throw new Error('no Sortable capture resolved')
+    // A leading non-`.slide-card` sibling — a shape this component does not
+    // render today (25-07's drop tile is always last), but the handler must
+    // still tolerate correctly since it no longer trusts element-count
+    // indices at all, only the draggable-scoped pair.
+    const leadingSibling = document.createElement('div')
+    capture.el.insertBefore(leadingSibling, capture.el.firstChild)
+
+    // With the leading sibling counted, element-index 1 is e1. Moving e1
+    // (draggable index 0) to the end (draggable index 2).
+    await capture.options.onEnd!({
+      oldIndex: 1,
+      newIndex: 3,
+      oldDraggableIndex: 0,
+      newDraggableIndex: 2,
+      item: capture.el.children[1],
+      from: capture.el,
+      to: capture.el,
+    } as never)
+    await Promise.resolve()
+
+    expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+    const [, , slidesArg] = mockReplaceGroupSlides.mock.calls[0]!
+    const slides = slidesArg as GroupSlideEntry[]
+    expect(slides.map((e) => e.id)).toEqual(['e2', 'e3', 'e1'])
+    expect(slides.map((e) => e.order)).toEqual([0, 1, 2])
+  })
+
   it.fails('appends a new slide at the true end of the group with contiguous orders (R050 — repro, unfix pending)', async () => {
     const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
     // ARRAY order disagrees with the `order` field values — a group that

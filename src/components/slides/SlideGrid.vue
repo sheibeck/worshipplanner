@@ -639,11 +639,13 @@ function onGridDrop(event: DragEvent): void {
 // --- Task 3: drag-reorder within the selected group (D-11) ---
 //
 // Reuses the exact SortableJS pattern already established in
-// `ServiceEditorView.vue`'s slot list: `handle`/`draggable` scoping, the
-// DOM-revert-before-Vue-re-render trick (prevents the snap-back flash), and
-// splice-and-reindex. The instance exists only while there is a stored group
-// to write to AND the caller can write — a group with no stored document has
-// no `slides` array to reorder, and would reject at the store.
+// `ServiceEditorView.vue`'s slot list: `handle`/`draggable` scoping and
+// splice-and-reindex. Renders from state alone (Phase 29 removed the D-16
+// single-step DOM revert) — `SlideCard` is keyed on a stable entry id, so
+// the card list re-renders correctly from props once a write lands. The
+// instance exists only while there is a stored group to write to AND the
+// caller can write — a group with no stored document has no `slides` array
+// to reorder, and would reject at the store.
 const cardsContainerRef = ref<HTMLElement | null>(null)
 let sortableInstance: Sortable | null = null
 
@@ -660,23 +662,20 @@ watch(
     if (el && allowed && !sortableInstance) {
       sortableInstance = Sortable.create(el, {
         handle: '.drag-handle',
-        // Scope both drag eligibility AND the old/new index arithmetic to
-        // `.slide-card` — this is what keeps 25-07's drop tile (a sibling in
-        // the same grid container) from shifting every index by one.
         draggable: '.slide-card',
         animation: 150,
         ghostClass: 'opacity-30',
         async onEnd(evt) {
-          if (evt.oldIndex == null || evt.newIndex == null) return
-          if (evt.oldIndex === evt.newIndex) return
-          // Revert SortableJS's DOM move so Vue's reactive render is the
-          // single source of truth — prevents the snap-back flash. Not
-          // incidental code; do not remove.
-          const parent = evt.item.parentNode
-          if (parent) {
-            const ref = parent.children[evt.oldIndex]
-            parent.insertBefore(evt.item, evt.oldIndex < evt.newIndex ? (ref?.nextSibling ?? null) : (ref ?? null))
-          }
+          // Draggable-scoped indices only (T-29-11) — `oldIndex`/`newIndex`
+          // count every element child of the container, including 25-07's
+          // drop tile (a non-`.slide-card` sibling, always last today). Only
+          // `oldDraggableIndex`/`newDraggableIndex` respect the `draggable:
+          // '.slide-card'` selector. The tile happens to sit last, which
+          // makes the un-prefixed pair latent rather than live here — fixed
+          // anyway for symmetry with `ServiceEditorView.vue` and to guard the
+          // one divergence case (dragging past the tile's own DOM position).
+          if (evt.oldDraggableIndex == null || evt.newDraggableIndex == null) return
+          if (evt.oldDraggableIndex === evt.newDraggableIndex) return
 
           // Read the current group and slot id from PROPS at call time —
           // never from values captured when the instance was created — since
@@ -686,9 +685,9 @@ watch(
           if (!currentGroup || !currentSlot) return
 
           const sorted = [...currentGroup.slides].sort((a, b) => a.order - b.order)
-          const moved = sorted.splice(evt.oldIndex, 1)[0]
+          const moved = sorted.splice(evt.oldDraggableIndex, 1)[0]
           if (!moved) return
-          sorted.splice(evt.newIndex, 0, moved)
+          sorted.splice(evt.newDraggableIndex, 0, moved)
           const reordered = sorted.map((entry, i) => ({ ...entry, order: i }))
 
           try {
