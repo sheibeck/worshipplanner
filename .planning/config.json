@@ -6,7 +6,7 @@
   "workflow": {
     "research": true,
     "plan_check": true,
-    "verifier": false,
+    "verifier": true,
     "_auto_chain_active": false
   },
   "granularity": "coarse",

@@ -57,18 +57,18 @@ audio are independent of it.
 - **D008** — The group/slide audio model **replaces** Phase 22's slot-level media. Existing slot media migrates onto its group. Adds a per-slide scope toggle (this slide / whole group) and a loop-until-next-slide flag, neither of which Phase 22 had.
 - **D009** — The first tab is renamed **"Service Order"** (mockup still says "Music" — instruction wins) and reverts to its production behaviour at `origin/master` @ `9f3700f`.
 
-- [ ] Phase 24: Slide Group Model and Migration ← **active**
-- [ ] Phase 25: Slides Tab Shell — Plan Rail and Slide Grid
-- [ ] Phase 26: Edit Slide Drawer
-- [ ] Phase 27: Service Order Tab — Rename and Strip Slide Editing
-- [ ] Phase 28: Song Lyrics Editor Rework
+- [x] Phase 24: Slide Group Model and Migration (completed 2026-07-28)
+- [x] Phase 25: Slides Tab Shell — Plan Rail and Slide Grid (completed 2026-07-28)
+- [x] Phase 26: Edit Slide Drawer (completed 2026-07-28)
+- [x] Phase 27: Service Order Tab — Rename and Strip Slide Editing (completed 2026-07-28)
+- [x] Phase 28: Song Lyrics Editor Rework (completed 2026-07-28)
 
 ### Phase 24: Slide Group Model and Migration `risk:high`
 
 **Goal:** Introduce slide groups owned by service plan items — order and membership mirror the plan, while slide structure, media and audio stay independent. Give `ServiceSlot` a stable `id` to anchor groups to. Materialize group structure per service while keeping song/scripture text a live reference. Deleting a plan item deletes its group behind a warning + confirm. Replace Phase 22's slot-level media with group-level and per-slide audio (scope + loop). Migrate existing services without data loss.
 **Depends on:** Phase 20, Phase 22, Phase 23
 **Requirements:** R028, R029, R030, R018 (supporting)
-**Plans:** 6 plans
+**Plans:** 6/6 plans complete
 
 Plans:
 **Wave 1**
@@ -97,7 +97,7 @@ Plans:
 **Goal:** Add the Slides tab: a service-plan rail that mirrors plan order (not draggable — reordering happens on Service Order), with kind badges, slide counts, group-music indicators and an UNANCHORED block for orphans; plus the slide grid for the selected group with cards, badges, labels, audio chips, a drop target for PPTX/images/video, and the group and page-level header actions.
 **Depends on:** Phase 24
 **Requirements:** R031, R032, R018 (supporting)
-**Plans:** 7 plans
+**Plans:** 7/7 plans complete
 
 > **Goal-vs-decisions note.** The goal prose above predates Phase 24's discuss and Phase 25's
 > `25-CONTEXT.md`. Where they disagree, the locked decisions win: there is **no** UNANCHORED block
@@ -134,7 +134,7 @@ Plans:
 **Goal:** Build the Edit Slide drawer in both states — closed, and open floating over the page with nothing underneath reflowing. Carries the slide preview, label, read-only slide text with an "Edit in song" link, slide audio with scope toggle and loop flag, operator-only notes, and delete.
 **Depends on:** Phase 25
 **Requirements:** R033, R029 (deferred confirm-flow debt), R018 (supporting)
-**Plans:** 9 plans
+**Plans:** 9/9 plans complete
 
 > **Scope note.** Phase 26 also closes the cross-phase debt Phases 24 and 25 both deferred: the
 > reconciliation confirm dialog (R029). Per `26-CONTEXT.md` D-06 there is **no** diff view; per D-04
@@ -171,7 +171,7 @@ Plans:
 **Goal:** Rename the Music tab to "Service Order" and strip the slide-editing surfaces added to it during Phases 18-23, so slide editing lives only on the Slides tab. **Narrowed by 27-CONTEXT D-01:** scripture passage/reading-mode editing and the section-assignment control are service-order content and STAY — this is a targeted strip, not a revert to `9f3700f`, since most of the file's growth is Phase 24-26 work that must survive.
 **Depends on:** Phase 25, Phase 26
 **Requirements:** R034, R018 (supporting)
-**Plans:** 5 plans
+**Plans:** 5/5 plans complete
 
 Plans:
 
@@ -190,7 +190,7 @@ Plans:
 **Goal:** Rework the song lyrics editor so it presents one scroll surface and one list that IS the slide order — eliminating the nested scrollbar and the duplicated Available-Sections / Performance-Order lists from Phase 18. Design Turn 2's option **2a** is chosen (28-CONTEXT D-01): one always-draggable list of section cards, collapsible to a one-line summary, with repeats rendered as linked rows. Option 2b (the mode toggle) is deferred.
 **Depends on:** — (independent of 24-27; sequenced last)
 **Requirements:** R035, R018 (supporting)
-**Plans:** 6 plans
+**Plans:** 6/6 plans complete
 
 Plans:
 **Wave 1**

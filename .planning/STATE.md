@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Slides Tab Rework
-current_phase: 28
-current_phase_name: Song Lyrics Editor Rework
-status: executing
-stopped_at: v1.2 archived on owner acceptance; v1.3 code-complete and OPEN for bug fixes
-last_updated: "2026-07-28T03:17:43.714Z"
-last_activity: 2026-07-27
+current_phase: 999.1
+current_phase_name: Songs page + service-plan picker
+status: planning
+stopped_at: Completed 28-06-PLAN.md (final plan of Phase 28, final phase of v1.3)
+last_updated: "2026-07-28T13:12:09.759Z"
+last_activity: 2026-07-28
+last_activity_desc: Phase 28 complete, transitioned to Phase 999.1
 progress:
   total_phases: 17
   completed_phases: 16
   total_plans: 101
   completed_plans: 101
   percent: 94
-last_activity_desc: Archived v1.2 (Phases 18-23) on owner acceptance 2026-07-28; v1.3 (Phases 24-28) code-complete and deliberately kept OPEN to carry incoming bug/issue fixes
 ---
 
 # Project State
@@ -35,20 +35,30 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 
 ## Current Position
 
-Phase: 28 (Song Lyrics Editor Rework) — CODE-COMPLETE, all 6/6 plans committed
-Plan: 6 of 6 (complete)
+Phase: 999.1 — Extract shared song-browse component (Songs page + service-plan picker) (BACKLOG)
+Plan: Not started
 Milestone: v1.3 Slides Tab Rework (Phases 24-28) — ALL PHASES CODE-COMPLETE
-Status: Ready for the milestone's batch human-verify, then /gsd-audit-milestone
+Status: Ready to plan
 
 Phases 20, 21, 22, 23 and now 28 are all code-complete; only their deferred human-verify checkpoints
 remain (see the Deferred Verification table below).
 
-> **Phase-completion convention (confirmed by user 2026-07-26).** `workflow.verifier` is `false`, so
-> no phase produces a `VERIFICATION.md` and `gsd-tools query phase.complete <N>` therefore refuses to
-> run (`verification is incomplete`). ROADMAP checkboxes for Phases 20-28 stay `- [ ]` by design;
-> phase completion is settled in one pass at `/gsd-audit-milestone`. Do NOT flip `workflow.verifier`
-> to work around this, and do NOT treat the unchecked boxes as unfinished work — cross-check against
-> the per-phase SUMMARY files and the code-complete record below.
+> **✅ SUPERSEDED 2026-07-28 — `workflow.verifier` is now `true`.**
+>
+> The old convention read: *"`workflow.verifier` is `false`, so no phase produces a `VERIFICATION.md`
+> and `phase.complete` therefore refuses to run. ROADMAP checkboxes stay `- [ ]` by design... Do NOT
+> flip `workflow.verifier` to work around this."*
+>
+> That convention is **retired**, and it was the root cause of both v1.2 and v1.3 ending up
+> code-complete-but-never-marked-complete — which in turn made `/gsd-autonomous` re-offer finished
+> phases (its `recommended_actions` were literally `/gsd-execute-phase 24..28` on already-complete
+> work). The user identified this as the source of the "messy milestones" and enabled the verifier on
+> 2026-07-28.
+>
+> **From v1.4 onward:** each phase runs a `gsd-verifier` agent, produces a real `VERIFICATION.md`, and
+> closes normally. Phases 24-28 were closed retroactively with owner-attributed VERIFICATION files
+> (see each phase's `*-VERIFICATION.md` — they state plainly that no verifier agent ran and that the
+> status records the owner's own verification).
 
 ### v1.3 code-complete record
 
@@ -69,12 +79,14 @@ Option **2b** (the "Switch to Sections to reorder" mode toggle, including its `L
 **deferred, not built**.
 
 **Two latent defects found and fixed during Phase 28:**
+
 - **Compounding reconciliation bug (28-03).** `reconcileSongGroup` pushed the WHOLE `storedBySectionId`
   array on every occurrence of a section id. Once D-02 made repeats first-class, a twice-referenced
   chorus with two stored entries compounded 2 → 4 → 8 → 16 — on the **additive** path, which has no
   confirm gate. Fixed by consuming stored entries positionally (occurrence `i` takes entry `i`, surplus
   emitted after the last occurrence), which keeps Phase 26-09's duplicate-survival case byte-equivalent.
   Idempotence asserted for N=M, N<M and N>M, and independently hand-traced by the reviewer.
+
 - **Two competing order fields (28-02).** Order lived in BOTH `Song.performanceOrder` and
   `SongLyrics.performanceOrder`, behind a 3-tier precedence chain duplicated in `slideshowAssembler.ts`
   and `slideGroupMaterializer.ts` — and `PerformanceOrderBuilder` **read one but wrote the other**, so
@@ -240,11 +252,13 @@ mapped. No third lost capability beyond the two Phase 27 caught.
 1. **Batch human-verify** — P20 + P21 + P22 + P23 (v1.2) and P28 (v1.3). Each phase's `-SUMMARY.md`
    carries its own `<human-check>` items; the Deferred Verification table below has the resume commands.
    Several want the same real-projector trip, so one sitting covers a lot.
+
 2. **Also worth a look during that pass** (from v1.3's reviews, none blocking):
    - the video-slide-suppresses-bed-audio behavior (25-REVIEW-FIX WR-01) — confirm it is what you want
    - whether the reconciliation warning reads clearly enough WITHOUT a diff (26 D-06 was your trade-off)
    - real OS drag-and-drop onto the slide grid — jsdom cannot test it; `docs/example.pptx` /
      `docs/example.mp3` are in the tree as fixtures
+
 3. **Phases 18 and 19** are implemented but were never verified — decide whether they need a pass.
 4. **Then** the lifecycle: `/gsd-audit-milestone` → `/gsd-complete-milestone` → `/gsd-cleanup`.
 
@@ -303,13 +317,21 @@ session may hold the Firestore/Storage emulator (ports 8080/9199) — executors 
 
 Phases **18 and 19** were likewise never verified and are archived with v1.2 on the same acceptance.
 
-### v1.3 — still open
+### v1.3 (Phases 24-28) — CLOSED, verified by owner 2026-07-28
 
-| Phase | State | Resume |
-|-------|-------|--------|
-| 28 | verification_deferred_human | /gsd-verify-work 28 (one scrollbar/one list, drag-reorder persists, edit propagates to a repeat, duplicate/remove semantics, add-section chips, CCLI paste with a repeated chorus, version history restore, Edit-in-song link from the Slides tab, live-edit reaching an in-use service, and the restored copyright block — see 28-06-SUMMARY.md) |
+> "Let's make sure all milestone 1.3 phases are marked as done. I verified"
+> — user, 2026-07-28
 
-**v1.3 remains OPEN** to carry the bug/issue fixes the user is about to file.
+**Nothing deferred remains.** Phase 28's checkpoint (one scrollbar / one list, drag-reorder persistence,
+edit-propagates-to-a-repeat, duplicate/remove semantics, add-section chips, CCLI paste with a repeated
+chorus, version-history restore, the Edit-in-song link, live-edit reaching an in-use service, and the
+restored copyright block) was **verified by the owner** rather than deferred.
+
+All five phases now carry a `*-VERIFICATION.md` with `status: passed`, each stating explicitly that the
+status records owner verification and **not** an automated verifier run. `phase.complete` ran cleanly
+for 24-28 with zero warnings; ROADMAP checkboxes are ticked.
+
+**Deferred Verification is now EMPTY across the whole project.**
 
 **Pre-audit hardening TODO (batch before milestone complete):**
 
@@ -320,6 +342,7 @@ Phases **18 and 19** were likewise never verified and are archived with v1.2 on 
   (MEDIA_CLEANUP_DRY_RUN unset or not 'true')") while `dryRun = process.env.MEDIA_CLEANUP_DRY_RUN === "true"`
   meant unset → LIVE delete on a daily 02:00 UTC schedule. The old test encoded the unsafe default too
   (unset → expects a real delete). Three fail-safe regression guards added; 26/26 functions tests pass.
+
 - ~~Fix `src/views/__tests__/ServiceEditorView.test.ts` — fails at mount since 21-01 added the `importedSlides` store subscription without a Pinia mock stub~~ — **FIXED in 22-04** (`8e3afb2`): added the missing `@/stores/importedSlides` reactive-stub mock; all 14 real tests now pass.
 - Run the FULL unit suite green + clean stale `.gsd/quarantine/worktrees/**` debris. Measured on `milestone/M001` after Phase 23 + its code-review fixes (`npx vitest run src/`): **3018 pass / 44 fail**, and every one of the 44 is pre-existing —
   - `.gsd/quarantine/worktrees/**` stale duplicates (35 tests across 6 files) — delete the debris. Note the count is *unstable* run-to-run (32 → 44 total across two runs an hour apart, entirely from the two quarantined `rules.test.ts` copies flapping against the emulator); the real-source failure set never moved.
@@ -724,7 +747,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 
 ## Session Continuity
 
-Last activity: 2026-07-27
+Last activity: 2026-07-28 — Phase 28 complete, transitioned to Phase 999.1
 Last session: 2026-07-28T03:17:43.620Z
 Stopped at: Completed 28-06-PLAN.md (final plan of Phase 28, final phase of v1.3)
 Resume file: None
