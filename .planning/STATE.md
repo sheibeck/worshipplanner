@@ -17,17 +17,16 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-05)
+See: .planning/PROJECT.md (updated 2026-07-28)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 28 — Song Lyrics Editor Rework
+**Current focus:** v1.4 Service and Slides — defining requirements
 
-> **v1.2 → v1.3 handoff (2026-07-25).** v1.2 is code-complete (Phases 18-23, all plans committed)
-> but its human-verify batch is still outstanding. v1.2 was deliberately **not** archived: running
-> `/gsd-complete-milestone` would fire `phases.clear`, moving `.planning/phases/18-*..23-*` into
-> `milestones/v1.2-phases/` and breaking the `/gsd-verify-work 20..23` resume paths recorded below.
-> Only the STATE frontmatter was switched to v1.3 so the roadmap parser scopes to Phases 24-28.
-> The Deferred Verification table below still governs v1.2 and now covers v1.2 + v1.3 together.
+> **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
+> v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
+> v1.3 were archived on 2026-07-28 and their phase directories now live under
+> `milestones/v1.2-phases/` and `milestones/v1.3-phases/`. Retained only so the reasoning isn't
+> rediscovered from scratch.
 
 ## Current Position
 
@@ -35,6 +34,60 @@ Phase: Not started (defining requirements)
 Plan: —
 Status: Defining requirements
 Last activity: 2026-07-28 — Milestone v1.4 started
+
+## ★ v1.4 RESEARCH FINDINGS — read before planning any v1.4 phase
+
+Full detail in `.planning/research/`. Recorded here because phase planners read STATE.md.
+
+### The drag-and-drop root cause is FOUND (HIGH confidence — verified against sortablejs v1.15.7 source)
+
+Three compounding bugs in `ServiceEditorView.vue`'s Sortable `onEnd` handler. This is **not** a
+fundamental SortableJS/Vue incompatibility, and it is **not** the DOM-revert trap already fixed under
+`D-16` (`ServiceEditorView.vue:1430`, `SlideGrid.vue:669`) — that earlier fix was real but addressed a
+different failure:
+
+| # | Bug | Effect |
+|---|-----|--------|
+| A | Uses `evt.oldIndex` / `evt.newIndex` | These count section-header nodes. Despite `draggable: '.slot-item'`, only `oldDraggableIndex` / `newDraggableIndex` honor that selector — so every cross-section drag splices at the wrong index. |
+| B | DOM-revert undoes ONE adjacent step, not a full revert | Multi-position drags leave DOM and state diverged. |
+| C | `v-for` key is `slot.kind + '-' + slot.position` | `reindexSlots()` rewrites `position` on every reorder → every key changes every reorder → Vue's keyed diff is defeated. Should be `slot.id` (stable, already anchors slide groups). |
+
+Explains every reported symptom including "correct again after refresh." **The same pattern is
+copy-pasted in `SlideGrid.vue`** — the "new slide lands second-to-last" bug is the same family, not a
+separate defect. Open trade-off for phase planning: per-section Sortable instances (recommended, more
+robust) vs one flat list read via `*DraggableIndex` (cheaper, less robust).
+
+### Draft-lock enforcement today is effectively ZERO (HIGH confidence)
+
+`firestore.rules` has **no** status check on services (role only); the router doesn't gate role on
+`/services/:id`; the sole existing gate `isExportedLocked` is scattered, cosmetic, and doesn't even
+cover `planned`. A UI-only lock would be bypassable — the lock needs a rules-level requirement.
+
+### Autosave hypothesis (MEDIUM confidence — NOT reproduced live)
+
+Each save's own Firestore echo carries a server `updatedAt` the client never tracked (`onSave()`
+destructures it out of the write payload), tripping the remote-merge watcher, which unconditionally
+resets the `autosaveInitialized` guard — swallowing whatever discrete mutation lands next. Continuous
+typing self-heals on the next keystroke; a one-shot action like picking a song does not.
+`ServiceEditorView.vue` also hand-duplicates the already-tested `useAutoSave` composable.
+**Write a failing repro test FIRST** — do not rewrite blind.
+
+### Other confirmed findings
+
+- **Reconciliation deletion** touches 9 files + tests (`slideGroupMaterializer.ts`,
+  `useSlideshowAssembly.ts`, `slideGroup.ts`, `slideGroups.ts`, `ReconcileConfirmModal.vue`,
+  `SlideGrid.vue`, `SlidesTab.vue`, `slideDisplay.ts`, `ServiceEditorView.vue`). **Keep** the
+  concurrent-write transaction merge in `replaceGroupSlides` even after the confirm gate goes.
+- **Post-Service** is a one-place additive type change in `src/types/service.ts` (no migration), but
+  print / share / plan-rail / PC-export need auditing for hard-coded four-section assumptions.
+- **PPTX rendered images** belong under the existing `orgs/{orgId}/pptx-imports/{importId}/` prefix —
+  structurally exempt from `cleanupExpiredMedia`'s regex guard with zero changes to that function.
+- **CCLI copyright placement:** the real-world convention is "at least once per song, typically the
+  last slide." The v1.4 requirement (first AND last) **exceeds** the legal minimum — a deliberate
+  safety margin for mid-deck starts and songs cut short. Do NOT justify it as "CCLI requires this."
+  Pull the actual license text before finalizing that acceptance criterion.
+- **Draft-lock/reopen has no competitor precedent** — Planning Center Services gates on roles only.
+  This is an original design call, not a convention being copied.
 
 ### v1.3 code-complete record
 

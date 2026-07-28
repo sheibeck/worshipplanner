@@ -7,12 +7,17 @@ Rules:
 - For codebase questions, query the graph before grepping raw source. It returns a scoped
   subgraph, usually much smaller than `GRAPH_REPORT.md` or raw grep output:
   - `/gsd:graphify query "<term>"` (or directly:
-    `node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" graphify query "<term>"`)
+    `node "$HOME/.claude/gsd-core/bin/gsd-tools.cjs" graphify query "<term>"`)
 - Read `.planning/graphs/GRAPH_REPORT.md` only for broad architecture review, or when a
   query does not surface enough context.
 - Check freshness with `/gsd:graphify status`; see changes since the last build with
   `/gsd:graphify diff`.
 - After modifying code, run `/gsd:graphify build` to keep the graph current.
+
+> ⚠ **The graph is stale as of 2026-07-28** and resolves symbols to `.gsd/quarantine/worktrees/**`
+> copies rather than real `src/` files (e.g. `ServiceSlot` → a quarantined `service.ts`). Delete the
+> quarantine debris and rebuild before trusting a query — until then, verify any graph hit against the
+> real path under `src/`.
 
 ## Environment: `.env.local` is REQUIRED in every worktree
 
