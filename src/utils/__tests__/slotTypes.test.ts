@@ -340,6 +340,33 @@ describe('buildSlots — default section assignment (D005)', () => {
   })
 })
 
+describe('buildSlots section defaults', () => {
+  // Pins defaultSectionForPosition (audited Phase 29 plan 02: purely
+  // position-keyed, no SERVICE_SECTIONS.length arithmetic, no "last section"
+  // derivation) so widening SERVICE_SECTIONS (Phase 29 adds Post-Service)
+  // cannot silently change which default section a template slot gets.
+  it.each(['1-2-2-3', '1-2-3-3'] as const)(
+    '%s: positions 0-6 are worship, position 7 is message, position 8 is sending, and no slot is section-less',
+    (progression) => {
+      const slots = buildSlots(progression)
+      for (let i = 0; i <= 6; i++) {
+        expect(slots[i]!.section).toBe('worship')
+      }
+      expect(slots[7]!.section).toBe('message')
+      expect(slots[8]!.section).toBe('sending')
+      for (const slot of slots) {
+        expect(slot.section).not.toBeUndefined()
+      }
+    },
+  )
+
+  it('produces no slot in the first SERVICE_SECTIONS member (the template has no default Pre-Service slot by design)', () => {
+    const slots = buildSlots('1-2-2-3')
+    const firstSection = SERVICE_SECTIONS[0]
+    expect(slots.some((s) => s.section === firstSection)).toBe(false)
+  })
+})
+
 describe('createSlot — section parameter', () => {
   it('createSlot(SONG, 2, sending) returns a SongSlot with section === sending', () => {
     const slot = createSlot('SONG', 2, 'sending') as SongSlot

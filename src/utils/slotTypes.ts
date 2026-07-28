@@ -232,6 +232,13 @@ export function backfillSlotIds(service: Service, reference?: Service | null): S
  * There is no default Pre-Service slot in the template (announcements arrive
  * in Phase 21) — positions 0-6 are 'worship', 7 (MESSAGE) is 'message',
  * 8 (sending song) is 'sending'.
+ *
+ * Intentionally position-keyed, not section-count-keyed: it contains no
+ * arithmetic over `SERVICE_SECTIONS.length` and no "last section" derivation,
+ * so widening `SERVICE_SECTIONS` (Phase 29 adds Post-Service) does not change
+ * which default section a template slot gets. Audited by reading during
+ * Phase 29 plan 02 — confirmed, not assumed; pinned by the
+ * `buildSlots section defaults` test block for both progressions.
  */
 function defaultSectionForPosition(position: number): ServiceSection {
   if (position === 7) return 'message'
