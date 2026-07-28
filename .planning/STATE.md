@@ -5,15 +5,15 @@ milestone_name: Slides Tab Rework
 current_phase: 28
 current_phase_name: Song Lyrics Editor Rework
 status: executing
-stopped_at: Completed 28-05-PLAN.md
-last_updated: "2026-07-28T02:38:16.373Z"
+stopped_at: Completed 28-06-PLAN.md (final plan of Phase 28, final phase of v1.3)
+last_updated: "2026-07-28T03:17:43.714Z"
 last_activity: 2026-07-27
 progress:
   total_phases: 17
-  completed_phases: 15
+  completed_phases: 16
   total_plans: 101
-  completed_plans: 100
-  percent: 88
+  completed_plans: 101
+  percent: 94
 last_activity_desc: Opened v1.3 Slides Tab Rework (Phases 24-28) from the Claude Design import; v1.2 left code-complete with its verification ledger intact
 ---
 
@@ -35,13 +35,13 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 
 ## Current Position
 
-Phase: 28 (Song Lyrics Editor Rework) — EXECUTING
-Plan: 5 of 6
-Milestone: v1.3 Slides Tab Rework (Phases 24-28) — IN PROGRESS
-Status: Ready to execute
+Phase: 28 (Song Lyrics Editor Rework) — CODE-COMPLETE, all 6/6 plans committed
+Plan: 6 of 6 (complete)
+Milestone: v1.3 Slides Tab Rework (Phases 24-28) — ALL PHASES CODE-COMPLETE
+Status: Ready for the milestone's batch human-verify, then /gsd-audit-milestone
 
-Phases 20, 21, 22 and 23 are all code-complete; only their deferred human-verify checkpoints remain
-(see the Deferred Verification table below).
+Phases 20, 21, 22, 23 and now 28 are all code-complete; only their deferred human-verify checkpoints
+remain (see the Deferred Verification table below).
 
 > **Phase-completion convention (confirmed by user 2026-07-26).** `workflow.verifier` is `false`, so
 > no phase produces a `VERIFICATION.md` and `gsd-tools query phase.complete <N>` therefore refuses to
@@ -58,6 +58,7 @@ Phases 20, 21, 22 and 23 are all code-complete; only their deferred human-verify
 | 25 Slides Tab Shell — Plan Rail and Slide Grid | 7/7 | 2 critical + 2 warning, all fixed | See `25-REVIEW.md` / `25-REVIEW-FIX.md`. Also carries the mid-phase D-18/D-19 model deletion. |
 | 26 Edit Slide Drawer | 9/9 | 3 critical + 1 warning, all fixed | See `26-REVIEW.md` / `26-REVIEW-FIX.md`. **Closed Phase 24+25's deferred reconciliation-confirm debt.** |
 | 27 Service Order Tab — Rename and Strip Slide Editing | 5/5 | **0 critical**, 1 warning fixed | See `27-REVIEW.md` / `27-REVIEW-FIX.md`. Clean removal — reviewer traced all load-bearing paths end to end. |
+| 28 Song Lyrics Editor Rework | 6/6 | Not run (no `/gsd-code-review` invoked this phase) | R035 proven by assertion in `28-06`'s acceptance block; restored the CCLI copyright display 28-04 dropped without a decision. Full unit suite failing-file-set unchanged from the 10-file baseline. |
 
 **Phase 27 shipped:** first tab renamed **Music → Service Order** (label AND the `activeTab` union value,
 now `'service-order' | 'roles' | 'slides'`); the deck editor, both PPTX-import menu entries, the per-slot
@@ -223,6 +224,7 @@ session may hold the Firestore/Storage emulator (ports 8080/9199) — executors 
 | 21 | verification_deferred_human | /gsd-verify-work 21 (import save confirmed live 2026-07-25; remaining: announcements/image, corrupted-file error, source-retention) |
 | 22 | verification_deferred_human | /gsd-verify-work 22 (cleanup dry-run review + media/autoplay e2e) |
 | 23 | verification_deferred_human | /gsd-verify-work 23 (real fullscreen + Esc-sync, real autoplay policy + held-key rapid advance, expired-media degradation, projector legibility, iPad Safari, and the two open overflow judgment calls — see 23-05-SUMMARY.md) |
+| 28 | verification_deferred_human | /gsd-verify-work 28 (one scrollbar/one list, drag-reorder persists, edit propagates to a repeat, duplicate/remove semantics, add-section chips, CCLI paste with a repeated chorus, version history restore, Edit-in-song link from the Slides tab, live-edit reaching an in-use service, and the restored copyright block — see 28-06-SUMMARY.md) |
 
 **Pre-audit hardening TODO (batch before milestone complete):**
 
@@ -412,6 +414,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 28 P03 | 25min | 2 tasks | 2 files |
 | Phase 28 P04 | 35min | 2 tasks | 4 files |
 | Phase 28 P05 | ~40min | 2 tasks | 2 files |
+| Phase 28 P06 | ~55min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -569,6 +572,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 28-05: which occurrence of a repeat is 'followed' vs. 'repeat' is re-derived by buildSectionRows every render, never stored as separate state
 - [Phase ?]: 28-05: SortableJS drag config for the lyrics row list reproduces ServiceEditorView/SlideGrid verbatim (handle/.section-row/animation 150/ghostClass opacity-30) so drag means the same thing app-wide
 - [Phase ?]: 28-05: the dashed Add-section row is a sibling of section-rows, not a child, so it stays outside both the row-count contract and Sortable's .section-row draggable scope
+- [Phase ?]: Restored the CCLI copyright display 28-04 dropped without an authorizing decision — R035 only requires one scroll surface and one list, and the display's absence removed the only place to verify CCLI licensing data before it reaches the presented copyright slide.
+- [Phase ?]: R035's acceptance block mounts SongSlideOver + SongLyricEditor together, unstubbed, since the nested-scrollbar defect only appears once panel and editor are mounted together — proven at the composed level, not just per-component.
 
 ### Roadmap Evolution
 
@@ -624,10 +629,11 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - Planning Center CSV column schema should be validated against an actual export
 - 22-03: dry-run human-verify checkpoint (Task 2) pending before enabling live deletion in cleanupExpiredMedia
 - 22-04: media/autoplay e2e human-verify checkpoint (Task 3) pending before this plan is fully signed off
+- 28-06: this phase's human-verify batch (queued in 28-06-SUMMARY.md) is outstanding, alongside Phases 20-23/25-27 — deferred to /gsd-audit-milestone per the documented v1.3 convention.
 
 ## Session Continuity
 
 Last activity: 2026-07-27
-Last session: 2026-07-28T02:38:03.295Z
-Stopped at: Completed 28-05-PLAN.md
+Last session: 2026-07-28T03:17:43.620Z
+Stopped at: Completed 28-06-PLAN.md (final plan of Phase 28, final phase of v1.3)
 Resume file: None

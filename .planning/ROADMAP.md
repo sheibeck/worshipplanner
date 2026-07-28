@@ -313,7 +313,7 @@ Plans:
 
 **Wave 6** *(blocked on Waves 3 and 5)*
 
-- [ ] 28-06-PLAN.md — R035 acceptance block and the phase gate
+- [x] 28-06-PLAN.md — R035 acceptance block and the phase gate
 
 *(Waves 3-6 are strictly sequential: every plan from 28-03 on edits a file an earlier wave owns.)*
 
