@@ -309,7 +309,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4)*
 
-- [ ] 28-05-PLAN.md — Row actions: drag reorder by handle, Duplicate, Remove, ＋ Add section
+- [x] 28-05-PLAN.md — Row actions: drag reorder by handle, Duplicate, Remove, ＋ Add section
 
 **Wave 6** *(blocked on Waves 3 and 5)*
 
