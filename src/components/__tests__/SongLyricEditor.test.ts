@@ -30,6 +30,20 @@ function makeLyrics(overrides?: Partial<SongLyrics>): SongLyrics {
   }
 }
 
+// A document whose order is [chorus, verse-1, chorus, verse-2] — row 3
+// (the second `chorus` entry) is a D-02 repeat reference to row 1's pooled
+// section, not a copy.
+const REPEAT_SECTIONS: LyricSection[] = [
+  { id: 'chorus', label: 'Chorus', lines: ['Bless the Lord', 'O my soul'] },
+  { id: 'verse-1', label: 'Verse 1', lines: ["The sun comes up", "it's a new day dawning"] },
+  { id: 'verse-2', label: 'Verse 2', lines: ["You're rich in love", "and You're slow to anger"] },
+]
+const REPEAT_ORDER = ['chorus', 'verse-1', 'chorus', 'verse-2']
+
+function makeRepeatLyrics(overrides?: Partial<SongLyrics>): SongLyrics {
+  return makeLyrics({ sections: REPEAT_SECTIONS, performanceOrder: REPEAT_ORDER, ...overrides })
+}
+
 const mockSubscribeLyrics = vi.fn()
 const mockUnsubscribeLyrics = vi.fn()
 const mockUpdateCurrentLyrics = vi.fn(() => Promise.resolve())
@@ -232,5 +246,146 @@ describe('SongLyricEditor', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-testid="status-saved"]').exists()).toBe(true)
+  })
+
+  // ── Task 2 (R035/D-01/D-02): the ordered row list ──────────────────────────
+
+  it('renders rows in order, numbered 1..N, with the repeat marked and naming the position it follows', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeRepeatLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    const rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    expect(rows).toHaveLength(4)
+
+    const positions = rows.map((r) => r.find('[data-testid="row-position"]').text())
+    expect(positions).toEqual(['1', '2', '3', '4'])
+
+    expect(rows[0]!.attributes('data-repeat')).toBe('false')
+    expect(rows[1]!.attributes('data-repeat')).toBe('false')
+    expect(rows[2]!.attributes('data-repeat')).toBe('true')
+    expect(rows[3]!.attributes('data-repeat')).toBe('false')
+
+    expect(rows[2]!.find('[data-testid="row-repeat-note"]').text()).toContain('1')
+    expect(rows[2]!.find('[data-testid="row-linked"]').text()).toBe('linked')
+  })
+
+  it('a collapsed row shows its label, a words preview, and its line count', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeRepeatLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    const rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    const verse1Row = rows[1]!
+    expect(verse1Row.text()).toContain('VERSE 1')
+    expect(verse1Row.find('[data-testid="row-preview"]').text()).toContain('The sun comes up')
+    expect(verse1Row.find('[data-testid="row-line-count"]').text()).toBe('2 lines')
+  })
+
+  it('expanding a row reveals an editable field; collapsing returns the one-line summary', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeRepeatLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    const rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    const verse1Row = rows[1]!
+    expect(verse1Row.find('textarea').exists()).toBe(false)
+
+    await verse1Row.find('[data-testid^="row-toggle-"]').trigger('click')
+    const textarea = verse1Row.find('[data-testid="row-textarea-verse-1"]')
+    expect(textarea.exists()).toBe(true)
+    expect((textarea.element as HTMLTextAreaElement).value).toBe("The sun comes up\nit's a new day dawning")
+
+    await verse1Row.find('[data-testid^="row-toggle-"]').trigger('click')
+    expect(verse1Row.find('[data-testid="row-textarea-verse-1"]').exists()).toBe(false)
+    expect(verse1Row.find('[data-testid="row-preview"]').exists()).toBe(true)
+  })
+
+  it('editing a section that appears twice changes the words shown by BOTH rows (D-02)', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeRepeatLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    const rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    const primaryChorusRow = rows[0]!
+    const repeatChorusRow = rows[2]!
+
+    await primaryChorusRow.find('[data-testid^="row-toggle-"]').trigger('click')
+    const textarea = primaryChorusRow.find('[data-testid="row-textarea-chorus"]')
+    await textarea.setValue('New chorus line one\nNew chorus line two')
+    expect((textarea.element as HTMLTextAreaElement).value).toBe('New chorus line one\nNew chorus line two')
+
+    // The repeat row has no edit point of its own — expanding it shows the
+    // shared (already-updated) words as read-only text, no textarea.
+    await repeatChorusRow.find('[data-testid^="row-toggle-"]').trigger('click')
+    expect(repeatChorusRow.find('textarea').exists()).toBe(false)
+    const sharedText = repeatChorusRow.find('[data-testid="row-shared-text-chorus#1"]')
+    expect(sharedText.exists()).toBe(true)
+    expect(sharedText.text()).toContain('New chorus line one')
+    expect(sharedText.text()).toContain('New chorus line two')
+  })
+
+  it("the closing note's count equals the number of rows", async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeRepeatLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="closing-note"]').text()).toContain('4 sections')
+  })
+
+  it('after an edit settles, the lyrics document is updated once with sections and performanceOrder together', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeRepeatLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    const { useAutoSave } = await import('@/composables/useAutoSave') as unknown as {
+      useAutoSave: ReturnType<typeof vi.fn>
+    }
+    const saveFn = useAutoSave.mock.calls[0]![1] as () => Promise<void>
+
+    const rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    await rows[1]!.find('[data-testid^="row-toggle-"]').trigger('click')
+    await rows[1]!.find('[data-testid="row-textarea-verse-1"]').setValue('Edited line')
+
+    mockUpdateCurrentLyrics.mockClear()
+    await saveFn()
+
+    expect(mockUpdateCurrentLyrics).toHaveBeenCalledTimes(1)
+    expect(mockUpdateCurrentLyrics).toHaveBeenCalledWith('org-1', 'song-1', 'lyrics-1', expect.objectContaining({
+      sections: expect.any(Array),
+      performanceOrder: REPEAT_ORDER,
+    }))
+  })
+
+  it('drops a stray order entry with no pooled section, and persists the repair via the same autosave path', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics({
+      sections: SAMPLE_SECTIONS,
+      performanceOrder: ['verse-1', 'bridge-ghost', 'chorus'],
+    })
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    const rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    expect(rows).toHaveLength(2)
+
+    expect(mockUpdateCurrentLyrics).toHaveBeenCalledWith('org-1', 'song-1', 'lyrics-1', expect.objectContaining({
+      performanceOrder: ['verse-1', 'chorus'],
+    }))
+  })
+
+  it('a document already satisfying the pool/order invariants triggers no write on open', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics()
+    await mountEditor()
+    await flushPromises()
+
+    expect(mockUpdateCurrentLyrics).not.toHaveBeenCalled()
   })
 })
