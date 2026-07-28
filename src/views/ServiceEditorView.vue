@@ -1923,7 +1923,8 @@ function addSlot(kind: SlotKind, vwType?: VWType) {
   // service it lands at the end of that section rather than in the ungrouped
   // bucket. `createSlot` omits the `section` key entirely when this is
   // `undefined` (a legacy, section-less service), preserving today's shape.
-  const newSlot = createSlot(kind, vwType, localService.value.slots.at(-1)?.section)
+  const currentSlots = localService.value.slots
+  const newSlot = createSlot(kind, vwType, currentSlots[currentSlots.length - 1]?.section)
   localService.value.slots.push(newSlot)
   localService.value.slots = reindexSlots(orderSlotsBySection(localService.value.slots))
   showAddMenu.value = false
