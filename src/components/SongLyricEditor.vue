@@ -1,14 +1,18 @@
 <template>
-  <div class="flex flex-col h-full">
-    <!-- Header with status and actions -->
-    <div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-800 shrink-0">
+  <div class="flex h-full flex-col">
+    <!-- Header (non-scrolling) -->
+    <div
+      class="flex shrink-0 items-center justify-between gap-3 border-b border-gray-800 px-4 py-3"
+      data-testid="lyrics-header"
+    >
       <div class="flex items-center gap-2">
-        <h3 class="text-sm font-semibold text-gray-100">Lyrics</h3>
+        <h3 class="text-sm font-semibold text-gray-100">Sections</h3>
+        <span class="text-[11px] text-gray-500">this order is the slide order</span>
         <!-- Auto-save status -->
         <span
           v-if="autoSaveStatus === 'pending'"
           data-testid="status-pending"
-          class="inline-block w-2 h-2 rounded-full bg-yellow-400"
+          class="inline-block h-2 w-2 rounded-full bg-yellow-400"
           title="Unsaved changes"
         ></span>
         <span
@@ -26,24 +30,20 @@
         <button
           type="button"
           data-testid="paste-lyrics-btn"
-          class="px-3 py-1.5 rounded-md text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-gray-600 transition-colors"
+          class="rounded-md border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm font-medium text-gray-300 transition-colors hover:border-gray-600 hover:bg-gray-700"
           @click="showPasteDialog = true"
-        >
-          Paste New Lyrics
-        </button>
+        >Paste lyrics</button>
         <button
           type="button"
-          data-testid="save-version-btn"
-          class="px-3 py-1.5 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors"
-          @click="onSaveVersion"
-        >
-          Save Version
-        </button>
+          data-testid="history-toggle-btn"
+          class="rounded-md border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm font-medium text-gray-300 transition-colors hover:border-gray-600 hover:bg-gray-700"
+          @click="showHistory = !showHistory"
+        >History</button>
       </div>
     </div>
 
     <!-- Loading -->
-    <div v-if="songLyricsStore.isLoading" class="flex-1 flex items-center justify-center">
+    <div v-if="songLyricsStore.isLoading" class="flex flex-1 items-center justify-center">
       <span class="text-sm text-gray-500">Loading lyrics...</span>
     </div>
 
@@ -51,61 +51,57 @@
     <div
       v-else-if="!currentLyrics"
       data-testid="empty-state"
-      class="flex-1 flex flex-col items-center justify-center gap-4 p-8"
+      class="flex flex-1 flex-col items-center justify-center gap-4 p-8"
     >
       <p class="text-sm text-gray-400">No lyrics yet for this song.</p>
       <button
         type="button"
         data-testid="paste-cta-btn"
-        class="px-4 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors"
+        class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500"
         @click="showPasteDialog = true"
-      >
-        Paste Lyrics from SongSelect
-      </button>
+      >Paste Lyrics from SongSelect</button>
     </div>
 
-    <!-- Editor -->
-    <div v-else class="flex-1 overflow-y-auto p-4 space-y-4">
-      <!-- Sections -->
+    <!--
+      Single scroll region — the ONLY element in this component that may
+      declare vertical overflow (R035). The header above and the closing
+      note at the bottom of this region stay outside/inside respectively so
+      the header never scrolls away. `section-rows` is a placeholder here;
+      Task 2 (28-05) fills it with the numbered, collapsible row list.
+    -->
+    <div
+      v-else
+      data-testid="lyrics-scroll-region"
+      class="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3"
+    >
+      <!-- History disclosure -->
       <div
-        v-for="(section, idx) in editableSections"
-        :key="section.id"
-        class="rounded-lg bg-gray-800/50 border border-gray-700/50 p-4"
+        v-if="showHistory"
+        data-testid="history-panel"
+        class="space-y-3 rounded-lg border border-gray-700 bg-gray-800/40 p-3"
       >
-        <div class="text-xs font-semibold text-indigo-400 uppercase tracking-wider mb-2">
-          {{ section.label }}
+        <div class="flex items-center justify-end">
+          <button
+            type="button"
+            data-testid="save-version-btn"
+            class="rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-indigo-500"
+            @click="onSaveVersion"
+          >Save Version</button>
         </div>
-        <textarea
-          :data-testid="`section-textarea-${idx}`"
-          :value="section.lines.join('\n')"
-          class="w-full rounded-md bg-gray-900 border border-gray-700 text-gray-100 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 resize-none font-mono leading-relaxed"
-          :rows="Math.max(section.lines.length, 2)"
-          @input="onSectionInput(idx, ($event.target as HTMLTextAreaElement).value)"
-        ></textarea>
+        <LyricVersionHistory
+          :versions="songLyricsStore.lyricVersions"
+          :current-version-id="currentLyrics?.id ?? ''"
+          @revert="onRevertVersion"
+        />
       </div>
 
-      <!-- Copyright -->
-      <div
-        v-if="currentLyrics.copyright.ccliSongNumber"
-        data-testid="copyright-display"
-        class="border-t border-gray-800 pt-4 mt-4 space-y-1"
-      >
-        <div class="text-sm font-medium text-gray-200">{{ currentLyrics.copyright.title }}</div>
-        <div class="text-xs text-gray-500">{{ currentLyrics.copyright.authors.join(', ') }}</div>
-        <div
-          v-for="(line, i) in currentLyrics.copyright.copyrightLines"
-          :key="i"
-          class="text-xs text-gray-500"
-        >
-          {{ line }}
-        </div>
-        <div class="text-xs text-gray-500">
-          CCLI Song # {{ currentLyrics.copyright.ccliSongNumber }}
-        </div>
-        <div v-if="currentLyrics.copyright.ccliLicenseNumber" class="text-xs text-gray-500">
-          CCLI License # {{ currentLyrics.copyright.ccliLicenseNumber }}
-        </div>
-      </div>
+      <!-- Ordered section rows (Task 2 / 28-05 fills this in). -->
+      <div data-testid="section-rows" class="flex flex-col gap-2.5"></div>
+
+      <p data-testid="closing-note" class="text-[11px] leading-relaxed text-gray-500">
+        <span class="text-emerald-400">&#10003; {{ currentLyrics?.performanceOrder.length ?? 0 }} sections</span>
+        &middot; used as the slide order for this song in every service. A repeat reuses the original words &mdash; edit once, both update.
+      </p>
     </div>
 
     <!-- Paste dialog -->
@@ -124,6 +120,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useSongLyricsStore } from '@/stores/songLyrics'
 import { useAutoSave } from '@/composables/useAutoSave'
 import LyricPasteDialog from './LyricPasteDialog.vue'
+import LyricVersionHistory from './LyricVersionHistory.vue'
 import type { LyricSection, SongLyrics } from '@/types/songLyrics'
 
 const props = defineProps<{
@@ -133,46 +130,25 @@ const props = defineProps<{
 
 const songLyricsStore = useSongLyricsStore()
 const showPasteDialog = ref(false)
-
-const editableSections = ref<LyricSection[]>([])
+const showHistory = ref(false)
 
 const currentLyrics = computed<SongLyrics | null>(() => songLyricsStore.currentLyrics)
 
+// Placeholder editable state — Task 2 (28-05) replaces this with the reactive
+// pool/order state that `buildSectionRows` renders through. Kept here only so
+// the autosave status indicator and useAutoSave wiring already behave
+// correctly in Task 1, before there is anything to edit.
+const editableSections = ref<LyricSection[]>([])
+
 watch(currentLyrics, (val) => {
-  if (val) {
-    editableSections.value = val.sections.map((s) => ({
-      ...s,
-      lines: [...s.lines],
-    }))
-  } else {
-    editableSections.value = []
-  }
+  editableSections.value = val ? val.sections.map((s) => ({ ...s, lines: [...s.lines] })) : []
 }, { immediate: true })
 
-function onSectionInput(idx: number, value: string) {
-  editableSections.value[idx]!.lines = value.split('\n')
-}
-
-const isDirty = computed(() => {
-  if (!currentLyrics.value) return false
-  const original = currentLyrics.value.sections
-  const current = editableSections.value
-  if (original.length !== current.length) return true
-  for (let i = 0; i < original.length; i++) {
-    if (original[i]!.lines.join('\n') !== current[i]!.lines.join('\n')) return true
-  }
-  return false
-})
+const isDirty = computed(() => false)
 
 async function doAutoSave() {
-  const cur = currentLyrics.value
-  if (!cur?.id) return
-  await songLyricsStore.updateCurrentLyrics(
-    props.orgId,
-    props.songId,
-    cur.id,
-    { sections: editableSections.value },
-  )
+  // Task 2 wires this to write the reactive pool/order editable state,
+  // sections and performanceOrder together in one call (T-28-12).
 }
 
 const { status: autoSaveStatus, cleanup: cleanupAutoSave } = useAutoSave(
@@ -185,10 +161,14 @@ async function onSaveVersion() {
   const cur = currentLyrics.value
   if (!cur) return
   await songLyricsStore.saveLyrics(props.orgId, props.songId, {
-    sections: editableSections.value,
+    sections: cur.sections,
     copyright: cur.copyright,
     performanceOrder: cur.performanceOrder,
   })
+}
+
+async function onRevertVersion(versionId: string) {
+  await songLyricsStore.revertToVersion(props.orgId, props.songId, versionId)
 }
 
 function onPasteSaved() {

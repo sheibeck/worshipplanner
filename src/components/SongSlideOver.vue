@@ -271,17 +271,13 @@
 
         </div>
 
-        <!-- Lyrics tab -->
-        <div v-if="activeTab === 'lyrics' && !isCreateMode" class="flex-1 overflow-y-auto px-5 py-5 space-y-6" data-testid="lyrics-tab-content">
+        <!-- Lyrics tab: a non-scrolling flex column that fills the remaining
+             height and lets its child shrink — SongLyricEditor owns the sole
+             scroll region (R035). This mounts the editor and nothing else. -->
+        <div v-if="activeTab === 'lyrics' && !isCreateMode" class="flex flex-1 min-h-0 flex-col" data-testid="lyrics-tab-content">
           <SongLyricEditor
             :song-id="props.song!.id"
             :org-id="orgId"
-          />
-          <LyricVersionHistory
-            v-if="songLyricsStore.lyricVersions.length > 0"
-            :versions="songLyricsStore.lyricVersions"
-            :current-version-id="songLyricsStore.currentLyrics?.id ?? ''"
-            @revert="onRevertVersion"
           />
         </div>
 
@@ -294,10 +290,8 @@
 import { ref, computed, watch } from 'vue'
 import { useSongStore } from '@/stores/songs'
 import { useAuthStore } from '@/stores/auth'
-import { useSongLyricsStore } from '@/stores/songLyrics'
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import SongLyricEditor from './SongLyricEditor.vue'
-import LyricVersionHistory from './LyricVersionHistory.vue'
 import type { Song, Arrangement, VWType } from '@/types/song'
 import type { SongEditTab } from '@/utils/songEditLink'
 
@@ -316,7 +310,6 @@ const emit = defineEmits<{
 
 const songStore = useSongStore()
 const authStore = useAuthStore()
-const songLyricsStore = useSongLyricsStore()
 
 const activeTab = ref<'details' | 'lyrics'>('details')
 const orgId = computed(() => authStore.orgId ?? '')
@@ -560,10 +553,4 @@ async function onDelete() {
   }
 }
 
-// ── Lyrics tab helpers ────────────────────────────────────────────────────────
-
-async function onRevertVersion(versionId: string) {
-  if (!props.song) return
-  await songLyricsStore.revertToVersion(orgId.value, props.song.id, versionId)
-}
 </script>
