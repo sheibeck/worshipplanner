@@ -73,6 +73,40 @@ describe('buildSectionRows', () => {
     expect(sections).toEqual(sectionsClone)
     expect(order).toEqual(orderClone)
   })
+
+  // WR-01: `stableKey` lets a caller track UI state per physical row across
+  // a reorder, independent of the positionally-derived `rowKey`.
+  describe('stableKey (WR-01)', () => {
+    it('falls back to rowKey when slotIds is omitted', () => {
+      const rows = buildSectionRows([verse1, chorus], ['chorus', 'verse-1', 'chorus'])
+      expect(rows.map((r) => r.stableKey)).toEqual(rows.map((r) => r.rowKey))
+    })
+
+    it('falls back to rowKey when slotIds length does not match order length', () => {
+      const rows = buildSectionRows([verse1, chorus], ['chorus', 'verse-1', 'chorus'], ['a', 'b'])
+      expect(rows.map((r) => r.stableKey)).toEqual(rows.map((r) => r.rowKey))
+    })
+
+    it('uses the supplied slotIds, positionally, when lengths match', () => {
+      const rows = buildSectionRows([verse1, chorus], ['chorus', 'verse-1', 'chorus'], ['s1', 's2', 's3'])
+      expect(rows.map((r) => r.stableKey)).toEqual(['s1', 's2', 's3'])
+    })
+
+    it('keeps a slotId attached to its order index even when the section it points to becomes the earlier or later occurrence after reordering the order array', () => {
+      // Before: [chorus(s1), verse-1(s2), chorus(s3)] — s3 is the repeat.
+      const before = buildSectionRows([verse1, chorus], ['chorus', 'verse-1', 'chorus'], ['s1', 's2', 's3'])
+      const repeatBefore = before.find((r) => r.isRepeat)!
+      expect(repeatBefore.stableKey).toBe('s3')
+
+      // After swapping the two chorus slots' positions (s1 now last): the
+      // slotId travels with its order slot, not with "being a repeat".
+      const after = buildSectionRows([verse1, chorus], ['verse-1', 'chorus', 'chorus'], ['s2', 's3', 's1'])
+      const repeatAfter = after.find((r) => r.isRepeat)!
+      expect(repeatAfter.stableKey).toBe('s1')
+      const followedAfter = after.find((r) => !r.isRepeat && r.sectionId === 'chorus')!
+      expect(followedAfter.stableKey).toBe('s3')
+    })
+  })
 })
 
 describe('normalizeLyricOrder', () => {

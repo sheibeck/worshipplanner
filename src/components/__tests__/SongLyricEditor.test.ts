@@ -591,6 +591,46 @@ describe('SongLyricEditor', () => {
     expect(repeatRow!.find('[data-testid="row-repeat-note"]').text()).toContain('1')
   })
 
+  it('reordering a twice-referenced section keeps expand state attached to the physical row the user opened, not the stale positional key (WR-01)', async () => {
+    mockIsLoading.value = false
+    // Order [chorus, verse-1, chorus] — the second chorus (index 2) is the
+    // repeat (chorus#1). rowKey is positionally derived, so a drag that
+    // changes which occurrence comes first reassigns rowKeys to different
+    // physical rows; stableKey must not.
+    mockCurrentLyrics.value = makeLyrics({
+      sections: REPEAT_SECTIONS,
+      performanceOrder: ['chorus', 'verse-1', 'chorus'],
+    })
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    // Expand the REPEAT (chorus#1) — the read-only "shared text" panel.
+    let rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    const repeatRowBefore = rows[2]!
+    expect(repeatRowBefore.attributes('data-testid')).toBe('section-row-chorus#1')
+    await repeatRowBefore.find('[data-testid^="row-toggle-"]').trigger('click')
+    expect(repeatRowBefore.find('[data-testid="row-shared-text-chorus#1"]').exists()).toBe(true)
+
+    // Drag the FOLLOWED chorus (index 0) past the repeat, to the end:
+    // [chorus, verse-1, chorus] -> [verse-1, chorus, chorus]. The physical
+    // row the user expanded is now the FOLLOWED occurrence (its rowKey
+    // shifts from chorus#1 to chorus#0), and the row that was never
+    // expanded is now the repeat (chorus#1).
+    await simulateDragEnd(0, 2, 3)
+    await flushPromises()
+
+    rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    const followedRowAfter = rows.find((r) => r.attributes('data-testid') === 'section-row-chorus#0')!
+    const repeatRowAfter = rows.find((r) => r.attributes('data-testid') === 'section-row-chorus#1')!
+
+    // The physically-expanded row followed the drag: it is now rendered as
+    // the non-repeat occurrence and still shows its editable textarea.
+    expect(followedRowAfter.find('[data-testid="row-textarea-chorus"]').exists()).toBe(true)
+    // The row that was never expanded stays collapsed — no stale key
+    // reattached expand state to it.
+    expect(repeatRowAfter.find('[data-testid="row-shared-text-chorus#1"]').exists()).toBe(false)
+  })
+
   it('destroys the drag instance on unmount', async () => {
     mockIsLoading.value = false
     mockCurrentLyrics.value = makeRepeatLyrics()

@@ -27,8 +27,23 @@ const ROW_KEY_SEPARATOR = '#'
 
 /** One row of option 2a's numbered, always-draggable section list. */
 export interface SectionRow {
-  /** Unique within a single `buildSectionRows` result. */
+  /**
+   * Unique within a single `buildSectionRows` result. Positionally derived
+   * (`${sectionId}#${occurrenceIndex}`) — used for display/testid purposes
+   * only. NOT stable across a mutation that changes which occurrence of a
+   * repeated section comes first (drag reorder, duplicate/remove of an
+   * earlier occurrence). Callers that need to track UI state (e.g.
+   * expand/collapse) per physical row across such mutations must use
+   * `stableKey` instead (WR-01).
+   */
   rowKey: string
+  /**
+   * Stable across a mutation of the order — set from the caller-supplied
+   * `slotIds` (see `buildSectionRows`'s third parameter) when provided,
+   * otherwise falls back to `rowKey` (i.e. no stability guarantee) so
+   * callers that don't need it are unaffected.
+   */
+  stableKey: string
   sectionId: string
   /** The resolved pooled section this row displays. */
   section: LyricSection
@@ -46,14 +61,28 @@ export interface SectionRow {
  * Derives the numbered row list option 2a draws from a (sections, order)
  * pair. Skips an order id that resolves to no pooled section rather than
  * emitting a row with an undefined section. Never mutates its arguments.
+ *
+ * `slotIds`, when supplied, must be the same length as `order` — element
+ * `i` is a stable identity for the order slot at `order[i]`, independent of
+ * section id or position, exposed as `SectionRow.stableKey` (WR-01: lets a
+ * caller track UI state, e.g. expand/collapse, per physical row across a
+ * reorder/duplicate/remove instead of by the positionally-derived
+ * `rowKey`). Omitted or mismatched-length `slotIds` falls back to `rowKey`
+ * for `stableKey`, preserving prior behavior for callers that don't pass it.
  */
-export function buildSectionRows(sections: LyricSection[], order: string[]): SectionRow[] {
+export function buildSectionRows(
+  sections: LyricSection[],
+  order: string[],
+  slotIds?: string[],
+): SectionRow[] {
   const pool = new Map(sections.map((section) => [section.id, section] as const))
   const occurrenceCounts = new Map<string, number>()
   const firstPositionBySectionId = new Map<string, number>()
   const rows: SectionRow[] = []
+  const hasSlotIds = slotIds !== undefined && slotIds.length === order.length
 
-  for (const sectionId of order) {
+  for (let i = 0; i < order.length; i++) {
+    const sectionId = order[i]!
     const section = pool.get(sectionId)
     if (!section) continue
 
@@ -66,8 +95,11 @@ export function buildSectionRows(sections: LyricSection[], order: string[]): Sec
       firstPositionBySectionId.set(sectionId, position)
     }
 
+    const rowKey = `${sectionId}${ROW_KEY_SEPARATOR}${occurrenceIndex}`
+
     rows.push({
-      rowKey: `${sectionId}${ROW_KEY_SEPARATOR}${occurrenceIndex}`,
+      rowKey,
+      stableKey: hasSlotIds ? slotIds![i]! : rowKey,
       sectionId,
       section,
       position,

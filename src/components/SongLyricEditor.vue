@@ -142,7 +142,7 @@
                 type="button"
                 :data-testid="`row-toggle-${row.rowKey}`"
                 class="shrink-0 text-gray-500 transition-colors hover:text-gray-300"
-                @click="toggleRow(row.rowKey)"
+                @click="toggleRow(row.stableKey)"
               >{{ isExpanded(row) ? '⌃' : '⌄' }}</button>
             </template>
 
@@ -174,7 +174,7 @@
                 type="button"
                 :data-testid="`row-toggle-${row.rowKey}`"
                 class="shrink-0 text-gray-500 transition-colors hover:text-gray-300"
-                @click="toggleRow(row.rowKey)"
+                @click="toggleRow(row.stableKey)"
               >{{ isExpanded(row) ? '⌃' : '⌄' }}</button>
             </template>
           </div>
@@ -298,8 +298,33 @@ interface EditableLyricsState {
 
 const editableState = reactive<EditableLyricsState>({ sections: [], performanceOrder: [] })
 
+// WR-01: a stable identity per `performanceOrder` SLOT (not per section id,
+// not per position) — kept in lockstep with `editableState.performanceOrder`
+// by every mutation below (drag reorder, duplicate, remove, add-section).
+// `buildSectionRows` exposes it as `SectionRow.stableKey`, which
+// `expandedRowKeys` is keyed by instead of the positionally-derived
+// `rowKey`, so a reorder can never silently reattach expand/collapse state
+// to a different physical row. Component-local only — never persisted, so a
+// document reload naturally starts expand state fresh (see the
+// `currentLyrics` watcher below for the one case that must NOT reseed: our
+// own autosave round-tripping back through the Firestore subscription).
+const orderSlotIds = ref<string[]>([])
+let slotIdCounter = 0
+function mintSlotId(): string {
+  slotIdCounter += 1
+  return `slot-${slotIdCounter}`
+}
+
+function arraysEqual(a: readonly string[], b: readonly string[]): boolean {
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false
+  }
+  return true
+}
+
 const sectionRows = computed<SectionRow[]>(() =>
-  buildSectionRows(editableState.sections, editableState.performanceOrder),
+  buildSectionRows(editableState.sections, editableState.performanceOrder, orderSlotIds.value),
 )
 
 const isDirty = computed(() => {
@@ -350,12 +375,27 @@ watch(
     if (!val) {
       editableState.sections = []
       editableState.performanceOrder = []
+      orderSlotIds.value = []
       return
     }
 
     const normalized = normalizeLyricOrder(val.sections, val.performanceOrder)
+
+    // WR-01: only reseed slot ids when the order actually changed from what
+    // is already held. This watcher re-fires after our OWN autosave writes
+    // round-trip back through the Firestore subscription with an unchanged
+    // order — reseeding unconditionally would silently collapse every
+    // expanded row on every save. A genuinely different order (first load,
+    // a different document, or a load-time repair) still reseeds, which is
+    // correct: those rows are not the ones the user had open.
+    const orderChanged = !arraysEqual(normalized.performanceOrder, editableState.performanceOrder)
+
     editableState.sections = normalized.sections.map((s) => ({ ...s, lines: [...s.lines] }))
     editableState.performanceOrder = [...normalized.performanceOrder]
+
+    if (orderChanged) {
+      orderSlotIds.value = normalized.performanceOrder.map(() => mintSlotId())
+    }
 
     // The load may have needed repair (a stale order reference, or a pooled
     // section no longer referenced). Persist that repair through the same
@@ -400,30 +440,42 @@ function orderIndexForRow(row: SectionRow): number {
   return -1
 }
 
-function expandRowKey(rowKey: string) {
+function expandRowKey(stableKey: string) {
   const next = new Set(expandedRowKeys.value)
-  next.add(rowKey)
+  next.add(stableKey)
   expandedRowKeys.value = next
 }
 
 // Duplicate/Remove/Add-section all mutate through 28-01's pure helpers —
-// no ordering or pool logic is re-implemented here.
+// no ordering or pool logic is re-implemented here. Each mirrors its
+// performanceOrder splice onto `orderSlotIds` at the same index, so
+// `SectionRow.stableKey` (and therefore expand/collapse state) tracks the
+// physical row rather than its position (WR-01).
 
 function onDuplicate(row: SectionRow) {
   const index = orderIndexForRow(row)
   if (index === -1) return
   const wasExpanded = isExpanded(row)
   editableState.performanceOrder = duplicateRow(editableState.performanceOrder, index)
+
+  // The duplicate is a NEW physical row (D-02: same words, but its own
+  // reference into the order) — mint it a fresh slot id rather than
+  // reusing `row`'s, so it can be independently reordered/removed without
+  // dragging `row`'s expand state along with it.
+  const nextSlotIds = [...orderSlotIds.value]
+  nextSlotIds.splice(index + 1, 0, mintSlotId())
+  orderSlotIds.value = nextSlotIds
+
   if (wasExpanded) {
     // The duplicate lands immediately after `row`, so it is the next
     // occurrence of the same section id. Look it up via buildSectionRows
     // rather than hand-assembling a rowKey, since the `#`-joined format is
     // an internal convention of songSectionOrder.ts.
-    const newRows = buildSectionRows(editableState.sections, editableState.performanceOrder)
+    const newRows = buildSectionRows(editableState.sections, editableState.performanceOrder, orderSlotIds.value)
     const newRow = newRows.find(
       (r) => r.sectionId === row.sectionId && r.occurrenceIndex === row.occurrenceIndex + 1,
     )
-    if (newRow) expandRowKey(newRow.rowKey)
+    if (newRow) expandRowKey(newRow.stableKey)
   }
 }
 
@@ -433,15 +485,20 @@ function onRemove(row: SectionRow) {
   const result = removeRow(editableState.sections, editableState.performanceOrder, index)
   editableState.sections = result.sections
   editableState.performanceOrder = result.performanceOrder
+
+  const nextSlotIds = [...orderSlotIds.value]
+  nextSlotIds.splice(index, 1)
+  orderSlotIds.value = nextSlotIds
 }
 
 function onAddSection(kind: string) {
   const result = addSection(editableState.sections, editableState.performanceOrder, kind)
   editableState.sections = result.sections
   editableState.performanceOrder = result.performanceOrder
-  const newRows = buildSectionRows(editableState.sections, editableState.performanceOrder)
+  orderSlotIds.value = [...orderSlotIds.value, mintSlotId()]
+  const newRows = buildSectionRows(editableState.sections, editableState.performanceOrder, orderSlotIds.value)
   const newRow = newRows.find((r) => r.sectionId === result.newSectionId)
-  if (newRow) expandRowKey(newRow.rowKey)
+  if (newRow) expandRowKey(newRow.stableKey)
 }
 
 // ── Drag reorder (D-01): the list is always draggable by handle, no mode to
@@ -480,6 +537,10 @@ watch(
             parent.insertBefore(evt.item, evt.oldIndex < evt.newIndex ? (ref?.nextSibling ?? null) : (ref ?? null))
           }
           editableState.performanceOrder = moveRow(editableState.performanceOrder, evt.oldIndex, evt.newIndex)
+          // Mirror the same move on the stable-id array (WR-01) — `moveRow`
+          // is a generic index-based splice, agnostic to what the array
+          // holds, so it applies unchanged here.
+          orderSlotIds.value = moveRow(orderSlotIds.value, evt.oldIndex, evt.newIndex)
         },
       })
     }
@@ -493,15 +554,18 @@ function destroySortable() {
 }
 
 function isExpanded(row: SectionRow): boolean {
-  return expandedRowKeys.value.has(row.rowKey)
+  // WR-01: keyed by the row's stable, order-slot-derived identity, not the
+  // positionally-derived `rowKey`, so a reorder/duplicate/remove can never
+  // silently reattach expand state to a different physical row.
+  return expandedRowKeys.value.has(row.stableKey)
 }
 
-function toggleRow(rowKey: string) {
+function toggleRow(stableKey: string) {
   const next = new Set(expandedRowKeys.value)
-  if (next.has(rowKey)) {
-    next.delete(rowKey)
+  if (next.has(stableKey)) {
+    next.delete(stableKey)
   } else {
-    next.add(rowKey)
+    next.add(stableKey)
   }
   expandedRowKeys.value = next
 }
