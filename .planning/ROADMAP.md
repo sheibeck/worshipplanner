@@ -305,7 +305,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 2)*
 
-- [ ] 28-04-PLAN.md — The one-list editor: one scroll surface, numbered rows, collapse, linked repeats
+- [x] 28-04-PLAN.md — The one-list editor: one scroll surface, numbered rows, collapse, linked repeats
 
 **Wave 5** *(blocked on Wave 4)*
 

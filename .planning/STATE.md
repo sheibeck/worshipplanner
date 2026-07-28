@@ -5,14 +5,14 @@ milestone_name: Slides Tab Rework
 current_phase: 28
 current_phase_name: Song Lyrics Editor Rework
 status: executing
-stopped_at: Completed 28-03-PLAN.md
-last_updated: "2026-07-28T01:28:52.515Z"
+stopped_at: Completed 28-04-PLAN.md
+last_updated: "2026-07-28T02:13:56.966Z"
 last_activity: 2026-07-27
 progress:
   total_phases: 17
   completed_phases: 15
   total_plans: 101
-  completed_plans: 98
+  completed_plans: 99
   percent: 88
 last_activity_desc: Opened v1.3 Slides Tab Rework (Phases 24-28) from the Claude Design import; v1.2 left code-complete with its verification ledger intact
 ---
@@ -36,7 +36,7 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 28 (Song Lyrics Editor Rework) — EXECUTING
-Plan: 3 of 6
+Plan: 4 of 6
 Milestone: v1.3 Slides Tab Rework (Phases 24-28) — IN PROGRESS
 Status: Ready to execute
 
@@ -410,6 +410,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 27 P05 | 55min | 3 tasks | 6 files |
 | Phase 28 P02 | ~40min | 3 tasks | 16 files |
 | Phase 28 P03 | 25min | 2 tasks | 2 files |
+| Phase 28 P04 | 35min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -563,6 +564,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: [Phase 28-02]: Song.performanceOrder deleted outright (D-19); SongLyrics.performanceOrder is now the single source of a song's slide order, replacing the three-tier resolveSongOrder precedence chain duplicated across slideshowAssembler.ts and slideGroupMaterializer.ts
 - [Phase ?]: [Phase 28-02]: Task 2/Task 3 boundary is intentionally not independently type-check-clean — Task 2 deletes the order field/action, Task 3 (same non-checkpointed plan) removes the two Vue consumers immediately after; documented rather than treated as a blocking deviation
 - [Phase ?]: 28-03: Surplus stored entries for a repeated section are emitted at the LAST occurrence, not the first — keeps Phase 26-09's N=1/M=2 output byte-identical while bounding growth for N>1
+- [Phase ?]: 28-04: Rebuilt SongLyricEditor as option 2a's single-scroll-region row list; dropped copyright display (not in 2a design); load-time repair persisted via a direct doAutoSave() call since useAutoSave suppresses its first watcher invocation.
 
 ### Roadmap Evolution
 
@@ -622,6 +624,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-27
-Last session: 2026-07-28T01:28:52.471Z
-Stopped at: Completed 28-03-PLAN.md
+Last session: 2026-07-28T02:13:56.913Z
+Stopped at: Completed 28-04-PLAN.md
 Resume file: None
