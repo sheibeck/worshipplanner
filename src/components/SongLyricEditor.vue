@@ -64,10 +64,9 @@
 
     <!--
       Single scroll region — the ONLY element in this component that may
-      declare vertical overflow (R035). The header above and the closing
-      note at the bottom of this region stay outside/inside respectively so
-      the header never scrolls away. `section-rows` is a placeholder here;
-      Task 2 (28-05) fills it with the numbered, collapsible row list.
+      declare vertical overflow (R035). The header above stays outside it, and
+      the closing note is the last child inside it, so the header never
+      scrolls away.
     -->
     <div
       v-else
@@ -95,11 +94,83 @@
         />
       </div>
 
-      <!-- Ordered section rows (Task 2 / 28-05 fills this in). -->
-      <div data-testid="section-rows" class="flex flex-col gap-2.5"></div>
+      <!-- Ordered section rows — the list IS the slide order (D-01/D-03). -->
+      <div data-testid="section-rows" class="flex flex-col gap-2.5">
+        <div
+          v-for="row in sectionRows"
+          :key="row.rowKey"
+          :data-testid="`section-row-${row.rowKey}`"
+          :data-repeat="row.isRepeat ? 'true' : 'false'"
+          :class="rowCardClass(row)"
+        >
+          <div class="flex items-center gap-2 px-3 py-2.5">
+            <span data-testid="row-position" class="w-5 shrink-0 text-right text-[11px] text-gray-500">{{ row.position }}</span>
+            <span class="drag-handle shrink-0 cursor-grab text-gray-600 hover:text-gray-400" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M7 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/>
+              </svg>
+            </span>
+
+            <template v-if="!row.isRepeat">
+              <span :class="isExpanded(row) ? LABEL_CHIP_CLASSES.expanded : LABEL_CHIP_CLASSES.collapsed">
+                {{ row.section.label.toUpperCase() }}
+                <span aria-hidden="true">{{ isExpanded(row) ? '⌃' : '⌄' }}</span>
+              </span>
+              <span
+                v-if="!isExpanded(row)"
+                data-testid="row-preview"
+                class="min-w-0 flex-1 truncate text-[11.5px] text-gray-400"
+              >{{ previewText(row.section) }}</span>
+              <span v-else class="min-w-0 flex-1"></span>
+              <span data-testid="row-line-count" class="shrink-0 text-[10.5px] text-gray-500">{{ lineCountLabel(row.section) }}</span>
+              <button
+                type="button"
+                :data-testid="`row-toggle-${row.rowKey}`"
+                class="shrink-0 text-gray-500 transition-colors hover:text-gray-300"
+                @click="toggleRow(row.rowKey)"
+              >{{ isExpanded(row) ? '⌃' : '⌄' }}</button>
+            </template>
+
+            <template v-else>
+              <span :class="LABEL_CHIP_CLASSES.repeat">
+                <span aria-hidden="true">&#8635;</span>
+                {{ row.section.label.toUpperCase() }}
+              </span>
+              <span
+                data-testid="row-repeat-note"
+                class="min-w-0 flex-1 truncate text-[11.5px] text-gray-400"
+              >repeat &mdash; follows row {{ row.repeatOfPosition }}</span>
+              <span data-testid="row-linked" class="shrink-0 text-[10.5px] text-gray-500">linked</span>
+              <button
+                type="button"
+                :data-testid="`row-toggle-${row.rowKey}`"
+                class="shrink-0 text-gray-500 transition-colors hover:text-gray-300"
+                @click="toggleRow(row.rowKey)"
+              >{{ isExpanded(row) ? '⌃' : '⌄' }}</button>
+            </template>
+          </div>
+
+          <div v-if="isExpanded(row) && !row.isRepeat" class="px-3 pb-3">
+            <textarea
+              :data-testid="`row-textarea-${row.sectionId}`"
+              :value="row.section.lines.join('\n')"
+              class="w-full resize-none rounded-md border border-gray-700 bg-gray-900 px-3 py-2 font-mono text-sm leading-relaxed text-gray-100 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              :rows="Math.max(row.section.lines.length, 2)"
+              @input="onSectionInput(row.sectionId, ($event.target as HTMLTextAreaElement).value)"
+            ></textarea>
+          </div>
+          <div v-else-if="isExpanded(row) && row.isRepeat" class="space-y-1.5 px-3 pb-3">
+            <div
+              :data-testid="`row-shared-text-${row.rowKey}`"
+              class="whitespace-pre-line rounded-md border border-gray-800 bg-gray-950/40 px-3 py-2 font-mono text-[12px] leading-relaxed text-gray-300"
+            >{{ row.section.lines.join('\n') }}</div>
+            <p class="text-[10.5px] text-gray-500">Editing happens on row {{ row.repeatOfPosition }}, where this section first appears.</p>
+          </div>
+        </div>
+      </div>
 
       <p data-testid="closing-note" class="text-[11px] leading-relaxed text-gray-500">
-        <span class="text-emerald-400">&#10003; {{ currentLyrics?.performanceOrder.length ?? 0 }} sections</span>
+        <span class="text-emerald-400">&#10003; {{ sectionRows.length }} sections</span>
         &middot; used as the slide order for this song in every service. A repeat reuses the original words &mdash; edit once, both update.
       </p>
     </div>
@@ -116,9 +187,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { reactive, ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useSongLyricsStore } from '@/stores/songLyrics'
 import { useAutoSave } from '@/composables/useAutoSave'
+import { buildSectionRows, normalizeLyricOrder, type SectionRow } from '@/utils/songSectionOrder'
 import LyricPasteDialog from './LyricPasteDialog.vue'
 import LyricVersionHistory from './LyricVersionHistory.vue'
 import type { LyricSection, SongLyrics } from '@/types/songLyrics'
@@ -131,39 +203,127 @@ const props = defineProps<{
 const songLyricsStore = useSongLyricsStore()
 const showPasteDialog = ref(false)
 const showHistory = ref(false)
+const expandedRowKeys = ref<Set<string>>(new Set())
 
 const currentLyrics = computed<SongLyrics | null>(() => songLyricsStore.currentLyrics)
 
-// Placeholder editable state — Task 2 (28-05) replaces this with the reactive
-// pool/order state that `buildSectionRows` renders through. Kept here only so
-// the autosave status indicator and useAutoSave wiring already behave
-// correctly in Task 1, before there is anything to edit.
-const editableSections = ref<LyricSection[]>([])
+// The pool + order model this editor renders/mutates through (28-01). Seeded
+// from the loaded document, normalised — never the store's own objects, so
+// rendering here can never mutate what other components read (T-28-13).
+interface EditableLyricsState {
+  sections: LyricSection[]
+  performanceOrder: string[]
+}
 
-watch(currentLyrics, (val) => {
-  editableSections.value = val ? val.sections.map((s) => ({ ...s, lines: [...s.lines] })) : []
-}, { immediate: true })
+const editableState = reactive<EditableLyricsState>({ sections: [], performanceOrder: [] })
 
-const isDirty = computed(() => false)
+const sectionRows = computed<SectionRow[]>(() =>
+  buildSectionRows(editableState.sections, editableState.performanceOrder),
+)
 
+const isDirty = computed(() => {
+  const cur = currentLyrics.value
+  if (!cur) return false
+
+  if (cur.performanceOrder.length !== editableState.performanceOrder.length) return true
+  for (let i = 0; i < cur.performanceOrder.length; i++) {
+    if (cur.performanceOrder[i] !== editableState.performanceOrder[i]) return true
+  }
+
+  if (cur.sections.length !== editableState.sections.length) return true
+  for (let i = 0; i < cur.sections.length; i++) {
+    const a = cur.sections[i]!
+    const b = editableState.sections[i]!
+    if (a.id !== b.id || a.label !== b.label) return true
+    if (a.lines.length !== b.lines.length) return true
+    for (let j = 0; j < a.lines.length; j++) {
+      if (a.lines[j] !== b.lines[j]) return true
+    }
+  }
+
+  return false
+})
+
+// T-28-12: sections and performanceOrder are written together in one call —
+// a reorder can never land without its text, or the reverse.
 async function doAutoSave() {
-  // Task 2 wires this to write the reactive pool/order editable state,
-  // sections and performanceOrder together in one call (T-28-12).
+  const cur = currentLyrics.value
+  if (!cur?.id) return
+  await songLyricsStore.updateCurrentLyrics(
+    props.orgId,
+    props.songId,
+    cur.id,
+    { sections: editableState.sections, performanceOrder: editableState.performanceOrder },
+  )
 }
 
 const { status: autoSaveStatus, cleanup: cleanupAutoSave } = useAutoSave(
-  editableSections,
+  () => editableState,
   doAutoSave,
   isDirty,
 )
+
+watch(
+  currentLyrics,
+  async (val) => {
+    if (!val) {
+      editableState.sections = []
+      editableState.performanceOrder = []
+      return
+    }
+
+    const normalized = normalizeLyricOrder(val.sections, val.performanceOrder)
+    editableState.sections = normalized.sections.map((s) => ({ ...s, lines: [...s.lines] }))
+    editableState.performanceOrder = [...normalized.performanceOrder]
+
+    // The load may have needed repair (a stale order reference, or a pooled
+    // section no longer referenced). Persist that repair through the same
+    // write path autosave uses — sections and order together — rather than
+    // waiting on a further edit. A document already satisfying the
+    // invariants reads as clean (isDirty false) and produces no write.
+    await nextTick()
+    if (isDirty.value) {
+      await doAutoSave()
+    }
+  },
+  { immediate: true },
+)
+
+function onSectionInput(sectionId: string, value: string) {
+  const section = editableState.sections.find((s) => s.id === sectionId)
+  if (section) section.lines = value.split('\n')
+}
+
+function isExpanded(row: SectionRow): boolean {
+  return expandedRowKeys.value.has(row.rowKey)
+}
+
+function toggleRow(rowKey: string) {
+  const next = new Set(expandedRowKeys.value)
+  if (next.has(rowKey)) {
+    next.delete(rowKey)
+  } else {
+    next.add(rowKey)
+  }
+  expandedRowKeys.value = next
+}
+
+function previewText(section: LyricSection): string {
+  return section.lines.join(' ').trim()
+}
+
+function lineCountLabel(section: LyricSection): string {
+  const count = section.lines.length
+  return `${count} line${count === 1 ? '' : 's'}`
+}
 
 async function onSaveVersion() {
   const cur = currentLyrics.value
   if (!cur) return
   await songLyricsStore.saveLyrics(props.orgId, props.songId, {
-    sections: cur.sections,
+    sections: editableState.sections,
     copyright: cur.copyright,
-    performanceOrder: cur.performanceOrder,
+    performanceOrder: editableState.performanceOrder,
   })
 }
 
@@ -183,4 +343,27 @@ onUnmounted(() => {
   cleanupAutoSave()
   songLyricsStore.unsubscribeLyrics()
 })
+
+// Static, fully-spelled-out class maps — Tailwind v4 purges dynamically built
+// class names, which has shipped as a bug twice in this codebase already.
+// Mirrors the pattern SongSlideOver.vue already uses for its category
+// buttons (vwTypeClasses).
+const ROW_CARD_CLASSES = {
+  ordinaryCollapsed: 'rounded-lg border border-gray-700/50 bg-gray-800/40',
+  ordinaryExpanded: 'rounded-lg border border-indigo-800/60 bg-gray-900/70',
+  repeatCollapsed: 'rounded-lg border border-gray-700/50 bg-gray-800/20 opacity-80',
+  repeatExpanded: 'rounded-lg border border-gray-700/50 bg-gray-800/30 opacity-90',
+} as const
+
+const LABEL_CHIP_CLASSES = {
+  collapsed: 'inline-flex shrink-0 items-center gap-1 rounded-md border border-indigo-800/60 bg-indigo-950/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-indigo-300',
+  expanded: 'inline-flex shrink-0 items-center gap-1 rounded-md border border-indigo-500/60 bg-indigo-900/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-indigo-200',
+  repeat: 'inline-flex shrink-0 items-center gap-1 rounded-md border border-gray-700 bg-gray-800/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400',
+} as const
+
+function rowCardClass(row: SectionRow): string {
+  const expanded = isExpanded(row)
+  if (row.isRepeat) return expanded ? ROW_CARD_CLASSES.repeatExpanded : ROW_CARD_CLASSES.repeatCollapsed
+  return expanded ? ROW_CARD_CLASSES.ordinaryExpanded : ROW_CARD_CLASSES.ordinaryCollapsed
+}
 </script>
