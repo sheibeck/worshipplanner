@@ -1307,3 +1307,125 @@ describe('reconcileGroup dispatcher', () => {
     expect(result.proposed).toBeDefined()
   })
 })
+
+// Plan 28-03 Task 2: `deriveGroupEntries` and `sourceSignature` already walk
+// the resolved order element-by-element, so they are expected to already be
+// correct for a section referenced more than once — this block locks that in
+// with a test, and proves the materialise-then-reconcile round trip stays
+// stable, and that the live-reference guarantee (D002/D007 — a slide entry
+// stores a reference, never text) holds across every occurrence of a
+// repeated section.
+describe('repeated section — derivation and round-trip parity (Plan 28-03 Task 2)', () => {
+  function repeatedThreeTimesLyrics(overrides: Partial<SongLyrics> = {}): SongLyrics {
+    return makeSongLyrics({
+      sections: [
+        { id: 'verse-1', label: 'Verse 1', lines: ['Line A'] },
+        { id: 'chorus', label: 'Chorus', lines: ['Line C'] },
+      ],
+      performanceOrder: ['chorus', 'verse-1', 'chorus', 'verse-1', 'chorus'],
+      ...overrides,
+    })
+  }
+
+  it('deriveGroupEntries emits one lyric entry per occurrence, each with a distinct id, plus leading and trailing copyright', () => {
+    const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
+    const lyrics = repeatedThreeTimesLyrics()
+    const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
+
+    const entries = deriveGroupEntries(slot, inputs)
+
+    expect(entries).toHaveLength(7) // copyright + 5 order entries + copyright
+    expect(entries.map((e) => e.sourceRef.kind)).toEqual([
+      'copyright',
+      'lyric',
+      'lyric',
+      'lyric',
+      'lyric',
+      'lyric',
+      'copyright',
+    ])
+    const chorusEntries = entries.filter((e) => e.sourceRef.kind === 'lyric' && e.sourceRef.sectionId === 'chorus')
+    expect(chorusEntries).toHaveLength(3)
+    expect(new Set(chorusEntries.map((e) => e.id)).size).toBe(3)
+    expect(new Set(entries.map((e) => e.id)).size).toBe(entries.length)
+  })
+
+  it('sourceSignature reflects the repeated section once per occurrence, and changes when the shared section is edited', () => {
+    const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
+    const lyrics = repeatedThreeTimesLyrics()
+    const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
+
+    const signature = sourceSignature(slot, inputs)
+    expect(signature).toBeDefined()
+    // Signature is `${count}:${joined texts}` — count must equal the number
+    // of ORDER entries (5), not the number of distinct sections (2).
+    expect(signature!.startsWith('5:')).toBe(true)
+
+    const editedLyrics = repeatedThreeTimesLyrics({
+      sections: [
+        { id: 'verse-1', label: 'Verse 1', lines: ['Line A'] },
+        { id: 'chorus', label: 'Chorus', lines: ['Edited chorus line'] },
+      ],
+    })
+    const editedInputs = makeInputs({ songLyricsById: new Map([['song-1', editedLyrics]]) })
+    const editedSignature = sourceSignature(slot, editedInputs)
+
+    expect(editedSignature).not.toBe(signature)
+    expect(editedSignature!.startsWith('5:')).toBe(true)
+  })
+
+  it('buildInitialGroup immediately followed by reconcileGroup reports no change — a freshly materialised group is already reconciled', () => {
+    const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
+    const lyrics = repeatedThreeTimesLyrics()
+    const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
+
+    const initial = buildInitialGroup(slot, 'svc-1', inputs)
+    const group: SlideGroup = { ...initial, createdAt: mockTimestamp, updatedAt: mockTimestamp }
+
+    const result = reconcileGroup(group, slot, inputs)
+
+    expect(result.changed).toBe(false)
+    expect(result.slides).toEqual(group.slides)
+  })
+
+  it('editing the shared section and reconciling again keeps the same entries with the same ids and reports no structural change, while every occurrence resolves the edited text', () => {
+    const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
+    const lyrics = repeatedThreeTimesLyrics()
+    const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
+
+    const initial = buildInitialGroup(slot, 'svc-1', inputs)
+    const group: SlideGroup = { ...initial, createdAt: mockTimestamp, updatedAt: mockTimestamp }
+    const originalChorusIds = group.slides
+      .filter((e) => e.sourceRef.kind === 'lyric' && e.sourceRef.sectionId === 'chorus')
+      .map((e) => e.id)
+
+    const editedLyrics = repeatedThreeTimesLyrics({
+      sections: [
+        { id: 'verse-1', label: 'Verse 1', lines: ['Line A'] },
+        { id: 'chorus', label: 'Chorus', lines: ['Edited chorus line'] },
+      ],
+    })
+    const editedInputs = makeInputs({ songLyricsById: new Map([['song-1', editedLyrics]]) })
+
+    const result = reconcileGroup(group, slot, editedInputs)
+
+    // No entry changed — text is never stored on the entry (D002/D007).
+    expect(result.changed).toBe(false)
+    expect(result.slides).toEqual(group.slides)
+    const resultChorusIds = result.slides
+      .filter((e) => e.sourceRef.kind === 'lyric' && e.sourceRef.sectionId === 'chorus')
+      .map((e) => e.id)
+    expect(resultChorusIds).toEqual(originalChorusIds)
+
+    // The live-reference half of the guarantee: every chorus occurrence
+    // resolves to the SAME edited section text — content lives on the
+    // canonical section, never on the entry.
+    for (const entry of result.slides) {
+      if (entry.sourceRef.kind === 'lyric' && entry.sourceRef.sectionId === 'chorus') {
+        const sectionId = entry.sourceRef.sectionId
+        const section = editedLyrics.sections.find((s) => s.id === sectionId)
+        expect(section?.lines).toEqual(['Edited chorus line'])
+      }
+    }
+  })
+})
