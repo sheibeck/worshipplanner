@@ -8,6 +8,23 @@ A worship service planning app for church worship teams that builds weekly servi
 
 Smart weekly service planning that follows the Vertical Worship methodology (1→2→3 song progression) while rotating through the full song stable and respecting team configurations.
 
+## Current State
+
+**Shipped:** v1.0 MVP (Phases 1–4, 6–7) · v1.1 (Phases 8–17) · **v1.2 Worship Service Slide Management
+(Phases 18–23) — archived 2026-07-28.**
+
+**In progress:** **v1.3 Slides Tab Rework (Phases 24–28)** — all five phases code-complete as of
+2026-07-28 (33 plans, ~200 commits). Kept OPEN to carry bug/issue fixes.
+
+v1.2 gave the app slide management (lyrics, scripture, PPTX import, media, presentation preview). v1.3
+then reworked it around a **persisted slide-group model**: a dedicated **Slides** tab where all slide
+editing lives, a plan rail that mirrors the service order rather than duplicating it, an Edit Slide
+drawer, and a song lyrics editor rebuilt as one list that IS the slide order. The first tab was renamed
+**Service Order** and stripped of slide editing.
+
+v1.2 closed on owner acceptance rather than a passing verification gate; its outstanding human-verify
+checkpoints were waived. v1.3's Phase 28 checkpoint remains open. See `.planning/STATE.md`.
+
 ## Requirements
 
 ### Validated

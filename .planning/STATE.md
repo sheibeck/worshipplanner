@@ -5,7 +5,7 @@ milestone_name: Slides Tab Rework
 current_phase: 28
 current_phase_name: Song Lyrics Editor Rework
 status: executing
-stopped_at: Completed 28-06-PLAN.md (final plan of Phase 28, final phase of v1.3)
+stopped_at: v1.2 archived on owner acceptance; v1.3 code-complete and OPEN for bug fixes
 last_updated: "2026-07-28T03:17:43.714Z"
 last_activity: 2026-07-27
 progress:
@@ -14,7 +14,7 @@ progress:
   total_plans: 101
   completed_plans: 101
   percent: 94
-last_activity_desc: Opened v1.3 Slides Tab Rework (Phases 24-28) from the Claude Design import; v1.2 left code-complete with its verification ledger intact
+last_activity_desc: Archived v1.2 (Phases 18-23) on owner acceptance 2026-07-28; v1.3 (Phases 24-28) code-complete and deliberately kept OPEN to carry incoming bug/issue fixes
 ---
 
 # Project State
