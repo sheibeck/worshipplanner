@@ -2,14 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Service and Slides
+current_phase: 29
+current_phase_name: Order Structure — Stable Reordering & Post-Service
 status: planning
-last_updated: "2026-07-28T14:30:00.000Z"
+stopped_at: Completed 29-02-PLAN.md
+last_updated: "2026-07-28T21:30:23.456Z"
 last_activity: 2026-07-28
+last_activity_desc: ROADMAP.md created for v1.4 (Phases 29-37); REQUIREMENTS.md traceability filled, 34/34 requirements mapped, 0 unmapped
 progress:
   total_phases: 9
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 5
+  completed_plans: 1
   percent: 0
 ---
 
@@ -40,6 +44,7 @@ Last activity: 2026-07-28 — ROADMAP.md created for v1.4 (Phases 29-37); REQUIR
 - **Phase 37 (PPTX rendering): BUILD BUT DO NOT DEPLOY.** Write the Cloud Run service, Dockerfile,
   bridging Cloud Function and tests, then STOP and hand the owner the exact `gcloud run deploy`
   command. Deploying provisions billable infrastructure — it is the owner's call, not the run's.
+
 - **Backlog 999.1 is excluded from autonomous runs.** Phase discovery returns it (it sorts after 37),
   but it must be promoted deliberately via `/gsd-review-backlog`. Scope autonomous with `--to 37`.
 
@@ -86,14 +91,18 @@ typing self-heals on the next keystroke; a one-shot action like picking a song d
   `useSlideshowAssembly.ts`, `slideGroup.ts`, `slideGroups.ts`, `ReconcileConfirmModal.vue`,
   `SlideGrid.vue`, `SlidesTab.vue`, `slideDisplay.ts`, `ServiceEditorView.vue`). **Keep** the
   concurrent-write transaction merge in `replaceGroupSlides` even after the confirm gate goes.
+
 - **Post-Service** is a one-place additive type change in `src/types/service.ts` (no migration), but
   print / share / plan-rail / PC-export need auditing for hard-coded four-section assumptions.
+
 - **PPTX rendered images** belong under the existing `orgs/{orgId}/pptx-imports/{importId}/` prefix —
   structurally exempt from `cleanupExpiredMedia`'s regex guard with zero changes to that function.
+
 - **CCLI copyright placement:** the real-world convention is "at least once per song, typically the
   last slide." The v1.4 requirement (first AND last) **exceeds** the legal minimum — a deliberate
   safety margin for mid-deck starts and songs cut short. Do NOT justify it as "CCLI requires this."
   Pull the actual license text before finalizing that acceptance criterion.
+
 - **Draft-lock/reopen has no competitor precedent** — Planning Center Services gates on roles only.
   This is an original design call, not a convention being copied.
 
@@ -105,14 +114,18 @@ Departures from the research default, recorded explicitly per the roadmapper's i
 - Merged SUMMARY's "stable key/ordering model" and "Post-Service" phases into one **Phase 29** — R043
   ("the five sections...") textually presupposes Post-Service already exists, and Post-Service alone
   is too thin a phase under this project's `coarse` granularity setting.
+
 - Moved **Phase 37 (PPTX rendering)** to the true end of the sequence (was mid-sequence in SUMMARY) —
   per the user's explicit milestone decision to schedule it last so an overrun/cut disturbs nothing else.
+
 - Split SUMMARY's final "presentation correctness + CCLI + action bars" phase into two: **Phase 35**
   (presentation correctness + lyric editor, standard-pattern) and **Phase 36** (Service Order rebuild +
   contextual action bars, sequenced last among UI work) — kept separate so each has a coherent goal.
+
 - **R053** (drop-zone-as-import + moving Add-slide/Add-music into the action bar) was moved from the
   Slides-interaction cluster into **Phase 36** because its own requirement text names R068 (the action
   bar) as its target — building it before Phase 36 would mean building it twice.
+
 - **R054** (song groups read-only in Slides tab) was grouped into **Phase 30** (hard-lock/reconciliation
   removal) rather than with the rest of Slides interaction — ARCHITECTURE.md §3 treats it as the same
   "structural shape can no longer diverge" change that makes reconciliation deletable.
@@ -552,6 +565,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 28 P04 | 35min | 2 tasks | 4 files |
 | Phase 28 P05 | ~40min | 2 tasks | 2 files |
 | Phase 28 P06 | ~55min | 3 tasks | 3 files |
+| Phase 29 P02 | 15min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -711,6 +725,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 28-05: the dashed Add-section row is a sibling of section-rows, not a child, so it stays outside both the row-count contract and Sortable's .section-row draggable scope
 - [Phase ?]: Restored the CCLI copyright display 28-04 dropped without an authorizing decision — R035 only requires one scroll surface and one list, and the display's absence removed the only place to verify CCLI licensing data before it reaches the presented copyright slide.
 - [Phase ?]: R035's acceptance block mounts SongSlideOver + SongLyricEditor together, unstubbed, since the nested-scrollbar defect only appears once panel and editor are mounted together — proven at the composed level, not just per-component.
+- [Phase ?]: 29-02: orderSlotsBySection/groupBySection/flattenBySection are total, SERVICE_SECTIONS-driven, identity-preserving; defaultSectionForPosition audited as position-keyed, no change needed for post-service
 
 ### Roadmap Evolution
 
@@ -772,6 +787,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — v1.4 ROADMAP.md created (Phases 29-37); REQUIREMENTS.md traceability filled (34/34 mapped, 0 unmapped)
-Last session: 2026-07-28T14:30:00.000Z
-Stopped at: Roadmap creation complete — ready for /gsd-plan-phase 29 (optionally preceded by /gsd-discuss-phase 29)
+Last session: 2026-07-28T21:30:23.430Z
+Stopped at: Completed 29-02-PLAN.md
 Resume file: None

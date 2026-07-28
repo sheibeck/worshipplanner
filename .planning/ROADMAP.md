@@ -109,17 +109,21 @@ can see, slides that always mirror the plan — and finish them against the Clau
 **Depends on**: Nothing (first phase of v1.4)
 **Requirements**: R042, R043, R044, R049, R050
 **Success Criteria** (what must be TRUE):
+
   1. Dragging a service item to a new position lands it exactly there immediately, with no page refresh needed to see the correct order
   2. The five service sections (Pre-Service, Worship, Message, Sending, Post-Service) always render in that fixed order, are never themselves draggable, and stay visible even when empty
   3. Dragging a slide within the Slides tab persists its new position without reverting
   4. Adding a new slide appends it to the true end of its group, not before the last slide
-**Plans**: 5 plans
+
+**Plans**: 1/5 plans executed
 Plans:
+
 - [ ] 29-01-PLAN.md — Failing repro FIRST: header-inclusive fixtures, DOM-derived drag helper, identity-based assertions (wave 1)
-- [ ] 29-02-PLAN.md — Pure section-ordering helpers in slotTypes.ts + defaultSectionForPosition audit (wave 1)
+- [x] 29-02-PLAN.md — Pure section-ordering helpers in slotTypes.ts + defaultSectionForPosition audit (wave 1)
 - [ ] 29-03-PLAN.md — ServiceEditorView: per-section containers, stable slot.id key, correct onEnd, save-failure revert (wave 2)
 - [ ] 29-04-PLAN.md — SlideGrid: draggable-scoped indices, one append contract, visible reorder failure (wave 2)
 - [ ] 29-05-PLAN.md — Add the fifth Post-Service section, audit four consumers, human-verify a real drag (wave 3)
+
 **UI hint**: yes
 **Research flag**: standard pattern — root cause and fix already fully derived with line-level citations (SUMMARY.md/ARCHITECTURE.md §1); no dedicated research pass needed.
 **Notes**: The existing D-16 DOM-revert fix (`ServiceEditorView.vue:1430`, `SlideGrid.vue:669`) already works and must NOT be re-applied or "re-fixed" — the two open defects are (a) `evt.oldIndex`/`evt.newIndex` used where `oldDraggableIndex`/`newDraggableIndex` are required (section-header DOM nodes are still counted despite the `draggable: '.slot-item'` selector), and (b) the `v-for` key (`slot.kind + '-' + slot.position`) being unstable across every reorder since `reindexSlots()` rewrites `position` on every mutation — re-key on `slot.id`. Land the index-source/per-section fix against the existing four sections first, THEN add `'post-service'` as the fifth section — proving the mechanism before widening it. The same root-cause fix explains both `ServiceEditorView.vue`'s reorder bug and `SlideGrid.vue`'s "new slide lands second-to-last" bug (R049/R050) — one fix, two files. Audit print/share/plan-rail/Planning-Center-export for hard-coded four-section assumptions when Post-Service is added (Pitfall 9).
@@ -130,11 +134,13 @@ Plans:
 **Depends on**: Phase 29
 **Requirements**: R045, R046, R047, R048, R054
 **Success Criteria** (what must be TRUE):
+
   1. Reordering a service item automatically reorders its slide group in the Slides tab — no second manual step
   2. Swapping a song on a service item silently rewrites that group's slides to the new song, with no confirmation prompt
   3. Changing a scripture passage updates its scripture slide automatically, defaulting to one slide carrying the passage
   4. No reconcile/confirm modal or banner ever appears in the Slides tab — every change rebuilds unconditionally
   5. Song groups in the Slides tab are read-only — a planner cannot create, edit, delete, or reorder a song's slides there
+
 **Plans**: TBD
 **UI hint**: no
 **Research flag**: needs research — graph-trace the full reconciliation consumer inventory (`SlideGroup.dismissedSignature`, `ReconcileResult`, `reconcileSongGroup`, `ReconcileConfirmModal`, and every static AND dynamic import of them) before deleting anything; spans 9 files plus tests.
@@ -146,10 +152,12 @@ Plans:
 **Depends on**: Phase 29
 **Requirements**: R036, R037, R038
 **Success Criteria** (what must be TRUE):
+
   1. A service can only be edited (Service Order, Slides, and Roles) while its status is Draft; a direct write attempt against a non-draft service — bypassing the UI — is rejected
   2. An editor can explicitly "Reopen for editing" a Planned or Exported service, returning it to Draft
   3. Reopening a service that was already exported to Planning Center shows a warning that Planning Center still holds the previously exported version; reopening a never-exported service does not show that warning
   4. Creating a new service defaults its date to the nearest Sunday that doesn't already have a service plan
+
 **Plans**: TBD
 **UI hint**: yes
 **Research flag**: needs research — Firestore rules field-level diff logic for the reopen-transition special case (the rule must read `resource.data.status`, not `request.resource.data.status`, and must carve out an explicit allowance for the one status-reverting write).
@@ -161,9 +169,11 @@ Plans:
 **Depends on**: Phase 29
 **Requirements**: R039, R040, R041
 **Success Criteria** (what must be TRUE):
+
   1. Changing a song on a service item reliably triggers a save, including immediately after a prior save's own echo lands
   2. Every surface with autosave shows a persistent inline "Saving… / Saved HH:MM" status anchored to the content being edited, visible without scrolling
   3. A save failure raises a toast; a save success does not
+
 **Plans**: TBD
 **UI hint**: yes
 **Research flag**: standard pattern — fix shape is well-evidenced; only needs repro-test-first discipline.
@@ -175,11 +185,13 @@ Plans:
 **Depends on**: Phase 30
 **Requirements**: R055, R056, R057, R058, R051, R052, R063
 **Success Criteria** (what must be TRUE):
+
   1. A background image can be set for an entire slide group, for one individual slide (overriding the group's), or for a song from the Song Lyrics editor — **most specific wins**: a slide's own background beats its group's, which beats the song's, mirroring the existing slide-beats-bed audio precedence
   2. Per-slide audio no longer offers a "whole group" scope option; group-wide audio is set only at the group level
   3. A slide only enters edit mode via an explicit 3-dot menu action, never by clicking the slide itself
   4. The 3-dot menu opens separate "Edit details" and "Edit lyrics" drawers instead of one multi-tab drawer
   5. The editing options offered for a slide vary by the service-item type it belongs to — a scripture item offers options a song item does not
+
 **Plans**: TBD
 **UI hint**: yes
 **Research flag**: standard pattern — directly extends an existing precedent (audio's slide-beats-bed cascade); no new libraries.
@@ -191,10 +203,12 @@ Plans:
 **Depends on**: Nothing new (independent within v1.4)
 **Requirements**: R064
 **Success Criteria** (what must be TRUE):
+
   1. A scripture item can be split into a leader/congregation congregational reading
   2. Displayed scripture text is always byte-identical to the already-fetched ESV source — the model returns only indices/speaker labels, never regenerated words
   3. Splits fall only on clause/verse boundaries, never mid-sentence
   4. If the split call fails, the scripture slide still renders and remains usable — the feature never blocks editing
+
 **Plans**: TBD
 **UI hint**: no
 **Research flag**: needs research — re-verify the current `@anthropic-ai/sdk` version and `output_config.format` call shape at implementation time (consult the `claude-api` skill again, details may have drifted); validate Haiku split determinism empirically against real passages.
@@ -206,11 +220,13 @@ Plans:
 **Depends on**: Phase 30
 **Requirements**: R059, R060, R061, R065, R066
 **Success Criteria** (what must be TRUE):
+
   1. Organizational labels never appear when presenting or previewing a slideshow
   2. Copyright/CCLI information is visible on both the first and last slide of every song group
   3. Starting the presentation begins at the highlighted group and slide, or that group's first slide when none is highlighted
   4. Pasting lyrics warns when copyright information is missing rather than accepting silently
   5. Pasting lyrics happens inline in the editor, not in a modal
+
 **Plans**: TBD
 **UI hint**: yes
 **Research flag**: standard pattern for R059/R061 (presentation-layer read of already-assembled data); see Notes for R060's documentation-language caveat.
@@ -223,11 +239,13 @@ Plans:
 **Depends on**: Phase 31, Phase 33
 **Requirements**: R067, R068, R069, R053
 **Success Criteria** (what must be TRUE):
+
   1. The Service Order tab matches the Claude Design "Turn 3 — Service Order tab" wireframes
   2. Every tabbed screen (Service Order, Slides, Roles) shows only the actions relevant to that tab through one shared contextual action-bar pattern — "Suggest All Songs"/"Copy to PC" no longer appear on the Slides or Roles tabs
   3. The Present button appears in the position specified by design "1a Plan rail · slide grid · Edit Slide drawer — two states"
   4. "Add slide" and "Add music to this group" live in the contextual action bar, and a group's own drag-and-drop zone doubles as the import affordance — the separate "Import into this Group" button is gone
   5. The Roles tab is last in the tab order
+
 **Plans**: TBD
 **UI hint**: yes
 **Research flag**: standard/UI-heavy — no deep technical uncertainty, but real sequencing risk: this phase must land LAST among UI work, after Phase 31's Service Order layout and Phase 33's Slides layout both finalize, or the action bar needs rework.
@@ -240,15 +258,16 @@ Plans:
 **Depends on**: Nothing (independent — deliberately scheduled last per user decision, so an overrun or cut cannot disturb the other 33 requirements)
 **Requirements**: R062
 **Success Criteria** (what must be TRUE):
+
   1. An imported PowerPoint deck displays as a true visual rendering of each slide — backgrounds, fonts, layout, effects — not text alone
   2. Extracted text remains available as a searchable/label layer alongside the rendered image
   3. Only metric-compatible open fonts (Carlito/Caladea/Liberation) are used server-side; no Microsoft fonts are bundled
   4. Orphan cleanup for failed renders defaults to dry-run/report-only
+
 **Plans**: TBD
 **UI hint**: no
 **Research flag**: needs research — highest-uncertainty item in the milestone; needs a real multi-font, multi-slide test deck and cost/latency validation, not a 2-slide fixture.
 **Notes**: Standalone Cloud Run service (custom Dockerfile, LibreOffice + Poppler) — Firebase Functions buildpacks cannot install these; a new Cloud Function bridges via service-to-service IAM auth, invoked asynchronously with a completeness check (only flip the deck to "ready" once every expected image is confirmed uploaded). Rendered images land under the existing `orgs/{orgId}/pptx-imports/{importId}/rendered/` prefix — sibling to `images/`, structurally exempt from `cleanupExpiredMedia`'s regex guard with zero changes to that function. Any new deletion path this introduces must default to dry-run — the inverse default already caused a real incident in this codebase (`cleanupExpiredMedia`'s doc-comment-vs-code-default mismatch, fixed 2026-07-28). **User decision:** kept in v1.4 but scheduled deliberately last so an overrun or cut disturbs nothing else.
-
 
 ## Progress
 
@@ -258,7 +277,7 @@ Plans:
 | 8-17, 16.1 | v1.1 | all | Complete (archived) | 2026-07-24 |
 | 18-23 | v1.2 | all | Complete (archived) | 2026-07-28 |
 | 24-28 | v1.3 | 33/33 | Complete (archived) | 2026-07-28 |
-| 29. Order Structure — Stable Reordering & Post-Service | v1.4 | 0/TBD | Not started | - |
+| 29. Order Structure — Stable Reordering & Post-Service | v1.4 | 1/5 | In Progress|  |
 | 30. Slides Mirror the Plan — Hard Lock & Reconciliation Removed | v1.4 | 0/TBD | Not started | - |
 | 31. Service Lifecycle — Draft Lock & Reopen | v1.4 | 0/TBD | Not started | - |
 | 32. Save Reliability — Autosave Fix & Persistent Status | v1.4 | 0/TBD | Not started | - |
