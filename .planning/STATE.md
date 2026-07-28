@@ -5,15 +5,15 @@ milestone_name: Service and Slides
 current_phase: 29
 current_phase_name: Order Structure — Stable Reordering & Post-Service
 status: planning
-stopped_at: Completed 29-04-PLAN.md
-last_updated: "2026-07-28T22:35:00.000Z"
+stopped_at: Completed 29-03-PLAN.md
+last_updated: "2026-07-28T23:02:39.041Z"
 last_activity: 2026-07-28
-last_activity_desc: 29-04 fixed SlideGrid's reorder/append defects (R049, R050) — draggable-scoped indices, D-16 revert removed, one appendToGroup contract shared by every append path, inline reorder-failure surface
+last_activity_desc: ROADMAP.md created for v1.4 (Phases 29-37); REQUIREMENTS.md traceability filled, 34/34 requirements mapped, 0 unmapped
 progress:
   total_phases: 9
   completed_phases: 0
   total_plans: 5
-  completed_plans: 3
+  completed_plans: 4
   percent: 0
 ---
 
@@ -568,6 +568,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 29 P02 | 15min | 2 tasks | 2 files |
 | Phase 29 P01 | 45min | 3 tasks | 2 files |
 | Phase 29 P04 | 55min | 3 tasks | 2 files |
+| Phase 29 P03 | 95min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -731,6 +732,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: makeSectionedService() and Sortable capture accessors placed at module scope so Task 1/Task 2 land as separate, independently-verifiable commits (29-01)
 - [Phase ?]: 29-04: R050's live mechanism was SlideGrid's own array-order/order-value divergence (closed by a shared appendToGroup sort-append-renumber contract), not slideGroupMaterializer.ts's trailing-copyright placement — that placement is correct, Phase-35-owned SONG-group behavior and was left untouched.
 - [Phase ?]: 29-04: added destroySortable() to the reorder-failure catch block (Rule 2) so the :key-driven gridRenderNonce re-render doesn't leave a stale Sortable instance bound to a discarded DOM node, which would otherwise silently disable real drag-and-drop after any single reorder failure.
+- [Phase ?]: onEnd never reassigns moved.section for a within-ungrouped-list reorder (put:false blocks any other case) — avoids silently normalizing a legacy/out-of-union section value
+- [Phase ?]: onSectionChange now composes reindexSlots(orderSlotsBySection(...)) — a genuine behavior change from silent-set-only, required so a dropdown section change produces the same section-major array a drag does
 
 ### Roadmap Evolution
 
@@ -792,6 +795,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-07-28T22:35:00.000Z
-Stopped at: Completed 29-04-PLAN.md
+Last session: 2026-07-28T23:02:39.014Z
+Stopped at: Completed 29-03-PLAN.md
 Resume file: None
