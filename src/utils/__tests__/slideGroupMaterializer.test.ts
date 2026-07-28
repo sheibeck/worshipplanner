@@ -750,6 +750,217 @@ describe('reconcileSongGroup', () => {
       expect(copyrightEntries).toHaveLength(2)
     })
   })
+
+  // Plan 28-03: D-02 makes a repeated section a first-class part of the
+  // order, so a chorus referenced N times shares one sectionId across N
+  // stored entries. The pre-fix merge loop re-emitted the WHOLE stored array
+  // on every occurrence of that sectionId in freshOrder, multiplying entries
+  // on every reconciliation pass (4 -> 8 -> 16). This block proves the
+  // occurrence-aware replacement: stored entries are consumed positionally
+  // (occurrence i takes stored entry i), any stored surplus is emitted next
+  // to the LAST occurrence (preserving Phase 26-09's duplicate-survival
+  // guarantee), and the whole thing is idempotent under repeated passes.
+  describe('occurrence-aware repeat merge (D-02, Plan 28-03)', () => {
+    function repeatLyrics(overrides: Partial<SongLyrics> = {}): SongLyrics {
+      return makeSongLyrics({
+        sections: [
+          { id: 'verse-1', label: 'Verse 1', lines: ['Line A'] },
+          { id: 'chorus', label: 'Chorus', lines: ['Line C'] },
+          { id: 'verse-2', label: 'Verse 2', lines: ['Line B'] },
+        ],
+        performanceOrder: ['verse-1', 'chorus', 'verse-2', 'chorus'],
+        ...overrides,
+      })
+    }
+
+    it('a section referenced twice with one stored entry per occurrence merges to exactly two entries, preserving each stored id, and reports no change', () => {
+      const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
+      const group = makeStoredSongGroup([
+        { id: 'e-copyright-lead', order: 0, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+        { id: 'e-verse-1', order: 1, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' } },
+        { id: 'e-chorus-1', order: 2, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'chorus' } },
+        { id: 'e-verse-2', order: 3, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-2' } },
+        { id: 'e-chorus-2', order: 4, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'chorus' } },
+        { id: 'e-copyright-trail', order: 5, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+      ])
+      const inputs = makeInputs({ songLyricsById: new Map([['song-1', repeatLyrics()]]) })
+
+      const result = reconcileSongGroup(group, slot, inputs)
+
+      expect(result.changed).toBe(false)
+      const chorusEntries = result.slides.filter(
+        (e) => e.sourceRef.kind === 'lyric' && e.sourceRef.sectionId === 'chorus',
+      )
+      expect(chorusEntries.map((e) => e.id)).toEqual(['e-chorus-1', 'e-chorus-2'])
+      expect(result.slides).toEqual(group.slides)
+    })
+
+    it('is idempotent: feeding the merge output back in as the stored slides reconciles to a value-equal result, with the repeated section entry count still equal to its occurrence count', () => {
+      const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
+      const group = makeStoredSongGroup([
+        { id: 'e-copyright-lead', order: 0, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+        { id: 'e-verse-1', order: 1, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' } },
+        { id: 'e-chorus-1', order: 2, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'chorus' } },
+        { id: 'e-verse-2', order: 3, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-2' } },
+        { id: 'e-chorus-2', order: 4, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'chorus' } },
+        { id: 'e-copyright-trail', order: 5, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+      ])
+      const inputs = makeInputs({ songLyricsById: new Map([['song-1', repeatLyrics()]]) })
+
+      const firstPass = reconcileSongGroup(group, slot, inputs)
+      const regroup = makeStoredSongGroup(firstPass.slides)
+      const secondPass = reconcileSongGroup(regroup, slot, inputs)
+
+      expect(secondPass.slides).toEqual(firstPass.slides)
+      expect(secondPass.changed).toBe(false)
+      const chorusEntries = secondPass.slides.filter(
+        (e) => e.sourceRef.kind === 'lyric' && e.sourceRef.sectionId === 'chorus',
+      )
+      expect(chorusEntries).toHaveLength(2)
+    })
+
+    it('26-09 regression: one occurrence with TWO stored entries keeps both, adjacent, at the section position', () => {
+      const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
+      const lyrics = makeSongLyrics({ performanceOrder: ['verse-1', 'chorus'] })
+      const group = makeStoredSongGroup([
+        { id: 'e-copyright-lead', order: 0, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+        { id: 'e-verse-1', order: 1, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' } },
+        { id: 'e-chorus-1', order: 2, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'chorus' } },
+        { id: 'e-chorus-2', order: 3, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'chorus' } },
+        { id: 'e-copyright-trail', order: 4, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+      ])
+      const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
+
+      const result = reconcileSongGroup(group, slot, inputs)
+
+      const chorusEntries = result.slides.filter(
+        (e) => e.sourceRef.kind === 'lyric' && e.sourceRef.sectionId === 'chorus',
+      )
+      expect(chorusEntries.map((e) => e.id)).toEqual(['e-chorus-1', 'e-chorus-2'])
+      expect(result.changed).toBe(false)
+
+      // A second pass must not grow this — this is the exact defect this
+      // plan closes: pre-fix, this would have gone 2 -> 4 -> 8.
+      const secondPass = reconcileSongGroup(makeStoredSongGroup(result.slides), slot, inputs)
+      const secondChorusEntries = secondPass.slides.filter(
+        (e) => e.sourceRef.kind === 'lyric' && e.sourceRef.sectionId === 'chorus',
+      )
+      expect(secondChorusEntries).toHaveLength(2)
+    })
+
+    it('N=2 occurrences with M=3 stored entries: two consumed positionally, the surplus emitted next to the LAST occurrence, and a second pass is value-equal', () => {
+      const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
+      const lyrics = makeSongLyrics({ performanceOrder: ['chorus', 'verse-1', 'chorus'] })
+      const group = makeStoredSongGroup([
+        { id: 'e-copyright-lead', order: 0, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+        { id: 'e-chorus-1', order: 1, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'chorus' } },
+        { id: 'e-verse-1', order: 2, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' } },
+        { id: 'e-chorus-2', order: 3, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'chorus' } },
+        { id: 'e-chorus-3', order: 4, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'chorus' } },
+        { id: 'e-copyright-trail', order: 5, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+      ])
+      const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
+
+      const result = reconcileSongGroup(group, slot, inputs)
+
+      const chorusEntries = result.slides.filter(
+        (e) => e.sourceRef.kind === 'lyric' && e.sourceRef.sectionId === 'chorus',
+      )
+      expect(chorusEntries).toHaveLength(3)
+      expect(chorusEntries.map((e) => e.id)).toEqual(['e-chorus-1', 'e-chorus-2', 'e-chorus-3'])
+      // The surplus (e-chorus-3) sits immediately after the last occurrence
+      // (e-chorus-2), which is itself immediately after verse-1.
+      const ids = result.slides.map((e) => e.id)
+      expect(ids.indexOf('e-chorus-3')).toBe(ids.indexOf('e-chorus-2') + 1)
+
+      const secondPass = reconcileSongGroup(makeStoredSongGroup(result.slides), slot, inputs)
+      expect(secondPass.slides).toEqual(result.slides)
+    })
+
+    it('N=2 occurrences with M=1 stored entry: the first occurrence keeps the stored entry, the second occurrence mints a fresh entry with a distinct id', () => {
+      const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
+      const lyrics = makeSongLyrics({ performanceOrder: ['chorus', 'verse-1', 'chorus'] })
+      const group = makeStoredSongGroup([
+        { id: 'e-copyright-lead', order: 0, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+        { id: 'e-chorus-1', order: 1, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'chorus' } },
+        { id: 'e-verse-1', order: 2, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' } },
+        { id: 'e-copyright-trail', order: 3, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+      ])
+      const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
+
+      const result = reconcileSongGroup(group, slot, inputs)
+
+      const chorusEntries = result.slides.filter(
+        (e) => e.sourceRef.kind === 'lyric' && e.sourceRef.sectionId === 'chorus',
+      )
+      expect(chorusEntries).toHaveLength(2)
+      expect(chorusEntries[0]!.id).toBe('e-chorus-1')
+      expect(chorusEntries[1]!.id).not.toBe('e-chorus-1')
+      expect(new Set(chorusEntries.map((e) => e.id)).size).toBe(2)
+    })
+
+    it('occurrence-level customisation stays on the occurrence it was set on: audio on the second stored chorus entry appears only on the second chorus entry in the merge', () => {
+      const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
+      const lyrics = makeSongLyrics({ performanceOrder: ['verse-1', 'chorus', 'chorus'] })
+      const group = makeStoredSongGroup([
+        { id: 'e-copyright-lead', order: 0, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+        { id: 'e-verse-1', order: 1, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' } },
+        { id: 'e-chorus-1', order: 2, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'chorus' } },
+        {
+          id: 'e-chorus-2',
+          order: 3,
+          sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'chorus' },
+          audioUrl: 'https://example.com/second.mp3',
+        },
+        { id: 'e-copyright-trail', order: 4, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+      ])
+      const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
+
+      const result = reconcileSongGroup(group, slot, inputs)
+
+      const chorusEntries = result.slides.filter(
+        (e) => e.sourceRef.kind === 'lyric' && e.sourceRef.sectionId === 'chorus',
+      )
+      expect(chorusEntries).toHaveLength(2)
+      expect(chorusEntries[0]!.audioUrl).toBeUndefined()
+      expect(chorusEntries[1]!.audioUrl).toBe('https://example.com/second.mp3')
+    })
+
+    it('a stored entry whose section id is absent from the fresh order is still retained, after the resolvable run and before the trailing copyright, alongside a repeated section', () => {
+      const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
+      const group = makeStoredSongGroup([
+        { id: 'e-copyright-lead', order: 0, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+        { id: 'e-verse-1', order: 1, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' } },
+        { id: 'e-chorus-1', order: 2, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'chorus' } },
+        { id: 'e-chorus-2', order: 3, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'chorus' } },
+        {
+          id: 'e-outro',
+          order: 4,
+          sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'outro' },
+          label: 'Keep me',
+        },
+        { id: 'e-copyright-trail', order: 5, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+      ])
+      // 'outro' no longer resolves; 'chorus' is referenced twice.
+      const lyrics = makeSongLyrics({
+        sections: [
+          { id: 'verse-1', label: 'Verse 1', lines: ['Line A'] },
+          { id: 'chorus', label: 'Chorus', lines: ['Line C'] },
+        ],
+        performanceOrder: ['verse-1', 'chorus', 'chorus'],
+      })
+      const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
+
+      const result = reconcileSongGroup(group, slot, inputs)
+
+      const outroIndex = result.slides.findIndex((e) => e.id === 'e-outro')
+      const trailingCopyrightIndex = result.slides.length - 1
+      const lastChorusIndex = result.slides.map((e) => e.id).lastIndexOf('e-chorus-2')
+      expect(outroIndex).toBeGreaterThan(lastChorusIndex)
+      expect(outroIndex).toBeLessThan(trailingCopyrightIndex)
+      expect(result.slides[outroIndex]!.label).toBe('Keep me')
+    })
+  })
 })
 
 describe('reconcileScriptureGroup', () => {
