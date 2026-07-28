@@ -1,14 +1,14 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.3
-milestone_name: Slides Tab Rework
-current_phase: 999.1
-current_phase_name: Songs page + service-plan picker
-status: planning
-stopped_at: Completed 28-06-PLAN.md (final plan of Phase 28, final phase of v1.3)
+milestone: (none — v1.3 archived; v1.4 not yet opened)
+milestone_name: (pending)
+current_phase: (none)
+current_phase_name: (none)
+status: between-milestones
+stopped_at: v1.2 and v1.3 both archived; awaiting the owner list to open v1.4
 last_updated: "2026-07-28T13:12:09.759Z"
 last_activity: 2026-07-28
-last_activity_desc: Phase 28 complete, transitioned to Phase 999.1
+last_activity_desc: Archived v1.2 and v1.3, enabled workflow.verifier, dropped the Tasks/Events phase, kept 999.1 in backlog. Clean slate for v1.4.
 progress:
   total_phases: 17
   completed_phases: 16
@@ -226,74 +226,35 @@ and `SlotMediaAttachment.vue`'s video-attach affordance are all deleted.
 > (`.gsd/` milestone M001, slices S01-S06) and faithfully ported into gsd-core as v1.2.
 > The gsdpi `.gsd/` store is now legacy/read-only — continue with regular `/gsd-*` commands.
 
-## ⏸ RESUME HERE (2026-07-28 — v1.3 Phases 24-28 ALL code-complete; milestone deliberately NOT archived)
+## ⏸ RESUME HERE (2026-07-28 — clean slate, no milestone open)
 
-`/gsd-autonomous --from 24 --to 28` completed every phase of v1.3. **Nothing is mid-flight; working tree
-is clean; `npm run type-check` = 0, `npm run build` green, `npx vitest run src/` = 3581 passing with the
-failing FILE SET unchanged at the documented 10-file baseline.** 200 commits since `fd1eda2`.
+**v1.2 and v1.3 are both archived.** Working tree clean; `npm run type-check` 0, `npm run build`
+green, `npx vitest run src/` 3581 passing with the failing FILE SET at the documented 10-file
+pre-existing baseline (8 `.gsd/quarantine/worktrees/**` duplicates, `storage.rules.test.ts`,
+`RosterView.test.ts`).
 
-**Cross-phase integration check: PASS** (`.planning/v1.3-INTEGRATION-CHECK.md`) — the full E2E flow
-(service → Slides tab → rail → materialize → grid → drawer → edit/duplicate/delete → drag-reorder →
-four-kind drop → Present → `PresentationViewer`) was traced in code, every seam wired, R028-R035 all
-mapped. No third lost capability beyond the two Phase 27 caught.
+**Deferred Verification is empty project-wide.** No phase is mid-flight.
 
-> **Archiving status (updated 2026-07-28).** **v1.2 is being archived** on the user's direct acceptance
-> of its outstanding checkpoints (see Deferred Verification below). **v1.3 stays OPEN** to carry the
-> bug/issue fixes the user is filing next.
->
-> A correction to an earlier note here: it claimed archiving "breaks the `/gsd-verify-work` resume
-> paths." **That was wrong.** `find-phase` (`gsd-core/bin/lib/phase-locator.cjs`) searches
-> `.planning/milestones/v*-phases/` and tags results `archived: <version>`, and `verify-work` has no
-> archived-phase guard — it resolves `phase_dir` through the same locator and would simply write UAT
-> files into the archived directory. Archiving was never the blocker it was described as.
+### What changed in this cleanup (2026-07-28)
 
-**Next actions, in order:**
+| Change | Why |
+|---|---|
+| v1.2 archived | Owner accepted its outstanding checkpoints rather than running them |
+| v1.3 phases 24-28 marked complete, then archived | Owner verified; owner-attributed VERIFICATION files written so `phase.complete` could run |
+| `workflow.verifier` **false → true** | Root cause of both milestones looking permanently unfinished. Before this, `/gsd-autonomous` would have re-executed all of v1.3. |
+| Requirements split | R028-R035 extracted from the misnamed `v1.2-REQUIREMENTS.md` into `v1.3-REQUIREMENTS.md` |
+| Phase 5 (Tasks & Events) **dropped** | Never started; owner: *"we don't need those"*. TASK-01..03 / EVNT-01..04 marked dropped. |
+| Backlog 999.1 **kept** | Shared song-browse extraction — duplication verified still present in `SongSlotPicker.vue` vs `SongFilters.vue` |
+| AUTH-03/04 traceability fixed | Pointed at Phase 5 (now gone); actually completed in Phase 7 |
 
-1. **Batch human-verify** — P20 + P21 + P22 + P23 (v1.2) and P28 (v1.3). Each phase's `-SUMMARY.md`
-   carries its own `<human-check>` items; the Deferred Verification table below has the resume commands.
-   Several want the same real-projector trip, so one sitting covers a lot.
+### Next step
 
-2. **Also worth a look during that pass** (from v1.3's reviews, none blocking):
-   - the video-slide-suppresses-bed-audio behavior (25-REVIEW-FIX WR-01) — confirm it is what you want
-   - whether the reconciliation warning reads clearly enough WITHOUT a diff (26 D-06 was your trade-off)
-   - real OS drag-and-drop onto the slide grid — jsdom cannot test it; `docs/example.pptx` /
-     `docs/example.mp3` are in the tree as fixtures
+**`/gsd-new-milestone`** — open v1.4 with the owner's re-adjustment list as input. That produces a
+clean ROADMAP + REQUIREMENTS, after which `/gsd-autonomous` runs against a real queue.
 
-3. **Phases 18 and 19** are implemented but were never verified — decide whether they need a pass.
-4. **Then** the lifecycle: `/gsd-audit-milestone` → `/gsd-complete-milestone` → `/gsd-cleanup`.
-
-### Superseded resume note (2026-07-25 — Phase 23)
-
-`/gsd-autonomous --from 23` completed Phase 23's automated work. **Nothing is mid-flight; working
-tree is clean; production build is GREEN (`npm run type-check` = 0, `npm run build` = 0).**
-
-**Done:** gsdpi→gsd-core migration (v1.2); Phases **20, 21, 22, 23 all code-complete** (every plan
-committed and unit-tested); foundation hardened (lyrics Firestore rule + 94 type errors fixed +
-import-save undefined fix). Phase 23 shipped `PresentationViewer.vue`, the `chromeless` media-player
-mode with an `isMuted`/`unmute()` accessor, imperative media driving with three degraded states, and
-the "Present Slideshow" CTA wired through `ServiceEditorView`.
-
-**Next actions to finish the milestone (in order):**
-
-1. **Pre-audit hardening batch** (see TODO below) — flip the `cleanupExpiredMedia` default to safe;
-   clean `.gsd/quarantine/worktrees/**` test debris; fix the stale `RosterView.test.ts` assertion;
-   get the full unit suite green.
-
-2. **Batch human-verify** P20 + P21 + P22 + P23 — the deferred visual/e2e/projector checks. Doing
-   all four in one sitting is worthwhile: P20's section grouping, P22's media autoplay and P23's
-   projector legibility all want the same real-projector trip.
-
-3. **Phases 18 and 19** are implemented but were never verified and are outside this run's `--from 23`
-   scope — decide whether they need a verification pass before the audit.
-
-4. **Milestone lifecycle:** `/gsd-audit-milestone` → `/gsd-complete-milestone v1.2` → `/gsd-cleanup`.
-
-Orchestration note: `workflow.verifier` is `false` in `.planning/config.json`, so no phase produces a
-`VERIFICATION.md` — goal-backward verification for the whole milestone happens at
-`/gsd-audit-milestone`. Worktree isolation auto-degrades to sequential main-tree execution because
-HEAD diverged from `origin/HEAD` (#683) — branch `milestone/M001`. `.env.local` present. A live user
-session may hold the Firestore/Storage emulator (ports 8080/9199) — executors must NOT run
-`test:rules` or restart the emulator.
+⚠ Do NOT run `/gsd-autonomous` before v1.4 exists — with no open milestone there is nothing for phase
+discovery to work from, and the only remaining incomplete entry is backlog item 999.1, which should be
+promoted deliberately via `/gsd-review-backlog` rather than picked up automatically.
 
 ## Deferred Verification
 
