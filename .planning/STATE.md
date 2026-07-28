@@ -5,14 +5,14 @@ milestone_name: Slides Tab Rework
 current_phase: 28
 current_phase_name: Song Lyrics Editor Rework
 status: executing
-stopped_at: Completed 27-05-PLAN.md (final plan of Phase 27)
-last_updated: "2026-07-27T16:46:47.133Z"
+stopped_at: Completed 28-02-PLAN.md
+last_updated: "2026-07-28T00:23:34.227Z"
 last_activity: 2026-07-27
 progress:
   total_phases: 17
   completed_phases: 15
   total_plans: 101
-  completed_plans: 95
+  completed_plans: 97
   percent: 88
 last_activity_desc: Opened v1.3 Slides Tab Rework (Phases 24-28) from the Claude Design import; v1.2 left code-complete with its verification ledger intact
 ---
@@ -36,9 +36,9 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 ## Current Position
 
 Phase: 28 (Song Lyrics Editor Rework) — EXECUTING
-Plan: 1 of 6
+Plan: 2 of 6
 Milestone: v1.3 Slides Tab Rework (Phases 24-28) — IN PROGRESS
-Status: Executing Phase 28
+Status: Ready to execute
 
 Phases 20, 21, 22 and 23 are all code-complete; only their deferred human-verify checkpoints remain
 (see the Deferred Verification table below).
@@ -408,6 +408,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 27 P03 | 15min | 3 tasks | 5 files |
 | Phase 27 P04 | 20min | 2 tasks | 7 files |
 | Phase 27 P05 | 55min | 3 tasks | 6 files |
+| Phase 28 P02 | ~40min | 3 tasks | 16 files |
 
 ## Accumulated Context
 
@@ -558,6 +559,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 27-04: Removed the per-plan-item SlotMediaAttachment control, its view-level read/write helpers, and the orphaned component; reworded the slideGroupsStore setup comment and five prose references naming the deleted file, leaving the group-bed audio write path itself (setGroupBedMedia) untouched for the Slides tab's SlideGroupMusicControl/SlideGrid callers
 - [Phase ?]: D-05 implemented verbatim: Present Slideshow relocated to the Slides tab (new CTA in SlidesTab.vue), reusing the existing presenting flag and PresentationViewer mount; SlideshowPreview removed from the Service Order tab and deleted (D-02/D-19).
 - [Phase ?]: Phase 27 closed: full unit suite failing FILE SET verified unchanged at the 10-file baseline (8 quarantine debris + storage.rules.test.ts + RosterView.test.ts); type-check and build both green.
+- [Phase ?]: [Phase 28-02]: Song.performanceOrder deleted outright (D-19); SongLyrics.performanceOrder is now the single source of a song's slide order, replacing the three-tier resolveSongOrder precedence chain duplicated across slideshowAssembler.ts and slideGroupMaterializer.ts
+- [Phase ?]: [Phase 28-02]: Task 2/Task 3 boundary is intentionally not independently type-check-clean — Task 2 deletes the order field/action, Task 3 (same non-checkpointed plan) removes the two Vue consumers immediately after; documented rather than treated as a blocking deviation
 
 ### Roadmap Evolution
 
@@ -617,6 +620,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-27
-Last session: 2026-07-27T13:10:59.055Z
-Stopped at: Completed 27-05-PLAN.md (final plan of Phase 27)
+Last session: 2026-07-28T00:23:34.185Z
+Stopped at: Completed 28-02-PLAN.md
 Resume file: None

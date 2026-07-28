@@ -297,7 +297,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 28-02-PLAN.md — One canonical order source; the second list and second order field both deleted
+- [x] 28-02-PLAN.md — One canonical order source; the second list and second order field both deleted
 
 **Wave 3** *(blocked on Wave 2)*
 
