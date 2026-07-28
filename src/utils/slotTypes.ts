@@ -1,4 +1,16 @@
-import type { Progression, Service, ServiceSlot, SongSlot, ScriptureSlot, NonAssignableSlot, HymnSlot, ImportedSlot, SlotKind, ServiceSection } from '@/types/service'
+import {
+  SERVICE_SECTIONS,
+  type Progression,
+  type Service,
+  type ServiceSlot,
+  type SongSlot,
+  type ScriptureSlot,
+  type NonAssignableSlot,
+  type HymnSlot,
+  type ImportedSlot,
+  type SlotKind,
+  type ServiceSection,
+} from '@/types/service'
 import type { VWType } from '@/types/song'
 
 export const PROGRESSION_SLOT_TYPES: Record<Progression, Record<number, VWType>> = {
@@ -96,6 +108,91 @@ export function createSlot(kind: SlotKind, vwType?: VWType, section?: ServiceSec
  */
 export function reindexSlots(slots: ServiceSlot[]): ServiceSlot[] {
   return slots.map((slot, index) => ({ ...slot, position: index }))
+}
+
+/**
+ * Groups any section-bearing collection into `SERVICE_SECTIONS`-ordered
+ * buckets, plus a trailing `legacy` bucket for members whose section is
+ * absent or not a recognized `SERVICE_SECTIONS` member (D005). Total and
+ * stable: every input item lands in exactly one bucket, in its original
+ * relative order within that bucket — nothing is dropped, cloned, or
+ * reordered within a bucket.
+ *
+ * Generic on purpose: the editor view groups `{ slot, index }` pairs for
+ * rendering while a reorder handler groups bare `ServiceSlot`s for
+ * persistence, and both must use the identical bucketing rule.
+ *
+ * Every `SERVICE_SECTIONS` key is initialized to an empty array up front, so
+ * an empty section is always present as a key — this is what lets the view
+ * render an empty section unconditionally (R043), and it's why the "adding a
+ * fifth section" story is free: this function iterates `SERVICE_SECTIONS`
+ * and never names a section as a string literal.
+ *
+ * `legacy` mirrors the trailing "Ungrouped" bucket `useSlideshowAssembly.ts`'s
+ * `assembledSections` (lines 544-559) already ships for section-less slides —
+ * do not invent a second placement rule for section-less members. A section
+ * value that is present but outside `SERVICE_SECTIONS` (production data
+ * corruption, or a stale value from a since-removed section) also routes to
+ * `legacy` rather than being silently dropped (T-29-03).
+ */
+export function groupBySection<T>(
+  items: readonly T[],
+  getSection: (item: T) => ServiceSection | undefined,
+): { sections: Record<ServiceSection, T[]>; legacy: T[] } {
+  const sections = Object.fromEntries(SERVICE_SECTIONS.map((section) => [section, [] as T[]])) as Record<
+    ServiceSection,
+    T[]
+  >
+  const legacy: T[] = []
+
+  for (const item of items) {
+    const section = getSection(item)
+    if (section !== undefined && SERVICE_SECTIONS.includes(section)) {
+      sections[section].push(item)
+    } else {
+      legacy.push(item)
+    }
+  }
+
+  return { sections, legacy }
+}
+
+/**
+ * Flattens a `groupBySection` result back into a single array: the section
+ * buckets concatenated in `SERVICE_SECTIONS` order, then the `legacy` bucket
+ * last. Pure — never mutates the input buckets.
+ */
+export function flattenBySection<T>(grouped: { sections: Record<ServiceSection, T[]>; legacy: T[] }): T[] {
+  const result: T[] = []
+  for (const section of SERVICE_SECTIONS) {
+    result.push(...grouped.sections[section])
+  }
+  result.push(...grouped.legacy)
+  return result
+}
+
+/**
+ * Composition of `groupBySection` + `flattenBySection` over `slot.section` —
+ * the one source of truth for "what order are the slots in," shared by the
+ * rendered grouping and the array that gets persisted, so the two can never
+ * disagree.
+ *
+ * Identity-preserving: when the section-major result is element-for-element
+ * reference-equal to the input, returns the ORIGINAL `slots` array rather
+ * than the freshly-built one. Same reason `backfillSlotIds` (above) returns
+ * the original `service` reference when nothing changed — a fresh array
+ * reference in an autosave-watched view manufactures a false `isDirty`, and
+ * on the load path's remote-merge branch, a comparison that never converges.
+ *
+ * Does NOT call `reindexSlots` — ordering and position-renumbering are
+ * separate concerns. Callers compose `reindexSlots(orderSlotsBySection(slots))`.
+ */
+export function orderSlotsBySection(slots: ServiceSlot[]): ServiceSlot[] {
+  const ordered = flattenBySection(groupBySection(slots, (slot) => slot.section))
+
+  const alreadyOrdered = ordered.length === slots.length && ordered.every((slot, index) => slot === slots[index])
+
+  return alreadyOrdered ? slots : ordered
 }
 
 /**
