@@ -113,7 +113,13 @@ can see, slides that always mirror the plan — and finish them against the Clau
   2. The five service sections (Pre-Service, Worship, Message, Sending, Post-Service) always render in that fixed order, are never themselves draggable, and stay visible even when empty
   3. Dragging a slide within the Slides tab persists its new position without reverting
   4. Adding a new slide appends it to the true end of its group, not before the last slide
-**Plans**: TBD
+**Plans**: 5 plans
+Plans:
+- [ ] 29-01-PLAN.md — Failing repro FIRST: header-inclusive fixtures, DOM-derived drag helper, identity-based assertions (wave 1)
+- [ ] 29-02-PLAN.md — Pure section-ordering helpers in slotTypes.ts + defaultSectionForPosition audit (wave 1)
+- [ ] 29-03-PLAN.md — ServiceEditorView: per-section containers, stable slot.id key, correct onEnd, save-failure revert (wave 2)
+- [ ] 29-04-PLAN.md — SlideGrid: draggable-scoped indices, one append contract, visible reorder failure (wave 2)
+- [ ] 29-05-PLAN.md — Add the fifth Post-Service section, audit four consumers, human-verify a real drag (wave 3)
 **UI hint**: yes
 **Research flag**: standard pattern — root cause and fix already fully derived with line-level citations (SUMMARY.md/ARCHITECTURE.md §1); no dedicated research pass needed.
 **Notes**: The existing D-16 DOM-revert fix (`ServiceEditorView.vue:1430`, `SlideGrid.vue:669`) already works and must NOT be re-applied or "re-fixed" — the two open defects are (a) `evt.oldIndex`/`evt.newIndex` used where `oldDraggableIndex`/`newDraggableIndex` are required (section-header DOM nodes are still counted despite the `draggable: '.slot-item'` selector), and (b) the `v-for` key (`slot.kind + '-' + slot.position`) being unstable across every reorder since `reindexSlots()` rewrites `position` on every mutation — re-key on `slot.id`. Land the index-source/per-section fix against the existing four sections first, THEN add `'post-service'` as the fifth section — proving the mechanism before widening it. The same root-cause fix explains both `ServiceEditorView.vue`'s reorder bug and `SlideGrid.vue`'s "new slide lands second-to-last" bug (R049/R050) — one fix, two files. Audit print/share/plan-rail/Planning-Center-export for hard-coded four-section assumptions when Post-Service is added (Pitfall 9).
