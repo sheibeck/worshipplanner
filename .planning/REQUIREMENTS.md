@@ -96,8 +96,10 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 - [ ] **R055** (core-capability): A background image can be set for all slides in a group, mirroring the
       existing group-level music control.
 - [ ] **R056** (core-capability): A background image can be set on a single slide, overriding the
-      group's. Cascade is song > group > slide, extending the existing slide-beats-bed audio precedent.
-      `[FEAT]` `[ARCH]`
+      group's. **Most specific wins:** a slide's own background beats its group's, which beats the
+      song's. (Stated as prose deliberately — arrow notation for this cascade appeared in both
+      directions during planning and reads as backwards half the time.) Extends the existing
+      slide-beats-bed audio precedent. `[FEAT]` `[ARCH]`
 - [ ] **R057** (core-capability): A background image can be set for a song from the Song Lyrics editor,
       applying wherever that song appears.
 - [ ] **R058** (quality-attribute): Per-slide audio loses its "all slides in this group" scope option —
@@ -182,17 +184,62 @@ Acknowledged, deferred, not in this roadmap.
 
 ## Traceability
 
-Populated during roadmap creation.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R036–R069 | TBD | Pending |
+| R036 | Phase 31 | Pending |
+| R037 | Phase 31 | Pending |
+| R038 | Phase 31 | Pending |
+| R039 | Phase 32 | Pending |
+| R040 | Phase 32 | Pending |
+| R041 | Phase 32 | Pending |
+| R042 | Phase 29 | Pending |
+| R043 | Phase 29 | Pending |
+| R044 | Phase 29 | Pending |
+| R045 | Phase 30 | Pending |
+| R046 | Phase 30 | Pending |
+| R047 | Phase 30 | Pending |
+| R048 | Phase 30 | Pending |
+| R049 | Phase 29 | Pending |
+| R050 | Phase 29 | Pending |
+| R051 | Phase 33 | Pending |
+| R052 | Phase 33 | Pending |
+| R053 | Phase 36 | Pending |
+| R054 | Phase 30 | Pending |
+| R055 | Phase 33 | Pending |
+| R056 | Phase 33 | Pending |
+| R057 | Phase 33 | Pending |
+| R058 | Phase 33 | Pending |
+| R059 | Phase 35 | Pending |
+| R060 | Phase 35 | Pending |
+| R061 | Phase 35 | Pending |
+| R062 | Phase 37 | Pending |
+| R063 | Phase 33 | Pending |
+| R064 | Phase 34 | Pending |
+| R065 | Phase 35 | Pending |
+| R066 | Phase 35 | Pending |
+| R067 | Phase 36 | Pending |
+| R068 | Phase 36 | Pending |
+| R069 | Phase 36 | Pending |
 
 **Coverage:**
 - v1.4 requirements: 34 total (R036–R069)
-- Mapped to phases: 0
-- Unmapped: 34 ⚠️ (roadmap pending)
+- Mapped to phases: 34
+- Unmapped: 0 ✓
+
+**Phase → requirement-count summary:**
+
+| Phase | Name | Requirements |
+|-------|------|---------------|
+| 29 | Order Structure — Stable Reordering & Post-Service | R042, R043, R044, R049, R050 (5) |
+| 30 | Slides Mirror the Plan — Hard Lock & Reconciliation Removed | R045, R046, R047, R048, R054 (5) |
+| 31 | Service Lifecycle — Draft Lock & Reopen | R036, R037, R038 (3) |
+| 32 | Save Reliability — Autosave Fix & Persistent Status | R039, R040, R041 (3) |
+| 33 | Backgrounds & Slide Editing | R051, R052, R055, R056, R057, R058, R063 (7) |
+| 34 | Smarter Content — LLM Scripture Split | R064 (1) |
+| 35 | Presentation Correctness & Lyric Editor | R059, R060, R061, R065, R066 (5) |
+| 36 | UI Rework — Service Order & Contextual Action Bars | R053, R067, R068, R069 (4) |
+| 37 | PowerPoint Server-Side Rendering | R062 (1) |
 
 ---
 *Requirements defined: 2026-07-28*
-*Last updated: 2026-07-28 after v1.4 research synthesis*
+*Last updated: 2026-07-28 — ROADMAP.md created (Phases 29-37); traceability filled, 34/34 requirements mapped, 0 unmapped*

@@ -2,10 +2,10 @@
 
 ## v1.4 Service and Slides (In progress — since 2026-07-28)
 
-**Goal:** Make the Service Order and Slides tabs trustworthy — ordering that holds, saves you can see,
+**Goal:** Make the Service Order and Slides tabs trustworthy — ordering that holds, saves you see,
 slides that always mirror the plan — and finish them against the Claude Design wireframes.
 
-**Phases:** 29+ (roadmap pending). **Requirements:** `.planning/REQUIREMENTS.md` (pending).
+**Phases:** 29-37 (9). **Requirements:** `.planning/REQUIREMENTS.md` (R036-R069, 34 total, 34/34 mapped).
 
 Scope covers service lifecycle locking, autosave reliability + app-wide save visibility, a fifth
 Post-Service section, the long-standing drag-and-drop reordering corruption, hard-locking slide groups
@@ -15,6 +15,10 @@ LLM-assisted congregational reading splits, lyric-editor copyright warnings, and
 action-bar audit across every tabbed screen.
 
 First milestone with `workflow.verifier: true` — every phase produces a real `VERIFICATION.md`.
+
+Roadmap: `.planning/ROADMAP.md` §Phase 29-37. Phase 29 (Order Structure — Stable Reordering &
+Post-Service) is first — foundational; Phase 37 (PowerPoint Server-Side Rendering) is deliberately
+last, per user decision, so an overrun or cut disturbs nothing else.
 
 ---
 
@@ -50,7 +54,7 @@ for announcements and sermon; media attachments with a storage lifecycle; presen
 
 **Verification:** closed by explicit owner acceptance with checkpoints waived — *"close v1.2. I've
 verified everything I need to anyway."* Phases 18-23 were never verified by a passing gate. Recorded
-plainly so this milestone's archived state is not later read as evidence the checkpoints ran.
+plainly so this milestone's archived state is not later read as evidence that the checkpoints ran.
 
 **Decisions:** D001-D006 (unified slide model, single canonical song version, PPTX universal import,
 server-side parsing, four service sections, CCLI paste). See STATE.md.
@@ -104,4 +108,3 @@ Phase 5 (Collaboration, Tasks & Events) deferred to v1.1:
 Note: AUTH-03 and AUTH-04 (team invites and shared access) were completed in Phase 7, not Phase 5.
 
 ---
-

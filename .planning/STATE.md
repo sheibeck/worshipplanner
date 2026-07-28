@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Service and Slides
 status: planning
-last_updated: "2026-07-28T13:40:33.362Z"
+last_updated: "2026-07-28T14:30:00.000Z"
 last_activity: 2026-07-28
 progress:
-  total_phases: 0
+  total_phases: 9
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -20,7 +20,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-28)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** v1.4 Service and Slides — defining requirements
+**Current focus:** v1.4 Service and Slides — ROADMAP.md created (Phases 29-37), ready to plan Phase 29
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -30,10 +30,10 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-07-28 — Milestone v1.4 started
+Phase: 29 of 37 (Order Structure — Stable Reordering & Post-Service)
+Plan: — (not yet planned)
+Status: Roadmap created — ready to plan Phase 29
+Last activity: 2026-07-28 — ROADMAP.md created for v1.4 (Phases 29-37); REQUIREMENTS.md traceability filled, 34/34 requirements mapped, 0 unmapped
 
 ## ★ v1.4 RESEARCH FINDINGS — read before planning any v1.4 phase
 
@@ -88,6 +88,29 @@ typing self-heals on the next keystroke; a one-shot action like picking a song d
   Pull the actual license text before finalizing that acceptance criterion.
 - **Draft-lock/reopen has no competitor precedent** — Planning Center Services gates on roles only.
   This is an original design call, not a convention being copied.
+
+### v1.4 ROADMAP.md phase breakdown (created 2026-07-28)
+
+9 phases (29-37), derived from `research/SUMMARY.md`'s 9-phase default with hard sequencing applied.
+Departures from the research default, recorded explicitly per the roadmapper's instructions:
+
+- Merged SUMMARY's "stable key/ordering model" and "Post-Service" phases into one **Phase 29** — R043
+  ("the five sections...") textually presupposes Post-Service already exists, and Post-Service alone
+  is too thin a phase under this project's `coarse` granularity setting.
+- Moved **Phase 37 (PPTX rendering)** to the true end of the sequence (was mid-sequence in SUMMARY) —
+  per the user's explicit milestone decision to schedule it last so an overrun/cut disturbs nothing else.
+- Split SUMMARY's final "presentation correctness + CCLI + action bars" phase into two: **Phase 35**
+  (presentation correctness + lyric editor, standard-pattern) and **Phase 36** (Service Order rebuild +
+  contextual action bars, sequenced last among UI work) — kept separate so each has a coherent goal.
+- **R053** (drop-zone-as-import + moving Add-slide/Add-music into the action bar) was moved from the
+  Slides-interaction cluster into **Phase 36** because its own requirement text names R068 (the action
+  bar) as its target — building it before Phase 36 would mean building it twice.
+- **R054** (song groups read-only in Slides tab) was grouped into **Phase 30** (hard-lock/reconciliation
+  removal) rather than with the rest of Slides interaction — ARCHITECTURE.md §3 treats it as the same
+  "structural shape can no longer diverge" change that makes reconciliation deletable.
+
+Full phase table, success criteria, and per-phase research/notes: `.planning/ROADMAP.md`. Traceability:
+`.planning/REQUIREMENTS.md` (34/34 mapped, 0 unmapped).
 
 ### v1.3 code-complete record
 
@@ -255,11 +278,12 @@ and `SlotMediaAttachment.vue`'s video-attach affordance are all deleted.
 > (`.gsd/` milestone M001, slices S01-S06) and faithfully ported into gsd-core as v1.2.
 > The gsdpi `.gsd/` store is now legacy/read-only — continue with regular `/gsd-*` commands.
 
-## ⏸ RESUME HERE (2026-07-28 — clean slate, no milestone open)
+## ⏸ RESUME HERE (2026-07-28 — v1.4 roadmap created, ready to plan Phase 29)
 
-**v1.2 and v1.3 are both archived.** Working tree clean; `npm run type-check` 0, `npm run build`
-green, `npx vitest run src/` 3581 passing with the failing FILE SET at the documented 10-file
-pre-existing baseline (8 `.gsd/quarantine/worktrees/**` duplicates, `storage.rules.test.ts`,
+**v1.2 and v1.3 are both archived; v1.4's ROADMAP.md and REQUIREMENTS.md traceability are now filled**
+(Phases 29-37, 34/34 requirements mapped, 0 unmapped). Working tree clean; `npm run type-check` 0,
+`npm run build` green, `npx vitest run src/` 3581 passing with the failing FILE SET at the documented
+10-file pre-existing baseline (8 `.gsd/quarantine/worktrees/**` duplicates, `storage.rules.test.ts`,
 `RosterView.test.ts`).
 
 **Deferred Verification is empty project-wide.** No phase is mid-flight.
@@ -275,15 +299,16 @@ pre-existing baseline (8 `.gsd/quarantine/worktrees/**` duplicates, `storage.rul
 | Phase 5 (Tasks & Events) **dropped** | Never started; owner: *"we don't need those"*. TASK-01..03 / EVNT-01..04 marked dropped. |
 | Backlog 999.1 **kept** | Shared song-browse extraction — duplication verified still present in `SongSlotPicker.vue` vs `SongFilters.vue` |
 | AUTH-03/04 traceability fixed | Pointed at Phase 5 (now gone); actually completed in Phase 7 |
+| v1.4 ROADMAP.md created | Phases 29-37, derived from `.planning/research/SUMMARY.md`'s 9-phase sequence with hard sequencing constraints applied (ordering fix first, PPTX rendering deliberately last) |
+| v1.4 REQUIREMENTS.md traceability filled | 34/34 requirements (R036-R069) mapped to exactly one phase each, 0 unmapped |
 
 ### Next step
 
-**`/gsd-new-milestone`** — open v1.4 with the owner's re-adjustment list as input. That produces a
-clean ROADMAP + REQUIREMENTS, after which `/gsd-autonomous` runs against a real queue.
-
-⚠ Do NOT run `/gsd-autonomous` before v1.4 exists — with no open milestone there is nothing for phase
-discovery to work from, and the only remaining incomplete entry is backlog item 999.1, which should be
-promoted deliberately via `/gsd-review-backlog` rather than picked up automatically.
+**`/gsd-plan-phase 29`** (optionally preceded by `/gsd-discuss-phase 29`) — Phase 29 (Order Structure —
+Stable Reordering & Post-Service) is first: it's foundational, everything else in v1.4 either depends on
+it directly or transitively. Phase 37 (PowerPoint Server-Side Rendering) is deliberately last — highest
+uncertainty, independently cuttable without disturbing anything else. See `.planning/ROADMAP.md` for the
+full phase table, success criteria, dependency graph, and per-phase research/notes.
 
 ## Deferred Verification
 
@@ -694,6 +719,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - Phase 16.1 inserted after Phase 16: Song list tags & columns customization: fold Team tags into Tags, Themes as separate column + column-visibility cog, document 1-2-3 methodology (URGENT)
 - Phase 16.2 inserted then REMOVED (2026-07-13): Admin permissions hardening was found redundant — Phase 7 already enforces viewer read-only at the route (requiresEditor guards), navigation (isEditor-gated sidebar), and Firestore rules (editor-only writes; songs/other collections editor-only). The only net change 16.2 described was EXPANDING viewer read access to Songs/Schedule/Volunteers, which is a feature, not hardening, and was not wanted. Removed from ROADMAP.
 - Phase 17 added: Sync schedule with planned services — add a Roles tab to service plans that seeds each role and its scheduled person from the quarterly schedule for that service date, allows per-service overrides (without mutating the schedule), and exposes a public shared service link (like the Phase 16 schedule share link) showing who is serving. Marries the schedule to services so a planned service carries both music AND people-per-role.
+- Phase 29-37 added (v1.4 Service and Slides, roadmap created 2026-07-28): 9 phases covering the ordering-model fix, Post-Service, the slide-mirror hard lock (reconciliation deletion), draft-only editing + reopen, save reliability, backgrounds + slide editing, LLM scripture split, presentation correctness + lyric editor, UI rework (Service Order rebuild + contextual action bars), and PowerPoint server-side rendering (deliberately last). Derived from `.planning/research/SUMMARY.md`'s 9-phase default with the hard sequencing constraints from ARCHITECTURE.md/PITFALLS.md applied. See ROADMAP.md Phase Details and REQUIREMENTS.md Traceability.
 
 ### Quick Tasks Completed
 
@@ -737,7 +763,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 
 ## Session Continuity
 
-Last activity: 2026-07-28 — Phase 28 complete, transitioned to Phase 999.1
-Last session: 2026-07-28T03:17:43.620Z
-Stopped at: Completed 28-06-PLAN.md (final plan of Phase 28, final phase of v1.3)
+Last activity: 2026-07-28 — v1.4 ROADMAP.md created (Phases 29-37); REQUIREMENTS.md traceability filled (34/34 mapped, 0 unmapped)
+Last session: 2026-07-28T14:30:00.000Z
+Stopped at: Roadmap creation complete — ready for /gsd-plan-phase 29 (optionally preceded by /gsd-discuss-phase 29)
 Resume file: None
