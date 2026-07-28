@@ -124,6 +124,20 @@
               >{{ previewText(row.section) }}</span>
               <span v-else class="min-w-0 flex-1"></span>
               <span data-testid="row-line-count" class="shrink-0 text-[10.5px] text-gray-500">{{ lineCountLabel(row.section) }}</span>
+              <template v-if="isExpanded(row)">
+                <button
+                  type="button"
+                  :data-testid="`row-duplicate-${row.rowKey}`"
+                  class="shrink-0 rounded-md border border-gray-700 bg-gray-800 px-2 py-1 text-[11px] font-medium text-gray-300 transition-colors hover:border-gray-600 hover:bg-gray-700"
+                  @click="onDuplicate(row)"
+                >Duplicate</button>
+                <button
+                  type="button"
+                  :data-testid="`row-remove-${row.rowKey}`"
+                  class="shrink-0 rounded-md border border-red-900/60 bg-gray-800 px-2 py-1 text-[11px] font-medium text-red-300 transition-colors hover:border-red-700 hover:bg-red-950/40"
+                  @click="onRemove(row)"
+                >Remove</button>
+              </template>
               <button
                 type="button"
                 :data-testid="`row-toggle-${row.rowKey}`"
@@ -142,6 +156,20 @@
                 class="min-w-0 flex-1 truncate text-[11.5px] text-gray-400"
               >repeat &mdash; follows row {{ row.repeatOfPosition }}</span>
               <span data-testid="row-linked" class="shrink-0 text-[10.5px] text-gray-500">linked</span>
+              <template v-if="isExpanded(row)">
+                <button
+                  type="button"
+                  :data-testid="`row-duplicate-${row.rowKey}`"
+                  class="shrink-0 rounded-md border border-gray-700 bg-gray-800 px-2 py-1 text-[11px] font-medium text-gray-300 transition-colors hover:border-gray-600 hover:bg-gray-700"
+                  @click="onDuplicate(row)"
+                >Duplicate</button>
+                <button
+                  type="button"
+                  :data-testid="`row-remove-${row.rowKey}`"
+                  class="shrink-0 rounded-md border border-red-900/60 bg-gray-800 px-2 py-1 text-[11px] font-medium text-red-300 transition-colors hover:border-red-700 hover:bg-red-950/40"
+                  @click="onRemove(row)"
+                >Remove</button>
+              </template>
               <button
                 type="button"
                 :data-testid="`row-toggle-${row.rowKey}`"
@@ -170,6 +198,27 @@
         </div>
       </div>
 
+      <!-- Add-section row: dashed border, appends a new, empty, uniquely-labelled
+           section ready to type into. Not part of `section-rows` (and carries no
+           `.section-row` class) so it stays outside both the row-count contract
+           and the drag library's `draggable` scope, matching the established
+           precedent of excluding non-row elements from Sortable (section headers
+           in ServiceEditorView.vue's slot list). -->
+      <div
+        data-testid="add-section-row"
+        class="flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-gray-700 px-3 py-2.5"
+      >
+        <span class="text-[11.5px] font-medium text-gray-400">&#65291; Add section</span>
+        <button
+          v-for="kind in ADD_SECTION_KINDS"
+          :key="kind"
+          type="button"
+          :data-testid="`add-section-chip-${kind}`"
+          class="rounded-full border border-gray-700 bg-gray-800 px-2.5 py-1 text-[11px] font-medium text-gray-300 transition-colors hover:border-indigo-600 hover:text-indigo-300"
+          @click="onAddSection(kind)"
+        >{{ kind }}</button>
+      </div>
+
       <p data-testid="closing-note" class="text-[11px] leading-relaxed text-gray-500">
         <span class="text-emerald-400">&#10003; {{ sectionRows.length }} sections</span>
         &middot; used as the slide order for this song in every service. A repeat reuses the original words &mdash; edit once, both update.
@@ -192,7 +241,16 @@ import { reactive, ref, computed, watch, nextTick, onMounted, onUnmounted } from
 import Sortable from 'sortablejs'
 import { useSongLyricsStore } from '@/stores/songLyrics'
 import { useAutoSave } from '@/composables/useAutoSave'
-import { buildSectionRows, normalizeLyricOrder, moveRow, type SectionRow } from '@/utils/songSectionOrder'
+import {
+  buildSectionRows,
+  normalizeLyricOrder,
+  moveRow,
+  duplicateRow,
+  removeRow,
+  addSection,
+  ADD_SECTION_KINDS,
+  type SectionRow,
+} from '@/utils/songSectionOrder'
 import LyricPasteDialog from './LyricPasteDialog.vue'
 import LyricVersionHistory from './LyricVersionHistory.vue'
 import type { LyricSection, SongLyrics } from '@/types/songLyrics'
@@ -294,6 +352,66 @@ watch(
 function onSectionInput(sectionId: string, value: string) {
   const section = editableState.sections.find((s) => s.id === sectionId)
   if (section) section.lines = value.split('\n')
+}
+
+/**
+ * Finds the index in `performanceOrder` that produced `row` — the `row.occurrenceIndex`-th
+ * occurrence of `row.sectionId`. Rows are keyed by (sectionId, occurrenceIndex), not a
+ * stable order index, since `buildSectionRows` re-derives them every render.
+ */
+function orderIndexForRow(row: SectionRow): number {
+  let seen = 0
+  for (let i = 0; i < editableState.performanceOrder.length; i++) {
+    if (editableState.performanceOrder[i] === row.sectionId) {
+      if (seen === row.occurrenceIndex) return i
+      seen++
+    }
+  }
+  return -1
+}
+
+function expandRowKey(rowKey: string) {
+  const next = new Set(expandedRowKeys.value)
+  next.add(rowKey)
+  expandedRowKeys.value = next
+}
+
+// Duplicate/Remove/Add-section all mutate through 28-01's pure helpers —
+// no ordering or pool logic is re-implemented here.
+
+function onDuplicate(row: SectionRow) {
+  const index = orderIndexForRow(row)
+  if (index === -1) return
+  const wasExpanded = isExpanded(row)
+  editableState.performanceOrder = duplicateRow(editableState.performanceOrder, index)
+  if (wasExpanded) {
+    // The duplicate lands immediately after `row`, so it is the next
+    // occurrence of the same section id. Look it up via buildSectionRows
+    // rather than hand-assembling a rowKey, since the `#`-joined format is
+    // an internal convention of songSectionOrder.ts.
+    const newRows = buildSectionRows(editableState.sections, editableState.performanceOrder)
+    const newRow = newRows.find(
+      (r) => r.sectionId === row.sectionId && r.occurrenceIndex === row.occurrenceIndex + 1,
+    )
+    if (newRow) expandRowKey(newRow.rowKey)
+  }
+}
+
+function onRemove(row: SectionRow) {
+  const index = orderIndexForRow(row)
+  if (index === -1) return
+  const result = removeRow(editableState.sections, editableState.performanceOrder, index)
+  editableState.sections = result.sections
+  editableState.performanceOrder = result.performanceOrder
+}
+
+function onAddSection(kind: string) {
+  const result = addSection(editableState.sections, editableState.performanceOrder, kind)
+  editableState.sections = result.sections
+  editableState.performanceOrder = result.performanceOrder
+  const newRows = buildSectionRows(editableState.sections, editableState.performanceOrder)
+  const newRow = newRows.find((r) => r.sectionId === result.newSectionId)
+  if (newRow) expandRowKey(newRow.rowKey)
 }
 
 // ── Drag reorder (D-01): the list is always draggable by handle, no mode to
