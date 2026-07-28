@@ -54,6 +54,18 @@ cards) and `mt-0.5` (2px, drag-handle icon vertical alignment) are pre-existing 
 code rather than "fixing" them to the 8-point scale — that would be an unrequested visual change to
 adjacent code outside this phase's correctness-fix scope.
 
+> **FLAG resolved (ui-checker, Dimension 5, 2026-07-28).** The checker correctly observed that §1/§2
+> propagate `space-y-1.5` into *newly added* per-section container markup, not merely untouched
+> legacy code, and suggested either snapping to `space-y-2` while these lines are already being
+> edited or promoting the value to a documented permanent exception.
+>
+> **Decision: keep `space-y-1.5` / `mt-0.5` as-is for Phase 29.** Phase 36 rebuilds this entire tab
+> against the Claude Design "Turn 3" wireframes, which are the authority on final spacing. Snapping
+> to the 8-point grid now is churn that Phase 36 overwrites, and mid-phase it would make the new
+> per-section containers visually inconsistent with the slot cards they wrap. The grid question is
+> **deferred to Phase 36**, where it gets answered once against the wireframes rather than guessed
+> at twice. Not a permanent CONVENTIONS.md exception — an explicitly time-boxed one.
+
 ---
 
 ## Typography
