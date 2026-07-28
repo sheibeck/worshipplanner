@@ -1,20 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: (none — v1.3 archived; v1.4 not yet opened)
-milestone_name: (pending)
-current_phase: (none)
-current_phase_name: (none)
-status: between-milestones
-stopped_at: v1.2 and v1.3 both archived; awaiting the owner list to open v1.4
-last_updated: "2026-07-28T13:12:09.759Z"
+milestone: v1.4
+milestone_name: Service and Slides
+status: planning
+last_updated: "2026-07-28T13:40:33.362Z"
 last_activity: 2026-07-28
-last_activity_desc: Archived v1.2 and v1.3, enabled workflow.verifier, dropped the Tasks/Events phase, kept 999.1 in backlog. Clean slate for v1.4.
 progress:
-  total_phases: 17
-  completed_phases: 16
-  total_plans: 101
-  completed_plans: 101
-  percent: 94
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -35,30 +31,10 @@ See: .planning/PROJECT.md (updated 2026-03-05)
 
 ## Current Position
 
-Phase: 999.1 — Extract shared song-browse component (Songs page + service-plan picker) (BACKLOG)
-Plan: Not started
-Milestone: v1.3 Slides Tab Rework (Phases 24-28) — ALL PHASES CODE-COMPLETE
-Status: Ready to plan
-
-Phases 20, 21, 22, 23 and now 28 are all code-complete; only their deferred human-verify checkpoints
-remain (see the Deferred Verification table below).
-
-> **✅ SUPERSEDED 2026-07-28 — `workflow.verifier` is now `true`.**
->
-> The old convention read: *"`workflow.verifier` is `false`, so no phase produces a `VERIFICATION.md`
-> and `phase.complete` therefore refuses to run. ROADMAP checkboxes stay `- [ ]` by design... Do NOT
-> flip `workflow.verifier` to work around this."*
->
-> That convention is **retired**, and it was the root cause of both v1.2 and v1.3 ending up
-> code-complete-but-never-marked-complete — which in turn made `/gsd-autonomous` re-offer finished
-> phases (its `recommended_actions` were literally `/gsd-execute-phase 24..28` on already-complete
-> work). The user identified this as the source of the "messy milestones" and enabled the verifier on
-> 2026-07-28.
->
-> **From v1.4 onward:** each phase runs a `gsd-verifier` agent, produces a real `VERIFICATION.md`, and
-> closes normally. Phases 24-28 were closed retroactively with owner-attributed VERIFICATION files
-> (see each phase's `*-VERIFICATION.md` — they state plainly that no verifier agent ran and that the
-> status records the owner's own verification).
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-07-28 — Milestone v1.4 started
 
 ### v1.3 code-complete record
 
