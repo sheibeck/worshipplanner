@@ -389,8 +389,11 @@ describe('SlideGrid', () => {
       expect(viewerWrapper.find('[data-testid="slide-grid-add-slide"]').exists()).toBe(false)
     })
 
-    it('appends exactly one new entry, in the existing entries plus one, and computes order one past the highest', async () => {
+    it('appends exactly one new entry, sorted-then-appended, with every order renumbered contiguously from zero (R050)', async () => {
       const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      // Non-contiguous existing orders (0, 2) — the R050 fix renumbers the
+      // WHOLE payload to its array index, not just the newly appended entry,
+      // so array order and `order` values can never drift apart again.
       const existingEntries: GroupSlideEntry[] = [
         { id: 'e1', order: 0, sourceRef: { kind: 'text' } },
         { id: 'e2', order: 2, sourceRef: { kind: 'text' } },
@@ -411,13 +414,15 @@ describe('SlideGrid', () => {
       expect(slotIdArg).toBe('slot-1')
       const slides = slidesArg as GroupSlideEntry[]
       expect(slides).toHaveLength(3)
-      expect(slides[0]).toBe(existingEntries[0])
-      expect(slides[1]).toBe(existingEntries[1])
-      expect(slides[2]!.order).toBe(3)
+      // `appendToGroup` copies every entry (even unchanged ones) while
+      // renumbering, so identity is no longer preserved — compare by value.
+      expect(slides.map((e) => e.id)).toEqual(['e1', 'e2', slides[2]!.id])
+      expect(slides.map((e) => e.order)).toEqual([0, 1, 2])
       expect(sigArg).toBe('sig-abc')
-      // CR-02: the pre-append snapshot is passed through as `baseSlides` so
-      // the store can detect and merge a concurrent write instead of
-      // silently overwriting it — see `replaceGroupSlides`'s doc comment.
+      // CR-02: the pre-append snapshot (unsorted, original reference) is
+      // passed through as `baseSlides` unchanged, so the store can detect
+      // and merge a concurrent write instead of silently overwriting it —
+      // see `replaceGroupSlides`'s doc comment.
       expect(baseSlidesArg).toBe(existingEntries)
     })
 
@@ -856,7 +861,9 @@ describe('SlideGrid', () => {
       expect(slotIdArg).toBe('slot-1')
       const slides = slidesArg as GroupSlideEntry[]
       expect(slides).toHaveLength(3)
-      expect(slides[0]).toBe(existingEntries[0])
+      // `appendToGroup` copies every entry while renumbering (R050) — the
+      // reference is no longer preserved, compare by value.
+      expect(slides[0]).toEqual(existingEntries[0])
       expect(slides[1]!.sourceRef).toEqual({ kind: 'imported', importId: 'deck-1', innerSlideId: 'inner-1' })
       expect(slides[1]!.order).toBe(1)
       expect(slides[2]!.sourceRef).toEqual({ kind: 'imported', importId: 'deck-1', innerSlideId: 'inner-2' })
@@ -952,7 +959,7 @@ describe('SlideGrid', () => {
       if (slides[1]!.sourceRef.kind === 'video') expect(slides[1]!.sourceRef.originalFileName).toBe('2.mp4')
     })
 
-    it('continues order from the highest existing entry', async () => {
+    it('renumbers all entries contiguously after appending, regardless of gaps in existing order values (R050)', async () => {
       const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
       const existingEntries: GroupSlideEntry[] = [
         { id: 'e1', order: 0, sourceRef: { kind: 'text' } },
@@ -968,7 +975,7 @@ describe('SlideGrid', () => {
       const [, , slidesArg] = mockReplaceGroupSlides.mock.calls[0]!
       const slides = slidesArg as GroupSlideEntry[]
       expect(slides).toHaveLength(3)
-      expect(slides[2]!.order).toBe(5)
+      expect(slides.map((e) => e.order)).toEqual([0, 1, 2])
     })
 
     it('awaits the on-demand materializer before appending when the plan item has no group yet', async () => {
@@ -1374,12 +1381,18 @@ describe('SlideGrid - Phase 29 reorder repro', () => {
     expect(slides.map((e) => e.order)).toEqual([0, 1, 2])
   })
 
-  it.fails('appends a new slide at the true end of the group with contiguous orders (R050 — repro, unfix pending)', async () => {
+  // Was `it.fails(... 'R050 — repro, unfix pending')` — now a genuine
+  // regression guard for the array-order/`order`-value divergence mechanism
+  // `appendToGroup` closes. See 29-04-SUMMARY.md's R050 investigation for the
+  // second, materializer-owned candidate mechanism (a SONG group's trailing
+  // copyright entry) this scope deliberately does not touch — that placement
+  // is correct today and belongs to Phase 35 (R060).
+  it('appends a new slide at the true end of the group with contiguous orders (R050)', async () => {
     const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
     // ARRAY order disagrees with the `order` field values — a group that
     // already fell out of sync (e.g. from a prior reorder or reconciliation),
-    // exactly the shape `onAddSlide`'s `Math.max(...)`-derived `nextOrder`
-    // does not defend against.
+    // exactly the shape the pre-fix `Math.max(...)`-derived `nextOrder` did
+    // not defend against.
     const existingEntries: GroupSlideEntry[] = [
       { id: 'e1', order: 0, sourceRef: { kind: 'text' } },
       { id: 'e3', order: 2, sourceRef: { kind: 'text' } },

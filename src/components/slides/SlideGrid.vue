@@ -399,7 +399,24 @@ async function onRemoveGroupMusic(): Promise<void> {
   }
 }
 
-// --- Task 2: ＋ Add slide, appended at the end of the selected group (D-16) ---
+// --- R050: the one append contract every write path below routes through ---
+//
+// Sorts a copy of `entries` by `order`, concatenates `additions` (in the
+// order given), then renumbers every element to its array index — so array
+// order and `order` are the same statement afterward. This is the exact
+// normalization the reorder handler's `onEnd` already performs; this helper
+// makes it the component's one contract instead of a behaviour only the
+// reorder path had. Closes the divergence where `entries`' array order and
+// `order`-field values disagree (e.g. after a prior reorder or
+// reconciliation) — the mechanism behind "a new slide lands second-to-last"
+// for a group with no copyright entries (see 29-04-SUMMARY.md for the
+// investigation of the second, unrelated candidate mechanism).
+function appendToGroup(entries: GroupSlideEntry[], additions: GroupSlideEntry[]): GroupSlideEntry[] {
+  const sorted = [...entries].sort((a, b) => a.order - b.order)
+  return [...sorted, ...additions].map((entry, i) => ({ ...entry, order: i }))
+}
+
+// --- Task 2: ＋ Add slide, appended at the true end of the selected group (D-16) ---
 //
 // Always resolves the group through `ensureGroupMaterialized` first — even
 // when `props.group` already reflects a stored document — rather than
@@ -414,10 +431,9 @@ async function onAddSlide(): Promise<void> {
     const resolved = await props.ensureGroupMaterialized(slotId)
     if (!resolved) return
     const { entries, sourceSignature } = resolved
-    const nextOrder = entries.length > 0 ? Math.max(...entries.map((e) => e.order)) + 1 : 0
     const newEntry: GroupSlideEntry = {
       id: crypto.randomUUID(),
-      order: nextOrder,
+      order: 0, // overwritten by appendToGroup's renumber below
       // A `text` ref with no authored content resolves from the owning slot
       // (nothing at all on a SONG/SCRIPTURE/IMPORTED plan item) — 25-01's
       // widened `text` SourceRef exists so a hand-added blank slide can carry
@@ -426,11 +442,15 @@ async function onAddSlide(): Promise<void> {
       // new card from looking blank in the grid.
       sourceRef: { kind: 'text', title: 'New slide', body: '' },
     }
-    // CR-02: `entries` is the snapshot this append was computed FROM — passed
-    // through as `baseSlides` so a concurrent write (a double-click's other
-    // call, or a drag-reorder landing first) is detected and merged rather
-    // than silently overwritten. See `replaceGroupSlides`'s doc comment.
-    await slideGroupsStore.replaceGroupSlides(props.orgId, slotId, [...entries, newEntry], sourceSignature, entries)
+    // CR-02: `entries` (unsorted, as returned) is the snapshot this append
+    // was computed FROM — passed through as `baseSlides` so a concurrent
+    // write (a double-click's other call, or a drag-reorder landing first)
+    // is detected and merged rather than silently overwritten. See
+    // `replaceGroupSlides`'s doc comment. Re-sorting THIS argument would
+    // defeat the merge — only the payload passed as `slides` goes through
+    // `appendToGroup`.
+    const nextSlides = appendToGroup(entries, [newEntry])
+    await slideGroupsStore.replaceGroupSlides(props.orgId, slotId, nextSlides, sourceSignature, entries)
   } catch (err) {
     console.error('Failed to add slide:', err)
   }
@@ -484,14 +504,14 @@ async function onImportConfirmed(payload: { importId: string; section: ServiceSe
     const resolved = await props.ensureGroupMaterialized(slotId)
     if (!resolved) return
     const { entries, sourceSignature } = resolved
-    const startOrder = entries.length > 0 ? Math.max(...entries.map((e) => e.order)) + 1 : 0
-    const newEntries: GroupSlideEntry[] = deck.slides.map((innerSlide, i) => ({
+    const newEntries: GroupSlideEntry[] = deck.slides.map((innerSlide) => ({
       id: crypto.randomUUID(),
-      order: startOrder + i,
+      order: 0, // overwritten by appendToGroup's renumber below
       sourceRef: { kind: 'imported', importId: payload.importId, innerSlideId: innerSlide.id },
     }))
-    // CR-02: see `onAddSlide` — `entries` is this append's base snapshot.
-    await slideGroupsStore.replaceGroupSlides(props.orgId, slotId, [...entries, ...newEntries], sourceSignature, entries)
+    // CR-02: see `onAddSlide` — `entries` (unsorted) is this append's base snapshot.
+    const nextSlides = appendToGroup(entries, newEntries)
+    await slideGroupsStore.replaceGroupSlides(props.orgId, slotId, nextSlides, sourceSignature, entries)
   } catch (err) {
     console.error('Failed to append imported deck to group:', err)
   }
@@ -511,24 +531,23 @@ async function appendVideoEntries(files: File[]): Promise<void> {
     if (!resolved) return
     // CR-02: `baseEntries` is the snapshot this whole drop's appends were
     // computed FROM (captured once, before the loop below builds up its own
-    // running `entries` value) — passed through to `replaceGroupSlides` as
+    // list of new entries) — passed through to `replaceGroupSlides` as
     // `baseSlides` so a concurrent write is detected and merged rather than
     // silently overwritten.
     const baseEntries = resolved.entries
-    let entries = resolved.entries
     const sourceSignature = resolved.sourceSignature
     resetMediaUpload()
+    const newEntries: GroupSlideEntry[] = []
     for (const file of files) {
       const url = await uploadMedia(file, props.orgId)
-      const nextOrder = entries.length > 0 ? Math.max(...entries.map((e) => e.order)) + 1 : 0
-      const newEntry: GroupSlideEntry = {
+      newEntries.push({
         id: crypto.randomUUID(),
-        order: nextOrder,
+        order: 0, // overwritten by appendToGroup's renumber below
         sourceRef: { kind: 'video', videoSrc: url, originalFileName: file.name },
-      }
-      entries = [...entries, newEntry]
+      })
     }
-    await slideGroupsStore.replaceGroupSlides(props.orgId, slotId, entries, sourceSignature, baseEntries)
+    const nextSlides = appendToGroup(baseEntries, newEntries)
+    await slideGroupsStore.replaceGroupSlides(props.orgId, slotId, nextSlides, sourceSignature, baseEntries)
   } catch (err) {
     console.error('Failed to append dropped video:', err)
   }
