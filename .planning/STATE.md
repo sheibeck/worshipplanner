@@ -58,6 +58,37 @@ remain (see the Deferred Verification table below).
 | 25 Slides Tab Shell — Plan Rail and Slide Grid | 7/7 | 2 critical + 2 warning, all fixed | See `25-REVIEW.md` / `25-REVIEW-FIX.md`. Also carries the mid-phase D-18/D-19 model deletion. |
 | 26 Edit Slide Drawer | 9/9 | 3 critical + 1 warning, all fixed | See `26-REVIEW.md` / `26-REVIEW-FIX.md`. **Closed Phase 24+25's deferred reconciliation-confirm debt.** |
 | 27 Service Order Tab — Rename and Strip Slide Editing | 5/5 | **0 critical**, 1 warning fixed | See `27-REVIEW.md` / `27-REVIEW-FIX.md`. Clean removal — reviewer traced all load-bearing paths end to end. |
+| 28 Song Lyrics Editor Rework | 6/6 | **0 critical**, 2 warnings fixed | See `28-REVIEW.md` / `28-REVIEW-FIX.md`. **Final phase of v1.3.** |
+
+**Phase 28 shipped (design option 2a, chosen by the user — the milestone's one mandated design choice):**
+`src/utils/songSectionOrder.ts` (pure pool+order model and helpers), one scroll surface with one
+numbered, collapsible, drag-reorderable section list that IS the slide order, `Duplicate` / `Remove` /
+`＋ Add section`, and an R035 acceptance suite (`SongLyricsTab.r035.test.ts`) that asserts *no nested
+scrollbar* and *exactly one list* as counts over the mounted subtree rather than by eye.
+Option **2b** (the "Switch to Sections to reorder" mode toggle, including its `Lyric sheet` segment) is
+**deferred, not built**.
+
+**Two latent defects found and fixed during Phase 28:**
+- **Compounding reconciliation bug (28-03).** `reconcileSongGroup` pushed the WHOLE `storedBySectionId`
+  array on every occurrence of a section id. Once D-02 made repeats first-class, a twice-referenced
+  chorus with two stored entries compounded 2 → 4 → 8 → 16 — on the **additive** path, which has no
+  confirm gate. Fixed by consuming stored entries positionally (occurrence `i` takes entry `i`, surplus
+  emitted after the last occurrence), which keeps Phase 26-09's duplicate-survival case byte-equivalent.
+  Idempotence asserted for N=M, N<M and N>M, and independently hand-traced by the reviewer.
+- **Two competing order fields (28-02).** Order lived in BOTH `Song.performanceOrder` and
+  `SongLyrics.performanceOrder`, behind a 3-tier precedence chain duplicated in `slideshowAssembler.ts`
+  and `slideGroupMaterializer.ts` — and `PerformanceOrderBuilder` **read one but wrote the other**, so
+  its displayed order never reflected what it saved. Collapsed to one canonical source;
+  `Song.performanceOrder`, its writer action, the precedence chain and `PerformanceOrderBuilder.vue`
+  are all deleted (D-19).
+
+**One unrequested removal caught and reverted:** plan 28-04 dropped the editor's read-only CCLI
+copyright block. No decision authorized it and R035 says nothing about it, so 28-06 restored it inside
+the single scroll region. The `CopyrightSlide` emission path was verified never affected.
+
+**Phase 28 items for batch human-verify:** the reworked editor's feel with a real multi-repeat song;
+that a CCLI paste of a song with repeated choruses folds into pool references rather than duplicates;
+and that editing a repeated section visibly updates every occurrence.
 | 28 Song Lyrics Editor Rework | 6/6 | Not run (no `/gsd-code-review` invoked this phase) | R035 proven by assertion in `28-06`'s acceptance block; restored the CCLI copyright display 28-04 dropped without a decision. Full unit suite failing-file-set unchanged from the 10-file baseline. |
 
 **Phase 27 shipped:** first tab renamed **Music → Service Order** (label AND the `activeTab` union value,
