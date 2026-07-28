@@ -106,6 +106,14 @@
         class="mx-6 mt-3 text-[12px] text-indigo-400"
         data-testid="slide-grid-media-progress"
       >Uploading... {{ Math.round(mediaUploadProgress) }}%</div>
+      <!-- UI-SPEC §5: minimal, transient reorder-failure text — same shape
+           as `mediaUploadError` above. No toast, no badge, no aria-live;
+           the persistent status indicator is Phase 32's (R040/R041). -->
+      <div
+        v-if="reorderError"
+        class="mx-6 mt-3 text-[12px] text-red-400"
+        data-testid="slide-grid-reorder-error"
+      >{{ reorderError }}</div>
 
       <!-- Grid-wide dragover highlight (D-13) — applied to the WHOLE content
            area, not only the drop tile, so the target isn't a pixel hunt.
@@ -123,6 +131,7 @@
       >
         <div
           v-if="cards.length > 0"
+          :key="gridRenderNonce"
           ref="cardsContainerRef"
           class="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4"
           data-testid="slide-grid-cards"
@@ -670,6 +679,16 @@ let sortableInstance: Sortable | null = null
 
 const canReorder = computed(() => props.isEditor && props.group !== null)
 
+// T-29-13 / UI-SPEC §5: a rejected reorder write is no longer silent. The
+// DOM revert this component used to lean on is gone (CONTEXT.md's explicit
+// D-16 removal) — the card list re-renders from `props.assembledSlideshow`,
+// so a rejection changes no prop and nothing re-renders on its own.
+// `gridRenderNonce` forces a rebuild of the keyed card list from props on
+// rejection, which is what puts the dragged card back where the data says
+// it belongs.
+const reorderError = ref<string | null>(null)
+const gridRenderNonce = ref(0)
+
 function destroySortable(): void {
   sortableInstance?.destroy()
   sortableInstance = null
@@ -703,6 +722,8 @@ watch(
           const currentSlot = props.selectedSlot
           if (!currentGroup || !currentSlot) return
 
+          reorderError.value = null
+
           const sorted = [...currentGroup.slides].sort((a, b) => a.order - b.order)
           const moved = sorted.splice(evt.oldDraggableIndex, 1)[0]
           if (!moved) return
@@ -723,7 +744,20 @@ watch(
               currentGroup.slides,
             )
           } catch (err) {
-            console.error('Failed to reorder slides:', err)
+            // T-29-13: surface the failure inline and force the card list to
+            // rebuild from props (via `gridRenderNonce`) — the DOM revert this
+            // used to lean on is gone, and `props.assembledSlideshow` changes
+            // no prop on a rejected write, so nothing re-renders on its own.
+            // `destroySortable()` releases the instance bound to the
+            // container element the `:key` bump is about to discard; the
+            // watcher below creates a fresh instance on the replacement
+            // container once it lands, so a rejected reorder can never leave
+            // real drag-and-drop silently unresponsive for the rest of the
+            // session.
+            reorderError.value = "Couldn't save this change — reverted. Try again."
+            destroySortable()
+            gridRenderNonce.value += 1
+            console.error('[SlideGrid] reorder save failed:', err)
           }
         },
       })

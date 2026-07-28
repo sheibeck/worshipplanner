@@ -1481,60 +1481,125 @@ const aiPerSlotResults = ref(new Map<number, AiSongSuggestion[]>())
 const aiPerSlotError = ref(new Map<number, boolean>())
 
 // ── Sortable ───────────────────────────────────────────────────────────────────
+// One Sortable instance PER SECTION list container (29-03/R044) — this codebase's
+// first multi-instance Sortable and first use of SortableJS `group` (cross-section
+// drag). Generalizes SlideGrid.vue's single-instance `canReorder` computed +
+// `destroySortable()` guard (SlideGrid.vue:650-655,712-714) to a keyed
+// `Map<ServiceSection | 'ungrouped', Sortable>` (PATTERNS.md "Multi-instance
+// Sortable lifecycle").
 
-const slotContainerRef = ref<HTMLElement | null>(null)
-let sortableInstance: Sortable | null = null
+const canReorder = computed(() => authStore.isEditor && localService.value !== null)
+const sectionSortables = new Map<ServiceSection | 'ungrouped', Sortable>()
 
-watch(slotContainerRef, (el) => {
-  if (el && !sortableInstance) {
-    sortableInstance = Sortable.create(el, {
-      handle: '.drag-handle',
-      // Scope both drag eligibility AND index counting (oldIndex/newIndex) to
-      // `.slot-item` — section-header divs are siblings in the same flat
-      // container but must stay non-draggable and excluded from the index
-      // math the onEnd handler below relies on (MEM008: onEnd/reindexSlots
-      // logic itself is untouched).
-      draggable: '.slot-item',
-      animation: 150,
-      ghostClass: 'opacity-30',
-      async onEnd(evt) {
-        if (!localService.value || evt.oldIndex == null || evt.newIndex == null) return
-        if (evt.oldIndex === evt.newIndex) return
-        // D-16: revert SortableJS's DOM move so Vue's reactive render is the single source of truth (prevents snap-back)
-        const parent = evt.item.parentNode
-        if (parent) {
-          const ref = parent.children[evt.oldIndex]
-          parent.insertBefore(evt.item, evt.oldIndex < evt.newIndex ? ref?.nextSibling ?? null : ref ?? null)
-        }
-        const slots = [...localService.value.slots]
-        const moved = slots.splice(evt.oldIndex, 1)[0]
-        if (!moved) return
-        slots.splice(evt.newIndex, 0, moved)
-        const reindexed = reindexSlots(slots)
-        localService.value.slots = reindexed
-        // D-15: persist immediately rather than waiting on the 800ms debounce
-        if (serviceId.value) {
-          if (autosaveTimer) {
-            clearTimeout(autosaveTimer)
-            autosaveTimer = null
-          }
-          autosaveSaving = true
-          autosaveStatus.value = 'saving'
-          try {
-            await serviceStore.updateService(serviceId.value, { slots: reindexed })
-            originalService.value = JSON.parse(JSON.stringify(localService.value))
-            autosaveStatus.value = 'saved'
-            setTimeout(() => {
-              if (autosaveStatus.value === 'saved') autosaveStatus.value = 'idle'
-            }, 3000)
-          } finally {
-            autosaveSaving = false
-          }
-        }
-      },
-    })
+function destroySectionSortables(): void {
+  for (const instance of sectionSortables.values()) {
+    instance.destroy()
   }
-}, { flush: 'post' })
+  sectionSortables.clear()
+}
+
+/** `'ungrouped'` has no `sections` bucket of its own — it maps to `grouped.legacy`. */
+function bucketForKey(
+  grouped: { sections: Record<ServiceSection, ServiceSlot[]>; legacy: ServiceSlot[] },
+  key: ServiceSection | 'ungrouped',
+): ServiceSlot[] {
+  return key === 'ungrouped' ? grouped.legacy : grouped.sections[key]
+}
+
+async function onSlotSortEnd(evt: Sortable.SortableEvent): Promise<void> {
+  dragOverSection.value = null
+  if (!localService.value) return
+  // Only the Draggable-suffixed indices honor the `draggable: '.slot-item'` selector.
+  // `oldIndex`/`newIndex` count EVERY child of the container (with per-section
+  // containers there ARE no other children today, but reading them here would still
+  // be the same category of mistake) and must never be read in this handler — the
+  // false comment that used to sit above this block claimed `draggable` scoped BOTH
+  // drag eligibility AND this index math; it does not, and that belief is why this
+  // bug survived three prior fix attempts.
+  const oldDraggableIndex = evt.oldDraggableIndex
+  const newDraggableIndex = evt.newDraggableIndex
+  if (oldDraggableIndex == null || newDraggableIndex == null) return
+
+  const fromKey = (evt.from.dataset.section as ServiceSection | undefined) ?? 'ungrouped'
+  const toKey = (evt.to.dataset.section as ServiceSection | undefined) ?? 'ungrouped'
+  if (fromKey === toKey && oldDraggableIndex === newDraggableIndex) return // genuine no-op
+
+  // Work in the grouped model — never translate a per-section position into a
+  // whole-array index by hand. This is what makes the destination position
+  // unambiguous for a cross-section move.
+  const grouped = groupBySection(localService.value.slots, (s) => s.section)
+  const fromBucket = bucketForKey(grouped, fromKey)
+  const moved = fromBucket.splice(oldDraggableIndex, 1)[0]
+  if (!moved) return
+  if (toKey !== 'ungrouped') {
+    moved.section = toKey
+  }
+  // toKey === 'ungrouped' only happens when fromKey === 'ungrouped' too — the
+  // ungrouped container's Sortable config sets `put: false`, so nothing can be
+  // dropped INTO it from another container; this branch is a same-list reorder.
+  // Leave `moved.section` untouched rather than silently reassigning a legacy or
+  // out-of-union section value (T-29-06).
+  const toBucket = bucketForKey(grouped, toKey)
+  toBucket.splice(newDraggableIndex, 0, moved)
+
+  const reindexed = reindexSlots(flattenBySection(grouped))
+  localService.value.slots = reindexed
+
+  // D-15: persist immediately rather than waiting on the 800ms debounce. A
+  // cross-section move updates only the `slots` array field, so order and section
+  // land in one write and cannot half-apply (T-29-07).
+  if (!serviceId.value) return
+  if (autosaveTimer) {
+    clearTimeout(autosaveTimer)
+    autosaveTimer = null
+  }
+  autosaveSaving = true
+  autosaveStatus.value = 'saving'
+  try {
+    await serviceStore.updateService(serviceId.value, { slots: reindexed })
+    originalService.value = JSON.parse(JSON.stringify(localService.value))
+    autosaveStatus.value = 'saved'
+    setTimeout(() => {
+      if (autosaveStatus.value === 'saved') autosaveStatus.value = 'idle'
+    }, 3000)
+  } finally {
+    autosaveSaving = false
+  }
+}
+
+watch(
+  [() => sectionListEls.value, canReorder],
+  ([elsMap, allowed]) => {
+    const keys: (ServiceSection | 'ungrouped')[] = [...SERVICE_SECTIONS, 'ungrouped']
+    for (const key of keys) {
+      const el = allowed ? elsMap.get(key) : undefined
+      if (el && !sectionSortables.has(key)) {
+        sectionSortables.set(
+          key,
+          Sortable.create(el, {
+            handle: '.drag-handle',
+            draggable: '.slot-item',
+            animation: 150,
+            ghostClass: 'opacity-30',
+            // Shared group name enables cross-section drag. The ungrouped container
+            // allows items to be dragged OUT (pull) but never dropped back IN
+            // (put: false) — legacy items can be re-sectioned, but nothing can be
+            // dragged back into limbo.
+            group: key === 'ungrouped' ? { name: 'service-slots', pull: true, put: false } : 'service-slots',
+            onMove(moveEvt) {
+              dragOverSection.value = (moveEvt.to.dataset.section as ServiceSection | undefined) ?? null
+            },
+            onEnd: onSlotSortEnd,
+          }),
+        )
+      } else if (!el && sectionSortables.has(key)) {
+        sectionSortables.get(key)?.destroy()
+        sectionSortables.delete(key)
+      }
+    }
+  },
+  { deep: true, flush: 'post' },
+)
 
 // ── Computed ───────────────────────────────────────────────────────────────────
 
@@ -1788,8 +1853,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  sortableInstance?.destroy()
-  sortableInstance = null
+  destroySectionSortables()
   if (autosaveTimer) clearTimeout(autosaveTimer)
   autosaveSaving = false
   // Don't unsubscribe serviceStore here — DashboardView may still be using it

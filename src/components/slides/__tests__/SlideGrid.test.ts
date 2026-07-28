@@ -1415,7 +1415,9 @@ describe('SlideGrid - Phase 29 reorder repro', () => {
     expect(slides.map((e) => e.order)).toEqual([0, 1, 2, 3])
   })
 
-  it.fails('reorder failure surfaces and does not leave the grid showing an unsaved order (R049 — pending)', async () => {
+  // Was `it.fails(... 'R049 — pending')` — the testid now exists (Task 3).
+  it('reorder failure surfaces and does not leave the grid showing an unsaved order (R049)', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
     const group = makeGroup({
       sourceSignature: 'sig-xyz',
@@ -1435,7 +1437,44 @@ describe('SlideGrid - Phase 29 reorder repro', () => {
     await Promise.resolve()
     await wrapper.vm.$nextTick()
 
-    // 29-04's territory — this testid does not exist yet.
+    expect(wrapper.get('[data-testid="slide-grid-reorder-error"]').text()).toBe(
+      "Couldn't save this change — reverted. Try again.",
+    )
+    // The D-16 DOM revert is gone — the grid renders from props alone, so a
+    // rejected write must still show the props-derived order, never a moved
+    // card sitting over unchanged data.
+    const cards = wrapper.findAllComponents(SlideCard)
+    expect(cards.map((c) => c.props('assembledSlide').slide.id)).toEqual(['e1', 'e2'])
+    expect(consoleSpy).toHaveBeenCalledWith('[SlideGrid] reorder save failed:', expect.any(Error))
+    consoleSpy.mockRestore()
+  })
+
+  it('clears the reorder failure row on the next successful write', async () => {
+    const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+    const group = makeGroup({
+      sourceSignature: 'sig-xyz',
+      slides: [
+        { id: 'e1', order: 0, sourceRef: { kind: 'text' } },
+        { id: 'e2', order: 1, sourceRef: { kind: 'text' } },
+      ],
+    })
+    const assembledSlideshow = [makeAssembled(0, 'e1'), makeAssembled(0, 'e2')]
+    mockReplaceGroupSlides.mockRejectedValueOnce(new Error('write failed'))
+    const wrapper = mountGrid({ selectedSlot: slot, assembledSlideshow, group, isEditor: true })
+    await Promise.resolve()
+    await Promise.resolve()
+
+    await simulateCardDrag(0, 1)
+    await Promise.resolve()
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
     expect(wrapper.find('[data-testid="slide-grid-reorder-error"]').exists()).toBe(true)
+
+    // Second attempt resolves (mockRejectedValueOnce only applied once).
+    await simulateCardDrag(0, 1)
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('[data-testid="slide-grid-reorder-error"]').exists()).toBe(false)
   })
 })

@@ -1757,7 +1757,7 @@ describe('ServiceEditorView - Phase 29 reorder repro', () => {
     resetSortableCaptures()
   })
 
-  it.fails('lands a service item exactly where it was dropped (R044 — repro, unfix pending)', async () => {
+  it('lands a service item exactly where it was dropped (R044)', async () => {
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
 
@@ -1780,7 +1780,7 @@ describe('ServiceEditorView - Phase 29 reorder repro', () => {
     expect(new Set(ids).size).toBe(ids.length)
   })
 
-  it.fails('moves an item within its own section to a non-adjacent position (R044 — repro, unfix pending)', async () => {
+  it('moves an item within its own section to a non-adjacent position (R044)', async () => {
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
 
@@ -1795,5 +1795,80 @@ describe('ServiceEditorView - Phase 29 reorder repro', () => {
 
     expect(ids).toEqual(['s1', 's3', 's4', 's2', 's5', 's6', 's7', 's8'])
     expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  it('creates one Sortable instance per rendered section list container, sharing the group name; the ungrouped container is pull-only (put: false)', async () => {
+    mockServicesList = [{
+      ...makeSectionedService(),
+      slots: [...makeSectionedService().slots, { kind: 'PRAYER', id: 's9', position: 8 }], // section-less -> ungrouped
+    }]
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    expect(sortableCaptures).toHaveLength(5) // 4 sections + the ungrouped container
+    for (const section of ['pre-service', 'worship', 'message', 'sending']) {
+      expect(captureForSection(section)?.options.group).toBe('service-slots')
+    }
+    // The ungrouped container has no `data-section` attribute — flatCapture() resolves it.
+    expect(flatCapture()?.options.group).toEqual({ name: 'service-slots', pull: true, put: false })
+  })
+
+  it('reads only the Draggable-suffixed indices — deliberately wrong un-prefixed oldIndex/newIndex do not affect the result', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const worshipCapture = captureForSection('worship')
+    if (!worshipCapture) throw new Error('no worship capture resolved')
+
+    // Same move as "moves an item within its own section..." above (s2 -> worship's last
+    // position) but with oldIndex/newIndex set to values that would splice the WRONG slot
+    // if the handler ever read them — it must not.
+    await worshipCapture.options.onEnd!({
+      oldIndex: 99,
+      newIndex: 0,
+      oldDraggableIndex: 0,
+      newDraggableIndex: 2,
+      item: worshipCapture.el.children[0] as HTMLElement,
+      from: worshipCapture.el,
+      to: worshipCapture.el,
+    } as never)
+    await flushPromises()
+
+    expect(mockUpdateService).toHaveBeenCalledTimes(1)
+    const payload = mockUpdateService.mock.calls[0]![1] as { slots: Array<{ id: string }> }
+    expect(payload.slots.map((s) => s.id)).toEqual(['s1', 's3', 's4', 's2', 's5', 's6', 's7', 's8'])
+  })
+
+  it('performs no write for a no-op drag (same section, same draggable index)', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const worshipCapture = captureForSection('worship')
+    if (!worshipCapture) throw new Error('no worship capture resolved')
+
+    await worshipCapture.options.onEnd!({
+      oldIndex: 0,
+      newIndex: 0,
+      oldDraggableIndex: 1,
+      newDraggableIndex: 1,
+      item: worshipCapture.el.children[1] as HTMLElement,
+      from: worshipCapture.el,
+      to: worshipCapture.el,
+    } as never)
+    await flushPromises()
+
+    expect(mockUpdateService).not.toHaveBeenCalled()
+  })
+
+  it('destroys every Sortable instance on unmount', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const instanceCount = sortableCaptures.length
+    expect(instanceCount).toBeGreaterThan(0)
+    mockSlotSortableDestroy.mockClear()
+    wrapper.unmount()
+
+    expect(mockSlotSortableDestroy).toHaveBeenCalledTimes(instanceCount)
   })
 })
