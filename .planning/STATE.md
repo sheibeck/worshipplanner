@@ -225,11 +225,15 @@ failing FILE SET unchanged at the documented 10-file baseline.** 200 commits sin
 four-kind drop → Present → `PresentationViewer`) was traced in code, every seam wired, R028-R035 all
 mapped. No third lost capability beyond the two Phase 27 caught.
 
-> **⚠ WHY THIS MILESTONE IS NOT ARCHIVED (user decision, 2026-07-28).** `/gsd-complete-milestone` fires
-> `phases.clear`, which moves phase directories into `milestones/` and **breaks the `/gsd-verify-work`
-> resume paths recorded in the Deferred Verification table below** — five of them are still outstanding
-> (P20-23 from v1.2, P28 from v1.3). Archiving is deliberately deferred until after the human-verify
-> batch. Do NOT run `/gsd-complete-milestone` or `/gsd-cleanup` before then.
+> **Archiving status (updated 2026-07-28).** **v1.2 is being archived** on the user's direct acceptance
+> of its outstanding checkpoints (see Deferred Verification below). **v1.3 stays OPEN** to carry the
+> bug/issue fixes the user is filing next.
+>
+> A correction to an earlier note here: it claimed archiving "breaks the `/gsd-verify-work` resume
+> paths." **That was wrong.** `find-phase` (`gsd-core/bin/lib/phase-locator.cjs`) searches
+> `.planning/milestones/v*-phases/` and tags results `archived: <version>`, and `verify-work` has no
+> archived-phase guard — it resolves `phase_dir` through the same locator and would simply write UAT
+> files into the archived directory. Archiving was never the blocker it was described as.
 
 **Next actions, in order:**
 
@@ -279,13 +283,33 @@ session may hold the Firestore/Storage emulator (ports 8080/9199) — executors 
 
 ## Deferred Verification
 
+### v1.2 (Phases 20-23) — CLOSED BY USER ACCEPTANCE, 2026-07-28
+
+> **These were not verified by a passing gate — the user accepted them directly.**
+>
+> > "close v1.2. I've verified everything I need to anyway. We don't need to verify."
+> > — user, 2026-07-28
+>
+> Recorded plainly so nobody later reads v1.2's archived state as evidence that the checkpoints below
+> ran. They did not. The user judged the remaining items unnecessary and authorized archiving on that
+> basis. If a v1.2-era bug surfaces, this is the reason it was not caught by a checkpoint.
+
+| Phase | Prior state | Items the user waived |
+|-------|-------------|------------------------|
+| 20 | verification_deferred_human | section grouping · live reorder-follows-slides · scripture override marker |
+| 21 | verification_deferred_human | announcements/image import · corrupted-file error path · source retention (import save was confirmed live 2026-07-25) |
+| 22 | verification_deferred_human | cleanup dry-run review · media/autoplay e2e |
+| 23 | verification_deferred_human | real fullscreen + Esc-sync · autoplay policy + held-key rapid advance · expired-media degradation · projector legibility · iPad Safari · two overflow judgment calls (23-05-SUMMARY.md) |
+
+Phases **18 and 19** were likewise never verified and are archived with v1.2 on the same acceptance.
+
+### v1.3 — still open
+
 | Phase | State | Resume |
 |-------|-------|--------|
-| 20 | verification_deferred_human | /gsd-verify-work 20 |
-| 21 | verification_deferred_human | /gsd-verify-work 21 (import save confirmed live 2026-07-25; remaining: announcements/image, corrupted-file error, source-retention) |
-| 22 | verification_deferred_human | /gsd-verify-work 22 (cleanup dry-run review + media/autoplay e2e) |
-| 23 | verification_deferred_human | /gsd-verify-work 23 (real fullscreen + Esc-sync, real autoplay policy + held-key rapid advance, expired-media degradation, projector legibility, iPad Safari, and the two open overflow judgment calls — see 23-05-SUMMARY.md) |
 | 28 | verification_deferred_human | /gsd-verify-work 28 (one scrollbar/one list, drag-reorder persists, edit propagates to a repeat, duplicate/remove semantics, add-section chips, CCLI paste with a repeated chorus, version history restore, Edit-in-song link from the Slides tab, live-edit reaching an in-use service, and the restored copyright block — see 28-06-SUMMARY.md) |
+
+**v1.3 remains OPEN** to carry the bug/issue fixes the user is about to file.
 
 **Pre-audit hardening TODO (batch before milestone complete):**
 
