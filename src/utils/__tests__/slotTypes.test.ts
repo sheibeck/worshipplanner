@@ -528,6 +528,19 @@ describe('groupBySection', () => {
     }
     expect(grouped.legacy.map((s) => s.id)).toEqual(['s-unknown'])
   })
+
+  it('buckets a post-service slot under the fifth (last) SERVICE_SECTIONS key, alongside the other four (29-05)', () => {
+    const slots: ServiceSlot[] = [
+      { kind: 'PRAYER', id: 's-post', position: 0, section: 'post-service' },
+      { kind: 'MESSAGE', id: 's-message', position: 1, section: 'message' },
+    ]
+    const grouped = groupBySection(slots, (s) => s.section)
+    expect(grouped.sections['post-service'].map((s) => s.id)).toEqual(['s-post'])
+    expect(grouped.sections['message'].map((s) => s.id)).toEqual(['s-message'])
+    expect(grouped.legacy).toEqual([])
+    // Confirmation-by-test, not rework (PATTERNS.md): groupBySection needed no
+    // source change for the fifth member — it iterates SERVICE_SECTIONS.
+  })
 })
 
 describe('flattenBySection', () => {
@@ -551,6 +564,19 @@ describe('flattenBySection', () => {
     const grouped = groupBySection(slots, (s) => s.section)
     expect(Object.keys(grouped.sections).sort()).toEqual([...SERVICE_SECTIONS].sort())
     expect(flattenBySection(grouped).map((s) => s.id)).toEqual(['s-1', 's-2'])
+  })
+
+  it('flattens a post-service slot after every other named section but before legacy (29-05)', () => {
+    const slots: ServiceSlot[] = [
+      { kind: 'PRAYER', id: 's-post', position: 0, section: 'post-service' },
+      { kind: 'PRAYER', id: 's-legacy', position: 1 },
+      { kind: 'MESSAGE', id: 's-message', position: 2, section: 'message' },
+      { kind: 'PRAYER', id: 's-worship', position: 3, section: 'worship' },
+      { kind: 'SONG', id: 's-sending', position: 4, requiredVwType: 1, songId: null, songTitle: null, songKey: null, section: 'sending' },
+    ]
+    const grouped = groupBySection(slots, (s) => s.section)
+    const flattened = flattenBySection(grouped)
+    expect(flattened.map((s) => s.id)).toEqual(['s-worship', 's-message', 's-sending', 's-post', 's-legacy'])
   })
 })
 

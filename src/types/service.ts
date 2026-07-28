@@ -6,19 +6,24 @@ export type ServiceStatus = 'draft' | 'planned' | 'exported'
 export type SlotKind = 'SONG' | 'SCRIPTURE' | 'PRAYER' | 'MESSAGE' | 'HYMN' | 'IMPORTED'
 
 /**
- * Formalized service sections (D005). Exactly these four members — no others.
+ * Formalized service sections (D005). Exactly these five members — no others.
  * SERVICE_SECTIONS below is the single source of truth for the section set;
  * a future per-church configurable section list is a localized change here.
+ * `'post-service'` was appended last (Phase 29, D-Post-Service) — it is
+ * purely additive: `ServiceSlot.section` is already optional, so widening
+ * this union needs no migration or backfill against shipped v1.0 service
+ * documents, which simply render the new section empty.
  */
-export type ServiceSection = 'pre-service' | 'worship' | 'message' | 'sending'
+export type ServiceSection = 'pre-service' | 'worship' | 'message' | 'sending' | 'post-service'
 
-export const SERVICE_SECTIONS: readonly ServiceSection[] = ['pre-service', 'worship', 'message', 'sending']
+export const SERVICE_SECTIONS: readonly ServiceSection[] = ['pre-service', 'worship', 'message', 'sending', 'post-service']
 
 export const SERVICE_SECTION_LABELS: Record<ServiceSection, string> = {
   'pre-service': 'Pre-Service',
   worship: 'Worship',
   message: 'Message',
   sending: 'Sending',
+  'post-service': 'Post-Service',
 }
 
 /**

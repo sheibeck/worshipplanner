@@ -562,7 +562,11 @@
                 :data-testid="`section-empty-${group.key}`"
               >
                 <p class="text-sm text-gray-500">No items yet</p>
-                <p class="mt-1 text-xs text-gray-600">Drag an item here, or set its Section to {{ group.label }}.</p>
+                <p class="mt-1 text-xs text-gray-600">
+                  {{ group.key === 'post-service'
+                    ? 'Drag an item here, or set its Section to Post-Service — runs as people exit, e.g. a cycling announcement deck.'
+                    : `Drag an item here, or set its Section to ${group.label}.` }}
+                </p>
               </div>
 
               <template v-for="{ slot, index } in group.entries" :key="slot.id">

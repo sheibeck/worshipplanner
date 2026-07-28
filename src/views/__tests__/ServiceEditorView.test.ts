@@ -96,8 +96,10 @@ function flatCapture(): SortableCapture | undefined {
 }
 
 // The reported ZTXcpNRcJTalEQp42fTx shape: 8 slots, section-major, across the
-// four sections that exist today — no 'post-service' (29-02's territory, not
-// anticipated here).
+// four ORIGINAL sections — deliberately no 'post-service' slot, so this fixture
+// pins the reorder-repro tests to the pre-29-05 four-section shape while the
+// Post-Service section itself (always rendered, empty here) is covered by its
+// own tests below.
 //   s1 SONG pre-service · s2 SONG worship · s3 SONG worship · s4 SCRIPTURE worship
 //   s5 MESSAGE message · s6 PRAYER message · s7 SONG sending · s8 PRAYER sending
 function makeSectionedService(): Service {
@@ -697,25 +699,26 @@ describe('ServiceEditorView - Section headers and slideshow preview (Phase 20-04
   // slot" (showsSectionHeaderAt was deleted) — every SERVICE_SECTIONS member renders its
   // own header unconditionally, in fixed SERVICE_SECTIONS order, whether or not it holds
   // items (R043).
-  it('renders all four section headers unconditionally, in SERVICE_SECTIONS order (29-03)', async () => {
-    mockServicesList = [buildSectionedService()] // no Pre-Service slot — still renders that header
+  it('renders all five section headers unconditionally, in SERVICE_SECTIONS order, Post-Service last (29-05)', async () => {
+    mockServicesList = [buildSectionedService()] // no Pre-Service or Post-Service slot — still renders both headers
     const wrapper = await mountView()
 
     const headers = wrapper.findAll('[data-testid^="section-header-"]')
-    expect(headers).toHaveLength(4)
+    expect(headers).toHaveLength(5)
     expect(headers[0]?.text()).toContain('Pre-Service')
     expect(headers[1]?.text()).toContain('Worship')
     expect(headers[2]?.text()).toContain('Message')
     expect(headers[3]?.text()).toContain('Sending')
+    expect(headers[4]?.text()).toContain('Post-Service')
   })
 
-  it('renders all four section headers, with placeholders, and routes every slot into the trailing ungrouped container for a legacy service (29-03)', async () => {
+  it('renders all five section headers, with placeholders, and routes every slot into the trailing ungrouped container for a legacy service (29-03/29-05)', async () => {
     mockServicesList = [mockService] // default fixture: no slot carries a `section` field
     const wrapper = await mountView()
 
     const headers = wrapper.findAll('[data-testid^="section-header-"]')
-    expect(headers).toHaveLength(4)
-    for (const section of ['pre-service', 'worship', 'message', 'sending']) {
+    expect(headers).toHaveLength(5)
+    for (const section of ['pre-service', 'worship', 'message', 'sending', 'post-service']) {
       expect(wrapper.find(`[data-testid="section-empty-${section}"]`).exists()).toBe(true)
       expect(wrapper.find(`[data-testid="section-list-${section}"] .slot-item`).exists()).toBe(false)
     }
@@ -733,6 +736,37 @@ describe('ServiceEditorView - Section headers and slideshow preview (Phase 20-04
     const placeholder = preServiceList.find('[data-testid="section-empty-pre-service"]')
     expect(placeholder.exists()).toBe(true)
     expect(placeholder.text()).toContain('No items yet')
+  })
+
+  it('the Post-Service empty placeholder carries the purpose-naming UI-SPEC §2 copy; Pre-Service (also empty in this fixture) carries the generic copy (29-05)', async () => {
+    mockServicesList = [buildSectionedService()] // no Pre-Service or Post-Service slot — both render empty
+    const wrapper = await mountView()
+
+    const postServicePlaceholder = wrapper.find('[data-testid="section-empty-post-service"]')
+    expect(postServicePlaceholder.exists()).toBe(true)
+    expect(postServicePlaceholder.text()).toContain(
+      'Drag an item here, or set its Section to Post-Service — runs as people exit, e.g. a cycling announcement deck.',
+    )
+
+    const preServicePlaceholder = wrapper.find('[data-testid="section-empty-pre-service"]')
+    expect(preServicePlaceholder.exists()).toBe(true)
+    expect(preServicePlaceholder.text()).toContain('Drag an item here, or set its Section to Pre-Service.')
+  })
+
+  it('a Post-Service slot renders inside the Post-Service container and every slot kind is accepted there (29-05)', async () => {
+    mockServicesList = [{
+      ...mockService,
+      slots: [
+        { kind: 'SONG', id: 'ps-song', position: 0, requiredVwType: 1, songId: null, songTitle: null, songKey: null, section: 'post-service' },
+        { kind: 'IMPORTED', id: 'ps-imported', position: 1, importId: null, section: 'post-service' },
+        { kind: 'PRAYER', id: 'ps-prayer', position: 2, section: 'post-service' },
+      ],
+    }]
+    const wrapper = await mountView()
+
+    const postServiceCards = wrapper.find('[data-testid="section-list-post-service"]').findAll('.slot-item')
+    expect(postServiceCards.map((c) => c.attributes('data-slot-id'))).toEqual(['ps-song', 'ps-imported', 'ps-prayer'])
+    expect(wrapper.find('[data-testid="section-empty-post-service"]').exists()).toBe(false)
   })
 
   it('every slot card carries data-slot-id equal to its slot.id, in section-major id order across containers (29-03)', async () => {
@@ -1805,8 +1839,8 @@ describe('ServiceEditorView - Phase 29 reorder repro', () => {
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
 
-    expect(sortableCaptures).toHaveLength(5) // 4 sections + the ungrouped container
-    for (const section of ['pre-service', 'worship', 'message', 'sending']) {
+    expect(sortableCaptures).toHaveLength(6) // 5 sections (including the always-rendered, empty Post-Service) + the ungrouped container
+    for (const section of ['pre-service', 'worship', 'message', 'sending', 'post-service']) {
       expect(captureForSection(section)?.options.group).toBe('service-slots')
     }
     // The ungrouped container has no `data-section` attribute — flatCapture() resolves it.
