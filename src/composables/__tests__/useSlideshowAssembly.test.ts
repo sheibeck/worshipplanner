@@ -411,6 +411,42 @@ describe('useSlideshowAssembly', () => {
     })
   })
 
+  it('assembledSections places a Post-Service group after Sending and before the trailing Ungrouped group, and still omits sections with no slides (29-05)', async () => {
+    const service = ref<Service | null>(
+      makeService([
+        hymnSlot({ position: 0, hymnName: 'Sending Hymn', section: 'sending' }),
+        hymnSlot({ position: 1, hymnName: 'Legacy Hymn' }), // no section — legacy
+        hymnSlot({ position: 2, hymnName: 'Post-Service Hymn', section: 'post-service' }),
+        hymnSlot({ position: 3, hymnName: 'Message Hymn', section: 'message' }),
+        // No 'worship' or 'pre-service' slot — both sections must be omitted entirely,
+        // confirming this composable's assembled-*output* omission behavior is
+        // unchanged (distinct from the editor's always-visible empty sections, R043).
+      ]),
+    )
+
+    const { assembledSections } = useSlideshowAssembly(service, 'org-1')
+    await nextTick()
+
+    expect(assembledSections.value.map((g) => g.section)).toEqual([
+      'message',
+      'sending',
+      'post-service',
+      undefined,
+    ])
+    expect(assembledSections.value.map((g) => g.label)).toEqual([
+      'Message',
+      'Sending',
+      'Post-Service',
+      'Ungrouped',
+    ])
+    expect(assembledSections.value.find((g) => g.section === 'post-service')!.slides[0]!.slide).toMatchObject({
+      body: 'Post-Service Hymn',
+    })
+    // 'worship'/'pre-service' had zero slides — omitted, not emitted empty.
+    expect(assembledSections.value.some((g) => g.section === 'worship')).toBe(false)
+    expect(assembledSections.value.some((g) => g.section === 'pre-service')).toBe(false)
+  })
+
   it('returns an empty assembledSlideshow when the service is null', async () => {
     const service = ref<Service | null>(null)
     const { assembledSlideshow, assembledSections } = useSlideshowAssembly(service, 'org-1')

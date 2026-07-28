@@ -173,4 +173,26 @@ describe('ServicePrintLayout', () => {
     expect(wrapper.text()).toContain('Choir')
     expect(wrapper.text()).toContain('Orchestra')
   })
+
+  // 29-05: confirmation-by-test, not rework — this component has no section
+  // awareness at all (PATTERNS.md), it renders `service.slots` in array order.
+  // The section model guarantees section-major array order, so a Post-Service
+  // item placed last in the array renders last on the printed page for free.
+  it('renders a Post-Service item last for a section-major slots array (29-05)', () => {
+    const sectionMajorService: Service = {
+      ...mockService,
+      slots: [
+        { kind: 'SONG', id: 'slot-worship', position: 0, requiredVwType: 1, songId: 'song-0', songTitle: 'Come Thou Fount', songKey: 'G', section: 'worship' },
+        { kind: 'MESSAGE', id: 'slot-message', position: 1, section: 'message' },
+        { kind: 'SONG', id: 'slot-sending', position: 2, requiredVwType: 3, songId: 'song-2', songTitle: 'Great Is Thy Faithfulness', songKey: 'D', section: 'sending' },
+        { kind: 'PRAYER', id: 'slot-post-service', position: 3, section: 'post-service' },
+      ],
+    }
+    const wrapper = mount(ServicePrintLayout, {
+      props: { service: sectionMajorService, songs: mockSongs },
+    })
+    const slotRows = wrapper.findAll('[data-slot-row]')
+    expect(slotRows).toHaveLength(4)
+    expect(slotRows[slotRows.length - 1]!.text()).toContain('Prayer')
+  })
 })

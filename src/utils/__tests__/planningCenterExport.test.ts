@@ -240,6 +240,28 @@ describe('formatForPlanningCenter', () => {
     const result = formatForPlanningCenter(serviceNoTeams, mockSongs)
     expect(result).toContain('Teams: Standard Band')
   })
+
+  // 29-05: confirmation-by-test, not rework — formatForPlanningCenter has no
+  // section awareness at all (PATTERNS.md), it iterates `service.slots` in
+  // array order. The section model guarantees section-major array order, so a
+  // Post-Service item placed last in the array exports last for free.
+  it('exports a Post-Service item last for a section-major slots array (29-05)', () => {
+    const sectionMajorService: Service = {
+      ...mockService,
+      slots: [
+        { kind: 'SONG', id: 'slot-worship', position: 0, requiredVwType: 1, songId: 'song-0', songTitle: 'Come Thou Fount', songKey: 'G', section: 'worship' },
+        { kind: 'MESSAGE', id: 'slot-message', position: 1, section: 'message' },
+        { kind: 'PRAYER', id: 'slot-post-service', position: 2, section: 'post-service' },
+      ],
+    }
+    const result = formatForPlanningCenter(sectionMajorService, mockSongs)
+    const songLine = result.indexOf('Song 1 -- Come Thou Fount')
+    const messageLine = result.indexOf('Message')
+    const lastPrayerLine = result.lastIndexOf('\nPrayer\n')
+    expect(songLine).toBeGreaterThanOrEqual(0)
+    expect(messageLine).toBeGreaterThan(songLine)
+    expect(lastPrayerLine).toBeGreaterThan(messageLine)
+  })
 })
 
 describe('formatForPlanningCenter - HYMN slots', () => {
