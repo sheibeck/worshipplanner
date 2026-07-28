@@ -275,16 +275,32 @@ export function reconcileSongGroup(group: SlideGroup, slot: SongSlot, inputs: As
   const freshSectionIds = new Set(freshOrder)
 
   const storedLyricEntries = group.slides.filter(isLyricEntry)
-  // Phase 26-09 Task 1: indexed as an ARRAY per sectionId, never collapsed to
-  // a single entry. The panel's Duplicate action (26-09 Task 2) can create a
-  // SECOND stored entry referencing the SAME sectionId (a copy of a
-  // song-section slide) — the pre-26-09 map kept only the LAST entry seen for
-  // a repeated key, so a copy would be silently swallowed the very next time
-  // this song's sections changed, with no confirm gate, because this additive
-  // merge never confirm-gates (it is the same path a plain within-song edit
-  // takes). Every stored entry for a section is kept, in stored order, and
-  // the rebuild below re-emits all of them for that section in that order —
-  // never just the first or the last.
+  // Phase 26-09 Task 1 + Plan 28-03 (D-02): indexed as an ARRAY per
+  // sectionId, never collapsed to a single entry, and consumed POSITIONALLY
+  // below rather than re-emitted wholesale.
+  //
+  // Why an array (26-09): the panel's Duplicate action can create a SECOND
+  // stored entry referencing the SAME sectionId (a copy of a song-section
+  // slide) — a map keyed one-entry-per-section would keep only the last
+  // entry seen for a repeated key, so a copy would be silently swallowed the
+  // very next time this song's sections changed, with no confirm gate,
+  // because this additive merge never confirm-gates (it is the same path a
+  // plain within-song edit takes).
+  //
+  // Why positional consumption (D-02, this plan): once a section can be
+  // REFERENCED more than once in the order (a repeated chorus), the merge
+  // loop below walks `freshOrder` and reaches this section's key once per
+  // occurrence. Re-emitting the WHOLE array on every occurrence — the
+  // pre-fix behavior — multiplies entries on every reconciliation pass (a
+  // chorus with 2 stored entries and 2 occurrences would yield 4, then 8,
+  // then 16). Occurrence `i` of a section now consumes stored entry `i`;
+  // any stored entries beyond the section's occurrence count are surplus and
+  // are emitted once, immediately after the section's LAST occurrence. When
+  // occurrences and stored entries are equal in count there is no surplus
+  // and no growth; when a section has exactly one occurrence and two stored
+  // entries (the 26-09 Duplicate case), that occurrence is also the last, so
+  // both entries still emit adjacently — byte-identical to what 26-09
+  // shipped.
   const storedBySectionId = new Map<string, GroupSlideEntry[]>()
   for (const entry of storedLyricEntries) {
     const existing = storedBySectionId.get(entry.sourceRef.sectionId)
@@ -309,14 +325,33 @@ export function reconcileSongGroup(group: SlideGroup, slot: SongSlot, inputs: As
       : { id: crypto.randomUUID(), order: order++, sourceRef: { kind: 'copyright', songId } },
   )
 
+  // Occurrence count per section id across the whole fresh order — how many
+  // times a repeated section appears, used to find each section's LAST
+  // occurrence (where its stored surplus, if any, is emitted) and to know
+  // when a stored array runs out and a fresh entry must be minted instead.
+  const occurrenceTotals = new Map<string, number>()
+  for (const sectionId of freshOrder) {
+    occurrenceTotals.set(sectionId, (occurrenceTotals.get(sectionId) ?? 0) + 1)
+  }
+  const occurrencesSeen = new Map<string, number>()
+
   for (const sectionId of freshOrder) {
     const stored = storedBySectionId.get(sectionId)
-    if (stored) {
-      for (const entry of stored) {
-        merged.push({ ...entry, order: order++ })
-      }
+    const occurrenceIndex = occurrencesSeen.get(sectionId) ?? 0
+    occurrencesSeen.set(sectionId, occurrenceIndex + 1)
+
+    if (stored && occurrenceIndex < stored.length) {
+      merged.push({ ...stored[occurrenceIndex]!, order: order++ })
     } else {
       merged.push({ id: crypto.randomUUID(), order: order++, sourceRef: { kind: 'lyric', songId, sectionId } })
+    }
+
+    const totalOccurrences = occurrenceTotals.get(sectionId)!
+    const isLastOccurrence = occurrenceIndex + 1 === totalOccurrences
+    if (isLastOccurrence && stored && stored.length > totalOccurrences) {
+      for (let surplusIndex = totalOccurrences; surplusIndex < stored.length; surplusIndex++) {
+        merged.push({ ...stored[surplusIndex]!, order: order++ })
+      }
     }
   }
 
