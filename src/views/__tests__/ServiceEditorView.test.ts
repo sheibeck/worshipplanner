@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from 'vitest'
-import { shallowMount, enableAutoUnmount, DOMWrapper } from '@vue/test-utils'
+import { shallowMount, enableAutoUnmount, DOMWrapper, flushPromises } from '@vue/test-utils'
 import { reactive } from 'vue'
+import type { Options as SortableOptions } from 'sortablejs'
 import type { Service } from '@/types/service'
 import type { Song } from '@/types/song'
 import type { Person, Role, Quarter } from '@/types/roster'
@@ -50,6 +51,70 @@ vi.mock('firebase/firestore', () => ({
   limit: vi.fn(),
   getDocs: vi.fn(() => Promise.resolve({ empty: true, docs: [] })),
 }))
+
+// ── Phase 29-01: multi-instance Sortable capture harness (R044) ────────────────
+// This file mounts the REAL SortableJS library today — no mock existed here
+// before this phase. `Sortable.create()` only wires native drag listeners (no
+// test above triggers a real browser drag), so replacing it with a capturing
+// mock is behavior-neutral for every describe block preceding this one.
+// `sortableCaptures` records EVERY `Sortable.create` call with its container
+// element and options, so a test can invoke `onEnd` directly against the exact
+// options the mounted component registered — generalizes the single-capture
+// pattern already used in SlideGrid.test.ts to the multi-instance shape 29-03
+// introduces (one Sortable instance per section container).
+interface SortableCapture {
+  el: HTMLElement
+  options: SortableOptions
+}
+let sortableCaptures: SortableCapture[] = []
+const mockSlotSortableDestroy = vi.fn()
+vi.mock('sortablejs', () => ({
+  default: {
+    create: vi.fn((el: HTMLElement, options: SortableOptions) => {
+      sortableCaptures.push({ el, options })
+      return { destroy: mockSlotSortableDestroy }
+    }),
+  },
+}))
+
+function resetSortableCaptures(): void {
+  sortableCaptures = []
+  mockSlotSortableDestroy.mockClear()
+}
+
+/** Resolves the capture whose container carries `data-section="{section}"` —
+ *  only resolves once 29-03 splits the flat slot list into per-section
+ *  containers. Resolves to `undefined` against today's flat render. */
+function captureForSection(section: string): SortableCapture | undefined {
+  return sortableCaptures.find((c) => c.el.dataset.section === section)
+}
+
+/** Resolves the single capture with NO `data-section` attribute — today's flat
+ *  container. Stops resolving once every container carries a section (29-03). */
+function flatCapture(): SortableCapture | undefined {
+  return sortableCaptures.find((c) => c.el.dataset.section === undefined)
+}
+
+// The reported ZTXcpNRcJTalEQp42fTx shape: 8 slots, section-major, across the
+// four sections that exist today — no 'post-service' (29-02's territory, not
+// anticipated here).
+//   s1 SONG pre-service · s2 SONG worship · s3 SONG worship · s4 SCRIPTURE worship
+//   s5 MESSAGE message · s6 PRAYER message · s7 SONG sending · s8 PRAYER sending
+function makeSectionedService(): Service {
+  return {
+    ...mockService,
+    slots: [
+      { kind: 'SONG', id: 's1', position: 0, requiredVwType: 1, songId: null, songTitle: null, songKey: null, section: 'pre-service' },
+      { kind: 'SONG', id: 's2', position: 1, requiredVwType: 2, songId: null, songTitle: null, songKey: null, section: 'worship' },
+      { kind: 'SONG', id: 's3', position: 2, requiredVwType: 2, songId: null, songTitle: null, songKey: null, section: 'worship' },
+      { kind: 'SCRIPTURE', id: 's4', position: 3, book: null, chapter: null, verseStart: null, verseEnd: null, section: 'worship' },
+      { kind: 'MESSAGE', id: 's5', position: 4, section: 'message' },
+      { kind: 'PRAYER', id: 's6', position: 5, section: 'message' },
+      { kind: 'SONG', id: 's7', position: 6, requiredVwType: 3, songId: null, songTitle: null, songKey: null, section: 'sending' },
+      { kind: 'PRAYER', id: 's8', position: 7, section: 'sending' },
+    ],
+  }
+}
 
 // useSlideshowAssembly (20-04) reads scripture readings from this store — mirrors
 // the reactive-stub mocking pattern used by ScriptureSlideEditor.test.ts.
@@ -1464,3 +1529,4 @@ describe('ServiceEditorView - no deck editing or deck import on the Service Orde
     expect(wrapper.text()).toContain('Imported Slides — Empty')
   })
 })
+
