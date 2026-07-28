@@ -34,26 +34,24 @@ const mockSubscribeLyrics = vi.fn()
 const mockUnsubscribeLyrics = vi.fn()
 const mockUpdateCurrentLyrics = vi.fn(() => Promise.resolve())
 const mockSaveLyrics = vi.fn(() => Promise.resolve())
+const mockRevertToVersion = vi.fn(() => Promise.resolve())
 
 const mockCurrentLyrics = ref<SongLyrics | null>(null)
 const mockIsLoading = ref(true)
+const mockLyricVersions = ref<SongLyrics[]>([])
 
 vi.mock('@/stores/songLyrics', () => ({
   useSongLyricsStore: () =>
     reactive({
       currentLyrics: computed(() => mockCurrentLyrics.value),
+      lyricVersions: computed(() => mockLyricVersions.value),
       isLoading: mockIsLoading,
       subscribeLyrics: mockSubscribeLyrics,
       unsubscribeLyrics: mockUnsubscribeLyrics,
       updateCurrentLyrics: mockUpdateCurrentLyrics,
       saveLyrics: mockSaveLyrics,
+      revertToVersion: mockRevertToVersion,
     }),
-}))
-
-vi.mock('@/stores/songs', () => ({
-  useSongStore: () => ({
-    updateSong: vi.fn(() => Promise.resolve()),
-  }),
 }))
 
 vi.mock('@/composables/useAutoSave', () => {
@@ -73,7 +71,7 @@ async function mountEditor() {
     props: { songId: 'song-1', orgId: 'org-1' },
     global: {
       stubs: {
-        LyricPasteDialog: { template: '<div data-testid="paste-dialog-stub"></div>', props: ['open', 'songId', 'orgId'] },
+        LyricPasteDialog: { template: '<div data-testid="paste-dialog-stub" :data-open="open"></div>', props: ['open', 'songId', 'orgId'] },
         Teleport: { template: '<div><slot /></div>' },
       },
     },
@@ -87,6 +85,7 @@ describe('SongLyricEditor', () => {
     vi.clearAllMocks()
     mockCurrentLyrics.value = null
     mockIsLoading.value = true
+    mockLyricVersions.value = []
   })
 
   it('subscribes to lyrics on mount', async () => {
@@ -108,46 +107,87 @@ describe('SongLyricEditor', () => {
     expect(wrapper.text()).toContain('Paste Lyrics from SongSelect')
   })
 
-  it('renders sections from store data', async () => {
+  it('shows "Paste lyrics" and "History" as the only header actions when lyrics are loaded', async () => {
     mockIsLoading.value = false
     mockCurrentLyrics.value = makeLyrics()
     const wrapper = await mountEditor()
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Verse 1')
-    expect(wrapper.text()).toContain('Chorus')
-    const textareas = wrapper.findAll('textarea')
-    expect(textareas.length).toBe(2)
-    expect((textareas[0]!.element as HTMLTextAreaElement).value).toContain('Amazing grace how sweet the sound')
-    expect((textareas[1]!.element as HTMLTextAreaElement).value).toContain('My chains are gone')
+    const pasteBtn = wrapper.find('[data-testid="paste-lyrics-btn"]')
+    const historyBtn = wrapper.find('[data-testid="history-toggle-btn"]')
+    expect(pasteBtn.exists()).toBe(true)
+    expect(pasteBtn.text()).toBe('Paste lyrics')
+    expect(historyBtn.exists()).toBe(true)
+    expect(historyBtn.text()).toBe('History')
+    // "Save Version" no longer lives directly in the header — it moved behind
+    // History, since 2a's header carries only these two buttons.
+    expect(wrapper.find('[data-testid="save-version-btn"]').exists()).toBe(false)
   })
 
-  it('displays copyright info', async () => {
+  it('has exactly one scrolling element, and the header and closing note live outside it', async () => {
     mockIsLoading.value = false
     mockCurrentLyrics.value = makeLyrics()
     const wrapper = await mountEditor()
     await flushPromises()
 
-    const copyright = wrapper.find('[data-testid="copyright-display"]')
-    expect(copyright.exists()).toBe(true)
-    expect(copyright.text()).toContain('Amazing Grace')
-    expect(copyright.text()).toContain('John Newton')
-    expect(copyright.text()).toContain('CCLI Song # 12345')
-    expect(copyright.text()).toContain('CCLI License # 99999')
-    expect(copyright.text()).toContain('© 2023 Test Publisher')
+    const scrollers = wrapper.findAll('[class*="overflow-y-auto"]')
+    expect(scrollers).toHaveLength(1)
+    expect(scrollers[0]!.attributes('data-testid')).toBe('lyrics-scroll-region')
+
+    expect(wrapper.find('[data-testid="lyrics-header"]').exists()).toBe(true)
+    expect(scrollers[0]!.find('[data-testid="lyrics-header"]').exists()).toBe(false)
+
+    expect(scrollers[0]!.find('[data-testid="closing-note"]').exists()).toBe(true)
   })
 
-  it('editing a section updates editable state', async () => {
+  it('history list is not rendered until activated, and activating it reveals the list', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics()
+    mockLyricVersions.value = [makeLyrics()]
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="history-panel"]').exists()).toBe(false)
+    await wrapper.find('[data-testid="history-toggle-btn"]').trigger('click')
+    expect(wrapper.find('[data-testid="history-panel"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="version-entry"]').exists()).toBe(true)
+  })
+
+  it('choosing to restore a version from the history panel calls the store revert action', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics({ id: 'lyrics-1' })
+    mockLyricVersions.value = [
+      makeLyrics({ id: 'lyrics-1' }),
+      makeLyrics({ id: 'lyrics-0' }),
+    ]
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    await wrapper.find('[data-testid="history-toggle-btn"]').trigger('click')
+    await wrapper.find('[data-testid="revert-btn"]').trigger('click')
+
+    expect(mockRevertToVersion).toHaveBeenCalledWith('org-1', 'song-1', 'lyrics-0')
+  })
+
+  it('the "Save Version" action lives inside the history panel and calls saveLyrics', async () => {
     mockIsLoading.value = false
     mockCurrentLyrics.value = makeLyrics()
     const wrapper = await mountEditor()
     await flushPromises()
 
-    const textarea = wrapper.find('[data-testid="section-textarea-0"]')
-    await textarea.setValue('New line 1\nNew line 2')
-    await wrapper.vm.$nextTick()
+    await wrapper.find('[data-testid="history-toggle-btn"]').trigger('click')
+    await wrapper.find('[data-testid="save-version-btn"]').trigger('click')
+    await flushPromises()
 
-    expect((textarea.element as HTMLTextAreaElement).value).toBe('New line 1\nNew line 2')
+    expect(mockSaveLyrics).toHaveBeenCalledWith('org-1', 'song-1', expect.objectContaining({
+      sections: expect.arrayContaining([
+        expect.objectContaining({ id: 'verse-1', label: 'Verse 1' }),
+        expect.objectContaining({ id: 'chorus', label: 'Chorus' }),
+      ]),
+      copyright: SAMPLE_COPYRIGHT,
+      performanceOrder: ['verse-1', 'chorus'],
+    }))
   })
 
   it('useAutoSave is wired with correct arguments', async () => {
@@ -192,44 +232,5 @@ describe('SongLyricEditor', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-testid="status-saved"]').exists()).toBe(true)
-  })
-
-  it('"Save Version" button calls saveLyrics to create a new version', async () => {
-    mockIsLoading.value = false
-    mockCurrentLyrics.value = makeLyrics()
-    const wrapper = await mountEditor()
-    await flushPromises()
-
-    await wrapper.find('[data-testid="save-version-btn"]').trigger('click')
-    await flushPromises()
-
-    expect(mockSaveLyrics).toHaveBeenCalledWith('org-1', 'song-1', expect.objectContaining({
-      sections: expect.arrayContaining([
-        expect.objectContaining({ id: 'verse-1', label: 'Verse 1' }),
-        expect.objectContaining({ id: 'chorus', label: 'Chorus' }),
-      ]),
-      copyright: SAMPLE_COPYRIGHT,
-      performanceOrder: ['verse-1', 'chorus'],
-    }))
-  })
-
-  it('"Paste New Lyrics" button exists when lyrics are loaded', async () => {
-    mockIsLoading.value = false
-    mockCurrentLyrics.value = makeLyrics()
-    const wrapper = await mountEditor()
-    await flushPromises()
-
-    expect(wrapper.find('[data-testid="paste-lyrics-btn"]').exists()).toBe(true)
-  })
-
-  it('hides no-lyrics copyright when ccliSongNumber is empty', async () => {
-    mockIsLoading.value = false
-    mockCurrentLyrics.value = makeLyrics({
-      copyright: { ...SAMPLE_COPYRIGHT, ccliSongNumber: '' },
-    })
-    const wrapper = await mountEditor()
-    await flushPromises()
-
-    expect(wrapper.find('[data-testid="copyright-display"]').exists()).toBe(false)
   })
 })

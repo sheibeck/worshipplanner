@@ -29,23 +29,8 @@ vi.mock('@/stores/auth', () => ({
   }),
 }))
 
-vi.mock('@/stores/songLyrics', () => ({
-  useSongLyricsStore: () => ({
-    currentLyrics: null,
-    lyricVersions: [],
-    isLoading: false,
-    subscribeLyrics: vi.fn(),
-    unsubscribeLyrics: vi.fn(),
-    revertToVersion: vi.fn(),
-  }),
-}))
-
 vi.mock('../SongLyricEditor.vue', () => ({
   default: { name: 'SongLyricEditor', template: '<div data-testid="song-lyric-editor" />', props: ['songId', 'orgId'] },
-}))
-
-vi.mock('../LyricVersionHistory.vue', () => ({
-  default: { name: 'LyricVersionHistory', template: '<div data-testid="lyric-version-history" />', props: ['versions', 'currentVersionId'] },
 }))
 
 function makeSong(overrides: Partial<Song> = {}): Song {
@@ -209,6 +194,22 @@ describe('SongSlideOver — tabs', () => {
     await wrapper.find('[data-testid="tab-lyrics"]').trigger('click')
     expect(wrapper.find('[data-testid="song-lyric-editor"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="performance-order-builder"]').exists()).toBe(false)
+  })
+
+  // Task 1 (28-04, R035): the Lyrics tab panel itself must stop scrolling — the
+  // editor owns the sole scroll region. With SongLyricEditor stubbed out here,
+  // this proves SongSlideOver's OWN markup contributes zero scroll containers;
+  // the real editor's single scroll region is verified against the actual
+  // component in SongLyricEditor.test.ts.
+  it('renders the Lyrics tab as a non-scrolling flex column with no scroll wrapper of its own', async () => {
+    const song = makeSong()
+    const wrapper = await mountDrawer(song)
+    await wrapper.find('[data-testid="tab-lyrics"]').trigger('click')
+
+    const tabContent = wrapper.find('[data-testid="lyrics-tab-content"]')
+    expect(tabContent.exists()).toBe(true)
+    expect(tabContent.classes().join(' ')).not.toMatch(/overflow-y-auto|overflow-auto/)
+    expect(wrapper.findAll('[class*="overflow-y-auto"]')).toHaveLength(0)
   })
 })
 
