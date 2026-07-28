@@ -582,4 +582,293 @@ describe('SongLyricEditor', () => {
       performanceOrder: ['verse-1', 'chorus', 'chorus', 'verse-2'],
     }))
   })
+
+  // ── Task 2 (R035/D-02): Duplicate, Remove, and the Add-section row ─────────
+
+  async function saveFnFor(wrapper: Awaited<ReturnType<typeof mountEditor>>) {
+    const { useAutoSave } = await import('@/composables/useAutoSave') as unknown as {
+      useAutoSave: ReturnType<typeof vi.fn>
+    }
+    void wrapper
+    return useAutoSave.mock.calls[0]![1] as () => Promise<void>
+  }
+
+  it('an expanded row shows Duplicate then Remove before the collapse control', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    const rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    const verse1Row = rows[0]!
+    await verse1Row.find('[data-testid^="row-toggle-"]').trigger('click')
+
+    const dup = verse1Row.find('[data-testid="row-duplicate-verse-1#0"]')
+    const rem = verse1Row.find('[data-testid="row-remove-verse-1#0"]')
+    expect(dup.exists()).toBe(true)
+    expect(dup.text()).toBe('Duplicate')
+    expect(rem.exists()).toBe(true)
+    expect(rem.text()).toBe('Remove')
+
+    const html = verse1Row.html()
+    expect(html.indexOf('row-duplicate-verse-1#0')).toBeLessThan(html.indexOf('row-remove-verse-1#0'))
+    expect(html.indexOf('row-remove-verse-1#0')).toBeLessThan(html.indexOf('row-toggle-verse-1#0'))
+  })
+
+  it('Duplicate is also available on a repeat card (duplicating a repeat adds another reference)', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeRepeatLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    const rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    const repeatRow = rows[2]! // chorus#1, the repeat
+    await repeatRow.find('[data-testid^="row-toggle-"]').trigger('click')
+    expect(repeatRow.find('[data-testid="row-duplicate-chorus#1"]').exists()).toBe(true)
+    expect(repeatRow.find('[data-testid="row-remove-chorus#1"]').exists()).toBe(true)
+  })
+
+  it('activating Duplicate inserts a new linked-repeat row directly beneath, sharing the original words', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    let rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    await rows[0]!.find('[data-testid^="row-toggle-"]').trigger('click')
+    await rows[0]!.find('[data-testid="row-duplicate-verse-1#0"]').trigger('click')
+    await flushPromises()
+
+    rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    expect(rows).toHaveLength(3)
+    expect(rows[0]!.attributes('data-testid')).toBe('section-row-verse-1#0')
+    expect(rows[1]!.attributes('data-testid')).toBe('section-row-verse-1#1')
+    expect(rows[1]!.attributes('data-repeat')).toBe('true')
+    expect(rows[1]!.find('[data-testid="row-linked"]').text()).toBe('linked')
+
+    // The row duplicated FROM (verse-1#0) was expanded, so the new repeat
+    // auto-expands too — no forced-open toggle needed here.
+    expect(rows[1]!.find('[data-testid="row-shared-text-verse-1#1"]').text()).toContain('Amazing grace how sweet the sound')
+  })
+
+  it('editing the followed row after duplicating updates both rows (D-02, not a copy)', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    let rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    await rows[0]!.find('[data-testid^="row-toggle-"]').trigger('click')
+    await rows[0]!.find('[data-testid="row-duplicate-verse-1#0"]').trigger('click')
+    await flushPromises()
+
+    rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    const textarea = rows[0]!.find('[data-testid="row-textarea-verse-1"]')
+    await textarea.setValue('Brand new words')
+
+    // The duplicate auto-expanded (its source row was expanded) — assert
+    // directly on its already-visible shared text.
+    expect(rows[1]!.find('[data-testid="row-shared-text-verse-1#1"]').text()).toContain('Brand new words')
+  })
+
+  it('Remove on a row referenced elsewhere removes only that occurrence; the section keeps its words on the other row', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeRepeatLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    let rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    const repeatRow = rows[2]! // chorus#1
+    await repeatRow.find('[data-testid^="row-toggle-"]').trigger('click')
+    await repeatRow.find('[data-testid="row-remove-chorus#1"]').trigger('click')
+    await flushPromises()
+
+    rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    expect(rows).toHaveLength(3)
+    expect(rows.map((r) => r.attributes('data-testid'))).toEqual([
+      'section-row-chorus#0',
+      'section-row-verse-1#0',
+      'section-row-verse-2#0',
+    ])
+    await rows[0]!.find('[data-testid^="row-toggle-"]').trigger('click')
+    const textarea = rows[0]!.find('[data-testid="row-textarea-chorus"]')
+    expect((textarea.element as HTMLTextAreaElement).value).toBe('Bless the Lord\nO my soul')
+  })
+
+  it("Remove on a section's only occurrence removes both the row and the section's words from the document", async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    let rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    const chorusRow = rows[1]!
+    await chorusRow.find('[data-testid^="row-toggle-"]').trigger('click')
+    await chorusRow.find('[data-testid="row-remove-chorus#0"]').trigger('click')
+    await flushPromises()
+
+    rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    expect(rows).toHaveLength(1)
+    expect(wrapper.text()).not.toContain('My chains are gone')
+
+    const saveFn = await saveFnFor(wrapper)
+    mockUpdateCurrentLyrics.mockClear()
+    await saveFn()
+    const call = mockUpdateCurrentLyrics.mock.calls[0] as unknown as [string, string, string, { sections: LyricSection[] }]
+    const sections = call[3].sections
+    expect(sections.find((s) => s.id === 'chorus')).toBeUndefined()
+  })
+
+  it('removing the followed row of a repeated pair leaves the survivor as an ordinary row, not a repeat pointing at nothing', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeRepeatLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    let rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    const followedChorusRow = rows[0]! // chorus#0
+    await followedChorusRow.find('[data-testid^="row-toggle-"]').trigger('click')
+    await followedChorusRow.find('[data-testid="row-remove-chorus#0"]').trigger('click')
+    await flushPromises()
+
+    rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    expect(rows).toHaveLength(3)
+    const survivor = rows.find((r) => r.attributes('data-testid') === 'section-row-chorus#0')
+    expect(survivor).toBeDefined()
+    expect(survivor!.attributes('data-repeat')).toBe('false')
+  })
+
+  it('the add row renders the five quick-add chips in mockup order', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    const addRow = wrapper.find('[data-testid="add-section-row"]')
+    expect(addRow.exists()).toBe(true)
+    const chips = addRow.findAll('button')
+    expect(chips.map((c) => c.text())).toEqual(['Verse', 'Chorus', 'Bridge', 'Tag', 'Ending'])
+  })
+
+  it('activating a chip appends a new empty row under that kind, and expands it', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    await wrapper.find('[data-testid="add-section-chip-Chorus"]').trigger('click')
+    await flushPromises()
+
+    const rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    expect(rows).toHaveLength(3)
+    const newRow = rows[2]!
+    expect(newRow.text()).toContain('CHORUS 2')
+    const textarea = newRow.find('textarea')
+    expect(textarea.exists()).toBe(true)
+    expect((textarea.element as HTMLTextAreaElement).value).toBe('')
+  })
+
+  it('activating the same chip twice yields two distinct sections with distinct labels and ids', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics({ sections: [], performanceOrder: [] })
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    await wrapper.find('[data-testid="add-section-chip-Verse"]').trigger('click')
+    await flushPromises()
+    await wrapper.find('[data-testid="add-section-chip-Verse"]').trigger('click')
+    await flushPromises()
+
+    const rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    expect(rows).toHaveLength(2)
+    const testids = rows.map((r) => r.attributes('data-testid'))
+    expect(testids[0]).not.toBe(testids[1])
+    expect(rows[0]!.text()).toContain('VERSE')
+    expect(rows[1]!.text()).toContain('VERSE 2')
+  })
+
+  it("the closing note's count tracks duplicate, remove, and add actions", async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+    expect(wrapper.find('[data-testid="closing-note"]').text()).toContain('2 sections')
+
+    await wrapper.find('[data-testid="add-section-chip-Bridge"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="closing-note"]').text()).toContain('3 sections')
+
+    let rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    await rows[0]!.find('[data-testid^="row-toggle-"]').trigger('click')
+    await rows[0]!.find('[data-testid="row-duplicate-verse-1#0"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="closing-note"]').text()).toContain('4 sections')
+
+    rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    const lastRow = rows[rows.length - 1]!
+    // The Bridge row added above auto-expanded itself (addSection expands
+    // its new row), so Duplicate/Remove are already visible here.
+    const removeBtn = lastRow.find('button[data-testid^="row-remove-"]')
+    await removeBtn.trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="closing-note"]').text()).toContain('3 sections')
+  })
+
+  it('Duplicate saves once with both fields', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+    const saveFn = await saveFnFor(wrapper)
+
+    const rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    await rows[0]!.find('[data-testid^="row-toggle-"]').trigger('click')
+    await rows[0]!.find('[data-testid="row-duplicate-verse-1#0"]').trigger('click')
+    await flushPromises()
+
+    mockUpdateCurrentLyrics.mockClear()
+    await saveFn()
+    expect(mockUpdateCurrentLyrics).toHaveBeenCalledTimes(1)
+    expect(mockUpdateCurrentLyrics).toHaveBeenCalledWith('org-1', 'song-1', 'lyrics-1', expect.objectContaining({
+      performanceOrder: ['verse-1', 'verse-1', 'chorus'],
+    }))
+  })
+
+  it('Remove saves once with both fields', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+    const saveFn = await saveFnFor(wrapper)
+
+    const rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    await rows[1]!.find('[data-testid^="row-toggle-"]').trigger('click')
+    await rows[1]!.find('[data-testid="row-remove-chorus#0"]').trigger('click')
+    await flushPromises()
+
+    mockUpdateCurrentLyrics.mockClear()
+    await saveFn()
+    expect(mockUpdateCurrentLyrics).toHaveBeenCalledTimes(1)
+    expect(mockUpdateCurrentLyrics).toHaveBeenCalledWith('org-1', 'song-1', 'lyrics-1', expect.objectContaining({
+      performanceOrder: ['verse-1'],
+    }))
+  })
+
+  it('Add section saves once with both fields', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+    const saveFn = await saveFnFor(wrapper)
+
+    await wrapper.find('[data-testid="add-section-chip-Tag"]').trigger('click')
+    await flushPromises()
+
+    mockUpdateCurrentLyrics.mockClear()
+    await saveFn()
+    expect(mockUpdateCurrentLyrics).toHaveBeenCalledTimes(1)
+    expect(mockUpdateCurrentLyrics).toHaveBeenCalledWith('org-1', 'song-1', 'lyrics-1', expect.objectContaining({
+      performanceOrder: ['verse-1', 'chorus', 'tag'],
+    }))
+  })
 })
