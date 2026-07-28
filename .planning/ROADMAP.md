@@ -301,7 +301,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2)*
 
-- [ ] 28-03-PLAN.md — Repeat-safe song reconciliation (the 26-09 follow-through)
+- [x] 28-03-PLAN.md — Repeat-safe song reconciliation (the 26-09 follow-through)
 
 **Wave 4** *(blocked on Wave 2)*
 
