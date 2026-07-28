@@ -35,6 +35,14 @@ Plan: — (not yet planned)
 Status: Roadmap created — ready to plan Phase 29
 Last activity: 2026-07-28 — ROADMAP.md created for v1.4 (Phases 29-37); REQUIREMENTS.md traceability filled, 34/34 requirements mapped, 0 unmapped
 
+## ★ v1.4 AUTONOMOUS RUN — standing decisions (2026-07-28)
+
+- **Phase 37 (PPTX rendering): BUILD BUT DO NOT DEPLOY.** Write the Cloud Run service, Dockerfile,
+  bridging Cloud Function and tests, then STOP and hand the owner the exact `gcloud run deploy`
+  command. Deploying provisions billable infrastructure — it is the owner's call, not the run's.
+- **Backlog 999.1 is excluded from autonomous runs.** Phase discovery returns it (it sorts after 37),
+  but it must be promoted deliberately via `/gsd-review-backlog`. Scope autonomous with `--to 37`.
+
 ## ★ v1.4 RESEARCH FINDINGS — read before planning any v1.4 phase
 
 Full detail in `.planning/research/`. Recorded here because phase planners read STATE.md.
