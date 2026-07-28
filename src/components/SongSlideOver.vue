@@ -277,12 +277,6 @@
             :song-id="props.song!.id"
             :org-id="orgId"
           />
-          <PerformanceOrderBuilder
-            v-if="songLyricsStore.currentLyrics"
-            :sections="songLyricsStore.currentLyrics.sections"
-            :performance-order="songLyricsStore.currentLyrics.performanceOrder"
-            @update:performance-order="onPerformanceOrderUpdate"
-          />
           <LyricVersionHistory
             v-if="songLyricsStore.lyricVersions.length > 0"
             :versions="songLyricsStore.lyricVersions"
@@ -303,7 +297,6 @@ import { useAuthStore } from '@/stores/auth'
 import { useSongLyricsStore } from '@/stores/songLyrics'
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import SongLyricEditor from './SongLyricEditor.vue'
-import PerformanceOrderBuilder from './PerformanceOrderBuilder.vue'
 import LyricVersionHistory from './LyricVersionHistory.vue'
 import type { Song, Arrangement, VWType } from '@/types/song'
 import type { SongEditTab } from '@/utils/songEditLink'
@@ -568,11 +561,6 @@ async function onDelete() {
 }
 
 // ── Lyrics tab helpers ────────────────────────────────────────────────────────
-
-async function onPerformanceOrderUpdate(order: string[]) {
-  if (!props.song) return
-  await songLyricsStore.updatePerformanceOrder(orgId.value, props.song.id, order)
-}
 
 async function onRevertVersion(versionId: string) {
   if (!props.song) return

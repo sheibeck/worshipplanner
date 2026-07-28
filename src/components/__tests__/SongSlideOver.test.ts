@@ -36,17 +36,12 @@ vi.mock('@/stores/songLyrics', () => ({
     isLoading: false,
     subscribeLyrics: vi.fn(),
     unsubscribeLyrics: vi.fn(),
-    updatePerformanceOrder: vi.fn(),
     revertToVersion: vi.fn(),
   }),
 }))
 
 vi.mock('../SongLyricEditor.vue', () => ({
   default: { name: 'SongLyricEditor', template: '<div data-testid="song-lyric-editor" />', props: ['songId', 'orgId'] },
-}))
-
-vi.mock('../PerformanceOrderBuilder.vue', () => ({
-  default: { name: 'PerformanceOrderBuilder', template: '<div data-testid="performance-order-builder" />', props: ['sections', 'performanceOrder'] },
 }))
 
 vi.mock('../LyricVersionHistory.vue', () => ({
@@ -202,6 +197,18 @@ describe('SongSlideOver — tabs', () => {
     await wrapper.find('[data-testid="tab-lyrics"]').trigger('click')
     expect(wrapper.find('[data-testid="lyrics-tab-content"]').exists()).toBe(true)
     expect(wrapper.find('input[placeholder="Song title"]').exists()).toBe(false)
+  })
+
+  // 28-02 Task 3 (R035/D-01): the Lyrics tab mounts ONE editor and no second
+  // list — PerformanceOrderBuilder is deleted from disk, so the Lyrics tab's
+  // only child surface is the lyric editor (plus version history, out of
+  // scope here). Regression guard against reintroducing a second list.
+  it('mounts the lyric editor and no second list on the Lyrics tab', async () => {
+    const song = makeSong()
+    const wrapper = await mountDrawer(song)
+    await wrapper.find('[data-testid="tab-lyrics"]').trigger('click')
+    expect(wrapper.find('[data-testid="song-lyric-editor"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="performance-order-builder"]').exists()).toBe(false)
   })
 })
 

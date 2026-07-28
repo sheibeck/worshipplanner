@@ -3,17 +3,10 @@ import { mount } from '@vue/test-utils'
 import LyricPasteDialog from '../LyricPasteDialog.vue'
 
 const mockSaveLyrics = vi.fn(() => Promise.resolve())
-const mockUpdateSong = vi.fn(() => Promise.resolve())
 
 vi.mock('@/stores/songLyrics', () => ({
   useSongLyricsStore: () => ({
     saveLyrics: mockSaveLyrics,
-  }),
-}))
-
-vi.mock('@/stores/songs', () => ({
-  useSongStore: () => ({
-    updateSong: mockUpdateSong,
   }),
 }))
 
@@ -24,6 +17,32 @@ Amazing grace how sweet the sound
 That saved a wretch like me
 I once was lost but now am found
 Was blind but now I see
+
+Chorus
+My chains are gone
+I've been set free
+
+CCLI Song # 12345
+John Newton
+© 2023 Test Publisher
+For use solely with the SongSelect Terms of Use.  All rights reserved. http://ccli.com
+CCLI License # 99999`
+
+// A paste whose Chorus marker repeats verbatim — D-02/D006: normalizeParsedSections
+// must pool this to ONE section referenced twice, not two duplicated sections.
+const SAMPLE_CCLI_REPEATED_CHORUS = `Amazing Grace
+
+Verse 1
+Amazing grace how sweet the sound
+That saved a wretch like me
+
+Chorus
+My chains are gone
+I've been set free
+
+Verse 2
+Through many dangers toils and snares
+I have already come
 
 Chorus
 My chains are gone
@@ -101,7 +120,9 @@ describe('LyricPasteDialog', () => {
     expect(wrapper.text()).toContain('No sections detected')
   })
 
-  it('calls saveLyrics and updateSong on confirm', async () => {
+  // 28-02 Task 3 (R035/D-03): a paste performs ONE order write, to the lyrics
+  // document alone — the Song-doc duplicate write is gone.
+  it('calls saveLyrics with sections and performanceOrder together, with no song-store write', async () => {
     const wrapper = await mountDialog()
     await wrapper.find('textarea').setValue(SAMPLE_CCLI)
     await wrapper.vm.$nextTick()
@@ -110,6 +131,7 @@ describe('LyricPasteDialog', () => {
       expect(mockSaveLyrics).toHaveBeenCalled()
     })
 
+    expect(mockSaveLyrics).toHaveBeenCalledTimes(1)
     expect(mockSaveLyrics).toHaveBeenCalledWith('org-1', 'song-1', expect.objectContaining({
       sections: expect.arrayContaining([
         expect.objectContaining({ label: 'Verse 1' }),
@@ -117,9 +139,25 @@ describe('LyricPasteDialog', () => {
       ]),
       performanceOrder: expect.arrayContaining(['verse-1', 'chorus']),
     }))
-    expect(mockUpdateSong).toHaveBeenCalledWith('song-1', {
-      performanceOrder: expect.arrayContaining(['verse-1', 'chorus']),
+  })
+
+  // D006/D-02: a parse containing a repeated section marker saves one pooled
+  // section referenced twice in the order, not two duplicated sections.
+  it('pools a repeated section marker into one section with two order entries', async () => {
+    const wrapper = await mountDialog()
+    await wrapper.find('textarea').setValue(SAMPLE_CCLI_REPEATED_CHORUS)
+    await wrapper.vm.$nextTick()
+    await wrapper.find('[data-testid="confirm-btn"]').trigger('click')
+    await vi.waitFor(() => {
+      expect(mockSaveLyrics).toHaveBeenCalled()
     })
+
+    const [, , data] = mockSaveLyrics.mock.calls[0] as unknown as [string, string, { sections: { id: string }[]; performanceOrder: string[] }]
+    const chorusSections = data.sections.filter((s) => s.id === 'chorus')
+    expect(chorusSections).toHaveLength(1)
+    const chorusOrderEntries = data.performanceOrder.filter((id) => id === 'chorus')
+    expect(chorusOrderEntries).toHaveLength(2)
+    expect(data.performanceOrder).toEqual(['verse-1', 'chorus', 'verse-2', 'chorus'])
   })
 
   it('emits saved after successful confirm', async () => {

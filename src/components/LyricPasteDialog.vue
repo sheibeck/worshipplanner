@@ -151,8 +151,8 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { parseCCLIPaste } from '@/utils/ccliParser'
+import { normalizeParsedSections } from '@/utils/songSectionOrder'
 import { useSongLyricsStore } from '@/stores/songLyrics'
-import { useSongStore } from '@/stores/songs'
 
 const props = defineProps<{
   open: boolean
@@ -170,7 +170,6 @@ const isSaving = ref(false)
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 
 const songLyricsStore = useSongLyricsStore()
-const songStore = useSongStore()
 
 const parsed = computed(() => parseCCLIPaste(rawText.value))
 const canConfirm = computed(() => parsed.value.sections.length > 0 && !isSaving.value)
@@ -187,14 +186,15 @@ async function onConfirm() {
   isSaving.value = true
   try {
     const result = parsed.value
-    const defaultOrder = result.sections.map((s) => s.id)
+    // D006/D-02: fold repeated section markers into pool references before
+    // saving, so a paste whose text names the same section twice stores one
+    // canonical section referenced twice, not two copies. Single order write
+    // to the lyrics document — R035/D-03 removed the Song-doc duplicate.
+    const normalized = normalizeParsedSections(result)
     await songLyricsStore.saveLyrics(props.orgId, props.songId, {
-      sections: result.sections,
+      sections: normalized.sections,
       copyright: result.copyright,
-      performanceOrder: defaultOrder,
-    })
-    await songStore.updateSong(props.songId, {
-      performanceOrder: defaultOrder,
+      performanceOrder: normalized.performanceOrder,
     })
     emit('saved')
   } finally {
