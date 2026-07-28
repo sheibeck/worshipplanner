@@ -1,8 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { ref, computed, reactive } from 'vue'
+import type { Options as SortableOptions } from 'sortablejs'
 import SongLyricEditor from '../SongLyricEditor.vue'
 import type { SongLyrics, LyricSection, CopyrightInfo } from '@/types/songLyrics'
+
+// --- 28-05 Task 1: capture the options passed to Sortable.create so onEnd can
+// be invoked directly — reproduces the SlideGrid.test.ts / ServiceEditorView
+// convention. jsdom cannot produce a real drag. ---
+let capturedSortableOptions: SortableOptions | undefined
+const mockSortableDestroy = vi.fn()
+vi.mock('sortablejs', () => ({
+  default: {
+    create: vi.fn((_el: HTMLElement, options: SortableOptions) => {
+      capturedSortableOptions = options
+      return { destroy: mockSortableDestroy }
+    }),
+  },
+}))
 
 const SAMPLE_COPYRIGHT: CopyrightInfo = {
   title: 'Amazing Grace',
@@ -100,6 +115,8 @@ describe('SongLyricEditor', () => {
     mockCurrentLyrics.value = null
     mockIsLoading.value = true
     mockLyricVersions.value = []
+    capturedSortableOptions = undefined
+    mockSortableDestroy.mockClear()
   })
 
   it('subscribes to lyrics on mount', async () => {
@@ -387,5 +404,182 @@ describe('SongLyricEditor', () => {
     await flushPromises()
 
     expect(mockUpdateCurrentLyrics).not.toHaveBeenCalled()
+  })
+
+  // ── Task 1 (R035/D-01): always-on drag reorder by handle ───────────────────
+
+  function simulateDragEnd(oldIndex: number, newIndex: number, rowCount: number) {
+    const parent = document.createElement('div')
+    const children = Array.from({ length: rowCount }, () => document.createElement('div'))
+    children.forEach((c) => parent.appendChild(c))
+    const item = children[oldIndex]!
+    return capturedSortableOptions!.onEnd!({ oldIndex, newIndex, item } as never)
+  }
+
+  it('creates the drag instance over the row list, handle-scoped, matching the slot list animation/ghost config', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeRepeatLyrics()
+    await mountEditor()
+    await flushPromises()
+
+    expect(capturedSortableOptions).toBeDefined()
+    expect(capturedSortableOptions!.handle).toBe('.drag-handle')
+    expect(capturedSortableOptions!.animation).toBe(150)
+    expect(capturedSortableOptions!.ghostClass).toBe('opacity-30')
+  })
+
+  it('invoking the captured end handler reorders the rendered rows and the editable order to the moved sequence', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeRepeatLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    // REPEAT_ORDER = ['chorus', 'verse-1', 'chorus', 'verse-2']; moving index
+    // 0 to index 2 yields ['verse-1', 'chorus', 'chorus', 'verse-2'].
+    await simulateDragEnd(0, 2, 4)
+    await flushPromises()
+
+    const rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    expect(rows).toHaveLength(4)
+    const sectionIds = rows.map((r) => r.attributes('data-testid'))
+    expect(sectionIds).toEqual([
+      'section-row-verse-1#0',
+      'section-row-chorus#0',
+      'section-row-chorus#1',
+      'section-row-verse-2#0',
+    ])
+  })
+
+  it('is a no-op when old and new index are equal', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeRepeatLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    await simulateDragEnd(1, 1, 4)
+    await flushPromises()
+
+    const rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    expect(rows.map((r) => r.attributes('data-testid'))).toEqual([
+      'section-row-chorus#0',
+      'section-row-verse-1#0',
+      'section-row-chorus#1',
+      'section-row-verse-2#0',
+    ])
+  })
+
+  it('is a no-op when either index is absent', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeRepeatLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    const parent = document.createElement('div')
+    const item = document.createElement('div')
+    parent.appendChild(item)
+    await capturedSortableOptions!.onEnd!({ oldIndex: undefined, newIndex: 2, item } as never)
+    await capturedSortableOptions!.onEnd!({ oldIndex: 0, newIndex: undefined, item } as never)
+    await flushPromises()
+
+    const rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    expect(rows.map((r) => r.attributes('data-testid'))).toEqual([
+      'section-row-chorus#0',
+      'section-row-verse-1#0',
+      'section-row-chorus#1',
+      'section-row-verse-2#0',
+    ])
+  })
+
+  it('moving one occurrence of a twice-referenced section moves only that occurrence, leaving the sibling in place', async () => {
+    mockIsLoading.value = false
+    // Order: [chorus, verse-1, verse-2, chorus] — move verse-1 (index 1) to
+    // the end (index 3): [chorus, verse-2, chorus, verse-1]. Neither chorus
+    // occurrence should move.
+    mockCurrentLyrics.value = makeLyrics({
+      sections: REPEAT_SECTIONS,
+      performanceOrder: ['chorus', 'verse-1', 'verse-2', 'chorus'],
+    })
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    await simulateDragEnd(1, 3, 4)
+    await flushPromises()
+
+    const rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    expect(rows.map((r) => r.attributes('data-testid'))).toEqual([
+      'section-row-chorus#0',
+      'section-row-verse-2#0',
+      'section-row-chorus#1',
+      'section-row-verse-1#0',
+    ])
+  })
+
+  it('row numbering re-derives after a move, reading 1..N with no gaps', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeRepeatLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    await simulateDragEnd(0, 2, 4)
+    await flushPromises()
+
+    const rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    const positions = rows.map((r) => r.find('[data-testid="row-position"]').text())
+    expect(positions).toEqual(['1', '2', '3', '4'])
+  })
+
+  it('a repeat dragged above the row it followed becomes the followed row, and the other becomes the repeat', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeRepeatLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    // REPEAT_ORDER = ['chorus', 'verse-1', 'chorus', 'verse-2']; the chorus
+    // at index 2 is currently the repeat (follows row 1). Move it to index 0
+    // so it becomes the earliest occurrence.
+    await simulateDragEnd(2, 0, 4)
+    await flushPromises()
+
+    const rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    expect(rows[0]!.attributes('data-repeat')).toBe('false')
+    // The chorus now at the later position is the repeat, following row 1.
+    const repeatRow = rows.find((r) => r.attributes('data-repeat') === 'true')
+    expect(repeatRow).toBeDefined()
+    expect(repeatRow!.find('[data-testid="row-repeat-note"]').text()).toContain('1')
+  })
+
+  it('destroys the drag instance on unmount', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeRepeatLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    expect(capturedSortableOptions).toBeDefined()
+    wrapper.unmount()
+    expect(mockSortableDestroy).toHaveBeenCalled()
+  })
+
+  it('after a move settles, the lyrics document is updated once with sections and order together', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeRepeatLyrics()
+    await mountEditor()
+    await flushPromises()
+
+    const { useAutoSave } = await import('@/composables/useAutoSave') as unknown as {
+      useAutoSave: ReturnType<typeof vi.fn>
+    }
+    const saveFn = useAutoSave.mock.calls[0]![1] as () => Promise<void>
+
+    await simulateDragEnd(0, 2, 4)
+    await flushPromises()
+
+    mockUpdateCurrentLyrics.mockClear()
+    await saveFn()
+
+    expect(mockUpdateCurrentLyrics).toHaveBeenCalledTimes(1)
+    expect(mockUpdateCurrentLyrics).toHaveBeenCalledWith('org-1', 'song-1', 'lyrics-1', expect.objectContaining({
+      sections: expect.any(Array),
+      performanceOrder: ['verse-1', 'chorus', 'chorus', 'verse-2'],
+    }))
   })
 })
