@@ -71,10 +71,12 @@ describe("cleanupExpiredMediaHandler", () => {
   afterEach(() => {
     vi.mocked(getStorage).mockReset();
     vi.mocked(getFirestore).mockReset();
+    delete process.env.MEDIA_CLEANUP_ENABLED;
     delete process.env.MEDIA_CLEANUP_DRY_RUN;
   });
 
-  it("deletes a media file older than the retention window", async () => {
+  it("deletes a media file older than the retention window when explicitly enabled", async () => {
+    process.env.MEDIA_CLEANUP_ENABLED = "true";
     const old = fakeFile("orgs/orgA/media/m1/old.mp4", RETENTION_DAYS + 6);
     mockBucket([old]);
 
@@ -84,7 +86,44 @@ describe("cleanupExpiredMediaHandler", () => {
     expect(summary).toMatchObject({ deletedCount: 1, dryRun: false });
   });
 
+  it("FAILS SAFE: deletes nothing when MEDIA_CLEANUP_ENABLED is unset, even for an expired file", async () => {
+    // Regression guard for the 22-03 defect: the gate used to be
+    // `MEDIA_CLEANUP_DRY_RUN === "true"`, so an unset env var meant LIVE
+    // deletion on a daily schedule. Unset must mean dry-run.
+    const old = fakeFile("orgs/orgA/media/m1/old.mp4", RETENTION_DAYS + 6);
+    mockBucket([old]);
+
+    const summary = await cleanupExpiredMediaHandler();
+
+    expect(old.delete).not.toHaveBeenCalled();
+    expect(summary).toMatchObject({ dryRun: true, deletedCount: 1, scannedCount: 1 });
+  });
+
+  it("FAILS SAFE: a stray MEDIA_CLEANUP_DRY_RUN=false does not enable deletion", async () => {
+    // The old flag is no longer read; only MEDIA_CLEANUP_ENABLED opts in.
+    process.env.MEDIA_CLEANUP_DRY_RUN = "false";
+    const old = fakeFile("orgs/orgA/media/m1/old.mp4", RETENTION_DAYS + 6);
+    mockBucket([old]);
+
+    const summary = await cleanupExpiredMediaHandler();
+
+    expect(old.delete).not.toHaveBeenCalled();
+    expect(summary.dryRun).toBe(true);
+  });
+
+  it("FAILS SAFE: a non-\"true\" MEDIA_CLEANUP_ENABLED value does not enable deletion", async () => {
+    process.env.MEDIA_CLEANUP_ENABLED = "1";
+    const old = fakeFile("orgs/orgA/media/m1/old.mp4", RETENTION_DAYS + 6);
+    mockBucket([old]);
+
+    const summary = await cleanupExpiredMediaHandler();
+
+    expect(old.delete).not.toHaveBeenCalled();
+    expect(summary.dryRun).toBe(true);
+  });
+
   it("does not delete a recent media file", async () => {
+    process.env.MEDIA_CLEANUP_ENABLED = "true";
     const recent = fakeFile("orgs/orgA/media/m2/new.mp3", 3);
     mockBucket([recent]);
 
@@ -95,6 +134,7 @@ describe("cleanupExpiredMediaHandler", () => {
   });
 
   it("never deletes a non-media (pptx-imports) object even when old", async () => {
+    process.env.MEDIA_CLEANUP_ENABLED = "true";
     const oldPptx = fakeFile("orgs/orgA/pptx-imports/i1/deck.pptx", 60);
     mockBucket([oldPptx]);
 
@@ -104,7 +144,6 @@ describe("cleanupExpiredMediaHandler", () => {
   });
 
   it("dry-run mode counts/logs an old media file but calls no delete, and reports deletedCount via the dry-run count", async () => {
-    process.env.MEDIA_CLEANUP_DRY_RUN = "true";
     const old = fakeFile("orgs/orgA/media/m1/old.mp4", 20);
     mockBucket([old]);
 
@@ -124,6 +163,7 @@ describe("cleanupExpiredMediaHandler", () => {
   });
 
   it("is idempotent by age: a second run against a bucket missing the already-deleted file performs no further deletes", async () => {
+    process.env.MEDIA_CLEANUP_ENABLED = "true";
     const old = fakeFile("orgs/orgA/media/m1/old.mp4", 20);
     const recent = fakeFile("orgs/orgA/media/m2/new.mp3", 3);
     const { getFiles } = mockBucket([old, recent]);

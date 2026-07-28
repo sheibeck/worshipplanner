@@ -215,9 +215,16 @@ export const parsePptx = onCall(
 // - This handler imports NO Firestore API at all. It is structurally
 //   incapable of touching slide documents, slot metadata, or slide text --
 //   it can only ever list/delete Storage objects.
-// - Defaults to dry-run (MEDIA_CLEANUP_DRY_RUN unset or not "true"): scans and
-//   logs what WOULD be deleted, deletes nothing. A human must review a dry-run
-//   before flipping this to live deletion (see the plan's human-verify gate).
+// - FAILS SAFE: deletion requires an explicit opt-in, MEDIA_CLEANUP_ENABLED="true".
+//   With it unset (or any other value) the run is a dry-run: it scans and logs
+//   what WOULD be deleted and deletes nothing. A human must review a dry-run
+//   before enabling live deletion.
+//
+//   History: this shipped in 22-03 gated on `MEDIA_CLEANUP_DRY_RUN === "true"`,
+//   which meant an UNSET env var produced LIVE deletion -- while the comment here
+//   claimed the opposite. A destructive daily scheduled job must default to safe,
+//   so the gate was inverted to an explicit enable. `MEDIA_CLEANUP_DRY_RUN` is no
+//   longer read at all; setting it has no effect.
 // - Idempotent by age: deletion eligibility depends only on an object's own
 //   timeCreated vs "now", never on prior-run state, so a partially-failed run
 //   is safely retried by the next daily invocation. Per-file deletes are each
@@ -245,7 +252,9 @@ export interface CleanupSummary {
  * unit-tested directly against a mocked bucket.
  */
 export async function cleanupExpiredMediaHandler(): Promise<CleanupSummary> {
-  const dryRun = process.env.MEDIA_CLEANUP_DRY_RUN === "true";
+  // Fail safe: only an explicit opt-in enables real deletion. Anything else --
+  // unset, empty, "false", a typo -- leaves this a dry run.
+  const dryRun = process.env.MEDIA_CLEANUP_ENABLED !== "true";
   const bucket = getStorage().bucket();
   const cutoffMs = Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
