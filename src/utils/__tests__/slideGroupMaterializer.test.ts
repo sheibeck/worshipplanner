@@ -91,7 +91,6 @@ function makeImportedDeck(overrides: Partial<ImportedDeck> = {}): ImportedDeck {
 function makeInputs(overrides: Partial<AssemblyInputs> = {}): AssemblyInputs {
   return {
     songLyricsById: new Map(),
-    performanceOrderById: new Map(),
     scriptureReadingsById: new Map(),
     importedDecksById: new Map(),
     groupsBySlotId: new Map(),

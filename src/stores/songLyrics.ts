@@ -132,20 +132,6 @@ export const useSongLyricsStore = defineStore('songLyrics', () => {
     )
   }
 
-  /**
-   * Update the performanceOrder field on the Song doc itself (not lyrics subcollection).
-   */
-  async function updatePerformanceOrder(
-    orgId: string,
-    songId: string,
-    order: string[],
-  ) {
-    await updateDoc(doc(db, 'organizations', orgId, 'songs', songId), {
-      performanceOrder: order,
-      updatedAt: serverTimestamp(),
-    })
-  }
-
   return {
     lyrics,
     isLoading,
@@ -156,6 +142,5 @@ export const useSongLyricsStore = defineStore('songLyrics', () => {
     saveLyrics,
     updateCurrentLyrics,
     revertToVersion,
-    updatePerformanceOrder,
   }
 })

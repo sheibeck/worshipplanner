@@ -37,7 +37,6 @@ import { slotLabel } from './slotTypes'
 /** Content maps the assembly engine resolves slots against. Pre-loaded by the caller. */
 export interface AssemblyInputs {
   songLyricsById: Map<string, SongLyrics>
-  performanceOrderById: Map<string, string[]>
   scriptureReadingsById: Map<string, ScriptureReading>
   importedDecksById: Map<string, ImportedDeck>
   /**
@@ -52,19 +51,6 @@ export interface AssemblyInputs {
 /** A Slide variant's fields minus the id/position this engine assigns on emit. */
 type DistributiveOmit<T, K extends keyof any> = T extends unknown ? Omit<T, K> : never
 type SlideContent = DistributiveOmit<Slide, 'id' | 'position'>
-
-/**
- * Order-source precedence for a song's lyric sections (research fallback chain):
- * 1. `performanceOrderById.get(songId)` if present and non-empty
- * 2. `lyrics.performanceOrder` if non-empty
- * 3. `lyrics.sections` mapped in stored order
- */
-function resolveSongOrder(songId: string, lyrics: SongLyrics, inputs: AssemblyInputs): string[] {
-  const explicitOrder = inputs.performanceOrderById.get(songId)
-  if (explicitOrder && explicitOrder.length > 0) return explicitOrder
-  if (lyrics.performanceOrder.length > 0) return lyrics.performanceOrder
-  return lyrics.sections.map((section) => section.id)
-}
 
 function buildCopyrightSlideContent(lyrics: SongLyrics): Omit<CopyrightSlide, 'id' | 'position'> {
   return {
@@ -317,7 +303,9 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
         const lyrics = inputs.songLyricsById.get(slot.songId)
         if (!lyrics) break
 
-        const order = resolveSongOrder(slot.songId, lyrics, inputs)
+        // The lyrics document's performanceOrder is the single source of
+        // truth for a song's slide order (R035/D-03) — no precedence chain.
+        const order = lyrics.performanceOrder
         const copyrightContent = buildCopyrightSlideContent(lyrics)
 
         let localSeq = 0

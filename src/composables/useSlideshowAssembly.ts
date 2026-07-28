@@ -3,13 +3,14 @@
  * R006: reorder/add/remove a service element and the assembled slideshow follows
  * with no manual re-sync.
  *
- * Builds the three content maps `assembleSlideshow` needs from live Pinia
- * stores — `scriptureReadingsById` from the scriptureSlides store,
- * `performanceOrderById` from the songs store — and maintains its own
- * `songLyricsById` map by loading the current (newest) lyrics doc for every
- * distinct songId referenced by a SONG slot in the service (the songLyrics
- * store itself only ever subscribes to a single song at a time, so it cannot
- * be reused directly here).
+ * Builds the content maps `assembleSlideshow` needs from live Pinia
+ * stores — `scriptureReadingsById` from the scriptureSlides store — and
+ * maintains its own `songLyricsById` map by loading the current (newest)
+ * lyrics doc for every distinct songId referenced by a SONG slot in the
+ * service (the songLyrics store itself only ever subscribes to a single song
+ * at a time, so it cannot be reused directly here). A song's slide order is
+ * read from that lyrics document's `performanceOrder` field alone (R035/D-03)
+ * — there is no second order source and no precedence chain.
  */
 import { ref, reactive, computed, watch, onUnmounted, type Ref, type ComputedRef } from 'vue'
 import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore'
@@ -188,15 +189,6 @@ export function useSlideshowAssembly(
     return map
   })
 
-  // --- performanceOrder: canonical order lives on the Song doc ---
-  const performanceOrderById = computed(() => {
-    const map = new Map<string, string[]>()
-    for (const song of songStore.songs) {
-      map.set(song.id, song.performanceOrder ?? [])
-    }
-    return map
-  })
-
   // --- per-song current lyrics: songLyrics store is single-song, so gather here ---
   const songLyricsById = reactive(new Map<string, SongLyrics>())
   const isLoading = ref(false)
@@ -243,7 +235,6 @@ export function useSlideshowAssembly(
     if (!svc) return []
     return assembleSlideshow(svc, {
       songLyricsById,
-      performanceOrderById: performanceOrderById.value,
       scriptureReadingsById: scriptureReadingsById.value,
       importedDecksById: importedDecksById.value,
       groupsBySlotId: slideGroupsStore.groupsBySlotId,
@@ -278,7 +269,6 @@ export function useSlideshowAssembly(
 
     const inputs: AssemblyInputs = {
       songLyricsById,
-      performanceOrderById: performanceOrderById.value,
       scriptureReadingsById: scriptureReadingsById.value,
       importedDecksById: importedDecksById.value,
       groupsBySlotId: slideGroupsStore.groupsBySlotId,
@@ -362,7 +352,6 @@ export function useSlideshowAssembly(
       try {
         const inputs: AssemblyInputs = {
           songLyricsById,
-          performanceOrderById: performanceOrderById.value,
           scriptureReadingsById: scriptureReadingsById.value,
           importedDecksById: importedDecksById.value,
           groupsBySlotId: slideGroupsStore.groupsBySlotId,
@@ -411,7 +400,6 @@ export function useSlideshowAssembly(
 
     const inputs: AssemblyInputs = {
       songLyricsById,
-      performanceOrderById: performanceOrderById.value,
       scriptureReadingsById: scriptureReadingsById.value,
       importedDecksById: importedDecksById.value,
       groupsBySlotId: slideGroupsStore.groupsBySlotId,

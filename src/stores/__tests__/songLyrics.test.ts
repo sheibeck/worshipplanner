@@ -306,23 +306,6 @@ describe('useSongLyricsStore', () => {
     })
   })
 
-  describe('updatePerformanceOrder', () => {
-    it('calls updateDoc on the Song doc with the new order and serverTimestamp', async () => {
-      const { updateDoc, serverTimestamp } = await import('firebase/firestore')
-      const { useSongLyricsStore } = await import('../songLyrics')
-      const store = useSongLyricsStore()
-
-      await store.updatePerformanceOrder('org-1', 'song-1', ['chorus', 'verse-1', 'verse-2'])
-
-      expect(updateDoc).toHaveBeenCalledOnce()
-      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
-      const data = callArgs[1] as unknown as Record<string, unknown>
-      expect(data.performanceOrder).toEqual(['chorus', 'verse-1', 'verse-2'])
-      expect(data.updatedAt).toBeDefined()
-      expect(serverTimestamp).toHaveBeenCalled()
-    })
-  })
-
   describe('unsubscribeLyrics', () => {
     it('calls the unsubscribe fn and resets state', async () => {
       const { useSongLyricsStore } = await import('../songLyrics')

@@ -15,21 +15,6 @@
 import type { ServiceSlot, SongSlot, ScriptureSlot, ImportedSlot } from '@/types/service'
 import type { SlideGroup, GroupSlideEntry, SourceRef, SlideGroupInput } from '@/types/slideGroup'
 import type { AssemblyInputs } from '@/utils/slideshowAssembler'
-import type { SongLyrics } from '@/types/songLyrics'
-
-/**
- * Order-source precedence for a song's lyric sections — mirrors
- * `slideshowAssembler.ts::resolveSongOrder` exactly, so a group derived
- * today produces a slideshow byte-identical to what the pre-group assembler
- * produced: `performanceOrderById` entry if non-empty, else
- * `lyrics.performanceOrder` if non-empty, else `lyrics.sections` stored order.
- */
-function resolveSongOrder(songId: string, lyrics: SongLyrics, inputs: AssemblyInputs): string[] {
-  const explicitOrder = inputs.performanceOrderById.get(songId)
-  if (explicitOrder && explicitOrder.length > 0) return explicitOrder
-  if (lyrics.performanceOrder.length > 0) return lyrics.performanceOrder
-  return lyrics.sections.map((section) => section.id)
-}
 
 /**
  * Derives a slide group's structure from its slot's canonical source.
@@ -48,7 +33,9 @@ export function deriveGroupEntries(slot: ServiceSlot, inputs: AssemblyInputs): G
       const lyrics = inputs.songLyricsById.get(songId)
       if (!lyrics) return []
 
-      const order = resolveSongOrder(songId, lyrics, inputs)
+      // The lyrics document's performanceOrder is the single source of
+      // truth for a song's slide order (R035/D-03) — no precedence chain.
+      const order = lyrics.performanceOrder
       const entries: GroupSlideEntry[] = []
       let idx = 0
 
@@ -121,7 +108,7 @@ export function sourceSignature(slot: ServiceSlot, inputs: AssemblyInputs): stri
       const lyrics = inputs.songLyricsById.get(songId)
       if (!lyrics) return undefined
 
-      const order = resolveSongOrder(songId, lyrics, inputs)
+      const order = lyrics.performanceOrder
       const texts: string[] = []
       for (const sectionId of order) {
         const section = lyrics.sections.find((s) => s.id === sectionId)
@@ -282,7 +269,7 @@ export function reconcileSongGroup(group: SlideGroup, slot: SongSlot, inputs: As
   const lyrics = inputs.songLyricsById.get(songId)
   if (!lyrics) return { needsConfirm: false, changed: false, slides: group.slides }
 
-  const freshOrder = resolveSongOrder(songId, lyrics, inputs).filter((sectionId) =>
+  const freshOrder = lyrics.performanceOrder.filter((sectionId) =>
     lyrics.sections.some((section) => section.id === sectionId),
   )
   const freshSectionIds = new Set(freshOrder)

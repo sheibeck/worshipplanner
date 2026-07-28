@@ -107,7 +107,6 @@ function makeImportedDeck(overrides: Partial<ImportedDeck> = {}): ImportedDeck {
 function makeInputs(overrides: Partial<AssemblyInputs> = {}): AssemblyInputs {
   return {
     songLyricsById: new Map(),
-    performanceOrderById: new Map(),
     scriptureReadingsById: new Map(),
     importedDecksById: new Map(),
     groupsBySlotId: new Map(),
@@ -209,7 +208,7 @@ describe('assembleSlideshow — song resolution', () => {
     }
   })
 
-  it('falls back to lyrics.performanceOrder when performanceOrderById has no entry for the song', () => {
+  it('resolves the section order from the lyrics document performanceOrder field', () => {
     const slot = songSlot({ songId: 'song-1' })
     const service = makeService([slot])
     const lyrics = makeSongLyrics({ performanceOrder: ['chorus', 'verse-1'] })

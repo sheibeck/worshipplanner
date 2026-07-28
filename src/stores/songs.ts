@@ -267,10 +267,6 @@ export const useSongStore = defineStore('songs', () => {
         if (!Array.isArray(data.removedThemes)) {
           data.removedThemes = []
         }
-        // Default performanceOrder for legacy docs missing the field.
-        if (!Array.isArray(data.performanceOrder)) {
-          data.performanceOrder = []
-        }
         return { id: d.id, ...data } as Song
       })
       isLoading.value = false
