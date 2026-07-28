@@ -94,14 +94,15 @@
         />
       </div>
 
-      <!-- Ordered section rows — the list IS the slide order (D-01/D-03). -->
-      <div data-testid="section-rows" class="flex flex-col gap-2.5">
+      <!-- Ordered section rows — the list IS the slide order (D-01/D-03).
+           Always draggable by handle, no mode to enter first (D-01). -->
+      <div ref="rowsContainerRef" data-testid="section-rows" class="flex flex-col gap-2.5">
         <div
           v-for="row in sectionRows"
           :key="row.rowKey"
           :data-testid="`section-row-${row.rowKey}`"
           :data-repeat="row.isRepeat ? 'true' : 'false'"
-          :class="rowCardClass(row)"
+          :class="[rowCardClass(row), 'section-row']"
         >
           <div class="flex items-center gap-2 px-3 py-2.5">
             <span data-testid="row-position" class="w-5 shrink-0 text-right text-[11px] text-gray-500">{{ row.position }}</span>
@@ -188,9 +189,10 @@
 
 <script setup lang="ts">
 import { reactive, ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import Sortable from 'sortablejs'
 import { useSongLyricsStore } from '@/stores/songLyrics'
 import { useAutoSave } from '@/composables/useAutoSave'
-import { buildSectionRows, normalizeLyricOrder, type SectionRow } from '@/utils/songSectionOrder'
+import { buildSectionRows, normalizeLyricOrder, moveRow, type SectionRow } from '@/utils/songSectionOrder'
 import LyricPasteDialog from './LyricPasteDialog.vue'
 import LyricVersionHistory from './LyricVersionHistory.vue'
 import type { LyricSection, SongLyrics } from '@/types/songLyrics'
@@ -294,6 +296,54 @@ function onSectionInput(sectionId: string, value: string) {
   if (section) section.lines = value.split('\n')
 }
 
+// ── Drag reorder (D-01): the list is always draggable by handle, no mode to
+// enter first. Reproduces the exact SortableJS configuration/DOM-revert
+// pattern established for the service slot list (ServiceEditorView.vue) and
+// reused by the slide grid (SlideGrid.vue) — handle-scoped, same animation
+// duration and ghost class, so drag means the same thing app-wide (D-01's
+// stated reason 2a was chosen over 2b).
+//
+// Reorder moves a POSITION in performanceOrder, not a section — moveRow only
+// ever splices the order array. Which occurrence of a repeated section is
+// "the followed row" vs. "the repeat" is derived fresh on every render by
+// buildSectionRows (earliest occurrence in order wins), so a drag that
+// reorders occurrences needs no extra bookkeeping here.
+const rowsContainerRef = ref<HTMLElement | null>(null)
+let sortableInstance: Sortable | null = null
+
+watch(
+  rowsContainerRef,
+  (el) => {
+    if (el && !sortableInstance) {
+      sortableInstance = Sortable.create(el, {
+        handle: '.drag-handle',
+        draggable: '.section-row',
+        animation: 150,
+        ghostClass: 'opacity-30',
+        onEnd(evt) {
+          if (evt.oldIndex == null || evt.newIndex == null) return
+          if (evt.oldIndex === evt.newIndex) return
+          // T-28-19: revert SortableJS's own DOM move so Vue's reactive
+          // render remains the single source of truth — the established
+          // codebase remedy for the snap-back defect.
+          const parent = evt.item.parentNode
+          if (parent) {
+            const ref = parent.children[evt.oldIndex]
+            parent.insertBefore(evt.item, evt.oldIndex < evt.newIndex ? (ref?.nextSibling ?? null) : (ref ?? null))
+          }
+          editableState.performanceOrder = moveRow(editableState.performanceOrder, evt.oldIndex, evt.newIndex)
+        },
+      })
+    }
+  },
+  { flush: 'post' },
+)
+
+function destroySortable() {
+  sortableInstance?.destroy()
+  sortableInstance = null
+}
+
 function isExpanded(row: SectionRow): boolean {
   return expandedRowKeys.value.has(row.rowKey)
 }
@@ -341,6 +391,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   cleanupAutoSave()
+  destroySortable()
   songLyricsStore.unsubscribeLyrics()
 })
 
