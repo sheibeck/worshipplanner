@@ -85,10 +85,10 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 
 ### Slides Interaction
 
-- [ ] **R049** (primary-user-loop): Dragging a slide to a new position persists it there. Same
+- [x] **R049** (primary-user-loop): Dragging a slide to a new position persists it there. Same
       root-cause family as R044 — the pattern is copy-pasted in `SlideGrid.vue`. `[ARCH]`
 
-- [ ] **R050** (quality-attribute): Adding a slide appends it to the end of the group, not before the
+- [x] **R050** (quality-attribute): Adding a slide appends it to the end of the group, not before the
       last slide.
 
 - [ ] **R051** (primary-user-loop): A slide enters edit mode only via an explicit action in a 3-dot
@@ -223,8 +223,8 @@ Acknowledged, deferred, not in this roadmap.
 | R046 | Phase 30 | Pending |
 | R047 | Phase 30 | Pending |
 | R048 | Phase 30 | Pending |
-| R049 | Phase 29 | Pending |
-| R050 | Phase 29 | Pending |
+| R049 | Phase 29 | Complete |
+| R050 | Phase 29 | Complete |
 | R051 | Phase 33 | Pending |
 | R052 | Phase 33 | Pending |
 | R053 | Phase 36 | Pending |

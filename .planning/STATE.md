@@ -5,15 +5,15 @@ milestone_name: Service and Slides
 current_phase: 29
 current_phase_name: Order Structure — Stable Reordering & Post-Service
 status: planning
-stopped_at: Completed 29-02-PLAN.md
-last_updated: "2026-07-28T21:30:23.456Z"
+stopped_at: Completed 29-01-PLAN.md
+last_updated: "2026-07-28T22:08:16.320Z"
 last_activity: 2026-07-28
 last_activity_desc: ROADMAP.md created for v1.4 (Phases 29-37); REQUIREMENTS.md traceability filled, 34/34 requirements mapped, 0 unmapped
 progress:
   total_phases: 9
   completed_phases: 0
   total_plans: 5
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -566,6 +566,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 28 P05 | ~40min | 2 tasks | 2 files |
 | Phase 28 P06 | ~55min | 3 tasks | 3 files |
 | Phase 29 P02 | 15min | 2 tasks | 2 files |
+| Phase 29 P01 | 45min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -726,6 +727,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Restored the CCLI copyright display 28-04 dropped without an authorizing decision — R035 only requires one scroll surface and one list, and the display's absence removed the only place to verify CCLI licensing data before it reaches the presented copyright slide.
 - [Phase ?]: R035's acceptance block mounts SongSlideOver + SongLyricEditor together, unstubbed, since the nested-scrollbar defect only appears once panel and editor are mounted together — proven at the composed level, not just per-component.
 - [Phase ?]: 29-02: orderSlotsBySection/groupBySection/flattenBySection are total, SERVICE_SECTIONS-driven, identity-preserving; defaultSectionForPosition audited as position-keyed, no change needed for post-service
+- [Phase ?]: makeSectionedService() and Sortable capture accessors placed at module scope so Task 1/Task 2 land as separate, independently-verifiable commits (29-01)
 
 ### Roadmap Evolution
 
@@ -787,6 +789,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — v1.4 ROADMAP.md created (Phases 29-37); REQUIREMENTS.md traceability filled (34/34 mapped, 0 unmapped)
-Last session: 2026-07-28T21:30:23.430Z
-Stopped at: Completed 29-02-PLAN.md
+Last session: 2026-07-28T22:08:16.290Z
+Stopped at: Completed 29-01-PLAN.md
 Resume file: None

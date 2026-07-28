@@ -115,10 +115,10 @@ can see, slides that always mirror the plan — and finish them against the Clau
   3. Dragging a slide within the Slides tab persists its new position without reverting
   4. Adding a new slide appends it to the true end of its group, not before the last slide
 
-**Plans**: 1/5 plans executed
+**Plans**: 2/5 plans executed
 Plans:
 
-- [ ] 29-01-PLAN.md — Failing repro FIRST: header-inclusive fixtures, DOM-derived drag helper, identity-based assertions (wave 1)
+- [x] 29-01-PLAN.md — Failing repro FIRST: header-inclusive fixtures, DOM-derived drag helper, identity-based assertions (wave 1)
 - [x] 29-02-PLAN.md — Pure section-ordering helpers in slotTypes.ts + defaultSectionForPosition audit (wave 1)
 - [ ] 29-03-PLAN.md — ServiceEditorView: per-section containers, stable slot.id key, correct onEnd, save-failure revert (wave 2)
 - [ ] 29-04-PLAN.md — SlideGrid: draggable-scoped indices, one append contract, visible reorder failure (wave 2)
@@ -277,7 +277,7 @@ Plans:
 | 8-17, 16.1 | v1.1 | all | Complete (archived) | 2026-07-24 |
 | 18-23 | v1.2 | all | Complete (archived) | 2026-07-28 |
 | 24-28 | v1.3 | 33/33 | Complete (archived) | 2026-07-28 |
-| 29. Order Structure — Stable Reordering & Post-Service | v1.4 | 1/5 | In Progress|  |
+| 29. Order Structure — Stable Reordering & Post-Service | v1.4 | 2/5 | In Progress|  |
 | 30. Slides Mirror the Plan — Hard Lock & Reconciliation Removed | v1.4 | 0/TBD | Not started | - |
 | 31. Service Lifecycle — Draft Lock & Reopen | v1.4 | 0/TBD | Not started | - |
 | 32. Save Reliability — Autosave Fix & Persistent Status | v1.4 | 0/TBD | Not started | - |
