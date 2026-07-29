@@ -2861,6 +2861,7 @@ async function onSave() {
     }
 
     // Persist the full slot array (reindexed) and other fields
+    const normalizedSlots = reindexSlots(orderSlotsBySection(data.slots))
     await serviceStore.updateService(id, {
       name: data.name,
       teams: data.teams,
@@ -2868,8 +2869,28 @@ async function onSave() {
       sermonTopic: data.sermonTopic ?? '',
       notes: data.notes,
       status: data.status,
-      slots: reindexSlots(orderSlotsBySection(data.slots)),
+      slots: normalizedSlots,
     })
+
+    // WR-01: sync the just-persisted, normalized slot order back into
+    // localService so display and persisted state agree in ORDER, not only
+    // content — otherwise a legacy/corrupted document's first non-reorder
+    // save silently reorders what's persisted without updating what's
+    // displayed (self-heals on the next remote snapshot, but is a real,
+    // avoidable mismatch until then).
+    //
+    // Guarded by reference equality against `data.slots` (captured before
+    // any `await` above, including the scheduledSongIds loop and the write
+    // itself): if something else reassigned `localService.value.slots` to a
+    // NEW array during those awaits — most plausibly a reorder drag racing
+    // this save, the same failure class CR-01 closed — the reference no
+    // longer matches, and we must NOT clobber that newer, more current
+    // array with this stale, pre-await snapshot. Skip the sync-back in that
+    // case; the existing remote-merge watcher already reconciles any
+    // resulting order mismatch on the next Firestore snapshot.
+    if (localService.value && localService.value.slots === data.slots) {
+      localService.value.slots = normalizedSlots
+    }
 
     // Mark current local state as clean (don't overwrite localService — user may still be typing)
     originalService.value = JSON.parse(JSON.stringify(localService.value))
