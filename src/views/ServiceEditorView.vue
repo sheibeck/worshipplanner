@@ -1362,6 +1362,7 @@ const {
   isLoading: slideshowLoading,
   groupsBySlotId,
   ensureGroupMaterialized,
+  suppressMaterialization,
 } = useSlideshowAssembly(localService, orgIdRef, { canWrite: computed(() => authStore.isEditor) })
 const presenting = ref(false)
 
@@ -1908,6 +1909,13 @@ async function confirmSlotDelete() {
     // (console.error, no user-facing banner for this scoped-write class of
     // failure) rather than silently diverging local from remote.
     const slotId = localService.value?.slots[index]?.id
+    // ME-04 (R045 membership): hold the materialize watcher off this slot for
+    // the whole delete. Firestore drops the group from its LOCAL cache — and
+    // raises onSnapshot — the instant deleteDoc is issued, while the await below
+    // resolves only on server ack. Without the hold, the watcher sees a slot
+    // with no group, re-creates the document, and the splice that follows
+    // performs no second cascade — leaving an orphan group behind forever.
+    const releaseMaterializationHold = slotId ? suppressMaterialization(slotId) : () => {}
     try {
       if (slotId && authStore.orgId) {
         await slideGroupsStore.deleteGroup(authStore.orgId, slotId)
@@ -1919,6 +1927,8 @@ async function confirmSlotDelete() {
       pendingDeleteIndex.value = null
       pendingDeleteIsClear.value = false
       return
+    } finally {
+      releaseMaterializationHold()
     }
   }
   showSlotDeleteConfirm.value = false

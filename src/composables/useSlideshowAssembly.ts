@@ -93,12 +93,30 @@ export interface UseSlideshowAssemblyReturn {
    * Phase 24 D-02's "groups are always populated" rule for AUTOMATIC
    * materialization; this function only ever runs because a user just asked
    * to put something into this plan item, R032). Resolves `undefined` when it
-   * cannot act (no service, no org, no such slot, or the caller cannot
-   * write). Every write path in 25-05/25-06/25-07 (add slide, drag-reorder,
-   * import, drop) resolves the group through this first rather than calling
-   * the store directly.
+   * cannot act (no service, no org, no such slot, the caller cannot write, or
+   * the slot's delete is in flight). Every write path in 25-05/25-06/25-07
+   * (add slide, drag-reorder, import, drop) resolves the group through this
+   * first rather than calling the store directly.
    */
   ensureGroupMaterialized: (slotId: string) => Promise<EnsureGroupMaterializedResult | undefined>
+  /**
+   * ME-04 (R045 membership). Marks `slotId` as having a delete in flight and
+   * returns the release; call it in a `finally`.
+   *
+   * `confirmSlotDelete` awaits the group cascade BEFORE splicing the slot, so
+   * that a failed delete never leaves the slot removed locally while its group
+   * lingers. But Firestore applies a delete to its LOCAL cache and raises
+   * `onSnapshot` immediately, whereas `deleteDoc` resolves only on server ack.
+   * For the length of that ack the slot is still in `service.slots` with no
+   * group — exactly the shape `materializationCandidates` treats as
+   * "materialize me" — so the watcher re-created the document the cascade had
+   * just deleted, and the slot was then spliced out with no second cascade,
+   * orphaning the group document indefinitely.
+   *
+   * A held slot is skipped by BOTH the automatic candidate watcher and
+   * `ensureGroupMaterialized`.
+   */
+  suppressMaterialization: (slotId: string) => () => void
 }
 
 /**
@@ -231,6 +249,19 @@ export function useSlideshowAssembly(
     input: SlideGroupInput
   }
 
+  // ME-04: slots whose group cascade-delete is in flight. `reactive` (not a
+  // plain Set) so the candidate computed below re-evaluates when a slot is
+  // held or released. See `suppressMaterialization`'s doc comment on the
+  // return type for why the window exists at all.
+  const deletingSlotIds = reactive(new Set<string>())
+
+  function suppressMaterialization(slotId: string): () => void {
+    deletingSlotIds.add(slotId)
+    return () => {
+      deletingSlotIds.delete(slotId)
+    }
+  }
+
   const materializationCandidates = computed<MaterializationCandidate[]>(() => {
     const svc = service.value
     const orgId = resolvedOrgId.value
@@ -249,6 +280,8 @@ export function useSlideshowAssembly(
       // `slot.position`, both of which `reindexSlots` rewrites on every
       // drag. A slot with an existing group is never a candidate here.
       if (slideGroupsStore.groupsBySlotId.has(slot.id)) continue
+      // ME-04: never re-create the document a cascade delete is mid-flight on.
+      if (deletingSlotIds.has(slot.id)) continue
 
       const input = buildInitialGroup(slot, svc.id, inputs)
       // A source resolving to zero slides (a SONG slot with no song
@@ -305,6 +338,8 @@ export function useSlideshowAssembly(
     const svc = service.value
     const orgId = resolvedOrgId.value
     if (!svc || !orgId || !canWrite.value) return undefined
+    // ME-04: same hold the automatic watcher respects.
+    if (deletingSlotIds.has(slotId)) return undefined
     const slot = svc.slots.find((s) => s.id === slotId)
     if (!slot) return undefined
 
@@ -458,5 +493,6 @@ export function useSlideshowAssembly(
     isLoading,
     groupsBySlotId,
     ensureGroupMaterialized,
+    suppressMaterialization,
   }
 }

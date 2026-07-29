@@ -554,6 +554,86 @@ describe('useSlideshowAssembly', () => {
       expect(mockMaterializeGroupIfMissing).not.toHaveBeenCalled()
     })
 
+    // ME-04 (R045 membership): `confirmSlotDelete` awaits `deleteGroup` BEFORE
+    // splicing the slot, by design. Firestore applies a delete to its LOCAL
+    // cache and raises onSnapshot immediately, while `deleteDoc` resolves only
+    // on server ack — so for the length of that ack the slot is still in the
+    // service with no group, which is precisely the shape
+    // `materializationCandidates` treats as "materialize me". The watcher then
+    // re-created the document the cascade had just deleted, and the slot was
+    // spliced out afterwards with no second cascade, leaving an orphan group
+    // document behind forever.
+    /** The local-cache `onSnapshot` a cascade delete raises before its server ack. */
+    function dropGroupFromLocalCache(slotId: string): void {
+      const index = slideGroupsState.groups.findIndex((g) => g.slotId === slotId)
+      if (index >= 0) slideGroupsState.groups.splice(index, 1)
+    }
+
+    it('a slot whose delete is in flight is not re-materialized when the local cache drops its group', async () => {
+      const service = ref<Service | null>(makeService([hymnSlot({ position: 0, id: 'slot-hymn-a', hymnName: 'Hymn A' })]))
+      const { suppressMaterialization } = useSlideshowAssembly(service, 'org-1', { canWrite: true })
+      await nextTick()
+      await nextTick()
+      expect(mockMaterializeGroupIfMissing).toHaveBeenCalledTimes(1)
+      mockMaterializeGroupIfMissing.mockClear()
+
+      // confirmSlotDelete marks the slot, then awaits deleteGroup. The local
+      // cache drops the group immediately; the slot is still in the service.
+      const release = suppressMaterialization('slot-hymn-a')
+      dropGroupFromLocalCache('slot-hymn-a')
+      await nextTick()
+      await nextTick()
+
+      expect(mockMaterializeGroupIfMissing).not.toHaveBeenCalled()
+
+      // Releasing without splicing the slot proves this test is exercising the
+      // real window: with no hold, the watcher re-creates the deleted document.
+      release()
+      await nextTick()
+      await nextTick()
+
+      expect(mockMaterializeGroupIfMissing).toHaveBeenCalledTimes(1)
+    })
+
+    it('suppression is scoped to the named slot — a neighbour whose group also vanished still materializes', async () => {
+      const service = ref<Service | null>(
+        makeService([
+          hymnSlot({ position: 0, id: 'slot-hymn-a', hymnName: 'Hymn A' }),
+          hymnSlot({ position: 1, id: 'slot-hymn-b', hymnName: 'Hymn B' }),
+        ]),
+      )
+      const { suppressMaterialization } = useSlideshowAssembly(service, 'org-1', { canWrite: true })
+      await nextTick()
+      await nextTick()
+      mockMaterializeGroupIfMissing.mockClear()
+
+      suppressMaterialization('slot-hymn-a')
+      dropGroupFromLocalCache('slot-hymn-a')
+      dropGroupFromLocalCache('slot-hymn-b')
+      await nextTick()
+      await nextTick()
+
+      const slotIds = mockMaterializeGroupIfMissing.mock.calls.map((call) => (call[1] as SlideGroup).slotId)
+      expect(slotIds).toEqual(['slot-hymn-b'])
+    })
+
+    it('the on-demand materializer refuses a slot whose delete is in flight too', async () => {
+      const service = ref<Service | null>(makeService([hymnSlot({ position: 0, id: 'slot-hymn-a', hymnName: 'Hymn A' })]))
+      const { suppressMaterialization, ensureGroupMaterialized } = useSlideshowAssembly(service, 'org-1', {
+        canWrite: true,
+      })
+      await nextTick()
+      await nextTick()
+      mockMaterializeGroupIfMissing.mockClear()
+
+      suppressMaterialization('slot-hymn-a')
+      dropGroupFromLocalCache('slot-hymn-a')
+      await nextTick()
+
+      await expect(ensureGroupMaterialized('slot-hymn-a')).resolves.toBeUndefined()
+      expect(mockMaterializeGroupIfMissing).not.toHaveBeenCalled()
+    })
+
     it('a SONG slot with songId null produces no call; assigning a song later produces exactly one call carrying no bed (D-19: no legacy slot-media migration)', async () => {
       const fakeLyricsLoader = vi.fn(async (_orgId: string, songId: string) => makeLyrics(songId))
       songsState.songs = [{ id: 'song-a' } as Song]
