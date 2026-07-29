@@ -1,4 +1,0 @@
-=== Empty paste handling ===
-56:                :disabled="!canConfirm || isSaving"
-=== Confirm disabled test ===
-65:  it('disables confirm when textarea is empty', async () => {

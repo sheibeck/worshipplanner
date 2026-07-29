@@ -1,4 +1,0 @@
-=== No CCLI markers → single section ===
-18:  it('parses title-only input with no sections', () => {
-=== Parser default section handling ===
-18:  it('parses title-only input with no sections', () => {

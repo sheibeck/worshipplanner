@@ -1,5 +1,0 @@
-PerformanceOrderBuilder-served: PASS
-has-sortable-drag: PASS
-has-reset: PASS
-has-empty-state: FAIL
-PASS: Performance order builder module verified

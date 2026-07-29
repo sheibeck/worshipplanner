@@ -14,10 +14,26 @@ Rules:
   `/gsd:graphify diff`.
 - After modifying code, run `/gsd:graphify build` to keep the graph current.
 
-> ⚠ **The graph is stale as of 2026-07-28** and resolves symbols to `.gsd/quarantine/worktrees/**`
-> copies rather than real `src/` files (e.g. `ServiceSlot` → a quarantined `service.ts`). Delete the
-> quarantine debris and rebuild before trusting a query — until then, verify any graph hit against the
-> real path under `src/`.
+> ⚠ **The graph needs a rebuild.** It was last built while `.gsd/` still existed, so it resolves
+> symbols to `.gsd/quarantine/worktrees/**` copies that are now deleted (e.g. `ServiceSlot` → a
+> quarantined `service.ts`). Run `/gsd:graphify build` before trusting a query; until then, verify any
+> graph hit against the real path under `src/`.
+
+## The `.gsd/` directory is gone
+
+This project used to run on **gsdpi**, which kept its state in `.gsd/`. It now runs on regular
+**gsd-core**, whose state lives in `.planning/`. The entire `.gsd/` tree — the frozen gsdpi planning
+record and 1461 files of quarantined worktree snapshots — was deleted on 2026-07-29 at the owner's
+instruction: *"We are no longer using anything in there and we don't want it to be influencing our
+decisions."*
+
+The quarantined copies were not merely dead weight. Their test files import through the `@/` alias,
+which the root Vite config resolves to the **real** `src/` — so a correct change to live source could
+fail a frozen snapshot. They also contributed 10 of the 14 failing files in the test baseline, hiding
+real failures behind permanent noise.
+
+`.planning/` is the only planning state. Do not resurrect `.gsd/` or cite it as precedent; recover it
+from git history only if explicitly asked.
 
 ## Environment: `.env.local` is REQUIRED in every worktree
 

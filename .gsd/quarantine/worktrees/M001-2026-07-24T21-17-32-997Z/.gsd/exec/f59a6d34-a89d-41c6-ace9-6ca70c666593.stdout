@@ -1,4 +1,0 @@
-node_modules: exists
-firebase.json: exists
-package.json: exists
-env.local: exists

@@ -1,5 +1,0 @@
-PASS: editor-guard-on-scripture-section
-PASS: slotToScriptureRef-returns-null-on-empty
-PASS: isEditor-computed
-
-Overall: ALL PASS

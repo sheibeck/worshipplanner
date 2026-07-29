@@ -1,9 +1,0 @@
-useAutoSave-served: PASS
-has-debounce: PASS
-has-status-tracking: PASS
-has-dirty-tracking: PASS
-songLyrics-store-served: PASS
-has-updateCurrentLyrics: PASS
-has-saveLyrics: PASS
-has-revertToVersion: PASS
-PASS: Auto-save and store modules verified
