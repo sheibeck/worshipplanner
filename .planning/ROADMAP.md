@@ -141,7 +141,14 @@ Plans:
   4. No reconcile/confirm modal or banner ever appears in the Slides tab — every change rebuilds unconditionally
   5. Song groups in the Slides tab are read-only — a planner cannot create, edit, delete, or reorder a song's slides there
 
-**Plans**: TBD
+**Plans**: 4 plans
+Plans:
+
+- [ ] 30-01-PLAN.md — Strip the confirm surface: prop chain, banner, modal, decline store action (wave 1)
+- [ ] 30-02-PLAN.md — Unconditional idempotent rebuild; survival generalized to all kinds; scripture reference-only (wave 2)
+- [ ] 30-03-PLAN.md — Song groups read-only in drawer and grid, after repointing the SONG test fixture (wave 3)
+- [ ] 30-04-PLAN.md — Permutation property test for the order lock, membership lock, removal gate, human-verify (wave 4)
+
 **UI hint**: no
 **Research flag**: needs research — graph-trace the full reconciliation consumer inventory (`SlideGroup.dismissedSignature`, `ReconcileResult`, `reconcileSongGroup`, `ReconcileConfirmModal`, and every static AND dynamic import of them) before deleting anything; spans 9 files plus tests.
 **Notes**: `dismissedSignature` is a persisted Firestore field on existing `SlideGroup` documents — record explicitly whether it's left-and-ignored (consistent with D-19, since it was never seen in production) or backfilled; don't let the decision happen by omission. Keep the concurrent-write transaction merge in `replaceGroupSlides` — that generic conflict guard is unrelated to the confirm UX and is still needed once writes become unconditional. Delete the reconciliation test suite entirely (not `describe.skip`); confirm the post-removal failing-file-set doesn't grow past the documented 10-file baseline.
