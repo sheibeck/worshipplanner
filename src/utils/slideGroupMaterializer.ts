@@ -163,36 +163,59 @@ export function buildInitialGroup(slot: ServiceSlot, serviceId: string, inputs: 
 }
 
 /**
- * True when an entry's `sourceRef` is NOT something the current slot config
- * would ever regenerate on its own (D-17 ripple). No slot kind derives a
- * `video` entry — it only ever arrives by user action (a drop, in 25-06) — so
- * a video entry is always non-derivable. A `text` entry carrying authored
- * content (title and/or body) is likewise non-derivable: `deriveGroupEntries`
- * only ever mints a content-free `{ kind: 'text' }` ref for PRAYER/MESSAGE/
- * HYMN, so an authored one can only exist because a user added it.
+ * True when an entry's `sourceRef` is something THIS SLOT's own derivation
+ * could have produced — i.e. the entry is source-derived and the rebuild owns
+ * it. Everything else on the group is user work.
  *
- * This is the predicate `survivingEntries` consults so EVERY rebuild path —
- * SONG, SCRIPTURE and IMPORTED alike — splices a user's dropped video or
- * hand-authored slide back in rather than silently losing it (T-30-02-01).
- * Phase 30 deleted the confirm dialog that used to protect this by stalling;
- * this predicate is what protects it now, by splicing instead.
+ * Keying off the SLOT rather than the ref kind alone is the whole point (BL-01,
+ * Phase 30 review). The predicate this replaced returned "non-derivable" only
+ * for `video` and authored-`text`, which meant an imported deck or a set of
+ * dropped images the user appended into a SCRIPTURE or IMPORTED group was in
+ * neither the carried list nor the surviving list, and the first unconditional
+ * rebuild destroyed it silently — the D-02 regression the deleted confirm gate
+ * used to stall. `＋ Add slide` and `⇪ Import into this group` are offered on
+ * every non-song group (`SlideGrid.vue`), so those entries are reachable and
+ * are, by definition, user work: no SCRIPTURE derivation ever emits an
+ * `imported` ref, and no IMPORTED derivation ever emits one for a deck other
+ * than the slot's own `importId`.
+ *
+ * SONG deliberately answers on ref KIND alone, not on `songId`: a full
+ * song-identity swap is detected and handled by `rebuildSongGroup` itself,
+ * which rebuilds from the new song's derivation. Matching `songId` here would
+ * classify the OLD song's lyric/copyright entries as user work and splice the
+ * entire previous song back into the swapped group.
  */
-function isNonDerivableEntry(entry: GroupSlideEntry): boolean {
-  const ref = entry.sourceRef
-  if (ref.kind === 'video') return true
-  if (ref.kind === 'text' && (ref.title !== undefined || ref.body !== undefined)) return true
-  return false
+function isSlotDerivableRef(slot: ServiceSlot, ref: SourceRef): boolean {
+  switch (slot.kind) {
+    case 'SONG':
+      return ref.kind === 'lyric' || ref.kind === 'copyright'
+    case 'SCRIPTURE':
+      return ref.kind === 'scripture'
+    case 'IMPORTED':
+      return ref.kind === 'imported' && ref.importId === slot.importId
+    case 'PRAYER':
+    case 'MESSAGE':
+    case 'HYMN':
+      return ref.kind === 'text' && ref.title === undefined && ref.body === undefined
+  }
 }
 
 /**
  * The one place any rebuild path decides what a user added by hand — every
- * `isNonDerivableEntry` entry currently stored on the group, in stored
+ * stored entry this slot's own derivation could not have produced, in stored
  * order. Every `rebuild*Group` function splices this back into its fresh
  * derivation so a song swap, a passage change, or a deck re-import can never
- * silently drop a dropped video or a hand-authored slide (T-30-02-01).
+ * silently drop a dropped video, a hand-authored slide, or a deck the user
+ * imported into the group (T-30-02-01, BL-01).
+ *
+ * The IMPORTED case still DROPS an entry whose `importId` matches the slot but
+ * whose `innerSlideId` the current deck no longer contains — that is the
+ * intended re-import behaviour, and it stays where it was, inside
+ * `carryStoredDerivedEntries`. This function only ever rescues refs a FOREIGN
+ * source produced.
  */
-function survivingEntries(group: SlideGroup): GroupSlideEntry[] {
-  return group.slides.filter(isNonDerivableEntry)
+function survivingEntries(group: SlideGroup, slot: ServiceSlot): GroupSlideEntry[] {
+  return group.slides.filter((entry) => !isSlotDerivableRef(slot, entry.sourceRef))
 }
 
 /**
@@ -229,6 +252,80 @@ function derivedIdentityKey(ref: SourceRef): string | null {
 /** Renumbers a slide list to contiguous `order` values starting at 0. */
 function renumbered(entries: GroupSlideEntry[]): GroupSlideEntry[] {
   return entries.map((entry, index) => ({ ...entry, order: index }))
+}
+
+/**
+ * Re-sorts a rebuilt slide list into the group's STORED order (BL-02, Phase 30
+ * review). The stored order is the USER's: `SlideGrid.vue` offers drag-reorder
+ * on every non-song group, and the drop paths append at a user-chosen position.
+ * Before this, `rebuildUnstableIdGroup` rebuilt the array from `fresh` and
+ * concatenated survivors after it, so the derivation's order always won — a
+ * drag-reorder committed successfully and was then reverted by the very next
+ * rebuild, with no error shown, and a hand-added video was relocated to the end
+ * of the group.
+ *
+ * Every entry that already exists in the group sorts by its stored index. A
+ * NEWLY derived entry has no stored index, so it is anchored to the nearest
+ * carried entry that does have one — just after the closest preceding one, or
+ * just before the closest following one, or ahead of the whole group when NO
+ * derived entry has a stored index at all. That last case is the re-import: a
+ * re-import mints entirely fresh `innerSlideId`s (`PptxImportModal.vue` mints
+ * per import), so every derived entry is new, and the whole fresh deck block
+ * lands where the previous deck's block was rather than behind an entry the
+ * user appended after it.
+ *
+ * Anchor fractions are strictly increasing across the derived run and stay
+ * inside `(0, 1)`, so an anchored entry can never sort past the stored
+ * neighbour it was anchored to, a run of new entries keeps its derivation
+ * order, and no anchored key can ever collide with an integer stored index.
+ *
+ * Idempotent by construction: after one pass every entry has a stored index
+ * equal to its own position, so a second pass is the identity sort.
+ *
+ * NOT used by `rebuildSongGroup`. A song's slide order is dictated by the
+ * lyrics document's `performanceOrder` — the single source of truth, no
+ * precedence chain (R035/D-03) — and a song group is read-only in the Slides
+ * tab (R054), so there is no user order to preserve there.
+ */
+function orderedByStoredPosition(
+  carried: GroupSlideEntry[],
+  surviving: GroupSlideEntry[],
+  group: SlideGroup,
+): GroupSlideEntry[] {
+  const storedIndexById = new Map(group.slides.map((entry, index) => [entry.id, index]))
+  const carriedStored = carried.map((entry) => storedIndexById.get(entry.id))
+
+  // Nearest stored index strictly BEFORE / AFTER each position in the carried
+  // (derivation-ordered) run.
+  const anchorBefore: (number | undefined)[] = []
+  let lastSeen: number | undefined
+  for (const stored of carriedStored) {
+    anchorBefore.push(lastSeen)
+    if (stored !== undefined) lastSeen = stored
+  }
+  const anchorAfter: (number | undefined)[] = new Array<number | undefined>(carried.length)
+  let nextSeen: number | undefined
+  for (let index = carried.length - 1; index >= 0; index--) {
+    anchorAfter[index] = nextSeen
+    const stored = carriedStored[index]
+    if (stored !== undefined) nextSeen = stored
+  }
+
+  const step = 1 / (carried.length + 1)
+  const positioned: { entry: GroupSlideEntry; key: number }[] = carried.map((entry, index) => {
+    const stored = carriedStored[index]
+    if (stored !== undefined) return { entry, key: stored }
+    const before = anchorBefore[index]
+    const after = anchorAfter[index]
+    const anchor = before !== undefined ? before : after !== undefined ? after - 1 : -1
+    return { entry, key: anchor + (index + 1) * step }
+  })
+
+  for (const entry of surviving) {
+    positioned.push({ entry, key: storedIndexById.get(entry.id) ?? Number.MAX_SAFE_INTEGER })
+  }
+
+  return positioned.sort((a, b) => a.key - b.key).map((p) => p.entry)
 }
 
 /** Length-plus-per-index JSON comparison — the same equality `rebuildSongGroup`'s additive merge already used, generalized for every rebuild path's idempotence assertion. */
@@ -376,7 +473,7 @@ export function rebuildSongGroup(group: SlideGroup, slot: SongSlot, inputs: Asse
     const trailingCopyrightIndex = freshEntries.length - 1
     const merged = [
       ...freshEntries.slice(0, trailingCopyrightIndex),
-      ...survivingEntries(group),
+      ...survivingEntries(group, slot),
       ...freshEntries.slice(trailingCopyrightIndex),
     ]
     const slides = renumbered(merged)
@@ -517,8 +614,10 @@ export interface RebuildResult {
  * imported deck). Derives fresh; if the derivation is empty (source not yet
  * loaded), returns the group untouched with `changed: false` (T-30-02-04) —
  * never blanking a group as a side effect of a loading race. Otherwise the
- * new slides are `carryStoredDerivedEntries`'s carried derived entries
- * followed by the group's surviving non-derivable entries, renumbered.
+ * new slides are `carryStoredDerivedEntries`'s carried derived entries plus
+ * the group's surviving user-added entries, re-sorted into the group's STORED
+ * order by `orderedByStoredPosition` (BL-02 — the stored order is the user's
+ * and a rebuild must not overwrite it) and renumbered.
  * Deliberately does NOT gate on the stored `sourceSignature` — the carry
  * helper makes this path idempotent on its own, and a signature gate would
  * be a second, redundant correctness mechanism. `sourceSignature` stays
@@ -534,7 +633,7 @@ function rebuildUnstableIdGroup(
   if (fresh.length === 0) return { changed: false, slides: group.slides }
 
   const carried = carryStoredDerivedEntries(fresh, group)
-  const slides = renumbered([...carried, ...survivingEntries(group)])
+  const slides = renumbered(orderedByStoredPosition(carried, survivingEntries(group, slot), group))
   return { changed: !slidesEqual(slides, group.slides), slides }
 }
 

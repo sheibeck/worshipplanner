@@ -1204,6 +1204,246 @@ describe('D-17 / T-30-02-01 — hand-added video and authored-text entries survi
   })
 })
 
+// ── BL-01 / BL-02 (Phase 30 code review) ─────────────────────────────────────
+//
+// The generalized carry rebuild bought idempotence at the cost of preservation:
+// it emitted only what the CURRENT derivation produced, in the DERIVATION's own
+// order, and recognised only `video`/authored-`text` as user work. Everything
+// else a user can legitimately put into a SCRIPTURE or IMPORTED group — an
+// imported deck, dropped images, a drag-reorder — was destroyed by the first
+// unconditional rebuild, with no dialog. These are the two closing contracts.
+describe('BL-01 — a stored entry no slot-kind derivation could have produced is user work and survives', () => {
+  it('an imported deck appended into a SCRIPTURE group survives a passage change', () => {
+    const slot = scriptureSlot()
+    const inputs = makeInputs()
+    const derived = deriveGroupEntries(slot, inputs)
+    const group = makeGroup({
+      sourceSignature: sourceSignature(slot, inputs),
+      slides: [
+        ...derived,
+        { id: 'e-deck-b-1', order: 1, sourceRef: { kind: 'imported', importId: 'deck-b', innerSlideId: 'b1' } },
+        { id: 'e-deck-b-2', order: 2, sourceRef: { kind: 'imported', importId: 'deck-b', innerSlideId: 'b2' } },
+      ],
+    })
+
+    const newSlot = scriptureSlot({ book: 'Psalms', chapter: 23, verseStart: 1, verseEnd: 6 })
+    const result = rebuildScriptureGroup(group, newSlot, inputs)
+
+    expect(result.slides.map((e) => e.id)).toEqual([derived[0]!.id, 'e-deck-b-1', 'e-deck-b-2'])
+    // The stored shape is reference-free (R047), so nothing needed rewriting.
+    expect(result.changed).toBe(false)
+  })
+
+  it('images dropped onto a SCRIPTURE group (imported refs from a foreign deck) survive a passage change', () => {
+    const slot = scriptureSlot()
+    const inputs = makeInputs()
+    const derived = deriveGroupEntries(slot, inputs)
+    const group = makeGroup({
+      slides: [
+        ...derived,
+        { id: 'e-image', order: 1, sourceRef: { kind: 'imported', importId: 'dropped-images', innerSlideId: 'img-1' } },
+      ],
+    })
+
+    const result = rebuildScriptureGroup(group, scriptureSlot({ chapter: 4 }), inputs)
+
+    expect(result.slides.some((e) => e.id === 'e-image')).toBe(true)
+  })
+
+  it('a SECOND deck imported into an IMPORTED group survives a rebuild of the slot\'s own deck', () => {
+    const slot = importedSlot({ importId: 'deck-1' })
+    const deck = makeImportedDeck()
+    const inputs = makeInputs({ importedDecksById: new Map([['deck-1', deck]]) })
+    const derived = deriveGroupEntries(slot, inputs)
+    const group = makeGroup({
+      sourceSignature: sourceSignature(slot, inputs),
+      slides: [
+        ...derived,
+        { id: 'e-deck-b-1', order: 2, sourceRef: { kind: 'imported', importId: 'deck-b', innerSlideId: 'b1' } },
+        { id: 'e-deck-b-2', order: 3, sourceRef: { kind: 'imported', importId: 'deck-b', innerSlideId: 'b2' } },
+      ],
+    })
+
+    const result = rebuildImportedGroup(group, slot, inputs)
+
+    expect(result.slides.map((e) => e.id)).toEqual([
+      derived[0]!.id,
+      derived[1]!.id,
+      'e-deck-b-1',
+      'e-deck-b-2',
+    ])
+    expect(result.changed).toBe(false)
+  })
+
+  it('the intended drop still happens: a matching importId whose innerSlideId the re-import no longer produces is dropped, in the SAME group where a foreign deck\'s entry survives', () => {
+    const slot = importedSlot({ importId: 'deck-1' })
+    const deck = makeImportedDeck()
+    const inputs = makeInputs({ importedDecksById: new Map([['deck-1', deck]]) })
+    const derived = deriveGroupEntries(slot, inputs)
+    const group = makeGroup({
+      slides: [
+        ...derived,
+        { id: 'e-deck-b-1', order: 2, sourceRef: { kind: 'imported', importId: 'deck-b', innerSlideId: 'b1' } },
+      ],
+    })
+
+    const shrunkDeck = makeImportedDeck({
+      slides: [{ id: 'is-1', position: 0, contentKind: 'text', title: 'Welcome', body: 'Welcome to church' } as TextSlide],
+    })
+    const shrunkInputs = makeInputs({ importedDecksById: new Map([['deck-1', shrunkDeck]]) })
+
+    const result = rebuildImportedGroup(group, slot, shrunkInputs)
+
+    // deck-1's own is-2 is gone — the source stopped producing it.
+    expect(
+      result.slides.some((e) => e.sourceRef.kind === 'imported' && e.sourceRef.innerSlideId === 'is-2'),
+    ).toBe(false)
+    // deck-b's entry is user work, not deck-1's derivation — it stays.
+    expect(result.slides.some((e) => e.id === 'e-deck-b-1')).toBe(true)
+    expect(result.changed).toBe(true)
+  })
+})
+
+describe('BL-02 — a SCRIPTURE/IMPORTED group\'s stored slide ORDER is the user\'s and survives every rebuild', () => {
+  function threeSlideDeck(): ReturnType<typeof makeImportedDeck> {
+    return makeImportedDeck({
+      slides: [
+        { id: 'is-1', position: 0, contentKind: 'text', title: 'One', body: 'One' } as TextSlide,
+        { id: 'is-2', position: 1, contentKind: 'text', title: 'Two', body: 'Two' } as TextSlide,
+        { id: 'is-3', position: 2, contentKind: 'text', title: 'Three', body: 'Three' } as TextSlide,
+      ],
+    })
+  }
+
+  function innerIds(slides: SlideGroup['slides']): (string | undefined)[] {
+    return slides.map((e) => (e.sourceRef.kind === 'imported' ? e.sourceRef.innerSlideId : undefined))
+  }
+
+  it('a reordered imported group rebuilds to changed: false — a drag-reorder is not reverted within one round trip', () => {
+    const slot = importedSlot({ importId: 'deck-1' })
+    const inputs = makeInputs({ importedDecksById: new Map([['deck-1', threeSlideDeck()]]) })
+    const derived = deriveGroupEntries(slot, inputs)
+    // The user drags i3 to the front: SlideGrid.onEnd writes [e3, e2, e1].
+    const reordered = [derived[2]!, derived[1]!, derived[0]!].map((e, index) => ({ ...e, order: index }))
+    const group = makeGroup({ sourceSignature: sourceSignature(slot, inputs), slides: reordered })
+
+    const result = rebuildImportedGroup(group, slot, inputs)
+
+    expect(result.changed).toBe(false)
+    expect(innerIds(result.slides)).toEqual(['is-3', 'is-2', 'is-1'])
+  })
+
+  it('a surviving hand-added video stays where the user put it rather than moving to the end', () => {
+    const slot = importedSlot({ importId: 'deck-1' })
+    const inputs = makeInputs({ importedDecksById: new Map([['deck-1', threeSlideDeck()]]) })
+    const derived = deriveGroupEntries(slot, inputs)
+    // The user dropped a video BETWEEN the first and second deck slides.
+    const group = makeGroup({
+      sourceSignature: sourceSignature(slot, inputs),
+      slides: [
+        { ...derived[0]!, order: 0 },
+        { id: 'e-video', order: 1, sourceRef: { kind: 'video', videoSrc: 'https://example.com/dropped.mp4' } },
+        { ...derived[1]!, order: 2 },
+        { ...derived[2]!, order: 3 },
+      ],
+    })
+
+    const result = rebuildImportedGroup(group, slot, inputs)
+
+    expect(result.changed).toBe(false)
+    expect(result.slides.map((e) => e.id)).toEqual([derived[0]!.id, 'e-video', derived[1]!.id, derived[2]!.id])
+  })
+
+  it('a reordered SCRIPTURE group keeps its hand-added entry ahead of the derived reference slide', () => {
+    const slot = scriptureSlot()
+    const inputs = makeInputs()
+    const derived = deriveGroupEntries(slot, inputs)
+    const group = makeGroup({
+      slides: [
+        { id: 'e-video', order: 0, sourceRef: { kind: 'video', videoSrc: 'https://example.com/intro.mp4' } },
+        { ...derived[0]!, order: 1 },
+      ],
+    })
+
+    const result = rebuildScriptureGroup(group, slot, inputs)
+
+    expect(result.changed).toBe(false)
+    expect(result.slides.map((e) => e.id)).toEqual(['e-video', derived[0]!.id])
+  })
+
+  it('a re-import that mints entirely fresh innerSlideIds lands the whole new deck block where the old deck block was — ahead of an entry the user appended after it', () => {
+    const slot = importedSlot({ importId: 'deck-1' })
+    const inputs = makeInputs({ importedDecksById: new Map([['deck-1', threeSlideDeck()]]) })
+    const derived = deriveGroupEntries(slot, inputs)
+    const group = makeGroup({
+      slides: [
+        ...derived,
+        { id: 'e-video', order: 3, sourceRef: { kind: 'video', videoSrc: 'https://example.com/dropped.mp4' } },
+      ],
+    })
+
+    // A re-import: every innerSlideId is new, so NO derived entry has a stored
+    // position to sort by.
+    const reimported = makeImportedDeck({
+      slides: [
+        { id: 'fresh-1', position: 0, contentKind: 'text', title: 'One', body: 'One' } as TextSlide,
+        { id: 'fresh-2', position: 1, contentKind: 'text', title: 'Two', body: 'Two' } as TextSlide,
+      ],
+    })
+    const reimportedInputs = makeInputs({ importedDecksById: new Map([['deck-1', reimported]]) })
+
+    const result = rebuildImportedGroup(group, slot, reimportedInputs)
+
+    expect(innerIds(result.slides)).toEqual(['fresh-1', 'fresh-2', undefined])
+    expect(result.slides[2]!.id).toBe('e-video')
+  })
+
+  it('a newly-added deck slide joins the deck block rather than jumping past a hand-added entry', () => {
+    const slot = importedSlot({ importId: 'deck-1' })
+    const inputs = makeInputs({ importedDecksById: new Map([['deck-1', makeImportedDeck()]]) })
+    const derived = deriveGroupEntries(slot, inputs) // is-1, is-2
+    const group = makeGroup({
+      slides: [
+        ...derived,
+        { id: 'e-video', order: 2, sourceRef: { kind: 'video', videoSrc: 'https://example.com/dropped.mp4' } },
+      ],
+    })
+
+    const widened = makeImportedDeck({
+      slides: [
+        { id: 'is-1', position: 0, contentKind: 'text', title: 'Welcome', body: 'Welcome to church' } as TextSlide,
+        { id: 'is-2', position: 1, contentKind: 'image', imageUrl: 'https://example.com/a.png', altText: 'slide 2' } as ImageSlide,
+        { id: 'is-3', position: 2, contentKind: 'text', title: 'Third', body: 'Third' } as TextSlide,
+      ],
+    })
+    const widenedInputs = makeInputs({ importedDecksById: new Map([['deck-1', widened]]) })
+
+    const result = rebuildImportedGroup(group, slot, widenedInputs)
+
+    expect(innerIds(result.slides)).toEqual(['is-1', 'is-2', 'is-3', undefined])
+    expect(result.slides[3]!.id).toBe('e-video')
+  })
+
+  it('the rebuild stays idempotent: a second pass over its own output is byte-identical', () => {
+    const slot = importedSlot({ importId: 'deck-1' })
+    const inputs = makeInputs({ importedDecksById: new Map([['deck-1', threeSlideDeck()]]) })
+    const derived = deriveGroupEntries(slot, inputs)
+    const group = makeGroup({
+      slides: [
+        { ...derived[2]!, order: 0 },
+        { id: 'e-video', order: 1, sourceRef: { kind: 'video', videoSrc: 'https://example.com/dropped.mp4' } },
+        { ...derived[0]!, order: 2 },
+      ],
+    })
+
+    const first = rebuildImportedGroup(group, slot, inputs)
+    const second = rebuildImportedGroup({ ...group, slides: first.slides }, slot, inputs)
+
+    expect(second.changed).toBe(false)
+    expect(second.slides).toEqual(first.slides)
+  })
+})
+
 describe('rebuildGroup dispatcher', () => {
   it('dispatches SONG to the additive rebuild', () => {
     const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
