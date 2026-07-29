@@ -3,11 +3,10 @@ import {
   deriveGroupEntries,
   sourceSignature,
   buildInitialGroup,
-  hasCustomization,
-  reconcileSongGroup,
-  reconcileScriptureGroup,
-  reconcileImportedGroup,
-  reconcileGroup,
+  rebuildSongGroup,
+  rebuildScriptureGroup,
+  rebuildImportedGroup,
+  rebuildGroup,
 } from '@/utils/slideGroupMaterializer'
 import type { AssemblyInputs } from '@/utils/slideshowAssembler'
 import type { SongSlot, ScriptureSlot, NonAssignableSlot, HymnSlot, ImportedSlot } from '@/types/service'
@@ -190,18 +189,16 @@ describe('deriveGroupEntries — SONG', () => {
 })
 
 describe('deriveGroupEntries — SCRIPTURE', () => {
-  it('derives one scripture entry per inner slide, carrying its id in sourceRef.innerSlideId', () => {
+  it('derives exactly ONE reference-only entry, with no innerSlideId, regardless of how many slides the reading itself carries (R047)', () => {
     const slot = scriptureSlot({ scriptureReadingId: 'reading-1' })
     const reading = makeScriptureReading()
     const inputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', reading]]) })
 
     const entries = deriveGroupEntries(slot, inputs)
 
-    expect(entries).toHaveLength(2)
-    expect(entries.map((e) => e.sourceRef)).toEqual([
-      { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'ss-1' },
-      { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'ss-2' },
-    ])
+    expect(entries).toHaveLength(1)
+    expect(entries[0]!.sourceRef).toEqual({ kind: 'scripture', scriptureReadingId: 'reading-1' })
+    expect(entries[0]!.sourceRef).not.toHaveProperty('innerSlideId')
   })
 
   it('a SCRIPTURE slot with no scriptureReadingId derives zero entries', () => {
@@ -297,43 +294,7 @@ describe('sourceSignature', () => {
   })
 })
 
-describe('hasCustomization', () => {
-  it('is false for a group with no label/notes/audio/bed media', () => {
-    const group = makeGroup({ slides: [{ id: 'e1', order: 0, sourceRef: { kind: 'text' } }] })
-    expect(hasCustomization(group)).toBe(false)
-  })
-
-  it('is true when any entry has a label', () => {
-    const group = makeGroup({ slides: [{ id: 'e1', order: 0, sourceRef: { kind: 'text' }, label: 'Custom' }] })
-    expect(hasCustomization(group)).toBe(true)
-  })
-
-  it('is true when any entry has notes', () => {
-    const group = makeGroup({ slides: [{ id: 'e1', order: 0, sourceRef: { kind: 'text' }, notes: 'Note' }] })
-    expect(hasCustomization(group)).toBe(true)
-  })
-
-  it('is true when any entry has audioUrl', () => {
-    const group = makeGroup({
-      slides: [{ id: 'e1', order: 0, sourceRef: { kind: 'text' }, audioUrl: 'https://example.com/x.mp3' }],
-    })
-    expect(hasCustomization(group)).toBe(true)
-  })
-
-  it('is true when the group has a bedAudioUrl', () => {
-    const group = makeGroup({ bedAudioUrl: 'https://example.com/bed.mp3', slides: [] })
-    expect(hasCustomization(group)).toBe(true)
-  })
-
-  it('is true when any entry is a non-derivable video entry (D-17 ripple)', () => {
-    const group = makeGroup({
-      slides: [{ id: 'e1', order: 0, sourceRef: { kind: 'video', videoSrc: 'https://example.com/dropped.mp4' } }],
-    })
-    expect(hasCustomization(group)).toBe(true)
-  })
-})
-
-describe('reconcileSongGroup', () => {
+describe('rebuildSongGroup', () => {
   function makeStoredSongGroup(slides: SlideGroup['slides']): SlideGroup {
     return makeGroup({ id: 'slot-1', slotId: 'slot-1', slides })
   }
@@ -363,7 +324,7 @@ describe('reconcileSongGroup', () => {
       songLyricsById: new Map([['song-1', lyrics]]),
     })
 
-    const result = reconcileSongGroup(group, slot, inputs)
+    const result = rebuildSongGroup(group, slot, inputs)
 
     expect(result.changed).toBe(true)
     expect(result.slides).toHaveLength(5)
@@ -395,7 +356,7 @@ describe('reconcileSongGroup', () => {
       songLyricsById: new Map([['song-1', lyrics]]),
     })
 
-    const result = reconcileSongGroup(group, slot, inputs)
+    const result = rebuildSongGroup(group, slot, inputs)
 
     const verseEntry = result.slides.find((e) => e.id === 'e-verse-1')
     expect(verseEntry?.label).toBe('Custom Verse Label')
@@ -424,7 +385,7 @@ describe('reconcileSongGroup', () => {
     })
     const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
 
-    const result = reconcileSongGroup(group, slot, inputs)
+    const result = rebuildSongGroup(group, slot, inputs)
 
     const chorusEntry = result.slides.find((e) => e.id === 'e-chorus')
     expect(chorusEntry).toBeDefined()
@@ -432,28 +393,14 @@ describe('reconcileSongGroup', () => {
     expect(chorusEntry?.notes).toBe('Old note')
   })
 
-  it('D-08: a within-song section change (same song) never reports a swap', () => {
-    const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
-    const group = makeStoredSongGroup(twoSectionStoredSlides)
-    const lyrics = threeSectionLyrics()
-    const inputs = makeInputs({
-      songLyricsById: new Map([['song-1', lyrics]]),
-    })
-
-    const result = reconcileSongGroup(group, slot, inputs)
-
-    expect(result.songSwap).toBeUndefined()
-  })
-
-  it('D-08: a song plan item with no song assigned returns the unchanged result with no swap detail', () => {
+  it('a song plan item with no song assigned returns the unchanged result', () => {
     const slot = songSlot({ id: 'slot-1', songId: null })
     const group = makeStoredSongGroup(twoSectionStoredSlides)
     const inputs = makeInputs()
 
-    const result = reconcileSongGroup(group, slot, inputs)
+    const result = rebuildSongGroup(group, slot, inputs)
 
-    expect(result).toEqual({ needsConfirm: false, changed: false, slides: group.slides })
-    expect(result.songSwap).toBeUndefined()
+    expect(result).toEqual({ changed: false, slides: group.slides })
   })
 
   it('reconciling an already-in-sync group returns changed: false and an entry list deep-equal to the stored one', () => {
@@ -464,7 +411,7 @@ describe('reconcileSongGroup', () => {
       songLyricsById: new Map([['song-1', lyrics]]),
     })
 
-    const result = reconcileSongGroup(group, slot, inputs)
+    const result = rebuildSongGroup(group, slot, inputs)
 
     expect(result.changed).toBe(false)
     expect(result.slides).toEqual(group.slides)
@@ -478,7 +425,7 @@ describe('reconcileSongGroup', () => {
       songLyricsById: new Map([['song-1', lyrics]]),
     })
 
-    const result = reconcileSongGroup(group, slot, inputs)
+    const result = rebuildSongGroup(group, slot, inputs)
 
     const copyrightEntries = result.slides.filter((e) => e.sourceRef.kind === 'copyright')
     expect(copyrightEntries).toHaveLength(2)
@@ -494,17 +441,18 @@ describe('reconcileSongGroup', () => {
       songLyricsById: new Map([['song-1', lyrics]]),
     })
 
-    const result = reconcileSongGroup(group, slot, inputs)
+    const result = rebuildSongGroup(group, slot, inputs)
 
     expect(result.slides.map((e) => e.order)).toEqual(result.slides.map((_, i) => i))
   })
 
-  // --- CR-01 regression: a songId change is a source-IDENTITY swap, not a
-  // section-level edit — it must never run through the additive merge above,
-  // which would blend the old song's copyright/lyric entries with the new
-  // song's. Routed through the same signature+customization confirm gate
-  // reconcileUnstableIdGroup uses for scripture/imported groups.
-  describe('song identity swap (CR-01)', () => {
+  // --- CR-01 / R046 regression: a songId change is a source-IDENTITY swap,
+  // not a section-level edit — it must never run through the additive merge
+  // above, which would blend the old song's copyright/lyric entries with the
+  // new song's. Phase 30 (R046) makes this branch UNCONDITIONAL — no confirm
+  // gate survives — so this describe now proves the swap writes immediately
+  // AND that a hand-added video/authored-text entry survives it (T-30-02-01).
+  describe('song identity swap (CR-01, R046 — unconditional)', () => {
     const songBLyrics = () =>
       makeSongLyrics({
         songId: 'song-b',
@@ -512,7 +460,7 @@ describe('reconcileSongGroup', () => {
         performanceOrder: ['verse-1-b'],
       })
 
-    it('an uncustomized group is replaced wholesale when slot.songId changes to a different song', () => {
+    it('a group with no non-derivable entries is replaced wholesale when slot.songId changes to a different song, immediately, with no confirm state anywhere on the result', () => {
       const slot = songSlot({ id: 'slot-1', songId: 'song-b' })
       const group = makeStoredSongGroup(twoSectionStoredSlides) // all entries reference song-1
       const lyrics = songBLyrics()
@@ -520,22 +468,22 @@ describe('reconcileSongGroup', () => {
         songLyricsById: new Map([['song-b', lyrics]]),
       })
 
-      const result = reconcileSongGroup(group, slot, inputs)
+      const result = rebuildSongGroup(group, slot, inputs)
 
-      expect(result.needsConfirm).toBe(false)
       expect(result.changed).toBe(true)
+      expect(Object.keys(result).sort()).toEqual(['changed', 'slides'])
       // Every entry references ONLY the new song — no blended song-1 leftovers.
-      for (const entry of result.slides) {
-        if (entry.sourceRef.kind === 'lyric' || entry.sourceRef.kind === 'copyright') {
-          expect(entry.sourceRef.songId).toBe('song-b')
-        }
-      }
+      const songRefEntries = result.slides.filter(
+        (e): e is typeof e & { sourceRef: { songId: string } } =>
+          e.sourceRef.kind === 'lyric' || e.sourceRef.kind === 'copyright',
+      )
+      expect(songRefEntries.every((e) => e.sourceRef.songId === 'song-b')).toBe(true)
       expect(result.slides.some((e) => e.sourceRef.kind === 'lyric' && e.sourceRef.sectionId === 'verse-1-b')).toBe(
         true,
       )
     })
 
-    it('a customized group requires confirm when slot.songId changes to a different song, and the stored slides are left untouched', () => {
+    it('a group with a labeled/audio lyric entry (source-derived, not non-derivable) is STILL replaced wholesale — R046 has no confirm step left to preserve it', () => {
       const slot = songSlot({ id: 'slot-1', songId: 'song-b' })
       const group = makeStoredSongGroup([
         { id: 'e-copyright-lead', order: 0, sourceRef: { kind: 'copyright', songId: 'song-1' } },
@@ -553,79 +501,49 @@ describe('reconcileSongGroup', () => {
         songLyricsById: new Map([['song-b', lyrics]]),
       })
 
-      const result = reconcileSongGroup(group, slot, inputs)
+      const result = rebuildSongGroup(group, slot, inputs)
 
-      expect(result.needsConfirm).toBe(true)
-      expect(result.changed).toBe(false)
-      expect(result.slides).toEqual(group.slides)
-      expect(result.proposed).toBeDefined()
-      expect(result.proposed!.every((e) => e.sourceRef.kind !== 'lyric' || e.sourceRef.songId === 'song-b')).toBe(
-        true,
+      expect(result.changed).toBe(true)
+      const staleSongOneEntries = result.slides.filter(
+        (e) => (e.sourceRef.kind === 'lyric' || e.sourceRef.kind === 'copyright') && e.sourceRef.songId === 'song-1',
       )
-      expect(result.loss).toEqual({ customizedEntries: 1, withAudio: 1, withNotes: 0 })
+      expect(staleSongOneEntries).toHaveLength(0)
     })
 
-    // D-08: the reconciler must name the OLD and NEW song on a customized
-    // identity swap — the confirm dialog's copy needs both ids to render
-    // "This plan item was reassigned from Song A to Song B" (26-RESEARCH.md
-    // Pattern 3, "The D-08 song-name gap").
-    it('D-08: a customized song-identity swap reports old song A and new song B on songSwap', () => {
+    it('a video entry and an authored-text entry both survive a song-identity swap, spliced ahead of the trailing copyright', () => {
       const slot = songSlot({ id: 'slot-1', songId: 'song-b' })
       const group = makeStoredSongGroup([
-        { id: 'e-copyright-lead', order: 0, sourceRef: { kind: 'copyright', songId: 'song-1' } },
-        {
-          id: 'e-verse-1',
-          order: 1,
-          sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
-          label: 'Custom Verse Label',
-        },
-        { id: 'e-copyright-trail', order: 2, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+        ...twoSectionStoredSlides.slice(0, 3),
+        { id: 'e-video', order: 3, sourceRef: { kind: 'video', videoSrc: 'https://example.com/dropped.mp4' } },
+        { id: 'e-authored', order: 4, sourceRef: { kind: 'text', title: 'My Slide', body: 'My words' } },
+        { ...twoSectionStoredSlides[3]!, order: 5 },
       ])
       const lyrics = songBLyrics()
       const inputs = makeInputs({
         songLyricsById: new Map([['song-b', lyrics]]),
       })
 
-      const result = reconcileSongGroup(group, slot, inputs)
+      const result = rebuildSongGroup(group, slot, inputs)
 
-      expect(result.needsConfirm).toBe(true)
-      expect(result.songSwap).toEqual({ oldSongId: 'song-1', newSongId: 'song-b' })
-    })
-
-    it('D-08: an UNcustomized song-identity swap replaces silently and reports no swap detail', () => {
-      const slot = songSlot({ id: 'slot-1', songId: 'song-b' })
-      const group = makeStoredSongGroup(twoSectionStoredSlides) // uncustomized — no label/notes/audio
-      const lyrics = songBLyrics()
-      const inputs = makeInputs({
-        songLyricsById: new Map([['song-b', lyrics]]),
-      })
-
-      const result = reconcileSongGroup(group, slot, inputs)
-
-      expect(result.needsConfirm).toBe(false)
       expect(result.changed).toBe(true)
-      expect(result.songSwap).toBeUndefined()
+      const videoEntry = result.slides.find((e) => e.id === 'e-video')
+      const authoredEntry = result.slides.find((e) => e.id === 'e-authored')
+      expect(videoEntry?.sourceRef).toEqual({ kind: 'video', videoSrc: 'https://example.com/dropped.mp4' })
+      expect(authoredEntry?.sourceRef).toEqual({ kind: 'text', title: 'My Slide', body: 'My words' })
+      const trailingCopyrightIndex = result.slides.length - 1
+      expect(result.slides[trailingCopyrightIndex]!.sourceRef.kind).toBe('copyright')
+      expect(result.slides.findIndex((e) => e.id === 'e-video')).toBeLessThan(trailingCopyrightIndex)
+      expect(result.slides.findIndex((e) => e.id === 'e-authored')).toBeLessThan(trailingCopyrightIndex)
     })
 
-    it('a SONG slot whose songId changes must not retain the previous song copyright or produce unresolvable lyric entries referencing the old song', () => {
-      // The exact CR-01 reproduction: an uncustomized group materialized for
-      // Song A, then the user picks Song B for the same slot. The additive
-      // merge's "retained-but-unresolvable" rule must never fire here — the
-      // whole group is replaced, so no song-1-referencing entry survives.
+    it('T-30-02-04: a song-identity swap whose new song lyrics have not loaded yet returns the group untouched with changed: false, never blanking it', () => {
       const slot = songSlot({ id: 'slot-1', songId: 'song-b' })
-      const group = makeStoredSongGroup(twoSectionStoredSlides) // song-1 copyright + 2 lyric entries
-      const lyrics = songBLyrics()
-      const inputs = makeInputs({
-        songLyricsById: new Map([['song-b', lyrics]]),
-      })
+      const group = makeStoredSongGroup(twoSectionStoredSlides) // song-1 entries; song-b not in inputs
+      const inputs = makeInputs() // song-b's lyrics not loaded
 
-      const result = reconcileSongGroup(group, slot, inputs)
+      const result = rebuildSongGroup(group, slot, inputs)
 
-      const staleSongOneEntries = result.slides.filter(
-        (e) =>
-          (e.sourceRef.kind === 'lyric' || e.sourceRef.kind === 'copyright') && e.sourceRef.songId === 'song-1',
-      )
-      expect(staleSongOneEntries).toHaveLength(0)
+      expect(result).toEqual({ changed: false, slides: group.slides })
     })
   })
 
@@ -662,7 +580,7 @@ describe('reconcileSongGroup', () => {
         songLyricsById: new Map([['song-1', lyrics]]),
       })
 
-      const result = reconcileSongGroup(group, slot, inputs)
+      const result = rebuildSongGroup(group, slot, inputs)
 
       const verseEntries = result.slides.filter(
         (e) => e.sourceRef.kind === 'lyric' && e.sourceRef.sectionId === 'verse-1',
@@ -680,7 +598,7 @@ describe('reconcileSongGroup', () => {
         songLyricsById: new Map([['song-1', lyrics]]),
       })
 
-      const result = reconcileSongGroup(group, slot, inputs)
+      const result = rebuildSongGroup(group, slot, inputs)
 
       const copyEntry = result.slides.find((e) => e.id === 'e-verse-1-copy')
       expect(copyEntry?.label).toBe('Copy label')
@@ -700,7 +618,7 @@ describe('reconcileSongGroup', () => {
         songLyricsById: new Map([['song-1', lyrics]]),
       })
 
-      const result = reconcileSongGroup(group, slot, inputs)
+      const result = rebuildSongGroup(group, slot, inputs)
 
       expect(result.changed).toBe(false)
       expect(result.slides).toEqual(group.slides)
@@ -732,7 +650,7 @@ describe('reconcileSongGroup', () => {
         songLyricsById: new Map([['song-1', lyrics]]),
       })
 
-      const result = reconcileSongGroup(group, slot, inputs)
+      const result = rebuildSongGroup(group, slot, inputs)
 
       expect(result.slides.map((e) => e.order)).toEqual(result.slides.map((_, i) => i))
       const verseEntries = result.slides.filter(
@@ -785,7 +703,7 @@ describe('reconcileSongGroup', () => {
       ])
       const inputs = makeInputs({ songLyricsById: new Map([['song-1', repeatLyrics()]]) })
 
-      const result = reconcileSongGroup(group, slot, inputs)
+      const result = rebuildSongGroup(group, slot, inputs)
 
       expect(result.changed).toBe(false)
       const chorusEntries = result.slides.filter(
@@ -807,9 +725,9 @@ describe('reconcileSongGroup', () => {
       ])
       const inputs = makeInputs({ songLyricsById: new Map([['song-1', repeatLyrics()]]) })
 
-      const firstPass = reconcileSongGroup(group, slot, inputs)
+      const firstPass = rebuildSongGroup(group, slot, inputs)
       const regroup = makeStoredSongGroup(firstPass.slides)
-      const secondPass = reconcileSongGroup(regroup, slot, inputs)
+      const secondPass = rebuildSongGroup(regroup, slot, inputs)
 
       expect(secondPass.slides).toEqual(firstPass.slides)
       expect(secondPass.changed).toBe(false)
@@ -831,7 +749,7 @@ describe('reconcileSongGroup', () => {
       ])
       const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
 
-      const result = reconcileSongGroup(group, slot, inputs)
+      const result = rebuildSongGroup(group, slot, inputs)
 
       const chorusEntries = result.slides.filter(
         (e) => e.sourceRef.kind === 'lyric' && e.sourceRef.sectionId === 'chorus',
@@ -841,7 +759,7 @@ describe('reconcileSongGroup', () => {
 
       // A second pass must not grow this — this is the exact defect this
       // plan closes: pre-fix, this would have gone 2 -> 4 -> 8.
-      const secondPass = reconcileSongGroup(makeStoredSongGroup(result.slides), slot, inputs)
+      const secondPass = rebuildSongGroup(makeStoredSongGroup(result.slides), slot, inputs)
       const secondChorusEntries = secondPass.slides.filter(
         (e) => e.sourceRef.kind === 'lyric' && e.sourceRef.sectionId === 'chorus',
       )
@@ -861,7 +779,7 @@ describe('reconcileSongGroup', () => {
       ])
       const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
 
-      const result = reconcileSongGroup(group, slot, inputs)
+      const result = rebuildSongGroup(group, slot, inputs)
 
       const chorusEntries = result.slides.filter(
         (e) => e.sourceRef.kind === 'lyric' && e.sourceRef.sectionId === 'chorus',
@@ -873,7 +791,7 @@ describe('reconcileSongGroup', () => {
       const ids = result.slides.map((e) => e.id)
       expect(ids.indexOf('e-chorus-3')).toBe(ids.indexOf('e-chorus-2') + 1)
 
-      const secondPass = reconcileSongGroup(makeStoredSongGroup(result.slides), slot, inputs)
+      const secondPass = rebuildSongGroup(makeStoredSongGroup(result.slides), slot, inputs)
       expect(secondPass.slides).toEqual(result.slides)
     })
 
@@ -888,7 +806,7 @@ describe('reconcileSongGroup', () => {
       ])
       const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
 
-      const result = reconcileSongGroup(group, slot, inputs)
+      const result = rebuildSongGroup(group, slot, inputs)
 
       const chorusEntries = result.slides.filter(
         (e) => e.sourceRef.kind === 'lyric' && e.sourceRef.sectionId === 'chorus',
@@ -916,7 +834,7 @@ describe('reconcileSongGroup', () => {
       ])
       const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
 
-      const result = reconcileSongGroup(group, slot, inputs)
+      const result = rebuildSongGroup(group, slot, inputs)
 
       const chorusEntries = result.slides.filter(
         (e) => e.sourceRef.kind === 'lyric' && e.sourceRef.sectionId === 'chorus',
@@ -951,7 +869,7 @@ describe('reconcileSongGroup', () => {
       })
       const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
 
-      const result = reconcileSongGroup(group, slot, inputs)
+      const result = rebuildSongGroup(group, slot, inputs)
 
       const outroIndex = result.slides.findIndex((e) => e.id === 'e-outro')
       const trailingCopyrightIndex = result.slides.length - 1
@@ -963,7 +881,7 @@ describe('reconcileSongGroup', () => {
   })
 })
 
-describe('reconcileScriptureGroup', () => {
+describe('rebuildScriptureGroup', () => {
   function makeInSyncScriptureGroup(slot: ScriptureSlot, inputs: AssemblyInputs): SlideGroup {
     return makeGroup({
       sourceSignature: sourceSignature(slot, inputs),
@@ -971,100 +889,117 @@ describe('reconcileScriptureGroup', () => {
     })
   }
 
-  it('an unchanged signature returns needsConfirm false, changed false, stored entries untouched', () => {
+  it('an already-in-sync group rebuilds to changed: false with stored entries untouched', () => {
     const slot = scriptureSlot({ scriptureReadingId: 'reading-1' })
     const reading = makeScriptureReading()
     const inputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', reading]]) })
     const group = makeInSyncScriptureGroup(slot, inputs)
 
-    const result = reconcileScriptureGroup(group, slot, inputs)
+    const result = rebuildScriptureGroup(group, slot, inputs)
 
-    expect(result.needsConfirm).toBe(false)
     expect(result.changed).toBe(false)
     expect(result.slides).toEqual(group.slides)
   })
 
-  it('a diverged signature on an uncustomized group returns fresh entries with needsConfirm false, changed true', () => {
+  it('editing a passage IN PLACE (ScriptureSlideEditor.vue updates the SAME reading document — scriptureReadingId never changes) reports changed: false, with no confirm state anywhere on the result — the new reference is resolved LIVE at render time (Task 1), not written here', () => {
     const slot = scriptureSlot({ scriptureReadingId: 'reading-1' })
     const reading = makeScriptureReading()
     const inputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', reading]]) })
     const group = makeInSyncScriptureGroup(slot, inputs)
 
-    const widenedReading = makeScriptureReading({
-      slides: [
-        makeScriptureSlide({ id: 'ss-1', position: 0, verseRange: '16', text: 'For God so loved the world' }),
-        makeScriptureSlide({ id: 'ss-2', position: 1, verseRange: '17', text: 'that he gave his only Son' }),
-        makeScriptureSlide({ id: 'ss-3', position: 2, verseRange: '18', text: 'that whoever believes in him' }),
-      ],
-    })
-    const widenedInputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', widenedReading]]) })
-
-    const result = reconcileScriptureGroup(group, slot, widenedInputs)
-
-    expect(result.needsConfirm).toBe(false)
-    expect(result.changed).toBe(true)
-    expect(result.slides).toHaveLength(3)
-  })
-
-  it('a diverged signature on a customized group returns needsConfirm true, stored entries unchanged, plus a proposed list and loss summary', () => {
-    const slot = scriptureSlot({ scriptureReadingId: 'reading-1' })
-    const reading = makeScriptureReading()
-    const inputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', reading]]) })
-    const group = makeInSyncScriptureGroup(slot, inputs)
-    group.slides[0]!.audioUrl = 'https://example.com/slide-audio.mp3'
-
-    const widenedReading = makeScriptureReading({
-      slides: [
-        makeScriptureSlide({ id: 'ss-1', position: 0, verseRange: '16', text: 'For God so loved the world' }),
-        makeScriptureSlide({ id: 'ss-2', position: 1, verseRange: '17', text: 'that he gave his only Son' }),
-        makeScriptureSlide({ id: 'ss-3', position: 2, verseRange: '18', text: 'that whoever believes in him' }),
-      ],
-    })
-    const widenedInputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', widenedReading]]) })
-
-    const result = reconcileScriptureGroup(group, slot, widenedInputs)
-
-    expect(result.needsConfirm).toBe(true)
-    expect(result.changed).toBe(false)
-    expect(result.slides).toEqual(group.slides)
-    expect(result.proposed).toHaveLength(3)
-    expect(result.loss?.customizedEntries).toBe(1)
-    expect(result.loss?.withAudio).toBe(1)
-    // D-08 field is specific to song identity — a confirmation-required
-    // scripture group must never report a swap.
-    expect(result.songSwap).toBeUndefined()
-  })
-
-  it('detects divergence when slide count is unchanged but text changed', () => {
-    const slot = scriptureSlot({ scriptureReadingId: 'reading-1' })
-    const reading = makeScriptureReading()
-    const inputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', reading]]) })
-    const group = makeInSyncScriptureGroup(slot, inputs)
-
-    const editedReading = makeScriptureReading({
-      slides: [
-        makeScriptureSlide({ id: 'ss-1', position: 0, verseRange: '16', text: 'A completely different verse text' }),
-        makeScriptureSlide({ id: 'ss-2', position: 1, verseRange: '17', text: 'that he gave his only Son' }),
-      ],
-    })
+    // Same scriptureReadingId — only the document's own content differs.
+    const editedReading = makeScriptureReading({ displayReference: 'John 3:16-18 (expanded)' })
     const editedInputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', editedReading]]) })
 
-    const result = reconcileScriptureGroup(group, slot, editedInputs)
+    const result = rebuildScriptureGroup(group, slot, editedInputs)
 
-    expect(result.changed).toBe(true)
+    expect(Object.keys(result).sort()).toEqual(['changed', 'slides'])
+    expect(result.changed).toBe(false)
+    expect(result.slides).toEqual(group.slides)
+  })
+
+  it('T-30-02-03: a passage change preserves the stored entry\'s id, label, notes and attached audio — only the resolved reference changes', () => {
+    const slot = scriptureSlot({ scriptureReadingId: 'reading-1' })
+    const reading = makeScriptureReading()
+    const inputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', reading]]) })
+    const group = makeInSyncScriptureGroup(slot, inputs)
+    group.slides[0] = {
+      ...group.slides[0]!,
+      label: 'Call to worship',
+      notes: 'Read slowly',
+      audioUrl: 'https://example.com/slide-audio.mp3',
+      audioLoop: true,
+    }
+    const storedId = group.slides[0]!.id
+
+    const widenedReading = makeScriptureReading({ displayReference: 'John 3:16-18 (expanded)' })
+    const widenedInputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', widenedReading]]) })
+
+    const result = rebuildScriptureGroup(group, slot, widenedInputs)
+
+    expect(result.slides).toHaveLength(1)
+    const rebuilt = result.slides[0]!
+    expect(rebuilt.id).toBe(storedId)
+    expect(rebuilt.label).toBe('Call to worship')
+    expect(rebuilt.notes).toBe('Read slowly')
+    expect(rebuilt.audioUrl).toBe('https://example.com/slide-audio.mp3')
+    expect(rebuilt.audioLoop).toBe(true)
+    expect(rebuilt.sourceRef).toEqual({ kind: 'scripture', scriptureReadingId: 'reading-1' })
+  })
+
+  it('T-30-02-03: swapping to a DIFFERENT reading still yields exactly one entry, carrying the previous entry\'s id and audio, now pointing at the new reading', () => {
+    const slot = scriptureSlot({ scriptureReadingId: 'reading-1' })
+    const reading = makeScriptureReading()
+    const inputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', reading]]) })
+    const group = makeInSyncScriptureGroup(slot, inputs)
+    group.slides[0] = { ...group.slides[0]!, audioUrl: 'https://example.com/slide-audio.mp3' }
+    const storedId = group.slides[0]!.id
+
+    const newReading = makeScriptureReading({ id: 'reading-2', displayReference: 'Psalm 23:1-6' })
+    const newSlot = scriptureSlot({ scriptureReadingId: 'reading-2' })
+    const newInputs = makeInputs({ scriptureReadingsById: new Map([['reading-2', newReading]]) })
+
+    const result = rebuildScriptureGroup(group, newSlot, newInputs)
+
+    expect(result.slides).toHaveLength(1)
+    expect(result.slides[0]!.id).toBe(storedId)
+    expect(result.slides[0]!.audioUrl).toBe('https://example.com/slide-audio.mp3')
+    expect(result.slides[0]!.sourceRef).toEqual({ kind: 'scripture', scriptureReadingId: 'reading-2' })
+  })
+
+  it('T-30-02-04: a reading absent from the inputs map (not yet loaded) leaves the group untouched, changed: false, never emptying it', () => {
+    const slot = scriptureSlot({ scriptureReadingId: 'reading-1' })
+    const reading = makeScriptureReading()
+    const inputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', reading]]) })
+    const group = makeInSyncScriptureGroup(slot, inputs)
+
+    const result = rebuildScriptureGroup(group, slot, makeInputs())
+
+    expect(result).toEqual({ changed: false, slides: group.slides })
   })
 })
 
-describe('reconcileImportedGroup', () => {
-  it('behaves identically to the scripture reconciler, differing only in source kind', () => {
+describe('rebuildImportedGroup', () => {
+  it('an already-in-sync group rebuilds to changed: false', () => {
     const slot = importedSlot({ importId: 'deck-1' })
     const deck = makeImportedDeck()
     const inputs = makeInputs({ importedDecksById: new Map([['deck-1', deck]]) })
     const group = makeGroup({ sourceSignature: sourceSignature(slot, inputs), slides: deriveGroupEntries(slot, inputs) })
 
-    const inSync = reconcileImportedGroup(group, slot, inputs)
-    expect(inSync.needsConfirm).toBe(false)
-    expect(inSync.changed).toBe(false)
+    const result = rebuildImportedGroup(group, slot, inputs)
+
+    expect(result.changed).toBe(false)
+  })
+
+  it('a re-import with an added slide rebuilds unconditionally, immediately, with no confirm state on the result — even when the group carries a labeled entry', () => {
+    const slot = importedSlot({ importId: 'deck-1' })
+    const deck = makeImportedDeck()
+    const inputs = makeInputs({ importedDecksById: new Map([['deck-1', deck]]) })
+    const group = makeGroup({ sourceSignature: sourceSignature(slot, inputs), slides: deriveGroupEntries(slot, inputs) })
+    const labeledGroup: SlideGroup = {
+      ...group,
+      slides: group.slides.map((e, i) => (i === 0 ? { ...e, label: 'Custom' } : e)),
+    }
 
     const widenedDeck = makeImportedDeck({
       slides: [
@@ -1075,22 +1010,51 @@ describe('reconcileImportedGroup', () => {
     })
     const widenedInputs = makeInputs({ importedDecksById: new Map([['deck-1', widenedDeck]]) })
 
-    const uncustomized = reconcileImportedGroup(group, slot, widenedInputs)
-    expect(uncustomized.needsConfirm).toBe(false)
-    expect(uncustomized.changed).toBe(true)
-    expect(uncustomized.slides).toHaveLength(3)
+    const result = rebuildImportedGroup(labeledGroup, slot, widenedInputs)
 
-    const customizedGroup: SlideGroup = {
-      ...group,
-      slides: group.slides.map((e, i) => (i === 0 ? { ...e, label: 'Custom' } : e)),
-    }
-    const customized = reconcileImportedGroup(customizedGroup, slot, widenedInputs)
-    expect(customized.needsConfirm).toBe(true)
-    expect(customized.proposed).toHaveLength(3)
+    expect(Object.keys(result).sort()).toEqual(['changed', 'slides'])
+    expect(result.changed).toBe(true)
+    expect(result.slides).toHaveLength(3)
+    // is-1 and is-2 keys still resolve — is-1's stored label carries through
+    // via carryStoredDerivedEntries; is-3 is a fresh key, minted new.
+    const carriedIs1 = result.slides.find(
+      (e) => e.sourceRef.kind === 'imported' && e.sourceRef.innerSlideId === 'is-1',
+    )
+    expect(carriedIs1?.label).toBe('Custom')
+  })
+
+  it('T-30-02-04: a deck absent from the inputs map (not yet loaded) leaves the group untouched, changed: false', () => {
+    const slot = importedSlot({ importId: 'deck-1' })
+    const deck = makeImportedDeck()
+    const inputs = makeInputs({ importedDecksById: new Map([['deck-1', deck]]) })
+    const group = makeGroup({ sourceSignature: sourceSignature(slot, inputs), slides: deriveGroupEntries(slot, inputs) })
+
+    const result = rebuildImportedGroup(group, slot, makeInputs())
+
+    expect(result).toEqual({ changed: false, slides: group.slides })
+  })
+
+  it('an obsolete innerSlideId (a re-import with fewer slides) is dropped, not carried as surplus', () => {
+    const slot = importedSlot({ importId: 'deck-1' })
+    const deck = makeImportedDeck()
+    const inputs = makeInputs({ importedDecksById: new Map([['deck-1', deck]]) })
+    const group = makeGroup({ sourceSignature: sourceSignature(slot, inputs), slides: deriveGroupEntries(slot, inputs) })
+
+    const shrunkDeck = makeImportedDeck({
+      slides: [{ id: 'is-1', position: 0, contentKind: 'text', title: 'Welcome', body: 'Welcome to church' } as TextSlide],
+    })
+    const shrunkInputs = makeInputs({ importedDecksById: new Map([['deck-1', shrunkDeck]]) })
+
+    const result = rebuildImportedGroup(group, slot, shrunkInputs)
+
+    expect(result.slides).toHaveLength(1)
+    expect(result.slides.some((e) => e.sourceRef.kind === 'imported' && e.sourceRef.innerSlideId === 'is-2')).toBe(
+      false,
+    )
   })
 })
 
-describe('D-17 — reconciliation carries video and authored-text entries through', () => {
+describe('D-17 / T-30-02-01 — hand-added video and authored-text entries survive every rebuild path', () => {
   function makeStoredSongGroup(slides: SlideGroup['slides']): SlideGroup {
     return makeGroup({ id: 'slot-1', slotId: 'slot-1', slides })
   }
@@ -1124,7 +1088,7 @@ describe('D-17 — reconciliation carries video and authored-text entries throug
       songLyricsById: new Map([['song-1', lyrics]]),
     })
 
-    const result = reconcileSongGroup(group, slot, inputs)
+    const result = rebuildSongGroup(group, slot, inputs)
 
     const videoEntry = result.slides.find((e) => e.id === 'e-video')
     expect(videoEntry).toBeDefined()
@@ -1152,7 +1116,7 @@ describe('D-17 — reconciliation carries video and authored-text entries throug
       songLyricsById: new Map([['song-1', lyrics]]),
     })
 
-    const result = reconcileSongGroup(group, slot, inputs)
+    const result = rebuildSongGroup(group, slot, inputs)
 
     const authoredEntry = result.slides.find((e) => e.id === 'e-authored')
     expect(authoredEntry).toBeDefined()
@@ -1167,7 +1131,7 @@ describe('D-17 — reconciliation carries video and authored-text entries throug
       songLyricsById: new Map([['song-1', lyrics]]),
     })
 
-    const result = reconcileSongGroup(group, slot, inputs)
+    const result = rebuildSongGroup(group, slot, inputs)
 
     expect(result.changed).toBe(true)
     expect(result.slides).toHaveLength(5)
@@ -1180,7 +1144,7 @@ describe('D-17 — reconciliation carries video and authored-text entries throug
     ])
   })
 
-  it('a scripture group whose only user work is a video entry reports as customized', () => {
+  it('a dropped video on a SCRIPTURE group survives a reading swap, appended after the (single, carried) scripture entry', () => {
     const slot = scriptureSlot({ scriptureReadingId: 'reading-1' })
     const reading = makeScriptureReading()
     const inputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', reading]]) })
@@ -1188,45 +1152,54 @@ describe('D-17 — reconciliation carries video and authored-text entries throug
       sourceSignature: sourceSignature(slot, inputs),
       slides: [
         ...deriveGroupEntries(slot, inputs),
-        { id: 'e-video', order: 99, sourceRef: { kind: 'video', videoSrc: 'https://example.com/dropped.mp4' } },
+        { id: 'e-video', order: 1, sourceRef: { kind: 'video', videoSrc: 'https://example.com/dropped.mp4' } },
       ],
     })
 
-    expect(hasCustomization(group)).toBe(true)
+    const newReading = makeScriptureReading({ id: 'reading-2', displayReference: 'Psalm 23:1-6' })
+    const newSlot = scriptureSlot({ scriptureReadingId: 'reading-2' })
+    const newInputs = makeInputs({ scriptureReadingsById: new Map([['reading-2', newReading]]) })
+
+    const result = rebuildScriptureGroup(group, newSlot, newInputs)
+
+    expect(result.changed).toBe(true)
+    const videoEntry = result.slides.find((e) => e.id === 'e-video')
+    expect(videoEntry?.sourceRef).toEqual({ kind: 'video', videoSrc: 'https://example.com/dropped.mp4' })
+    const scriptureEntry = result.slides.find((e) => e.sourceRef.kind === 'scripture')
+    expect(scriptureEntry?.sourceRef).toEqual({ kind: 'scripture', scriptureReadingId: 'reading-2' })
+    expect(result.slides).toHaveLength(2)
   })
 
-  it('that same group with a diverged signature returns the confirm-required outcome with the stored slides untouched, and the loss summary counts the video entry', () => {
-    const slot = scriptureSlot({ scriptureReadingId: 'reading-1' })
-    const reading = makeScriptureReading()
-    const inputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', reading]]) })
+  it('an authored-text entry on an IMPORTED group survives a re-import, appended after the carried/fresh deck entries', () => {
+    const slot = importedSlot({ importId: 'deck-1' })
+    const deck = makeImportedDeck()
+    const inputs = makeInputs({ importedDecksById: new Map([['deck-1', deck]]) })
     const group = makeGroup({
       sourceSignature: sourceSignature(slot, inputs),
       slides: [
         ...deriveGroupEntries(slot, inputs),
-        { id: 'e-video', order: 99, sourceRef: { kind: 'video', videoSrc: 'https://example.com/dropped.mp4' } },
+        { id: 'e-authored', order: 99, sourceRef: { kind: 'text', title: 'My Slide', body: 'My words' } },
       ],
     })
 
-    const widenedReading = makeScriptureReading({
+    const newDeck = makeImportedDeck({
       slides: [
-        makeScriptureSlide({ id: 'ss-1', position: 0, verseRange: '16', text: 'For God so loved the world' }),
-        makeScriptureSlide({ id: 'ss-2', position: 1, verseRange: '17', text: 'that he gave his only Son' }),
-        makeScriptureSlide({ id: 'ss-3', position: 2, verseRange: '18', text: 'that whoever believes in him' }),
+        { id: 'new-1', position: 0, contentKind: 'text', title: 'New', body: 'New body' } as TextSlide,
       ],
     })
-    const widenedInputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', widenedReading]]) })
+    const newInputs = makeInputs({ importedDecksById: new Map([['deck-1', newDeck]]) })
 
-    const result = reconcileScriptureGroup(group, slot, widenedInputs)
+    const result = rebuildImportedGroup(group, slot, newInputs)
 
-    expect(result.needsConfirm).toBe(true)
-    expect(result.changed).toBe(false)
-    expect(result.slides).toEqual(group.slides)
-    expect(result.loss?.customizedEntries).toBe(1)
+    expect(result.changed).toBe(true)
+    const authoredEntry = result.slides.find((e) => e.id === 'e-authored')
+    expect(authoredEntry?.sourceRef).toEqual({ kind: 'text', title: 'My Slide', body: 'My words' })
+    expect(result.slides[result.slides.length - 1]!.id).toBe('e-authored')
   })
 })
 
-describe('reconcileGroup dispatcher', () => {
-  it('dispatches SONG to the additive path (never confirm-gated)', () => {
+describe('rebuildGroup dispatcher', () => {
+  it('dispatches SONG to the additive rebuild', () => {
     const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
     const lyrics = makeSongLyrics({ performanceOrder: ['verse-1', 'chorus'] })
     const inputs = makeInputs({
@@ -1234,12 +1207,13 @@ describe('reconcileGroup dispatcher', () => {
     })
     const group = makeGroup({ id: 'slot-1', slotId: 'slot-1', slides: deriveGroupEntries(slot, inputs) })
 
-    const result = reconcileGroup(group, slot, inputs)
+    const result = rebuildGroup(group, slot, inputs)
 
-    expect(result.needsConfirm).toBe(false)
+    expect(Object.keys(result).sort()).toEqual(['changed', 'slides'])
+    expect(result.changed).toBe(false)
   })
 
-  it('dispatches SCRIPTURE and IMPORTED to the confirm-gated path', () => {
+  it('dispatches SCRIPTURE and IMPORTED to the generalized carry rebuild', () => {
     const scripture = scriptureSlot({ scriptureReadingId: 'reading-1' })
     const reading = makeScriptureReading()
     const scriptureInputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', reading]]) })
@@ -1247,8 +1221,7 @@ describe('reconcileGroup dispatcher', () => {
       sourceSignature: sourceSignature(scripture, scriptureInputs),
       slides: deriveGroupEntries(scripture, scriptureInputs),
     })
-    const scriptureResult = reconcileGroup(scriptureGroup, scripture, scriptureInputs)
-    expect(scriptureResult.needsConfirm).toBe(false)
+    const scriptureResult = rebuildGroup(scriptureGroup, scripture, scriptureInputs)
     expect(scriptureResult.changed).toBe(false)
 
     const deck = makeImportedDeck()
@@ -1258,23 +1231,21 @@ describe('reconcileGroup dispatcher', () => {
       sourceSignature: sourceSignature(imported, importedInputs),
       slides: deriveGroupEntries(imported, importedInputs),
     })
-    const importedResult = reconcileGroup(importedGroup, imported, importedInputs)
-    expect(importedResult.needsConfirm).toBe(false)
+    const importedResult = rebuildGroup(importedGroup, imported, importedInputs)
     expect(importedResult.changed).toBe(false)
   })
 
-  it('a text-kind slot returns the stored slides with both flags false', () => {
+  it('a text-kind slot returns the stored slides with changed: false', () => {
     const slot: NonAssignableSlot = { kind: 'PRAYER', id: 'slot-prayer-0', position: 0 }
     const group = makeGroup({ slides: [{ id: 'e1', order: 0, sourceRef: { kind: 'text' } }] })
 
-    const result = reconcileGroup(group, slot, makeInputs())
+    const result = rebuildGroup(group, slot, makeInputs())
 
-    expect(result.needsConfirm).toBe(false)
     expect(result.changed).toBe(false)
     expect(result.slides).toEqual(group.slides)
   })
 
-  it('CR-01: a SONG slot with a customized group surfaces needsConfirm through reconcileGroup when songId changes to a different song', () => {
+  it('CR-01/R046: a SONG slot whose songId changes to a different song rebuilds wholesale through rebuildGroup, unconditionally', () => {
     const slot = songSlot({ id: 'slot-1', songId: 'song-b' })
     const group = makeGroup({
       id: 'slot-1',
@@ -1299,12 +1270,120 @@ describe('reconcileGroup dispatcher', () => {
       songLyricsById: new Map([['song-b', lyrics]]),
     })
 
-    const result = reconcileGroup(group, slot, inputs)
+    const result = rebuildGroup(group, slot, inputs)
 
-    expect(result.needsConfirm).toBe(true)
-    expect(result.changed).toBe(false)
-    expect(result.slides).toEqual(group.slides)
-    expect(result.proposed).toBeDefined()
+    expect(result.changed).toBe(true)
+    expect(result.slides.every((e) => e.sourceRef.kind !== 'lyric' || e.sourceRef.songId === 'song-b')).toBe(true)
+  })
+})
+
+// Cross-cutting guarantees Task 2 must prove hold on EVERY rebuild path, not
+// just SONG's (where they were already exercised pre-Phase-30): a dropped
+// video surviving a same-reading-id passage edit (not just a reading swap),
+// and idempotence — re-running a rebuild over its own output is byte-
+// identical — for the scripture, imported, and song-swap paths specifically.
+// The song ADDITIVE path's N=M/N<M/N>M idempotence is already asserted in
+// 'occurrence-aware repeat merge (D-02, Plan 28-03)' above; this block does
+// not repeat it.
+describe('T-30-02 — cross-cutting survival and idempotence', () => {
+  it('a dropped video on a SCRIPTURE group survives a same-reading-id passage edit (not just a reading swap)', () => {
+    const slot = scriptureSlot({ scriptureReadingId: 'reading-1' })
+    const reading = makeScriptureReading()
+    const inputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', reading]]) })
+    const group = makeGroup({
+      sourceSignature: sourceSignature(slot, inputs),
+      slides: [
+        ...deriveGroupEntries(slot, inputs),
+        { id: 'e-video', order: 1, sourceRef: { kind: 'video', videoSrc: 'https://example.com/dropped.mp4' } },
+      ],
+    })
+
+    const editedReading = makeScriptureReading({ displayReference: 'John 3:16-18 (edited)' })
+    const editedInputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', editedReading]]) })
+
+    const result = rebuildScriptureGroup(group, slot, editedInputs)
+
+    expect(result.slides.some((e) => e.id === 'e-video')).toBe(true)
+  })
+
+  it('idempotence: re-running rebuildScriptureGroup over its own output after a reading swap is byte-identical on the second pass', () => {
+    const slot = scriptureSlot({ scriptureReadingId: 'reading-1' })
+    const reading = makeScriptureReading()
+    const inputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', reading]]) })
+    const group = makeGroup({
+      sourceSignature: sourceSignature(slot, inputs),
+      slides: [
+        { ...deriveGroupEntries(slot, inputs)[0]!, audioUrl: 'https://example.com/audio.mp3' },
+        { id: 'e-video', order: 1, sourceRef: { kind: 'video', videoSrc: 'https://example.com/dropped.mp4' } },
+      ],
+    })
+
+    const newReading = makeScriptureReading({ id: 'reading-2', displayReference: 'Psalm 23:1-6' })
+    const newSlot = scriptureSlot({ scriptureReadingId: 'reading-2' })
+    const newInputs = makeInputs({ scriptureReadingsById: new Map([['reading-2', newReading]]) })
+
+    const firstPass = rebuildScriptureGroup(group, newSlot, newInputs)
+    const regrouped = makeGroup({ ...group, slides: firstPass.slides })
+    const secondPass = rebuildScriptureGroup(regrouped, newSlot, newInputs)
+
+    expect(secondPass.changed).toBe(false)
+    expect(secondPass.slides).toEqual(firstPass.slides)
+  })
+
+  it('idempotence: re-running rebuildImportedGroup over its own output after a re-import is byte-identical on the second pass', () => {
+    const slot = importedSlot({ importId: 'deck-1' })
+    const deck = makeImportedDeck()
+    const inputs = makeInputs({ importedDecksById: new Map([['deck-1', deck]]) })
+    const group = makeGroup({
+      sourceSignature: sourceSignature(slot, inputs),
+      slides: [
+        ...deriveGroupEntries(slot, inputs),
+        { id: 'e-authored', order: 99, sourceRef: { kind: 'text', title: 'My Slide', body: 'My words' } },
+      ],
+    })
+
+    const widenedDeck = makeImportedDeck({
+      slides: [
+        ...deck.slides,
+        { id: 'is-3', position: 2, contentKind: 'text', title: 'Announcement', body: 'New announcement' } as TextSlide,
+      ],
+    })
+    const widenedInputs = makeInputs({ importedDecksById: new Map([['deck-1', widenedDeck]]) })
+
+    const firstPass = rebuildImportedGroup(group, slot, widenedInputs)
+    const regrouped = makeGroup({ ...group, slides: firstPass.slides })
+    const secondPass = rebuildImportedGroup(regrouped, slot, widenedInputs)
+
+    expect(secondPass.changed).toBe(false)
+    expect(secondPass.slides).toEqual(firstPass.slides)
+  })
+
+  it('idempotence: re-running rebuildSongGroup over its own output after a song-identity swap (with a surviving video entry) is byte-identical on the second pass', () => {
+    const slot = songSlot({ id: 'slot-1', songId: 'song-b' })
+    const group = makeGroup({
+      id: 'slot-1',
+      slotId: 'slot-1',
+      slides: [
+        { id: 'e-copyright-lead', order: 0, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+        { id: 'e-verse-1', order: 1, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' } },
+        { id: 'e-video', order: 2, sourceRef: { kind: 'video', videoSrc: 'https://example.com/dropped.mp4' } },
+        { id: 'e-copyright-trail', order: 3, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+      ],
+    })
+    const lyrics = makeSongLyrics({
+      songId: 'song-b',
+      sections: [{ id: 'verse-1-b', label: 'Verse 1', lines: ['Song B line'] }],
+      performanceOrder: ['verse-1-b'],
+    })
+    const inputs = makeInputs({ songLyricsById: new Map([['song-b', lyrics]]) })
+
+    const firstPass = rebuildSongGroup(group, slot, inputs)
+    const regrouped = makeGroup({ ...group, slides: firstPass.slides })
+    const secondPass = rebuildSongGroup(regrouped, slot, inputs)
+
+    expect(secondPass.changed).toBe(false)
+    expect(secondPass.slides).toEqual(firstPass.slides)
+    expect(secondPass.slides.some((e) => e.id === 'e-video')).toBe(true)
   })
 })
 
@@ -1382,7 +1461,7 @@ describe('repeated section — derivation and round-trip parity (Plan 28-03 Task
     const initial = buildInitialGroup(slot, 'svc-1', inputs)
     const group: SlideGroup = { ...initial, createdAt: mockTimestamp, updatedAt: mockTimestamp }
 
-    const result = reconcileGroup(group, slot, inputs)
+    const result = rebuildGroup(group, slot, inputs)
 
     expect(result.changed).toBe(false)
     expect(result.slides).toEqual(group.slides)
@@ -1407,7 +1486,7 @@ describe('repeated section — derivation and round-trip parity (Plan 28-03 Task
     })
     const editedInputs = makeInputs({ songLyricsById: new Map([['song-1', editedLyrics]]) })
 
-    const result = reconcileGroup(group, slot, editedInputs)
+    const result = rebuildGroup(group, slot, editedInputs)
 
     // No entry changed — text is never stored on the entry (D002/D007).
     expect(result.changed).toBe(false)
@@ -1420,12 +1499,14 @@ describe('repeated section — derivation and round-trip parity (Plan 28-03 Task
     // The live-reference half of the guarantee: every chorus occurrence
     // resolves to the SAME edited section text — content lives on the
     // canonical section, never on the entry.
-    for (const entry of result.slides) {
-      if (entry.sourceRef.kind === 'lyric' && entry.sourceRef.sectionId === 'chorus') {
-        const sectionId = entry.sourceRef.sectionId
-        const section = editedLyrics.sections.find((s) => s.id === sectionId)
-        expect(section?.lines).toEqual(['Edited chorus line'])
-      }
+    const chorusEntries = result.slides.filter(
+      (e): e is typeof e & { sourceRef: { sectionId: string } } =>
+        e.sourceRef.kind === 'lyric' && e.sourceRef.sectionId === 'chorus',
+    )
+    expect(chorusEntries.length).toBeGreaterThan(0)
+    for (const entry of chorusEntries) {
+      const section = editedLyrics.sections.find((s) => s.id === entry.sourceRef.sectionId)
+      expect(section?.lines).toEqual(['Edited chorus line'])
     }
   })
 })

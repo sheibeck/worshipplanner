@@ -99,11 +99,20 @@ export interface GroupSlideEntry {
  * carries nothing and its content derives entirely from the owning slot,
  * which stays correct for the auto-derived PRAYER/MESSAGE/HYMN entry. Both
  * fields are optional so every entry written before this change stays valid.
+ *
+ * `scripture`'s `innerSlideId` is OPTIONAL (Phase 30, R047): a scripture
+ * group now derives exactly ONE reference-only entry, so the field is no
+ * longer minted — kept in the union, not removed, because Phase 34 widens
+ * this derivation back to per-fragment entries for congregational splits,
+ * and removing the field now would make that a rewrite instead of a
+ * widening. Any stored entry still carrying a legacy value is read
+ * identically to one without it (`slideshowAssembler.ts` and
+ * `deriveGroupEntries` both resolve by `scriptureReadingId` alone).
  */
 export type SourceRef =
   | { kind: 'lyric'; songId: string; sectionId: string }
   | { kind: 'copyright'; songId: string }
-  | { kind: 'scripture'; scriptureReadingId: string; innerSlideId: string }
+  | { kind: 'scripture'; scriptureReadingId: string; innerSlideId?: string }
   | { kind: 'imported'; importId: string; innerSlideId: string }
   | { kind: 'text'; title?: string; body?: string }
   | { kind: 'video'; videoSrc: string; originalFileName?: string }
