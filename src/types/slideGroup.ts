@@ -39,22 +39,15 @@ export interface SlideGroup {
   slotId: string
   /** Group-level audio bed, set via `setGroupBedMedia` (D-18); no legacy slot-media migration feeds this (D-19). */
   bedAudioUrl?: string
-  /** Opaque signature of the source content this group was last materialized/reconciled against. */
-  sourceSignature?: string
   /**
-   * Opaque signature of the source divergence the user last DECLINED via the
-   * reconciliation confirm dialog's `Dismiss` action (D-07). Deliberately a
-   * SECOND field, distinct from `sourceSignature` (what was last WRITTEN):
-   * collapsing them into one field would make an applied update
-   * indistinguishable from a declined one the next time the same value is
-   * compared, so a decline would wrongly suppress a legitimate later update.
-   * Absent on every existing document — that absence IS the correct
-   * "never declined" state, with no migration or backfill needed (D-19). A
-   * FRESH divergence (a new `sourceSignature` mismatch computing a DIFFERENT
-   * current signature than this field's value) must re-prompt; only the
-   * SAME unchanged divergence stays silenced.
+   * Opaque signature of the source content this group was last rebuilt
+   * against — a stored change-detector only, consulted by nothing (Phase 30
+   * deleted the confirm-gated reconciler that used to compare against it;
+   * every rebuild path now decides purely from a fresh derivation diff). Kept
+   * for storage parity across group documents and because deleting it would
+   * be a write against every existing document for no reader.
    */
-  dismissedSignature?: string
+  sourceSignature?: string
   slides: GroupSlideEntry[]
   createdAt: Timestamp
   updatedAt: Timestamp

@@ -341,7 +341,10 @@ describe('useSlideshowAssembly', () => {
     expect(mockSubscribeDecks).toHaveBeenCalledTimes(1)
     expect(mockSubscribeDecks).toHaveBeenCalledWith('org-1')
     expect(assembledSlideshow.value).toHaveLength(1)
-    expect(assembledSlideshow.value[0]!.slide).toMatchObject({ text: 'For God so loved the world...' })
+    // R047: a scripture slot's fallback derivation is reference-only — text
+    // is always empty; the reference resolves from the reading's own
+    // displayReference, not from any inner slide's text.
+    expect(assembledSlideshow.value[0]!.slide).toMatchObject({ text: '', reference: 'John 3' })
 
     // Re-render with the same orgId must not re-subscribe (T-20-03-DoS guard).
     service.value = makeService([scriptureSlot({ position: 0, scriptureReadingId: 'reading-1' })])
@@ -623,7 +626,7 @@ describe('useSlideshowAssembly', () => {
   })
 
   // --- Task 3: trigger reconciliation, apply the additive result, surface confirm-required ones ---
-  describe('reconciliation (Task 3)', () => {
+  describe('unconditional rebuild-and-write (R046 — no confirm state)', () => {
     it('a song group whose source gained a section reconciles automatically, preserving the pre-existing customized entry', async () => {
       songsState.songs = [{ id: 'song-a' } as Song]
       const twoSectionLyrics: SongLyrics = {
@@ -722,14 +725,14 @@ describe('useSlideshowAssembly', () => {
       const [, slotIdArg, slidesArg] = mockReplaceGroupSlides.mock.calls[0]!
       expect(slotIdArg).toBe('slot-song-swap')
       const slides = slidesArg as GroupSlideEntry[]
-      for (const entry of slides) {
-        if (entry.sourceRef.kind === 'lyric' || entry.sourceRef.kind === 'copyright') {
-          expect(entry.sourceRef.songId).toBe('song-b')
-        }
-      }
+      const songRefEntries = slides.filter(
+        (e): e is GroupSlideEntry & { sourceRef: { songId: string } } =>
+          e.sourceRef.kind === 'lyric' || e.sourceRef.kind === 'copyright',
+      )
+      expect(songRefEntries.every((e) => e.sourceRef.songId === 'song-b')).toBe(true)
     })
 
-    it('a customized group requires confirm (zero writes) when slot.songId changes to a different song', async () => {
+    it('R046: a group with a labeled lyric entry (source-derived) is STILL replaced wholesale, immediately, with a single write and no confirm state anywhere on the return', async () => {
       songsState.songs = [{ id: 'song-a' } as Song, { id: 'song-b' } as Song]
       const fakeLyricsLoader = vi.fn(async (_orgId: string, songId: string) => makeLyrics(songId))
 
@@ -756,7 +759,7 @@ describe('useSlideshowAssembly', () => {
       const service = ref<Service | null>(
         makeService([songSlot({ position: 0, id: 'slot-song-swap-2', songId: 'song-b' })]),
       )
-      const { pendingReconciliations } = useSlideshowAssembly(service, 'org-1', {
+      const returned = useSlideshowAssembly(service, 'org-1', {
         canWrite: true,
         lyricsLoader: fakeLyricsLoader,
       })
@@ -765,12 +768,12 @@ describe('useSlideshowAssembly', () => {
       await nextTick()
       await nextTick()
 
-      expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
-      expect(pendingReconciliations.value).toHaveLength(1)
-      expect(pendingReconciliations.value[0]!.slotId).toBe('slot-song-swap-2')
+      expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+      expect(mockReplaceGroupSlides.mock.calls[0]![1]).toBe('slot-song-swap-2')
+      expect('pendingReconciliations' in returned).toBe(false)
     })
 
-    it('a customized scripture group with a diverged signature issues zero writes and populates pendingReconciliations', async () => {
+    it('a scripture group whose slot is reassigned to a DIFFERENT reading rebuilds and writes immediately, preserving the stored entry\'s label and pointing at the new reading — no confirm state consulted', async () => {
       scriptureState.readings = [
         {
           id: 'reading-1',
@@ -778,18 +781,17 @@ describe('useSlideshowAssembly', () => {
           displayReference: 'John 3',
           rawText: 'text',
           readingMode: 'normal',
-          slides: [
-            {
-              id: 'orig-id',
-              position: 0,
-              contentKind: 'scripture',
-              reference: 'John 3:16',
-              bookRef: { book: 'John', chapter: 3 },
-              text: 'New verse text',
-              verseRange: '16',
-              readingMode: 'normal',
-            },
-          ],
+          slides: [],
+          createdAt: {} as never,
+          updatedAt: {} as never,
+        },
+        {
+          id: 'reading-2',
+          reference: { book: 'Psalm', chapter: 23 },
+          displayReference: 'Psalm 23',
+          rawText: 'text',
+          readingMode: 'normal',
+          slides: [],
           createdAt: {} as never,
           updatedAt: {} as never,
         },
@@ -799,12 +801,11 @@ describe('useSlideshowAssembly', () => {
           id: 'slot-scripture-a',
           slotId: 'slot-scripture-a',
           serviceId: 'service-1',
-          sourceSignature: '1:Old verse text',
           slides: [
             {
               id: 'ss-1',
               order: 0,
-              sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'orig-id' },
+              sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1' },
               label: 'Custom label',
             },
           ],
@@ -813,81 +814,26 @@ describe('useSlideshowAssembly', () => {
         },
       ]
 
+      // The slot now points at reading-2 — the user picked a different reading for the same slot.
       const service = ref<Service | null>(
-        makeService([scriptureSlot({ position: 0, id: 'slot-scripture-a', scriptureReadingId: 'reading-1' })]),
+        makeService([scriptureSlot({ position: 0, id: 'slot-scripture-a', scriptureReadingId: 'reading-2' })]),
       )
-      const { pendingReconciliations } = useSlideshowAssembly(service, 'org-1', { canWrite: true })
-      await nextTick()
-      await nextTick()
-
-      expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
-      expect(pendingReconciliations.value).toHaveLength(1)
-      expect(pendingReconciliations.value[0]!.slotId).toBe('slot-scripture-a')
-
-      // A second watcher tick (e.g. an unrelated service reassignment) must not duplicate the entry.
-      service.value = makeService([
-        scriptureSlot({ position: 0, id: 'slot-scripture-a', scriptureReadingId: 'reading-1' }),
-      ])
-      await nextTick()
-      await nextTick()
-      expect(pendingReconciliations.value).toHaveLength(1)
-    })
-
-    it('an uncustomized diverged group reconciles automatically with exactly one replaceGroupSlides call', async () => {
-      scriptureState.readings = [
-        {
-          id: 'reading-1',
-          reference: { book: 'John', chapter: 3 },
-          displayReference: 'John 3',
-          rawText: 'text',
-          readingMode: 'normal',
-          slides: [
-            {
-              id: 'orig-id',
-              position: 0,
-              contentKind: 'scripture',
-              reference: 'John 3:16',
-              bookRef: { book: 'John', chapter: 3 },
-              text: 'New verse text',
-              verseRange: '16',
-              readingMode: 'normal',
-            },
-          ],
-          createdAt: {} as never,
-          updatedAt: {} as never,
-        },
-      ]
-      slideGroupsState.groups = [
-        {
-          id: 'slot-scripture-b',
-          slotId: 'slot-scripture-b',
-          serviceId: 'service-1',
-          sourceSignature: '1:Old verse text',
-          slides: [
-            {
-              id: 'ss-1',
-              order: 0,
-              sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'orig-id' },
-            },
-          ],
-          createdAt: {} as never,
-          updatedAt: {} as never,
-        },
-      ]
-
-      const service = ref<Service | null>(
-        makeService([scriptureSlot({ position: 0, id: 'slot-scripture-b', scriptureReadingId: 'reading-1' })]),
-      )
-      useSlideshowAssembly(service, 'org-1', { canWrite: true })
+      const returned = useSlideshowAssembly(service, 'org-1', { canWrite: true })
       await nextTick()
       await nextTick()
 
       expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
-      const [, slotIdArg] = mockReplaceGroupSlides.mock.calls[0]!
-      expect(slotIdArg).toBe('slot-scripture-b')
+      const [, slotIdArg, slidesArg] = mockReplaceGroupSlides.mock.calls[0]!
+      expect(slotIdArg).toBe('slot-scripture-a')
+      const slides = slidesArg as GroupSlideEntry[]
+      expect(slides).toHaveLength(1)
+      expect(slides[0]!.id).toBe('ss-1')
+      expect(slides[0]!.label).toBe('Custom label')
+      expect(slides[0]!.sourceRef).toEqual({ kind: 'scripture', scriptureReadingId: 'reading-2' })
+      expect('pendingReconciliations' in returned).toBe(false)
     })
 
-    it('a group already in sync (unchanged signature) issues no reconciliation call', async () => {
+    it('a scripture group already in sync (same reading, freshly-shaped stored entry) issues no write', async () => {
       scriptureState.readings = [
         {
           id: 'reading-1',
@@ -895,18 +841,7 @@ describe('useSlideshowAssembly', () => {
           displayReference: 'John 3',
           rawText: 'text',
           readingMode: 'normal',
-          slides: [
-            {
-              id: 'orig-id',
-              position: 0,
-              contentKind: 'scripture',
-              reference: 'John 3:16',
-              bookRef: { book: 'John', chapter: 3 },
-              text: 'Same verse text',
-              verseRange: '16',
-              readingMode: 'normal',
-            },
-          ],
+          slides: [],
           createdAt: {} as never,
           updatedAt: {} as never,
         },
@@ -916,13 +851,8 @@ describe('useSlideshowAssembly', () => {
           id: 'slot-scripture-c',
           slotId: 'slot-scripture-c',
           serviceId: 'service-1',
-          sourceSignature: '1:Same verse text',
           slides: [
-            {
-              id: 'ss-1',
-              order: 0,
-              sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'orig-id' },
-            },
+            { id: 'ss-1', order: 0, sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1' } },
           ],
           createdAt: {} as never,
           updatedAt: {} as never,
@@ -932,15 +862,14 @@ describe('useSlideshowAssembly', () => {
       const service = ref<Service | null>(
         makeService([scriptureSlot({ position: 0, id: 'slot-scripture-c', scriptureReadingId: 'reading-1' })]),
       )
-      const { pendingReconciliations } = useSlideshowAssembly(service, 'org-1', { canWrite: true })
+      useSlideshowAssembly(service, 'org-1', { canWrite: true })
       await nextTick()
       await nextTick()
 
       expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
-      expect(pendingReconciliations.value).toHaveLength(0)
     })
 
-    it('canWrite false issues zero reconciliation writes', async () => {
+    it('canWrite false issues zero rebuild writes', async () => {
       scriptureState.readings = [
         {
           id: 'reading-1',
@@ -948,18 +877,17 @@ describe('useSlideshowAssembly', () => {
           displayReference: 'John 3',
           rawText: 'text',
           readingMode: 'normal',
-          slides: [
-            {
-              id: 'orig-id',
-              position: 0,
-              contentKind: 'scripture',
-              reference: 'John 3:16',
-              bookRef: { book: 'John', chapter: 3 },
-              text: 'New verse text',
-              verseRange: '16',
-              readingMode: 'normal',
-            },
-          ],
+          slides: [],
+          createdAt: {} as never,
+          updatedAt: {} as never,
+        },
+        {
+          id: 'reading-2',
+          reference: { book: 'Psalm', chapter: 23 },
+          displayReference: 'Psalm 23',
+          rawText: 'text',
+          readingMode: 'normal',
+          slides: [],
           createdAt: {} as never,
           updatedAt: {} as never,
         },
@@ -969,13 +897,8 @@ describe('useSlideshowAssembly', () => {
           id: 'slot-scripture-d',
           slotId: 'slot-scripture-d',
           serviceId: 'service-1',
-          sourceSignature: '1:Old verse text',
           slides: [
-            {
-              id: 'ss-1',
-              order: 0,
-              sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'orig-id' },
-            },
+            { id: 'ss-1', order: 0, sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1' } },
           ],
           createdAt: {} as never,
           updatedAt: {} as never,
@@ -983,526 +906,80 @@ describe('useSlideshowAssembly', () => {
       ]
 
       const service = ref<Service | null>(
-        makeService([scriptureSlot({ position: 0, id: 'slot-scripture-d', scriptureReadingId: 'reading-1' })]),
+        makeService([scriptureSlot({ position: 0, id: 'slot-scripture-d', scriptureReadingId: 'reading-2' })]),
       )
-      const { pendingReconciliations } = useSlideshowAssembly(service, 'org-1')
+      useSlideshowAssembly(service, 'org-1')
       await nextTick()
       await nextTick()
 
       expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
-      expect(pendingReconciliations.value).toHaveLength(0)
     })
-  })
 
-  // --- 26-04 Task 1: pending entry carries the divergence + song titles ---
-  describe('PendingReconciliation widening — divergence and song titles (26-04 Task 1)', () => {
-    it('a confirm-required reconciliation stores the current divergence value on the pending entry', async () => {
-      scriptureState.readings = [
-        {
-          id: 'reading-1',
-          reference: { book: 'John', chapter: 3 },
-          displayReference: 'John 3',
-          rawText: 'text',
-          readingMode: 'normal',
-          slides: [
-            {
-              id: 'orig-id',
-              position: 0,
-              contentKind: 'scripture',
-              reference: 'John 3:16',
-              bookRef: { book: 'John', chapter: 3 },
-              text: 'New verse text',
-              verseRange: '16',
-              readingMode: 'normal',
-            },
-          ],
-          createdAt: {} as never,
-          updatedAt: {} as never,
+    it('the write passes the group\'s PRE-rebuild slides as the compare-and-swap base (CR-02), so a concurrent write is merged, not overwritten', async () => {
+      songsState.songs = [{ id: 'song-a' } as Song]
+      const twoSectionLyrics: SongLyrics = {
+        id: 'lyrics-song-a',
+        songId: 'song-a',
+        sections: [
+          { id: 'v1', label: 'Verse 1', lines: ['song-a line 1'] },
+          { id: 'v2', label: 'Verse 2', lines: ['song-a line 2'] },
+        ],
+        copyright: {
+          title: 'song-a Title',
+          authors: ['Author'],
+          ccliSongNumber: '123',
+          copyrightLines: ['(c) 2026'],
+          ccliLicenseNumber: 'LIC-1',
         },
+        performanceOrder: ['v1', 'v2'],
+        createdAt: {} as never,
+        updatedAt: {} as never,
+      }
+      const fakeLyricsLoader = vi.fn(async () => twoSectionLyrics)
+
+      const preRebuildSlides: GroupSlideEntry[] = [
+        { id: 'cr-1', order: 0, sourceRef: { kind: 'copyright', songId: 'song-a' } },
+        { id: 'ly-v1', order: 1, sourceRef: { kind: 'lyric', songId: 'song-a', sectionId: 'v1' } },
+        { id: 'cr-2', order: 2, sourceRef: { kind: 'copyright', songId: 'song-a' } },
       ]
       slideGroupsState.groups = [
         {
-          id: 'slot-scripture-fresh',
-          slotId: 'slot-scripture-fresh',
+          id: 'slot-song-base',
+          slotId: 'slot-song-base',
           serviceId: 'service-1',
-          sourceSignature: '1:Old verse text',
-          slides: [
-            {
-              id: 'ss-1',
-              order: 0,
-              sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'orig-id' },
-              label: 'Custom label',
-            },
-          ],
+          slides: preRebuildSlides,
           createdAt: {} as never,
           updatedAt: {} as never,
         },
       ]
 
       const service = ref<Service | null>(
-        makeService([scriptureSlot({ position: 0, id: 'slot-scripture-fresh', scriptureReadingId: 'reading-1' })]),
+        makeService([songSlot({ position: 0, id: 'slot-song-base', songId: 'song-a' })]),
       )
-      const { pendingReconciliations } = useSlideshowAssembly(service, 'org-1', { canWrite: true })
-      await nextTick()
-      await nextTick()
-
-      expect(pendingReconciliations.value).toHaveLength(1)
-      expect(pendingReconciliations.value[0]!.freshSignature).toBe('1:New verse text')
-    })
-
-    it('a confirm-required SONG REASSIGNMENT stores both the old and new song titles resolved from the catalogue', async () => {
-      songsState.songs = [
-        { id: 'song-a', title: 'Old Song Title' } as Song,
-        { id: 'song-b', title: 'New Song Title' } as Song,
-      ]
-      const fakeLyricsLoader = vi.fn(async (_orgId: string, songId: string) => makeLyrics(songId))
-
-      slideGroupsState.groups = [
-        {
-          id: 'slot-song-swap-titled',
-          slotId: 'slot-song-swap-titled',
-          serviceId: 'service-1',
-          slides: [
-            { id: 'cr-1', order: 0, sourceRef: { kind: 'copyright', songId: 'song-a' } },
-            {
-              id: 'ly-v1',
-              order: 1,
-              sourceRef: { kind: 'lyric', songId: 'song-a', sectionId: 'v1' },
-              label: 'Custom Label',
-            },
-            { id: 'cr-2', order: 2, sourceRef: { kind: 'copyright', songId: 'song-a' } },
-          ],
-          createdAt: {} as never,
-          updatedAt: {} as never,
-        },
-      ]
-
-      const service = ref<Service | null>(
-        makeService([songSlot({ position: 0, id: 'slot-song-swap-titled', songId: 'song-b' })]),
-      )
-      const { pendingReconciliations } = useSlideshowAssembly(service, 'org-1', {
-        canWrite: true,
-        lyricsLoader: fakeLyricsLoader,
-      })
+      useSlideshowAssembly(service, 'org-1', { canWrite: true, lyricsLoader: fakeLyricsLoader })
       await nextTick()
       await vi.waitFor(() => expect(fakeLyricsLoader).toHaveBeenCalled())
-      await nextTick()
-      await nextTick()
-
-      expect(pendingReconciliations.value).toHaveLength(1)
-      expect(pendingReconciliations.value[0]!.oldSongTitle).toBe('Old Song Title')
-      expect(pendingReconciliations.value[0]!.newSongTitle).toBe('New Song Title')
-    })
-
-    it('a confirm-required SONG REASSIGNMENT with the old song absent from the catalogue stores a generic label, never an id or empty value', async () => {
-      // song-a (the OLD, stored song) has been deleted from the catalogue.
-      songsState.songs = [{ id: 'song-b', title: 'New Song Title' } as Song]
-      const fakeLyricsLoader = vi.fn(async (_orgId: string, songId: string) => makeLyrics(songId))
-
-      slideGroupsState.groups = [
-        {
-          id: 'slot-song-swap-missing',
-          slotId: 'slot-song-swap-missing',
-          serviceId: 'service-1',
-          slides: [
-            { id: 'cr-1', order: 0, sourceRef: { kind: 'copyright', songId: 'song-a' } },
-            {
-              id: 'ly-v1',
-              order: 1,
-              sourceRef: { kind: 'lyric', songId: 'song-a', sectionId: 'v1' },
-              label: 'Custom Label',
-            },
-            { id: 'cr-2', order: 2, sourceRef: { kind: 'copyright', songId: 'song-a' } },
-          ],
-          createdAt: {} as never,
-          updatedAt: {} as never,
-        },
-      ]
-
-      const service = ref<Service | null>(
-        makeService([songSlot({ position: 0, id: 'slot-song-swap-missing', songId: 'song-b' })]),
-      )
-      const { pendingReconciliations } = useSlideshowAssembly(service, 'org-1', {
-        canWrite: true,
-        lyricsLoader: fakeLyricsLoader,
-      })
-      await nextTick()
-      await vi.waitFor(() => expect(fakeLyricsLoader).toHaveBeenCalled())
-      await nextTick()
-      await nextTick()
-
-      expect(pendingReconciliations.value).toHaveLength(1)
-      expect(pendingReconciliations.value[0]!.oldSongTitle).toBe('Unknown Song')
-      expect(pendingReconciliations.value[0]!.oldSongTitle).not.toBe('song-a')
-      expect(pendingReconciliations.value[0]!.oldSongTitle).not.toBe('')
-      expect(pendingReconciliations.value[0]!.newSongTitle).toBe('New Song Title')
-    })
-
-    it('a confirm-required SCRIPTURE reconciliation stores no song titles', async () => {
-      scriptureState.readings = [
-        {
-          id: 'reading-1',
-          reference: { book: 'John', chapter: 3 },
-          displayReference: 'John 3',
-          rawText: 'text',
-          readingMode: 'normal',
-          slides: [
-            {
-              id: 'orig-id',
-              position: 0,
-              contentKind: 'scripture',
-              reference: 'John 3:16',
-              bookRef: { book: 'John', chapter: 3 },
-              text: 'New verse text',
-              verseRange: '16',
-              readingMode: 'normal',
-            },
-          ],
-          createdAt: {} as never,
-          updatedAt: {} as never,
-        },
-      ]
-      slideGroupsState.groups = [
-        {
-          id: 'slot-scripture-no-titles',
-          slotId: 'slot-scripture-no-titles',
-          serviceId: 'service-1',
-          sourceSignature: '1:Old verse text',
-          slides: [
-            {
-              id: 'ss-1',
-              order: 0,
-              sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'orig-id' },
-              label: 'Custom label',
-            },
-          ],
-          createdAt: {} as never,
-          updatedAt: {} as never,
-        },
-      ]
-
-      const service = ref<Service | null>(
-        makeService([scriptureSlot({ position: 0, id: 'slot-scripture-no-titles', scriptureReadingId: 'reading-1' })]),
-      )
-      const { pendingReconciliations } = useSlideshowAssembly(service, 'org-1', { canWrite: true })
-      await nextTick()
-      await nextTick()
-
-      expect(pendingReconciliations.value).toHaveLength(1)
-      expect(pendingReconciliations.value[0]!.oldSongTitle).toBeUndefined()
-      expect(pendingReconciliations.value[0]!.newSongTitle).toBeUndefined()
-    })
-
-    it('the automatic-apply path still writes without any pending entry appearing', async () => {
-      scriptureState.readings = [
-        {
-          id: 'reading-1',
-          reference: { book: 'John', chapter: 3 },
-          displayReference: 'John 3',
-          rawText: 'text',
-          readingMode: 'normal',
-          slides: [
-            {
-              id: 'orig-id',
-              position: 0,
-              contentKind: 'scripture',
-              reference: 'John 3:16',
-              bookRef: { book: 'John', chapter: 3 },
-              text: 'New verse text',
-              verseRange: '16',
-              readingMode: 'normal',
-            },
-          ],
-          createdAt: {} as never,
-          updatedAt: {} as never,
-        },
-      ]
-      // Uncustomized group — no label/notes/audio — so this reconciles automatically.
-      slideGroupsState.groups = [
-        {
-          id: 'slot-scripture-auto',
-          slotId: 'slot-scripture-auto',
-          serviceId: 'service-1',
-          sourceSignature: '1:Old verse text',
-          slides: [
-            {
-              id: 'ss-1',
-              order: 0,
-              sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'orig-id' },
-            },
-          ],
-          createdAt: {} as never,
-          updatedAt: {} as never,
-        },
-      ]
-
-      const service = ref<Service | null>(
-        makeService([scriptureSlot({ position: 0, id: 'slot-scripture-auto', scriptureReadingId: 'reading-1' })]),
-      )
-      const { pendingReconciliations } = useSlideshowAssembly(service, 'org-1', { canWrite: true })
       await nextTick()
       await nextTick()
 
       expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
-      expect(pendingReconciliations.value).toHaveLength(0)
+      const baseSlidesArg = mockReplaceGroupSlides.mock.calls[0]![4]
+      // `slideGroupsState` is Vue-`reactive()`, so the array the composable
+      // reads back is a Proxy over (not the same object identity as)
+      // `preRebuildSlides` — assert deep equality, which is what "the
+      // pre-rebuild snapshot, unmutated" actually means here.
+      expect(baseSlidesArg).toEqual(preRebuildSlides)
     })
   })
 
-  // --- 26-04 Task 2: a declined divergence stops surfacing, until it changes again ---
-  describe('durable decline suppression (26-04 Task 2)', () => {
-    function customizedScriptureGroup(overrides: Partial<SlideGroup>): SlideGroup {
-      return {
-        id: 'slot-scripture-decline',
-        slotId: 'slot-scripture-decline',
-        serviceId: 'service-1',
-        sourceSignature: '1:Old verse text',
-        slides: [
-          {
-            id: 'ss-1',
-            order: 0,
-            sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'orig-id' },
-            label: 'Custom label',
-          },
-        ],
-        createdAt: {} as never,
-        updatedAt: {} as never,
-        ...overrides,
-      }
-    }
-
-    function readingWithText(text: string): ScriptureReading[] {
-      return [
-        {
-          id: 'reading-1',
-          reference: { book: 'John', chapter: 3 },
-          displayReference: 'John 3',
-          rawText: 'text',
-          readingMode: 'normal',
-          slides: [
-            {
-              id: 'orig-id',
-              position: 0,
-              contentKind: 'scripture',
-              reference: 'John 3:16',
-              bookRef: { book: 'John', chapter: 3 },
-              text,
-              verseRange: '16',
-              readingMode: 'normal',
-            },
-          ],
-          createdAt: {} as never,
-          updatedAt: {} as never,
-        },
-      ]
-    }
-
-    it('a group whose recorded declined value equals the current divergence surfaces no pending entry', async () => {
-      scriptureState.readings = readingWithText('New verse text')
-      slideGroupsState.groups = [customizedScriptureGroup({ dismissedSignature: '1:New verse text' })]
-
-      const service = ref<Service | null>(
-        makeService([scriptureSlot({ position: 0, id: 'slot-scripture-decline', scriptureReadingId: 'reading-1' })]),
-      )
-      const { pendingReconciliations } = useSlideshowAssembly(service, 'org-1', { canWrite: true })
-      await nextTick()
-      await nextTick()
-
-      expect(pendingReconciliations.value).toHaveLength(0)
-      expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
-    })
-
-    it('a group whose recorded declined value differs from the current divergence surfaces normally', async () => {
-      scriptureState.readings = readingWithText('New verse text')
-      slideGroupsState.groups = [customizedScriptureGroup({ dismissedSignature: '1:Some other divergence' })]
-
-      const service = ref<Service | null>(
-        makeService([scriptureSlot({ position: 0, id: 'slot-scripture-decline', scriptureReadingId: 'reading-1' })]),
-      )
-      const { pendingReconciliations } = useSlideshowAssembly(service, 'org-1', { canWrite: true })
-      await nextTick()
-      await nextTick()
-
-      expect(pendingReconciliations.value).toHaveLength(1)
-    })
-
-    it('a group with no recorded decline surfaces normally', async () => {
-      scriptureState.readings = readingWithText('New verse text')
-      slideGroupsState.groups = [customizedScriptureGroup({})]
-
-      const service = ref<Service | null>(
-        makeService([scriptureSlot({ position: 0, id: 'slot-scripture-decline', scriptureReadingId: 'reading-1' })]),
-      )
-      const { pendingReconciliations } = useSlideshowAssembly(service, 'org-1', { canWrite: true })
-      await nextTick()
-      await nextTick()
-
-      expect(pendingReconciliations.value).toHaveLength(1)
-    })
-
-    it('a group whose recorded decline matches surfaces again once the source changes to a FURTHER different divergence', async () => {
-      scriptureState.readings = readingWithText('New verse text')
-      slideGroupsState.groups = [customizedScriptureGroup({ dismissedSignature: '1:New verse text' })]
-
-      const service = ref<Service | null>(
-        makeService([scriptureSlot({ position: 0, id: 'slot-scripture-decline', scriptureReadingId: 'reading-1' })]),
-      )
-      const { pendingReconciliations } = useSlideshowAssembly(service, 'org-1', { canWrite: true })
-      await nextTick()
-      await nextTick()
-      expect(pendingReconciliations.value).toHaveLength(0)
-
-      // A further source change: the declined divergence is now stale. Mutated
-      // IN PLACE (not reassigned) — the mock store's `readings` property
-      // captured a reactive proxy over this SAME raw array at composable
-      // setup time; reassigning the outer `scriptureState.readings` binding
-      // here would silently stop being visible to that already-constructed
-      // mock, since it would swap in an entirely different raw array the mock
-      // never re-reads.
-      scriptureState.readings[0]!.slides[0]!.text = 'Yet another verse text'
-      await nextTick()
-      await nextTick()
-
-      expect(pendingReconciliations.value).toHaveLength(1)
-    })
-
-    it('suppression never issues a write; the group stays completely untouched', async () => {
-      scriptureState.readings = readingWithText('New verse text')
-      slideGroupsState.groups = [customizedScriptureGroup({ dismissedSignature: '1:New verse text' })]
-
-      const service = ref<Service | null>(
-        makeService([scriptureSlot({ position: 0, id: 'slot-scripture-decline', scriptureReadingId: 'reading-1' })]),
-      )
-      useSlideshowAssembly(service, 'org-1', { canWrite: true })
-      await nextTick()
-      await nextTick()
-
-      expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
-      expect(mockSetGroupBedMedia).not.toHaveBeenCalled()
-    })
-  })
-
-  // CR-03 regression: `pendingReconciliationsMap` must be pruned once an
-  // outcome is no longer `needsConfirm`, on BOTH resolution paths (Dismiss
-  // and Apply) — not just suppressed from being re-added on the next tick.
-  // The existing "durable decline suppression" tests above only ever
-  // pre-seed `dismissedSignature` BEFORE the composable's first mount, which
-  // cannot catch a stale map entry set on an EARLIER tick of the SAME
-  // mounted instance — these tests dismiss/apply live, within one lifecycle.
-  describe('CR-03 — pending-reconciliation map pruned after resolution', () => {
-    function customizedScriptureGroup(overrides: Partial<SlideGroup>): SlideGroup {
-      return {
-        id: 'slot-scripture-decline',
-        slotId: 'slot-scripture-decline',
-        serviceId: 'service-1',
-        sourceSignature: '1:Old verse text',
-        slides: [
-          {
-            id: 'ss-1',
-            order: 0,
-            sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'orig-id' },
-            label: 'Custom label',
-          },
-        ],
-        createdAt: {} as never,
-        updatedAt: {} as never,
-        ...overrides,
-      }
-    }
-
-    function readingWithText(text: string): ScriptureReading[] {
-      return [
-        {
-          id: 'reading-1',
-          reference: { book: 'John', chapter: 3 },
-          displayReference: 'John 3',
-          rawText: 'text',
-          readingMode: 'normal',
-          slides: [
-            {
-              id: 'orig-id',
-              position: 0,
-              contentKind: 'scripture',
-              reference: 'John 3:16',
-              bookRef: { book: 'John', chapter: 3 },
-              text,
-              verseRange: '16',
-              readingMode: 'normal',
-            },
-          ],
-          createdAt: {} as never,
-          updatedAt: {} as never,
-        },
-      ]
-    }
-
-    it('a pending reconciliation is pruned once a LIVE Dismiss round-trips back within the same mounted instance', async () => {
-      scriptureState.readings = readingWithText('New verse text')
-      const group = customizedScriptureGroup({})
-      slideGroupsState.groups = [group]
-
-      const service = ref<Service | null>(
-        makeService([scriptureSlot({ position: 0, id: 'slot-scripture-decline', scriptureReadingId: 'reading-1' })]),
-      )
-      const { pendingReconciliations } = useSlideshowAssembly(service, 'org-1', { canWrite: true })
-      await nextTick()
-      await nextTick()
-
-      expect(pendingReconciliations.value).toHaveLength(1)
-      const freshSignature = pendingReconciliations.value[0]!.freshSignature
-
-      // Simulate the store round-trip after `SlideGrid.vue`'s
-      // `onDismissReconciliation` write commits: the SAME mounted composable
-      // instance now sees `dismissedSignature` matching the divergence it
-      // already surfaced on the previous tick. Before the CR-03 fix, the
-      // `dismissedSignature` guard's bare `continue` suppressed the outcome
-      // from being RE-added but never removed the stale entry already set —
-      // the banner would persist forever.
-      slideGroupsState.groups = [{ ...group, dismissedSignature: freshSignature }]
-      await nextTick()
-      await nextTick()
-
-      expect(pendingReconciliations.value).toHaveLength(0)
-    })
-
-    it('a pending reconciliation is pruned once a LIVE Apply round-trips back, so re-opening Review cannot read stale proposed content', async () => {
-      scriptureState.readings = readingWithText('New verse text')
-      const group = customizedScriptureGroup({})
-      slideGroupsState.groups = [group]
-
-      const service = ref<Service | null>(
-        makeService([scriptureSlot({ position: 0, id: 'slot-scripture-decline', scriptureReadingId: 'reading-1' })]),
-      )
-      const { pendingReconciliations } = useSlideshowAssembly(service, 'org-1', { canWrite: true })
-      await nextTick()
-      await nextTick()
-
-      expect(pendingReconciliations.value).toHaveLength(1)
-      const freshSignature = pendingReconciliations.value[0]!.freshSignature
-
-      // Simulate `SlideGrid.vue`'s `onApplyReconciliation`: it writes
-      // `slides`/`sourceSignature` DIRECTLY via the store, bypassing this
-      // composable's own watcher entirely. Once that round-trips back, the
-      // group's `sourceSignature` now matches the derived signature, so
-      // `reconcileGroup` returns `changed: false, needsConfirm: false`
-      // (already in sync) — before the CR-03 fix, this outcome fell through
-      // both branches in `applyReconciliationOutcomes` without ever pruning
-      // the stale map entry, leaving the banner (and its now-stale
-      // `proposed` list) visible after the user had already resolved it.
-      slideGroupsState.groups = [{ ...group, sourceSignature: freshSignature, slides: [] }]
-      await nextTick()
-      await nextTick()
-
-      expect(pendingReconciliations.value).toHaveLength(0)
-    })
-  })
-
-  // --- Task 3 (25-01): end-to-end guard that a dropped video survives a live
-  // reconciliation tick. This is the highest-consequence regression this
-  // phase can produce: a video a user dropped disappearing on the next lyric
-  // edit or re-split passage. Adds no production code — asserts on what the
-  // store received (mockReplaceGroupSlides args) and on pendingReconciliations,
-  // not on internal composable state.
-  describe('D-17 — dropped video survives reconciliation (25-01 Task 3)', () => {
+  // --- R046: end-to-end guard that a dropped video / hand-authored slide
+  // survives a live rebuild tick, across all three slot kinds. This is the
+  // highest-consequence regression this phase can produce: a video a user
+  // dropped disappearing on the next lyric edit, reading swap, or re-import —
+  // with no confirm dialog left to have ever caught it. Adds no production
+  // assertions beyond what the store received (mockReplaceGroupSlides args)
+  // and the assembled output, not internal composable state.
+  describe('D-17 / T-30-02-01 — dropped video survives an unconditional rebuild (end-to-end)', () => {
     it('a song group holding a video entry keeps that entry in the slide list passed to replaceGroupSlides after a lyric change triggers reconciliation', async () => {
       songsState.songs = [{ id: 'song-a' } as Song]
       const twoSectionLyrics: SongLyrics = {
@@ -1565,7 +1042,7 @@ describe('useSlideshowAssembly', () => {
       expect(videoEntry?.sourceRef).toEqual({ kind: 'video', videoSrc: 'https://example.com/dropped.mp4' })
     })
 
-    it('a customized scripture group with a video entry and a diverged source issues zero writes, surfaces a pending reconciliation, and the assembled output still shows the video slide', async () => {
+    it('a dropped video on a SCRIPTURE group survives a reading swap end-to-end: the write includes it, and the assembled output still shows the video slide', async () => {
       scriptureState.readings = [
         {
           id: 'reading-1',
@@ -1573,18 +1050,17 @@ describe('useSlideshowAssembly', () => {
           displayReference: 'John 3',
           rawText: 'text',
           readingMode: 'normal',
-          slides: [
-            {
-              id: 'orig-id',
-              position: 0,
-              contentKind: 'scripture',
-              reference: 'John 3:16',
-              bookRef: { book: 'John', chapter: 3 },
-              text: 'New verse text',
-              verseRange: '16',
-              readingMode: 'normal',
-            },
-          ],
+          slides: [],
+          createdAt: {} as never,
+          updatedAt: {} as never,
+        },
+        {
+          id: 'reading-2',
+          reference: { book: 'Psalm', chapter: 23 },
+          displayReference: 'Psalm 23',
+          rawText: 'text',
+          readingMode: 'normal',
+          slides: [],
           createdAt: {} as never,
           updatedAt: {} as never,
         },
@@ -1594,13 +1070,8 @@ describe('useSlideshowAssembly', () => {
           id: 'slot-scripture-video',
           slotId: 'slot-scripture-video',
           serviceId: 'service-1',
-          sourceSignature: '1:Old verse text',
           slides: [
-            {
-              id: 'ss-1',
-              order: 0,
-              sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'orig-id' },
-            },
+            { id: 'ss-1', order: 0, sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1' } },
             {
               id: 'entry-video',
               order: 1,
@@ -1612,22 +1083,75 @@ describe('useSlideshowAssembly', () => {
         },
       ]
 
+      // The slot is reassigned to reading-2 — the source has changed.
       const service = ref<Service | null>(
-        makeService([scriptureSlot({ position: 0, id: 'slot-scripture-video', scriptureReadingId: 'reading-1' })]),
+        makeService([scriptureSlot({ position: 0, id: 'slot-scripture-video', scriptureReadingId: 'reading-2' })]),
       )
-      const { pendingReconciliations, assembledSlideshow } = useSlideshowAssembly(service, 'org-1', {
-        canWrite: true,
-      })
+      const { assembledSlideshow } = useSlideshowAssembly(service, 'org-1', { canWrite: true })
       await nextTick()
       await nextTick()
 
-      expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
-      expect(pendingReconciliations.value).toHaveLength(1)
-      expect(pendingReconciliations.value[0]!.slotId).toBe('slot-scripture-video')
+      expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+      const [, , slidesArg] = mockReplaceGroupSlides.mock.calls[0]!
+      const slides = slidesArg as GroupSlideEntry[]
+      const videoEntry = slides.find((e) => e.id === 'entry-video')
+      expect(videoEntry).toBeDefined()
+      expect(videoEntry?.sourceRef).toEqual({ kind: 'video', videoSrc: 'https://example.com/dropped.mp4' })
 
+      // The store mock does not itself apply the write, so the assembled
+      // output still resolves from the ORIGINAL stored slides at this point
+      // (a real Firestore round trip lands async) — assert the video slide
+      // is present in the CURRENT assembled output either way, since the
+      // video entry was never removed from the group by this rebuild.
       const videoSlide = assembledSlideshow.value.find((s) => s.slide.contentKind === 'video')
       expect(videoSlide).toBeDefined()
       expect(videoSlide!.slide.id).toBe('entry-video')
+    })
+
+    it('an authored-text entry on an IMPORTED group survives a re-import end-to-end: the write includes it', async () => {
+      importedState.decks = [
+        {
+          id: 'deck-1',
+          sourceFileName: 'announcements.pptx',
+          section: 'pre-service',
+          slides: [
+            { id: 'new-1', position: 0, contentKind: 'text', title: 'New', body: 'New body' },
+          ],
+          createdAt: {} as never,
+          updatedAt: {} as never,
+        },
+      ]
+      slideGroupsState.groups = [
+        {
+          id: 'slot-imported-authored',
+          slotId: 'slot-imported-authored',
+          serviceId: 'service-1',
+          slides: [
+            { id: 'is-old', order: 0, sourceRef: { kind: 'imported', importId: 'deck-1', innerSlideId: 'old-1' } },
+            {
+              id: 'entry-authored',
+              order: 1,
+              sourceRef: { kind: 'text', title: 'My Slide', body: 'My words' },
+            },
+          ],
+          createdAt: {} as never,
+          updatedAt: {} as never,
+        },
+      ]
+
+      const service = ref<Service | null>(
+        makeService([{ kind: 'IMPORTED', id: 'slot-imported-authored', position: 0, importId: 'deck-1', section: 'pre-service' }]),
+      )
+      useSlideshowAssembly(service, 'org-1', { canWrite: true })
+      await nextTick()
+      await nextTick()
+
+      expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+      const [, , slidesArg] = mockReplaceGroupSlides.mock.calls[0]!
+      const slides = slidesArg as GroupSlideEntry[]
+      const authoredEntry = slides.find((e) => e.id === 'entry-authored')
+      expect(authoredEntry).toBeDefined()
+      expect(authoredEntry?.sourceRef).toEqual({ kind: 'text', title: 'My Slide', body: 'My words' })
     })
   })
 

@@ -17,10 +17,9 @@ import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore'
 import { db } from '@/firebase'
 import { useScriptureSlides } from '@/stores/scriptureSlides'
 import { useImportedSlides } from '@/stores/importedSlides'
-import { useSongStore } from '@/stores/songs'
 import { useSlideGroups } from '@/stores/slideGroups'
 import { assembleSlideshow, type AssemblyInputs } from '@/utils/slideshowAssembler'
-import { buildInitialGroup, reconcileGroup, sourceSignature, type ReconcileResult } from '@/utils/slideGroupMaterializer'
+import { buildInitialGroup, rebuildGroup, sourceSignature, type RebuildResult } from '@/utils/slideGroupMaterializer'
 import { SERVICE_SECTIONS, SERVICE_SECTION_LABELS, type Service } from '@/types/service'
 import type { AssembledSlide, AssembledSection } from '@/types/slide'
 import type { SongLyrics } from '@/types/songLyrics'
@@ -67,33 +66,6 @@ export interface UseSlideshowAssemblyOptions {
 }
 
 /**
- * A confirm-required reconciliation (Task 3, D-02): a source diverged against
- * a customized group, so nothing was written — the Phase 26 confirm dialog
- * renders against this entry instead. Deduplicated by `slotId` (a Map, not an
- * array) so a repeated watcher tick can never append a second entry.
- */
-export interface PendingReconciliation {
-  slotId: string
-  proposed: GroupSlideEntry[]
-  loss?: { customizedEntries: number; withAudio: number; withNotes: number }
-  /**
-   * The divergence this pending entry was computed against (26-04) —
-   * precomputed here from the outcome's own `freshSignature` rather than
-   * left for the confirm dialog to recompute later against possibly-changed
-   * state. `Apply` must write THIS value, not a freshly-recomputed one.
-   */
-  freshSignature?: string
-  /**
-   * Populated ONLY for a song-identity-swap reconciliation (D-08) — both
-   * titles resolved from the song catalogue HERE, the one layer that already
-   * holds it; the pure reconciler below never resolves a title. Absent for
-   * every other confirm-required reconciliation (scripture, imported).
-   */
-  oldSongTitle?: string
-  newSongTitle?: string
-}
-
-/**
  * Result of an on-demand materialization (25-05 Task 1): the group's current
  * slide entries plus its stored source signature. Returned by value rather
  * than left for the caller to re-derive from `groupsBySlotId`, because the
@@ -113,8 +85,6 @@ export interface UseSlideshowAssemblyReturn {
   isLoading: Ref<boolean>
   /** Re-exposed from the `slideGroups` store so consumers (24-06's delete warning) don't subscribe a second time. */
   groupsBySlotId: ComputedRef<Map<string, SlideGroup>>
-  /** Confirm-required reconciliations awaiting the Phase 26 dialog — this phase ships the state, not the dialog. */
-  pendingReconciliations: ComputedRef<PendingReconciliation[]>
   /**
    * On-demand group materializer (25-05 Task 1): resolves to `{ entries,
    * sourceSignature }` for `slotId`'s group, creating it first if it does not
@@ -144,7 +114,6 @@ export function useSlideshowAssembly(
 ): UseSlideshowAssemblyReturn {
   const scriptureStore = useScriptureSlides()
   const importedStore = useImportedSlides()
-  const songStore = useSongStore()
   const slideGroupsStore = useSlideGroups()
   const loadLyrics = options?.lyricsLoader ?? defaultLyricsLoader
 
@@ -371,29 +340,22 @@ export function useSlideshowAssembly(
     return promise
   }
 
-  // --- Task 3: trigger reconciliation, apply the additive result, surface the confirm-required ones ---
+  // --- Phase 30 (R046): one unconditional rebuild-and-write loop, no confirm state ---
   //
   // Same synchronous-decision / async-effect split as materialization above,
-  // for the same reason (async watch bodies only track pre-await reads).
-  interface ReconciliationOutcome {
+  // for the same reason (async watch bodies only track pre-await reads). The
+  // only decision left is "write, or don't bother" (`result.changed`) — there
+  // is no pending/confirm state to surface anymore.
+  interface RebuildOutcome {
     slotId: string
     orgId: string
     group: SlideGroup
-    result: ReconcileResult
+    result: RebuildResult
     /** Precomputed here (synchronously, inside the tracked computed) rather than re-derived in the async apply step. */
     freshSignature?: string
   }
 
-  // Reactive, keyed by slotId (Task 3's "surface the confirm-required ones").
-  // A Map dedupes by construction — re-setting the same key on a later
-  // watcher tick is a no-op-shaped overwrite, never a second entry. Declared
-  // BEFORE `reconciliationOutcomes` below (CR-03) so that computed's filter
-  // can consult it: an outcome that is no longer `needsConfirm`/`changed`
-  // must still be let through, EXACTLY ONCE, if a stale map entry exists for
-  // its slot, so `applyReconciliationOutcomes` gets a chance to prune it.
-  const pendingReconciliationsMap = reactive(new Map<string, PendingReconciliation>())
-
-  const reconciliationOutcomes = computed<ReconciliationOutcome[]>(() => {
+  const rebuildOutcomes = computed<RebuildOutcome[]>(() => {
     const svc = service.value
     const orgId = resolvedOrgId.value
     if (!svc || !orgId || !canWrite.value) return []
@@ -405,20 +367,12 @@ export function useSlideshowAssembly(
       groupsBySlotId: slideGroupsStore.groupsBySlotId,
     }
 
-    const outcomes: ReconciliationOutcome[] = []
+    const outcomes: RebuildOutcome[] = []
     for (const slot of svc.slots) {
       const group = slideGroupsStore.groupsBySlotId.get(slot.id)
       if (!group) continue
-      const result = reconcileGroup(group, slot, inputs)
-      // CR-03: normally a slot with nothing to do (no confirm needed, no
-      // change to apply) is skipped entirely. But if a STALE pending entry
-      // is still sitting in the map for this slot (e.g. the user just
-      // resolved it via Apply, which writes directly through the store and
-      // bypasses this computable's own watcher), this outcome must still be
-      // emitted once so `applyReconciliationOutcomes` can prune the map --
-      // otherwise the stale entry, and the banner it drives, would never be
-      // reconsidered and would persist indefinitely.
-      if (!result.changed && !result.needsConfirm && !pendingReconciliationsMap.has(slot.id)) continue
+      const result = rebuildGroup(group, slot, inputs)
+      if (!result.changed) continue
       outcomes.push({
         slotId: slot.id,
         orgId,
@@ -432,93 +386,25 @@ export function useSlideshowAssembly(
 
   // Applied-outcome guard: since a mocked/just-written store doesn't
   // necessarily produce a NEW `SlideGroup` object on every recompute, this
-  // tracks the exact stored group object reference already reconciled for a
-  // slot, so a repeated watcher tick against the SAME unreconciled stored
-  // state never re-issues `replaceGroupSlides` a second time. Only a genuine
-  // new stored group (a fresh onSnapshot after the write lands) clears it.
+  // tracks the exact stored group object reference already rebuilt for a
+  // slot, so a repeated watcher tick against the SAME unrebuilt stored state
+  // never re-issues `replaceGroupSlides` a second time. Only a genuine new
+  // stored group (a fresh onSnapshot after the write lands) clears it.
   const appliedGroupRefForSlot = new Map<string, SlideGroup>()
 
-  /**
-   * Resolves a song's title from the catalogue already in scope at this
-   * layer (D-08) — the pure reconciler below has no catalogue access and
-   * must never resolve one itself. A miss (the song has since been deleted)
-   * falls back to a plain generic label rather than an id or an empty
-   * string, so the dialog never renders a raw identifier or empty quotes.
-   */
-  function resolveSongTitle(songId: string): string {
-    return songStore.songs.find((s) => s.id === songId)?.title ?? 'Unknown Song'
-  }
-
-  async function applyReconciliationOutcomes(outcomes: ReconciliationOutcome[]) {
+  async function applyRebuildOutcomes(outcomes: RebuildOutcome[]) {
     for (const outcome of outcomes) {
-      if (outcome.result.needsConfirm) {
-        // D-07: a divergence identical to the one the user already declined
-        // for this group must not surface again. Compared against the
-        // group's RECORDED DECLINED value (`dismissedSignature`), never
-        // `sourceSignature` (what was last WRITTEN) — those two fields mean
-        // different things, and reusing the wrong one would suppress
-        // legitimate updates too. A FURTHER source change naturally produces
-        // a different `freshSignature`, so re-prompting after a later change
-        // requires no extra code and no expiry — do not add a timestamp or
-        // counter here.
-        if (
-          outcome.group.dismissedSignature !== undefined &&
-          outcome.freshSignature === outcome.group.dismissedSignature
-        ) {
-          // CR-03: this slot's divergence is suppressed by a durable decline
-          // (D-07) -- the STORED decision, `dismissedSignature`, is what
-          // governs re-prompting, never this in-memory map. Pruning the map
-          // entry here only clears a UI-visibility cache; it does NOT
-          // "un-dismiss" anything, since a genuinely NEW divergence produces
-          // a different `freshSignature` that will not match
-          // `dismissedSignature` and will re-populate the map on its own,
-          // exactly as D-07 requires.
-          pendingReconciliationsMap.delete(outcome.slotId)
-          continue
-        }
-
-        if (!pendingReconciliationsMap.has(outcome.slotId)) {
-          const songSwap = outcome.result.songSwap
-          pendingReconciliationsMap.set(outcome.slotId, {
-            slotId: outcome.slotId,
-            proposed: outcome.result.proposed ?? [],
-            loss: outcome.result.loss,
-            freshSignature: outcome.freshSignature,
-            ...(songSwap
-              ? {
-                  oldSongTitle: resolveSongTitle(songSwap.oldSongId),
-                  newSongTitle: resolveSongTitle(songSwap.newSongId),
-                }
-              : {}),
-          })
-        }
-        continue
-      }
-
-      // CR-03: once a slot's outcome is no longer `needsConfirm` AND is
-      // unchanged (already in sync with the source -- e.g. right after an
-      // Apply's write has round-tripped back), any pending banner entry for
-      // it is stale and must be pruned so the banner cannot persist past its
-      // own resolution.
-      if (!outcome.result.changed) {
-        pendingReconciliationsMap.delete(outcome.slotId)
-        continue
-      }
       if (appliedGroupRefForSlot.get(outcome.slotId) === outcome.group) continue
       appliedGroupRefForSlot.set(outcome.slotId, outcome.group)
-      // CR-03: this outcome is about to be applied (written) -- clear any
-      // stale pending-reconciliation entry now rather than waiting for a
-      // later tick, so a user who re-triggers "Review" -> "Apply" from an
-      // already-stale dialog cannot read back the map's now-outdated
-      // `proposed` list before the write below has had a chance to land.
-      pendingReconciliationsMap.delete(outcome.slotId)
 
-      // CR-02: `outcome.group.slides` is the snapshot this reconciliation was
+      // CR-02: `outcome.group.slides` is the snapshot this rebuild was
       // computed FROM — passed through as `baseSlides` so a concurrent
       // SlideGrid.vue write (add-slide/import/video-append/reorder) that
       // lands between this computation and this write is detected and merged
       // rather than silently overwritten. See `replaceGroupSlides`'s doc
-      // comment in `src/stores/slideGroups.ts`.
+      // comment in `src/stores/slideGroups.ts`. This matters MORE now than
+      // pre-Phase-30, since every rebuild outcome writes unconditionally —
+      // there is no confirm step left to catch a lost concurrent edit.
       await slideGroupsStore.replaceGroupSlides(
         outcome.orgId,
         outcome.slotId,
@@ -529,16 +415,12 @@ export function useSlideshowAssembly(
     }
   }
 
-  const stopReconcileWatch = watch(
-    reconciliationOutcomes,
+  const stopRebuildWatch = watch(
+    rebuildOutcomes,
     (outcomes) => {
-      void applyReconciliationOutcomes(outcomes)
+      void applyRebuildOutcomes(outcomes)
     },
     { immediate: true },
-  )
-
-  const pendingReconciliations = computed<PendingReconciliation[]>(() =>
-    Array.from(pendingReconciliationsMap.values()),
   )
 
   const assembledSections = computed<AssembledSection[]>(() => {
@@ -565,7 +447,7 @@ export function useSlideshowAssembly(
     stopOrgWatch()
     stopLyricsWatch()
     stopMaterializeWatch()
-    stopReconcileWatch()
+    stopRebuildWatch()
   }
 
   onUnmounted(cleanup)
@@ -575,7 +457,6 @@ export function useSlideshowAssembly(
     assembledSections,
     isLoading,
     groupsBySlotId,
-    pendingReconciliations,
     ensureGroupMaterialized,
   }
 }
