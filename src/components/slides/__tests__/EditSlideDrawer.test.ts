@@ -1362,3 +1362,114 @@ describe('EditSlideDrawer (Phase 26-09 Task 3 — Delete, behind a warning namin
   })
 })
 
+describe('EditSlideDrawer (R054 — song groups are read-only)', () => {
+  // Explicit opt-back-into-SONG override — mountDrawer's own default is
+  // MESSAGE as of Task 1, so every test below that needs a song group must
+  // pass this planItem itself.
+  const songPlanItem = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songTitle: 'This Is Our God' } as never)
+
+  beforeEach(() => {
+    mockReplaceGroupSlides.mockClear()
+    mockSetGroupBedMedia.mockClear()
+  })
+
+  it('renders no label input, notes textarea, audio scope choice or audio attach input for a song group', () => {
+    const { entry, assembledSlide } = makeLyricFixtures()
+    mountDrawer({ planItem: songPlanItem, entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+
+    expect(body().find('[data-testid="drawer-label-input"]').exists()).toBe(false)
+    expect(body().find('[data-testid="drawer-notes-input"]').exists()).toBe(false)
+    expect(body().find('[data-testid="audio-scope-choice"]').exists()).toBe(false)
+    expect(body().find('[data-testid="audio-attach-input"]').exists()).toBe(false)
+  })
+
+  it('renders the audio file row but no Remove control when audio is already attached to a song group slide', () => {
+    const entry = makeEntry({
+      id: 'entry-1',
+      sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'sec-1' },
+      audioUrl: 'https://example.com/orgs/org-1/media/m1/song.mp3',
+    })
+    mountDrawer({ planItem: songPlanItem, entry, group: makeGroup({ slides: [entry] }) })
+
+    expect(body().find('[data-testid="audio-file-row"]').exists()).toBe(true)
+    expect(body().find('[data-testid="audio-remove"]').exists()).toBe(false)
+  })
+
+  it('renders no editable slide-text textarea for a song group, even for a text-kind entry', () => {
+    const { entry, assembledSlide } = makeAuthoredTextFixtures('Should not be editable here')
+    mountDrawer({ planItem: songPlanItem, entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+
+    expect(body().find('[data-testid="drawer-slide-text-editable"]').exists()).toBe(false)
+  })
+
+  it('renders no footer actions row, Duplicate control or Delete Slide trigger for a song group', () => {
+    const { entry, assembledSlide } = makeLyricFixtures()
+    mountDrawer({ planItem: songPlanItem, entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+
+    expect(body().find('[data-testid="drawer-footer-actions"]').exists()).toBe(false)
+    expect(body().find('[data-testid="drawer-duplicate"]').exists()).toBe(false)
+    expect(body().find('[data-testid="drawer-delete-trigger"]').exists()).toBe(false)
+  })
+
+  it('still offers the Edit in song link for a lyric entry in a song group', () => {
+    const { entry, assembledSlide } = makeLyricFixtures()
+    mountDrawer({ planItem: songPlanItem, entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+
+    expect(body().find('[data-testid="drawer-edit-in-song-link"]').exists()).toBe(true)
+  })
+
+  it('still offers the Edit in song link for a copyright entry in a song group', () => {
+    const { entry, assembledSlide } = makeCopyrightFixtures()
+    mountDrawer({ planItem: songPlanItem, entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+
+    expect(body().find('[data-testid="drawer-edit-in-song-link"]').exists()).toBe(true)
+  })
+
+  it('shows the read-only notice naming the Song Lyrics screen for a song group', () => {
+    const { entry, assembledSlide } = makeLyricFixtures()
+    mountDrawer({ planItem: songPlanItem, entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+
+    const notice = body().find('[data-testid="drawer-song-readonly-notice"]')
+    expect(notice.exists()).toBe(true)
+    expect(notice.text()).toMatch(/Song Lyrics/)
+  })
+
+  it('renders no read-only notice for a non-song group', () => {
+    mountDrawer() // Task 1's repointed default planItem is MESSAGE
+    expect(body().find('[data-testid="drawer-song-readonly-notice"]').exists()).toBe(false)
+  })
+
+  it('behaves exactly as a viewer for a song group when not an editor: no mutation control appears', () => {
+    const { entry, assembledSlide } = makeLyricFixtures()
+    mountDrawer({ planItem: songPlanItem, entry, assembledSlide, group: makeGroup({ slides: [entry] }), isEditor: false })
+
+    expect(body().find('[data-testid="drawer-label-input"]').exists()).toBe(false)
+    expect(body().find('[data-testid="drawer-notes-input"]').exists()).toBe(false)
+    expect(body().find('[data-testid="drawer-footer-actions"]').exists()).toBe(false)
+    expect(body().find('[data-testid="drawer-edit-in-song-link"]').exists()).toBe(false)
+  })
+
+  it('preserves every control for a non-song group (contrast case)', () => {
+    const entry = makeEntry({ id: 'entry-1', label: 'Verse 1' })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }) }) // default planItem is MESSAGE
+
+    expect(body().find('[data-testid="drawer-label-input"]').exists()).toBe(true)
+    expect(body().find('[data-testid="drawer-notes-input"]').exists()).toBe(true)
+    expect(body().find('[data-testid="drawer-footer-actions"]').exists()).toBe(true)
+    expect(body().find('[data-testid="drawer-duplicate"]').exists()).toBe(true)
+    expect(body().find('[data-testid="drawer-delete-trigger"]').exists()).toBe(true)
+    expect(body().find('[data-testid="audio-attach-input"]').exists()).toBe(true)
+  })
+
+  it("a scripture entry's slide-text block shows the passage reference when the resolved text is empty (R047 ripple)", () => {
+    const { entry, assembledSlide } = makeScriptureFixtures()
+    const emptyTextSlide = makeAssembled({
+      slotKind: 'SCRIPTURE',
+      slide: { ...assembledSlide.slide, text: '' } as never,
+    })
+    mountDrawer({ entry, assembledSlide: emptyTextSlide, group: makeGroup({ slides: [entry] }) })
+
+    expect(body().find('[data-testid="drawer-slide-text-readonly"]').text()).toBe('John 3:16')
+  })
+})
+

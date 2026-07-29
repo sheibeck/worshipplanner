@@ -43,6 +43,17 @@
 
         <!-- Body — scrolls on its own; header stays fixed above it. 16px padding/section-gap (md token). -->
         <div class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+          <!-- R054: song groups are read-only in the Slides tab — this notice
+               pairs with the retained "Edit in song" link so the lock reads
+               as deliberate rather than broken (30-CONTEXT.md). Muted
+               informational idiom, matching this drawer's own helper
+               captions — not an error/warning colour. -->
+          <div
+            v-if="isSongGroup"
+            class="rounded-md border border-gray-700 bg-gray-800/50 px-3 py-2 text-[12px] text-gray-400"
+            data-testid="drawer-song-readonly-notice"
+          >This song's slides come from the song itself — edit them on the Song Lyrics screen.</div>
+
           <div class="flex items-center gap-1.5" data-testid="drawer-context-line">
             <span
               class="inline-flex items-center rounded border px-1.5 py-0.5 text-[11px] font-medium"
@@ -77,8 +88,9 @@
             >{{ previewText }}</p>
           </div>
 
-          <!-- Task 3: label/notes fields render here, gated on isEditor. -->
-          <div v-if="isEditor">
+          <!-- Task 3: label/notes fields render here, gated on canMutate
+               (R054: absent entirely for a song group, never merely disabled). -->
+          <div v-if="canMutate">
             <label class="block text-xs font-medium text-gray-400 mb-1" for="edit-slide-drawer-label">Slide Label</label>
             <input
               id="edit-slide-drawer-label"
@@ -171,7 +183,7 @@
                    right here, no caption, no link, and (D-13, closed) no
                    per-service override control of any kind. -->
               <textarea
-                v-if="isEditor"
+                v-if="canMutate"
                 v-model="localBody"
                 rows="3"
                 class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
@@ -200,7 +212,7 @@
                  future attach — changing it here never moves an
                  already-attached file (26-UI-SPEC.md § Slide Audio, last
                  paragraph). -->
-            <div v-if="isEditor" class="flex flex-wrap items-center gap-2 mb-2" data-testid="audio-scope-choice">
+            <div v-if="canMutate" class="flex flex-wrap items-center gap-2 mb-2" data-testid="audio-scope-choice">
               <span class="text-[11px] text-gray-500">Play this audio for</span>
               <button
                 type="button"
@@ -232,7 +244,7 @@
                 <span v-if="audioDurationText" class="text-[11px] text-gray-500" data-testid="audio-duration">{{ audioDurationText }}</span>
                 <span v-if="audioFailed" class="text-[11px] font-medium text-red-400" data-testid="audio-unavailable">Unavailable</span>
                 <button
-                  v-if="isEditor"
+                  v-if="canMutate"
                   type="button"
                   class="text-xs text-gray-500 hover:text-red-400 transition-colors"
                   data-testid="audio-remove"
@@ -253,7 +265,7 @@
                  — the same empty-state markup pattern used by every other
                  audio-attach control in the slides area (same copy, same
                  file input) rather than a second upload UI. -->
-            <div v-else-if="isEditor" class="flex items-center gap-1.5" data-testid="audio-attach">
+            <div v-else-if="canMutate" class="flex items-center gap-1.5" data-testid="audio-attach">
               <label class="text-[11px] font-medium text-gray-400">Audio</label>
               <input
                 type="file"
@@ -287,7 +299,7 @@
             </div>
           </div>
 
-          <div v-if="isEditor">
+          <div v-if="canMutate">
             <label class="block text-xs font-medium text-gray-400 mb-1" for="edit-slide-drawer-notes">Notes (operator only)</label>
             <textarea
               id="edit-slide-drawer-notes"
@@ -302,7 +314,7 @@
                Slide (right), above a border-t divider (26-UI-SPEC.md §
                "Duplicate and Delete Slide"), matching SongSlideOver.vue's own
                "Delete Song" block placement convention. -->
-          <div v-if="isEditor" class="border-t border-gray-800 pt-4" data-testid="drawer-footer-actions">
+          <div v-if="canMutate" class="border-t border-gray-800 pt-4" data-testid="drawer-footer-actions">
             <div v-if="!showDeleteConfirm" class="flex items-center justify-between">
               <button
                 type="button"
@@ -410,6 +422,15 @@ let previouslyFocused: HTMLElement | null = null
 /** Closed, or open with nothing resolvable behind the selection: render nothing. */
 const isOpenAndResolvable = computed(() => props.open && props.entry !== null)
 
+/**
+ * R054: a song's slides are canonical, edited only from the Song Lyrics
+ * screen — this drawer must offer no CRUD on them at all. Read from the
+ * existing `planItem` prop; no new prop is threaded (30-03-PLAN.md key_links).
+ */
+const isSongGroup = computed(() => props.planItem?.kind === 'SONG')
+/** The one gating computed every mutation control in this drawer uses (30-PATTERNS.md: a plain v-if, no new gating mechanism). */
+const canMutate = computed(() => props.isEditor && !isSongGroup.value)
+
 function onClose(): void {
   emit('close')
 }
@@ -481,10 +502,19 @@ const copyrightSlide = computed(() =>
   sourceKind.value === 'copyright' ? (props.assembledSlide?.slide as CopyrightSlide | undefined) : undefined,
 )
 
-/** `scripture`-kind entries: the UI-SPEC calls for the passage text alone, not `slideBodyText`'s reference-prefixed form (the reference is already shown in the context line above). */
+/**
+ * `scripture`-kind entries: the UI-SPEC calls for the passage text alone, not
+ * `slideBodyText`'s reference-prefixed form (the reference is already shown
+ * in the context line above). R047 ripple (30-03-PLAN.md): a reference-only
+ * scripture slide now always resolves with empty `text` — falling back to
+ * the slide's own `reference` keeps this block from going blank, while a
+ * future Phase 34 slide that DOES carry text (the congregational reading
+ * widening) still shows that text unchanged.
+ */
 const scripturePassageText = computed(() => {
   if (sourceKind.value !== 'scripture' || !props.assembledSlide) return ''
-  return (props.assembledSlide.slide as ScriptureSlide).text
+  const slide = props.assembledSlide.slide as ScriptureSlide
+  return slide.text || slide.reference
 })
 
 /** `imported`-kind entries whose resolved content is a picture render no separate words block (see template comment) — this is the ONE place content kind legitimately narrows behavior WITHIN an already-source-keyed branch, not a substitute for the source-kind key itself. */
