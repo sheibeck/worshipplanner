@@ -68,8 +68,12 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 
 ### Slides Mirror the Plan
 
-- [ ] **R045** (core-capability): Slide-group sequence and membership always mirror the service order.
-      Reordering a service item reorders its slide group with no second manual step.
+- [x] **R045** (core-capability): Slide-group sequence and membership always mirror the service order.
+      Reordering a service item reorders its slide group with no second manual step. Proven over 50
+      generated permutations of a mixed slot arrangement (order lock) and by re-verifying the single
+      existing remove-element cascade delete unedited plus a new no-repeat-delete assertion (membership
+      lock) — not example-based, per the phase's governing decision that this class of bug ("some
+      particular arrangement desyncs") is what fixed-fixture tests systematically miss.
 
 - [x] **R046** (core-capability): Changing the song on a service item rewrites that group's slides to
       the new song automatically, with no review or confirmation step.
@@ -80,6 +84,16 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
       congregational reading feature (R064, Phase 34), which keeps that phase purely additive rather
       than a rewrite of this one. *(Clarified by the owner 2026-07-28 during Phase 30 discussion; the
       original wording "one slide carrying the passage" was ambiguous between reference and text.)*
+      **Delivered shape changed during this phase's human-verify pass:** the slide derives directly
+      from the SCRIPTURE slot's own book/chapter/verse fields (`scriptureRefFromSlot`), exactly as a
+      SONG slot's `songId` is its slide's source — there is no separate scripture-reading document, ESV
+      fetch, or linking step in the loop. Entering the reference on the Service Order tab is what makes
+      the slide appear; editing it replaces the slide's content with no group write, resolved live at
+      assembly time. The "Edit Scripture Slides" button, its reading-mode toggle, and the expandable
+      editor panel are removed from the Service Order tab as a result (both editor components remain on
+      disk, unmounted, for Phase 34/R064 to reuse). *(Superseded an initial fix — 3da5fe4 — that linked a
+      separately-created reading document to the slot instead; the owner rejected that model in favor of
+      the slot-as-source-of-truth shape landed in 5c531b1.)*
 
 - [x] **R048** (quality-attribute): The reconciliation/confirm flow is removed — `ReconcileConfirmModal`,
       `dismissedSignature`, and the confirm branches — replaced by one unconditional rebuild path.
@@ -223,7 +237,7 @@ Acknowledged, deferred, not in this roadmap.
 | R042 | Phase 29 | Complete |
 | R043 | Phase 29 | Complete |
 | R044 | Phase 29 | Complete |
-| R045 | Phase 30 | Pending |
+| R045 | Phase 30 | Complete |
 | R046 | Phase 30 | Complete |
 | R047 | Phase 30 | Complete |
 | R048 | Phase 30 | Complete |
