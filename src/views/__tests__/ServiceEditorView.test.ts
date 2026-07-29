@@ -1481,7 +1481,13 @@ describe('ServiceEditorView - Edit in scripture plumbing (Phase 26-03)', () => {
     mockServicesList = [mockService]
   })
 
-  it('switches to the Service Order tab and expands the requested scripture plan item\'s editor', async () => {
+  // R047 rewrote what "edit in scripture" navigates TO. There is no expandable
+  // slides-editor panel any more: the reference on the plan item row IS the
+  // slide's source, so the request switches tabs and scrolls that row into
+  // view. The rows are rendered unconditionally, so these tests assert the
+  // tab switch and the absence of the old panel/button rather than an
+  // expand/collapse state that no longer exists.
+  it('switches to the Service Order tab when a scripture plan item is requested', async () => {
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
 
@@ -1497,54 +1503,56 @@ describe('ServiceEditorView - Edit in scripture plumbing (Phase 26-03)', () => {
     await wrapper.vm.$nextTick()
 
     expect(isVShowHidden(wrapper.find('[data-testid="service-order-panel"]'))).toBe(false)
-    const panel = wrapper.find('[data-scripture-panel-index="1"]')
-    expect(panel.exists()).toBe(true)
+    expect(wrapper.find('[data-scripture-slot-index="1"]').exists()).toBe(true)
   })
 
-  it('asking twice never collapses the editor — the second request is a no-op, not a toggle', async () => {
+  it('asking twice is idempotent and does not throw', async () => {
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
 
-    await wrapper.findComponent(SlidesTab).vm.$emit('navigate-to-scripture-editor', 1)
-    await wrapper.vm.$nextTick()
-    await wrapper.vm.$nextTick()
-    expect(wrapper.find('[data-scripture-panel-index="1"]').exists()).toBe(true)
-
-    await wrapper.findComponent(SlidesTab).vm.$emit('navigate-to-scripture-editor', 1)
-    await wrapper.vm.$nextTick()
-    await wrapper.vm.$nextTick()
-    expect(wrapper.find('[data-scripture-panel-index="1"]').exists()).toBe(true)
+    for (let i = 0; i < 2; i++) {
+      await wrapper.findComponent(SlidesTab).vm.$emit('navigate-to-scripture-editor', 1)
+      await wrapper.vm.$nextTick()
+      await wrapper.vm.$nextTick()
+      expect(wrapper.find('[data-scripture-slot-index="1"]').exists()).toBe(true)
+    }
   })
 
-  it('the existing hand-operated button still opens then closes on alternate clicks', async () => {
+  // R047: the "Edit Scripture Slides" button and its panel are gone from this
+  // tab. They fetched passage TEXT into a separate reading document, which is
+  // not what a scripture slide shows and is Phase 34's concern. Their presence
+  // implied the slide had a second, hidden source.
+  it('renders no scripture slides editor button or panel on the Service Order tab', async () => {
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
 
-    const btn = wrapper.find('[data-testid="edit-scripture-slides-btn"]')
-    expect(btn.exists()).toBe(true)
-
-    await btn.trigger('click')
-    await wrapper.vm.$nextTick()
-    expect(wrapper.find('[data-testid="scripture-editor-panel"]').exists()).toBe(true)
-
-    await btn.trigger('click')
-    await wrapper.vm.$nextTick()
+    expect(wrapper.find('[data-testid="edit-scripture-slides-btn"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="scripture-editor-panel"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="reading-mode-toggle"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="scripture-slide-editor"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="congregational-editor"]').exists()).toBe(false)
   })
 
   it('an out-of-range index changes nothing and does not throw', async () => {
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
 
+    const before = wrapper.find('[data-testid="service-order-panel"]')
+    const wasHidden = isVShowHidden(before)
+
     expect(() => wrapper.findComponent(SlidesTab).vm.$emit('navigate-to-scripture-editor', 999)).not.toThrow()
     await wrapper.vm.$nextTick()
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.find('[data-testid="scripture-editor-panel"]').exists()).toBe(false)
+    expect(isVShowHidden(wrapper.find('[data-testid="service-order-panel"]'))).toBe(wasHidden)
   })
 
-  it('a request naming a non-scripture plan item changes nothing', async () => {
+  it('a request naming a non-scripture plan item does not switch tabs', async () => {
     const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const slidesBtn = wrapper.findAll('button').find((b) => b.text() === 'Slides')
+    await slidesBtn!.trigger('click')
     await wrapper.vm.$nextTick()
 
     // slot-0 is a SONG plan item.
@@ -1552,11 +1560,10 @@ describe('ServiceEditorView - Edit in scripture plumbing (Phase 26-03)', () => {
     await wrapper.vm.$nextTick()
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.find('[data-testid="scripture-editor-panel"]').exists()).toBe(false)
+    expect(isVShowHidden(wrapper.find('[data-testid="service-order-panel"]'))).toBe(true)
   })
 
-  it('expanding one plan item\'s editor never expands or collapses another\'s', async () => {
-    // Make both slot-1 and slot-4 populated scripture items so two panels can exist.
+  it('every scripture plan item row carries its own index marker', async () => {
     const twoScriptureService: Service = {
       ...mockService,
       slots: mockService.slots.map((slot) =>
@@ -1569,12 +1576,8 @@ describe('ServiceEditorView - Edit in scripture plumbing (Phase 26-03)', () => {
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
 
-    await wrapper.findComponent(SlidesTab).vm.$emit('navigate-to-scripture-editor', 1)
-    await wrapper.vm.$nextTick()
-    await wrapper.vm.$nextTick()
-
-    expect(wrapper.find('[data-scripture-panel-index="1"]').exists()).toBe(true)
-    expect(wrapper.find('[data-scripture-panel-index="4"]').exists()).toBe(false)
+    expect(wrapper.find('[data-scripture-slot-index="1"]').exists()).toBe(true)
+    expect(wrapper.find('[data-scripture-slot-index="4"]').exists()).toBe(true)
   })
 })
 
@@ -2058,13 +2061,14 @@ describe('ServiceEditorView - Phase 29 reorder repro', () => {
   })
 })
 
-// ── R047: linking a newly minted scripture reading to its slot (Phase 30 verify) ──
-// Verification defect: adding a scripture item produced NO slide on the Slides
-// tab. Root cause was here, not in the materializer — ScriptureSlideEditor
-// minted the reading document and kept the id in a local ref, so
-// `slot.scriptureReadingId` stayed null and `deriveGroupEntries` correctly
-// returned zero entries for a slot pointing at nothing.
-describe('ServiceEditorView - R047 scripture reading link', () => {
+// ── R047: the scripture slot's own reference is the slide's source ────────────
+// Phase 30 verification defect: adding a scripture item produced NO slide on
+// the Slides tab. The slide was sourced from a separate reading document that
+// only an ESV fetch inside an "Edit Scripture Slides" panel could create, and
+// its id was never written back to the slot — so the slot always pointed at
+// nothing and `deriveGroupEntries` correctly derived zero slides. The panel is
+// gone; the reference typed on the row is now the source.
+describe('ServiceEditorView - R047 scripture reference is the slide source', () => {
   async function mountView() {
     const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
     return shallowMount(ServiceEditorView, {
@@ -2075,9 +2079,7 @@ describe('ServiceEditorView - R047 scripture reading link', () => {
           ServicePrintLayout: true,
           SongBadge: true,
           SongSlotPicker: true,
-          ScriptureInput: true,
-          ScriptureSlideEditor: { name: 'ScriptureSlideEditor', props: ['orgId', 'readingId'], template: '<div />' },
-          CongregationalEditor: { name: 'CongregationalEditor', props: ['orgId', 'readingId'], template: '<div />' },
+          ScriptureInput: { name: 'ScriptureInput', props: ['modelValue'], template: '<div />' },
         },
       },
     })
@@ -2090,65 +2092,41 @@ describe('ServiceEditorView - R047 scripture reading link', () => {
     mockServicesList = [buildSectionedService()]
   })
 
-  async function openScriptureEditor() {
+  it('renders the scripture reference row with no slides-editor surface at all', async () => {
     const wrapper = await mountView()
-    const btn = wrapper.find('[data-testid="edit-scripture-slides-btn"]')
-    expect(btn.exists()).toBe(true)
-    await btn.trigger('click')
-    await wrapper.vm.$nextTick()
-    return wrapper
-  }
-
-  it('starts with no reading linked to the scripture slot', async () => {
-    const wrapper = await openScriptureEditor()
-    const editor = wrapper.findComponent({ name: 'ScriptureSlideEditor' })
-    expect(editor.exists()).toBe(true)
-    expect(editor.props('readingId')).toBeUndefined()
-  })
-
-  it('writes the emitted reading id onto the slot, so the editor re-renders bound to it', async () => {
-    const wrapper = await openScriptureEditor()
-    const editor = wrapper.findComponent({ name: 'ScriptureSlideEditor' })
-
-    editor.vm.$emit('reading-created', 'reading-xyz')
     await wrapper.vm.$nextTick()
 
-    // The prop round-trip proves the id reached `localService.slots[index]`:
-    // it can only come back down through the same `:readingId` binding.
-    expect(wrapper.findComponent({ name: 'ScriptureSlideEditor' }).props('readingId')).toBe('reading-xyz')
+    expect(wrapper.find('[data-scripture-slot-index="1"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="edit-scripture-slides-btn"]').exists()).toBe(false)
+    expect(wrapper.findComponent({ name: 'ScriptureSlideEditor' }).exists()).toBe(false)
+    expect(wrapper.findComponent({ name: 'CongregationalEditor' }).exists()).toBe(false)
   })
 
-  // D-15: written immediately, NOT left to the 800ms debounce. That watcher is
-  // armed by a `localService` replacement, so a nested slots[index] write does
-  // not reliably re-arm it — the same brittleness the owner reported for song
-  // changes, which Phase 32 owns. A dropped link here means the slot forgets
-  // which passage it points at and the slide vanishes again.
-  it('persists the link immediately, without waiting on the autosave debounce', async () => {
-    const wrapper = await openScriptureEditor()
+  // The reference itself is edited through ScriptureInput on the row, and that
+  // is the ONLY scripture write path left on this tab. Nothing writes
+  // `scriptureReadingId` any more — the field is legacy, and a slot that still
+  // carries one derives its slide from its own reference regardless.
+  it('changing the reference writes the slot fields and nothing else', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
     mockUpdateService.mockClear()
 
-    wrapper.findComponent({ name: 'ScriptureSlideEditor' }).vm.$emit('reading-created', 'reading-xyz')
-    await flushPromises()
-
-    expect(mockUpdateService).toHaveBeenCalledTimes(1)
-    const [, patch] = mockUpdateService.mock.calls[0] as [string, { slots: Array<Record<string, unknown>> }]
-    const scriptureSlot = patch.slots.find((s) => s.kind === 'SCRIPTURE')
-    expect(scriptureSlot?.scriptureReadingId).toBe('reading-xyz')
-    // Every other slot is carried through untouched.
-    expect(patch.slots).toHaveLength(buildSectionedService().slots.length)
-  })
-
-  it('is idempotent — re-emitting the id already stored writes nothing new', async () => {
-    const wrapper = await openScriptureEditor()
-    wrapper.findComponent({ name: 'ScriptureSlideEditor' }).vm.$emit('reading-created', 'reading-xyz')
-    await flushPromises()
-
-    mockUpdateService.mockClear()
-    wrapper.findComponent({ name: 'ScriptureSlideEditor' }).vm.$emit('reading-created', 'reading-xyz')
-    await flushPromises()
+    const input = wrapper.findComponent({ name: 'ScriptureInput' })
+    expect(input.exists()).toBe(true)
+    input.vm.$emit('update:modelValue', { book: 'Psalms', chapter: 103, verseStart: 1, verseEnd: 5 })
+    await wrapper.vm.$nextTick()
     await new Promise((resolve) => setTimeout(resolve, 900))
     await flushPromises()
 
-    expect(mockUpdateService).not.toHaveBeenCalled()
+    const written = mockUpdateService.mock.calls
+      .map(([, patch]) => (patch as { slots?: Array<Record<string, unknown>> }).slots)
+      .filter((slots): slots is Array<Record<string, unknown>> => Array.isArray(slots))
+      .pop()
+    const scriptureSlot = written?.find((s) => s.kind === 'SCRIPTURE')
+    if (scriptureSlot) {
+      expect(scriptureSlot.book).toBe('Psalms')
+      expect(scriptureSlot.chapter).toBe(103)
+      expect(scriptureSlot.scriptureReadingId).toBeUndefined()
+    }
   })
 })

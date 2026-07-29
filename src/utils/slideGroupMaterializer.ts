@@ -16,6 +16,7 @@
 import type { ServiceSlot, SongSlot, ScriptureSlot, ImportedSlot } from '@/types/service'
 import type { SlideGroup, GroupSlideEntry, SourceRef, SlideGroupInput } from '@/types/slideGroup'
 import type { AssemblyInputs } from '@/utils/slideshowAssembler'
+import { formatScriptureReference, scriptureRefFromSlot } from '@/utils/scripture'
 
 /**
  * Derives a slide group's structure from its slot's canonical source.
@@ -58,23 +59,19 @@ export function deriveGroupEntries(slot: ServiceSlot, inputs: AssemblyInputs): G
     }
 
     case 'SCRIPTURE': {
-      if (!slot.scriptureReadingId) return []
-      const reading = inputs.scriptureReadingsById.get(slot.scriptureReadingId)
-      if (!reading) return []
-
-      // R047: exactly ONE reference-only entry, never one per inner slide —
-      // a scripture group shows the passage reference, never the passage
-      // text. No inner-slide id: `derivedIdentityKey` treats the ref KIND
+      // R047: exactly ONE reference-only entry, derived from the slot's OWN
+      // reference fields — the passage the user typed on the Service Order
+      // tab. No reading document, no ESV fetch, no id to link: entering or
+      // changing the reference IS the source change, so the slide appears and
+      // is replaced the same way a song swap replaces a song's slides.
+      //
+      // The ref carries no payload. `derivedIdentityKey` treats the ref KIND
       // alone as this group's identity, which is what lets a passage change
-      // or a reading swap carry the stored entry's id/audio forward through
-      // `carryStoredDerivedEntries`.
-      return [
-        {
-          id: crypto.randomUUID(),
-          order: 0,
-          sourceRef: { kind: 'scripture' as const, scriptureReadingId: slot.scriptureReadingId },
-        },
-      ]
+      // carry the stored entry's id/audio forward through
+      // `carryStoredDerivedEntries` instead of minting a fresh id and
+      // silently dropping attached audio.
+      if (!scriptureRefFromSlot(slot)) return []
+      return [{ id: crypto.randomUUID(), order: 0, sourceRef: { kind: 'scripture' as const } }]
     }
 
     case 'IMPORTED': {
@@ -123,11 +120,11 @@ export function sourceSignature(slot: ServiceSlot, inputs: AssemblyInputs): stri
     }
 
     case 'SCRIPTURE': {
-      if (!slot.scriptureReadingId) return undefined
-      const reading = inputs.scriptureReadingsById.get(slot.scriptureReadingId)
-      if (!reading) return undefined
-      const texts = reading.slides.map((s) => s.text)
-      return `${texts.length}:${texts.join('|')}`
+      // R047: the slot's reference IS the source, so the formatted reference
+      // is the whole signature — it changes exactly when the rendered slide
+      // would change.
+      const scriptureRef = scriptureRefFromSlot(slot)
+      return scriptureRef ? formatScriptureReference(scriptureRef) : undefined
     }
 
     case 'IMPORTED': {

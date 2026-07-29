@@ -93,19 +93,23 @@ export interface GroupSlideEntry {
  * which stays correct for the auto-derived PRAYER/MESSAGE/HYMN entry. Both
  * fields are optional so every entry written before this change stays valid.
  *
- * `scripture`'s `innerSlideId` is OPTIONAL (Phase 30, R047): a scripture
- * group now derives exactly ONE reference-only entry, so the field is no
- * longer minted — kept in the union, not removed, because Phase 34 widens
- * this derivation back to per-fragment entries for congregational splits,
- * and removing the field now would make that a rewrite instead of a
- * widening. Any stored entry still carrying a legacy value is read
- * identically to one without it (`slideshowAssembler.ts` and
- * `deriveGroupEntries` both resolve by `scriptureReadingId` alone).
+ * `scripture` carries NO required payload (Phase 30, R047). Its content comes
+ * from the owning SCRIPTURE slot's own reference fields, resolved live at
+ * render time — exactly like the auto-derived `text` entry, and for the same
+ * reason: the slot IS the canonical record. A `scriptureReadingId` pointing at
+ * a separately-fetched reading document was the previous source, and it never
+ * worked — nothing wrote the id back onto the slot, so a scripture item
+ * produced no slide at all.
+ *
+ * Both `scriptureReadingId` and `innerSlideId` stay in the union as OPTIONAL
+ * legacy fields rather than being removed: Phase 34 widens this derivation
+ * back to per-fragment entries for congregational splits, and every entry
+ * written before this change stays readable (both fields are ignored on read).
  */
 export type SourceRef =
   | { kind: 'lyric'; songId: string; sectionId: string }
   | { kind: 'copyright'; songId: string }
-  | { kind: 'scripture'; scriptureReadingId: string; innerSlideId?: string }
+  | { kind: 'scripture'; scriptureReadingId?: string; innerSlideId?: string }
   | { kind: 'imported'; importId: string; innerSlideId: string }
   | { kind: 'text'; title?: string; body?: string }
   | { kind: 'video'; videoSrc: string; originalFileName?: string }

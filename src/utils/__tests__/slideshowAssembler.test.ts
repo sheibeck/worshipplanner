@@ -148,15 +148,20 @@ function songSlot(overrides: Partial<SongSlot> = {}): SongSlot {
   }
 }
 
+// R047: the slot's OWN reference is the scripture slide's source, so the
+// default fixture carries one. It formats to "John 3:16-18" — deliberately the
+// same string `makeScriptureReading`'s displayReference used, so tests written
+// against the old reading-document source keep asserting the same text.
+// Pass `book: null` to model a scripture item whose reference is not filled in.
 function scriptureSlot(overrides: Partial<ScriptureSlot> = {}): ScriptureSlot {
   return {
     kind: 'SCRIPTURE',
     id: 'slot-scripture-0',
     position: 0,
-    book: null,
-    chapter: null,
-    verseStart: null,
-    verseEnd: null,
+    book: 'John',
+    chapter: 3,
+    verseStart: 16,
+    verseEnd: 18,
     ...overrides,
   }
 }
@@ -253,63 +258,65 @@ describe('assembleSlideshow — song resolution', () => {
 })
 
 describe('assembleSlideshow — scripture resolution', () => {
-  it('emits exactly ONE reference-only slide, regardless of how many slides the reading itself carries (R047)', () => {
-    const slot = scriptureSlot({ scriptureReadingId: 'reading-1' })
+  it('emits exactly ONE reference-only slide, built from the slot\'s own reference (R047)', () => {
+    const slot = scriptureSlot()
     const service = makeService([slot])
-    const reading = makeScriptureReading()
-    const inputs = makeInputs({
-      scriptureReadingsById: new Map([['reading-1', reading]]),
-    })
 
-    const result = assembleSlideshow(service, inputs)
+    const result = assembleSlideshow(service, makeInputs())
 
     expect(result).toHaveLength(1)
     expect(result[0]!.slide.contentKind).toBe('scripture')
-    expect((result[0]!.slide as ScriptureSlide).reference).toBe(reading.displayReference)
-    expect((result[0]!.slide as ScriptureSlide).bookRef).toEqual(reading.reference)
+    expect((result[0]!.slide as ScriptureSlide).reference).toBe('John 3:16-18')
+    expect((result[0]!.slide as ScriptureSlide).bookRef).toEqual({ book: 'John', chapter: 3, verseStart: 16, verseEnd: 18 })
     expect((result[0]!.slide as ScriptureSlide).text).toBe('')
     expect((result[0]!.slide as ScriptureSlide).verseRange).toBe('')
     expect((result[0]!.slide as ScriptureSlide).readingMode).toBe('normal')
   })
 
-  it('every emitted slide from a scripture slot carries slotIndex, slotKind, section, and sourceId', () => {
-    const slot = scriptureSlot({ scriptureReadingId: 'reading-1', section: 'worship' })
-    const service = makeService([slot])
-    const reading = makeScriptureReading()
-    const inputs = makeInputs({
-      scriptureReadingsById: new Map([['reading-1', reading]]),
-    })
+  it('a single-verse reference renders without a spurious range', () => {
+    const slot = scriptureSlot({ verseStart: 16, verseEnd: null })
+    const result = assembleSlideshow(makeService([slot]), makeInputs())
+    expect((result[0]!.slide as ScriptureSlide).reference).toBe('John 3:16')
+  })
 
-    const result = assembleSlideshow(service, inputs)
+  it('a whole-chapter reference renders as the bare chapter', () => {
+    const slot = scriptureSlot({ verseStart: null, verseEnd: null })
+    const result = assembleSlideshow(makeService([slot]), makeInputs())
+    expect((result[0]!.slide as ScriptureSlide).reference).toBe('John 3')
+  })
+
+  it('every emitted slide from a scripture slot carries slotIndex, slotKind, section, and a null sourceId', () => {
+    const slot = scriptureSlot({ section: 'worship' })
+    const service = makeService([slot])
+
+    const result = assembleSlideshow(service, makeInputs())
 
     expect(result).toHaveLength(1)
     for (const assembled of result) {
       expect(assembled.slotIndex).toBe(0)
       expect(assembled.slotKind).toBe('SCRIPTURE')
       expect(assembled.section).toBe('worship')
-      expect(assembled.sourceId).toBe('reading-1')
+      // R047: a slot-derived reference has no canonical record behind it.
+      expect(assembled.sourceId).toBeNull()
     }
   })
 
-  it('a SCRIPTURE slot with scriptureReadingId === null contributes nothing', () => {
-    const slot = scriptureSlot({ scriptureReadingId: null })
+  it('a SCRIPTURE slot with no reference filled in contributes nothing', () => {
+    const slot = scriptureSlot({ book: null, chapter: null, verseStart: null, verseEnd: null })
     const service = makeService([slot])
     const result = assembleSlideshow(service, makeInputs())
     expect(result).toHaveLength(0)
   })
 
-  it('a SCRIPTURE slot with no scriptureReadingId field contributes nothing', () => {
-    const slot = scriptureSlot()
-    const service = makeService([slot])
-    const result = assembleSlideshow(service, makeInputs())
-    expect(result).toHaveLength(0)
-  })
-
-  it('a SCRIPTURE slot whose scriptureReadingId is absent from scriptureReadingsById contributes nothing', () => {
+  // R047: this is the defect the owner hit — the slide used to require a
+  // reading document that only an ESV fetch could create, so a scripture item
+  // with a perfectly good reference rendered nothing.
+  it('a SCRIPTURE slot renders from its reference with NO reading document loaded', () => {
     const slot = scriptureSlot({ scriptureReadingId: 'unloaded-reading' })
     const service = makeService([slot])
     const result = assembleSlideshow(service, makeInputs())
-    expect(result).toHaveLength(0)
+    expect(result).toHaveLength(1)
+    expect((result[0]!.slide as ScriptureSlide).reference).toBe('John 3:16-18')
   })
 })
 
@@ -598,64 +605,47 @@ describe('assembleSlideshow — stored group resolution (D-02, R028)', () => {
     expect((result[0]!.slide as CopyrightSlide).title).toBe('Amazing Grace')
   })
 
-  it('a scripture sourceRef resolves the reading reference-only, regardless of any legacy innerSlideId it still carries (R047)', () => {
-    const slot = scriptureSlot({ id: 'slot-scripture-0', scriptureReadingId: 'reading-1' })
+  it('a stored scripture entry resolves reference-only from the SLOT, ignoring any legacy scriptureReadingId/innerSlideId it still carries (R047)', () => {
+    const slot = scriptureSlot({ id: 'slot-scripture-0' })
     const service = makeService([slot])
-    const reading = makeScriptureReading()
     const entry = makeGroupSlideEntry({
       id: 'entry-scripture',
       order: 0,
+      // A pre-R047 entry, written when the reading document was the source.
       sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'ss-2' },
     })
     const group = makeSlideGroup({ id: 'slot-scripture-0', slotId: 'slot-scripture-0', slides: [entry] })
-    const inputs = makeInputs({
-      scriptureReadingsById: new Map([['reading-1', reading]]),
-      groupsBySlotId: new Map([['slot-scripture-0', group]]),
-    })
+    const inputs = makeInputs({ groupsBySlotId: new Map([['slot-scripture-0', group]]) })
 
     const result = assembleSlideshow(service, inputs)
 
     expect(result).toHaveLength(1)
     expect(result[0]!.slide.id).toBe('entry-scripture')
-    expect((result[0]!.slide as ScriptureSlide).reference).toBe(reading.displayReference)
+    expect((result[0]!.slide as ScriptureSlide).reference).toBe('John 3:16-18')
     expect((result[0]!.slide as ScriptureSlide).text).toBe('')
   })
 
-  it('R047 reactive path: a scripture sourceRef resolves the reading displayReference LIVE — an in-place passage edit on the SAME reading (ScriptureSlideEditor.vue updates the reading document in place, sourceRef never changes) changes the assembled reference with no group write', () => {
-    const slot = scriptureSlot({ id: 'slot-scripture-0', scriptureReadingId: 'reading-1' })
-    const service = makeService([slot])
-    const entry = makeGroupSlideEntry({
-      id: 'entry-scripture',
-      order: 0,
-      sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1' },
-    })
+  it('R047 reactive path: changing the SLOT\'s passage changes the assembled reference with no group write', () => {
+    const entry = makeGroupSlideEntry({ id: 'entry-scripture', order: 0, sourceRef: { kind: 'scripture' } })
     const group = makeSlideGroup({ id: 'slot-scripture-0', slotId: 'slot-scripture-0', slides: [entry] })
     const originalSlides = group.slides
+    const inputs = makeInputs({ groupsBySlotId: new Map([['slot-scripture-0', group]]) })
 
-    const readingV1 = makeScriptureReading({
-      id: 'reading-1',
-      displayReference: 'John 3:16-18',
-    })
     const resultV1 = assembleSlideshow(
-      service,
-      makeInputs({ scriptureReadingsById: new Map([['reading-1', readingV1]]), groupsBySlotId: new Map([['slot-scripture-0', group]]) }),
+      makeService([scriptureSlot({ id: 'slot-scripture-0' })]),
+      inputs,
     )
     expect((resultV1[0]!.slide as ScriptureSlide).reference).toBe('John 3:16-18')
 
-    // Same reading id, edited passage — this is the shape ScriptureSlideEditor.vue
-    // produces (updateReading on the SAME document), not a reading swap.
-    const readingV2 = makeScriptureReading({
-      id: 'reading-1',
-      displayReference: 'Psalm 103:1-5',
-      reference: { book: 'Psalm', chapter: 103, verseStart: 1, verseEnd: 5 },
-    })
+    // The user edits the reference on the Service Order tab. Same slot, same
+    // group document, same stored entry — only the slot's fields differ.
     const resultV2 = assembleSlideshow(
-      service,
-      makeInputs({ scriptureReadingsById: new Map([['reading-1', readingV2]]), groupsBySlotId: new Map([['slot-scripture-0', group]]) }),
+      makeService([scriptureSlot({ id: 'slot-scripture-0', book: 'Psalms', chapter: 103, verseStart: 1, verseEnd: 5 })]),
+      inputs,
     )
-    expect((resultV2[0]!.slide as ScriptureSlide).reference).toBe('Psalm 103:1-5')
-    // The stored group entry itself is never written to for an in-place edit —
-    // the update flows through reactively at assembly time, no rebuild needed.
+    expect((resultV2[0]!.slide as ScriptureSlide).reference).toBe('Psalms 103:1-5')
+    // The stored group entry is never written to — the update flows through
+    // reactively at assembly time, no rebuild needed.
     expect(group.slides).toBe(originalSlides)
   })
 

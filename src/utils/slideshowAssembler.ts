@@ -33,6 +33,7 @@ import type { ScriptureReading } from '@/types/scriptureReading'
 import type { ImportedDeck } from '@/types/importedDeck'
 import type { SlideGroup, GroupSlideEntry, SourceRef } from '@/types/slideGroup'
 import { slotLabel } from './slotTypes'
+import { formatScriptureReference, scriptureRefFromSlot } from './scripture'
 
 /** Content maps the assembly engine resolves slots against. Pre-loaded by the caller. */
 export interface AssemblyInputs {
@@ -87,7 +88,10 @@ function sourceIdForRef(ref: SourceRef): string | null {
     case 'copyright':
       return ref.songId
     case 'scripture':
-      return ref.scriptureReadingId
+      // R047: a slot-derived reference has no canonical record behind it. A
+      // legacy stored id is surfaced if present, purely so an old entry's
+      // sourceId does not change shape underneath a consumer.
+      return ref.scriptureReadingId ?? null
     case 'imported':
       return ref.importId
     case 'text':
@@ -133,15 +137,18 @@ function resolveEntryContent(
     }
 
     case 'scripture': {
-      // R047: a scripture entry is reference-only — never the passage text.
-      // Resolved directly from the reading's own displayReference/reference,
-      // never by looking up an inner slide by (legacy) innerSlideId.
-      const reading = inputs.scriptureReadingsById.get(ref.scriptureReadingId)
-      if (!reading) return undefined
+      // R047: a scripture entry is reference-only — never the passage text —
+      // and its reference is resolved LIVE from the owning slot, so editing
+      // the passage on the Service Order tab changes the slide with no group
+      // write and no second step. Legacy `scriptureReadingId`/`innerSlideId`
+      // on a stored entry are deliberately ignored.
+      if (slot.kind !== 'SCRIPTURE') return undefined
+      const scriptureRef = scriptureRefFromSlot(slot)
+      if (!scriptureRef) return undefined
       const content: Omit<ScriptureSlide, 'id' | 'position'> = {
         contentKind: 'scripture',
-        reference: reading.displayReference,
-        bookRef: reading.reference,
+        reference: formatScriptureReference(scriptureRef),
+        bookRef: scriptureRef,
         text: '',
         verseRange: '',
         readingMode: 'normal',
@@ -336,22 +343,24 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
       }
 
       case 'SCRIPTURE': {
-        if (!slot.scriptureReadingId) break
-        const reading: ScriptureReading | undefined = inputs.scriptureReadingsById.get(slot.scriptureReadingId)
-        if (!reading) break
+        const scriptureRef = scriptureRefFromSlot(slot)
+        if (!scriptureRef) break
 
-        // R047: exactly one reference-only slide, matching the stored-group
-        // resolution path so a slot never visibly flips slide count the
-        // moment its group document materializes.
+        // R047: exactly one reference-only slide, resolved from the slot's own
+        // reference — identical to the stored-group resolution path above, so
+        // a slot never visibly changes slide content the moment its group
+        // document materializes.
         const content: Omit<ScriptureSlide, 'id' | 'position'> = {
           contentKind: 'scripture',
-          reference: reading.displayReference,
-          bookRef: reading.reference,
+          reference: formatScriptureReference(scriptureRef),
+          bookRef: scriptureRef,
           text: '',
           verseRange: '',
           readingMode: 'normal',
         }
-        emitFallback(slot, index, content, slot.scriptureReadingId, 0)
+        // No canonical record id behind a slot-derived reference — same
+        // convention `sourceIdForRef` now applies to a payload-free ref.
+        emitFallback(slot, index, content, null, 0)
         break
       }
 

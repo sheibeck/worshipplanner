@@ -682,7 +682,7 @@
 
               <!-- SCRIPTURE slot -->
               <template v-else-if="slot.kind === 'SCRIPTURE'">
-                <div class="flex items-center gap-4">
+                <div class="flex items-center gap-4" :data-scripture-slot-index="index">
                   <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">Scripture Reading</p>
                   <div class="flex-1">
                     <!-- Editor: ScriptureInput -->
@@ -714,76 +714,13 @@
                   </div>
                 </div>
 
-                <!-- Scripture slides editor: editor only, when scripture reference is populated -->
-                <div
-                  v-if="authStore.isEditor && !isExportedLocked && slotToScriptureRef(slot as ScriptureSlot)"
-                  class="mt-2"
-                >
-                  <!-- Toggle + Edit button row -->
-                  <div class="flex items-center gap-3 mb-2">
-                    <button
-                      type="button"
-                      data-testid="edit-scripture-slides-btn"
-                      class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-indigo-400 bg-gray-800 border border-gray-700 hover:bg-gray-700 transition-colors"
-                      @click="toggleScriptureEditor(index)"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                      {{ expandedScriptureSlots.has(index) ? 'Close Slides Editor' : 'Edit Scripture Slides' }}
-                    </button>
-
-                    <!-- Reading mode toggle -->
-                    <div
-                      v-if="expandedScriptureSlots.has(index)"
-                      class="flex items-center gap-1 rounded-md bg-gray-800 border border-gray-700 p-0.5"
-                      data-testid="reading-mode-toggle"
-                    >
-                      <button
-                        type="button"
-                        data-testid="mode-normal"
-                        class="px-2.5 py-1 rounded text-xs font-medium transition-colors"
-                        :class="getSlotReadingMode(slot as ScriptureSlot) === 'normal'
-                          ? 'bg-indigo-600 text-white'
-                          : 'text-gray-400 hover:text-gray-200'"
-                        @click="setReadingMode(index, 'normal')"
-                      >Normal Reading</button>
-                      <button
-                        type="button"
-                        data-testid="mode-congregational"
-                        class="px-2.5 py-1 rounded text-xs font-medium transition-colors"
-                        :class="getSlotReadingMode(slot as ScriptureSlot) === 'congregational'
-                          ? 'bg-indigo-600 text-white'
-                          : 'text-gray-400 hover:text-gray-200'"
-                        @click="setReadingMode(index, 'congregational')"
-                      >Congregational Reading</button>
-                    </div>
-                  </div>
-
-                  <!-- Expanded editor panel -->
-                  <div
-                    v-if="expandedScriptureSlots.has(index)"
-                    class="rounded-lg border border-gray-700 bg-gray-950 overflow-hidden"
-                    style="min-height: 300px"
-                    data-testid="scripture-editor-panel"
-                    :data-scripture-panel-index="index"
-                  >
-                    <ScriptureSlideEditor
-                      v-if="getSlotReadingMode(slot as ScriptureSlot) === 'normal'"
-                      :orgId="authStore.orgId!"
-                      :readingId="(slot as ScriptureSlot).scriptureReadingId ?? undefined"
-                      data-testid="scripture-slide-editor"
-                      @reading-created="linkScriptureReading(index, $event)"
-                    />
-                    <CongregationalEditor
-                      v-else
-                      :orgId="authStore.orgId!"
-                      :readingId="(slot as ScriptureSlot).scriptureReadingId ?? undefined"
-                      data-testid="congregational-editor"
-                      @reading-created="linkScriptureReading(index, $event)"
-                    />
-                  </div>
-                </div>
+                <!-- R047: no slides editor here. The reference typed above IS
+                     the scripture slide's source — entering or changing it
+                     rebuilds the slot's one reference slide automatically,
+                     exactly as changing a song replaces that song's slides.
+                     The old "Edit Scripture Slides" panel fetched passage TEXT
+                     into a separate reading document, which is Phase 34's
+                     congregational-reading concern, not a slide source. -->
               </template>
 
               <!-- PRAYER slot -->
@@ -1171,8 +1108,6 @@ import SongBadge from '@/components/SongBadge.vue'
 import SongSlotPicker from '@/components/SongSlotPicker.vue'
 import ScriptureInput from '@/components/ScriptureInput.vue'
 import ServicePrintLayout from '@/components/ServicePrintLayout.vue'
-import ScriptureSlideEditor from '@/components/ScriptureSlideEditor.vue'
-import CongregationalEditor from '@/components/CongregationalEditor.vue'
 import PresentationViewer from '@/components/PresentationViewer.vue'
 import SlidesTab from '@/components/slides/SlidesTab.vue'
 import { useSlideshowAssembly } from '@/composables/useSlideshowAssembly'
@@ -1313,107 +1248,26 @@ const deleteConfirmBody = computed(() => {
 })
 
 // ── Scripture editor expansion state ──────────────────────────────────────────
-const expandedScriptureSlots = ref<Set<number>>(new Set())
-
-function toggleScriptureEditor(index: number) {
-  const next = new Set(expandedScriptureSlots.value)
-  if (next.has(index)) {
-    next.delete(index)
-  } else {
-    next.add(index)
-  }
-  expandedScriptureSlots.value = next
-}
-
-/**
- * Expand-only sibling of `toggleScriptureEditor` (D-15, 26-RESEARCH.md
- * Pitfall 5 / Assumptions Log A2): the toggle above is a strict add-or-remove
- * and its own button depends on the remove half, so a second click on an
- * arriving "Edit in scripture" request must never repurpose it — reusing the
- * toggle would close an already-open editor on a second request. This adds
- * the index and never removes it; calling it repeatedly on an
- * already-expanded index is a no-op.
- */
-function expandScriptureEditor(index: number): void {
-  const slot = localService.value?.slots[index]
-  if (!slot || slot.kind !== 'SCRIPTURE') return
-  if (expandedScriptureSlots.value.has(index)) return
-  const next = new Set(expandedScriptureSlots.value)
-  next.add(index)
-  expandedScriptureSlots.value = next
-}
-
 /**
  * Handles the "Edit in scripture" request relayed up through SlidesTab's
  * `navigate-to-scripture-editor` event (T-26-03-01: validates the index
- * against the current plan item list and its kind before touching any
- * state, so an unhonourable request — out of range, or naming a non-
- * scripture plan item — is a no-op rather than switching tabs or expanding
- * an unrelated row). Switches to the tab that owns the scripture editor,
- * expands (never toggles) the requested plan item's editor, then brings its
- * panel into view. This does not focus or scroll into the editor itself —
- * only its containing panel.
+ * against the current plan item list and its kind before touching any state,
+ * so an unhonourable request — out of range, or naming a non-scripture plan
+ * item — is a no-op rather than switching tabs or scrolling to an unrelated
+ * row). Switches to the Service Order tab and brings the plan item's ROW into
+ * view: R047 removed the expandable slides-editor panel, so the row's own
+ * `ScriptureInput` is now the thing being navigated to — it is where the
+ * reference, and therefore the slide, is edited.
  */
 async function handleNavigateToScriptureEditor(index: number): Promise<void> {
   const slot = localService.value?.slots[index]
   if (!slot || slot.kind !== 'SCRIPTURE') return
   activeTab.value = 'service-order'
-  expandScriptureEditor(index)
   await nextTick()
-  const panel = document.querySelector(`[data-scripture-panel-index="${index}"]`)
-  panel?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' })
+  const row = document.querySelector(`[data-scripture-slot-index="${index}"]`)
+  row?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' })
 }
 
-function getSlotReadingMode(slot: ScriptureSlot): 'normal' | 'congregational' {
-  return slot.readingMode ?? 'normal'
-}
-
-/**
- * R047: persist the link from a SCRIPTURE slot to the reading document its
- * editor just created. Without this write the slot's `scriptureReadingId`
- * stays null, `deriveGroupEntries` returns zero entries, and the item shows
- * up on the Service Order tab with NO slide on the Slides tab.
- *
- * Persists IMMEDIATELY (D-15), like a reorder and unlike a typed field: this
- * is a structural link the user never sees or retypes, and the 800ms debounce
- * watcher is only armed by a `localService` REPLACEMENT — a nested
- * `slots[index] = ...` write does not reliably re-arm it (the same brittleness
- * the owner reported for song changes; Phase 32 owns that fix). Waiting on it
- * here would mean the slot silently forgets which passage it points at.
- *
- * Idempotent: re-linking the id already stored is skipped, so a re-render or a
- * second emit cannot produce a redundant write.
- */
-async function linkScriptureReading(index: number, readingId: string) {
-  if (!localService.value) return
-  const slot = localService.value.slots[index]
-  if (!slot || slot.kind !== 'SCRIPTURE') return
-  if (slot.scriptureReadingId === readingId) return
-
-  const nextSlots = localService.value.slots.map((s, i) =>
-    i === index ? ({ ...s, scriptureReadingId: readingId } as ScriptureSlot) : s,
-  )
-  localService.value.slots = nextSlots
-
-  if (!serviceId.value) return
-  try {
-    await serviceStore.updateService(serviceId.value, { slots: nextSlots })
-    originalService.value = JSON.parse(JSON.stringify(localService.value))
-  } catch (err) {
-    console.error('[ServiceEditorView] scripture reading link save failed:', err)
-    autosaveStatus.value = 'error'
-  }
-}
-
-function setReadingMode(index: number, mode: 'normal' | 'congregational') {
-  if (!localService.value) return
-  const slot = localService.value.slots[index]
-  if (!slot || slot.kind !== 'SCRIPTURE') return
-  localService.value.slots[index] = {
-    ...slot,
-    readingMode: mode,
-  } as ScriptureSlot
-}
 
 // ── Export to PC state ─────────────────────────────────────────────────────────
 

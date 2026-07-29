@@ -165,15 +165,17 @@ function songSlot(overrides: Partial<SongSlot>): SongSlot {
   }
 }
 
+// R047: the slot's OWN reference is the scripture slide's source, so the
+// default fixture carries one, formatting to "John 3:16-18".
 function scriptureSlot(overrides: Partial<ScriptureSlot>): ScriptureSlot {
   return {
     kind: 'SCRIPTURE',
     id: 'slot-scripture-0',
     position: 0,
-    book: null,
-    chapter: null,
-    verseStart: null,
-    verseEnd: null,
+    book: 'John',
+    chapter: 3,
+    verseStart: 16,
+    verseEnd: 18,
     ...overrides,
   }
 }
@@ -341,10 +343,11 @@ describe('useSlideshowAssembly', () => {
     expect(mockSubscribeDecks).toHaveBeenCalledTimes(1)
     expect(mockSubscribeDecks).toHaveBeenCalledWith('org-1')
     expect(assembledSlideshow.value).toHaveLength(1)
-    // R047: a scripture slot's fallback derivation is reference-only — text
-    // is always empty; the reference resolves from the reading's own
-    // displayReference, not from any inner slide's text.
-    expect(assembledSlideshow.value[0]!.slide).toMatchObject({ text: '', reference: 'John 3' })
+    // R047: a scripture slot's derivation is reference-only — text is always
+    // empty, and the reference comes from the SLOT's own fields, not from the
+    // reading document or any inner slide's text. The readings subscription is
+    // still asserted above because Phase 34's congregational reading needs it.
+    expect(assembledSlideshow.value[0]!.slide).toMatchObject({ text: '', reference: 'John 3:16-18' })
 
     // Re-render with the same orgId must not re-subscribe (T-20-03-DoS guard).
     service.value = makeService([scriptureSlot({ position: 0, scriptureReadingId: 'reading-1' })])
@@ -829,11 +832,14 @@ describe('useSlideshowAssembly', () => {
       expect(slides).toHaveLength(1)
       expect(slides[0]!.id).toBe('ss-1')
       expect(slides[0]!.label).toBe('Custom label')
-      expect(slides[0]!.sourceRef).toEqual({ kind: 'scripture', scriptureReadingId: 'reading-2' })
+      // R047: the rebuild normalizes a legacy reading-document ref to the
+      // payload-free shape, carrying the user's label across. The reference
+      // itself is no longer stored — it resolves from the slot at render time.
+      expect(slides[0]!.sourceRef).toEqual({ kind: 'scripture' })
       expect('pendingReconciliations' in returned).toBe(false)
     })
 
-    it('a scripture group already in sync (same reading, freshly-shaped stored entry) issues no write', async () => {
+    it('a scripture group already in sync (freshly-shaped stored entry) issues no write', async () => {
       scriptureState.readings = [
         {
           id: 'reading-1',
@@ -852,7 +858,7 @@ describe('useSlideshowAssembly', () => {
           slotId: 'slot-scripture-c',
           serviceId: 'service-1',
           slides: [
-            { id: 'ss-1', order: 0, sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1' } },
+            { id: 'ss-1', order: 0, sourceRef: { kind: 'scripture' } },
           ],
           createdAt: {} as never,
           updatedAt: {} as never,
@@ -860,7 +866,7 @@ describe('useSlideshowAssembly', () => {
       ]
 
       const service = ref<Service | null>(
-        makeService([scriptureSlot({ position: 0, id: 'slot-scripture-c', scriptureReadingId: 'reading-1' })]),
+        makeService([scriptureSlot({ position: 0, id: 'slot-scripture-c' })]),
       )
       useSlideshowAssembly(service, 'org-1', { canWrite: true })
       await nextTick()

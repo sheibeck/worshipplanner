@@ -110,15 +110,18 @@ function songSlot(overrides: Partial<SongSlot> = {}): SongSlot {
   }
 }
 
+// R047: the slot's OWN reference is the scripture slide's source, so the
+// default fixture carries one, formatting to "John 3:16-18". Pass `book: null`
+// to model a scripture item whose reference is not filled in yet.
 function scriptureSlot(overrides: Partial<ScriptureSlot> = {}): ScriptureSlot {
   return {
     kind: 'SCRIPTURE',
     id: 'slot-scripture-0',
     position: 0,
-    book: null,
-    chapter: null,
-    verseStart: null,
-    verseEnd: null,
+    book: 'John',
+    chapter: 3,
+    verseStart: 16,
+    verseEnd: 18,
     ...overrides,
   }
 }
@@ -189,26 +192,33 @@ describe('deriveGroupEntries — SONG', () => {
 })
 
 describe('deriveGroupEntries — SCRIPTURE', () => {
-  it('derives exactly ONE reference-only entry, with no innerSlideId, regardless of how many slides the reading itself carries (R047)', () => {
-    const slot = scriptureSlot({ scriptureReadingId: 'reading-1' })
-    const reading = makeScriptureReading()
-    const inputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', reading]]) })
+  it('derives exactly ONE reference-only entry carrying no payload at all (R047)', () => {
+    const slot = scriptureSlot()
 
-    const entries = deriveGroupEntries(slot, inputs)
+    const entries = deriveGroupEntries(slot, makeInputs())
 
     expect(entries).toHaveLength(1)
-    expect(entries[0]!.sourceRef).toEqual({ kind: 'scripture', scriptureReadingId: 'reading-1' })
+    expect(entries[0]!.sourceRef).toEqual({ kind: 'scripture' })
     expect(entries[0]!.sourceRef).not.toHaveProperty('innerSlideId')
+    expect(entries[0]!.sourceRef).not.toHaveProperty('scriptureReadingId')
   })
 
-  it('a SCRIPTURE slot with no scriptureReadingId derives zero entries', () => {
-    const slot = scriptureSlot()
+  it('a SCRIPTURE slot with no reference filled in derives zero entries', () => {
+    const slot = scriptureSlot({ book: null, chapter: null, verseStart: null, verseEnd: null })
     expect(deriveGroupEntries(slot, makeInputs())).toEqual([])
   })
 
-  it('a SCRIPTURE slot whose reading id is absent from the input map derives zero entries', () => {
+  it('a whole-chapter reference (no verses) is a valid source and derives its one entry', () => {
+    const slot = scriptureSlot({ verseStart: null, verseEnd: null })
+    expect(deriveGroupEntries(slot, makeInputs())).toHaveLength(1)
+  })
+
+  // R047: the reading-document indirection is gone. A slot derives its slide
+  // from its own reference whether or not any reading document exists — that
+  // dependency is exactly what used to make a scripture item produce no slide.
+  it('derives its entry with NO reading document loaded at all', () => {
     const slot = scriptureSlot({ scriptureReadingId: 'unloaded-reading' })
-    expect(deriveGroupEntries(slot, makeInputs())).toEqual([])
+    expect(deriveGroupEntries(slot, makeInputs())).toHaveLength(1)
   })
 })
 
@@ -901,27 +911,27 @@ describe('rebuildScriptureGroup', () => {
     expect(result.slides).toEqual(group.slides)
   })
 
-  it('editing a passage IN PLACE (ScriptureSlideEditor.vue updates the SAME reading document — scriptureReadingId never changes) reports changed: false, with no confirm state anywhere on the result — the new reference is resolved LIVE at render time (Task 1), not written here', () => {
-    const slot = scriptureSlot({ scriptureReadingId: 'reading-1' })
-    const reading = makeScriptureReading()
-    const inputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', reading]]) })
+  // R047: the entry's sourceRef carries no reference at all, so a passage
+  // change never changes the STORED shape — the new reference is resolved live
+  // at render time from the slot. `changed: false` here is the point: editing a
+  // passage costs no group write.
+  it('editing the passage reports changed: false, with no confirm state anywhere on the result — the new reference is resolved LIVE at render time, not written here', () => {
+    const slot = scriptureSlot()
+    const inputs = makeInputs()
     const group = makeInSyncScriptureGroup(slot, inputs)
 
-    // Same scriptureReadingId — only the document's own content differs.
-    const editedReading = makeScriptureReading({ displayReference: 'John 3:16-18 (expanded)' })
-    const editedInputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', editedReading]]) })
+    const editedSlot = scriptureSlot({ book: 'Psalms', chapter: 103, verseStart: 1, verseEnd: 5 })
 
-    const result = rebuildScriptureGroup(group, slot, editedInputs)
+    const result = rebuildScriptureGroup(group, editedSlot, inputs)
 
     expect(Object.keys(result).sort()).toEqual(['changed', 'slides'])
     expect(result.changed).toBe(false)
     expect(result.slides).toEqual(group.slides)
   })
 
-  it('T-30-02-03: a passage change preserves the stored entry\'s id, label, notes and attached audio — only the resolved reference changes', () => {
-    const slot = scriptureSlot({ scriptureReadingId: 'reading-1' })
-    const reading = makeScriptureReading()
-    const inputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', reading]]) })
+  it('T-30-02-03: a passage change preserves the stored entry\'s id, label, notes and attached audio', () => {
+    const slot = scriptureSlot()
+    const inputs = makeInputs()
     const group = makeInSyncScriptureGroup(slot, inputs)
     group.slides[0] = {
       ...group.slides[0]!,
@@ -932,10 +942,9 @@ describe('rebuildScriptureGroup', () => {
     }
     const storedId = group.slides[0]!.id
 
-    const widenedReading = makeScriptureReading({ displayReference: 'John 3:16-18 (expanded)' })
-    const widenedInputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', widenedReading]]) })
+    const widenedSlot = scriptureSlot({ verseEnd: 21 })
 
-    const result = rebuildScriptureGroup(group, slot, widenedInputs)
+    const result = rebuildScriptureGroup(group, widenedSlot, inputs)
 
     expect(result.slides).toHaveLength(1)
     const rebuilt = result.slides[0]!
@@ -944,36 +953,33 @@ describe('rebuildScriptureGroup', () => {
     expect(rebuilt.notes).toBe('Read slowly')
     expect(rebuilt.audioUrl).toBe('https://example.com/slide-audio.mp3')
     expect(rebuilt.audioLoop).toBe(true)
-    expect(rebuilt.sourceRef).toEqual({ kind: 'scripture', scriptureReadingId: 'reading-1' })
+    expect(rebuilt.sourceRef).toEqual({ kind: 'scripture' })
   })
 
-  it('T-30-02-03: swapping to a DIFFERENT reading still yields exactly one entry, carrying the previous entry\'s id and audio, now pointing at the new reading', () => {
-    const slot = scriptureSlot({ scriptureReadingId: 'reading-1' })
-    const reading = makeScriptureReading()
-    const inputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', reading]]) })
+  it('T-30-02-03: swapping to an entirely different passage still yields exactly one entry, carrying the previous entry\'s id and audio', () => {
+    const slot = scriptureSlot()
+    const inputs = makeInputs()
     const group = makeInSyncScriptureGroup(slot, inputs)
     group.slides[0] = { ...group.slides[0]!, audioUrl: 'https://example.com/slide-audio.mp3' }
     const storedId = group.slides[0]!.id
 
-    const newReading = makeScriptureReading({ id: 'reading-2', displayReference: 'Psalm 23:1-6' })
-    const newSlot = scriptureSlot({ scriptureReadingId: 'reading-2' })
-    const newInputs = makeInputs({ scriptureReadingsById: new Map([['reading-2', newReading]]) })
+    const newSlot = scriptureSlot({ book: 'Psalms', chapter: 23, verseStart: 1, verseEnd: 6 })
 
-    const result = rebuildScriptureGroup(group, newSlot, newInputs)
+    const result = rebuildScriptureGroup(group, newSlot, inputs)
 
     expect(result.slides).toHaveLength(1)
     expect(result.slides[0]!.id).toBe(storedId)
     expect(result.slides[0]!.audioUrl).toBe('https://example.com/slide-audio.mp3')
-    expect(result.slides[0]!.sourceRef).toEqual({ kind: 'scripture', scriptureReadingId: 'reading-2' })
+    expect(result.slides[0]!.sourceRef).toEqual({ kind: 'scripture' })
   })
 
-  it('T-30-02-04: a reading absent from the inputs map (not yet loaded) leaves the group untouched, changed: false, never emptying it', () => {
-    const slot = scriptureSlot({ scriptureReadingId: 'reading-1' })
-    const reading = makeScriptureReading()
-    const inputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', reading]]) })
+  it('T-30-02-04: clearing the slot\'s reference leaves the group untouched, changed: false, never emptying it', () => {
+    const slot = scriptureSlot()
+    const inputs = makeInputs()
     const group = makeInSyncScriptureGroup(slot, inputs)
 
-    const result = rebuildScriptureGroup(group, slot, makeInputs())
+    const clearedSlot = scriptureSlot({ book: null, chapter: null, verseStart: null, verseEnd: null })
+    const result = rebuildScriptureGroup(group, clearedSlot, inputs)
 
     expect(result).toEqual({ changed: false, slides: group.slides })
   })
@@ -1144,10 +1150,9 @@ describe('D-17 / T-30-02-01 — hand-added video and authored-text entries survi
     ])
   })
 
-  it('a dropped video on a SCRIPTURE group survives a reading swap, appended after the (single, carried) scripture entry', () => {
-    const slot = scriptureSlot({ scriptureReadingId: 'reading-1' })
-    const reading = makeScriptureReading()
-    const inputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', reading]]) })
+  it('a dropped video on a SCRIPTURE group survives a passage swap, still after the single carried scripture entry', () => {
+    const slot = scriptureSlot()
+    const inputs = makeInputs()
     const group = makeGroup({
       sourceSignature: sourceSignature(slot, inputs),
       slides: [
@@ -1156,18 +1161,19 @@ describe('D-17 / T-30-02-01 — hand-added video and authored-text entries survi
       ],
     })
 
-    const newReading = makeScriptureReading({ id: 'reading-2', displayReference: 'Psalm 23:1-6' })
-    const newSlot = scriptureSlot({ scriptureReadingId: 'reading-2' })
-    const newInputs = makeInputs({ scriptureReadingsById: new Map([['reading-2', newReading]]) })
+    const newSlot = scriptureSlot({ book: 'Psalms', chapter: 23, verseStart: 1, verseEnd: 6 })
 
-    const result = rebuildScriptureGroup(group, newSlot, newInputs)
+    const result = rebuildScriptureGroup(group, newSlot, inputs)
 
-    expect(result.changed).toBe(true)
-    const videoEntry = result.slides.find((e) => e.id === 'e-video')
-    expect(videoEntry?.sourceRef).toEqual({ kind: 'video', videoSrc: 'https://example.com/dropped.mp4' })
-    const scriptureEntry = result.slides.find((e) => e.sourceRef.kind === 'scripture')
-    expect(scriptureEntry?.sourceRef).toEqual({ kind: 'scripture', scriptureReadingId: 'reading-2' })
+    // R047: the stored shape is reference-free, so a passage swap needs no
+    // write at all — the survival guarantee is that the video is still there
+    // and still second, not that the group churned.
+    expect(result.changed).toBe(false)
     expect(result.slides).toHaveLength(2)
+    expect(result.slides[0]!.sourceRef).toEqual({ kind: 'scripture' })
+    const videoEntry = result.slides[1]!
+    expect(videoEntry.id).toBe('e-video')
+    expect(videoEntry.sourceRef).toEqual({ kind: 'video', videoSrc: 'https://example.com/dropped.mp4' })
   })
 
   it('an authored-text entry on an IMPORTED group survives a re-import, appended after the carried/fresh deck entries', () => {

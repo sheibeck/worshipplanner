@@ -1,6 +1,69 @@
 import { describe, it, expect } from 'vitest'
-import { BIBLE_BOOKS, esvLink, scripturesOverlap, parseScriptureInput } from '@/utils/scripture'
-import type { ScriptureRef } from '@/types/service'
+import {
+  BIBLE_BOOKS,
+  esvLink,
+  scripturesOverlap,
+  parseScriptureInput,
+  formatScriptureReference,
+  scriptureRefFromSlot,
+} from '@/utils/scripture'
+import type { ScriptureRef, ScriptureSlot } from '@/types/service'
+
+function makeSlot(overrides: Partial<ScriptureSlot> = {}): ScriptureSlot {
+  return {
+    kind: 'SCRIPTURE',
+    id: 'slot-0',
+    position: 0,
+    book: 'John',
+    chapter: 3,
+    verseStart: 16,
+    verseEnd: 18,
+    ...overrides,
+  }
+}
+
+// R047: these two are the whole source chain for a scripture slide — the slot's
+// reference in, the projected string out. No reading document in between.
+describe('formatScriptureReference', () => {
+  it('renders a verse range', () => {
+    expect(formatScriptureReference({ book: 'Romans', chapter: 8, verseStart: 1, verseEnd: 11 })).toBe('Romans 8:1-11')
+  })
+
+  it('renders a single verse without a spurious range', () => {
+    expect(formatScriptureReference({ book: 'Romans', chapter: 8, verseStart: 28 })).toBe('Romans 8:28')
+  })
+
+  it('renders a whole chapter', () => {
+    expect(formatScriptureReference({ book: 'Psalms', chapter: 23 })).toBe('Psalms 23')
+  })
+
+  it('round-trips what parseScriptureInput produces', () => {
+    const parsed = parseScriptureInput('Psalms 103:1-5')!
+    expect(formatScriptureReference(parsed)).toBe('Psalms 103:1-5')
+  })
+})
+
+describe('scriptureRefFromSlot', () => {
+  it('reads the slot\'s own reference fields', () => {
+    expect(scriptureRefFromSlot(makeSlot())).toEqual({ book: 'John', chapter: 3, verseStart: 16, verseEnd: 18 })
+  })
+
+  it('accepts a whole-chapter reference — verses are optional', () => {
+    expect(scriptureRefFromSlot(makeSlot({ verseStart: null, verseEnd: null }))).toEqual({ book: 'John', chapter: 3 })
+  })
+
+  it('omits an absent verseEnd rather than emitting null', () => {
+    const ref = scriptureRefFromSlot(makeSlot({ verseEnd: null }))
+    expect(ref).toEqual({ book: 'John', chapter: 3, verseStart: 16 })
+    expect(ref).not.toHaveProperty('verseEnd')
+  })
+
+  it('returns null when the reference has not been filled in — this is what derives zero slides', () => {
+    expect(scriptureRefFromSlot(makeSlot({ book: null }))).toBeNull()
+    expect(scriptureRefFromSlot(makeSlot({ chapter: null }))).toBeNull()
+    expect(scriptureRefFromSlot(makeSlot({ book: null, chapter: null, verseStart: null, verseEnd: null }))).toBeNull()
+  })
+})
 
 describe('BIBLE_BOOKS', () => {
   it('contains exactly 66 books', () => {

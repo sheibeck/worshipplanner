@@ -177,33 +177,6 @@ describe('CongregationalEditor', () => {
     }))
   })
 
-  // R047 — identical contract to ScriptureSlideEditor: a slot switched to
-  // congregational mode mints its reading HERE, so this editor must surface
-  // the id too or the slot links to nothing and derives no slide.
-  describe('R047 — surfacing a newly minted reading id', () => {
-    it('emits reading-created with the id createReading returned', async () => {
-      const wrapper = mountEditor()
-      await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
-      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
-      await flushPromises()
-
-      expect(wrapper.emitted('reading-created')).toBeTruthy()
-      expect(wrapper.emitted('reading-created')![0]).toEqual(['new-reading-id'])
-    })
-
-    it('does NOT emit when a reading already exists', async () => {
-      const wrapper = mountEditor({ readingId: 'existing-reading-id' })
-      await flushPromises()
-
-      await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
-      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
-      await flushPromises()
-
-      expect(mockCreateReading).not.toHaveBeenCalled()
-      expect(wrapper.emitted('reading-created')).toBeUndefined()
-    })
-  })
-
   it('auto-save triggers on section changes via useAutoSave', async () => {
     const { useAutoSave } = await import('@/composables/useAutoSave')
     mountEditor()

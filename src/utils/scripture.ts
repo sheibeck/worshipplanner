@@ -1,4 +1,4 @@
-import type { ScriptureRef } from '@/types/service'
+import type { ScriptureRef, ScriptureSlot } from '@/types/service'
 
 export const BIBLE_BOOKS: readonly string[] = [
   // Old Testament (39 books)
@@ -140,6 +140,43 @@ export function parseScriptureInput(text: string): ScriptureRef | null {
   if (verseEnd !== undefined) result.verseEnd = verseEnd
 
   return result
+}
+
+/**
+ * The canonical human-readable form of a reference: "Romans 8:1-11",
+ * "Romans 8:28", or "Romans 8". Single source of truth — the projector slide
+ * (R047), the Planning Center export (`formatScriptureRef` delegates here) and
+ * the Service Order row must never disagree about how a passage is written.
+ *
+ * `parseScriptureInput` can produce a verseStart with no verseEnd (a single
+ * verse), which the Planning Center formatter used to collapse to a bare
+ * chapter; that case is handled explicitly here.
+ */
+export function formatScriptureReference(ref: ScriptureRef): string {
+  if (ref.verseStart && ref.verseEnd) return `${ref.book} ${ref.chapter}:${ref.verseStart}-${ref.verseEnd}`
+  if (ref.verseStart) return `${ref.book} ${ref.chapter}:${ref.verseStart}`
+  return `${ref.book} ${ref.chapter}`
+}
+
+/**
+ * R047: a SCRIPTURE slot's OWN reference fields are the slide's source.
+ *
+ * The reference the user types on the Service Order tab is the canonical
+ * record — there is no separate reading document to fetch first, and no
+ * `scriptureReadingId` to link. That indirection is why a scripture item used
+ * to produce no slide at all: the id was minted only by an ESV fetch inside a
+ * separate editor panel and never written back to the slot.
+ *
+ * Requires only book + chapter, so a whole-chapter reading is a valid source.
+ * Returns `null` for a slot whose reference has not been filled in yet, which
+ * is what makes `deriveGroupEntries` correctly derive zero slides for it.
+ */
+export function scriptureRefFromSlot(slot: ScriptureSlot): ScriptureRef | null {
+  if (!slot.book || !slot.chapter) return null
+  const ref: ScriptureRef = { book: slot.book, chapter: slot.chapter }
+  if (slot.verseStart != null) ref.verseStart = slot.verseStart
+  if (slot.verseEnd != null) ref.verseEnd = slot.verseEnd
+  return ref
 }
 
 export function scripturesOverlap(reading: ScriptureRef, sermon: ScriptureRef): boolean {

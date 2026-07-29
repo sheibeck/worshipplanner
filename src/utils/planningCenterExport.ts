@@ -1,15 +1,18 @@
 import type { Service } from '@/types/service'
 import type { Song } from '@/types/song'
 import type { ScriptureRef } from '@/types/service'
+import { formatScriptureReference } from '@/utils/scripture'
 
 /**
- * Format a ScriptureRef as "Book Chapter:VerseStart-VerseEnd"
+ * Format a ScriptureRef as "Book Chapter:VerseStart-VerseEnd".
+ *
+ * Delegates to `scripture.ts`'s canonical formatter so the export text and the
+ * projector slide (R047) can never drift apart. Behaviour is unchanged except
+ * that a single-verse reference now renders "Romans 8:28" instead of
+ * collapsing to "Romans 8".
  */
 export function formatScriptureRef(ref: ScriptureRef): string {
-  if (ref.verseStart && ref.verseEnd) {
-    return `${ref.book} ${ref.chapter}:${ref.verseStart}-${ref.verseEnd}`
-  }
-  return `${ref.book} ${ref.chapter}`
+  return formatScriptureReference(ref)
 }
 
 /**

@@ -209,65 +209,6 @@ describe('ScriptureSlideEditor', () => {
     )
   })
 
-  // R047 (Phase 30 verification defect): the reading document minted here is
-  // the ONLY link between a SCRIPTURE slot and its passage. The id used to be
-  // kept in a local ref and never surfaced, so `slot.scriptureReadingId`
-  // stayed null, `deriveGroupEntries` returned zero entries, and adding a
-  // scripture item produced NO slide on the Slides tab at all.
-  describe('R047 — surfacing a newly minted reading id', () => {
-    it('emits reading-created with the id createReading returned', async () => {
-      const wrapper = mountEditor()
-
-      await wrapper.find('[data-testid="reference-input"]').setValue('Romans 8:28-30')
-      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
-      await flushPromises()
-
-      expect(mockCreateReading).toHaveBeenCalledTimes(1)
-      expect(wrapper.emitted('reading-created')).toBeTruthy()
-      expect(wrapper.emitted('reading-created')![0]).toEqual(['new-reading-id'])
-    })
-
-    it('does NOT emit when a reading already exists — that id is already on the slot', async () => {
-      mockGetReading.mockResolvedValueOnce(null)
-      const wrapper = mountEditor({ readingId: 'existing-reading-id' })
-      await flushPromises()
-
-      await wrapper.find('[data-testid="reference-input"]').setValue('Romans 8:28-30')
-      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
-      await flushPromises()
-
-      expect(mockCreateReading).not.toHaveBeenCalled()
-      expect(mockUpdateReading).toHaveBeenCalled()
-      expect(wrapper.emitted('reading-created')).toBeUndefined()
-    })
-
-    it('emits exactly once across repeated fetches — the second reuses the id', async () => {
-      const wrapper = mountEditor()
-
-      await wrapper.find('[data-testid="reference-input"]').setValue('Romans 8:28-30')
-      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
-      await flushPromises()
-
-      await wrapper.find('[data-testid="reference-input"]').setValue('Psalm 103:1-5')
-      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
-      await flushPromises()
-
-      expect(mockCreateReading).toHaveBeenCalledTimes(1)
-      expect(wrapper.emitted('reading-created')!.length).toBe(1)
-    })
-
-    it('emits nothing when the ESV fetch fails — no reading was minted', async () => {
-      mockFetchPassageText.mockRejectedValueOnce(new Error('Network error'))
-      const wrapper = mountEditor()
-
-      await wrapper.find('[data-testid="reference-input"]').setValue('Romans 8:28-30')
-      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
-      await flushPromises()
-
-      expect(wrapper.emitted('reading-created')).toBeUndefined()
-    })
-  })
-
   it('shows error message when ESV fetch fails', async () => {
     mockFetchPassageText.mockRejectedValueOnce(new Error('Network error'))
     const wrapper = mountEditor()
