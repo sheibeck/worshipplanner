@@ -4,16 +4,16 @@ milestone: v1.4
 milestone_name: Service and Slides
 current_phase: 30
 current_phase_name: Slides Mirror the Plan — Hard Lock & Reconciliation Removed
-status: planning
-stopped_at: Completed 29-05-PLAN.md
-last_updated: "2026-07-29T02:05:45.640Z"
-last_activity: 2026-07-28
-last_activity_desc: Phase 29 complete, transitioned to Phase 30
+status: executing
+stopped_at: Completed 30-01-PLAN.md
+last_updated: "2026-07-29T04:11:59.126Z"
+last_activity: 2026-07-29
+last_activity_desc: Phase 30 Plan 01 complete (reconciliation UI surface removed)
 progress:
   total_phases: 9
   completed_phases: 1
-  total_plans: 5
-  completed_plans: 5
+  total_plans: 9
+  completed_plans: 6
   percent: 11
 ---
 
@@ -35,9 +35,9 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 ## Current Position
 
 Phase: 30 of 37 (Slides Mirror the Plan — Hard Lock & Reconciliation Removed)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-07-28 — Phase 29 complete, transitioned to Phase 30
+Plan: 2 of 4
+Status: Ready to execute
+Last activity: 2026-07-29 — Phase 30 Plan 01 complete (reconciliation UI surface removed)
 
 ## ★ v1.4 AUTONOMOUS RUN — standing decisions (2026-07-28)
 
@@ -570,6 +570,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 29 P04 | 55min | 3 tasks | 2 files |
 | Phase 29 P03 | 95min | 3 tasks | 2 files |
 | Phase 29 P05 | ~55min | 3 tasks | 7 files |
+| Phase 30 P01 | 36min | 3 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -736,6 +737,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: onEnd never reassigns moved.section for a within-ungrouped-list reorder (put:false blocks any other case) — avoids silently normalizing a legacy/out-of-union section value
 - [Phase ?]: onSectionChange now composes reindexSlots(orderSlotsBySection(...)) — a genuine behavior change from silent-set-only, required so a dropdown section change produces the same section-major array a drag does
 - [Phase ?]: 29-05: Post-Service section is purely additive (union/array/label map) with zero migration; the four downstream consumers (assembly, print, PC export, plan rail) needed zero source changes, confirmed by dedicated tests per consumer rather than assumed
+- [Phase ?]: Followed Phase 27's exact commit sequencing (test -> feat -> chore) for the reconciliation-UI deletion so each commit compiles clean against the prior one
+- [Phase ?]: Left useSlideshowAssembly.ts and slideGroupMaterializer.ts's confirm engine untouched -- 30-02's job, landing with the generalized non-derivable-entry-survival fix
 
 ### Roadmap Evolution
 
@@ -797,6 +800,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-07-29T00:25:02.683Z
-Stopped at: Completed 29-05-PLAN.md
+Last session: 2026-07-29T04:11:59.055Z
+Stopped at: Completed 30-01-PLAN.md
 Resume file: None
