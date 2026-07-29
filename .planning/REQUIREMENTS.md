@@ -50,7 +50,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 
 ### Order Structure
 
-- [ ] **R042** (core-capability): A fifth **Post-Service** section exists in both the service plan and
+- [x] **R042** (core-capability): A fifth **Post-Service** section exists in both the service plan and
       the Slides tab, for content that runs as people exit. Structural only — no auto-advance or loop
       timer engine, which belongs to the live-presentation layer this app does not own. `[FEAT]`
 
@@ -216,7 +216,7 @@ Acknowledged, deferred, not in this roadmap.
 | R039 | Phase 32 | Pending |
 | R040 | Phase 32 | Pending |
 | R041 | Phase 32 | Pending |
-| R042 | Phase 29 | Pending |
+| R042 | Phase 29 | Complete |
 | R043 | Phase 29 | Complete |
 | R044 | Phase 29 | Complete |
 | R045 | Phase 30 | Pending |

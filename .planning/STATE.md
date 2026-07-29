@@ -4,17 +4,17 @@ milestone: v1.4
 milestone_name: Service and Slides
 current_phase: 29
 current_phase_name: Order Structure — Stable Reordering & Post-Service
-status: planning
-stopped_at: Completed 29-03-PLAN.md
-last_updated: "2026-07-28T23:02:39.041Z"
+status: verifying
+stopped_at: Completed 29-05-PLAN.md
+last_updated: "2026-07-29T00:25:02.746Z"
 last_activity: 2026-07-28
 last_activity_desc: ROADMAP.md created for v1.4 (Phases 29-37); REQUIREMENTS.md traceability filled, 34/34 requirements mapped, 0 unmapped
 progress:
   total_phases: 9
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 5
-  completed_plans: 4
-  percent: 0
+  completed_plans: 5
+  percent: 11
 ---
 
 # Project State
@@ -35,8 +35,8 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 ## Current Position
 
 Phase: 29 of 37 (Order Structure — Stable Reordering & Post-Service)
-Plan: — (not yet planned)
-Status: Roadmap created — ready to plan Phase 29
+Plan: 5 of 5
+Status: Phase complete — ready for verification
 Last activity: 2026-07-28 — ROADMAP.md created for v1.4 (Phases 29-37); REQUIREMENTS.md traceability filled, 34/34 requirements mapped, 0 unmapped
 
 ## ★ v1.4 AUTONOMOUS RUN — standing decisions (2026-07-28)
@@ -569,6 +569,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 29 P01 | 45min | 3 tasks | 2 files |
 | Phase 29 P04 | 55min | 3 tasks | 2 files |
 | Phase 29 P03 | 95min | 3 tasks | 2 files |
+| Phase 29 P05 | ~55min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -734,6 +735,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 29-04: added destroySortable() to the reorder-failure catch block (Rule 2) so the :key-driven gridRenderNonce re-render doesn't leave a stale Sortable instance bound to a discarded DOM node, which would otherwise silently disable real drag-and-drop after any single reorder failure.
 - [Phase ?]: onEnd never reassigns moved.section for a within-ungrouped-list reorder (put:false blocks any other case) — avoids silently normalizing a legacy/out-of-union section value
 - [Phase ?]: onSectionChange now composes reindexSlots(orderSlotsBySection(...)) — a genuine behavior change from silent-set-only, required so a dropdown section change produces the same section-major array a drag does
+- [Phase ?]: 29-05: Post-Service section is purely additive (union/array/label map) with zero migration; the four downstream consumers (assembly, print, PC export, plan rail) needed zero source changes, confirmed by dedicated tests per consumer rather than assumed
 
 ### Roadmap Evolution
 
@@ -795,6 +797,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-07-28T23:02:39.014Z
-Stopped at: Completed 29-03-PLAN.md
+Last session: 2026-07-29T00:25:02.683Z
+Stopped at: Completed 29-05-PLAN.md
 Resume file: None
