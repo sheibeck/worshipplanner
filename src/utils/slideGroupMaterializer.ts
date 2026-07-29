@@ -7,11 +7,20 @@
  * store or Vue reactivity — callers (the composable) load data, decide, and
  * write. Mirrors `slideshowAssembler.ts`'s stated purity contract.
  *
- * `deriveGroupEntries` is the ONLY place a `GroupSlideEntry.id` is ever
- * minted (via `crypto.randomUUID()`) — the assembler (24-04) must never
- * regenerate one, since `PresentationViewer.vue` keys its per-slide
- * `AudioPlayer`/`VideoPlayer` child components on this id (Phase 23's WR-02
- * contract).
+ * The load-bearing id invariant is that an entry id is minted ONCE and never
+ * REgenerated for an existing entry — `PresentationViewer.vue` keys its
+ * per-slide `AudioPlayer`/`VideoPlayer` child components on this id (Phase 23's
+ * WR-02 contract), so regenerating one leaks stale muted/blocked media state
+ * from one slide onto another. Every carry/merge path below therefore spreads
+ * the stored entry (`{ ...stored }`) rather than rebuilding it, and the
+ * assembler (24-04) never mints at all.
+ *
+ * This is NOT the same as "only `deriveGroupEntries` mints", which this comment
+ * used to claim and which has been false for several phases (LO-04):
+ * `rebuildSongGroup` mints for a newly-resolved section and for absent
+ * leading/trailing copyright entries, and `SlideGrid.vue` and
+ * `EditSlideDrawer.vue` each mint for a user-added or duplicated slide. Minting
+ * for a NEW entry is fine; only regenerating an EXISTING entry's id is not.
  */
 import type { ServiceSlot, SongSlot, ScriptureSlot, ImportedSlot } from '@/types/service'
 import type { SlideGroup, GroupSlideEntry, SourceRef, SlideGroupInput } from '@/types/slideGroup'
@@ -25,7 +34,8 @@ import { formatScriptureReference, scriptureRefFromSlot } from '@/utils/scriptur
  * pre-group assembler produced. Slide TEXT is never read or stored here
  * (D-02); only structural references (`sourceRef`) are minted.
  *
- * This is the ONLY place a `GroupSlideEntry.id` is ever minted.
+ * Every entry this returns is NEW, so every id here is freshly minted. It is
+ * not the only minting site in the codebase — see the module doc comment.
  */
 export function deriveGroupEntries(slot: ServiceSlot, inputs: AssemblyInputs): GroupSlideEntry[] {
   switch (slot.kind) {
