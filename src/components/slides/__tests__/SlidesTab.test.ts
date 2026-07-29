@@ -44,7 +44,6 @@ function mountTab(props: {
   slots: ServiceSlot[]
   assembledSlideshow?: AssembledSlide[]
   groupsBySlotId?: Map<string, SlideGroup>
-  pendingReconciliations?: unknown[]
   active?: boolean
 }) {
   return shallowMount(SlidesTab, {
@@ -54,7 +53,6 @@ function mountTab(props: {
       orgId: 'org-1',
       assembledSlideshow: props.assembledSlideshow ?? [],
       groupsBySlotId: props.groupsBySlotId ?? new Map(),
-      pendingReconciliations: (props.pendingReconciliations ?? []) as never,
       isEditor: true,
       groupsLoading: false,
       active: props.active ?? true,
@@ -244,7 +242,6 @@ describe('SlidesTab', () => {
           orgId: 'org-1',
           assembledSlideshow: [],
           groupsBySlotId: new Map(),
-          pendingReconciliations: [],
           isEditor: true,
           groupsLoading: false,
           active: true,
@@ -499,7 +496,6 @@ describe('SlidesTab', () => {
           orgId: 'org-1',
           assembledSlideshow: [],
           groupsBySlotId: new Map(),
-          pendingReconciliations: [],
           isEditor: true,
           groupsLoading: false,
           active: true,

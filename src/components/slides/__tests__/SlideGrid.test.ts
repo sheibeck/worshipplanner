@@ -6,25 +6,21 @@ import SlideGrid from '../SlideGrid.vue'
 import SlideCard from '../SlideCard.vue'
 import SlideGroupMusicControl from '../SlideGroupMusicControl.vue'
 import SlideDropTarget from '../SlideDropTarget.vue'
-import ReconcileConfirmModal from '../ReconcileConfirmModal.vue'
 import PptxImportModal from '@/components/PptxImportModal.vue'
 import type { ServiceSlot } from '@/types/service'
 import type { AssembledSlide } from '@/types/slide'
 import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
-import type { PendingReconciliation, EnsureGroupMaterializedResult } from '../slideDisplay'
+import type { EnsureGroupMaterializedResult } from '../slideDisplay'
 import { UNSUPPORTED_FILE_MESSAGE } from '../dropRouting'
 
 // --- 25-05: SlideGrid calls the slideGroups store directly (add-slide, drag-reorder) ---
 // --- 25-06 Task 2: also calls setGroupBedMedia directly for the group music bar ---
 const mockReplaceGroupSlides = vi.fn().mockResolvedValue(undefined)
 const mockSetGroupBedMedia = vi.fn().mockResolvedValue(undefined)
-// --- 26-06 Task 2: the `Dismiss` half of the reconciliation dialog's writes ---
-const mockDismissReconciliation = vi.fn().mockResolvedValue(undefined)
 vi.mock('@/stores/slideGroups', () => ({
   useSlideGroups: () => ({
     replaceGroupSlides: mockReplaceGroupSlides,
     setGroupBedMedia: mockSetGroupBedMedia,
-    dismissReconciliation: mockDismissReconciliation,
   }),
 }))
 
@@ -219,7 +215,6 @@ function mountGrid(props: {
   totalPlanItems?: number
   assembledSlideshow?: AssembledSlide[]
   selectedSlideId?: string | null
-  pendingReconciliations?: PendingReconciliation[]
   group?: SlideGroup | null
   isEditor?: boolean
   orgId?: string
@@ -235,7 +230,6 @@ function mountGrid(props: {
       assembledSlideshow: props.assembledSlideshow ?? [],
       selectedSlideId: props.selectedSlideId ?? null,
       group: props.group ?? null,
-      pendingReconciliations: props.pendingReconciliations ?? [],
       isEditor: props.isEditor ?? true,
       orgId: props.orgId ?? 'org-1',
       serviceId: props.serviceId ?? 'service-1',
@@ -247,7 +241,6 @@ function mountGrid(props: {
 beforeEach(() => {
   mockReplaceGroupSlides.mockClear()
   mockSetGroupBedMedia.mockClear()
-  mockDismissReconciliation.mockClear()
   mockUpdateService.mockClear()
   mockSortableDestroy.mockClear()
   capturedSortableOptions = undefined
@@ -324,40 +317,12 @@ describe('SlideGrid', () => {
     expect(wrapper.findAllComponents(SlideCard)).toHaveLength(0)
   })
 
-  it("renders the passive reconciliation notice for the selected plan item's slot id, and nothing for a different one", () => {
+  it('renders no reconciliation notice or review affordance for any group state (R048)', () => {
     const slot = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: 'X', songKey: null, requiredVwType: 1 } as never)
-    const pendingForMine: PendingReconciliation = {
-      slotId: 'slot-1',
-      proposed: [],
-      loss: { customizedEntries: 3, withAudio: 1, withNotes: 0 },
-    }
-    const wrapperMine = mountGrid({ selectedSlot: slot, slotArrayIndex: 0, pendingReconciliations: [pendingForMine] })
-    expect(wrapperMine.get('[data-testid="slide-grid-reconciliation-notice"]').text()).toContain('3')
-
-    const pendingForOther: PendingReconciliation = { slotId: 'slot-other', proposed: [] }
-    const wrapperOther = mountGrid({ selectedSlot: slot, slotArrayIndex: 0, pendingReconciliations: [pendingForOther] })
-    expect(wrapperOther.find('[data-testid="slide-grid-reconciliation-notice"]').exists()).toBe(false)
-  })
-
-  it('keeps cards selectable while a reconciliation is pending', async () => {
-    const slot = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: 'X', songKey: null, requiredVwType: 1 } as never)
-    const assembledSlideshow = [makeAssembled(0, 'c1')]
-    const pending: PendingReconciliation = { slotId: 'slot-1', proposed: [] }
-    const wrapper = mountGrid({ selectedSlot: slot, slotArrayIndex: 0, assembledSlideshow, pendingReconciliations: [pending] })
-    await wrapper.findComponent(SlideCard).trigger('click')
-    expect(wrapper.emitted('select')).toEqual([['c1']])
-  })
-
-  it('renders no inline apply/dismiss wording alongside the notice — those live in the reconciliation dialog (26-06)', () => {
-    const slot = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: 'X', songKey: null, requiredVwType: 1 } as never)
-    const pending: PendingReconciliation = { slotId: 'slot-1', proposed: [], freshSignature: 'sig-1' }
-    const wrapper = mountGrid({ selectedSlot: slot, slotArrayIndex: 0, pendingReconciliations: [pending] })
-    const text = wrapper.text().toLowerCase()
-    expect(text).not.toContain('apply')
-    expect(text).not.toContain('dismiss')
-    // The notice's own way in (below) reads "Review", never "Apply"/"Dismiss" —
-    // those labels belong only to the teleported dialog's own two buttons.
-    expect(wrapper.find('[data-testid="slide-grid-reconciliation-review"]').exists()).toBe(true)
+    const group = makeGroup({ slides: [] })
+    const wrapper = mountGrid({ selectedSlot: slot, slotArrayIndex: 0, group })
+    expect(wrapper.find('[data-testid="slide-grid-reconciliation-notice"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="slide-grid-reconciliation-review"]').exists()).toBe(false)
   })
 
   it('marks the card matching the selected slide id as selected, and clicking another emits its id', async () => {
@@ -1054,195 +1019,6 @@ describe('SlideGrid', () => {
     })
   })
 
-  // --- 26-06 Task 2: the notice becomes a way in, and the two choices become writes ---
-  describe('reconciliation confirm dialog (26-06 Task 2)', () => {
-    function pendingWith(overrides: Partial<PendingReconciliation> = {}): PendingReconciliation {
-      return { slotId: 'slot-1', proposed: [], freshSignature: 'sig-fresh', ...overrides }
-    }
-
-    it('renders the review affordance for an editor, and only the passive notice for a viewer', () => {
-      const slot = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: 'X', songKey: null, requiredVwType: 1 } as never)
-      const pending = pendingWith()
-      const editorWrapper = mountGrid({ selectedSlot: slot, pendingReconciliations: [pending], isEditor: true })
-      const viewerWrapper = mountGrid({ selectedSlot: slot, pendingReconciliations: [pending], isEditor: false })
-
-      expect(editorWrapper.get('[data-testid="slide-grid-reconciliation-notice"]')).toBeTruthy()
-      expect(editorWrapper.find('[data-testid="slide-grid-reconciliation-review"]').exists()).toBe(true)
-
-      expect(viewerWrapper.get('[data-testid="slide-grid-reconciliation-notice"]')).toBeTruthy()
-      expect(viewerWrapper.find('[data-testid="slide-grid-reconciliation-review"]').exists()).toBe(false)
-    })
-
-    it('opens the dialog with the pending update and the plan item for the selected slot', async () => {
-      const slot = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: 'X', songKey: null, requiredVwType: 1 } as never)
-      const pending = pendingWith()
-      const wrapper = mountGrid({ selectedSlot: slot, pendingReconciliations: [pending] })
-
-      expect(wrapper.findComponent(ReconcileConfirmModal).props('open')).toBe(false)
-      await wrapper.get('[data-testid="slide-grid-reconciliation-review"]').trigger('click')
-
-      const modal = wrapper.findComponent(ReconcileConfirmModal)
-      expect(modal.props('open')).toBe(true)
-      expect(modal.props('pending')).toEqual(pending)
-      expect(modal.props('planItem')).toEqual(slot)
-    })
-
-    it("taking the source's version calls the whole-array replace with the plan item id, the proposed slides, the pending update's divergence, and the group's current slides as base", async () => {
-      const slot = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: 'X', songKey: null, requiredVwType: 1 } as never)
-      const proposed: GroupSlideEntry[] = [{ id: 'p1', order: 0, sourceRef: { kind: 'text' } }]
-      const pending = pendingWith({ proposed, freshSignature: 'sig-fresh' })
-      const group = makeGroup({ slides: [{ id: 'e1', order: 0, sourceRef: { kind: 'text' } }] })
-      const wrapper = mountGrid({ selectedSlot: slot, pendingReconciliations: [pending], group })
-
-      await wrapper.get('[data-testid="slide-grid-reconciliation-review"]').trigger('click')
-      await wrapper.findComponent(ReconcileConfirmModal).vm.$emit('apply')
-      await Promise.resolve()
-
-      expect(mockReplaceGroupSlides).toHaveBeenCalledWith('org-1', 'slot-1', proposed, 'sig-fresh', group.slides)
-    })
-
-    it('declining calls the decline action with the plan item id and the same divergence value', async () => {
-      const slot = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: 'X', songKey: null, requiredVwType: 1 } as never)
-      const pending = pendingWith({ freshSignature: 'sig-fresh' })
-      const wrapper = mountGrid({ selectedSlot: slot, pendingReconciliations: [pending] })
-
-      await wrapper.get('[data-testid="slide-grid-reconciliation-review"]').trigger('click')
-      await wrapper.findComponent(ReconcileConfirmModal).vm.$emit('dismiss')
-      await Promise.resolve()
-
-      expect(mockDismissReconciliation).toHaveBeenCalledWith('org-1', 'slot-1', 'sig-fresh')
-    })
-
-    it('neither choice calls the bed-media write', async () => {
-      const slot = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: 'X', songKey: null, requiredVwType: 1 } as never)
-      const pending = pendingWith()
-      const applyWrapper = mountGrid({ selectedSlot: slot, pendingReconciliations: [pending] })
-      await applyWrapper.get('[data-testid="slide-grid-reconciliation-review"]').trigger('click')
-      await applyWrapper.findComponent(ReconcileConfirmModal).vm.$emit('apply')
-      await Promise.resolve()
-      expect(mockSetGroupBedMedia).not.toHaveBeenCalled()
-
-      const dismissWrapper = mountGrid({ selectedSlot: slot, pendingReconciliations: [pending] })
-      await dismissWrapper.get('[data-testid="slide-grid-reconciliation-review"]').trigger('click')
-      await dismissWrapper.findComponent(ReconcileConfirmModal).vm.$emit('dismiss')
-      await Promise.resolve()
-      expect(mockSetGroupBedMedia).not.toHaveBeenCalled()
-    })
-
-    it('closes the dialog after either choice', async () => {
-      const slot = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: 'X', songKey: null, requiredVwType: 1 } as never)
-      const pending = pendingWith()
-      const wrapper = mountGrid({ selectedSlot: slot, pendingReconciliations: [pending] })
-
-      await wrapper.get('[data-testid="slide-grid-reconciliation-review"]').trigger('click')
-      expect(wrapper.findComponent(ReconcileConfirmModal).props('open')).toBe(true)
-      await wrapper.findComponent(ReconcileConfirmModal).vm.$emit('apply')
-      expect(wrapper.findComponent(ReconcileConfirmModal).props('open')).toBe(false)
-
-      await wrapper.get('[data-testid="slide-grid-reconciliation-review"]').trigger('click')
-      expect(wrapper.findComponent(ReconcileConfirmModal).props('open')).toBe(true)
-      await wrapper.findComponent(ReconcileConfirmModal).vm.$emit('dismiss')
-      expect(wrapper.findComponent(ReconcileConfirmModal).props('open')).toBe(false)
-    })
-
-    it('reports a rejected apply write and leaves the grid unchanged', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-      const slot = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: 'X', songKey: null, requiredVwType: 1 } as never)
-      const pending = pendingWith()
-      mockReplaceGroupSlides.mockRejectedValueOnce(new Error('write failed'))
-      const wrapper = mountGrid({ selectedSlot: slot, pendingReconciliations: [pending] })
-
-      await wrapper.get('[data-testid="slide-grid-reconciliation-review"]').trigger('click')
-      await wrapper.findComponent(ReconcileConfirmModal).vm.$emit('apply')
-      await Promise.resolve()
-
-      expect(consoleSpy).toHaveBeenCalled()
-      consoleSpy.mockRestore()
-    })
-
-    it('reports a rejected dismiss write and leaves the grid unchanged', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-      const slot = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: 'X', songKey: null, requiredVwType: 1 } as never)
-      const pending = pendingWith()
-      mockDismissReconciliation.mockRejectedValueOnce(new Error('write failed'))
-      const wrapper = mountGrid({ selectedSlot: slot, pendingReconciliations: [pending] })
-
-      await wrapper.get('[data-testid="slide-grid-reconciliation-review"]').trigger('click')
-      await wrapper.findComponent(ReconcileConfirmModal).vm.$emit('dismiss')
-      await Promise.resolve()
-
-      expect(consoleSpy).toHaveBeenCalled()
-      consoleSpy.mockRestore()
-    })
-
-    it('renders neither the notice nor the affordance for a plan item with no pending update', () => {
-      const slot = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: 'X', songKey: null, requiredVwType: 1 } as never)
-      const wrapper = mountGrid({ selectedSlot: slot, pendingReconciliations: [] })
-      expect(wrapper.find('[data-testid="slide-grid-reconciliation-notice"]').exists()).toBe(false)
-      expect(wrapper.find('[data-testid="slide-grid-reconciliation-review"]').exists()).toBe(false)
-    })
-  })
-
-  // --- Task 3: the dialog cannot outlive the decision it is about ---
-  describe('reconciliation dialog self-closes when its subject disappears (26-06 Task 3)', () => {
-    it('closes and makes no write when the pending update for the selected slot disappears while open', async () => {
-      const slot = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: 'X', songKey: null, requiredVwType: 1 } as never)
-      const pending: PendingReconciliation = { slotId: 'slot-1', proposed: [], freshSignature: 'sig-fresh' }
-      const wrapper = mountGrid({ selectedSlot: slot, pendingReconciliations: [pending] })
-
-      await wrapper.get('[data-testid="slide-grid-reconciliation-review"]').trigger('click')
-      expect(wrapper.findComponent(ReconcileConfirmModal).props('open')).toBe(true)
-
-      await wrapper.setProps({ pendingReconciliations: [] })
-
-      expect(wrapper.findComponent(ReconcileConfirmModal).props('open')).toBe(false)
-      expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
-      expect(mockDismissReconciliation).not.toHaveBeenCalled()
-    })
-
-    it('closes when the selected plan item changes while the dialog is open', async () => {
-      const slotA = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: 'X', songKey: null, requiredVwType: 1 } as never)
-      const slotB = makeSlot({ kind: 'PRAYER', id: 'slot-2', position: 1 })
-      const pendingA: PendingReconciliation = { slotId: 'slot-1', proposed: [], freshSignature: 'sig-fresh' }
-      const wrapper = mountGrid({ selectedSlot: slotA, pendingReconciliations: [pendingA] })
-
-      await wrapper.get('[data-testid="slide-grid-reconciliation-review"]').trigger('click')
-      expect(wrapper.findComponent(ReconcileConfirmModal).props('open')).toBe(true)
-
-      await wrapper.setProps({ selectedSlot: slotB })
-
-      expect(wrapper.findComponent(ReconcileConfirmModal).props('open')).toBe(false)
-    })
-
-    it('after a self-close, neither intent can still be triggered', async () => {
-      const slot = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: 'X', songKey: null, requiredVwType: 1 } as never)
-      const pending: PendingReconciliation = { slotId: 'slot-1', proposed: [], freshSignature: 'sig-fresh' }
-      const wrapper = mountGrid({ selectedSlot: slot, pendingReconciliations: [pending] })
-
-      await wrapper.get('[data-testid="slide-grid-reconciliation-review"]').trigger('click')
-      await wrapper.setProps({ pendingReconciliations: [] })
-
-      await wrapper.findComponent(ReconcileConfirmModal).vm.$emit('apply')
-      await wrapper.findComponent(ReconcileConfirmModal).vm.$emit('dismiss')
-      await Promise.resolve()
-
-      expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
-      expect(mockDismissReconciliation).not.toHaveBeenCalled()
-    })
-
-    it('a pending update that disappears leaves the group slides and bed untouched', async () => {
-      const slot = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: 'X', songKey: null, requiredVwType: 1 } as never)
-      const pending: PendingReconciliation = { slotId: 'slot-1', proposed: [], freshSignature: 'sig-fresh' }
-      const wrapper = mountGrid({ selectedSlot: slot, pendingReconciliations: [pending] })
-
-      await wrapper.get('[data-testid="slide-grid-reconciliation-review"]').trigger('click')
-      await wrapper.setProps({ pendingReconciliations: [] })
-      await Promise.resolve()
-
-      expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
-      expect(mockSetGroupBedMedia).not.toHaveBeenCalled()
-    })
-  })
 })
 
 // ── Reorder repro (Phase 29-01, R049/R050) ───────────────────────────────────

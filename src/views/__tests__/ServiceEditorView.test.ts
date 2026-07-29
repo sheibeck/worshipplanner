@@ -1351,7 +1351,7 @@ describe('ServiceEditorView - Slides tab (Phase 25-03)', () => {
     expect(isVShowHidden(wrapper.find('[data-testid="service-order-panel"]'))).toBe(false)
   })
 
-  it('the slides panel receives the assembled slideshow, the groups map and the pending reconciliations as props', async () => {
+  it('the slides panel receives the assembled slideshow and the groups map as props', async () => {
     mockSlideGroupsState.groups = [
       { id: 'slot-0', slotId: 'slot-0', serviceId: 'service-1', slides: [], createdAt: mockTimestamp, updatedAt: mockTimestamp },
     ]
@@ -1364,8 +1364,7 @@ describe('ServiceEditorView - Slides tab (Phase 25-03)', () => {
     expect(Array.isArray(slidesTab.props('assembledSlideshow'))).toBe(true)
     expect(slidesTab.props('groupsBySlotId')).toBeInstanceOf(Map)
     expect((slidesTab.props('groupsBySlotId') as Map<string, unknown>).has('slot-0')).toBe(true)
-    expect(slidesTab.props('pendingReconciliations')).toBeDefined()
-    expect(Array.isArray(slidesTab.props('pendingReconciliations'))).toBe(true)
+    expect(slidesTab.props()).not.toHaveProperty('pendingReconciliations')
     expect(slidesTab.props('slots')).toEqual(mockService.slots)
     expect(slidesTab.props('serviceId')).toBe('service-1')
     expect(slidesTab.props('isEditor')).toBe(true)
