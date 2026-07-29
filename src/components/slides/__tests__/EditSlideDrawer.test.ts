@@ -196,7 +196,7 @@ function mountDrawer(props: Partial<InstanceType<typeof EditSlideDrawer>['$props
       open: true,
       entry: entry ?? null,
       group: makeGroup({ slides: entry ? [entry] : [] }),
-      planItem: makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songTitle: 'This Is Our God' } as never),
+      planItem: makeSlot({ kind: 'MESSAGE', id: 'slot-1', position: 0 } as never),
       assembledSlide: makeAssembled(),
       position: 3,
       total: 6,
@@ -261,7 +261,7 @@ describe('EditSlideDrawer (Phase 26-05 Task 1 — shell)', () => {
   })
 
   it("shows the context line's kind badge, source title and position within the group", () => {
-    mountDrawer()
+    mountDrawer({ planItem: makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songTitle: 'This Is Our God' } as never) })
     expect(body().find('[data-testid="drawer-kind-badge"]').text()).toBe('SONG')
     const context = body().find('[data-testid="drawer-context-text"]').text()
     expect(context).toContain('This Is Our God')
