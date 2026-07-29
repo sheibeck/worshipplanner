@@ -1449,6 +1449,56 @@ describe('EditSlideDrawer (R054 — song groups are read-only)', () => {
     expect(body().find('[data-testid="drawer-edit-in-song-link"]').exists()).toBe(false)
   })
 
+  // ME-03: the audio-loop row was the one mutation control the R054 lock sweep
+  // missed. It was gated only on `v-if="audioState"`, its :disabled binding was
+  // `audioState === 'group'` alone, and `onLoopToggle` had no canMutate/isEditor
+  // guard — so a SONG group entry carrying its own audioUrl rendered an ENABLED
+  // checkbox that wrote the song group's slides array straight from the Slides
+  // tab, which is the exact CRUD R054 says a song group must block.
+  it('renders the audio-loop checkbox disabled for a song group slide that carries its own audio', () => {
+    const entry = makeEntry({
+      id: 'entry-1',
+      sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'sec-1' },
+      audioUrl: 'https://example.com/orgs/org-1/media/m1/song.mp3',
+    })
+    mountDrawer({ planItem: songPlanItem, entry, group: makeGroup({ slides: [entry] }) })
+
+    const checkbox = body().find('[data-testid="audio-loop-checkbox"]')
+    expect(checkbox.exists()).toBe(true)
+    expect((checkbox.element as HTMLInputElement).disabled).toBe(true)
+  })
+
+  it('issues no write when the song group\'s audio-loop control is toggled anyway', async () => {
+    const entry = makeEntry({
+      id: 'entry-1',
+      sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'sec-1' },
+      audioUrl: 'https://example.com/orgs/org-1/media/m1/song.mp3',
+    })
+    mountDrawer({ planItem: songPlanItem, entry, group: makeGroup({ slides: [entry] }) })
+
+    await body().find('[data-testid="audio-loop-checkbox"]').trigger('change')
+
+    expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
+  })
+
+  it('renders the audio-loop checkbox disabled for a VIEWER on any group', () => {
+    const entry = makeEntry({ id: 'entry-1', audioUrl: 'https://example.com/orgs/org-1/media/m1/song.mp3' })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }), isEditor: false }) // default planItem is MESSAGE
+
+    const checkbox = body().find('[data-testid="audio-loop-checkbox"]')
+    expect(checkbox.exists()).toBe(true)
+    expect((checkbox.element as HTMLInputElement).disabled).toBe(true)
+  })
+
+  it('issues no write when a viewer toggles the audio-loop control anyway', async () => {
+    const entry = makeEntry({ id: 'entry-1', audioUrl: 'https://example.com/orgs/org-1/media/m1/song.mp3' })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }), isEditor: false })
+
+    await body().find('[data-testid="audio-loop-checkbox"]').trigger('change')
+
+    expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
+  })
+
   it('preserves every control for a non-song group (contrast case)', () => {
     const entry = makeEntry({ id: 'entry-1', label: 'Verse 1' })
     mountDrawer({ entry, group: makeGroup({ slides: [entry] }) }) // default planItem is MESSAGE

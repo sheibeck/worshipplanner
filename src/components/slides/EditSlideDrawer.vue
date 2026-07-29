@@ -288,7 +288,7 @@
                 id="edit-slide-drawer-audio-loop"
                 type="checkbox"
                 :checked="loopChecked"
-                :disabled="loopDisabled"
+                :disabled="loopDisabled || !canMutate"
                 data-testid="audio-loop-checkbox"
                 @change="onLoopToggle"
               />
@@ -586,7 +586,15 @@ const loopChecked = computed(() => audioState.value === 'slide' && !!props.entry
 /** D-11: a group bed never loops — disabled and unchecked whenever the group's shared music is what's shown. */
 const loopDisabled = computed(() => audioState.value === 'group')
 
-function onLoopToggle(event: Event): void {
+async function onLoopToggle(event: Event): Promise<void> {
+  // ME-03: the R054/viewer lock, missed by the original sweep. This row is
+  // gated only on `v-if="audioState"`, so a SONG group entry carrying its own
+  // audioUrl (attachable before this phase, and still present in existing
+  // documents) rendered an enabled checkbox whose write replaced the song
+  // group's whole `slides` array from the Slides tab — exactly the CRUD R054
+  // blocks — and the same control rendered enabled for a VIEWER on any group,
+  // whose write Firestore rejects as an unhandled rejection.
+  if (!canMutate.value) return
   // Belt-and-suspenders alongside the DOM `disabled` attribute — a group-bed
   // state must never be able to issue a loop write, no matter how the event
   // arrived.
@@ -595,7 +603,10 @@ function onLoopToggle(event: Event): void {
   const entryId = props.entry.id
   const base = props.group.slides
   const next = base.map((e) => (e.id === entryId ? { ...e, audioLoop: checked } : e))
-  void slideGroupsStore.replaceGroupSlides(props.orgId, props.group.slotId, next, props.group.sourceSignature, base)
+  // Awaited (not `void`-discarded) so a rejected write reaches Vue's handler
+  // the same way every other write in this drawer does, instead of surfacing as
+  // a bare unhandled rejection.
+  await slideGroupsStore.replaceGroupSlides(props.orgId, props.group.slotId, next, props.group.sourceSignature, base)
 }
 
 /** This drawer's OWN failure state (26-RESEARCH.md Pitfall 6) — `AudioPlayer` is a deliberately dumb primitive that only emits `error`, it renders no degraded-state text of its own. Reset whenever the attached file or the edited slide changes, so a stale failure never sticks to a different file (see the two watchers below). */
