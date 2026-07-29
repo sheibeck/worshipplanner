@@ -75,7 +75,11 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
       the new song automatically, with no review or confirmation step.
 
 - [ ] **R047** (core-capability): Changing a scripture passage on a service item updates its scripture
-      slide. A scripture slide defaults to one slide carrying the passage.
+      slide. A scripture slide defaults to **one slide showing the passage REFERENCE only** (e.g.
+      "Psalm 103:1–5") — not the scripture text. Full scripture text is added only through the
+      congregational reading feature (R064, Phase 34), which keeps that phase purely additive rather
+      than a rewrite of this one. *(Clarified by the owner 2026-07-28 during Phase 30 discussion; the
+      original wording "one slide carrying the passage" was ambiguous between reference and text.)*
 
 - [ ] **R048** (quality-attribute): The reconciliation/confirm flow is removed — `ReconcileConfirmModal`,
       `dismissedSignature`, and the confirm branches — replaced by one unconditional rebuild path.
