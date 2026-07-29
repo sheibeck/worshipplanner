@@ -71,17 +71,17 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 - [ ] **R045** (core-capability): Slide-group sequence and membership always mirror the service order.
       Reordering a service item reorders its slide group with no second manual step.
 
-- [ ] **R046** (core-capability): Changing the song on a service item rewrites that group's slides to
+- [x] **R046** (core-capability): Changing the song on a service item rewrites that group's slides to
       the new song automatically, with no review or confirmation step.
 
-- [ ] **R047** (core-capability): Changing a scripture passage on a service item updates its scripture
+- [x] **R047** (core-capability): Changing a scripture passage on a service item updates its scripture
       slide. A scripture slide defaults to **one slide showing the passage REFERENCE only** (e.g.
       "Psalm 103:1–5") — not the scripture text. Full scripture text is added only through the
       congregational reading feature (R064, Phase 34), which keeps that phase purely additive rather
       than a rewrite of this one. *(Clarified by the owner 2026-07-28 during Phase 30 discussion; the
       original wording "one slide carrying the passage" was ambiguous between reference and text.)*
 
-- [ ] **R048** (quality-attribute): The reconciliation/confirm flow is removed — `ReconcileConfirmModal`,
+- [x] **R048** (quality-attribute): The reconciliation/confirm flow is removed — `ReconcileConfirmModal`,
       `dismissedSignature`, and the confirm branches — replaced by one unconditional rebuild path.
       Spans 9 files plus tests. **Keep** the concurrent-write transaction merge in `replaceGroupSlides`.
       `dismissedSignature` is a persisted Firestore field: the leave-vs-backfill decision must be
@@ -224,9 +224,9 @@ Acknowledged, deferred, not in this roadmap.
 | R043 | Phase 29 | Complete |
 | R044 | Phase 29 | Complete |
 | R045 | Phase 30 | Pending |
-| R046 | Phase 30 | Pending |
-| R047 | Phase 30 | Pending |
-| R048 | Phase 30 | Pending |
+| R046 | Phase 30 | Complete |
+| R047 | Phase 30 | Complete |
+| R048 | Phase 30 | Complete |
 | R049 | Phase 29 | Complete |
 | R050 | Phase 29 | Complete |
 | R051 | Phase 33 | Pending |

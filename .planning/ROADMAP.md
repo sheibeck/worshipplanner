@@ -141,11 +141,11 @@ Plans:
   4. No reconcile/confirm modal or banner ever appears in the Slides tab — every change rebuilds unconditionally
   5. Song groups in the Slides tab are read-only — a planner cannot create, edit, delete, or reorder a song's slides there
 
-**Plans**: 1/4 plans executed
+**Plans**: 2/4 plans executed
 Plans:
 
 - [x] 30-01-PLAN.md — Strip the confirm surface: prop chain, banner, modal, decline store action (wave 1)
-- [ ] 30-02-PLAN.md — Unconditional idempotent rebuild; survival generalized to all kinds; scripture reference-only (wave 2)
+- [x] 30-02-PLAN.md — Unconditional idempotent rebuild; survival generalized to all kinds; scripture reference-only (wave 2)
 - [ ] 30-03-PLAN.md — Song groups read-only in drawer and grid, after repointing the SONG test fixture (wave 3)
 - [ ] 30-04-PLAN.md — Permutation property test for the order lock, membership lock, removal gate, human-verify (wave 4)
 
@@ -285,7 +285,7 @@ Plans:
 | 18-23 | v1.2 | all | Complete (archived) | 2026-07-28 |
 | 24-28 | v1.3 | 33/33 | Complete (archived) | 2026-07-28 |
 | 29. Order Structure — Stable Reordering & Post-Service | v1.4 | 5/5 | Complete    | 2026-07-28 |
-| 30. Slides Mirror the Plan — Hard Lock & Reconciliation Removed | v1.4 | 1/4 | In Progress|  |
+| 30. Slides Mirror the Plan — Hard Lock & Reconciliation Removed | v1.4 | 2/4 | In Progress|  |
 | 31. Service Lifecycle — Draft Lock & Reopen | v1.4 | 0/TBD | Not started | - |
 | 32. Save Reliability — Autosave Fix & Persistent Status | v1.4 | 0/TBD | Not started | - |
 | 33. Backgrounds & Slide Editing | v1.4 | 0/TBD | Not started | - |
