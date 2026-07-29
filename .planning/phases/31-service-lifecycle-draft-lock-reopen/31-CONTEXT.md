@@ -72,6 +72,13 @@ phase adds a lock layer over the existing controls; it does not restyle them.
 - **D-07: Notes and sermon topic lock too.** A carve-out for free-text metadata was offered and
   declined — R036 says the tabs are read-only and that is taken literally.
 
+  > **Correction (2026-07-29, from 31-PATTERNS.md):** the `notes` half of this decision is currently
+  > vacuous — `Service.notes` has **no editable UI anywhere**. It appears only in the Planning Center
+  > export payload (`src/stores/services.ts:216`) and in the print/share snapshots. There is nothing to
+  > lock. `sermonTopic` and `sermonPassage` DO have editable controls and are genuinely covered by this
+  > decision. The recorded intent stands — if a notes editor is ever added, it locks — but the planner
+  > must not budget work for gating a control that does not exist.
+
 - **D-08: Non-editing actions stay live while locked** — Export/Copy to Planning Center, Present /
   preview, Print, and Share link.
 
@@ -108,6 +115,35 @@ phase adds a lock layer over the existing controls; it does not restyle them.
   Deciding where the taken-dates set comes from (prop from `ServicesView.vue`, which already
   subscribes, vs. the store directly) is a planning decision — but the wiring is new work, not a
   one-line change.
+
+### Deleting a locked service (added 2026-07-29 after research)
+
+- **D-15: Delete stays available at any status, but warns when there is export evidence.** Both the UI
+  checker and the research agent independently raised this as an unresolved gap — D-08 listed the
+  non-editing carve-outs and simply omitted Delete, while the proposed Firestore rule allowed it. The
+  owner's call: keep Delete available, and when the service carries `pcExportedAt`/`pcPlanId`, extend
+  the EXISTING delete confirm body (`ServiceEditorView.vue:216`) with one evidence-gated sentence —
+  *"This service was exported to Planning Center. Deleting it here does not remove that plan."*
+
+  Rationale for warning rather than locking: Delete is the only irreversible action in this view, and
+  for an exported service it silently orphans a live Planning Center plan and destroys the audit trail
+  D-11 exists to preserve. D-10's "friction only where there are consequences" argues the OPPOSITE way
+  here than it does for Reopen — reopening is reversible, deleting is not. Reuses the same
+  `hasPcExportEvidence` computed as D-04; no new dialog, no new rules change.
+  **UI and rules must move together on this** — the rule must permit delete at any status.
+
+### Shipping the rules change (added 2026-07-29 after research)
+
+- **★ D-16: The plan carries an explicit emulator test gate and a manual deploy hand-off.** Research
+  established that `firestore.rules` does NOT ship with the app bundle, this repo has NO CI
+  (`.github/workflows` does not exist), and `src/rules.test.ts` is excluded from the default vitest run
+  (`vite.config.ts:85-86`). A broken lock would therefore ship green twice over.
+
+  Therefore: (a) a mandatory `npm run test:rules` gate, emulator-backed, is its own plan task — a rules
+  change with no emulator test is untested code; (b) the final task STOPS and instructs the owner to
+  run `firebase deploy --only firestore:rules`. **I do not deploy.** This mirrors how Phase 37 is
+  scoped ("build but do not deploy") and respects the standing rule that outward-facing actions are
+  confirmed, not assumed. Adding CI was offered and declined as wider than R036–R038.
 
 ### Claude's Discretion
 
