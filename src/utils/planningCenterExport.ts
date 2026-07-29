@@ -1,7 +1,7 @@
 import type { Service } from '@/types/service'
 import type { Song } from '@/types/song'
 import type { ScriptureRef } from '@/types/service'
-import { formatScriptureReference } from '@/utils/scripture'
+import { formatScriptureReference, scriptureRefFromSlot } from '@/utils/scripture'
 
 /**
  * Format a ScriptureRef as "Book Chapter:VerseStart-VerseEnd".
@@ -75,13 +75,16 @@ export function formatForPlanningCenter(service: Service, songs: Song[]): string
       }
     } else if (slot.kind === 'SCRIPTURE') {
       const label = 'Scripture'
-      if (!slot.book) {
+      // ME-01: routed through the canonical primitives rather than the old
+      // inline `verseStart && verseEnd` rule, which dropped the verse entirely
+      // from a single-verse reading (verseEnd is null unless the reference is a
+      // RANGE) and so exported "Scripture -- Romans 8" for a slide reading
+      // "Romans 8:28". Only the sermon-passage path had been delegated.
+      const ref = scriptureRefFromSlot(slot)
+      if (!ref) {
         lines.push(`${label} -- [empty]`)
       } else {
-        const verseRange = slot.verseStart && slot.verseEnd ? `:${slot.verseStart}-${slot.verseEnd}` : ''
-        lines.push(
-          `${label} -- ${slot.book} ${slot.chapter}${verseRange}`,
-        )
+        lines.push(`${label} -- ${formatScriptureReference(ref)}`)
       }
     } else if (slot.kind === 'PRAYER') {
       lines.push('Prayer')

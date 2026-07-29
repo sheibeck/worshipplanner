@@ -815,6 +815,53 @@ describe('addSlotAsItem', () => {
     expect(body.data.attributes.html_details).toBe('For God so loved the world...')
   })
 
+  // ME-01: the item title AND the ESV query were built inline by the old
+  // `verseStart && verseEnd` rule, so a single-verse reading dropped its verse
+  // — the plan item was titled "Scripture - Romans 8" and fetchPassageText
+  // pulled the WHOLE CHAPTER into the item description, while the projected
+  // slide read "Romans 8:28".
+  it('maps a single-verse SCRIPTURE slot without widening it to the whole chapter', async () => {
+    defaultFetchResponse()
+    vi.mocked(fetchPassageText).mockResolvedValueOnce('And we know that for those who love God...')
+    const slot: ScriptureSlot = {
+      kind: 'SCRIPTURE',
+      id: 'slot-scripture-2',
+      position: 2,
+      book: 'Romans',
+      chapter: 8,
+      verseStart: 28,
+      verseEnd: null,
+    }
+
+    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 2, [])
+
+    expect(vi.mocked(fetchPassageText)).toHaveBeenCalledWith('Romans 8:28')
+    const [, options] = vi.mocked(fetch).mock.calls[0]!
+    const body = JSON.parse(options?.body as string)
+    expect(body.data.attributes.title).toBe('Scripture - Romans 8:28')
+  })
+
+  it('maps a whole-chapter SCRIPTURE slot as the bare chapter', async () => {
+    defaultFetchResponse()
+    vi.mocked(fetchPassageText).mockResolvedValueOnce('Bless the LORD, O my soul...')
+    const slot: ScriptureSlot = {
+      kind: 'SCRIPTURE',
+      id: 'slot-scripture-2',
+      position: 2,
+      book: 'Psalms',
+      chapter: 103,
+      verseStart: null,
+      verseEnd: null,
+    }
+
+    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 2, [])
+
+    expect(vi.mocked(fetchPassageText)).toHaveBeenCalledWith('Psalms 103')
+    const [, options] = vi.mocked(fetch).mock.calls[0]!
+    const body = JSON.parse(options?.body as string)
+    expect(body.data.attributes.title).toBe('Scripture - Psalms 103')
+  })
+
   it('maps PRAYER slot to regular item with title "Prayer"', async () => {
     defaultFetchResponse()
     const slot: NonAssignableSlot = { kind: 'PRAYER', id: 'slot-prayer-3', position: 3 }

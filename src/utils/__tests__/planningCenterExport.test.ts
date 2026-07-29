@@ -189,6 +189,44 @@ describe('formatForPlanningCenter', () => {
     expect(result).toContain('Scripture -- Psalms 23:1-6')
   })
 
+  // ME-01: the SCRIPTURE SLOT was formatted inline by the old rule
+  // (`verseStart && verseEnd`), so a single-verse reading — which
+  // `parseScriptureInput` stores as verseStart with verseEnd null — silently
+  // widened to the whole chapter in the exported text while the projected slide
+  // read the verse. Only the sermon-passage path had been delegated.
+  it('formats a single-verse scripture slot as the verse, not the whole chapter', () => {
+    const service: Service = {
+      ...mockService,
+      slots: [
+        { kind: 'SCRIPTURE', id: 'slot-scripture-0', position: 0, book: 'Romans', chapter: 8, verseStart: 28, verseEnd: null },
+      ],
+    }
+    const result = formatForPlanningCenter(service, mockSongs)
+    expect(result).toContain('Scripture -- Romans 8:28')
+  })
+
+  it('formats a whole-chapter scripture slot as the bare chapter', () => {
+    const service: Service = {
+      ...mockService,
+      slots: [
+        { kind: 'SCRIPTURE', id: 'slot-scripture-0', position: 0, book: 'Psalms', chapter: 103, verseStart: null, verseEnd: null },
+      ],
+    }
+    const result = formatForPlanningCenter(service, mockSongs)
+    expect(result).toContain('Scripture -- Psalms 103')
+  })
+
+  it('collapses a degenerate scripture-slot range the same way the slide does', () => {
+    const service: Service = {
+      ...mockService,
+      slots: [
+        { kind: 'SCRIPTURE', id: 'slot-scripture-0', position: 0, book: 'John', chapter: 3, verseStart: 16, verseEnd: 16 },
+      ],
+    }
+    const result = formatForPlanningCenter(service, mockSongs)
+    expect(result.split('\n')).toContain('Scripture -- John 3:16')
+  })
+
   it('formats prayer slot as just "Prayer"', () => {
     const result = formatForPlanningCenter(mockService, mockSongs)
     expect(result).toContain('\nPrayer\n')
