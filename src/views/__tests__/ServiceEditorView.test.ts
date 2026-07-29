@@ -2130,3 +2130,99 @@ describe('ServiceEditorView - R047 scripture reference is the slide source', () 
     }
   })
 })
+
+// ── ME-02: R047's source of truth must round-trip in its OWN editor ──────────
+//
+// `scriptureRefFromSlot` requires only book + chapter — a whole-chapter reading
+// is explicitly a valid slide source. The view's private `slotToScriptureRef`
+// required all FOUR fields, so a slot the slide layer considers populated was
+// handed to ScriptureInput as `null`: the Service Order row rendered an EMPTY
+// input, the read-only lines rendered "Scripture — Empty", and "Edit in
+// scripture" scrolled to a blank field — all while the slide projected the
+// reference correctly.
+describe('ServiceEditorView - ME-02 scripture reference round-trips in its own editor', () => {
+  async function mountView() {
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          RouterLink: { template: '<a><slot /></a>' },
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: { name: 'ScriptureInput', props: ['modelValue'], template: '<div />' },
+        },
+      },
+    })
+  }
+
+  function serviceWithScriptureSlot(overrides: Record<string, unknown>): Service {
+    return {
+      ...mockService,
+      slots: [
+        { kind: 'SCRIPTURE', id: 'slot-0', position: 0, book: null, chapter: null, verseStart: null, verseEnd: null, ...overrides } as Service['slots'][number],
+      ],
+    }
+  }
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+  })
+
+  /**
+   * The ROW's input specifically — the sermon-passage field is another
+   * ScriptureInput earlier in the tree, and a bare `findComponent` returns it.
+   */
+  function rowScriptureInput(wrapper: Awaited<ReturnType<typeof mountView>>) {
+    return wrapper.find('[data-scripture-slot-index="0"]').findComponent({ name: 'ScriptureInput' })
+  }
+
+  it('renders a whole-chapter reading back into the Service Order input after reload', async () => {
+    mockServicesList = [serviceWithScriptureSlot({ book: 'Psalms', chapter: 103 })]
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const input = rowScriptureInput(wrapper)
+    expect(input.exists()).toBe(true)
+    expect(input.props('modelValue')).toEqual({ book: 'Psalms', chapter: 103 })
+  })
+
+  it('renders a single-verse reading back into the Service Order input after reload', async () => {
+    mockServicesList = [serviceWithScriptureSlot({ book: 'Romans', chapter: 8, verseStart: 28 })]
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    expect(rowScriptureInput(wrapper).props('modelValue')).toEqual({ book: 'Romans', chapter: 8, verseStart: 28 })
+  })
+
+  it('still hands null to the input for a reference that has not been filled in', async () => {
+    mockServicesList = [serviceWithScriptureSlot({})]
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    expect(rowScriptureInput(wrapper).props('modelValue')).toBeNull()
+  })
+
+  it('a viewer sees the reference, not "Scripture — Empty", for a whole-chapter reading', async () => {
+    mockAuthState.isEditor = false
+    mockServicesList = [serviceWithScriptureSlot({ book: 'Psalms', chapter: 103 })]
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const row = wrapper.find('[data-scripture-slot-index="0"]')
+    expect(row.exists()).toBe(true)
+    expect(row.text()).toContain('Psalms 103')
+    expect(row.text()).not.toContain('Scripture — Empty')
+  })
+
+  it('a viewer sees a single verse spelled out rather than the whole chapter', async () => {
+    mockAuthState.isEditor = false
+    mockServicesList = [serviceWithScriptureSlot({ book: 'Romans', chapter: 8, verseStart: 28 })]
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('[data-scripture-slot-index="0"]').text()).toContain('Romans 8:28')
+  })
+})

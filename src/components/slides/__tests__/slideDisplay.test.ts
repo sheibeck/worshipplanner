@@ -87,6 +87,36 @@ describe('slideDisplay', () => {
       expect(slotDisplayTitle(slot)).toBe('John 3:16')
     })
 
+    // ME-02: `scriptureRefFromSlot` treats book + chapter as a populated
+    // reference (a whole-chapter reading is a valid slide source), so the rail
+    // row must name the passage rather than falling back to the generic label
+    // while the slide beside it projects "Psalms 103".
+    it('names a whole-chapter SCRIPTURE slot rather than falling back to the kind label', () => {
+      const slot: ServiceSlot = {
+        kind: 'SCRIPTURE',
+        id: 'slot-scripture-chapter',
+        position: 1,
+        book: 'Psalms',
+        chapter: 103,
+        verseStart: null,
+        verseEnd: null,
+      }
+      expect(slotDisplayTitle(slot)).toBe('Psalms 103')
+    })
+
+    it('names a single-verse SCRIPTURE slot with no verseEnd at all', () => {
+      const slot: ServiceSlot = {
+        kind: 'SCRIPTURE',
+        id: 'slot-scripture-single-open',
+        position: 1,
+        book: 'Romans',
+        chapter: 8,
+        verseStart: 28,
+        verseEnd: null,
+      }
+      expect(slotDisplayTitle(slot)).toBe('Romans 8:28')
+    })
+
     it('falls back to the per-kind label for an empty SCRIPTURE slot', () => {
       const slot: ServiceSlot = {
         kind: 'SCRIPTURE',

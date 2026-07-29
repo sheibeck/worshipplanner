@@ -11,6 +11,7 @@ import type { ServiceSlot, SlotKind } from '@/types/service'
 import type { Slide } from '@/types/slide'
 import type { GroupSlideEntry } from '@/types/slideGroup'
 import { slotLabel } from '@/utils/slotTypes'
+import { formatScriptureReference, scriptureRefFromSlot } from '@/utils/scripture'
 
 /**
  * Static, fully-spelled-out kind-badge class map keyed by `SlotKind` — per
@@ -47,12 +48,13 @@ export function slotDisplayTitle(slot: ServiceSlot): string {
     case 'SONG':
       return slot.songTitle && slot.songTitle.trim() ? slot.songTitle : slotLabel(slot)
     case 'SCRIPTURE': {
-      if (slot.book && slot.chapter != null && slot.verseStart != null) {
-        const range =
-          slot.verseEnd != null && slot.verseEnd !== slot.verseStart ? `-${slot.verseEnd}` : ''
-        return `${slot.book} ${slot.chapter}:${slot.verseStart}${range}`
-      }
-      return slotLabel(slot)
+      // HI-02/ME-02: the canonical primitives, not a private formatter. The
+      // one this replaced required `verseStart`, so a whole-chapter reading —
+      // which R047 treats as a fully valid slide source — fell back to the
+      // generic "Scripture Reading" label while the slide beside it projected
+      // "Psalms 103".
+      const ref = scriptureRefFromSlot(slot)
+      return ref ? formatScriptureReference(ref) : slotLabel(slot)
     }
     case 'HYMN':
       return slot.hymnName && slot.hymnName.trim() ? slot.hymnName : slotLabel(slot)

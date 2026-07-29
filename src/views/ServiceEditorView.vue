@@ -697,19 +697,15 @@
                       label="Scripture Reading"
                       @update:modelValue="(ref) => onScriptureChange(index, ref)"
                     />
-                    <!-- Exported lock: read-only -->
+                    <!-- Exported lock: read-only. ME-02 — one canonical
+                         formatter, not a second inline copy of the rule that
+                         spelled out a null verseEnd as "Psalms 103:null". -->
                     <p v-else-if="authStore.isEditor && isExportedLocked" class="text-sm text-gray-200">
-                      {{ slotToScriptureRef(slot as ScriptureSlot)
-                        ? `${slotToScriptureRef(slot as ScriptureSlot)?.book} ${slotToScriptureRef(slot as ScriptureSlot)?.chapter}:${slotToScriptureRef(slot as ScriptureSlot)?.verseStart}${slotToScriptureRef(slot as ScriptureSlot)?.verseEnd ? '-' + slotToScriptureRef(slot as ScriptureSlot)?.verseEnd : ''}`
-                        : 'Scripture — Empty'
-                      }}
+                      {{ slotScriptureText(slot as ScriptureSlot) }}
                     </p>
                     <!-- Viewer: read-only text -->
                     <p v-else class="text-sm text-gray-200">
-                      {{ slotToScriptureRef(slot)
-                        ? `${slotToScriptureRef(slot)?.book} ${slotToScriptureRef(slot)?.chapter}:${slotToScriptureRef(slot)?.verseStart}${slotToScriptureRef(slot)?.verseEnd ? '-' + slotToScriptureRef(slot)?.verseEnd : ''}`
-                        : 'Scripture — Empty'
-                      }}
+                      {{ slotScriptureText(slot) }}
                     </p>
                   </div>
                 </div>
@@ -1095,7 +1091,7 @@ import { useRosterStore } from '@/stores/roster'
 import { useQuartersStore } from '@/stores/quarters'
 import { useSlideGroups } from '@/stores/slideGroups'
 import { slotLabel, createSlot, reindexSlots, backfillSlotIds, groupBySection, flattenBySection, orderSlotsBySection } from '@/utils/slotTypes'
-import { scripturesOverlap } from '@/utils/scripture'
+import { scripturesOverlap, scriptureRefFromSlot, formatScriptureReference } from '@/utils/scripture'
 import { getPrimaryKey } from '@/utils/songSearch'
 import { resolveServiceRoleAssignments, findQuarterForDate } from '@/utils/serviceRoles'
 import type { ResolvedRoleAssignment } from '@/utils/serviceRoles'
@@ -2160,14 +2156,25 @@ function rejectAiSong(index: number) {
 
 // ── Scripture ──────────────────────────────────────────────────────────────────
 
+/**
+ * ME-02: the canonical primitive, not a private four-field variant.
+ *
+ * This used to require book + chapter + verseStart + verseEnd, while
+ * `scriptureRefFromSlot` — the rule R047 derives the SLIDE from — requires only
+ * book + chapter. A whole-chapter reading ("Psalms 103") or a single verse
+ * ("Romans 8:28", where `parseScriptureInput` leaves verseEnd null) therefore
+ * projected a correct slide while this row handed `null` to ScriptureInput: the
+ * input rendered empty, the read-only lines rendered "Scripture — Empty", and
+ * "Edit in scripture" scrolled to a blank field.
+ */
 function slotToScriptureRef(slot: ScriptureSlot): ScriptureRef | null {
-  if (!slot.book || !slot.chapter || !slot.verseStart || !slot.verseEnd) return null
-  return {
-    book: slot.book,
-    chapter: slot.chapter,
-    verseStart: slot.verseStart,
-    verseEnd: slot.verseEnd,
-  }
+  return scriptureRefFromSlot(slot)
+}
+
+/** Read-only rendering of a slot's reference — the same string the slide projects. */
+function slotScriptureText(slot: ScriptureSlot): string {
+  const ref = scriptureRefFromSlot(slot)
+  return ref ? formatScriptureReference(ref) : 'Scripture — Empty'
 }
 
 function onScriptureChange(index: number, ref: ScriptureRef | null) {
