@@ -92,7 +92,7 @@ can see, slides that always mirror the plan — and finish them against the Clau
 **Requirements:** `.planning/REQUIREMENTS.md` (R036–R069, 34 total)
 
 - [x] **Phase 29: Order Structure — Stable Reordering & Post-Service** - Fix the drag-and-drop root cause and add the fifth Post-Service section (completed 2026-07-28)
-- [ ] **Phase 30: Slides Mirror the Plan — Hard Lock & Reconciliation Removed** - Delete the reconcile/confirm flow; slide groups always mirror the service order
+- [x] **Phase 30: Slides Mirror the Plan — Hard Lock & Reconciliation Removed** - Delete the reconcile/confirm flow; slide groups always mirror the service order (completed 2026-07-29)
 - [ ] **Phase 31: Service Lifecycle — Draft Lock & Reopen** - Draft-only editing with a genuine three-layer lock and an explicit Reopen path
 - [ ] **Phase 32: Save Reliability — Autosave Fix & Persistent Status** - Fix the song-change autosave bug and give every surface a persistent save indicator
 - [ ] **Phase 33: Backgrounds & Slide Editing** - Backgrounds at group/slide/song level and a split 3-dot Edit Slide menu
@@ -285,7 +285,7 @@ Plans:
 | 18-23 | v1.2 | all | Complete (archived) | 2026-07-28 |
 | 24-28 | v1.3 | 33/33 | Complete (archived) | 2026-07-28 |
 | 29. Order Structure — Stable Reordering & Post-Service | v1.4 | 5/5 | Complete    | 2026-07-28 |
-| 30. Slides Mirror the Plan — Hard Lock & Reconciliation Removed | v1.4 | 4/4 | In Progress|  |
+| 30. Slides Mirror the Plan — Hard Lock & Reconciliation Removed | v1.4 | 4/4 | Complete    | 2026-07-29 |
 | 31. Service Lifecycle — Draft Lock & Reopen | v1.4 | 0/TBD | Not started | - |
 | 32. Save Reliability — Autosave Fix & Persistent Status | v1.4 | 0/TBD | Not started | - |
 | 33. Backgrounds & Slide Editing | v1.4 | 0/TBD | Not started | - |
@@ -295,6 +295,26 @@ Plans:
 | 37. PowerPoint Server-Side Rendering | v1.4 | 0/TBD | Not started | - |
 
 ## Backlog
+
+### Phase 999.2: Clearing a song should clear its slides, even when the song is reprised (BACKLOG)
+
+**Goal:** Clearing the song from a plan item empties that item's slide group. Today it does not, in one
+reachable case: if the *same* song is still assigned to another plan item in the same service, the
+cleared item keeps projecting the old song's full slide set.
+**Motivation:** W-03 in `.planning/phases/30-.../30-VERIFICATION.md`, proven by executing
+`assembleSlideshow` — a cleared SONG slot whose stored group still holds the old song's copyright and
+lyric entries emits 2 slides when a second slot references that song. `rebuildSongGroup` returns
+`{changed: false}` on `!songId` (`src/utils/slideGroupMaterializer.ts:478`), and `confirmSlotDelete`'s
+clear path deliberately does not cascade (`ServiceEditorView.vue:1894-1902`). Normally the stale slides
+are masked because the old song's lyrics stop being loaded; a reprise defeats that mask.
+**Pre-existing:** yes — byte-identical at `0ecc84f`, so NOT a Phase 30 regression. It nonetheless
+contradicts R045's "membership always mirrors" wording, which is why it is recorded rather than dropped.
+**Requirements:** relates to R045
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (promote with /gsd-review-backlog when ready)
 
 ### Phase 999.1: Extract shared song-browse component (Songs page + service-plan picker) (BACKLOG)
 

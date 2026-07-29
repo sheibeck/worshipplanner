@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Service and Slides
-current_phase: 30
-current_phase_name: Slides Mirror the Plan — Hard Lock & Reconciliation Removed
-status: verifying
+current_phase: 31
+current_phase_name: Service Lifecycle — Draft Lock & Reopen
+status: planning
 stopped_at: Completed 30-04-PLAN.md (Phase 30 complete)
-last_updated: "2026-07-29T14:24:53.081Z"
+last_updated: "2026-07-29T16:28:37.528Z"
 last_activity: 2026-07-29
-last_activity_desc: Phase 30 Plan 01 complete (reconciliation UI surface removed)
+last_activity_desc: Phase 30 complete, transitioned to Phase 31
 progress:
   total_phases: 9
   completed_phases: 2
@@ -34,10 +34,10 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 
 ## Current Position
 
-Phase: 30 of 37 (Slides Mirror the Plan — Hard Lock & Reconciliation Removed)
-Plan: 4 of 4
-Status: Phase complete — ready for verification
-Last activity: 2026-07-29 — Phase 30 Plan 01 complete (reconciliation UI surface removed)
+Phase: 31 of 37 (Service Lifecycle — Draft Lock & Reopen)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-07-29 — Phase 30 complete, transitioned to Phase 31
 
 ## ★ v1.4 AUTONOMOUS RUN — standing decisions (2026-07-28)
 

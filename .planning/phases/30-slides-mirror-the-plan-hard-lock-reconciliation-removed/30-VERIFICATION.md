@@ -2,7 +2,9 @@
 phase: 30-slides-mirror-the-plan-hard-lock-reconciliation-removed
 verified: 2026-07-29T15:48:51Z
 verified_at_commit: e5727d1
-status: human_needed
+reverified: 2026-07-29
+reverified_at_commit: 7b91498
+status: passed
 score: 5/5 must-haves verified
 behavior_unverified: 0
 overrides_applied: 0
@@ -43,14 +45,43 @@ deferred:
   - item: "LO-01 (dead scriptureReadingsById subscription), LO-02 (dead AssembledSlide.sourceId), LO-03 (middle copyright entries dropped on rebuild), LO-05 (stale sourceSignature comment)"
     addressed_in: "deferred-items.md (explicit, not by omission); LO-01 is adjacent to Phase 34 (R064) which the deferral note names"
     evidence: "All four are dead-code / stale-comment cleanups with no user-facing defect; LO-03 is unreachable for new data now that R054 removed the Duplicate action from song groups."
+  - item: "W-03 — clearing a song from a plan item leaves the old song's slides projecting when that song is reprised elsewhere in the same service"
+    addressed_in: "ROADMAP backlog; NOT Phase 30"
+    evidence: "Pre-existing and byte-identical at 0ecc84f, so not a Phase 30 regression. Deferred as a product decision, not a phase defect."
+human_verification_outcome:
+  reverified_by: owner
+  date: 2026-07-29
+  at_commit: 7b91498
+  result: "All five re-verification checks PASS. Reported verbatim: 'Everything passes.'"
+  checks:
+    - "Scripture round-trip: a whole-chapter reference ('Psalm 103') and a single-verse reference ('Romans 8:28') both project correctly AND render back into the Service Order input after reload (closes ME-02 in the running app)."
+    - "Song-group read-only: the drawer's audio-loop checkbox is disabled on a song group slide carrying its own audio (closes ME-03 in the running app)."
+    - "Deleting a plan item removes its slide group and it stays gone (closes ME-04's orphan window in the running app)."
+    - "NEW, never previously hand-checked: slides imported into a SCRIPTURE group survive a subsequent passage change (closes BL-01 through the real UI, not just the probe)."
+    - "NEW, never previously hand-checked: a drag-reorder inside an IMPORTED group sticks rather than silently snapping back (closes BL-02 through the real UI, not just the probe)."
+  w01_resolution: "CLOSED. W-01 was 'the shipped tree was never human-verified'. The owner has now driven HEAD, not the superseded 5c531b1 tree. BL-01 and BL-02 had only ever been proven by executing rebuildGroup in isolation; both are now confirmed through the running application."
+  w02_resolution: "CLOSED BY FIX, not by decision. ScriptureInput.formatRef now delegates to formatScriptureReference; 4 tests added, confirmed red-before-green by restoring HEAD's component on disk (exactly one failed — the degenerate-range case — which is the correct result)."
+  w03_resolution: "DEFERRED to the backlog as a product decision. Pre-existing, not a Phase 30 regression."
+baseline_note: "The test baseline changed materially after this report was first written. The entire .gsd/ directory (1495 tracked files) was deleted at the owner's instruction, and gitignored functions/lib build output was excluded from the root vitest run. Root baseline is now 2 failing files — src/storage.rules.test.ts (needs the Storage emulator) and src/views/__tests__/RosterView.test.ts (stale assertion) — down from 14. Neither is slide-related. 1757 tests pass."
 ---
 
 # Phase 30: Slides Mirror the Plan — Hard Lock & Reconciliation Removed — Verification Report
 
 **Phase Goal:** Slide-group order and membership are hard-locked to the service order, with the reconcile/confirm review flow deleted entirely.
 **Verified:** 2026-07-29T15:48:51Z at `e5727d1`
-**Status:** human_needed — 5/5 must-haves verified, 0 blockers, 3 warnings requiring an owner decision
-**Re-verification:** No — initial verification
+**Re-verified:** 2026-07-29 at `7b91498` — owner drove the shipped tree; all five checks pass
+**Status:** passed — 5/5 must-haves verified, 0 blockers, W-01 and W-02 closed, W-03 deferred to backlog
+
+> **Re-verification record.** This report was first written at `e5727d1` with status `human_needed`,
+> because the owner's UAT approval covered the superseded `5c531b1` tree and nine fix commits had since
+> changed the rebuild engine, the projected reference string, the Service Order scripture binding and
+> the drawer's audio controls (W-01). The owner has now driven HEAD directly, including two checks that
+> had never been performed by hand at all: that slides imported into a SCRIPTURE group survive a
+> passage change (BL-01), and that a drag-reorder inside an IMPORTED group sticks (BL-02). Both were
+> previously proven only by executing `rebuildGroup` in isolation. Result: *"Everything passes."*
+>
+> W-02 was closed by fixing it rather than accepting the divergence. W-03 is pre-existing (byte-identical
+> at `0ecc84f`) and moves to the backlog as a product decision.
 
 ## Verdict
 
