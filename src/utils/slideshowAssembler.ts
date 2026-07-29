@@ -27,7 +27,7 @@
  *    a pre-materialization render cannot churn Vue keys across recomputes.
  */
 import type { Service, ServiceSlot } from '@/types/service'
-import type { AssembledSlide, Slide, LyricSlide, CopyrightSlide, TextSlide, VideoSlide } from '@/types/slide'
+import type { AssembledSlide, Slide, LyricSlide, CopyrightSlide, ScriptureSlide, TextSlide, VideoSlide } from '@/types/slide'
 import type { SongLyrics } from '@/types/songLyrics'
 import type { ScriptureReading } from '@/types/scriptureReading'
 import type { ImportedDeck } from '@/types/importedDeck'
@@ -133,12 +133,20 @@ function resolveEntryContent(
     }
 
     case 'scripture': {
+      // R047: a scripture entry is reference-only — never the passage text.
+      // Resolved directly from the reading's own displayReference/reference,
+      // never by looking up an inner slide by (legacy) innerSlideId.
       const reading = inputs.scriptureReadingsById.get(ref.scriptureReadingId)
       if (!reading) return undefined
-      const innerSlide = reading.slides.find((s) => s.id === ref.innerSlideId)
-      if (!innerSlide) return undefined
-      const { id: _id, position: _position, ...rest } = innerSlide
-      return rest
+      const content: Omit<ScriptureSlide, 'id' | 'position'> = {
+        contentKind: 'scripture',
+        reference: reading.displayReference,
+        bookRef: reading.reference,
+        text: '',
+        verseRange: '',
+        readingMode: 'normal',
+      }
+      return content
     }
 
     case 'imported': {
@@ -332,10 +340,18 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
         const reading: ScriptureReading | undefined = inputs.scriptureReadingsById.get(slot.scriptureReadingId)
         if (!reading) break
 
-        reading.slides.forEach((innerSlide, localSeq) => {
-          const { id: _id, position: _position, ...rest } = innerSlide
-          emitFallback(slot, index, rest, slot.scriptureReadingId!, localSeq)
-        })
+        // R047: exactly one reference-only slide, matching the stored-group
+        // resolution path so a slot never visibly flips slide count the
+        // moment its group document materializes.
+        const content: Omit<ScriptureSlide, 'id' | 'position'> = {
+          contentKind: 'scripture',
+          reference: reading.displayReference,
+          bookRef: reading.reference,
+          text: '',
+          verseRange: '',
+          readingMode: 'normal',
+        }
+        emitFallback(slot, index, content, slot.scriptureReadingId, 0)
         break
       }
 

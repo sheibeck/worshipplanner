@@ -213,6 +213,17 @@ describe('slideDisplay', () => {
       expect(slideBodyText(scripture)).toBe('Psalms 23:1-6\nThe LORD is my shepherd')
     })
 
+    it('returns just the reference for a scripture slide with no text (R047 default: reference-only)', () => {
+      const scripture = {
+        id: 's3',
+        position: 0,
+        contentKind: 'scripture',
+        reference: 'Psalms 23:1-6',
+        text: '',
+      } as Slide
+      expect(slideBodyText(scripture)).toBe('Psalms 23:1-6')
+    })
+
     it('returns the body for a text slide', () => {
       const text = { id: 's4', position: 0, contentKind: 'text', body: 'Please stand.' } as Slide
       expect(slideBodyText(text)).toBe('Please stand.')

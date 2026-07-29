@@ -253,7 +253,7 @@ describe('assembleSlideshow — song resolution', () => {
 })
 
 describe('assembleSlideshow — scripture resolution', () => {
-  it('emits one AssembledSlide per reading.slides entry, in stored order, content unchanged', () => {
+  it('emits exactly ONE reference-only slide, regardless of how many slides the reading itself carries (R047)', () => {
     const slot = scriptureSlot({ scriptureReadingId: 'reading-1' })
     const service = makeService([slot])
     const reading = makeScriptureReading()
@@ -263,12 +263,13 @@ describe('assembleSlideshow — scripture resolution', () => {
 
     const result = assembleSlideshow(service, inputs)
 
-    expect(result).toHaveLength(reading.slides.length)
+    expect(result).toHaveLength(1)
     expect(result[0]!.slide.contentKind).toBe('scripture')
-    expect((result[0]!.slide as ScriptureSlide).verseRange).toBe('16')
-    expect((result[0]!.slide as ScriptureSlide).reference).toBe(reading.slides[0]!.reference)
-    expect((result[0]!.slide as ScriptureSlide).text).toBe(reading.slides[0]!.text)
-    expect((result[1]!.slide as ScriptureSlide).verseRange).toBe('17')
+    expect((result[0]!.slide as ScriptureSlide).reference).toBe(reading.displayReference)
+    expect((result[0]!.slide as ScriptureSlide).bookRef).toEqual(reading.reference)
+    expect((result[0]!.slide as ScriptureSlide).text).toBe('')
+    expect((result[0]!.slide as ScriptureSlide).verseRange).toBe('')
+    expect((result[0]!.slide as ScriptureSlide).readingMode).toBe('normal')
   })
 
   it('every emitted slide from a scripture slot carries slotIndex, slotKind, section, and sourceId', () => {
@@ -281,6 +282,7 @@ describe('assembleSlideshow — scripture resolution', () => {
 
     const result = assembleSlideshow(service, inputs)
 
+    expect(result).toHaveLength(1)
     for (const assembled of result) {
       expect(assembled.slotIndex).toBe(0)
       expect(assembled.slotKind).toBe('SCRIPTURE')
@@ -502,16 +504,16 @@ describe('assembleSlideshow — section metadata pass-through', () => {
     const result = assembleSlideshow(service, inputs)
 
     // song-1: copyright, verse-1, chorus, copyright (4) — worship
-    // reading-1: 2 slides — worship
+    // reading-1: 1 reference-only slide (R047) — worship
     // prayer: 1 slide — message
     // song-2: copyright, verse-1, copyright (3) — sending
     expect(result.map((r) => r.section)).toEqual([
       'worship', 'worship', 'worship', 'worship',
-      'worship', 'worship',
+      'worship',
       'message',
       'sending', 'sending', 'sending',
     ])
-    expect(result.filter((r) => r.section === 'worship')).toHaveLength(6)
+    expect(result.filter((r) => r.section === 'worship')).toHaveLength(5)
     expect(result.filter((r) => r.section === 'message')).toHaveLength(1)
     expect(result.filter((r) => r.section === 'sending')).toHaveLength(3)
   })
@@ -596,7 +598,7 @@ describe('assembleSlideshow — stored group resolution (D-02, R028)', () => {
     expect((result[0]!.slide as CopyrightSlide).title).toBe('Amazing Grace')
   })
 
-  it('a scripture sourceRef resolves its inner slide by innerSlideId', () => {
+  it('a scripture sourceRef resolves the reading reference-only, regardless of any legacy innerSlideId it still carries (R047)', () => {
     const slot = scriptureSlot({ id: 'slot-scripture-0', scriptureReadingId: 'reading-1' })
     const service = makeService([slot])
     const reading = makeScriptureReading()
@@ -615,7 +617,8 @@ describe('assembleSlideshow — stored group resolution (D-02, R028)', () => {
 
     expect(result).toHaveLength(1)
     expect(result[0]!.slide.id).toBe('entry-scripture')
-    expect((result[0]!.slide as ScriptureSlide).verseRange).toBe('17')
+    expect((result[0]!.slide as ScriptureSlide).reference).toBe(reading.displayReference)
+    expect((result[0]!.slide as ScriptureSlide).text).toBe('')
   })
 
   it('an imported sourceRef resolves its inner slide by innerSlideId', () => {

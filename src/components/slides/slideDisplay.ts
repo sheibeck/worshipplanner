@@ -100,7 +100,11 @@ export function slideBodyText(slide: Slide): string {
     case 'lyric':
       return 'sectionId' in slide ? slide.lines.join('\n') : slide.title
     case 'scripture':
-      return `${slide.reference}\n${slide.text}`
+      // R047: a scripture slide defaults to reference-only (empty text) —
+      // return just the reference, with no trailing blank line. Phase 34's
+      // congregational reading feature will populate `text` again, at which
+      // point the joined form below applies.
+      return slide.text ? `${slide.reference}\n${slide.text}` : slide.reference
     case 'text':
       return slide.body
     case 'image':
