@@ -42,7 +42,6 @@
           :assembled-slideshow="assembledSlideshow"
           :selected-slide-id="selectedSlideId"
           :group="selectedGroup"
-          :pending-reconciliations="pendingReconciliations"
           :is-editor="isEditor"
           :org-id="orgId"
           :service-id="serviceId"
@@ -128,7 +127,7 @@ import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
 import SlidePlanRail from './SlidePlanRail.vue'
 import SlideGrid from './SlideGrid.vue'
 import EditSlideDrawer from './EditSlideDrawer.vue'
-import type { PendingReconciliation, EnsureGroupMaterializedResult } from './slideDisplay'
+import type { EnsureGroupMaterializedResult } from './slideDisplay'
 
 const props = defineProps<{
   slots: ServiceSlot[]
@@ -136,7 +135,6 @@ const props = defineProps<{
   orgId: string
   assembledSlideshow: AssembledSlide[]
   groupsBySlotId: Map<string, SlideGroup>
-  pendingReconciliations: PendingReconciliation[]
   isEditor: boolean
   groupsLoading: boolean
   /** True while the Slides tab is the visible one in `ServiceEditorView`. */

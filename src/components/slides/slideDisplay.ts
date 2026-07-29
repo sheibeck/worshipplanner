@@ -131,88 +131,15 @@ export function slideFooterLabel(slide: Slide): string {
 }
 
 /**
- * A confirm-required reconciliation — mirrors the page's assembly
- * composable's own shape exactly, but is never imported from it; nothing
- * under `src/components/slides/` may import or call that composable, per
- * 25-04's hard constraints. Defined once here so `SlidesTab.vue` and
- * `SlideGrid.vue` share a single local copy instead of each duplicating it
- * (25-03 duplicated it directly in `SlidesTab.vue`; 25-04 centralizes it
- * here).
- *
- * 26-04 widens this identically to the composable's own copy (`freshSignature`,
- * `oldSongTitle`, `newSongTitle`) — the two are kept in step deliberately, not
- * accidentally: the reconciliation confirm dialog under this folder reads the
- * widened fields directly off this LOCAL copy, and would otherwise have
- * nothing to read.
- */
-export interface PendingReconciliation {
-  slotId: string
-  proposed: GroupSlideEntry[]
-  loss?: { customizedEntries: number; withAudio: number; withNotes: number }
-  /** The divergence this pending entry was computed against — `Apply` writes THIS value, never a recomputed one. */
-  freshSignature?: string
-  /** Populated only for a song-identity-swap reconciliation (D-08); resolved one layer up, never in the pure reconciler. */
-  oldSongTitle?: string
-  newSongTitle?: string
-}
-
-/**
  * Result shape of `useSlideshowAssembly`'s `ensureGroupMaterialized` (25-05
- * Task 1) — mirrored here BY VALUE rather than imported, for the same reason
- * `PendingReconciliation` is: nothing under `src/components/slides/` may
- * import the assembly composable itself. `SlidesTab.vue` and `SlideGrid.vue`
- * both type their `ensureGroupMaterialized` prop against this shape.
+ * Task 1) — mirrored here BY VALUE rather than imported; nothing under
+ * `src/components/slides/` may import the assembly composable itself.
+ * `SlidesTab.vue` and `SlideGrid.vue` both type their `ensureGroupMaterialized`
+ * prop against this shape.
  */
 export interface EnsureGroupMaterializedResult {
   entries: GroupSlideEntry[]
   sourceSignature?: string
-}
-
-/**
- * Builds the reconciliation confirm dialog's heading and body (D-05..D-08,
- * 26-UI-SPEC.md § "Reconciliation Confirm Modal") — the exact two copy tables
- * there, reproduced verbatim, never paraphrased. D-06 traded away a diff
- * view; this wording's concreteness (exact counts and kinds of what's at
- * risk) is the ENTIRE compensation for that trade-off, so do not "improve"
- * it later by adding a diff, a per-slide list, or a before-and-after — that
- * would silently re-introduce what the user explicitly declined.
- *
- * Branches on whether `pending` carries BOTH song titles (D-08, populated
- * only for a song-identity-swap reconciliation): with them, the
- * song-reassignment copy; without them, the generic copy naming `slot`'s
- * display title.
- */
-export function reconciliationConfirmCopy(
-  pending: PendingReconciliation,
-  slot: ServiceSlot,
-): { heading: string; body: string } {
-  // The count falls back to the number of proposed slides when `loss` is
-  // absent altogether — the same fallback the passive banner already uses —
-  // rather than ever reading zero.
-  const count = pending.loss?.customizedEntries ?? pending.proposed.length
-  const slideWord = count === 1 ? 'slide' : 'slides'
-
-  // Mirrors ServiceEditorView.vue's `deleteConfirmBody` (D-03 precedent):
-  // include a phrase only for a kind whose count is non-zero, join the
-  // included ones, and drop the whole "including" clause when neither is at
-  // risk — never emit an empty or zero-valued phrase.
-  const mediaParts: string[] = []
-  if (pending.loss?.withAudio) mediaParts.push(`${pending.loss.withAudio} with attached audio`)
-  if (pending.loss?.withNotes) mediaParts.push(`${pending.loss.withNotes} with operator notes`)
-  const mediaClause = mediaParts.length > 0 ? `, including ${mediaParts.join(', ')}` : ''
-
-  if (pending.oldSongTitle && pending.newSongTitle) {
-    return {
-      heading: `Replace "${pending.oldSongTitle}" with "${pending.newSongTitle}"?`,
-      body: `This group's slides currently come from "${pending.oldSongTitle}". Applying the update will switch them to "${pending.newSongTitle}" and replace ${count} ${slideWord} you added${mediaClause}. This cannot be undone.`,
-    }
-  }
-
-  const title = slotDisplayTitle(slot)
-  return {
-    heading: `Update this group's slides?`,
-    body: `"${title}"'s source content has changed since these slides were generated. Applying the update will replace ${count} ${slideWord} you added${mediaClause}. This cannot be undone.`,
-  }
 }
 
 /**

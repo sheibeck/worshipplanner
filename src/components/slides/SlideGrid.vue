@@ -61,36 +61,6 @@
       </div>
 
       <div
-        v-if="reconciliationNotice"
-        class="mx-6 mt-3 flex flex-wrap items-center gap-2 rounded-md border border-amber-800 bg-amber-900/20 px-3 py-2 text-[12px] text-amber-300"
-        data-testid="slide-grid-reconciliation-notice"
-      >
-        <span>{{ reconciliationNotice }}</span>
-        <!-- The way in (26-06 Task 2) — gated on write-capability: a viewer
-             keeps the passive notice but is not offered a decision they
-             cannot carry out (T-26-06-02). -->
-        <button
-          v-if="isEditor"
-          type="button"
-          class="font-medium text-amber-200 underline underline-offset-2 hover:text-amber-100"
-          data-testid="slide-grid-reconciliation-review"
-          @click="showReconcileModal = true"
-        >Review</button>
-      </div>
-
-      <!-- The reconciliation confirm dialog (26-06, R029/D-05..D-08) — a
-           second, independently-teleported surface alongside the drawer this
-           phase also builds. Group-level (D-05), so it lives here at the
-           grid rather than inside any per-slide panel. -->
-      <ReconcileConfirmModal
-        :open="showReconcileModal"
-        :pending="pendingForSelected"
-        :plan-item="selectedSlot"
-        @apply="onApplyReconciliation"
-        @dismiss="onDismissReconciliation"
-      />
-
-      <div
         v-if="rejectionNotice"
         class="mx-6 mt-3 rounded-md border border-red-800 bg-red-900/20 px-3 py-2 text-[12px] text-red-300"
         data-testid="slide-grid-rejection-notice"
@@ -180,12 +150,11 @@
  * group's Firestore snapshot lands (25-RESEARCH.md Pitfall 2), even though
  * the fallback-path slides being shown are already real and correct.
  *
- * Ships no Grid/List toggle (D-09). The passive reconciliation notice below
- * gained its "way in" in 26-06 Task 2 — a `Review` affordance opening the
- * group-level `ReconcileConfirmModal.vue`, wired to the two writes named in
- * 26-RESEARCH.md's flow table (`replaceGroupSlides` / `dismissReconciliation`).
+ * Ships no Grid/List toggle (D-09). The reconciliation confirm/review surface
+ * (26-06) was removed entirely in Phase 30 (R048) — every group write is now
+ * unconditional; only `replaceGroupSlides` (the concurrent-write transaction
+ * merge) remains.
  *
-
  * 25-07 adds the drop tile (always the grid's last item, D-13), a whole-grid
  * dragover highlight, and the four accepted-kind persistence paths (PPTX and
  * image import append via the reused `PptxImportModal.vue`, video appends its
@@ -205,10 +174,9 @@ import { slotLabel } from '@/utils/slotTypes'
 import SlideCard from './SlideCard.vue'
 import SlideGroupMusicControl from './SlideGroupMusicControl.vue'
 import SlideDropTarget from './SlideDropTarget.vue'
-import ReconcileConfirmModal from './ReconcileConfirmModal.vue'
 import PptxImportModal from '@/components/PptxImportModal.vue'
 import { resolveDrop, UNSUPPORTED_FILE_MESSAGE } from './dropRouting'
-import { slotDisplayTitle, type PendingReconciliation, type EnsureGroupMaterializedResult } from './slideDisplay'
+import { slotDisplayTitle, type EnsureGroupMaterializedResult } from './slideDisplay'
 
 const props = defineProps<{
   /** The currently-selected plan item, or null when no plan item is selected. */
@@ -223,7 +191,6 @@ const props = defineProps<{
   selectedSlideId: string | null
   /** The group document for the selected plan item, if materialized. */
   group: SlideGroup | null
-  pendingReconciliations: PendingReconciliation[]
   /** Gates every write control this component renders (add-slide button, drag grip/Sortable instance, group-music add/remove). */
   isEditor: boolean
   /** Org id — needed to call the `slideGroups` store's write actions directly. */
@@ -274,102 +241,6 @@ const cards = computed<CardEntry[]>(() => {
     .filter((assembled) => assembled.slotIndex === props.slotArrayIndex)
     .map((assembledSlide, i) => ({ assembledSlide, number: i + 1 }))
 })
-
-const pendingForSelected = computed<PendingReconciliation | null>(() => {
-  if (!props.selectedSlot) return null
-  return props.pendingReconciliations.find((p) => p.slotId === props.selectedSlot!.id) ?? null
-})
-
-/**
- * Notice text — unchanged wording from Phase 25, which shipped it passive
- * (no way to act on it). 26-06 Task 2 gives it a `Review` affordance (below)
- * that opens `ReconcileConfirmModal.vue`. Uses the reconciler's own loss
- * count when available, falling back to the number of proposed entries.
- */
-const reconciliationNotice = computed<string | null>(() => {
-  const entry = pendingForSelected.value
-  if (!entry) return null
-  const count = entry.loss?.customizedEntries ?? entry.proposed.length
-  const noun = count === 1 ? 'slide' : 'slides'
-  return `${count} ${noun} may need review before this group updates.`
-})
-
-// --- 26-06 Task 2: the notice becomes a way in, and the two choices become writes ---
-const showReconcileModal = ref(false)
-
-/**
- * Taking the source's version (D-07 primary action). Writes the pending
- * update's OFFERED `proposed` slides against the divergence value CARRIED ON
- * the pending update (`freshSignature`) — never one recomputed here (this
- * subtree may not import the assembly composable that would let it). The
- * group's CURRENT slides are passed as `baseSlides`, the same compare-and-swap
- * discipline every other write path in this feature follows (CR-02).
- *
- * Closes the dialog immediately, before the write resolves — matching the
- * rest of this component's write handlers, which never block the UI on a
- * pending Firestore round trip. A rejection is reported (console.error) and
- * leaves state alone, exactly like `onAttachGroupMusic`/`onAddSlide` above.
- */
-async function onApplyReconciliation(): Promise<void> {
-  const pending = pendingForSelected.value
-  const slot = props.selectedSlot
-  showReconcileModal.value = false
-  if (!pending || !slot || !pending.freshSignature) return
-  try {
-    await slideGroupsStore.replaceGroupSlides(
-      props.orgId,
-      slot.id,
-      pending.proposed,
-      pending.freshSignature,
-      props.group?.slides ?? [],
-    )
-  } catch (err) {
-    console.error('Failed to apply source changes:', err)
-  }
-}
-
-/**
- * Declining (D-07 secondary action) — durable per divergence. Writes the
- * SAME `freshSignature` the dialog was opened for, via `dismissReconciliation`,
- * which is what makes a later, DIFFERENT source change re-prompt automatically
- * (26-04 Task 2). Never touches `slides` or the group's bed.
- */
-async function onDismissReconciliation(): Promise<void> {
-  const pending = pendingForSelected.value
-  const slot = props.selectedSlot
-  showReconcileModal.value = false
-  if (!pending || !slot || !pending.freshSignature) return
-  try {
-    await slideGroupsStore.dismissReconciliation(props.orgId, slot.id, pending.freshSignature)
-  } catch (err) {
-    console.error('Failed to dismiss reconciliation:', err)
-  }
-}
-
-// --- Task 3: the dialog cannot outlive the decision it is about ---
-//
-// Two ways an open dialog can end up stale: another tab declines or applies
-// the SAME divergence, so it stops surfacing in `pendingReconciliations`; or
-// the user changes the selected plan item while the dialog is still open,
-// which would otherwise leave it showing a DIFFERENT group's decision. No
-// existing multi-tab-race pattern exists elsewhere in this codebase to copy
-// (26-UI-SPEC.md's flagged backstop) — covered by these explicit watchers and
-// by tests, not assumed to just work. `ReconcileConfirmModal.vue`'s own
-// render-conditional-on-pending guard is the backstop underneath this one.
-watch(pendingForSelected, (pending) => {
-  if (!pending && showReconcileModal.value) {
-    showReconcileModal.value = false
-  }
-})
-
-watch(
-  () => props.selectedSlot?.id,
-  () => {
-    if (showReconcileModal.value) {
-      showReconcileModal.value = false
-    }
-  },
-)
 
 // --- 25-06 Task 2: group music bar attach/remove — the bed write path ---
 //

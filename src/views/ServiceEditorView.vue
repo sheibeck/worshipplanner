@@ -1068,7 +1068,6 @@
             :org-id="authStore.orgId!"
             :assembled-slideshow="assembledSlideshow"
             :groups-by-slot-id="groupsBySlotId"
-            :pending-reconciliations="pendingReconciliations"
             :is-editor="authStore.isEditor"
             :groups-loading="slideGroupsStore.isLoading"
             :active="activeTab === 'slides'"
@@ -1473,7 +1472,6 @@ const {
   assembledSlideshow,
   isLoading: slideshowLoading,
   groupsBySlotId,
-  pendingReconciliations,
   ensureGroupMaterialized,
 } = useSlideshowAssembly(localService, orgIdRef, { canWrite: computed(() => authStore.isEditor) })
 const presenting = ref(false)
