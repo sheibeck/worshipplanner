@@ -2057,3 +2057,98 @@ describe('ServiceEditorView - Phase 29 reorder repro', () => {
     errSpy.mockRestore()
   })
 })
+
+// ── R047: linking a newly minted scripture reading to its slot (Phase 30 verify) ──
+// Verification defect: adding a scripture item produced NO slide on the Slides
+// tab. Root cause was here, not in the materializer — ScriptureSlideEditor
+// minted the reading document and kept the id in a local ref, so
+// `slot.scriptureReadingId` stayed null and `deriveGroupEntries` correctly
+// returned zero entries for a slot pointing at nothing.
+describe('ServiceEditorView - R047 scripture reading link', () => {
+  async function mountView() {
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          RouterLink: { template: '<a><slot /></a>' },
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+          ScriptureSlideEditor: { name: 'ScriptureSlideEditor', props: ['orgId', 'readingId'], template: '<div />' },
+          CongregationalEditor: { name: 'CongregationalEditor', props: ['orgId', 'readingId'], template: '<div />' },
+        },
+      },
+    })
+  }
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    // slot-1 is SCRIPTURE with a populated reference and NO scriptureReadingId.
+    mockServicesList = [buildSectionedService()]
+  })
+
+  async function openScriptureEditor() {
+    const wrapper = await mountView()
+    const btn = wrapper.find('[data-testid="edit-scripture-slides-btn"]')
+    expect(btn.exists()).toBe(true)
+    await btn.trigger('click')
+    await wrapper.vm.$nextTick()
+    return wrapper
+  }
+
+  it('starts with no reading linked to the scripture slot', async () => {
+    const wrapper = await openScriptureEditor()
+    const editor = wrapper.findComponent({ name: 'ScriptureSlideEditor' })
+    expect(editor.exists()).toBe(true)
+    expect(editor.props('readingId')).toBeUndefined()
+  })
+
+  it('writes the emitted reading id onto the slot, so the editor re-renders bound to it', async () => {
+    const wrapper = await openScriptureEditor()
+    const editor = wrapper.findComponent({ name: 'ScriptureSlideEditor' })
+
+    editor.vm.$emit('reading-created', 'reading-xyz')
+    await wrapper.vm.$nextTick()
+
+    // The prop round-trip proves the id reached `localService.slots[index]`:
+    // it can only come back down through the same `:readingId` binding.
+    expect(wrapper.findComponent({ name: 'ScriptureSlideEditor' }).props('readingId')).toBe('reading-xyz')
+  })
+
+  // D-15: written immediately, NOT left to the 800ms debounce. That watcher is
+  // armed by a `localService` replacement, so a nested slots[index] write does
+  // not reliably re-arm it — the same brittleness the owner reported for song
+  // changes, which Phase 32 owns. A dropped link here means the slot forgets
+  // which passage it points at and the slide vanishes again.
+  it('persists the link immediately, without waiting on the autosave debounce', async () => {
+    const wrapper = await openScriptureEditor()
+    mockUpdateService.mockClear()
+
+    wrapper.findComponent({ name: 'ScriptureSlideEditor' }).vm.$emit('reading-created', 'reading-xyz')
+    await flushPromises()
+
+    expect(mockUpdateService).toHaveBeenCalledTimes(1)
+    const [, patch] = mockUpdateService.mock.calls[0] as [string, { slots: Array<Record<string, unknown>> }]
+    const scriptureSlot = patch.slots.find((s) => s.kind === 'SCRIPTURE')
+    expect(scriptureSlot?.scriptureReadingId).toBe('reading-xyz')
+    // Every other slot is carried through untouched.
+    expect(patch.slots).toHaveLength(buildSectionedService().slots.length)
+  })
+
+  it('is idempotent — re-emitting the id already stored writes nothing new', async () => {
+    const wrapper = await openScriptureEditor()
+    wrapper.findComponent({ name: 'ScriptureSlideEditor' }).vm.$emit('reading-created', 'reading-xyz')
+    await flushPromises()
+
+    mockUpdateService.mockClear()
+    wrapper.findComponent({ name: 'ScriptureSlideEditor' }).vm.$emit('reading-created', 'reading-xyz')
+    await flushPromises()
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    await flushPromises()
+
+    expect(mockUpdateService).not.toHaveBeenCalled()
+  })
+})

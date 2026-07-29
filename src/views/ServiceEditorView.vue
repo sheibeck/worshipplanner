@@ -773,12 +773,14 @@
                       :orgId="authStore.orgId!"
                       :readingId="(slot as ScriptureSlot).scriptureReadingId ?? undefined"
                       data-testid="scripture-slide-editor"
+                      @reading-created="linkScriptureReading(index, $event)"
                     />
                     <CongregationalEditor
                       v-else
                       :orgId="authStore.orgId!"
                       :readingId="(slot as ScriptureSlot).scriptureReadingId ?? undefined"
                       data-testid="congregational-editor"
+                      @reading-created="linkScriptureReading(index, $event)"
                     />
                   </div>
                 </div>
@@ -1364,6 +1366,43 @@ async function handleNavigateToScriptureEditor(index: number): Promise<void> {
 
 function getSlotReadingMode(slot: ScriptureSlot): 'normal' | 'congregational' {
   return slot.readingMode ?? 'normal'
+}
+
+/**
+ * R047: persist the link from a SCRIPTURE slot to the reading document its
+ * editor just created. Without this write the slot's `scriptureReadingId`
+ * stays null, `deriveGroupEntries` returns zero entries, and the item shows
+ * up on the Service Order tab with NO slide on the Slides tab.
+ *
+ * Persists IMMEDIATELY (D-15), like a reorder and unlike a typed field: this
+ * is a structural link the user never sees or retypes, and the 800ms debounce
+ * watcher is only armed by a `localService` REPLACEMENT — a nested
+ * `slots[index] = ...` write does not reliably re-arm it (the same brittleness
+ * the owner reported for song changes; Phase 32 owns that fix). Waiting on it
+ * here would mean the slot silently forgets which passage it points at.
+ *
+ * Idempotent: re-linking the id already stored is skipped, so a re-render or a
+ * second emit cannot produce a redundant write.
+ */
+async function linkScriptureReading(index: number, readingId: string) {
+  if (!localService.value) return
+  const slot = localService.value.slots[index]
+  if (!slot || slot.kind !== 'SCRIPTURE') return
+  if (slot.scriptureReadingId === readingId) return
+
+  const nextSlots = localService.value.slots.map((s, i) =>
+    i === index ? ({ ...s, scriptureReadingId: readingId } as ScriptureSlot) : s,
+  )
+  localService.value.slots = nextSlots
+
+  if (!serviceId.value) return
+  try {
+    await serviceStore.updateService(serviceId.value, { slots: nextSlots })
+    originalService.value = JSON.parse(JSON.stringify(localService.value))
+  } catch (err) {
+    console.error('[ServiceEditorView] scripture reading link save failed:', err)
+    autosaveStatus.value = 'error'
+  }
 }
 
 function setReadingMode(index: number, mode: 'normal' | 'congregational') {

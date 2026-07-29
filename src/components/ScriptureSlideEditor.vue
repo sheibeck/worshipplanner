@@ -109,6 +109,17 @@ const props = defineProps<{
   readingId?: string
 }>()
 
+/**
+ * R047: the reading document minted below is the ONLY link between a
+ * SCRIPTURE slot and its passage. Until Phase 30 the new id was kept in
+ * `currentReadingId` and never surfaced, so `slot.scriptureReadingId` stayed
+ * null forever and `deriveGroupEntries` returned zero entries — a scripture
+ * item produced no slide at all. The owner MUST bind this and persist it.
+ */
+const emit = defineEmits<{
+  'reading-created': [readingId: string]
+}>()
+
 const store = useScriptureSlides()
 
 const referenceText = ref('')
@@ -146,6 +157,7 @@ async function onFetchPassage() {
         slides,
       })
       currentReadingId.value = id
+      emit('reading-created', id)
     } else {
       await store.updateReading(props.orgId, currentReadingId.value, {
         reference: scriptureRef,

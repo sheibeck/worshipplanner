@@ -140,6 +140,13 @@ const props = defineProps<{
   readingId?: string
 }>()
 
+/** R047 — see the identical contract in `ScriptureSlideEditor.vue`: the id of
+ * a freshly minted reading must reach the slot, or the slot never derives a
+ * slide. Both editors write to the same `slot.scriptureReadingId`. */
+const emit = defineEmits<{
+  'reading-created': [readingId: string]
+}>()
+
 const store = useScriptureSlides()
 
 const referenceText = ref('')
@@ -184,6 +191,7 @@ async function onFetchPassage() {
         congregationalSections: sections.value,
       })
       currentReadingId.value = id
+      emit('reading-created', id)
     } else {
       await store.updateReading(props.orgId, currentReadingId.value, {
         readingMode: 'congregational',
