@@ -1946,4 +1946,89 @@ describe('ServiceEditorView - Phase 29 reorder repro', () => {
 
     errSpy.mockRestore()
   })
+
+  // ── CR-01 regression: overlapping drags, first fails, second succeeds ────────
+  // Reproduces the code-review BLOCKER empirically: SortableJS invokes `onEnd`
+  // fire-and-forget (never awaited), so a second, faster drag can start — and its
+  // write can succeed and persist — before an earlier drag's write settles. The
+  // earlier drag's rejection must NOT restore a stale pre-drag snapshot that
+  // discards the later, already-persisted edit, and must NOT leave a stale array
+  // for the general autosave debounce to silently re-persist over the successful
+  // write.
+  it('a failed drag does not clobber (locally or via the debounce re-save) a later drag that already succeeded', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    // Drag A's write is held open until explicitly rejected below — this lets
+    // drag B's write resolve first, matching the reviewer's empirical repro
+    // timing (drag B's write settles BEFORE drag A's rejection is observed).
+    let rejectDragA!: (err: Error) => void
+    const dragAWrite = new Promise<void>((_resolve, reject) => {
+      rejectDragA = reject
+    })
+    mockUpdateService.mockImplementationOnce(() => dragAWrite)
+
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const worshipCapture = captureForSection('worship')
+    if (!worshipCapture) throw new Error('no worship capture resolved')
+
+    // Drag A: worship is [s2, s3, s4] — move s2 (draggableIndex 0) to the last
+    // position (draggableIndex 2). Fire-and-forget: do NOT await the returned
+    // promise, matching real SortableJS's `onEnd` invocation.
+    void worshipCapture.options.onEnd!({
+      oldIndex: 0,
+      newIndex: 2,
+      oldDraggableIndex: 0,
+      newDraggableIndex: 2,
+      item: worshipCapture.el.children[0] as HTMLElement,
+      from: worshipCapture.el,
+      to: worshipCapture.el,
+    } as never)
+
+    // Let Vue apply drag A's synchronous optimistic mutation (worship is now
+    // [s3, s4, s2] locally) before drag B reads state. Drag A's write is still
+    // pending (dragAWrite unresolved) — this is the "overlapping" window.
+    await wrapper.vm.$nextTick()
+    expect(mockUpdateService).toHaveBeenCalledTimes(1)
+
+    // Drag B: move s3 (now worship draggableIndex 0) to the last position
+    // (draggableIndex 2). This write resolves via the default mock
+    // (Promise.resolve()) and is fully awaited here, so it settles before
+    // drag A's rejection below.
+    await worshipCapture.options.onEnd!({
+      oldIndex: 0,
+      newIndex: 2,
+      oldDraggableIndex: 0,
+      newDraggableIndex: 2,
+      item: worshipCapture.el.children[0] as HTMLElement,
+      from: worshipCapture.el,
+      to: worshipCapture.el,
+    } as never)
+
+    expect(mockUpdateService).toHaveBeenCalledTimes(2)
+    const dragBPayload = mockUpdateService.mock.calls[1]![1] as { slots: Array<{ id: string }> }
+    // s3 -> s4 -> s2 -> s3: worship becomes [s4, s2, s3].
+    expect(dragBPayload.slots.map((s) => s.id)).toEqual(['s1', 's4', 's2', 's3', 's5', 's6', 's7', 's8'])
+
+    // Drag A's write now rejects — its stale, pre-both-drags snapshot must NOT
+    // be restored over drag B's already-persisted result.
+    rejectDragA(new Error('network error'))
+    await flushPromises()
+
+    // Drag B's persisted order must survive in local state...
+    const cards = wrapper.findAll('.slot-item')
+    expect(cards.map((c) => c.attributes('data-slot-id'))).toEqual(['s1', 's4', 's2', 's3', 's5', 's6', 's7', 's8'])
+
+    // ...the error must be visible (not silent)...
+    expect(wrapper.find('[data-testid="autosave-error"]').exists()).toBe(true)
+
+    // ...and the general 800ms autosave debounce must NOT then silently
+    // re-persist a stale array over drag B's committed write. A third call (or
+    // a third call whose payload isn't drag B's order) means the bug is back.
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    expect(mockUpdateService).toHaveBeenCalledTimes(2)
+
+    errSpy.mockRestore()
+  })
 })

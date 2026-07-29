@@ -1555,10 +1555,6 @@ async function onSlotSortEnd(evt: Sortable.SortableEvent): Promise<void> {
   const toBucket = bucketForKey(grouped, toKey)
   toBucket.splice(newDraggableIndex, 0, moved)
 
-  // Pre-drag snapshot (the array REFERENCE is enough — the reindex below assigns a
-  // fresh array rather than mutating in place) — restored on a rejected write so the
-  // editor never displays an order that was never persisted (T-29-09).
-  const preDragSlots = localService.value.slots
   const reindexed = reindexSlots(flattenBySection(grouped))
   localService.value.slots = reindexed
 
@@ -1580,11 +1576,27 @@ async function onSlotSortEnd(evt: Sortable.SortableEvent): Promise<void> {
       if (autosaveStatus.value === 'saved') autosaveStatus.value = 'idle'
     }, 3000)
   } catch (err) {
-    // Revert to the pre-drag snapshot — the UI must never keep showing an order that
-    // was rejected. Leave `originalService` untouched so `isDirty` still reflects
-    // reality (the revert makes local match what's actually persisted again).
-    if (localService.value) {
-      localService.value.slots = preDragSlots
+    // CR-01 fix: do NOT restore a closure-captured pre-drag snapshot here.
+    // SortableJS calls `onEnd` fire-and-forget (never awaited), so a second,
+    // faster drag can start — and its write can succeed and persist — before
+    // THIS drag's write settles. A stale pre-drag snapshot would then discard
+    // that already-persisted second edit from local state, and because the
+    // revert makes `localService` differ from `originalService` again, the
+    // general 800ms debounce watcher would treat it as a new unsaved change
+    // and silently re-write the stale array back over the successful edit.
+    //
+    // Instead, restore `originalService.value.slots` — the last known-good
+    // PERSISTED state at the moment this catch runs. If nothing else wrote
+    // in the meantime, that's identical to this drag's own pre-drag state
+    // (today's simple case, unchanged). If a later drag/save already
+    // succeeded, `originalService` already reflects it (every successful
+    // write sets `originalService.value = clone(localService.value)`), so
+    // this revert becomes a no-op against that newer state instead of
+    // clobbering it — and because local now matches original exactly, the
+    // debounce watcher's `isDirty` check is false, so it never re-arms and
+    // never re-persists the reverted array (T-29-09 / CR-01).
+    if (localService.value && originalService.value) {
+      localService.value.slots = JSON.parse(JSON.stringify(originalService.value.slots))
     }
     autosaveStatus.value = 'error'
     console.error('[ServiceEditorView] reorder save failed:', err)
