@@ -82,7 +82,17 @@ export default defineConfig(({ mode, command }) => {
     },
     test: {
       environment: 'jsdom',
-      exclude: ['src/rules.test.ts', '**/node_modules/**'],
+      exclude: [
+        'src/rules.test.ts',
+        '**/node_modules/**',
+        // `functions/lib/` is gitignored TypeScript build output. Its compiled
+        // `*.test.js` files were being collected by this root jsdom run, where
+        // they fail on a node-only environment — two permanent failures in the
+        // baseline that masked real ones. The Cloud Functions suite has its own
+        // config (`functions/vitest.config.ts`) which correctly runs the TS
+        // sources under node.
+        'functions/lib/**',
+      ],
     },
   }
 })
