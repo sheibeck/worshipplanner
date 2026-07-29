@@ -125,14 +125,18 @@
           />
           <!-- Always the LAST grid item (D-13) — deliberately NOT given the
                `.slide-card` class SortableJS is scoped to. -->
-          <SlideDropTarget v-if="isEditor" @drop="onFilesDropped" />
+          <SlideDropTarget v-if="isEditor" :audio-only="isSongGroup" @drop="onFilesDropped" />
         </div>
         <template v-else>
           <div class="px-1 py-8" data-testid="slide-grid-empty-state">
             <p class="text-sm font-medium text-gray-300">No slides in this group yet</p>
-            <p class="mt-1 text-xs text-gray-500">Add a slide, or drop a file below.</p>
+            <p class="mt-1 text-xs text-gray-500">
+              {{ isSongGroup
+                ? 'A song\'s slides come from its lyrics — add them in Song Lyrics.'
+                : 'Add a slide, or drop a file below.' }}
+            </p>
           </div>
-          <SlideDropTarget v-if="isEditor" @drop="onFilesDropped" />
+          <SlideDropTarget v-if="isEditor" :audio-only="isSongGroup" @drop="onFilesDropped" />
         </template>
       </div>
     </template>

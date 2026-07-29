@@ -5,9 +5,16 @@
     @dragover.prevent
     @drop.prevent="onDrop"
   >
-    <p class="text-sm font-medium text-gray-300">Drop PPTX, images, video, or audio</p>
+    <p class="text-sm font-medium text-gray-300">
+      {{ audioOnly ? 'Drop audio' : 'Drop PPTX, images, video, or audio' }}
+    </p>
     <p class="mt-1 text-[11px] text-gray-500">
-      PPTX, image, and video appends a slide &middot; audio sets this group's music
+      <template v-if="audioOnly">
+        Audio sets this group's music &middot; a song's slides are managed in Song Lyrics
+      </template>
+      <template v-else>
+        PPTX, image, and video appends a slide &middot; audio sets this group's music
+      </template>
     </p>
   </div>
 </template>
@@ -26,6 +33,16 @@
  * (`dropRouting.ts`'s `resolveDrop`), so the two entry points can never
  * diverge.
  */
+/**
+ * R054: on a SONG group the tile stays mounted — group-level music is still
+ * allowed — but every slide-appending route (deck, image, video) is refused
+ * by `SlideGrid.onFilesDropped`. `audioOnly` makes the COPY tell the same
+ * story the handler enforces; advertising "PPTX, image, and video appends a
+ * slide" on a locked group reads as a bug, which is exactly how it was
+ * reported during Phase 30 verification.
+ */
+withDefaults(defineProps<{ audioOnly?: boolean }>(), { audioOnly: false })
+
 const emit = defineEmits<{
   drop: [files: File[]]
 }>()
