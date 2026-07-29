@@ -625,7 +625,7 @@ describe('useSlideshowAssembly', () => {
     })
   })
 
-  // --- Task 3: trigger reconciliation, apply the additive result, surface confirm-required ones ---
+  // --- Phase 30 (R046): rebuild and write unconditionally, no confirm state ---
   describe('unconditional rebuild-and-write (R046 — no confirm state)', () => {
     it('a song group whose source gained a section reconciles automatically, preserving the pre-existing customized entry', async () => {
       songsState.songs = [{ id: 'song-a' } as Song]

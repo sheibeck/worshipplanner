@@ -1453,7 +1453,7 @@ describe('repeated section — derivation and round-trip parity (Plan 28-03 Task
     expect(editedSignature!.startsWith('5:')).toBe(true)
   })
 
-  it('buildInitialGroup immediately followed by reconcileGroup reports no change — a freshly materialised group is already reconciled', () => {
+  it('buildInitialGroup immediately followed by rebuildGroup reports no change — a freshly materialised group is already in sync', () => {
     const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
     const lyrics = repeatedThreeTimesLyrics()
     const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
