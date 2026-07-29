@@ -86,6 +86,27 @@ congregational splitting (Phase 34), CCLI/copyright placement (Phase 35), the sa
 - **One human-verify item:** swap a song on a real service and confirm the slides update with no
   prompt. That is the exact user-reported symptom behind R046.
 
+### Resolved after research (2026-07-28) — were open questions in 30-RESEARCH.md
+
+- **Rename `reconcile*` → `rebuild*`.** Leaving "reconcile" naming in place after deleting
+  reconciliation is actively misleading — it invites a future reader to look for a confirm flow that no
+  longer exists. Low-risk mechanical rename.
+
+- **★ Generalize "non-derivable entries survive" to ALL THREE group kinds — not just SONG.**
+  Research found the phase's most dangerous defect: today only SONG's additive merge preserves
+  hand-added video/text entries. SCRIPTURE and IMPORTED groups are protected from losing them *only
+  because the confirm gate stalls*. Deleting the gate without generalizing SONG's pattern would
+  silently regress Phase 24 D-02 ("never silently drop a user's added slide") — destroying user work
+  with no dialog, on the very phase that removes the dialog. **This is a hard requirement, not an
+  improvement.**
+
+- **A scripture passage change PRESERVES the entry id and any attached audio; only the derived
+  reference text is replaced.** This is the direct application of this phase's own governing principle
+  (source-derived content rebuilds, user-added content survives) to a case research surfaced. The
+  reference string is source-derived — rebuild it. Attached audio is user work — keep it. Minting a
+  fresh id would silently drop that audio, which is the same class of failure as dropping a hand-added
+  slide.
+
 ### Claude's Discretion
 
 - The visual treatment of the read-only affordance on song groups (follow UI-SPEC once written).
