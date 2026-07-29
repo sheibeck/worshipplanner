@@ -621,6 +621,44 @@ describe('assembleSlideshow — stored group resolution (D-02, R028)', () => {
     expect((result[0]!.slide as ScriptureSlide).text).toBe('')
   })
 
+  it('R047 reactive path: a scripture sourceRef resolves the reading displayReference LIVE — an in-place passage edit on the SAME reading (ScriptureSlideEditor.vue updates the reading document in place, sourceRef never changes) changes the assembled reference with no group write', () => {
+    const slot = scriptureSlot({ id: 'slot-scripture-0', scriptureReadingId: 'reading-1' })
+    const service = makeService([slot])
+    const entry = makeGroupSlideEntry({
+      id: 'entry-scripture',
+      order: 0,
+      sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1' },
+    })
+    const group = makeSlideGroup({ id: 'slot-scripture-0', slotId: 'slot-scripture-0', slides: [entry] })
+    const originalSlides = group.slides
+
+    const readingV1 = makeScriptureReading({
+      id: 'reading-1',
+      displayReference: 'John 3:16-18',
+    })
+    const resultV1 = assembleSlideshow(
+      service,
+      makeInputs({ scriptureReadingsById: new Map([['reading-1', readingV1]]), groupsBySlotId: new Map([['slot-scripture-0', group]]) }),
+    )
+    expect((resultV1[0]!.slide as ScriptureSlide).reference).toBe('John 3:16-18')
+
+    // Same reading id, edited passage — this is the shape ScriptureSlideEditor.vue
+    // produces (updateReading on the SAME document), not a reading swap.
+    const readingV2 = makeScriptureReading({
+      id: 'reading-1',
+      displayReference: 'Psalm 103:1-5',
+      reference: { book: 'Psalm', chapter: 103, verseStart: 1, verseEnd: 5 },
+    })
+    const resultV2 = assembleSlideshow(
+      service,
+      makeInputs({ scriptureReadingsById: new Map([['reading-1', readingV2]]), groupsBySlotId: new Map([['slot-scripture-0', group]]) }),
+    )
+    expect((resultV2[0]!.slide as ScriptureSlide).reference).toBe('Psalm 103:1-5')
+    // The stored group entry itself is never written to for an in-place edit —
+    // the update flows through reactively at assembly time, no rebuild needed.
+    expect(group.slides).toBe(originalSlides)
+  })
+
   it('an imported sourceRef resolves its inner slide by innerSlideId', () => {
     const slot = importedSlot({ id: 'slot-imported-0', importId: 'deck-1' })
     const service = makeService([slot])

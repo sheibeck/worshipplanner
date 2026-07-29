@@ -1124,6 +1124,32 @@ describe('ServiceEditorView - slot delete cascades to its group (Phase 24-06 Tas
     expect(wrapper.findAll('[data-testid="section-select"]')).toHaveLength(8)
   })
 
+  it('R045 membership lock: after a confirmed remove-element delete, the removed slot id no longer appears in the view and no further group delete is issued for it', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    await openDeleteConfirm(wrapper, 0)
+
+    await confirmButton()!.trigger('click')
+    await flushPromises()
+    await wrapper.vm.$nextTick()
+
+    // Membership: the removed slot's id is gone from the rendered slot list.
+    const remainingSlotIds = wrapper.findAll('[data-slot-id]').map((w) => w.attributes('data-slot-id'))
+    expect(remainingSlotIds).not.toContain('slot-0')
+
+    const callsAfterDelete = mockDeleteGroup.mock.calls.length
+    expect(callsAfterDelete).toBe(1)
+
+    // Locked, not just cascaded once: further ticks (e.g. an unrelated
+    // autosave/reactivity pass) issue no repeat delete for the same slot.
+    await flushPromises()
+    await wrapper.vm.$nextTick()
+    await new Promise((resolve) => setTimeout(resolve, 900))
+
+    expect(mockDeleteGroup).toHaveBeenCalledTimes(callsAfterDelete)
+    expect(mockDeleteGroup).toHaveBeenCalledWith('org-1', 'slot-0')
+  })
+
   it('cancelling calls neither deleteGroup nor the splice, leaving the slot list unchanged', async () => {
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
