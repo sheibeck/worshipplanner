@@ -76,6 +76,18 @@ vi.mock('@/utils/scripture', () => ({
     if (verseEnd !== undefined) result.verseEnd = verseEnd
     return result
   }),
+  // W-02: the component now delegates its input formatting here rather than
+  // keeping a private fourth copy. Real implementation, including HI-02's
+  // collapse of a degenerate `16-16` range to `16`.
+  formatScriptureReference: vi.fn(
+    (ref: { book: string; chapter: number; verseStart?: number; verseEnd?: number }) => {
+      if (ref.verseStart && ref.verseEnd && ref.verseEnd !== ref.verseStart) {
+        return `${ref.book} ${ref.chapter}:${ref.verseStart}-${ref.verseEnd}`
+      }
+      if (ref.verseStart) return `${ref.book} ${ref.chapter}:${ref.verseStart}`
+      return `${ref.book} ${ref.chapter}`
+    },
+  ),
 }))
 
 vi.mock('@/utils/esvApi', () => ({
@@ -93,6 +105,43 @@ describe('ScriptureInput', () => {
     showOverlapWarning: true,
     label: 'Scripture Reading',
   }
+
+  // W-02: this component held a FOURTH private copy of the reference
+  // formatter. Phase 30 consolidated the other three, and HI-02's collapse of a
+  // degenerate `16-16` range then left this one disagreeing with the Slides
+  // rail, the projected slide and the Planning Center export.
+  describe('W-02 — the input renders the canonical reference form', () => {
+    it('collapses a degenerate range, matching every other surface', () => {
+      const wrapper = mount(ScriptureInput, {
+        props: { ...defaultProps, modelValue: { book: 'John', chapter: 3, verseStart: 16, verseEnd: 16 } },
+      })
+      expect(wrapper.find('input[type="text"]').element.value).toBe('John 3:16')
+    })
+
+    it('renders a real range unchanged', () => {
+      const wrapper = mount(ScriptureInput, {
+        props: { ...defaultProps, modelValue: { book: 'Isaiah', chapter: 53, verseStart: 1, verseEnd: 6 } },
+      })
+      expect(wrapper.find('input[type="text"]').element.value).toBe('Isaiah 53:1-6')
+    })
+
+    it('renders a single-verse and a whole-chapter reference', () => {
+      const single = mount(ScriptureInput, {
+        props: { ...defaultProps, modelValue: { book: 'Romans', chapter: 8, verseStart: 28 } },
+      })
+      expect(single.find('input[type="text"]').element.value).toBe('Romans 8:28')
+
+      const chapter = mount(ScriptureInput, {
+        props: { ...defaultProps, modelValue: { book: 'Psalms', chapter: 103 } },
+      })
+      expect(chapter.find('input[type="text"]').element.value).toBe('Psalms 103')
+    })
+
+    it('renders empty for a null reference', () => {
+      const wrapper = mount(ScriptureInput, { props: { ...defaultProps, modelValue: null } })
+      expect(wrapper.find('input[type="text"]').element.value).toBe('')
+    })
+  })
 
   describe('Freeform text input', () => {
     it('renders a single text input (no select element)', () => {

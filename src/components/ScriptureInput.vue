@@ -196,7 +196,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { esvLink, scripturesOverlap, parseScriptureInput } from '@/utils/scripture'
+import { esvLink, scripturesOverlap, parseScriptureInput, formatScriptureReference } from '@/utils/scripture'
 import { fetchPassageText } from '@/utils/esvApi'
 import { getScriptureSuggestions, type AiScriptureSuggestion } from '@/utils/claudeApi'
 import type { ScriptureRef } from '@/types/service'
@@ -217,16 +217,15 @@ const emit = defineEmits<{
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+/**
+ * Delegates to the canonical formatter (W-02). This was the FOURTH private copy
+ * of this logic; the other three were consolidated during Phase 30, and the
+ * HI-02 fix — which collapses a degenerate `16-16` range to `16` — then left
+ * this one rendering "John 3:16-16" in the input box while the Slides rail, the
+ * projected slide and the Planning Center export all rendered "John 3:16".
+ */
 function formatRef(scriptureRef: ScriptureRef | null): string {
-  if (!scriptureRef) return ''
-  const { book, chapter, verseStart, verseEnd } = scriptureRef
-  if (verseStart !== undefined && verseEnd !== undefined) {
-    return `${book} ${chapter}:${verseStart}-${verseEnd}`
-  }
-  if (verseStart !== undefined) {
-    return `${book} ${chapter}:${verseStart}`
-  }
-  return `${book} ${chapter}`
+  return scriptureRef ? formatScriptureReference(scriptureRef) : ''
 }
 
 // ── Local state ────────────────────────────────────────────────────────────────
