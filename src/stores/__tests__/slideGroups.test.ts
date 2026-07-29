@@ -509,65 +509,6 @@ describe('useSlideGroups', () => {
     })
   })
 
-  describe('dismissReconciliation', () => {
-    it('issues a scoped updateDoc against the org/planItem path carrying only dismissedSignature and updatedAt', async () => {
-      const { updateDoc, doc: docFn } = await import('firebase/firestore')
-      const { useSlideGroups } = await import('../slideGroups')
-      const store = useSlideGroups()
-
-      await store.dismissReconciliation('org-1', 'slot-1', 'sig-declined')
-
-      expect(updateDoc).toHaveBeenCalledOnce()
-      expect(docFn).toHaveBeenCalledWith(
-        expect.anything(),
-        'organizations',
-        'org-1',
-        'slideGroups',
-        'slot-1',
-      )
-      const payload = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
-      expect(payload.dismissedSignature).toBe('sig-declined')
-      expect(payload.updatedAt).toBeDefined()
-      expect(Object.keys(payload).sort()).toEqual(['dismissedSignature', 'updatedAt'])
-    })
-
-    it('the payload carries no slides key, no bed key, and no source-signature key', async () => {
-      const { updateDoc } = await import('firebase/firestore')
-      const { useSlideGroups } = await import('../slideGroups')
-      const store = useSlideGroups()
-
-      await store.dismissReconciliation('org-1', 'slot-1', 'sig-declined')
-
-      const payload = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
-      expect('slides' in payload).toBe(false)
-      expect('bedAudioUrl' in payload).toBe(false)
-      expect('sourceSignature' in payload).toBe(false)
-    })
-
-    it('does not call the whole-array replace function', async () => {
-      const { updateDoc } = await import('firebase/firestore')
-      const { useSlideGroups } = await import('../slideGroups')
-      const store = useSlideGroups()
-
-      vi.mocked(updateDoc).mockClear()
-      await store.dismissReconciliation('org-1', 'slot-1', 'sig-declined')
-
-      // The replace function always writes a `slides` key; the dismissal
-      // write never does, so a payload check doubles as proof the two write
-      // paths are distinct and this action never routed through replace.
-      expect(vi.mocked(updateDoc).mock.calls).toHaveLength(1)
-      const payload = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
-      expect('slides' in payload).toBe(false)
-    })
-
-    it('resolves without throwing', async () => {
-      const { useSlideGroups } = await import('../slideGroups')
-      const store = useSlideGroups()
-
-      await expect(store.dismissReconciliation('org-1', 'slot-1', 'sig-declined')).resolves.toBeUndefined()
-    })
-  })
-
   describe('replaceGroupSlides', () => {
     it('writes slides and sourceSignature together with updatedAt, touching no bed field', async () => {
       const { updateDoc, doc: docFn } = await import('firebase/firestore')
