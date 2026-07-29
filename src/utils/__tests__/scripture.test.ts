@@ -41,6 +41,23 @@ describe('formatScriptureReference', () => {
     const parsed = parseScriptureInput('Psalms 103:1-5')!
     expect(formatScriptureReference(parsed)).toBe('Psalms 103:1-5')
   })
+
+  // HI-02: `verseEnd === verseStart` is reachable — `parseScriptureInput`
+  // produces it for "John 3:16-16" (Math.min/Math.max over [16,16]), and
+  // `ScriptureInput.onSelectAiScripture` writes whatever the AI returns. The
+  // rail, the grid header and the drawer context line all collapsed that case;
+  // only this formatter (and therefore the projected slide and the Planning
+  // Center plan title) spelled it out as a degenerate range.
+  it('collapses a degenerate range to a single verse', () => {
+    expect(formatScriptureReference({ book: 'John', chapter: 3, verseStart: 16, verseEnd: 16 })).toBe('John 3:16')
+  })
+
+  it('collapses what parseScriptureInput makes of a typed degenerate range', () => {
+    const parsed = parseScriptureInput('John 3:16-16')!
+    expect(parsed.verseStart).toBe(16)
+    expect(parsed.verseEnd).toBe(16)
+    expect(formatScriptureReference(parsed)).toBe('John 3:16')
+  })
 })
 
 describe('scriptureRefFromSlot', () => {

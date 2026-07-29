@@ -151,9 +151,19 @@ export function parseScriptureInput(text: string): ScriptureRef | null {
  * `parseScriptureInput` can produce a verseStart with no verseEnd (a single
  * verse), which the Planning Center formatter used to collapse to a bare
  * chapter; that case is handled explicitly here.
+ *
+ * A DEGENERATE range (`verseEnd === verseStart`) collapses to the single verse
+ * (HI-02). That state is reachable two ways — `parseScriptureInput` on
+ * "John 3:16-16" runs Math.min/Math.max over [16,16], and
+ * `ScriptureInput.onSelectAiScripture` writes whatever the AI returns — and the
+ * rail row, the grid header and the drawer context line have always collapsed
+ * it. Spelling it out here made the projected slide and the Planning Center
+ * plan title read "John 3:16-16" while every other surface read "John 3:16".
  */
 export function formatScriptureReference(ref: ScriptureRef): string {
-  if (ref.verseStart && ref.verseEnd) return `${ref.book} ${ref.chapter}:${ref.verseStart}-${ref.verseEnd}`
+  if (ref.verseStart && ref.verseEnd && ref.verseEnd !== ref.verseStart) {
+    return `${ref.book} ${ref.chapter}:${ref.verseStart}-${ref.verseEnd}`
+  }
   if (ref.verseStart) return `${ref.book} ${ref.chapter}:${ref.verseStart}`
   return `${ref.book} ${ref.chapter}`
 }
