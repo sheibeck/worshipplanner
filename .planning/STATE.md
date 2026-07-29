@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Service and Slides
-current_phase: 29
-current_phase_name: Order Structure — Stable Reordering & Post-Service
-status: verifying
+current_phase: 30
+current_phase_name: Slides Mirror the Plan — Hard Lock & Reconciliation Removed
+status: planning
 stopped_at: Completed 29-05-PLAN.md
-last_updated: "2026-07-29T00:25:02.746Z"
+last_updated: "2026-07-29T02:05:45.640Z"
 last_activity: 2026-07-28
-last_activity_desc: ROADMAP.md created for v1.4 (Phases 29-37); REQUIREMENTS.md traceability filled, 34/34 requirements mapped, 0 unmapped
+last_activity_desc: Phase 29 complete, transitioned to Phase 30
 progress:
   total_phases: 9
   completed_phases: 1
@@ -34,10 +34,10 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 
 ## Current Position
 
-Phase: 29 of 37 (Order Structure — Stable Reordering & Post-Service)
-Plan: 5 of 5
-Status: Phase complete — ready for verification
-Last activity: 2026-07-28 — ROADMAP.md created for v1.4 (Phases 29-37); REQUIREMENTS.md traceability filled, 34/34 requirements mapped, 0 unmapped
+Phase: 30 of 37 (Slides Mirror the Plan — Hard Lock & Reconciliation Removed)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-07-28 — Phase 29 complete, transitioned to Phase 30
 
 ## ★ v1.4 AUTONOMOUS RUN — standing decisions (2026-07-28)
 

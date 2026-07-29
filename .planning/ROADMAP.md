@@ -91,7 +91,7 @@ can see, slides that always mirror the plan — and finish them against the Clau
 
 **Requirements:** `.planning/REQUIREMENTS.md` (R036–R069, 34 total)
 
-- [ ] **Phase 29: Order Structure — Stable Reordering & Post-Service** - Fix the drag-and-drop root cause and add the fifth Post-Service section
+- [x] **Phase 29: Order Structure — Stable Reordering & Post-Service** - Fix the drag-and-drop root cause and add the fifth Post-Service section (completed 2026-07-28)
 - [ ] **Phase 30: Slides Mirror the Plan — Hard Lock & Reconciliation Removed** - Delete the reconcile/confirm flow; slide groups always mirror the service order
 - [ ] **Phase 31: Service Lifecycle — Draft Lock & Reopen** - Draft-only editing with a genuine three-layer lock and an explicit Reopen path
 - [ ] **Phase 32: Save Reliability — Autosave Fix & Persistent Status** - Fix the song-change autosave bug and give every surface a persistent save indicator
@@ -277,7 +277,7 @@ Plans:
 | 8-17, 16.1 | v1.1 | all | Complete (archived) | 2026-07-24 |
 | 18-23 | v1.2 | all | Complete (archived) | 2026-07-28 |
 | 24-28 | v1.3 | 33/33 | Complete (archived) | 2026-07-28 |
-| 29. Order Structure — Stable Reordering & Post-Service | v1.4 | 5/5 | In Progress|  |
+| 29. Order Structure — Stable Reordering & Post-Service | v1.4 | 5/5 | Complete    | 2026-07-28 |
 | 30. Slides Mirror the Plan — Hard Lock & Reconciliation Removed | v1.4 | 0/TBD | Not started | - |
 | 31. Service Lifecycle — Draft Lock & Reopen | v1.4 | 0/TBD | Not started | - |
 | 32. Save Reliability — Autosave Fix & Persistent Status | v1.4 | 0/TBD | Not started | - |
