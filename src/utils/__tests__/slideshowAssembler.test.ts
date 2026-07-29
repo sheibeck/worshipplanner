@@ -16,7 +16,7 @@ import type { ImportedDeck } from '@/types/importedDeck'
 import type { ScriptureSlide, CopyrightSlide, LyricSlide, TextSlide, ImageSlide, VideoSlide } from '@/types/slide'
 import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
 import type { Timestamp } from 'firebase/firestore'
-import { slotLabel } from '@/utils/slotTypes'
+import { slotLabel, reindexSlots, orderSlotsBySection } from '@/utils/slotTypes'
 
 const mockTimestamp = { toDate: () => new Date('2026-01-01') } as unknown as Timestamp
 
@@ -1072,5 +1072,168 @@ describe('assembleSlideshow — D-17 video entries and authored text entries', (
     expect(result[0]!.slide.contentKind).toBe('text')
     expect((result[0]!.slide as TextSlide).title).toBe(slotLabel(slot))
     expect((result[0]!.slide as TextSlide).body).toBe(slotLabel(slot))
+  })
+})
+
+describe('assembleSlideshow — R045 order lock (permutation property)', () => {
+  // Fisher-Yates shuffle. Plain Math.random is deliberate here — a seeded
+  // generator is unnecessary because a failing arrangement is reported in
+  // the assertion message, not a seed to reproduce it from.
+  function shuffle<T>(items: T[]): T[] {
+    const copy = [...items]
+    for (let i = copy.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      const tmp = copy[i]!
+      copy[i] = copy[j]!
+      copy[j] = tmp
+    }
+    return copy
+  }
+
+  // One fixed mixed slot array: SONG (fallback), SCRIPTURE (materialized),
+  // PRAYER (fallback), IMPORTED (fallback), MESSAGE (materialized, hand-added
+  // text entry), SONG (materialized) — spanning worship/message/sending/
+  // post-service so the fifth section is not special-cased, and mixing
+  // materialized-group slots with fallback-derivation slots (not
+  // all-or-nothing). Distinct, recognisable ids on every slot.
+  const permSlots: ServiceSlot[] = [
+    songSlot({ id: 'slot-song-fallback', position: 0, section: 'worship', songId: 'song-1' }),
+    scriptureSlot({
+      id: 'slot-scripture-materialized',
+      position: 1,
+      section: 'worship',
+      scriptureReadingId: 'reading-1',
+    }),
+    { kind: 'PRAYER', id: 'slot-prayer-fallback', position: 2, section: 'message' } as NonAssignableSlot,
+    importedSlot({ id: 'slot-imported-fallback', position: 3, section: 'sending', importId: 'deck-1' }),
+    { kind: 'MESSAGE', id: 'slot-message-materialized', position: 4, section: 'sending' } as NonAssignableSlot,
+    songSlot({ id: 'slot-song-materialized', position: 5, section: 'post-service', songId: 'song-2' }),
+  ]
+
+  const permLyricsSong1 = makeSongLyrics({ songId: 'song-1', performanceOrder: ['verse-1', 'chorus'] })
+  const permLyricsSong2 = makeSongLyrics({
+    songId: 'song-2',
+    sections: [{ id: 'verse-1', label: 'Verse 1', lines: ['Line X'] }],
+    performanceOrder: ['verse-1'],
+  })
+  const permReading = makeScriptureReading({ id: 'reading-1' })
+  const permDeck = makeImportedDeck({ id: 'deck-1' })
+
+  const permScriptureGroup = makeSlideGroup({
+    id: 'slot-scripture-materialized',
+    slotId: 'slot-scripture-materialized',
+    slides: [
+      makeGroupSlideEntry({
+        id: 'entry-scripture-materialized',
+        order: 0,
+        sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1' },
+      }),
+    ],
+  })
+  const permMessageGroup = makeSlideGroup({
+    id: 'slot-message-materialized',
+    slotId: 'slot-message-materialized',
+    slides: [
+      makeGroupSlideEntry({
+        id: 'entry-message-materialized',
+        order: 0,
+        sourceRef: { kind: 'text', title: 'Announcement', body: 'Welcome everyone' },
+      }),
+    ],
+  })
+  const permSongGroup = makeSlideGroup({
+    id: 'slot-song-materialized',
+    slotId: 'slot-song-materialized',
+    slides: [
+      makeGroupSlideEntry({
+        id: 'entry-song-materialized-verse',
+        order: 0,
+        sourceRef: { kind: 'lyric', songId: 'song-2', sectionId: 'verse-1' },
+      }),
+      makeGroupSlideEntry({
+        id: 'entry-song-materialized-copyright',
+        order: 1,
+        sourceRef: { kind: 'copyright', songId: 'song-2' },
+      }),
+    ],
+  })
+
+  const permInputs = makeInputs({
+    songLyricsById: new Map([
+      ['song-1', permLyricsSong1],
+      ['song-2', permLyricsSong2],
+    ]),
+    scriptureReadingsById: new Map([['reading-1', permReading]]),
+    importedDecksById: new Map([['deck-1', permDeck]]),
+    groupsBySlotId: new Map([
+      ['slot-scripture-materialized', permScriptureGroup],
+      ['slot-message-materialized', permMessageGroup],
+      ['slot-song-materialized', permSongGroup],
+    ]),
+  })
+
+  it('for 50 shuffled permutations of the fixed slot array, the assembled block order (collapsed by slot id) equals the normalized slots array order — materialized and fallback slots alike, every group contiguous', () => {
+    for (let i = 0; i < 50; i++) {
+      const shuffled = shuffle(permSlots)
+      const normalized = reindexSlots(orderSlotsBySection(shuffled))
+      const service = makeService(normalized)
+
+      const result = assembleSlideshow(service, permInputs)
+
+      // Map each emitted slide back to its slot via slotIndex, then collapse
+      // consecutive duplicates. A non-contiguous group would produce a
+      // repeated (non-consecutive) slot id here, which the toEqual below
+      // catches against the normalized array's own id sequence.
+      const collapsedIds: string[] = []
+      for (const assembled of result) {
+        const slotId = normalized[assembled.slotIndex]!.id
+        if (collapsedIds[collapsedIds.length - 1] !== slotId) collapsedIds.push(slotId)
+      }
+
+      const expectedIds = normalized.map((slot) => slot.id)
+      expect(
+        collapsedIds,
+        `iteration ${i}: shuffled arrangement was [${shuffled.map((slot) => slot.id).join(', ')}]`,
+      ).toEqual(expectedIds)
+    }
+  })
+
+  it('for the same 50 permutations, reindexSlots(orderSlotsBySection(...)) leaves every slot position equal to its own array index', () => {
+    for (let i = 0; i < 50; i++) {
+      const shuffled = shuffle(permSlots)
+      const normalized = reindexSlots(orderSlotsBySection(shuffled))
+
+      normalized.forEach((slot, index) => {
+        expect(
+          slot.position,
+          `iteration ${i}: slot ${slot.id} sits at array index ${index} but carries position ${slot.position}`,
+        ).toBe(index)
+      })
+    }
+  })
+
+  it('the owner-reported scenario: moving a scripture slot between two songs produces song, scripture, song in one step', () => {
+    const songA = songSlot({ id: 'slot-song-a', position: 0, section: 'worship', songId: 'song-1' })
+    const scripture = scriptureSlot({
+      id: 'slot-scripture-b',
+      position: 1,
+      section: 'worship',
+      scriptureReadingId: 'reading-1',
+    })
+    const songB = songSlot({ id: 'slot-song-c', position: 2, section: 'worship', songId: 'song-2' })
+
+    // Owner's reported starting arrangement: scripture, song, song.
+    const before = reindexSlots(orderSlotsBySection([scripture, songA, songB]))
+    const beforeResult = assembleSlideshow(makeService(before), permInputs)
+    const beforeIds = beforeResult.map((r) => before[r.slotIndex]!.id)
+    const beforeCollapsed = beforeIds.filter((id, idx) => id !== beforeIds[idx - 1])
+    expect(beforeCollapsed).toEqual(['slot-scripture-b', 'slot-song-a', 'slot-song-c'])
+
+    // Move the scripture slot between the two songs — one step, no second action.
+    const after = reindexSlots(orderSlotsBySection([songA, scripture, songB]))
+    const afterResult = assembleSlideshow(makeService(after), permInputs)
+    const afterIds = afterResult.map((r) => after[r.slotIndex]!.id)
+    const afterCollapsed = afterIds.filter((id, idx) => id !== afterIds[idx - 1])
+    expect(afterCollapsed).toEqual(['slot-song-a', 'slot-scripture-b', 'slot-song-c'])
   })
 })
