@@ -353,7 +353,10 @@ function slidesEqual(a: GroupSlideEntry[], b: GroupSlideEntry[]): boolean {
  * key's LAST occurrence, each carrying that occurrence's fresh `sourceRef` —
  * never re-emitted on an earlier occurrence, mirroring 26-09's
  * duplicate-survival guarantee for a kind with no fresh-side multiplicity
- * concept of its own. A stored entry whose key never appears in `fresh` at
+ * concept of its own — EXCEPT for scripture, whose derivation is defined as
+ * exactly one entry (R047), so its surplus is discarded rather than emitted
+ * (HI-01: otherwise a pre-5c531b1 group stabilised at N identical reference
+ * slides and never converged). A stored entry whose key never appears in `fresh` at
  * all (an obsolete imported `innerSlideId` a re-import no longer produces)
  * is DROPPED — it is source-derived and the source no longer produces it;
  * only `isNonDerivableEntry` entries are user work, and those always survive
@@ -398,9 +401,22 @@ function carryStoredDerivedEntries(fresh: GroupSlideEntry[], group: SlideGroup):
       carried.push(freshEntry)
     }
 
+    // R047 (HI-01): surplus is meaningful only for kinds with real fresh-side
+    // multiplicity. A scripture group's derivation is defined as exactly ONE
+    // entry, but `derivedIdentityKey` returns the constant 'scripture' for
+    // every scripture ref — so a group written before 5c531b1 (one entry per
+    // split passage fragment, each with its own innerSlideId) had N stored
+    // entries under that one key, and the surplus loop below re-emitted
+    // stored[1..N-1] rewritten to the fresh reference-only ref. That is
+    // STABLE, so such a group never converged: it projected the same reference
+    // string N times forever. Suppressing surplus for scripture is what makes
+    // "exactly ONE reference-only slide" true for stored data as well as for a
+    // fresh derivation. The first stored entry is still carried, so its id,
+    // label, notes and audio come forward.
+    const carriesSurplus = freshEntry.sourceRef.kind !== 'scripture'
     const totalOccurrences = occurrenceTotals.get(key)!
     const isLastOccurrence = occurrenceIndex + 1 === totalOccurrences
-    if (isLastOccurrence && stored && stored.length > totalOccurrences) {
+    if (carriesSurplus && isLastOccurrence && stored && stored.length > totalOccurrences) {
       for (let surplusIndex = totalOccurrences; surplusIndex < stored.length; surplusIndex++) {
         carried.push({ ...stored[surplusIndex]!, sourceRef: freshEntry.sourceRef })
       }

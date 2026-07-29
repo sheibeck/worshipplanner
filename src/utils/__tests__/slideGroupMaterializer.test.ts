@@ -1444,6 +1444,62 @@ describe('BL-02 — a SCRIPTURE/IMPORTED group\'s stored slide ORDER is the user
   })
 })
 
+describe('HI-01 — a pre-R047 scripture group collapses to exactly ONE entry', () => {
+  it('a 3-entry legacy scripture group (each entry carrying its own innerSlideId) rebuilds to one entry, not three', () => {
+    const slot = scriptureSlot()
+    const inputs = makeInputs()
+    const group = makeGroup({
+      slides: [
+        { id: 'e-1', order: 0, sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'scripture-0' } },
+        { id: 'e-2', order: 1, sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'scripture-1' } },
+        { id: 'e-3', order: 2, sourceRef: { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'scripture-2' } },
+      ],
+    })
+
+    const result = rebuildScriptureGroup(group, slot, inputs)
+
+    expect(result.changed).toBe(true)
+    expect(result.slides).toHaveLength(1)
+    // The FIRST stored entry is the one carried — its id, label, notes and
+    // audio come forward onto the single reference slide.
+    expect(result.slides[0]!.id).toBe('e-1')
+    expect(result.slides[0]!.sourceRef).toEqual({ kind: 'scripture' })
+  })
+
+  it('the collapse is stable — a second rebuild of the collapsed group is a no-op', () => {
+    const slot = scriptureSlot()
+    const inputs = makeInputs()
+    const group = makeGroup({
+      slides: [
+        { id: 'e-1', order: 0, sourceRef: { kind: 'scripture', innerSlideId: 'scripture-0' } },
+        { id: 'e-2', order: 1, sourceRef: { kind: 'scripture', innerSlideId: 'scripture-1' } },
+      ],
+    })
+
+    const first = rebuildScriptureGroup(group, slot, inputs)
+    const second = rebuildScriptureGroup({ ...group, slides: first.slides }, slot, inputs)
+
+    expect(second.changed).toBe(false)
+    expect(second.slides).toEqual(first.slides)
+  })
+
+  it('a legacy scripture group\'s hand-added video is not collapsed away with the surplus reference entries', () => {
+    const slot = scriptureSlot()
+    const inputs = makeInputs()
+    const group = makeGroup({
+      slides: [
+        { id: 'e-1', order: 0, sourceRef: { kind: 'scripture', innerSlideId: 'scripture-0' } },
+        { id: 'e-2', order: 1, sourceRef: { kind: 'scripture', innerSlideId: 'scripture-1' } },
+        { id: 'e-video', order: 2, sourceRef: { kind: 'video', videoSrc: 'https://example.com/dropped.mp4' } },
+      ],
+    })
+
+    const result = rebuildScriptureGroup(group, slot, inputs)
+
+    expect(result.slides.map((e) => e.id)).toEqual(['e-1', 'e-video'])
+  })
+})
+
 describe('rebuildGroup dispatcher', () => {
   it('dispatches SONG to the additive rebuild', () => {
     const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
