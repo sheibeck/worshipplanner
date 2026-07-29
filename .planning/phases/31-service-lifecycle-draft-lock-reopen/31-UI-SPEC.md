@@ -859,9 +859,35 @@ this phase guessing and Phase 36 overwriting:
       confirm-dialog shell at `ServiceEditorView.vue:214-216`. Accepted by the ui-checker on
       2026-07-29; recorded here so it does not surprise the next reviewer.
 - [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** APPROVED 2026-07-29 (orchestrator-verified — see the re-check note below)
+
+> **Re-check note.** The `gsd-ui-checker` re-run failed twice on transient API 529s, so the
+> orchestrator verified the two blocking fixes directly against source rather than retry a third time
+> into an overloaded endpoint. What was checked, and the result:
+>
+> - **BLOCK 1 (Dim 2) — CLEARED.** Every disputed gate-migration classification was read from
+>   `ServiceEditorView.vue` and confirmed: `:134`/`:453`/`:463`/`:492` are `:disabled="isExportedLocked"`
+>   bindings (class C, delete the binding); `:510` and `:703` are
+>   `v-else-if="authStore.isEditor && isExportedLocked"` inverse read-only branches (class D);
+>   `:443` and `:579` are `v-if="authStore.isEditor"` with no lock term and `:631` is
+>   `v-if="authStore.isEditor && aiDraftSongs.has(index)"` (class B). **The revision's most surprising
+>   claim also holds: `:970` is `<div class="mt-2 flex flex-wrap gap-3">` with no `v-if` at all.**
+> - **BLOCK 2 (Dim 1) — CLEARED.** Per-transition copy is specified verbatim (`:226-227`), not deferred;
+>   both host surfaces are defined (banner error line `:316-319` / E13, inline Save-area span `:250` /
+>   E14); and "Status must not flip optimistically" is stated as a contract row (`:251`), not advice.
+> - **`z-10` — CONFIRMED** with rationale (`:326-331`) and E16.
+> - **Testid — CONFIRMED zero churn.** The dynamic binding (`:651`) yields
+>   `drawer-song-readonly-notice` for a song group, keeping `EditSlideDrawer.test.ts:1432`'s presence
+>   assertion green, and `drawer-service-locked-notice` for a locked non-song group, keeping `:1439`'s
+>   absence assertion green.
+> - **`SlideGrid.vue` citation dispute — resolved IN THE SPEC'S FAVOUR.** `16-22`, `23-29` and `33-37`
+>   exactly bracket the two `<button>` elements and the `<span>`. The checker's `15`/`22`/`31` starts
+>   land on a blank line, the first button's closing tag, and a comment line respectively. The spec's
+>   documented element-range convention is correct; this was not a finding.
+> - **D-15 (Delete) — no longer an open question.** Settled by the owner: available at any status,
+>   evidence-gated warning. The spec implements it.
 
 ### Revision log
 
