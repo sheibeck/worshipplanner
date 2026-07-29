@@ -105,7 +105,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
       clicked; the separate "Import into this Group" button is removed. "Add slide" and "Add music to
       this group" move into the contextual action bar (R068).
 
-- [ ] **R054** (core-capability): Song groups are read-only in the Slides tab — no create, update,
+- [x] **R054** (core-capability): Song groups are read-only in the Slides tab — no create, update,
       delete, or reorder of their slides. Songs are edited only from the Song Lyrics screen, keeping the
       canonical-song guarantee (D002) intact.
 
@@ -232,7 +232,7 @@ Acknowledged, deferred, not in this roadmap.
 | R051 | Phase 33 | Pending |
 | R052 | Phase 33 | Pending |
 | R053 | Phase 36 | Pending |
-| R054 | Phase 30 | Pending |
+| R054 | Phase 30 | Complete |
 | R055 | Phase 33 | Pending |
 | R056 | Phase 33 | Pending |
 | R057 | Phase 33 | Pending |

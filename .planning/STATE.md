@@ -5,15 +5,15 @@ milestone_name: Service and Slides
 current_phase: 30
 current_phase_name: Slides Mirror the Plan — Hard Lock & Reconciliation Removed
 status: executing
-stopped_at: Completed 30-02-PLAN.md
-last_updated: "2026-07-29T05:02:14.098Z"
+stopped_at: Completed 30-03-PLAN.md
+last_updated: "2026-07-29T05:26:57.114Z"
 last_activity: 2026-07-29
 last_activity_desc: Phase 30 Plan 01 complete (reconciliation UI surface removed)
 progress:
   total_phases: 9
   completed_phases: 1
   total_plans: 9
-  completed_plans: 7
+  completed_plans: 8
   percent: 11
 ---
 
@@ -35,7 +35,7 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 ## Current Position
 
 Phase: 30 of 37 (Slides Mirror the Plan — Hard Lock & Reconciliation Removed)
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-07-29 — Phase 30 Plan 01 complete (reconciliation UI surface removed)
 
@@ -572,6 +572,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 29 P05 | ~55min | 3 tasks | 7 files |
 | Phase 30 P01 | 36min | 3 tasks | 12 files |
 | Phase 30 P02 | 195 | 3 tasks | 9 files |
+| Phase 30 P03 | 21min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -742,6 +743,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Left useSlideshowAssembly.ts and slideGroupMaterializer.ts's confirm engine untouched -- 30-02's job, landing with the generalized non-derivable-entry-survival fix
 - [Phase ?]: Generalized 28-03's positional-consumption + 26-09's array-per-key survival fixes from SONG-only to all three group kinds (derivedIdentityKey/carryStoredDerivedEntries), in the same commit that deleted the confirm gate protecting SCRIPTURE/IMPORTED groups
 - [Phase ?]: A same-scriptureReadingId passage edit is a no-op at the materializer level; only a reading-id swap or a legacy-shaped stored entry triggers a rebuild write, since GroupSlideEntry stores no content
+- [Phase ?]: R054: song groups block all slide CRUD/reorder in the Slides tab via a plain isSongGroup/canMutate v-if gate — no new prop/mechanism; group-level bed audio and the Edit in song link stay open.
+- [Phase ?]: R047 ripple: scripturePassageText falls back to the slide's reference when resolved text is empty, so the drawer's Slide Text block never goes blank for a scripture slide.
 
 ### Roadmap Evolution
 
@@ -803,6 +806,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-07-29T05:02:14.043Z
-Stopped at: Completed 30-02-PLAN.md
+Last session: 2026-07-29T05:26:56.998Z
+Stopped at: Completed 30-03-PLAN.md
 Resume file: None
