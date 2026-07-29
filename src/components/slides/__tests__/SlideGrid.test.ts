@@ -1019,6 +1019,105 @@ describe('SlideGrid', () => {
     })
   })
 
+  // --- R054: song groups are read-only in the Slides tab ---
+  describe('R054 — song groups are read-only', () => {
+    function makeSongSlot(id = 'slot-1') {
+      return makeSlot({ kind: 'SONG', id, position: 0, songId: 's1', songTitle: 'X', songKey: null, requiredVwType: 1 } as never)
+    }
+
+    it('renders no Add slide or Import button for a song group, and both for a non-song group', () => {
+      const songWrapper = mountGrid({ selectedSlot: makeSongSlot() })
+      expect(songWrapper.find('[data-testid="slide-grid-add-slide"]').exists()).toBe(false)
+      expect(songWrapper.find('[data-testid="slide-grid-import"]').exists()).toBe(false)
+
+      const otherSlot = makeSlot({ kind: 'PRAYER', id: 'slot-2', position: 0 })
+      const otherWrapper = mountGrid({ selectedSlot: otherSlot })
+      expect(otherWrapper.find('[data-testid="slide-grid-add-slide"]').exists()).toBe(true)
+      expect(otherWrapper.find('[data-testid="slide-grid-import"]').exists()).toBe(true)
+    })
+
+    it('shows a read-only badge for a song group and none for a non-song group', () => {
+      const songWrapper = mountGrid({ selectedSlot: makeSongSlot() })
+      expect(songWrapper.find('[data-testid="slide-grid-song-readonly-badge"]').exists()).toBe(true)
+
+      const otherWrapper = mountGrid({ selectedSlot: makeSlot({ kind: 'PRAYER', id: 'slot-2', position: 0 }) })
+      expect(otherWrapper.find('[data-testid="slide-grid-song-readonly-badge"]').exists()).toBe(false)
+    })
+
+    it('still renders SlideCard for a song group, selectable exactly as before', async () => {
+      const assembledSlideshow = [makeAssembled(0, 'c1'), makeAssembled(0, 'c2')]
+      const wrapper = mountGrid({ selectedSlot: makeSongSlot(), assembledSlideshow })
+      const cards = wrapper.findAllComponents(SlideCard)
+      expect(cards).toHaveLength(2)
+      await cards[1]!.trigger('click')
+      expect(wrapper.emitted('select')).toEqual([['c2']])
+    })
+
+    it('hands the cards reorderable=false for a song group even with a stored group document', () => {
+      const group = makeGroup({ slides: [{ id: 'e1', order: 0, sourceRef: { kind: 'lyric', songId: 's1', sectionId: 'sec-1' } }] })
+      const assembledSlideshow = [makeAssembled(0, 'e1')]
+      const wrapper = mountGrid({ selectedSlot: makeSongSlot(), assembledSlideshow, group, isEditor: true })
+      expect(wrapper.find('[data-testid="slide-card-drag-handle"]').exists()).toBe(false)
+    })
+
+    it('an audio-file drop still reaches setGroupBedMedia for a song group, and appends no slide', async () => {
+      mockUploadMedia.mockResolvedValueOnce('https://storage.example.com/pad.mp3')
+      const wrapper = mountGrid({ selectedSlot: makeSongSlot(), serviceId: 'service-9' })
+
+      await wrapper.findComponent(SlideDropTarget).vm.$emit('drop', [makeFile('pad.mp3', 'audio/mpeg')])
+      await flushPromises()
+
+      expect(mockSetGroupBedMedia).toHaveBeenCalledWith('org-1', 'slot-1', {
+        serviceId: 'service-9',
+        bedAudioUrl: 'https://storage.example.com/pad.mp3',
+      })
+      expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
+    })
+
+    it('a video-file drop on a song group appends nothing and shows the song-specific refusal notice', async () => {
+      const wrapper = mountGrid({ selectedSlot: makeSongSlot() })
+
+      await wrapper.findComponent(SlideDropTarget).vm.$emit('drop', [makeFile('clip.mp4', 'video/mp4')])
+      await flushPromises()
+
+      expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
+      expect(mockUploadMedia).not.toHaveBeenCalled()
+      expect(wrapper.get('[data-testid="slide-grid-rejection-notice"]').text()).toBe(
+        "This group's slides come from the song and are edited on the Song Lyrics screen.",
+      )
+    })
+
+    it('a deck (PPTX) drop on a song group appends nothing, opens no import modal, and shows the refusal notice', async () => {
+      const wrapper = mountGrid({ selectedSlot: makeSongSlot() })
+      const file = makeFile('deck.pptx', '')
+
+      await wrapper.get('[data-testid="slide-grid-drop-area"]').trigger('drop', { dataTransfer: { files: [file] } })
+      await flushPromises()
+
+      expect(wrapper.findComponent(PptxImportModal).props('open')).toBe(false)
+      expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
+      expect(wrapper.get('[data-testid="slide-grid-rejection-notice"]').text()).toBe(
+        "This group's slides come from the song and are edited on the Song Lyrics screen.",
+      )
+    })
+
+    it('still renders and wires the group music control for a song group', async () => {
+      const group = makeGroup({ bedAudioUrl: 'https://storage.example.com/pad.mp3', slides: [] })
+      const wrapper = mountGrid({ selectedSlot: makeSongSlot(), group })
+
+      const musicControl = wrapper.findComponent(SlideGroupMusicControl)
+      expect(musicControl.exists()).toBe(true)
+      expect(musicControl.props('audioUrl')).toBe('https://storage.example.com/pad.mp3')
+
+      await musicControl.vm.$emit('attach', 'https://storage.example.com/new.mp3')
+      await Promise.resolve()
+      expect(mockSetGroupBedMedia).toHaveBeenCalledWith('org-1', 'slot-1', {
+        serviceId: 'service-1',
+        bedAudioUrl: 'https://storage.example.com/new.mp3',
+      })
+    })
+  })
+
 })
 
 // ── Reorder repro (Phase 29-01, R049/R050) ───────────────────────────────────

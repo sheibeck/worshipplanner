@@ -14,19 +14,27 @@
         >Plays 1 &rarr; {{ cards.length }}, left to right then down</span>
 
         <button
-          v-if="isEditor"
+          v-if="isEditor && !isSongGroup"
           type="button"
           class="ml-auto inline-flex items-center gap-1.5 rounded-md border border-gray-700 bg-gray-800 px-2.5 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:bg-gray-700"
           data-testid="slide-grid-add-slide"
           @click="onAddSlide"
         >＋ Add slide</button>
         <button
-          v-if="isEditor"
+          v-if="isEditor && !isSongGroup"
           type="button"
           class="inline-flex items-center gap-1.5 rounded-md border border-gray-700 bg-gray-800 px-2.5 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:bg-gray-700"
           data-testid="slide-grid-import"
           @click="openImportModal"
         >⇪ Import into this group</button>
+        <!-- R054: a song group's slides are canonical, edited only from the
+             Song Lyrics screen — a quiet marker rather than silence, matching
+             the drawer's own read-only affordance. -->
+        <span
+          v-if="isSongGroup"
+          class="ml-auto inline-flex items-center rounded border border-gray-700 bg-gray-800/50 px-2 py-0.5 text-[11px] text-gray-400"
+          data-testid="slide-grid-song-readonly-badge"
+        >Read-only — edit in Song Lyrics</span>
       </div>
 
       <!-- The grid's OWN import-modal instance (25-07 Task 3, D-15/D-16) —
@@ -226,6 +234,14 @@ const groupTitle = computed(() => {
   const display = slotDisplayTitle(props.selectedSlot)
   return display === kindLabel ? kindLabel : `${kindLabel} — ${display}`
 })
+
+/**
+ * R054: a song's slides are canonical, edited only from the Song Lyrics
+ * screen — this grid must offer no create/import/reorder for a song group,
+ * and must route a drop to audio only. Read from the existing `selectedSlot`
+ * prop; no new prop is threaded (30-03-PLAN.md key_links).
+ */
+const isSongGroup = computed(() => props.selectedSlot?.kind === 'SONG')
 
 interface CardEntry {
   assembledSlide: AssembledSlide
@@ -459,8 +475,17 @@ async function attachDroppedAudio(file: File): Promise<void> {
 const rejectionNotice = ref<string | null>(null)
 let rejectionTimeout: ReturnType<typeof setTimeout> | null = null
 
-function showRejectionNotice(): void {
-  rejectionNotice.value = UNSUPPORTED_FILE_MESSAGE
+/**
+ * R054: a song group's own refusal message — `dropRouting.ts`'s
+ * `UNSUPPORTED_FILE_MESSAGE` is about file TYPE (this file isn't audio/
+ * image/video/deck) and would be misleading here, where the file IS a
+ * supported kind but this group cannot own the resulting slide.
+ */
+const SONG_GROUP_UNSUPPORTED_DROP_MESSAGE =
+  "This group's slides come from the song and are edited on the Song Lyrics screen."
+
+function showRejectionNotice(message: string = UNSUPPORTED_FILE_MESSAGE): void {
+  rejectionNotice.value = message
   if (rejectionTimeout) clearTimeout(rejectionTimeout)
   rejectionTimeout = setTimeout(() => {
     rejectionNotice.value = null
@@ -472,6 +497,22 @@ function showRejectionNotice(): void {
 // through — so they cannot diverge (25-07 Task 2 key link).
 async function onFilesDropped(files: File[]): Promise<void> {
   const resolved = resolveDrop(files)
+
+  if (isSongGroup.value) {
+    // R054: a song group still accepts group-level media (audio, the same
+    // bed every other group's drop path already sets) — every other route
+    // (deck, image, video) is refused with a visible notice instead of
+    // silently appending a slide this locked group cannot own.
+    if (resolved.deck || resolved.images.length > 0 || resolved.videos.length > 0) {
+      showRejectionNotice(SONG_GROUP_UNSUPPORTED_DROP_MESSAGE)
+    } else if (resolved.skipped.length > 0) {
+      showRejectionNotice()
+    }
+    if (resolved.audio) {
+      await attachDroppedAudio(resolved.audio)
+    }
+    return
+  }
 
   if (resolved.skipped.length > 0) {
     showRejectionNotice()
@@ -548,7 +589,7 @@ function onGridDrop(event: DragEvent): void {
 const cardsContainerRef = ref<HTMLElement | null>(null)
 let sortableInstance: Sortable | null = null
 
-const canReorder = computed(() => props.isEditor && props.group !== null)
+const canReorder = computed(() => props.isEditor && props.group !== null && !isSongGroup.value)
 
 // T-29-13 / UI-SPEC §5: a rejected reorder write is no longer silent. The
 // DOM revert this component used to lean on is gone (CONTEXT.md's explicit
