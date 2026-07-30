@@ -23,7 +23,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
       three-layer — Firestore rules, store guard, and UI — because `firestore.rules` has **zero**
       status-based write guard today, making any UI-only lock bypassable. `[ARCH]` `[PITFALL]`
 
-- [ ] **R037** (core-capability): An editor can explicitly reopen a non-draft service for editing,
+- [x] **R037** (core-capability): An editor can explicitly reopen a non-draft service for editing,
       returning it to `draft`. When the service was already `exported`, the action warns that Planning
       Center holds the previously exported version. No competitor precedent exists for this pattern —
       Planning Center gates on role only. `[FEAT]`
@@ -229,7 +229,7 @@ Acknowledged, deferred, not in this roadmap.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | R036 | Phase 31 | Complete |
-| R037 | Phase 31 | Pending |
+| R037 | Phase 31 | Complete |
 | R038 | Phase 31 | Complete |
 | R039 | Phase 32 | Pending |
 | R040 | Phase 32 | Pending |

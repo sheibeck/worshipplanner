@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Service and Slides
-current_phase: 31
-current_phase_name: Service Lifecycle — Draft Lock & Reopen
+current_phase: 32
+current_phase_name: Save Reliability — Autosave Fix & Persistent Status
 status: planning
-stopped_at: Completed 31-05-PLAN.md (wave 5 of 6)
-last_updated: "2026-07-30T15:35:00.000Z"
+stopped_at: Completed 31-04-PLAN.md (wave 4 of 6)
+last_updated: "2026-07-30T16:43:40.971Z"
 last_activity: 2026-07-30
-last_activity_desc: Phase 31 wave 5 complete — R038 next-free-Sunday default
+last_activity_desc: Phase 31 complete, transitioned to Phase 32
 progress:
   total_phases: 9
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 15
-  completed_plans: 14
-  percent: 22
+  completed_plans: 15
+  percent: 33
 ---
 
 # Project State
@@ -75,10 +75,10 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 
 ## Current Position
 
-Phase: 31 of 37 (Service Lifecycle — Draft Lock & Reopen)
+Phase: 32 of 37 (Save Reliability — Autosave Fix & Persistent Status)
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-07-29 — Phase 30 complete, transitioned to Phase 31
+Last activity: 2026-07-30 — Phase 31 complete, transitioned to Phase 32
 
 ## ★ v1.4 AUTONOMOUS RUN — standing decisions (2026-07-28)
 

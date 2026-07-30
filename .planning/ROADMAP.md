@@ -93,7 +93,7 @@ can see, slides that always mirror the plan — and finish them against the Clau
 
 - [x] **Phase 29: Order Structure — Stable Reordering & Post-Service** - Fix the drag-and-drop root cause and add the fifth Post-Service section (completed 2026-07-28)
 - [x] **Phase 30: Slides Mirror the Plan — Hard Lock & Reconciliation Removed** - Delete the reconcile/confirm flow; slide groups always mirror the service order (completed 2026-07-29)
-- [ ] **Phase 31: Service Lifecycle — Draft Lock & Reopen** - Draft-only editing with a genuine three-layer lock and an explicit Reopen path
+- [x] **Phase 31: Service Lifecycle — Draft Lock & Reopen** - Draft-only editing with a genuine three-layer lock and an explicit Reopen path (completed 2026-07-30)
 - [ ] **Phase 32: Save Reliability — Autosave Fix & Persistent Status** - Fix the song-change autosave bug and give every surface a persistent save indicator
 - [ ] **Phase 33: Backgrounds & Slide Editing** - Backgrounds at group/slide/song level and a split 3-dot Edit Slide menu
 - [ ] **Phase 34: Smarter Content — LLM Scripture Split** - LLM-assisted congregational reading splits, index-only, never regenerating scripture text
@@ -172,7 +172,7 @@ Plans:
 - [x] 31-03-PLAN.md
 - [x] 31-04-PLAN.md
 - [x] 31-05-PLAN.md
-- [ ] 31-06-PLAN.md
+- [x] 31-06-PLAN.md
 
 **UI hint**: yes
 **Research flag**: needs research — Firestore rules field-level diff logic for the reopen-transition special case (the rule must read `resource.data.status`, not `request.resource.data.status`, and must carve out an explicit allowance for the one status-reverting write).
@@ -294,7 +294,7 @@ Plans:
 | 24-28 | v1.3 | 33/33 | Complete (archived) | 2026-07-28 |
 | 29. Order Structure — Stable Reordering & Post-Service | v1.4 | 5/5 | Complete    | 2026-07-28 |
 | 30. Slides Mirror the Plan — Hard Lock & Reconciliation Removed | v1.4 | 4/4 | Complete    | 2026-07-29 |
-| 31. Service Lifecycle — Draft Lock & Reopen | v1.4 | 5/6 | In Progress|  |
+| 31. Service Lifecycle — Draft Lock & Reopen | v1.4 | 6/6 | Complete    | 2026-07-30 |
 | 32. Save Reliability — Autosave Fix & Persistent Status | v1.4 | 0/TBD | Not started | - |
 | 33. Backgrounds & Slide Editing | v1.4 | 0/TBD | Not started | - |
 | 34. Smarter Content — LLM Scripture Split | v1.4 | 0/TBD | Not started | - |
