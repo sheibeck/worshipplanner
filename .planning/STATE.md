@@ -5,15 +5,15 @@ milestone_name: Service and Slides
 current_phase: 31
 current_phase_name: Service Lifecycle — Draft Lock & Reopen
 status: planning
-stopped_at: Phase 31 context gathered
-last_updated: "2026-07-29T18:27:31.007Z"
+stopped_at: Completed 31-03-PLAN.md (wave 3 of 6)
+last_updated: "2026-07-30T14:40:47.019Z"
 last_activity: 2026-07-29
 last_activity_desc: Phase 30 complete, transitioned to Phase 31
 progress:
   total_phases: 9
   completed_phases: 2
-  total_plans: 9
-  completed_plans: 9
+  total_plans: 15
+  completed_plans: 12
   percent: 22
 ---
 
@@ -846,6 +846,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-07-29T18:27:30.976Z
-Stopped at: Phase 31 context gathered
-Resume file: .planning/phases/31-service-lifecycle-draft-lock-reopen/31-CONTEXT.md
+Last session: 2026-07-30T14:40:46.988Z
+Stopped at: Completed 31-03-PLAN.md (wave 3 of 6)
+Resume file: .planning/phases/31-service-lifecycle-draft-lock-reopen/31-04-PLAN.md

@@ -165,7 +165,15 @@ Plans:
   3. Reopening a service that was already exported to Planning Center shows a warning that Planning Center still holds the previously exported version; reopening a never-exported service does not show that warning
   4. Creating a new service defaults its date to the nearest Sunday that doesn't already have a service plan
 
-**Plans**: TBD
+**Plans**: 3/6 plans executed
+
+- [x] 31-01-PLAN.md
+- [x] 31-02-PLAN.md
+- [x] 31-03-PLAN.md
+- [ ] 31-04-PLAN.md
+- [ ] 31-05-PLAN.md
+- [ ] 31-06-PLAN.md
+
 **UI hint**: yes
 **Research flag**: needs research — Firestore rules field-level diff logic for the reopen-transition special case (the rule must read `resource.data.status`, not `request.resource.data.status`, and must carve out an explicit allowance for the one status-reverting write).
 **Notes**: `firestore.rules` has ZERO status-based write guard today (role-only) — this is the only genuinely adversary-proof layer, so build it first, then the Pinia store guard (defense-in-depth), then centralize the ~15-repetition UI-only `isExportedLocked` pattern into one `isEditable` computed. Any Cloud Function that writes to `services`/`slideGroups` needs its own explicit status check — the Admin SDK bypasses Firestore rules entirely. Extend `firestore.rules.test.ts`, don't just add UI tests. Sequence the rules change carefully against Phase 29's drag-drop-immediate-save path — a reorder mid-flight during a status transition needs the same rule to hold.
@@ -286,7 +294,7 @@ Plans:
 | 24-28 | v1.3 | 33/33 | Complete (archived) | 2026-07-28 |
 | 29. Order Structure — Stable Reordering & Post-Service | v1.4 | 5/5 | Complete    | 2026-07-28 |
 | 30. Slides Mirror the Plan — Hard Lock & Reconciliation Removed | v1.4 | 4/4 | Complete    | 2026-07-29 |
-| 31. Service Lifecycle — Draft Lock & Reopen | v1.4 | 0/TBD | Not started | - |
+| 31. Service Lifecycle — Draft Lock & Reopen | v1.4 | 3/6 | In Progress | - |
 | 32. Save Reliability — Autosave Fix & Persistent Status | v1.4 | 0/TBD | Not started | - |
 | 33. Backgrounds & Slide Editing | v1.4 | 0/TBD | Not started | - |
 | 34. Smarter Content — LLM Scripture Split | v1.4 | 0/TBD | Not started | - |
