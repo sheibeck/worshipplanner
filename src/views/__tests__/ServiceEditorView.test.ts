@@ -307,11 +307,17 @@ vi.mock('@/stores/services', () => ({
   }),
 }))
 
+// ME-02: the `lastUsedAt` bump now writes the SONG documents directly instead
+// of round-tripping through `assignSongToSlot` (which rewrote the whole service
+// `slots` array from the store snapshot).
+const mockUpdateSong = vi.fn((_id: string, _data: unknown) => Promise.resolve())
+
 vi.mock('@/stores/songs', () => ({
   useSongStore: () => ({
     songs: mockSongs,
     orgId: null,
     subscribe: vi.fn(),
+    updateSong: mockUpdateSong,
   }),
 }))
 
@@ -3501,5 +3507,129 @@ describe('ServiceEditorView - ME-01: export failure copy and the pre-flight stat
       expect.objectContaining({ status: 'exported', pcPlanId: 'pc-plan-new' }),
     )
     expect(vm.localService.status).toBe('exported')
+  })
+})
+
+// ── ME-02 / ME-03: the relocated lastUsedAt bump ──────────────────────────────
+//
+// Wave 3 moved the draft->planned `lastUsedAt` bump out of `onSave` and into
+// `onMarkAsPlanned`. The move is faithful but landed the bump AFTER `onSave`
+// had just persisted `reindexSlots(orderSlotsBySection(...))` and synced the
+// normalized array back into `localService` — and the bump routed each song
+// through `assignSongToSlot`, which does not read `localService` at all. It
+// reads the STORE's copy and writes the whole `slots` array back, at an index
+// derived from `localService`. The two agree only once the snapshot for
+// `onSave`'s write has landed, so a drag-then-Mark-as-Planned could write the
+// pre-drag array back over the reorder that had just been persisted. Firestore's
+// latency compensation usually closes the window, which makes it intermittent
+// rather than absent. In the pre-Phase-31 code the bump ran BEFORE the
+// normalizing write, so this ordering hazard is new.
+//
+// ME-03: the bump also had to precede the status write (it wrote `slots`, which
+// is illegal once locked), so a failed `markAsPlanned` left every scheduled song
+// aged for a service that was never scheduled — feeding the AI rotation
+// heuristics with no way for the user to know or undo it.
+describe('ServiceEditorView - ME-02/ME-03: the lastUsedAt bump on Mark as Planned', () => {
+  async function mountView() {
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          RouterLink: { template: '<a><slot /></a>' },
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+          teleport: false,
+        },
+      },
+    })
+  }
+
+  interface LifecycleVm {
+    localService: { status: string }
+    lifecycleError: string | null
+    onMarkAsPlanned: () => Promise<void>
+  }
+
+  let consoleErrorSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockUpdateService.mockClear()
+    mockUpdateService.mockImplementation(() => Promise.resolve())
+    mockMarkAsPlanned.mockClear()
+    mockMarkAsPlanned.mockImplementation(() => Promise.resolve())
+    mockAssignSongToSlot.mockClear()
+    mockUpdateSong.mockClear()
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore()
+    mockMarkAsPlanned.mockImplementation(() => Promise.resolve())
+  })
+
+  it('bumps the SONG documents directly and never re-writes the service slots array', async () => {
+    mockServicesList = [{ ...mockService, status: 'draft' }]
+    const wrapper = await mountView()
+    const vm = wrapper.vm as unknown as LifecycleVm
+
+    await vm.onMarkAsPlanned()
+    await flushPromises()
+
+    // mockService schedules exactly one song (song-1 in slot-0).
+    expect(mockUpdateSong).toHaveBeenCalledTimes(1)
+    expect(mockUpdateSong).toHaveBeenCalledWith('song-1', expect.objectContaining({ lastUsedAt: expect.anything() }))
+
+    // ME-02: `assignSongToSlot` is the round trip that rewrote `slots` from the
+    // store snapshot — the reorder-clobbering hazard. It must not be used here.
+    expect(mockAssignSongToSlot).not.toHaveBeenCalled()
+    // ...and no `slots` write of any kind rides along with the transition.
+    const slotWrites = mockUpdateService.mock.calls.filter(
+      ([, patch]) => (patch as Record<string, unknown>).slots !== undefined,
+    )
+    expect(slotWrites).toHaveLength(0)
+  })
+
+  it('a failed markAsPlanned leaves lastUsedAt untouched — no song aged for a service that was never scheduled', async () => {
+    mockServicesList = [{ ...mockService, status: 'draft' }]
+    const wrapper = await mountView()
+    const vm = wrapper.vm as unknown as LifecycleVm
+
+    mockMarkAsPlanned.mockRejectedValueOnce(new Error('network error'))
+    await vm.onMarkAsPlanned()
+    await flushPromises()
+
+    expect(vm.localService.status).toBe('draft')
+    // Asserted over BOTH aging mechanisms, not just the new one: `updateSong`
+    // alone would pass trivially against the pre-fix code (which aged songs via
+    // `assignSongToSlot`) and so would prove nothing.
+    expect(mockUpdateSong).not.toHaveBeenCalled()
+    expect(mockAssignSongToSlot).not.toHaveBeenCalled()
+  })
+
+  it('distinguishes a lock refusal from a connection failure in the message', async () => {
+    mockServicesList = [{ ...mockService, status: 'draft' }]
+    const wrapper = await mountView()
+    const vm = wrapper.vm as unknown as LifecycleVm
+
+    mockMarkAsPlanned.mockRejectedValueOnce(new ServiceLockedErrorStub('service-1', 'exported', 'mark as planned'))
+    await vm.onMarkAsPlanned()
+    await flushPromises()
+
+    expect(vm.lifecycleError).toBeTruthy()
+    // "Check your connection and try again" is wrong advice for a store-guard
+    // refusal — the connection is fine and retrying will fail identically.
+    expect(vm.lifecycleError!.toLowerCase()).not.toContain('connection')
+    expect(vm.lifecycleError).not.toContain('R036')
+
+    // ...and the transport case still says what it always said.
+    mockMarkAsPlanned.mockRejectedValueOnce(new Error('network error'))
+    await vm.onMarkAsPlanned()
+    await flushPromises()
+    expect(vm.lifecycleError!.toLowerCase()).toContain('connection')
   })
 })

@@ -2290,13 +2290,31 @@ function applyTransitionLocally(status: 'draft' | 'planned'): void {
  * longer moves through `onSave`, so that branch became unreachable; the
  * behaviour it implemented is not obsolete and moves here.
  *
- * ★ Must run BEFORE the status write. It goes through `assignSongToSlot`, which
- * writes `slots` to the service — legal while the stored status is still draft
- * and refused the instant it is `planned`.
- *
  * A song counts as "used" only once the service it belongs to is actually
  * scheduled; merely editing songs on a draft, or the AI selector *showing* a
  * suggestion, must not age them.
+ *
+ * ★ ME-02 — this writes the SONG documents and nothing else. It used to route
+ * each song through `serviceStore.assignSongToSlot`, which re-stamps the song
+ * fields on a slot and writes the WHOLE `slots` array back. That was safe in the
+ * pre-Phase-31 code because the bump ran BEFORE the normalizing write. Wave 3
+ * moved it AFTER `onSave()` — which persists
+ * `reindexSlots(orderSlotsBySection(...))` and syncs that normalized array into
+ * `localService` — and `assignSongToSlot` does not read `localService` at all:
+ * it reads the STORE's copy and writes it back, at an index derived from
+ * `localService`. The two agree only once the snapshot for `onSave`'s write has
+ * landed, so a drag-then-Mark-as-Planned could write the pre-drag array back
+ * over the reorder that had just been persisted, and stamp the song fields at an
+ * index computed against the NEW order. Latency compensation usually closes the
+ * window, which made it intermittent rather than absent. Bumping the songs
+ * directly removes the hazard rather than narrowing it, and drops N redundant
+ * full-`slots` service writes (one per distinct song) that existed purely to
+ * touch `lastUsedAt`.
+ *
+ * ★ ME-03 — because this no longer writes `slots`, it no longer has to precede
+ * the status write. `/songs` is role-gated only (`firestore.rules:124-125`), so
+ * a song write is legal at any service status. See `onMarkAsPlanned` for why
+ * that lets the whole compensating-restore problem be deleted instead of solved.
  */
 async function bumpScheduledSongsLastUsed(): Promise<void> {
   const svc = localService.value
@@ -2304,16 +2322,11 @@ async function bumpScheduledSongsLastUsed(): Promise<void> {
   const scheduledSongIds = new Set(
     svc.slots.filter((s) => s.kind === 'SONG' && (s as SongSlot).songId).map((s) => (s as SongSlot).songId!),
   )
-  for (const songId of scheduledSongIds) {
-    const songSlot = svc.slots.find(
-      (s) => s.kind === 'SONG' && (s as SongSlot).songId === songId,
-    ) as SongSlot
-    await serviceStore.assignSongToSlot(svc.id, svc.slots.indexOf(songSlot), {
-      id: songId,
-      title: songSlot.songTitle!,
-      key: songSlot.songKey!,
-    })
-  }
+  await Promise.all(
+    [...scheduledSongIds].map((songId) =>
+      songStore.updateSong(songId, { lastUsedAt: serverTimestamp() as never }),
+    ),
+  )
 }
 
 async function onMarkAsPlanned(): Promise<void> {
@@ -2341,7 +2354,6 @@ async function onMarkAsPlanned(): Promise<void> {
     // still writable — otherwise the in-flight autosave lands after the lock
     // and is refused, silently losing whatever the user last typed.
     if (isDirty.value) await onSave()
-    await bumpScheduledSongsLastUsed()
     // HI-01: the same "flush before the lock" reasoning as the autosave above,
     // for the OTHER write path out of this view. Assigning a song to a slot
     // changes `localService.slots`, which recomputes `rebuildOutcomes` and
@@ -2354,13 +2366,46 @@ async function onMarkAsPlanned(): Promise<void> {
     await drainGroupWrites()
     await serviceStore.markAsPlanned(localService.value.id)
     applyTransitionLocally('planned')
+
+    // ★ ME-03 — the bump runs AFTER the transition has landed, not before it.
+    //
+    // It had to precede the status write only because it wrote `slots`, which
+    // is illegal once locked; ME-02 removed that, and `/songs` is role-gated
+    // only, so a song write is legal at any status. The two therefore still
+    // cannot be atomic — but they no longer need to be, because the failure
+    // that mattered is now unreachable rather than compensated: a rejected
+    // `markAsPlanned` never reaches this line, so no song is ever aged for a
+    // service that was never scheduled. `lastUsedAt` feeds the AI rotation
+    // heuristics (`recentServiceSongIds`, the `songLibrary` payload), and a
+    // wrongly-aged song is invisible to the user and has no undo — so deleting
+    // the window beats capturing prior values and restoring them in a `catch`,
+    // which would itself have to survive a second failure.
+    //
+    // Its own try/catch, and deliberately NOT re-raised: the transition the
+    // user asked for has already succeeded and is already reflected on screen.
+    // Reporting "Couldn't mark this service as Planned" here would be false.
+    // The cost of a silent failure is one song looking less recently used than
+    // it is, which self-corrects the next time it is scheduled.
+    try {
+      await bumpScheduledSongsLastUsed()
+    } catch (bumpErr) {
+      console.error('[ServiceEditorView] lastUsedAt bump failed after a successful transition:', bumpErr)
+    }
   } catch (err) {
     console.error('Mark as Planned failed:', err)
     // ★ No optimistic flip: the pill, the banner and every gate are still
     // reading the OLD status here, and stay that way. Saying so on screen is
     // the whole point — a UI showing one status while the store holds another
     // is the "it didn't save" defect class this milestone exists to close.
-    lifecycleError.value = "Couldn't mark this service as Planned. Check your connection and try again."
+    //
+    // ME-03 — branch on the CAUSE. "Check your connection and try again" is
+    // wrong advice for a store-guard refusal: the connection is fine, and
+    // retrying fails identically until the user reloads. The raw
+    // `ServiceLockedError` message is a developer string and must not be shown.
+    lifecycleError.value =
+      err instanceof ServiceLockedError
+        ? 'This service changed status somewhere else. Reload to see where it stands.'
+        : "Couldn't mark this service as Planned. Check your connection and try again."
   } finally {
     isTransitioning.value = false
   }
