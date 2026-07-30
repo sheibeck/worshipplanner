@@ -134,6 +134,36 @@ not as passed.**
   where every upcoming Sunday for a year already has a plan; it should fall back to the plain next
   Sunday and let you type over it.
 
+### Added by the 31-REVIEW fix pass — copy and behaviour changed by BL-01/BL-02/HI-01/ME-01/ME-03
+
+All of these are proven by automated regression tests; what is deferred is only the human judgement on
+**wording and feel**, which no test can make. Nothing below was visually confirmed by the run.
+
+- ☐ **31.25** ★ **The service date on a locked service.** Open a `planned` service. The date in the
+  header must now be plain text — no hover colour change, no cursor pointer, no picker on click. Reopen
+  it and the picker must come straight back with no page reload. Before this fix the picker still opened
+  on a locked service and silently discarded the date you chose.
+- ☐ **31.26** **The autosave-failure message, draft.** Hard to stage deliberately; if you ever see it,
+  check the wording reads right: *"Couldn't save your changes — they're still here. Check your
+  connection; editing again will retry."* The claim "they're still here" is load-bearing — a transport
+  failure deliberately KEEPS your typing rather than reverting it, so confirm your text really is still
+  in the field when this appears.
+- ☐ **31.27** **The autosave-failure message, locked.** Stage this with two browsers on the same
+  service: type in one, and Mark as Planned in the other within ~800ms. The typing browser should show
+  *"This service is locked, so that change wasn't saved. Reopen it for editing and try again."* in the
+  amber lock banner, and — this is the part that was broken — must then keep receiving later changes to
+  that service instead of freezing silently for the rest of the session.
+- ☐ **31.28** **Reorder-failure copy is unchanged.** The drag-failure line still reads *"Couldn't save
+  this order — reverted. Try dragging again."* It now shares a state with the autosave failure above but
+  must NOT have inherited its wording.
+- ☐ **31.29** ★ **Export copy after a status change.** Two browsers, same `planned` service. Export in
+  one; then export in the other. The second must refuse *before* contacting Planning Center — check your
+  real PC account afterwards and confirm **no duplicate or orphaned plan was created**. This is the one
+  item with a real-world side effect that a unit test cannot observe.
+- ☐ **31.30** **Mark-as-Planned failure copy.** A store-guard refusal should now say *"This service
+  changed status somewhere else. Reload to see where it stands."* rather than blaming your connection.
+  A genuine offline failure should still say *"Check your connection and try again."*
+
 ---
 
 ## Later phases
