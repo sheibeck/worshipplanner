@@ -260,6 +260,15 @@ const mockClearRoleOverride = vi.fn(() => Promise.resolve())
 // Hoisted (not created fresh per useServiceStore() call) so the Phase 24-06
 // backfill tests below can inspect what the autosave path actually persisted.
 const mockUpdateService = vi.fn((_id: string, _data: unknown) => Promise.resolve())
+// R037 (31-03): the two named status transitions that replaced toggleStatus.
+// Hoisted so the lifecycle tests can assert what the view asked the store to do
+// AND make either transition reject, which is how the no-optimistic-flip
+// contract is proved.
+const mockMarkAsPlanned = vi.fn<(id: string) => Promise<void>>(() => Promise.resolve())
+const mockReopenService = vi.fn<(id: string) => Promise<void>>(() => Promise.resolve())
+const mockAssignSongToSlot = vi.fn<
+  (id: string, index: number, song: { id: string; title: string; key: string }) => Promise<void>
+>(() => Promise.resolve())
 
 vi.mock('@/stores/services', () => ({
   useServiceStore: () => ({
@@ -268,7 +277,9 @@ vi.mock('@/stores/services', () => ({
     orgId: null,
     subscribe: vi.fn(),
     updateService: mockUpdateService,
-    assignSongToSlot: vi.fn(() => Promise.resolve()),
+    markAsPlanned: mockMarkAsPlanned,
+    reopenService: mockReopenService,
+    assignSongToSlot: mockAssignSongToSlot,
     clearSongFromSlot: vi.fn(() => Promise.resolve()),
     setRoleOverride: mockSetRoleOverride,
     clearRoleOverride: mockClearRoleOverride,
@@ -2312,5 +2323,383 @@ describe('ServiceEditorView - no slide-group writes on a locked service (R036)',
     await wrapper.vm.$nextTick()
 
     expect(mockMaterializeGroupIfMissing).toHaveBeenCalled()
+  })
+})
+
+// -- R036/R037 wave 3: the status pill, the two named transitions, and the
+// no-optimistic-flip contract ------------------------------------------------
+//
+// D-01 deleted `toggleStatus`, a blind draft -> planned -> exported -> draft
+// cycle on a badge click. It is the source of two live defects: a user could
+// mark a service "Exported" without ever exporting it (leaving pcExportedAt and
+// pcPlanId unset), and reopening was an unlabelled click with no warning.
+//
+// The star assertion in this block is the rejection case. A UI that shows
+// `Draft` while the store still holds `planned` is exactly the "it didn't save"
+// defect class this milestone exists to close, so a rejected transition must
+// leave the pill, the banner and every gate reading the OLD status -- and say so
+// on screen.
+describe('ServiceEditorView - service lifecycle transitions (R036, R037)', () => {
+  async function mountView() {
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          RouterLink: { template: '<a><slot /></a>' },
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+          // The reopen and delete confirms are <Teleport to="body"> blocks;
+          // shallowMount discards teleported children unless opted out.
+          teleport: false,
+        },
+      },
+    })
+  }
+
+  function body() {
+    return new DOMWrapper(document.body)
+  }
+
+  const PC_EVIDENCE = { pcExportedAt: mockTimestamp, pcPlanId: 'pc-plan-1' }
+
+  let consoleErrorSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockUpdateService.mockClear()
+    mockMarkAsPlanned.mockClear()
+    mockMarkAsPlanned.mockImplementation(() => Promise.resolve())
+    mockReopenService.mockClear()
+    mockReopenService.mockImplementation(() => Promise.resolve())
+    mockAssignSongToSlot.mockClear()
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore()
+  })
+
+  // ---- The pill is not a control (D-01) -------------------------------------
+
+  it('renders the status pill as a non-interactive <span>, not a button', async () => {
+    mockServicesList = [{ ...mockService, status: 'draft' }]
+    const wrapper = await mountView()
+
+    const pill = wrapper.find('[data-testid="service-status-pill"]')
+    expect(pill.exists()).toBe(true)
+    expect(pill.element.tagName).toBe('SPAN')
+    // Not focusable, not in the tab order, and no hover affordance -- the four
+    // "this is status, not a button" signals are all obtained by deletion.
+    expect(pill.attributes('tabindex')).toBeUndefined()
+    expect(pill.classes()).not.toContain('cursor-pointer')
+    // role="status" is a LIVE REGION and would announce on every reactive
+    // touch -- deliberately absent.
+    expect(pill.attributes('role')).toBeUndefined()
+  })
+
+  it('clicking the status pill changes nothing — there is no cycle left', async () => {
+    mockServicesList = [{ ...mockService, status: 'draft' }]
+    const wrapper = await mountView()
+    const vm = wrapper.vm as unknown as { localService: { status: string } | null }
+
+    await wrapper.find('[data-testid="service-status-pill"]').trigger('click')
+    await wrapper.vm.$nextTick()
+    await flushPromises()
+
+    expect(vm.localService!.status).toBe('draft')
+    expect(mockMarkAsPlanned).not.toHaveBeenCalled()
+    expect(mockUpdateService).not.toHaveBeenCalled()
+  })
+
+  // ---- One action per status (D-02) -----------------------------------------
+
+  it('draft: shows Mark as Planned, no Reopen, no lock banner', async () => {
+    mockServicesList = [{ ...mockService, status: 'draft' }]
+    const wrapper = await mountView()
+
+    expect(wrapper.find('[data-testid="mark-planned-btn"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="reopen-service-btn"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="service-lock-banner"]').exists()).toBe(false)
+  })
+
+  for (const status of ['planned', 'exported'] as const) {
+    it(`${status}: shows the lock banner with Reopen, and no Mark as Planned`, async () => {
+      mockServicesList = [{ ...mockService, status }]
+      const wrapper = await mountView()
+
+      expect(wrapper.find('[data-testid="service-lock-banner"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="reopen-service-btn"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="mark-planned-btn"]').exists()).toBe(false)
+    })
+  }
+
+  // E8: a viewer cannot edit at ANY status, so a banner saying "editing is
+  // locked" would explain a restriction that is not the reason they cannot
+  // edit, and would hand them a Reopen button they may not use.
+  it('viewer: no lock banner and no Reopen, but the pill still renders', async () => {
+    mockAuthState.isEditor = false
+    mockServicesList = [{ ...mockService, status: 'exported' }]
+    const wrapper = await mountView()
+
+    expect(wrapper.find('[data-testid="service-lock-banner"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="reopen-service-btn"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="service-status-pill"]').text()).toContain('Exported')
+  })
+
+  it('Mark as Planned awaits the store action, then moves the pill to Planned', async () => {
+    mockServicesList = [{ ...mockService, status: 'draft' }]
+    const wrapper = await mountView()
+
+    await wrapper.find('[data-testid="mark-planned-btn"]').trigger('click')
+    await flushPromises()
+    await wrapper.vm.$nextTick()
+
+    expect(mockMarkAsPlanned).toHaveBeenCalledWith('service-1')
+    expect(wrapper.find('[data-testid="service-status-pill"]').text()).toContain('Planned')
+    expect(wrapper.find('[data-testid="service-lock-banner"]').exists()).toBe(true)
+  })
+
+  // ---- Reopen: friction only where there are consequences (D-10) ------------
+
+  it('reopening a planned service with no export evidence fires immediately, no dialog', async () => {
+    mockServicesList = [{ ...mockService, status: 'planned' }]
+    const wrapper = await mountView()
+
+    await wrapper.find('[data-testid="reopen-service-btn"]').trigger('click')
+    await flushPromises()
+    await wrapper.vm.$nextTick()
+
+    expect(body().find('[data-testid="reopen-confirm-dialog"]').exists()).toBe(false)
+    expect(mockReopenService).toHaveBeenCalledWith('service-1')
+    expect(wrapper.find('[data-testid="service-status-pill"]').text()).toContain('Draft')
+  })
+
+  // ★ E9 / D-04 -- the gate is EVIDENCE, never the status string. Live data
+  // holds services sitting at `exported` that the deleted cycle hand-set and
+  // that were never exported; warning them that "Planning Center holds the
+  // previously exported version" would be false, and a warning users learn is
+  // sometimes false is one they learn to click through.
+  it('reopening a legacy exported service with NO evidence shows no dialog and no PC warning', async () => {
+    mockServicesList = [{ ...mockService, status: 'exported' }]
+    const wrapper = await mountView()
+
+    expect(wrapper.find('[data-testid="service-lock-banner-text"]').text()).not.toContain(
+      'Planning Center',
+    )
+
+    await wrapper.find('[data-testid="reopen-service-btn"]').trigger('click')
+    await flushPromises()
+
+    expect(body().find('[data-testid="reopen-confirm-dialog"]').exists()).toBe(false)
+    expect(mockReopenService).toHaveBeenCalledOnce()
+  })
+
+  it('reopening with export evidence opens the confirm and does NOT transition yet', async () => {
+    mockServicesList = [{ ...mockService, status: 'exported', ...PC_EVIDENCE }]
+    const wrapper = await mountView()
+
+    await wrapper.find('[data-testid="reopen-service-btn"]').trigger('click')
+    await flushPromises()
+    await wrapper.vm.$nextTick()
+
+    const dialog = body().find('[data-testid="reopen-confirm-dialog"]')
+    expect(dialog.exists()).toBe(true)
+    expect(body().find('[data-testid="reopen-confirm-pc-warning"]').text()).toContain(
+      'exported to Planning Center',
+    )
+    expect(mockReopenService).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="service-status-pill"]').text()).toContain('Exported')
+  })
+
+  it('the reopen confirm transitions only once its confirm button is pressed', async () => {
+    mockServicesList = [{ ...mockService, status: 'exported', ...PC_EVIDENCE }]
+    const wrapper = await mountView()
+
+    await wrapper.find('[data-testid="reopen-service-btn"]').trigger('click')
+    await flushPromises()
+    await body().find('[data-testid="reopen-confirm-btn"]').trigger('click')
+    await flushPromises()
+    await wrapper.vm.$nextTick()
+
+    expect(mockReopenService).toHaveBeenCalledWith('service-1')
+    expect(wrapper.find('[data-testid="service-status-pill"]').text()).toContain('Draft')
+    expect(body().find('[data-testid="reopen-confirm-dialog"]').exists()).toBe(false)
+  })
+
+  // E10: a reopened-then-re-planned service still carries the ids D-11 kept, so
+  // it is `planned` WITH evidence -- and still gets the dialog. Proves the gate
+  // is not "status === exported" in disguise.
+  it('a planned service that carries export evidence still gets the dialog', async () => {
+    mockServicesList = [{ ...mockService, status: 'planned', ...PC_EVIDENCE }]
+    const wrapper = await mountView()
+
+    await wrapper.find('[data-testid="reopen-service-btn"]').trigger('click')
+    await flushPromises()
+
+    expect(body().find('[data-testid="reopen-confirm-dialog"]').exists()).toBe(true)
+    expect(mockReopenService).not.toHaveBeenCalled()
+  })
+
+  // ★ D-11 -- the rule's hasOnly(['status','updatedAt']) reads affectedKeys(),
+  // so re-writing pcExportedAt/pcPlanId even to their existing values can get
+  // the whole reopen denied. The view must go through the dedicated action and
+  // must never route a reopen through updateService with those fields attached.
+  it('the reopen carries no pcExportedAt/pcPlanId payload', async () => {
+    mockServicesList = [{ ...mockService, status: 'exported', ...PC_EVIDENCE }]
+    const wrapper = await mountView()
+
+    await wrapper.find('[data-testid="reopen-service-btn"]').trigger('click')
+    await flushPromises()
+    await body().find('[data-testid="reopen-confirm-btn"]').trigger('click')
+    await flushPromises()
+
+    expect(mockReopenService).toHaveBeenCalledWith('service-1')
+    expect(mockReopenService.mock.calls[0]).toHaveLength(1)
+    for (const [, data] of mockUpdateService.mock.calls) {
+      expect(data).not.toHaveProperty('pcExportedAt')
+      expect(data).not.toHaveProperty('pcPlanId')
+    }
+  })
+
+  it('the ids D-11 preserves are still on the service after a reopen', async () => {
+    mockServicesList = [{ ...mockService, status: 'exported', ...PC_EVIDENCE }]
+    const wrapper = await mountView()
+    const vm = wrapper.vm as unknown as {
+      localService: { status: string; pcPlanId?: string | null; pcExportedAt?: unknown } | null
+    }
+
+    await wrapper.find('[data-testid="reopen-service-btn"]').trigger('click')
+    await flushPromises()
+    await body().find('[data-testid="reopen-confirm-btn"]').trigger('click')
+    await flushPromises()
+
+    expect(vm.localService!.status).toBe('draft')
+    expect(vm.localService!.pcPlanId).toBe('pc-plan-1')
+    expect(vm.localService!.pcExportedAt).toBeTruthy()
+  })
+
+  // ---- ★ The no-optimistic-flip contract (E13 / E14) ------------------------
+
+  it('★ a rejected Reopen leaves the OLD status everywhere and renders the error in the banner', async () => {
+    mockReopenService.mockImplementation(() => Promise.reject(new Error('permission-denied')))
+    mockServicesList = [{ ...mockService, status: 'planned' }]
+    const wrapper = await mountView()
+    const vm = wrapper.vm as unknown as { localService: { status: string } | null }
+
+    await wrapper.find('[data-testid="reopen-service-btn"]').trigger('click')
+    await flushPromises()
+    await wrapper.vm.$nextTick()
+
+    // The store still holds `planned`; so must every surface.
+    expect(vm.localService!.status).toBe('planned')
+    expect(wrapper.find('[data-testid="service-status-pill"]').text()).toContain('Planned')
+    expect(wrapper.find('[data-testid="service-lock-banner"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="mark-planned-btn"]').exists()).toBe(false)
+
+    const err = wrapper.find('[data-testid="service-lock-banner-error"]')
+    expect(err.exists()).toBe(true)
+    expect(err.text()).toBe("Couldn't reopen this service. Check your connection and try again.")
+    // The banner's Reopen button IS the retry affordance -- it must survive.
+    expect(wrapper.find('[data-testid="reopen-service-btn"]').exists()).toBe(true)
+  })
+
+  it('★ a rejected Mark as Planned leaves the pill at Draft and renders the inline error', async () => {
+    mockMarkAsPlanned.mockImplementation(() => Promise.reject(new Error('permission-denied')))
+    mockServicesList = [{ ...mockService, status: 'draft' }]
+    const wrapper = await mountView()
+    const vm = wrapper.vm as unknown as { localService: { status: string } | null }
+
+    await wrapper.find('[data-testid="mark-planned-btn"]').trigger('click')
+    await flushPromises()
+    await wrapper.vm.$nextTick()
+
+    expect(vm.localService!.status).toBe('draft')
+    expect(wrapper.find('[data-testid="service-status-pill"]').text()).toContain('Draft')
+    // No banner appeared -- the service never left draft.
+    expect(wrapper.find('[data-testid="service-lock-banner"]').exists()).toBe(false)
+
+    const err = wrapper.find('[data-testid="lifecycle-error"]')
+    expect(err.exists()).toBe(true)
+    expect(err.text()).toBe(
+      "Couldn't mark this service as Planned. Check your connection and try again.",
+    )
+    expect(wrapper.find('[data-testid="mark-planned-btn"]').exists()).toBe(true)
+  })
+
+  it('the lifecycle error clears when the next attempt starts', async () => {
+    mockReopenService.mockImplementationOnce(() => Promise.reject(new Error('offline')))
+    mockServicesList = [{ ...mockService, status: 'planned' }]
+    const wrapper = await mountView()
+
+    await wrapper.find('[data-testid="reopen-service-btn"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="service-lock-banner-error"]').exists()).toBe(true)
+
+    await wrapper.find('[data-testid="reopen-service-btn"]').trigger('click')
+    await flushPromises()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('[data-testid="service-status-pill"]').text()).toContain('Draft')
+    expect(wrapper.find('[data-testid="service-lock-banner"]').exists()).toBe(false)
+  })
+
+  // ---- D-15: the delete confirm's evidence-gated sentence -------------------
+
+  it('delete confirm gains the Planning Center sentence when there is export evidence', async () => {
+    mockServicesList = [{ ...mockService, status: 'exported', ...PC_EVIDENCE }]
+    const wrapper = await mountView()
+
+    const deleteBtn = wrapper.findAll('button').find((b) => b.text() === 'Delete')
+    await deleteBtn!.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    const copy = body().find('[data-testid="delete-service-confirm-body"]').text()
+    expect(copy).toContain('This cannot be undone.')
+    expect(copy).toContain(
+      'This service was exported to Planning Center. Deleting it here does not remove that plan.',
+    )
+  })
+
+  it('delete confirm omits the Planning Center sentence without export evidence', async () => {
+    mockServicesList = [{ ...mockService, status: 'exported' }]
+    const wrapper = await mountView()
+
+    const deleteBtn = wrapper.findAll('button').find((b) => b.text() === 'Delete')
+    await deleteBtn!.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    const copy = body().find('[data-testid="delete-service-confirm-body"]').text()
+    expect(copy).toContain('This cannot be undone.')
+    expect(copy).not.toContain('Planning Center')
+  })
+
+  // Delete stays available at EVERY status -- it is a lifecycle action on the
+  // service, not an edit to its contents, and forcing a Reopen just to delete
+  // strands the "created by mistake" case behind two extra steps (D-15).
+  it('the Delete button is still rendered on a locked service', async () => {
+    mockServicesList = [{ ...mockService, status: 'planned' }]
+    const wrapper = await mountView()
+
+    expect(wrapper.findAll('button').some((b) => b.text() === 'Delete')).toBe(true)
+  })
+
+  // ---- The Suggest All Songs disabled binding is COMPOUND --------------------
+  //
+  // Only the isExportedLocked term was dropped from :134. Deleting the whole
+  // binding would make the button clickable with no sermon context and
+  // re-clickable while a request is in flight.
+  it('Suggest All Songs stays disabled with no sermon context after the lock term was dropped', async () => {
+    mockServicesList = [{ ...mockService, status: 'draft', sermonPassage: null, sermonTopic: '' }]
+    const wrapper = await mountView()
+
+    const suggestBtn = wrapper.findAll('button').find((b) => b.text().includes('Suggest All Songs'))
+    expect(suggestBtn).toBeDefined()
+    expect(suggestBtn!.attributes('disabled')).toBeDefined()
+    // The retired tooltip named a control that no longer exists.
+    expect(suggestBtn!.attributes('title')).not.toContain('cycle badge')
   })
 })
