@@ -147,19 +147,23 @@ phase adds a lock layer over the existing controls; it does not restyle them.
   > *"We have the emulator so firebase rules should be able to be just local for now until we're all
   > done working. We can deploy to production at a later date."*
   >
-  > What this changes, and the consequence to be honest about: **`src/firebase.ts` contains no emulator
-  > wiring**, so `npm run dev` talks to LIVE Firebase. `npm run test:rules` is self-contained — it
-  > starts its own throwaway emulator via `firebase emulators:exec` — so the rules ARE genuinely
-  > verified, but only there.
+  > **★ Correction (2026-07-30).** An earlier version of this note claimed `src/firebase.ts` has no
+  > emulator wiring and that `npm run dev` therefore always talks to live Firebase. **That was wrong** —
+  > the file is `src/firebase/index.ts`, and it already wires all four emulators (auth 9099, firestore
+  > 8080, storage 9199, functions 5001) at `:23-28`, gated on `VITE_USE_EMULATORS === 'true'`. The
+  > mistake came from grepping a path that does not exist and reading the empty result as absence.
   >
-  > Therefore, until someone runs `firebase deploy --only firestore:rules`:
-  > - the rules layer is proven **in the emulator** and is the phase's enforcement evidence;
-  > - in the **running app**, only the UI gate and the store guard are active;
-  > - a direct devtools write to a locked service **will still succeed** in the running app. That is
-  >   expected and is not a phase defect — it is the undeployed state.
+  > So local emulator use is a one-line `.env.local` setting, not new work. Owner's direction:
+  > *"we should run local off of emulators and only run live when we're in production."*
   >
-  > The deploy therefore moves OUT of this phase's completion gate and into a milestone-level task, to
-  > be done before v1.4 ships. Phase 31 completes on emulator-verified rules plus UI/store verification.
+  > **What this means for the phase gate:**
+  > - With `VITE_USE_EMULATORS=true`, the dev app runs against the emulator, so **all three layers are
+  >   live locally** and the devtools bypass check IS meaningful during human-verify. Phase 31 can be
+  >   verified end-to-end without touching production.
+  > - `npm run test:rules` remains the automated evidence and is self-contained.
+  > - Production still has only the UI gate and store guard until
+  >   `firebase deploy --only firestore:rules` runs. That deploy stays deferred and OUT of this phase's
+  >   completion gate, tracked as ROADMAP backlog Phase 999.3, required before v1.4 ships.
 
 ### Claude's Discretion
 

@@ -80,8 +80,16 @@ denied including load-time materialization on DRAFT services.
 
 ## Note for the phase gate
 
-The rules are verified in the **emulator only**. `src/firebase.ts` has no emulator wiring,
-so `npm run dev` talks to live Firebase, and the owner deferred deployment
-(`firebase deploy --only firestore:rules`) to a later date. Until that runs, the rules layer
-is not active in the running app. Recorded as ROADMAP backlog Phase 999.3, required before
-v1.4 ships.
+The rules are verified in the emulator. Production deployment
+(`firebase deploy --only firestore:rules`) is deferred by the owner and tracked as ROADMAP
+backlog Phase 999.3, required before v1.4 ships — until it runs, production has only the UI
+gate and the store guard.
+
+> **★ Correction (2026-07-30).** This summary originally said `src/firebase.ts` has no
+> emulator wiring and that the running app therefore always talks to live Firebase. **Wrong.**
+> The file is `src/firebase/index.ts`, and `:23-28` already connects all four emulators
+> (auth 9099, firestore 8080, storage 9199, functions 5001) when
+> `VITE_USE_EMULATORS === 'true'`. I had grepped a non-existent path and read the empty
+> result as absence. With that flag set, the dev app runs against the emulator and all three
+> enforcement layers are active locally — so this phase can be verified end-to-end without
+> touching production.

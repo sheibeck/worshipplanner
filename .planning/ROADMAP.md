@@ -308,9 +308,10 @@ Until this deploys, anyone with a browser console can write to a locked service 
 Phase 31 exists to close.
 **Deferred by:** owner, 2026-07-30 — *"We have the emulator so firebase rules should be able to be just
 local for now until we're all done working. We can deploy to production at a later date."*
-**Verification after deploy:** set a service to Planned, open devtools, attempt a direct Firestore
-write. Expect permission denied. (`npm run dev` talks to live Firebase — `src/firebase.ts` has no
-emulator wiring — so this check is meaningful only post-deploy.)
+**Verification after deploy:** set a service to Planned in the PRODUCTION app, open devtools, attempt a
+direct Firestore write. Expect permission denied. (Locally this same check is already meaningful with
+`VITE_USE_EMULATORS=true` — `src/firebase/index.ts:23-28` points the dev app at the emulator, where the
+rules ARE active. This backlog item is specifically about production.)
 **Requirements:** R036
 **Plans:** 0 plans
 
