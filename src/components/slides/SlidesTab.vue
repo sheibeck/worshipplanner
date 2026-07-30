@@ -28,6 +28,7 @@
         :groups-by-slot-id="groupsBySlotId"
         :selected-slot-id="selectedSlotId"
         :groups-loading="groupsLoading"
+        :service-locked="serviceLocked"
         @select="onSelectSlot"
       />
       <!-- The grid for `selectedSlotId`, keyed on `selectedSlideId` for
@@ -43,6 +44,7 @@
           :selected-slide-id="selectedSlideId"
           :group="selectedGroup"
           :is-editor="isEditor"
+          :service-locked="serviceLocked"
           :org-id="orgId"
           :service-id="serviceId"
           :ensure-group-materialized="ensureGroupMaterialized"
@@ -65,6 +67,7 @@
       :org-id="orgId"
       :service-id="serviceId"
       :is-editor="isEditor"
+      :service-locked="serviceLocked"
       @close="onDrawerClose"
       @edit-in-scripture="requestEditInScripture"
       @duplicate="selectSlideById"
@@ -129,19 +132,32 @@ import SlideGrid from './SlideGrid.vue'
 import EditSlideDrawer from './EditSlideDrawer.vue'
 import type { EnsureGroupMaterializedResult } from './slideDisplay'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   slots: ServiceSlot[]
   serviceId: string
   orgId: string
   assembledSlideshow: AssembledSlide[]
   groupsBySlotId: Map<string, SlideGroup>
   isEditor: boolean
+  /**
+   * ★ R036 — the lifecycle lock, threaded DISTINCT from `isEditor` rather than
+   * folded into it upstream. Passing `canEditService` as `is-editor` would lock
+   * everything in one line, but it would also make it impossible for
+   * `EditSlideDrawer` to tell "you are a viewer" from "the service is locked" —
+   * and 31-UI-SPEC § 6 requires different read-only copy for each. Every
+   * downstream gate composes the two (`isEditor && !serviceLocked`); the drawer
+   * additionally branches on `serviceLocked` alone for its notice.
+   *
+   * Defaulted `false` so existing fixtures that mount this component without the
+   * prop keep behaving exactly as they did.
+   */
+  serviceLocked?: boolean
   groupsLoading: boolean
   /** True while the Slides tab is the visible one in `ServiceEditorView`. */
   active: boolean
   /** On-demand group materializer (25-05 Task 1), threaded down to the grid unused by this component itself. */
   ensureGroupMaterialized: (slotId: string) => Promise<EnsureGroupMaterializedResult | undefined>
-}>()
+}>(), { serviceLocked: false })
 
 const emit = defineEmits<{
   /** D-15's "Edit in scripture" request, carrying the plan item's raw array index. */

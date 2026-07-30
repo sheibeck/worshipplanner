@@ -1230,6 +1230,7 @@
             :assembled-slideshow="assembledSlideshow"
             :groups-by-slot-id="groupsBySlotId"
             :is-editor="authStore.isEditor"
+            :service-locked="isLocked"
             :groups-loading="slideGroupsStore.isLoading"
             :active="activeTab === 'slides'"
             :ensure-group-materialized="ensureGroupMaterialized"

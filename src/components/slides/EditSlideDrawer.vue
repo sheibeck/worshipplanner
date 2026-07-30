@@ -48,11 +48,25 @@
                as deliberate rather than broken (30-CONTEXT.md). Muted
                informational idiom, matching this drawer's own helper
                captions — not an error/warning colour. -->
+          <!-- ★ R036 shares this ONE slot — the single permitted exception to
+               D-06's "one banner". This drawer is a fixed overlay that COVERS the
+               sticky page banner, so without a notice a locked drawer is a
+               stripped body with no explanation anywhere on screen.
+               ★ Never two notices stacked: when both restrictions hold the
+               song-group message wins, because it names the more specific and
+               more actionable one (a song's slides stay non-editable here even
+               after a reopen).
+               ★ The `:data-testid` is DYNAMIC so `drawer-song-readonly-notice`
+               keeps its exact meaning: present for a song group, absent
+               otherwise. Both existing assertions in EditSlideDrawer.test.ts stay
+               green with zero test churn — do not rename it. -->
           <div
-            v-if="isSongGroup"
+            v-if="isSongGroup || serviceLocked"
             class="rounded-md border border-gray-700 bg-gray-800/50 px-3 py-2 text-[12px] text-gray-400"
-            data-testid="drawer-song-readonly-notice"
-          >This song's slides come from the song itself — edit them on the Song Lyrics screen.</div>
+            :data-testid="isSongGroup ? 'drawer-song-readonly-notice' : 'drawer-service-locked-notice'"
+          >{{ isSongGroup
+              ? "This song's slides come from the song itself — edit them on the Song Lyrics screen."
+              : 'This service is locked — reopen it for editing to change this slide.' }}</div>
 
           <div class="flex items-center gap-1.5" data-testid="drawer-context-line">
             <span
@@ -386,7 +400,7 @@ import { buildSongEditLink, type SongEditTab } from '@/utils/songEditLink'
 import { useMediaUpload } from '@/composables/useMediaUpload'
 import AudioPlayer from '../AudioPlayer.vue'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   open: boolean
   /** The resolved stored entry behind the selection — null means "render nothing" (see header comment). */
   entry: GroupSlideEntry | null
@@ -401,7 +415,22 @@ const props = defineProps<{
   serviceId: string
   /** Gates the label/notes write controls (T-26-05-02) — a viewer still reads the slide's information. */
   isEditor: boolean
-}>()
+  /**
+   * R036 — the service's lifecycle lock, kept DISTINCT from `isEditor` because
+   * this drawer is the one surface that must tell the two apart: a viewer and a
+   * locked editor need different read-only copy (31-UI-SPEC § 6). Composed into
+   * `canMutate` below, which is why the entire Phase 30 read-only rendering comes
+   * for free rather than needing a parallel mechanism.
+   *
+   * ★ The drawer still OPENS when locked. It is the only surface showing a slide
+   * at size, plus its context line and what audio covers it; blocking it would
+   * remove a VIEW affordance in the name of a WRITE lock.
+   *
+   * Defaults `false` — `mountDrawer`'s fixture omits it, so no fixture rewrite is
+   * needed.
+   */
+  serviceLocked?: boolean
+}>(), { serviceLocked: false })
 
 const emit = defineEmits<{
   close: []
@@ -428,8 +457,15 @@ const isOpenAndResolvable = computed(() => props.open && props.entry !== null)
  * existing `planItem` prop; no new prop is threaded (30-03-PLAN.md key_links).
  */
 const isSongGroup = computed(() => props.planItem?.kind === 'SONG')
-/** The one gating computed every mutation control in this drawer uses (30-PATTERNS.md: a plain v-if, no new gating mechanism). */
-const canMutate = computed(() => props.isEditor && !isSongGroup.value)
+/**
+ * The one gating computed every mutation control in this drawer uses
+ * (30-PATTERNS.md: a plain v-if, no new gating mechanism). R036 composes into
+ * it rather than adding a second gate: label input, body textarea, audio scope
+ * choice, attach, remove, loop checkbox, Notes, Duplicate and Delete Slide all
+ * vanish together, while the preview, kind badge, context line, attached-audio
+ * row and player all stay.
+ */
+const canMutate = computed(() => props.isEditor && !props.serviceLocked && !isSongGroup.value)
 
 function onClose(): void {
   emit('close')
@@ -663,6 +699,7 @@ async function attachGroupAudio(url: string): Promise<void> {
 }
 
 async function onAudioFileSelected(event: Event): Promise<void> {
+  if (!canMutate.value) return
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
@@ -687,6 +724,7 @@ async function onAudioFileSelected(event: Event): Promise<void> {
 
 /** Targets whichever audio is actually shown right now (`audioState`), never `scopeChoice` — Remove always acts on what's covering the slide, not on the pending choice for a future attach. */
 async function onRemoveAudio(): Promise<void> {
+  if (!canMutate.value) return
   if (audioState.value === 'slide') {
     await removeSlideAudio()
   } else if (audioState.value === 'group') {
@@ -796,6 +834,10 @@ function scheduleSavedFade(): void {
  * `flushField`, called when the edited entry changes).
  */
 async function writeField(field: FieldName, entryId: string, value: string): Promise<void> {
+  // R036: the single persistence point for label/notes/body. Guarding here (not
+  // only `scheduleWrite`) also covers `flushField`/`flushAll`, so an edit typed
+  // moments before the service locked cannot land after it.
+  if (!canMutate.value) return
   if (!props.group) return
   status.value = 'saving'
   try {
@@ -1026,6 +1068,7 @@ onUnmounted(() => {
  * once it lands; this function is what actually creates it.
  */
 async function onDuplicate(): Promise<void> {
+  if (!canMutate.value) return
   if (!props.group || !props.entry) return
   const base = props.group.slides
   const originalIndex = base.findIndex((e) => e.id === props.entry!.id)
@@ -1055,6 +1098,7 @@ const isDeleting = ref(false)
 const deleteConfirmBody = computed(() => (props.entry ? deleteSlideConfirmBody(props.entry) : ''))
 
 function onDeleteTrigger(): void {
+  if (!canMutate.value) return
   showDeleteConfirm.value = true
 }
 
@@ -1074,6 +1118,7 @@ function onCancelDelete(): void {
  * fight that seam, not complement it.
  */
 async function onConfirmDelete(): Promise<void> {
+  if (!canMutate.value) return
   if (!props.group || !props.entry) return
   const entryId = props.entry.id
   const base = props.group.slides

@@ -17,11 +17,15 @@
     </div>
 
     <!-- Empty: no plan items at all (D-07) — points the user at the Service
-         Order tab; the Slides tab itself stays reachable. -->
+         Order tab; the Slides tab itself stays reachable.
+         ★ R036 locked variant (31-UI-SPEC E3): the unlocked body sends the user
+         to a tab where they can no longer add anything. Copy swap only. -->
     <div v-else-if="showEmptyState" class="px-4 pb-4" data-testid="rail-empty-state">
       <p class="text-sm font-medium text-gray-300">Nothing planned yet</p>
       <p class="mt-1 text-xs text-gray-500">
-        Add songs, scripture, and other elements on the Service Order tab &mdash; they'll show up here automatically.
+        {{ serviceLocked
+          ? 'This service has no plan items. Reopen it for editing to add some.'
+          : "Add songs, scripture, and other elements on the Service Order tab — they'll show up here automatically." }}
       </p>
     </div>
 
@@ -77,7 +81,7 @@ import type { AssembledSlide } from '@/types/slide'
 import type { SlideGroup } from '@/types/slideGroup'
 import { KIND_BADGE_CLASSES, slotDisplayTitle, bedAudioLabel } from './slideDisplay'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   /**
    * The service's slots in their RAW array order (not pre-sorted). This
    * component sorts a working copy by `position` for display, but the
@@ -91,7 +95,18 @@ const props = defineProps<{
   groupsBySlotId: Map<string, SlideGroup>
   selectedSlotId: string | null
   groupsLoading: boolean
-}>()
+  /**
+   * R036 — used ONLY to swap the empty-state body copy. This rail renders no
+   * mutation control at all (D-06: no drag handle, no drop handler), so the lock
+   * has nothing else to close here.
+   *
+   * ★ Note the word collision for the reviewer: the standing `order locked ⇄
+   * Service Order` caption three inches above is about slide ORDER following the
+   * plan (Phase 25, D-06) and has nothing to do with the lifecycle lock. It is
+   * deliberately unchanged.
+   */
+  serviceLocked?: boolean
+}>(), { serviceLocked: false })
 
 const emit = defineEmits<{
   select: [slotId: string]

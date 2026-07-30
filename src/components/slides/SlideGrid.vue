@@ -13,15 +13,19 @@
           data-testid="slide-grid-reading-order"
         >Plays 1 &rarr; {{ cards.length }}, left to right then down</span>
 
+        <!-- R036: `canMutateGroup` composes the lifecycle lock with R054's
+             song-group lock. Removed, never disabled (D-05); the header keeps
+             its title, the "group N of M · follows plan" chip and the
+             reading-order line. -->
         <button
-          v-if="isEditor && !isSongGroup"
+          v-if="canMutateGroup"
           type="button"
           class="ml-auto inline-flex items-center gap-1.5 rounded-md border border-gray-700 bg-gray-800 px-2.5 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:bg-gray-700"
           data-testid="slide-grid-add-slide"
           @click="onAddSlide"
         >＋ Add slide</button>
         <button
-          v-if="isEditor && !isSongGroup"
+          v-if="canMutateGroup"
           type="button"
           class="inline-flex items-center gap-1.5 rounded-md border border-gray-700 bg-gray-800 px-2.5 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:bg-gray-700"
           data-testid="slide-grid-import"
@@ -29,7 +33,11 @@
         >⇪ Import into this group</button>
         <!-- R054: a song group's slides are canonical, edited only from the
              Song Lyrics screen — a quiet marker rather than silence, matching
-             the drawer's own read-only affordance. -->
+             the drawer's own read-only affordance.
+             ★ NO second chip for the lifecycle lock: this one explains a
+             DIFFERENT restriction that applies even to a draft service, while
+             the lifecycle lock is already stated once by the sticky page banner.
+             A lock chip here would be the second banner D-06 forbids. -->
         <span
           v-if="isSongGroup"
           class="ml-auto inline-flex items-center rounded border border-gray-700 bg-gray-800/50 px-2 py-0.5 text-[11px] text-gray-400"
@@ -57,12 +65,17 @@
            group's bed via the slideGroups store's scoped write (the sole
            surviving attach/remove surface for group-bed audio; the Service
            Order tab's equivalent control was removed in Phase 27-04). -->
-      <div class="px-6 pt-3">
+      <!-- ★ 31-UI-SPEC E5: gate the WRAPPER, not just the control's contents.
+           With no bed audio and no add affordance the control renders an empty
+           bordered box, which a locked service hits constantly. The condition
+           incidentally fixes the pre-existing viewer case too — a two-token side
+           effect of the correct condition, not a scope expansion. -->
+      <div v-if="group?.bedAudioUrl || canWriteGroupMedia" class="px-6 pt-3">
         <SlideGroupMusicControl
           :audio-url="group?.bedAudioUrl"
           :slide-count="cards.length"
           :org-id="orgId"
-          :is-editor="isEditor"
+          :is-editor="canWriteGroupMedia"
           @attach="onAttachGroupMusic"
           @remove="onRemoveGroupMusic"
         />
@@ -124,19 +137,28 @@
             @select="emit('select', $event)"
           />
           <!-- Always the LAST grid item (D-13) — deliberately NOT given the
-               `.slide-card` class SortableJS is scoped to. -->
-          <SlideDropTarget v-if="isEditor" :audio-only="isSongGroup" @drop="onFilesDropped" />
+               `.slide-card` class SortableJS is scoped to. Gone when locked: the
+               card grid simply ends at the last real card. -->
+          <SlideDropTarget v-if="canWriteGroupMedia" :audio-only="isSongGroup" @drop="onFilesDropped" />
         </div>
         <template v-else>
+          <!-- ★ R036 locked variant (31-UI-SPEC E2). "Add a slide, or drop a file
+               below." is a dead instruction once both affordances are gone — and
+               the drop tile it says "below" about is gone too. Copy swap only,
+               no restyle. -->
           <div class="px-1 py-8" data-testid="slide-grid-empty-state">
-            <p class="text-sm font-medium text-gray-300">No slides in this group yet</p>
+            <p class="text-sm font-medium text-gray-300">
+              {{ canMutateGroup ? 'No slides in this group yet' : 'No slides in this group.' }}
+            </p>
             <p class="mt-1 text-xs text-gray-500">
               {{ isSongGroup
                 ? 'A song\'s slides come from its lyrics — add them in Song Lyrics.'
-                : 'Add a slide, or drop a file below.' }}
+                : serviceLocked
+                  ? 'Reopen the service for editing to add slides.'
+                  : 'Add a slide, or drop a file below.' }}
             </p>
           </div>
-          <SlideDropTarget v-if="isEditor" :audio-only="isSongGroup" @drop="onFilesDropped" />
+          <SlideDropTarget v-if="canWriteGroupMedia" :audio-only="isSongGroup" @drop="onFilesDropped" />
         </template>
       </div>
     </template>
@@ -190,7 +212,7 @@ import PptxImportModal from '@/components/PptxImportModal.vue'
 import { resolveDrop, UNSUPPORTED_FILE_MESSAGE } from './dropRouting'
 import { slotDisplayTitle, type EnsureGroupMaterializedResult } from './slideDisplay'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   /** The currently-selected plan item, or null when no plan item is selected. */
   selectedSlot: ServiceSlot | null
   /** The selected slot's ARRAY index within the service's raw `slots` — what `AssembledSlide.slotIndex` matches. */
@@ -205,13 +227,21 @@ const props = defineProps<{
   group: SlideGroup | null
   /** Gates every write control this component renders (add-slide button, drag grip/Sortable instance, group-music add/remove). */
   isEditor: boolean
+  /**
+   * R036 — the service's lifecycle lock, kept DISTINCT from `isEditor` (see
+   * `SlidesTab.vue`'s own prop comment for why). Composes with `isEditor` and
+   * with R054's `isSongGroup` through the two computeds below rather than
+   * introducing a third gating mechanism. Defaults `false` so every existing
+   * fixture behaves exactly as before.
+   */
+  serviceLocked?: boolean
   /** Org id — needed to call the `slideGroups` store's write actions directly. */
   orgId: string
   /** Service id — required by `setGroupBedMedia`'s skeleton-create payload when the group has not materialized yet. */
   serviceId: string
   /** On-demand group materializer (25-05 Task 1) — resolved before every append so a plan item with no group yet can still receive a slide (R032). */
   ensureGroupMaterialized: (slotId: string) => Promise<EnsureGroupMaterializedResult | undefined>
-}>()
+}>(), { serviceLocked: false })
 
 const emit = defineEmits<{
   select: [slideId: string]
@@ -247,6 +277,25 @@ const groupTitle = computed(() => {
  */
 const isSongGroup = computed(() => props.selectedSlot?.kind === 'SONG')
 
+/**
+ * ★ R036 — the two composed gates this component uses everywhere. Both fold the
+ * lifecycle lock into the existing R054 seam rather than running beside it.
+ *
+ * `canMutateGroup` — create/import/reorder the group's SLIDES. Excludes song
+ * groups (R054: a song's slides are canonical and edited in Song Lyrics).
+ *
+ * `canWriteGroupMedia` — the drop tile and the group-bed music control. These
+ * stay available on a SONG group (audio-only there, which is exactly what 30-03
+ * shipped: "lock the slide grid for song groups without blocking group media"),
+ * so this gate deliberately omits `isSongGroup`.
+ *
+ * Every corresponding HANDLER re-checks the same computed. 30-VERIFICATION I-01
+ * found six of seven mutation entry points here guarded by template `v-if`
+ * ALONE; a lifecycle lock layered over that inherits its fragility.
+ */
+const canMutateGroup = computed(() => props.isEditor && !props.serviceLocked && !isSongGroup.value)
+const canWriteGroupMedia = computed(() => props.isEditor && !props.serviceLocked)
+
 interface CardEntry {
   assembledSlide: AssembledSlide
   number: number
@@ -272,6 +321,7 @@ const cards = computed<CardEntry[]>(() => {
 // clobbered (WR-01). Adding a redundant materialization call here would only
 // reintroduce that race, not prevent it.
 async function onAttachGroupMusic(url: string): Promise<void> {
+  if (!canWriteGroupMedia.value) return
   if (!props.selectedSlot) return
   try {
     await slideGroupsStore.setGroupBedMedia(props.orgId, props.selectedSlot.id, {
@@ -288,6 +338,7 @@ async function onAttachGroupMusic(url: string): Promise<void> {
 // Firestore, and `deleteField()` is the only way to actually remove the
 // field (mirrors `ServiceEditorView.vue`'s existing `onSlotBedAudioChange`).
 async function onRemoveGroupMusic(): Promise<void> {
+  if (!canWriteGroupMedia.value) return
   if (!props.selectedSlot) return
   try {
     await slideGroupsStore.setGroupBedMedia(props.orgId, props.selectedSlot.id, {
@@ -325,6 +376,7 @@ function appendToGroup(entries: GroupSlideEntry[], additions: GroupSlideEntry[])
 // of the freshly-returned entries would risk appending to (and persisting) a
 // stale list on rapid repeated clicks.
 async function onAddSlide(): Promise<void> {
+  if (!canMutateGroup.value) return
   if (!props.selectedSlot) return
   const slotId = props.selectedSlot.id
   try {
@@ -370,6 +422,7 @@ const importSection = computed<ServiceSection>(
 )
 
 function openImportModal(): void {
+  if (!canMutateGroup.value) return
   showImportModal.value = true
 }
 
@@ -380,12 +433,14 @@ function openImportModal(): void {
 // upload-in-progress state, so the reset can never clobber an import that
 // just started.
 async function importDeckFile(file: File): Promise<void> {
+  if (!canMutateGroup.value) return
   showImportModal.value = true
   await nextTick()
   importModalRef.value?.importPptxFile(file)
 }
 
 async function importImageFilesDropped(files: File[]): Promise<void> {
+  if (!canMutateGroup.value) return
   showImportModal.value = true
   await nextTick()
   importModalRef.value?.importImageFiles(files)
@@ -396,6 +451,7 @@ async function importImageFilesDropped(files: File[]): Promise<void> {
 // new plan item, never the slot factory/reindexer (Pattern 4, D-16).
 async function onImportConfirmed(payload: { importId: string; section: ServiceSection }): Promise<void> {
   showImportModal.value = false
+  if (!canMutateGroup.value) return
   if (!props.selectedSlot) return
   const slotId = props.selectedSlot.id
   try {
@@ -424,6 +480,7 @@ async function onImportConfirmed(payload: { importId: string; section: ServiceSe
 // only persisted once, in a single `replaceGroupSlides` call after every
 // upload in this drop has resolved.
 async function appendVideoEntries(files: File[]): Promise<void> {
+  if (!canMutateGroup.value) return
   if (!props.selectedSlot || files.length === 0) return
   const slotId = props.selectedSlot.id
   try {
@@ -459,6 +516,7 @@ async function appendVideoEntries(files: File[]): Promise<void> {
 // `setGroupBedMedia`'s own merging skeleton-create already covers a plan
 // item with no group document yet.
 async function attachDroppedAudio(file: File): Promise<void> {
+  if (!canWriteGroupMedia.value) return
   if (!props.selectedSlot) return
   try {
     resetMediaUpload()
@@ -500,6 +558,11 @@ function showRejectionNotice(message: string = UNSUPPORTED_FILE_MESSAGE): void {
 // emit and the whole-grid container's native `drop` event, below) route
 // through — so they cannot diverge (25-07 Task 2 key link).
 async function onFilesDropped(files: File[]): Promise<void> {
+  // R036: the single dispatch point for BOTH drop entry points, so one guard
+  // here closes the tile's `drop` emit and the grid container's native drop
+  // together. Silent, deliberately — a locked service renders no drop tile and
+  // no dragover highlight, so there is no affordance to explain a refusal for.
+  if (!canWriteGroupMedia.value) return
   const resolved = resolveDrop(files)
 
   if (isSongGroup.value) {
@@ -553,6 +616,8 @@ function dragCarriesFiles(event: DragEvent): boolean {
 }
 
 function onGridDragEnter(event: DragEvent): void {
+  // No highlight on a locked service — the drop it advertises cannot happen.
+  if (!canWriteGroupMedia.value) return
   if (!dragCarriesFiles(event)) return
   event.preventDefault()
   dragDepth += 1
@@ -593,7 +658,12 @@ function onGridDrop(event: DragEvent): void {
 const cardsContainerRef = ref<HTMLElement | null>(null)
 let sortableInstance: Sortable | null = null
 
-const canReorder = computed(() => props.isEditor && props.group !== null && !isSongGroup.value)
+// ★ R036 composes into the EXISTING seam rather than beside it, so the watcher
+// below — which already keys on `canReorder` — destroys the Sortable instance
+// when the service locks and creates a fresh one when it reopens. Hiding the
+// grips without that pairing would leave a reopened service undraggable until a
+// page reload, a new defect introduced by the fix.
+const canReorder = computed(() => canMutateGroup.value && props.group !== null)
 
 // T-29-13 / UI-SPEC §5: a rejected reorder write is no longer silent. The
 // DOM revert this component used to lean on is gone (CONTEXT.md's explicit
@@ -620,6 +690,10 @@ watch(
         animation: 150,
         ghostClass: 'opacity-30',
         async onEnd(evt) {
+          // R036: second lock over the instance itself. It is destroyed when
+          // `canReorder` goes false, so this only catches a drag already in
+          // flight when the service locks mid-gesture.
+          if (!canReorder.value) return
           // Draggable-scoped indices only (T-29-11) — `oldIndex`/`newIndex`
           // count every element child of the container, including 25-07's
           // drop tile (a non-`.slide-card` sibling, always last today). Only
