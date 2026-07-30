@@ -23,6 +23,42 @@ export function generateSundaysInQuarter(year: number, quarter: 1 | 2 | 3 | 4): 
 }
 
 /**
+ * R038 / D-12 / D-13: the nearest FUTURE Sunday that does not already have a plan.
+ *
+ * Walks FORWARD only from `from` (D-12 — a new-service dialog defaulting to a past
+ * date is surprising), skipping every Sunday present in `takenDates`, bounded at
+ * `maxWeeks` (D-13 ~52). On exhaustion it returns the plain next Sunday so the field
+ * is never blank and the degenerate case degrades to exactly the pre-R038 behaviour.
+ *
+ * ★ Sunday convention — deliberately STRICTLY FORWARD, and deliberately NOT the same
+ * as `generateSundaysInQuarter`'s `(7 - d.getDay()) % 7` advance above. That one yields
+ * TODAY when today is a Sunday; this one yields the FOLLOWING Sunday, matching the
+ * `nextSunday()` that `NewServiceDialog.vue` used before R038. The two differ by seven
+ * days on a Sunday, and D-13 requires the fallback to "degrade to exactly the behaviour
+ * that exists now" — so the strictly-forward rule wins here. Do not "unify" these
+ * without re-reading D-13; `quarterDates.test.ts` pins this with a Sunday `from`.
+ *
+ * Pure: no `Date.now()` — the caller passes `from`, which is what makes it testable.
+ */
+export function nextFreeSunday(
+  from: Date,
+  takenDates: Iterable<string> = [],
+  maxWeeks = 52,
+): string {
+  const taken = new Set(takenDates)
+  // Normalize away any time component so date math never straddles a DST boundary.
+  const d = new Date(from.getFullYear(), from.getMonth(), from.getDate())
+  d.setDate(d.getDate() + (d.getDay() === 0 ? 7 : 7 - d.getDay())) // strictly forward — see above
+  const plainNextSunday = fmtDate(d)
+  for (let i = 0; i < maxWeeks; i++) {
+    const candidate = fmtDate(d)
+    if (!taken.has(candidate)) return candidate
+    d.setDate(d.getDate() + 7)
+  }
+  return plainNextSunday
+}
+
+/**
  * Applies one-off date additions/removals to a base list of service dates.
  * Returns a sorted, de-duplicated array of YYYY-MM-DD strings.
  */
