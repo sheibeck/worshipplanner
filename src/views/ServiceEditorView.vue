@@ -85,8 +85,12 @@
 
           <!-- Save area -->
           <div class="flex items-center gap-3">
-            <!-- Autosave status indicator: editor only -->
-            <template v-if="authStore.isEditor">
+            <!-- Autosave status indicator: editor only, and only while the
+                 service is editable — nothing can be dirty once it is locked
+                 (31-UI-SPEC § 3). ★ Because this line disappears at `planned`
+                 and `exported`, a failed Reopen has no host here; the lock
+                 banner below carries `lifecycleError` instead. -->
+            <template v-if="canEditService">
               <span
                 v-if="autosaveStatus === 'pending' || autosaveStatus === 'saving'"
                 class="text-xs text-gray-400 italic"
@@ -116,9 +120,11 @@
               </span>
             </template>
 
-            <!-- Undo button (editor only, only visible when a previous snapshot exists) -->
+            <!-- Undo button (editor only, only visible when a previous snapshot
+                 exists). Removed while locked (31-UI-SPEC § 3): restoring a
+                 pre-lock snapshot is a write. -->
             <button
-              v-if="authStore.isEditor && previousService"
+              v-if="canEditService && previousService"
               type="button"
               @click="onUndo"
               title="Undo last save (Ctrl+Z)"
@@ -130,9 +136,13 @@
               Undo
             </button>
 
-            <!-- Suggest All Songs button: editor only -->
+            <!-- Suggest All Songs button: editor only, removed while locked
+                 (31-UI-SPEC § 3, class B — it carried no lock term at all).
+                 Its `:disabled` keeps the OTHER two terms (31-03 dropped only
+                 the `isExportedLocked` one): without them the button would be
+                 clickable with no sermon context and re-clickable mid-flight. -->
             <button
-              v-if="authStore.isEditor"
+              v-if="canEditService"
               type="button"
               @click="suggestAllSongs"
               :disabled="!hasSermonContext || aiSuggestingAll"
@@ -228,9 +238,10 @@
               {{ pcCopied ? 'Copied!' : 'Copy for PC' }}
             </button>
 
-            <!-- Save button: editor only -->
+            <!-- Save button: editor only, removed while locked (31-UI-SPEC § 3)
+                 — there is nothing to save. -->
             <button
-              v-if="authStore.isEditor"
+              v-if="canEditService"
               type="button"
               @click="onSave"
               :disabled="!isDirty || isSaving"
@@ -595,8 +606,17 @@
         <div class="mb-3 rounded-lg bg-gray-900 border border-gray-800 p-3">
           <div class="flex items-center gap-4">
           <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">Teams</h2>
-          <!-- Editor: checkboxes -->
-          <div v-if="authStore.isEditor" class="flex flex-wrap items-center gap-4">
+          <!-- Editor: checkboxes. 31-UI-SPEC gate migration, CLASS B — this
+               block carried no lock term at all, so an `isExportedLocked` grep
+               never found it. Widened to `canEditService`; the viewer branch
+               below (class E) now absorbs the locked editor too.
+               The two `:disabled="isExportedLocked"` bindings that used to sit
+               inside were CLASS C (pure) and are DELETED, not rewritten: D-05 is
+               "removed, not disabled", this whole block is gone when locked, and
+               `:disabled="canEditService"` would have disabled the controls
+               exactly when editing IS allowed. Their orphaned
+               `disabled:opacity-50` classes go with them. -->
+          <div v-if="canEditService" class="flex flex-wrap items-center gap-4">
             <label
               v-for="team in AVAILABLE_TEAMS"
               :key="team"
@@ -606,8 +626,7 @@
                 type="checkbox"
                 :checked="localService.teams.includes(team)"
                 @change="toggleTeam(team)"
-                :disabled="isExportedLocked"
-                class="h-4 w-4 rounded border-gray-600 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-gray-900 disabled:opacity-50"
+                class="h-4 w-4 rounded border-gray-600 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-gray-900"
               />
               <span class="text-sm text-gray-200">{{ team }}</span>
             </label>
@@ -616,8 +635,7 @@
               v-model="localService.name"
               type="text"
               placeholder="e.g. Good Friday, Easter"
-              :disabled="isExportedLocked"
-              class="rounded-md bg-gray-800 border border-gray-700 text-indigo-300 text-sm px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500 w-48 disabled:opacity-50"
+              class="rounded-md bg-gray-800 border border-gray-700 text-indigo-300 text-sm px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500 w-48"
             />
           </div>
           <!-- Viewer: read-only text list -->
@@ -639,31 +657,37 @@
             <div class="flex-1 space-y-3">
               <div>
                 <p class="text-xs text-gray-500 mb-1">Sermon Topic</p>
-                <!-- Editor: editable input -->
+                <!-- Editor: editable input. CLASS B (no lock term today) →
+                     `canEditService`; D-07 locks sermon topic with no carve-out.
+                     Its `:disabled="isExportedLocked"` was CLASS C (pure) and is
+                     DELETED along with `disabled:opacity-50`. -->
                 <input
-                  v-if="authStore.isEditor"
+                  v-if="canEditService"
                   v-model="localService.sermonTopic"
                   type="text"
                   placeholder="e.g. Grace and forgiveness, The prodigal son"
-                  :disabled="isExportedLocked"
-                  class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                  class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 />
                 <!-- Viewer: read-only text -->
                 <p v-else class="text-sm text-gray-200">{{ localService.sermonTopic || '—' }}</p>
               </div>
               <div>
                 <p class="text-xs text-gray-500 mb-1">Sermon Passage</p>
-                <!-- Editor: ScriptureInput -->
+                <!-- Editor: ScriptureInput. CLASS A — the only true 1:1 shape. -->
                 <ScriptureInput
-                  v-if="authStore.isEditor && !isExportedLocked"
+                  v-if="canEditService"
                   :modelValue="localService.sermonPassage"
                   :sermonPassage="null"
                   :showOverlapWarning="false"
                   label="Sermon Passage"
                   @update:modelValue="onSermonPassageChange"
                 />
-                <!-- Exported lock: read-only passage -->
-                <p v-else-if="authStore.isEditor && isExportedLocked" class="text-sm text-gray-200">
+                <!-- Lifecycle lock: read-only passage. CLASS D — this is the
+                     INVERSE branch, so it keeps pointing at the locked state
+                     (`isLocked`, now `planned` as well as `exported`). Rewriting
+                     it to `canEditService` would delete the very rendering the
+                     line above depends on and leave a locked editor with nothing. -->
+                <p v-else-if="authStore.isEditor && isLocked" class="text-sm text-gray-200">
                   {{ localService.sermonPassage
                     ? `${localService.sermonPassage.book} ${localService.sermonPassage.chapter}:${localService.sermonPassage.verseStart}${localService.sermonPassage.verseEnd ? '-' + localService.sermonPassage.verseEnd : ''}`
                     : '—'
@@ -717,8 +741,16 @@
                 :class="{ 'bg-indigo-950/20': dragOverSection === group.key }"
                 :data-testid="`section-empty-${group.key}`"
               >
-                <p class="text-sm text-gray-500">No items yet</p>
-                <p class="mt-1 text-xs text-gray-600">
+                <!-- ★ Locked variant (31-UI-SPEC E1). The Phase 29 second line
+                     tells the user to drag an item in and to change a Section —
+                     both dead instructions when the drag handles and the section
+                     <select> are gone. Hiding the control while leaving the
+                     instruction is worse than either, so the copy changes and the
+                     second line drops entirely. The dashed border and the
+                     drag-over :class stay: Sortable is destroyed when locked, so
+                     `dragOverSection` never fires. -->
+                <p class="text-sm text-gray-500">{{ canEditService ? 'No items yet' : 'No items in this section.' }}</p>
+                <p v-if="canEditService" class="mt-1 text-xs text-gray-600">
                   {{ group.key === 'post-service'
                     ? 'Drag an item here, or set its Section to Post-Service — runs as people exit, e.g. a cycling announcement deck.'
                     : `Drag an item here, or set its Section to ${group.label}.` }}
@@ -731,8 +763,11 @@
               :data-testid="`slot-${index}`"
               :data-slot-id="slot.id"
             >
-            <!-- Drag handle: editor only -->
-            <div v-if="authStore.isEditor" class="cursor-grab active:cursor-grabbing text-gray-600 hover:text-gray-400 drag-handle flex-shrink-0 mt-0.5">
+            <!-- Drag handle: editor only, and only while editable. CLASS B — no
+                 lock term today, which is why drag-reorder still worked on an
+                 exported service. No placeholder gutter is left behind: the
+                 viewer layout already ships without this element. -->
+            <div v-if="canEditService" class="cursor-grab active:cursor-grabbing text-gray-600 hover:text-gray-400 drag-handle flex-shrink-0 mt-0.5">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M7 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM7 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM13 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/>
               </svg>
@@ -769,8 +804,10 @@
                       >CCLI {{ getCcliNumber(slot.songId) }}</a>
                     </template>
                   </div>
+                  <!-- Clear-song ×: CLASS A. The assigned-song row above keeps
+                       title / key / CCLI link when locked. -->
                   <button
-                    v-if="authStore.isEditor && !isExportedLocked"
+                    v-if="canEditService"
                     type="button"
                     @click="onClearSong(index)"
                     class="text-gray-500 hover:text-gray-300 transition-colors flex-shrink-0"
@@ -782,9 +819,11 @@
                   </button>
                 </div>
 
-                <!-- AI draft song display: editor only -->
+                <!-- AI draft song display: editor only. CLASS B — the lock term
+                     is ADDED beside the existing data condition; drafts are
+                     editor-only proposals and accepting one is a write. -->
                 <div
-                  v-if="authStore.isEditor && aiDraftSongs.has(index)"
+                  v-if="canEditService && aiDraftSongs.has(index)"
                   class="flex items-center justify-between gap-3 rounded-md bg-indigo-950/50 border border-indigo-800/60 px-3 py-2 mb-1"
                 >
                   <div class="flex-1 min-w-0">
@@ -817,9 +856,11 @@
                   </div>
                 </div>
 
-                <!-- Song picker: editor only, hidden when exported -->
+                <!-- Song picker: editor only, hidden while locked. CLASS A.
+                     The `v-else-if` below (class E) renders `Song — Empty` for
+                     an unassigned slot, unchanged. -->
                 <SongSlotPicker
-                  v-if="authStore.isEditor && !isExportedLocked"
+                  v-if="canEditService"
                   :requiredVwType="slot.requiredVwType"
                   :serviceTeams="localService.teams"
                   :currentSongId="slot.songId"
@@ -841,9 +882,9 @@
                 <div class="flex items-center gap-4" :data-scripture-slot-index="index">
                   <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">Scripture Reading</p>
                   <div class="flex-1">
-                    <!-- Editor: ScriptureInput -->
+                    <!-- Editor: ScriptureInput. CLASS A. -->
                     <ScriptureInput
-                      v-if="authStore.isEditor && !isExportedLocked"
+                      v-if="canEditService"
                       :modelValue="slotToScriptureRef(slot)"
                       :sermonPassage="localService.sermonPassage"
                       :showOverlapWarning="true"
@@ -853,10 +894,12 @@
                       label="Scripture Reading"
                       @update:modelValue="(ref) => onScriptureChange(index, ref)"
                     />
-                    <!-- Exported lock: read-only. ME-02 — one canonical
-                         formatter, not a second inline copy of the rule that
-                         spelled out a null verseEnd as "Psalms 103:null". -->
-                    <p v-else-if="authStore.isEditor && isExportedLocked" class="text-sm text-gray-200">
+                    <!-- Lifecycle lock: read-only. CLASS D — INVERSE branch, so
+                         it keeps pointing at the locked state (`isLocked`), now
+                         reached at `planned` as well as `exported`. ME-02 — one
+                         canonical formatter, not a second inline copy of the rule
+                         that spelled out a null verseEnd as "Psalms 103:null". -->
+                    <p v-else-if="authStore.isEditor && isLocked" class="text-sm text-gray-200">
                       {{ slotScriptureText(slot as ScriptureSlot) }}
                     </p>
                     <!-- Viewer: read-only text -->
@@ -881,8 +924,8 @@
                   <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Prayer</p>
                   <span class="text-xs text-gray-600 italic">No assignment needed</span>
                 </div>
-                <!-- Editor: editable link fields -->
-                <div v-if="authStore.isEditor && !isExportedLocked" class="flex items-center gap-2 mt-1">
+                <!-- Editor: editable link fields. CLASS A. -->
+                <div v-if="canEditService" class="flex items-center gap-2 mt-1">
                   <input
                     :value="(slot as NonAssignableSlot).linkLabel"
                     @input="(slot as NonAssignableSlot).linkLabel = ($event.target as HTMLInputElement).value"
@@ -928,8 +971,8 @@
                   <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Message</p>
                   <span class="text-xs text-gray-600 italic">No assignment needed</span>
                 </div>
-                <!-- Editor: editable link fields -->
-                <div v-if="authStore.isEditor && !isExportedLocked" class="flex items-center gap-2 mt-1">
+                <!-- Editor: editable link fields. CLASS A. -->
+                <div v-if="canEditService" class="flex items-center gap-2 mt-1">
                   <input
                     :value="(slot as NonAssignableSlot).linkLabel"
                     @input="(slot as NonAssignableSlot).linkLabel = ($event.target as HTMLInputElement).value"
@@ -974,8 +1017,8 @@
                 <div class="mb-1">
                   <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Hymn</p>
                 </div>
-                <!-- Editor: editable fields -->
-                <div v-if="authStore.isEditor && !isExportedLocked" class="flex flex-wrap items-center gap-2 mt-1">
+                <!-- Editor: editable fields. CLASS A. -->
+                <div v-if="canEditService" class="flex flex-wrap items-center gap-2 mt-1">
                   <input
                     :value="(slot as HymnSlot).hymnName"
                     @input="(slot as HymnSlot).hymnName = ($event.target as HTMLInputElement).value"
@@ -1018,9 +1061,13 @@
 
             </div>
 
-            <!-- Section-assignment control: editor only, hidden when exported (D005/R007) -->
+            <!-- Section-assignment control: editor only, hidden while locked
+                 (D005/R007). CLASS A. Nothing renders in its place and no
+                 information is lost: since Phase 29 every row sits inside a
+                 per-section container beneath a visible section header, so the
+                 section is already stated typographically. -->
             <select
-              v-if="authStore.isEditor && !isExportedLocked"
+              v-if="canEditService"
               data-testid="section-select"
               :value="slot.section ?? ''"
               @change="onSectionChange(index, ($event.target as HTMLSelectElement).value)"
@@ -1031,9 +1078,9 @@
               <option v-for="s in SERVICE_SECTIONS" :key="s" :value="s">{{ SERVICE_SECTION_LABELS[s] }}</option>
             </select>
 
-            <!-- Remove button: editor only, hidden when exported -->
+            <!-- Remove button: editor only, hidden while locked. CLASS A. -->
             <button
-              v-if="authStore.isEditor && !isExportedLocked"
+              v-if="canEditService"
               type="button"
               @click="removeSlot(index)"
               class="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0 mt-0.5"
@@ -1049,8 +1096,10 @@
           </template>
         </div>
 
-        <!-- Add Element button: editor only, hidden when exported -->
-        <div v-if="authStore.isEditor && !isExportedLocked" class="mt-2 relative">
+        <!-- Add Element button + menu: editor only, hidden while locked. CLASS A.
+             The tab does not read as broken with it gone — the sticky lock
+             banner is in view at every scroll position and says why. -->
+        <div v-if="canEditService" class="mt-2 relative">
           <button
             type="button"
             @click="showAddMenu = !showAddMenu"
@@ -1092,8 +1141,15 @@
           </div>
           <template v-else>
             <!-- Empty state: no quarter covers this service's date -->
+            <!-- ★ Locked variant (31-UI-SPEC E4): "assign roles manually below"
+                 is a dead instruction once the override picker is gone. Copy
+                 swap only — no restyle. -->
             <div v-if="!hasQuarterForServiceDate" class="rounded-lg bg-gray-900 border border-gray-800 p-4 mb-3">
-              <p class="text-sm text-gray-400">No schedule found for this date — assign roles manually below.</p>
+              <p class="text-sm text-gray-400" data-testid="roles-no-schedule-note">
+                {{ canEditService
+                  ? 'No schedule found for this date — assign roles manually below.'
+                  : 'No schedule found for this date.' }}
+              </p>
             </div>
 
             <div class="space-y-2">
@@ -1110,8 +1166,13 @@
                       class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-900/40 text-amber-300 border border-amber-800"
                     >Overridden</span>
                   </div>
+                  <!-- Reset to schedule: CLASS B. Its own line carried only a
+                       DATA condition and was editor-only by ancestry (the
+                       `<template v-else>` under the viewer branch above), so an
+                       `isExportedLocked` grep never found it. The lock term is
+                       ADDED beside the data condition, never substituted for it. -->
                   <button
-                    v-if="assignment.overriddenPersonIds !== null"
+                    v-if="canEditService && assignment.overriddenPersonIds !== null"
                     type="button"
                     @click="onResetRoleOverride(assignment.roleId)"
                     class="text-xs text-indigo-400 hover:text-indigo-300 transition-colors flex-shrink-0"
@@ -1122,8 +1183,17 @@
                 <p class="text-sm text-gray-300 mt-1">
                   {{ effectiveNames(assignment).length > 0 ? effectiveNames(assignment).join(', ') : 'Nobody scheduled' }}
                 </p>
-                <!-- Override picker: eligible people are those with this role (mirrors QuarterGrid.vue's hasRole) -->
-                <div class="mt-2 flex flex-wrap gap-3">
+                <!-- Override picker: eligible people are those with this role
+                     (mirrors QuarterGrid.vue's hasRole). CLASS B, and the most
+                     surprising entry in the table — this div had NO `v-if` of any
+                     kind, so nothing but ancestry kept it off a locked service.
+                     D-06's "assignments render as names, no checkboxes" is
+                     satisfied by removing it: the effective-names line above
+                     already renders unconditionally and falls back to
+                     `Nobody scheduled`, so no new markup is needed. The
+                     "No eligible people have this role" caption goes with it — it
+                     exists solely to explain an empty picker. -->
+                <div v-if="canEditService" class="mt-2 flex flex-wrap gap-3" data-testid="role-override-picker">
                   <label
                     v-for="person in eligiblePeople(assignment.roleId)"
                     :key="person.id"
@@ -1462,16 +1532,14 @@ const selectedPcTeamIds = ref<string[]>([])
 
 // ── Computed: editing guard ─────────────────────────────────────────────────────
 
-const isExportedLocked = computed(() =>
-  localService.value?.status === 'exported'
-)
-
 // ── R036 / R037 — the lifecycle lock seams ────────────────────────────────────
 //
-// `isLocked` widens `isExportedLocked` from `=== 'exported'` to `!== 'draft'`.
-// Both exist during this phase: 31-04 owns migrating the per-line gates off
-// `isExportedLocked` (a five-class migration — a blind find-and-replace inverts
-// three of the classes), and deletes it once no call site remains.
+// `isLocked` widened the retired `isExportedLocked` (`=== 'exported'`) to
+// `!== 'draft'`. ★ `isExportedLocked` is DELETED as of 31-04: it fired only at
+// `exported` and never at `planned`, which is half of R036, and leaving a
+// similarly-named computed alongside this one invites a future edit to reach for
+// the wrong one. The per-line migration off it was a five-class job (31-UI-SPEC
+// § gate migration) — a blind find-and-replace inverts three of the classes.
 
 const isLocked = computed(() => localService.value !== null && localService.value.status !== 'draft')
 
@@ -1591,6 +1659,7 @@ function setSectionListRef(key: ServiceSection | 'ungrouped', el: Element | Comp
  *  produces the same array shape a drag does — the array order the editor renders and
  *  the array order that gets persisted can never disagree. */
 function onSectionChange(index: number, value: string) {
+  if (!canEditService.value) return
   if (!localService.value) return
   const slot = localService.value.slots[index]
   if (!slot) return
@@ -1654,7 +1723,14 @@ const aiPerSlotError = ref(new Map<number, boolean>())
 // `Map<ServiceSection | 'ungrouped', Sortable>` (PATTERNS.md "Multi-instance
 // Sortable lifecycle").
 
-const canReorder = computed(() => authStore.isEditor && localService.value !== null)
+// ★ R036: this computed carried NO lock term until 31-04, so drag-reorder worked
+// on an exported service — a live defect, not a theoretical one. Composing
+// `canEditService` in also gives the Sortable teardown for free: the watcher
+// below already keys on `canReorder`, so the five per-section instances are
+// `destroy()`ed the moment the service locks and re-created the moment it
+// reopens. Without that pairing, hiding the handles would leave a reopened
+// service undraggable until a page reload.
+const canReorder = computed(() => canEditService.value && localService.value !== null)
 const sectionSortables = new Map<ServiceSection | 'ungrouped', Sortable>()
 
 function destroySectionSortables(): void {
@@ -1674,6 +1750,10 @@ function bucketForKey(
 
 async function onSlotSortEnd(evt: Sortable.SortableEvent): Promise<void> {
   dragOverSection.value = null
+  // R036: second lock over the Sortable instance itself. The instances are
+  // destroyed when `canReorder` goes false, so this is belt-and-braces — but a
+  // drag already in flight when the status changes must not land a write.
+  if (!canEditService.value) return
   if (!localService.value) return
   // Only the Draggable-suffixed indices honor the `draggable: '.slot-item'` selector.
   // `oldIndex`/`newIndex` count EVERY child of the container (with per-section
@@ -2183,7 +2263,14 @@ async function runReopen(): Promise<void> {
 
 // ── Team toggle ────────────────────────────────────────────────────────────────
 
+// ★ R036 / 30-VERIFICATION I-01: every mutation entry point below returns early
+// when the service is not editable, not merely when its control is hidden. A
+// lifecycle lock enforced only by template `v-if` inherits the fragility I-01
+// documented for the Slides tab — the control disappears, the write path does
+// not. `canEditService` (not `isLocked`) is the guard so a viewer is refused by
+// the same line.
 function toggleTeam(team: string) {
+  if (!canEditService.value) return
   if (!localService.value) return
   const teams = localService.value.teams
   const idx = teams.indexOf(team)
@@ -2197,6 +2284,7 @@ function toggleTeam(team: string) {
 // ── Dynamic slot add/remove ────────────────────────────────────────────────────
 
 function addSlot(kind: SlotKind, vwType?: VWType) {
+  if (!canEditService.value) return
   if (!localService.value) return
   // New slot inherits the current last slot's section — on a fully sectioned
   // service it lands at the end of that section rather than in the ungrouped
@@ -2242,6 +2330,7 @@ function performRemoveSlot(index: number) {
 }
 
 function removeSlot(index: number) {
+  if (!canEditService.value) return
   if (!localService.value) return
   const slot = localService.value.slots[index]
   if (!slot) return
@@ -2264,6 +2353,7 @@ function elementLabel(kind: SlotKind): string {
 }
 
 async function confirmSlotDelete() {
+  if (!canEditService.value) return
   if (pendingDeleteIndex.value == null) return
   const index = pendingDeleteIndex.value
   if (pendingDeleteIsClear.value) {
@@ -2317,6 +2407,7 @@ function onSelectSong(
   index: number,
   song: { id: string; title: string; key: string },
 ) {
+  if (!canEditService.value) return
   if (!localService.value) return
   const slot = localService.value.slots[index]
   if (!slot) return
@@ -2327,6 +2418,7 @@ function onSelectSong(
 }
 
 function onClearSong(index: number) {
+  if (!canEditService.value) return
   if (!localService.value) return
   const slot = localService.value.slots[index]
   if (!slot) return
@@ -2357,6 +2449,7 @@ function aiCacheKey(slotVwType: number): string {
 // ── Suggest All Songs ──────────────────────────────────────────────────────────
 
 async function suggestAllSongs() {
+  if (!canEditService.value) return
   if (!localService.value || !hasSermonContext.value) return
   aiSuggestingAll.value = true
 
@@ -2440,6 +2533,7 @@ async function suggestAllSongs() {
 // ── Fetch AI suggestions for a single slot (called by SongSlotPicker emit) ──────
 
 async function fetchAiForSlot(slotIndex: number) {
+  if (!canEditService.value) return
   if (!localService.value) return
   const slot = localService.value.slots[slotIndex]
   if (!slot || slot.kind !== 'SONG') return
@@ -2525,6 +2619,7 @@ async function fetchAiForSlot(slotIndex: number) {
 // ── Accept / Reject AI draft songs ─────────────────────────────────────────────
 
 function acceptAiSong(index: number) {
+  if (!canEditService.value) return
   const draft = aiDraftSongs.value.get(index)
   if (!draft) return
   onSelectSong(index, { id: draft.songId, title: draft.songTitle, key: draft.songKey })
@@ -2534,6 +2629,7 @@ function acceptAiSong(index: number) {
 }
 
 function rejectAiSong(index: number) {
+  if (!canEditService.value) return
   const newMap = new Map(aiDraftSongs.value)
   newMap.delete(index)
   aiDraftSongs.value = newMap
@@ -2563,6 +2659,7 @@ function slotScriptureText(slot: ScriptureSlot): string {
 }
 
 function onScriptureChange(index: number, ref: ScriptureRef | null) {
+  if (!canEditService.value) return
   if (!localService.value) return
   const slot = localService.value.slots[index]
   if (!slot) return
@@ -2578,6 +2675,7 @@ function onScriptureChange(index: number, ref: ScriptureRef | null) {
 }
 
 function onSermonPassageChange(ref: ScriptureRef | null) {
+  if (!canEditService.value) return
   if (!localService.value) return
   localService.value.sermonPassage = ref
 }
@@ -3066,7 +3164,13 @@ function eligiblePeople(roleId: string): Person[] {
   return rosterStore.activePeople.filter((p) => p.roles.includes(roleId))
 }
 
+// ★ R036: the Roles tab writes `roleAssignmentOverrides.{roleId}` through the
+// store DIRECTLY, bypassing `localService`/autosave — so a template-only gate
+// leaves the write path wide open. Both handlers guard. (The rules layer and the
+// store guard already deny these writes on a locked service; the UI must not
+// offer them, and must not fire a request it knows will be refused.)
 async function onToggleOverridePerson(assignment: ResolvedRoleAssignment, personId: string) {
+  if (!canEditService.value) return
   if (!localService.value) return
   const current = new Set(assignment.effectivePersonIds)
   if (current.has(personId)) {
@@ -3107,6 +3211,7 @@ async function onToggleOverridePerson(assignment: ResolvedRoleAssignment, person
 }
 
 async function onResetRoleOverride(roleId: string) {
+  if (!canEditService.value) return
   if (!localService.value) return
   await serviceStore.clearRoleOverride(localService.value.id, roleId)
 }
@@ -3181,6 +3286,9 @@ async function onSave() {
 // ── Undo (restore previous autosave snapshot) ───────────────────────────────────
 
 function onUndo() {
+  // R036: restoring a pre-lock snapshot is a write, and it triggers an autosave
+  // 500ms later that the store guard would then reject.
+  if (!canEditService.value) return
   if (!previousService.value) return
   // Restore previous snapshot — this will trigger another autosave after 0.5s
   localService.value = JSON.parse(JSON.stringify(previousService.value))
