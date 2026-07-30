@@ -244,6 +244,72 @@
           </div>
         </div>
 
+        <!-- D-05/D-06: THE lock banner. One element, rendered once, and its
+             "once" is guaranteed structurally — it sits here, outside all three
+             v-show tab panels, so switching tabs cannot re-render or duplicate
+             it. It is also directly beneath the status pill it explains.
+
+             sticky top-0: <main> in AppShell is the scroll container and nothing
+             between it and here sets overflow, so this pins to the top of the
+             scrollport. A locked service is otherwise exactly the "saves were
+             invisible above the fold" complaint waiting to happen — scroll to
+             the bottom of the Service Order tab, find no Add Element, and have
+             no explanation on screen. z-10 (not z-30) keeps it above page
+             content but BELOW the sidebar (z-30), its backdrop (z-20) and every
+             Teleported dialog (z-50). bg-amber-950 is opaque on purpose: page
+             content scrolls underneath a sticky element and would otherwise
+             read through the banner's own text.
+
+             Viewers do NOT see it: a viewer cannot edit at any status, so
+             "editing is locked" would explain a restriction that is not the
+             reason they cannot edit, and would hand them a Reopen button they
+             may not use — the dead affordance D-05 exists to eliminate.
+
+             Deliberately not a live region: this is persistent page furniture,
+             not an announcement, and aria-live here would re-announce on every
+             reactive touch. The lock glyph is aria-hidden — the sentence
+             already says "locked".
+
+             ★ 31-04 fills in the read-only tab renderings beneath this. The
+             banner ships HERE because lifecycleError needs a host that renders
+             while locked, and the autosave error line above is removed at
+             locked statuses. -->
+        <div
+          v-if="authStore.isEditor && isLocked"
+          class="sticky top-0 z-10 mb-3 flex flex-wrap items-center gap-3 rounded-md border border-amber-800 bg-amber-950 px-4 py-3"
+          data-testid="service-lock-banner"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
+               class="h-4 w-4 flex-none text-amber-400" aria-hidden="true">
+            <path fill-rule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clip-rule="evenodd" />
+          </svg>
+
+          <p class="min-w-0 flex-1 text-sm text-amber-200" data-testid="service-lock-banner-text">
+            <span class="font-medium">{{ lockBannerLead }}</span>
+            {{ lockBannerBody }}
+          </p>
+
+          <button
+            type="button"
+            data-testid="reopen-service-btn"
+            :disabled="isTransitioning"
+            class="flex-none rounded-md border border-amber-700 bg-amber-900/60 px-3 py-2 text-sm font-medium text-amber-100 transition-colors hover:bg-amber-900 disabled:opacity-50"
+            @click="onReopenRequest"
+          >
+            Reopen for editing
+          </button>
+
+          <!-- Failed-transition surface while LOCKED. basis-full drops it to its
+               own row beneath the copy and the Reopen button, which doubles as
+               the retry affordance. text-red-300 (not red-400) because it sits
+               on the opaque amber-950 fill rather than the gray-950 page. -->
+          <p
+            v-if="lifecycleError"
+            class="basis-full text-sm text-red-300"
+            data-testid="service-lock-banner-error"
+          >{{ lifecycleError }}</p>
+        </div>
+
         <!-- Delete confirmation dialog -->
         <Teleport to="body">
           <div v-if="showDeleteConfirm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
@@ -403,6 +469,60 @@
                   >{{ isExporting ? 'Exporting...' : exportMode === 'existing' ? 'Add to Plan' : 'Export' }}</button>
                 </div>
               </template>
+            </div>
+          </div>
+        </Teleport>
+
+        <!-- R037 reopen confirm (D-10). Opened ONLY when the service carries
+             real Planning Center export evidence; a `planned` service — or a
+             legacy `exported` one that the deleted cycle hand-set — reopens on
+             one click with no dialog. A dialog with nothing to warn about
+             trains people to click through the one that matters.
+
+             Shell copied from the delete-service confirm above (there is no
+             shared confirm component in this repo; every one is a hand-rolled
+             Teleport in its owning view), widened to max-w-md because this body
+             runs two paragraphs.
+
+             ★ The confirm button is INDIGO, not the red of the two delete
+             confirms. Reopening deletes nothing and is reversible in one click.
+             Colouring it red would teach users that red means "proceed", which
+             is the desensitisation D-10 guards against. -->
+        <Teleport to="body">
+          <div v-if="showReopenConfirm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+            <div class="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl p-6 w-full max-w-md mx-4"
+                 data-testid="reopen-confirm-dialog">
+              <h2 class="text-base font-semibold text-gray-100 mb-2">Reopen this service for editing?</h2>
+
+              <p class="text-sm text-gray-400 mb-3" data-testid="reopen-confirm-pc-warning">
+                {{ reopenPcWarning }}
+              </p>
+              <!-- This paragraph is true ONLY because the reopen keeps pcPlanId
+                   (D-11). If that ever changes, this sentence changes with it. -->
+              <p class="text-sm text-gray-400 mb-6">
+                Edits you make now won't reach Planning Center until you export again.
+                Re-exporting can update the same plan, so you won't create a duplicate.
+              </p>
+
+              <div class="flex justify-end gap-3">
+                <button
+                  type="button"
+                  :disabled="isTransitioning"
+                  @click="showReopenConfirm = false"
+                  class="rounded-md px-4 py-2 text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  data-testid="reopen-confirm-btn"
+                  :disabled="isTransitioning"
+                  @click="onConfirmReopen"
+                  class="rounded-md px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors disabled:opacity-50"
+                >
+                  Reopen for editing
+                </button>
+              </div>
             </div>
           </div>
         </Teleport>
@@ -1359,6 +1479,37 @@ const hasPcExportEvidence = computed(
   () => !!(localService.value?.pcExportedAt || localService.value?.pcPlanId),
 )
 
+// Conditional copy lives in computeds rather than template v-if branches,
+// mirroring deleteConfirmBody's precedent below.
+const lockBannerLead = computed(() =>
+  localService.value?.status === 'exported'
+    ? 'Exported — editing is locked.'
+    : 'Planned — editing is locked.',
+)
+
+const lockBannerBody = computed(() =>
+  hasPcExportEvidence.value
+    ? 'Planning Center already has this plan. Reopen it for editing to change the order, slides or roles here.'
+    : 'Reopen it for editing to change the order, slides or roles.',
+)
+
+/** Same locale/option shape as `formattedDate`, minus `weekday`. */
+const reopenPcWarning = computed(() => {
+  const exportedAt = localService.value?.pcExportedAt
+  const toDate = (exportedAt as { toDate?: () => Date } | null | undefined)?.toDate
+  const when = typeof toDate === 'function' ? toDate.call(exportedAt) : null
+  if (when) {
+    const formatted = when.toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    })
+    return `This service was exported to Planning Center on ${formatted}. That plan is still there — reopening here does not change or remove it.`
+  }
+  // pcPlanId present but no usable pcExportedAt — same sentence, no date clause.
+  return 'This service was exported to Planning Center. That plan is still there — reopening here does not change or remove it.'
+})
+
 // ── Sections (D005/R007/R043/R044) + live slideshow assembly (R005/R006 visible) ─
 
 /**
@@ -1958,6 +2109,52 @@ async function onMarkAsPlanned(): Promise<void> {
     // the whole point — a UI showing one status while the store holds another
     // is the "it didn't save" defect class this milestone exists to close.
     lifecycleError.value = "Couldn't mark this service as Planned. Check your connection and try again."
+  } finally {
+    isTransitioning.value = false
+  }
+}
+
+const showReopenConfirm = ref(false)
+
+/**
+ * D-10 — friction only where there are consequences.
+ *
+ * ★ Branches on EVIDENCE, not on the status string. A `planned` service and a
+ * legacy `exported` one that the deleted cycle hand-set both reopen on one
+ * click; only a service that genuinely reached Planning Center gets the dialog.
+ * Gating on `status === 'exported'` instead would show those legacy rows a
+ * warning that is simply false.
+ */
+function onReopenRequest(): void {
+  if (!localService.value || isTransitioning.value) return
+  if (hasPcExportEvidence.value) {
+    showReopenConfirm.value = true
+    return
+  }
+  void runReopen()
+}
+
+function onConfirmReopen(): void {
+  void runReopen()
+}
+
+async function runReopen(): Promise<void> {
+  if (!localService.value || isTransitioning.value) return
+  lifecycleError.value = null
+  isTransitioning.value = true
+  try {
+    await serviceStore.reopenService(localService.value.id)
+    applyTransitionLocally('draft')
+    showReopenConfirm.value = false
+  } catch (err) {
+    console.error('Reopen failed:', err)
+    // ★ No optimistic flip. The pill, the banner and every gate keep showing
+    // the OLD status; the banner's Reopen button is the retry. The dialog is
+    // dismissed on the way out because the banner — which hosts lifecycleError
+    // while locked — sits UNDERNEATH the overlay; leaving it open would strand
+    // the message behind the thing that failed.
+    lifecycleError.value = "Couldn't reopen this service. Check your connection and try again."
+    showReopenConfirm.value = false
   } finally {
     isTransitioning.value = false
   }
