@@ -83,6 +83,37 @@ Automated tests cover all of these except 31.14 and 31.15, which need a real bac
 - ☐ **31.17** Mark a Draft service with assigned songs as Planned, then check those songs' **last used**
   date. Expect it to update. That bump used to live inside the save path and moved with this wave.
 
+### Added by wave 4 (31-04) — the read-only tabs themselves
+
+52 automated tests cover the gates, the copy and the Sortable lifecycle at BOTH `planned` and
+`exported`. The five below are the parts a jsdom test cannot honestly assert: real pointer dragging,
+and whether a stripped screen *reads* as deliberate rather than broken.
+
+- ☐ **31.18** ★ **Reopen, then actually drag.** On a `planned` service, confirm the Service Order rows
+  have no drag grips and the Slides grid cards have none either. Click **Reopen for editing**, then —
+  **without reloading the page** — drag a Service Order row to a different section, and drag a slide
+  card within its group. Both must work. The unit tests prove the Sortable instances are destroyed and
+  re-created; only a real pointer proves the re-created instances are actually live. If dragging is
+  dead after a reopen, that is the regression this wave was written to prevent.
+- ☐ **31.19** Scroll to the bottom of a long locked Service Order tab. Expect the amber lock banner to
+  still be pinned at the top of the scrollport, and expect the tab NOT to read as broken with **Add
+  Element** gone. That "is it broken or is it locked?" judgement is the whole reason the banner is
+  sticky, and no test can make it.
+- ☐ **31.20** On a locked service, open the Slides tab and click a slide card. The **Edit Slide drawer
+  must still open**, showing the preview at size, the kind badge, the context line and any attached
+  audio with a working player — and a gray notice reading *"This service is locked — reopen it for
+  editing to change this slide."* If the drawer refuses to open, the lock over-reached: it removed a
+  view affordance in the name of a write lock.
+- ☐ **31.21** On a locked service, select a slide group that has **no** background music. Expect **no
+  empty bordered rectangle** where the group-music control used to be — the whole control should be
+  absent. Then select a group that DOES have music: the filename, the "plays across all N slides" line
+  and the ▶ preview must all still be there, with no × remove button.
+- ☐ **31.22** Eyeball the four locked empty states for tone: an empty Service Order section
+  (*"No items in this section."*, no second line), an empty slide group (*"No slides in this group." /
+  "Reopen the service for editing to add slides."*), the Slides rail on a service with no plan items,
+  and the Roles tab with no quarter schedule (*"No schedule found for this date."*). None may instruct
+  the reader to perform an action they cannot perform.
+
 ---
 
 ## Later phases

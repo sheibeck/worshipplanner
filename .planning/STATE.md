@@ -5,15 +5,15 @@ milestone_name: Service and Slides
 current_phase: 31
 current_phase_name: Service Lifecycle — Draft Lock & Reopen
 status: planning
-stopped_at: Completed 31-03-PLAN.md (wave 3 of 6)
-last_updated: "2026-07-30T14:40:47.019Z"
+stopped_at: Completed 31-04-PLAN.md (wave 4 of 6)
+last_updated: "2026-07-30T15:16:16.715Z"
 last_activity: 2026-07-29
 last_activity_desc: Phase 30 complete, transitioned to Phase 31
 progress:
   total_phases: 9
   completed_phases: 2
   total_plans: 15
-  completed_plans: 12
+  completed_plans: 13
   percent: 22
 ---
 
@@ -33,20 +33,25 @@ before deciding to stop for a checkpoint.
 
 - **Do not block on human-verify checkpoints.** Record each as DEFERRED in
   `.planning/PENDING-VERIFICATION.md`, then continue to the next wave/phase.
+
 - Complete phases whose only outstanding gate is human verification, marking the gate deferred rather
   than passed.
+
 - Proceed through Phases 31 → 37 without pausing for approval on ordinary implementation decisions.
 
 ### What this does NOT authorize
 
 - **Never record a deferred check as passed.** "Skip the checkpoint" means defer and disclose, not
   self-approve. A phase whose verification was deferred says so in its VERIFICATION.md.
+
 - **No deploys.** `firebase deploy` stays the owner's step (backlog Phase 999.3). Phase 37 remains
   "build but do not deploy" per the v1.4 standing decisions.
+
 - **No `.env.local` changes** — it holds live secrets and is gitignored.
 - **No destructive or irreversible actions** without asking: no `git stash` (multi-worktree repo), no
   project-wide `lint --fix`, no history rewrites, no bulk deletions of tracked files beyond what a
   plan explicitly scopes.
+
 - **Stop and ask** only when proceeding under any assumption would be unsafe or would make the work
   useless if the assumption is wrong. Otherwise pick the reasonable default, state it, and continue.
 
@@ -610,6 +615,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 30 P02 | 195 | 3 tasks | 9 files |
 | Phase 30 P03 | 21min | 3 tasks | 4 files |
 | Phase 30 P04 | 8h30min | 3 tasks | 14 files |
+| Phase 31 P04 | ~2h | 6 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -785,6 +791,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: R045 proven with this codebase's first permutation-property test (50 shuffles, no fast-check dependency added, per 30-CONTEXT.md)
 - [Phase ?]: R047 rebuilt around the SCRIPTURE slot's own book/chapter/verse fields as the slide's source, replacing the reading-document model an initial human-verify fix (3da5fe4) had linked -- the owner rejected that model live and required slot-as-source-of-truth (5c531b1)
 - [Phase ?]: Phase 30 human-verify failed twice on first pass (R054 drop-tile copy, R047 no slide appearing) and was fixed and re-verified live before final approval -- recorded honestly in 30-04-SUMMARY.md rather than presented as a clean pass
+- [Phase ?]: [Phase 31-04]: The gate migration is five classes, not a substitution — class C :disabled bindings are DELETED, class D inverse branches keep pointing at isLocked
+- [Phase ?]: [Phase 31-04]: The lifecycle lock composes INTO canMutate/canReorder, which is what makes Sortable teardown and rebuild automatic
+- [Phase ?]: [Phase 31-04]: serviceLocked is a prop distinct from isEditor — the drawer must tell a viewer from a locked editor to pick its copy
 
 ### Roadmap Evolution
 
@@ -846,6 +855,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-07-30T14:40:46.988Z
-Stopped at: Completed 31-03-PLAN.md (wave 3 of 6)
-Resume file: .planning/phases/31-service-lifecycle-draft-lock-reopen/31-04-PLAN.md
+Last session: 2026-07-30T15:16:03.306Z
+Stopped at: Completed 31-04-PLAN.md (wave 4 of 6)
+Resume file: .planning/phases/31-service-lifecycle-draft-lock-reopen/31-05-PLAN.md

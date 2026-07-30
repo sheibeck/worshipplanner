@@ -18,7 +18,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 
 ### Service Lifecycle
 
-- [ ] **R036** (core-capability): A service is editable only while its status is `draft`. At `planned`
+- [x] **R036** (core-capability): A service is editable only while its status is `draft`. At `planned`
       or `exported`, the Service Order, Slides and Roles tabs are all read-only. Enforcement is
       three-layer — Firestore rules, store guard, and UI — because `firestore.rules` has **zero**
       status-based write guard today, making any UI-only lock bypassable. `[ARCH]` `[PITFALL]`
@@ -228,7 +228,7 @@ Acknowledged, deferred, not in this roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R036 | Phase 31 | Pending |
+| R036 | Phase 31 | Complete |
 | R037 | Phase 31 | Pending |
 | R038 | Phase 31 | Pending |
 | R039 | Phase 32 | Pending |

@@ -165,12 +165,12 @@ Plans:
   3. Reopening a service that was already exported to Planning Center shows a warning that Planning Center still holds the previously exported version; reopening a never-exported service does not show that warning
   4. Creating a new service defaults its date to the nearest Sunday that doesn't already have a service plan
 
-**Plans**: 3/6 plans executed
+**Plans**: 4/6 plans executed
 
 - [x] 31-01-PLAN.md
 - [x] 31-02-PLAN.md
 - [x] 31-03-PLAN.md
-- [ ] 31-04-PLAN.md
+- [x] 31-04-PLAN.md
 - [ ] 31-05-PLAN.md
 - [ ] 31-06-PLAN.md
 
@@ -294,7 +294,7 @@ Plans:
 | 24-28 | v1.3 | 33/33 | Complete (archived) | 2026-07-28 |
 | 29. Order Structure — Stable Reordering & Post-Service | v1.4 | 5/5 | Complete    | 2026-07-28 |
 | 30. Slides Mirror the Plan — Hard Lock & Reconciliation Removed | v1.4 | 4/4 | Complete    | 2026-07-29 |
-| 31. Service Lifecycle — Draft Lock & Reopen | v1.4 | 3/6 | In Progress | - |
+| 31. Service Lifecycle — Draft Lock & Reopen | v1.4 | 4/6 | In Progress|  |
 | 32. Save Reliability — Autosave Fix & Persistent Status | v1.4 | 0/TBD | Not started | - |
 | 33. Backgrounds & Slide Editing | v1.4 | 0/TBD | Not started | - |
 | 34. Smarter Content — LLM Scripture Split | v1.4 | 0/TBD | Not started | - |
