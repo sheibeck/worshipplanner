@@ -867,9 +867,16 @@ this phase guessing and Phase 36 overwriting:
 > orchestrator verified the two blocking fixes directly against source rather than retry a third time
 > into an overloaded endpoint. What was checked, and the result:
 >
+> **★ Correction (2026-07-29, from `gsd-plan-checker`).** This note originally lumped `:134` in with
+> the pure class-C sites. It is not one: `:134` is
+> `:disabled="!hasSermonContext || aiSuggestingAll || isExportedLocked"` — **compound** — and its
+> button is class B, not removed by any plan. Only the `isExportedLocked` term is dropped. §Gate
+> migration `:92` always had this right; this summary line did not, and the error propagated into two
+> plans before being caught. Both are corrected.
+>
 > - **BLOCK 1 (Dim 2) — CLEARED.** Every disputed gate-migration classification was read from
->   `ServiceEditorView.vue` and confirmed: `:134`/`:453`/`:463`/`:492` are `:disabled="isExportedLocked"`
->   bindings (class C, delete the binding); `:510` and `:703` are
+>   `ServiceEditorView.vue` and confirmed: `:453`/`:463`/`:492` are pure
+>   `:disabled="isExportedLocked"` bindings (class C, delete the binding); `:510` and `:703` are
 >   `v-else-if="authStore.isEditor && isExportedLocked"` inverse read-only branches (class D);
 >   `:443` and `:579` are `v-if="authStore.isEditor"` with no lock term and `:631` is
 >   `v-if="authStore.isEditor && aiDraftSongs.has(index)"` (class B). **The revision's most surprising
