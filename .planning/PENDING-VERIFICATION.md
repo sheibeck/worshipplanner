@@ -61,6 +61,28 @@ would mean. Items are grouped by phase and ordered by the risk of the thing they
   to the third Sunday. Note whether the default team selection looks right for that date — changing the
   default date changes the ordinal-of-month, which drives team defaults.
 
+### Added by wave 3 (31-03) — the transitions themselves
+
+Automated tests cover all of these except 31.14 and 31.15, which need a real backend to fail against.
+
+- ☐ **31.13** Click the status pill on a Draft, a Planned and an Exported service. Expect **nothing to
+  happen** — no cursor change, no hover response, no status change. It is a `<span>` now. If it still
+  cycles, `toggleStatus` came back.
+- ☐ **31.14** ★ **A rejected transition must not flip the status.** Easiest way to force one: stop the
+  Firestore emulator, then click **Reopen for editing**. Expect the pill and the banner to keep saying
+  **Planned**/**Exported**, and a red line inside the banner reading *"Couldn't reopen this service.
+  Check your connection and try again."* Then do the same with **Mark as Planned** on a Draft — the
+  pill stays **Draft** and the red line appears inline beside the button. A UI that shows the NEW
+  status after a failed write is the exact defect this milestone exists to close.
+- ☐ **31.15** Export a service to Planning Center and then **wait ~2 seconds without touching
+  anything**. Expect no error, and no permission-denied write in the devtools console. Before this wave
+  the autosave fired a full-document write ~800ms after every export, against a service the rules layer
+  had just locked.
+- ☐ **31.16** Type an edit into a Draft service and click **Mark as Planned** immediately, before the
+  autosave settles. Expect the edit to survive — reload and confirm it is still there.
+- ☐ **31.17** Mark a Draft service with assigned songs as Planned, then check those songs' **last used**
+  date. Expect it to update. That bump used to live inside the save path and moved with this wave.
+
 ---
 
 ## Later phases
