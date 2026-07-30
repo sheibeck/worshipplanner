@@ -69,3 +69,21 @@ and passes, and the `exported` + `slots` shape *is* covered one layer up
 layer that has to stop it.
 
 **Fix:** add the B4 shape verbatim alongside the existing case.
+
+---
+
+## Newly dead: `serviceStore.assignSongToSlot` (created by the ME-02 fix, not a review finding)
+
+**File:** `src/stores/services.ts:225-250`
+
+ME-02 replaced the `lastUsedAt` bump's `assignSongToSlot` round trip with direct song-document writes.
+That was the store action's **only** remaining production caller — `onSelectSong`
+(`ServiceEditorView.vue:2602`) mutates `localService` locally and lets autosave persist it, and nothing
+else in `src/` calls it. It is now referenced only by its own tests.
+
+Deliberately **not** deleted here. Deleting an exported, separately-tested store action is a cleanup, not
+a review fix, and this repo has a precedent for flagging rather than removing dead code mid-phase
+(`isSlotPopulated`, flagged as IN-01 in `27-REVIEW.md` and still present). Recorded so the next author
+does not assume it is load-bearing.
+
+**Fix:** delete `assignSongToSlot` and its tests, or document it as a deliberately-retained store API.
