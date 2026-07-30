@@ -167,3 +167,46 @@ describe('SlidePlanRail', () => {
     })
   })
 })
+
+// ── 31-04: the rail's only lock-sensitive surface is its empty state (R036) ───
+describe('SlidePlanRail - locked service (R036)', () => {
+  it('replaces the dead "go add them on the Service Order tab" instruction when locked', () => {
+    const wrapper = mount(SlidePlanRail, {
+      props: {
+        slots: [],
+        assembledSlideshow: [],
+        groupsBySlotId: new Map(),
+        selectedSlotId: null,
+        groupsLoading: false,
+        serviceLocked: true,
+      },
+    })
+
+    const empty = wrapper.get('[data-testid="rail-empty-state"]')
+    expect(empty.text()).toContain('Nothing planned yet')
+    expect(empty.text()).toContain('This service has no plan items. Reopen it for editing to add some.')
+    // The unlocked body sends the user to a tab where they can no longer add.
+    expect(empty.text()).not.toContain("they'll show up here automatically")
+  })
+
+  it('defaults serviceLocked to false, keeping the shipped copy for every existing caller', () => {
+    const wrapper = mountRail({ slots: [] })
+    expect(wrapper.get('[data-testid="rail-empty-state"]').text()).toContain('Service Order')
+  })
+
+  it('★ leaves the standing "order locked" caption alone — a different lock entirely', () => {
+    const wrapper = mount(SlidePlanRail, {
+      props: {
+        slots: [makeSlot({ kind: 'PRAYER', id: 'slot-a', position: 0 })],
+        assembledSlideshow: [],
+        groupsBySlotId: new Map(),
+        selectedSlotId: null,
+        groupsLoading: false,
+        serviceLocked: true,
+      },
+    })
+    // That caption is about slide ORDER following the plan (Phase 25, D-06),
+    // not the lifecycle lock. Unfortunate word collision, deliberate no-op.
+    expect(wrapper.text()).toContain('order locked')
+  })
+})

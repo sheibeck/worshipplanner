@@ -561,3 +561,49 @@ describe('SlidesTab', () => {
     })
   })
 })
+
+// ── 31-04: serviceLocked is threaded, and kept DISTINCT from isEditor (R036) ──
+describe('SlidesTab - lifecycle lock threading (R036)', () => {
+  function mountLockedTab(serviceLocked: boolean) {
+    return shallowMount(SlidesTab, {
+      props: {
+        slots: [makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })],
+        serviceId: 'service-1',
+        orgId: 'org-1',
+        assembledSlideshow: [makeAssembled(0, 'c1')],
+        groupsBySlotId: new Map(),
+        isEditor: true,
+        serviceLocked,
+        groupsLoading: false,
+        active: true,
+        ensureGroupMaterialized: vi.fn().mockResolvedValue(undefined),
+      },
+    })
+  }
+
+  it('defaults serviceLocked to false, so a fixture that omits it behaves exactly as before', () => {
+    const wrapper = mountTab({ slots: [makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })] })
+    expect(wrapper.findComponent(SlideGrid).props('serviceLocked')).toBe(false)
+    expect(wrapper.findComponent(EditSlideDrawer).props('serviceLocked')).toBe(false)
+    expect(wrapper.findComponent(SlidePlanRail).props('serviceLocked')).toBe(false)
+  })
+
+  it('passes serviceLocked to the rail, the grid and the drawer WITHOUT touching isEditor', async () => {
+    const wrapper = mountLockedTab(true)
+    await wrapper.vm.$nextTick()
+
+    for (const child of [SlidePlanRail, SlideGrid, EditSlideDrawer] as const) {
+      expect(wrapper.findComponent(child).props('serviceLocked')).toBe(true)
+    }
+    // ★ The distinction the drawer's read-only copy depends on: a locked editor
+    // is not a viewer, and overloading isEditor here would erase that.
+    expect(wrapper.findComponent(SlideGrid).props('isEditor')).toBe(true)
+    expect(wrapper.findComponent(EditSlideDrawer).props('isEditor')).toBe(true)
+  })
+
+  it('D-08: Present stays enabled while locked — it is not an editing action', () => {
+    const wrapper = mountLockedTab(true)
+    const cta = wrapper.get('[data-testid="present-slideshow-cta"]')
+    expect(cta.attributes('disabled')).toBeUndefined()
+  })
+})

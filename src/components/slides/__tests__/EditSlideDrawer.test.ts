@@ -1523,3 +1523,117 @@ describe('EditSlideDrawer (R054 — song groups are read-only)', () => {
   })
 })
 
+
+// ── 31-04: the drawer opens read-only on a locked service (R036) ──────────────
+describe('EditSlideDrawer - locked service (R036)', () => {
+  const songPlanItem = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songTitle: 'This Is Our God' } as never)
+
+  beforeEach(() => {
+    mockReplaceGroupSlides.mockClear()
+    mockSetGroupBedMedia.mockClear()
+  })
+
+  it('★ still OPENS when locked — it is the only surface showing a slide at size', () => {
+    mountDrawer({ serviceLocked: true })
+
+    expect(body().find('[data-testid="edit-slide-drawer"]').exists()).toBe(true)
+    // Everything that is a VIEW affordance stays.
+    expect(body().find('[data-testid="drawer-preview"]').exists()).toBe(true)
+    expect(body().find('[data-testid="drawer-kind-badge"]').exists()).toBe(true)
+    expect(body().find('[data-testid="drawer-context-line"]').exists()).toBe(true)
+  })
+
+  it('drops every mutation control when locked', () => {
+    mountDrawer({ serviceLocked: true })
+
+    expect(body().find('[data-testid="drawer-label-input"]').exists()).toBe(false)
+    expect(body().find('[data-testid="drawer-notes-input"]').exists()).toBe(false)
+    expect(body().find('[data-testid="audio-scope-choice"]').exists()).toBe(false)
+    expect(body().find('[data-testid="audio-attach"]').exists()).toBe(false)
+    expect(body().find('[data-testid="drawer-footer-actions"]').exists()).toBe(false)
+  })
+
+  // ★ The dynamic :data-testid is what keeps the two pre-existing assertions in
+  // this file green with zero churn: `drawer-song-readonly-notice` still means
+  // "song group", and never leaks onto the lifecycle-lock state.
+  it('renders drawer-service-locked-notice (NOT the song testid) for a locked non-song group', () => {
+    mountDrawer({ serviceLocked: true })
+
+    const notice = body().find('[data-testid="drawer-service-locked-notice"]')
+    expect(notice.exists()).toBe(true)
+    expect(notice.text()).toBe('This service is locked — reopen it for editing to change this slide.')
+    expect(body().find('[data-testid="drawer-song-readonly-notice"]').exists()).toBe(false)
+  })
+
+  it('★ never stacks two notices — the song-group message wins, as the more specific restriction', () => {
+    const { entry, assembledSlide } = makeLyricFixtures()
+    mountDrawer({
+      planItem: songPlanItem,
+      entry,
+      assembledSlide,
+      group: makeGroup({ slides: [entry] }),
+      serviceLocked: true,
+    })
+
+    expect(body().findAll('[data-testid="drawer-song-readonly-notice"]')).toHaveLength(1)
+    expect(body().find('[data-testid="drawer-service-locked-notice"]').exists()).toBe(false)
+    // A song's slides stay non-editable here even AFTER a reopen, which is why
+    // that message is the more actionable one.
+    expect(body().find('[data-testid="drawer-song-readonly-notice"]').text()).toMatch(/Song Lyrics/)
+  })
+
+  it('a viewer on an unlocked service still gets no notice — role is not a lifecycle lock', () => {
+    mountDrawer({ isEditor: false })
+    expect(body().find('[data-testid="drawer-service-locked-notice"]').exists()).toBe(false)
+    expect(body().find('[data-testid="drawer-song-readonly-notice"]').exists()).toBe(false)
+  })
+
+  it('the loop checkbox is disabled when locked, and its handler refuses the write', async () => {
+    const entry = makeEntry({ id: 'entry-1', audioUrl: 'https://storage.example.com/a.mp3', audioScope: 'slide' })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }), serviceLocked: true })
+
+    const checkbox = body().find('[data-testid="audio-loop-checkbox"]')
+    expect(checkbox.exists()).toBe(true)
+    expect(checkbox.attributes('disabled')).toBeDefined()
+
+    await checkbox.trigger('change')
+    await flushPromises()
+    expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
+  })
+
+  // ---- ★ Handler-level guards (30-VERIFICATION I-01) -----------------------
+  it('★ every mutation handler no-ops when locked, called directly rather than through its hidden control', async () => {
+    const entry = makeEntry({ id: 'entry-1', audioUrl: 'https://storage.example.com/a.mp3', audioScope: 'slide' })
+    const wrapper = mountDrawer({ entry, group: makeGroup({ slides: [entry] }), serviceLocked: true })
+    const vm = wrapper.vm as unknown as {
+      writeField: (f: string, id: string, v: string) => Promise<void>
+      onRemoveAudio: () => Promise<void>
+      onDuplicate: () => Promise<void>
+      onDeleteTrigger: () => void
+      showDeleteConfirm: boolean
+      onConfirmDelete: () => Promise<void>
+    }
+
+    await vm.writeField('label', 'entry-1', 'renamed')
+    await vm.onRemoveAudio()
+    await vm.onDuplicate()
+    vm.onDeleteTrigger()
+    await vm.onConfirmDelete()
+    await flushPromises()
+
+    expect(vm.showDeleteConfirm).toBe(false)
+    expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
+    expect(mockSetGroupBedMedia).not.toHaveBeenCalled()
+    expect(wrapper.emitted('duplicate')).toBeUndefined()
+  })
+
+  it('the same handlers DO act on an unlocked service — the guard is the lock, not a blanket no-op', async () => {
+    const entry = makeEntry({ id: 'entry-1' })
+    const wrapper = mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+    const vm = wrapper.vm as unknown as { writeField: (f: string, id: string, v: string) => Promise<void> }
+
+    await vm.writeField('label', 'entry-1', 'renamed')
+    await flushPromises()
+    expect(mockReplaceGroupSlides).toHaveBeenCalled()
+  })
+})

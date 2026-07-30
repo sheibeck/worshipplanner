@@ -217,6 +217,8 @@ function mountGrid(props: {
   selectedSlideId?: string | null
   group?: SlideGroup | null
   isEditor?: boolean
+  /** R036 (31-04) — defaults false, so every pre-existing call keeps its behaviour. */
+  serviceLocked?: boolean
   orgId?: string
   serviceId?: string
   ensureGroupMaterialized?: (slotId: string) => Promise<EnsureGroupMaterializedResult | undefined>
@@ -231,6 +233,7 @@ function mountGrid(props: {
       selectedSlideId: props.selectedSlideId ?? null,
       group: props.group ?? null,
       isEditor: props.isEditor ?? true,
+      serviceLocked: props.serviceLocked ?? false,
       orgId: props.orgId ?? 'org-1',
       serviceId: props.serviceId ?? 'service-1',
       ensureGroupMaterialized: props.ensureGroupMaterialized ?? vi.fn().mockResolvedValue(undefined),
@@ -1351,5 +1354,142 @@ describe('SlideGrid - Phase 29 reorder repro', () => {
     await wrapper.vm.$nextTick()
 
     expect(wrapper.find('[data-testid="slide-grid-reorder-error"]').exists()).toBe(false)
+  })
+})
+
+// ── 31-04: the lifecycle lock composes into this grid's existing seams (R036) ──
+describe('SlideGrid - locked service (R036)', () => {
+  function makeSongSlot(id = 'slot-1') {
+    return makeSlot({ kind: 'SONG', id, position: 0, songId: 'song-1', songTitle: 'This Is Our God', songKey: null, requiredVwType: 1 } as never)
+  }
+
+  it('removes ＋ Add slide, ⇪ Import and the drop tile — removed, never disabled (D-05)', () => {
+    const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+    const wrapper = mountGrid({ selectedSlot: slot, serviceLocked: true })
+
+    expect(wrapper.find('[data-testid="slide-grid-add-slide"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="slide-grid-import"]').exists()).toBe(false)
+    expect(wrapper.findComponent(SlideDropTarget).exists()).toBe(false)
+    // The header keeps everything that is information rather than affordance.
+    expect(wrapper.find('[data-testid="slide-grid-title"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="slide-grid-position"]').exists()).toBe(true)
+  })
+
+  it('adds NO second read-only chip — the page banner already states the reason once (D-06)', () => {
+    const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+    const wrapper = mountGrid({ selectedSlot: slot, serviceLocked: true })
+    // The R054 song chip explains a DIFFERENT restriction and must not appear
+    // for a non-song group just because the service is locked.
+    expect(wrapper.find('[data-testid="slide-grid-song-readonly-badge"]').exists()).toBe(false)
+  })
+
+  it('swaps the empty-state copy instead of leaving a dead "drop a file below" instruction', () => {
+    const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+    const wrapper = mountGrid({ selectedSlot: slot, assembledSlideshow: [], serviceLocked: true })
+
+    const empty = wrapper.get('[data-testid="slide-grid-empty-state"]')
+    expect(empty.text()).toContain('No slides in this group.')
+    expect(empty.text()).toContain('Reopen the service for editing to add slides.')
+    expect(empty.text()).not.toContain('Add a slide, or drop a file below.')
+  })
+
+  it('renders NO group music control at all when locked with no bed audio (E5 — no empty bordered box)', () => {
+    const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+    const wrapper = mountGrid({ selectedSlot: slot, group: makeGroup({ slides: [] }), serviceLocked: true })
+    expect(wrapper.findComponent(SlideGroupMusicControl).exists()).toBe(false)
+  })
+
+  it('still renders the group music control when a bed IS attached — playback is not mutation', () => {
+    const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+    const group = makeGroup({ bedAudioUrl: 'https://storage.example.com/pad.mp3', slides: [] })
+    const wrapper = mountGrid({ selectedSlot: slot, group, serviceLocked: true })
+
+    const control = wrapper.findComponent(SlideGroupMusicControl)
+    expect(control.exists()).toBe(true)
+    // ...but with no remove affordance, because that IS mutation.
+    expect(control.props('isEditor')).toBe(false)
+  })
+
+  it('hands SlideCard reorderable=false and creates no Sortable instance while locked', () => {
+    const group = makeGroup({ slides: [{ id: 'e1', order: 0, sourceRef: { kind: 'text', title: 'a', body: '' } }] })
+    const wrapper = mountGrid({
+      selectedSlot: makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 }),
+      assembledSlideshow: [makeAssembled(0, 'e1')],
+      group,
+      serviceLocked: true,
+    })
+    expect(wrapper.find('[data-testid="slide-card-drag-handle"]').exists()).toBe(false)
+    expect(capturedSortableOptions).toBeUndefined()
+  })
+
+  it('★ destroys the Sortable instance when the service locks and re-creates it on reopen', async () => {
+    const group = makeGroup({ slides: [{ id: 'e1', order: 0, sourceRef: { kind: 'text', title: 'a', body: '' } }] })
+    const wrapper = mountGrid({
+      selectedSlot: makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 }),
+      assembledSlideshow: [makeAssembled(0, 'e1')],
+      group,
+    })
+    await wrapper.vm.$nextTick()
+    expect(capturedSortableOptions).toBeDefined()
+    expect(mockSortableDestroy).not.toHaveBeenCalled()
+
+    await wrapper.setProps({ serviceLocked: true })
+    await wrapper.vm.$nextTick()
+    expect(mockSortableDestroy).toHaveBeenCalled()
+
+    // ★ The regression: without the destroy/re-create pairing, reopening leaves
+    // this grid permanently undraggable until a page reload.
+    capturedSortableOptions = undefined
+    await wrapper.setProps({ serviceLocked: false })
+    await wrapper.vm.$nextTick()
+    expect(capturedSortableOptions).toBeDefined()
+    expect(capturedSortableOptions!.handle).toBe('.drag-handle')
+  })
+
+  // ---- ★ Handler-level guards (30-VERIFICATION I-01) ------------------------
+  //
+  // Six of the seven mutation entry points here were guarded by template `v-if`
+  // ALONE. Calling each directly proves the lock is not merely cosmetic.
+  it('★ every mutation handler no-ops when locked, called directly rather than through its hidden control', async () => {
+    const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+    const group = makeGroup({ slides: [{ id: 'e1', order: 0, sourceRef: { kind: 'text', title: 'a', body: '' } }] })
+    const ensure = vi.fn().mockResolvedValue({ entries: group.slides, sourceSignature: null })
+    const wrapper = mountGrid({ selectedSlot: slot, group, serviceLocked: true, ensureGroupMaterialized: ensure })
+    const vm = wrapper.vm as unknown as {
+      onAddSlide: () => Promise<void>
+      openImportModal: () => void
+      showImportModal: boolean
+      onImportConfirmed: (p: { importId: string; section: string }) => Promise<void>
+      onFilesDropped: (files: File[]) => Promise<void>
+      onAttachGroupMusic: (url: string) => Promise<void>
+      onRemoveGroupMusic: () => Promise<void>
+    }
+
+    await vm.onAddSlide()
+    vm.openImportModal()
+    await vm.onImportConfirmed({ importId: 'imp-1', section: 'worship' })
+    await vm.onFilesDropped([makeFile('deck.pptx', 'application/vnd.openxmlformats-officedocument.presentationml.presentation')])
+    await vm.onFilesDropped([makeFile('pad.mp3', 'audio/mpeg')])
+    await vm.onAttachGroupMusic('https://storage.example.com/new.mp3')
+    await vm.onRemoveGroupMusic()
+
+    expect(vm.showImportModal).toBe(false)
+    expect(ensure).not.toHaveBeenCalled()
+    expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
+    expect(mockSetGroupBedMedia).not.toHaveBeenCalled()
+    expect(mockUploadMedia).not.toHaveBeenCalled()
+  })
+
+  it('a song group on a DRAFT service keeps its group-media affordance — the two locks are distinct', () => {
+    const wrapper = mountGrid({ selectedSlot: makeSongSlot(), serviceLocked: false })
+    // R054 removes create/import/reorder but NOT group media (30-03).
+    expect(wrapper.find('[data-testid="slide-grid-add-slide"]').exists()).toBe(false)
+    expect(wrapper.findComponent(SlideGroupMusicControl).props('isEditor')).toBe(true)
+  })
+
+  it('a song group on a LOCKED service loses group media too', () => {
+    const group = makeGroup({ bedAudioUrl: 'https://storage.example.com/pad.mp3', slides: [] })
+    const wrapper = mountGrid({ selectedSlot: makeSongSlot(), group, serviceLocked: true })
+    expect(wrapper.findComponent(SlideGroupMusicControl).props('isEditor')).toBe(false)
   })
 })

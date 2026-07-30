@@ -2703,3 +2703,364 @@ describe('ServiceEditorView - service lifecycle transitions (R036, R037)', () =>
     expect(suggestBtn!.attributes('title')).not.toContain('cycle badge')
   })
 })
+
+// ── 31-04: the three tabs go read-only when the service is locked (R036) ──────
+//
+// ★ Every assertion below runs at BOTH `planned` and `exported`. That symmetry
+// IS the bug being fixed: the retired `isExportedLocked` fired only at
+// `exported`, so a `planned` service went on offering every mutation control it
+// was supposed to have lost. A suite that only exercised `exported` would pass
+// against the defect.
+describe('ServiceEditorView - locked service renders all three tabs read-only (R036)', () => {
+  async function mountView() {
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          RouterLink: { template: '<a><slot /></a>' },
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+          teleport: false,
+        },
+      },
+    })
+  }
+
+  const SCHEDULED_QUARTER: Quarter = {
+    id: 'q1',
+    label: 'Q1 2026',
+    year: 2026,
+    quarter: 1,
+    serviceDates: ['2026-03-08'],
+    roleOverridesByDate: {},
+    personQuarterData: {},
+    calendar: { '2026-03-08': { 'role-vox': ['person-1'] } },
+    status: 'finalized',
+    shareToken: null,
+    createdAt: mockTimestamp,
+    updatedAt: mockTimestamp,
+  }
+
+  const LOCKED_STATUSES = ['planned', 'exported'] as const
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockQuarters = [SCHEDULED_QUARTER]
+    mockUpdateService.mockClear()
+    mockSetRoleOverride.mockClear()
+    mockClearRoleOverride.mockClear()
+    mockMarkAsPlanned.mockClear()
+    mockMarkAsPlanned.mockImplementation(() => Promise.resolve())
+    mockReopenService.mockClear()
+    mockReopenService.mockImplementation(() => Promise.resolve())
+    resetSortableCaptures()
+  })
+
+  async function openRolesTab(wrapper: Awaited<ReturnType<typeof mountView>>) {
+    const rolesTabBtn = wrapper.findAll('button').find((b) => b.text() === 'Roles')
+    await rolesTabBtn!.trigger('click')
+  }
+
+  // ---- Service Order (D-06) -------------------------------------------------
+
+  for (const status of LOCKED_STATUSES) {
+    it(`${status}: Service Order offers no drag handle, Add Element, section select or remove control`, async () => {
+      mockServicesList = [{ ...mockService, status }]
+      const wrapper = await mountView()
+
+      expect(wrapper.findAll('.drag-handle')).toHaveLength(0)
+      expect(wrapper.findAll('button').some((b) => b.text().includes('Add Element'))).toBe(false)
+      expect(wrapper.findAll('[data-testid="section-select"]')).toHaveLength(0)
+      expect(wrapper.findAll('button').some((b) => b.attributes('title') === 'Remove element')).toBe(false)
+      expect(wrapper.findAll('button').some((b) => b.attributes('title') === 'Remove song')).toBe(false)
+    })
+
+    it(`${status}: Teams checkboxes and the Sermon Topic input are REMOVED, not disabled`, async () => {
+      mockServicesList = [{ ...mockService, status, sermonTopic: 'Grace' }]
+      const wrapper = await mountView()
+
+      // D-05: removed, not disabled. A `:disabled` binding rewritten instead of
+      // deleted would leave these in the DOM.
+      expect(wrapper.findAll('input[type="checkbox"]')).toHaveLength(0)
+      expect(wrapper.findAll('input[type="text"]')).toHaveLength(0)
+      // Class E: the shipped viewer branch now absorbs the locked editor.
+      expect(wrapper.text()).toContain('Choir')
+      expect(wrapper.text()).toContain('Grace')
+    })
+
+    it(`${status}: the sermon passage renders through the class-D inverse branch, not nothing`, async () => {
+      mockServicesList = [{ ...mockService, status }]
+      const wrapper = await mountView()
+
+      // Substituting canEditService into that `v-else-if` would have deleted this
+      // rendering and left a locked editor staring at a bare field label.
+      expect(wrapper.text()).toContain('Romans 8:1-11')
+    })
+
+    it(`${status}: the same fixture at draft DOES still offer them — the gate is the status`, async () => {
+      mockServicesList = [{ ...mockService, status: 'draft' }]
+      const draft = await mountView()
+      expect(draft.findAll('.drag-handle').length).toBeGreaterThan(0)
+      expect(draft.findAll('[data-testid="section-select"]').length).toBeGreaterThan(0)
+      draft.unmount()
+
+      mockServicesList = [{ ...mockService, status }]
+      const locked = await mountView()
+      expect(locked.findAll('.drag-handle')).toHaveLength(0)
+    })
+
+    // ---- Roles (D-06) -------------------------------------------------------
+
+    it(`${status}: Roles renders assignments as names, with no checkboxes and no Reset to schedule`, async () => {
+      mockServicesList = [{
+        ...mockService,
+        status,
+        roleAssignmentOverrides: { 'role-drums': ['person-2'] },
+      }]
+      const wrapper = await mountView()
+      await openRolesTab(wrapper)
+
+      expect(wrapper.find('[data-testid="role-override-picker"]').exists()).toBe(false)
+      expect(wrapper.findAll('button').some((b) => b.text() === 'Reset to schedule')).toBe(false)
+      // The names line — the "names not checkboxes" rendering D-06 asks for —
+      // already rendered unconditionally, so no new markup was needed.
+      expect(wrapper.text()).toContain('Vocals')
+      expect(wrapper.text()).toContain('Alice')
+      // The `Overridden` badge is STATUS, not a control: it stays.
+      expect(wrapper.text()).toContain('Overridden')
+    })
+
+    it(`${status}: the Roles viewer branch is untouched — a viewer still gets its own note`, async () => {
+      mockAuthState.isEditor = false
+      mockServicesList = [{ ...mockService, status }]
+      const wrapper = await mountView()
+
+      // Class E. The tab BUTTON is editor-only; the PANEL's viewer branch is not,
+      // and deleting it would strand viewers with an empty panel.
+      expect(wrapper.text()).toContain('visible via the shared service link')
+    })
+
+    // ---- D-08: the non-editing carve-outs stay live --------------------------
+
+    it(`${status}: Print, Share, Copy for PC and Delete all stay rendered and enabled`, async () => {
+      mockServicesList = [{ ...mockService, status }]
+      const wrapper = await mountView()
+
+      const printBtn = wrapper.find('[data-testid="print-btn"]')
+      expect(printBtn.exists()).toBe(true)
+      expect(printBtn.attributes('disabled')).toBeUndefined()
+
+      const copyBtn = wrapper.find('[data-testid="copy-pc-btn"]')
+      expect(copyBtn.exists()).toBe(true)
+      expect(copyBtn.attributes('disabled')).toBeUndefined()
+
+      const shareBtn = wrapper.findAll('button').find((b) => b.text() === 'Share')
+      expect(shareBtn).toBeDefined()
+      expect(shareBtn!.attributes('disabled')).toBeUndefined()
+
+      expect(wrapper.findAll('button').some((b) => b.text() === 'Delete')).toBe(true)
+    })
+
+    it(`${status}: SlidesTab is told the service is locked, WITHOUT overloading isEditor`, async () => {
+      mockServicesList = [{ ...mockService, status }]
+      const wrapper = await mountView()
+
+      const tab = wrapper.findComponent(SlidesTab)
+      expect(tab.props('serviceLocked')).toBe(true)
+      // ★ isEditor is NOT overloaded: the drawer must be able to tell "you are a
+      // viewer" from "the service is locked" — they need different copy. Present
+      // (D-08) is gated on neither, so it stays live.
+      expect(tab.props('isEditor')).toBe(true)
+    })
+
+    // ---- No dead instructions (Task 5) --------------------------------------
+
+    it(`${status}: the empty-section placeholder drops its drag/section instruction`, async () => {
+      mockServicesList = [{ ...mockService, status }]
+      const wrapper = await mountView()
+
+      const placeholder = wrapper.find('[data-testid="section-empty-worship"]')
+      expect(placeholder.exists()).toBe(true)
+      expect(placeholder.text()).toContain('No items in this section.')
+      expect(placeholder.text()).not.toContain('Drag an item here')
+      expect(placeholder.text()).not.toContain('set its Section')
+    })
+
+    it(`${status}: the Roles no-schedule note drops "assign roles manually below"`, async () => {
+      mockQuarters = [] // no quarter covers 2026-03-08
+      mockServicesList = [{ ...mockService, status }]
+      const wrapper = await mountView()
+      await openRolesTab(wrapper)
+
+      const note = wrapper.find('[data-testid="roles-no-schedule-note"]')
+      expect(note.exists()).toBe(true)
+      expect(note.text()).toBe('No schedule found for this date.')
+      expect(note.text()).not.toContain('assign roles manually')
+    })
+  }
+
+  it('draft keeps both instructions — the locked copy is a swap, not a deletion', async () => {
+    mockQuarters = []
+    mockServicesList = [{ ...mockService, status: 'draft' }]
+    const wrapper = await mountView()
+
+    expect(wrapper.find('[data-testid="section-empty-worship"]').text()).toContain('Drag an item here')
+    await openRolesTab(wrapper)
+    expect(wrapper.find('[data-testid="roles-no-schedule-note"]').text()).toContain('assign roles manually below')
+  })
+
+  // ---- D-06: exactly one banner, guaranteed structurally --------------------
+
+  it('exactly one lock banner is on screen, and switching tabs does not add a second', async () => {
+    mockServicesList = [{ ...mockService, status: 'planned' }]
+    const wrapper = await mountView()
+
+    expect(wrapper.findAll('[data-testid="service-lock-banner"]')).toHaveLength(1)
+
+    await openRolesTab(wrapper)
+    expect(wrapper.findAll('[data-testid="service-lock-banner"]')).toHaveLength(1)
+
+    const slidesBtn = wrapper.findAll('button').find((b) => b.text() === 'Slides')
+    await slidesBtn!.trigger('click')
+    expect(wrapper.findAll('[data-testid="service-lock-banner"]')).toHaveLength(1)
+
+    const orderBtn = wrapper.findAll('button').find((b) => b.text() === 'Service Order')
+    await orderBtn!.trigger('click')
+    expect(wrapper.findAll('[data-testid="service-lock-banner"]')).toHaveLength(1)
+  })
+
+  it('a viewer sees no banner at any status — read-only by role, not by status', async () => {
+    mockAuthState.isEditor = false
+    for (const status of ['draft', 'planned', 'exported'] as const) {
+      mockServicesList = [{ ...mockService, status }]
+      const wrapper = await mountView()
+      expect(wrapper.findAll('[data-testid="service-lock-banner"]')).toHaveLength(0)
+      wrapper.unmount()
+    }
+  })
+
+  // ---- ★ Sortable teardown and rebuild (Task 5) ----------------------------
+
+  it('★ locking destroys the per-section Sortable instances', async () => {
+    mockServicesList = [{ ...mockService, status: 'draft' }]
+    const wrapper = await mountView()
+    expect(sortableCaptures.length).toBeGreaterThan(0)
+    expect(mockSlotSortableDestroy).not.toHaveBeenCalled()
+
+    await wrapper.find('[data-testid="mark-planned-btn"]').trigger('click')
+    await flushPromises()
+    await wrapper.vm.$nextTick()
+
+    expect(mockSlotSortableDestroy).toHaveBeenCalled()
+  })
+
+  it('★ reopening re-creates them — drag works again with no page reload', async () => {
+    // The regression this guards: hiding the drag handles without destroying and
+    // re-creating the instances leaves a reopened service permanently undraggable.
+    mockServicesList = [{ ...mockService, status: 'planned' }]
+    const wrapper = await mountView()
+    expect(sortableCaptures).toHaveLength(0)
+
+    // No PC evidence -> one click, no dialog (D-10).
+    await wrapper.find('[data-testid="reopen-service-btn"]').trigger('click')
+    await flushPromises()
+    await wrapper.vm.$nextTick()
+
+    expect(sortableCaptures.length).toBeGreaterThan(0)
+    // And the fresh instances are wired to the real handler, not a stub.
+    expect(sortableCaptures[0]!.options.handle).toBe('.drag-handle')
+  })
+
+  // ---- ★ Handler-level guards (30-VERIFICATION I-01) ------------------------
+  //
+  // Calling each handler DIRECTLY, not merely asserting the template hides its
+  // control. Six of seven Slides-tab mutation entry points were `v-if`-only when
+  // this phase started; a lifecycle lock that only hides templates inherits that.
+  for (const status of LOCKED_STATUSES) {
+    it(`${status}: every Service Order and Roles mutation handler no-ops when called directly`, async () => {
+      mockServicesList = [{
+        ...mockService,
+        status,
+        roleAssignmentOverrides: { 'role-drums': ['person-2'] },
+      }]
+      const wrapper = await mountView()
+      const vm = wrapper.vm as unknown as {
+        localService: {
+          teams: string[]
+          slots: Array<Record<string, unknown>>
+          sermonPassage: unknown
+        }
+        showSlotDeleteConfirm: boolean
+        resolvedRoleAssignments: Array<{ roleId: string; effectivePersonIds: string[] }>
+        toggleTeam: (t: string) => void
+        addSlot: (kind: string) => void
+        removeSlot: (i: number) => void
+        onSelectSong: (i: number, s: { id: string; title: string; key: string }) => void
+        onClearSong: (i: number) => void
+        onSectionChange: (i: number, v: string) => void
+        onScriptureChange: (i: number, r: unknown) => void
+        onSermonPassageChange: (r: unknown) => void
+        onUndo: () => void
+        onToggleOverridePerson: (a: unknown, p: string) => Promise<void>
+        onResetRoleOverride: (roleId: string) => Promise<void>
+      }
+
+      const slotCount = vm.localService.slots.length
+
+      vm.toggleTeam('Orchestra')
+      expect(vm.localService.teams).toEqual(['Choir'])
+
+      vm.addSlot('SONG')
+      expect(vm.localService.slots).toHaveLength(slotCount)
+
+      vm.removeSlot(0)
+      expect(vm.showSlotDeleteConfirm).toBe(false)
+
+      vm.onSelectSong(2, { id: 'song-1', title: 'Amazing Grace', key: 'G' })
+      expect(vm.localService.slots[2]!.songId).toBeNull()
+
+      vm.onClearSong(0)
+      expect(vm.localService.slots[0]!.songId).toBe('song-1')
+
+      vm.onSectionChange(0, 'worship')
+      expect(vm.localService.slots[0]!.section).toBeUndefined()
+
+      vm.onScriptureChange(1, null)
+      expect(vm.localService.slots[1]!.book).toBe('Psalms')
+
+      vm.onSermonPassageChange(null)
+      expect(vm.localService.sermonPassage).not.toBeNull()
+
+      vm.onUndo()
+
+      await vm.onToggleOverridePerson(vm.resolvedRoleAssignments[0], 'person-1')
+      expect(mockSetRoleOverride).not.toHaveBeenCalled()
+
+      await vm.onResetRoleOverride('role-drums')
+      expect(mockClearRoleOverride).not.toHaveBeenCalled()
+
+      await flushPromises()
+      expect(mockUpdateService).not.toHaveBeenCalled()
+    })
+  }
+
+  it('the same handlers DO act on a draft service — the guard is the lock, not a blanket no-op', async () => {
+    mockServicesList = [{ ...mockService, status: 'draft' }]
+    const wrapper = await mountView()
+    const vm = wrapper.vm as unknown as {
+      localService: { teams: string[] }
+      toggleTeam: (t: string) => void
+      onResetRoleOverride: (roleId: string) => Promise<void>
+    }
+
+    vm.toggleTeam('Orchestra')
+    expect(vm.localService.teams).toContain('Orchestra')
+
+    await vm.onResetRoleOverride('role-vox')
+    expect(mockClearRoleOverride).toHaveBeenCalledWith('service-1', 'role-vox')
+  })
+})
