@@ -140,10 +140,26 @@ phase adds a lock layer over the existing controls; it does not restyle them.
   (`vite.config.ts:85-86`). A broken lock would therefore ship green twice over.
 
   Therefore: (a) a mandatory `npm run test:rules` gate, emulator-backed, is its own plan task — a rules
-  change with no emulator test is untested code; (b) the final task STOPS and instructs the owner to
-  run `firebase deploy --only firestore:rules`. **I do not deploy.** This mirrors how Phase 37 is
-  scoped ("build but do not deploy") and respects the standing rule that outward-facing actions are
-  confirmed, not assumed. Adding CI was offered and declined as wider than R036–R038.
+  change with no emulator test is untested code. **I do not deploy.** Adding CI was offered and
+  declined as wider than R036–R038.
+
+  > **★ Revised 2026-07-30 — deploy is DEFERRED, not part of this phase.** Owner's instruction:
+  > *"We have the emulator so firebase rules should be able to be just local for now until we're all
+  > done working. We can deploy to production at a later date."*
+  >
+  > What this changes, and the consequence to be honest about: **`src/firebase.ts` contains no emulator
+  > wiring**, so `npm run dev` talks to LIVE Firebase. `npm run test:rules` is self-contained — it
+  > starts its own throwaway emulator via `firebase emulators:exec` — so the rules ARE genuinely
+  > verified, but only there.
+  >
+  > Therefore, until someone runs `firebase deploy --only firestore:rules`:
+  > - the rules layer is proven **in the emulator** and is the phase's enforcement evidence;
+  > - in the **running app**, only the UI gate and the store guard are active;
+  > - a direct devtools write to a locked service **will still succeed** in the running app. That is
+  >   expected and is not a phase defect — it is the undeployed state.
+  >
+  > The deploy therefore moves OUT of this phase's completion gate and into a milestone-level task, to
+  > be done before v1.4 ships. Phase 31 completes on emulator-verified rules plus UI/store verification.
 
 ### Claude's Discretion
 

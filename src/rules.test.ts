@@ -6,7 +6,7 @@ import {
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing'
 import { readFileSync } from 'fs'
-import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore'
+import { doc, getDoc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore'
 
 let testEnv: RulesTestEnvironment
 
@@ -655,5 +655,219 @@ describe('Editor/Viewer RBAC', () => {
         updatedAt: new Date(),
       }),
     )
+  })
+})
+
+// -- R036/R037 -- the service draft lock (Phase 31) --------------------------
+//
+// A service is editable only while its STORED status is draft. Two writes to a
+// NON-draft service stay legal: the Planning Center export (D-09) and delete
+// (D-15). Reopen (-> draft) is the only status-reverting write and may touch
+// nothing but `status` and `updatedAt`.
+//
+// *** These tests are the ONLY enforcement evidence for the rules layer.
+// `src/rules.test.ts` is excluded from the default vitest run
+// (`vite.config.ts`), so `npx vitest run` proves nothing here -- this file runs
+// only via `npm run test:rules`, which starts its own emulator.
+describe('Service draft lock (R036/R037)', () => {
+  const SVC = 'organizations/orgA/services/svc1'
+
+  async function seedService(status: string | null, extra: Record<string, unknown> = {}) {
+    const base: Record<string, unknown> = {
+      name: 'Sunday Service',
+      date: '2026-08-02',
+      slots: [],
+      notes: '',
+      updatedAt: new Date(),
+      ...extra,
+    }
+    if (status !== null) base.status = status
+    await seedDoc(SVC, base)
+  }
+
+  async function editorDb() {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    return testEnv.authenticatedContext('userA').firestore()
+  }
+
+  type TestDb = ReturnType<ReturnType<typeof testEnv.authenticatedContext>['firestore']>
+
+  function svcRef(db: TestDb) {
+    return doc(db, 'organizations', 'orgA', 'services', 'svc1')
+  }
+
+  describe('ordinary editing', () => {
+    it('a draft service accepts a full field save', async () => {
+      await seedService('draft')
+      const db = await editorDb()
+      await assertSucceeds(updateDoc(svcRef(db), { notes: 'edited', updatedAt: new Date() }))
+    })
+
+    it('draft -> planned is allowed', async () => {
+      await seedService('draft')
+      const db = await editorDb()
+      await assertSucceeds(updateDoc(svcRef(db), { status: 'planned', updatedAt: new Date() }))
+    })
+
+    it('a PLANNED service rejects an ordinary field edit', async () => {
+      await seedService('planned')
+      const db = await editorDb()
+      await assertFails(updateDoc(svcRef(db), { notes: 'sneaky', updatedAt: new Date() }))
+    })
+
+    it('an EXPORTED service rejects an ordinary field edit', async () => {
+      await seedService('exported')
+      const db = await editorDb()
+      await assertFails(updateDoc(svcRef(db), { notes: 'sneaky', updatedAt: new Date() }))
+    })
+
+    it('a legacy document with NO status field is treated as draft and stays editable', async () => {
+      await seedService(null)
+      const db = await editorDb()
+      await assertSucceeds(updateDoc(svcRef(db), { notes: 'still editable', updatedAt: new Date() }))
+    })
+  })
+
+  describe('reopen (R037)', () => {
+    it('exported -> draft touching only status and updatedAt is allowed', async () => {
+      await seedService('exported', { pcExportedAt: new Date(), pcPlanId: 'plan-1' })
+      const db = await editorDb()
+      await assertSucceeds(updateDoc(svcRef(db), { status: 'draft', updatedAt: new Date() }))
+    })
+
+    it('planned -> draft is allowed', async () => {
+      await seedService('planned')
+      const db = await editorDb()
+      await assertSucceeds(updateDoc(svcRef(db), { status: 'draft', updatedAt: new Date() }))
+    })
+
+    // *** hasOnly() is what stops "reopen" being used to smuggle an edit
+    // through alongside the status change.
+    it('a reopen payload that ALSO edits another field is REJECTED', async () => {
+      await seedService('planned')
+      const db = await editorDb()
+      await assertFails(
+        updateDoc(svcRef(db), { status: 'draft', notes: 'smuggled', updatedAt: new Date() }),
+      )
+    })
+  })
+
+  describe('Planning Center export (D-09/D-11)', () => {
+    it('planned -> exported carrying export evidence is allowed', async () => {
+      await seedService('planned')
+      const db = await editorDb()
+      await assertSucceeds(
+        updateDoc(svcRef(db), {
+          status: 'exported',
+          pcExportedAt: new Date(),
+          pcPlanId: 'plan-1',
+          updatedAt: new Date(),
+        }),
+      )
+    })
+
+    // *** THE case reasoning gets wrong. affectedKeys() reports only keys whose
+    // VALUE changed, so a re-export to the SAME plan writes an unchanged
+    // pcPlanId that never appears in the diff. A rule requiring
+    // hasAll(['pcPlanId']) denies this -- the exact flow D-11 preserves
+    // pcPlanId to enable.
+    it('re-export to the SAME pcPlanId is allowed (D-11)', async () => {
+      await seedService('planned', { pcPlanId: 'plan-1' })
+      const db = await editorDb()
+      await assertSucceeds(
+        updateDoc(svcRef(db), {
+          status: 'exported',
+          pcExportedAt: new Date(),
+          pcPlanId: 'plan-1',
+          updatedAt: new Date(),
+        }),
+      )
+    })
+
+    it('an export write with no pcPlanId is rejected', async () => {
+      await seedService('planned')
+      const db = await editorDb()
+      await assertFails(
+        updateDoc(svcRef(db), {
+          status: 'exported',
+          pcExportedAt: new Date(),
+          updatedAt: new Date(),
+        }),
+      )
+    })
+  })
+
+  describe('create and delete', () => {
+    it('create with status draft is allowed; create with status exported is rejected', async () => {
+      const db = await editorDb()
+      await assertSucceeds(
+        setDoc(doc(db, 'organizations', 'orgA', 'services', 'new1'), {
+          name: 'New', date: '2026-08-09', status: 'draft', slots: [], updatedAt: new Date(),
+        }),
+      )
+      await assertFails(
+        setDoc(doc(db, 'organizations', 'orgA', 'services', 'new2'), {
+          name: 'New', date: '2026-08-09', status: 'exported', slots: [], updatedAt: new Date(),
+        }),
+      )
+    })
+
+    // D-15 -- delete stays available at any status; the UI warns instead.
+    it('deleting a LOCKED service is allowed', async () => {
+      await seedService('exported', { pcPlanId: 'plan-1' })
+      const db = await editorDb()
+      await assertSucceeds(deleteDoc(svcRef(db)))
+    })
+  })
+
+  describe('the Roles tab is covered for free', () => {
+    // A scoped dot-path write surfaces in affectedKeys() as the TOP-LEVEL key
+    // `roleAssignmentOverrides`, which is in neither carve-out's hasOnly list --
+    // so the Roles tab is denied on a locked service with no Roles-specific rule.
+    it('a roleAssignmentOverrides dot-path write is REJECTED on a planned service', async () => {
+      await seedService('planned', { roleAssignmentOverrides: {} })
+      const db = await editorDb()
+      await assertFails(
+        updateDoc(svcRef(db), {
+          'roleAssignmentOverrides.role-vox': ['person-1'],
+          updatedAt: new Date(),
+        }),
+      )
+    })
+
+    it('the same write is ALLOWED on a draft service', async () => {
+      await seedService('draft', { roleAssignmentOverrides: {} })
+      const db = await editorDb()
+      await assertSucceeds(
+        updateDoc(svcRef(db), {
+          'roleAssignmentOverrides.role-vox': ['person-1'],
+          updatedAt: new Date(),
+        }),
+      )
+    })
+  })
+
+  describe('viewers', () => {
+    it('a viewer can read but cannot write, at any status', async () => {
+      await seedService('draft')
+      await seedMembershipDoc('orgA', 'userV', 'viewer')
+      const db = testEnv.authenticatedContext('userV').firestore()
+      await assertSucceeds(getDoc(svcRef(db)))
+      await assertFails(updateDoc(svcRef(db), { notes: 'nope', updatedAt: new Date() }))
+    })
+  })
+
+  // *** The regression test for the bypass this phase exists to close. Before
+  // the `collection != 'services'` exclusion, the org-level catch-all wildcard
+  // ALSO matched /services and granted write -- so a locked service stayed
+  // editable even with `allow write: if false` in the /services block.
+  describe('catch-all wildcard no longer backstops /services', () => {
+    it('a write to a locked service is not rescued by the org-level wildcard', async () => {
+      await seedService('exported')
+      const db = await editorDb()
+      await assertFails(
+        updateDoc(svcRef(db), { name: 'renamed via wildcard', updatedAt: new Date() }),
+      )
+    })
   })
 })

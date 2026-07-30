@@ -296,6 +296,28 @@ Plans:
 
 ## Backlog
 
+### ★ Phase 999.3: Deploy firestore.rules to production before v1.4 ships (BACKLOG — REQUIRED)
+
+**Goal:** run `firebase deploy --only firestore:rules`, then re-run the devtools bypass check that
+Phase 31 deliberately skipped.
+**Why this is not optional:** Phase 31 (R036) added a three-layer draft lock. Two layers — the UI gate
+and the store guard — ship with the app bundle. **The third does not.** `firestore.rules` deploys
+separately, this repo has no CI, and `src/rules.test.ts` is excluded from the default vitest run
+(`vite.config.ts:85-86`). So the rules layer is verified in the emulator and is currently NOT live.
+Until this deploys, anyone with a browser console can write to a locked service — the exact bypass
+Phase 31 exists to close.
+**Deferred by:** owner, 2026-07-30 — *"We have the emulator so firebase rules should be able to be just
+local for now until we're all done working. We can deploy to production at a later date."*
+**Verification after deploy:** set a service to Planned, open devtools, attempt a direct Firestore
+write. Expect permission denied. (`npm run dev` talks to live Firebase — `src/firebase.ts` has no
+emulator wiring — so this check is meaningful only post-deploy.)
+**Requirements:** R036
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD — must be done before the v1.4 milestone is considered shipped
+
 ### Phase 999.2: Clearing a song should clear its slides, even when the song is reprised (BACKLOG)
 
 **Goal:** Clearing the song from a plan item empties that item's slide group. Today it does not, in one
