@@ -35,6 +35,29 @@ real failures behind permanent noise.
 `.planning/` is the only planning state. Do not resurrect `.gsd/` or cite it as precedent; recover it
 from git history only if explicitly asked.
 
+## Type-checking: use `npm run type-check`, not `-p tsconfig.app.json`
+
+`npm run type-check` runs **`vue-tsc --build`**, which typechecks the **test files** as well as `src/`.
+`vue-tsc --noEmit -p tsconfig.app.json` does **not** — it silently skips them.
+
+This is not academic: five `TS2339` errors introduced in Phase 30 survived two full phases because every
+verification gate used the narrower form and reported clean. Use `npm run type-check` as the gate. The
+`-p tsconfig.app.json` form is fine as a fast inner-loop check, but it is not sufficient evidence that a
+plan or phase is type-clean.
+
+## Testing: two suites, one of which the default run skips
+
+- `npx vitest run` — the app suite. **Excludes `src/rules.test.ts`** (see `vite.config.ts`), so it
+  proves nothing about Firestore security rules.
+- `npm run test:rules` — the rules suite, via `firebase emulators:exec`, which starts its **own**
+  emulator. **It fails with "port taken" if an emulator is already running.** In that case run
+  `npx vitest run --config vitest.rules.config.ts` directly against the running one instead — the
+  harness scopes to projectId `test-project` while the app uses `worship-planner-bc515`, so both the
+  rules install and the per-test `clearFirestore()` leave real data alone.
+
+Known-failing baseline, not defects: `src/storage.rules.test.ts` (needs the Storage emulator) and
+`src/views/__tests__/RosterView.test.ts` (stale assertion).
+
 ## Environment: `.env.local` is REQUIRED in every worktree
 
 `.env.local` is gitignored (it holds Firebase/ESV/Claude/Planning Center secrets) and is
