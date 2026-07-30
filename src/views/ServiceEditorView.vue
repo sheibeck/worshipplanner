@@ -1719,6 +1719,7 @@ const {
   groupsBySlotId,
   ensureGroupMaterialized,
   suppressMaterialization,
+  drainGroupWrites,
 } = useSlideshowAssembly(localService, orgIdRef, { canWrite: canWriteSlideGroups })
 const presenting = ref(false)
 
@@ -2341,6 +2342,16 @@ async function onMarkAsPlanned(): Promise<void> {
     // and is refused, silently losing whatever the user last typed.
     if (isDirty.value) await onSave()
     await bumpScheduledSongsLastUsed()
+    // HI-01: the same "flush before the lock" reasoning as the autosave above,
+    // for the OTHER write path out of this view. Assigning a song to a slot
+    // changes `localService.slots`, which recomputes `rebuildOutcomes` and
+    // issues a `replaceGroupSlides` transaction fire-and-forget via `void`.
+    // Flipping the status straight through that window leaves the write to be
+    // denied on arrival by the new /slideGroups rule — the user sees a normal
+    // transition while that group's slides silently stay stale until the next
+    // reopen. Draining first lets those writes land while the service is still
+    // draft and therefore still writable.
+    await drainGroupWrites()
     await serviceStore.markAsPlanned(localService.value.id)
     applyTransitionLocally('planned')
   } catch (err) {

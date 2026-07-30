@@ -1242,6 +1242,113 @@ describe('useSlideshowAssembly', () => {
   })
 
   // --- 25-05 Task 1: on-demand materialization for an explicit user write ---
+  // ── HI-01: a denied group write must be contained, not escape ──────────────
+  //
+  // Both apply loops are invoked fire-and-forget (`void applyRebuildOutcomes(…)`)
+  // from `{ immediate: true }` watchers, and both `await`ed their store writes
+  // with no `try`/`catch`. Before Phase 31 those writes always succeeded
+  // (`allow write: if isOrgEditor`); the new `/slideGroups` rule denies them the
+  // instant the parent service leaves `draft`. A denied write therefore both
+  // escapes as an unhandled `permission-denied` AND aborts the loop, so every
+  // LATER slot in the same batch is silently skipped with nothing on screen.
+  describe('HI-01 — a denied group write is contained, and does not abort the batch', () => {
+    it('a rejected materialization still lets the remaining candidates through, and is logged', async () => {
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      mockMaterializeGroupIfMissing.mockRejectedValueOnce(
+        new Error('FirebaseError: Missing or insufficient permissions'),
+      )
+
+      const service = ref<Service | null>(
+        makeService([
+          hymnSlot({ position: 0, id: 'slot-denied', hymnName: 'Denied' }),
+          hymnSlot({ position: 1, id: 'slot-after', hymnName: 'After' }),
+        ]),
+      )
+      useSlideshowAssembly(service, 'org-1', { canWrite: true })
+      await nextTick()
+      await nextTick()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      const attempted = mockMaterializeGroupIfMissing.mock.calls.map(
+        ([, input]) => (input as SlideGroup).slotId,
+      )
+      expect(attempted).toContain('slot-denied')
+      // The bug: the rejection propagated out of the `for` loop, so this one
+      // was never attempted at all.
+      expect(attempted).toContain('slot-after')
+      expect(errSpy).toHaveBeenCalledWith(
+        '[useSlideshowAssembly] group materialization write failed:',
+        expect.any(Error),
+      )
+
+      errSpy.mockRestore()
+    })
+
+    it('a rejected rebuild write is logged and releases its applied-guard so a retry is possible', async () => {
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      songsState.songs = [{ id: 'song-a' } as Song]
+      const fakeLyricsLoader = vi.fn(async (_orgId: string, songId: string) => makeLyrics(songId))
+
+      // A group missing the lyric entry its source now derives ⇒ `rebuildGroup`
+      // reports `changed`, so the watcher issues a `replaceGroupSlides`.
+      slideGroupsState.groups = [
+        {
+          id: 'slot-song-a',
+          slotId: 'slot-song-a',
+          serviceId: 'service-1',
+          slides: [],
+          createdAt: {} as never,
+          updatedAt: {} as never,
+        },
+      ]
+      mockReplaceGroupSlides.mockRejectedValueOnce(
+        new Error('FirebaseError: Missing or insufficient permissions'),
+      )
+
+      const service = ref<Service | null>(
+        makeService([songSlot({ position: 0, id: 'slot-song-a', songId: 'song-a' })]),
+      )
+      useSlideshowAssembly(service, 'org-1', { canWrite: true, lyricsLoader: fakeLyricsLoader })
+      await nextTick()
+      await vi.waitFor(() => expect(mockReplaceGroupSlides).toHaveBeenCalled())
+      await nextTick()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      expect(errSpy).toHaveBeenCalledWith(
+        '[useSlideshowAssembly] group rebuild write failed:',
+        expect.any(Error),
+      )
+
+      errSpy.mockRestore()
+    })
+
+    it('drainGroupWrites resolves only once an in-flight group write has settled', async () => {
+      let releaseWrite!: () => void
+      mockMaterializeGroupIfMissing.mockImplementationOnce(
+        () => new Promise<boolean>((resolve) => { releaseWrite = () => resolve(true) }),
+      )
+
+      const service = ref<Service | null>(
+        makeService([hymnSlot({ position: 0, id: 'slot-slow', hymnName: 'Slow' })]),
+      )
+      const { drainGroupWrites } = useSlideshowAssembly(service, 'org-1', { canWrite: true })
+      await nextTick()
+      await nextTick()
+      expect(mockMaterializeGroupIfMissing).toHaveBeenCalled()
+
+      let drained = false
+      const draining = drainGroupWrites().then(() => { drained = true })
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      // Still in flight — this is the window `onMarkAsPlanned` used to flip the
+      // status through, leaving the write to be denied on arrival.
+      expect(drained).toBe(false)
+
+      releaseWrite()
+      await draining
+      expect(drained).toBe(true)
+    })
+  })
+
   describe('ensureGroupMaterialized (25-05 Task 1)', () => {
     it('resolves with the existing group\'s entries and signature and calls no store create action when a group already exists', async () => {
       slideGroupsState.groups = [

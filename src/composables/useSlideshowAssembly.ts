@@ -117,6 +117,18 @@ export interface UseSlideshowAssemblyReturn {
    * `ensureGroupMaterialized`.
    */
   suppressMaterialization: (slotId: string) => () => void
+  /**
+   * HI-01. Resolves once no group write issued by this composable is still in
+   * flight. Both apply loops run fire-and-forget from `{ immediate: true }`
+   * watchers, so without this there is no way for a caller to know a write is
+   * outstanding — and `onMarkAsPlanned` flipped the service's status straight
+   * through that window, leaving the write to be denied on arrival by the new
+   * `/slideGroups` rule while the user saw a normal transition.
+   *
+   * Never rejects: individual failures are already contained and logged at the
+   * point of the write. This is a barrier, not an error channel.
+   */
+  drainGroupWrites: () => Promise<void>
 }
 
 /**
@@ -302,12 +314,51 @@ export function useSlideshowAssembly(
   // `materializationCandidates`.
   const materializingSlotIds = new Set<string>()
 
+  // HI-01. Both apply loops below are invoked fire-and-forget (`void …`) from
+  // `{ immediate: true }` watchers, so nothing awaits them and nothing can
+  // observe when their writes settle. Two consequences this set addresses:
+  //
+  //  - `onMarkAsPlanned` used to flip the service's status straight through the
+  //    window where a group write was still in flight, so the write arrived at
+  //    a service that had just become locked and was denied by the new
+  //    `/slideGroups` rule. `drainGroupWrites` gives the view something to await
+  //    before the status write.
+  //  - a caller that wants to know the batch has quiesced (tests included) had
+  //    no handle on it at all.
+  const inFlightGroupWrites = new Set<Promise<unknown>>()
+
+  function trackGroupWrite<T>(promise: Promise<T>): Promise<T> {
+    inFlightGroupWrites.add(promise)
+    // `.finally` on a COPY: the tracked promise must not become the caller's,
+    // or a rejection here would be reported twice.
+    void promise.finally(() => inFlightGroupWrites.delete(promise)).catch(() => {})
+    return promise
+  }
+
+  async function drainGroupWrites(): Promise<void> {
+    // Loop rather than a single `Promise.allSettled`: draining one batch can
+    // let a watcher issue the next one, and the caller wants quiescence.
+    while (inFlightGroupWrites.size > 0) {
+      await Promise.allSettled([...inFlightGroupWrites])
+    }
+  }
+
   async function materializeCandidates(candidates: MaterializationCandidate[]) {
     for (const candidate of candidates) {
       if (materializingSlotIds.has(candidate.slotId)) continue
       materializingSlotIds.add(candidate.slotId)
       try {
-        await slideGroupsStore.materializeGroupIfMissing(candidate.orgId, candidate.input)
+        await trackGroupWrite(
+          slideGroupsStore.materializeGroupIfMissing(candidate.orgId, candidate.input),
+        )
+      } catch (err) {
+        // HI-01: contain it. Without this `catch` the rejection escapes the
+        // fire-and-forget `void` call above as an unhandled
+        // `permission-denied`, AND aborts this loop — so every LATER candidate
+        // in the same batch is silently skipped, not just the denied one.
+        // The slot stays a candidate, so a legitimate retry (after a reopen)
+        // still happens on the next recompute.
+        console.error('[useSlideshowAssembly] group materialization write failed:', err)
       } finally {
         materializingSlotIds.delete(candidate.slotId)
       }
@@ -440,13 +491,27 @@ export function useSlideshowAssembly(
       // comment in `src/stores/slideGroups.ts`. This matters MORE now than
       // pre-Phase-30, since every rebuild outcome writes unconditionally —
       // there is no confirm step left to catch a lost concurrent edit.
-      await slideGroupsStore.replaceGroupSlides(
-        outcome.orgId,
-        outcome.slotId,
-        outcome.result.slides,
-        outcome.freshSignature,
-        outcome.group.slides,
-      )
+      try {
+        await trackGroupWrite(
+          slideGroupsStore.replaceGroupSlides(
+            outcome.orgId,
+            outcome.slotId,
+            outcome.result.slides,
+            outcome.freshSignature,
+            outcome.group.slides,
+          ),
+        )
+      } catch (err) {
+        // HI-01, same containment as `materializeCandidates`. Release the
+        // applied-outcome guard as well: it was set BEFORE the write on the
+        // assumption the write lands, and leaving it set would suppress every
+        // future rebuild for this slot against this stored group — so a group
+        // denied while the service was locked would stay stale even after a
+        // reopen, until an unrelated remote snapshot happened to mint a new
+        // group object.
+        appliedGroupRefForSlot.delete(outcome.slotId)
+        console.error('[useSlideshowAssembly] group rebuild write failed:', err)
+      }
     }
   }
 
@@ -494,5 +559,6 @@ export function useSlideshowAssembly(
     groupsBySlotId,
     ensureGroupMaterialized,
     suppressMaterialization,
+    drainGroupWrites,
   }
 }
