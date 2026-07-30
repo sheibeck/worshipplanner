@@ -114,6 +114,26 @@ and whether a stripped screen *reads* as deliberate rather than broken.
   and the Roles tab with no quarter schedule (*"No schedule found for this date."*). None may instruct
   the reader to perform an action they cannot perform.
 
+### Added by wave 5 (31-05) — the next-free-Sunday default
+
+31 automated tests cover the date walk and the team side effect (`quarterDates.test.ts`,
+`NewServiceDialog.test.ts`, both green). 31.12 above remains the primary human check; these two are
+the judgement calls a unit test cannot make. **Neither has been performed — recorded as outstanding,
+not as passed.**
+
+- ☐ **31.23** ★ **The team side effect, seen with real data.** Create a plan on the next upcoming
+  Sunday, then open **New Service** again. The date must skip to the Sunday after it — and the
+  pre-checked TEAMS will change with it, because team defaults are derived from which Sunday-of-the-
+  month the date is (1st → Orchestra + Communion, 3rd → Choir, otherwise none). This is intended and
+  now tested, but it is a visible change from before: the dialog no longer always opens on the same
+  ordinal. Confirm the teams shown are the ones you would actually want for the *skipped-to* date; if
+  they are not, that is a product decision to revisit, not a bug in the walk.
+- ☐ **31.24** Open **New Service** on a Sunday (or with the machine clock set to one). The default must
+  be the FOLLOWING Sunday, never today — the strictly-forward convention this wave locked in and
+  commented in `quarterDates.ts`. Also confirm the date field is never blank in the pathological case
+  where every upcoming Sunday for a year already has a plan; it should fall back to the plain next
+  Sunday and let you type over it.
+
 ---
 
 ## Later phases

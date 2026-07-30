@@ -5,15 +5,15 @@ milestone_name: Service and Slides
 current_phase: 31
 current_phase_name: Service Lifecycle — Draft Lock & Reopen
 status: planning
-stopped_at: Completed 31-04-PLAN.md (wave 4 of 6)
-last_updated: "2026-07-30T15:16:16.715Z"
-last_activity: 2026-07-29
-last_activity_desc: Phase 30 complete, transitioned to Phase 31
+stopped_at: Completed 31-05-PLAN.md (wave 5 of 6)
+last_updated: "2026-07-30T15:35:00.000Z"
+last_activity: 2026-07-30
+last_activity_desc: Phase 31 wave 5 complete — R038 next-free-Sunday default
 progress:
   total_phases: 9
   completed_phases: 2
   total_plans: 15
-  completed_plans: 13
+  completed_plans: 14
   percent: 22
 ---
 
@@ -616,6 +616,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 30 P03 | 21min | 3 tasks | 4 files |
 | Phase 30 P04 | 8h30min | 3 tasks | 14 files |
 | Phase 31 P04 | ~2h | 6 tasks | 11 files |
+| Phase 31 P05 | ~40min | 4 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -794,6 +795,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: [Phase 31-04]: The gate migration is five classes, not a substitution — class C :disabled bindings are DELETED, class D inverse branches keep pointing at isLocked
 - [Phase ?]: [Phase 31-04]: The lifecycle lock composes INTO canMutate/canReorder, which is what makes Sortable teardown and rebuild automatic
 - [Phase ?]: [Phase 31-04]: serviceLocked is a prop distinct from isEditor — the drawer must tell a viewer from a locked editor to pick its copy
+- [Phase ?]: [Phase 31-05]: The two Sunday conventions in this repo were reconciled in favour of STRICTLY FORWARD (a Sunday `from` yields the FOLLOWING Sunday), because D-13 requires the fallback to degrade to the pre-R038 behaviour — commented in quarterDates.ts and pinned by tests at both the util and component level
+- [Phase ?]: [Phase 31-05]: nextFreeSunday went INSIDE quarterDates.ts to reuse its module-private fmtDate; deleting NewServiceDialog's nextSunday() removed a formatter copy, so the net count went down rather than up
+- [Phase ?]: [Phase 31-05]: R038's date skip changes the DEFAULT TEAM selection (teams derive from sundayOrdinal) — a real behaviour change, now tested with two ordinal pairs rather than left to surface in UAT (human judgement filed as 31.23)
 
 ### Roadmap Evolution
 

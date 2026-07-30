@@ -28,7 +28,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
       Center holds the previously exported version. No competitor precedent exists for this pattern —
       Planning Center gates on role only. `[FEAT]`
 
-- [ ] **R038** (quality-attribute): Creating a service defaults the date to the nearest Sunday that does
+- [x] **R038** (quality-attribute): Creating a service defaults the date to the nearest Sunday that does
       not already have a service plan, rather than the nearest Sunday outright.
 
 ### Save Reliability
@@ -230,7 +230,7 @@ Acknowledged, deferred, not in this roadmap.
 |-------------|-------|--------|
 | R036 | Phase 31 | Complete |
 | R037 | Phase 31 | Pending |
-| R038 | Phase 31 | Pending |
+| R038 | Phase 31 | Complete |
 | R039 | Phase 32 | Pending |
 | R040 | Phase 32 | Pending |
 | R041 | Phase 32 | Pending |
