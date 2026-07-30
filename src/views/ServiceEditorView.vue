@@ -53,28 +53,32 @@
                   @change="onDateChange(($event.target as HTMLInputElement).value)"
                 />
               </div>
-              <!-- Status badge: editor gets clickable toggle, viewer gets static badge -->
-              <button
-                v-if="authStore.isEditor"
-                type="button"
-                class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border cursor-pointer hover:opacity-80 transition-opacity"
-                :class="statusBadgeClasses[localService.status]"
-                @click="toggleStatus"
-              >
-                <svg v-if="localService.status === 'planned'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3">
-                  <path fill-rule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clip-rule="evenodd" />
-                </svg>
-                <svg v-else-if="localService.status === 'exported'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3">
-                  <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
-                </svg>
-                {{ localService.status === 'exported' ? 'Exported' : localService.status === 'planned' ? 'Planned' : 'Draft' }}
-              </button>
+              <!-- D-01: the status badge is NOT a control. The clickable editor
+                   branch that used to sit here cycled draft -> planned ->
+                   exported -> draft on a bare click, which let a user mark a
+                   service "Exported" without ever exporting it and made
+                   reopening an unlabelled click with no warning. Both are
+                   deleted; status now moves only through the named actions
+                   (Mark as Planned / Reopen for editing) and the real Planning
+                   Center export. This <span> is the pre-existing viewer branch,
+                   now rendered for everyone — a deletion, not a rewrite, which
+                   is why its px-2 py-0.5 is untouched (31-UI-SPEC § 2).
+                   It reads as status rather than button by subtraction: not a
+                   <button>, not focusable, no cursor-pointer, no hover response.
+                   Deliberately no role="status" (that is a live region) and no
+                   title tooltip — the lock banner below is the explanation. -->
               <span
-                v-else
                 class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border"
                 :class="statusBadgeClasses[localService.status]"
+                data-testid="service-status-pill"
               >
-                {{ localService.status === 'exported' ? 'Exported' : localService.status === 'planned' ? 'Planned' : 'Draft' }}
+                <svg v-if="localService.status === 'planned'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3" aria-hidden="true">
+                  <path fill-rule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clip-rule="evenodd" />
+                </svg>
+                <svg v-else-if="localService.status === 'exported'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-3 w-3" aria-hidden="true">
+                  <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                </svg>
+                {{ statusLabel }}
               </span>
             </div>
           </div>
@@ -131,8 +135,8 @@
               v-if="authStore.isEditor"
               type="button"
               @click="suggestAllSongs"
-              :disabled="!hasSermonContext || aiSuggestingAll || isExportedLocked"
-              :title="isExportedLocked ? 'Service is exported — cycle badge back to Draft to edit' : !hasSermonContext ? 'Add a sermon topic or passage for AI suggestions' : undefined"
+              :disabled="!hasSermonContext || aiSuggestingAll"
+              :title="!hasSermonContext ? 'Add a sermon topic or passage for AI suggestions' : undefined"
               class="print:hidden inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-gray-200 bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-indigo-400" viewBox="0 0 24 24" fill="currentColor">
@@ -140,6 +144,38 @@
               </svg>
               {{ aiSuggestingAll ? 'Suggesting...' : 'Suggest All Songs' }}
             </button>
+
+            <!-- D-02: Mark as Planned — the draft half of the two named
+                 transitions that replace the deleted cycle. Placed immediately
+                 left of Export so the lifecycle reads left-to-right in the
+                 order a planner performs it: suggest -> mark planned -> export.
+                 Secondary treatment (gray, like its neighbours), NOT indigo:
+                 Save is the row's only accent-filled control and a second
+                 primary beside it competes with it.
+                 Deliberately no confirm dialog (D-10 — reversible in one click
+                 from the banner that appears in the same instant) and no
+                 "your service is empty" completeness gate (that would be a new
+                 product rule, not a lock layer). -->
+            <button
+              v-if="canEditService"
+              type="button"
+              data-testid="mark-planned-btn"
+              :disabled="isTransitioning"
+              class="print:hidden inline-flex items-center rounded-md px-3 py-2 text-sm font-medium text-gray-200 bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700 disabled:opacity-50"
+              @click="onMarkAsPlanned"
+            >
+              Mark as Planned
+            </button>
+
+            <!-- Failed-transition surface while DRAFT. The locked counterpart
+                 lives in the lock banner, because the autosave error line above
+                 is removed at locked statuses (31-04) — precisely when a failed
+                 Reopen fires. -->
+            <span
+              v-if="canEditService && lifecycleError"
+              class="text-sm text-red-400"
+              data-testid="lifecycle-error"
+            >{{ lifecycleError }}</span>
 
             <!-- Export to PC button: shown when credentials configured, enabled only for planned services -->
             <button
@@ -1289,6 +1325,40 @@ const isExportedLocked = computed(() =>
   localService.value?.status === 'exported'
 )
 
+// ── R036 / R037 — the lifecycle lock seams ────────────────────────────────────
+//
+// `isLocked` widens `isExportedLocked` from `=== 'exported'` to `!== 'draft'`.
+// Both exist during this phase: 31-04 owns migrating the per-line gates off
+// `isExportedLocked` (a five-class migration — a blind find-and-replace inverts
+// three of the classes), and deletes it once no call site remains.
+
+const isLocked = computed(() => localService.value !== null && localService.value.status !== 'draft')
+
+const canEditService = computed(() => authStore.isEditor && !isLocked.value)
+
+const statusLabel = computed(() =>
+  localService.value?.status === 'exported'
+    ? 'Exported'
+    : localService.value?.status === 'planned'
+      ? 'Planned'
+      : 'Draft',
+)
+
+/**
+ * ★ D-04 — the Planning Center warning gates on EVIDENCE, never on the status
+ * string. Live data holds services sitting at `exported` that were hand-set
+ * through the deleted three-way cycle and were never exported; telling those
+ * users "Planning Center already has this plan" would be false, and a warning
+ * users learn is sometimes false is one they learn to click through.
+ *
+ * ★ ONE computed, deliberately. It drives the lock banner's body, the reopen
+ * confirm dialog AND the delete-confirm's Planning Center sentence (D-15). A
+ * second copy of this predicate is how those three drift apart.
+ */
+const hasPcExportEvidence = computed(
+  () => !!(localService.value?.pcExportedAt || localService.value?.pcPlanId),
+)
+
 // ── Sections (D005/R007/R043/R044) + live slideshow assembly (R005/R006 visible) ─
 
 /**
@@ -1814,18 +1884,82 @@ function getCcliNumber(songId: string): string | null {
   return songStore.songs.find((s) => s.id === songId)?.ccliNumber || null
 }
 
-// ── Status toggle ──────────────────────────────────────────────────────────────
+// ── R037 status transitions ────────────────────────────────────────────────────
+//
+// D-01 deleted `toggleStatus`, the blind draft -> planned -> exported -> draft
+// badge cycle that used to live here. Two named actions replace it, and there is
+// deliberately no third: `exported` is reachable ONLY through a real Planning
+// Center export (D-03).
 
-function toggleStatus() {
-  if (!localService.value) return
-  const current = localService.value.status
-  if (current === 'draft') {
-    localService.value.status = 'planned'
-  } else if (current === 'planned') {
-    localService.value.status = 'exported'
-  } else {
-    // exported -> draft
-    localService.value.status = 'draft'
+const isTransitioning = ref(false)
+const lifecycleError = ref<string | null>(null)
+
+/**
+ * ★ Reflect a transition in the UI only AFTER the store write has resolved.
+ *
+ * Both `localService` and `originalService` are moved together: the status write
+ * is already persisted at this point, so leaving `originalService` behind would
+ * make `isDirty` true and hand the autosave watcher a full-document write
+ * against a service that is now locked — a guaranteed rejection ~800ms later.
+ */
+function applyTransitionLocally(status: 'draft' | 'planned'): void {
+  if (localService.value) localService.value.status = status
+  if (originalService.value) originalService.value.status = status
+}
+
+/**
+ * The `lastUsedAt` bump that used to live inside `onSave`, keyed on
+ * `originalService.status === 'draft' && data.status === 'planned'`. Status no
+ * longer moves through `onSave`, so that branch became unreachable; the
+ * behaviour it implemented is not obsolete and moves here.
+ *
+ * ★ Must run BEFORE the status write. It goes through `assignSongToSlot`, which
+ * writes `slots` to the service — legal while the stored status is still draft
+ * and refused the instant it is `planned`.
+ *
+ * A song counts as "used" only once the service it belongs to is actually
+ * scheduled; merely editing songs on a draft, or the AI selector *showing* a
+ * suggestion, must not age them.
+ */
+async function bumpScheduledSongsLastUsed(): Promise<void> {
+  const svc = localService.value
+  if (!svc) return
+  const scheduledSongIds = new Set(
+    svc.slots.filter((s) => s.kind === 'SONG' && (s as SongSlot).songId).map((s) => (s as SongSlot).songId!),
+  )
+  for (const songId of scheduledSongIds) {
+    const songSlot = svc.slots.find(
+      (s) => s.kind === 'SONG' && (s as SongSlot).songId === songId,
+    ) as SongSlot
+    await serviceStore.assignSongToSlot(svc.id, svc.slots.indexOf(songSlot), {
+      id: songId,
+      title: songSlot.songTitle!,
+      key: songSlot.songKey!,
+    })
+  }
+}
+
+async function onMarkAsPlanned(): Promise<void> {
+  if (!localService.value || isTransitioning.value) return
+  lifecycleError.value = null
+  isTransitioning.value = true
+  try {
+    // Flush pending edits while the service is still draft and therefore
+    // still writable — otherwise the in-flight autosave lands after the lock
+    // and is refused, silently losing whatever the user last typed.
+    if (isDirty.value) await onSave()
+    await bumpScheduledSongsLastUsed()
+    await serviceStore.markAsPlanned(localService.value.id)
+    applyTransitionLocally('planned')
+  } catch (err) {
+    console.error('Mark as Planned failed:', err)
+    // ★ No optimistic flip: the pill, the banner and every gate are still
+    // reading the OLD status here, and stay that way. Saying so on screen is
+    // the whole point — a UI showing one status while the store holds another
+    // is the "it didn't save" defect class this milestone exists to close.
+    lifecycleError.value = "Couldn't mark this service as Planned. Check your connection and try again."
+  } finally {
+    isTransitioning.value = false
   }
 }
 
@@ -2640,6 +2774,18 @@ async function onConfirmExport() {
     localService.value.pcPlanId = planId
     localService.value.status = 'exported'
 
+    // ★ R036 (Rule 1 fix, 31-03): the write above flips the STORED status to
+    // `exported`, after which the rules layer (31-01) and the store guard
+    // (31-03) both refuse an ordinary update. Without mirroring these three
+    // fields into the clean snapshot, `isDirty` stays true and the autosave
+    // watcher fires a full-document `onSave` ~800ms later against a service
+    // that is now locked — a guaranteed permission-denied write, every export.
+    if (originalService.value) {
+      originalService.value.pcExportedAt = localService.value.pcExportedAt
+      originalService.value.pcPlanId = planId
+      originalService.value.status = 'exported'
+    }
+
     showExportDialog.value = false
 
     if (failures.length > 0) {
@@ -2769,27 +2915,11 @@ async function onSave() {
   try {
     const { id, createdAt, updatedAt, ...data } = localService.value
 
-    // Only bump lastUsedAt when the service transitions from draft to scheduled (planned).
-    // Merely editing songs while still a draft — or the AI auto song selector *showing*
-    // suggested/drafted songs — must NOT age songs; a song counts as "used" only once the
-    // service it belongs to is actually scheduled.
-    if (originalService.value?.status === 'draft' && data.status === 'planned') {
-      const scheduledSongIds = new Set(
-        localService.value.slots
-          .filter((s) => s.kind === 'SONG' && (s as SongSlot).songId)
-          .map((s) => (s as SongSlot).songId!),
-      )
-      for (const songId of scheduledSongIds) {
-        const songSlot = localService.value.slots.find(
-          (s) => s.kind === 'SONG' && (s as SongSlot).songId === songId,
-        ) as SongSlot
-        await serviceStore.assignSongToSlot(id, localService.value.slots.indexOf(songSlot), {
-          id: songId,
-          title: songSlot.songTitle!,
-          key: songSlot.songKey!,
-        })
-      }
-    }
+    // The draft -> planned `lastUsedAt` bump that used to sit here has moved to
+    // `bumpScheduledSongsLastUsed`, called by `onMarkAsPlanned`. D-01/D-02 took
+    // status changes off this path entirely, so the `data.status === 'planned'`
+    // condition this branch keyed on became unreachable — it would have looked
+    // live while silently never firing again.
 
     // Persist the full slot array (reindexed) and other fields
     const normalizedSlots = reindexSlots(orderSlotsBySection(data.slots))
