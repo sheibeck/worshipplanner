@@ -2961,6 +2961,29 @@ async function onConfirmExport() {
   if (!localService.value) return
   if (!authStore.pcCredentials || !exportSelectedServiceTypeId.value) return
 
+  // ME-01 — pre-flight against the STORED status, before any Planning Center
+  // work. The Export button's own `:disabled` reads `localService.status`
+  // (:196), which is this editor's copy and can disagree with what is stored:
+  // two editors open the same `planned` service, A exports, and B's button is
+  // still enabled. Without this check B's export runs the ENTIRE PC
+  // conversation — creating or mutating a real plan — and only then hits the
+  // store guard on the terminal write. The plan is left orphaned in Planning
+  // Center with `pcPlanId` unrecorded and no audit trail, which is the loss
+  // D-11 exists to prevent. Refusing here costs one array lookup and makes that
+  // outcome unreachable.
+  //
+  // Reads the same source the guard does (`services.ts:134-136`), including its
+  // `?? 'draft'` default for a legacy document with no status field.
+  const storedStatus =
+    serviceStore.services.find((s) => s.id === localService.value!.id)?.status ?? 'draft'
+  if (storedStatus !== 'planned') {
+    exportError.value =
+      storedStatus === 'exported'
+        ? 'This service has already been exported to Planning Center. Reload to see the current state.'
+        : 'This service is no longer marked as Planned. Reload and try again.'
+    return
+  }
+
   isExporting.value = true
   exportError.value = null
 
@@ -3262,7 +3285,20 @@ async function onConfirmExport() {
       setTimeout(() => { pcExported.value = false }, 3000)
     }
   } catch (e) {
-    exportError.value = e instanceof Error ? e.message : 'Export failed'
+    // ME-01 — `assertWritable`'s message is written for developers ("R036:
+    // refusing to update service svc-1 — its stored status is …"), and this
+    // catch rendered it verbatim. By the time a ServiceLockedError can reach
+    // here the Planning Center plan has ALREADY been created or updated, so the
+    // copy has to say that: a user told only "try again" would export a second
+    // time and duplicate the plan.
+    if (e instanceof ServiceLockedError) {
+      console.error('[ServiceEditorView] export write refused by the lock guard:', e)
+      exportError.value =
+        'The plan was written to Planning Center, but this service changed status before we ' +
+        'could record it. Reload before exporting again — re-exporting now would create a duplicate plan.'
+    } else {
+      exportError.value = e instanceof Error ? e.message : 'Export failed'
+    }
   } finally {
     isExporting.value = false
   }

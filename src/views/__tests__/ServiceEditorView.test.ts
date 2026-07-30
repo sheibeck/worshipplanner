@@ -321,14 +321,53 @@ vi.mock('@/stores/songs', () => ({
 // observe a post-mount transition — mirrors how the real Pinia store is
 // reactive. Tests that need to flip isEditor after mount (WR-01 regression)
 // mutate `mockAuthState.isEditor` directly and await a tick.
-const mockAuthState = reactive<{ user: { uid: string }; isEditor: boolean; orgId: string | null }>({
+const mockAuthState = reactive<{
+  user: { uid: string }
+  isEditor: boolean
+  orgId: string | null
+  hasPcCredentials: boolean
+  pcCredentials: { appId: string; secret: string } | null
+}>({
   user: { uid: 'user-1' },
   isEditor: false,
   orgId: 'org-1',
+  // ME-01: default false/null, so every pre-existing test keeps taking the
+  // "Copy for PC" branch it always took. Only the export tests flip these.
+  hasPcCredentials: false,
+  pcCredentials: null,
 })
 
 vi.mock('@/stores/auth', () => ({
   useAuthStore: () => mockAuthState,
+}))
+
+// ── ME-01: Planning Center API surface ────────────────────────────────────────
+// Only `onExportToPC`/`onConfirmExport` reach these, and no test before the
+// ME-01 block below invokes either — so stubbing the module is behaviour-neutral
+// for everything above it. `formatForPlanningCenter` (the Copy-for-PC path) is
+// deliberately NOT mocked: those tests assert its real output.
+const mockCreatePlan = vi.fn(async () => 'pc-plan-new')
+const mockAddSlotAsItem = vi.fn(async () => undefined)
+const mockFetchPlanItems = vi.fn(async () => [])
+const mockFetchTemplateItems = vi.fn(async () => [])
+
+vi.mock('@/utils/planningCenterApi', () => ({
+  fetchServiceTypes: vi.fn(async () => []),
+  fetchTemplates: vi.fn(async () => []),
+  fetchServiceTypeTeams: vi.fn(async () => []),
+  fetchPlans: vi.fn(async () => []),
+  fetchPlanItems: mockFetchPlanItems,
+  createPlan: mockCreatePlan,
+  fetchTemplateItems: mockFetchTemplateItems,
+  addSlotAsItem: mockAddSlotAsItem,
+  buildPlanTitle: vi.fn(() => 'Sunday Service'),
+  createItem: vi.fn(async () => undefined),
+  updateItem: vi.fn(async () => undefined),
+  deleteItem: vi.fn(async () => undefined),
+  createPlanTime: vi.fn(async () => undefined),
+  fetchPlanNeededPositionTeamIds: vi.fn(async () => new Set<string>()),
+  fetchTeamPositions: vi.fn(async () => []),
+  addNeededPosition: vi.fn(async () => undefined),
 }))
 
 const mockRoles: Role[] = [
@@ -3330,5 +3369,137 @@ describe('ServiceEditorView - BL-02: a rejected autosave must not strand the sta
 
     expect(mockUpdateService).not.toHaveBeenCalled()
     expect(vm.autosaveStatus).not.toBe('saving')
+  })
+})
+
+// ── ME-01: a completed export must never report a developer string ────────────
+//
+// `onConfirmExport`'s terminal Firestore write goes through
+// `serviceStore.updateService`, whose new `assertWritable` throws a message
+// written for developers, and the catch rendered `e.message` verbatim. The
+// Export button's own guard reads `localService.status`, which can disagree
+// with the STORED status the guard reads.
+//
+// So: two editors have the same `planned` service open. A exports; the stored
+// status becomes `exported`. B's Export button is still enabled from B's own
+// `localService`. B exports — every Planning Center API call completes, creating
+// a real plan — and only then does the local guard throw. B is shown
+// "R036: refusing to update service svc-1 — its stored status is …", `pcPlanId`
+// is never recorded, and the plan just written to Planning Center is orphaned
+// with no audit trail. That is exactly the loss D-11 exists to prevent.
+describe('ServiceEditorView - ME-01: export failure copy and the pre-flight status re-check', () => {
+  async function mountView() {
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          RouterLink: { template: '<a><slot /></a>' },
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+          teleport: false,
+        },
+      },
+    })
+  }
+
+  interface ExportVm {
+    localService: { status: string }
+    exportSelectedServiceTypeId: string
+    exportSelectedTemplateId: string
+    exportMode: string
+    exportError: string | null
+    onConfirmExport: () => Promise<void>
+  }
+
+  async function armExport(wrapper: Awaited<ReturnType<typeof mountView>>): Promise<ExportVm> {
+    const vm = wrapper.vm as unknown as ExportVm
+    vm.exportSelectedServiceTypeId = 'st-1'
+    vm.exportSelectedTemplateId = ''
+    vm.exportMode = 'new'
+    await wrapper.vm.$nextTick()
+    return vm
+  }
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockAuthState.hasPcCredentials = true
+    mockAuthState.pcCredentials = { appId: 'app-1', secret: 'secret-1' }
+    mockUpdateService.mockClear()
+    mockUpdateService.mockImplementation(() => Promise.resolve())
+    mockCreatePlan.mockClear()
+    mockAddSlotAsItem.mockClear()
+  })
+
+  afterEach(() => {
+    mockAuthState.hasPcCredentials = false
+    mockAuthState.pcCredentials = null
+    mockUpdateService.mockImplementation(() => Promise.resolve())
+  })
+
+  it('refuses BEFORE any Planning Center work when the stored status is no longer planned', async () => {
+    // The stored row says `exported` (editor A already exported it); this
+    // editor's own localService still says `planned`, which is what the Export
+    // button's `:disabled` reads.
+    mockServicesList = [{ ...mockService, status: 'exported' }]
+    const wrapper = await mountView()
+    const vm = await armExport(wrapper)
+    vm.localService.status = 'planned'
+    await wrapper.vm.$nextTick()
+
+    await vm.onConfirmExport()
+    await flushPromises()
+
+    // The whole point: no orphaned plan. Nothing was created in Planning
+    // Center, so there is nothing to reconcile by hand.
+    expect(mockCreatePlan).not.toHaveBeenCalled()
+    expect(mockAddSlotAsItem).not.toHaveBeenCalled()
+    expect(mockUpdateService).not.toHaveBeenCalled()
+
+    expect(vm.exportError).toBeTruthy()
+    expect(vm.exportError).not.toContain('R036')
+    expect(vm.exportError).not.toContain('refusing to')
+  })
+
+  it('maps a ServiceLockedError from the terminal write to user copy, not the R036 developer string', async () => {
+    mockServicesList = [{ ...mockService, status: 'planned' }]
+    const wrapper = await mountView()
+    const vm = await armExport(wrapper)
+
+    // The pre-flight check passes (stored status IS planned), the PC
+    // conversation completes, and the service is locked underneath us only in
+    // the window between. The terminal write is then refused.
+    mockUpdateService.mockRejectedValueOnce(new ServiceLockedErrorStub('service-1', 'exported'))
+
+    await vm.onConfirmExport()
+    await flushPromises()
+
+    expect(mockCreatePlan).toHaveBeenCalled()
+    expect(vm.exportError).toBeTruthy()
+    expect(vm.exportError).not.toContain('R036')
+    expect(vm.exportError).not.toContain('refusing to')
+    // And it must name the actual situation, so the user knows the plan DID
+    // reach Planning Center and a blind retry would duplicate it.
+    expect(vm.exportError!.toLowerCase()).toContain('planning center')
+  })
+
+  it('a genuinely planned service still exports — the pre-flight check is not a blanket refusal', async () => {
+    mockServicesList = [{ ...mockService, status: 'planned' }]
+    const wrapper = await mountView()
+    const vm = await armExport(wrapper)
+
+    await vm.onConfirmExport()
+    await flushPromises()
+
+    expect(mockCreatePlan).toHaveBeenCalled()
+    expect(vm.exportError).toBeNull()
+    expect(mockUpdateService).toHaveBeenCalledWith(
+      'service-1',
+      expect.objectContaining({ status: 'exported', pcPlanId: 'pc-plan-new' }),
+    )
+    expect(vm.localService.status).toBe('exported')
   })
 })
