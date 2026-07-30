@@ -111,35 +111,41 @@ describe('ScriptureInput', () => {
   // degenerate `16-16` range then left this one disagreeing with the Slides
   // rail, the projected slide and the Planning Center export.
   describe('W-02 — the input renders the canonical reference form', () => {
+    // `find()` returns DOMWrapper<Element>, whose `element` has no `.value`.
+    // The generic is required for `vue-tsc --build`; `-p tsconfig.app.json`
+    // does not typecheck this file, which is how the original omission shipped.
+    const inputValue = (w: ReturnType<typeof mount>) =>
+      w.find<HTMLInputElement>('input[type="text"]').element.value
+
     it('collapses a degenerate range, matching every other surface', () => {
       const wrapper = mount(ScriptureInput, {
         props: { ...defaultProps, modelValue: { book: 'John', chapter: 3, verseStart: 16, verseEnd: 16 } },
       })
-      expect(wrapper.find('input[type="text"]').element.value).toBe('John 3:16')
+      expect(inputValue(wrapper)).toBe('John 3:16')
     })
 
     it('renders a real range unchanged', () => {
       const wrapper = mount(ScriptureInput, {
         props: { ...defaultProps, modelValue: { book: 'Isaiah', chapter: 53, verseStart: 1, verseEnd: 6 } },
       })
-      expect(wrapper.find('input[type="text"]').element.value).toBe('Isaiah 53:1-6')
+      expect(inputValue(wrapper)).toBe('Isaiah 53:1-6')
     })
 
     it('renders a single-verse and a whole-chapter reference', () => {
       const single = mount(ScriptureInput, {
         props: { ...defaultProps, modelValue: { book: 'Romans', chapter: 8, verseStart: 28 } },
       })
-      expect(single.find('input[type="text"]').element.value).toBe('Romans 8:28')
+      expect(inputValue(single)).toBe('Romans 8:28')
 
       const chapter = mount(ScriptureInput, {
         props: { ...defaultProps, modelValue: { book: 'Psalms', chapter: 103 } },
       })
-      expect(chapter.find('input[type="text"]').element.value).toBe('Psalms 103')
+      expect(inputValue(chapter)).toBe('Psalms 103')
     })
 
     it('renders empty for a null reference', () => {
       const wrapper = mount(ScriptureInput, { props: { ...defaultProps, modelValue: null } })
-      expect(wrapper.find('input[type="text"]').element.value).toBe('')
+      expect(inputValue(wrapper)).toBe('')
     })
   })
 
