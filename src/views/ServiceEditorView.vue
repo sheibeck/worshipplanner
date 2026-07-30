@@ -315,7 +315,7 @@
           <div v-if="showDeleteConfirm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
             <div class="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl p-6 w-full max-w-sm mx-4">
               <h2 class="text-base font-semibold text-gray-100 mb-2">Delete service?</h2>
-              <p class="text-sm text-gray-400 mb-6">This will permanently delete the service for <span class="text-gray-200">{{ formattedDate }}</span>. This cannot be undone.</p>
+              <p class="text-sm text-gray-400 mb-6" data-testid="delete-service-confirm-body">{{ deleteServiceConfirmBody }}</p>
               <div class="flex justify-end gap-3">
                 <button
                   type="button"
@@ -1397,6 +1397,27 @@ const deleteConfirmBody = computed(() => {
     : ', with no attached audio or notes'
 
   return `This will remove ${label} and its ${slideCount} ${slideWord}${mediaClause}. This cannot be undone.`
+})
+
+/**
+ * D-15 — Delete stays available at every status, but must not stay un-warned.
+ *
+ * The reasoning that justifies NO friction on Reopen runs the opposite way
+ * here: reopening is reversible, deleting is not. Delete is the only
+ * irreversible action in this view, and for a service carrying export evidence
+ * it silently orphans a live Planning Center plan and destroys the audit trail
+ * D-11 exists to preserve. Warning is the mitigation; locking is not — forcing
+ * a Reopen just to delete adds friction with no safety gain and strands the
+ * "created by mistake" case behind two extra steps.
+ *
+ * Same `hasPcExportEvidence` computed as the reopen dialog. No new dialog, no
+ * rules change (the rule's `allow delete` is deliberately unconditional).
+ */
+const deleteServiceConfirmBody = computed(() => {
+  const base = `This will permanently delete the service for ${formattedDate.value}. This cannot be undone.`
+  return hasPcExportEvidence.value
+    ? `${base} This service was exported to Planning Center. Deleting it here does not remove that plan.`
+    : base
 })
 
 // ── Scripture editor expansion state ──────────────────────────────────────────
