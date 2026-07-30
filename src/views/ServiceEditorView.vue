@@ -1357,13 +1357,36 @@ function onSectionChange(index: number, value: string) {
 }
 
 const orgIdRef = computed(() => authStore.orgId)
+/**
+ * R036 — whether this session may write slide-group documents at all.
+ *
+ * ★ This is NOT only a UI concern, and narrowing it is not optional. The
+ * `/slideGroups` Firestore rule rejects every write whose parent service is not
+ * draft. `useSlideshowAssembly`'s materialization watcher runs with
+ * `{ immediate: true }` — it writes on service LOAD, with no user action — as
+ * does `rebuildOutcomes`. Leaving this as bare `isEditor` would therefore make
+ * every locked service throw permission-denied the moment it opens, which is a
+ * worse failure than the one the lock fixes.
+ *
+ * Suppressing the write is the right shape rather than carving an exception into
+ * the rule: the rules layer cannot distinguish a load-time materialization from
+ * a user edit, so the exception would have to be "allow any write", i.e. no lock.
+ *
+ * A service still loading has no status yet; `?? 'draft'` matches the rule's own
+ * `resource.data.get('status','draft')` default so the two layers agree, and it
+ * avoids wedging materialization behind a transient null.
+ */
+const canWriteSlideGroups = computed(
+  () => authStore.isEditor && (localService.value?.status ?? 'draft') === 'draft',
+)
+
 const {
   assembledSlideshow,
   isLoading: slideshowLoading,
   groupsBySlotId,
   ensureGroupMaterialized,
   suppressMaterialization,
-} = useSlideshowAssembly(localService, orgIdRef, { canWrite: computed(() => authStore.isEditor) })
+} = useSlideshowAssembly(localService, orgIdRef, { canWrite: canWriteSlideGroups })
 const presenting = ref(false)
 
 // ── AI state ───────────────────────────────────────────────────────────────────

@@ -2226,3 +2226,91 @@ describe('ServiceEditorView - ME-02 scripture reference round-trips in its own e
     expect(wrapper.find('[data-scripture-slot-index="0"]').text()).toContain('Romans 8:28')
   })
 })
+
+// -- R036 wave 2: no slide-group writes are ATTEMPTED on a locked service ----
+//
+// *** This is the regression test for the failure mode that would have shipped
+// green. useSlideshowAssembly's materialization watcher runs with
+// `{ immediate: true }` -- it writes to slideGroups when an editor merely OPENS
+// a service, with no user action -- and rebuildOutcomes does too. Both read the
+// `canWrite` this view passes in.
+//
+// Once the /slideGroups Firestore rule rejects writes whose parent service is
+// not draft, leaving canWrite as bare `isEditor` makes EVERY locked service
+// throw permission-denied the moment it loads. Nothing in the default vitest
+// run would catch that: src/rules.test.ts is excluded from it, so the rule and
+// the client would each look correct in isolation.
+describe('ServiceEditorView - no slide-group writes on a locked service (R036)', () => {
+  async function mountView() {
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          RouterLink: { template: '<a><slot /></a>' },
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+        },
+      },
+    })
+  }
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockSlideGroupsState.groups = []
+  })
+
+  for (const status of ['planned', 'exported'] as const) {
+    it(`attempts ZERO slide-group writes when the service is ${status}`, async () => {
+      mockServicesList = [{ ...mockService, status }]
+      const wrapper = await mountView()
+      await wrapper.vm.$nextTick()
+      await flushPromises()
+      await wrapper.vm.$nextTick()
+
+      expect(mockMaterializeGroupIfMissing).not.toHaveBeenCalled()
+      expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
+    })
+  }
+
+  it('still materializes normally when the service is draft', async () => {
+    mockServicesList = [{ ...mockService, status: 'draft' }]
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    await flushPromises()
+    await wrapper.vm.$nextTick()
+
+    // The draft path is unchanged by this wave; if this ever stops being called
+    // the narrowing has over-reached and slides silently stop materializing.
+    expect(mockMaterializeGroupIfMissing).toHaveBeenCalled()
+  })
+
+  // Reopening must restore slide editing without a reload -- the gate has to be
+  // a live computed over the service's status, not a value captured at mount.
+  //
+  // Driven by mutating `localService` directly rather than by swapping
+  // `mockServicesList`: that mock hands `useServiceStore()` the array reference
+  // it holds at creation time (see its own comment at the declaration), so a
+  // post-mount reassignment cannot reach an already-mounted view. Mutating
+  // localService is also the closer analogue of the real path, where the store
+  // write lands and the snapshot updates localService in place.
+  it('resumes materialization when a locked service is reopened, with no remount', async () => {
+    mockServicesList = [{ ...mockService, status: 'planned' }]
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    await flushPromises()
+    expect(mockMaterializeGroupIfMissing).not.toHaveBeenCalled()
+
+    const vm = wrapper.vm as unknown as { localService: { status: string } | null }
+    expect(vm.localService).not.toBeNull()
+    vm.localService!.status = 'draft'
+    await wrapper.vm.$nextTick()
+    await flushPromises()
+    await wrapper.vm.$nextTick()
+
+    expect(mockMaterializeGroupIfMissing).toHaveBeenCalled()
+  })
+})

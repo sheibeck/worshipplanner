@@ -871,3 +871,172 @@ describe('Service draft lock (R036/R037)', () => {
     })
   })
 })
+
+// -- R036 -- the slide-group lock (Phase 31, wave 2) -------------------------
+//
+// A slideGroups doc's id IS the slot id, so its parent service is reachable
+// only through the `serviceId` FIELD. The rule therefore does an exists()+get()
+// on the parent (2 extra billed reads per write) and requires the parent to be
+// draft.
+//
+// `allow delete` is deliberately MORE permissive than `allow update`: an orphan
+// whose parent service was deleted, or a legacy doc carrying no serviceId at
+// all, must stay deletable or it is wedged in the database forever.
+describe('Slide group lock (R036)', () => {
+  const GRP = 'organizations/orgA/slideGroups/slot-1'
+
+  async function seedParent(status: string) {
+    await seedDoc('organizations/orgA/services/svc1', {
+      name: 'Sunday Service',
+      date: '2026-08-02',
+      status,
+      slots: [],
+      updatedAt: new Date(),
+    })
+  }
+
+  async function seedGroup(extra: Record<string, unknown> = {}) {
+    await seedDoc(GRP, {
+      serviceId: 'svc1',
+      slotId: 'slot-1',
+      slides: [],
+      updatedAt: new Date(),
+      ...extra,
+    })
+  }
+
+  async function editorDb() {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    return testEnv.authenticatedContext('userA').firestore()
+  }
+
+  function grpRef(db: ReturnType<ReturnType<typeof testEnv.authenticatedContext>['firestore']>) {
+    return doc(db, 'organizations', 'orgA', 'slideGroups', 'slot-1')
+  }
+
+  describe('update follows the parent service status', () => {
+    it('a slide write is ALLOWED when the parent is draft', async () => {
+      await seedParent('draft')
+      await seedGroup()
+      const db = await editorDb()
+      await assertSucceeds(
+        updateDoc(grpRef(db), { serviceId: 'svc1', slides: [{ id: 'e1' }], updatedAt: new Date() }),
+      )
+    })
+
+    it('a slide write is REJECTED when the parent is planned', async () => {
+      await seedParent('planned')
+      await seedGroup()
+      const db = await editorDb()
+      await assertFails(
+        updateDoc(grpRef(db), { serviceId: 'svc1', slides: [{ id: 'e1' }], updatedAt: new Date() }),
+      )
+    })
+
+    it('a slide write is REJECTED when the parent is exported', async () => {
+      await seedParent('exported')
+      await seedGroup()
+      const db = await editorDb()
+      await assertFails(
+        updateDoc(grpRef(db), { serviceId: 'svc1', slides: [{ id: 'e1' }], updatedAt: new Date() }),
+      )
+    })
+  })
+
+  describe('create (materialization)', () => {
+    it('materializing a group is ALLOWED when the parent is draft', async () => {
+      await seedParent('draft')
+      const db = await editorDb()
+      await assertSucceeds(
+        setDoc(grpRef(db), { serviceId: 'svc1', slotId: 'slot-1', slides: [], updatedAt: new Date() }),
+      )
+    })
+
+    it('materializing a group is REJECTED when the parent is locked', async () => {
+      await seedParent('planned')
+      const db = await editorDb()
+      await assertFails(
+        setDoc(grpRef(db), { serviceId: 'svc1', slotId: 'slot-1', slides: [], updatedAt: new Date() }),
+      )
+    })
+
+    it('a create with no serviceId is REJECTED', async () => {
+      await seedParent('draft')
+      const db = await editorDb()
+      await assertFails(
+        setDoc(grpRef(db), { slotId: 'slot-1', slides: [], updatedAt: new Date() }),
+      )
+    })
+  })
+
+  describe('serviceId is immutable', () => {
+    // Without this, a group could be re-parented from a draft service onto a
+    // locked one and then edited through the seam.
+    it('re-parenting a group to a different serviceId is REJECTED', async () => {
+      await seedParent('draft')
+      await seedDoc('organizations/orgA/services/svc2', {
+        name: 'Other', date: '2026-08-09', status: 'draft', slots: [], updatedAt: new Date(),
+      })
+      await seedGroup()
+      const db = await editorDb()
+      await assertFails(
+        updateDoc(grpRef(db), { serviceId: 'svc2', updatedAt: new Date() }),
+      )
+    })
+  })
+
+  describe('delete is more permissive than update, on purpose', () => {
+    it('cascade delete is ALLOWED when the parent is draft', async () => {
+      await seedParent('draft')
+      await seedGroup()
+      const db = await editorDb()
+      await assertSucceeds(deleteDoc(grpRef(db)))
+    })
+
+    it('cascade delete is REJECTED when the parent is locked', async () => {
+      await seedParent('planned')
+      await seedGroup()
+      const db = await editorDb()
+      await assertFails(deleteDoc(grpRef(db)))
+    })
+
+    // *** Without the parentGone() branch an orphan is BOTH unwritable and
+    // undeletable -- wedged in the database with no cleanup path. An earlier
+    // iteration of this rule had exactly that defect.
+    it('an ORPHAN group (parent service deleted) is still DELETABLE', async () => {
+      await seedGroup() // no parent service seeded at all
+      const db = await editorDb()
+      await assertSucceeds(deleteDoc(grpRef(db)))
+    })
+
+    it('a legacy group carrying no serviceId is still DELETABLE', async () => {
+      await seedDoc(GRP, { slotId: 'slot-1', slides: [], updatedAt: new Date() })
+      const db = await editorDb()
+      await assertSucceeds(deleteDoc(grpRef(db)))
+    })
+  })
+
+  describe('the catch-all wildcard no longer backstops /slideGroups', () => {
+    // The wildcard was the ONLY rule granting write here before this wave, which
+    // is why its exclusion and the block above had to land in one commit.
+    it('a write against a locked parent is not rescued by the org-level wildcard', async () => {
+      await seedParent('exported')
+      await seedGroup()
+      const db = await editorDb()
+      await assertFails(
+        updateDoc(grpRef(db), { serviceId: 'svc1', slides: [{ id: 'sneaky' }], updatedAt: new Date() }),
+      )
+    })
+  })
+
+  describe('viewers', () => {
+    it('a viewer can read a group but cannot write one', async () => {
+      await seedParent('draft')
+      await seedGroup()
+      await seedMembershipDoc('orgA', 'userV', 'viewer')
+      const db = testEnv.authenticatedContext('userV').firestore()
+      await assertSucceeds(getDoc(grpRef(db)))
+      await assertFails(updateDoc(grpRef(db), { serviceId: 'svc1', updatedAt: new Date() }))
+    })
+  })
+})

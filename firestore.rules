@@ -84,6 +84,42 @@ service cloud.firestore {
         );
       }
 
+      // Slide groups — one doc per slot (doc id IS the slot id), so the parent
+      // service is reachable only via the serviceId FIELD. Two extra billed
+      // reads per write (exists + get); 3 of the 10-call budget once
+      // isOrgEditor's own get() is counted.
+      match /slideGroups/{groupId} {
+        function svcPath(sid) {
+          return /databases/$(database)/documents/organizations/$(orgId)/services/$(sid);
+        }
+        function parentDraft(sid) {
+          return exists(svcPath(sid)) && get(svcPath(sid)).data.get('status','draft') == 'draft';
+        }
+        function parentGone(sid) { return !exists(svcPath(sid)); }
+
+        allow read: if isOrgMember(orgId);
+
+        allow create: if isOrgEditor(orgId)
+          && request.resource.data.keys().hasAll(['serviceId'])
+          && parentDraft(request.resource.data.serviceId);
+
+        // serviceId is immutable (mirrors quarterShares' orgId immutability,
+        // firestore.rules:118) — otherwise a group could be re-parented from a
+        // draft service onto a locked one and edited through the seam.
+        allow update: if isOrgEditor(orgId)
+          && resource.data.keys().hasAll(['serviceId'])
+          && request.resource.data.serviceId == resource.data.serviceId
+          && parentDraft(resource.data.serviceId);
+
+        // Delete is deliberately MORE permissive than update: an orphan (parent
+        // service deleted) or a legacy doc with no serviceId must remain
+        // deletable, or it is wedged in the database forever with no cleanup path.
+        allow delete: if isOrgEditor(orgId)
+          && (!resource.data.keys().hasAll(['serviceId'])
+              || parentGone(resource.data.serviceId)
+              || parentDraft(resource.data.serviceId));
+      }
+
       // Songs — editors only (viewers cannot read songs)
       match /songs/{songId} {
         allow read, write: if isOrgEditor(orgId);
@@ -100,7 +136,8 @@ service cloud.firestore {
 
       // All other nested collections — editors only.
       //
-      // ★ `collection != 'services'` is LOAD-BEARING. Do not remove it.
+      // ★ `collection != 'services'` and `collection != 'slideGroups'` are both
+      // LOAD-BEARING. Do not remove either.
       // `{collection}` is a single-segment wildcard, so this rule also matches
       // /organizations/{orgId}/services/{docId}, and Firestore rules are
       // OR-evaluated: a broader rule that grants access wins over a narrower one
@@ -114,11 +151,19 @@ service cloud.firestore {
       // itself grant read, create, update AND delete — it does.
       //
       // NOTE: only `write` is excluded. `read` still falls through here
-      // harmlessly; the /services block grants read to any org member, which is
-      // strictly broader than isOrgEditor.
+      // harmlessly; both blocks grant read to any org member, which is strictly
+      // broader than isOrgEditor.
+      //
+      // The slideGroups exclusion had to land in the SAME commit as the
+      // /slideGroups block above: before that block existed, THIS wildcard was
+      // the only rule granting write to slide groups, so excluding it alone
+      // would have denied every slide-group write — including the load-time
+      // materialization that runs on DRAFT services.
       match /{collection}/{docId} {
         allow read: if isOrgEditor(orgId);
-        allow write: if isOrgEditor(orgId) && collection != 'services';
+        allow write: if isOrgEditor(orgId)
+          && collection != 'services'
+          && collection != 'slideGroups';
       }
     }
 
