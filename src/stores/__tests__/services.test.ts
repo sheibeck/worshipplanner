@@ -109,7 +109,7 @@ function makeService(overrides: Partial<{
   name: string
   progression: '1-2-2-3' | '1-2-3-3'
   teams: string[]
-  status: 'draft' | 'planned'
+  status: 'draft' | 'planned' | 'exported'
   slots: unknown[]
   sermonPassage: null
   notes: string
@@ -122,7 +122,7 @@ function makeService(overrides: Partial<{
     name: 'Sunday Service',
     progression: '1-2-2-3' as '1-2-2-3' | '1-2-3-3',
     teams: [],
-    status: 'draft' as 'draft' | 'planned',
+    status: 'draft' as 'draft' | 'planned' | 'exported',
     slots: [],
     sermonPassage: null,
     notes: '',
@@ -653,6 +653,213 @@ describe('useServiceStore', () => {
       expect(token).toMatch(/^[0-9a-f]{36}$/)
       expect(consoleErrorSpy).toHaveBeenCalled()
       consoleErrorSpy.mockRestore()
+    })
+  })
+
+  // ── R036 / R037 — the store's draft-only write guard + status transitions ────
+  //
+  // Layer 2 of 3. These assertions deliberately mirror the `/services`
+  // `allow update` clause in firestore.rules shape-for-shape: the guard exists
+  // to make a client-side bug legible locally, so if it ever drifts from the
+  // rule it becomes either a phantom lock or an opaque round-trip failure.
+  //
+  // Every "refused" case asserts `updateDoc` was NOT called, not merely that
+  // the promise rejected — a guard that throws AFTER writing is no guard.
+  describe('draft-only write guard (R036)', () => {
+    async function storeAtStatus(status: 'draft' | 'planned' | 'exported', extra = {}) {
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService({ status, ...extra })])
+      return store
+    }
+
+    it('allows an ordinary update while the stored status is draft', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const store = await storeAtStatus('draft')
+
+      await store.updateService('service-1', { notes: 'edited' })
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+    })
+
+    for (const status of ['planned', 'exported'] as const) {
+      it(`refuses an ordinary update locally when the stored status is ${status}`, async () => {
+        const { updateDoc } = await import('firebase/firestore')
+        const store = await storeAtStatus(status)
+
+        await expect(store.updateService('service-1', { notes: 'edited' })).rejects.toThrow(
+          /R036/,
+        )
+        expect(updateDoc).not.toHaveBeenCalled()
+      })
+    }
+
+    // The status is read from the STORED snapshot, never from the payload —
+    // otherwise any write that also sets `status: 'draft'` would edit a locked
+    // service, which is precisely the payload an attacker would send. The
+    // reopen carve-out is why `{ status: 'draft' }` ALONE is allowed; adding a
+    // second key must not inherit that permission.
+    it('refuses a locked update that smuggles other fields alongside status: draft', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const store = await storeAtStatus('exported')
+
+      await expect(
+        store.updateService('service-1', { status: 'draft', slots: [] }),
+      ).rejects.toThrow(/R036/)
+      expect(updateDoc).not.toHaveBeenCalled()
+    })
+
+    it('allows the reopen-shaped update (status alone) at planned and exported', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const store = await storeAtStatus('exported')
+
+      await store.updateService('service-1', { status: 'draft' })
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+    })
+
+    // ★ D-09 — if this ever fails, `exported` has become unreachable and the
+    // primary Planning Center workflow is broken.
+    it('allows the Planning Center export write from planned (D-09)', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const store = await storeAtStatus('planned')
+
+      await store.updateService('service-1', {
+        pcExportedAt: { seconds: 1, nanoseconds: 0 },
+        pcPlanId: 'plan-1',
+        status: 'exported',
+      })
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+    })
+
+    it('refuses an export-shaped write from an already-exported service', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const store = await storeAtStatus('exported')
+
+      await expect(
+        store.updateService('service-1', {
+          pcExportedAt: { seconds: 1, nanoseconds: 0 },
+          pcPlanId: 'plan-2',
+          status: 'exported',
+        }),
+      ).rejects.toThrow(/R036/)
+      expect(updateDoc).not.toHaveBeenCalled()
+    })
+
+    // D-15 — delete stays available at every status; the UI warns instead.
+    // Keep in step with firestore.rules' unconditional `allow delete`.
+    for (const status of ['draft', 'planned', 'exported'] as const) {
+      it(`allows delete while the stored status is ${status} (D-15)`, async () => {
+        const { deleteDoc } = await import('firebase/firestore')
+        const store = await storeAtStatus(status)
+
+        await store.deleteService('service-1')
+
+        expect(deleteDoc).toHaveBeenCalledOnce()
+      })
+    }
+
+    // ★ The Roles tab does not go through updateService. Without these two the
+    // store layer does not cover it at all.
+    it('refuses setRoleOverride on a locked service', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const store = await storeAtStatus('planned')
+
+      await expect(store.setRoleOverride('service-1', 'role-1', ['p1'])).rejects.toThrow(/R036/)
+      expect(updateDoc).not.toHaveBeenCalled()
+    })
+
+    it('refuses clearRoleOverride on a locked service', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const store = await storeAtStatus('exported')
+
+      await expect(store.clearRoleOverride('service-1', 'role-1')).rejects.toThrow(/R036/)
+      expect(updateDoc).not.toHaveBeenCalled()
+    })
+
+    it('still allows setRoleOverride and clearRoleOverride on a draft service', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const store = await storeAtStatus('draft')
+
+      await store.setRoleOverride('service-1', 'role-1', ['p1'])
+      await store.clearRoleOverride('service-1', 'role-1')
+
+      expect(updateDoc).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  describe('status transitions (R037)', () => {
+    async function storeAtStatus(status: 'draft' | 'planned' | 'exported', extra = {}) {
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService({ status, ...extra })])
+      return store
+    }
+
+    it('markAsPlanned writes status and updatedAt, and nothing else', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const store = await storeAtStatus('draft')
+
+      await store.markAsPlanned('service-1')
+
+      const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+      expect(Object.keys(data).sort()).toEqual(['status', 'updatedAt'])
+      expect(data.status).toBe('planned')
+    })
+
+    for (const status of ['planned', 'exported'] as const) {
+      it(`markAsPlanned refuses when the stored status is already ${status}`, async () => {
+        const { updateDoc } = await import('firebase/firestore')
+        const store = await storeAtStatus(status)
+
+        await expect(store.markAsPlanned('service-1')).rejects.toThrow(/R036/)
+        expect(updateDoc).not.toHaveBeenCalled()
+      })
+    }
+
+    // ★ D-11 — the rule's hasOnly(['status','updatedAt']) reads affectedKeys().
+    // Re-writing pcExportedAt/pcPlanId here, even to their existing values, can
+    // surface in that diff and get the whole reopen denied. The fields survive
+    // by being left alone, which is also what keeps the Planning Center plan
+    // linked for a re-export and what D-04's evidence gate reads on a SECOND
+    // reopen. This test is the guard against a future "let's also clear the
+    // export fields" edit.
+    it('reopenService writes ONLY status and updatedAt — never pcExportedAt/pcPlanId', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const store = await storeAtStatus('exported', {
+        pcExportedAt: { seconds: 5, nanoseconds: 0 },
+        pcPlanId: 'plan-9',
+      })
+
+      await store.reopenService('service-1')
+
+      const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+      expect(Object.keys(data).sort()).toEqual(['status', 'updatedAt'])
+      expect(data.status).toBe('draft')
+      expect(data).not.toHaveProperty('pcExportedAt')
+      expect(data).not.toHaveProperty('pcPlanId')
+    })
+
+    it('reopenService works from planned as well as exported', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const store = await storeAtStatus('planned')
+
+      await store.reopenService('service-1')
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+    })
+
+    it('there is no generic status setter on the store (D-03)', async () => {
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      // `exported` must be reachable ONLY through a real Planning Center
+      // export. A setStatus/toggleStatus escape hatch would re-admit the
+      // hand-set "Exported" defect D-01 deletes.
+      expect(store).not.toHaveProperty('setStatus')
+      expect(store).not.toHaveProperty('toggleStatus')
     })
   })
 })
