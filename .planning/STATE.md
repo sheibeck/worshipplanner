@@ -19,6 +19,42 @@ progress:
 
 # Project State
 
+## ★★ STANDING AUTONOMY GRANT — 2026-07-30, owner away for the weekend
+
+Owner instruction, verbatim: *"I'll be leaving for the weekend, so I want you to skip any human
+verification points. I want autonomous while I'm away and when we're you're done, we'll do human
+verification then. Keep working fully autonomously while I'm away until you get to a point where you
+literally can't work because of outstanding issues that must have answers, or until you finish."*
+
+**In force until the owner returns and says otherwise.** This survives context compaction — re-read it
+before deciding to stop for a checkpoint.
+
+### What this authorizes
+
+- **Do not block on human-verify checkpoints.** Record each as DEFERRED in
+  `.planning/PENDING-VERIFICATION.md`, then continue to the next wave/phase.
+- Complete phases whose only outstanding gate is human verification, marking the gate deferred rather
+  than passed.
+- Proceed through Phases 31 → 37 without pausing for approval on ordinary implementation decisions.
+
+### What this does NOT authorize
+
+- **Never record a deferred check as passed.** "Skip the checkpoint" means defer and disclose, not
+  self-approve. A phase whose verification was deferred says so in its VERIFICATION.md.
+- **No deploys.** `firebase deploy` stays the owner's step (backlog Phase 999.3). Phase 37 remains
+  "build but do not deploy" per the v1.4 standing decisions.
+- **No `.env.local` changes** — it holds live secrets and is gitignored.
+- **No destructive or irreversible actions** without asking: no `git stash` (multi-worktree repo), no
+  project-wide `lint --fix`, no history rewrites, no bulk deletions of tracked files beyond what a
+  plan explicitly scopes.
+- **Stop and ask** only when proceeding under any assumption would be unsafe or would make the work
+  useless if the assumption is wrong. Otherwise pick the reasonable default, state it, and continue.
+
+### Where deferred items go
+
+`.planning/PENDING-VERIFICATION.md` — one running list across all phases, written as the owner's
+to-do for when they return.
+
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-07-28)
