@@ -38,7 +38,17 @@
         <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-3">
           <div>
             <div class="flex items-center gap-3">
-              <h1 v-if="!authStore.isEditor" class="text-xl font-semibold text-gray-100">{{ formattedDate }}</h1>
+              <!-- BL-01 / 31-PATTERNS § 4a row 1. This was gated on
+                   `authStore.isEditor` alone, so the picker still rendered on a
+                   `planned`/`exported` service: picking a Sunday mutated
+                   `localService.date`, the 800ms debounce fired a full-document
+                   `onSave`, and all three enforcement layers refused it — with
+                   nothing on screen, because the autosave error line at :93
+                   lives inside `v-if="canEditService"`. `canEditService` (not
+                   `isLocked`) so a viewer keeps the same read-only branch it
+                   always had — this is the class-D inverse, a swap, not a
+                   deletion (31-UI-SPEC § 3). -->
+              <h1 v-if="!canEditService" class="text-xl font-semibold text-gray-100">{{ formattedDate }}</h1>
               <div v-else class="relative">
                 <button
                   type="button"
@@ -103,14 +113,19 @@
               >
                 Saved
               </span>
-              <!-- UI-SPEC §5: minimal, transient reorder-failure text — no toast, no
-                   modal, no aria-live (Phase 32's persistent status indicator owns that). -->
+              <!-- UI-SPEC §5: minimal, transient save-failure text — no toast, no
+                   modal, no aria-live (Phase 32's persistent status indicator owns
+                   that). Two producers, two messages (BL-02): the reorder save
+                   reverts and the retry is another drag; the debounced autosave
+                   keeps the user's text and the retry is another keystroke. -->
               <span
                 v-else-if="autosaveStatus === 'error'"
                 class="text-xs text-red-400"
                 data-testid="autosave-error"
               >
-                Couldn't save this order — reverted. Try dragging again.
+                {{ autosaveErrorSource === 'reorder'
+                  ? "Couldn't save this order — reverted. Try dragging again."
+                  : "Couldn't save your changes — they're still here. Try again." }}
               </span>
               <span
                 v-else-if="isDirty"
@@ -1312,7 +1327,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick, type ComponentPublicInstance } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { useServiceStore } from '@/stores/services'
+import { useServiceStore, ServiceLockedError } from '@/stores/services'
 import { useSongStore } from '@/stores/songs'
 import { useRosterStore } from '@/stores/roster'
 import { useQuartersStore } from '@/stores/quarters'
@@ -1412,6 +1427,12 @@ const pcCopied = ref(false)
 // ── Autosave state ─────────────────────────────────────────────────────────────
 const previousService = ref<Service | null>(null)   // snapshot before last autosave (for undo)
 const autosaveStatus = ref<'idle' | 'pending' | 'saving' | 'saved' | 'error'>('idle')
+// BL-02: `'error'` used to have exactly one producer — the immediate reorder
+// save — so its message could name dragging. The debounced autosave now
+// produces it too (a rejection there must not strand the status at 'saving'),
+// and "Try dragging again" is simply wrong advice after typing. One ref, one
+// message each, rather than one message stretched over two causes.
+const autosaveErrorSource = ref<'reorder' | 'autosave'>('reorder')
 let autosaveTimer: ReturnType<typeof setTimeout> | null = null
 let autosaveInitialized = false                     // suppress first-load trigger
 let autosaveSaving = false                          // inflight guard — prevents concurrent saves
@@ -1832,6 +1853,7 @@ async function onSlotSortEnd(evt: Sortable.SortableEvent): Promise<void> {
     if (localService.value && originalService.value) {
       localService.value.slots = JSON.parse(JSON.stringify(originalService.value.slots))
     }
+    autosaveErrorSource.value = 'reorder'
     autosaveStatus.value = 'error'
     console.error('[ServiceEditorView] reorder save failed:', err)
   } finally {
@@ -1897,6 +1919,12 @@ const formattedDate = computed(() => {
 })
 
 function onDateChange(newDate: string) {
+  // R036 / 30-VERIFICATION I-01: gate the handler, not just the template. The
+  // `v-if` above removes the control, but the handler stays reachable from the
+  // input's own change event during the tick before a status flip re-renders —
+  // and a lock enforced only by `v-if` inherits exactly the fragility I-01
+  // documented for the Slides tab (BL-01).
+  if (!canEditService.value) return
   if (!localService.value || !newDate) return
   localService.value.date = newDate
 }
@@ -1969,7 +1997,18 @@ watch(
       autosaveInitialized = false
       previousService.value = null
       autosaveStatus.value = 'idle'
-    } else if (autosaveStatus.value === 'idle' || autosaveStatus.value === 'saved') {
+    } else if (
+      autosaveStatus.value === 'idle' ||
+      autosaveStatus.value === 'saved' ||
+      // BL-02: a FAILED save must not close this branch for the life of the
+      // component. `'error'` is admitted only once the local copy matches the
+      // last persisted state — which both failure paths that revert (the
+      // reorder catch, and `handleAutosaveFailure`'s ServiceLockedError branch)
+      // guarantee — so re-admitting it can never discard unsaved work. A
+      // transport failure that KEPT the user's text stays dirty and stays
+      // excluded, which is the intended protection rather than an oversight.
+      (autosaveStatus.value === 'error' && !isDirty.value)
+    ) {
       // Remote update arrived while user is not actively editing — apply it.
       // This is what makes two simultaneous viewers see each other's changes.
       // Guard: skip if the remote version matches what we already have (avoid
@@ -2011,13 +2050,85 @@ watch(
 
 // ── Autosave watcher ────────────────────────────────────────────────────────────
 
+/**
+ * BL-02 — a rejected autosave must leave the view USABLE.
+ *
+ * The timer callback used to be `try { … } finally { … }` with no `catch`, so a
+ * rejection skipped `autosaveStatus = 'saved'` and stranded the status at
+ * `'saving'` forever. That is not a cosmetic stall: the remote-merge branch in
+ * the store watcher runs only at `'idle'`/`'saved'`, so every subsequent
+ * Firestore snapshot was silently discarded for the life of the component — two
+ * editors on one service stop seeing each other, permanently, with no symptom
+ * beyond an unhandled promise rejection in the console.
+ *
+ * Whatever else this function does, `autosaveStatus` must not be left at
+ * `'saving'`.
+ *
+ * The two failure classes are treated differently because the right recovery
+ * genuinely differs, and picking one for both would be wrong for the other:
+ *
+ *  - `ServiceLockedError` — the write can NEVER succeed while the stored status
+ *    is locked. Keeping the edit locally would show the user a change that is
+ *    not persisted and cannot become persisted (BL-01's exact symptom: the
+ *    header showing a date Firestore never accepted). So drop back to the last
+ *    persisted state — the same "revert to `originalService`" shape the reorder
+ *    catch uses at :1832, and for the same reason. Local now equals persisted,
+ *    which makes the merge branch both reachable AND safe.
+ *
+ *  - anything else (transport, a server blip) — the edit may well land on a
+ *    retry, so the user's text is KEPT. `'error'` rather than `'idle'` is
+ *    deliberate: it holds the merge branch closed while the local copy is
+ *    dirty, so a snapshot arriving mid-outage cannot discard unsaved typing.
+ *    This does not re-create the wedge, because the branch below admits
+ *    `'error'` once local is clean again, and because the next keystroke
+ *    re-arms the debounce (:2029 sets `'pending'` unconditionally) — so this
+ *    class retries by itself rather than needing a remount.
+ *
+ * The user surface is `lifecycleError`, not the autosave status line. 31-04 put
+ * that line inside `v-if="canEditService"`, so it is gone at precisely the
+ * statuses where a `ServiceLockedError` is deterministic. `lifecycleError` has a
+ * host at BOTH — the draft span at :184 and the lock banner's own row at :317.
+ */
+function handleAutosaveFailure(err: unknown): void {
+  console.error('[ServiceEditorView] autosave failed:', err)
+  if (err instanceof ServiceLockedError) {
+    if (localService.value && originalService.value) {
+      localService.value = JSON.parse(JSON.stringify(originalService.value))
+    }
+    autosaveStatus.value = 'idle'
+    lifecycleError.value =
+      "This service is locked, so that change wasn't saved. Reopen it for editing and try again."
+    return
+  }
+  autosaveErrorSource.value = 'autosave'
+  autosaveStatus.value = 'error'
+  lifecycleError.value =
+    "Couldn't save your changes — they're still here. Check your connection; editing again will retry."
+}
+
 watch(
   localService,
   () => {
     // Skip: not loaded yet, or no actual change
     if (!localService.value || !originalService.value) return
-    // Viewers cannot autosave
-    if (!authStore.isEditor) return
+    // ★ 31-PATTERNS § 4a row 23 (BL-02). This read `!authStore.isEditor`, so it
+    // declined to autosave for a VIEWER but happily armed an 800ms debounce on
+    // a LOCKED service — a write all three enforcement layers refuse.
+    //
+    // Note what this does beyond returning early: it CANCELS an already-armed
+    // timer. 31-RESEARCH's rule is "cancel or no-op pending debounced writes
+    // when the lock engages, not merely hide their inputs" (honoured in
+    // `EditSlideDrawer.writeField`, missed here). Merely declining to arm a new
+    // timer leaves the one armed a moment before the lock engaged — the
+    // `onMarkAsPlanned`-while-typing trigger — free to fire into it.
+    if (!canEditService.value) {
+      if (autosaveTimer) {
+        clearTimeout(autosaveTimer)
+        autosaveTimer = null
+      }
+      if (autosaveStatus.value === 'pending') autosaveStatus.value = 'idle'
+      return
+    }
     // Suppress the trigger that fires when service first loads from the store
     if (!autosaveInitialized) {
       autosaveInitialized = true
@@ -2033,6 +2144,16 @@ watch(
       autosaveTimer = setTimeout(async () => {
         // D-17: clear the handle immediately so autosaveTimer === null is reachable for the re-arm guard
         autosaveTimer = null
+        // Re-check at FIRING time, not only at arming time: 800ms is ample for
+        // the lock to engage in between (a Mark as Planned, or another editor's
+        // status write arriving on a snapshot). Belt and braces with the
+        // watcher's cancel above — the watcher only runs if something mutated
+        // `localService`, and a remote status flip that leaves the rest of the
+        // document identical need not.
+        if (!canEditService.value) {
+          autosaveStatus.value = 'idle'
+          return
+        }
         if (!isDirty.value) {
           autosaveStatus.value = 'idle'
           return
@@ -2053,6 +2174,8 @@ watch(
           setTimeout(() => {
             if (autosaveStatus.value === 'saved') autosaveStatus.value = 'idle'
           }, 3000)
+        } catch (err) {
+          handleAutosaveFailure(err)
         } finally {
           autosaveSaving = false
         }
@@ -2197,6 +2320,22 @@ async function onMarkAsPlanned(): Promise<void> {
   lifecycleError.value = null
   isTransitioning.value = true
   try {
+    // BL-02, second trigger. Disarm the debounce before flushing: an armed
+    // timer left running here fires ~800ms later, i.e. AFTER
+    // `applyTransitionLocally('planned')` below, and lands a full-document
+    // write on a service that is now locked. The flush on the next line is the
+    // correct way to persist those same edits — while the service is still
+    // draft and therefore still writable — so the pending timer is redundant as
+    // well as harmful.
+    //
+    // This alone is not sufficient: the user can keep typing DURING the awaited
+    // round trip below, re-arming the timer while the service is still locally
+    // draft. The autosave watcher's cancel-on-lock and the timer callback's own
+    // re-check cover that window.
+    if (autosaveTimer) {
+      clearTimeout(autosaveTimer)
+      autosaveTimer = null
+    }
     // Flush pending edits while the service is still draft and therefore
     // still writable — otherwise the in-flight autosave lands after the lock
     // and is refused, silently losing whatever the user last typed.
@@ -3234,6 +3373,17 @@ async function onDelete() {
 // ── Save ───────────────────────────────────────────────────────────────────────
 
 async function onSave() {
+  // ★ 31-PATTERNS § 4a row 24 (BL-02). 31-04-SUMMARY recorded the decision to
+  // leave this ungated because "the store guard already refuses it" — but this
+  // phase made that refusal a THROW, so an ungated `onSave` is not a harmless
+  // no-op, it is a rejected promise. Refusing here, like every other mutation
+  // entry point in this file, is what makes the rejection unreachable rather
+  // than merely caught.
+  //
+  // `canEditService`, not `isLocked`: a viewer is refused by the same line.
+  // Note this cannot break `onMarkAsPlanned`'s flush — that awaits `onSave()`
+  // while the service is still locally draft, before `applyTransitionLocally`.
+  if (!canEditService.value) return
   if (!localService.value || !isDirty.value) return
   isSaving.value = true
   try {

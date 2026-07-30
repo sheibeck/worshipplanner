@@ -270,7 +270,28 @@ const mockAssignSongToSlot = vi.fn<
   (id: string, index: number, song: { id: string; title: string; key: string }) => Promise<void>
 >(() => Promise.resolve())
 
+// BL-02: the view branches on `err instanceof ServiceLockedError` to tell a
+// refusal it can never retry (the service is locked) from a transport blip it
+// can. Because this whole module is mocked, the mock must export a REAL class
+// or that `instanceof` is unsatisfiable and the branch is untestable. Shape
+// mirrors `src/stores/services.ts:52-65` exactly.
+class ServiceLockedErrorStub extends Error {
+  readonly serviceId: string
+  readonly storedStatus: string
+
+  constructor(serviceId: string, storedStatus: string, action = 'update') {
+    super(
+      `R036: refusing to ${action} service ${serviceId} — its stored status is ` +
+        `"${storedStatus}", not "draft". Reopen it for editing first.`,
+    )
+    this.name = 'ServiceLockedError'
+    this.serviceId = serviceId
+    this.storedStatus = storedStatus
+  }
+}
+
 vi.mock('@/stores/services', () => ({
+  ServiceLockedError: ServiceLockedErrorStub,
   useServiceStore: () => ({
     services: mockServicesList,
     isLoading: false,
@@ -2765,6 +2786,48 @@ describe('ServiceEditorView - locked service renders all three tabs read-only (R
     await rolesTabBtn!.trigger('click')
   }
 
+  // ---- BL-01: the service DATE (31-PATTERNS § 4a row 1) ----------------------
+  //
+  // Row 1 shipped with gate `none`. The heading button and its <input type=date>
+  // were gated on `authStore.isEditor` ALONE, so on a locked service the picker
+  // still rendered, still opened, and still wrote: picking a Sunday mutated
+  // `localService.date`, the 800ms debounce fired a full-document `onSave`, and
+  // all three enforcement layers refused it — with nothing on screen, because
+  // the autosave error line lives inside `v-if="canEditService"`. The header
+  // showed a date that was never persisted and never would be.
+  for (const status of LOCKED_STATUSES) {
+    it(`${status}: the service date is read-only text — no picker button, no date input`, async () => {
+      mockServicesList = [{ ...mockService, status }]
+      const wrapper = await mountView()
+
+      expect(wrapper.findAll('input[type="date"]')).toHaveLength(0)
+      // D-05's "removed, not disabled" rule: the class-D inverse branch renders
+      // the date as a plain heading rather than leaving the editor with nothing.
+      const heading = wrapper.find('h1')
+      expect(heading.exists()).toBe(true)
+      expect(heading.text()).toContain('March 8, 2026')
+    })
+  }
+
+  it('a draft service still gets the date picker — the guard is the lock, not a blanket removal', async () => {
+    mockServicesList = [{ ...mockService, status: 'draft' }]
+    const wrapper = await mountView()
+
+    expect(wrapper.findAll('input[type="date"]')).toHaveLength(1)
+  })
+
+  it('onDateChange DOES move the date on a draft service', async () => {
+    mockServicesList = [{ ...mockService, status: 'draft' }]
+    const wrapper = await mountView()
+    const vm = wrapper.vm as unknown as {
+      localService: { date: string }
+      onDateChange: (d: string) => void
+    }
+
+    vm.onDateChange('2026-12-25')
+    expect(vm.localService.date).toBe('2026-12-25')
+  })
+
   // ---- Service Order (D-06) -------------------------------------------------
 
   for (const status of LOCKED_STATUSES) {
@@ -2993,9 +3056,14 @@ describe('ServiceEditorView - locked service renders all three tabs read-only (R
           teams: string[]
           slots: Array<Record<string, unknown>>
           sermonPassage: unknown
+          date: string
+          notes: string
         }
+        autosaveStatus: string
         showSlotDeleteConfirm: boolean
         resolvedRoleAssignments: Array<{ roleId: string; effectivePersonIds: string[] }>
+        onDateChange: (d: string) => void
+        onSave: () => Promise<void>
         toggleTeam: (t: string) => void
         addSlot: (kind: string) => void
         removeSlot: (i: number) => void
@@ -3010,6 +3078,14 @@ describe('ServiceEditorView - locked service renders all three tabs read-only (R
       }
 
       const slotCount = vm.localService.slots.length
+
+      // Row 1 — the enumeration below shipped WITHOUT onDateChange, which is
+      // precisely why BL-01 survived a 1880-test suite. Hiding the picker is
+      // not enough: the handler is reachable from the input's own change event
+      // during the tick before a status flip re-renders, and 30-VERIFICATION
+      // I-01's rule is "gate the handlers, not just the templates".
+      vm.onDateChange('2026-12-25')
+      expect(vm.localService.date).toBe('2026-03-08')
 
       vm.toggleTeam('Orchestra')
       expect(vm.localService.teams).toEqual(['Choir'])
@@ -3043,8 +3119,27 @@ describe('ServiceEditorView - locked service renders all three tabs read-only (R
       await vm.onResetRoleOverride('role-drums')
       expect(mockClearRoleOverride).not.toHaveBeenCalled()
 
+      // Row 24 — `onSave` itself. 31-04-SUMMARY records the decision to leave
+      // it ungated because "the store guard already refuses it"; this phase
+      // made that refusal a THROW, so an ungated `onSave` is not a harmless
+      // no-op but a rejected promise nobody catches (BL-02).
+      await vm.onSave()
+
+      // Row 23 — the autosave debounce watcher. Mutating `localService`
+      // directly is exactly what any handler that lost its guard would do, and
+      // is also what a still-armed debounce carries across a status flip. The
+      // watcher must decline to issue the write, not merely decline to render
+      // its indicator. 31-RESEARCH: "cancel or no-op pending debounced writes
+      // when the lock engages, not merely hide their inputs."
+      vm.localService.notes = 'smuggled past the debounce'
+      await wrapper.vm.$nextTick()
+      vm.localService.notes = 'smuggled past the debounce, twice'
+      await wrapper.vm.$nextTick()
+      await new Promise((resolve) => setTimeout(resolve, 900))
+
       await flushPromises()
       expect(mockUpdateService).not.toHaveBeenCalled()
+      expect(vm.autosaveStatus).not.toBe('saving')
     })
   }
 
@@ -3062,5 +3157,178 @@ describe('ServiceEditorView - locked service renders all three tabs read-only (R
 
     await vm.onResetRoleOverride('role-vox')
     expect(mockClearRoleOverride).toHaveBeenCalledWith('service-1', 'role-vox')
+  })
+})
+
+// ── BL-02: a rejected autosave must not wedge the view ────────────────────────
+//
+// The autosave timer callback awaited `onSave()` inside `try { … } finally { … }`
+// with NO `catch`. Any rejection therefore skipped the `autosaveStatus = 'saved'`
+// line and left the status stranded at `'saving'` forever — and the remote-merge
+// branch in the store watcher only runs at `'idle'`/`'saved'`, so EVERY later
+// Firestore snapshot was silently discarded for the life of the component. Two
+// editors on the same service stop seeing each other, permanently, with nothing
+// on screen (the autosave error line is inside `v-if="canEditService"`, which is
+// false at exactly the statuses where the deterministic rejection happens).
+//
+// Phase 31 made that rejection deterministic rather than hypothetical: the store
+// guard now THROWS `ServiceLockedError` instead of relying on a round trip.
+describe('ServiceEditorView - BL-02: a rejected autosave must not strand the status machine', () => {
+  async function mountView() {
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          RouterLink: { template: '<a><slot /></a>' },
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+          teleport: false,
+        },
+      },
+    })
+  }
+
+  let consoleErrorSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockUpdateService.mockClear()
+    mockUpdateService.mockImplementation(() => Promise.resolve())
+    mockMarkAsPlanned.mockClear()
+    mockMarkAsPlanned.mockImplementation(() => Promise.resolve())
+    mockAssignSongToSlot.mockClear()
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore()
+    mockUpdateService.mockImplementation(() => Promise.resolve())
+    mockMarkAsPlanned.mockImplementation(() => Promise.resolve())
+  })
+
+  /** The autosave watcher swallows the first `localService` mutation after a
+   *  load or a remote merge (`autosaveInitialized`), so a test that wants a
+   *  real debounce armed has to touch the model twice. */
+  async function warmAutosaveWatcher(
+    wrapper: Awaited<ReturnType<typeof mountView>>,
+    vm: { localService: { notes: string } },
+  ) {
+    vm.localService.notes = 'warm-up touch the watcher swallows'
+    await wrapper.vm.$nextTick()
+  }
+
+  it('a store-guard rejection leaves the status recoverable AND a later remote change still applies', async () => {
+    // A reactive list so a post-mount mutation actually reaches the mounted
+    // view's `watch(() => serviceStore.services, …, { deep: true })` — this is
+    // the remote-snapshot path the wedge disables.
+    mockServicesList = reactive([{ ...mockService, status: 'draft' }])
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    const vm = wrapper.vm as unknown as {
+      localService: { notes: string; date: string; status: string }
+      autosaveStatus: string
+    }
+
+    // ── Control: the remote-merge branch works BEFORE the failure ────────────
+    mockServicesList[0]!.date = '2026-03-15'
+    await flushPromises()
+    await wrapper.vm.$nextTick()
+    expect(vm.localService.date).toBe('2026-03-15')
+
+    // ── Another editor locks the service; our debounced write is refused ─────
+    await warmAutosaveWatcher(wrapper, vm)
+    mockUpdateService.mockRejectedValueOnce(new ServiceLockedErrorStub('service-1', 'planned'))
+    vm.localService.notes = 'typed just as another editor marked it Planned'
+    await wrapper.vm.$nextTick()
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    await flushPromises()
+
+    expect(mockUpdateService).toHaveBeenCalled()
+
+    // BL-02 consequence 1 — the status machine must not be stranded.
+    expect(vm.autosaveStatus).not.toBe('saving')
+
+    // BL-02 consequence 2 — the remote-merge branch must still be alive. This
+    // is the assertion the reviewer reproduced failing: remote 2026-05-03 was
+    // ignored and the editor kept showing the stale date for the whole session.
+    mockServicesList[0]!.date = '2026-05-03'
+    await flushPromises()
+    await wrapper.vm.$nextTick()
+    expect(vm.localService.date).toBe('2026-05-03')
+  })
+
+  it('the failure is on screen, not only in the console', async () => {
+    mockServicesList = reactive([{ ...mockService, status: 'draft' }])
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    const vm = wrapper.vm as unknown as { localService: { notes: string } }
+
+    await warmAutosaveWatcher(wrapper, vm)
+    mockUpdateService.mockRejectedValueOnce(new ServiceLockedErrorStub('service-1', 'exported'))
+    vm.localService.notes = 'an edit that can never land'
+    await wrapper.vm.$nextTick()
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    await flushPromises()
+    await wrapper.vm.$nextTick()
+
+    // `:93` put the autosave status/error line inside `v-if="canEditService"`,
+    // so it is gone at exactly the statuses where this rejection is
+    // deterministic. `lifecycleError` is the surface that renders at BOTH —
+    // the draft span at `:184` and the lock banner's row at `:317`.
+    const surfaced =
+      wrapper.find('[data-testid="lifecycle-error"]').exists() ||
+      wrapper.find('[data-testid="service-lock-banner-error"]').exists()
+    expect(surfaced).toBe(true)
+  })
+
+  // ── The second, date-independent trigger ────────────────────────────────────
+  //
+  // `onMarkAsPlanned` awaits `onSave()` and the status write but never cleared
+  // the armed `autosaveTimer`. A user still typing during that round trip
+  // re-arms the debounce while the service is still locally draft; it then
+  // fires AFTER `applyTransitionLocally('planned')` and lands a full-document
+  // write on a service that is now locked.
+  it('typing during Mark as Planned does not leave a debounced write to land on the locked service', async () => {
+    mockServicesList = reactive([{ ...mockService, status: 'draft' }])
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    const vm = wrapper.vm as unknown as {
+      localService: { notes: string; status: string }
+      autosaveStatus: string
+      onMarkAsPlanned: () => Promise<void>
+    }
+
+    await warmAutosaveWatcher(wrapper, vm)
+
+    // Hold the status write open so the "user keeps typing during the awaited
+    // round trip" window is real rather than a zero-width race.
+    let resolveMark!: () => void
+    mockMarkAsPlanned.mockImplementationOnce(
+      () => new Promise<void>((resolve) => { resolveMark = resolve }),
+    )
+
+    const marking = vm.onMarkAsPlanned()
+    await flushPromises()
+
+    vm.localService.notes = 'still typing while the transition is in flight'
+    await wrapper.vm.$nextTick()
+
+    resolveMark()
+    await marking
+    await wrapper.vm.$nextTick()
+    expect(vm.localService.status).toBe('planned')
+
+    // Everything up to here is legitimate. What must NOT happen is the armed
+    // debounce firing into the now-locked service.
+    mockUpdateService.mockClear()
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    await flushPromises()
+
+    expect(mockUpdateService).not.toHaveBeenCalled()
+    expect(vm.autosaveStatus).not.toBe('saving')
   })
 })

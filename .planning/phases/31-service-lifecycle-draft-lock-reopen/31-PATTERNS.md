@@ -239,6 +239,20 @@ All of these mutate `localService` locally; the write happens via the autosave w
 | 25 | `onDelete` (deletes the service) | `:2729` | `:228` | none — D-08 does not list Delete; **decide explicitly** |
 | 26 | ★ export write (`status:'exported'` + `pcExportedAt` + `pcPlanId`) | ≈`:2691` inside `onConfirmExport:2336` | `:364` | must stay ALLOWED (D-09) |
 
+> **★ Post-review closure note (31-REVIEW BL-01 / BL-02).** The "Gate today" column above is the
+> pre-phase snapshot and is left as written. Rows **3-22** and **27-28** were all closed during the
+> phase; rows **1**, **23** and **24** were not, and shipped. The phase's own
+> "every mutation handler no-ops when called directly" test
+> (`ServiceEditorView.test.ts`) enumerated ten handlers while omitting exactly those three,
+> which is why a 1880-test suite passed over them. All three are now closed, with the
+> enumeration test extended to cover them so the same hole cannot pass again:
+>
+> | # | Entry point | Closed by |
+> |---|---|---|
+> | 1 | `onDateChange` | `v-if="!canEditService"` on the heading/picker pair + `if (!canEditService.value) return` in the handler |
+> | 23 | autosave watcher | `isEditor` term replaced by `canEditService`, and the watcher now **cancels** an already-armed `autosaveTimer` rather than merely declining to arm a new one (31-RESEARCH's "cancel or no-op pending debounced writes when the lock engages"); the timer callback re-checks at firing time as well |
+> | 24 | `onSave` | `if (!canEditService.value) return`, plus a `catch` on the debounce callback so a rejection can never strand `autosaveStatus` at `'saving'` and disable the remote-merge branch |
+
 ### 4b. Roles tab — writes straight through the store, zero lock today
 
 | # | Entry point | Handler | Binding | Gate today |
