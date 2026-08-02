@@ -69,6 +69,16 @@ export const useServiceStore = defineStore('services', () => {
   const isLoading = ref(true)
   const orgId = ref<string | null>(null)
 
+  // R039 (32-01) — own-write echo classification. `ownWriteEchoIds` is the
+  // public signal (a service id in this array means "the most recent
+  // snapshot for this document is this client's own write settling, not a
+  // genuinely external change"); `pendingWriteIds` is private closure state
+  // remembering which ids were mid-flight as of the PREVIOUS snapshot, so
+  // the settle edge (pending -> not-pending) can be detected across two
+  // consecutive emissions rather than read off a single one.
+  const ownWriteEchoIds = ref<string[]>([])
+  let pendingWriteIds: string[] = []
+
   let unsubscribeFn: Unsubscribe | null = null
 
   function subscribe(orgIdValue: string) {
@@ -80,7 +90,25 @@ export const useServiceStore = defineStore('services', () => {
       collection(db, 'organizations', orgIdValue, 'services'),
       orderBy('date', 'desc'),
     )
-    unsubscribeFn = onSnapshot(q, (snap) => {
+    // The metadata-changes option below is what makes BOTH edges of
+    // `hasPendingWrites` observable: without it, the metadata-only emission
+    // marking a pending write as settled never reaches this callback at all.
+    unsubscribeFn = onSnapshot(q, { includeMetadataChanges: true }, (snap) => {
+      // Optional chaining on `d.metadata` is deliberate: a doc without
+      // metadata (every pre-32-01 test fixture) must classify as
+      // not-pending rather than throw.
+      const nowPending = snap.docs
+        .filter((d) => d.metadata?.hasPendingWrites === true)
+        .map((d) => d.id)
+      // The settle edge — a doc that WAS pending as of the previous
+      // emission and is no longer pending now — is the server-ack snapshot
+      // whose resolved `serverTimestamp()` value is what defeats a naive
+      // updatedAt diff. Both edges must classify as an echo, or only half
+      // the R039 window closes.
+      const justSettled = pendingWriteIds.filter((id) => !nowPending.includes(id))
+      ownWriteEchoIds.value = [...nowPending, ...justSettled]
+      pendingWriteIds = nowPending
+
       services.value = snap.docs.map((d) => {
         const data = d.data()
         return { id: d.id, name: '', notes: '', ...data } as Service
@@ -95,6 +123,17 @@ export const useServiceStore = defineStore('services', () => {
     orgId.value = null
     services.value = []
     isLoading.value = true
+    ownWriteEchoIds.value = []
+    pendingWriteIds = []
+  }
+
+  /** R039 — true when `serviceId`'s most recent snapshot is this client's
+   *  own write settling (optimistic OR server-ack edge), never a
+   *  field-by-field diff. Firestore's `metadata.hasPendingWrites` is local
+   *  SDK state a remote writer cannot set, so this cannot be spoofed by a
+   *  genuinely external change (T-32-02). */
+  function isOwnWriteEcho(serviceId: string): boolean {
+    return ownWriteEchoIds.value.includes(serviceId)
   }
 
   async function createService(data: CreateServiceInput): Promise<string> {
@@ -405,6 +444,8 @@ export const useServiceStore = defineStore('services', () => {
     services,
     isLoading,
     orgId,
+    ownWriteEchoIds,
+    isOwnWriteEcho,
     subscribe,
     unsubscribeAll,
     createService,

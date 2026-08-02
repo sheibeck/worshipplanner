@@ -16,7 +16,9 @@ vi.stubGlobal('crypto', {
 })
 
 // Track onSnapshot callbacks and unsubscribe fns
-let snapshotCallback: ((snap: { docs: { id: string; data: () => Record<string, unknown> }[] }) => void) | null = null
+type SnapshotDoc = { id: string; data: () => Record<string, unknown>; metadata?: { hasPendingWrites: boolean } }
+let snapshotCallback: ((snap: { docs: SnapshotDoc[] }) => void) | null = null
+let snapshotOptions: { includeMetadataChanges?: boolean } | undefined
 const mockUnsubscribe = vi.fn()
 
 // Mock firebase/firestore module
@@ -25,10 +27,27 @@ vi.mock('firebase/firestore', () => {
     getFirestore: vi.fn(() => ({})),
     collection: vi.fn((db, ...segments) => ({ path: segments.join('/') })),
     doc: vi.fn((db, ...segments) => ({ id: segments[segments.length - 1] ?? 'mock-id', path: segments.join('/') })),
-    onSnapshot: vi.fn((_query, callback) => {
-      snapshotCallback = callback
-      return mockUnsubscribe
-    }),
+    // R039 (32-01): widened to accept BOTH the pre-existing two-argument
+    // form (query, callback) and the new three-argument form
+    // (query, options, callback) — whichever of argument 2/3 is a function
+    // is the real callback, so every existing call site in this file keeps
+    // working unmodified.
+    onSnapshot: vi.fn(
+      (
+        _query: unknown,
+        optionsOrCallback: unknown,
+        maybeCallback?: (snap: { docs: SnapshotDoc[] }) => void,
+      ) => {
+        if (typeof optionsOrCallback === 'function') {
+          snapshotOptions = undefined
+          snapshotCallback = optionsOrCallback as (snap: { docs: SnapshotDoc[] }) => void
+        } else {
+          snapshotOptions = optionsOrCallback as { includeMetadataChanges?: boolean } | undefined
+          snapshotCallback = maybeCallback ?? null
+        }
+        return mockUnsubscribe
+      },
+    ),
     addDoc: vi.fn(() => Promise.resolve({ id: 'new-service-id' })),
     updateDoc: vi.fn(() => Promise.resolve()),
     deleteDoc: vi.fn(() => Promise.resolve()),
@@ -132,7 +151,11 @@ function makeService(overrides: Partial<{
   }
 }
 
-function triggerSnapshot(services: ReturnType<typeof makeService>[]) {
+// R039 (32-01): `pendingIds` names which of `services`' ids this emission
+// reports as `metadata.hasPendingWrites === true` — omitted/empty means
+// every doc in this snapshot reports no pending write (the everyday case
+// every pre-32-01 test below already exercises).
+function triggerSnapshot(services: ReturnType<typeof makeService>[], pendingIds: string[] = []) {
   if (snapshotCallback) {
     snapshotCallback({
       docs: services.map((s) => ({
@@ -141,6 +164,7 @@ function triggerSnapshot(services: ReturnType<typeof makeService>[]) {
           const { id: _id, ...rest } = s
           return rest
         },
+        metadata: { hasPendingWrites: pendingIds.includes(s.id) },
       })),
     })
   }
@@ -151,6 +175,7 @@ describe('useServiceStore', () => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
     snapshotCallback = null
+    snapshotOptions = undefined
   })
 
   describe('initial state', () => {
@@ -214,6 +239,63 @@ describe('useServiceStore', () => {
       store.subscribe('org-1')
       store.subscribe('org-2')
       expect(mockUnsubscribe).toHaveBeenCalledOnce()
+    })
+
+    // ── R039 (32-01): own-write echo classification ─────────────────────────
+
+    it('subscribes with includeMetadataChanges: true — without it, the settle edge never reaches this callback', async () => {
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      expect(snapshotOptions).toEqual({ includeMetadataChanges: true })
+    })
+
+    it('a snapshot reporting a pending write puts that doc id in ownWriteEchoIds and isOwnWriteEcho', async () => {
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService()], ['service-1'])
+      expect(store.ownWriteEchoIds).toEqual(['service-1'])
+      expect(store.isOwnWriteEcho('service-1')).toBe(true)
+    })
+
+    it('the following snapshot with no pending write for that doc STILL classifies it as an echo (the settle edge)', async () => {
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService()], ['service-1'])
+      expect(store.isOwnWriteEcho('service-1')).toBe(true)
+
+      // Server-ack snapshot: no longer pending. This is the emission whose
+      // resolved serverTimestamp() value is what defeats a naive updatedAt
+      // diff — it must classify as an echo too, or only half the window closes.
+      triggerSnapshot([makeService()], [])
+      expect(store.ownWriteEchoIds).toEqual(['service-1'])
+      expect(store.isOwnWriteEcho('service-1')).toBe(true)
+    })
+
+    it('a third snapshot with no pending writes anywhere leaves ownWriteEchoIds empty — a genuinely external change is not misclassified', async () => {
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService()], ['service-1']) // optimistic edge
+      triggerSnapshot([makeService()], []) // settle edge — still an echo
+      expect(store.isOwnWriteEcho('service-1')).toBe(true)
+
+      // A later, unrelated snapshot — nothing pending anywhere.
+      triggerSnapshot([makeService()], [])
+      expect(store.ownWriteEchoIds).toEqual([])
+      expect(store.isOwnWriteEcho('service-1')).toBe(false)
+    })
+
+    it('unsubscribeAll empties ownWriteEchoIds', async () => {
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService()], ['service-1'])
+      expect(store.ownWriteEchoIds).toEqual(['service-1'])
+      store.unsubscribeAll()
+      expect(store.ownWriteEchoIds).toEqual([])
     })
   })
 
