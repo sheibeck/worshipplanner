@@ -4,16 +4,16 @@ milestone: v1.4
 milestone_name: Service and Slides
 current_phase: 32
 current_phase_name: Save Reliability — Autosave Fix & Persistent Status
-status: planning
-stopped_at: Completed 31-04-PLAN.md (wave 4 of 6)
-last_updated: "2026-07-30T16:43:40.971Z"
-last_activity: 2026-07-30
-last_activity_desc: Phase 31 complete, transitioned to Phase 32
+status: executing
+stopped_at: Completed 32-01-PLAN.md (wave 1)
+last_updated: "2026-08-02T22:45:57.428Z"
+last_activity: 2026-08-02
+last_activity_desc: Phase 32 execution started
 progress:
   total_phases: 9
   completed_phases: 3
-  total_plans: 15
-  completed_plans: 15
+  total_plans: 21
+  completed_plans: 16
   percent: 33
 ---
 
@@ -65,7 +65,7 @@ to-do for when they return.
 See: .planning/PROJECT.md (updated 2026-07-28)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** v1.4 Service and Slides — ROADMAP.md created (Phases 29-37), ready to plan Phase 29
+**Current focus:** Phase 32 — Save Reliability — Autosave Fix & Persistent Status
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -75,10 +75,10 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 
 ## Current Position
 
-Phase: 32 of 37 (Save Reliability — Autosave Fix & Persistent Status)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-07-30 — Phase 31 complete, transitioned to Phase 32
+Phase: 32 (Save Reliability — Autosave Fix & Persistent Status) — EXECUTING
+Plan: 2 of 6
+Status: Ready to execute
+Last activity: 2026-08-02 — Phase 32 execution started
 
 ## ★ v1.4 AUTONOMOUS RUN — standing decisions (2026-07-28)
 
@@ -617,6 +617,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 30 P04 | 8h30min | 3 tasks | 14 files |
 | Phase 31 P04 | ~2h | 6 tasks | 11 files |
 | Phase 31 P05 | ~40min | 4 tasks | 5 files |
+| Phase 32 P01 | 40min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -798,6 +799,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: [Phase 31-05]: The two Sunday conventions in this repo were reconciled in favour of STRICTLY FORWARD (a Sunday `from` yields the FOLLOWING Sunday), because D-13 requires the fallback to degrade to the pre-R038 behaviour — commented in quarterDates.ts and pinned by tests at both the util and component level
 - [Phase ?]: [Phase 31-05]: nextFreeSunday went INSIDE quarterDates.ts to reuse its module-private fmtDate; deleting NewServiceDialog's nextSunday() removed a formatter copy, so the net count went down rather than up
 - [Phase ?]: [Phase 31-05]: R038's date skip changes the DEFAULT TEAM selection (teams derive from sundayOrdinal) — a real behaviour change, now tested with two ordinal pairs rather than left to surface in UAT (human judgement filed as 31.23)
+- [Phase ?]: R039 fix lives in the services store (subscribe()'s onSnapshot echo classifier), not the view's onSave() payload — RESEARCH found a second write path (D-15 reorder-save) sharing the identical bug mechanism
+- [Phase ?]: R039 repro must dispatch the echo simulation and the discrete mutation in the SAME synchronous tick (no awaited nextTick between them) — Vue's reactivity scheduler dedups multiple watch(localService) triggers within one flush, so a tick in between lets the merge's own reassignment self-consume the swallow guard and produces a false green
 
 ### Roadmap Evolution
 
@@ -859,6 +862,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-07-30T15:16:03.306Z
-Stopped at: Completed 31-04-PLAN.md (wave 4 of 6)
-Resume file: .planning/phases/31-service-lifecycle-draft-lock-reopen/31-05-PLAN.md
+Last session: 2026-08-02T22:45:57.398Z
+Stopped at: Completed 32-01-PLAN.md (wave 1)
+Resume file: None

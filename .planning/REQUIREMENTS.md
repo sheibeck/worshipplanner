@@ -33,7 +33,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 
 ### Save Reliability
 
-- [ ] **R039** (quality-attribute): Every mutation on the Service Order fires autosave, including
+- [x] **R039** (quality-attribute): Every mutation on the Service Order fires autosave, including
       discrete one-shot actions such as changing a song — not only continuous typing.
       **A failing repro test must be written before any fix.** The evidenced root cause (a save's own
       Firestore echo carrying a server `updatedAt` the client never tracked, resetting the
@@ -231,7 +231,7 @@ Acknowledged, deferred, not in this roadmap.
 | R036 | Phase 31 | Complete |
 | R037 | Phase 31 | Complete |
 | R038 | Phase 31 | Complete |
-| R039 | Phase 32 | Pending |
+| R039 | Phase 32 | Complete |
 | R040 | Phase 32 | Pending |
 | R041 | Phase 32 | Pending |
 | R042 | Phase 29 | Complete |
