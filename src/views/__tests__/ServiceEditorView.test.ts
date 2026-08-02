@@ -221,6 +221,13 @@ const mockService: Service = {
 // useServiceStore() on every mount, so a test can reassign it before mountView().
 let mockServicesList: Service[] = [mockService]
 
+// R039 (32-01): which service ids the store currently classifies as "this
+// client's own write settling" — read live (arrow function, same lazy-read
+// convention as `services: mockServicesList` above) by the `isOwnWriteEcho`
+// member the mock exposes below. This is the interface Task 2's real
+// `src/stores/services.ts` classifier and Task 3's view guard must satisfy.
+let mockOwnWriteEchoIds: string[] = []
+
 const mockSongs: Song[] = [
   {
     id: 'song-1',
@@ -304,6 +311,10 @@ vi.mock('@/stores/services', () => ({
     clearSongFromSlot: vi.fn(() => Promise.resolve()),
     setRoleOverride: mockSetRoleOverride,
     clearRoleOverride: mockClearRoleOverride,
+    // R039 (32-01): arrow function evaluated lazily at call time — same reason
+    // `services: mockServicesList` above stays live across a test's mutation
+    // of `mockOwnWriteEchoIds` rather than snapshotting it at mock-creation time.
+    isOwnWriteEcho: (id: string) => mockOwnWriteEchoIds.includes(id),
   }),
 }))
 
@@ -1108,6 +1119,178 @@ describe('ServiceEditorView - slot id backfill on load (Phase 24-06 Task 1)', ()
     const secondIds = secondPayload.slots.map((s) => s.id)
 
     expect([...secondIds].sort()).toEqual([...firstIds].sort())
+  })
+})
+
+// ── R039 (32-01): a save's own Firestore echo must not swallow the next
+//    discrete mutation ───────────────────────────────────────────────────────
+//
+// See 32-RESEARCH.md § "Root Cause: Confirmed" for the full mechanism. In
+// short: `serviceStore.updateService` always stamps a fresh `updatedAt` on
+// the server; the client never re-syncs its own copy after a successful
+// save; the next snapshot echoing that write back (server ack, or a stale
+// re-emission) differs from local state ONLY in `updatedAt`; the
+// remote-merge watcher's JSON diff treats that lone difference as a genuine
+// remote change, applies it, and resets the `autosaveInitialized` guard —
+// which then swallows whatever discrete mutation lands next (a song pick,
+// a reorder-triggered re-render, etc.) with no debounce armed and no
+// status change.
+//
+// `mockTimestamp` (declared above) is NOT reusable here — it exposes only a
+// `toDate` function with no enumerable fields, so `JSON.stringify` drops it
+// entirely and the JSON diff this bug depends on would see no difference at
+// all (32-RESEARCH.md Pitfall 2). `stampedService()` below fixes that with a
+// real `{ seconds, nanoseconds }` shape, which survives `JSON.stringify`
+// exactly like a genuine Firestore `Timestamp` does.
+function stampedService(seconds: number, base: Service = mockService): Service {
+  return {
+    ...base,
+    updatedAt: { seconds, nanoseconds: 0 } as unknown as Timestamp,
+  }
+}
+
+describe("ServiceEditorView - R039: a save's own Firestore echo must not swallow the next discrete mutation", () => {
+  async function mountView() {
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          RouterLink: { template: '<a><slot /></a>' },
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+          teleport: false,
+        },
+      },
+    })
+  }
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockUpdateService.mockClear()
+    mockUpdateService.mockImplementation(() => Promise.resolve())
+    mockOwnWriteEchoIds = []
+    resetSortableCaptures()
+  })
+
+  /** The autosave watcher swallows the FIRST `localService` mutation after a
+   *  load or a remote merge (`autosaveInitialized`) — same idiom as the
+   *  BL-02 block's `warmAutosaveWatcher`. A `notes` touch is used
+   *  deliberately (not a slot mutation) so slot state stays untouched for
+   *  the repro's own assertions. */
+  async function warmAutosaveWatcher(
+    wrapper: Awaited<ReturnType<typeof mountView>>,
+    vm: { localService: { notes: string } },
+  ) {
+    vm.localService.notes = 'R039 warm-up touch the watcher swallows'
+    await wrapper.vm.$nextTick()
+  }
+
+  it("picking a song immediately after a prior save's own echo lands still fires a save", async () => {
+    const reactiveServices = reactive([stampedService(1)])
+    mockServicesList = reactiveServices as unknown as Service[]
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    const vm = wrapper.vm as unknown as {
+      localService: { notes: string; slots: Array<{ songId: string | null }> }
+      onSelectSong: (index: number, song: { id: string; title: string; key: string }) => void
+    }
+
+    // ── Absorb the watcher's first-trigger guard, then land a REAL prior
+    //    edit that actually arms and fires the 800ms debounce — this is the
+    //    "prior save" the repro's echo is standing on.
+    await warmAutosaveWatcher(wrapper, vm)
+    vm.localService.notes = 'a prior edit that will actually save'
+    await wrapper.vm.$nextTick()
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    await flushPromises()
+    expect(mockUpdateService).toHaveBeenCalledTimes(1)
+
+    // ── Simulate that save's own echo: identical content, a NEW enumerable
+    //    timestamp — exactly what serverTimestamp() produces on the
+    //    server-ack snapshot. Built from the CURRENT local state (not a
+    //    fresh mockService) so the only field that differs is updatedAt,
+    //    isolating exactly the mechanism 32-RESEARCH.md documents.
+    // ── Simulate the echo landing AND the discrete pick in the SAME
+    //    synchronous tick — deliberately not separated by an awaited
+    //    `$nextTick()`. This is the actual race: Vue's reactivity scheduler
+    //    dedups multiple triggers of the SAME watcher within one flush into
+    //    a single execution. The remote-merge watcher (declared earlier,
+    //    lower job id) runs first in that flush and resets
+    //    `autosaveInitialized`; the discrete mutation's own trigger to
+    //    `watch(localService, …)` is coalesced into that watcher's ALREADY-
+    //    queued job rather than getting its own separate run, so the one
+    //    execution that does happen observes the freshly-reset guard and
+    //    swallows it — even though it was genuinely triggered by a NEW user
+    //    edit, not by the echo's own reassignment.
+    mockOwnWriteEchoIds = ['service-1']
+    reactiveServices[0] = stampedService(2, JSON.parse(JSON.stringify(vm.localService)))
+    // ── THE REPRO: a discrete one-shot mutation, immediately after the
+    //    echo, via the real onSelectSong path (not a raw property
+    //    assignment) — matching the phase's own "picking a song" example.
+    vm.onSelectSong(0, { id: 'song-9', title: 'New Song', key: 'C' })
+    await wrapper.vm.$nextTick()
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    await flushPromises()
+
+    // If the hypothesis holds, this call count is STILL 1 (the mutation was
+    // swallowed) — red against today's code, green once the fix lands.
+    expect(mockUpdateService).toHaveBeenCalledTimes(2)
+    // The local edit itself is never lost — only the SAVE is.
+    expect(vm.localService.slots[0]!.songId).toBe('song-9')
+  })
+
+  it("a discrete pick immediately after the D-15 reorder-save's echo also fires a save", async () => {
+    // The reorder-save path (unlike the debounced onSave() path) writes
+    // immediately and unconditionally — no warm-up touch is needed to
+    // produce its "prior save"; RESEARCH Pitfall 1 is exactly that a fix
+    // scoped to onSave()'s payload would leave this second entry point
+    // into the identical failure unpatched.
+    const reactiveServices = reactive([stampedService(1, makeSectionedService())])
+    mockServicesList = reactiveServices as unknown as Service[]
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    const vm = wrapper.vm as unknown as {
+      localService: { slots: Array<{ id: string; songId?: string | null }> }
+      onSelectSong: (index: number, song: { id: string; title: string; key: string }) => void
+    }
+
+    const worshipCapture = captureForSection('worship')
+    if (!worshipCapture) throw new Error('R039 reorder repro: no worship Sortable capture resolved')
+
+    // Worship is [s2, s3, s4] — drag s2 (position 0) to the last position,
+    // mirroring the existing "moves an item within its own section" D-15 test.
+    await worshipCapture.options.onEnd!({
+      oldDraggableIndex: 0,
+      newDraggableIndex: 2,
+      item: worshipCapture.el.children[0] as HTMLElement,
+      from: worshipCapture.el,
+      to: worshipCapture.el,
+    } as never)
+    await flushPromises()
+    expect(mockUpdateService).toHaveBeenCalledTimes(1)
+
+    const songSlotIndex = vm.localService.slots.findIndex((s) => s.id === 's1')
+    expect(songSlotIndex).toBeGreaterThanOrEqual(0)
+
+    // ── Simulate the reorder-save's own echo landing AND the discrete pick
+    //    in the SAME synchronous tick — see the sibling test's comment for
+    //    why this ordering (not separated by an awaited `$nextTick()`) is
+    //    what actually exercises the race.
+    mockOwnWriteEchoIds = ['service-1']
+    reactiveServices[0] = stampedService(2, JSON.parse(JSON.stringify(vm.localService)))
+    // THE REPRO: a discrete pick (via the real onSelectSong path) landing
+    // immediately after the reorder-save's own echo.
+    vm.onSelectSong(songSlotIndex, { id: 'song-9', title: 'New Song', key: 'C' })
+    await wrapper.vm.$nextTick()
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    await flushPromises()
+
+    expect(mockUpdateService).toHaveBeenCalledTimes(2)
+    expect(vm.localService.slots[songSlotIndex]!.songId).toBe('song-9')
   })
 })
 
