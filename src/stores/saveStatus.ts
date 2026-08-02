@@ -1,6 +1,7 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import type { AutoSaveStatus } from '@/composables/useAutoSave'
+import { useToasts } from '@/stores/toasts'
 
 export interface SaveStatusEntry {
   status: AutoSaveStatus
@@ -22,8 +23,7 @@ const URGENCY: Record<AutoSaveStatus, number> = {
  * Per-surface save-status aggregator (R040). Sits strictly ABOVE
  * useAutoSave — it does not re-implement any of useAutoSave's own timing,
  * inflight guard, flush() or cleanup() machinery; it only records what each
- * surface reports and derives a
- * "most urgent" rollup across all of them.
+ * surface reports and derives a "most urgent" rollup across all of them.
  *
  * Keyed by surfaceId so several autosaving surfaces can be mounted
  * simultaneously without one surface's 'saved' erasing another's 'saving'.
@@ -33,7 +33,24 @@ const URGENCY: Record<AutoSaveStatus, number> = {
 export const useSaveStatus = defineStore('saveStatus', () => {
   const entries = ref<Record<string, SaveStatusEntry>>({})
 
+  // Mirrors the generic inline error text (32-UI-SPEC.md § Copywriting
+  // Contract) so a toast pushed without an explicit errorText still reads
+  // the same sentence a caller would otherwise have rendered inline.
+  const GENERIC_ERROR_TEXT = "Couldn't save your changes — they're still here. Try again."
+
   function set(surfaceId: string, entry: SaveStatusEntry) {
+    // set() is the single place the not-error -> error edge is detected,
+    // so no caller needs to know toasts exist. Read the previous entry
+    // BEFORE overwriting: a toast fires only on the transition INTO
+    // 'error' for this surface, never on every reactive tick while the
+    // surface stays 'error' (that would spam a toast every retry of an
+    // 800ms-debounced save against a still-down network).
+    const previous = entries.value[surfaceId]
+    if (entry.status === 'error' && previous?.status !== 'error') {
+      // Resolved lazily against the active Pinia at call time, not at
+      // module scope.
+      useToasts().push(entry.errorText ?? GENERIC_ERROR_TEXT)
+    }
     entries.value[surfaceId] = entry
   }
 
