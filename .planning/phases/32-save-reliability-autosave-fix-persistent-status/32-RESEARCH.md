@@ -733,7 +733,30 @@ function set(surfaceId: string, entry: SaveStatusEntry) {
 
 **If this table is empty:** N/A — see above.
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> All three were resolved during planning on 2026-08-02 (plan-checker WARNING 1). The original text is
+> kept below for provenance; each item's disposition is recorded inline as **RESOLVED:**.
+
+1. **RESOLVED — regression net accepted as sufficient; no enumeration of network interleavings.**
+   `32-01` keeps the existing `R028 remote-merge stability` and `BL-02` tests green as an explicit
+   acceptance criterion, and `32-05` Task 3 adds a test asserting a genuine external merge still
+   applies and arms no save. `32-01` additionally specifies tracking the pending→not-pending
+   *transition* (not `hasPendingWrites` alone), because the server-ack snapshot is the emission that
+   actually defeats the JSON diff — without that, only half the window closes.
+
+2. **RESOLVED — deferred out of phase, deliberately.** The other Firestore-subscribing stores are not
+   in R039's scope, and the three already-migrated editors are structurally not exposed (they load
+   once per mount rather than via a live subscription watcher). Recorded as a future backlog audit,
+   not silently dropped.
+
+3. **RESOLVED — designed in `32-05`.** The D-15 reorder-save writes directly to `useSaveStatus`,
+   bypassing `useAutoSave`'s debounce, preserving its intentionally-immediate behaviour and its
+   `autosaveErrorSource: 'reorder'` discriminator.
+
+---
+
+*Original text, retained for provenance:*
 
 1. **Does `useAutoSave`'s watcher (or `useSaveStatus`) need to distinguish "the store's own echo reset
    autosaveInitialized as an unavoidable side effect" from "a genuine external editor's change" AFTER the
