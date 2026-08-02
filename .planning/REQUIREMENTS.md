@@ -40,12 +40,12 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
       `autosaveInitialized` guard and swallowing the next discrete mutation) is MEDIUM confidence and
       has never been reproduced against the live app. `[ARCH]` `[PITFALL]`
 
-- [ ] **R040** (primary-user-loop): Every surface with autosave shows a persistent inline
+- [x] **R040** (primary-user-loop): Every surface with autosave shows a persistent inline
       "Saving… / Saved HH:MM" status anchored to the content being edited, never above the fold. Backed
       by one `useSaveStatus` aggregator rather than per-surface implementations; `ServiceEditorView.vue`
       stops hand-duplicating the already-tested `useAutoSave` composable. `[ARCH]` `[STACK]`
 
-- [ ] **R041** (quality-attribute): A save **failure** raises a toast. Success does not — at a 500ms
+- [x] **R041** (quality-attribute): A save **failure** raises a toast. Success does not — at a 500ms
       debounce, success toasts are constant noise. Status region is `aria-live`. `[FEAT]` `[STACK]`
 
 ### Order Structure
@@ -232,8 +232,8 @@ Acknowledged, deferred, not in this roadmap.
 | R037 | Phase 31 | Complete |
 | R038 | Phase 31 | Complete |
 | R039 | Phase 32 | Complete |
-| R040 | Phase 32 | Pending |
-| R041 | Phase 32 | Pending |
+| R040 | Phase 32 | Complete |
+| R041 | Phase 32 | Complete |
 | R042 | Phase 29 | Complete |
 | R043 | Phase 29 | Complete |
 | R044 | Phase 29 | Complete |

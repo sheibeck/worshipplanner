@@ -5,15 +5,15 @@ milestone_name: Service and Slides
 current_phase: 32
 current_phase_name: Save Reliability — Autosave Fix & Persistent Status
 status: executing
-stopped_at: Completed 32-01-PLAN.md (wave 1)
-last_updated: "2026-08-02T22:45:57.428Z"
+stopped_at: Completed 32-02-PLAN.md
+last_updated: "2026-08-02T22:56:46.848Z"
 last_activity: 2026-08-02
 last_activity_desc: Phase 32 execution started
 progress:
   total_phases: 9
   completed_phases: 3
   total_plans: 21
-  completed_plans: 16
+  completed_plans: 17
   percent: 33
 ---
 
@@ -76,7 +76,7 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 ## Current Position
 
 Phase: 32 (Save Reliability — Autosave Fix & Persistent Status) — EXECUTING
-Plan: 2 of 6
+Plan: 3 of 6
 Status: Ready to execute
 Last activity: 2026-08-02 — Phase 32 execution started
 
@@ -618,6 +618,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 31 P04 | ~2h | 6 tasks | 11 files |
 | Phase 31 P05 | ~40min | 4 tasks | 5 files |
 | Phase 32 P01 | 40min | 3 tasks | 4 files |
+| Phase 32 P02 | 25min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -801,6 +802,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: [Phase 31-05]: R038's date skip changes the DEFAULT TEAM selection (teams derive from sundayOrdinal) — a real behaviour change, now tested with two ordinal pairs rather than left to surface in UAT (human judgement filed as 31.23)
 - [Phase ?]: R039 fix lives in the services store (subscribe()'s onSnapshot echo classifier), not the view's onSave() payload — RESEARCH found a second write path (D-15 reorder-save) sharing the identical bug mechanism
 - [Phase ?]: R039 repro must dispatch the echo simulation and the discrete mutation in the SAME synchronous tick (no awaited nextTick between them) — Vue's reactivity scheduler dedups multiple watch(localService) triggers within one flush, so a tick in between lets the merge's own reassignment self-consume the swallow guard and produces a false green
+- [Phase ?]: useAutoSave: 5-status union ('error' added), fade removed — saved is now terminal; test-count baseline in plan was stale (12 not 13), added 4 net-new tests to hit the literal >=16 floor
 
 ### Roadmap Evolution
 
@@ -862,6 +864,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-02T22:45:57.398Z
-Stopped at: Completed 32-01-PLAN.md (wave 1)
+Last session: 2026-08-02T22:56:46.787Z
+Stopped at: Completed 32-02-PLAN.md
 Resume file: None
