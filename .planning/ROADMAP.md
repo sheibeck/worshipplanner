@@ -189,11 +189,11 @@ Plans:
   2. Every surface with autosave shows a persistent inline "Saving… / Saved HH:MM" status anchored to the content being edited, visible without scrolling
   3. A save failure raises a toast; a save success does not
 
-**Plans**: 2/6 plans executed
+**Plans**: 3/6 plans executed
 
 - [x] 32-01-PLAN.md — R039 repro test (red first), store-layer own-echo classifier, view guard
 - [x] 32-02-PLAN.md — `useAutoSave` gains `'error'` and loses the 3s fade
-- [ ] 32-03-PLAN.md — `useSaveStatus` and `useToasts` stores, with the error-edge toast trigger
+- [x] 32-03-PLAN.md — `useSaveStatus` and `useToasts` stores, with the error-edge toast trigger
 - [ ] 32-04-PLAN.md — `SaveStatusIndicator.vue`, `ToastHost.vue`, mounted in `AppShell.vue`
 - [ ] 32-05-PLAN.md — `ServiceEditorView` migrates onto `useAutoSave`; sticky status bar
 - [ ] 32-06-PLAN.md — the three editors adopt the shared indicator; per-status testids retired
@@ -303,7 +303,7 @@ Plans:
 | 29. Order Structure — Stable Reordering & Post-Service | v1.4 | 5/5 | Complete    | 2026-07-28 |
 | 30. Slides Mirror the Plan — Hard Lock & Reconciliation Removed | v1.4 | 4/4 | Complete    | 2026-07-29 |
 | 31. Service Lifecycle — Draft Lock & Reopen | v1.4 | 6/6 | Complete    | 2026-07-30 |
-| 32. Save Reliability — Autosave Fix & Persistent Status | v1.4 | 2/6 | In Progress|  |
+| 32. Save Reliability — Autosave Fix & Persistent Status | v1.4 | 3/6 | In Progress|  |
 | 33. Backgrounds & Slide Editing | v1.4 | 0/TBD | Not started | - |
 | 34. Smarter Content — LLM Scripture Split | v1.4 | 0/TBD | Not started | - |
 | 35. Presentation Correctness & Lyric Editor | v1.4 | 0/TBD | Not started | - |
