@@ -62,7 +62,34 @@ describe('useAutoSave', () => {
     expect(status.value).toBe('saved')
   })
 
-  it('transitions through idle -> pending -> saving -> saved -> idle', async () => {
+  it('coalesces two mutations in one debounce window into one save carrying the later value', async () => {
+    const source = ref({ value: 'initial' })
+    let observedValue = ''
+    const saveFn = vi.fn().mockImplementation(() => {
+      observedValue = source.value.value
+      return Promise.resolve()
+    })
+    useAutoSave(() => source.value, saveFn)
+
+    // Skip initialized guard
+    source.value = { value: 'skip' }
+    await nextTick()
+
+    // Two mutations inside the same debounce window
+    source.value = { value: 'first' }
+    await nextTick()
+    source.value = { value: 'second' }
+    await nextTick()
+
+    await vi.advanceTimersByTimeAsync(800)
+
+    // Exactly one save, carrying the second (later) mutation — the debounce
+    // coalesces, it never drops or reorders
+    expect(saveFn).toHaveBeenCalledTimes(1)
+    expect(observedValue).toBe('second')
+  })
+
+  it('transitions through idle -> pending -> saving -> saved, and saved persists', async () => {
     const source = ref({ value: 'initial' })
     let resolvePromise: () => void
     const saveFn = vi.fn().mockImplementation(
@@ -94,9 +121,10 @@ describe('useAutoSave', () => {
     await vi.advanceTimersByTimeAsync(0)
     expect(status.value).toBe('saved')
 
-    // After 3 seconds -> idle
+    // After 3 seconds -> still saved (the fade is gone; 'saved' is terminal
+    // until the next pending transition)
     vi.advanceTimersByTime(3000)
-    expect(status.value).toBe('idle')
+    expect(status.value).toBe('saved')
   })
 
   it('prevents concurrent saves via inflight guard', async () => {
@@ -142,6 +170,50 @@ describe('useAutoSave', () => {
     // Now the rescheduled timer fires
     await vi.advanceTimersByTimeAsync(100)
     expect(saveFn).toHaveBeenCalledTimes(2)
+  })
+
+  it('a mutation dispatched while a save is in flight is not lost — the follow-up save observes the later value', async () => {
+    const source = ref({ count: 0 })
+    let resolveFirst: () => void
+    let callCount = 0
+    const observedValues: number[] = []
+    const saveFn = vi.fn().mockImplementation(() => {
+      callCount++
+      observedValues.push(source.value.count)
+      if (callCount === 1) {
+        return new Promise<void>((resolve) => { resolveFirst = resolve })
+      }
+      return Promise.resolve()
+    })
+    const { status } = useAutoSave(() => source.value, saveFn, undefined, { debounceMs: 100 })
+
+    // Skip initialized guard
+    source.value = { count: 1 }
+    await nextTick()
+
+    // Trigger a real change — first save starts after debounce
+    source.value = { count: 2 }
+    await nextTick()
+    await vi.advanceTimersByTimeAsync(100)
+    expect(saveFn).toHaveBeenCalledTimes(1)
+    expect(status.value).toBe('saving')
+
+    // Trigger another change while saving — this mutation must not be lost
+    source.value = { count: 3 }
+    await nextTick()
+
+    // Advance debounce again — inflight guard reschedules, doesn't call saveFn yet
+    await vi.advanceTimersByTimeAsync(100)
+    expect(saveFn).toHaveBeenCalledTimes(1)
+
+    // Resolve the in-flight save — the reschedule fires the follow-up save
+    resolveFirst!()
+    await vi.advanceTimersByTimeAsync(0)
+    await vi.advanceTimersByTimeAsync(100)
+
+    expect(saveFn).toHaveBeenCalledTimes(2)
+    expect(observedValues[1]).toBe(3)
+    expect(status.value).toBe('saved')
   })
 
   it('flush forces immediate save bypassing debounce', async () => {
@@ -268,7 +340,7 @@ describe('useAutoSave', () => {
     expect(saveFn).toHaveBeenCalledTimes(1)
   })
 
-  it('saved status fades to idle after 3 seconds', async () => {
+  it('saved status persists indefinitely until the next change (no fade)', async () => {
     const source = ref({ value: 'initial' })
     const saveFn = vi.fn().mockResolvedValue(undefined)
     const { status } = useAutoSave(() => source.value, saveFn)
@@ -283,12 +355,46 @@ describe('useAutoSave', () => {
     await vi.advanceTimersByTimeAsync(800)
     expect(status.value).toBe('saved')
 
-    // At 2.9 seconds, still 'saved'
-    vi.advanceTimersByTime(2900)
+    // Advancing well past the old 3-second fade window — status must still
+    // read 'saved'. R040 replaces the fade with a persistent Saved timestamp.
+    vi.advanceTimersByTime(60000)
     expect(status.value).toBe('saved')
-
-    // At 3 seconds, transitions to 'idle'
-    vi.advanceTimersByTime(100)
-    expect(status.value).toBe('idle')
   })
+
+  it('debounced-path save failure sets status to error, not stranded at saving', async () => {
+    const source = ref({ value: 'initial' })
+    const saveFn = vi.fn().mockRejectedValue(new Error('write failed'))
+    const { status } = useAutoSave(() => source.value, saveFn)
+
+    // Skip initialized guard
+    source.value = { value: 'skip' }
+    await nextTick()
+
+    // Real change -> pending -> saving -> rejects -> error
+    source.value = { value: 'change' }
+    await nextTick()
+    await vi.advanceTimersByTimeAsync(800)
+
+    expect(status.value).toBe('error')
+  })
+
+  it('flush() save failure sets status to error, not stranded at saving', async () => {
+    const source = ref({ value: 'initial' })
+    const saveFn = vi.fn().mockRejectedValue(new Error('write failed'))
+    const { status, flush } = useAutoSave(() => source.value, saveFn)
+
+    // Skip initialized guard
+    source.value = { value: 'skip' }
+    await nextTick()
+
+    // Arm a pending change
+    source.value = { value: 'change' }
+    await nextTick()
+    expect(status.value).toBe('pending')
+
+    await flush()
+
+    expect(status.value).toBe('error')
+  })
+
 })
