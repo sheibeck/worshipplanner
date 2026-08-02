@@ -1,6 +1,6 @@
 import { ref, watch, onUnmounted, type WatchSource, type Ref, type ComputedRef } from 'vue'
 
-export type AutoSaveStatus = 'idle' | 'pending' | 'saving' | 'saved'
+export type AutoSaveStatus = 'idle' | 'pending' | 'saving' | 'saved' | 'error'
 
 export interface UseAutoSaveOptions {
   /** Debounce delay in milliseconds before triggering a save (default 800). */
@@ -27,6 +27,14 @@ export interface UseAutoSaveReturn {
  * The first trigger from the watcher is suppressed (initialized guard) so that
  * the initial load of data does not trigger a save.
  *
+ * Status is one of five values: 'idle' | 'pending' | 'saving' | 'saved' |
+ * 'error'. A rejected `saveFn` is contained on both the debounced path and
+ * `flush()` and surfaces as the 'error' status rather than an unhandled
+ * rejection — it is never left stranded at 'saving'. The handling is
+ * generic: it only sets the status, it does not inspect or discriminate
+ * the failure. The 'saved' state is terminal — it persists until the next
+ * pending transition, it does not fade back to 'idle' on its own.
+ *
  * @param watchSource - Reactive source to watch (deep).
  * @param saveFn      - Async function that performs the actual save.
  * @param isDirty     - Optional computed that must be true for a save to proceed.
@@ -45,7 +53,6 @@ export function useAutoSave(
   const status = ref<AutoSaveStatus>('idle')
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
-  let savedFadeTimer: ReturnType<typeof setTimeout> | null = null
   let initialized = false
   let saving = false
 
@@ -53,13 +60,6 @@ export function useAutoSave(
     if (debounceTimer !== null) {
       clearTimeout(debounceTimer)
       debounceTimer = null
-    }
-  }
-
-  function clearSavedFadeTimer() {
-    if (savedFadeTimer !== null) {
-      clearTimeout(savedFadeTimer)
-      savedFadeTimer = null
     }
   }
 
@@ -84,13 +84,8 @@ export function useAutoSave(
       try {
         await saveFn()
         status.value = 'saved'
-        // Fade "Saved" indicator back to idle after 3 seconds
-        clearSavedFadeTimer()
-        savedFadeTimer = setTimeout(() => {
-          if (status.value === 'saved') {
-            status.value = 'idle'
-          }
-        }, 3000)
+      } catch {
+        status.value = 'error'
       } finally {
         saving = false
       }
@@ -140,21 +135,16 @@ export function useAutoSave(
     try {
       await saveFn()
       status.value = 'saved'
-      clearSavedFadeTimer()
-      savedFadeTimer = setTimeout(() => {
-        if (status.value === 'saved') {
-          status.value = 'idle'
-        }
-      }, 3000)
+    } catch {
+      status.value = 'error'
     } finally {
       saving = false
     }
   }
 
-  /** Clear all pending timers (debounce + saved-fade). */
+  /** Clear all pending timers (currently: the debounce timer). */
   function cleanup() {
     clearDebounceTimer()
-    clearSavedFadeTimer()
   }
 
   // Auto-cleanup when the host component unmounts
