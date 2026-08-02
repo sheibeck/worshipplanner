@@ -189,7 +189,15 @@ Plans:
   2. Every surface with autosave shows a persistent inline "Saving… / Saved HH:MM" status anchored to the content being edited, visible without scrolling
   3. A save failure raises a toast; a save success does not
 
-**Plans**: TBD
+**Plans**: 6 plans
+
+- [ ] 32-01-PLAN.md — R039 repro test (red first), store-layer own-echo classifier, view guard
+- [ ] 32-02-PLAN.md — `useAutoSave` gains `'error'` and loses the 3s fade
+- [ ] 32-03-PLAN.md — `useSaveStatus` and `useToasts` stores, with the error-edge toast trigger
+- [ ] 32-04-PLAN.md — `SaveStatusIndicator.vue`, `ToastHost.vue`, mounted in `AppShell.vue`
+- [ ] 32-05-PLAN.md — `ServiceEditorView` migrates onto `useAutoSave`; sticky status bar
+- [ ] 32-06-PLAN.md — the three editors adopt the shared indicator; per-status testids retired
+
 **UI hint**: yes
 **Research flag**: standard pattern — fix shape is well-evidenced; only needs repro-test-first discipline.
 **Notes**: Write the failing repro test FIRST. The root cause (a save's own Firestore echo carrying a server `updatedAt` the client never tracked, resetting the `autosaveInitialized` guard and swallowing the next discrete mutation) is MEDIUM confidence and has never been reproduced against the live app — do not rewrite blind. Build one `useSaveStatus` Pinia aggregator sitting ABOVE the existing, already-tested `useAutoSave` composable (not replacing it); migrate `ServiceEditorView.vue` off its hand-duplicated ~150-line inline autosave onto `useAutoSave` once the root cause is confirmed. `AutoSaveStatus` needs a fifth `'error'` state — today's type has no failure state at all.
