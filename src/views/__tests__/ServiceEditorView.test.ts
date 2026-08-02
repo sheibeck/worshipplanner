@@ -1176,6 +1176,15 @@ describe("ServiceEditorView - R039: a save's own Firestore echo must not swallow
     resetSortableCaptures()
   })
 
+  // `mockOwnWriteEchoIds` is module-level state shared by the WHOLE file —
+  // every describe block after this one mounts services with the SAME
+  // 'service-1' id but has no reason to know this mock member exists, so a
+  // value left set by the last test here would silently make every later
+  // remote-merge test's `isOwnWriteEcho('service-1')` return true.
+  afterEach(() => {
+    mockOwnWriteEchoIds = []
+  })
+
   /** The autosave watcher swallows the FIRST `localService` mutation after a
    *  load or a remote merge (`autosaveInitialized`) — same idiom as the
    *  BL-02 block's `warmAutosaveWatcher`. A `notes` touch is used

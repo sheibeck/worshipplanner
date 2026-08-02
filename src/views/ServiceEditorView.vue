@@ -1985,6 +1985,17 @@ watch(
     const found = services.find((s) => s.id === serviceId.value)
     if (!found) return
 
+    // R039: this snapshot is this client's OWN write settling (Firestore's
+    // local `metadata.hasPendingWrites`, surfaced by the store), not a
+    // change some other writer made. Local state is therefore already
+    // correct, so merging it in — and resetting the guard below as if a
+    // real remote change had arrived — would be a false positive: it is
+    // exactly what let the very next discrete mutation land in the swallow
+    // window. Only the already-loaded path is skipped; the initial-load
+    // branch below must still run even mid-echo, or a service opened while
+    // one of our own writes is in flight would never populate.
+    if (localService.value && serviceStore.isOwnWriteEcho(serviceId.value)) return
+
     if (!localService.value) {
       // Initial load: populate from store, backfilling any missing slot ids
       // (D-01/R028) first. Both refs get the SAME backfilled value — if
