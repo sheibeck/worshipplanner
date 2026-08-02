@@ -5,15 +5,15 @@ milestone_name: Service and Slides
 current_phase: 32
 current_phase_name: Save Reliability — Autosave Fix & Persistent Status
 status: executing
-stopped_at: Completed 32-03-PLAN.md
-last_updated: "2026-08-02T23:08:41.561Z"
+stopped_at: Completed 32-04-PLAN.md
+last_updated: "2026-08-02T23:20:00.335Z"
 last_activity: 2026-08-02
 last_activity_desc: Phase 32 execution started
 progress:
   total_phases: 9
   completed_phases: 3
   total_plans: 21
-  completed_plans: 18
+  completed_plans: 19
   percent: 33
 ---
 
@@ -76,7 +76,7 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 ## Current Position
 
 Phase: 32 (Save Reliability — Autosave Fix & Persistent Status) — EXECUTING
-Plan: 4 of 6
+Plan: 5 of 6
 Status: Ready to execute
 Last activity: 2026-08-02 — Phase 32 execution started
 
@@ -620,6 +620,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 32 P01 | 40min | 3 tasks | 4 files |
 | Phase 32 P02 | 25min | 2 tasks | 2 files |
 | Phase 32 P03 | 45min | 3 tasks | 4 files |
+| Phase 32 P04 | 20min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -805,6 +806,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: R039 repro must dispatch the echo simulation and the discrete mutation in the SAME synchronous tick (no awaited nextTick between them) — Vue's reactivity scheduler dedups multiple watch(localService) triggers within one flush, so a tick in between lets the merge's own reassignment self-consume the swallow guard and produces a false green
 - [Phase ?]: useAutoSave: 5-status union ('error' added), fade removed — saved is now terminal; test-count baseline in plan was stale (12 not 13), added 4 net-new tests to hit the literal >=16 floor
 - [Phase ?]: useSaveStatus/useToasts: edge-detection for the failure toast lives inside saveStatus.set() (the writer), not inside a component watch (the reader), so no caller of set() needs to know a toast store exists.
+- [Phase ?]: SaveStatusIndicator.vue and ToastHost.vue built verbatim from 32-UI-SPEC.md, consuming plan 03's real useSaveStatus/useToasts stores; both component tests install real Pinia rather than mocking, matching the new-precedent pattern 32-03 set.
+- [Phase ?]: ToastHost mounted once in AppShell.vue inside the inner content flex column (sibling after </main>), confirmed via grep as the sole mount point across src/.
 
 ### Roadmap Evolution
 
@@ -866,6 +869,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-02T23:08:41.528Z
-Stopped at: Completed 32-03-PLAN.md
+Last session: 2026-08-02T23:20:00.307Z
+Stopped at: Completed 32-04-PLAN.md
 Resume file: None

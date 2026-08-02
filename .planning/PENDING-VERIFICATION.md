@@ -170,6 +170,23 @@ All of these are proven by automated regression tests; what is deferred is only 
 
 Appended as each phase completes.
 
+## Phase 32 — Save Reliability: Autosave Fix & Persistent Status
+
+### Plan 32-04 — `SaveStatusIndicator.vue` and `ToastHost.vue`
+
+- ☐ **32-04.1** ★ **E1 overflow backstop, visual confirmation.** The automated test
+  (`src/components/__tests__/SaveStatusIndicator.test.ts`, "E1 overflow backstop") only proves — via
+  jsdom, which cannot measure real layout — that the 59-character generic error sentence renders with
+  no truncation class and its full text content present inside a 120px-wide mounted parent. It does
+  **not** prove the text visually wraps instead of clipping in a real browser. Open `SongLyricEditor.vue`
+  (the narrowest of the three editor headers per 32-UI-SPEC.md § E1), force its status into the error
+  state, and confirm the sentence *"Couldn't save your changes — they're still here. Try again."* wraps
+  onto multiple lines rather than being clipped or causing horizontal overflow of the header row.
+- ☐ **32-04.2** Trigger a real save failure (e.g. stop the Firestore emulator, then edit a saving
+  surface) and confirm the toast appears bottom-right on a normal-width window, and full-width-minus-
+  margins at the bottom on a narrow/mobile width, without overlapping the sticky status bar or the
+  Phase 31 lock banner at the top of the viewport.
+
 ---
 
 ## Notes and failures
