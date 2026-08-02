@@ -142,16 +142,68 @@ box. A floating alert should look like the app's other floating alerts, not foun
 
 ## UI Considerations
 
-Applicable state considerations resolved: 6 covered, 0 backstop, 0 unresolved.
+Produced by the ui-consideration-probe over four described surfaces (E1 `SaveStatusIndicator.vue`,
+E2 the ServiceEditorView sticky status bar, E3 `ToastHost.vue`, E4 the three editors' status slot).
 
-| Category | Element(s) | Status | Resolution / Reason |
-|----------|------------|--------|---------------------|
-| loading | the `saving` status itself (page-header / panel-header) | ✅ covered | `Saving…` is the loading state of this very component — no separate spinner or skeleton is introduced |
-| error | autosave failure, all four surfaces (interactive-control) | ✅ covered | Two verbatim strings (reorder / generic), an inline `aria-live="polite"` region, and a mirrored `role="alert"` toast — all specified in § Copywriting Contract and § 4 |
-| populated | pending / saving / saved states (page-header / panel-header) | ✅ covered | Exact copy and color per state in § Copywriting Contract and § Color |
-| overflow | status bar text at narrow width; toast body at narrow width | ✅ covered | Status bar text wraps normally inside its `flex-1` container (§ 3); toast uses `inset-x-4` full-width-with-margin below the `sm:` breakpoint instead of a fixed `max-w-sm` (§ 4) |
-| zero-one-many | toast stack | ✅ covered | Array-backed store, vertical `gap-2` stack, each toast has its own auto-dismiss timer; in practice at most one of the four surfaces is ever mounted at a time today (see § 4's scope note), so multi-toast stacking is a safety net, not the common case |
-| long-text | toast body (static-content) | ✅ covered | Both possible bodies are fixed enum strings (≤55 characters); no user-supplied text ever enters a toast |
+**Applicable: 30 — 23 covered, 7 backstop, 0 unresolved.**
+
+> The seven backstops are the planner's real work items here. Four of them (E2/E3/E4 `partial`,
+> E4 `loading`) are lifecycle questions the prose contract genuinely does not answer: what a
+> keyed-by-`surfaceId` store does when the surface unmounts, when its id changes mid-save, or when a
+> toast outlives the surface that raised it. Do not treat them as paperwork.
+
+### E1 — `SaveStatusIndicator.vue`
+
+| Category | Status | Resolution |
+|----------|--------|------------|
+| empty | ✅ covered | `idle` renders nothing at all — no placeholder box, no reserved layout height (§ 2). Before the first edit in a session there is nothing to report. |
+| loading | ✅ covered | `Saving…` (italic, `text-gray-400`) **is** this component's loading state. No spinner, no skeleton, no separate loading affordance is introduced. |
+| error | ✅ covered | Red text, `data-testid="save-status-error"`, one of exactly two fixed strings, rendered inside the same single `aria-live="polite"` region — no nested second live region (§ 2). |
+| populated | ✅ covered | Exactly one of four mutually exclusive spans at a time. `Saved {h:mm AM/PM}` persists until the next change; the 3-second fade-to-idle is removed from `useAutoSave` (§ 1). |
+| overflow | ⚑ backstop | **Statement:** the longest string (`Couldn't save your changes — they're still here. Try again.`, 59 chars) must not overflow or clip the narrowest host header — `SongLyricEditor.vue`'s `flex items-center gap-2` group is the tightest. **verification: backstop** — a mounted-width test asserting the error text wraps rather than clipping in that header. |
+| long-text | ✅ covered | Every string is a fixed enum; no user-supplied text ever reaches this component. The only variable segment is the timestamp (`h:mm AM/PM`, ≤8 chars). |
+
+### E2 — ServiceEditorView sticky status bar
+
+| Category | Status | Resolution |
+|----------|--------|------------|
+| empty | ✅ covered | Edge state E1: the bar renders (draft ⇒ `canEditService`) but the indicator shows nothing. |
+| loading | ⚑ backstop | **Statement:** while the service document is still loading and `localService` is not yet populated, the status bar must not render a stale or spurious status from a previously-viewed service. **verification: backstop** — a test that navigating between two services does not carry the first one's `Saved HH:MM` into the second's initial render. |
+| error | ✅ covered | Edge state E3 — inline text (reorder or generic variant) plus one edge-triggered mirrored toast. |
+| populated | ✅ covered | `Saved {h:mm AM/PM}`, green, persistent until the next change. |
+| partial | ⚑ backstop | **Statement:** the `useSaveStatus` store is keyed by `surfaceId`, so an entry must not outlive its surface — unmounting `ServiceEditorView` has to clear or invalidate its entry, or a later mount reads a stale one. **verification: backstop** — a test asserting the store holds no entry for a surface after its component unmounts. |
+| overflow | ✅ covered | Text-only content in a `flex-1` row; it wraps normally inside its container. No truncation, no special narrow-width case (§ 3). |
+| zero-one-many | ✅ covered | Structurally singular — the bar hosts exactly one indicator, always. There is no zero/many case to render. |
+| long-text | ✅ covered | Fixed enum strings only, as E1. |
+
+### E3 — `ToastHost.vue`
+
+| Category | Status | Resolution |
+|----------|--------|------------|
+| empty | ✅ covered | Zero toasts ⇒ the `flex flex-col` container has no children and collapses to zero height, so it neither renders nor intercepts pointer events over the page beneath it. |
+| loading | ✅ covered | A toast has no loading state — it is pushed fully formed on the error edge and contains no async content. |
+| error | ✅ covered | This element **is** the error surface: `role="alert"`, `Save failed.` lead, mirrored body, `×` dismiss (§ 4). |
+| populated | ✅ covered | One card: `aria-hidden` warning icon + bold lead + mirrored body + dismiss button, on the `bg-red-950 / border-red-800 / text-red-400` triple. |
+| partial | ⚑ backstop | **Statement:** a toast raised by a surface that unmounts before its 6000ms auto-dismiss elapses must still dismiss cleanly and must not leak its timer. **verification: backstop** — a test that unmounting the raising surface leaves no pending timer and no orphaned toast. |
+| overflow | ✅ covered | `min-w-0 flex-1` on the `<p>` lets the body wrap; `sm:max-w-sm` (384px) caps width above the breakpoint, `inset-x-4` full-width-minus-margins below it (§ 4, edge state E8). |
+| zero-one-many | ✅ covered | Array-backed store, vertical `gap-2` stack, per-toast timers. Edge-triggering bounds the stack structurally: at most one live toast per surface per failure episode, across at most four surfaces — so no cap logic is needed. |
+| long-text | ✅ covered | Both possible bodies are fixed enum strings (≤59 chars); no user-supplied text ever enters a toast. |
+
+### E4 — the three editors' status slot
+
+| Category | Status | Resolution |
+|----------|--------|------------|
+| empty | ✅ covered | `idle` renders nothing, exactly as today's dot/title markup does when there is nothing to report. |
+| loading | ⚑ backstop | **Statement:** while an editor's own content is still loading (e.g. a lyrics fetch), the indicator must read `idle` and must not report a status inherited from the previously-open record. **verification: backstop** — same test shape as E2 `loading`, applied to a reading/song switch. |
+| error | ✅ covered | Generic variant only — `Couldn't save your changes — they're still here. Try again.` None of these three has a reorder concept (§ Copywriting Contract). |
+| populated | ✅ covered | `Saved {h:mm AM/PM}` in the existing `shrink-0` header slot; no sticky wrapper needed because the body, not the panel, is the scroll container (§ 5). |
+| partial | ⚑ backstop | **Statement:** `surfaceId` is derived from a reactive id (`congregational:${currentReadingId}`, `scripture:${currentReadingId}`, `song-lyrics:${props.songId}`). Switching records **while a save is in flight** must not attribute the in-flight save's result to the newly-selected record's id. **verification: backstop** — a test that switching mid-save leaves the new record's indicator `idle` and resolves the old id's entry. ★ This is the sharpest correctness risk in the phase's UI layer. |
+| overflow | ⚑ backstop | **Statement:** as E1 `overflow` — the narrowest of these three headers must wrap the 59-char error string rather than clip it. **verification: backstop** — covered by the same mounted-width test. |
+| zero-one-many | ✅ covered | One indicator per editor, always — no zero/many case. |
+| long-text | ✅ covered | Fixed enum strings only, as E1. |
+
+**Copy for the empty and error states is not restated here** — it lives in § Copywriting Contract and
+§ Empty / Edge States, which these rows reference rather than duplicate.
 
 ---
 
