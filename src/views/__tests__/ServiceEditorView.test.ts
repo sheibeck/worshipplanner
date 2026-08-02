@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from 'vitest'
 import { shallowMount, enableAutoUnmount, DOMWrapper, flushPromises } from '@vue/test-utils'
 import { reactive } from 'vue'
+import { createPinia, setActivePinia } from 'pinia'
 import type { Options as SortableOptions } from 'sortablejs'
 import type { Service } from '@/types/service'
 import type { Song } from '@/types/song'
@@ -9,6 +10,10 @@ import type { Timestamp } from 'firebase/firestore'
 import type { SlideGroup } from '@/types/slideGroup'
 import PresentationViewer from '@/components/PresentationViewer.vue'
 import SlidesTab from '@/components/slides/SlidesTab.vue'
+// 32-05: ServiceEditorView now consumes the REAL, Firestore-free useSaveStatus
+// store directly (not vi.mock-ed) — the same new-precedent choice 32-03/32-04
+// already made for their own store/component tests.
+import { useSaveStatus } from '@/stores/saveStatus'
 
 // Every test in this file mounts ServiceEditorView (a large component with a
 // live autosave debounce timer + Sortable instance) but historically never
@@ -24,8 +29,13 @@ enableAutoUnmount(afterEach)
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
+// Reactive (not a fresh plain object per call) so a test can simulate a route
+// param change without remounting the component — the 32-05 E2 loading
+// backstop drives serviceId's own computed off route.params.id, which only
+// stays reactive if the mocked route itself is a Vue reactive object.
+const mockRoute = reactive({ params: { id: 'service-1' } })
 vi.mock('vue-router', () => ({
-  useRoute: () => ({ params: { id: 'service-1' } }),
+  useRoute: () => mockRoute,
   useRouter: () => ({ push: vi.fn() }),
   RouterLink: { template: '<a><slot /></a>' },
 }))
@@ -458,6 +468,25 @@ vi.mock('@/stores/quarters', () => ({
   }),
 }))
 
+// 32-05: a fresh, real Pinia before every test — new-precedent hazard, since
+// no component test in this file previously installed one (every store below
+// is vi.mock-ed). ServiceEditorView now consumes useSaveStatus directly, so a
+// mount with no active Pinia throws "no active Pinia" at setup(). The route
+// mock is also reset here so a test that drives the E2 loading backstop
+// (mutating mockRoute.params.id mid-test) never leaks into a later test.
+beforeEach(() => {
+  setActivePinia(createPinia())
+  mockRoute.params.id = 'service-1'
+})
+
+/** Reads the real useSaveStatus store's entry for `service:{id}` — the
+ *  post-migration equivalent of the deleted `vm.autosaveStatus` ref. Reads
+ *  the CURRENTLY active Pinia (set fresh in the beforeEach above), so this
+ *  only resolves correctly when called after a mountView() in the same test. */
+function saveStatusEntry(id = 'service-1') {
+  return useSaveStatus().entryFor(`service:${id}`)
+}
+
 // Reset the stateful slideGroups mock before every test so a test that
 // populates `mockSlideGroupsState.groups` never leaks into a later one that
 // assumes the default empty-groups state.
@@ -477,6 +506,9 @@ beforeEach(() => {
 // happens to mount first. Paying that one-time cold cost here (with a generous
 // timeout) keeps every individual test's timer measuring only a warm mount.
 beforeAll(async () => {
+  // 32-05: this runs before the first per-test beforeEach, so it needs its
+  // own active Pinia — same "no active Pinia" reasoning as above.
+  setActivePinia(createPinia())
   const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
   shallowMount(ServiceEditorView, {
     global: {
@@ -513,6 +545,10 @@ describe('ServiceEditorView - Print and Copy for PC buttons', () => {
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
           RouterLink: { template: '<a><slot /></a>' },
+          // 32-05: render the real SaveStatusIndicator (not a shallow stub)
+          // so its data-testid="save-status"/"save-status-error" handles are
+          // reachable from these tests.
+          SaveStatusIndicator: false,
           ServicePrintLayout: true,
           SongBadge: true,
           SongSlotPicker: true,
@@ -558,6 +594,10 @@ describe('ServiceEditorView - Roles tab (Phase 17-04)', () => {
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
           RouterLink: { template: '<a><slot /></a>' },
+          // 32-05: render the real SaveStatusIndicator (not a shallow stub)
+          // so its data-testid="save-status"/"save-status-error" handles are
+          // reachable from these tests.
+          SaveStatusIndicator: false,
           ServicePrintLayout: true,
           SongBadge: true,
           SongSlotPicker: true,
@@ -761,6 +801,10 @@ describe('ServiceEditorView - Section headers and slideshow preview (Phase 20-04
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
           RouterLink: { template: '<a><slot /></a>' },
+          // 32-05: render the real SaveStatusIndicator (not a shallow stub)
+          // so its data-testid="save-status"/"save-status-error" handles are
+          // reachable from these tests.
+          SaveStatusIndicator: false,
           ServicePrintLayout: true,
           SongBadge: true,
           SongSlotPicker: true,
@@ -982,6 +1026,10 @@ describe('ServiceEditorView - slot id backfill on load (Phase 24-06 Task 1)', ()
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
           RouterLink: { template: '<a><slot /></a>' },
+          // 32-05: render the real SaveStatusIndicator (not a shallow stub)
+          // so its data-testid="save-status"/"save-status-error" handles are
+          // reachable from these tests.
+          SaveStatusIndicator: false,
           ServicePrintLayout: true,
           SongBadge: true,
           SongSlotPicker: true,
@@ -1157,6 +1205,10 @@ describe("ServiceEditorView - R039: a save's own Firestore echo must not swallow
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
           RouterLink: { template: '<a><slot /></a>' },
+          // 32-05: render the real SaveStatusIndicator (not a shallow stub)
+          // so its data-testid="save-status"/"save-status-error" handles are
+          // reachable from these tests.
+          SaveStatusIndicator: false,
           ServicePrintLayout: true,
           SongBadge: true,
           SongSlotPicker: true,
@@ -1313,6 +1365,10 @@ describe('ServiceEditorView - slot delete cascades to its group (Phase 24-06 Tas
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
           RouterLink: { template: '<a><slot /></a>' },
+          // 32-05: render the real SaveStatusIndicator (not a shallow stub)
+          // so its data-testid="save-status"/"save-status-error" handles are
+          // reachable from these tests.
+          SaveStatusIndicator: false,
           ServicePrintLayout: true,
           SongBadge: true,
           SongSlotPicker: true,
@@ -1595,6 +1651,10 @@ describe('ServiceEditorView - Slides tab (Phase 25-03)', () => {
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
           RouterLink: { template: '<a><slot /></a>' },
+          // 32-05: render the real SaveStatusIndicator (not a shallow stub)
+          // so its data-testid="save-status"/"save-status-error" handles are
+          // reachable from these tests.
+          SaveStatusIndicator: false,
           ServicePrintLayout: true,
           SongBadge: true,
           SongSlotPicker: true,
@@ -1735,6 +1795,10 @@ describe('ServiceEditorView - Edit in scripture plumbing (Phase 26-03)', () => {
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
           RouterLink: { template: '<a><slot /></a>' },
+          // 32-05: render the real SaveStatusIndicator (not a shallow stub)
+          // so its data-testid="save-status"/"save-status-error" handles are
+          // reachable from these tests.
+          SaveStatusIndicator: false,
           ServicePrintLayout: true,
           SongBadge: true,
           SongSlotPicker: true,
@@ -1873,6 +1937,10 @@ describe('ServiceEditorView - no deck editing or deck import on the Service Orde
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
           RouterLink: { template: '<a><slot /></a>' },
+          // 32-05: render the real SaveStatusIndicator (not a shallow stub)
+          // so its data-testid="save-status"/"save-status-error" handles are
+          // reachable from these tests.
+          SaveStatusIndicator: false,
           ServicePrintLayout: true,
           SongBadge: true,
           SongSlotPicker: true,
@@ -1965,6 +2033,10 @@ describe('ServiceEditorView - Phase 29 reorder repro', () => {
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
           RouterLink: { template: '<a><slot /></a>' },
+          // 32-05: render the real SaveStatusIndicator (not a shallow stub)
+          // so its data-testid="save-status"/"save-status-error" handles are
+          // reachable from these tests.
+          SaveStatusIndicator: false,
           ServicePrintLayout: true,
           SongBadge: true,
           SongSlotPicker: true,
@@ -2217,7 +2289,7 @@ describe('ServiceEditorView - Phase 29 reorder repro', () => {
     const cards = wrapper.findAll('.slot-item')
     expect(cards.map((c) => c.attributes('data-slot-id'))).toEqual(['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8'])
 
-    const errorMsg = wrapper.find('[data-testid="autosave-error"]')
+    const errorMsg = wrapper.find('[data-testid="save-status-error"]')
     expect(errorMsg.exists()).toBe(true)
     expect(errorMsg.text()).toBe("Couldn't save this order — reverted. Try dragging again.")
 
@@ -2234,12 +2306,12 @@ describe('ServiceEditorView - Phase 29 reorder repro', () => {
     await wrapper.vm.$nextTick()
 
     await simulateSlotDrag(wrapper, { fromSection: 'worship', fromPos: 0, toSection: 'worship', toPos: 2 })
-    expect(wrapper.find('[data-testid="autosave-error"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="save-status-error"]').exists()).toBe(true)
 
     // Same move again — this time the write resolves (mockUpdateService's default
     // implementation, not overridden a second time).
     await simulateSlotDrag(wrapper, { fromSection: 'worship', fromPos: 0, toSection: 'worship', toPos: 2 })
-    expect(wrapper.find('[data-testid="autosave-error"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="save-status-error"]').exists()).toBe(false)
 
     errSpy.mockRestore()
   })
@@ -2318,7 +2390,7 @@ describe('ServiceEditorView - Phase 29 reorder repro', () => {
     expect(cards.map((c) => c.attributes('data-slot-id'))).toEqual(['s1', 's4', 's2', 's3', 's5', 's6', 's7', 's8'])
 
     // ...the error must be visible (not silent)...
-    expect(wrapper.find('[data-testid="autosave-error"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="save-status-error"]').exists()).toBe(true)
 
     // ...and the general 800ms autosave debounce must NOT then silently
     // re-persist a stale array over drag B's committed write. A third call (or
@@ -2345,6 +2417,10 @@ describe('ServiceEditorView - R047 scripture reference is the slide source', () 
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
           RouterLink: { template: '<a><slot /></a>' },
+          // 32-05: render the real SaveStatusIndicator (not a shallow stub)
+          // so its data-testid="save-status"/"save-status-error" handles are
+          // reachable from these tests.
+          SaveStatusIndicator: false,
           ServicePrintLayout: true,
           SongBadge: true,
           SongSlotPicker: true,
@@ -2417,6 +2493,10 @@ describe('ServiceEditorView - ME-02 scripture reference round-trips in its own e
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
           RouterLink: { template: '<a><slot /></a>' },
+          // 32-05: render the real SaveStatusIndicator (not a shallow stub)
+          // so its data-testid="save-status"/"save-status-error" handles are
+          // reachable from these tests.
+          SaveStatusIndicator: false,
           ServicePrintLayout: true,
           SongBadge: true,
           SongSlotPicker: true,
@@ -2517,6 +2597,10 @@ describe('ServiceEditorView - no slide-group writes on a locked service (R036)',
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
           RouterLink: { template: '<a><slot /></a>' },
+          // 32-05: render the real SaveStatusIndicator (not a shallow stub)
+          // so its data-testid="save-status"/"save-status-error" handles are
+          // reachable from these tests.
+          SaveStatusIndicator: false,
           ServicePrintLayout: true,
           SongBadge: true,
           SongSlotPicker: true,
@@ -2605,6 +2689,10 @@ describe('ServiceEditorView - service lifecycle transitions (R036, R037)', () =>
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
           RouterLink: { template: '<a><slot /></a>' },
+          // 32-05: render the real SaveStatusIndicator (not a shallow stub)
+          // so its data-testid="save-status"/"save-status-error" handles are
+          // reachable from these tests.
+          SaveStatusIndicator: false,
           ServicePrintLayout: true,
           SongBadge: true,
           SongSlotPicker: true,
@@ -2977,6 +3065,10 @@ describe('ServiceEditorView - locked service renders all three tabs read-only (R
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
           RouterLink: { template: '<a><slot /></a>' },
+          // 32-05: render the real SaveStatusIndicator (not a shallow stub)
+          // so its data-testid="save-status"/"save-status-error" handles are
+          // reachable from these tests.
+          SaveStatusIndicator: false,
           ServicePrintLayout: true,
           SongBadge: true,
           SongSlotPicker: true,
@@ -3296,7 +3388,6 @@ describe('ServiceEditorView - locked service renders all three tabs read-only (R
           date: string
           notes: string
         }
-        autosaveStatus: string
         showSlotDeleteConfirm: boolean
         resolvedRoleAssignments: Array<{ roleId: string; effectivePersonIds: string[] }>
         onDateChange: (d: string) => void
@@ -3376,7 +3467,7 @@ describe('ServiceEditorView - locked service renders all three tabs read-only (R
 
       await flushPromises()
       expect(mockUpdateService).not.toHaveBeenCalled()
-      expect(vm.autosaveStatus).not.toBe('saving')
+      expect(saveStatusEntry('service-1').status).not.toBe('saving')
     })
   }
 
@@ -3418,6 +3509,10 @@ describe('ServiceEditorView - BL-02: a rejected autosave must not strand the sta
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
           RouterLink: { template: '<a><slot /></a>' },
+          // 32-05: render the real SaveStatusIndicator (not a shallow stub)
+          // so its data-testid="save-status"/"save-status-error" handles are
+          // reachable from these tests.
+          SaveStatusIndicator: false,
           ServicePrintLayout: true,
           SongBadge: true,
           SongSlotPicker: true,
@@ -3467,7 +3562,6 @@ describe('ServiceEditorView - BL-02: a rejected autosave must not strand the sta
     await wrapper.vm.$nextTick()
     const vm = wrapper.vm as unknown as {
       localService: { notes: string; date: string; status: string }
-      autosaveStatus: string
     }
 
     // ── Control: the remote-merge branch works BEFORE the failure ────────────
@@ -3487,7 +3581,7 @@ describe('ServiceEditorView - BL-02: a rejected autosave must not strand the sta
     expect(mockUpdateService).toHaveBeenCalled()
 
     // BL-02 consequence 1 — the status machine must not be stranded.
-    expect(vm.autosaveStatus).not.toBe('saving')
+    expect(saveStatusEntry('service-1').status).not.toBe('saving')
 
     // BL-02 consequence 2 — the remote-merge branch must still be alive. This
     // is the assertion the reviewer reproduced failing: remote 2026-05-03 was
@@ -3535,7 +3629,6 @@ describe('ServiceEditorView - BL-02: a rejected autosave must not strand the sta
     await wrapper.vm.$nextTick()
     const vm = wrapper.vm as unknown as {
       localService: { notes: string; status: string }
-      autosaveStatus: string
       onMarkAsPlanned: () => Promise<void>
     }
 
@@ -3566,7 +3659,7 @@ describe('ServiceEditorView - BL-02: a rejected autosave must not strand the sta
     await flushPromises()
 
     expect(mockUpdateService).not.toHaveBeenCalled()
-    expect(vm.autosaveStatus).not.toBe('saving')
+    expect(saveStatusEntry('service-1').status).not.toBe('saving')
   })
 })
 
@@ -3593,6 +3686,10 @@ describe('ServiceEditorView - ME-01: export failure copy and the pre-flight stat
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
           RouterLink: { template: '<a><slot /></a>' },
+          // 32-05: render the real SaveStatusIndicator (not a shallow stub)
+          // so its data-testid="save-status"/"save-status-error" handles are
+          // reachable from these tests.
+          SaveStatusIndicator: false,
           ServicePrintLayout: true,
           SongBadge: true,
           SongSlotPicker: true,
@@ -3729,6 +3826,10 @@ describe('ServiceEditorView - ME-02/ME-03: the lastUsedAt bump on Mark as Planne
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
           RouterLink: { template: '<a><slot /></a>' },
+          // 32-05: render the real SaveStatusIndicator (not a shallow stub)
+          // so its data-testid="save-status"/"save-status-error" handles are
+          // reachable from these tests.
+          SaveStatusIndicator: false,
           ServicePrintLayout: true,
           SongBadge: true,
           SongSlotPicker: true,
@@ -3823,5 +3924,318 @@ describe('ServiceEditorView - ME-02/ME-03: the lastUsedAt bump on Mark as Planne
     await vm.onMarkAsPlanned()
     await flushPromises()
     expect(vm.lifecycleError!.toLowerCase()).toContain('connection')
+  })
+})
+
+// ── 32-05: migrated onto useAutoSave/useSaveStatus; one sticky status bar ─────
+//
+// The hand-rolled ~150-line inline autosave block (autosaveStatus/autosaveTimer/
+// autosaveInitialized/autosaveSaving) is gone — ServiceEditorView now delegates
+// its debounce/inflight-guard/error-catch to the shared `useAutoSave` composable
+// and reports into the shared `useSaveStatus` store, keyed `service:{id}`. The
+// header's inline status text is retired in favour of a sticky
+// `service-save-status-bar` hosting one `SaveStatusIndicator`. See 32-RESEARCH.md
+// § Architecture Patterns → Pattern 3 for the full migration checklist this
+// block exercises.
+describe('ServiceEditorView - 32-05: migrated onto useAutoSave/useSaveStatus, sticky status bar', () => {
+  async function mountView() {
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          RouterLink: { template: '<a><slot /></a>' },
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+          SaveStatusIndicator: false,
+        },
+      },
+    })
+  }
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockServicesList = [{ ...mockService }]
+    mockUpdateService.mockClear()
+    mockUpdateService.mockImplementation(() => Promise.resolve())
+    mockOwnWriteEchoIds = []
+    resetSortableCaptures()
+  })
+
+  afterEach(() => {
+    mockOwnWriteEchoIds = []
+  })
+
+  /** The composable's own internal `initialized` flag swallows its FIRST
+   *  `localService` trigger, same reasoning as the R039/BL-02 blocks'
+   *  `warmAutosaveWatcher` — a throwaway touch absorbs it so the SECOND edit
+   *  is the one that genuinely arms the debounce. */
+  async function warmUp(
+    wrapper: Awaited<ReturnType<typeof mountView>>,
+    vm: { localService: { notes: string } },
+  ) {
+    vm.localService.notes = 'warm-up touch the composable swallows'
+    await wrapper.vm.$nextTick()
+  }
+
+  // ── Structure: one bar, one indicator, mutually exclusive with lock/viewer ──
+
+  it('renders exactly one service-save-status-bar hosting exactly one save-status indicator for an editable draft service', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const bars = wrapper.findAll('[data-testid="service-save-status-bar"]')
+    expect(bars).toHaveLength(1)
+    expect(bars[0]!.findAll('[data-testid="save-status"]')).toHaveLength(1)
+  })
+
+  it('the bar is absent for a locked (planned) service', async () => {
+    mockServicesList = [{ ...mockService, status: 'planned' }]
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('[data-testid="service-save-status-bar"]').exists()).toBe(false)
+  })
+
+  it('the bar is absent for a viewer', async () => {
+    mockAuthState.isEditor = false
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('[data-testid="service-save-status-bar"]').exists()).toBe(false)
+  })
+
+  it('the header Save area keeps Undo, Suggest All Songs, Mark as Planned and Export/Copy once the inline status block is removed', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('[data-testid="mark-planned-btn"]').exists()).toBe(true)
+    const buttons = wrapper.findAll('button')
+    expect(buttons.some((b) => b.text().includes('Suggest All Songs'))).toBe(true)
+    const exportOrCopy =
+      wrapper.find('[data-testid="export-pc-btn"]').exists() ||
+      wrapper.find('[data-testid="copy-pc-btn"]').exists()
+    expect(exportOrCopy).toBe(true)
+  })
+
+  // ── Reporting into useSaveStatus ────────────────────────────────────────────
+
+  it('after a successful debounced save the store entry reads saved with a savedAt', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    const vm = wrapper.vm as unknown as { localService: { notes: string } }
+
+    await warmUp(wrapper, vm)
+    vm.localService.notes = 'a real edit'
+    await wrapper.vm.$nextTick()
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    await flushPromises()
+
+    const entry = saveStatusEntry('service-1')
+    expect(entry.status).toBe('saved')
+    expect(entry.savedAt).toBeInstanceOf(Date)
+  })
+
+  it('after a rejected debounced save the store entry reads error with the generic sentence, and the edit is kept', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    const vm = wrapper.vm as unknown as { localService: { notes: string } }
+
+    await warmUp(wrapper, vm)
+    mockUpdateService.mockRejectedValueOnce(new Error('network error'))
+    vm.localService.notes = 'an edit that fails to save'
+    await wrapper.vm.$nextTick()
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    await flushPromises()
+
+    const entry = saveStatusEntry('service-1')
+    expect(entry.status).toBe('error')
+    expect(entry.errorText).toBe("Couldn't save your changes — they're still here. Try again.")
+    expect(vm.localService.notes).toBe('an edit that fails to save')
+  })
+
+  it("after a rejected reorder save the store entry reads error with the reorder sentence", async () => {
+    mockServicesList = [makeSectionedService()]
+    resetSortableCaptures()
+    mockUpdateService.mockRejectedValueOnce(new Error('network error'))
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const worshipCapture = captureForSection('worship')
+    if (!worshipCapture) throw new Error('no worship capture resolved')
+    await worshipCapture.options.onEnd!({
+      oldDraggableIndex: 0,
+      newDraggableIndex: 2,
+      item: worshipCapture.el.children[0] as HTMLElement,
+      from: worshipCapture.el,
+      to: worshipCapture.el,
+    } as never)
+    await flushPromises()
+
+    const entry = saveStatusEntry('service-1')
+    expect(entry.status).toBe('error')
+    expect(entry.errorText).toBe("Couldn't save this order — reverted. Try dragging again.")
+  })
+
+  // ── P-02: viewing must never write ──────────────────────────────────────────
+
+  it('mounting the view and touching nothing issues no write and leaves the entry idle, even for a service with zero slots', async () => {
+    mockServicesList = [{ ...mockService, slots: [] }]
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    await flushPromises()
+
+    expect(mockUpdateService).not.toHaveBeenCalled()
+    expect(saveStatusEntry('service-1').status).toBe('idle')
+  })
+
+  // ── E2 backstops ─────────────────────────────────────────────────────────────
+
+  it("navigating from one service id to another does not carry the first save's entry into the second render (loading backstop)", async () => {
+    mockServicesList = [
+      { ...mockService, id: 'service-1' },
+      { ...mockService, id: 'service-2' },
+    ]
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    const vm = wrapper.vm as unknown as { localService: { notes: string } }
+
+    await warmUp(wrapper, vm)
+    vm.localService.notes = 'drive to saved'
+    await wrapper.vm.$nextTick()
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    await flushPromises()
+    expect(saveStatusEntry('service-1').status).toBe('saved')
+
+    mockRoute.params.id = 'service-2'
+    await wrapper.vm.$nextTick()
+    await flushPromises()
+
+    expect(saveStatusEntry('service-2').status).toBe('idle')
+  })
+
+  it('unmounting the view leaves no entry for its surface (partial backstop)', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    const vm = wrapper.vm as unknown as { localService: { notes: string } }
+
+    await warmUp(wrapper, vm)
+    vm.localService.notes = 'a real edit'
+    await wrapper.vm.$nextTick()
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    await flushPromises()
+    expect(saveStatusEntry('service-1').status).toBe('saved')
+
+    wrapper.unmount()
+
+    expect(useSaveStatus().entries['service:service-1']).toBeUndefined()
+  })
+
+  // ── Task 3: the four preserved behaviours the migration could silently drop ──
+
+  it('the lock-cancel guarantee: a timer armed before the lock engages is cancelled the instant it engages, not merely left to no-op at fire time', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    const vm = wrapper.vm as unknown as { localService: { notes: string; status: string } }
+
+    await warmUp(wrapper, vm)
+    vm.localService.notes = 'typed just before the lock engages'
+    await wrapper.vm.$nextTick()
+    expect(saveStatusEntry('service-1').status).toBe('pending')
+
+    // The client's own copy locks — the same effect `applyTransitionLocally`
+    // has, without going through the whole onMarkAsPlanned flow the BL-02
+    // block already exercises via a different mechanism.
+    vm.localService.status = 'planned'
+    await wrapper.vm.$nextTick()
+
+    // Proactive: the entry drops to idle immediately, not merely once the
+    // now-orphaned timer eventually fires 800ms later and no-ops on its own
+    // re-check.
+    expect(saveStatusEntry('service-1').status).toBe('idle')
+
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    await flushPromises()
+    expect(mockUpdateService).not.toHaveBeenCalled()
+  })
+
+  it('the undo snapshot: undo restores the pre-save state after a completed autosave', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    const vm = wrapper.vm as unknown as {
+      localService: { notes: string }
+      onUndo: () => void
+    }
+
+    await warmUp(wrapper, vm)
+    const beforeNotes = vm.localService.notes
+    vm.localService.notes = 'a change that will be undone'
+    await wrapper.vm.$nextTick()
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    await flushPromises()
+    expect(mockUpdateService).toHaveBeenCalledTimes(1)
+
+    vm.onUndo()
+    expect(vm.localService.notes).toBe(beforeNotes)
+  })
+
+  it('a genuine external merge still applies and arms no save (RESEARCH assumption A2)', async () => {
+    const reactiveServices = reactive([{ ...mockService }])
+    mockServicesList = reactiveServices as unknown as Service[]
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    const vm = wrapper.vm as unknown as { localService: { notes: string } }
+
+    // Not classified as our own echo — genuinely a different writer's change.
+    mockOwnWriteEchoIds = []
+    reactiveServices[0]!.notes = 'a change from a different editor'
+    await wrapper.vm.$nextTick()
+    await flushPromises()
+
+    expect(vm.localService.notes).toBe('a change from a different editor')
+
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    await flushPromises()
+    expect(mockUpdateService).not.toHaveBeenCalled()
+  })
+
+  it('a locked-service rejection reverts local state and returns the entry to idle, not error', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    const vm = wrapper.vm as unknown as { localService: { notes: string } }
+
+    await warmUp(wrapper, vm)
+    const persistedNotes = vm.localService.notes
+    mockUpdateService.mockRejectedValueOnce(new ServiceLockedErrorStub('service-1', 'planned'))
+    vm.localService.notes = 'typed just as another editor locked it'
+    await wrapper.vm.$nextTick()
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    await flushPromises()
+
+    expect(vm.localService.notes).toBe(persistedNotes)
+    const entry = saveStatusEntry('service-1')
+    expect(entry.status).toBe('idle')
+  })
+
+  it("a transport rejection keeps the user's edit and leaves the entry at error, never stranded at saving", async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    const vm = wrapper.vm as unknown as { localService: { notes: string } }
+
+    await warmUp(wrapper, vm)
+    mockUpdateService.mockRejectedValueOnce(new Error('network error'))
+    vm.localService.notes = 'an edit kept after a transport failure'
+    await wrapper.vm.$nextTick()
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    await flushPromises()
+
+    expect(vm.localService.notes).toBe('an edit kept after a transport failure')
+    const entry = saveStatusEntry('service-1')
+    expect(entry.status).toBe('error')
+    expect(entry.status).not.toBe('saving')
   })
 })
