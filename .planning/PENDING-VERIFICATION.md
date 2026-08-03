@@ -172,6 +172,28 @@ Appended as each phase completes.
 
 ## Phase 32 — Save Reliability: Autosave Fix & Persistent Status
 
+> ⚠ **Read before verifying: the code moved after these items were written.** A code review found
+> **3 Critical + 4 Warning** findings and all seven were fixed in commits `5a68288`…`2e76d8b`, which
+> land *after* `32-VERIFICATION.md` was produced. Three of those fixes change behaviour you may be
+> about to look at:
+>
+> - **CR-01** — an edit made *during* an in-flight save was being marked clean without ever being
+>   written (silent data loss). `onSave()` now marks clean against the payload actually sent, not
+>   against live `localService`. **Worth exercising deliberately:** edit, and keep editing while the
+>   save is in flight; nothing you typed should be lost.
+> - **CR-02** — `flush()` used to destroy a newer edit's only retry path. Reachable via
+>   **Mark as Planned** — flush now checks for an in-flight save before clearing the debounce timer.
+> - **CR-03** — an outstanding autosave **error** used to vanish silently the instant a service
+>   locked. It now routes into `lifecycleError` and stays visible in the lock banner. **Worth
+>   exercising:** force a save failure, then Mark as Planned, and confirm the failure is still
+>   reported rather than swallowed by the lock.
+>
+> Full dispositions in `32-REVIEW-FIX.md`. Gates at the fixed HEAD: `npm run type-check` clean,
+> `npx vitest run src/` 1981 passed / 9 failed (the two documented baseline files only).
+>
+> **`32-VERIFICATION.md` is `human_needed`, not `passed`** — the eight items below are why. Nothing
+> here has been self-approved.
+
 ### Plan 32-04 — `SaveStatusIndicator.vue` and `ToastHost.vue`
 
 - ☐ **32-04.1** ★ **E1 overflow backstop, visual confirmation.** The automated test

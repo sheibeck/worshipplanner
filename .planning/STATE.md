@@ -374,6 +374,58 @@ full phase table, success criteria, dependency graph, and per-phase research/not
 
 ## Deferred Verification
 
+| Phase | State | Resume |
+|-------|-------|--------|
+| 32 | verification_deferred_human | /gsd-verify-work 32 |
+
+### v1.4 Phase 32 — Save Reliability (2026-08-02)
+
+**Code complete, all gates green, 8 human checks deferred under the standing autonomy grant.**
+`32-VERIFICATION.md` is `human_needed` — **not** `passed`. 3/3 must-haves verified against the live
+codebase; the 8 open items are in `.planning/PENDING-VERIFICATION.md` and are genuinely
+jsdom-unprovable (real-browser wrap/sticky/scroll, real wall-clock persistence, real Firestore
+snapshot timing, screen-reader politeness) plus one interpretive call flagged for cheap owner override.
+
+| Artifact | Outcome |
+|---|---|
+| Plans | 6/6 executed across 4 waves |
+| Verification | `human_needed`, 3/3 must-haves verified, 8 items deferred |
+| Code review | 3 Critical + 4 Warning + 2 Info; **all 7 in-scope findings fixed** (`5a68288`…`2e76d8b`) |
+| UI review | 23/24 — spec fidelity essentially byte-identical; the held-back point is unverifiable statically |
+| Gates at `c46c408` | `npm run type-check` clean · `npx vitest run src/` 1981 passed / 9 failed (the two documented baseline files only) · `npm run build` succeeds |
+
+**R039's hypothesis is now CONFIRMED, not MEDIUM confidence.** The repro (`7cd2821`, test-only,
+committed before any fix) went red on `expected 2 times, got 1 times` and green after. Two corrections
+to the prior research record are worth carrying forward:
+
+- **The fix is in `src/stores/services.ts`, not the view.** `onSnapshot` now passes
+  `{ includeMetadataChanges: true }` and classifies this client's own write settling via the
+  `hasPendingWrites` **pending→settled transition** — `hasPendingWrites` alone is not enough, because
+  the server-ack snapshot is the emission that actually defeats the JSON diff. A view-scoped fix would
+  have left the D-15 immediate reorder-save (a second entry point through the same `updateService`)
+  still broken.
+- **A second layer compounds it:** a pending `serverTimestamp()` resolves as `null` in the optimistic
+  snapshot and as a real value on server ack — two emissions per save, so the swallow window can open
+  twice.
+
+**The code review found a real data-loss bug the phase had introduced and it is fixed (CR-01):** an
+edit made *during* an in-flight save was marked clean without ever being written, because `onSave()`
+stamped `originalService` from live `localService` rather than the payload actually sent.
+
+**Deliberate breaking rename:** the `status-pending` / `status-saving` / `status-saved` `data-testid`s
+are retired app-wide in favour of one `save-status` (+ `save-status-error`). Zero occurrences remain
+under `src/`.
+
+**Known bookkeeping artifact:** plans 32-02…32-06 all declare `requirements: [R040, R041]`, so the
+executor `mark-complete` protocol flipped both to Complete in `REQUIREMENTS.md` after 32-02 landed —
+before the UI shipped. The table is accurate now, but the verifier deliberately did not treat those
+checkboxes as evidence.
+
+**Backlog item raised, not actioned:** the other Firestore-subscribing stores (`songs`, `roster`,
+`slideGroups`, `scriptureSlides`) were not audited for the same own-echo defect shape. R039 is Service
+Order specific and the three migrated editors are structurally not exposed (they load once per mount
+rather than via a live subscription watcher), so this was scoped out deliberately.
+
 ### v1.2 (Phases 20-23) — CLOSED BY USER ACCEPTANCE, 2026-07-28
 
 > **These were not verified by a passing gate — the user accepted them directly.**
