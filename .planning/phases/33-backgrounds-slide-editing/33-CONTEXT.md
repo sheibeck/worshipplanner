@@ -169,9 +169,35 @@ correctness is Phase 35); the Service Order tab.
   migration) — resolved wherever `assembleSlideshow` already resolves `audioUrl` per slide. The 'Edit
   lyrics' drawer applies only to hand-authored text slides (PRAYER/MESSAGE/blank), never SONG-group
   lyric entries."*
-- **"Confirm against the Claude Design wireframes at plan time which drawer a given slide's 3-dot menu
-  opens."** The ROADMAP says this explicitly. If the wireframes are not locatable in the repo, say so
-  in the plan rather than inventing the mapping silently.
+- **★ FALSE ROADMAP PREMISE — the wireframes cannot answer the question the ROADMAP points them at.**
+  The ROADMAP note says: *"Confirm against the Claude Design wireframes at plan time which drawer a
+  given slide's 3-dot menu opens."* The wireframes **are** in the repo
+  (`docs/design/slides-tab.dc.html`, 49KB, plus `docs/design/README.md`) — but they do not cover any
+  of this phase's new affordances. Verified 2026-08-02:
+
+  | Looked for | Found in the mockup |
+  |---|---|
+  | A 3-dot / kebab menu | **none** |
+  | "Edit details" / "Edit lyrics" | **none** |
+  | Background image as a feature | **none** — all 106 matches for `background` are CSS `background:` declarations |
+
+  Per its README the mockup is "source of truth for the **v1.3** Slides-tab rework" — Turn 1 is the
+  plan rail + slide grid + the *single* Edit Slide drawer, Turn 2 is the song lyrics editor. It
+  predates R051/R052/R055-R057 entirely. **This is the same class of finding as Phase 27's two false
+  ROADMAP premises** (which were caught before anything broke) and should be recorded the same way.
+
+  **Consequence, and the assumption this phase proceeds under:** the 3-dot menu, the details/lyrics
+  drawer split, and every background affordance are **original design work**, not a wireframe being
+  implemented. The UI-SPEC step is where that design gets settled and reviewed.
+
+  **⚠ One thing only the owner can resolve.** `docs/design/README.md` states: *"The single remote file
+  is cumulative across design turns and is overwritten in place — **re-pull before planning any phase
+  against it.**"* This copy was pulled **2026-07-25**. If newer design turns covering the 3-dot menu
+  or backgrounds exist in the Claude Design project
+  (`e8e6c287-3e88-402f-88e1-7ad6d5101fa2`, "Worship Planner Slideshow Design"), this phase is being
+  designed without them and may need rework. Proceeding under the standing autonomy grant, because
+  proceeding is neither unsafe nor useless if wrong — but flagging it prominently, and it is logged as
+  a human-verification item.
 
 </specifics>
 

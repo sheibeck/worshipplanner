@@ -372,6 +372,41 @@ it directly or transitively. Phase 37 (PowerPoint Server-Side Rendering) is deli
 uncertainty, independently cuttable without disturbing anything else. See `.planning/ROADMAP.md` for the
 full phase table, success criteria, dependency graph, and per-phase research/notes.
 
+## ⚠ OPEN ITEM FOR THE OWNER — the design wireframes are stale, and Phase 36 depends on them
+
+**Found 2026-08-02 during Phase 33 discuss. Survives compaction deliberately — re-read before Phase 36.**
+
+`docs/design/slides-tab.dc.html` was pulled **2026-07-25**. Its own README states the remote file is
+*"cumulative across design turns and is overwritten in place — **re-pull before planning any phase
+against it**."* Verified contents of the current copy: **only two screens** — Turn 1 (Slides tab:
+plan rail, slide grid, the single Edit Slide drawer) and Turn 2 (Song lyrics editor, options 2a/2b).
+
+**What is NOT in it:**
+
+| Needed by | Missing from the mockup |
+|---|---|
+| Phase 33 (R051, R052) | any 3-dot / kebab menu; "Edit details" / "Edit lyrics" |
+| Phase 33 (R055-R057) | background images as a feature — all 106 `background` matches are CSS declarations |
+| **Phase 36 (R068 + the rebuild)** | **any Service Order screen at all; any contextual action bar** |
+
+**Two ROADMAP premises are therefore false as written:**
+
+1. Phase 33's note — *"Confirm against the Claude Design wireframes at plan time which drawer a given
+   slide's 3-dot menu opens"* — cannot be satisfied; the mockup predates the menu.
+2. **Phase 36's goal — *"The Service Order tab is rebuilt against the Claude Design wireframes"* — has
+   no wireframe behind it, nor behind the action-bar half.**
+
+Same class as Phase 27's two false premises, which were caught before anything broke.
+
+**Owner action, if newer turns exist:** re-pull `Slides Tab.dc.html` from the Claude Design project
+`e8e6c287-3e88-402f-88e1-7ad6d5101fa2` ("Worship Planner Slideshow Design") into `docs/design/`.
+
+**How the autonomous run is proceeding meanwhile:** Phase 33's new affordances are being treated as
+**original design work**, settled and reviewed through the UI-SPEC step rather than transcribed from a
+mockup. Phases 34 and 35 do not depend on the wireframes. **Phase 36 does** — if this is still
+unresolved when the run reaches it, that phase either becomes original design work too (a materially
+different deliverable from "rebuild against wireframes") or should be deferred. Raise it there.
+
 ## Deferred Verification
 
 | Phase | State | Resume |
