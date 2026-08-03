@@ -1500,6 +1500,81 @@ describe('HI-01 — a pre-R047 scripture group collapses to exactly ONE entry', 
   })
 })
 
+// R064: PATTERNS.md claimed `slideGroupMaterializer.ts` needs no structural
+// change for congregational sections. This describe block converts that
+// claim into an executable assertion rather than an assumed one — an
+// unverified claim of this exact shape is what produced the Phase 34 gap in
+// the first place. No production code changes accompany this task; the
+// `git diff --exit-code` verification step proves it.
+describe('R064 — congregationalSections requires no structural change to slideGroupMaterializer', () => {
+  it('deriveGroupEntries on a SCRIPTURE slot WITH congregationalSections returns exactly one entry, payload-free', () => {
+    // (1) The entry stays payload-free and singular. R047's design keeps the
+    // scripture SourceRef empty so `derivedIdentityKey` treats the ref KIND
+    // alone as the group's identity, which is what lets
+    // `carryStoredDerivedEntries` carry a stored entry's id and attached
+    // audio forward across a passage change instead of minting a fresh id.
+    // Baking sections into the entry would break that; resolving them live
+    // at assembly time (Task 2) is what preserves it.
+    const slot = scriptureSlot({
+      congregationalSections: [
+        { speaker: 'LEADER', text: 'The Lord is my shepherd;' },
+        { speaker: 'CONGREGATION', text: 'I shall not want.' },
+      ],
+    })
+    const inputs = makeInputs()
+
+    const entries = deriveGroupEntries(slot, inputs)
+
+    expect(entries).toHaveLength(1)
+    expect(entries[0]!.sourceRef).toEqual({ kind: 'scripture' })
+  })
+
+  it('entry count and sourceRef shape are identical with and without congregationalSections', () => {
+    const withoutSections = scriptureSlot()
+    const withSections = scriptureSlot({
+      congregationalSections: [{ speaker: 'LEADER', text: 'Section text' }],
+    })
+    const inputs = makeInputs()
+
+    const entriesWithout = deriveGroupEntries(withoutSections, inputs)
+    const entriesWith = deriveGroupEntries(withSections, inputs)
+
+    expect(entriesWith).toHaveLength(entriesWithout.length)
+    expect(entriesWith[0]!.sourceRef).toEqual(entriesWithout[0]!.sourceRef)
+    expect(entriesWith[0]!.sourceRef).toEqual({ kind: 'scripture' })
+  })
+
+  it('sourceSignature is byte-identical across slots that differ only in congregationalSections (absent, one section, three different sections)', () => {
+    // (2) sourceSignature must NOT fold in the sections. Editing a reading is
+    // not a source change that warrants a group rebuild: the sections are
+    // resolved live off the slot on every assembly, so they already reach
+    // the slide with no signature involvement. Folding them in would
+    // invalidate the group signature on every keystroke-level section edit
+    // and route through the rebuild path, minting fresh entry ids and
+    // dropping attached slide audio.
+    const inputs = makeInputs()
+    const slotAbsent = scriptureSlot()
+    const slotOneSection = scriptureSlot({
+      congregationalSections: [{ speaker: 'LEADER', text: 'One section only' }],
+    })
+    const slotThreeSections = scriptureSlot({
+      congregationalSections: [
+        { speaker: 'LEADER', text: 'First distinct text' },
+        { speaker: 'CONGREGATION', text: 'Second distinct text' },
+        { speaker: 'LEADER', text: 'Third distinct text' },
+      ],
+    })
+
+    const sigAbsent = sourceSignature(slotAbsent, inputs)
+    const sigOne = sourceSignature(slotOneSection, inputs)
+    const sigThree = sourceSignature(slotThreeSections, inputs)
+
+    expect(sigAbsent).toBe(sigOne)
+    expect(sigOne).toBe(sigThree)
+    expect(sigAbsent).toBe('John 3:16-18')
+  })
+})
+
 describe('rebuildGroup dispatcher', () => {
   it('dispatches SONG to the additive rebuild', () => {
     const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
