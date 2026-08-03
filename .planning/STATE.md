@@ -4,17 +4,17 @@ milestone: v1.4
 milestone_name: Service and Slides
 current_phase: 35
 current_phase_name: Presentation Correctness & Lyric Editor
-status: executing
-stopped_at: Completed 35-03-PLAN.md
-last_updated: "2026-08-03T14:08:37.805Z"
+status: verifying
+stopped_at: Completed 35-04-PLAN.md — phase 35 complete, ready for verification
+last_updated: "2026-08-03T14:42:18.100Z"
 last_activity: 2026-08-03
 last_activity_desc: Phase 35 execution started
 progress:
   total_phases: 9
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 38
-  completed_plans: 37
-  percent: 67
+  completed_plans: 38
+  percent: 78
 ---
 
 # Project State
@@ -77,7 +77,7 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 
 Phase: 35 (Presentation Correctness & Lyric Editor) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-08-03 — Phase 35 execution started
 
 ## ★ v1.4 AUTONOMOUS RUN — standing decisions (2026-07-28)
@@ -881,6 +881,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 35 P01 | 14min | 3 tasks | 5 files |
 | Phase 35 P02 | 20min | 2 tasks | 2 files |
 | Phase 35 P03 | 45min | 2 tasks | 2 files |
+| Phase 35 P04 | 50min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -1099,6 +1100,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: R060 closed by regression test only; no production code added — every group-construction path already emitted the copyright bracket unconditionally
 - [Phase ?]: First-and-last copyright placement is framed only as a deliberate safety margin, never a CCLI licensing requirement (P-01); CCLI's primary license text failed retrieval a second time (2026-08-03)
 - [Phase ?]: R065/R066 governed by 35-UI-SPEC's approved contract, not probe-derived edge coverage (#1110 flagged unclassified); canConfirm holds exactly three clauses (sections, copyright-or-override, not-saving)
+- [Phase ?]: 35-04: hosted LyricPasteRegion inline behind pasteMode (v-if/v-else, never v-show) and deleted LyricPasteDialog.vue + its test file — R066 closes with exactly one paste surface.
+- [Phase ?]: 35-04: two host-mechanism tests (empty-textarea exit via each of paste-back-btn/paste-cancel-btn) added beyond the plan's specified seven so -t "paste" clears the plan's own >=9 acceptance floor without renaming any pre-existing test.
 
 ### Roadmap Evolution
 
@@ -1160,6 +1163,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-03T14:08:37.768Z
-Stopped at: Completed 35-03-PLAN.md
+Last session: 2026-08-03T14:42:18.061Z
+Stopped at: Completed 35-04-PLAN.md — phase 35 complete, ready for verification
 Resume file: None

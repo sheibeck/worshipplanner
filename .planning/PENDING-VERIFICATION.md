@@ -335,6 +335,58 @@ self-approved.
 
 ---
 
+## Phase 35 — Presentation Correctness & Lyric Editor
+
+R059/R060/R061's structural work and R065/R066's inline-paste behavior are all automated-tested
+across 35-01/35-02/35-03/35-04 — including the R065 copyright gate, the always-available override
+checkbox, the E4 save-rejection backstop, and R066's modal-to-inline swap (`LyricPasteDialog.vue`
+and its test file are deleted; `grep -rc 'LyricPasteDialog' src/` returns 0). The four items below
+are 35-VALIDATION.md's Manual-Only Verifications table — jsdom cannot judge projector legibility,
+what a congregation actually sees, or subjective feel-against-a-mockup fidelity. None is marked
+passed, resolved, or self-approved.
+
+- ☐ **35.1** **Copyright slide legibility at projector distance (R060 long-text backstop).** A song
+  with an unusually long title, a long author list, or many `copyrightLines` must not overflow the
+  projected copyright slide or push the **CCLI licence number** off-screen — that number is the one
+  element that must always be visible. Needs a real projector or a fixed-viewport render; not
+  settleable in jsdom. **Instructions:** project a song with a long title and 4+ authors. Confirm the
+  licence number is visible on both the leading and trailing copyright slide.
+
+- ☐ **35.2** **Presented lyric slide shows no organizational label (R059).** The `sectionLabel`
+  render was deleted from `PresentationViewer.vue`'s `lyric` branch — confirmed by
+  `grep -c 'sectionLabel' src/components/PresentationViewer.vue` returning 0 — but the point of R059
+  is what a congregation actually sees on the projected surface. **Instructions:** present a song.
+  Confirm no VERSE / CHORUS / BRIDGE label appears on any lyric slide, and that the slide grid still
+  shows them (the field itself is untouched — only the presented render changed).
+
+- ☐ **35.3** **Presenting starts where you were looking (R061).** The start-index threading is
+  automated-tested (`SlidesTab.vue` → `ServiceEditorView.vue` → `PresentationViewer.vue`), but
+  whether it *feels* like a natural start rather than a jarring mid-deck jump is a UX judgment, not
+  an index-arithmetic one. **Instructions:** highlight a slide mid-deck, press Present — it should
+  open there with no "you skipped ahead" indication. Then highlight only a group (no slide within it)
+  and confirm it starts at that group's first slide, never slide 0 of the whole deck.
+
+- ☐ **35.4** ★ **The inline paste region reads as designed (R066, 35-03's D7).** Compare against
+  Turn 3 of the wireframe (`docs/design/slides-tab.dc.html:358-654`). State transitions and gating
+  logic are exhaustively covered by `LyricPasteRegion.test.ts` (16 tests) and
+  `SongLyricEditor.test.ts`'s "paste mode" block (9 tests, including both entry points, the
+  header/body swap, the reopen-reset, and both exits' unsaved-changes guard) — but visual/interaction
+  fidelity against the mockup is not settleable by jsdom assertions. **Instructions:** open the
+  editor, click "Paste lyrics" (and separately, from an empty song, "Paste Lyrics from SongSelect")
+  and confirm the drawer swaps to the paste view in place rather than opening a modal. Paste a real
+  CCLI song with a copyright block, and one without. Confirm the second shows the amber warning card,
+  disables **Replace lyrics**, and that ticking "Add anyway — I'll enter credits later" alone
+  re-enables it with nothing else required.
+
+**Also noted, not blocking:** 35-VALIDATION.md records that a second attempt to retrieve CCLI's
+primary licence text failed (2026-08-03; a prior attempt returned marketing copy). Nothing in this
+phase cites CCLI as a mandate — every warning card and instructional copy this phase ships was
+reworded specifically to avoid that claim (`grep -rEin 'ccli (requires|mandates|requirement)|licen[cs]e requires' src/`
+returns 0 matches) — so this omission does not block anything; it is only relevant if the owner wants
+the underlying R060 criterion formally finalised against the primary source text.
+
+---
+
 ## Notes and failures
 
 _(Record anything that failed here, with what you saw versus what was expected.)_
