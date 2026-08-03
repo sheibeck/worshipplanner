@@ -5,16 +5,16 @@ milestone_name: Service and Slides
 current_phase: 37
 current_phase_name: PowerPoint Server-Side Rendering
 status: verifying
-stopped_at: Completed 37-06-PLAN.md
-last_updated: "2026-08-03T18:30:42.741Z"
+stopped_at: Completed 34-05-PLAN.md (gap-closure, Phase 37 remains the tracked current phase)
+last_updated: "2026-08-03T23:40:08.906Z"
 last_activity: 2026-08-03
 last_activity_desc: Phase 37 execution started
 progress:
   total_phases: 9
-  completed_phases: 8
-  total_plans: 44
-  completed_plans: 44
-  percent: 89
+  completed_phases: 7
+  total_plans: 52
+  completed_plans: 45
+  percent: 78
 ---
 
 # Project State
@@ -526,8 +526,10 @@ regression.** Scope the app run, or run each suite from its own directory.
 1. **`/gsd-plan-phase 34 --gaps`** — the scripture split is unreachable. R047 explicitly handed the
    mount to Phase 34 and it wasn't done. Direction is already decided (slot-as-source-of-truth): extend
    `ScriptureSlot` with `congregationalSections` through `slideGroupMaterializer`, then mount.
+
 2. **`/gsd-autonomous --only 36`** — now unblocked; the wireframe's Turn 3 covers the Service Order
    rebuild. Its action-bar half (R068) remains original design work.
+
 3. **`.planning/PENDING-VERIFICATION.md`** — the human-verify pass across Phases 31-35 and 37.
 4. **`render-service/DEPLOY.md`** — when you want the renderer live.
 5. **CCLI's primary licence text** — failed retrieval twice; R060's criterion isn't final without it.
@@ -1024,6 +1026,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 37 P04 | 55min | 3 tasks | 3 files |
 | Phase 37 P05 | 50min | 3 tasks | 5 files |
 | Phase 37 P06 | 50min | 3 tasks | 3 files |
+| Phase 34 P05 | 55min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -1255,6 +1258,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: ImportedDeck.renderImportId links the Storage-side import id to the confirmed deck, set only on the PPTX path and explicitly cleared (not just left default) on the image-only path to prevent leaking a cancelled PPTX import's id
 - [Phase ?]: R062 marked [~] partial (not complete): pipeline built+tested end to end, but undeployed by owner instruction and no UI consumes rendered images yet -- followed the R064 precedent format
 - [Phase ?]: No-deploy audit passed: zero executed gcloud/docker/firebase-deploy invocations across all Phase 37 commits and summaries
+- [Phase ?]: 34-05: congregationalSlideFieldsFromSlot ignores ScriptureSlot.readingMode entirely, gating only on non-empty congregationalSections, matching PresentationViewer's isCongregational computed and avoiding the two-competing-fields defect class
+- [Phase ?]: 34-05: slideGroupMaterializer.ts needs no structural change for congregational sections — sections resolve live at assembly time, proven by executable test and git diff --exit-code rather than assumed
 
 ### Roadmap Evolution
 
@@ -1316,6 +1321,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-03T18:30:42.700Z
-Stopped at: Completed 37-06-PLAN.md
+Last session: 2026-08-03T23:40:08.869Z
+Stopped at: Completed 34-05-PLAN.md (gap-closure, Phase 37 remains the tracked current phase)
 Resume file: None
