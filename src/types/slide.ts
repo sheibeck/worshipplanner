@@ -31,6 +31,22 @@ export interface SlideBase {
    * because a bed never loops.
    */
   audioLoop?: boolean
+  /**
+   * Resolved background image (R055/R056/R057) — the winner of the slide →
+   * group → song cascade `resolveEntryMedia` computes. Never persisted
+   * standalone; regenerated on every assembly like `audioUrl`.
+   */
+  backgroundImageUrl?: string
+  /**
+   * Which tier supplied `backgroundImageUrl` — `'slide'` (this entry's own),
+   * `'group'` (the owning `SlideGroup`'s), or `'song'` (the owning
+   * `SongLyrics`' document's). Absent when no tier defined a background.
+   * Deliberately a single tri-state field, not two booleans (R055/R056/R057)
+   * — a 3-level cascade needs three mutually exclusive states. Lives on
+   * `SlideBase` (not `AssembledSlide`) so it and `backgroundImageUrl` can
+   * never drift apart the way `audioUrl`/`audioFromBed` historically did.
+   */
+  backgroundSource?: 'slide' | 'group' | 'song'
 }
 
 /** A lyric slide — one section of a song's lyrics. */

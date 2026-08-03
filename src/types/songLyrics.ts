@@ -54,6 +54,8 @@ export interface SongLyrics {
    * enforces both directions of that invariant.
    */
   performanceOrder: string[]
+  /** Song-level background image (R057) — the least specific tier of the slide/group/song cascade `resolveEntryMedia` resolves; greenfield, no migration (D-19). */
+  backgroundImageUrl?: string
   createdAt: Timestamp
   updatedAt: Timestamp
 }

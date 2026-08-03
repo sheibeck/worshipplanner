@@ -39,6 +39,8 @@ export interface SlideGroup {
   slotId: string
   /** Group-level audio bed, set via `setGroupBedMedia` (D-18); no legacy slot-media migration feeds this (D-19). */
   bedAudioUrl?: string
+  /** Group-level background image (R055) — the middle tier of the slide/group/song cascade `resolveEntryMedia` resolves; greenfield, no migration (D-19). */
+  backgroundImageUrl?: string
   /**
    * Opaque signature of the source content this group was last rebuilt
    * against — a stored change-detector only, consulted by nothing (Phase 30
@@ -70,6 +72,8 @@ export interface GroupSlideEntry {
   audioScope?: 'slide' | 'group'
   /** D-04: loop is a per-slide flag only — a group bed never loops. */
   audioLoop?: boolean
+  /** Per-slide background image (R056) — the most specific tier of the slide/group/song cascade `resolveEntryMedia` resolves; greenfield, no migration (D-19). */
+  backgroundImageUrl?: string
 }
 
 /**
