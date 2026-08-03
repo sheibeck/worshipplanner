@@ -272,7 +272,13 @@ Plans:
   4. Pasting lyrics warns when copyright information is missing rather than accepting silently
   5. Pasting lyrics happens inline in the editor, not in a modal
 
-**Plans**: TBD
+**Plans**: 4 plans
+Plans:
+
+- [ ] 35-01-PLAN.md — R059 render fix (delete the leaked `sectionLabel`) + R061 present-start threading through `SlidesTab` → `ServiceEditorView` → `PresentationViewer` (wave 1)
+- [ ] 35-02-PLAN.md — R060 regression tests on all three copyright-bracket paths. **Test-only: no emission code — research proved all three paths already bracket, so adding emission would triple-emit** (wave 1)
+- [ ] 35-03-PLAN.md — R065/R066: new `LyricPasteRegion.vue` inline surface with the copyright block + always-available override, plus the migrated `LyricPasteDialog` test coverage (wave 1)
+- [ ] 35-04-PLAN.md — R066: host the region in `SongLyricEditor.vue`, delete `LyricPasteDialog.vue` and its test file, cover the host-driven open/close/reset mechanisms (wave 2)
 **UI hint**: yes
 **Research flag**: standard pattern for R059/R061 (presentation-layer read of already-assembled data); see Notes for R060's documentation-language caveat.
 **Design source**: Claude Design project "Worship Planner Slideshow Design" (`e8e6c287-3e88-402f-88e1-7ad6d5101fa2`), read via DesignSync (`/design-login` if unauthorized) — R066's inline paste-lyrics treatment is specified in the wireframes referenced from `Slides Tab.dc.html`/`support.js`.
