@@ -1812,3 +1812,182 @@ describe('repeated section — derivation and round-trip parity (Plan 28-03 Task
     }
   })
 })
+
+// R060 — the two materialized-path copyright brackets: fresh derivation
+// (`deriveGroupEntries`) and rebuild self-healing (`rebuildSongGroup`). Both
+// pushes in `deriveGroupEntries`'s SONG case and both merge pushes in
+// `rebuildSongGroup` (slideGroupMaterializer.ts:54/:66, :562-566/:619-623)
+// are already unconditional — this block PINS that existing behavior, as a
+// deliberate safety margin beyond the documented convention, never as a
+// licensing mandate. It adds no new emission.
+//
+// Dependency note (Pitfall 2, 35-RESEARCH.md): `ensureGroupMaterialized`'s
+// zero-slide bypass (useSlideshowAssembly.ts:388-427) could persist a
+// bracket-less SONG group, but every call site sits behind `canMutateGroup`,
+// which excludes song groups (R054, SlideGrid.vue:335). A future phase that
+// relaxes R054 must revisit that bypass before it can reach a SONG slot.
+describe('R060 — copyright bracket (materialized paths)', () => {
+  // On this path the source ref is a clean discriminator — unlike the
+  // assembled-slide path, no `contentKind` ambiguity exists here.
+  function copyrightIndices(entries: { sourceRef: { kind: string } }[]): number[] {
+    return entries.reduce<number[]>((acc, entry, index) => {
+      if (entry.sourceRef.kind === 'copyright') acc.push(index)
+      return acc
+    }, [])
+  }
+
+  describe('deriveGroupEntries — fresh materialization', () => {
+    it('an empty performanceOrder still derives exactly 2 copyright entries with order [0, 1]', () => {
+      const slot = songSlot({ songId: 'song-1' })
+      const lyrics = makeSongLyrics({ performanceOrder: [] })
+      const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
+
+      const entries = deriveGroupEntries(slot, inputs)
+
+      expect(entries).toHaveLength(2)
+      expect(entries.every((e) => e.sourceRef.kind === 'copyright')).toBe(true)
+      expect(entries.map((e) => e.order)).toEqual([0, 1])
+    })
+
+    it('a one-section order derives copyright, lyric, copyright — the two copyright entries have distinct ids', () => {
+      const slot = songSlot({ songId: 'song-1' })
+      const lyrics = makeSongLyrics({ performanceOrder: ['verse-1'] })
+      const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
+
+      const entries = deriveGroupEntries(slot, inputs)
+
+      expect(entries.map((e) => e.sourceRef.kind)).toEqual(['copyright', 'lyric', 'copyright'])
+      expect(entries[0]!.id).not.toBe(entries[2]!.id)
+    })
+
+    it('a five-section order derives a first-and-last copyright bracket with a contiguous 0..n order', () => {
+      const sections = Array.from({ length: 5 }, (_, i) => ({
+        id: `verse-${i}`,
+        label: `Verse ${i}`,
+        lines: [`Line ${i}`],
+      }))
+      const slot = songSlot({ songId: 'song-1' })
+      const lyrics = makeSongLyrics({ sections, performanceOrder: sections.map((s) => s.id) })
+      const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
+
+      const entries = deriveGroupEntries(slot, inputs)
+
+      expect(entries).toHaveLength(7)
+      expect(entries[0]!.sourceRef.kind).toBe('copyright')
+      expect(entries[entries.length - 1]!.sourceRef.kind).toBe('copyright')
+      for (let i = 1; i < entries.length - 1; i++) {
+        expect(entries[i]!.sourceRef.kind).not.toBe('copyright')
+      }
+      expect(entries.map((e) => e.order)).toEqual([0, 1, 2, 3, 4, 5, 6])
+    })
+  })
+
+  describe('rebuildSongGroup — self-healing', () => {
+    function makeStoredSongGroup(slides: SlideGroup['slides']): SlideGroup {
+      return { id: 'slot-1', serviceId: 'svc-1', slotId: 'slot-1', slides, createdAt: mockTimestamp, updatedAt: mockTimestamp }
+    }
+
+    it('one stored copyright entry (leading only) self-heals to exactly 2, minting a genuinely new trailing entry', () => {
+      const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
+      const group = makeStoredSongGroup([
+        { id: 'e-copyright-lead', order: 0, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+        { id: 'e-verse-1', order: 1, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' } },
+      ])
+      const lyrics = makeSongLyrics({ performanceOrder: ['verse-1'] })
+      const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
+
+      const result = rebuildSongGroup(group, slot, inputs)
+
+      const copyrightEntries = result.slides.filter((e) => e.sourceRef.kind === 'copyright')
+      expect(copyrightEntries).toHaveLength(2)
+      expect(copyrightEntries[0]!.id).toBe('e-copyright-lead')
+      const storedIds = new Set(group.slides.map((e) => e.id))
+      expect(storedIds.has(copyrightEntries[1]!.id)).toBe(false)
+    })
+
+    it('zero stored copyright entries self-heal to exactly 2, both freshly minted', () => {
+      const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
+      const group = makeStoredSongGroup([
+        { id: 'e-verse-1', order: 0, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' } },
+      ])
+      const lyrics = makeSongLyrics({ performanceOrder: ['verse-1'] })
+      const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
+
+      const result = rebuildSongGroup(group, slot, inputs)
+
+      const copyrightEntries = result.slides.filter((e) => e.sourceRef.kind === 'copyright')
+      expect(copyrightEntries).toHaveLength(2)
+      const storedIds = new Set(group.slides.map((e) => e.id))
+      expect(copyrightEntries.every((e) => !storedIds.has(e.id))).toBe(true)
+    })
+
+    it('three stored copyright entries (corrupted/hand-edited data) self-heal to 2, keeping first-as-leading and last-as-trailing, dropping the middle', () => {
+      const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
+      const group = makeStoredSongGroup([
+        { id: 'e-copyright-lead', order: 0, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+        { id: 'e-copyright-middle', order: 1, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+        { id: 'e-verse-1', order: 2, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' } },
+        { id: 'e-copyright-trail', order: 3, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+      ])
+      const lyrics = makeSongLyrics({ performanceOrder: ['verse-1'] })
+      const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
+
+      const result = rebuildSongGroup(group, slot, inputs)
+
+      const copyrightEntries = result.slides.filter((e) => e.sourceRef.kind === 'copyright')
+      expect(copyrightEntries).toHaveLength(2)
+      expect(copyrightEntries.map((e) => e.id)).toEqual(['e-copyright-lead', 'e-copyright-trail'])
+      expect(result.slides.some((e) => e.id === 'e-copyright-middle')).toBe(false)
+    })
+
+    it('an empty performanceOrder still rebuilds to a bracket — 2 copyright entries, no lyric entry between them', () => {
+      const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
+      const group = makeStoredSongGroup([
+        { id: 'e-copyright-lead', order: 0, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+        { id: 'e-verse-1', order: 1, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' } },
+        { id: 'e-copyright-trail', order: 2, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+      ])
+      // The song's performanceOrder is now empty and its sections gone too —
+      // the lyric entry no longer resolves against freshOrder.
+      const lyrics = makeSongLyrics({ sections: [], performanceOrder: [] })
+      const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
+
+      const result = rebuildSongGroup(group, slot, inputs)
+
+      const indices = copyrightIndices(result.slides)
+      expect(indices).toEqual([0, result.slides.length - 1])
+      expect(result.slides.filter((e) => e.sourceRef.kind === 'copyright')).toHaveLength(2)
+    })
+
+    it('across 0/1/3-stored-copyright rebuilds, copyright entries sit at index 0 and length-1 with contiguous order from 0', () => {
+      const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
+      const lyrics = makeSongLyrics({ performanceOrder: ['verse-1'] })
+      const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
+
+      const fixtures: SlideGroup['slides'][] = [
+        // zero stored copyright entries
+        [{ id: 'e-verse-1', order: 0, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' } }],
+        // one stored copyright entry
+        [
+          { id: 'e-copyright-lead', order: 0, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+          { id: 'e-verse-1', order: 1, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' } },
+        ],
+        // three stored copyright entries
+        [
+          { id: 'e-copyright-lead', order: 0, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+          { id: 'e-copyright-middle', order: 1, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+          { id: 'e-verse-1', order: 2, sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' } },
+          { id: 'e-copyright-trail', order: 3, sourceRef: { kind: 'copyright', songId: 'song-1' } },
+        ],
+      ]
+
+      for (const slides of fixtures) {
+        const group = makeStoredSongGroup(slides)
+        const result = rebuildSongGroup(group, slot, inputs)
+
+        expect(copyrightIndices(result.slides)).toEqual([0, result.slides.length - 1])
+        expect(result.slides.map((e) => e.order)).toEqual(result.slides.map((_, i) => i))
+      }
+    })
+  })
+})
