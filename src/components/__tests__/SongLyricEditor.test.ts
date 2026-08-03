@@ -1268,11 +1268,11 @@ describe('SongLyricEditor', () => {
   })
 
   // ── 35-04 (R066): the lyric paste happens inline, not in a modal ───────────
-  // These are the re-homed rows 12-13 of plan 03's LyricPasteDialog.test.ts
-  // migration map ("renders nothing when closed" and "resets textarea when
-  // reopened") — the open/closed and reopen-reset mechanisms are now the
-  // host's v-if/mount-unmount, not the old dialog's `open` prop, so they live
-  // here rather than in LyricPasteRegion.test.ts.
+  // These are the re-homed rows 12-13 of plan 03's migration map for the now-
+  // deleted modal's test file ("renders nothing when closed" and "resets
+  // textarea when reopened") — the open/closed and reopen-reset mechanisms
+  // are now the host's v-if/mount-unmount, not the old dialog's `open` prop,
+  // so they live here rather than in LyricPasteRegion.test.ts.
   describe('paste mode — the lyric paste happens inline, not in a modal (R066)', () => {
     afterEach(() => {
       vi.restoreAllMocks()
