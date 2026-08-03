@@ -1,11 +1,17 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getStorage } from "firebase-admin/storage";
 import { getFirestore } from "firebase-admin/firestore";
+import type { CallableRequest } from "firebase-functions/v2/https";
 import {
   cleanupExpiredMediaHandler,
   MEDIA_PATH_GUARD,
   RETENTION_DAYS,
+  parsePptxHandler,
 } from "./index";
+import { parsePptxBuffer } from "./pptxParser";
+import { invokeRenderService } from "./renderInvoker";
 
 // index.ts's module-scope initializeApp()/defineSecret() calls, and its
 // getAuth/getFirestore/getStorage imports, must be neutralized so importing
@@ -20,12 +26,22 @@ vi.mock("firebase-admin/auth", () => ({
 }));
 vi.mock("firebase-admin/firestore", () => ({
   getFirestore: vi.fn(),
+  FieldValue: { serverTimestamp: vi.fn(() => "SERVER_TIMESTAMP_SENTINEL") },
 }));
 vi.mock("firebase-admin/storage", () => ({
   getStorage: vi.fn(),
 }));
 vi.mock("firebase-functions/params", () => ({
   defineSecret: vi.fn(() => ({ value: () => "fake-secret" })),
+}));
+vi.mock("./pptxParser", () => ({
+  parsePptxBuffer: vi.fn(),
+}));
+// parsePptxHandler must never reach this seam directly (case 6, "never
+// blocks on rendering"): it queues a Firestore doc for a separate trigger
+// (37-04) to pick up, and never imports/calls invokeRenderService itself.
+vi.mock("./renderInvoker", () => ({
+  invokeRenderService: vi.fn(),
 }));
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -179,5 +195,189 @@ describe("cleanupExpiredMediaHandler", () => {
 
     expect(recent.delete).not.toHaveBeenCalled();
     expect(secondRun.deletedCount).toBe(0);
+  });
+});
+
+describe("parsePptxHandler", () => {
+  const ORG_ID = "org1";
+  const IMPORT_ID = "import1";
+  const STORAGE_PATH = `orgs/${ORG_ID}/pptx-imports/${IMPORT_ID}/source.pptx`;
+  const UID = "user1";
+
+  interface FakeDbOptions {
+    memberExists?: boolean;
+    setSpy?: ReturnType<typeof vi.fn>;
+  }
+
+  /**
+   * A minimal fake Firestore builder supporting exactly the two chains
+   * parsePptxHandler / pptxRenderDocRef use:
+   *   organizations/{orgId}/members/{uid}       -> .get()
+   *   organizations/{orgId}/pptxRenders/{importId} -> .set()
+   */
+  function fakeDb(opts: FakeDbOptions = {}) {
+    const memberDoc = {
+      get: vi.fn(async () => ({ exists: opts.memberExists ?? true })),
+    };
+    const pptxRendersDoc = { set: opts.setSpy ?? vi.fn(async () => undefined) };
+
+    const orgDoc = {
+      collection: vi.fn((name: string) => {
+        if (name === "members") return { doc: vi.fn(() => memberDoc) };
+        if (name === "pptxRenders") return { doc: vi.fn(() => pptxRendersDoc) };
+        throw new Error(`fakeDb: unexpected subcollection "${name}"`);
+      }),
+    };
+
+    return {
+      collection: vi.fn((name: string) => {
+        if (name === "organizations") return { doc: vi.fn(() => orgDoc) };
+        throw new Error(`fakeDb: unexpected collection "${name}"`);
+      }),
+      __memberDoc: memberDoc,
+      __pptxRendersDoc: pptxRendersDoc,
+    };
+  }
+
+  function fakeRequest(
+    overrides: {
+      auth?: { uid: string } | null;
+      data?: { orgId?: string; importId?: string; storagePath?: string };
+    } = {},
+  ): CallableRequest<{ orgId?: string; importId?: string; storagePath?: string }> {
+    const auth = overrides.auth === undefined ? { uid: UID } : overrides.auth;
+    return {
+      auth: auth ?? undefined,
+      data: overrides.data ?? {
+        orgId: ORG_ID,
+        importId: IMPORT_ID,
+        storagePath: STORAGE_PATH,
+      },
+    } as unknown as CallableRequest<{ orgId?: string; importId?: string; storagePath?: string }>;
+  }
+
+  function mockBucketForDownload() {
+    const download = vi.fn(async () => [Buffer.from("fake-pptx-bytes")]);
+    const file = vi.fn(() => ({ download }));
+    vi.mocked(getStorage).mockReturnValue({
+      bucket: () => ({ file }),
+    } as never);
+    return { file, download };
+  }
+
+  afterEach(() => {
+    vi.mocked(getFirestore).mockReset();
+    vi.mocked(getStorage).mockReset();
+    vi.mocked(parsePptxBuffer).mockReset();
+    vi.mocked(invokeRenderService).mockReset();
+  });
+
+  it("case 1: return shape is unchanged -- resolves to exactly { slides } with parsePptxBuffer's array", async () => {
+    const slides = [{ type: "text", text: "Hello" }];
+    vi.mocked(parsePptxBuffer).mockResolvedValue(slides as never);
+    const db = fakeDb();
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+    mockBucketForDownload();
+
+    const result = await parsePptxHandler(fakeRequest());
+
+    expect(result).toEqual({ slides });
+    expect(Object.keys(result)).toEqual(["slides"]);
+  });
+
+  it("case 2: writes exactly one pptxRenders queue doc with status pending and the storagePath", async () => {
+    vi.mocked(parsePptxBuffer).mockResolvedValue([] as never);
+    const setSpy = vi.fn(async () => undefined);
+    const db = fakeDb({ setSpy });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+    mockBucketForDownload();
+
+    await parsePptxHandler(fakeRequest());
+
+    expect(setSpy).toHaveBeenCalledTimes(1);
+    expect(setSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "pending", storagePath: STORAGE_PATH }),
+    );
+  });
+
+  it("case 3: a queue-write failure does not fail the parse -- still resolves { slides }, throws nothing", async () => {
+    const slides = [{ type: "text", text: "Still works" }];
+    vi.mocked(parsePptxBuffer).mockResolvedValue(slides as never);
+    const setSpy = vi.fn(async () => {
+      throw new Error("Firestore write failed");
+    });
+    const db = fakeDb({ setSpy });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+    mockBucketForDownload();
+
+    const result = await parsePptxHandler(fakeRequest());
+
+    expect(result).toEqual({ slides });
+  });
+
+  it("case 4: on a parse failure, throws invalid-argument and never writes a render doc", async () => {
+    vi.mocked(parsePptxBuffer).mockRejectedValue(new Error("corrupt file"));
+    const setSpy = vi.fn(async () => undefined);
+    const db = fakeDb({ setSpy });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+    mockBucketForDownload();
+
+    await expect(parsePptxHandler(fakeRequest())).rejects.toMatchObject({
+      code: "invalid-argument",
+    });
+    expect(setSpy).not.toHaveBeenCalled();
+  });
+
+  it("case 5a: throws unauthenticated when request.auth is missing", async () => {
+    await expect(
+      parsePptxHandler(fakeRequest({ auth: null })),
+    ).rejects.toMatchObject({ code: "unauthenticated" });
+  });
+
+  it("case 5b: throws permission-denied for a storagePath outside this org's prefix, and never reads Storage", async () => {
+    const { file } = mockBucketForDownload();
+
+    await expect(
+      parsePptxHandler(
+        fakeRequest({
+          data: {
+            orgId: ORG_ID,
+            importId: IMPORT_ID,
+            storagePath: `orgs/other-org/pptx-imports/${IMPORT_ID}/source.pptx`,
+          },
+        }),
+      ),
+    ).rejects.toMatchObject({ code: "permission-denied" });
+    expect(file).not.toHaveBeenCalled();
+  });
+
+  it("case 5c: throws permission-denied for a non-member uid", async () => {
+    const db = fakeDb({ memberExists: false });
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+
+    await expect(parsePptxHandler(fakeRequest())).rejects.toMatchObject({
+      code: "permission-denied",
+    });
+  });
+
+  it("case 6a: never calls invokeRenderService -- rendering is queued, not invoked, from this onCall path", async () => {
+    vi.mocked(parsePptxBuffer).mockResolvedValue([] as never);
+    const db = fakeDb();
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+    mockBucketForDownload();
+
+    await parsePptxHandler(fakeRequest());
+
+    expect(invokeRenderService).not.toHaveBeenCalled();
+  });
+
+  it("case 6b: source inspection -- parsePptxHandler's body contains no invokeRenderService reference", () => {
+    const source = readFileSync(path.join(__dirname, "index.ts"), "utf-8");
+    const start = source.indexOf("export async function parsePptxHandler(");
+    const onCallStart = source.indexOf("export const parsePptx = onCall(");
+    expect(start).toBeGreaterThan(-1);
+    expect(onCallStart).toBeGreaterThan(start);
+    const handlerBody = source.slice(start, onCallStart);
+    expect(handlerBody).not.toMatch(/invokeRenderService/);
   });
 });

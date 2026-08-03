@@ -3,7 +3,7 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { defineSecret } from "firebase-functions/params";
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { parsePptxBuffer, type MappedSlide } from "./pptxParser";
 
@@ -132,6 +132,35 @@ interface ParsePptxRequestData {
   storagePath?: string;
 }
 
+// --- pptxRenders queue (R062: async server-side render bridge) ----------
+//
+// One canonical path builder so parsePptxHandler (37-03, this plan), the
+// requestPptxRenderHandler trigger (37-04), and cleanupOrphanRendersHandler
+// (37-05) cannot drift apart on the collection path.
+//
+// No firestore.rules change is needed or made: the rules file's catch-all
+// `match /{document=**} { allow read, write: if false; }` already denies
+// client access to this collection by default, and the Admin SDK (used here
+// and by every handler that touches it) bypasses rules entirely. Rules
+// deployment is separately deferred as backlog 999.3.
+
+export type PptxRenderStatus = "pending" | "ready" | "failed";
+
+export interface PptxRenderDoc {
+  status: PptxRenderStatus;
+  storagePath: string;
+  renderedCount?: number;
+  failureReason?: string;
+}
+
+export function pptxRenderDocRef(orgId: string, importId: string) {
+  return getFirestore()
+    .collection("organizations")
+    .doc(orgId)
+    .collection("pptxRenders")
+    .doc(importId);
+}
+
 /**
  * The parsePptx handler body, exported separately from the `onCall` wrapper
  * so tests can invoke it directly with a fake CallableRequest without needing
@@ -148,6 +177,14 @@ interface ParsePptxRequestData {
  * - On any parse failure, throws a friendly HttpsError and never deletes the
  *   source object at storagePath -- this function never issues a delete call
  *   at all, on any path (CONTEXT D004 / 21-RESEARCH.md Pitfall 5).
+ * - ★ R062 additive write: on a successful parse, also queues a render by
+ *   writing organizations/{orgId}/pptxRenders/{importId} (status "pending").
+ *   This write is wrapped in its own nested try/catch and can NEVER fail this
+ *   call -- a queue-write failure is swallowed and logged, not surfaced to
+ *   the caller, because the parsed text layer above is already a complete,
+ *   successful result and a render is only an enhancement over it. This
+ *   handler never awaits or imports invokeRenderService; rendering happens
+ *   asynchronously via a separate trigger (37-04), never on this onCall path.
  */
 export async function parsePptxHandler(
   request: CallableRequest<ParsePptxRequestData>,
@@ -185,6 +222,22 @@ export async function parsePptxHandler(
     const bucket = getStorage().bucket();
     const [buffer] = await bucket.file(storagePath).download();
     const slides = await parsePptxBuffer(buffer, orgId, importId);
+
+    // ★ Additive queue write (R062). Nested try/catch is deliberate, not
+    // defensive padding: the outer catch below converts ANY thrown error
+    // into a user-facing "couldn't read this file" failure, which would
+    // wrongly turn a successful parse into an apparent corrupt-file error
+    // and throw away a text layer that already works. Swallow and log only.
+    try {
+      const renderDoc: PptxRenderDoc = { status: "pending", storagePath };
+      await pptxRenderDocRef(orgId, importId).set({
+        ...renderDoc,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+    } catch (queueErr) {
+      console.error("parsePptx: failed to queue render (non-fatal):", queueErr);
+    }
+
     return { slides };
   } catch (err) {
     console.error("parsePptx failed:", err);
