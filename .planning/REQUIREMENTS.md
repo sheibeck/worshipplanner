@@ -165,6 +165,8 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
       exempt from `cleanupExpiredMedia`'s prefix guard. Only metric-compatible open fonts
       (Carlito/Caladea/Liberation) — never bundle Microsoft fonts. Orphan cleanup for failed renders
       **defaults to dry-run**; the inverse default already caused a real incident in this codebase.
+      **In progress — Phase 37 is 6 plans across 4 waves; plan 37-01 (this run) delivered only the
+      render-service/ scaffold and the font-policy build-time gate, not the render pipeline itself.**
       `[STACK]` `[PITFALL]`
 
 - [x] **R063** (core-capability): Slide-editing options vary by service-item type — a scripture item
@@ -268,7 +270,7 @@ Acknowledged, deferred, not in this roadmap.
 | R059 | Phase 35 | Complete |
 | R060 | Phase 35 | Complete |
 | R061 | Phase 35 | Complete |
-| R062 | Phase 37 | Pending |
+| R062 | Phase 37 | In Progress — 1/6 plans done (37-01: render-service scaffold + font-policy gate) |
 | R063 | Phase 33 | Complete |
 | R064 | Phase 34 | Partial — structural guarantee done, reachability NOT delivered |
 | R065 | Phase 35 | Complete |

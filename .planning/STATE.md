@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Service and Slides
-current_phase: 35
-current_phase_name: Presentation Correctness & Lyric Editor
-status: verifying
-stopped_at: Completed 35-04-PLAN.md — phase 35 complete, ready for verification
-last_updated: "2026-08-03T14:42:18.100Z"
+current_phase: 37
+current_phase_name: PowerPoint Server-Side Rendering
+status: executing
+stopped_at: Completed 37-01-PLAN.md — render-service scaffolded, Dockerfile+font-policy gate authored, package legitimacy checkpoint deferred
+last_updated: "2026-08-03T16:05:52.800Z"
 last_activity: 2026-08-03
-last_activity_desc: Phase 35 execution started
+last_activity_desc: Phase 37 execution started
 progress:
   total_phases: 9
   completed_phases: 7
-  total_plans: 38
-  completed_plans: 38
+  total_plans: 44
+  completed_plans: 39
   percent: 78
 ---
 
@@ -65,7 +65,7 @@ to-do for when they return.
 See: .planning/PROJECT.md (updated 2026-07-28)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 35 — Presentation Correctness & Lyric Editor
+**Current focus:** Phase 37 — PowerPoint Server-Side Rendering
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -75,10 +75,10 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 
 ## Current Position
 
-Phase: 35 (Presentation Correctness & Lyric Editor) — EXECUTING
-Plan: 4 of 4
-Status: Phase complete — ready for verification
-Last activity: 2026-08-03 — Phase 35 execution started
+Phase: 37 (PowerPoint Server-Side Rendering) — EXECUTING
+Plan: 2 of 6
+Status: Ready to execute
+Last activity: 2026-08-03 — Phase 37 execution started
 
 ## ★ v1.4 AUTONOMOUS RUN — standing decisions (2026-07-28)
 
@@ -925,6 +925,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 35 P02 | 20min | 2 tasks | 2 files |
 | Phase 35 P03 | 45min | 2 tasks | 2 files |
 | Phase 35 P04 | 50min | 2 tasks | 6 files |
+| Phase 37 P01 | 25min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -1145,6 +1146,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: R065/R066 governed by 35-UI-SPEC's approved contract, not probe-derived edge coverage (#1110 flagged unclassified); canConfirm holds exactly three clauses (sections, copyright-or-override, not-saving)
 - [Phase ?]: 35-04: hosted LyricPasteRegion inline behind pasteMode (v-if/v-else, never v-show) and deleted LyricPasteDialog.vue + its test file — R066 closes with exactly one paste surface.
 - [Phase ?]: 35-04: two host-mechanism tests (empty-textarea exit via each of paste-back-btn/paste-cancel-btn) added beyond the plan's specified seven so -t "paste" clears the plan's own >=9 acceptance floor without renaming any pre-existing test.
+- [Phase 37]: Package legitimacy checkpoint (render-service deps: express, @google-cloud/storage, @types/express, @types/node) recorded DEFERRED per standing autonomy grant, not owner-approved
+- [Phase 37]: render-service/src/placeholder.ts added (Rule 1 fix) to keep tsc --noEmit satisfiable until 37-02 lands render.ts/server.ts/main.ts; delete once those exist
 
 ### Roadmap Evolution
 
@@ -1206,6 +1209,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-03T14:42:18.061Z
-Stopped at: Completed 35-04-PLAN.md — phase 35 complete, ready for verification
+Last session: 2026-08-03T16:05:52.766Z
+Stopped at: Completed 37-01-PLAN.md — render-service scaffolded, Dockerfile+font-policy gate authored, package legitimacy checkpoint deferred
 Resume file: None
