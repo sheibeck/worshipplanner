@@ -69,10 +69,39 @@ must still be able to build a responsive reading by hand exactly as they can tod
 - **Validation lives at the Cloud Function proxy choke point** (`functions/src/index.ts` — the single
   existing egress for `anthropic`), per the ROADMAP.
 
-### The SDK Upgrade — a hard prerequisite, scheduled first
+### ★★ CORRECTED 2026-08-03 BY RESEARCH — two more false premises, both in R064 itself
 
-- **`@anthropic-ai/sdk` is pinned at `^0.78.0`** (`package.json:20`), which predates structured
-  outputs. **Upgrade is task one of the phase**, per the ROADMAP.
+Research verified both of these against live artifacts, not docs. **They supersede what this section
+originally said, and they change the plan.**
+
+**1. The SDK upgrade is NOT a blocking prerequisite — R064's own text is wrong.** R064 states the
+`^0.78.0` pin *"predates the structured-outputs support this depends on."* It does not. The researcher
+extracted the actually-installed `@anthropic-ai/sdk@0.78.0` tarball and read its `.d.ts` files
+directly: `output_config.format` (`JSONOutputFormat`), `client.messages.parse()`, and the
+`jsonSchemaOutputFormat` helper are **all already present and non-beta**. Structured outputs went GA in
+SDK **0.72.0** (2026-01-29) — three weeks *before* 0.78.0 shipped. An upgrade is reasonable hygiene;
+it is **not** a prerequisite and must not be scheduled as a blocking first task.
+*Bonus:* `jsonSchemaOutputFormat` needs no `zod` (this project has none) because `json-schema-to-ts`
+is a normal dependency of the SDK, not a peer dependency.
+
+**2. Validation CANNOT live at the Cloud Function proxy.** The ROADMAP says to validate *"at the
+existing single Cloud Function proxy choke point."* That is unimplementable as written:
+`functions/src/index.ts` is a **generic byte-blind pass-through** (`fetch` + forward), has no
+`@anthropic-ai/sdk` dependency, and — decisively — **never sees the ESV source text**, which the
+browser fetches separately. A proxy that cannot see the source cannot byte-match against it.
+**Validation stays client-side in `src/utils/claudeApi.ts`**, matching the existing
+`suggestSongs`/`suggestScripture` pattern.
+
+**A better contract than R064 asks for.** Research designed **boundary indices, not raw character
+offsets**: pre-compute the legal split positions from the untouched ESV text, and constrain the
+model's schema to integer indices *into that array*. This makes byte-match a trivial bounds check and
+makes **mid-sentence splits structurally unrepresentable** rather than merely validated-against —
+strictly stronger than R064's requirement. Prefer it.
+
+### The SDK Upgrade — hygiene, not a prerequisite (see the correction above)
+
+- **`@anthropic-ai/sdk` is pinned at `^0.78.0`** (`package.json:20`), which **already supports
+  structured outputs**. Upgrading is optional cleanliness, not a gate.
 - **Use `output_config: { format: { type: 'json_schema', schema } }`.** The top-level `output_format`
   parameter is deprecated API-wide. For a TypeScript project the ergonomic path is
   `client.messages.parse()` with `zodOutputFormat` from `@anthropic-ai/sdk/helpers/zod`.

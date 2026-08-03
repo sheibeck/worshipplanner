@@ -408,6 +408,26 @@ mockup. Phases 34 and 35 do not depend on the wireframes. **Phase 36 does** — 
 unresolved when the run reaches it, that phase either becomes original design work too (a materially
 different deliverable from "rebuild against wireframes") or should be deferred. Raise it there.
 
+## ⚠ FIVE FALSE ROADMAP/REQUIREMENT PREMISES FOUND THIS RUN — read before trusting a phase note
+
+All five were caught before anything was built on them, and all are recorded in their phase's
+CONTEXT.md. Listed together because the pattern matters: **the v1.4 planning docs were written before
+several of the things they describe already existed or changed.** Verify a phase note against live
+source before planning on it.
+
+| # | Premise as written | Reality |
+|---|---|---|
+| 1 | Phase 33: *"confirm against the Claude Design wireframes which drawer a given slide's 3-dot menu opens"* | The wireframes predate the menu entirely — no 3-dot menu, no Edit details/Edit lyrics, no background feature |
+| 2 | Phase 36: *"the Service Order tab is rebuilt against the Claude Design wireframes"* + the action bar | **No Service Order screen and no action bar exist in the export at all.** See the OPEN ITEM above — still unresolved |
+| 3 | R052: the change replaces *"the multi-tab single drawer"* | `EditSlideDrawer.vue` had **sections, not tabs**. Intent honoured, premise corrected — tabs were not built just to remove them |
+| 4 | R064: *"requires upgrading `@anthropic-ai/sdk` from the current `^0.78.0` pin, which predates the structured-outputs support this depends on"* | **False.** Structured outputs went GA in SDK **0.72.0**; 0.78.0 already ships `output_config.format`, `messages.parse()`, and `jsonSchemaOutputFormat`. Verified by extracting the installed tarball and reading its `.d.ts`. The upgrade is hygiene, not a gate. |
+| 5 | Phase 34: validate *"at the existing single Cloud Function proxy choke point"* | **Unimplementable as written.** `functions/src/index.ts` is a byte-blind pass-through with no SDK dependency that **never sees the ESV source text** (the browser fetches it separately). A proxy that cannot see the source cannot byte-match it. Validation stays client-side. |
+
+**Phase 34 also gained a design stronger than its requirement:** boundary indices instead of raw
+character offsets, constraining the model to integer indices into a pre-computed array of legal split
+positions. This makes mid-sentence splits **structurally unrepresentable** rather than merely
+validated-against — strictly stronger than R064 asks for.
+
 ## Deferred Verification
 
 | Phase | State | Resume |
