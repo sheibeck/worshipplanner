@@ -477,6 +477,42 @@ action bar were deferred from Phase 33 into 36 by the ROADMAP's own reasoning.
 
 **Also still open from this run:** Phase 34's reachability gap (`/gsd-plan-phase 34 --gaps`) — see below.
 
+## ⏸ RUN STATE — autonomous run in progress, 2026-08-03 (written for compaction safety)
+
+**Owner scoped this run to Phases 35 and 37; Phase 36 deferred (see the decision above).**
+
+| Phase | State |
+|---|---|
+| 32, 33 | ✅ complete, `verification_deferred_human` |
+| 34 | ⚠ **PARTIAL** — `verification_deferred_gaps`, resume `/gsd-plan-phase 34 --gaps` |
+| 35 | ✅ complete, `verification_deferred_human` |
+| 36 | ⏸ deferred by owner — **wireframe now exists** (Turn 3), resume `/gsd-autonomous --only 36` |
+| **37** | **◆ IN PROGRESS — 4 of 6 plans done.** Waves: 1 ✅(37-01, 37-03) · 2 ✅(37-02, 37-04) · **3 ← next (37-05)** · 4 (37-06) |
+
+**Phase 37 remaining work:**
+- **37-05** (wave 3) — orphan cleanup with the **dry-run default** mirroring `functions/src/index.ts:257`
+  (`process.env.X !== "true"` ⇒ dryRun), plus the `renderImportId` bridge field on
+  `src/types/importedDeck.ts` and `PptxImportModal.vue`.
+- **37-06** (wave 4) — writes `render-service/DEPLOY.md` (the `gcloud run deploy` handoff), the
+  Phase 37 section of `PENDING-VERIFICATION.md`, and runs the three-suite gate. **37-06 owns
+  `requirements mark-complete R062`** — every earlier plan correctly declined it.
+
+**★ NOTHING HAS BEEN DEPLOYED, CONTAINERIZED, OR PROVISIONED**, and nothing may be. Verified per plan.
+
+**Two open items for 37-06's DEPLOY.md:** `STORAGE_BUCKET` is a required Cloud Run env var (37-02
+found `@google-cloud/storage`'s `bucket()` needs an explicit name, unlike `firebase-admin`'s default
+form), and **two package-legitimacy checkpoints are DEFERRED, never approved** — `express`,
+`@google-cloud/storage`, `@types/*` (37-01) and `google-auth-library` (37-03). Both are recorded in
+their SUMMARYs for 37-06 to transcribe as `PENDING-VERIFICATION.md` item 37.5.
+
+**⚠ A gate command is now contaminated.** Root `npx vitest run src/` picks up
+`render-service/src/render.test.ts` via Vitest's substring path filter and fails on a version mismatch
+(root `4.0.18` vs render-service's pinned `4.1.10`). **Not a regression** — `cd render-service && npx
+vitest run` passes 39/39 directly. Logged in the phase's `deferred-items.md`. Use per-suite commands.
+
+**Suite counts at this point:** app `src/` ~2284 passing / 9 baseline failures ·
+`functions/` 55/55 · `render-service/` 39/39.
+
 ## Deferred Verification
 
 | Phase | State | Resume |
