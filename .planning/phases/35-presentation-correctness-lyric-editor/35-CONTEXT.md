@@ -71,9 +71,16 @@ Turn 3 also covers the Service Order rebuild, but that is **R067/Phase 36** — 
   and R065 builds directly on it. Do not write a second parser.
 - **Follow Turn 3's wireframe for placement and treatment.** It shows `Paste lyrics` inline with the
   `No copyright information found` warning; that is the specified design.
-- **R065 advises, it never blocks.** "Warns rather than accepting silently" — the paste still
-  succeeds and the user is told. Blocking a paste because a song has no CCLI number would be a worse
-  failure than the silence it replaces.
+- **★ R065 — CORRECTED 2026-08-03 in favour of the wireframe. Block with an override, not advise-and-proceed.**
+  This decision originally read *"advises, never blocks,"* reasoning that blocking a paste over a
+  missing CCLI number would be worse than the silence it replaces. **UI research found the wireframe
+  says otherwise:** Turn 2 "State 3" shows the paste **blocked** on missing copyright **with a
+  checkbox to override**. That is the owner's actual design, and it defeats the objection — it is not
+  a hard block, it is a speed bump you can step over deliberately.
+  It is also the better reading of R065 (*"warns, rather than accepting silently"*): an advisory line
+  can be dismissed without ever being read, whereas an override checkbox guarantees the user saw it.
+  **Follow the wireframe.** The paste must still be completable in every case — the override is always
+  available, never conditional on filling anything in.
 - **One paste path only.** The modal does not survive as a fallback — two paste surfaces is exactly
   the ambiguity R066 removes.
 
