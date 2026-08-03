@@ -4,17 +4,17 @@ milestone: v1.4
 milestone_name: Service and Slides
 current_phase: 33
 current_phase_name: Backgrounds & Slide Editing
-status: executing
-stopped_at: Completed 33-08-PLAN.md
-last_updated: "2026-08-03T05:14:06.614Z"
+status: verifying
+stopped_at: Completed 33-09-PLAN.md (last plan of phase 33)
+last_updated: "2026-08-03T05:41:03.749Z"
 last_activity: 2026-08-02
 last_activity_desc: Phase 33 execution started
 progress:
   total_phases: 9
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 30
-  completed_plans: 29
-  percent: 44
+  completed_plans: 30
+  percent: 56
 ---
 
 # Project State
@@ -77,7 +77,7 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 
 Phase: 33 (Backgrounds & Slide Editing) — EXECUTING
 Plan: 9 of 9
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-08-02 — Phase 33 execution started
 
 ## ★ v1.4 AUTONOMOUS RUN — standing decisions (2026-07-28)
@@ -720,6 +720,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 33 P06 | 45min | 2 tasks | 4 files |
 | Phase 33 P07 | 50min | 3 tasks | 2 files |
 | Phase 33 P08 | 55min | 3 tasks | 4 files |
+| Phase 33 P09 | 35min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -927,6 +928,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 'Set for this slide only' performs a direct copy-then-override write of the resolved url (per plan text), not a toggle into upload UI (33-UI-SPEC's looser prose)
 - [Phase ?]: pendingAction's remove-caption song branch is unreachable from EditSlideDrawer's available props (no song document threaded in) — documented as a known gap rather than guessed at
 - [Phase ?]: 33-08: BackgroundControl's Remove aria-label stays generic ('Remove background') — no acceptance criterion tests the per-level wording, and this is the last wave-3 mount site; flagged as a small optional removeLabel prop for a future follow-up if UAT needs it.
+- [Phase ?]: 33-09: onMenuAction dispatches duplicate/delete via the drawer's pendingAction seam (open + pending, never a direct store call) per the plan's explicit text, overriding 33-08's stale handoff note
 
 ### Roadmap Evolution
 
@@ -988,6 +990,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-03T05:13:47.776Z
-Stopped at: Completed 33-08-PLAN.md
+Last session: 2026-08-03T05:41:03.720Z
+Stopped at: Completed 33-09-PLAN.md (last plan of phase 33)
 Resume file: None

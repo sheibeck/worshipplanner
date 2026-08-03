@@ -249,6 +249,42 @@ Appended as each phase completes.
 
 ---
 
+## Phase 33 — Backgrounds & Slide Editing
+
+Recorded from 33-09-PLAN.md's `<verification>` § Manual-only list — the phase's own last plan. These are
+the items the phase's plans deliberately deferred under the standing autonomy grant rather than
+attempting to fake with jsdom.
+
+- ☐ **33.1** With a screen reader active, tab to a slide card's 3-dot menu trigger, open it with Enter
+  or Space, move through the items, close with Escape, and confirm focus returns to the trigger and the
+  reader announces the menu correctly. The automated suite proves `role="menu"`/`role="menuitem"`/
+  `aria-haspopup`/`aria-expanded` are present and that Escape closes the panel in jsdom; it cannot prove
+  a real screen reader announces it correctly, and there is **no arrow-key roving-tabindex navigation**
+  (a stated, deliberate gap — 33-UI-SPEC.md § Accessibility Note).
+- ☐ **33.2** Confirm the 3-dot menu (its trigger, its open panel, its click-away backdrop) does not
+  interfere with dragging a slide card via its own drag handle — open a menu, close it, then drag-reorder
+  the same card, and drag a card whose menu was never opened.
+- ☐ **33.3** ★ **Inheritance legibility across all three background levels** — this phase's own named
+  sharpest UI risk. Set a song background, confirm it shows on the song editor, on every group of that
+  song with no group override, and on every slide with neither a group nor a slide override, each with
+  the correct "From song"/"Inherited from song" wording. Then set a group override and confirm slides
+  flip to "From group". Then set one slide's own override and confirm only that card shows "Background"
+  (indigo) while its siblings are unaffected. An override that is not visibly distinguishable at a glance
+  is the exact failure mode this phase exists to prevent.
+- ☐ **33.4** The per-type 3-dot menu item list (33-UI-SPEC.md §3's table) is **original design work with
+  no wireframe to check it against** — review the table directly against what each slide type (song
+  lyric/copyright, scripture, hand-authored text, Hymn-pristine text, image, video, other imported)
+  should actually offer, and confirm it matches the owner's intent, not just internal consistency.
+- ☐ **33.5** (33-09, R051) Drag-reorder a slide card without opening its menu first — confirm the drag
+  starts and completes cleanly with no drawer flashing open, on both a freshly-loaded grid and one where
+  a different card's drawer is already open.
+- ☐ **33.6** (33-09, R052) Open a lyric or scripture slide's 3-dot menu and confirm "Edit in song"/"Edit
+  in scripture" still navigate correctly now that the trigger lives in the menu rather than the drawer's
+  body — including while the drawer for a DIFFERENT slide is already open (the navigation must not
+  require the drawer to be open at all).
+
+---
+
 ## Notes and failures
 
 _(Record anything that failed here, with what you saw versus what was expected.)_
