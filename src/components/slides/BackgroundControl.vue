@@ -16,7 +16,7 @@
           type="button"
           class="text-gray-500 hover:text-red-400 transition-colors"
           data-testid="background-control-remove"
-          aria-label="Remove background"
+          :aria-label="removeLabel"
           @click="onRemove"
         >&times;</button>
       </div>
@@ -94,13 +94,21 @@ import { computed } from 'vue'
 import { useBackgroundUpload } from '@/composables/useBackgroundUpload'
 import { backgroundImageLabel } from './slideDisplay'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   /** This level's own stored background URL, or undefined when it has none. */
   imageUrl?: string
   /** The level-specific caption sentence (§ Copywriting Contract). */
   caption: string
   /** The level-specific add-affordance label ("+ Add background for this group/song"). */
   addLabel: string
+  /**
+   * The level-specific remove-affordance `aria-label` (§ Copywriting
+   * Contract declares `Remove group background` / `Remove song background`
+   * as distinct strings) — optional, mirroring `addLabel`'s pattern, but
+   * defaults to the pre-existing generic string so no call site that hasn't
+   * been updated yet breaks.
+   */
+  removeLabel?: string
   /**
    * Populated ONLY by the group-level call site for a SONG group whose own
    * background is empty while the song's is set. Undefined everywhere else.
@@ -110,7 +118,7 @@ const props = defineProps<{
   isEditor: boolean
   /** Org id, passed straight through to `useBackgroundUpload`. */
   orgId: string
-}>()
+}>(), { removeLabel: 'Remove background' })
 
 const emit = defineEmits<{
   attach: [url: string]

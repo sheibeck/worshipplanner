@@ -95,6 +95,7 @@
           :is-editor="canWriteGroupMedia"
           :org-id="orgId"
           add-label="+ Add background for this group"
+          remove-label="Remove group background"
           @attach="onAttachGroupBackground"
           @remove="onRemoveGroupBackground"
         />

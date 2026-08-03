@@ -1162,6 +1162,16 @@ describe('SongLyricEditor', () => {
     expect(row.find('[data-testid="background-control-remove"]').exists()).toBe(true)
   })
 
+  it("background: the Remove control's aria-label is the song-level string declared in the Copywriting Contract, distinct from the group level's", async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics({ backgroundImageUrl: SAMPLE_BG_URL })
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    const row = wrapper.find('[data-testid="song-background-row"]')
+    expect(row.get('[data-testid="background-control-remove"]').attributes('aria-label')).toBe('Remove song background')
+  })
+
   it("background: the control's attach emit results in exactly one setSongBackground call whose fourth argument is the emitted URL", async () => {
     mockIsLoading.value = false
     mockCurrentLyrics.value = makeLyrics({ id: 'lyrics-1' })

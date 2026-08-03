@@ -228,6 +228,46 @@ describe('BackgroundControl', () => {
     expect(wrapper.text().toLowerCase()).not.toContain('confirm')
   })
 
+  it('defaults the remove control\'s aria-label to the generic string when removeLabel is not passed', () => {
+    const wrapper = mount(BackgroundControl, {
+      props: {
+        imageUrl: 'https://storage.example.com/existing.jpg',
+        caption: GROUP_CAPTION,
+        addLabel: GROUP_ADD_LABEL,
+        isEditor: true,
+        orgId: 'org-1',
+      },
+    })
+
+    expect(wrapper.get('[data-testid="background-control-remove"]').attributes('aria-label')).toBe('Remove background')
+  })
+
+  it('threads a per-level removeLabel into the remove control\'s aria-label, matching the Copywriting Contract\'s two distinct strings', () => {
+    const groupWrapper = mount(BackgroundControl, {
+      props: {
+        imageUrl: 'https://storage.example.com/existing.jpg',
+        caption: GROUP_CAPTION,
+        addLabel: GROUP_ADD_LABEL,
+        removeLabel: 'Remove group background',
+        isEditor: true,
+        orgId: 'org-1',
+      },
+    })
+    expect(groupWrapper.get('[data-testid="background-control-remove"]').attributes('aria-label')).toBe('Remove group background')
+
+    const songWrapper = mount(BackgroundControl, {
+      props: {
+        imageUrl: 'https://storage.example.com/existing.jpg',
+        caption: GROUP_CAPTION,
+        addLabel: GROUP_ADD_LABEL,
+        removeLabel: 'Remove song background',
+        isEditor: true,
+        orgId: 'org-1',
+      },
+    })
+    expect(songWrapper.get('[data-testid="background-control-remove"]').attributes('aria-label')).toBe('Remove song background')
+  })
+
   it('the filename display span carries the truncate class so a long filename cannot overflow the row', () => {
     const wrapper = mount(BackgroundControl, {
       props: {

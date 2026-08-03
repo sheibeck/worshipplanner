@@ -36,6 +36,7 @@
         :image-url="currentLyrics.backgroundImageUrl"
         :caption="currentLyrics.backgroundImageUrl ? 'Applies wherever this song appears — services can override it.' : 'Applies to every service using this song, unless a group or slide overrides it.'"
         add-label="+ Add background for this song"
+        remove-label="Remove song background"
         :is-editor="isEditor"
         :org-id="orgId"
         @attach="onAttachSongBackground"

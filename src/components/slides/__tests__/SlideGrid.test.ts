@@ -699,6 +699,15 @@ describe('SlideGrid', () => {
       expect(control.props('addLabel')).toBe('+ Add background for this group')
     })
 
+    it("threads the group-level removeLabel declared in the Copywriting Contract into the control's aria-label", () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const group = makeGroup({ backgroundImageUrl: 'https://storage.example.com/bg.jpg', slides: [] })
+      const wrapper = mountGrid({ selectedSlot: slot, isEditor: true, group })
+      const control = wrapper.findComponent(BackgroundControl)
+      expect(control.props('removeLabel')).toBe('Remove group background')
+      expect(wrapper.get('[data-testid="background-control-remove"]').attributes('aria-label')).toBe('Remove group background')
+    })
+
     it("relays the control's attach emit to setGroupBackground with the URL, and remove with the clear flag — carrying no slides key", async () => {
       const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
       const wrapper = mountGrid({ selectedSlot: slot, serviceId: 'service-9' })
