@@ -543,3 +543,157 @@ export const cleanupExpiredMedia = onSchedule(
     await cleanupExpiredMediaHandler();
   },
 );
+
+// --- cleanupOrphanRenders (R062: dry-run-by-default orphan sweep) --------
+//
+// A second, SEPARATE scheduled job from cleanupExpiredMedia above. It is not
+// folded into that handler because it must read the pptxRenders queue
+// (Firestore) -- something cleanupExpiredMedia deliberately never does, and
+// whose "imports no Firestore API at all" property is exactly why that
+// handler needs zero changes for this phase.
+//
+// SAFETY CONTRACT:
+// - FAILS SAFE: real deletion requires an explicit opt-in,
+//   PPTX_RENDER_CLEANUP_ENABLED="true". With it unset, empty, "false", or any
+//   other value (including a case-sensitive typo like "True" or "1"), this is
+//   a dry run: it scans and logs what WOULD be deleted and deletes nothing.
+//   This is the same gate shape as cleanupExpiredMediaHandler's own
+//   post-incident fix above, in the same direction -- the 2026-07-28 incident
+//   (9f1b881) was precisely an inverted gate whose doc comment claimed the
+//   opposite default from what the code implemented. This comment describes
+//   only the default the code below actually implements.
+// - RENDERED_OBJECT_GUARD is applied to every listed Storage object BEFORE
+//   any delete decision. Only objects under
+//   orgs/{orgId}/pptx-imports/{importId}/rendered/ are ever eligible; a
+//   deck's source.pptx and its extracted images/ are structurally
+//   unreachable through this guard, no matter how stale the render doc is.
+// - Only pptxRenders docs whose status is "pending" or "failed" AND whose
+//   createdAt is older than ORPHAN_RENDER_STALE_HOURS are ever candidates. A
+//   "ready" render is never a candidate (excluded by the status filter), and
+//   an in-flight "pending" render younger than the staleness window is
+//   skipped. A doc with an unreadable createdAt is skipped rather than
+//   treated as old -- fail safe, matching cleanupExpiredMediaHandler's own
+//   NaN handling of an unparseable timeCreated.
+// - Age is keyed on the server-set Firestore createdAt timestamp
+//   (FieldValue.serverTimestamp(), written by parsePptxHandler's queue
+//   write), never on client-settable input.
+// - Per-object deletes are each wrapped in their own try/catch so one
+//   failure never aborts the run, mirroring cleanupExpiredMediaHandler's
+//   partial-failure tolerance. The render doc's own delete is likewise
+//   wrapped so a doc-delete failure cannot abort the scan of remaining
+//   candidates.
+// - Runs on its own daily schedule, 03:00 UTC -- deliberately one hour after
+//   cleanupExpiredMedia's 02:00 UTC, so the two sweeps never overlap.
+
+/** Render docs older than this many hours (and still pending/failed) are orphan candidates. */
+export const ORPHAN_RENDER_STALE_HOURS = 24;
+
+/**
+ * Hard path guard: matches ONLY object names under the rendered/ prefix of a
+ * pptx-imports scope. Structurally unable to match source.pptx or anything
+ * under images/ at the same importId -- both are excluded by construction,
+ * not by a runtime check on their names.
+ */
+export const RENDERED_OBJECT_GUARD = /^orgs\/[^/]+\/pptx-imports\/[^/]+\/rendered\//;
+
+export interface OrphanCleanupSummary {
+  scannedCount: number;
+  deletedDocCount: number;
+  deletedObjectCount: number;
+  dryRun: boolean;
+}
+
+/**
+ * The cleanupOrphanRenders handler body, exported separately from the
+ * `onSchedule` wrapper (mirroring cleanupExpiredMediaHandler/cleanupExpiredMedia)
+ * so it can be unit-tested directly against mocked Firestore/Storage.
+ */
+export async function cleanupOrphanRendersHandler(): Promise<OrphanCleanupSummary> {
+  // Fail safe: only an explicit opt-in enables real deletion. Anything else --
+  // unset, empty, "false", a typo -- leaves this a dry run.
+  const dryRun = process.env.PPTX_RENDER_CLEANUP_ENABLED !== "true";
+
+  const cutoffMs = Date.now() - ORPHAN_RENDER_STALE_HOURS * 60 * 60 * 1000;
+
+  let scannedCount = 0;
+  let deletedDocCount = 0;
+  let deletedObjectCount = 0;
+
+  const snapshot = await getFirestore()
+    .collectionGroup("pptxRenders")
+    .where("status", "in", ["pending", "failed"])
+    .get();
+
+  const bucket = getStorage().bucket();
+
+  for (const renderDoc of snapshot.docs) {
+    // Recover the org id from the parent chain rather than guessing -- skip
+    // any doc whose parent chain is unexpectedly missing.
+    const orgId = renderDoc.ref.parent.parent?.id;
+    if (!orgId) {
+      console.error(
+        `cleanupOrphanRenders: skipping ${renderDoc.ref.path} -- missing parent org id`,
+      );
+      continue;
+    }
+    const importId = renderDoc.id;
+
+    const data = renderDoc.data() as { createdAt?: { toMillis?: () => number } } | undefined;
+    const createdAt = data?.createdAt;
+    const createdMs = typeof createdAt?.toMillis === "function" ? createdAt.toMillis() : NaN;
+    if (Number.isNaN(createdMs) || createdMs > cutoffMs) {
+      // Not stale yet (or timestamp unreadable -- fail safe, skip it).
+      continue;
+    }
+
+    scannedCount++;
+
+    const [files] = await bucket.getFiles({ prefix: renderedPrefixFor(orgId, importId) });
+
+    // Hard safety gate, applied BEFORE any delete decision: never consider
+    // anything outside rendered/, no matter how stale this render doc is.
+    const eligibleFiles = files.filter((file) => RENDERED_OBJECT_GUARD.test(file.name));
+
+    if (dryRun) {
+      deletedObjectCount += eligibleFiles.length;
+      deletedDocCount++;
+      continue;
+    }
+
+    for (const file of eligibleFiles) {
+      try {
+        await file.delete();
+        deletedObjectCount++;
+      } catch (err) {
+        // Partial-failure tolerance: one bad delete never aborts the run.
+        console.error(`cleanupOrphanRenders: failed to delete ${file.name}:`, err);
+      }
+    }
+
+    try {
+      await renderDoc.ref.delete();
+      deletedDocCount++;
+    } catch (err) {
+      console.error(
+        `cleanupOrphanRenders: failed to delete render doc ${renderDoc.ref.path}:`,
+        err,
+      );
+    }
+  }
+
+  const summary: OrphanCleanupSummary = {
+    scannedCount,
+    deletedDocCount,
+    deletedObjectCount,
+    dryRun,
+  };
+  console.log("cleanupOrphanRenders summary:", summary);
+  return summary;
+}
+
+export const cleanupOrphanRenders = onSchedule(
+  { schedule: "every day 03:00", timeZone: "UTC" },
+  async () => {
+    await cleanupOrphanRendersHandler();
+  },
+);
