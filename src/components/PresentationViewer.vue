@@ -300,6 +300,10 @@ import VideoPlayer from './VideoPlayer.vue'
 const props = defineProps<{
   slides: AssembledSlide[]
   isLoading?: boolean
+  /** R061 — the flat deck index to open on, computed by SlidesTab from
+   *  whatever was selected when Present was clicked. Optional so every
+   *  existing mount that omits it keeps opening on slide 0, unchanged. */
+  initialIndex?: number
 }>()
 
 const emit = defineEmits<{
@@ -309,7 +313,17 @@ const emit = defineEmits<{
 // ── Refs / state ─────────────────────────────────────────────────────────────
 
 const viewerRoot = ref<HTMLElement | null>(null)
-const currentIndex = ref(0)
+// R061 — seeded from `initialIndex` (SlidesTab's presentStartIndex), clamped
+// with the SAME formula as the length-change watcher below (:459 as the file
+// stood before this change) so the two clamps agree by construction rather
+// than by two independently-written expressions happening to match. Not
+// routed through goToIndex(): that function's pause/reset/play lifecycle is
+// for a slide CHANGE while already mounted — at mount there is no outgoing
+// slide to pause, and onMounted's own playCurrentMedia() call already
+// handles the first slide's media.
+const currentIndex = ref(
+  Math.min(Math.max(props.initialIndex ?? 0, 0), Math.max(0, props.slides.length - 1)),
+)
 const chromeVisible = ref(true)
 const isTrueFullscreen = ref(false)
 let chromeTimer: ReturnType<typeof setTimeout> | null = null

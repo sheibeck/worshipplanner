@@ -1220,12 +1220,13 @@
             :active="activeTab === 'slides'"
             :ensure-group-materialized="ensureGroupMaterialized"
             @navigate-to-scripture-editor="handleNavigateToScriptureEditor"
-            @present="presenting = true"
+            @present="onPresent"
           />
           <PresentationViewer
             v-if="presenting"
             :slides="assembledSlideshow"
             :is-loading="slideshowLoading"
+            :initial-index="presentStartIndex"
             @exit="presenting = false"
           />
         </div>
@@ -1693,6 +1694,17 @@ const {
   drainGroupWrites,
 } = useSlideshowAssembly(localService, orgIdRef, { canWrite: canWriteSlideGroups })
 const presenting = ref(false)
+/** R061 — the flat deck index PresentationViewer should open on, set by
+ * onPresent() BEFORE `presenting` flips true so the viewer never mounts
+ * with a stale index. */
+const presentStartIndex = ref(0)
+
+/** D-05/R061 — `SlidesTab`'s present emit now carries a computed start
+ * index; assign it first, then open the viewer, in that order. */
+function onPresent(startIndex: number): void {
+  presentStartIndex.value = startIndex
+  presenting.value = true
+}
 
 // ── AI state ───────────────────────────────────────────────────────────────────
 

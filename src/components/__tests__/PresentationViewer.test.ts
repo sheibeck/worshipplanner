@@ -1167,4 +1167,84 @@ describe('PresentationViewer', () => {
       )
     })
   })
+
+  describe('initialIndex — presenting starts where you were looking (R061)', () => {
+    // `withoutSection()` keeps the progress pill in its plain "n / m" shape
+    // (no `SERVICE_SECTION_LABELS` prefix), so index math is legible.
+    it('mounting with initialIndex: 2 against a 5-slide deck opens on slide index 2 ("3 / 5")', async () => {
+      const slides: AssembledSlide[] = [
+        withoutSection(lyricSlide('a')),
+        withoutSection(copyrightSlide('b')),
+        withoutSection(scriptureSlide('c')),
+        withoutSection(lyricSlide('d')),
+        withoutSection(copyrightSlide('e')),
+      ]
+      mount(PresentationViewer, { props: { slides, initialIndex: 2 } })
+      await Promise.resolve()
+
+      expect(body().find('[data-testid="presentation-progress"]').text()).toBe('3 / 5')
+    })
+
+    it('omitting initialIndex entirely opens on index 0 — unchanged pre-R061 behavior', async () => {
+      const slides: AssembledSlide[] = [
+        withoutSection(lyricSlide('a')),
+        withoutSection(copyrightSlide('b')),
+        withoutSection(scriptureSlide('c')),
+      ]
+      mount(PresentationViewer, { props: { slides } })
+      await Promise.resolve()
+
+      expect(body().find('[data-testid="presentation-progress"]').text()).toBe('1 / 3')
+    })
+
+    it('initialIndex: 99 against a 3-slide deck clamps to index 2, the last slide', async () => {
+      const slides: AssembledSlide[] = [
+        withoutSection(lyricSlide('a')),
+        withoutSection(copyrightSlide('b')),
+        withoutSection(scriptureSlide('c')),
+      ]
+      mount(PresentationViewer, { props: { slides, initialIndex: 99 } })
+      await Promise.resolve()
+
+      expect(body().find('[data-testid="presentation-progress"]').text()).toBe('3 / 3')
+    })
+
+    it('initialIndex: -1 clamps to 0', async () => {
+      const slides: AssembledSlide[] = [
+        withoutSection(lyricSlide('a')),
+        withoutSection(copyrightSlide('b')),
+        withoutSection(scriptureSlide('c')),
+      ]
+      mount(PresentationViewer, { props: { slides, initialIndex: -1 } })
+      await Promise.resolve()
+
+      expect(body().find('[data-testid="presentation-progress"]').text()).toBe('1 / 3')
+    })
+
+    it('initialIndex: 4 against an empty deck resolves to 0 without throwing', async () => {
+      expect(() => {
+        mount(PresentationViewer, { props: { slides: [], initialIndex: 4 } })
+      }).not.toThrow()
+      await Promise.resolve()
+
+      expect(body().find('[data-testid="presentation-empty-state"]').exists()).toBe(true)
+    })
+
+    it('starting mid-deck renders identical chrome to starting at 0 — no extra badge or notice', async () => {
+      const slides: AssembledSlide[] = [
+        withoutSection(lyricSlide('a')),
+        withoutSection(copyrightSlide('b')),
+        withoutSection(scriptureSlide('c')),
+      ]
+      mount(PresentationViewer, { props: { slides, initialIndex: 1 } })
+      await Promise.resolve()
+
+      // Same chrome elements as any other mount — no additional "started
+      // partway through" element exists anywhere in the viewer.
+      expect(body().find('[data-testid="presentation-chrome"]').exists()).toBe(true)
+      expect(body().find('[data-testid="presentation-exit"]').exists()).toBe(true)
+      expect(body().find('[data-testid="presentation-progress"]').text()).toBe('2 / 3')
+      expect(body().findAll('[data-testid="presentation-progress"]')).toHaveLength(1)
+    })
+  })
 })
