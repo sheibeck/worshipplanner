@@ -538,4 +538,141 @@ describe('CongregationalEditor', () => {
       expect(wrapper.find('[data-testid="speaker-toggle-0"]').text()).toBe('Congregation')
     })
   })
+
+  // ── 34-04 Task 2: the failure path and the manual-path regression proof ────
+
+  describe('AI split (34-04, Task 2: failure path)', () => {
+    const FAILURE_TOAST_TEXT =
+      "Couldn't split this passage — your reading is unchanged. Build it by hand or try again."
+
+    beforeEach(() => {
+      mockSplitCongregationalReading.mockReset()
+    })
+
+    async function fetchAndPrime(wrapper: ReturnType<typeof mountEditor>) {
+      await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
+      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
+      await flushPromises()
+    }
+
+    // Reads a snapshot of the rendered sections (speaker + text per row) via
+    // the DOM rather than an internal expose — `sections` itself is not part
+    // of this component's public seam (only `currentReadingId` is, for the
+    // unrelated E4 backstop), so the DOM is the honest external observation
+    // point for "did anything change".
+    function sectionsSnapshot(wrapper: ReturnType<typeof mountEditor>) {
+      const toggles = wrapper.findAll('[data-testid^="speaker-toggle-"]')
+      return toggles.map((toggle, idx) => ({
+        speaker: toggle.text(),
+        text: wrapper.find(`[data-testid="preview-section-${idx}"] span:last-child`).text(),
+      }))
+    }
+
+    it('pushes exactly one verbatim toast and leaves sections byte-identical when the split resolves null', async () => {
+      const wrapper = mountEditor()
+      await fetchAndPrime(wrapper)
+      const before = sectionsSnapshot(wrapper)
+
+      mockSplitCongregationalReading.mockResolvedValueOnce(null)
+      await wrapper.find('[data-testid="ai-split-btn"]').trigger('click')
+      await flushPromises()
+
+      const toasts = useToasts()
+      expect(toasts.toasts).toHaveLength(1)
+      expect(toasts.toasts[0]!.message).toBe(FAILURE_TOAST_TEXT)
+      expect(sectionsSnapshot(wrapper)).toEqual(before)
+    })
+
+    it('pushes the same toast and leaves sections unchanged when the split call rejects, with no error escaping the handler', async () => {
+      const wrapper = mountEditor()
+      await fetchAndPrime(wrapper)
+      const before = sectionsSnapshot(wrapper)
+
+      mockSplitCongregationalReading.mockRejectedValueOnce(new Error('network down'))
+
+      await expect(
+        wrapper.find('[data-testid="ai-split-btn"]').trigger('click'),
+      ).resolves.not.toThrow()
+      await flushPromises()
+
+      const toasts = useToasts()
+      expect(toasts.toasts).toHaveLength(1)
+      expect(toasts.toasts[0]!.message).toBe(FAILURE_TOAST_TEXT)
+      expect(sectionsSnapshot(wrapper)).toEqual(before)
+    })
+
+    it('clears isSplitting (button usable again) after both a null result and a rejection', async () => {
+      const wrapper = mountEditor()
+      await fetchAndPrime(wrapper)
+
+      mockSplitCongregationalReading.mockResolvedValueOnce(null)
+      await wrapper.find('[data-testid="ai-split-btn"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.find('[data-testid="ai-split-btn"]').attributes('disabled')).toBeUndefined()
+
+      mockSplitCongregationalReading.mockRejectedValueOnce(new Error('boom'))
+      await wrapper.find('[data-testid="ai-split-btn"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.find('[data-testid="ai-split-btn"]').attributes('disabled')).toBeUndefined()
+    })
+
+    it('pushes no toast on a successful split — this surface is failure-only', async () => {
+      const wrapper = mountEditor()
+      await fetchAndPrime(wrapper)
+
+      mockSplitCongregationalReading.mockResolvedValueOnce([
+        { speaker: 'LEADER', text: 'a' },
+        { speaker: 'CONGREGATION', text: 'b' },
+      ])
+      await wrapper.find('[data-testid="ai-split-btn"]').trigger('click')
+      await flushPromises()
+
+      expect(useToasts().toasts).toHaveLength(0)
+    })
+
+    it('regression: after a failed split, the manual speaker-toggle still works and the manual Fetch Passage flow still rebuilds sections', async () => {
+      const wrapper = mountEditor()
+      await fetchAndPrime(wrapper)
+
+      mockSplitCongregationalReading.mockResolvedValueOnce(null)
+      await wrapper.find('[data-testid="ai-split-btn"]').trigger('click')
+      await flushPromises()
+
+      // Manual toggle still works.
+      expect(wrapper.find('[data-testid="speaker-toggle-0"]').text()).toBe('Leader')
+      await wrapper.find('[data-testid="speaker-toggle-0"]').trigger('click')
+      expect(wrapper.find('[data-testid="speaker-toggle-0"]').text()).toBe('Congregation')
+
+      // Manual fetch-and-build flow still works, from scratch.
+      mockSplitPassage.mockReturnValueOnce(makeSampleSlides())
+      await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
+      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="speaker-toggle-0"]').text()).toBe('Leader')
+      expect(wrapper.find('[data-testid="speaker-toggle-1"]').text()).toBe('Congregation')
+      expect(wrapper.find('[data-testid="speaker-toggle-2"]').text()).toBe('Leader')
+    })
+
+    it('does not add any new data-testid beyond ai-split-btn', () => {
+      const wrapper = mountEditor()
+      const html = wrapper.html()
+      const testIds = [...html.matchAll(/data-testid="([^"]+)"/g)].map((m) => m[1])
+      const knownPrefixes = [
+        'reference-input',
+        'fetch-btn',
+        'ai-split-btn',
+        'fetch-error',
+        'sections-container',
+        'speaker-toggle-',
+        'preview-panel',
+        'preview-section-',
+        'preview-label-',
+        'save-status',
+      ]
+      for (const id of testIds) {
+        expect(knownPrefixes.some((prefix) => id === prefix || id.startsWith(prefix))).toBe(true)
+      }
+    })
+  })
 })
