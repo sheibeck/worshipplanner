@@ -434,6 +434,41 @@ validated-against — strictly stronger than R064 asks for.
 |-------|-------|--------|
 | 32 | verification_deferred_human | /gsd-verify-work 32 |
 | 33 | verification_deferred_human | /gsd-verify-work 33 |
+| 34 | verification_deferred_gaps | /gsd-plan-phase 34 --gaps |
+
+### ★ v1.4 Phase 34 — Smarter Content: LLM Scripture Split (2026-08-03) — **PARTIAL, and the gap is real**
+
+`34-VERIFICATION.md` is **`gaps_found`, 7/8 must-haves** — not passed, not merely human-needed.
+
+**What IS delivered, and verified against live source (not SUMMARY claims):** R064's structural
+correctness guarantee, in full.
+
+| Criterion | Verdict |
+|---|---|
+| 2 — text byte-identical to ESV source | ✅ `SPLIT_SCHEMA` permits **no string field except the speaker enum**, so the model literally cannot emit scripture words. Section text is one `text.slice()` from the untouched source, guarded by a source-inspection test **and** a non-ASCII (curly quotes, em dash) round-trip test with strict `===`. |
+| 3 — splits only on clause/verse boundaries | ✅ **Structurally unrepresentable** otherwise: the model picks integer indices into a pre-computed legal-boundary array. Stronger than R064 asks for. |
+| 4 — failure never blocks | ✅ Returns `null`, one toast, `sections.value` untouched. P-03 proven by `git diff`: **279 insertions / 0 deletions** on the editor and its test — the 19 pre-existing manual-path tests are byte-for-byte unmodified. |
+| **1 — a scripture item can be split** | ❌ **FAILS. No user can reach the feature.** |
+
+**The gap, stated plainly.** `CongregationalEditor.vue` is mounted nowhere — no route, no parent, no
+dynamic import outside its own test. **R047 explicitly handed this to Phase 34**: *"both editor
+components remain on disk, unmounted, for Phase 34/R064 to reuse."* Phase 34 did not do it.
+
+**The direction is NOT an open question — planning mis-read it as one.** R047 landed
+slot-as-source-of-truth and the owner **rejected** the separate-reading-document model (`3da5fe4`
+superseded by `5c531b1`). So closing the gap means **extending `ScriptureSlot` with
+`congregationalSections` and threading it through `slideGroupMaterializer`**, then mounting the editor.
+That is a data-model + assembler change, not a one-line mount — which is why it was recorded rather
+than attempted at the end of a long autonomous run, where a half-applied model change would be worse
+than an honest gap.
+
+**`REQUIREMENTS.md` was marked `[x]` Complete for R064 in error and has been corrected** to `[~]`
+partial, with the traceability row reading "Partial — structural guarantee done, reachability NOT
+delivered." Leaving it Complete would have misrepresented an unreachable feature as shipped.
+
+**Resume:** `/gsd-plan-phase 34 --gaps` — the scope is the model/assembler change above plus the mount.
+Also tracked as `PENDING-VERIFICATION.md` item 34.2, alongside 34.1 (empirical Haiku split determinism
+on Psalm 136 / Psalm 24 — no live API access during the run).
 
 ### v1.4 Phase 33 — Backgrounds & Slide Editing (2026-08-03)
 
