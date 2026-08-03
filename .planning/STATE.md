@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Service and Slides
-current_phase: 33
-current_phase_name: Backgrounds & Slide Editing
-status: verifying
-stopped_at: Completed 33-09-PLAN.md (last plan of phase 33)
-last_updated: "2026-08-03T05:41:03.749Z"
-last_activity: 2026-08-02
-last_activity_desc: Phase 33 execution started
+current_phase: 34
+current_phase_name: Smarter Content — LLM Scripture Split
+status: executing
+stopped_at: Completed 34-01-PLAN.md
+last_updated: "2026-08-03T07:30:08.588Z"
+last_activity: 2026-08-03
+last_activity_desc: Phase 34 execution started
 progress:
   total_phases: 9
   completed_phases: 5
-  total_plans: 30
-  completed_plans: 30
+  total_plans: 34
+  completed_plans: 31
   percent: 56
 ---
 
@@ -65,7 +65,7 @@ to-do for when they return.
 See: .planning/PROJECT.md (updated 2026-07-28)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 33 — Backgrounds & Slide Editing
+**Current focus:** Phase 34 — Smarter Content — LLM Scripture Split
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -75,10 +75,10 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 
 ## Current Position
 
-Phase: 33 (Backgrounds & Slide Editing) — EXECUTING
-Plan: 9 of 9
-Status: Phase complete — ready for verification
-Last activity: 2026-08-02 — Phase 33 execution started
+Phase: 34 (Smarter Content — LLM Scripture Split) — EXECUTING
+Plan: 2 of 4
+Status: Ready to execute
+Last activity: 2026-08-03 — Phase 34 execution started
 
 ## ★ v1.4 AUTONOMOUS RUN — standing decisions (2026-07-28)
 
@@ -455,9 +455,11 @@ requirements verified against live source.**
   `sourceRef.kind` rather than the group's owning song. A SONG group's legitimately-preserved
   `text`/`video` entries therefore silently skipped the song background tier while their `lyric`
   siblings did not — two cards in one group disagreeing about the same song's background.
+
 - **WR-03 (a11y bug with a test that hid it).** The 3-dot menu never moved focus into its panel on
   open, so **Escape did nothing** — the one keyboard behaviour the phase mandated. The test passed
   only because it dispatched `keydown` directly on the panel, bypassing the real event path.
+
 - **WR-04 (a removed guard).** Deleting the drawer's in-body nav links removed the "Discard unsaved
   changes?" confirmation with them and it was never ported to the menu path. Resolved by **restoring**
   the guard, wired at both the drawer's close/Escape and the menu-dispatched navigation.
@@ -787,6 +789,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 33 P07 | 50min | 3 tasks | 2 files |
 | Phase 33 P08 | 55min | 3 tasks | 4 files |
 | Phase 33 P09 | 35min | 3 tasks | 4 files |
+| Phase 34 P01 | 15min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -995,6 +998,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: pendingAction's remove-caption song branch is unreachable from EditSlideDrawer's available props (no song document threaded in) — documented as a known gap rather than guessed at
 - [Phase ?]: 33-08: BackgroundControl's Remove aria-label stays generic ('Remove background') — no acceptance criterion tests the per-level wording, and this is the last wave-3 mount site; flagged as a small optional removeLabel prop for a future follow-up if UAT needs it.
 - [Phase ?]: 33-09: onMenuAction dispatches duplicate/delete via the drawer's pendingAction seam (open + pending, never a direct store call) per the plan's explicit text, overriding 33-08's stale handoff note
+- [Phase ?]: 34-01: implemented the boundary-index contract exactly per RESEARCH.md — computeBoundaries/hasSplittableBoundaries/embedBoundaryMarkers/sliceAtBoundaries/stripVerseMarkers/verseRangeForSlice, with an encoding backstop enforced both behaviorally and via source-inspection
 
 ### Roadmap Evolution
 
@@ -1056,6 +1060,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-03T05:41:03.720Z
-Stopped at: Completed 33-09-PLAN.md (last plan of phase 33)
+Last session: 2026-08-03T07:30:08.524Z
+Stopped at: Completed 34-01-PLAN.md
 Resume file: None

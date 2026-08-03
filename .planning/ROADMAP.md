@@ -245,10 +245,11 @@ Plans:
   3. Splits fall only on clause/verse boundaries, never mid-sentence
   4. If the split call fails, the scripture slide still renders and remains usable — the feature never blocks editing
 
-**Plans**: 4 plans
+**Plans**: 1/4 plans executed
 
 Plans:
-- [ ] 34-01-PLAN.md — Boundary computation, marker embedding, and byte-exact slicing (pure functions)
+
+- [x] 34-01-PLAN.md — Boundary computation, marker embedding, and byte-exact slicing (pure functions)
 - [ ] 34-02-PLAN.md — SPLIT_SCHEMA and validateSplitResult() tested against every individual failure mode
 - [ ] 34-03-PLAN.md — splitCongregationalReading(): call shape, slicing, and every failure path
 - [ ] 34-04-PLAN.md — Opt-in "Split with AI" affordance, failure toast, manual-path regression
@@ -326,7 +327,7 @@ Plans:
 | 31. Service Lifecycle — Draft Lock & Reopen | v1.4 | 6/6 | Complete    | 2026-07-30 |
 | 32. Save Reliability — Autosave Fix & Persistent Status | v1.4 | 6/6 | In Progress|  |
 | 33. Backgrounds & Slide Editing | v1.4 | 9/9 | In Progress|  |
-| 34. Smarter Content — LLM Scripture Split | v1.4 | 0/TBD | Not started | - |
+| 34. Smarter Content — LLM Scripture Split | v1.4 | 1/4 | In Progress|  |
 | 35. Presentation Correctness & Lyric Editor | v1.4 | 0/TBD | Not started | - |
 | 36. UI Rework — Service Order & Contextual Action Bars | v1.4 | 0/TBD | Not started | - |
 | 37. PowerPoint Server-Side Rendering | v1.4 | 0/TBD | Not started | - |
