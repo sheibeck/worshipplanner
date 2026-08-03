@@ -1,11 +1,13 @@
 import { onCall, onRequest, HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { defineSecret } from "firebase-functions/params";
+import { onDocumentCreated } from "firebase-functions/v2/firestore";
+import { defineSecret, defineString } from "firebase-functions/params";
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { parsePptxBuffer, type MappedSlide } from "./pptxParser";
+import { invokeRenderService } from "./renderInvoker";
 
 // Server-held secrets (Google Secret Manager). Set once with:
 //   firebase functions:secrets:set CLAUDE_API_KEY
@@ -252,6 +254,186 @@ export async function parsePptxHandler(
 export const parsePptx = onCall(
   { memory: "1GiB", timeoutSeconds: 120 },
   parsePptxHandler,
+);
+
+// --- requestPptxRender (R062: the completeness check) -------------------
+//
+// The bridging trigger: fires when parsePptxHandler's additive queue write
+// (above) creates a pptxRenders/{importId} doc, invokes the render service,
+// and is the ONLY place that flips status to "ready". Configuration, not a
+// credential -- defineString, not defineSecret and not the deprecated
+// functions.config(). Empty default is deliberate: nothing is deployed yet
+// (37-CONTEXT.md's deploy prohibition), and the unconfigured branch below is
+// a tested behaviour, never a placeholder.
+export const PPTX_RENDER_SERVICE_URL = defineString("PPTX_RENDER_SERVICE_URL", {
+  default: "",
+});
+
+/** Builds the Storage prefix a completed render uploads its pages under. */
+export function renderedPrefixFor(orgId: string, importId: string): string {
+  return `orgs/${orgId}/pptx-imports/${importId}/rendered/`;
+}
+
+// The exact 4-digit zero-padded shape render-service/src/render.ts's
+// renderedObjectName produces (RENDERED_PAGE_PAD = 4). The padding is what
+// makes a Storage listing sort identically to render order under any locale
+// collation -- an unpadded page-1/page-10/page-2 would corrupt the recount
+// below by making "contiguous" impossible to determine from listing order.
+export const RENDERED_OBJECT_NAME = /^page-(\d{4})\.png$/;
+
+export interface RenderOutcome {
+  status: PptxRenderStatus;
+  renderedCount: number;
+  failureReason?: string;
+}
+
+/**
+ * The requestPptxRender trigger body, exported separately from the
+ * onDocumentCreated wrapper (mirroring parsePptxHandler/parsePptx and
+ * cleanupExpiredMediaHandler/cleanupExpiredMedia) so it is directly
+ * unit-testable against mocked Firestore/Storage/renderInvoker seams.
+ *
+ * ★ Trap 1 (37-CONTEXT.md / 37-VALIDATION.md): this handler must NEVER
+ * import, reference, or reason about parsePptxBuffer, MappedSlide, or a
+ * parsed slide array. mapAstToSlides (pptxParser.ts) SKIPS slides with
+ * neither substantial text nor images, and emits ONE ENTRY PER IMAGE on a
+ * multi-image slide -- its length is structurally decoupled from the deck's
+ * real page count (a 6-slide deck can yield 4 entries, or more than 6 with a
+ * multi-image collage). Deriving the expected render page count from it
+ * would be silently wrong in BOTH directions. The expected count comes only
+ * from the render service's own self-report, cross-checked below.
+ *
+ * ★ The ready gate (T-37-13): status flips to "ready" only when THREE
+ * independent signals agree -- never on the render service's self-report
+ * alone, mirroring parsePptxHandler's own "never trust the caller alone"
+ * pattern (independent org-membership re-check) at lines 172-181 above.
+ */
+export async function requestPptxRenderHandler(params: {
+  orgId: string;
+  importId: string;
+}): Promise<RenderOutcome> {
+  const { orgId, importId } = params;
+  const docRef = pptxRenderDocRef(orgId, importId);
+
+  const doc = await docRef.get();
+  if (!doc.exists) {
+    console.error(`requestPptxRender: no render doc at organizations/${orgId}/pptxRenders/${importId}`);
+    return { status: "failed", renderedCount: 0, failureReason: "missing-render-doc" };
+  }
+
+  const data = doc.data() as PptxRenderDoc | undefined;
+  const storagePath = data?.storagePath;
+  if (typeof storagePath !== "string" || storagePath.length === 0) {
+    const outcome: RenderOutcome = {
+      status: "failed",
+      renderedCount: 0,
+      failureReason: "missing-storage-path",
+    };
+    await docRef.set(
+      { status: outcome.status, renderedCount: outcome.renderedCount, failureReason: outcome.failureReason, updatedAt: FieldValue.serverTimestamp() },
+      { merge: true },
+    );
+    return outcome;
+  }
+
+  // Unconfigured service URL: fail closed, before ANY invocation. There is
+  // no branch from here that can reach "ready" -- an unconfigured render
+  // service must never be able to produce a ready flip (T-37-15). This is
+  // the expected state until the owner runs render-service/DEPLOY.md's
+  // deploy command; it is a tested behaviour, not a TODO.
+  const renderServiceUrl = PPTX_RENDER_SERVICE_URL.value().trim();
+  if (renderServiceUrl === "") {
+    const outcome: RenderOutcome = {
+      status: "failed",
+      renderedCount: 0,
+      failureReason: "render-service-not-configured",
+    };
+    await docRef.set(
+      { status: outcome.status, renderedCount: outcome.renderedCount, failureReason: outcome.failureReason, updatedAt: FieldValue.serverTimestamp() },
+      { merge: true },
+    );
+    return outcome;
+  }
+
+  let reportedCount: number;
+  try {
+    const response = await invokeRenderService({ orgId, importId, storagePath, renderServiceUrl });
+    reportedCount = response.renderedCount;
+  } catch (err) {
+    console.error(`requestPptxRender: invokeRenderService failed for ${orgId}/${importId}:`, err);
+    const outcome: RenderOutcome = {
+      status: "failed",
+      renderedCount: 0,
+      failureReason: "render-service-error",
+    };
+    await docRef.set(
+      { status: outcome.status, renderedCount: outcome.renderedCount, failureReason: outcome.failureReason, updatedAt: FieldValue.serverTimestamp() },
+      { merge: true },
+    );
+    return outcome;
+  }
+
+  // ★ Independent recount (never trust the response's renderedCount alone,
+  // mirroring parsePptxHandler's "never trust the client-declared value
+  // alone, independently re-verify" pattern at lines 172-181). Only objects
+  // whose final path segment matches RENDERED_OBJECT_NAME are counted, so a
+  // stray upload (e.g. a thumbnail) can never inflate the count.
+  const [files] = await getStorage()
+    .bucket()
+    .getFiles({ prefix: renderedPrefixFor(orgId, importId) });
+
+  const pageNumbers: number[] = [];
+  for (const file of files) {
+    const segments = file.name.split("/");
+    const basename = segments[segments.length - 1] ?? "";
+    const match = RENDERED_OBJECT_NAME.exec(basename);
+    if (!match) continue;
+    pageNumbers.push(Number(match[1]));
+  }
+  pageNumbers.sort((a, b) => a - b);
+
+  const actualCount = pageNumbers.length;
+
+  // ★ The gate (T-37-13). Three independent conjuncts, all required:
+  //   - actualCount > 0        -- the empty-render guard. A deck that
+  //                                rendered nothing must be "failed", never
+  //                                "ready" -- its parsed text layer stays
+  //                                usable either way.
+  //   - actualCount === reportedCount -- the self-report cross-check.
+  //   - contiguous              -- catches the partial render that count
+  //                                alone misses: pages 1, 2 and 4 uploaded
+  //                                against a reported count of 3 would
+  //                                otherwise pass the count check above.
+  const contiguous = pageNumbers.every((n, i) => n === i + 1);
+  const complete = actualCount > 0 && actualCount === reportedCount && contiguous;
+
+  const outcome: RenderOutcome = {
+    status: complete ? "ready" : "failed",
+    renderedCount: actualCount,
+    ...(complete ? {} : { failureReason: "incomplete-render" }),
+  };
+
+  await docRef.set(
+    {
+      status: outcome.status,
+      renderedCount: outcome.renderedCount,
+      updatedAt: FieldValue.serverTimestamp(),
+      ...(outcome.failureReason ? { failureReason: outcome.failureReason } : {}),
+    },
+    { merge: true },
+  );
+
+  return outcome;
+}
+
+export const requestPptxRender = onDocumentCreated(
+  "organizations/{orgId}/pptxRenders/{importId}",
+  async (event) => {
+    await requestPptxRenderHandler({
+      orgId: event.params.orgId,
+      importId: event.params.importId,
+    });
+  },
 );
 
 // --- cleanupExpiredMedia (R015: 2-week Storage retention) ---------------
