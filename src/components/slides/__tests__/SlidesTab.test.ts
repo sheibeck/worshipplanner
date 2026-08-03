@@ -538,6 +538,129 @@ describe('SlidesTab', () => {
     })
   })
 
+  describe('presentStartIndex — present starts where you were looking (R061)', () => {
+    // Three groups of differing slide counts (1, 4, 2) mapped onto three
+    // slots, in the same array order as slotIndex — this is what makes
+    // `selectedSlotArrayIndex` (props.slots.findIndex) agree with the
+    // `slotIndex` recorded on each fixture below.
+    // Flat deck order: [g0-0(0), g1-0(1), g1-1(2), g1-2(3), g1-3(4), g2-0(5), g2-1(6)]
+    const slots: ServiceSlot[] = [
+      makeSlot({ kind: 'SONG', id: 'slot-0', position: 0 }),
+      makeSlot({ kind: 'SONG', id: 'slot-1', position: 1 }),
+      makeSlot({ kind: 'SONG', id: 'slot-2', position: 2 }),
+    ]
+    const assembledSlideshow: AssembledSlide[] = [
+      makeAssembled(0, 'g0-0'),
+      makeAssembled(1, 'g1-0'),
+      makeAssembled(1, 'g1-1'),
+      makeAssembled(1, 'g1-2'),
+      makeAssembled(1, 'g1-3'),
+      makeAssembled(2, 'g2-0'),
+      makeAssembled(2, 'g2-1'),
+    ]
+
+    function mountWithSelection() {
+      return mountTab({ slots, assembledSlideshow, active: true })
+    }
+
+    /** Clicks the CTA and returns the payload of the LATEST `present` emit —
+     * the only public surface `presentStartIndex` has (it is deliberately
+     * not in `defineExpose`). */
+    async function presentPayload(wrapper: ReturnType<typeof mountWithSelection>): Promise<number> {
+      await wrapper.find('[data-testid="present-slideshow-cta"]').trigger('click')
+      const emitted = wrapper.emitted('present')
+      return (emitted?.[emitted.length - 1] as [number])[0]
+    }
+
+    it('a selected slide resolves to its own flat index', async () => {
+      const wrapper = mountWithSelection()
+      await wrapper.vm.$nextTick()
+      const vm = wrapper.vm as unknown as { selectedSlideId: string | null }
+      vm.selectedSlideId = 'g1-2'
+      await wrapper.vm.$nextTick()
+
+      expect(await presentPayload(wrapper)).toBe(3)
+    })
+
+    it('a slide at its group\'s first or last position resolves to its own flat index — no off-by-one', async () => {
+      const wrapper = mountWithSelection()
+      await wrapper.vm.$nextTick()
+      const vm = wrapper.vm as unknown as { selectedSlideId: string | null }
+
+      vm.selectedSlideId = 'g1-0' // group-1's first slide
+      await wrapper.vm.$nextTick()
+      expect(await presentPayload(wrapper)).toBe(1)
+
+      vm.selectedSlideId = 'g1-3' // group-1's last slide
+      await wrapper.vm.$nextTick()
+      expect(await presentPayload(wrapper)).toBe(4)
+    })
+
+    it('a slot selected with no slide within it resolves to that group\'s first assembled slide', async () => {
+      const wrapper = mountWithSelection()
+      await wrapper.vm.$nextTick()
+      const vm = wrapper.vm as unknown as { selectedSlotId: string | null; selectedSlideId: string | null }
+      vm.selectedSlotId = 'slot-1'
+      vm.selectedSlideId = null // slot-only selection — the watch already clears this on a real slot change
+      await wrapper.vm.$nextTick()
+
+      expect(await presentPayload(wrapper)).toBe(1) // g1-0, group-1's first slide
+    })
+
+    it('nothing selected resolves to 0', async () => {
+      // No slots at all — the D-05 auto-select watch has nothing to select,
+      // so both selectedSlotId and selectedSlideId stay null.
+      const wrapper = mountTab({ slots: [], assembledSlideshow, active: true })
+      await wrapper.vm.$nextTick()
+
+      expect(await presentPayload(wrapper)).toBe(0)
+    })
+
+    it('a stale selectedSlideId falls back to the group\'s first slide, then to 0 if the group is gone too', async () => {
+      const wrapper = mountWithSelection()
+      await wrapper.vm.$nextTick()
+      const vm = wrapper.vm as unknown as { selectedSlotId: string | null; selectedSlideId: string | null }
+
+      // Stale slide id, but the selected slot's group still resolves.
+      vm.selectedSlotId = 'slot-1'
+      await wrapper.vm.$nextTick()
+      vm.selectedSlideId = 'deleted-slide-id'
+      await wrapper.vm.$nextTick()
+      expect(await presentPayload(wrapper)).toBe(1) // g1-0, group-1's first slide
+
+      // Both the slide AND the slot are stale/gone — falls all the way to 0.
+      vm.selectedSlotId = 'deleted-slot-id'
+      await wrapper.vm.$nextTick()
+      expect(await presentPayload(wrapper)).toBe(0)
+    })
+
+    it('groups with differing slide counts (1, 4, 2) each map their selection to the correct flat index', async () => {
+      const wrapper = mountWithSelection()
+      await wrapper.vm.$nextTick()
+      const vm = wrapper.vm as unknown as { selectedSlideId: string | null }
+
+      vm.selectedSlideId = 'g0-0' // the 1-slide group
+      await wrapper.vm.$nextTick()
+      expect(await presentPayload(wrapper)).toBe(0)
+
+      vm.selectedSlideId = 'g2-1' // the 2-slide group, second slide
+      await wrapper.vm.$nextTick()
+      expect(await presentPayload(wrapper)).toBe(6)
+    })
+
+    it('clicking present-slideshow-cta emits present with the computed start index as its payload', async () => {
+      const wrapper = mountWithSelection()
+      await wrapper.vm.$nextTick()
+      const vm = wrapper.vm as unknown as { selectedSlideId: string | null }
+      vm.selectedSlideId = 'g1-2'
+      await wrapper.vm.$nextTick()
+
+      await wrapper.find('[data-testid="present-slideshow-cta"]').trigger('click')
+
+      expect(wrapper.emitted('present')?.[0]).toEqual([3])
+    })
+  })
+
   describe('Duplicate follows the copy (Phase 26-09 Task 2)', () => {
     it("selects the new entry and shows it in the panel when the drawer's duplicate event fires", async () => {
       const slots: ServiceSlot[] = [makeSlot({ kind: 'SONG', id: 'slot-a', position: 0 })]

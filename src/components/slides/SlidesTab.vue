@@ -16,7 +16,7 @@
         :disabled="!canPresent"
         :title="canPresent ? undefined : 'Add songs or scripture to build a slideshow to present.'"
         class="inline-flex items-center gap-1.5 rounded-md border border-indigo-400/60 px-3 py-1.5 text-xs font-medium text-indigo-300 transition-colors hover:bg-indigo-500/10 disabled:cursor-not-allowed disabled:opacity-50"
-        @click="emit('present')"
+        @click="onPresentClick"
       >
         <span aria-hidden="true">&#9654;</span> Present
       </button>
@@ -177,8 +177,10 @@ const emit = defineEmits<{
   (e: 'navigate-to-scripture-editor', slotArrayIndex: number): void
   /** D-05 (Phase 27-05): request to start presenting. `ServiceEditorView` owns
    *  the `presenting` flag and the `PresentationViewer` mount; this component
-   *  only asks for it, exactly as SlideshowPreview's own `present` emit did. */
-  (e: 'present'): void
+   *  only asks for it, exactly as SlideshowPreview's own `present` emit did.
+   *  R061: the payload is the flat index into `assembledSlideshow` that
+   *  `PresentationViewer` should open on. */
+  (e: 'present', startIndex: number): void
 }>()
 
 const router = useRouter()
@@ -378,6 +380,33 @@ const selectedAssembledSlide = computed<AssembledSlide | null>(() => {
   if (selectedSlideId.value === null) return null
   return selectedGroupAssembledSlides.value.find((a) => a.slide.id === selectedSlideId.value) ?? null
 })
+
+/**
+ * R061 — the (group, slide) → flat-deck-index mapping `present` hands to
+ * `PresentationViewer`. Ladder: a selected SLIDE resolves to its own flat
+ * index; failing that (not found, or only a group selected), the selected
+ * GROUP's first slide; failing that (no group selected, or the group is
+ * gone too), 0. Each rung falls through to the next on a miss — this is what
+ * makes a stale selection degrade quietly instead of throwing or landing on
+ * an unrelated slide. Resolved via `findIndex` only: `selectedSlideId` is an
+ * assembled slide's string `id`, never a position (35-RESEARCH.md Anti-Patterns).
+ */
+const presentStartIndex = computed<number>(() => {
+  if (selectedSlideId.value !== null) {
+    const bySlide = props.assembledSlideshow.findIndex((a) => a.slide.id === selectedSlideId.value)
+    if (bySlide >= 0) return bySlide
+  }
+  if (selectedSlotArrayIndex.value >= 0) {
+    const byGroup = props.assembledSlideshow.findIndex((a) => a.slotIndex === selectedSlotArrayIndex.value)
+    if (byGroup >= 0) return byGroup
+  }
+  return 0
+})
+
+/** Present CTA click handler (R061) — carries the computed start index on the emit. */
+function onPresentClick(): void {
+  emit('present', presentStartIndex.value)
+}
 
 const selectedSlidePosition = computed(() => {
   const index = selectedGroupAssembledSlides.value.findIndex((a) => a.slide.id === selectedSlideId.value)
