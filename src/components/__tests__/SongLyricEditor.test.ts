@@ -4,6 +4,7 @@ import { ref, computed, reactive } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import type { Options as SortableOptions } from 'sortablejs'
 import SongLyricEditor from '../SongLyricEditor.vue'
+import BackgroundControl from '../slides/BackgroundControl.vue'
 import { useSaveStatus } from '@/stores/saveStatus'
 import type { SongLyrics, LyricSection, CopyrightInfo } from '@/types/songLyrics'
 
@@ -72,6 +73,7 @@ const mockUnsubscribeLyrics = vi.fn()
 const mockUpdateCurrentLyrics = vi.fn(() => Promise.resolve())
 const mockSaveLyrics = vi.fn(() => Promise.resolve())
 const mockRevertToVersion = vi.fn(() => Promise.resolve())
+const mockSetSongBackground = vi.fn(() => Promise.resolve())
 
 const mockCurrentLyrics = ref<SongLyrics | null>(null)
 const mockIsLoading = ref(true)
@@ -88,7 +90,33 @@ vi.mock('@/stores/songLyrics', () => ({
       updateCurrentLyrics: mockUpdateCurrentLyrics,
       saveLyrics: mockSaveLyrics,
       revertToVersion: mockRevertToVersion,
+      setSongBackground: mockSetSongBackground,
     }),
+}))
+
+// 33-06: viewer/editor gating for the new song-level background control —
+// this editor has no other editor gate today, so this is the first
+// useAuthStore mock in this file.
+const mockIsEditor = ref(true)
+vi.mock('@/stores/auth', () => ({
+  useAuthStore: () =>
+    reactive({
+      isEditor: computed(() => mockIsEditor.value),
+    }),
+}))
+
+// 33-06: BackgroundControl (mounted un-stubbed below) pulls in
+// useBackgroundUpload, which touches '@/firebase' storage — mocked out here
+// exactly like BackgroundControl.test.ts's own idiom, since none of this
+// file's cases drive an actual file upload.
+vi.mock('@/composables/useBackgroundUpload', () => ({
+  useBackgroundUpload: () => ({
+    progress: ref(0),
+    error: ref(null),
+    isUploading: ref(false),
+    uploadBackground: vi.fn(),
+    reset: vi.fn(),
+  }),
 }))
 
 vi.mock('@/composables/useAutoSave', () => {
@@ -130,6 +158,7 @@ describe('SongLyricEditor', () => {
     mockCurrentLyrics.value = null
     mockIsLoading.value = true
     mockLyricVersions.value = []
+    mockIsEditor.value = true
     capturedSortableOptions = undefined
     // Reset the shared mocked composable's status ref between tests -- it
     // is module-level and persists its last value otherwise, which masks a
@@ -1100,5 +1129,114 @@ describe('SongLyricEditor', () => {
     expect(mockUpdateCurrentLyrics).toHaveBeenCalledWith('org-1', 'song-1', 'lyrics-1', expect.objectContaining({
       performanceOrder: ['verse-1', 'chorus', 'tag'],
     }))
+  })
+
+  // ── 33-06: song-level background control (R057) ────────────────────────────
+
+  const EMPTY_BACKGROUND_CAPTION = 'Applies to every service using this song, unless a group or slide overrides it.'
+  const SET_BACKGROUND_CAPTION = 'Applies wherever this song appears — services can override it.'
+  const SAMPLE_BG_URL = 'https://storage.example.com/org-1/backgrounds/abc/sunset.jpg'
+
+  it('background: with lyrics loaded and no background set, renders the row with the empty-state caption and the add affordance', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    const row = wrapper.find('[data-testid="song-background-row"]')
+    expect(row.exists()).toBe(true)
+    expect(row.get('[data-testid="background-control-caption"]').text()).toBe(EMPTY_BACKGROUND_CAPTION)
+    expect(row.find('[data-testid="background-control-add"]').exists()).toBe(true)
+  })
+
+  it('background: with a background set, shows the populated-state caption, thumbnail, filename and Remove', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics({ backgroundImageUrl: SAMPLE_BG_URL })
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    const row = wrapper.find('[data-testid="song-background-row"]')
+    expect(row.get('[data-testid="background-control-caption"]').text()).toBe(SET_BACKGROUND_CAPTION)
+    expect(row.find('[data-testid="background-control-image"]').exists()).toBe(true)
+    expect(row.get('[data-testid="background-control-filename"]').text()).toBe('sunset.jpg')
+    expect(row.find('[data-testid="background-control-remove"]').exists()).toBe(true)
+  })
+
+  it("background: the control's attach emit results in exactly one setSongBackground call whose fourth argument is the emitted URL", async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics({ id: 'lyrics-1' })
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    const control = wrapper.findComponent(BackgroundControl)
+    control.vm.$emit('attach', SAMPLE_BG_URL)
+    await flushPromises()
+
+    expect(mockSetSongBackground).toHaveBeenCalledTimes(1)
+    expect(mockSetSongBackground).toHaveBeenCalledWith('org-1', 'song-1', 'lyrics-1', SAMPLE_BG_URL)
+  })
+
+  it("background: the control's remove emit results in one setSongBackground call whose fourth argument is null", async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics({ id: 'lyrics-1', backgroundImageUrl: SAMPLE_BG_URL })
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    const control = wrapper.findComponent(BackgroundControl)
+    control.vm.$emit('remove')
+    await flushPromises()
+
+    expect(mockSetSongBackground).toHaveBeenCalledTimes(1)
+    expect(mockSetSongBackground).toHaveBeenCalledWith('org-1', 'song-1', 'lyrics-1', null)
+  })
+
+  it('background: with no lyrics loaded, the row does not render at all', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = null
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="song-background-row"]').exists()).toBe(false)
+  })
+
+  it('background: with a viewer role, the add and remove controls are absent while the thumbnail and caption still render', async () => {
+    mockIsEditor.value = false
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics({ backgroundImageUrl: SAMPLE_BG_URL })
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    const row = wrapper.find('[data-testid="song-background-row"]')
+    expect(row.get('[data-testid="background-control-caption"]').text()).toBe(SET_BACKGROUND_CAPTION)
+    expect(row.find('[data-testid="background-control-image"]').exists()).toBe(true)
+    expect(row.find('[data-testid="background-control-add"]').exists()).toBe(false)
+    expect(row.find('[data-testid="background-control-remove"]').exists()).toBe(false)
+  })
+
+  it('background: the row sits between the header and the loading/empty/scroll-region branch chain, a sibling of both, nested in neither', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    const header = wrapper.find('[data-testid="lyrics-header"]')
+    const scrollRegion = wrapper.find('[data-testid="lyrics-scroll-region"]')
+    expect(header.find('[data-testid="song-background-row"]').exists()).toBe(false)
+    expect(scrollRegion.find('[data-testid="song-background-row"]').exists()).toBe(false)
+
+    const html = wrapper.html()
+    expect(html.indexOf('data-testid="lyrics-header"')).toBeLessThan(html.indexOf('data-testid="song-background-row"'))
+    expect(html.indexOf('data-testid="song-background-row"')).toBeLessThan(html.indexOf('data-testid="lyrics-scroll-region"'))
+  })
+
+  it('background: the mounted BackgroundControl never receives an inheritedFrom prop — the song is the least specific level', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    const control = wrapper.findComponent(BackgroundControl)
+    expect(control.exists()).toBe(true)
+    expect(control.props('inheritedFrom')).toBeUndefined()
   })
 })

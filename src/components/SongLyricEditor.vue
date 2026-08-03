@@ -26,6 +26,23 @@
       </div>
     </div>
 
+    <!-- Song background (R057) — the least specific tier of the slide/group/
+         song cascade; this is the LEAST specific level, so there is nothing
+         below it for the control to display as inherited (no such prop is
+         ever passed here). A sibling of the header and the branches below,
+         nested in neither. -->
+    <div v-if="currentLyrics" data-testid="song-background-row" class="px-4 pt-3">
+      <BackgroundControl
+        :image-url="currentLyrics.backgroundImageUrl"
+        :caption="currentLyrics.backgroundImageUrl ? 'Applies wherever this song appears — services can override it.' : 'Applies to every service using this song, unless a group or slide overrides it.'"
+        add-label="+ Add background for this song"
+        :is-editor="isEditor"
+        :org-id="orgId"
+        @attach="onAttachSongBackground"
+        @remove="onRemoveSongBackground"
+      />
+    </div>
+
     <!-- Loading -->
     <div v-if="songLyricsStore.isLoading" class="flex flex-1 items-center justify-center">
       <span class="text-sm text-gray-500">Loading lyrics...</span>
@@ -245,9 +262,11 @@
 import { reactive, ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import Sortable from 'sortablejs'
 import { useSongLyricsStore } from '@/stores/songLyrics'
+import { useAuthStore } from '@/stores/auth'
 import { useAutoSave } from '@/composables/useAutoSave'
 import { useSaveStatus } from '@/stores/saveStatus'
 import SaveStatusIndicator from './SaveStatusIndicator.vue'
+import BackgroundControl from './slides/BackgroundControl.vue'
 import {
   buildSectionRows,
   normalizeLyricOrder,
@@ -268,12 +287,34 @@ const props = defineProps<{
 }>()
 
 const songLyricsStore = useSongLyricsStore()
+const authStore = useAuthStore()
 const saveStatus = useSaveStatus()
 const showPasteDialog = ref(false)
 const showHistory = ref(false)
 const expandedRowKeys = ref<Set<string>>(new Set())
 
 const currentLyrics = computed<SongLyrics | null>(() => songLyricsStore.currentLyrics)
+
+// R057: gated on the auth store's isEditor rather than a new prop — this
+// editor has no editor gate today (SongSlideOver.vue doesn't add one
+// either), but the Firestore rule on the lyrics subcollection already
+// requires an org editor, so a viewer's write would fail with a permission
+// error rather than a visible refusal. Gating only this NEW control is a
+// strict improvement; retrofitting the gate onto the rest of the editor is
+// a pre-existing gap, deliberately out of scope here.
+const isEditor = computed(() => authStore.isEditor)
+
+async function onAttachSongBackground(url: string): Promise<void> {
+  const cur = currentLyrics.value
+  if (!cur?.id) return
+  await songLyricsStore.setSongBackground(props.orgId, props.songId, cur.id, url)
+}
+
+async function onRemoveSongBackground(): Promise<void> {
+  const cur = currentLyrics.value
+  if (!cur?.id) return
+  await songLyricsStore.setSongBackground(props.orgId, props.songId, cur.id, null)
+}
 
 // 32-06: same capture-once shape as CongregationalEditor.vue/
 // ScriptureSlideEditor.vue, for consistency across all three editors.
