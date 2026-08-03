@@ -19,7 +19,7 @@ render line (R059), verify a bracket that already appears to exist on both assem
 duplicate it (R060), and thread a start index that already exists in `SlidesTab.vue`'s state through to
 `PresentationViewer.vue` (R061); (2) **lyric editor** — convert `LyricPasteDialog.vue` from a
 Teleport-modal into an inline region of `SongLyricEditor.vue`, adding a missing-copyright warning that
-never blocks the paste (R065, R066).
+blocks the paste unless overridden (R065, R066).
 
 **★ This phase has real wireframe backing for R065/R066 — the other three (R059–R061) have none.**
 `docs/design/slides-tab.dc.html`'s **Turn 2 — Song lyrics editor** section (lines 358–654, the file's
@@ -27,16 +27,6 @@ own "State 1/2/3" sequence) is the specified design for the inline paste treatme
 touch no surface the mockup depicts (a presented slide's chrome, a copyright slide's assembly, a
 start-index computation) and are original, minimal design work by this spec, exactly as 33-UI-SPEC
 recorded for its own unwireframed surfaces.
-
-**★ Verified divergence from the mockup — record before building, don't silently "correct" the spec to
-match the picture.** The mockup's own "State 3 — pasted without credits" (lines 570–654) shows the paste
-**blocked**: "Copyright is required — the paste is blocked until credits are supplied or explicitly
-deferred," a grayed-out "Replace lyrics" button, and an "☐ Add anyway — I'll enter credits later"
-checkbox gating it. **35-CONTEXT.md's own R065 framing directly overrides this:** "R065 advises, it
-never blocks… Blocking a paste because a song has no CCLI number would be a worse failure than the
-silence it replaces." §4 keeps the mockup's warning card and its "We found… ⚠ no copyright" status line
-verbatim, but drops the block/checkbox mechanism entirely — the confirm button never disables on missing
-copyright, only on zero detected sections (parity with the app's own existing, tested gate).
 
 **Upstream decisions this spec implements, not re-opens (35-CONTEXT.md):** R059 is a render fix, not a
 model change — `sectionLabel` stays on `LyricSlide`, only `PresentationViewer.vue:53`'s render of it is
@@ -66,18 +56,22 @@ Declared values (must be multiples of 4):
 
 | Token | Value | Usage in this phase |
 |-------|-------|---------------------|
-| xs | 4px | `gap-1` between the warning icon and its title line |
-| sm | 8px | `gap-2` in the paste-mode header row; `gap-2` between summary-line segments |
-| md | 16px | `px-4` — outer padding for the paste header/instructions/textarea, matching the editor's own existing `px-4` header/scroll-region padding verbatim (`SongLyricEditor.vue:5,76`) |
+| xs | 4px | `gap-1` — spacing between a section-detected chip's index number and its label (`{{ i + 1 }} {{ section.label }}`) |
+| sm | 8px | `gap-2` in the paste-mode header row; `gap-2` between summary-line segments; `gap-2` for the missing-copyright warning card's internal vertical stack (icon+title row, body line, override checkbox) and its icon+title row's own horizontal gap; `gap-2` for the section-detected chips' wrap gap; `py-2` vertical padding on the warning card and the "no sections detected" notice |
+| md | 16px | `px-4` — outer padding for the paste header/instructions/textarea, matching the editor's own existing `px-4` header/scroll-region padding verbatim (`SongLyricEditor.vue:5,76`); also `px-4` horizontal padding on the missing-copyright warning card and the "no sections detected" notice |
 | lg | 24px | not used by new markup this phase |
 | xl | 32px | not used |
 | 2xl | 48px | not used |
 | 3xl | 64px | not used |
-| — | 12px (`px-3 py-2.5`) | the missing-copyright warning card and the "no sections detected" notice — matches `section-row`/`add-section-row`'s existing `px-3 py-2.5` shell verbatim (`SongLyricEditor.vue:109,211`) |
-| — | 6px (`gap-1.5`) | vertical stack gap inside the warning card (icon+title line, body line) |
 
-**Exceptions: none.** Every value above is either an established 4px-grid token or a verbatim reuse of
-this exact file's own already-declared padding — no new spacing value is introduced.
+**Exceptions: none.** Every value above is a multiple of 4 drawn from the standard set (4, 8, 16, 24,
+32, 48, 64) — no half-step or off-grid value is introduced. **Revision note:** the prior draft used
+`gap-1.5` (6px) and `px-3 py-2.5` (12px horizontal / 10px vertical) on the warning card and the
+"no sections detected" notice, justified only as verbatim reuse of `section-row`/`add-section-row`'s
+existing shell (`SongLyricEditor.vue:109,211`). That reuse does not exempt the value from the grid rule —
+it inherits the break rather than curing it. Both are replaced with `gap-2`/`px-4 py-2`; the pre-existing
+off-grid classes in `SongLyricEditor.vue` itself are untouched, this phase simply no longer extends them
+into new markup.
 
 ---
 
@@ -91,19 +85,23 @@ already declared in `SongLyricEditor.vue` itself, or (the warning card) a verbat
 | Role | Size | Weight | Line Height | Usage |
 |------|------|--------|-------------|-------|
 | Paste-mode title | 14px (`text-sm`) | 600 (`font-semibold`) | 1.4 | "Paste lyrics" — reuses the existing "Sections" `<h3>` class verbatim (`SongLyricEditor.vue:9`, `text-sm font-semibold text-gray-100`) |
-| Back link | 12px (`text-xs`) | 500 (`font-medium`) | 1.4 | "‹ Back to sections" — matches the app's established indigo-link size/weight (33-UI-SPEC's own `text-indigo-400 hover:text-indigo-300` convention) |
+| Back link | 12px (`text-xs`) | 600 (`font-semibold`) | 1.4 | "‹ Back to sections" — 33-UI-SPEC's own indigo-link precedent (`text-indigo-400 hover:text-indigo-300`, `EditSlideDrawer.vue:444`) uses `font-medium` (500); this phase bumps to `font-semibold` (600) specifically to hold this spec's weight count at 2 (see the cap note below) — size and color convention otherwise unchanged |
 | Instructions paragraph | 11.5px (`text-[11.5px]`) | 400 (regular) | 1.55 (`leading-[1.55]`) | The four-sentence paste guidance — this exact arbitrary size is **already native to this file**, not borrowed from the wireframe: `row-preview` (`:126`), `row-repeat-note` (`:158`), and `add-section-row`'s label (`:213`) all already use `text-[11.5px]` |
 | Textarea | 14px (`text-sm`) | 400 (regular), `font-mono` | 1.6 | The paste input — reuses the editor's own expanded-row textarea classes verbatim (`SongLyricEditor.vue:188`, `bg-gray-900 border-gray-700 font-mono text-sm`), not the old dialog's `bg-gray-800` |
-| Found-summary line | 11px (`text-[11px]`) | 400 (regular) | 1.5 | "We found · ✓ N sections · ✓ copyright / ⚠ no copyright" — reuses the editor's own `closing-note` class verbatim (`:224-227`, `text-[11px] leading-relaxed text-gray-500`), extended with one more emerald/amber span in the same family |
+| Found-summary line | 11.5px (`text-[11.5px]`) | 400 (regular) | 1.5 | "We found · ✓ N sections · ✓ copyright / ⚠ no copyright" — the editor's own `closing-note` class uses `text-[11px]` verbatim (`:224-227`); that 0.5px tier is merged into the Instructions-paragraph size here to hold this spec at 4 declared sizes rather than 5, an imperceptible difference — same `leading-relaxed`/`text-gray-500` family otherwise, extended with one more emerald/amber span |
 | Section-detected chip | 10px (`text-[10px]`) | 600 (`font-semibold`), uppercase | 1 | Reuses `LABEL_CHIP_CLASSES.collapsed` verbatim (`:690`) — no new chip style |
-| Warning title | 14px (`text-sm`) | 500 (`font-medium`) | 1.4 | "No copyright information found" — matches `service-lock-banner-text`'s lead span size/weight verbatim (`ServiceEditorView.vue:283-284`, `text-sm font-medium`) |
+| Warning title | 14px (`text-sm`) | 600 (`font-semibold`) | 1.4 | "No copyright information found" — `service-lock-banner-text`'s lead span uses `font-medium` (500) verbatim (`ServiceEditorView.vue:283-284`); this phase standardizes on `font-semibold` (600) instead, matching the Paste-mode title's own weight rather than introducing a third tier |
 | Warning body | 14px (`text-sm`) | 400 (regular) | 1.5 | The advisory sentence beneath the warning title — matches the same lock-banner paragraph's body size verbatim |
+| Override checkbox label | 11.5px (`text-[11.5px]`) | 400 (regular) | 1.4 | "Add anyway — I'll enter credits later" — the wireframe's own copy (`docs/design/slides-tab.dc.html:644`), sized to the same tier as the Instructions paragraph rather than introducing a new size |
 | Save-error line | 12px (`text-xs`) | 400 (regular) | 1.4 | New — matches the app's established inline-error convention (`useMediaUpload.ts`-family error text, `text-red-400 text-xs`) |
+| Footer buttons (`Cancel` / `Replace lyrics`) | 14px (`text-sm`) | 600 (`font-semibold`) | 1.4 | The old dialog's Cancel/Save buttons used `font-medium` (500); bumped to `font-semibold` (600) here for the same reason as the Back link and Warning title above — holding this spec at 2 declared weights |
 
-**Weights declared: exactly 3 — 400 (regular), 500 (`font-medium`), 600 (`font-semibold`).** All three
-already exist in this exact file before this phase touches it. **Sizes declared: exactly 5 — 10px, 11px,
-11.5px, 12px, 14px.** Every one is verbatim reuse of a size this file, or the sibling lock banner this
-codebase already ships, already uses — no invented tier.
+**Weights declared: exactly 2 — 400 (regular) and 600 (`font-semibold`).** The prior draft declared a
+third tier, 500 (`font-medium`), on the Back link and the Warning title; both move to 600 above so the
+phase holds at 2, matching the 14px Paste-mode title's existing weight rather than inventing a new one.
+**Sizes declared: exactly 4 — 10px, 11.5px, 12px, 14px.** The prior draft declared 5 (10px, 11px, 11.5px,
+12px, 14px); the Found-summary line's 11px is merged into the 11.5px tier above (see that row) to hold
+the total at 4.
 
 ---
 
@@ -142,9 +140,10 @@ introducing indigo as a second, competing "this is fine" signal.
 | Found-summary line | `We found` · `✓ {N} section{s}` · `✓ copyright` **or** `⚠ no copyright` |
 | Section-detected chips | `{n} {Label}` per detected section, e.g. `1 Chorus`, `2 Verse 1` — matches the wireframe's chip content exactly |
 | Missing-copyright warning — title | `No copyright information found` |
-| Missing-copyright warning — body (★ adapted from the wireframe, never-block — see divergence note above) | `This song will save without CCLI credits. They're normally shown small under the first and last slide once added — copy the CCLI block from the bottom of the SongSelect page and paste it above, or add it anytime by pasting again.` |
+| Missing-copyright warning — body (adapted from the wireframe's State-3 body text — reworded to avoid implying CCLI requires screen credits; pairs with the disabled-button mechanism in § Phase-Specific Component Contracts §4) | `This song can't be saved without CCLI credits unless you check the box below. They're normally shown small under the first and last slide once added — copy the CCLI block from the bottom of the SongSelect page and paste it above, or check the box to save now and add credits later.` |
+| Override checkbox (restored per the wireframe, Turn 2 State 3 — `docs/design/slides-tab.dc.html:644`) | `Add anyway — I'll enter credits later` — always rendered alongside the warning card, never conditional on any other field being filled in |
 | Footer caption | `Replaces the current {N} section{s} · undoable from History.` — shown identically whether or not copyright is present; History's Save Version/Revert is unaffected by the copyright warning, so the caption does not change shape between the two states (unlike the wireframe's two slightly different footer captions) |
-| Primary CTA | `Replace lyrics` (renamed from the old dialog's `Save Lyrics` — adopts the wireframe's more specific label, since "Replace" is what this action actually does to the song's existing sections) |
+| Primary CTA | `Replace lyrics` (renamed from the old dialog's `Save Lyrics` — adopts the wireframe's more specific label, since "Replace" is what this action actually does to the song's existing sections). Disabled when zero sections are detected, OR when copyright is missing and the override checkbox is unchecked — see §4 |
 | Primary CTA — saving | `Saving...` (unchanged, reused) |
 | Secondary action | `Cancel` — same unsaved-changes guard as today, reused verbatim: `You have unsaved changes. Discard them?` (native `window.confirm`), fired from BOTH `Cancel` and `‹ Back to sections` |
 | Save error (NEW) | `Couldn't save your changes. Your paste is still here — try again.` — mirrors this codebase's established "state the failure, don't discard the user's work" convention (`SongLyricEditor.vue`'s own autosave error text, `:431`) |
@@ -162,9 +161,16 @@ chrome after the label removal (`static-content`), E2 copyright-slide bracket co
 group (`list-collection`), E3 the Present entry point's start-index behavior (`nav`), E4 the inline
 paste-lyrics region including the missing-copyright warning (`form`).
 
-**Applicable: 18 — 17 covered, 1 backstop, 0 unresolved.**
+**Applicable: 28 — 26 covered, 2 backstop, 0 unresolved.**
 
-Per-element: E1 2/2 covered · E2 7/7 covered · E3 4/4 covered · E4 4 covered / 1 backstop.
+Per-element: E1 8/8 covered · E2 7 covered / 1 backstop · E3 4/4 covered · E4 7 covered / 1 backstop.
+
+> **Reconciled 2026-08-03 — the first pass under-counted at 18.** The prose classifier is lossy: a
+> second probe run over the same four surfaces, described differently, tripped a different set of
+> element kinds (E1 as an interactive surface rather than `static-content`; E4 as both a form *and* a
+> list). Per the probe protocol, recall depends on the **union** of detected kinds, not either run
+> alone — so the 10 categories the first classification missed are resolved in
+> **§ Reconciliation** at the end of this section. Original per-element rows below are unchanged.
 
 ### E1 — Presented lyric slide, after `sectionLabel` removal
 
@@ -206,8 +212,41 @@ this spec's own E2 `empty`/`zero-one-many` rows above assume does NOT happen.
 | empty | ✅ covered | No text pasted: textarea shows its placeholder, no found-summary line, no warning card, `Replace lyrics` disabled (zero sections) — matches the current dialog's existing `canConfirm` gate exactly, just re-hosted inline |
 | loading | ✅ covered | Parsing (`parseCCLIPaste`) is a synchronous pure function — no loading state exists for detection itself; the only async step is the Firestore write on confirm, which reuses the existing `Saving...` button-label swap verbatim |
 | error | 🧪 backstop | **Statement:** if `songLyricsStore.saveLyrics` rejects, the pasted text must remain in the textarea (never cleared) and a visible error line must render — today's `LyricPasteDialog.vue` has no catch branch and would silently reset `isSaving` with no user-facing signal, which is the exact "invisible save failure" class R041 exists to prevent elsewhere in this codebase. **verification: backstop** — a test that a rejected `saveLyrics` call leaves `rawText` intact and renders `paste-save-error` with the exact copy from § Copywriting Contract. |
-| partial | ✅ covered | Sections detected but copyright missing is this element's CORE resolved case — R065's entire deliverable. The warning card renders, `Replace lyrics` stays enabled, and the save proceeds exactly as if copyright had been found — the full state machine is specified in § Copywriting Contract and § Phase-Specific Component Contracts §4 |
+| partial | ✅ covered | Sections detected but copyright missing is this element's CORE resolved case — R065's entire deliverable. The warning card renders with an always-available override checkbox; `Replace lyrics` stays disabled until either a CCLI number is detected or the checkbox is checked, at which point the save proceeds identically to the copyright-present case — the full state machine is specified in § Copywriting Contract and § Phase-Specific Component Contracts §4 |
 | long-text | ✅ covered | A full song's pasted text can be arbitrarily long — the textarea/preview region keeps the existing dialog's `overflow-y-auto` scroll behavior, now scoped to the region's own bounded height rather than a modal's `max-h-[85vh]` |
+
+### § Reconciliation — the 10 categories the first classification missed
+
+Resolved 2026-08-03 (see the note under the header). These complete the union to 28.
+
+**E1 — Presented lyric slide** (first pass classified it `static-content` and surfaced only
+`overflow`/`long-text`; the second run surfaced all eight). Most resolve trivially, and that is a
+legitimate answer for a static projected surface rather than a gap being waved through:
+
+| Category | Status | Resolution |
+|----------|--------|------------|
+| empty | ✅ covered | A lyric section with no lines renders a blank slide — it does **not** fall back to the removed label. In practice unreachable: the assembler emits no section-less lyric entry. Blank is the correct projected output if it ever occurred. |
+| loading | ✅ covered | There is no loading state. `assembleSlideshow` completes before `PresentationViewer` mounts; nothing is fetched mid-presentation. |
+| error | ✅ covered | Unchanged from Phase 23: a media failure degrades **silently** and is never surfaced as an error on a projected surface (`PresentationViewer.vue:642` records this deliberately). Removing the label does not add an error path. |
+| populated | ✅ covered | Lines only, at projector type sizes. No label, no badge, no chrome. |
+| partial | ✅ covered | Whatever lines exist are rendered; no placeholder or filler is substituted for missing ones. |
+| zero-one-many | ✅ covered | Each slide renders independently — deck size affects navigation only, never an individual slide's chrome. |
+
+**E2 — Copyright slide** (first pass classified it `list-collection`, which surfaced coverage across
+the group but not the single slide's own text limits):
+
+| Category | Status | Resolution |
+|----------|--------|------------|
+| long-text | ⚑ backstop | **Statement:** a song with an unusually long title, a long author list, or many `copyrightLines` must not overflow the projected copyright slide or push the CCLI license number off-screen — the licence number is the one element that must always be visible. **verification: backstop** — needs a real projector or a fixed-viewport render; it cannot be settled in jsdom. |
+
+**E4 — Inline paste region** (first pass classified it `form`; the second run also read it as a list,
+surfacing the section-chip cases):
+
+| Category | Status | Resolution |
+|----------|--------|------------|
+| populated | ✅ covered | A successful parse with sections **and** a CCLI number: found-summary line, section chips, no warning card, `Replace lyrics` enabled. |
+| overflow | ✅ covered | Many detected sections wrap as chips at `gap-2`; the region scrolls within the editor body rather than growing the page. |
+| zero-one-many | ✅ covered | **Zero** → the "no sections detected" notice, `Replace lyrics` disabled. **One** and **many** render the same chip list, with the found-summary line reporting the actual count — no singular/plural special-casing beyond that line's own wording. |
 
 ---
 
@@ -282,7 +321,7 @@ cannot fit, and the wireframe's own narrower panel already shows a stacked flow,
   <button
     type="button"
     data-testid="paste-back-btn"
-    class="text-xs font-medium text-indigo-400 hover:text-indigo-300 transition-colors"
+    class="text-xs font-semibold text-indigo-400 hover:text-indigo-300 transition-colors"
     @click="onPasteExit"
   >&#8249; Back to sections</button>
   <h3 class="text-sm font-semibold text-gray-100">Paste lyrics</h3>
@@ -318,12 +357,12 @@ hidden while `pasteMode` is true, matching the wireframe's "everything stays inl
     <p
       v-if="rawText.trim() && parsed.sections.length === 0"
       data-testid="paste-no-sections-warning"
-      class="rounded-md border border-amber-800 bg-amber-950 px-3 py-2.5 text-sm text-amber-200"
+      class="rounded-md border border-amber-800 bg-amber-950 px-4 py-2 text-sm text-amber-200"
     >No sections detected — check that you copied the full lyrics from SongSelect</p>
 
     <template v-else-if="rawText.trim()">
       <!-- Found-summary line -->
-      <p data-testid="paste-summary-line" class="text-[11px] leading-relaxed text-gray-500">
+      <p data-testid="paste-summary-line" class="text-[11.5px] leading-relaxed text-gray-500">
         <span class="text-gray-500">We found</span>
         <span class="text-emerald-400">&#10003; {{ parsed.sections.length }} section{{ parsed.sections.length === 1 ? '' : 's' }}</span>
         <span> &middot; </span>
@@ -332,7 +371,7 @@ hidden while `pasteMode` is true, matching the wireframe's "everything stays inl
       </p>
 
       <!-- Section-detected chips -->
-      <div class="flex flex-wrap gap-1.5">
+      <div class="flex flex-wrap gap-2">
         <span
           v-for="(section, i) in parsed.sections"
           :key="section.id"
@@ -341,23 +380,33 @@ hidden while `pasteMode` is true, matching the wireframe's "everything stays inl
         >{{ i + 1 }} {{ section.label }}</span>
       </div>
 
-      <!-- Missing-copyright warning (R065 — never blocks) -->
+      <!-- Missing-copyright warning (R065 — blocks unless overridden) -->
       <div
         v-if="!parsed.copyright.ccliSongNumber"
         data-testid="paste-copyright-warning"
-        class="flex flex-col gap-1.5 rounded-md border border-amber-800 bg-amber-950 px-3 py-2.5"
+        class="flex flex-col gap-2 rounded-md border border-amber-800 bg-amber-950 px-4 py-2"
       >
-        <div class="flex items-center gap-1.5">
+        <div class="flex items-center gap-2">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4 flex-none text-amber-400" aria-hidden="true">
             <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l6.28 11.18c.75 1.334-.213 2.987-1.744 2.987H3.72c-1.53 0-2.493-1.653-1.744-2.987l6.28-11.18zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-.25-6.75a.75.75 0 00-1.5 0v3.5a.75.75 0 001.5 0v-3.5z" clip-rule="evenodd" />
           </svg>
-          <span class="text-sm font-medium text-amber-200">No copyright information found</span>
+          <span class="text-sm font-semibold text-amber-200">No copyright information found</span>
         </div>
         <p class="text-sm leading-[1.5] text-amber-200/90">
-          This song will save without CCLI credits. They're normally shown small under the first and
-          last slide once added — copy the CCLI block from the bottom of the SongSelect page and paste
-          it above, or add it anytime by pasting again.
+          This song can't be saved without CCLI credits unless you check the box below. They're
+          normally shown small under the first and last slide once added — copy the CCLI block from
+          the bottom of the SongSelect page and paste it above, or check the box to save now and add
+          credits later.
         </p>
+        <label class="flex items-center gap-2 text-[11.5px] text-amber-300/90">
+          <input
+            type="checkbox"
+            v-model="overrideCopyright"
+            data-testid="paste-copyright-override"
+            class="h-3.5 w-3.5 rounded border-amber-700 bg-amber-950 text-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          />
+          Add anyway — I'll enter credits later
+        </label>
       </div>
     </template>
 
@@ -374,13 +423,13 @@ hidden while `pasteMode` is true, matching the wireframe's "everything stays inl
       <button
         type="button"
         data-testid="paste-cancel-btn"
-        class="rounded-md border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm font-medium text-gray-300 transition-colors hover:border-gray-600 hover:bg-gray-700"
+        class="rounded-md border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm font-semibold text-gray-300 transition-colors hover:border-gray-600 hover:bg-gray-700"
         @click="onPasteExit"
       >Cancel</button>
       <button
         type="button"
         data-testid="paste-replace-btn"
-        class="rounded-md px-3 py-1.5 text-sm font-medium text-white transition-colors"
+        class="rounded-md px-3 py-1.5 text-sm font-semibold text-white transition-colors"
         :class="canConfirm ? 'bg-indigo-600 hover:bg-indigo-500' : 'bg-indigo-600/40 cursor-default text-white/50'"
         :disabled="!canConfirm || isSaving"
         @click="onPasteConfirm"
@@ -390,12 +439,20 @@ hidden while `pasteMode` is true, matching the wireframe's "everything stays inl
 </div>
 ```
 
-- **`canConfirm` is UNCHANGED from the current dialog** (`parsed.sections.length > 0 && !isSaving`) —
-  **never additionally gated on `parsed.copyright.ccliSongNumber`**. This is the one line that makes the
-  never-block override concrete: the mockup's State 3 disables this exact button on missing copyright;
-  this spec deliberately does not.
-- **No "Add anyway" checkbox.** The mockup's checkbox exists to unblock a blocked button; since nothing
-  is blocked here, the checkbox has nothing to gate and is dropped rather than kept as inert decoration.
+- **`canConfirm` now also gates on copyright-or-override:**
+  `parsed.sections.length > 0 && (!!parsed.copyright.ccliSongNumber || overrideCopyright) && !isSaving`.
+  This is the concrete implementation of R065's corrected direction (35-CONTEXT.md, "R065 — CORRECTED
+  2026-08-03 in favour of the wireframe"): the paste **blocks** on missing copyright, exactly as the
+  mockup's State 3 shows, but the override is **always available and never conditional on any other
+  field** — checking it alone flips `canConfirm` from false to true with nothing else required, so the
+  paste stays completable in every case.
+- **Override checkbox restored**, per the wireframe (Turn 2 State 3, `docs/design/slides-tab.dc.html:644`):
+  `<input type="checkbox" data-testid="paste-copyright-override">`, labelled `Add anyway — I'll enter
+  credits later` (the wireframe's own copy, unchanged). Rendered inside the warning card, directly below
+  its body text — it only ever appears when the warning card does, since a present CCLI number removes
+  the block it exists to lift. `overrideCopyright` is a local `ref(false)`, reset to `false` whenever
+  `pasteMode` closes/reopens (same reset timing as `rawText`) and never persisted onto the saved
+  document — it only gates this one confirm action.
 - **No manual copyright-entry field.** R065 says "detects… and warns," not "offers an inline credits
   form" — the mockup's placeholder-styled hint box (`Author, CCLI Song #, © publisher…`) is not
   transcribed; a user who wants to add credits pastes again with the CCLI block included, or edits the
@@ -448,9 +505,9 @@ this UI-SPEC adds no markup, no prop, and no `background-image` CSS to `Presenta
 | E4 | Presenting starts with a group highlighted but no slide within it highlighted | Opens on that group's FIRST slide (R061's literal wording) — never slide 0 of the whole deck unless nothing at all is highlighted |
 | E5 | Presenting starts with nothing highlighted anywhere | Opens on slide 0 of the whole deck (E3 probe `error` fallback) |
 | E6 | User opens "Paste lyrics" with existing sections already present | Header swaps to paste mode; textarea starts empty (NOT pre-filled with the existing sections — a paste always represents fresh incoming text, matching the current dialog's existing `watch(() => props.open, ...)` reset behavior, reused as `watch(pasteMode, ...)`) |
-| E7 | User pastes text with sections but no CCLI block | Warning card renders (§4); `Replace lyrics` stays enabled; saving proceeds and clears the warning (it only exists while `pasteMode` is open, not persisted as a flag on the saved document) |
-| E8 | User pastes garbage text with zero detected sections | Amber "No sections detected" notice renders in place of the found-summary line and chips; `Replace lyrics` stays disabled — unchanged behavior from today's dialog, restyled only |
-| E9 | Save fails after clicking `Replace lyrics` | `paste-save-error` renders, pasted text remains in the textarea, `pasteMode` stays open — user can retry without re-pasting (E4 backstop) |
+| E7 | User pastes text with sections but no CCLI block | Warning card renders with an always-available override checkbox (§4); `Replace lyrics` stays disabled until either a CCLI number is detected or the checkbox is checked; checking it alone enables the save with nothing else required. Saving clears the warning and the checkbox's checked state (neither is persisted as a flag on the saved document — a later paste starts fresh) |
+| E8 | User pastes garbage text with zero detected sections | Amber "No sections detected" notice renders in place of the found-summary line and chips; `Replace lyrics` stays disabled regardless of the override checkbox, which never renders here (zero sections means no found-summary block, so no warning card either) — unchanged behavior from today's dialog, restyled only |
+| E9 | Save fails after clicking `Replace lyrics` | `paste-save-error` renders, pasted text remains in the textarea, the override checkbox (if checked) stays checked, `pasteMode` stays open — user can retry without re-pasting or re-checking the override (E4 backstop) |
 | E10 | User clicks `‹ Back to sections` or `Cancel` with unpasted-but-unsaved text present | Native confirm guard fires (`You have unsaved changes. Discard them?`) — unchanged from today's dialog |
 | E11 | A video slide is the mid-deck start target for R061 | No special case — video slides already resolve their own content/media independent of position; starting on one behaves identically to starting on any other slide kind |
 
@@ -466,6 +523,10 @@ this UI-SPEC adds no markup, no prop, and no `background-image` CSS to `Presenta
 - **Missing-copyright warning icon:** `aria-hidden="true"` — the adjacent text already states the warning
   in full; the icon is decorative reinforcement, matching the identical pattern at
   `ServiceEditorView.vue:278-281`.
+- **Override checkbox:** the `<input type="checkbox">` is wrapped in a `<label>` with its text as a
+  direct sibling, so the checkbox and "Add anyway — I'll enter credits later" form one accessible,
+  keyboard-reachable, click-anywhere-on-the-row target with no separate `aria-label` needed — the native
+  label/input association covers both mouse and screen-reader interaction.
 - **Textarea label:** the instructions paragraph immediately precedes the textarea in DOM order and
   functions as its accessible description for sighted and screen-reader users alike, matching the old
   dialog's own `<label>`-then-`<textarea>` adjacency (not re-declared as a formal `aria-describedby` link,
@@ -505,3 +566,4 @@ this UI-SPEC adds no markup, no prop, and no `background-image` CSS to `Presenta
 | Date | Change |
 |------|--------|
 | 2026-08-03 | Initial draft |
+| 2026-08-03 | Revision (checker BLOCKED, 3 issues): (1) R065/R066 flipped from advise-and-proceed to block-with-override, following 35-CONTEXT.md's correction in favour of the wireframe — restored the "Add anyway" override checkbox, gated `canConfirm` on copyright-or-override, deleted the now-inaccurate "verified divergence" note, updated E7/E9 and the E4 `partial` row accordingly; (2) Typography collapsed from 5 sizes/3 weights to 4 sizes/2 weights — merged the 11px found-summary line into the 11.5px instructions-paragraph tier, moved the back-link and warning-title off 500 onto 600; (3) Spacing's off-grid `gap-1.5` (6px) and `px-3 py-2.5` (12px/10px) replaced with grid-conformant `gap-2`/`px-4 py-2` throughout the warning card, the "no sections detected" notice, and the section-chip wrap gap — verbatim reuse of another file's off-grid padding does not exempt a value from the grid rule. |
