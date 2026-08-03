@@ -97,6 +97,18 @@ describe('SaveStatusIndicator', () => {
     expect(wrapper.findAll('[aria-live]')).toHaveLength(1)
   })
 
+  it('WR-01 (32-REVIEW): falls back to the generic sentence when errorText is missing, rather than rendering blank', async () => {
+    const wrapper = mountIndicator()
+    // No errorText — nothing in the type system currently prevents a caller
+    // from omitting it (SaveStatusEntry.errorText is optional).
+    useSaveStatus().set('service:svc-1', { status: 'error' })
+    await wrapper.vm.$nextTick()
+
+    const errorEl = wrapper.find('[data-testid="save-status-error"]')
+    expect(errorEl.exists()).toBe(true)
+    expect(errorEl.text()).toBe(GENERIC_ERROR_TEXT)
+  })
+
   it('renders idle for an unknown surfaceId rather than throwing', () => {
     useSaveStatus().set('service:svc-1', { status: 'saving' })
     const wrapper = mountIndicator('service:never-registered')

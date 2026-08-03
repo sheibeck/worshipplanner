@@ -9,6 +9,13 @@ export interface SaveStatusEntry {
   errorText?: string
 }
 
+// WR-01 (32-REVIEW): module-level (not store-internal) so both the toast
+// fallback below AND SaveStatusIndicator.vue's inline-error fallback share
+// the identical string — 32-UI-SPEC § 4's "toast body always mirrors the
+// inline text, word for word" contract would otherwise depend on two
+// separately-maintained copies never drifting apart.
+export const GENERIC_ERROR_TEXT = "Couldn't save your changes — they're still here. Try again."
+
 // One place the urgency ordering lives — no consumer re-derives it in a
 // template v-if chain.
 const URGENCY: Record<AutoSaveStatus, number> = {
@@ -32,11 +39,6 @@ const URGENCY: Record<AutoSaveStatus, number> = {
  */
 export const useSaveStatus = defineStore('saveStatus', () => {
   const entries = ref<Record<string, SaveStatusEntry>>({})
-
-  // Mirrors the generic inline error text (32-UI-SPEC.md § Copywriting
-  // Contract) so a toast pushed without an explicit errorText still reads
-  // the same sentence a caller would otherwise have rendered inline.
-  const GENERIC_ERROR_TEXT = "Couldn't save your changes — they're still here. Try again."
 
   function set(surfaceId: string, entry: SaveStatusEntry) {
     // set() is the single place the not-error -> error edge is detected,

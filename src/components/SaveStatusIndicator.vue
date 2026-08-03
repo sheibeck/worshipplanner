@@ -12,13 +12,13 @@
       v-else-if="entry.status === 'error'"
       class="text-red-400"
       data-testid="save-status-error"
-    >{{ entry.errorText }}</span>
+    >{{ entry.errorText ?? GENERIC_ERROR_TEXT }}</span>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useSaveStatus } from '@/stores/saveStatus'
+import { useSaveStatus, GENERIC_ERROR_TEXT } from '@/stores/saveStatus'
 
 // One shared status component (R040). No variant prop, no per-surface
 // wrapper — the four call sites differ only in which surfaceId they pass.
