@@ -3403,7 +3403,7 @@ async function onSave() {
 
     // Persist the full slot array (reindexed) and other fields
     const normalizedSlots = reindexSlots(orderSlotsBySection(data.slots))
-    await serviceStore.updateService(id, {
+    const payload = {
       name: data.name,
       teams: data.teams,
       sermonPassage: data.sermonPassage,
@@ -3411,7 +3411,14 @@ async function onSave() {
       notes: data.notes,
       status: data.status,
       slots: normalizedSlots,
-    })
+    }
+    // CR-01: snapshot exactly what is about to be sent, so the "mark clean"
+    // step below (after the WR-01 slots sync-back, which is also compared
+    // against `normalizedSlots`, not the pre-normalization value) can tell a
+    // genuinely-concurrent edit — made to localService while this write is
+    // in flight — from that intentional sync-back.
+    const sentSnapshot = JSON.stringify(payload)
+    await serviceStore.updateService(id, payload)
 
     // WR-01: sync the just-persisted, normalized slot order back into
     // localService so display and persisted state agree in ORDER, not only
@@ -3433,8 +3440,31 @@ async function onSave() {
       localService.value.slots = normalizedSlots
     }
 
-    // Mark current local state as clean (don't overwrite localService — user may still be typing)
-    originalService.value = JSON.parse(JSON.stringify(localService.value))
+    // Mark current local state as clean (don't overwrite localService — user
+    // may still be typing) — but ONLY if it still matches exactly what was
+    // just persisted above. CR-01: a distinct mutation made to localService
+    // while the write was in flight (e.g. a different field edited between
+    // the snapshot above and this line resolving) must NOT be marked clean
+    // against a payload that never included it — doing so silently and
+    // permanently drops that edit, because the next debounce timer's own
+    // `isDirty` re-check would then see nothing to save. Leaving
+    // originalService untouched in that case keeps isDirty accurately true,
+    // so the still-armed follow-up timer performs a real save carrying the
+    // concurrent edit instead of a false-positive no-op.
+    if (
+      localService.value &&
+      JSON.stringify({
+        name: localService.value.name,
+        teams: localService.value.teams,
+        sermonPassage: localService.value.sermonPassage,
+        sermonTopic: localService.value.sermonTopic ?? '',
+        notes: localService.value.notes,
+        status: localService.value.status,
+        slots: localService.value.slots,
+      }) === sentSnapshot
+    ) {
+      originalService.value = JSON.parse(JSON.stringify(localService.value))
+    }
   } finally {
     isSaving.value = false
   }

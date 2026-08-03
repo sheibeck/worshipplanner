@@ -397,4 +397,88 @@ describe('useAutoSave', () => {
     expect(status.value).toBe('error')
   })
 
+  // ── CR-01/CR-02 (32-REVIEW) ──────────────────────────────────────────────────
+  //
+  // These close the two Critical findings the review traced to the composable
+  // itself. Both existing tests above ('a mutation dispatched while a save is
+  // in flight is not lost' and 'prevents concurrent saves via inflight guard')
+  // only assert the eventual, self-correcting outcome — never the intermediate
+  // state in the exact window the bugs live in. That's precisely what let both
+  // bugs ship with the composable's own suite green.
+
+  it('CR-01: does not clobber a newer pending status when an earlier in-flight save resolves', async () => {
+    const source = ref({ count: 0 })
+    let resolveFirst: () => void
+    let callCount = 0
+    const saveFn = vi.fn().mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        return new Promise<void>((resolve) => { resolveFirst = resolve })
+      }
+      return Promise.resolve()
+    })
+    const { status } = useAutoSave(() => source.value, saveFn, undefined, { debounceMs: 100 })
+
+    // Skip initialized guard
+    source.value = { count: 1 }
+    await nextTick()
+
+    // First edit -> debounce -> saving (held open)
+    source.value = { count: 2 }
+    await nextTick()
+    await vi.advanceTimersByTimeAsync(100)
+    expect(saveFn).toHaveBeenCalledTimes(1)
+    expect(status.value).toBe('saving')
+
+    // A second, distinct edit lands while the first save is still in flight —
+    // its own watcher trigger advances status to 'pending' and arms a
+    // follow-up timer.
+    source.value = { count: 3 }
+    await nextTick()
+    expect(status.value).toBe('pending')
+
+    // Resolve the first save. Before the fix, the success handler
+    // unconditionally wrote 'saved' right here — lying about the second,
+    // still-unpersisted edit for up to a full debounce interval.
+    resolveFirst!()
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(status.value).toBe('pending')
+    expect(saveFn).toHaveBeenCalledTimes(1)
+  })
+
+  it("CR-01: flush()'s own success handler does not clobber a newer pending status either", async () => {
+    const source = ref({ value: 'initial' })
+    let resolveSave: () => void
+    const saveFn = vi.fn().mockImplementation(
+      () => new Promise<void>((resolve) => { resolveSave = resolve }),
+    )
+    const { status, flush } = useAutoSave(() => source.value, saveFn)
+
+    // Skip initialized guard
+    source.value = { value: 'skip' }
+    await nextTick()
+
+    source.value = { value: 'change' }
+    await nextTick()
+    expect(status.value).toBe('pending')
+
+    const flushing = flush()
+    await nextTick()
+    expect(status.value).toBe('saving')
+
+    // A distinct mutation lands while flush()'s own save is in flight — same
+    // shape as the debounced-path case above, just reached via flush().
+    source.value = { value: 'newer edit while flush is in flight' }
+    await nextTick()
+    expect(status.value).toBe('pending')
+
+    resolveSave!()
+    await flushing
+
+    // Before the fix, flush()'s success handler unconditionally wrote
+    // 'saved' here.
+    expect(status.value).toBe('pending')
+  })
+
 })

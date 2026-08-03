@@ -4258,3 +4258,98 @@ describe('ServiceEditorView - 32-05: migrated onto useAutoSave/useSaveStatus, st
     expect(entry.status).not.toBe('saving')
   })
 })
+
+// ── 32-REVIEW: CR-01/CR-02/CR-03 ────────────────────────────────────────────────
+//
+// The review's three Critical findings all live in the window where a SECOND,
+// distinct edit lands while a FIRST autosave write for this same view is still
+// in flight — a window none of the phase's own (otherwise careful) tests
+// exercised. See 32-REVIEW.md for the full traces.
+describe('ServiceEditorView - 32-REVIEW: CR-01/CR-02/CR-03', () => {
+  async function mountView() {
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          RouterLink: { template: '<a><slot /></a>' },
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+          SaveStatusIndicator: false,
+        },
+      },
+    })
+  }
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockServicesList = [{ ...mockService }]
+    mockUpdateService.mockClear()
+    mockUpdateService.mockImplementation(() => Promise.resolve())
+    mockMarkAsPlanned.mockClear()
+    mockMarkAsPlanned.mockImplementation(() => Promise.resolve())
+    mockOwnWriteEchoIds = []
+    resetSortableCaptures()
+  })
+
+  afterEach(() => {
+    mockOwnWriteEchoIds = []
+    mockMarkAsPlanned.mockImplementation(() => Promise.resolve())
+  })
+
+  /** Same warm-up idiom as the 32-05 block above — the composable's own
+   *  `initialized` flag swallows the first `localService` trigger. */
+  async function warmUp(
+    wrapper: Awaited<ReturnType<typeof mountView>>,
+    vm: { localService: { notes: string } },
+  ) {
+    vm.localService.notes = 'warm-up touch the composable swallows'
+    await wrapper.vm.$nextTick()
+  }
+
+  it('CR-01: an edit made while an earlier autosave write is still in flight is not marked clean before it is ever persisted', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    const vm = wrapper.vm as unknown as { localService: { notes: string; name: string } }
+
+    await warmUp(wrapper, vm)
+
+    // Edit A: hold its write open so a second, distinct edit can land while
+    // it is still in flight.
+    let resolveA!: () => void
+    mockUpdateService.mockImplementationOnce(
+      () => new Promise<void>((resolve) => { resolveA = resolve }),
+    )
+    vm.localService.notes = 'edit A'
+    await wrapper.vm.$nextTick()
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    await flushPromises()
+    expect(mockUpdateService).toHaveBeenCalledTimes(1)
+
+    // Edit B: a DIFFERENT field, made while edit A's write is still in flight.
+    vm.localService.name = 'edit B, made mid-flight'
+    await wrapper.vm.$nextTick()
+
+    // Edit A's write resolves.
+    resolveA()
+    await flushPromises()
+
+    // Before the fix: onSave() stamped originalService from the LIVE
+    // localService (which by then already contained B), marking B clean
+    // without B ever having been sent — the next debounce timer's own
+    // isDirty re-check would then see nothing left to save, and B would
+    // never reach Firestore.
+    mockUpdateService.mockClear()
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    await flushPromises()
+
+    expect(mockUpdateService).toHaveBeenCalledTimes(1)
+    const payload = mockUpdateService.mock.calls[0]![1] as { name?: string; notes?: string }
+    expect(payload.name).toBe('edit B, made mid-flight')
+    expect(payload.notes).toBe('edit A')
+  })
+
+})

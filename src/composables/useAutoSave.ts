@@ -83,9 +83,23 @@ export function useAutoSave(
       status.value = 'saving'
       try {
         await saveFn()
-        status.value = 'saved'
+        // CR-01: a newer mutation may have already run its own watcher while
+        // this save was in flight, advancing status to 'pending' and arming
+        // its own follow-up timer. Don't stomp that back to 'saved' — doing
+        // so lies about an edit that hasn't actually been persisted, and
+        // (worse, for callers whose "is there anything left to save" check
+        // is keyed off something other than this status) can make the
+        // follow-up timer believe there's nothing left to do.
+        //
+        // The `as AutoSaveStatus` widen is required, not decorative: TS's
+        // control-flow narrowing sees `status.value = 'saving'` a few lines
+        // up and (wrongly, for a Vue ref that's shared, mutable state) keeps
+        // treating `status.value` as the literal `'saving'` across the
+        // `await` above, even though the mutation watcher runs concurrently
+        // and can have set it to `'pending'` in the meantime.
+        if ((status.value as AutoSaveStatus) !== 'pending') status.value = 'saved'
       } catch {
-        status.value = 'error'
+        if ((status.value as AutoSaveStatus) !== 'pending') status.value = 'error'
       } finally {
         saving = false
       }
@@ -134,9 +148,12 @@ export function useAutoSave(
     status.value = 'saving'
     try {
       await saveFn()
-      status.value = 'saved'
+      // CR-01, mirrored from scheduleSave's success handler above (including
+      // the `as AutoSaveStatus` widen — see that comment for why it's
+      // required).
+      if ((status.value as AutoSaveStatus) !== 'pending') status.value = 'saved'
     } catch {
-      status.value = 'error'
+      if ((status.value as AutoSaveStatus) !== 'pending') status.value = 'error'
     } finally {
       saving = false
     }
