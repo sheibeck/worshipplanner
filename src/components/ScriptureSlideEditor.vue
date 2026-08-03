@@ -3,22 +3,7 @@
     <!-- Header with status -->
     <div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-800 shrink-0">
       <h3 class="text-sm font-semibold text-gray-100">Scripture Slides</h3>
-      <span
-        v-if="autoSaveStatus === 'pending'"
-        data-testid="status-pending"
-        class="inline-block w-2 h-2 rounded-full bg-yellow-400"
-        title="Unsaved changes"
-      ></span>
-      <span
-        v-else-if="autoSaveStatus === 'saving'"
-        data-testid="status-saving"
-        class="text-xs text-gray-400"
-      >Saving...</span>
-      <span
-        v-else-if="autoSaveStatus === 'saved'"
-        data-testid="status-saved"
-        class="text-xs text-green-400"
-      >Saved &#10003;</span>
+      <SaveStatusIndicator :surface-id="surfaceId ?? ''" />
     </div>
 
     <div class="flex-1 overflow-y-auto p-4 space-y-4">
@@ -95,12 +80,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { parseScriptureInput } from '@/utils/scripture'
 import { fetchPassageText } from '@/utils/esvApi'
 import { splitPassage } from '@/utils/scriptureSplitter'
 import { useAutoSave } from '@/composables/useAutoSave'
 import { useScriptureSlides } from '@/stores/scriptureSlides'
+import { useSaveStatus } from '@/stores/saveStatus'
+import SaveStatusIndicator from './SaveStatusIndicator.vue'
 import type { ScriptureSlide } from '@/types/slide'
 import type { ScriptureRef } from '@/types/service'
 
@@ -110,6 +97,7 @@ const props = defineProps<{
 }>()
 
 const store = useScriptureSlides()
+const saveStatus = useSaveStatus()
 
 const referenceText = ref('')
 const isFetching = ref(false)
@@ -120,6 +108,21 @@ const currentReadingId = ref<string | null>(props.readingId ?? null)
 const parsedRef = computed<ScriptureRef | null>(() => parseScriptureInput(referenceText.value))
 const canFetch = computed(() => parsedRef.value !== null)
 const rawText = ref('')
+
+// 32-06: same stable-id capture as CongregationalEditor.vue — captured ONCE,
+// the first time currentReadingId resolves, never re-derived while mounted.
+// See that file's comment for the full correctness-risk rationale (32-UI-SPEC
+// § UI Considerations E4 `partial`).
+const surfaceId = ref<string | null>(null)
+watch(
+  currentReadingId,
+  (id) => {
+    if (id && !surfaceId.value) {
+      surfaceId.value = `scripture:${id}`
+    }
+  },
+  { immediate: true },
+)
 
 async function onFetchPassage() {
   const scriptureRef = parsedRef.value
@@ -191,6 +194,27 @@ const { status: autoSaveStatus, cleanup: cleanupAutoSave } = useAutoSave(
   doAutoSave,
 )
 
+// Reports status into the shared store; skips entirely while surfaceId is
+// unresolved. Same reasoning as CongregationalEditor.vue.
+watch(
+  () => autoSaveStatus.value,
+  (status) => {
+    if (!surfaceId.value) return
+    if (status === 'saved') {
+      saveStatus.set(surfaceId.value, { status: 'saved', savedAt: new Date() })
+      return
+    }
+    if (status === 'error') {
+      saveStatus.set(surfaceId.value, {
+        status: 'error',
+        errorText: "Couldn't save your changes — they're still here. Try again.",
+      })
+      return
+    }
+    saveStatus.set(surfaceId.value, { status })
+  },
+)
+
 onMounted(async () => {
   if (props.readingId) {
     store.subscribeReadings(props.orgId)
@@ -206,6 +230,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   cleanupAutoSave()
+  if (surfaceId.value) saveStatus.clear(surfaceId.value)
   if (props.readingId) {
     store.unsubscribeReadings()
   }

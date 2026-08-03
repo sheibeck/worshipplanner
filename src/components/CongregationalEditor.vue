@@ -3,22 +3,7 @@
     <!-- Header with status -->
     <div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-800 shrink-0">
       <h3 class="text-sm font-semibold text-gray-100">Congregational Reading</h3>
-      <span
-        v-if="autoSaveStatus === 'pending'"
-        data-testid="status-pending"
-        class="inline-block w-2 h-2 rounded-full bg-yellow-400"
-        title="Unsaved changes"
-      ></span>
-      <span
-        v-else-if="autoSaveStatus === 'saving'"
-        data-testid="status-saving"
-        class="text-xs text-gray-400"
-      >Saving...</span>
-      <span
-        v-else-if="autoSaveStatus === 'saved'"
-        data-testid="status-saved"
-        class="text-xs text-green-400"
-      >Saved &#10003;</span>
+      <SaveStatusIndicator :surface-id="surfaceId ?? ''" />
     </div>
 
     <div class="flex-1 overflow-y-auto p-4 space-y-4">
@@ -126,12 +111,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { parseScriptureInput } from '@/utils/scripture'
 import { fetchPassageText } from '@/utils/esvApi'
 import { splitPassage } from '@/utils/scriptureSplitter'
 import { useAutoSave } from '@/composables/useAutoSave'
 import { useScriptureSlides } from '@/stores/scriptureSlides'
+import { useSaveStatus } from '@/stores/saveStatus'
+import SaveStatusIndicator from './SaveStatusIndicator.vue'
 import type { CongregationalSection } from '@/types/slide'
 import type { ScriptureRef } from '@/types/service'
 
@@ -141,6 +128,7 @@ const props = defineProps<{
 }>()
 
 const store = useScriptureSlides()
+const saveStatus = useSaveStatus()
 
 const referenceText = ref('')
 const isFetching = ref(false)
@@ -150,6 +138,27 @@ const currentReadingId = ref<string | null>(props.readingId ?? null)
 const parsedRef = computed<ScriptureRef | null>(() => parseScriptureInput(referenceText.value))
 const canFetch = computed(() => parsedRef.value !== null)
 const rawText = ref('')
+
+// 32-06: the surface id is captured ONCE, the first time currentReadingId
+// resolves to a non-null value, and never re-derived while mounted. Reading
+// it reactively at render time would be wrong: onFetchPassage sets
+// `sections.value` (which arms useAutoSave's watcher) BEFORE the awaited
+// `createReading` resolves and assigns `currentReadingId`, so a naive
+// binding would transition from a `congregational:null`-suffixed key to a
+// real-id key while the save that key's mutation armed is still pending
+// (32-UI-SPEC.md § UI Considerations E4 `partial`). While unresolved,
+// nothing is registered in the store at all, and the indicator is bound to
+// an empty string, which `entryFor` resolves to idle.
+const surfaceId = ref<string | null>(null)
+watch(
+  currentReadingId,
+  (id) => {
+    if (id && !surfaceId.value) {
+      surfaceId.value = `congregational:${id}`
+    }
+  },
+  { immediate: true },
+)
 
 function buildAlternatingSections(text: string, scriptureRef: ScriptureRef): CongregationalSection[] {
   const slides = splitPassage(text, scriptureRef)
@@ -230,6 +239,30 @@ const { status: autoSaveStatus, cleanup: cleanupAutoSave } = useAutoSave(
   doAutoSave,
 )
 
+// Reports useAutoSave's status into the shared store, keyed by the captured
+// surfaceId, skipping entirely while it is unresolved (nothing to attribute
+// a status to yet). The generic failure sentence is the only error copy
+// this editor ever uses — it has no reorder concept, so a caught error's
+// own message never reaches this text (T-32-17).
+watch(
+  () => autoSaveStatus.value,
+  (status) => {
+    if (!surfaceId.value) return
+    if (status === 'saved') {
+      saveStatus.set(surfaceId.value, { status: 'saved', savedAt: new Date() })
+      return
+    }
+    if (status === 'error') {
+      saveStatus.set(surfaceId.value, {
+        status: 'error',
+        errorText: "Couldn't save your changes — they're still here. Try again.",
+      })
+      return
+    }
+    saveStatus.set(surfaceId.value, { status })
+  },
+)
+
 onMounted(async () => {
   if (props.readingId) {
     store.subscribeReadings(props.orgId)
@@ -252,6 +285,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   cleanupAutoSave()
+  if (surfaceId.value) saveStatus.clear(surfaceId.value)
   if (props.readingId) {
     store.unsubscribeReadings()
   }
