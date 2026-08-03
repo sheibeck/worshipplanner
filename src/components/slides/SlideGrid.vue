@@ -153,7 +153,11 @@
             :number="card.number"
             :selected="card.assembledSlide.slide.id === selectedSlideId"
             :reorderable="canReorder"
+            :menu-items="card.menuItems"
+            :menu-open="openMenuEntryId === card.assembledSlide.slide.id"
             @select="emit('select', $event)"
+            @menu-toggle="onCardMenuToggle"
+            @menu-select="onCardMenuSelect"
           />
           <!-- Always the LAST grid item (D-13) — deliberately NOT given the
                `.slide-card` class SortableJS is scoped to. Gone when locked: the
@@ -230,7 +234,14 @@ import BackgroundControl from './BackgroundControl.vue'
 import SlideDropTarget from './SlideDropTarget.vue'
 import PptxImportModal from '@/components/PptxImportModal.vue'
 import { resolveDrop, UNSUPPORTED_FILE_MESSAGE } from './dropRouting'
-import { slotDisplayTitle, backgroundImageLabel, type EnsureGroupMaterializedResult } from './slideDisplay'
+import {
+  slotDisplayTitle,
+  backgroundImageLabel,
+  slideActionMenuItems,
+  type EnsureGroupMaterializedResult,
+  type MenuItem,
+  type MenuItemKey,
+} from './slideDisplay'
 
 const props = withDefaults(defineProps<{
   /** The currently-selected plan item, or null when no plan item is selected. */
@@ -265,6 +276,13 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   select: [slideId: string]
+  /**
+   * A menu item was selected for the given slide id. This grid does not act
+   * on the key itself — the tab one level up owns the dispatch (drawer open,
+   * navigate, duplicate, delete), exactly as it already owns the `select`
+   * relay (Task 3).
+   */
+  'menu-action': [slideId: string, key: MenuItemKey]
 }>()
 
 const slideGroupsStore = useSlideGroups()
@@ -319,6 +337,15 @@ const canWriteGroupMedia = computed(() => props.isEditor && !props.serviceLocked
 interface CardEntry {
   assembledSlide: AssembledSlide
   number: number
+  /**
+   * Task 3: pre-computed by `slideActionMenuItems` (the SINGLE place that
+   * decides per-kind items, per-type item list `slideDisplay.ts`), never
+   * re-implemented here. Empty when the card's slide id resolves to no
+   * stored entry yet (the pre-materialization fallback-id window) — that
+   * card renders no menu rather than one whose only action would open an
+   * empty drawer.
+   */
+  menuItems: MenuItem[]
 }
 
 /**
@@ -328,8 +355,30 @@ interface CardEntry {
 const cards = computed<CardEntry[]>(() => {
   return props.assembledSlideshow
     .filter((assembled) => assembled.slotIndex === props.slotArrayIndex)
-    .map((assembledSlide, i) => ({ assembledSlide, number: i + 1 }))
+    .map((assembledSlide, i) => {
+      const entry = props.group?.slides.find((e) => e.id === assembledSlide.slide.id)
+      const menuItems = entry
+        ? slideActionMenuItems(entry, props.selectedSlot?.kind, canMutateGroup.value)
+        : []
+      return { assembledSlide, number: i + 1, menuItems }
+    })
 })
+
+/**
+ * Task 3: the single ref that makes "exactly one menu open at a time" true
+ * across the whole grid without any cross-card coordination — the cards
+ * hold no menu state of their own (`menuOpen` is a prop, per 33-05).
+ */
+const openMenuEntryId = ref<string | null>(null)
+
+function onCardMenuToggle(slideId: string): void {
+  openMenuEntryId.value = openMenuEntryId.value === slideId ? null : slideId
+}
+
+function onCardMenuSelect(slideId: string, key: MenuItemKey): void {
+  openMenuEntryId.value = null
+  emit('menu-action', slideId, key)
+}
 
 // --- 25-06 Task 2: group music bar attach/remove — the bed write path ---
 //

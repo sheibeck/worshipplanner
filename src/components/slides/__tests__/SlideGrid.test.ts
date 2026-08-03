@@ -11,7 +11,7 @@ import PptxImportModal from '@/components/PptxImportModal.vue'
 import type { ServiceSlot } from '@/types/service'
 import type { AssembledSlide } from '@/types/slide'
 import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
-import type { EnsureGroupMaterializedResult } from '../slideDisplay'
+import type { EnsureGroupMaterializedResult, MenuItem } from '../slideDisplay'
 import { UNSUPPORTED_FILE_MESSAGE } from '../dropRouting'
 
 // --- 25-05: SlideGrid calls the slideGroups store directly (add-slide, drag-reorder) ---
@@ -793,6 +793,119 @@ describe('SlideGrid', () => {
       await wrapper.findComponent(SlideGroupMusicControl).vm.$emit('attach', 'https://storage.example.com/new.mp3')
       await Promise.resolve()
       expect(mockSetGroupBedMedia).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  // --- 33-08 Task 3: menu ownership — one open at a time, per-card items, the action relay ---
+  describe('menu ownership (33-08 Task 3)', () => {
+    function makeTextEntry(id: string, body?: string): GroupSlideEntry {
+      return { id, order: 0, sourceRef: body !== undefined ? { kind: 'text', body } : { kind: 'text' } }
+    }
+
+    it("each card's menuItems come from slideActionMenuItems for its own stored entry, distinguishing kinds within the same group", () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const group = makeGroup({
+        slides: [
+          makeTextEntry('c1', ''),
+          { id: 'c2', order: 1, sourceRef: { kind: 'scripture' } },
+        ],
+      })
+      const assembledSlideshow = [makeAssembled(0, 'c1'), makeAssembled(0, 'c2')]
+      const wrapper = mountGrid({ selectedSlot: slot, assembledSlideshow, group })
+      const cards = wrapper.findAllComponents(SlideCard)
+      const textKeys = (cards[0]!.props('menuItems') as MenuItem[]).map((i) => i.key)
+      const scriptureKeys = (cards[1]!.props('menuItems') as MenuItem[]).map((i) => i.key)
+      expect(textKeys).toContain('edit-lyrics')
+      expect(scriptureKeys).not.toContain('edit-lyrics')
+      expect(scriptureKeys).toContain('edit-in-scripture')
+    })
+
+    it('toggles one card open, then toggling a DIFFERENT card menu closes the first and opens the second', async () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const group = makeGroup({ slides: [makeTextEntry('c1', ''), makeTextEntry('c2', '')] })
+      const assembledSlideshow = [makeAssembled(0, 'c1'), makeAssembled(0, 'c2')]
+      const wrapper = mountGrid({ selectedSlot: slot, assembledSlideshow, group })
+
+      await wrapper.findAllComponents(SlideCard)[0]!.vm.$emit('menu-toggle', 'c1')
+      expect(wrapper.findAllComponents(SlideCard)[0]!.props('menuOpen')).toBe(true)
+      expect(wrapper.findAllComponents(SlideCard)[1]!.props('menuOpen')).toBe(false)
+
+      await wrapper.findAllComponents(SlideCard)[1]!.vm.$emit('menu-toggle', 'c2')
+      expect(wrapper.findAllComponents(SlideCard)[0]!.props('menuOpen')).toBe(false)
+      expect(wrapper.findAllComponents(SlideCard)[1]!.props('menuOpen')).toBe(true)
+    })
+
+    it('toggling the same card twice leaves its menuOpen prop false', async () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const group = makeGroup({ slides: [makeTextEntry('c1', '')] })
+      const assembledSlideshow = [makeAssembled(0, 'c1')]
+      const wrapper = mountGrid({ selectedSlot: slot, assembledSlideshow, group })
+
+      await wrapper.findComponent(SlideCard).vm.$emit('menu-toggle', 'c1')
+      expect(wrapper.findComponent(SlideCard).props('menuOpen')).toBe(true)
+      await wrapper.findComponent(SlideCard).vm.$emit('menu-toggle', 'c1')
+      expect(wrapper.findComponent(SlideCard).props('menuOpen')).toBe(false)
+    })
+
+    it('a menu-select produces exactly one menu-action on the grid carrying the slide id and the key, and clears the open ref', async () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const group = makeGroup({ slides: [makeTextEntry('c1', '')] })
+      const assembledSlideshow = [makeAssembled(0, 'c1')]
+      const wrapper = mountGrid({ selectedSlot: slot, assembledSlideshow, group })
+
+      await wrapper.findComponent(SlideCard).vm.$emit('menu-toggle', 'c1')
+      expect(wrapper.findComponent(SlideCard).props('menuOpen')).toBe(true)
+
+      await wrapper.findComponent(SlideCard).vm.$emit('menu-select', 'c1', 'edit-details')
+      expect(wrapper.emitted('menu-action')).toEqual([['c1', 'edit-details']])
+      expect(wrapper.findComponent(SlideCard).props('menuOpen')).toBe(false)
+    })
+
+    it('a card whose slide id matches no stored entry receives menuItems of length 0', () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const group = makeGroup({ slides: [] })
+      const assembledSlideshow = [makeAssembled(0, 'no-entry')]
+      const wrapper = mountGrid({ selectedSlot: slot, assembledSlideshow, group })
+      expect(wrapper.findComponent(SlideCard).props('menuItems')).toHaveLength(0)
+    })
+
+    it('with the service locked, no card menuItems contains the duplicate or delete key', () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const group = makeGroup({ slides: [makeTextEntry('c1', '')] })
+      const assembledSlideshow = [makeAssembled(0, 'c1')]
+      const wrapper = mountGrid({
+        selectedSlot: slot,
+        assembledSlideshow,
+        group,
+        isEditor: true,
+        serviceLocked: true,
+      })
+      const keys = (wrapper.findComponent(SlideCard).props('menuItems') as MenuItem[]).map((i) => i.key)
+      expect(keys).not.toContain('duplicate')
+      expect(keys).not.toContain('delete')
+    })
+
+    it('for a SONG group, no card menuItems contains edit-lyrics, duplicate or delete', () => {
+      const slot = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: 'X', songKey: null, requiredVwType: 1 } as never)
+      const group = makeGroup({ slides: [{ id: 'c1', order: 0, sourceRef: { kind: 'lyric', songId: 's1', sectionId: 'v1' } }] })
+      const assembledSlideshow = [makeAssembled(0, 'c1', 'SONG')]
+      const wrapper = mountGrid({ selectedSlot: slot, assembledSlideshow, group })
+      const keys = (wrapper.findComponent(SlideCard).props('menuItems') as MenuItem[]).map((i) => i.key)
+      expect(keys).not.toContain('edit-lyrics')
+      expect(keys).not.toContain('duplicate')
+      expect(keys).not.toContain('delete')
+    })
+
+    it("a HYMN group's auto-derived pristine text entry has no edit-lyrics key, while a hand-added blank entry in the same group does", () => {
+      const slot = makeSlot({ kind: 'HYMN', id: 'slot-1', position: 0, hymnName: 'Amazing Grace', hymnNumber: '1' } as never)
+      const group = makeGroup({ slides: [makeTextEntry('pristine'), makeTextEntry('handadded', '')] })
+      const assembledSlideshow = [makeAssembled(0, 'pristine', 'HYMN'), makeAssembled(0, 'handadded', 'HYMN')]
+      const wrapper = mountGrid({ selectedSlot: slot, assembledSlideshow, group })
+      const cards = wrapper.findAllComponents(SlideCard)
+      const pristineKeys = (cards[0]!.props('menuItems') as MenuItem[]).map((i) => i.key)
+      const handAddedKeys = (cards[1]!.props('menuItems') as MenuItem[]).map((i) => i.key)
+      expect(pristineKeys).not.toContain('edit-lyrics')
+      expect(handAddedKeys).toContain('edit-lyrics')
     })
   })
 
