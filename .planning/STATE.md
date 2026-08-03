@@ -5,15 +5,15 @@ milestone_name: Service and Slides
 current_phase: 37
 current_phase_name: PowerPoint Server-Side Rendering
 status: verifying
-stopped_at: Completed 34-05-PLAN.md (gap-closure, Phase 37 remains the tracked current phase)
-last_updated: "2026-08-03T23:40:08.906Z"
+stopped_at: Completed 34-06-PLAN.md (gap-closure Task 2/12 of 12 planned; Phase 37 remains the tracked current phase; 34-07 mounts the editor next)
+last_updated: "2026-08-03T23:54:16.905Z"
 last_activity: 2026-08-03
 last_activity_desc: Phase 37 execution started
 progress:
   total_phases: 9
   completed_phases: 7
   total_plans: 52
-  completed_plans: 45
+  completed_plans: 46
   percent: 78
 ---
 
@@ -1027,6 +1027,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 37 P05 | 50min | 3 tasks | 5 files |
 | Phase 37 P06 | 50min | 3 tasks | 3 files |
 | Phase 34 P05 | 55min | 3 tasks | 6 files |
+| Phase 34 P06 | 35min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -1260,6 +1261,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: No-deploy audit passed: zero executed gcloud/docker/firebase-deploy invocations across all Phase 37 commits and summaries
 - [Phase ?]: 34-05: congregationalSlideFieldsFromSlot ignores ScriptureSlot.readingMode entirely, gating only on non-empty congregationalSections, matching PresentationViewer's isCongregational computed and avoiding the two-competing-fields defect class
 - [Phase ?]: 34-05: slideGroupMaterializer.ts needs no structural change for congregational sections — sections resolve live at assembly time, proven by executable test and git diff --exit-code rather than assumed
+- [Phase ?]: 34-06: CongregationalEditor.vue converted to a controlled prop/emit component (reference/sections in, update:sections/update:reference/close out) — no store, no auto-save, no save-status of its own; the rejected separate-ScriptureReading-document persistence model (useScriptureSlides) is fully removed from this file
+- [Phase ?]: 34-06: draftSections/referenceText seeded once at setup from props, not reactive to later prop changes — carries forward the pre-existing WR-04 keyed-mount contract into 34-07's mount point
 
 ### Roadmap Evolution
 
@@ -1321,6 +1324,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-03T23:40:08.869Z
-Stopped at: Completed 34-05-PLAN.md (gap-closure, Phase 37 remains the tracked current phase)
+Last session: 2026-08-03T23:54:16.861Z
+Stopped at: Completed 34-06-PLAN.md (gap-closure Task 2/12 of 12 planned; Phase 37 remains the tracked current phase; 34-07 mounts the editor next)
 Resume file: None

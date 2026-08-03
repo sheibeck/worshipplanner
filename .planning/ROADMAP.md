@@ -245,7 +245,7 @@ Plans:
   3. Splits fall only on clause/verse boundaries, never mid-sentence
   4. If the split call fails, the scripture slide still renders and remains usable — the feature never blocks editing
 
-**Plans**: 5/12 plans executed
+**Plans**: 6/12 plans executed
 
 Plans:
 
@@ -254,7 +254,7 @@ Plans:
 - [x] 34-03-PLAN.md — splitCongregationalReading(): call shape, slicing, and every failure path
 - [x] 34-04-PLAN.md — Opt-in "Split with AI" affordance, failure toast, manual-path regression
 - [x] 34-05-PLAN.md — ScriptureSlot.congregationalSections, the two scripture helpers, and BOTH assembler call sites (wave 1, gap closure)
-- [ ] 34-06-PLAN.md — CongregationalEditor persistence rewrite: off the rejected reading document, onto a prop/emit contract (wave 1, gap closure)
+- [x] 34-06-PLAN.md — CongregationalEditor persistence rewrite: off the rejected reading document, onto a prop/emit contract (wave 1, gap closure)
 - [ ] 34-07-PLAN.md — Mount it on the SLIDE: action-menu and drawer routes to one keyed editor, plus the WR-04 swap test (wave 2, gap closure)
 - [ ] 34-08-PLAN.md — Composed slot→group→slide pipeline proof, validation/PENDING/R064+R070+R071 records, phase gate (wave 4, gap closure)
 - [ ] 34-09-PLAN.md — UAT F3: render the resolved background on the Present screen; propose and write R070 (wave 1, UAT)
@@ -352,7 +352,7 @@ Plans:
 | 31. Service Lifecycle — Draft Lock & Reopen | v1.4 | 6/6 | Complete    | 2026-07-30 |
 | 32. Save Reliability — Autosave Fix & Persistent Status | v1.4 | 6/6 | In Progress|  |
 | 33. Backgrounds & Slide Editing | v1.4 | 9/9 | In Progress|  |
-| 34. Smarter Content — LLM Scripture Split | v1.4 | 5/12 | In Progress|  |
+| 34. Smarter Content — LLM Scripture Split | v1.4 | 6/12 | In Progress|  |
 | 35. Presentation Correctness & Lyric Editor | v1.4 | 4/4 | In Progress|  |
 | 36. UI Rework — Service Order & Contextual Action Bars | v1.4 | 0/TBD | Not started | - |
 | 37. PowerPoint Server-Side Rendering | v1.4 | 6/6 | In Progress|  |
