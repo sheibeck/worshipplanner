@@ -5,15 +5,15 @@ milestone_name: Service and Slides
 current_phase: 33
 current_phase_name: Backgrounds & Slide Editing
 status: executing
-stopped_at: Completed 33-06-PLAN.md
-last_updated: "2026-08-03T04:25:49.940Z"
+stopped_at: Completed 33-07-PLAN.md
+last_updated: "2026-08-03T04:57:11.999Z"
 last_activity: 2026-08-02
 last_activity_desc: Phase 33 execution started
 progress:
   total_phases: 9
   completed_phases: 4
   total_plans: 30
-  completed_plans: 27
+  completed_plans: 28
   percent: 44
 ---
 
@@ -76,7 +76,7 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 ## Current Position
 
 Phase: 33 (Backgrounds & Slide Editing) — EXECUTING
-Plan: 7 of 9
+Plan: 8 of 9
 Status: Ready to execute
 Last activity: 2026-08-02 — Phase 33 execution started
 
@@ -718,6 +718,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 33 P04 | 35min | 2 tasks | 4 files |
 | Phase 33 P05 | 20min | 2 tasks | 2 files |
 | Phase 33 P06 | 45min | 2 tasks | 4 files |
+| Phase 33 P07 | 50min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -921,6 +922,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Both 33-05 tasks landed in a single commit (55d6b6c) since Task 2's chip markup sits adjacent to Task 1's closing-tag change in the same file diff
 - [Phase ?]: SongLyricEditor.vue's isEditor gate is read directly from useAuthStore (new import) rather than a new component prop, scoped only to the new background control — the rest of the editor remains ungated by design, per Firestore rule enforcement
 - [Phase ?]: No removeLabel prop added to BackgroundControl.vue for 33-06 — plan's exact prop list excluded it; flagged forward to 33-08 in case per-level aria-label wording matters at UAT
+- [Phase ?]: canMutateBackground deliberately omits the song-group exclusion canMutate carries — a song group's reduced menu still offers background-setting per 33-CONTEXT.md
+- [Phase ?]: 'Set for this slide only' performs a direct copy-then-override write of the resolved url (per plan text), not a toggle into upload UI (33-UI-SPEC's looser prose)
+- [Phase ?]: pendingAction's remove-caption song branch is unreachable from EditSlideDrawer's available props (no song document threaded in) — documented as a known gap rather than guessed at
 
 ### Roadmap Evolution
 
@@ -982,6 +986,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-03T04:25:49.890Z
-Stopped at: Completed 33-06-PLAN.md
+Last session: 2026-08-03T04:57:11.967Z
+Stopped at: Completed 33-07-PLAN.md
 Resume file: None
