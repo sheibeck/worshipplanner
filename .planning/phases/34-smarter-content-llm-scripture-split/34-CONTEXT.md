@@ -39,8 +39,25 @@ reading" — is already true today, manually.** Verified against live source 202
 | `ScriptureReading` with `congregationalSections?` | `src/types/scriptureReading.ts:10-12` |
 | **A working manual editor** (321 lines, reference input + ESV fetch) | `src/components/CongregationalEditor.vue` |
 
+**⚠ CORRECTED 2026-08-03 BY PLANNING — the sentence below overstated it.** `CongregationalEditor.vue`
+is mounted **nowhere**: no route, no parent component, no dynamic import outside its own test. The
+editor *works when mounted*, but **no user can reach it**, so success criterion 1 is **not** already
+true — the model and the editor exist; the path to them does not. Mounting it is blocked on a
+data-model question that is the **owner's call**: the editor persists `congregationalSections` to a
+separate `ScriptureReading` document, while **R047's delivered shape made the SCRIPTURE slot the
+source of truth and explicitly rejected linking a reading document to the slot** (`3da5fe4`
+superseded by `5c531b1`). `ScriptureSlot` has `readingMode` but no `congregationalSections`, so
+sections written today reach no slide. Resolving it means either re-linking the rejected document
+model, or moving `congregationalSections` onto the slot and through `slideGroupMaterializer`.
+Recorded as an open human-check in `.planning/PENDING-VERIFICATION.md` — **never self-approve it.**
+
+**All of R064's substance — the boundary contract, the schema, the validator, the call shape, the
+failure path — is correct and complete under either outcome**, which is why the phase is planned and
+built in full rather than blocked.
+
 **Therefore this phase does NOT build congregational reading. It adds an LLM-assisted split on top of
-a capability that already works manually.** That is a materially smaller and differently-shaped phase
+a capability that already exists in the model layer and has a working (if currently unreachable)
+manual editor.** That is a materially smaller and differently-shaped phase
 than the ROADMAP's success criteria imply, and the plan must say so rather than re-implementing the
 model. This is the same class of finding as Phase 27's two false premises and Phase 33's stale
 wireframes — record it, don't work around it silently.
