@@ -1,75 +1,25 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils'
-import { ref, reactive, computed } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import CongregationalEditor from '../CongregationalEditor.vue'
-import { useSaveStatus } from '@/stores/saveStatus'
 import { useToasts } from '@/stores/toasts'
 import type { ScriptureSlide, CongregationalSection } from '@/types/slide'
-import type { ScriptureReading } from '@/types/scriptureReading'
+import type { ScriptureRef } from '@/types/service'
 
-// 32-06: the shared generic failure sentence — verbatim, the only error copy
-// this editor (and its two siblings) ever renders. It has no reorder
-// concept, so the reorder variant (ServiceEditorView-only) must never
-// appear here.
-const GENERIC_ERROR_TEXT = "Couldn't save your changes — they're still here. Try again."
-const REORDER_ERROR_TEXT = "Couldn't save this order — reverted. Try dragging again."
-
-// 32-06: these components now consume the real, Firestore-free useSaveStatus
-// store rather than mocking it — pure client state, so a real instance is
-// simpler and asserts more (matching 32-04/32-05's own precedent).
+// 34-06: this component is now a controlled prop/emit component that
+// persists NOTHING itself — the reading-document store (`useScriptureSlides`)
+// and auto-save/save-status machinery it used to own were removed, so those
+// mocks and the tests that asserted against them are gone too.
 //
 // enableAutoUnmount (matching ServiceEditorView.test.ts's own precedent) is
-// load-bearing here, not just tidy cleanup: every mounted wrapper's
-// reporting watcher stays subscribed to the shared, module-level
-// autoSaveStatusRef mock until its component unmounts. Pinia wraps every
-// store action (including saveStatus.set) to call setActivePinia(itsOwnPinia)
-// before running -- so a single un-unmounted wrapper from an earlier test
-// silently hijacks the globally-active Pinia the next time this shared ref
-// changes, corrupting an unrelated, later test's "fresh" store.
+// still load-bearing: Pinia wraps every store action (including
+// `toasts.push`) to call `setActivePinia(itsOwnPinia)` before running, so a
+// single un-unmounted wrapper from an earlier test could still hijack the
+// globally-active Pinia the next time the (real) toasts store is touched.
 beforeEach(() => {
   setActivePinia(createPinia())
 })
 enableAutoUnmount(afterEach)
-
-const mockCreateReading = vi.fn(() => Promise.resolve('new-reading-id'))
-const mockUpdateReading = vi.fn(() => Promise.resolve())
-const mockGetReading = vi.fn<() => Promise<ScriptureReading | null>>(() => Promise.resolve(null))
-const mockSubscribeReadings = vi.fn()
-const mockUnsubscribeReadings = vi.fn()
-
-vi.mock('@/stores/scriptureSlides', () => ({
-  useScriptureSlides: () =>
-    reactive({
-      readings: [],
-      isLoading: false,
-      currentReading: computed(() => null),
-      subscribeReadings: mockSubscribeReadings,
-      unsubscribeReadings: mockUnsubscribeReadings,
-      createReading: mockCreateReading,
-      updateReading: mockUpdateReading,
-      getReading: mockGetReading,
-    }),
-}))
-
-const autoSaveStatusRef = ref('idle')
-const mockAutoSaveFlush = vi.fn()
-const mockAutoSaveCleanup = vi.fn()
-let capturedSaveFn: (() => Promise<void>) | null = null
-
-vi.mock('@/composables/useAutoSave', () => ({
-  useAutoSave: vi.fn((
-    _source: unknown,
-    saveFn: () => Promise<void>,
-  ) => {
-    capturedSaveFn = saveFn
-    return {
-      status: autoSaveStatusRef,
-      flush: mockAutoSaveFlush,
-      cleanup: mockAutoSaveCleanup,
-    }
-  }),
-}))
 
 const mockFetchPassageText = vi.fn()
 vi.mock('@/utils/esvApi', () => ({
@@ -125,31 +75,70 @@ function makeSampleSlides(): ScriptureSlide[] {
   ]
 }
 
-function mountEditor(props?: Record<string, unknown>) {
+const SAMPLE_REFERENCE: ScriptureRef = { book: 'Psalms', chapter: 136, verseStart: 1, verseEnd: 3 }
+const SAMPLE_SECTIONS: CongregationalSection[] = [
+  { speaker: 'LEADER', text: 'Give thanks to the LORD', verseRange: 'v. 1' },
+  { speaker: 'CONGREGATION', text: 'for his steadfast love endures forever', verseRange: 'v. 2' },
+]
+
+function mountEditor(props?: { reference?: ScriptureRef | null; sections?: CongregationalSection[] }) {
   return mount(CongregationalEditor, {
-    props: { orgId: 'org-1', ...props },
+    props: {
+      reference: props?.reference ?? null,
+      sections: props?.sections ?? [],
+    },
   })
+}
+
+// @vue/test-utils's wrapper.emitted() also records the RAW native DOM events
+// dispatched by `.trigger()`/`.setValue()` (e.g. 'input', 'change', 'click'
+// bubbling off the reference input / fetch button) alongside this
+// component's own custom emits — not just events sent through Vue's `emit`.
+// Any test that both interacts with the DOM and asserts on the emitted-event
+// set must filter down to this component's declared contract first.
+const CUSTOM_EVENT_NAMES = ['update:sections', 'update:reference', 'close']
+function customEmittedKeys(wrapper: ReturnType<typeof mountEditor>): string[] {
+  return Object.keys(wrapper.emitted()).filter((key) => CUSTOM_EVENT_NAMES.includes(key))
 }
 
 describe('CongregationalEditor', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    autoSaveStatusRef.value = 'idle'
-    capturedSaveFn = null
     mockFetchPassageText.mockResolvedValue('[1] Give thanks to the LORD...')
     mockSplitPassage.mockReturnValue(makeSampleSlides())
   })
 
-  it('renders reference input and fetch button', () => {
+  it('renders reference input and fetch button, and emits nothing on a bare mount', () => {
     const wrapper = mountEditor()
     expect(wrapper.find('[data-testid="reference-input"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="fetch-btn"]').exists()).toBe(true)
+    expect(Object.keys(wrapper.emitted())).toHaveLength(0)
   })
 
   it('fetch button is disabled when reference is empty', () => {
     const wrapper = mountEditor()
     const btn = wrapper.find('[data-testid="fetch-btn"]')
     expect(btn.attributes('disabled')).toBeDefined()
+  })
+
+  it('mounted with two sections and a reference: reference input is pre-filled and both sections render', () => {
+    const wrapper = mountEditor({ reference: SAMPLE_REFERENCE, sections: SAMPLE_SECTIONS })
+
+    expect((wrapper.find('[data-testid="reference-input"]').element as HTMLInputElement).value).toBe(
+      'Psalms 136:1-3',
+    )
+    expect(wrapper.find('[data-testid="speaker-toggle-0"]').text()).toBe('Leader')
+    expect(wrapper.find('[data-testid="speaker-toggle-1"]').text()).toBe('Congregation')
+    expect(wrapper.find('[data-testid="preview-section-0"]').text()).toContain(SAMPLE_SECTIONS[0]!.text)
+    expect(wrapper.find('[data-testid="preview-section-1"]').text()).toContain(SAMPLE_SECTIONS[1]!.text)
+  })
+
+  it('prohibition: mounting with populated props and immediately unmounting emits zero events', () => {
+    const wrapper = mountEditor({ reference: SAMPLE_REFERENCE, sections: SAMPLE_SECTIONS })
+    expect(Object.keys(wrapper.emitted())).toHaveLength(0)
+
+    wrapper.unmount()
+    expect(Object.keys(wrapper.emitted())).toHaveLength(0)
   })
 
   it('after fetch, displays verse chunks with speaker role toggles', async () => {
@@ -175,15 +164,52 @@ describe('CongregationalEditor', () => {
     expect(wrapper.find('[data-testid="speaker-toggle-2"]').text()).toBe('Leader')
   })
 
-  it('toggling speaker role updates section assignment', async () => {
+  it('Fetch Passage success emits update:reference then update:sections with alternating speakers', async () => {
     const wrapper = mountEditor()
     await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
     await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="speaker-toggle-0"]').text()).toBe('Leader')
-    await wrapper.find('[data-testid="speaker-toggle-0"]').trigger('click')
-    expect(wrapper.find('[data-testid="speaker-toggle-0"]').text()).toBe('Congregation')
+    // Object key insertion order proves emission order: update:reference,
+    // then update:sections — the reference the user fetched must never be
+    // recorded as belonging to a different passage than the sections.
+    expect(customEmittedKeys(wrapper)).toEqual(['update:reference', 'update:sections'])
+
+    const refEmits = wrapper.emitted('update:reference')
+    expect(refEmits).toHaveLength(1)
+    expect(refEmits![0]).toEqual([SAMPLE_REFERENCE])
+
+    const sectionsEmits = wrapper.emitted('update:sections')
+    expect(sectionsEmits).toHaveLength(1)
+    expect(sectionsEmits![0]![0]).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ speaker: 'LEADER' }),
+        expect.objectContaining({ speaker: 'CONGREGATION' }),
+      ]),
+    )
+  })
+
+  it('prohibition: a successful onFetchPassage does not call the AI split util at all', async () => {
+    const wrapper = mountEditor()
+    await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
+    await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
+    await flushPromises()
+
+    expect(mockSplitCongregationalReading).not.toHaveBeenCalled()
+  })
+
+  it('toggling speaker role updates section assignment and emits update:sections with the flipped speaker only', async () => {
+    const wrapper = mountEditor({ reference: SAMPLE_REFERENCE, sections: SAMPLE_SECTIONS })
+
+    expect(wrapper.find('[data-testid="speaker-toggle-1"]').text()).toBe('Congregation')
+    await wrapper.find('[data-testid="speaker-toggle-1"]').trigger('click')
+    expect(wrapper.find('[data-testid="speaker-toggle-1"]').text()).toBe('Leader')
+
+    const emits = wrapper.emitted('update:sections')
+    expect(emits).toHaveLength(1)
+    const emitted = emits![0]![0] as CongregationalSection[]
+    expect(emitted[0]).toEqual(SAMPLE_SECTIONS[0])
+    expect(emitted[1]).toEqual({ ...SAMPLE_SECTIONS[1], speaker: 'LEADER' })
   })
 
   it('preview shows Leader/Congregation labels with distinct styling', async () => {
@@ -198,48 +224,7 @@ describe('CongregationalEditor', () => {
     expect(wrapper.find('[data-testid="preview-label-2"]').text()).toBe('Leader:')
   })
 
-  it('saved data includes readingMode congregational and congregationalSections array', async () => {
-    const wrapper = mountEditor()
-    await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
-    await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
-    await flushPromises()
-
-    expect(mockCreateReading).toHaveBeenCalledWith('org-1', expect.objectContaining({
-      readingMode: 'congregational',
-      congregationalSections: expect.arrayContaining([
-        expect.objectContaining({ speaker: 'LEADER', text: expect.any(String) }),
-        expect.objectContaining({ speaker: 'CONGREGATION', text: expect.any(String) }),
-      ]),
-    }))
-  })
-
-  it('auto-save triggers on section changes via useAutoSave', async () => {
-    const { useAutoSave } = await import('@/composables/useAutoSave')
-    mountEditor()
-    expect(useAutoSave).toHaveBeenCalled()
-    expect(capturedSaveFn).toBeInstanceOf(Function)
-  })
-
-  it('auto-save save function calls updateReading with congregational data', async () => {
-    const wrapper = mountEditor()
-    await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
-    await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
-    await flushPromises()
-
-    mockUpdateReading.mockClear()
-    expect(capturedSaveFn).toBeInstanceOf(Function)
-    await capturedSaveFn!()
-    expect(mockUpdateReading).toHaveBeenCalledWith(
-      'org-1',
-      'new-reading-id',
-      expect.objectContaining({
-        readingMode: 'congregational',
-        congregationalSections: expect.any(Array),
-      }),
-    )
-  })
-
-  it('shows error message when ESV fetch fails', async () => {
+  it('shows error message when ESV fetch fails, and emits nothing', async () => {
     mockFetchPassageText.mockRejectedValueOnce(new Error('Network error'))
     const wrapper = mountEditor()
     await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
@@ -249,145 +234,7 @@ describe('CongregationalEditor', () => {
     const errorEl = wrapper.find('[data-testid="fetch-error"]')
     expect(errorEl.exists()).toBe(true)
     expect(errorEl.text()).toContain('Could not load passage')
-  })
-
-  it('shows save status indicator for each status, reported into the shared store under the congregational: surface id', async () => {
-    // readingId provided -> currentReadingId (and therefore surfaceId)
-    // resolves immediately, so every status transition below is reported.
-    const wrapper = mountEditor({ readingId: 'reading-1' })
-    await flushPromises()
-
-    autoSaveStatusRef.value = 'pending'
-    await flushPromises()
-    expect(wrapper.find('[data-testid="save-status"]').text()).toBe('Saving soon…')
-    expect(useSaveStatus().entryFor('congregational:reading-1').status).toBe('pending')
-
-    autoSaveStatusRef.value = 'saving'
-    await flushPromises()
-    expect(wrapper.find('[data-testid="save-status"]').text()).toBe('Saving…')
-
-    autoSaveStatusRef.value = 'saved'
-    await flushPromises()
-    expect(wrapper.find('[data-testid="save-status"]').text()).toMatch(/^Saved \d{1,2}:\d{2} (AM|PM)$/)
-    expect(useSaveStatus().entryFor('congregational:reading-1').status).toBe('saved')
-  })
-
-  it('reports the generic failure sentence on error — never the reorder variant, which belongs to ServiceEditorView alone', async () => {
-    const wrapper = mountEditor({ readingId: 'reading-1' })
-    await flushPromises()
-
-    autoSaveStatusRef.value = 'error'
-    await flushPromises()
-
-    const errorEl = wrapper.find('[data-testid="save-status-error"]')
-    expect(errorEl.exists()).toBe(true)
-    expect(errorEl.text()).toBe(GENERIC_ERROR_TEXT)
-    expect(wrapper.text()).not.toContain(REORDER_ERROR_TEXT)
-    expect(useSaveStatus().entryFor('congregational:reading-1').errorText).toBe(GENERIC_ERROR_TEXT)
-  })
-
-  it('clears its store entry on unmount, next to the existing composable cleanup call', async () => {
-    const wrapper = mountEditor({ readingId: 'reading-1' })
-    await flushPromises()
-    autoSaveStatusRef.value = 'saved'
-    await flushPromises()
-    expect(useSaveStatus().entries['congregational:reading-1']).toBeDefined()
-
-    wrapper.unmount()
-    expect(useSaveStatus().entries['congregational:reading-1']).toBeUndefined()
-  })
-
-  // ── E4 backstops (32-UI-SPEC.md § UI Considerations) ────────────────────────
-
-  it('E4 loading backstop: a freshly-mounted editor for a different record never inherits a previous record’s saved status', async () => {
-    const first = mountEditor({ readingId: 'reading-old' })
-    await flushPromises()
-    autoSaveStatusRef.value = 'saved'
-    await flushPromises()
-    expect(useSaveStatus().entryFor('congregational:reading-old').status).toBe('saved')
-
-    // A second, independently-mounted instance for a DIFFERENT record must
-    // start idle — nothing to inherit, because its own surfaceId has never
-    // been written to.
-    const second = mountEditor({ readingId: 'reading-new' })
-    await flushPromises()
-    expect(second.find('[data-testid="save-status"]').text()).toBe('')
-    expect(useSaveStatus().entryFor('congregational:reading-new').status).toBe('idle')
-
-    first.unmount()
-    second.unmount()
-  })
-
-  it('E4 partial backstop (★ sharpest correctness risk): a save armed before the surface id resolves, then the id changing again, must not misattribute the in-flight result to the new id', async () => {
-    // No readingId -> currentReadingId starts null -> surfaceId unresolved.
-    const wrapper = mountEditor()
-    await flushPromises()
-
-    // A save arms (e.g. sections mutated by a fetch) while the surface id is
-    // still unresolved -- nothing must be registered anywhere yet.
-    autoSaveStatusRef.value = 'saving'
-    await flushPromises()
-    expect(wrapper.find('[data-testid="save-status"]').text()).toBe('')
-    expect(Object.keys(useSaveStatus().entries)).toHaveLength(0)
-
-    // The id resolves for the FIRST time (captured once) -- this is the
-    // exposed test-only seam, since currentReadingId has no reactive
-    // prop-watcher of its own in production (see CongregationalEditor.vue).
-    ;(wrapper.vm as unknown as { currentReadingId: string | null }).currentReadingId = 'reading-old'
-    await flushPromises()
-    // Capturing the id alone does not retroactively report the in-flight
-    // 'saving' status -- only a further status TRANSITION does. Still
-    // nothing registered for the just-captured id.
-    expect(useSaveStatus().entryFor('congregational:reading-old').status).toBe('idle')
-
-    // The id "switches" again (simulating a record swap) -- per spec the
-    // surface id is captured ONCE and never re-derived, so this must NOT
-    // move the target.
-    ;(wrapper.vm as unknown as { currentReadingId: string | null }).currentReadingId = 'reading-new'
-    await flushPromises()
-
-    // The original in-flight save now resolves.
-    autoSaveStatusRef.value = 'saved'
-    await flushPromises()
-
-    // The NEW record's indicator/entry must read idle -- the in-flight
-    // result was never attributed to it.
-    expect(useSaveStatus().entryFor('congregational:reading-new').status).toBe('idle')
-    // The OLD (first-captured) id's entry is the one that resolves.
-    expect(useSaveStatus().entryFor('congregational:reading-old').status).toBe('saved')
-    expect(wrapper.find('[data-testid="save-status"]').text()).toMatch(/^Saved \d{1,2}:\d{2} (AM|PM)$/)
-  })
-
-  it('cleans up auto-save on unmount', () => {
-    const wrapper = mountEditor()
-    wrapper.unmount()
-    expect(mockAutoSaveCleanup).toHaveBeenCalled()
-  })
-
-  it('loads existing reading in edit mode with congregationalSections', async () => {
-    mockGetReading.mockResolvedValueOnce({
-      id: 'existing-reading',
-      reference: { book: 'Psalms', chapter: 136, verseStart: 1, verseEnd: 3 },
-      displayReference: 'Psalms 136:1-3',
-      rawText: '[1] Give thanks...',
-      readingMode: 'congregational',
-      slides: [],
-      congregationalSections: [
-        { speaker: 'LEADER', text: 'Give thanks to the LORD', verseRange: 'v. 1' },
-        { speaker: 'CONGREGATION', text: 'for his steadfast love', verseRange: 'v. 2' },
-      ],
-      createdAt: { seconds: 1000000, nanoseconds: 0 } as never,
-      updatedAt: { seconds: 1000000, nanoseconds: 0 } as never,
-    })
-
-    const wrapper = mountEditor({ readingId: 'existing-reading' })
-    await flushPromises()
-
-    expect(mockSubscribeReadings).toHaveBeenCalledWith('org-1')
-    expect(mockGetReading).toHaveBeenCalledWith('org-1', 'existing-reading')
-    expect(wrapper.find('[data-testid="speaker-toggle-0"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="speaker-toggle-0"]').text()).toBe('Leader')
-    expect(wrapper.find('[data-testid="speaker-toggle-1"]').text()).toBe('Congregation')
+    expect(customEmittedKeys(wrapper)).toHaveLength(0)
   })
 
   it('does not show sections or preview when no passage is fetched', () => {
@@ -405,6 +252,15 @@ describe('CongregationalEditor', () => {
     expect(wrapper.find('[data-testid="preview-label-0"]').text()).toBe('Leader:')
     await wrapper.find('[data-testid="speaker-toggle-0"]').trigger('click')
     expect(wrapper.find('[data-testid="preview-label-0"]').text()).toBe('Congregation:')
+  })
+
+  it('close control emits close and no section or reference change', async () => {
+    const wrapper = mountEditor({ reference: SAMPLE_REFERENCE, sections: SAMPLE_SECTIONS })
+    await wrapper.find('[data-testid="congregational-close-btn"]').trigger('click')
+
+    expect(wrapper.emitted('close')).toHaveLength(1)
+    expect(wrapper.emitted('update:sections')).toBeUndefined()
+    expect(wrapper.emitted('update:reference')).toBeUndefined()
   })
 
   // ── 34-04 Task 1: the opt-in "Split with AI" affordance ────────────────────
@@ -479,7 +335,7 @@ describe('CongregationalEditor', () => {
       expect(wrapper.find('[data-testid="ai-split-btn"]').text()).not.toContain('Splitting...')
     })
 
-    it('on success, replaces sections wholesale in the returned order — never merged, appended, or re-sorted', async () => {
+    it('on success, replaces sections wholesale in the returned order and emits update:sections — never merged, appended, or re-sorted', async () => {
       const wrapper = mountEditor()
       await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
       await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
@@ -500,6 +356,13 @@ describe('CongregationalEditor', () => {
       expect(wrapper.find('[data-testid="preview-section-1"]').text()).toContain('Then this')
       expect(wrapper.find('[data-testid="preview-label-0"]').text()).toBe('Congregation:')
       expect(wrapper.find('[data-testid="preview-label-1"]').text()).toBe('Leader:')
+
+      // update:sections is emitted twice here — once by the preceding fetch,
+      // once by the split — the split's own emission is the last one and
+      // carries exactly the returned array.
+      const sectionsEmits = wrapper.emitted('update:sections')
+      expect(sectionsEmits).toHaveLength(2)
+      expect(sectionsEmits![1]![0]).toEqual(aiSections)
     })
 
     it('encoding backstop: rendered section text is strictly === to the mocked section text, including curly quotes and an em dash', async () => {
@@ -556,10 +419,10 @@ describe('CongregationalEditor', () => {
     }
 
     // Reads a snapshot of the rendered sections (speaker + text per row) via
-    // the DOM rather than an internal expose — `sections` itself is not part
-    // of this component's public seam (only `currentReadingId` is, for the
-    // unrelated E4 backstop), so the DOM is the honest external observation
-    // point for "did anything change".
+    // the DOM rather than an internal expose — `draftSections` itself is not
+    // part of this component's public seam (there is no defineExpose at all
+    // any more), so the DOM is the honest external observation point for
+    // "did anything change".
     function sectionsSnapshot(wrapper: ReturnType<typeof mountEditor>) {
       const toggles = wrapper.findAll('[data-testid^="speaker-toggle-"]')
       return toggles.map((toggle, idx) => ({
@@ -568,10 +431,18 @@ describe('CongregationalEditor', () => {
       }))
     }
 
-    it('pushes exactly one verbatim toast and leaves sections byte-identical when the split resolves null', async () => {
+    it('pushes exactly one verbatim toast, leaves sections byte-identical, and emits no additional update:sections when the split resolves null', async () => {
       const wrapper = mountEditor()
       await fetchAndPrime(wrapper)
       const before = sectionsSnapshot(wrapper)
+      // The preceding fetch already emitted update:sections once (34-06's
+      // contract); a failed split must add NO further emission. Since a
+      // split can only be attempted after a fetch (rawText is fetch-only,
+      // per 34-06's documented AI-split-needs-a-fetch-first consequence),
+      // "wrapper.emitted('update:sections') is undefined" cannot be tested
+      // literally in this state — the count-stays-flat assertion below is
+      // the equivalent proof.
+      const emissionsBeforeSplit = wrapper.emitted('update:sections')?.length ?? 0
 
       mockSplitCongregationalReading.mockResolvedValueOnce(null)
       await wrapper.find('[data-testid="ai-split-btn"]').trigger('click')
@@ -581,12 +452,14 @@ describe('CongregationalEditor', () => {
       expect(toasts.toasts).toHaveLength(1)
       expect(toasts.toasts[0]!.message).toBe(FAILURE_TOAST_TEXT)
       expect(sectionsSnapshot(wrapper)).toEqual(before)
+      expect(wrapper.emitted('update:sections')?.length ?? 0).toBe(emissionsBeforeSplit)
     })
 
-    it('pushes the same toast and leaves sections unchanged when the split call rejects, with no error escaping the handler', async () => {
+    it('pushes the same toast, leaves sections unchanged and emits no additional update:sections when the split call rejects, with no error escaping the handler', async () => {
       const wrapper = mountEditor()
       await fetchAndPrime(wrapper)
       const before = sectionsSnapshot(wrapper)
+      const emissionsBeforeSplit = wrapper.emitted('update:sections')?.length ?? 0
 
       mockSplitCongregationalReading.mockRejectedValueOnce(new Error('network down'))
 
@@ -599,6 +472,7 @@ describe('CongregationalEditor', () => {
       expect(toasts.toasts).toHaveLength(1)
       expect(toasts.toasts[0]!.message).toBe(FAILURE_TOAST_TEXT)
       expect(sectionsSnapshot(wrapper)).toEqual(before)
+      expect(wrapper.emitted('update:sections')?.length ?? 0).toBe(emissionsBeforeSplit)
     })
 
     it('clears isSplitting (button usable again) after both a null result and a rejection', async () => {
@@ -654,7 +528,7 @@ describe('CongregationalEditor', () => {
       expect(wrapper.find('[data-testid="speaker-toggle-2"]').text()).toBe('Leader')
     })
 
-    it('does not add any new data-testid beyond ai-split-btn', () => {
+    it('does not add any new data-testid beyond ai-split-btn and congregational-close-btn', () => {
       const wrapper = mountEditor()
       const html = wrapper.html()
       const testIds = [...html.matchAll(/data-testid="([^"]+)"/g)].map((m) => m[1]!)
@@ -668,7 +542,7 @@ describe('CongregationalEditor', () => {
         'preview-panel',
         'preview-section-',
         'preview-label-',
-        'save-status',
+        'congregational-close-btn',
       ]
       for (const id of testIds) {
         expect(knownPrefixes.some((prefix) => id === prefix || id.startsWith(prefix))).toBe(true)
