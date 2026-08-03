@@ -141,6 +141,15 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
       group-wide audio is set only at group level. Per-slide audio remains. Supersedes the scope toggle
       shipped in **R030**.
 
+- [ ] **R070** (core-capability): A slide's resolved background image is displayed while presenting, not
+      only while authoring. The presented slide renders the single background the slide → group → song
+      cascade already resolved (R055/R056/R057) — the presentation surface consumes that resolved value
+      and never re-derives the cascade — with a legibility treatment so projected text stays readable
+      over the image. A video slide's own video takes precedence: no background renders on a video
+      slide. *(Added 2026-08-03 from owner UAT finding F3. R055 and R056 both describe SETTING a
+      background and neither ever asked for it to render while presenting, which is why Phase 33
+      verified green with authoring and preview complete and display absent.)* `[FEAT]`
+
 ### Presentation Correctness
 
 - [x] **R059** (quality-attribute): Organizational labels never render when presenting or previewing —
@@ -292,11 +301,12 @@ Acknowledged, deferred, not in this roadmap.
 | R067 | Phase 36 | Pending |
 | R068 | Phase 36 | Pending |
 | R069 | Phase 36 | Pending |
+| R070 | Phase 34 | Pending |
 
 **Coverage:**
 
-- v1.4 requirements: 34 total (R036–R069)
-- Mapped to phases: 34
+- v1.4 requirements: 35 total (R036–R070)
+- Mapped to phases: 35
 - Unmapped: 0 ✓
 
 **Phase → requirement-count summary:**
@@ -308,7 +318,7 @@ Acknowledged, deferred, not in this roadmap.
 | 31 | Service Lifecycle — Draft Lock & Reopen | R036, R037, R038 (3) |
 | 32 | Save Reliability — Autosave Fix & Persistent Status | R039, R040, R041 (3) |
 | 33 | Backgrounds & Slide Editing | R051, R052, R055, R056, R057, R058, R063 (7) |
-| 34 | Smarter Content — LLM Scripture Split | R064 (1) |
+| 34 | Smarter Content — LLM Scripture Split | R064, R070 (2) |
 | 35 | Presentation Correctness & Lyric Editor | R059, R060, R061, R065, R066 (5) |
 | 36 | UI Rework — Service Order & Contextual Action Bars | R053, R067, R068, R069 (4) |
 | 37 | PowerPoint Server-Side Rendering | R062 (1) |
