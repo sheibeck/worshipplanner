@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { shallowMount } from '@vue/test-utils'
 import SlidesTab from '../SlidesTab.vue'
 import SlidePlanRail from '../SlidePlanRail.vue'
@@ -7,6 +7,15 @@ import EditSlideDrawer from '../EditSlideDrawer.vue'
 import type { ServiceSlot } from '@/types/service'
 import type { AssembledSlide } from '@/types/slide'
 import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
+
+// 33-09 Task 2: the song-navigation menu key is a real router.push — mocked
+// here so these tests never touch a real router, mirroring
+// EditSlideDrawer.test.ts's own identical convention for the link button
+// this key replaces.
+const mockRouterPush = vi.fn().mockResolvedValue(undefined)
+vi.mock('vue-router', () => ({
+  useRouter: () => ({ push: mockRouterPush }),
+}))
 
 function makeEntry(overrides: Partial<GroupSlideEntry> & { id: string }): GroupSlideEntry {
   return {
@@ -567,6 +576,164 @@ describe('SlidesTab', () => {
       const drawer = wrapper.findComponent(EditSlideDrawer)
       expect(drawer.props('open')).toBe(true)
       expect(drawer.props('entry')).toEqual(entryCopy)
+    })
+  })
+
+  describe('Menu dispatch (Phase 33-09 Task 2 — onMenuAction, the single dispatcher for all six keys)', () => {
+    beforeEach(() => {
+      mockRouterPush.mockClear()
+    })
+
+    function mountWithEntry(sourceRef: GroupSlideEntry['sourceRef']) {
+      const slots: ServiceSlot[] = [makeSlot({ kind: 'SONG', id: 'slot-a', position: 0 })]
+      const entry = makeEntry({ id: 'entry-1', sourceRef })
+      const group = makeGroup({ id: 'slot-a', slotId: 'slot-a', slides: [entry] })
+      const assembledSlideshow: AssembledSlide[] = [makeAssembled(0, 'entry-1')]
+      return mountTab({ slots, assembledSlideshow, groupsBySlotId: new Map([['slot-a', group]]) })
+    }
+
+    it('menu: the edit-details key opens the drawer with mode "details"', async () => {
+      const wrapper = mountWithEntry({ kind: 'text', title: 'New slide', body: '' })
+      await wrapper.vm.$nextTick()
+
+      wrapper.findComponent(SlideGrid).vm.$emit('menu-action', 'entry-1', 'edit-details')
+      await wrapper.vm.$nextTick()
+
+      const drawer = wrapper.findComponent(EditSlideDrawer)
+      expect(drawer.props('open')).toBe(true)
+      expect(drawer.props('mode')).toBe('details')
+    })
+
+    it('menu: the edit-lyrics key opens the drawer with mode "lyrics"', async () => {
+      const wrapper = mountWithEntry({ kind: 'text', title: 'New slide', body: '' })
+      await wrapper.vm.$nextTick()
+
+      wrapper.findComponent(SlideGrid).vm.$emit('menu-action', 'entry-1', 'edit-lyrics')
+      await wrapper.vm.$nextTick()
+
+      const drawer = wrapper.findComponent(EditSlideDrawer)
+      expect(drawer.props('open')).toBe(true)
+      expect(drawer.props('mode')).toBe('lyrics')
+    })
+
+    it('menu: dispatching the lyrics key then the details key on the SAME entry leaves the drawer open throughout and only flips mode', async () => {
+      const wrapper = mountWithEntry({ kind: 'text', title: 'New slide', body: '' })
+      await wrapper.vm.$nextTick()
+
+      const grid = wrapper.findComponent(SlideGrid)
+      grid.vm.$emit('menu-action', 'entry-1', 'edit-lyrics')
+      await wrapper.vm.$nextTick()
+      let drawer = wrapper.findComponent(EditSlideDrawer)
+      expect(drawer.props('open')).toBe(true)
+      expect(drawer.props('mode')).toBe('lyrics')
+
+      grid.vm.$emit('menu-action', 'entry-1', 'edit-details')
+      await wrapper.vm.$nextTick()
+      drawer = wrapper.findComponent(EditSlideDrawer)
+      expect(drawer.props('open')).toBe(true)
+      expect(drawer.props('mode')).toBe('details')
+    })
+
+    it("menu: the delete key sets the drawer's pendingAction to a { key: 'delete' } request — this component calls no delete action itself (P-01; it has no store import at all, see its own file header)", async () => {
+      const wrapper = mountWithEntry({ kind: 'text', title: 'New slide', body: '' })
+      await wrapper.vm.$nextTick()
+
+      wrapper.findComponent(SlideGrid).vm.$emit('menu-action', 'entry-1', 'delete')
+      await wrapper.vm.$nextTick()
+
+      const drawer = wrapper.findComponent(EditSlideDrawer)
+      expect(drawer.props('pendingAction')).toMatchObject({ key: 'delete' })
+      expect(drawer.props('open')).toBe(true)
+      expect(drawer.props('mode')).toBe('details')
+    })
+
+    it("menu: the duplicate key sets the drawer's pendingAction to a { key: 'duplicate' } request", async () => {
+      const wrapper = mountWithEntry({ kind: 'text', title: 'New slide', body: '' })
+      await wrapper.vm.$nextTick()
+
+      wrapper.findComponent(SlideGrid).vm.$emit('menu-action', 'entry-1', 'duplicate')
+      await wrapper.vm.$nextTick()
+
+      const drawer = wrapper.findComponent(EditSlideDrawer)
+      expect(drawer.props('pendingAction')).toMatchObject({ key: 'duplicate' })
+    })
+
+    it('menu: the same key dispatched twice produces two pendingAction requests with DIFFERENT nonces', async () => {
+      const wrapper = mountWithEntry({ kind: 'text', title: 'New slide', body: '' })
+      await wrapper.vm.$nextTick()
+
+      const grid = wrapper.findComponent(SlideGrid)
+      grid.vm.$emit('menu-action', 'entry-1', 'delete')
+      await wrapper.vm.$nextTick()
+      const first = wrapper.findComponent(EditSlideDrawer).props('pendingAction') as { key: string; nonce: number }
+
+      grid.vm.$emit('menu-action', 'entry-1', 'delete')
+      await wrapper.vm.$nextTick()
+      const second = wrapper.findComponent(EditSlideDrawer).props('pendingAction') as { key: string; nonce: number }
+
+      expect(second.nonce).not.toBe(first.nonce)
+    })
+
+    it("menu: the drawer's pending-action-consumed emit clears pendingAction back to null", async () => {
+      const wrapper = mountWithEntry({ kind: 'text', title: 'New slide', body: '' })
+      await wrapper.vm.$nextTick()
+
+      wrapper.findComponent(SlideGrid).vm.$emit('menu-action', 'entry-1', 'delete')
+      await wrapper.vm.$nextTick()
+      expect(wrapper.findComponent(EditSlideDrawer).props('pendingAction')).not.toBeNull()
+
+      wrapper.findComponent(EditSlideDrawer).vm.$emit('pending-action-consumed')
+      await wrapper.vm.$nextTick()
+      expect(wrapper.findComponent(EditSlideDrawer).props('pendingAction')).toBeNull()
+    })
+
+    it('menu: the edit-in-song key pushes the lyrics tab for a lyric-kind entry and leaves the drawer closed', async () => {
+      const wrapper = mountWithEntry({ kind: 'lyric', songId: 'song-1', sectionId: 'sec-1' })
+      await wrapper.vm.$nextTick()
+
+      wrapper.findComponent(SlideGrid).vm.$emit('menu-action', 'entry-1', 'edit-in-song')
+      await wrapper.vm.$nextTick()
+
+      expect(mockRouterPush).toHaveBeenCalledWith({ name: 'songs', query: { edit: 'song-1', tab: 'lyrics' } })
+      expect(wrapper.findComponent(EditSlideDrawer).props('open')).toBe(false)
+    })
+
+    it('menu: the edit-in-song key pushes the details tab for a copyright-kind entry', async () => {
+      const wrapper = mountWithEntry({ kind: 'copyright', songId: 'song-1' })
+      await wrapper.vm.$nextTick()
+
+      wrapper.findComponent(SlideGrid).vm.$emit('menu-action', 'entry-1', 'edit-in-song')
+      await wrapper.vm.$nextTick()
+
+      expect(mockRouterPush).toHaveBeenCalledWith({ name: 'songs', query: { edit: 'song-1', tab: 'details' } })
+    })
+
+    it('menu: the edit-in-scripture key emits navigate-to-scripture-editor and leaves the drawer closed', async () => {
+      const wrapper = mountWithEntry({ kind: 'scripture', scriptureReadingId: 'read-1', innerSlideId: 'inner-1' })
+      await wrapper.vm.$nextTick()
+
+      wrapper.findComponent(SlideGrid).vm.$emit('menu-action', 'entry-1', 'edit-in-scripture')
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.emitted('navigate-to-scripture-editor')).toBeTruthy()
+      expect(wrapper.findComponent(EditSlideDrawer).props('open')).toBe(false)
+    })
+
+    it('menu: a menu action on a slide id that was NOT already selected selects it first, so the grid receives it as selectedSlideId', async () => {
+      const slots: ServiceSlot[] = [makeSlot({ kind: 'SONG', id: 'slot-a', position: 0 })]
+      const entryOne = makeEntry({ id: 'entry-1' })
+      const entryTwo = makeEntry({ id: 'entry-2' })
+      const group = makeGroup({ id: 'slot-a', slotId: 'slot-a', slides: [entryOne, entryTwo] })
+      const assembledSlideshow: AssembledSlide[] = [makeAssembled(0, 'entry-1'), makeAssembled(0, 'entry-2')]
+      const wrapper = mountTab({ slots, assembledSlideshow, groupsBySlotId: new Map([['slot-a', group]]) })
+      await wrapper.vm.$nextTick()
+      expect(wrapper.findComponent(SlideGrid).props('selectedSlideId')).toBeNull()
+
+      wrapper.findComponent(SlideGrid).vm.$emit('menu-action', 'entry-2', 'edit-details')
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.findComponent(SlideGrid).props('selectedSlideId')).toBe('entry-2')
+      expect(wrapper.findComponent(EditSlideDrawer).props('entry')).toEqual(entryTwo)
     })
   })
 })

@@ -49,6 +49,7 @@
           :service-id="serviceId"
           :ensure-group-materialized="ensureGroupMaterialized"
           @select="onSelectSlide"
+          @menu-action="onMenuAction"
         />
       </div>
     </div>
@@ -58,6 +59,8 @@
          only on its own `close` emit. -->
     <EditSlideDrawer
       :open="drawerOpen"
+      :mode="drawerMode"
+      :pending-action="pendingDrawerAction"
       :entry="selectedEntry"
       :group="selectedGroup"
       :plan-item="selectedSlot"
@@ -71,6 +74,7 @@
       @close="onDrawerClose"
       @edit-in-scripture="requestEditInScripture"
       @duplicate="selectSlideById"
+      @pending-action-consumed="onPendingActionConsumed"
     />
   </div>
 </template>
@@ -130,13 +134,15 @@
  * (D-03) — this part of the original design is unchanged.
  */
 import { ref, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import type { ServiceSlot } from '@/types/service'
 import type { AssembledSlide } from '@/types/slide'
 import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
+import { buildSongEditLink, type SongEditTab } from '@/utils/songEditLink'
 import SlidePlanRail from './SlidePlanRail.vue'
 import SlideGrid from './SlideGrid.vue'
 import EditSlideDrawer from './EditSlideDrawer.vue'
-import type { EnsureGroupMaterializedResult } from './slideDisplay'
+import type { EnsureGroupMaterializedResult, MenuItemKey } from './slideDisplay'
 
 const props = withDefaults(defineProps<{
   slots: ServiceSlot[]
@@ -173,6 +179,8 @@ const emit = defineEmits<{
    *  only asks for it, exactly as SlideshowPreview's own `present` emit did. */
   (e: 'present'): void
 }>()
+
+const router = useRouter()
 
 const selectedSlotId = ref<string | null>(null)
 const selectedSlideId = ref<string | null>(null)
@@ -258,6 +266,32 @@ function onSelectSlot(slotId: string): void {
 // selection CHANGE to a still-valid slide, so once open the drawer still
 // follows the selection instead of closing and reopening (D-03).
 const drawerOpen = ref(false)
+
+/**
+ * Phase 33-09 (R052) — which body the drawer shows, set exclusively by
+ * `onMenuAction`'s two edit keys. Defaults `'details'` so the post-duplicate
+ * follow-selection path (`selectSlideById`) and every pre-existing fixture
+ * that never touches this ref keep opening the details view, unchanged.
+ */
+const drawerMode = ref<'details' | 'lyrics'>('details')
+
+/**
+ * Phase 33-09 — a menu-dispatched Duplicate/Delete request, relayed
+ * verbatim into the drawer's own `pendingAction` prop (33-07's seam). Keyed
+ * on a monotonically incrementing nonce (never the `key` alone) so the same
+ * key dispatched twice in a row still fires the drawer's watcher the second
+ * time. ★ P-01: this component never calls a delete/duplicate store action
+ * itself — it only ever sets this pending request, which the drawer turns
+ * into its OWN existing write paths (the inline delete confirm, the
+ * duplicate write).
+ */
+const pendingDrawerAction = ref<{ key: 'duplicate' | 'delete'; nonce: number } | null>(null)
+let pendingActionNonce = 0
+
+/** Clears the pending request once the drawer has handled it (33-07's `pending-action-consumed` emit). */
+function onPendingActionConsumed(): void {
+  pendingDrawerAction.value = null
+}
 
 // R051: selection only. Selecting a card must never also open the drawer —
 // that coupling is what blocked dragging a slide without triggering edit.
@@ -351,6 +385,65 @@ const selectedSlideTotal = computed(() => selectedGroupAssembledSlides.value.len
 function requestEditInScripture(): void {
   if (selectedSlotArrayIndex.value < 0) return
   emit('navigate-to-scripture-editor', selectedSlotArrayIndex.value)
+}
+
+/**
+ * Phase 33-09 (R051/R052) — the single dispatcher for every one of the six
+ * 3-dot menu keys (`SlideGrid`'s `menu-action` emit, 33-08). A menu action
+ * always implies its own card is the one being acted on, so this selects
+ * the entry FIRST — mirroring `onSelectSlide`'s own selection line — before
+ * dispatching on the key, since both the drawer's entry resolution and the
+ * song-navigation lookup below depend on the selection already being
+ * current (even when the acted-on card was not already selected).
+ *
+ * Only the two edit keys and Duplicate/Delete ever touch `drawerOpen` — the
+ * two navigation keys are pure routes/relays and never open it. Duplicate
+ * and Delete open the drawer in `details` mode because that is where their
+ * EXISTING write paths live (the duplicate write, the inline delete
+ * confirm) — this dispatcher itself never calls a delete or duplicate store
+ * action; it only ever sets a pending request for the drawer to act on
+ * (P-01).
+ */
+function onMenuAction(slideId: string, key: MenuItemKey): void {
+  selectedSlideId.value = slideId
+  switch (key) {
+    case 'edit-details':
+      drawerMode.value = 'details'
+      drawerOpen.value = true
+      break
+    case 'edit-lyrics':
+      drawerMode.value = 'lyrics'
+      drawerOpen.value = true
+      break
+    case 'edit-in-song': {
+      // T-33-24: built from the SELECTED entry's own stored song id, never
+      // from anything carried on the menu event itself — a crafted event
+      // cannot redirect this to an arbitrary song. Unchanged in behaviour
+      // from the link button this replaces (`EditSlideDrawer.vue`'s former
+      // `onEditInSong`): lyrics tab for a lyric-section slide, details tab
+      // for a copyright slide.
+      const ref = selectedEntry.value?.sourceRef
+      if (!ref || (ref.kind !== 'lyric' && ref.kind !== 'copyright')) return
+      const tab: SongEditTab = ref.kind === 'lyric' ? 'lyrics' : 'details'
+      void router.push(buildSongEditLink(ref.songId, tab))
+      break
+    }
+    case 'edit-in-scripture':
+      // Not a navigation — relays through the existing plumbing up to the
+      // service editor, unchanged from the drawer's own former emit.
+      requestEditInScripture()
+      break
+    case 'duplicate':
+      drawerMode.value = 'details'
+      pendingDrawerAction.value = { key: 'duplicate', nonce: ++pendingActionNonce }
+      drawerOpen.value = true
+      break
+    case 'delete':
+      drawerMode.value = 'details'
+      pendingDrawerAction.value = { key: 'delete', nonce: ++pendingActionNonce }
+      drawerOpen.value = true
+      break
+  }
 }
 
 defineExpose({ selectedSlotId, selectedSlideId, requestEditInScripture, selectSlideById })
