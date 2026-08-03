@@ -66,6 +66,7 @@
       :group="selectedGroup"
       :plan-item="selectedSlot"
       :assembled-slide="selectedAssembledSlide"
+      :group-assembled-slides="selectedGroupAssembledSlides"
       :position="selectedSlidePosition"
       :total="selectedSlideTotal"
       :org-id="orgId"
@@ -363,7 +364,10 @@ const selectedEntry = computed<GroupSlideEntry | null>(() => {
 /**
  * The selected group's assembled slides, in the SAME order/filter the grid
  * itself applies (`SlideGrid.vue`'s own `cards` computed) — so the drawer's
- * position/total can never disagree with the grid's own card numbering.
+ * position/total can never disagree with the grid's own card numbering. Also
+ * threaded into the drawer's `groupAssembledSlides` prop (Phase 33 UI-audit
+ * fix) so its own remove-caption can tell a song-sourced inherited
+ * background apart from nothing resolving beneath a slide's own override.
  */
 const selectedGroupAssembledSlides = computed<AssembledSlide[]>(() => {
   if (selectedSlotArrayIndex.value < 0) return []

@@ -492,7 +492,21 @@ const props = withDefaults(defineProps<{
    * every pre-33-07 fixture is unaffected.
    */
   pendingAction?: { key: 'duplicate' | 'delete'; nonce: number } | null
-}>(), { serviceLocked: false, mode: 'details', pendingAction: null })
+  /**
+   * Phase 33 UI-audit fix — the selected slide's GROUP siblings, already
+   * resolved (same array `SlidesTab.vue`'s `selectedGroupAssembledSlides`
+   * computes for the position/total props above, at the same altitude, no
+   * new resolver). Lets `lowerLevelBackgroundLabel` below tell a song-level
+   * inherited background apart from "nothing resolves beneath this slide's
+   * own override" without re-deriving the cascade itself — mirrors how
+   * `SlideGrid.vue`'s `songBackgroundForInheritedDisplay` finds the same
+   * song-sourced value by scanning its own group's assembled cards. Defaults
+   * `[]` so every pre-existing fixture/mount is unaffected. See
+   * `lowerLevelBackgroundLabel`'s own comment for the known limitation this
+   * shares with that precedent.
+   */
+  groupAssembledSlides?: AssembledSlide[]
+}>(), { serviceLocked: false, mode: 'details', pendingAction: null, groupAssembledSlides: () => [] })
 
 const emit = defineEmits<{
   close: []
@@ -832,22 +846,32 @@ const backgroundFileName = computed(() => (ownBackgroundUrl.value ? backgroundIm
 const canMutateBackground = computed(() => props.isEditor && !props.serviceLocked)
 
 /**
- * ★ Data-availability note (documented in 33-07-SUMMARY.md as a known,
- * scoped gap): this drawer receives `group` (with its own
- * `backgroundImageUrl`) but no `song` document — no plan in this phase
- * threads a song-level background lookup into this component. The GROUP
- * branch below reads `props.group.backgroundImageUrl` directly (a raw field
- * read, not a re-derivation of resolution precedence). The SONG branch
- * cannot be verified from available props — rather than assert a caption
- * this component cannot confirm (which would risk the INVERSE of this
- * phase's own "override the user cannot see" risk: a false claim that a
- * background survives when none does), the caption renders only for the
- * provable group case.
+ * ★ Phase 33 UI-audit fix (previously a known, scoped gap documented in
+ * 33-07-SUMMARY.md): this drawer still receives no `song` document, so the
+ * GROUP branch keeps reading `props.group.backgroundImageUrl` directly (a
+ * raw field read, not a re-derivation of resolution precedence). The SONG
+ * branch is now provable WITHOUT threading a song document or a second
+ * resolver: `groupAssembledSlides` (populated by `SlidesTab.vue` from the
+ * SAME `assembledSlideshow` prop it already filters for position/total) is
+ * this slide's own group, already resolved — a sibling entry with
+ * `backgroundSource === 'song'` proves the song has one, exactly mirroring
+ * how `SlideGrid.vue`'s `songBackgroundForInheritedDisplay` scans its own
+ * group's assembled cards for the same signal.
+ *
+ * ★ Known limitation, shared with that precedent, not introduced by this
+ * fix: if EVERY slide in the group has its own override (so no sibling ever
+ * resolves to 'song'), a song-level background one level further down stays
+ * invisible to this caption. This is narrower than a silent wrong-level
+ * claim — the caption simply doesn't render rather than naming the wrong
+ * level (the same "absent is safer than wrong" reasoning the original gap
+ * used) — and is considered acceptable because the group-level control
+ * already surfaces this exact case via its own `inheritedFrom` prop.
  */
 const lowerLevelBackgroundLabel = computed<'group' | 'song' | null>(() => {
   if (!ownBackgroundUrl.value) return null
   if (props.group?.backgroundImageUrl) return 'group'
-  return null
+  const songSourced = props.groupAssembledSlides.some((a) => a.slide.backgroundSource === 'song')
+  return songSourced ? 'song' : null
 })
 
 const {

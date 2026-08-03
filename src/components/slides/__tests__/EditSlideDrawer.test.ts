@@ -1783,6 +1783,40 @@ describe('EditSlideDrawer (Phase 33-07 Task 2 — Slide Background)', () => {
     expect(body().find('[data-testid="background-remove-caption"]').exists()).toBe(false)
   })
 
+  it('★ renders the remove-caption naming the song when the group has none of its own but a sibling slide resolves from the song (33 UI-audit CR)', () => {
+    const { entry, assembledSlide } = makeOwnBackgroundFixtures('https://example.com/own.jpg')
+    const sibling = makeAssembled({
+      slide: { id: 'entry-2', position: 1, contentKind: 'lyric', sectionId: 'sec-1', sectionLabel: 'Verse 2', lines: ['x'], backgroundImageUrl: 'https://example.com/song-bg.jpg', backgroundSource: 'song' } as never,
+    })
+    // No group background at all — the failure mode this fix closes.
+    mountDrawer({
+      entry,
+      assembledSlide,
+      group: makeGroup({ slides: [entry] }),
+      groupAssembledSlides: [assembledSlide, sibling],
+    })
+
+    const caption = body().find('[data-testid="background-remove-caption"]')
+    expect(caption.exists()).toBe(true)
+    expect(caption.text()).toMatch(/the song's still applies\.$/)
+  })
+
+  it('still prefers the group when both a sibling song-sourced slide AND the group\'s own background exist', () => {
+    const { entry, assembledSlide } = makeOwnBackgroundFixtures('https://example.com/own.jpg')
+    const sibling = makeAssembled({
+      slide: { id: 'entry-2', position: 1, contentKind: 'lyric', sectionId: 'sec-1', sectionLabel: 'Verse 2', lines: ['x'], backgroundImageUrl: 'https://example.com/song-bg.jpg', backgroundSource: 'song' } as never,
+    })
+    mountDrawer({
+      entry,
+      assembledSlide,
+      group: makeGroup({ slides: [entry], backgroundImageUrl: 'https://example.com/g.jpg' }),
+      groupAssembledSlides: [assembledSlide, sibling],
+    })
+
+    const caption = body().find('[data-testid="background-remove-caption"]')
+    expect(caption.text()).toMatch(/the group's still applies\.$/)
+  })
+
   it('★ renders the Slide Background section for a video-kind entry, while the Slide Audio section stays absent', () => {
     const { entry, assembledSlide } = makeVideoFixtures()
     mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
