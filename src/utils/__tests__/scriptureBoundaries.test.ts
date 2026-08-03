@@ -56,8 +56,10 @@ describe('computeBoundaries', () => {
   })
 
   it('always includes position 0 and text.length as anchors for empty text', () => {
+    // For empty text, 0 and text.length are the same value, so the Set
+    // collapses them into a single entry — still correctly "0 and length".
     const boundaries = computeBoundaries('')
-    expect(boundaries).toEqual([0, 0])
+    expect(boundaries).toEqual([0])
   })
 
   it('returns a strictly ascending array with no duplicates when a clause-ending mark and a verse marker resolve to adjacent/overlapping regions', () => {
