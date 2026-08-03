@@ -82,7 +82,7 @@ Declared values (must be multiples of 4):
 | 2xl | 48px | not used |
 | 3xl | 64px | not used |
 | — | 12px (`px-3 py-2`, `gap-3`) | menu panel padding, background-control bordered row padding — matches `SlideGroupMusicControl.vue:2`'s existing `px-3 py-2` shell verbatim, and the add-menu dropdown's own `px-3 py-2` item padding (`ServiceEditorView.vue:1111`) |
-| — | 6px (`w-6 h-6`, `p-1`) | menu trigger hit-target padding around the 3-dot glyph — below the 4px grid on its own, but the resulting **28×28px total hit target** (`p-1` + `h-5 w-5` glyph, matching `EditSlideDrawer.vue:32`'s close-button treatment exactly) is what's authored, not the padding number in isolation |
+| — | 4px (`p-1`) | menu trigger hit-target padding around the 3-dot glyph. `p-1` (4px) + an `h-5 w-5` (20px) glyph = a **28×28px** total hit target. **A deliberate half-step below `EditSlideDrawer.vue:32`'s close button**, which is `p-1.5` (6px) + `h-5 w-5` = 32×32px. The drawer's close button sits in a roomy panel header; this trigger sits in the corner of a dense slide card next to a drag grip, where 32×32 crowds the grip's own hit area. Both values are 4px-grid multiples. *(Corrected 2026-08-02 after the UI checker flagged the original row, which labelled this 6px and claimed it matched the close button "exactly" — it does not, and the authored class was `p-1` all along.)* |
 
 **Exceptions: none introduced beyond the one already-established close-button treatment cited above,
 reused verbatim rather than re-derived.**
@@ -170,7 +170,12 @@ contract exists to prevent.
 Produced by the ui-consideration-probe over four described surfaces (E1 `SlideActionMenu.vue`, E2 the
 per-type menu item list, E3 the three background controls, E4 card-level provenance legibility).
 
-**Applicable: 26 — 19 covered, 6 backstop, 1 unresolved.**
+**Applicable: 32 — 23 covered, 8 backstop, 1 unresolved.**
+
+*(Count corrected 2026-08-02. The engine reports 8 categories × 4 elements = 32. The first draft of
+this section stated 26, omitted E1 `partial` entirely, and resolved E2 `overflow` by cross-reference
+rather than on its own row — both are now resolved explicitly below, so the no-silent-drop equality
+holds: 32 surfaced = 32 authored.)*
 
 ### E1 — `SlideActionMenu.vue`
 
@@ -180,6 +185,7 @@ per-type menu item list, E3 the three background controls, E4 card-level provena
 | loading | ✅ covered | No async content of its own — items are a pure synchronous function of already-loaded props (`sourceRef.kind`, `planItem.kind`, `serviceLocked`, `isEditor`) |
 | error | ✅ covered | The menu issues no writes itself; every item either opens a drawer (Details/Lyrics) or navigates (Edit in song/scripture) or fires an existing, already-erroring-covered store action (Duplicate/Delete, both already produce `console.error` + no silent failure per `EditSlideDrawer.vue:1083-1085,1130-1131`) |
 | populated | ✅ covered | Exact per-kind lists in §3's table — 7 rows plus the Hymn refinement, exhaustive |
+| partial | ⚑ backstop | **Statement:** the item list depends on BOTH `sourceRef.kind` and the owning `planItem.kind` (the Hymn discriminator, §3). If the owning plan item has not resolved when the menu opens, the list must not silently fall back to the generic `text` row and offer `Edit lyrics` on a Hymn placeholder. **verification: backstop** — a test that opening the menu while `planItemKind` is `undefined` renders the conservative reduced list, never the permissive one. ★ This is the one place where a partial-data fallback would grant an edit affordance the phase deliberately withholds. |
 | overflow | ⚑ backstop | **Statement:** the widest item list (scripture/text/imported: 4 items) must not overflow the panel's fixed width at the narrowest card width (200px, `SlideGrid.vue:127`'s `minmax(200px,1fr)`). **verification: backstop** — a mounted-width test asserting the panel (fixed `w-40`, § 2) never collides with the card's own right edge at 200px card width. |
 | zero-one-many | ✅ covered | Exactly one menu open at a time — opening a second card's menu closes the first (§ 2, mirrors the drawer's own "only one open at a time" rule) |
 | long-text | ✅ covered | Every item label is a fixed enum string; no user-supplied text ever reaches this component |
@@ -193,7 +199,7 @@ per-type menu item list, E3 the three background controls, E4 card-level provena
 | error | ✅ covered | E1 |
 | populated | ✅ covered | §3 |
 | partial | ⚑ backstop | **Statement:** the Hymn discriminator (§3, `sourceRef.body !== undefined`) must be evaluated on the STORED entry, never on a stale prop captured before a first "Edit lyrics" write lands — a user who edits a HYMN's auto-derived text via a future path must see the menu re-derive correctly on the next open. **verification: backstop** — a test that a `text`-kind entry whose `body` transitions from `undefined` to a defined string (mid-session) changes the rendered item list on the SAME card without a remount. |
-| overflow | E1 (shared) | — |
+| overflow | ⚑ backstop | **Statement:** resolved on its own row rather than deferred to E1, so the count reconciles. The per-type list's *longest single label* (`Edit in scripture`, 17 chars) must fit the `w-40` panel without wrapping to two lines, at every kind that offers it. **verification: backstop** — a mounted test asserting no menu item wraps at the panel's fixed width. |
 | zero-one-many | ✅ covered | One list per card, always |
 | long-text | ✅ covered | Fixed enum labels only |
 
