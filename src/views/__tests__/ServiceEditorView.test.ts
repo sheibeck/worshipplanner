@@ -2456,7 +2456,17 @@ describe('ServiceEditorView - R047 scripture reference is the slide source', () 
     await wrapper.vm.$nextTick()
     mockUpdateService.mockClear()
 
-    const input = wrapper.findComponent({ name: 'ScriptureInput' })
+    // [Rule 1 - Bug, pre-existing, exposed by 32-05] A bare
+    // `findComponent({ name: 'ScriptureInput' })` matches the FIRST
+    // ScriptureInput in the render tree, which is the header's Sermon
+    // Passage editor (:671), not slot-1's own Scripture Reading row
+    // (:880) this test's title and body are actually about. This test
+    // silently passed before the R039 fix because the pre-fix swallow bug
+    // consumed the edit's own watcher trigger, so `written` was always
+    // undefined and every assertion inside `if (scriptureSlot)` was
+    // vacuous. Scoping the query to the slot's own container is the real
+    // fix — not the swallow bug, which 32-01 already closed.
+    const input = wrapper.find('[data-scripture-slot-index="1"]').findComponent({ name: 'ScriptureInput' })
     expect(input.exists()).toBe(true)
     input.vm.$emit('update:modelValue', { book: 'Psalms', chapter: 103, verseStart: 1, verseEnd: 5 })
     await wrapper.vm.$nextTick()
@@ -2468,11 +2478,12 @@ describe('ServiceEditorView - R047 scripture reference is the slide source', () 
       .filter((slots): slots is Array<Record<string, unknown>> => Array.isArray(slots))
       .pop()
     const scriptureSlot = written?.find((s) => s.kind === 'SCRIPTURE')
-    if (scriptureSlot) {
-      expect(scriptureSlot.book).toBe('Psalms')
-      expect(scriptureSlot.chapter).toBe(103)
-      expect(scriptureSlot.scriptureReadingId).toBeUndefined()
-    }
+    // Unconditional now, not `if (scriptureSlot)` — a missing slot must fail
+    // the test, not silently skip its assertions (see the Rule 1 note above).
+    expect(scriptureSlot).toBeDefined()
+    expect(scriptureSlot!.book).toBe('Psalms')
+    expect(scriptureSlot!.chapter).toBe(103)
+    expect(scriptureSlot!.scriptureReadingId).toBeUndefined()
   })
 })
 
@@ -4171,8 +4182,12 @@ describe('ServiceEditorView - 32-05: migrated onto useAutoSave/useSaveStatus, st
       onUndo: () => void
     }
 
+    // Captured BEFORE the warm-up touch: the snapshot `onUndo` restores is
+    // taken from `originalService` at the moment the save wrapper runs,
+    // which — for this, the FIRST save on this mount — is still the
+    // pristine, as-loaded state, not whatever the warm-up touch left behind.
+    const pristineNotes = vm.localService.notes
     await warmUp(wrapper, vm)
-    const beforeNotes = vm.localService.notes
     vm.localService.notes = 'a change that will be undone'
     await wrapper.vm.$nextTick()
     await new Promise((resolve) => setTimeout(resolve, 900))
@@ -4180,7 +4195,7 @@ describe('ServiceEditorView - 32-05: migrated onto useAutoSave/useSaveStatus, st
     expect(mockUpdateService).toHaveBeenCalledTimes(1)
 
     vm.onUndo()
-    expect(vm.localService.notes).toBe(beforeNotes)
+    expect(vm.localService.notes).toBe(pristineNotes)
   })
 
   it('a genuine external merge still applies and arms no save (RESEARCH assumption A2)', async () => {
@@ -4208,8 +4223,12 @@ describe('ServiceEditorView - 32-05: migrated onto useAutoSave/useSaveStatus, st
     await wrapper.vm.$nextTick()
     const vm = wrapper.vm as unknown as { localService: { notes: string } }
 
-    await warmUp(wrapper, vm)
+    // Captured BEFORE the warm-up touch — see the undo-snapshot test's
+    // comment above for why: this is the FIRST save attempt on this mount,
+    // so the state `handleAutosaveFailure` reverts to is the pristine,
+    // as-loaded state, not whatever the warm-up touch left behind.
     const persistedNotes = vm.localService.notes
+    await warmUp(wrapper, vm)
     mockUpdateService.mockRejectedValueOnce(new ServiceLockedErrorStub('service-1', 'planned'))
     vm.localService.notes = 'typed just as another editor locked it'
     await wrapper.vm.$nextTick()
