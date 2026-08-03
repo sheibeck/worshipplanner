@@ -192,11 +192,18 @@ function resolveEntryContent(
   }
 }
 
-/** D-04 two-level audio precedence for one group entry. Video has no bed layer (D-18) — a video slide's own source resolves through `resolveEntryContent`, not here. */
+/**
+ * D-04 two-level audio precedence for one group entry, plus the R055/R056/R057
+ * three-level background cascade (slide → group → song). Video has no bed
+ * layer (D-18) — a video slide's own source resolves through
+ * `resolveEntryContent`, not here.
+ */
 interface ResolvedGroupMedia {
   audioUrl?: string
   audioLoop?: boolean
   audioFromBed: boolean
+  backgroundImageUrl?: string
+  backgroundSource?: 'slide' | 'group' | 'song'
 }
 
 /**
@@ -212,9 +219,34 @@ interface ResolvedGroupMedia {
  * independently per entry with no cross-entry state, matching D-18's framing
  * of a video slide as a self-contained unit.
  */
-function resolveEntryMedia(group: SlideGroup, entry: GroupSlideEntry): ResolvedGroupMedia {
+function resolveEntryMedia(
+  group: SlideGroup,
+  entry: GroupSlideEntry,
+  song: SongLyrics | undefined,
+): ResolvedGroupMedia {
+  // R055/R056/R057: slide → group → song, most specific wins. Computed
+  // BEFORE the video early return below (★ Pitfall 1, 33-RESEARCH.md) — a
+  // video slide's own audio bed is deliberately suppressed (two audio
+  // sources would collide audibly), but a video slide's background is NOT
+  // suppressed the same way: a video's own picture already covers the
+  // background, and there is no collision to avoid. See 33-UI-SPEC.md §9.
+  // ★ Pitfall 3: `song` is legitimately `undefined` for non-SONG groups
+  // (PRAYER/SCRIPTURE/MESSAGE/HYMN/IMPORTED) — optional-chain the song tier
+  // so resolving a group with no owning song never throws.
+  const backgroundImageUrl = entry.backgroundImageUrl ?? group.backgroundImageUrl ?? song?.backgroundImageUrl
+  const backgroundSource: 'slide' | 'group' | 'song' | undefined = entry.backgroundImageUrl
+    ? 'slide'
+    : group.backgroundImageUrl
+      ? 'group'
+      : song?.backgroundImageUrl
+        ? 'song'
+        : undefined
+
   if (entry.sourceRef.kind === 'video') {
-    return { audioFromBed: false }
+    const videoMedia: ResolvedGroupMedia = { audioFromBed: false }
+    if (backgroundImageUrl) videoMedia.backgroundImageUrl = backgroundImageUrl
+    if (backgroundSource) videoMedia.backgroundSource = backgroundSource
+    return videoMedia
   }
 
   // Effective audio: the entry's OWN audio wins; otherwise fall back to the
@@ -227,6 +259,8 @@ function resolveEntryMedia(group: SlideGroup, entry: GroupSlideEntry): ResolvedG
   // A group bed never loops (D-04) — audioLoop is copied ONLY when the audio
   // came from the entry itself, never when it resolved from the bed.
   if (!audioFromBed && entry.audioUrl && entry.audioLoop) media.audioLoop = true
+  if (backgroundImageUrl) media.backgroundImageUrl = backgroundImageUrl
+  if (backgroundSource) media.backgroundSource = backgroundSource
   return media
 }
 
@@ -276,7 +310,14 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
     entry: GroupSlideEntry,
     content: SlideContent,
   ): void => {
-    const media = resolveEntryMedia(group, entry)
+    // Song lookup only for source kinds that carry a songId — every other
+    // kind (PRAYER/SCRIPTURE/MESSAGE/HYMN/IMPORTED/video/text) has no owning
+    // song document, so `song` is `undefined` for them (★ Pitfall 3).
+    const song =
+      entry.sourceRef.kind === 'lyric' || entry.sourceRef.kind === 'copyright'
+        ? inputs.songLyricsById.get(entry.sourceRef.songId)
+        : undefined
+    const media = resolveEntryMedia(group, entry, song)
     const slide = {
       ...content,
       // Never recompute — the stored GroupSlideEntry.id IS the slide id
@@ -285,6 +326,8 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
       position: globalPosition,
       ...(media.audioUrl ? { audioUrl: media.audioUrl } : {}),
       ...(media.audioLoop ? { audioLoop: true } : {}),
+      ...(media.backgroundImageUrl ? { backgroundImageUrl: media.backgroundImageUrl } : {}),
+      ...(media.backgroundSource ? { backgroundSource: media.backgroundSource } : {}),
     } as Slide
     assembled.push({
       slide,

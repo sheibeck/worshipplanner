@@ -1103,6 +1103,204 @@ describe('assembleSlideshow — D-17 video entries and authored text entries', (
   })
 })
 
+describe('assembleSlideshow — background cascade (R055/R056/R057)', () => {
+  it("an entry with its own background wins even when the group AND the song also have one — backgroundSource is 'slide'", () => {
+    const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+    const service = makeService([slot])
+    const lyrics = makeSongLyrics({ backgroundImageUrl: 'https://example.com/song-bg.png' })
+    const entry = makeGroupSlideEntry({
+      id: 'entry-1',
+      order: 0,
+      sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+      backgroundImageUrl: 'https://example.com/slide-bg.png',
+    })
+    const group = makeSlideGroup({
+      id: 'slot-song-0',
+      slotId: 'slot-song-0',
+      slides: [entry],
+      backgroundImageUrl: 'https://example.com/group-bg.png',
+    })
+    const inputs = makeInputs({
+      songLyricsById: new Map([['song-1', lyrics]]),
+      groupsBySlotId: new Map([['slot-song-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result[0]!.slide.backgroundImageUrl).toBe('https://example.com/slide-bg.png')
+    expect(result[0]!.slide.backgroundSource).toBe('slide')
+  })
+
+  it("an entry with no background in a group that has one, song also has one, resolves the group's — backgroundSource is 'group'", () => {
+    const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+    const service = makeService([slot])
+    const lyrics = makeSongLyrics({ backgroundImageUrl: 'https://example.com/song-bg.png' })
+    const entry = makeGroupSlideEntry({
+      id: 'entry-1',
+      order: 0,
+      sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+    })
+    const group = makeSlideGroup({
+      id: 'slot-song-0',
+      slotId: 'slot-song-0',
+      slides: [entry],
+      backgroundImageUrl: 'https://example.com/group-bg.png',
+    })
+    const inputs = makeInputs({
+      songLyricsById: new Map([['song-1', lyrics]]),
+      groupsBySlotId: new Map([['slot-song-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result[0]!.slide.backgroundImageUrl).toBe('https://example.com/group-bg.png')
+    expect(result[0]!.slide.backgroundSource).toBe('group')
+  })
+
+  it("an entry and group with no background fall through to the song's — backgroundSource is 'song'", () => {
+    const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+    const service = makeService([slot])
+    const lyrics = makeSongLyrics({ backgroundImageUrl: 'https://example.com/song-bg.png' })
+    const entry = makeGroupSlideEntry({
+      id: 'entry-1',
+      order: 0,
+      sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+    })
+    const group = makeSlideGroup({ id: 'slot-song-0', slotId: 'slot-song-0', slides: [entry] })
+    const inputs = makeInputs({
+      songLyricsById: new Map([['song-1', lyrics]]),
+      groupsBySlotId: new Map([['slot-song-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result[0]!.slide.backgroundImageUrl).toBe('https://example.com/song-bg.png')
+    expect(result[0]!.slide.backgroundSource).toBe('song')
+  })
+
+  it('nothing set at any level leaves both backgroundImageUrl and backgroundSource genuinely absent, never present-and-undefined', () => {
+    const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+    const service = makeService([slot])
+    const lyrics = makeSongLyrics()
+    const entry = makeGroupSlideEntry({
+      id: 'entry-1',
+      order: 0,
+      sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+    })
+    const group = makeSlideGroup({ id: 'slot-song-0', slotId: 'slot-song-0', slides: [entry] })
+    const inputs = makeInputs({
+      songLyricsById: new Map([['song-1', lyrics]]),
+      groupsBySlotId: new Map([['slot-song-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect('backgroundImageUrl' in result[0]!.slide).toBe(false)
+    expect('backgroundSource' in result[0]!.slide).toBe(false)
+  })
+
+  // ★ Pitfall 3: a PRAYER group has no owning song at all — `song` is
+  // `undefined` at the resolution point. Must resolve group-then-nothing
+  // without throwing (optional chaining on the song tier).
+  it('a PRAYER group with no owning song resolves its group background without throwing (no SongLyrics document exists for this group)', () => {
+    const slot: import('@/types/service').NonAssignableSlot = { kind: 'PRAYER', id: 'slot-prayer-0', position: 0 }
+    const service = makeService([slot])
+    const entry = makeGroupSlideEntry({ id: 'entry-prayer', order: 0, sourceRef: { kind: 'text' } })
+    const group = makeSlideGroup({
+      id: 'slot-prayer-0',
+      slotId: 'slot-prayer-0',
+      slides: [entry],
+      backgroundImageUrl: 'https://example.com/group-bg.png',
+    })
+    const inputs = makeInputs({ groupsBySlotId: new Map([['slot-prayer-0', group]]) })
+
+    expect(() => assembleSlideshow(service, inputs)).not.toThrow()
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result[0]!.slide.backgroundImageUrl).toBe('https://example.com/group-bg.png')
+    expect(result[0]!.slide.backgroundSource).toBe('group')
+  })
+
+  // ★ Pitfall 1 / the deliberate divergence: a video slide DOES resolve a
+  // background through the ordinary cascade — unlike audio, which it never
+  // inherits from the group's bed. Both assertions live in the same test so
+  // the asymmetry cannot be silently "fixed" away later.
+  it("a video entry with no background of its own, in a group that has one, resolves backgroundSource: 'group' while still resolving no bed audio", () => {
+    const slot = scriptureSlot({ id: 'slot-scripture-0', scriptureReadingId: 'reading-1' })
+    const service = makeService([slot])
+    const reading = makeScriptureReading()
+    const videoEntry = makeGroupSlideEntry({
+      id: 'entry-video',
+      order: 0,
+      sourceRef: { kind: 'video', videoSrc: 'https://example.com/dropped.mp4' },
+    })
+    const group = makeSlideGroup({
+      id: 'slot-scripture-0',
+      slotId: 'slot-scripture-0',
+      slides: [videoEntry],
+      bedAudioUrl: 'https://example.com/bed.mp3',
+      backgroundImageUrl: 'https://example.com/group-bg.png',
+    })
+    const inputs = makeInputs({
+      scriptureReadingsById: new Map([['reading-1', reading]]),
+      groupsBySlotId: new Map([['slot-scripture-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result).toHaveLength(1)
+    // Background: resolves normally through the cascade.
+    expect(result[0]!.slide.backgroundImageUrl).toBe('https://example.com/group-bg.png')
+    expect(result[0]!.slide.backgroundSource).toBe('group')
+    // Audio: still suppressed for video (WR-01, unchanged by this task).
+    expect('audioUrl' in result[0]!.slide).toBe(false)
+    expect(result[0]!.audioFromBed).toBe(false)
+  })
+
+  it('a group with backgroundImageUrl set and an empty slides array emits no slides and throws nothing', () => {
+    const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+    const service = makeService([slot])
+    const group = makeSlideGroup({
+      id: 'slot-song-0',
+      slotId: 'slot-song-0',
+      slides: [],
+      backgroundImageUrl: 'https://example.com/group-bg.png',
+    })
+    const inputs = makeInputs({ groupsBySlotId: new Map([['slot-song-0', group]]) })
+
+    expect(() => assembleSlideshow(service, inputs)).not.toThrow()
+    const result = assembleSlideshow(service, inputs)
+    expect(result).toHaveLength(0)
+  })
+
+  it('an entry carrying a stale unknown extra property, with no audioUrl, in a group with a bed, still resolves audioUrl from the bed with audioFromBed true', () => {
+    const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+    const service = makeService([slot])
+    const lyrics = makeSongLyrics()
+    const entry = {
+      id: 'entry-stale',
+      order: 0,
+      sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+      legacyUnknownField: 'leftover-from-a-prior-schema',
+    } as unknown as GroupSlideEntry
+    const group = makeSlideGroup({
+      id: 'slot-song-0',
+      slotId: 'slot-song-0',
+      slides: [entry],
+      bedAudioUrl: 'https://example.com/bed.mp3',
+    })
+    const inputs = makeInputs({
+      songLyricsById: new Map([['song-1', lyrics]]),
+      groupsBySlotId: new Map([['slot-song-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result[0]!.slide.audioUrl).toBe('https://example.com/bed.mp3')
+    expect(result[0]!.audioFromBed).toBe(true)
+  })
+})
+
 describe('assembleSlideshow — R045 order lock (permutation property)', () => {
   // Fisher-Yates shuffle. Plain Math.random is deliberate here — a seeded
   // generator is unnecessary because a failing arrangement is reported in
