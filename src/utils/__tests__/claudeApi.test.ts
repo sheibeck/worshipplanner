@@ -33,6 +33,7 @@ import {
   getSongSuggestions,
   getScriptureSuggestions,
   SPLIT_SCHEMA,
+  validateSplitResult,
 } from '@/utils/claudeApi'
 import type { AiSongSuggestion, AiScriptureSuggestion } from '@/utils/claudeApi'
 
@@ -416,5 +417,221 @@ describe('SPLIT_SCHEMA', () => {
     const itemProps = SPLIT_SCHEMA.properties.sections.items.properties
     expect(itemProps.startBoundary.type).toBe('integer')
     expect(itemProps.endBoundary.type).toBe('integer')
+  })
+})
+
+// ─── Congregational Split (34-02) — validateSplitResult ───────────────────────
+//
+// validateSplitResult() is the sole gate between untrusted model output and
+// scripture a congregation will read aloud. A happy-path-only suite would be
+// the single most misleading form of green available in this phase — every
+// bullet below is its own rejection test.
+
+describe('validateSplitResult', () => {
+  const boundaries = [0, 10, 20, 30] // maxIndex = 3
+
+  it('accepts a well-formed result: ascending, gapless, alternating speakers, spanning the whole passage, and does not mutate the input', () => {
+    const wellFormed = {
+      sections: [
+        { speaker: 'LEADER', startBoundary: 0, endBoundary: 1 },
+        { speaker: 'CONGREGATION', startBoundary: 1, endBoundary: 2 },
+        { speaker: 'LEADER', startBoundary: 2, endBoundary: 3 },
+      ],
+    }
+    // Freezing every level means any attempted mutation inside
+    // validateSplitResult throws (this file is compiled as an ES module,
+    // which is strict-mode by default) — a structural proof of "does not
+    // mutate the input," not just a before/after equality check.
+    wellFormed.sections.forEach((s) => Object.freeze(s))
+    Object.freeze(wellFormed.sections)
+    Object.freeze(wellFormed)
+
+    const result = validateSplitResult(wellFormed, boundaries)
+
+    expect(result).not.toBeNull()
+    expect(result).toEqual(wellFormed.sections)
+  })
+
+  it('rejects null', () => {
+    expect(validateSplitResult(null, boundaries)).toBeNull()
+  })
+
+  it('rejects a non-object', () => {
+    expect(validateSplitResult('not an object', boundaries)).toBeNull()
+  })
+
+  it('rejects an object with no sections key', () => {
+    expect(validateSplitResult({ notSections: [] }, boundaries)).toBeNull()
+  })
+
+  it('rejects sections that is not an array', () => {
+    expect(validateSplitResult({ sections: 'not-an-array' }, boundaries)).toBeNull()
+  })
+
+  it('rejects an empty sections array', () => {
+    expect(validateSplitResult({ sections: [] }, boundaries)).toBeNull()
+  })
+
+  it('rejects a startBoundary below 0', () => {
+    const bad = {
+      sections: [
+        { speaker: 'LEADER', startBoundary: -1, endBoundary: 1 },
+        { speaker: 'CONGREGATION', startBoundary: 1, endBoundary: 2 },
+        { speaker: 'LEADER', startBoundary: 2, endBoundary: 3 },
+      ],
+    }
+    expect(validateSplitResult(bad, boundaries)).toBeNull()
+  })
+
+  it('rejects an endBoundary above the last valid index', () => {
+    const bad = {
+      sections: [
+        { speaker: 'LEADER', startBoundary: 0, endBoundary: 1 },
+        { speaker: 'CONGREGATION', startBoundary: 1, endBoundary: 2 },
+        { speaker: 'LEADER', startBoundary: 2, endBoundary: 4 },
+      ],
+    }
+    expect(validateSplitResult(bad, boundaries)).toBeNull()
+  })
+
+  it('rejects a non-integer float index', () => {
+    const bad = {
+      sections: [
+        { speaker: 'LEADER', startBoundary: 0, endBoundary: 1.5 },
+        { speaker: 'CONGREGATION', startBoundary: 1.5, endBoundary: 2 },
+        { speaker: 'LEADER', startBoundary: 2, endBoundary: 3 },
+      ],
+    }
+    expect(validateSplitResult(bad, boundaries)).toBeNull()
+  })
+
+  it('rejects a NaN index', () => {
+    const bad = {
+      sections: [
+        { speaker: 'LEADER', startBoundary: 0, endBoundary: Number.NaN },
+        { speaker: 'CONGREGATION', startBoundary: 1, endBoundary: 2 },
+        { speaker: 'LEADER', startBoundary: 2, endBoundary: 3 },
+      ],
+    }
+    expect(validateSplitResult(bad, boundaries)).toBeNull()
+  })
+
+  it('rejects a numeric-string index', () => {
+    const bad = {
+      sections: [
+        { speaker: 'LEADER', startBoundary: '0', endBoundary: 1 },
+        { speaker: 'CONGREGATION', startBoundary: 1, endBoundary: 2 },
+        { speaker: 'LEADER', startBoundary: 2, endBoundary: 3 },
+      ],
+    }
+    expect(validateSplitResult(bad, boundaries)).toBeNull()
+  })
+
+  it('rejects a startBoundary greater than or equal to its endBoundary (inverted or zero-length)', () => {
+    const bad = {
+      sections: [{ speaker: 'LEADER', startBoundary: 1, endBoundary: 1 }],
+    }
+    expect(validateSplitResult(bad, boundaries)).toBeNull()
+  })
+
+  it('rejects overlapping sections (section N+1 starts before section N ends)', () => {
+    const bad = {
+      sections: [
+        { speaker: 'LEADER', startBoundary: 0, endBoundary: 2 },
+        { speaker: 'CONGREGATION', startBoundary: 1, endBoundary: 3 },
+      ],
+    }
+    expect(validateSplitResult(bad, boundaries)).toBeNull()
+  })
+
+  it('rejects a gap (section N+1 starts after section N ends)', () => {
+    const bad = {
+      sections: [
+        { speaker: 'LEADER', startBoundary: 0, endBoundary: 1 },
+        { speaker: 'CONGREGATION', startBoundary: 2, endBoundary: 3 },
+      ],
+    }
+    expect(validateSplitResult(bad, boundaries)).toBeNull()
+  })
+
+  it('rejects a result that does not start at boundary 0', () => {
+    const bad = {
+      sections: [
+        { speaker: 'LEADER', startBoundary: 1, endBoundary: 2 },
+        { speaker: 'CONGREGATION', startBoundary: 2, endBoundary: 3 },
+      ],
+    }
+    expect(validateSplitResult(bad, boundaries)).toBeNull()
+  })
+
+  it('rejects a result that does not end at the last boundary index', () => {
+    const bad = {
+      sections: [
+        { speaker: 'LEADER', startBoundary: 0, endBoundary: 1 },
+        { speaker: 'CONGREGATION', startBoundary: 1, endBoundary: 2 },
+      ],
+    }
+    expect(validateSplitResult(bad, boundaries)).toBeNull()
+  })
+
+  it('rejects an out-of-order result, and a companion assertion proves it was not silently re-sorted to accept it', () => {
+    const outOfOrder = {
+      sections: [
+        { speaker: 'LEADER', startBoundary: 1, endBoundary: 2 },
+        { speaker: 'CONGREGATION', startBoundary: 0, endBoundary: 1 },
+        { speaker: 'LEADER', startBoundary: 2, endBoundary: 3 },
+      ],
+    }
+    expect(validateSplitResult(outOfOrder, boundaries)).toBeNull()
+
+    // If validateSplitResult secretly sorted its input before validating, the
+    // rejection above would be meaningless — it would just mean "the raw
+    // input order was wrong," not "out-of-order input is rejected." This
+    // proves the function truly rejects rather than repairs: the identical
+    // set of sections, pre-sorted by the TEST (not by the function under
+    // test), IS accepted, showing the function only ever validates the order
+    // it is given and never silently re-sorts to rescue a bad result.
+    const sorted = {
+      sections: [...outOfOrder.sections].sort((a, b) => a.startBoundary - b.startBoundary),
+    }
+    expect(validateSplitResult(sorted, boundaries)).not.toBeNull()
+  })
+
+  it('rejects an unrecognised speaker value', () => {
+    const bad = {
+      sections: [
+        { speaker: 'NARRATOR', startBoundary: 0, endBoundary: 1 },
+        { speaker: 'CONGREGATION', startBoundary: 1, endBoundary: 2 },
+        { speaker: 'LEADER', startBoundary: 2, endBoundary: 3 },
+      ],
+    }
+    expect(validateSplitResult(bad, boundaries)).toBeNull()
+  })
+
+  it('rejects a lowercase variant of a legal speaker value', () => {
+    const bad = {
+      sections: [
+        { speaker: 'leader', startBoundary: 0, endBoundary: 1 },
+        { speaker: 'CONGREGATION', startBoundary: 1, endBoundary: 2 },
+        { speaker: 'LEADER', startBoundary: 2, endBoundary: 3 },
+      ],
+    }
+    expect(validateSplitResult(bad, boundaries)).toBeNull()
+  })
+
+  it('(P-02 defence in depth) rejects a section carrying an extra property beyond the three expected, including one carrying scripture words', () => {
+    const bad = {
+      sections: [
+        {
+          speaker: 'LEADER',
+          startBoundary: 0,
+          endBoundary: 1,
+          text: 'For God so loved the world that he gave his only Son',
+        },
+        { speaker: 'CONGREGATION', startBoundary: 1, endBoundary: 2 },
+        { speaker: 'LEADER', startBoundary: 2, endBoundary: 3 },
+      ],
+    }
+    expect(validateSplitResult(bad, boundaries)).toBeNull()
   })
 })
