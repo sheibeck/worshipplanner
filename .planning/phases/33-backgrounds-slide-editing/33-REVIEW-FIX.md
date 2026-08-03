@@ -164,6 +164,92 @@ Per-file test counts after all four fixes (all green): `slideshowAssembler.test.
 
 ---
 
+## UI audit fixes
+
+**Source:** `.planning/phases/33-backgrounds-slide-editing/33-UI-REVIEW.md` (Top 3 Priority Fixes
+#1 and #2). Scope was exactly these two per the task instruction — #3 (footer-row crowding at the
+200px card floor, unverified) was explicitly out of scope and not touched.
+
+**Summary:** 2 findings in scope, 2 fixed, 0 skipped, 0 rejected.
+
+### #1: `lowerLevelBackgroundLabel` structurally could never return `'song'`
+
+**Files modified:** `src/components/slides/EditSlideDrawer.vue`, `src/components/slides/SlidesTab.vue`, `src/components/slides/__tests__/EditSlideDrawer.test.ts`
+**Commit:** `5963afd`
+**Disposition:** Fixed — the reviewer's own escape hatch ("if the data genuinely is not reachable
+... say so plainly") did not apply. `SlidesTab.vue` already computes `selectedGroupAssembledSlides`
+(the selected group's fully-resolved sibling slides, used today for the drawer's `position`/`total`
+props) at the exact same altitude as the props already threaded into `EditSlideDrawer.vue` — no new
+resolver, no re-derivation of the cascade, no large prop chain. Added an optional
+`groupAssembledSlides: AssembledSlide[]` prop (default `[]`, so every pre-existing fixture/mount is
+unaffected) and passed `selectedGroupAssembledSlides` into it from `SlidesTab.vue`. `EditSlideDrawer`'s
+own `lowerLevelBackgroundLabel` computed now checks, after the existing direct `group.backgroundImageUrl`
+read: does any sibling in `groupAssembledSlides` resolve with `backgroundSource === 'song'`? If so,
+the song has a background beneath this slide's own override, and the caption correctly reads
+"the song's still applies." This is the exact same technique `SlideGrid.vue`'s own
+`songBackgroundForInheritedDisplay` already uses (scanning its group's assembled cards for a
+`backgroundSource === 'song'` sibling) — the fix mirrors an established precedent rather than
+inventing a new pattern.
+**Known, disclosed limitation (shared with the `SlideGrid.vue` precedent, not introduced by this
+fix):** if every slide in the group has its own background override, no sibling can ever resolve
+to `'song'`, so this caption stays silent even when the song does have a background one level
+further down. This is deliberately narrower than a false claim — the fix keeps this component's
+existing "absent is safer than wrong" posture (documented in the pre-fix code comment) rather than
+trading it for a caption that could occasionally name the wrong level. The group-level control
+already surfaces this exact edge case independently via its own `inheritedFrom` prop, so the gap is
+covered elsewhere in the UI, just not in this one caption.
+**Regression tests (both new, in `EditSlideDrawer.test.ts`):**
+- "renders the remove-caption naming the song when the group has none of its own but a sibling
+  slide resolves from the song (33 UI-audit CR)" — an entry with its own background, a group with
+  none, and a `groupAssembledSlides` sibling resolving `backgroundSource: 'song'`. Asserts the
+  caption exists and ends `"the song's still applies."`. Fails on the pre-fix computed (which
+  returns `null` whenever `group.backgroundImageUrl` is unset, regardless of `groupAssembledSlides`
+  — a prop that didn't exist before this fix), passes after.
+- "still prefers the group when both a sibling song-sourced slide AND the group's own background
+  exist" — same sibling fixture, but the group also has its own `backgroundImageUrl` set. Asserts
+  the caption still names the group (most-specific-below-slide-wins), not the song. Guards against
+  the fix accidentally inverting cascade precedence.
+
+### #2: `BackgroundControl.vue`'s Remove button shipped one generic `aria-label` at both call sites
+
+**Files modified:** `src/components/slides/BackgroundControl.vue`, `src/components/slides/SlideGrid.vue`, `src/components/SongLyricEditor.vue`, `src/components/slides/__tests__/BackgroundControl.test.ts`, `src/components/slides/__tests__/SlideGrid.test.ts`, `src/components/__tests__/SongLyricEditor.test.ts`
+**Commit:** `f7e1e63`
+**Disposition:** Fixed exactly as suggested — added an optional `removeLabel?: string` prop
+alongside the existing `addLabel` prop (same per-level pattern already established), defaulting to
+the pre-existing generic `"Remove background"` string via `withDefaults` so no un-updated call site
+breaks. Threaded `remove-label="Remove group background"` at `SlideGrid.vue`'s group-level mount
+and `remove-label="Remove song background"` at `SongLyricEditor.vue`'s song-level mount — the two
+strings the Copywriting Contract declares verbatim (33-UI-SPEC.md lines 147, 151). Checked whether
+`EditSlideDrawer.vue`'s slide-level Remove control needed the same treatment: it does not, because
+that control is separate inline markup (not a `BackgroundControl.vue` mount) whose Remove button
+already carries visible text `"Remove"`, not an icon-only `aria-label` — no declared per-level
+string exists for it in the spec, and none was needed, so that mount was left untouched.
+**Regression tests (4 new):**
+- `BackgroundControl.test.ts`: one test asserting the default `aria-label` is still the generic
+  string when `removeLabel` is omitted (guards the non-breaking-default requirement); one test
+  asserting a passed `removeLabel` reaches the rendered `aria-label` for both the group and song
+  strings.
+- `SlideGrid.test.ts`: one test asserting the mounted `BackgroundControl` receives
+  `removeLabel="Remove group background"` and that the rendered DOM's `aria-label` matches.
+- `SongLyricEditor.test.ts`: one test asserting the rendered Remove control's `aria-label` is
+  `"Remove song background"`.
+
+All four fail on the pre-fix code (no `removeLabel` prop exists; the DOM always renders the single
+generic `aria-label="Remove background"`) and pass after.
+
+### Project gates after both UI-audit fixes
+
+| Gate | Command | Result |
+|---|---|---|
+| Type-check | `npm run type-check` (`vue-tsc --build`) | **Exit 0**, no errors |
+| App suite | `npx vitest run src/` | **2134 passed / 9 failed / 2143 total** — same two documented baseline files (`src/storage.rules.test.ts`, needs the Storage emulator; `src/views/__tests__/RosterView.test.ts`, stale assertion). The +6 over the stated 2128 pre-change baseline is exactly the 6 new regression-test assertions this pass added (2 in `EditSlideDrawer.test.ts`, 2 in `BackgroundControl.test.ts`, 1 in `SlideGrid.test.ts`, 1 in `SongLyricEditor.test.ts`). Zero new failures. |
+| Build | `npm run build` | **Succeeded** (`vite build` exit 0; only the pre-existing "chunk larger than 500kB" advisory warning) |
+
+_UI audit fixes appended: 2026-08-03_
+_Fixer: Claude (gsd-code-fixer)_
+
+---
+
 _Fixed: 2026-08-03_
 _Fixer: Claude (gsd-code-fixer)_
 _Iteration: 1_
