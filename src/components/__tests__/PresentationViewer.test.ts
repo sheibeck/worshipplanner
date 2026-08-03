@@ -155,6 +155,27 @@ function imageSlide(id: string): AssembledSlide {
   }
 }
 
+/**
+ * Attaches a resolved `backgroundImageUrl` (+ its provenance tier) to an
+ * existing fixture rather than writing a new slide fixture from scratch —
+ * the viewer only ever reads these two fields off `slide`, so any fixture
+ * can carry them (Task 2, R070).
+ */
+function withBackground(
+  assembled: AssembledSlide,
+  url: string,
+  source: 'slide' | 'group' | 'song' = 'slide',
+): AssembledSlide {
+  return {
+    ...assembled,
+    slide: {
+      ...assembled.slide,
+      backgroundImageUrl: url,
+      backgroundSource: source,
+    },
+  }
+}
+
 function markupSlide(id: string): AssembledSlide {
   return {
     slide: {
@@ -1245,6 +1266,104 @@ describe('PresentationViewer', () => {
       expect(body().find('[data-testid="presentation-exit"]').exists()).toBe(true)
       expect(body().find('[data-testid="presentation-progress"]').text()).toBe('2 / 3')
       expect(body().findAll('[data-testid="presentation-progress"]')).toHaveLength(1)
+    })
+  })
+
+  // ── Task 2: background rendering at presentation time (R070, UAT F3) ──────
+  describe('background rendering (R070, UAT F3)', () => {
+    it('a lyric slide with a resolved backgroundImageUrl renders a background element with that url inline, plus a scrim', async () => {
+      const slide = withBackground(lyricSlide('a'), 'https://example.com/bg.jpg')
+      mount(PresentationViewer, { props: { slides: [slide] } })
+      await Promise.resolve()
+
+      const bg = body().find('[data-testid="presentation-background"]')
+      expect(bg.exists()).toBe(true)
+      expect(bg.attributes('style')).toContain('https://example.com/bg.jpg')
+      expect(body().find('[data-testid="presentation-background-scrim"]').exists()).toBe(true)
+    })
+
+    it("the same slide's text still renders unchanged", async () => {
+      const slide = withBackground(lyricSlide('a'), 'https://example.com/bg.jpg')
+      mount(PresentationViewer, { props: { slides: [slide] } })
+      await Promise.resolve()
+
+      const text = body().find('[data-testid="presentation-body"]').text()
+      expect(text).toContain('Amazing grace, how sweet the sound')
+      expect(text).toContain('That saved a wretch like me')
+    })
+
+    it('a slide with no resolved backgroundImageUrl renders neither the background nor scrim element', async () => {
+      mount(PresentationViewer, { props: { slides: [lyricSlide('a')] } })
+      await Promise.resolve()
+
+      expect(body().find('[data-testid="presentation-background"]').exists()).toBe(false)
+      expect(body().find('[data-testid="presentation-background-scrim"]').exists()).toBe(false)
+    })
+
+    it('a video slide carrying a resolved background renders neither background element while still rendering presentation-video', async () => {
+      window.HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined)
+      window.HTMLMediaElement.prototype.pause = vi.fn()
+      const slide = withBackground(videoSlide('v1', 'https://example.com/clip.mp4'), 'https://example.com/bg.jpg')
+      mount(PresentationViewer, { props: { slides: [slide] } })
+      await flushPromises()
+
+      expect(body().find('[data-testid="presentation-background"]').exists()).toBe(false)
+      expect(body().find('[data-testid="presentation-background-scrim"]').exists()).toBe(false)
+      expect(body().find('[data-testid="presentation-video"]').exists()).toBe(true)
+    })
+
+    it('a congregational scripture slide with a background renders the background AND every congregational section', async () => {
+      const sections = [
+        { speaker: 'LEADER' as const, text: 'Give thanks to the LORD, for he is good.' },
+        { speaker: 'CONGREGATION' as const, text: 'His love endures forever.' },
+      ]
+      const slide = withBackground(congregationalScriptureSlide('a', sections), 'https://example.com/bg.jpg')
+      mount(PresentationViewer, { props: { slides: [slide] } })
+      await Promise.resolve()
+
+      expect(body().find('[data-testid="presentation-background"]').exists()).toBe(true)
+      expect(body().find('[data-testid="presentation-congregational-section-0"]').exists()).toBe(true)
+      expect(body().find('[data-testid="presentation-congregational-section-1"]').exists()).toBe(true)
+    })
+
+    it('advancing from a slide with a background to a slide without one removes both elements', async () => {
+      const slides = [withBackground(lyricSlide('a'), 'https://example.com/bg.jpg'), copyrightSlide('b')]
+      mount(PresentationViewer, { props: { slides } })
+      await Promise.resolve()
+
+      expect(body().find('[data-testid="presentation-background"]').exists()).toBe(true)
+
+      await body().find('[data-testid="presentation-next"]').trigger('click')
+      expect(body().find('[data-testid="presentation-background"]').exists()).toBe(false)
+      expect(body().find('[data-testid="presentation-background-scrim"]').exists()).toBe(false)
+    })
+
+    it('advancing between two slides with different backgrounds updates the url', async () => {
+      const slides = [
+        withBackground(lyricSlide('a'), 'https://example.com/bg1.jpg'),
+        withBackground(copyrightSlide('b'), 'https://example.com/bg2.jpg'),
+      ]
+      mount(PresentationViewer, { props: { slides } })
+      await Promise.resolve()
+
+      expect(body().find('[data-testid="presentation-background"]').attributes('style')).toContain('bg1.jpg')
+
+      await body().find('[data-testid="presentation-next"]').trigger('click')
+      expect(body().find('[data-testid="presentation-background"]').attributes('style')).toContain('bg2.jpg')
+    })
+
+    it('a slide whose backgroundSource is \'slide\' renders that slide\'s own url; a slide whose backgroundSource is \'group\' renders the url it inherited — the viewer distinguished nothing, it just rendered what it was given', async () => {
+      const slides = [
+        withBackground(lyricSlide('a'), 'https://example.com/own.jpg', 'slide'),
+        withBackground(copyrightSlide('b'), 'https://example.com/inherited.jpg', 'group'),
+      ]
+      mount(PresentationViewer, { props: { slides } })
+      await Promise.resolve()
+
+      expect(body().find('[data-testid="presentation-background"]').attributes('style')).toContain('own.jpg')
+
+      await body().find('[data-testid="presentation-next"]').trigger('click')
+      expect(body().find('[data-testid="presentation-background"]').attributes('style')).toContain('inherited.jpg')
     })
   })
 })
