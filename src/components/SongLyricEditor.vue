@@ -8,23 +8,7 @@
       <div class="flex items-center gap-2">
         <h3 class="text-sm font-semibold text-gray-100">Sections</h3>
         <span class="text-[11px] text-gray-500">this order is the slide order</span>
-        <!-- Auto-save status -->
-        <span
-          v-if="autoSaveStatus === 'pending'"
-          data-testid="status-pending"
-          class="inline-block h-2 w-2 rounded-full bg-yellow-400"
-          title="Unsaved changes"
-        ></span>
-        <span
-          v-else-if="autoSaveStatus === 'saving'"
-          data-testid="status-saving"
-          class="text-xs text-gray-400"
-        >Saving...</span>
-        <span
-          v-else-if="autoSaveStatus === 'saved'"
-          data-testid="status-saved"
-          class="text-xs text-green-400"
-        >Saved &#10003;</span>
+        <SaveStatusIndicator :surface-id="surfaceId ?? ''" />
       </div>
       <div v-if="currentLyrics" class="flex items-center gap-2">
         <button
@@ -262,6 +246,8 @@ import { reactive, ref, computed, watch, nextTick, onMounted, onUnmounted } from
 import Sortable from 'sortablejs'
 import { useSongLyricsStore } from '@/stores/songLyrics'
 import { useAutoSave } from '@/composables/useAutoSave'
+import { useSaveStatus } from '@/stores/saveStatus'
+import SaveStatusIndicator from './SaveStatusIndicator.vue'
 import {
   buildSectionRows,
   normalizeLyricOrder,
@@ -282,11 +268,29 @@ const props = defineProps<{
 }>()
 
 const songLyricsStore = useSongLyricsStore()
+const saveStatus = useSaveStatus()
 const showPasteDialog = ref(false)
 const showHistory = ref(false)
 const expandedRowKeys = ref<Set<string>>(new Set())
 
 const currentLyrics = computed<SongLyrics | null>(() => songLyricsStore.currentLyrics)
+
+// 32-06: same capture-once shape as CongregationalEditor.vue/
+// ScriptureSlideEditor.vue, for consistency across all three editors.
+// props.songId is non-null from mount here (the parent panel only renders
+// while open, behind a click-blocking backdrop — see SongSlideOver.vue), so
+// this resolves immediately; captured via the same watch idiom anyway so a
+// future change to that guarantee fails safe rather than silently.
+const surfaceId = ref<string | null>(null)
+watch(
+  () => props.songId,
+  (id) => {
+    if (id && !surfaceId.value) {
+      surfaceId.value = `song-lyrics:${id}`
+    }
+  },
+  { immediate: true },
+)
 
 // The pool + order model this editor renders/mutates through (28-01). Seeded
 // from the loaded document, normalised — never the store's own objects, so
@@ -367,6 +371,27 @@ const { status: autoSaveStatus, cleanup: cleanupAutoSave } = useAutoSave(
   () => editableState,
   doAutoSave,
   isDirty,
+)
+
+// Reports status into the shared store; skips entirely while surfaceId is
+// unresolved. Same reasoning as CongregationalEditor.vue/ScriptureSlideEditor.vue.
+watch(
+  () => autoSaveStatus.value,
+  (status) => {
+    if (!surfaceId.value) return
+    if (status === 'saved') {
+      saveStatus.set(surfaceId.value, { status: 'saved', savedAt: new Date() })
+      return
+    }
+    if (status === 'error') {
+      saveStatus.set(surfaceId.value, {
+        status: 'error',
+        errorText: "Couldn't save your changes — they're still here. Try again.",
+      })
+      return
+    }
+    saveStatus.set(surfaceId.value, { status })
+  },
 )
 
 watch(
@@ -603,6 +628,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   cleanupAutoSave()
+  if (surfaceId.value) saveStatus.clear(surfaceId.value)
   destroySortable()
   songLyricsStore.unsubscribeLyrics()
 })
