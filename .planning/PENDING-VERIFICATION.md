@@ -285,6 +285,56 @@ attempting to fake with jsdom.
 
 ---
 
+## Phase 34 — Smarter Content: LLM Scripture Split
+
+R064's structural guarantee (boundary-index contract, schema, validator, call shape, additive/
+non-blocking failure path) is complete and automated-tested end to end across 34-01/34-02/34-03/34-04.
+The two items below are the ones this phase genuinely cannot close by itself — one needs a live
+Anthropic API call this environment cannot make, the other needs an owner decision this phase's plans
+were explicitly told not to make on the owner's behalf. Neither is marked passed, resolved, or
+self-approved.
+
+- ☐ **34.1** ★ **Empirical split determinism (manual-only — no live Anthropic API access here).**
+  Simulating this with a fixture would give false confidence about model behaviour, which is exactly
+  what is under test, so it was not attempted. Run the "Split with AI" affordance against **Psalm 136**
+  (the archetypal responsive reading, with a repeated congregational refrain — the case most likely to
+  expose a boundary-tuning problem) and **Psalm 24** (a natural call-and-response shape), each **more
+  than once**, and compare the runs. Confirm: every returned section's text matches the ESV source
+  exactly (no rewording, no dropped/added words); no split falls mid-sentence; the LEADER/CONGREGATION
+  assignment reads as sensible (in particular, a repeated congregational refrain like Psalm 136's "for
+  his steadfast love endures forever" should land on CONGREGATION consistently); and repeated runs on
+  the *same* passage give a stable (or at least reasonably consistent) result. A split that validates on
+  every offset but varies noticeably run-to-run is a **usability problem, not a correctness one** —
+  record it either way, don't treat it as a pass/fail gate on its own. If the sections read as too long,
+  or the split misses a natural sub-verse break a human would take, the first knob to revisit is the
+  **deliberate exclusion of the comma** from `scriptureBoundaries.ts`'s `CLAUSE_END_PATTERN` (34-01) — a
+  tuning change to a regex, not a change to any validation logic.
+
+- ☐ **34.2** ★ **The owner decision blocking reachability — `CongregationalEditor.vue` is mounted
+  nowhere.** No route, no parent component, no dynamic import references it anywhere outside its own
+  test file — so as of this plan, **no user can reach either the manual congregational-reading editor or
+  the AI split added on top of it.** This makes ROADMAP success criterion 1 ("A scripture item can be
+  split into a leader/congregation congregational reading") **false today** for an actual user, despite
+  `34-CONTEXT.md`'s initial (later self-corrected) claim that it was "already true, manually." Phase 30's
+  R047 deliberately left both `CongregationalEditor.vue` and its sibling `ScriptureSlideEditor.vue` "on
+  disk, unmounted, for Phase 34/R064 to reuse" — without specifying where they should be mounted.
+  Mounting requires choosing between two data-model shapes, and the owner has already ruled against one
+  of them once: (a) re-link the editor's separate `ScriptureReading` document to the `SCRIPTURE` slot —
+  the model R047 **explicitly rejected** in favour of slot-as-source-of-truth (`3da5fe4` superseded by
+  `5c531b1`); or (b) add `congregationalSections` onto `ScriptureSlot` itself and carry it through
+  `slideGroupMaterializer`, matching the direction R047 actually took for the scripture reference. No
+  plan in this phase picked a default, because a default already exists and the owner overturned it once
+  in the opposite direction — this is the owner's call to make, not a planner's to assume. **Also
+  record, for whoever mounts it:** `CongregationalEditor.vue`'s own `WR-04` call-site-contract comment
+  (added 32-REVIEW, addressed by name to Phase 34) — `currentReadingId` and everything seeded from it
+  (`surfaceId`, `sections`, `referenceText`, `rawText`) are captured **once** at mount and are **not**
+  reactive to `props.readingId` changing afterward. Whoever wires this component into a route or parent
+  **must** mount it keyed on `readingId` (e.g. `:key="readingId"`) so a record swap forces a fresh
+  instance; reusing one mounted instance across different `readingId` values is not a supported usage and
+  will silently misattribute later saves to the first reading the instance ever saw.
+
+---
+
 ## Notes and failures
 
 _(Record anything that failed here, with what you saw versus what was expected.)_
