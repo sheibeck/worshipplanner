@@ -5,15 +5,15 @@ milestone_name: Service and Slides
 current_phase: 37
 current_phase_name: PowerPoint Server-Side Rendering
 status: executing
-stopped_at: Completed 37-04-PLAN.md
-last_updated: "2026-08-03T17:55:54.224Z"
+stopped_at: Completed 37-05-PLAN.md
+last_updated: "2026-08-03T18:20:09.440Z"
 last_activity: 2026-08-03
 last_activity_desc: Phase 37 execution started
 progress:
   total_phases: 9
   completed_phases: 7
   total_plans: 44
-  completed_plans: 42
+  completed_plans: 43
   percent: 78
 ---
 
@@ -76,7 +76,7 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 ## Current Position
 
 Phase: 37 (PowerPoint Server-Side Rendering) — EXECUTING
-Plan: 5 of 6
+Plan: 6 of 6
 Status: Ready to execute
 Last activity: 2026-08-03 — Phase 37 execution started
 
@@ -490,9 +490,11 @@ action bar were deferred from Phase 33 into 36 by the ROADMAP's own reasoning.
 | **37** | **◆ IN PROGRESS — 4 of 6 plans done.** Waves: 1 ✅(37-01, 37-03) · 2 ✅(37-02, 37-04) · **3 ← next (37-05)** · 4 (37-06) |
 
 **Phase 37 remaining work:**
+
 - **37-05** (wave 3) — orphan cleanup with the **dry-run default** mirroring `functions/src/index.ts:257`
   (`process.env.X !== "true"` ⇒ dryRun), plus the `renderImportId` bridge field on
   `src/types/importedDeck.ts` and `PptxImportModal.vue`.
+
 - **37-06** (wave 4) — writes `render-service/DEPLOY.md` (the `gcloud run deploy` handoff), the
   Phase 37 section of `PENDING-VERIFICATION.md`, and runs the three-suite gate. **37-06 owns
   `requirements mark-complete R062`** — every earlier plan correctly declined it.
@@ -965,6 +967,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 37 P03 | 15min | 3 tasks | 6 files |
 | Phase 37 P02 | 32min | 3 tasks | 5 files |
 | Phase 37 P04 | 55min | 3 tasks | 3 files |
+| Phase 37 P05 | 50min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -1192,6 +1195,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: STORAGE_BUCKET env var added (read lazily via requiredBucketName()) -- @google-cloud/storage's Storage#bucket() requires an explicit bucket name, unlike firebase-admin's default-bucket form; flagged for 37-06's DEPLOY.md
 - [Phase ?]: Render page ordering fixed and verified load-bearing: renderedObjectName/pageNumberFromOutputName sort numerically on parsed page number, never lexically or by array index; confirmed by temporarily breaking RENDERED_PAGE_PAD and observing 4 test failures, then restoring
 - [Phase ?]: 37-04: completeness gate requires three independent conjuncts (positive count, reported-vs-actual equality, contiguous 1..N) -- never derived from parsePptxBuffer's MappedSlide[] length, which is structurally decoupled from real page count
+- [Phase ?]: cleanupOrphanRendersHandler: second scheduled job (03:00 UTC), dry-run gate process.env.PPTX_RENDER_CLEANUP_ENABLED !== "true" mirroring the post-9f1b881 shape exactly, RENDERED_OBJECT_GUARD applied before any delete decision
+- [Phase ?]: ImportedDeck.renderImportId links the Storage-side import id to the confirmed deck, set only on the PPTX path and explicitly cleared (not just left default) on the image-only path to prevent leaking a cancelled PPTX import's id
 
 ### Roadmap Evolution
 
@@ -1253,6 +1258,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-03T17:55:54.161Z
-Stopped at: Completed 37-04-PLAN.md
+Last session: 2026-08-03T18:20:09.403Z
+Stopped at: Completed 37-05-PLAN.md
 Resume file: None
