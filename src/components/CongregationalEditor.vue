@@ -290,4 +290,12 @@ onUnmounted(() => {
     store.unsubscribeReadings()
   }
 })
+
+// Test-only seam (matches PptxImportModal.vue's existing defineExpose
+// precedent): currentReadingId has no reactive prop-watcher wired to it in
+// production — it is set once at ref-init and once more inside
+// onFetchPassage — so the E4 `partial` backstop test needs a way to force
+// the id-resolution race described above without re-implementing internal
+// timing. No other internal state is exposed.
+defineExpose({ currentReadingId })
 </script>

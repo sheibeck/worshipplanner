@@ -1,9 +1,25 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils'
 import { ref, reactive, computed } from 'vue'
+import { createPinia, setActivePinia } from 'pinia'
 import ScriptureSlideEditor from '../ScriptureSlideEditor.vue'
+import { useSaveStatus } from '@/stores/saveStatus'
 import type { ScriptureSlide } from '@/types/slide'
 import type { ScriptureReading } from '@/types/scriptureReading'
+
+// 32-06: verbatim, the only error copy this editor (and its two siblings)
+// ever renders — see CongregationalEditor.test.ts for the full rationale.
+const GENERIC_ERROR_TEXT = "Couldn't save your changes — they're still here. Try again."
+const REORDER_ERROR_TEXT = "Couldn't save this order — reverted. Try dragging again."
+
+// 32-06: real, Firestore-free useSaveStatus store — see
+// CongregationalEditor.test.ts for the enableAutoUnmount rationale
+// (a Pinia-action-triggered setActivePinia hijack from an un-unmounted
+// zombie wrapper, not just tidy cleanup).
+beforeEach(() => {
+  setActivePinia(createPinia())
+})
+enableAutoUnmount(afterEach)
 
 const mockCreateReading = vi.fn(() => Promise.resolve('new-reading-id'))
 const mockUpdateReading = vi.fn(() => Promise.resolve())
@@ -230,21 +246,90 @@ describe('ScriptureSlideEditor', () => {
     expect(wrapper.find('[data-testid="fetch-error"]').exists()).toBe(false)
   })
 
-  it('shows save status indicator for each status', async () => {
-    const wrapper = mountEditor()
+  it('shows save status indicator for each status, reported into the shared store under the scripture: surface id', async () => {
+    const wrapper = mountEditor({ readingId: 'reading-1' })
+    await flushPromises()
 
     autoSaveStatusRef.value = 'pending'
     await flushPromises()
-    expect(wrapper.find('[data-testid="status-pending"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="save-status"]').text()).toBe('Saving soon…')
+    expect(useSaveStatus().entryFor('scripture:reading-1').status).toBe('pending')
 
     autoSaveStatusRef.value = 'saving'
     await flushPromises()
-    expect(wrapper.find('[data-testid="status-saving"]').exists()).toBe(true)
-    expect(wrapper.text()).toContain('Saving...')
+    expect(wrapper.find('[data-testid="save-status"]').text()).toBe('Saving…')
 
     autoSaveStatusRef.value = 'saved'
     await flushPromises()
-    expect(wrapper.find('[data-testid="status-saved"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="save-status"]').text()).toMatch(/^Saved \d{1,2}:\d{2} (AM|PM)$/)
+    expect(useSaveStatus().entryFor('scripture:reading-1').status).toBe('saved')
+  })
+
+  it('reports the generic failure sentence on error — never the reorder variant, which belongs to ServiceEditorView alone', async () => {
+    const wrapper = mountEditor({ readingId: 'reading-1' })
+    await flushPromises()
+
+    autoSaveStatusRef.value = 'error'
+    await flushPromises()
+
+    const errorEl = wrapper.find('[data-testid="save-status-error"]')
+    expect(errorEl.exists()).toBe(true)
+    expect(errorEl.text()).toBe(GENERIC_ERROR_TEXT)
+    expect(wrapper.text()).not.toContain(REORDER_ERROR_TEXT)
+    expect(useSaveStatus().entryFor('scripture:reading-1').errorText).toBe(GENERIC_ERROR_TEXT)
+  })
+
+  it('clears its store entry on unmount, next to the existing composable cleanup call', async () => {
+    const wrapper = mountEditor({ readingId: 'reading-1' })
+    await flushPromises()
+    autoSaveStatusRef.value = 'saved'
+    await flushPromises()
+    expect(useSaveStatus().entries['scripture:reading-1']).toBeDefined()
+
+    wrapper.unmount()
+    expect(useSaveStatus().entries['scripture:reading-1']).toBeUndefined()
+  })
+
+  // ── E4 backstops (32-UI-SPEC.md § UI Considerations) ────────────────────────
+
+  it('E4 loading backstop: a freshly-mounted editor for a different record never inherits a previous record’s saved status', async () => {
+    const first = mountEditor({ readingId: 'reading-old' })
+    await flushPromises()
+    autoSaveStatusRef.value = 'saved'
+    await flushPromises()
+    expect(useSaveStatus().entryFor('scripture:reading-old').status).toBe('saved')
+
+    const second = mountEditor({ readingId: 'reading-new' })
+    await flushPromises()
+    expect(second.find('[data-testid="save-status"]').text()).toBe('')
+    expect(useSaveStatus().entryFor('scripture:reading-new').status).toBe('idle')
+
+    first.unmount()
+    second.unmount()
+  })
+
+  it('E4 partial backstop (★ sharpest correctness risk): a save armed before the surface id resolves, then the id changing again, must not misattribute the in-flight result to the new id', async () => {
+    const wrapper = mountEditor()
+    await flushPromises()
+
+    autoSaveStatusRef.value = 'saving'
+    await flushPromises()
+    expect(wrapper.find('[data-testid="save-status"]').text()).toBe('')
+    expect(Object.keys(useSaveStatus().entries)).toHaveLength(0)
+
+    ;(wrapper.vm as unknown as { currentReadingId: string | null }).currentReadingId = 'reading-old'
+    await flushPromises()
+    expect(useSaveStatus().entryFor('scripture:reading-old').status).toBe('idle')
+
+    ;(wrapper.vm as unknown as { currentReadingId: string | null }).currentReadingId = 'reading-new'
+    await flushPromises()
+
+    autoSaveStatusRef.value = 'saved'
+    await flushPromises()
+
+    expect(useSaveStatus().entryFor('scripture:reading-new').status).toBe('idle')
+    expect(useSaveStatus().entryFor('scripture:reading-old').status).toBe('saved')
+    expect(wrapper.find('[data-testid="save-status"]').text()).toMatch(/^Saved \d{1,2}:\d{2} (AM|PM)$/)
   })
 
   it('creates a new reading on first fetch', async () => {

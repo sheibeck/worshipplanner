@@ -235,4 +235,9 @@ onUnmounted(() => {
     store.unsubscribeReadings()
   }
 })
+
+// Test-only seam (matches PptxImportModal.vue's existing defineExpose
+// precedent and CongregationalEditor.vue's identical comment) — needed for
+// the E4 `partial` backstop test.
+defineExpose({ currentReadingId })
 </script>

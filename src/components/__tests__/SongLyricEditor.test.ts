@@ -1,9 +1,17 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils'
 import { ref, computed, reactive } from 'vue'
+import { createPinia, setActivePinia } from 'pinia'
 import type { Options as SortableOptions } from 'sortablejs'
 import SongLyricEditor from '../SongLyricEditor.vue'
+import { useSaveStatus } from '@/stores/saveStatus'
 import type { SongLyrics, LyricSection, CopyrightInfo } from '@/types/songLyrics'
+
+// 32-06: the shared generic failure sentence — verbatim, the only error copy
+// this editor (and its two siblings) ever renders — see
+// CongregationalEditor.test.ts for the full rationale.
+const GENERIC_ERROR_TEXT = "Couldn't save your changes — they're still here. Try again."
+const REORDER_ERROR_TEXT = "Couldn't save this order — reverted. Try dragging again."
 
 // --- 28-05 Task 1: capture the options passed to Sortable.create so onEnd can
 // be invoked directly — reproduces the SlideGrid.test.ts / ServiceEditorView
@@ -95,9 +103,9 @@ vi.mock('@/composables/useAutoSave', () => {
   }
 })
 
-async function mountEditor() {
+async function mountEditor(songId = 'song-1') {
   const wrapper = mount(SongLyricEditor, {
-    props: { songId: 'song-1', orgId: 'org-1' },
+    props: { songId, orgId: 'org-1' },
     global: {
       stubs: {
         LyricPasteDialog: { template: '<div data-testid="paste-dialog-stub" :data-open="open"></div>', props: ['open', 'songId', 'orgId'] },
@@ -110,14 +118,31 @@ async function mountEditor() {
 }
 
 describe('SongLyricEditor', () => {
-  beforeEach(() => {
+  // 32-06: real, Firestore-free useSaveStatus store — see
+  // CongregationalEditor.test.ts for the enableAutoUnmount rationale (a
+  // Pinia-action-triggered setActivePinia hijack from an un-unmounted
+  // zombie wrapper, not just tidy cleanup). This file's `_statusRef` is
+  // module-level and shared across every mounted instance, exactly like
+  // the other two editors' `autoSaveStatusRef`, so the same hazard applies.
+  beforeEach(async () => {
+    setActivePinia(createPinia())
     vi.clearAllMocks()
     mockCurrentLyrics.value = null
     mockIsLoading.value = true
     mockLyricVersions.value = []
     capturedSortableOptions = undefined
+    // Reset the shared mocked composable's status ref between tests -- it
+    // is module-level and persists its last value otherwise, which masks a
+    // no-op re-assignment (Vue's watch() only fires on an actual VALUE
+    // change) when two adjacent tests happen to drive it to the same
+    // status back-to-back.
+    const { _statusRef } = (await import('@/composables/useAutoSave')) as unknown as {
+      _statusRef: ReturnType<typeof ref<string>>
+    }
+    _statusRef.value = 'idle'
     mockSortableDestroy.mockClear()
   })
+  enableAutoUnmount(afterEach)
 
   it('subscribes to lyrics on mount', async () => {
     await mountEditor()
@@ -231,38 +256,131 @@ describe('SongLyricEditor', () => {
     expect(useAutoSave).toHaveBeenCalled()
   })
 
-  it('shows auto-save status indicator for pending', async () => {
+  async function importStatusRef() {
+    const { _statusRef } = await import('@/composables/useAutoSave') as unknown as { _statusRef: ReturnType<typeof ref<string>> }
+    return _statusRef
+  }
+
+  it('shows save status indicator for each status, reported into the shared store under the song-lyrics: surface id', async () => {
     mockIsLoading.value = false
     mockCurrentLyrics.value = makeLyrics()
-    const { _statusRef } = await import('@/composables/useAutoSave') as unknown as { _statusRef: ReturnType<typeof ref<string>> }
-    _statusRef.value = 'pending'
+    const statusRef = await importStatusRef()
     const wrapper = await mountEditor()
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="status-pending"]').exists()).toBe(true)
+    statusRef.value = 'pending'
+    await flushPromises()
+    expect(wrapper.find('[data-testid="save-status"]').text()).toBe('Saving soon…')
+    expect(useSaveStatus().entryFor('song-lyrics:song-1').status).toBe('pending')
+
+    statusRef.value = 'saving'
+    await flushPromises()
+    expect(wrapper.find('[data-testid="save-status"]').text()).toBe('Saving…')
+
+    statusRef.value = 'saved'
+    await flushPromises()
+    expect(wrapper.find('[data-testid="save-status"]').text()).toMatch(/^Saved \d{1,2}:\d{2} (AM|PM)$/)
+    expect(useSaveStatus().entryFor('song-lyrics:song-1').status).toBe('saved')
   })
 
-  it('shows auto-save status indicator for saving', async () => {
+  it('reports the generic failure sentence on error — never the reorder variant, which belongs to ServiceEditorView alone', async () => {
     mockIsLoading.value = false
     mockCurrentLyrics.value = makeLyrics()
-    const { _statusRef } = await import('@/composables/useAutoSave') as unknown as { _statusRef: ReturnType<typeof ref<string>> }
-    _statusRef.value = 'saving'
+    const statusRef = await importStatusRef()
     const wrapper = await mountEditor()
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="status-saving"]').exists()).toBe(true)
-    expect(wrapper.text()).toContain('Saving...')
+    statusRef.value = 'error'
+    await flushPromises()
+
+    const errorEl = wrapper.find('[data-testid="save-status-error"]')
+    expect(errorEl.exists()).toBe(true)
+    expect(errorEl.text()).toBe(GENERIC_ERROR_TEXT)
+    expect(wrapper.text()).not.toContain(REORDER_ERROR_TEXT)
+    expect(useSaveStatus().entryFor('song-lyrics:song-1').errorText).toBe(GENERIC_ERROR_TEXT)
   })
 
-  it('shows auto-save status indicator for saved', async () => {
+  it('clears its store entry on unmount, next to the existing composable cleanup call', async () => {
     mockIsLoading.value = false
     mockCurrentLyrics.value = makeLyrics()
-    const { _statusRef } = await import('@/composables/useAutoSave') as unknown as { _statusRef: ReturnType<typeof ref<string>> }
-    _statusRef.value = 'saved'
+    const statusRef = await importStatusRef()
+    const wrapper = await mountEditor()
+    await flushPromises()
+    statusRef.value = 'saved'
+    await flushPromises()
+    expect(useSaveStatus().entries['song-lyrics:song-1']).toBeDefined()
+
+    wrapper.unmount()
+    expect(useSaveStatus().entries['song-lyrics:song-1']).toBeUndefined()
+  })
+
+  // ── E4 backstops (32-UI-SPEC.md § UI Considerations) ────────────────────────
+
+  it('E4 loading backstop: a freshly-mounted editor for a different song never inherits a previous song’s saved status', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics()
+    const statusRef = await importStatusRef()
+
+    const first = await mountEditor('song-old')
+    await flushPromises()
+    statusRef.value = 'saved'
+    await flushPromises()
+    expect(useSaveStatus().entryFor('song-lyrics:song-old').status).toBe('saved')
+
+    const second = await mountEditor('song-new')
+    await flushPromises()
+    expect(second.find('[data-testid="save-status"]').text()).toBe('')
+    expect(useSaveStatus().entryFor('song-lyrics:song-new').status).toBe('idle')
+
+    first.unmount()
+    second.unmount()
+  })
+
+  it('E4 partial backstop, defensive: switching the songId prop on an already-mounted instance must not misattribute an in-flight save to the new song (not currently reachable in production — see SUMMARY)', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics()
+    const statusRef = await importStatusRef()
+    const wrapper = await mountEditor()
+    await flushPromises()
+    // songId is non-null from mount, so surfaceId resolves immediately to
+    // song-lyrics:song-1 (see mountEditor's fixed props).
+    expect(useSaveStatus().entryFor('song-lyrics:song-1').status).toBe('idle')
+
+    statusRef.value = 'saving'
+    await flushPromises()
+    expect(useSaveStatus().entryFor('song-lyrics:song-1').status).toBe('saving')
+
+    // Simulate the parent swapping which song is open on the SAME instance
+    // (not reachable today: SongSlideOver only renders this editor while
+    // open behind a click-blocking backdrop, and SongsView always sets the
+    // selection and the open flag together — see 32-RESEARCH.md). The
+    // capture-once guard must still hold even if that ever changes.
+    await wrapper.setProps({ songId: 'song-new' })
+    await flushPromises()
+    expect(useSaveStatus().entryFor('song-lyrics:song-new').status).toBe('idle')
+
+    statusRef.value = 'saved'
+    await flushPromises()
+
+    expect(useSaveStatus().entryFor('song-lyrics:song-new').status).toBe('idle')
+    expect(useSaveStatus().entryFor('song-lyrics:song-1').status).toBe('saved')
+  })
+
+  it('E1/E4 overflow backstop: the 59-char generic error string renders without a truncation class inside this editor’s own (narrowest of the three) header', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics()
+    const statusRef = await importStatusRef()
     const wrapper = await mountEditor()
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="status-saved"]').exists()).toBe(true)
+    statusRef.value = 'error'
+    await flushPromises()
+
+    const errorEl = wrapper.find('[data-testid="save-status-error"]')
+    expect(errorEl.exists()).toBe(true)
+    expect(errorEl.classes().join(' ')).not.toMatch(/truncate|overflow-hidden|text-ellipsis|line-clamp/)
+    expect(errorEl.text()).toBe(GENERIC_ERROR_TEXT)
+    expect(GENERIC_ERROR_TEXT.length).toBe(59)
   })
 
   // ── Task 2 (R035/D-01/D-02): the ordered row list ──────────────────────────

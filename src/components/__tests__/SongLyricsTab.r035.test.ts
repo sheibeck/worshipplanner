@@ -16,6 +16,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises, DOMWrapper, enableAutoUnmount } from '@vue/test-utils'
 import { ref, computed, reactive } from 'vue'
+import { createPinia, setActivePinia } from 'pinia'
 import type { Options as SortableOptions } from 'sortablejs'
 import SongSlideOver from '../SongSlideOver.vue'
 import { buildSongEditLink, parseSongEditRequest } from '@/utils/songEditLink'
@@ -175,7 +176,15 @@ function simulateDragEnd(oldIndex: number, newIndex: number, rowCount: number) {
 }
 
 describe('R035 — one scroll surface, one list, and the phase-wide hard constraints', () => {
+  // 32-06: SongLyricEditor now consumes the real, Firestore-free
+  // useSaveStatus store (SaveStatusIndicator swap) -- this composed
+  // SongSlideOver + SongLyricEditor mount needs an active Pinia for that,
+  // same as SongLyricEditor.test.ts itself. enableAutoUnmount is already
+  // imported/used below; see CongregationalEditor.test.ts for the
+  // rationale (a Pinia-action-triggered setActivePinia hijack from an
+  // un-unmounted zombie wrapper).
   beforeEach(() => {
+    setActivePinia(createPinia())
     vi.clearAllMocks()
     mockCurrentLyrics.value = null
     mockIsLoading.value = false

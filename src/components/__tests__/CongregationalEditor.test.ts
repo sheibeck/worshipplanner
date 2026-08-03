@@ -1,9 +1,35 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils'
 import { ref, reactive, computed } from 'vue'
+import { createPinia, setActivePinia } from 'pinia'
 import CongregationalEditor from '../CongregationalEditor.vue'
+import { useSaveStatus } from '@/stores/saveStatus'
 import type { ScriptureSlide, CongregationalSection } from '@/types/slide'
 import type { ScriptureReading } from '@/types/scriptureReading'
+
+// 32-06: the shared generic failure sentence — verbatim, the only error copy
+// this editor (and its two siblings) ever renders. It has no reorder
+// concept, so the reorder variant (ServiceEditorView-only) must never
+// appear here.
+const GENERIC_ERROR_TEXT = "Couldn't save your changes — they're still here. Try again."
+const REORDER_ERROR_TEXT = "Couldn't save this order — reverted. Try dragging again."
+
+// 32-06: these components now consume the real, Firestore-free useSaveStatus
+// store rather than mocking it — pure client state, so a real instance is
+// simpler and asserts more (matching 32-04/32-05's own precedent).
+//
+// enableAutoUnmount (matching ServiceEditorView.test.ts's own precedent) is
+// load-bearing here, not just tidy cleanup: every mounted wrapper's
+// reporting watcher stays subscribed to the shared, module-level
+// autoSaveStatusRef mock until its component unmounts. Pinia wraps every
+// store action (including saveStatus.set) to call setActivePinia(itsOwnPinia)
+// before running -- so a single un-unmounted wrapper from an earlier test
+// silently hijacks the globally-active Pinia the next time this shared ref
+// changes, corrupting an unrelated, later test's "fresh" store.
+beforeEach(() => {
+  setActivePinia(createPinia())
+})
+enableAutoUnmount(afterEach)
 
 const mockCreateReading = vi.fn(() => Promise.resolve('new-reading-id'))
 const mockUpdateReading = vi.fn(() => Promise.resolve())
@@ -215,20 +241,111 @@ describe('CongregationalEditor', () => {
     expect(errorEl.text()).toContain('Could not load passage')
   })
 
-  it('shows save status indicator for each status', async () => {
-    const wrapper = mountEditor()
+  it('shows save status indicator for each status, reported into the shared store under the congregational: surface id', async () => {
+    // readingId provided -> currentReadingId (and therefore surfaceId)
+    // resolves immediately, so every status transition below is reported.
+    const wrapper = mountEditor({ readingId: 'reading-1' })
+    await flushPromises()
 
     autoSaveStatusRef.value = 'pending'
     await flushPromises()
-    expect(wrapper.find('[data-testid="status-pending"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="save-status"]').text()).toBe('Saving soon…')
+    expect(useSaveStatus().entryFor('congregational:reading-1').status).toBe('pending')
 
     autoSaveStatusRef.value = 'saving'
     await flushPromises()
-    expect(wrapper.find('[data-testid="status-saving"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="save-status"]').text()).toBe('Saving…')
 
     autoSaveStatusRef.value = 'saved'
     await flushPromises()
-    expect(wrapper.find('[data-testid="status-saved"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="save-status"]').text()).toMatch(/^Saved \d{1,2}:\d{2} (AM|PM)$/)
+    expect(useSaveStatus().entryFor('congregational:reading-1').status).toBe('saved')
+  })
+
+  it('reports the generic failure sentence on error — never the reorder variant, which belongs to ServiceEditorView alone', async () => {
+    const wrapper = mountEditor({ readingId: 'reading-1' })
+    await flushPromises()
+
+    autoSaveStatusRef.value = 'error'
+    await flushPromises()
+
+    const errorEl = wrapper.find('[data-testid="save-status-error"]')
+    expect(errorEl.exists()).toBe(true)
+    expect(errorEl.text()).toBe(GENERIC_ERROR_TEXT)
+    expect(wrapper.text()).not.toContain(REORDER_ERROR_TEXT)
+    expect(useSaveStatus().entryFor('congregational:reading-1').errorText).toBe(GENERIC_ERROR_TEXT)
+  })
+
+  it('clears its store entry on unmount, next to the existing composable cleanup call', async () => {
+    const wrapper = mountEditor({ readingId: 'reading-1' })
+    await flushPromises()
+    autoSaveStatusRef.value = 'saved'
+    await flushPromises()
+    expect(useSaveStatus().entries['congregational:reading-1']).toBeDefined()
+
+    wrapper.unmount()
+    expect(useSaveStatus().entries['congregational:reading-1']).toBeUndefined()
+  })
+
+  // ── E4 backstops (32-UI-SPEC.md § UI Considerations) ────────────────────────
+
+  it('E4 loading backstop: a freshly-mounted editor for a different record never inherits a previous record’s saved status', async () => {
+    const first = mountEditor({ readingId: 'reading-old' })
+    await flushPromises()
+    autoSaveStatusRef.value = 'saved'
+    await flushPromises()
+    expect(useSaveStatus().entryFor('congregational:reading-old').status).toBe('saved')
+
+    // A second, independently-mounted instance for a DIFFERENT record must
+    // start idle — nothing to inherit, because its own surfaceId has never
+    // been written to.
+    const second = mountEditor({ readingId: 'reading-new' })
+    await flushPromises()
+    expect(second.find('[data-testid="save-status"]').text()).toBe('')
+    expect(useSaveStatus().entryFor('congregational:reading-new').status).toBe('idle')
+
+    first.unmount()
+    second.unmount()
+  })
+
+  it('E4 partial backstop (★ sharpest correctness risk): a save armed before the surface id resolves, then the id changing again, must not misattribute the in-flight result to the new id', async () => {
+    // No readingId -> currentReadingId starts null -> surfaceId unresolved.
+    const wrapper = mountEditor()
+    await flushPromises()
+
+    // A save arms (e.g. sections mutated by a fetch) while the surface id is
+    // still unresolved -- nothing must be registered anywhere yet.
+    autoSaveStatusRef.value = 'saving'
+    await flushPromises()
+    expect(wrapper.find('[data-testid="save-status"]').text()).toBe('')
+    expect(Object.keys(useSaveStatus().entries)).toHaveLength(0)
+
+    // The id resolves for the FIRST time (captured once) -- this is the
+    // exposed test-only seam, since currentReadingId has no reactive
+    // prop-watcher of its own in production (see CongregationalEditor.vue).
+    ;(wrapper.vm as unknown as { currentReadingId: string | null }).currentReadingId = 'reading-old'
+    await flushPromises()
+    // Capturing the id alone does not retroactively report the in-flight
+    // 'saving' status -- only a further status TRANSITION does. Still
+    // nothing registered for the just-captured id.
+    expect(useSaveStatus().entryFor('congregational:reading-old').status).toBe('idle')
+
+    // The id "switches" again (simulating a record swap) -- per spec the
+    // surface id is captured ONCE and never re-derived, so this must NOT
+    // move the target.
+    ;(wrapper.vm as unknown as { currentReadingId: string | null }).currentReadingId = 'reading-new'
+    await flushPromises()
+
+    // The original in-flight save now resolves.
+    autoSaveStatusRef.value = 'saved'
+    await flushPromises()
+
+    // The NEW record's indicator/entry must read idle -- the in-flight
+    // result was never attributed to it.
+    expect(useSaveStatus().entryFor('congregational:reading-new').status).toBe('idle')
+    // The OLD (first-captured) id's entry is the one that resolves.
+    expect(useSaveStatus().entryFor('congregational:reading-old').status).toBe('saved')
+    expect(wrapper.find('[data-testid="save-status"]').text()).toMatch(/^Saved \d{1,2}:\d{2} (AM|PM)$/)
   })
 
   it('cleans up auto-save on unmount', () => {
