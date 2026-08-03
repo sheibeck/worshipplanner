@@ -146,7 +146,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 - [x] **R059** (quality-attribute): Organizational labels never render when presenting or previewing —
       they exist only to organize slides within a group.
 
-- [ ] **R060** (quality-attribute): Copyright/CCLI information is visible on the first **and** last
+- [x] **R060** (quality-attribute): Copyright/CCLI information is visible on the first **and** last
       slide of every song group. **This exceeds the documented legal minimum** (the convention is at
       least once per song, typically the last slide) and is a deliberate safety margin for mid-deck
       starts and songs cut short. Must not be justified as a CCLI mandate; CCLI's primary license text
@@ -266,7 +266,7 @@ Acknowledged, deferred, not in this roadmap.
 | R057 | Phase 33 | Complete |
 | R058 | Phase 33 | Complete |
 | R059 | Phase 35 | Complete |
-| R060 | Phase 35 | Pending |
+| R060 | Phase 35 | Complete |
 | R061 | Phase 35 | Complete |
 | R062 | Phase 37 | Pending |
 | R063 | Phase 33 | Complete |

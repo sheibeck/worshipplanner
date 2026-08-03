@@ -272,11 +272,11 @@ Plans:
   4. Pasting lyrics warns when copyright information is missing rather than accepting silently
   5. Pasting lyrics happens inline in the editor, not in a modal
 
-**Plans**: 1/4 plans executed
+**Plans**: 2/4 plans executed
 Plans:
 
 - [x] 35-01-PLAN.md — R059 render fix (delete the leaked `sectionLabel`) + R061 present-start threading through `SlidesTab` → `ServiceEditorView` → `PresentationViewer` (wave 1)
-- [ ] 35-02-PLAN.md — R060 regression tests on all three copyright-bracket paths. **Test-only: no emission code — research proved all three paths already bracket, so adding emission would triple-emit** (wave 1)
+- [x] 35-02-PLAN.md — R060 regression tests on all three copyright-bracket paths. **Test-only: no emission code — research proved all three paths already bracket, so adding emission would triple-emit** (wave 1)
 - [ ] 35-03-PLAN.md — R065/R066: new `LyricPasteRegion.vue` inline surface with the copyright block + always-available override, plus the migrated `LyricPasteDialog` test coverage (wave 1)
 - [ ] 35-04-PLAN.md — R066: host the region in `SongLyricEditor.vue`, delete `LyricPasteDialog.vue` and its test file, cover the host-driven open/close/reset mechanisms (wave 2)
 
@@ -335,7 +335,7 @@ Plans:
 | 32. Save Reliability — Autosave Fix & Persistent Status | v1.4 | 6/6 | In Progress|  |
 | 33. Backgrounds & Slide Editing | v1.4 | 9/9 | In Progress|  |
 | 34. Smarter Content — LLM Scripture Split | v1.4 | 4/4 | In Progress|  |
-| 35. Presentation Correctness & Lyric Editor | v1.4 | 1/4 | In Progress|  |
+| 35. Presentation Correctness & Lyric Editor | v1.4 | 2/4 | In Progress|  |
 | 36. UI Rework — Service Order & Contextual Action Bars | v1.4 | 0/TBD | Not started | - |
 | 37. PowerPoint Server-Side Rendering | v1.4 | 0/TBD | Not started | - |
 

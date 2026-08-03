@@ -5,15 +5,15 @@ milestone_name: Service and Slides
 current_phase: 35
 current_phase_name: Presentation Correctness & Lyric Editor
 status: executing
-stopped_at: Completed 35-01-PLAN.md
-last_updated: "2026-08-03T13:38:51.378Z"
+stopped_at: Completed 35-02-PLAN.md
+last_updated: "2026-08-03T13:54:09.035Z"
 last_activity: 2026-08-03
 last_activity_desc: Phase 35 execution started
 progress:
   total_phases: 9
   completed_phases: 6
   total_plans: 38
-  completed_plans: 35
+  completed_plans: 36
   percent: 67
 ---
 
@@ -76,7 +76,7 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 ## Current Position
 
 Phase: 35 (Presentation Correctness & Lyric Editor) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-08-03 — Phase 35 execution started
 
@@ -879,6 +879,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 34 P03 | 12min | 2 tasks | 2 files |
 | Phase 34 P04 | 35min | 3 tasks | 3 files |
 | Phase 35 P01 | 14min | 3 tasks | 5 files |
+| Phase 35 P02 | 20min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -1094,6 +1095,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 34-04: wholesale-replace-on-success + untouched-plus-toast-on-any-failure is the additive AI pattern (canAiSplit gated by 34-01's hasSplittableBoundaries; onAiSplit never merges, never partially applies)
 - [Phase ?]: 34-04: sectionsSnapshot() in tests reads the DOM rather than exposing sections internally — matches the component's existing minimal test seam (only currentReadingId is exposed, for the unrelated E4 backstop)
 - [Phase ?]: R059/R061 (35-01): sectionLabel render deleted from PresentationViewer lyric branch; presentStartIndex computed in SlidesTab, threaded via initialIndex prop through ServiceEditorView, reusing the existing clamp formula
+- [Phase ?]: R060 closed by regression test only; no production code added — every group-construction path already emitted the copyright bracket unconditionally
+- [Phase ?]: First-and-last copyright placement is framed only as a deliberate safety margin, never a CCLI licensing requirement (P-01); CCLI's primary license text failed retrieval a second time (2026-08-03)
 
 ### Roadmap Evolution
 
@@ -1155,6 +1158,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-03T13:38:51.340Z
-Stopped at: Completed 35-01-PLAN.md
+Last session: 2026-08-03T13:54:08.996Z
+Stopped at: Completed 35-02-PLAN.md
 Resume file: None
