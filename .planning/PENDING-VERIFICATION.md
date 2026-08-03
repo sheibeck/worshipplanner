@@ -209,6 +209,22 @@ Appended as each phase completes.
   meant; if not, only this plan's Task 2 template change (the `service-save-status-bar` placement) needs
   revisiting, not the store/composable layer beneath it.
 
+### Plan 32-06 — `CongregationalEditor`/`ScriptureSlideEditor`/`SongLyricEditor` onto `SaveStatusIndicator`
+
+- ☐ **32-06.1** Open the song lyrics editor, edit a section, and confirm the header shows `Saving…` then
+  a persisting `Saved h:mm` rather than the old dot-and-tick. `CongregationalEditor.vue` and
+  `ScriptureSlideEditor.vue` are currently unmounted dead weight pending Phase 34, so this check is only
+  possible against `SongLyricEditor.vue` today — reconfirm the other two once Phase 34 mounts them.
+- ☐ **32-06.2** Resize below 640px with a failure showing and confirm the sentence *"Couldn't save your
+  changes — they're still here. Try again."* wraps rather than clipping in the narrowest header
+  (`SongLyricEditor.vue`'s `flex items-center gap-2` group). The automated E1/E4 overflow backstop
+  (`src/components/__tests__/SongLyricEditor.test.ts`) only proves — via jsdom, which cannot measure real
+  layout — that no truncation class is present and the full text renders; it does not prove the sentence
+  visually wraps in a real browser.
+- ☐ **32-06.3** With a screen reader active, confirm a routine save (`Saving soon…` / `Saving…` /
+  `Saved h:mm`) is announced politely and does not interrupt, while a failure raises the assertive toast
+  in addition to the polite inline announcement.
+
 ---
 
 ## Notes and failures

@@ -4,17 +4,17 @@ milestone: v1.4
 milestone_name: Service and Slides
 current_phase: 32
 current_phase_name: Save Reliability — Autosave Fix & Persistent Status
-status: executing
-stopped_at: Completed 32-05-PLAN.md
-last_updated: "2026-08-03T00:10:46.561Z"
+status: verifying
+stopped_at: Completed 32-06-PLAN.md
+last_updated: "2026-08-03T00:44:09.823Z"
 last_activity: 2026-08-02
 last_activity_desc: Phase 32 execution started
 progress:
   total_phases: 9
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 21
-  completed_plans: 20
-  percent: 33
+  completed_plans: 21
+  percent: 44
 ---
 
 # Project State
@@ -77,7 +77,7 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 
 Phase: 32 (Save Reliability — Autosave Fix & Persistent Status) — EXECUTING
 Plan: 6 of 6
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-08-02 — Phase 32 execution started
 
 ## ★ v1.4 AUTONOMOUS RUN — standing decisions (2026-07-28)
@@ -622,6 +622,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 32 P03 | 45min | 3 tasks | 4 files |
 | Phase 32 P04 | 20min | 3 tasks | 5 files |
 | Phase 32 P05 | ~2h | 3 tasks | 3 files |
+| Phase 32 P06 | 1h 40min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -811,6 +812,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: ToastHost mounted once in AppShell.vue inside the inner content flex column (sibling after </main>), confirmed via grep as the sole mount point across src/.
 - [Phase ?]: 32-05: useAutoSave is declared before the immediate remote-merge watcher that reads its status; deleted autosaveInitialized outright (no reset() API added) since the R039 fix already makes a genuine merge leave local==original, which the composable's own dirty check suppresses
 - [Phase ?]: 32-05: handleAutosaveFailure writes the definitive useSaveStatus entry directly and re-throws so useAutoSave's own generic catch also lands on 'error' without double-reporting — the reporting watcher skips the 'error' transition rather than mirroring it
+- [Phase ?]: 32-06: capture-once surface id (a dedicated ref assigned exactly once when the driving record id/prop first resolves) applied identically across all three editors, closing the E4 partial/loading backstops
+- [Phase ?]: 32-06: added defineExpose({ currentReadingId }) to CongregationalEditor.vue/ScriptureSlideEditor.vue as a minimal, precedented test-only seam to drive the E4 partial backstop
+- [Phase ?]: 32-06: SongLyricEditor's E4 partial backstop is written defensively (not a live repro) since a mid-mount songId swap is not reachable in production today
 
 ### Roadmap Evolution
 
@@ -872,6 +876,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-03T00:10:46.534Z
-Stopped at: Completed 32-05-PLAN.md
+Last session: 2026-08-03T00:44:09.794Z
+Stopped at: Completed 32-06-PLAN.md
 Resume file: None
