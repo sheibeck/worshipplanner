@@ -187,6 +187,28 @@ Appended as each phase completes.
   margins at the bottom on a narrow/mobile width, without overlapping the sticky status bar or the
   Phase 31 lock banner at the top of the viewport.
 
+### Plan 32-05 — `ServiceEditorView` migrated onto `useAutoSave`/`useSaveStatus`; sticky status bar
+
+- ☐ **32-05.1** Open a Service Order with enough items to scroll. Scroll to the bottom of the list.
+  Confirm the save-status bar is still pinned at the top of the editing surface, not scrolled out of
+  view — this is the exact "it didn't save" failure mode the sticky placement exists to prevent.
+- ☐ **32-05.2** Make one edit, then wait at least **ten real seconds** without touching anything else.
+  Confirm `Saved h:mm` is still on screen the whole time. The automated suite uses fake timers, which
+  proves the 3-second fade is gone but does not prove the text visually stays on screen in a real
+  browser tab over real wall-clock time.
+- ☐ **32-05.3** With the Firestore emulator running: edit a field so a debounced save fires, wait for
+  its own echo to land, then immediately pick a song on a slot. Confirm the pick's save lands against
+  the real Firestore `serverTimestamp()` resolution (both the optimistic and the server-ack snapshot) —
+  jsdom's mocked `updatedAt`/`hasPendingWrites` values simulate this but do not prove it against a real
+  backend.
+- ☐ **32-05.4** ★ **The "above the fold" reading.** This plan's own `<flagged_reading>` section records
+  that R040's "never above the fold" was read as "not parked in the global app header, far from the
+  content" — which is why the status lives in a sticky sub-header of the editing surface itself, rather
+  than (for example) the app's top-level header bar. That reading was Claude's recommendation, accepted
+  under the standing autonomy grant — **not an owner statement**. Confirm this is what was actually
+  meant; if not, only this plan's Task 2 template change (the `service-save-status-bar` placement) needs
+  revisiting, not the store/composable layer beneath it.
+
 ---
 
 ## Notes and failures

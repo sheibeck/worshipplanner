@@ -5,15 +5,15 @@ milestone_name: Service and Slides
 current_phase: 32
 current_phase_name: Save Reliability — Autosave Fix & Persistent Status
 status: executing
-stopped_at: Completed 32-04-PLAN.md
-last_updated: "2026-08-02T23:20:00.335Z"
+stopped_at: Completed 32-05-PLAN.md
+last_updated: "2026-08-03T00:10:46.561Z"
 last_activity: 2026-08-02
 last_activity_desc: Phase 32 execution started
 progress:
   total_phases: 9
   completed_phases: 3
   total_plans: 21
-  completed_plans: 19
+  completed_plans: 20
   percent: 33
 ---
 
@@ -76,7 +76,7 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 ## Current Position
 
 Phase: 32 (Save Reliability — Autosave Fix & Persistent Status) — EXECUTING
-Plan: 5 of 6
+Plan: 6 of 6
 Status: Ready to execute
 Last activity: 2026-08-02 — Phase 32 execution started
 
@@ -621,6 +621,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 32 P02 | 25min | 2 tasks | 2 files |
 | Phase 32 P03 | 45min | 3 tasks | 4 files |
 | Phase 32 P04 | 20min | 3 tasks | 5 files |
+| Phase 32 P05 | ~2h | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -808,6 +809,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: useSaveStatus/useToasts: edge-detection for the failure toast lives inside saveStatus.set() (the writer), not inside a component watch (the reader), so no caller of set() needs to know a toast store exists.
 - [Phase ?]: SaveStatusIndicator.vue and ToastHost.vue built verbatim from 32-UI-SPEC.md, consuming plan 03's real useSaveStatus/useToasts stores; both component tests install real Pinia rather than mocking, matching the new-precedent pattern 32-03 set.
 - [Phase ?]: ToastHost mounted once in AppShell.vue inside the inner content flex column (sibling after </main>), confirmed via grep as the sole mount point across src/.
+- [Phase ?]: 32-05: useAutoSave is declared before the immediate remote-merge watcher that reads its status; deleted autosaveInitialized outright (no reset() API added) since the R039 fix already makes a genuine merge leave local==original, which the composable's own dirty check suppresses
+- [Phase ?]: 32-05: handleAutosaveFailure writes the definitive useSaveStatus entry directly and re-throws so useAutoSave's own generic catch also lands on 'error' without double-reporting — the reporting watcher skips the 'error' transition rather than mirroring it
 
 ### Roadmap Evolution
 
@@ -869,6 +872,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-02T23:20:00.307Z
-Stopped at: Completed 32-04-PLAN.md
+Last session: 2026-08-03T00:10:46.534Z
+Stopped at: Completed 32-05-PLAN.md
 Resume file: None
