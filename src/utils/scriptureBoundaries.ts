@@ -63,3 +63,80 @@ export function computeBoundaries(text: string): number[] {
 export function hasSplittableBoundaries(boundaries: number[]): boolean {
   return boundaries.length >= 3
 }
+
+/**
+ * Synthetic markers embedded in the model-facing copy of the text at every
+ * legal boundary so the model can choose among them by index — never asked
+ * to count characters blind. U+27E6/U+27E7 (mathematical white square
+ * brackets) are chosen because they cannot occur in ESV API output.
+ */
+export const BOUNDARY_MARKER_OPEN = '⟦'
+export const BOUNDARY_MARKER_CLOSE = '⟧'
+
+/**
+ * Produces a model-facing copy of `text` with a `⟦i⟧` marker inserted
+ * immediately before the character at `boundaries[i]`, for every boundary.
+ * The untouched `text` remains the only slicing source — this output is for
+ * display to the model only, never fed back into `sliceAtBoundaries`.
+ *
+ * Returns `null` — a hard refusal — when `text` already contains either
+ * marker delimiter, since an ambiguous marker set would let the model index
+ * into text the caller did not mean.
+ */
+export function embedBoundaryMarkers(text: string, boundaries: number[]): string | null {
+  if (text.includes(BOUNDARY_MARKER_OPEN) || text.includes(BOUNDARY_MARKER_CLOSE)) {
+    return null
+  }
+
+  let out = ''
+  let previous = 0
+  boundaries.forEach((boundary, index) => {
+    out += text.slice(previous, boundary) + BOUNDARY_MARKER_OPEN + index + BOUNDARY_MARKER_CLOSE
+    previous = boundary
+  })
+  return out
+}
+
+/**
+ * THE ENCODING BACKSTOP. This is the byte-exactness guarantee at the core of
+ * R064: it performs exactly one `String.prototype.slice` call against the
+ * untouched source and nothing else. Do NOT add `.normalize()`, `.trim()`,
+ * `.replace()`, `.toLowerCase()`, or any comparison here — any such
+ * transform would silently defeat the structural claim that a sliced
+ * section is character-for-character identical to the ESV source,
+ * including non-ASCII punctuation (curly quotes, curly apostrophes, em
+ * dashes, etc.). The boundary array passed in must be the exact same array
+ * used to build the prompt — never recomputed here.
+ */
+export function sliceAtBoundaries(
+  text: string,
+  boundaries: number[],
+  startBoundary: number,
+  endBoundary: number,
+): string {
+  return text.slice(boundaries[startBoundary], boundaries[endBoundary])
+}
+
+/**
+ * Removes bracketed-digit verse-number runs (and their trailing whitespace)
+ * and trims the outer edges — the only two permitted display transforms,
+ * for display only, matching `scriptureSplitter.ts`'s existing convention
+ * of keeping verse numbers OUT of a section's `.text` and surfacing them
+ * separately via `verseRangeForSlice`. Everything else in the slice —
+ * including non-ASCII punctuation — is left untouched.
+ */
+export function stripVerseMarkers(slice: string): string {
+  return slice.replace(VERSE_MARKER_PATTERN, '').trim()
+}
+
+/**
+ * Reads the bracketed verse numbers present in `slice` and returns a single
+ * number as a string, a hyphenated first-last range when several are
+ * present, or `undefined` when the slice carries no verse marker at all.
+ */
+export function verseRangeForSlice(slice: string): string | undefined {
+  const numbers = [...slice.matchAll(/\[(\d+)\]/g)].map((match) => match[1]!)
+  if (numbers.length === 0) return undefined
+  if (numbers.length === 1) return numbers[0]
+  return `${numbers[0]}-${numbers[numbers.length - 1]}`
+}
