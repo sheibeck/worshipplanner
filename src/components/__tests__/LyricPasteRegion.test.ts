@@ -87,7 +87,7 @@ describe('LyricPasteRegion', () => {
     vi.clearAllMocks()
   })
 
-  // Rows 12-13 of LyricPasteDialog.test.ts ("renders nothing when closed", "resets
+  // Rows 12-13 of the deleted modal test file ("renders nothing when closed", "resets
   // textarea when reopened") are NOT ported here — the open/closed and reopen-reset
   // mechanisms are now the host's v-if/mount-unmount, not an `open` prop. They move
   // to plan 04's SongLyricEditor.test.ts.

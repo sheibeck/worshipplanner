@@ -96,9 +96,9 @@ vi.mock('@/composables/useAutoSave', () => {
 
 // Teleported content — established codebase convention (26-RESEARCH.md
 // Pitfall 3; see EditSlideDrawer.test.ts / ServiceEditorView.test.ts).
-// SongSlideOver's own root teleports the whole panel to document.body, and
-// SongLyricEditor (mounted for real, not stubbed) nests a second, inert
-// (closed by default) Teleport of its own for LyricPasteDialog.
+// SongSlideOver's own root teleports the whole panel to document.body.
+// SongLyricEditor's inline paste region (35-04, R066) is mounted in place —
+// no second Teleport nests inside it anymore.
 enableAutoUnmount(afterEach)
 
 function body() {

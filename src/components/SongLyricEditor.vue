@@ -1,5 +1,6 @@
 <template>
   <div class="flex h-full flex-col">
+    <template v-if="!pasteMode">
     <!-- Header (non-scrolling) -->
     <div
       class="flex shrink-0 items-center justify-between gap-3 border-b border-gray-800 px-4 py-3"
@@ -15,7 +16,7 @@
           type="button"
           data-testid="paste-lyrics-btn"
           class="rounded-md border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm font-medium text-gray-300 transition-colors hover:border-gray-600 hover:bg-gray-700"
-          @click="showPasteDialog = true"
+          @click="pasteMode = true"
         >Paste lyrics</button>
         <button
           type="button"
@@ -60,7 +61,7 @@
         type="button"
         data-testid="paste-cta-btn"
         class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500"
-        @click="showPasteDialog = true"
+        @click="pasteMode = true"
       >Paste Lyrics from SongSelect</button>
     </div>
 
@@ -247,13 +248,18 @@
         </div>
       </div>
     </div>
+    </template>
 
-    <!-- Paste dialog -->
-    <LyricPasteDialog
-      :open="showPasteDialog"
+    <!-- Inline paste region (R066) — swaps in place of the Sections view
+         above rather than stacking a second surface over it. Mount/unmount
+         via v-if/v-else IS the reset mechanism for the region's own internal
+         state (E6) — v-show would keep it alive across closes. -->
+    <LyricPasteRegion
+      v-else
       :song-id="props.songId"
       :org-id="props.orgId"
-      @close="showPasteDialog = false"
+      :current-section-count="sectionRows.length"
+      @close="pasteMode = false"
       @saved="onPasteSaved"
     />
   </div>
@@ -278,7 +284,7 @@ import {
   ADD_SECTION_KINDS,
   type SectionRow,
 } from '@/utils/songSectionOrder'
-import LyricPasteDialog from './LyricPasteDialog.vue'
+import LyricPasteRegion from './LyricPasteRegion.vue'
 import LyricVersionHistory from './LyricVersionHistory.vue'
 import type { LyricSection, SongLyrics } from '@/types/songLyrics'
 
@@ -290,7 +296,7 @@ const props = defineProps<{
 const songLyricsStore = useSongLyricsStore()
 const authStore = useAuthStore()
 const saveStatus = useSaveStatus()
-const showPasteDialog = ref(false)
+const pasteMode = ref(false)
 const showHistory = ref(false)
 const expandedRowKeys = ref<Set<string>>(new Set())
 
@@ -661,7 +667,7 @@ async function onRevertVersion(versionId: string) {
 }
 
 function onPasteSaved() {
-  showPasteDialog.value = false
+  pasteMode.value = false
 }
 
 onMounted(() => {
