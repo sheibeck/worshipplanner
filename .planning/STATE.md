@@ -413,6 +413,52 @@ different deliverable from "rebuild against wireframes") or should be deferred. 
 | Phase | State | Resume |
 |-------|-------|--------|
 | 32 | verification_deferred_human | /gsd-verify-work 32 |
+| 33 | verification_deferred_human | /gsd-verify-work 33 |
+
+### v1.4 Phase 33 — Backgrounds & Slide Editing (2026-08-03)
+
+**Code complete, all gates green, human checks deferred under the standing autonomy grant.**
+`33-VERIFICATION.md` is `human_needed` — **not** `passed`. **5/5 success criteria and 7/7
+requirements verified against live source.**
+
+| Artifact | Outcome |
+|---|---|
+| Plans | 9/9 executed across 4 waves |
+| Verification | `human_needed`, 5/5 criteria, 7/7 requirements verified |
+| Code review | 0 Critical, 4 Warning, 2 Info; **all 4 in-scope findings fixed** (`8ad301a`…`0c56e88`) |
+| UI review | 21/24; 2 of 3 findings fixed (`5963afd`, `f7e1e63`), the third needs a real browser |
+| Gates at `c101874` | `npm run type-check` clean · `npx vitest run src/` 2134 passed / 9 failed (the two documented baseline files only) · `npm run build` succeeds |
+
+**Three real defects were caught after the plans "completed" — worth knowing about:**
+
+- **WR-01 (cascade bug).** `resolveEntryMedia`'s song lookup keyed off the **entry's own**
+  `sourceRef.kind` rather than the group's owning song. A SONG group's legitimately-preserved
+  `text`/`video` entries therefore silently skipped the song background tier while their `lyric`
+  siblings did not — two cards in one group disagreeing about the same song's background.
+- **WR-03 (a11y bug with a test that hid it).** The 3-dot menu never moved focus into its panel on
+  open, so **Escape did nothing** — the one keyboard behaviour the phase mandated. The test passed
+  only because it dispatched `keydown` directly on the panel, bypassing the real event path.
+- **WR-04 (a removed guard).** Deleting the drawer's in-body nav links removed the "Discard unsaved
+  changes?" confirmation with them and it was never ported to the menu path. Resolved by **restoring**
+  the guard, wired at both the drawer's close/Escape and the menu-dispatched navigation.
+
+**Design provenance:** this phase's affordances — the 3-dot menu, the details/lyrics split, all three
+background controls — are **original design work**, not a wireframe implementation. See the ⚠ OPEN
+ITEM above. The per-type menu table in `33-UI-SPEC.md` §3 is a design judgment the owner has not seen
+and is listed for human verification.
+
+**Deliberate deletions** (recorded so they never read as breakage): `GroupSlideEntry.audioScope` and
+its two write routes · the drawer's audio-scope toggle · `EditSlideDrawer.test.ts`'s audio-scope
+describe block · the drawer's in-body "Edit in song"/"Edit in scripture" links and the
+`edit-in-scripture` emit · `SlidesTab.vue`'s `drawerOpen = true` inside `onSelectSlide`.
+
+**Two false premises corrected, both recorded rather than silently worked around:** R052 describes
+replacing a "multi-tab single drawer" that never had tabs (it had sections), and the ROADMAP's
+instruction to confirm the 3-dot menu against the wireframes cannot be satisfied.
+
+**Still open (deferred, not fixed):** `IN-01` permanent Storage orphaning when a background is removed
+or replaced — no cleanup path exists for `orgs/{orgId}/backgrounds/**`, which is deliberately exempt
+from `cleanupExpiredMedia`'s sweep. Raised as a backlog item, not absorbed into this phase.
 
 ### v1.4 Phase 32 — Save Reliability (2026-08-02)
 
