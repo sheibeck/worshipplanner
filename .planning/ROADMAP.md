@@ -215,9 +215,22 @@ Plans:
   4. The 3-dot menu opens separate "Edit details" and "Edit lyrics" drawers instead of one multi-tab drawer
   5. The editing options offered for a slide vary by the service-item type it belongs to — a scripture item offers options a song item does not
 
-**Plans**: TBD
+**Plans**: 9 plans
+Plans:
+
+- [ ] 33-01-PLAN.md — Three background fields + the slide/group/song cascade in `resolveEntryMedia` (wave 1)
+- [ ] 33-02-PLAN.md — `slideActionMenuItems` pure per-kind helper + `SlideActionMenu.vue`, the codebase's first ARIA menu (wave 1)
+- [ ] 33-03-PLAN.md — `useBackgroundUpload` composable + shared `BackgroundControl.vue` (wave 2)
+- [ ] 33-04-PLAN.md — R058: delete the per-slide audio scope option, its field, and its test block (wave 2)
+- [ ] 33-05-PLAN.md — `SlideCard`: root element swap for legal menu nesting + background provenance chip (wave 2)
+- [ ] 33-06-PLAN.md — Song-level background in the Song Lyrics editor + `setSongBackground` (wave 3)
+- [ ] 33-07-PLAN.md — Drawer `mode` split, Slide Background section, pending-action seam (wave 3)
+- [ ] 33-08-PLAN.md — `SlideGrid`: group background control + one-menu-open-at-a-time ownership (wave 3)
+- [ ] 33-09-PLAN.md — `SlidesTab`: R051 decoupling + the single menu dispatcher (wave 4)
+
 **UI hint**: yes
 **Research flag**: standard pattern — directly extends an existing precedent (audio's slide-beats-bed cascade); no new libraries.
+**★ Plan-time premise correction (2026-08-02):** the Notes line below ends by saying "Confirm against the Claude Design wireframes at plan time which drawer a given slide's 3-dot menu opens." **That is a false premise.** `docs/design/slides-tab.dc.html` was pulled 2026-07-25 and contains no 3-dot menu, no "Edit details"/"Edit lyrics", and no background feature — verified, all 106 `background` matches are CSS declarations. Every new affordance in this phase is **original design work**, settled and reviewed in `33-UI-SPEC.md`. Same class of finding as Phase 27's two false ROADMAP premises. See `.planning/STATE.md` § "⚠ OPEN ITEM FOR THE OWNER — the design wireframes are stale", which also flags that **Phase 36 depends on wireframes that do not exist**.
 **Notes**: Add `backgroundImageUrl?: string` at three levels — `GroupSlideEntry` (per-slide), `SlideGroup` (group), `SongLyrics` (song, greenfield, no migration) — resolved wherever `assembleSlideshow` already resolves `audioUrl` per slide. The "Edit lyrics" drawer applies only to hand-authored text slides (PRAYER/MESSAGE/blank), never SONG-group lyric entries, which stay read-only here and route to "Edit in song" (R054, Phase 30). Confirm against the Claude Design wireframes at plan time which drawer a given slide's 3-dot menu opens.
 
 ### Phase 34: Smarter Content — LLM Scripture Split
@@ -304,7 +317,7 @@ Plans:
 | 30. Slides Mirror the Plan — Hard Lock & Reconciliation Removed | v1.4 | 4/4 | Complete    | 2026-07-29 |
 | 31. Service Lifecycle — Draft Lock & Reopen | v1.4 | 6/6 | Complete    | 2026-07-30 |
 | 32. Save Reliability — Autosave Fix & Persistent Status | v1.4 | 6/6 | In Progress|  |
-| 33. Backgrounds & Slide Editing | v1.4 | 0/TBD | Not started | - |
+| 33. Backgrounds & Slide Editing | v1.4 | 0/9 | Planned | - |
 | 34. Smarter Content — LLM Scripture Split | v1.4 | 0/TBD | Not started | - |
 | 35. Presentation Correctness & Lyric Editor | v1.4 | 0/TBD | Not started | - |
 | 36. UI Rework — Service Order & Contextual Action Bars | v1.4 | 0/TBD | Not started | - |
