@@ -157,6 +157,22 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 
 ### Smarter Content
 
+- [~] **R062** — ⚠ **PARTIALLY DELIVERED (Phase 37, 2026-08-03).** The full pipeline is built and
+      automated-tested end to end: `render-service/` (LibreOffice + Poppler, custom Dockerfile, font
+      policy build-time gate, fontconfig substitution aliases — 39/39 tests), the bridging function
+      (`requestPptxRenderHandler`, independent-recount completeness check, `renderInvoker.ts`'s
+      IAM-authenticated Cloud Run call — 70/70 `functions/` tests), and the dry-run-by-default orphan
+      sweep (`cleanupOrphanRendersHandler`, mirroring the post-9f1b881 fail-safe gate shape).
+      **What is NOT delivered:** (1) the service is **not deployed** — STATE.md's standing v1.4
+      decision was explicitly BUILD BUT DO NOT DEPLOY, so `PPTX_RENDER_SERVICE_URL` is unset and
+      every render fails closed by design (`failureReason: "render-service-not-configured"`) until the
+      owner runs `render-service/DEPLOY.md`'s handoff command; (2) **no UI consumes the rendered
+      images yet** — 37-CONTEXT.md explicitly defers "client-side display rework for rendered images
+      beyond storing and referencing them" to a later phase, so even once deployed, nothing in the app
+      shows a rendered slide to a user. Real visual fidelity, font substitution, and cost/latency are
+      consequently unverified (`PENDING-VERIFICATION.md` items 37.1–37.3). Original requirement text
+      follows:
+
 - [ ] **R062** (core-capability): PowerPoint import produces a true visual representation of each slide —
       backgrounds, fonts, layout, effects — not text alone. Rendered server-side to images via a
       standalone Cloud Run service (LibreOffice + Poppler, custom Dockerfile — Firebase Functions
@@ -165,8 +181,6 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
       exempt from `cleanupExpiredMedia`'s prefix guard. Only metric-compatible open fonts
       (Carlito/Caladea/Liberation) — never bundle Microsoft fonts. Orphan cleanup for failed renders
       **defaults to dry-run**; the inverse default already caused a real incident in this codebase.
-      **In progress — Phase 37 is 6 plans across 4 waves; plan 37-01 (this run) delivered only the
-      render-service/ scaffold and the font-policy build-time gate, not the render pipeline itself.**
       `[STACK]` `[PITFALL]`
 
 - [x] **R063** (core-capability): Slide-editing options vary by service-item type — a scripture item
@@ -270,7 +284,7 @@ Acknowledged, deferred, not in this roadmap.
 | R059 | Phase 35 | Complete |
 | R060 | Phase 35 | Complete |
 | R061 | Phase 35 | Complete |
-| R062 | Phase 37 | In Progress — 1/6 plans done (37-01: render-service scaffold + font-policy gate) |
+| R062 | Phase 37 | Partial — pipeline built + automated-tested end to end; deploy and UI consumption NOT delivered (owner instruction: build but do not deploy) |
 | R063 | Phase 33 | Complete |
 | R064 | Phase 34 | Partial — structural guarantee done, reachability NOT delivered |
 | R065 | Phase 35 | Complete |
