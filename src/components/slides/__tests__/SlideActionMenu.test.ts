@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import SlideActionMenu from '../SlideActionMenu.vue'
 import type { MenuItem } from '../slideDisplay'
 
@@ -73,16 +73,37 @@ describe('SlideActionMenu', () => {
     expect(wrapper.emitted('select')).toEqual([['delete']])
   })
 
-  it('pressing Escape inside the open panel emits toggle and moves focus back to the trigger', async () => {
+  it('WR-03: activating the trigger moves focus onto the first menuitem, and Escape from there emits toggle and returns focus to the trigger', async () => {
     const wrapper = mount(SlideActionMenu, {
-      props: { entryId: 'entry-1', items: FOUR_ITEMS, open: true },
+      props: { entryId: 'entry-1', items: FOUR_ITEMS, open: false },
       attachTo: document.body,
     })
 
-    const panel = wrapper.get('[data-testid="slide-action-panel-entry-1"]')
-    await panel.trigger('keydown', { key: 'Escape' })
-
+    // The real event path a keyboard (or mouse) user goes through: activate
+    // the trigger, which emits `toggle` — the PARENT is the one that actually
+    // flips `open` (this component holds no state of its own), so the test
+    // reproduces that round trip via `setProps` rather than asserting on an
+    // internal ref.
+    await wrapper.get('[data-testid="slide-action-trigger-entry-1"]').trigger('click')
     expect(wrapper.emitted('toggle')).toEqual([['entry-1']])
+    await wrapper.setProps({ open: true })
+    // The component's own focus-on-open watcher awaits its own `nextTick()`
+    // internally (a second microtask hop beyond the render VTU's `setProps`
+    // already waited for) — `flushPromises` drains that too.
+    await flushPromises()
+
+    const firstItem = wrapper.get('[data-testid="slide-action-item-edit-details"]')
+    expect(document.activeElement).toBe(firstItem.element)
+
+    // Escape dispatched from the ACTUAL focused element inside the panel —
+    // not directly on the panel div. Dispatching straight at the panel (the
+    // pre-fix version of this test) bypasses the real DOM focus/bubble path
+    // a keyboard user is actually in immediately after opening the menu, and
+    // was why this test kept passing while Escape did nothing for a real
+    // user (WR-03).
+    await firstItem.trigger('keydown', { key: 'Escape' })
+
+    expect(wrapper.emitted('toggle')).toEqual([['entry-1'], ['entry-1']])
     expect(document.activeElement).toBe(wrapper.get('[data-testid="slide-action-trigger-entry-1"]').element)
     wrapper.unmount()
   })

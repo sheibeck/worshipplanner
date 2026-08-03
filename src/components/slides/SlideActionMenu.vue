@@ -29,6 +29,7 @@
     >
       <div
         v-if="open"
+        ref="panelRef"
         role="menu"
         class="absolute right-0 top-full mt-1 w-40 origin-top-right rounded-lg border border-gray-700 bg-gray-800 shadow-xl z-20 overflow-hidden"
         :data-testid="`slide-action-panel-${entryId}`"
@@ -84,8 +85,17 @@
  * `@click.stop` on the trigger is the exact idiom `SlideCard.vue`'s drag
  * grip already established: the click must never bubble to the card's own
  * select handler, so opening the menu never re-fires selection.
+ *
+ * WR-03: opening the panel moves focus onto its first `menuitem`. The
+ * trigger `<button>` and the `role="menu"` panel `<div>` are DOM siblings,
+ * not ancestor/descendant, and nothing previously moved focus into the
+ * panel when `open` became `true` — so `onPanelKeydown`'s `Escape` handler
+ * (bound to the panel's own `@keydown`) never received the event until the
+ * user had separately tabbed focus into the panel. Focusing the first item
+ * on open both fixes Escape and matches the WAI-ARIA menu-button pattern's
+ * expectation that opening a menu moves focus onto it.
  */
-import { ref } from 'vue'
+import { ref, nextTick, watch } from 'vue'
 import type { MenuItem, MenuItemKey } from './slideDisplay'
 
 const props = defineProps<{
@@ -103,6 +113,16 @@ const emit = defineEmits<{
 }>()
 
 const triggerRef = ref<HTMLButtonElement | null>(null)
+const panelRef = ref<HTMLElement | null>(null)
+
+watch(
+  () => props.open,
+  async (isOpen) => {
+    if (!isOpen) return
+    await nextTick()
+    panelRef.value?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus()
+  },
+)
 
 function onTriggerClick(): void {
   emit('toggle', props.entryId)
