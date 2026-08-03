@@ -44,10 +44,12 @@
         <!-- Body — scrolls on its own; header stays fixed above it. 16px padding/section-gap (md token). -->
         <div class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
           <!-- R054: song groups are read-only in the Slides tab — this notice
-               pairs with the retained "Edit in song" link so the lock reads
-               as deliberate rather than broken (30-CONTEXT.md). Muted
-               informational idiom, matching this drawer's own helper
-               captions — not an error/warning colour. -->
+               names why (30-CONTEXT.md); Phase 33-09 moved the "Edit in
+               song"/"Edit in scripture" navigation onto the 3-dot menu, so
+               this notice no longer pairs with an in-body link, only with
+               the menu items it names. Muted informational idiom, matching
+               this drawer's own helper captions — not an error/warning
+               colour. -->
           <!-- ★ R036 shares this ONE slot — the single permitted exception to
                D-06's "one banner". This drawer is a fixed overlay that COVERS the
                sticky page banner, so without a notice a locked drawer is a
@@ -138,13 +140,6 @@
                 data-testid="drawer-slide-text-readonly"
               >{{ lyricLinesText }}</p>
               <p class="mt-1 text-xs text-gray-500" data-testid="drawer-slide-text-caption">{{ SONG_TEXT_CAPTION }}</p>
-              <button
-                v-if="isEditor"
-                type="button"
-                class="mt-2 text-xs font-medium text-indigo-400 hover:text-indigo-300"
-                data-testid="drawer-edit-in-song-link"
-                @click="onEditInSong('lyrics')"
-              >Edit in song</button>
             </template>
 
             <template v-else-if="sourceKind === 'copyright'">
@@ -155,13 +150,6 @@
                 <p data-testid="drawer-copyright-license">{{ copyrightSlide?.ccliLicenseNumber }}</p>
               </div>
               <p class="mt-1 text-xs text-gray-500" data-testid="drawer-slide-text-caption">{{ SONG_TEXT_CAPTION }}</p>
-              <button
-                v-if="isEditor"
-                type="button"
-                class="mt-2 text-xs font-medium text-indigo-400 hover:text-indigo-300"
-                data-testid="drawer-edit-in-song-link"
-                @click="onEditInSong('details')"
-              >Edit in song</button>
             </template>
 
             <template v-else-if="sourceKind === 'scripture'">
@@ -170,13 +158,6 @@
                 data-testid="drawer-slide-text-readonly"
               >{{ scripturePassageText }}</p>
               <p class="mt-1 text-xs text-gray-500" data-testid="drawer-slide-text-caption">{{ SCRIPTURE_TEXT_CAPTION }}</p>
-              <button
-                v-if="isEditor"
-                type="button"
-                class="mt-2 text-xs font-medium text-indigo-400 hover:text-indigo-300"
-                data-testid="drawer-edit-in-scripture-link"
-                @click="onEditInScripture"
-              >Edit in scripture</button>
             </template>
 
             <template v-else-if="sourceKind === 'imported'">
@@ -454,14 +435,12 @@
  * already handles clearing a dangling selection.
  */
 import { ref, computed, watch, onUnmounted, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
 import type { ServiceSlot } from '@/types/service'
 import type { AssembledSlide, ImageSlide, CopyrightSlide, ScriptureSlide } from '@/types/slide'
 import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
 import { useSlideGroups } from '@/stores/slideGroups'
 import { KIND_BADGE_CLASSES, slotDisplayTitle, slideBodyText, bedAudioLabel, backgroundImageLabel, deleteSlideConfirmBody } from './slideDisplay'
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
-import { buildSongEditLink, type SongEditTab } from '@/utils/songEditLink'
 import { useMediaUpload } from '@/composables/useMediaUpload'
 import { useBackgroundUpload } from '@/composables/useBackgroundUpload'
 import AudioPlayer from '../AudioPlayer.vue'
@@ -517,8 +496,6 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   close: []
-  /** Phase 26-07, D-15: a scripture slide's route away is a same-page request, not a navigation — `SlidesTab.vue` relays it to `ServiceEditorView` via 26-03's plumbing. */
-  'edit-in-scripture': []
   /** Phase 26-09 Task 2: carries the freshly-minted copy's id, only once the write has actually succeeded — `SlidesTab.vue` relays it into `selectSlideById` so the panel follows the copy. */
   duplicate: [entryId: string]
   /** Phase 33-07 — fired once per handled `pendingAction` nonce so the parent (which owns the pending state) can clear it. */
@@ -526,7 +503,6 @@ const emit = defineEmits<{
 }>()
 
 const slideGroupsStore = useSlideGroups()
-const router = useRouter()
 
 // ── Open/close, focus and Escape (Task 1) ──────────────────────────────────
 
@@ -1071,22 +1047,6 @@ async function flushAll(): Promise<void> {
   await flushField('body')
 }
 
-/**
- * D-16: cancels every field's pending debounced write WITHOUT committing it —
- * the opposite of `flushAll`. Used when the user accepts the unsaved-edit
- * confirmation before following a route away: without this, the confirmation
- * would be a lie (the discarded edit would still land moments later, either
- * from its own debounce timer or from this component's unmount-time
- * best-effort flush). Never called on decline — a declined confirmation
- * leaves the pending write in place so it still lands normally.
- */
-function cancelPendingWrites(): void {
-  for (const field of ['label', 'notes', 'body'] as const) {
-    clearFieldTimer(field)
-    pendingWrite[field] = null
-  }
-}
-
 function resetLocalFields(entry: GroupSlideEntry | null): void {
   syncing = true
   localLabel.value = entry?.label ?? ''
@@ -1167,40 +1127,13 @@ watch(localBody, (value) => {
   scheduleWrite('body', props.entry.id, value)
 })
 
-// ── Phase 26-07 Task 3: the two routes away, each guarded against losing
-// unsaved work (D-14/D-15/D-16) ──────────────────────────────────────────────
-
-/**
- * "Edit in song" (D-15): a real navigation via 26-02's link contract, landing
- * on the tab that actually owns the field being shown — Lyrics for a
- * lyric-section slide, Details for a copyright slide (a deliberate
- * refinement of D-14, not a plain reuse of one fixed tab). Guarded by
- * `confirmDiscard()`; on accept, cancels the pending write BEFORE navigating
- * so the confirmation is truthful (see `cancelPendingWrites`'s own comment).
- * On decline, does nothing — the pending write stays scheduled and still
- * lands normally.
- */
-function onEditInSong(tab: SongEditTab): void {
-  const ref = props.entry?.sourceRef
-  if (!ref || (ref.kind !== 'lyric' && ref.kind !== 'copyright')) return
-  if (!unsavedGuard.confirmDiscard()) return
-  cancelPendingWrites()
-  void router.push(buildSongEditLink(ref.songId, tab))
-}
-
-/**
- * "Edit in scripture" (D-15): NOT a navigation — the scripture editor's
- * expansion state is page-local to `ServiceEditorView`, unreachable from this
- * subtree directly (26-03's plumbing). Emits a request `SlidesTab.vue` relays
- * via its own `requestEditInScripture()`. Same guard, same cancel-before-emit
- * discipline as `onEditInSong`.
- */
-function onEditInScripture(): void {
-  if (props.entry?.sourceRef.kind !== 'scripture') return
-  if (!unsavedGuard.confirmDiscard()) return
-  cancelPendingWrites()
-  emit('edit-in-scripture')
-}
+// Phase 33-09 (R051/R052): "Edit in song" and "Edit in scripture" — both real
+// navigations away from this drawer's own entry — moved up to `SlidesTab.vue`'s
+// `onMenuAction` (the 3-dot menu now triggers them, not an in-body link). The
+// song-edit-link builder, the router import/instance, and the two handlers
+// that used them (`onEditInSong`/`onEditInScripture`) are gone from this file
+// entirely — see `SlidesTab.vue` for the relocated, behaviourally-unchanged
+// route logic.
 
 onUnmounted(() => {
   if (savedFadeTimer !== null) clearTimeout(savedFadeTimer)

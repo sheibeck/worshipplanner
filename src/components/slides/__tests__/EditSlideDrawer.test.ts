@@ -20,13 +20,6 @@ vi.mock('@/stores/slideGroups', () => ({
   }),
 }))
 
-// --- 26-07 Task 3: "Edit in song" is a real navigation via 26-02's link
-// contract — mocked here so the drawer's own tests never touch a real router. ---
-const mockRouterPush = vi.fn().mockResolvedValue(undefined)
-vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: mockRouterPush }),
-}))
-
 // --- 26-08 Task 1: audio file attach goes through the existing upload
 // composable (never a second uploader) — mocked here exactly like
 // SlideGroupMusicControl.test.ts's own convention, so these tests never touch
@@ -744,47 +737,29 @@ describe('EditSlideDrawer (Phase 26-07 Task 2 — hand-written slide edited here
   })
 })
 
-describe('EditSlideDrawer (Phase 26-07 Task 3 — routes away, guarded)', () => {
-  beforeEach(() => {
-    vi.useFakeTimers()
-    mockReplaceGroupSlides.mockReset()
-    mockReplaceGroupSlides.mockResolvedValue(undefined)
-    mockRouterPush.mockClear()
+// 33-09 Task 3: "Edit in song"/"Edit in scripture" were in-body link buttons
+// with their own navigation, guarded by an unsaved-edit confirmation. Both
+// links (and the navigation/guard logic behind them) are gone entirely —
+// superseded by the 3-dot menu's `edit-in-song`/`edit-in-scripture` items,
+// which SlidesTab.vue's `onMenuAction` now dispatches directly. This block's
+// remaining subject is what's still true post-removal: every read-only kind
+// still renders its text/caption (or the copyright block), and NEITHER link
+// button exists anywhere, for any permission combination.
+describe('EditSlideDrawer (Phase 33-09 Task 3 — the removed "Edit in song"/"Edit in scripture" links)', () => {
+  it('renders no "Edit in song" link for a lyric-kind or copyright-kind entry, with the editor permission granted', () => {
+    for (const fixtures of [makeLyricFixtures(), makeCopyrightFixtures()]) {
+      mountDrawer({ entry: fixtures.entry, assembledSlide: fixtures.assembledSlide, group: makeGroup({ slides: [fixtures.entry] }), isEditor: true })
+      expect(body().find('[data-testid="drawer-edit-in-song-link"]').exists()).toBe(false)
+    }
   })
 
-  afterEach(() => {
-    vi.useRealTimers()
-  })
-
-  it("pushes the song destination with that song's id and the lyrics tab for a lyric-section slide", async () => {
-    const { entry, assembledSlide } = makeLyricFixtures()
-    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
-
-    await body().find('[data-testid="drawer-edit-in-song-link"]').trigger('click')
-
-    expect(mockRouterPush).toHaveBeenCalledWith({ name: 'songs', query: { edit: 'song-1', tab: 'lyrics' } })
-  })
-
-  it('pushes the same destination on the details tab for a copyright slide', async () => {
-    const { entry, assembledSlide } = makeCopyrightFixtures()
-    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
-
-    await body().find('[data-testid="drawer-edit-in-song-link"]').trigger('click')
-
-    expect(mockRouterPush).toHaveBeenCalledWith({ name: 'songs', query: { edit: 'song-1', tab: 'details' } })
-  })
-
-  it('emits a request (not a navigation) for a scripture slide', async () => {
+  it('renders no "Edit in scripture" link for a scripture-kind entry, with the editor permission granted', () => {
     const { entry, assembledSlide } = makeScriptureFixtures()
-    const wrapper = mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
-
-    await body().find('[data-testid="drawer-edit-in-scripture-link"]').trigger('click')
-
-    expect(mockRouterPush).not.toHaveBeenCalled()
-    expect(wrapper.emitted('edit-in-scripture')).toBeTruthy()
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }), isEditor: true })
+    expect(body().find('[data-testid="drawer-edit-in-scripture-link"]').exists()).toBe(false)
   })
 
-  it('offers no route for an imported slide, a video slide, or a hand-written slide', () => {
+  it('renders no route link for an imported slide, a video slide, or a hand-written slide either', () => {
     for (const fixtures of [makeImportedTextFixtures(), makeImportedImageFixtures(), makeVideoFixtures(), makeAuthoredTextFixtures()]) {
       mountDrawer({ entry: fixtures.entry, assembledSlide: fixtures.assembledSlide, group: makeGroup({ slides: [fixtures.entry] }) })
       expect(body().find('[data-testid="drawer-edit-in-song-link"]').exists()).toBe(false)
@@ -792,72 +767,26 @@ describe('EditSlideDrawer (Phase 26-07 Task 3 — routes away, guarded)', () => 
     }
   })
 
-  it('proceeds immediately, with no confirmation, when nothing is pending', async () => {
-    const confirmSpy = vi.spyOn(window, 'confirm')
-    const { entry, assembledSlide } = makeLyricFixtures()
-    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
-
-    await body().find('[data-testid="drawer-edit-in-song-link"]').trigger('click')
-
-    expect(confirmSpy).not.toHaveBeenCalled()
-    expect(mockRouterPush).toHaveBeenCalledTimes(1)
-    confirmSpy.mockRestore()
-  })
-
-  it('typing then following a route, declining the confirmation: nothing navigates and the pending write still lands', async () => {
-    const { entry, assembledSlide } = makeLyricFixtures()
-    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
-
-    await body().find('[data-testid="drawer-label-input"]').setValue('Changed label')
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
-
-    await body().find('[data-testid="drawer-edit-in-song-link"]').trigger('click')
-
-    expect(confirmSpy).toHaveBeenCalledWith('You have unsaved changes. Discard them?')
-    expect(mockRouterPush).not.toHaveBeenCalled()
-
-    await vi.advanceTimersByTimeAsync(800)
-    expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
-    confirmSpy.mockRestore()
-  })
-
-  it('typing then following a route, accepting the confirmation: navigation happens and no write lands afterward', async () => {
-    const { entry, assembledSlide } = makeLyricFixtures()
-    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
-
-    await body().find('[data-testid="drawer-label-input"]').setValue('Changed label')
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
-
-    await body().find('[data-testid="drawer-edit-in-song-link"]').trigger('click')
-
-    expect(mockRouterPush).toHaveBeenCalledTimes(1)
-
-    await vi.advanceTimersByTimeAsync(800)
-    await flushPromises()
-    expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
-    confirmSpy.mockRestore()
-  })
-
-  it("uses the existing guard's exact wording, introducing no new confirmation string", async () => {
-    const { entry, assembledSlide } = makeScriptureFixtures()
-    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
-
-    await body().find('[data-testid="drawer-label-input"]').setValue('Changed label')
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
-
-    await body().find('[data-testid="drawer-edit-in-scripture-link"]').trigger('click')
-
-    expect(confirmSpy).toHaveBeenCalledTimes(1)
-    expect(confirmSpy).toHaveBeenCalledWith('You have unsaved changes. Discard them?')
-    confirmSpy.mockRestore()
-  })
-
-  it('renders neither route for a user without write capability', () => {
+  it('renders neither link for a user without write capability either (never existed only for a viewer to lose)', () => {
     for (const fixtures of [makeLyricFixtures(), makeCopyrightFixtures(), makeScriptureFixtures()]) {
       mountDrawer({ entry: fixtures.entry, assembledSlide: fixtures.assembledSlide, group: makeGroup({ slides: [fixtures.entry] }), isEditor: false })
       expect(body().find('[data-testid="drawer-edit-in-song-link"]').exists()).toBe(false)
       expect(body().find('[data-testid="drawer-edit-in-scripture-link"]').exists()).toBe(false)
     }
+  })
+
+  it('still renders the read-only text and its caption for the lyric, scripture and imported (text) kinds', () => {
+    for (const fixtures of [makeLyricFixtures(), makeScriptureFixtures(), makeImportedTextFixtures()]) {
+      mountDrawer({ entry: fixtures.entry, assembledSlide: fixtures.assembledSlide, group: makeGroup({ slides: [fixtures.entry] }) })
+      expect(body().find('[data-testid="drawer-slide-text-readonly"]').exists()).toBe(true)
+      expect(body().find('[data-testid="drawer-slide-text-caption"]').exists()).toBe(true)
+    }
+  })
+
+  it('still renders the copyright block for the copyright kind', () => {
+    const { entry, assembledSlide } = makeCopyrightFixtures()
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+    expect(body().find('[data-testid="drawer-copyright-block"]').exists()).toBe(true)
   })
 })
 
@@ -1385,18 +1314,18 @@ describe('EditSlideDrawer (R054 — song groups are read-only)', () => {
     expect(body().find('[data-testid="drawer-delete-trigger"]').exists()).toBe(false)
   })
 
-  it('still offers the Edit in song link for a lyric entry in a song group', () => {
+  it('renders no "Edit in song" link for a lyric entry in a song group either (33-09: moved to the 3-dot menu)', () => {
     const { entry, assembledSlide } = makeLyricFixtures()
     mountDrawer({ planItem: songPlanItem, entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
 
-    expect(body().find('[data-testid="drawer-edit-in-song-link"]').exists()).toBe(true)
+    expect(body().find('[data-testid="drawer-edit-in-song-link"]').exists()).toBe(false)
   })
 
-  it('still offers the Edit in song link for a copyright entry in a song group', () => {
+  it('renders no "Edit in song" link for a copyright entry in a song group either (33-09: moved to the 3-dot menu)', () => {
     const { entry, assembledSlide } = makeCopyrightFixtures()
     mountDrawer({ planItem: songPlanItem, entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
 
-    expect(body().find('[data-testid="drawer-edit-in-song-link"]').exists()).toBe(true)
+    expect(body().find('[data-testid="drawer-edit-in-song-link"]').exists()).toBe(false)
   })
 
   it('shows the read-only notice naming the Song Lyrics screen for a song group', () => {

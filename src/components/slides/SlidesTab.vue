@@ -72,7 +72,6 @@
       :is-editor="isEditor"
       :service-locked="serviceLocked"
       @close="onDrawerClose"
-      @edit-in-scripture="requestEditInScripture"
       @duplicate="selectSlideById"
       @pending-action-consumed="onPendingActionConsumed"
     />
@@ -110,10 +109,10 @@
  * (26-RESEARCH.md Pitfall 5). `requestEditInScripture` emits
  * `navigate-to-scripture-editor` carrying the selected plan item's raw array
  * index, the one upward channel a page-level action can travel through.
- * Phase 26-07 wires the drawer's own "Edit in scripture" affordance to this
- * exact function via its `edit-in-scripture` emit — the drawer never reaches
- * page state directly, it only asks this component to make the same request
- * it already exposes.
+ * Phase 33-09 (R051/R052): the trigger moved from an in-drawer link to the
+ * 3-dot menu's `edit-in-scripture` key — `onMenuAction` calls this exact
+ * function directly, so the drawer never reaches page state and this
+ * component's own relay plumbing is unchanged.
  *
  * Edit Slide drawer seam (Phase 26-05, R033): `selectedEntry` resolves
  * `selectedSlideId` against the selected group's stored slides by a DIRECT id
