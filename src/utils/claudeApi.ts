@@ -325,3 +325,55 @@ export async function getScriptureSuggestions(
     return null
   }
 }
+
+// ─── Congregational Split ─────────────────────────────────────────────────────
+
+/**
+ * The structural data the model is allowed to hand back for a congregational
+ * split: a speaker label and two integer indices into a pre-computed
+ * legal-boundary array (see `src/utils/scriptureBoundaries.ts`). Never text.
+ */
+export interface SplitSection {
+  speaker: 'LEADER' | 'CONGREGATION'
+  startBoundary: number
+  endBoundary: number
+}
+
+/**
+ * The structural contract the model is allowed to speak — nothing else.
+ *
+ * This schema's field set is itself part of R064's guarantee: there is no
+ * field here the model could populate with scripture words, not even an
+ * optional one the code never reads. Adding any string-typed property beyond
+ * `speaker`'s closed enum would mean the model *could* emit text, defeating
+ * the structural guarantee no matter how good the prompt (see P-02).
+ *
+ * Structured outputs' JSON Schema subset has no `minimum`, `maximum`, or
+ * `multipleOf` — this schema proves SHAPE only (an integer where an integer
+ * is expected, one of two enum strings). Every bounds, ordering, adjacency
+ * and coverage check lives in `validateSplitResult` below, in plain
+ * TypeScript, because the schema is structurally incapable of expressing
+ * them. Do not reach for `strict: true` here — that field belongs to tool
+ * definitions, not to `OutputConfig`, and would not add range enforcement
+ * even if it applied.
+ */
+export const SPLIT_SCHEMA = {
+  type: 'object',
+  properties: {
+    sections: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          speaker: { type: 'string', enum: ['LEADER', 'CONGREGATION'] },
+          startBoundary: { type: 'integer' },
+          endBoundary: { type: 'integer' },
+        },
+        required: ['speaker', 'startBoundary', 'endBoundary'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['sections'],
+  additionalProperties: false,
+} as const
