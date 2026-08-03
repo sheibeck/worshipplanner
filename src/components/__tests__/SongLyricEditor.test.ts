@@ -136,7 +136,6 @@ async function mountEditor(songId = 'song-1') {
     props: { songId, orgId: 'org-1' },
     global: {
       stubs: {
-        LyricPasteDialog: { template: '<div data-testid="paste-dialog-stub" :data-open="open"></div>', props: ['open', 'songId', 'orgId'] },
         Teleport: { template: '<div><slot /></div>' },
       },
     },
@@ -144,6 +143,24 @@ async function mountEditor(songId = 'song-1') {
   await wrapper.vm.$nextTick()
   return wrapper
 }
+
+// A minimal CCLI sample local to this file — the plan directs reusing a
+// constant defined here rather than importing one from LyricPasteRegion.test.ts.
+const SAMPLE_CCLI = `Amazing Grace
+
+Verse 1
+Amazing grace how sweet the sound
+That saved a wretch like me
+
+Chorus
+My chains are gone
+I've been set free
+
+CCLI Song # 12345
+John Newton
+© 2023 Test Publisher
+For use solely with the SongSelect Terms of Use.  All rights reserved. http://ccli.com
+CCLI License # 99999`
 
 describe('SongLyricEditor', () => {
   // 32-06: real, Firestore-free useSaveStatus store — see
@@ -1248,5 +1265,184 @@ describe('SongLyricEditor', () => {
     const control = wrapper.findComponent(BackgroundControl)
     expect(control.exists()).toBe(true)
     expect(control.props('inheritedFrom')).toBeUndefined()
+  })
+
+  // ── 35-04 (R066): the lyric paste happens inline, not in a modal ───────────
+  // These are the re-homed rows 12-13 of plan 03's LyricPasteDialog.test.ts
+  // migration map ("renders nothing when closed" and "resets textarea when
+  // reopened") — the open/closed and reopen-reset mechanisms are now the
+  // host's v-if/mount-unmount, not the old dialog's `open` prop, so they live
+  // here rather than in LyricPasteRegion.test.ts.
+  describe('paste mode — the lyric paste happens inline, not in a modal (R066)', () => {
+    afterEach(() => {
+      vi.restoreAllMocks()
+    })
+
+    it('re-homed row 12: paste-region does not exist until paste-lyrics-btn is clicked; lyrics-header does', async () => {
+      mockIsLoading.value = false
+      mockCurrentLyrics.value = makeLyrics()
+      const wrapper = await mountEditor()
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="lyrics-header"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="paste-region"]').exists()).toBe(false)
+
+      await wrapper.find('[data-testid="paste-lyrics-btn"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="paste-region"]').exists()).toBe(true)
+    })
+
+    it('header swap: entering paste mode replaces the Sections view entirely', async () => {
+      mockIsLoading.value = false
+      mockCurrentLyrics.value = makeLyrics()
+      const wrapper = await mountEditor()
+      await flushPromises()
+
+      await wrapper.find('[data-testid="paste-lyrics-btn"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="lyrics-paste-header"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="lyrics-header"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="song-background-row"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="lyrics-scroll-region"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="section-rows"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="add-section-row"]').exists()).toBe(false)
+    })
+
+    it('re-homed row 13 (E6): reopening paste mode always starts with an empty textarea, never pre-filled', async () => {
+      mockIsLoading.value = false
+      mockCurrentLyrics.value = makeLyrics()
+      vi.spyOn(window, 'confirm').mockReturnValue(true)
+      const wrapper = await mountEditor()
+      await flushPromises()
+
+      await wrapper.find('[data-testid="paste-lyrics-btn"]').trigger('click')
+      await flushPromises()
+      await wrapper.find('[data-testid="paste-textarea"]').setValue(SAMPLE_CCLI)
+      await flushPromises()
+
+      await wrapper.find('[data-testid="paste-cancel-btn"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.find('[data-testid="paste-region"]').exists()).toBe(false)
+
+      await wrapper.find('[data-testid="paste-lyrics-btn"]').trigger('click')
+      await flushPromises()
+
+      const textarea = wrapper.find('[data-testid="paste-textarea"]')
+      expect((textarea.element as HTMLTextAreaElement).value).toBe('')
+    })
+
+    it('E10: both exits fire the unsaved-changes guard, and declining it leaves the paste intact', async () => {
+      mockIsLoading.value = false
+      mockCurrentLyrics.value = makeLyrics()
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+      const wrapper = await mountEditor()
+      await flushPromises()
+
+      await wrapper.find('[data-testid="paste-lyrics-btn"]').trigger('click')
+      await flushPromises()
+      await wrapper.find('[data-testid="paste-textarea"]').setValue(SAMPLE_CCLI)
+      await flushPromises()
+
+      await wrapper.find('[data-testid="paste-back-btn"]').trigger('click')
+      await flushPromises()
+      expect(confirmSpy).toHaveBeenCalled()
+      expect(wrapper.find('[data-testid="paste-region"]').exists()).toBe(true)
+      expect((wrapper.find('[data-testid="paste-textarea"]').element as HTMLTextAreaElement).value).toBe(SAMPLE_CCLI)
+
+      confirmSpy.mockClear()
+      await wrapper.find('[data-testid="paste-cancel-btn"]').trigger('click')
+      await flushPromises()
+      expect(confirmSpy).toHaveBeenCalled()
+      expect(wrapper.find('[data-testid="paste-region"]').exists()).toBe(true)
+      expect((wrapper.find('[data-testid="paste-textarea"]').element as HTMLTextAreaElement).value).toBe(SAMPLE_CCLI)
+    })
+
+    it('paste-back-btn closes without any confirm prompt, and without saving, when the textarea is empty', async () => {
+      mockIsLoading.value = false
+      mockCurrentLyrics.value = makeLyrics()
+      const confirmSpy = vi.spyOn(window, 'confirm')
+      const wrapper = await mountEditor()
+      await flushPromises()
+
+      await wrapper.find('[data-testid="paste-lyrics-btn"]').trigger('click')
+      await flushPromises()
+
+      await wrapper.find('[data-testid="paste-back-btn"]').trigger('click')
+      await flushPromises()
+
+      expect(confirmSpy).not.toHaveBeenCalled()
+      expect(wrapper.find('[data-testid="paste-region"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="lyrics-header"]').exists()).toBe(true)
+    })
+
+    it('paste-cancel-btn closes without any confirm prompt, and without saving, when the textarea is empty', async () => {
+      mockIsLoading.value = false
+      mockCurrentLyrics.value = makeLyrics()
+      const confirmSpy = vi.spyOn(window, 'confirm')
+      const wrapper = await mountEditor()
+      await flushPromises()
+
+      await wrapper.find('[data-testid="paste-lyrics-btn"]').trigger('click')
+      await flushPromises()
+
+      await wrapper.find('[data-testid="paste-cancel-btn"]').trigger('click')
+      await flushPromises()
+
+      expect(confirmSpy).not.toHaveBeenCalled()
+      expect(wrapper.find('[data-testid="paste-region"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="lyrics-header"]').exists()).toBe(true)
+    })
+
+    it('the empty-state CTA reaches the same paste region as the header button', async () => {
+      mockIsLoading.value = false
+      mockCurrentLyrics.value = null
+      const wrapper = await mountEditor()
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="empty-state"]').exists()).toBe(true)
+      await wrapper.find('[data-testid="paste-cta-btn"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="paste-region"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="lyrics-paste-header"]').exists()).toBe(true)
+    })
+
+    it('R066: the paste region is a plain in-place descendant — no Teleported modal chrome anywhere', async () => {
+      mockIsLoading.value = false
+      mockCurrentLyrics.value = makeLyrics()
+      const wrapper = await mountEditor()
+      await flushPromises()
+
+      await wrapper.find('[data-testid="paste-lyrics-btn"]').trigger('click')
+      await flushPromises()
+
+      const region = wrapper.find('[data-testid="paste-region"]')
+      expect(region.exists()).toBe(true)
+      expect(wrapper.element.contains(region.element)).toBe(true)
+      expect(wrapper.html()).not.toMatch(/fixed inset-0/)
+    })
+
+    it('a successful paste returns to the Sections view', async () => {
+      mockIsLoading.value = false
+      mockCurrentLyrics.value = makeLyrics()
+      const wrapper = await mountEditor()
+      await flushPromises()
+
+      await wrapper.find('[data-testid="paste-lyrics-btn"]').trigger('click')
+      await flushPromises()
+      await wrapper.find('[data-testid="paste-textarea"]').setValue(SAMPLE_CCLI)
+      await flushPromises()
+
+      await wrapper.find('[data-testid="paste-replace-btn"]').trigger('click')
+      await vi.waitFor(() => {
+        expect(mockSaveLyrics).toHaveBeenCalled()
+      })
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="paste-region"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="lyrics-header"]').exists()).toBe(true)
+    })
   })
 })
