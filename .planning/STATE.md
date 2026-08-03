@@ -4,17 +4,17 @@ milestone: v1.4
 milestone_name: Service and Slides
 current_phase: 34
 current_phase_name: Smarter Content — LLM Scripture Split
-status: executing
-stopped_at: Completed 34-03-PLAN.md
-last_updated: "2026-08-03T07:56:25.541Z"
+status: verifying
+stopped_at: Completed 34-04-PLAN.md (phase 34 complete, all four plans executed)
+last_updated: "2026-08-03T08:13:49.541Z"
 last_activity: 2026-08-03
 last_activity_desc: Phase 34 execution started
 progress:
   total_phases: 9
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 34
-  completed_plans: 33
-  percent: 56
+  completed_plans: 34
+  percent: 67
 ---
 
 # Project State
@@ -77,7 +77,7 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 
 Phase: 34 (Smarter Content — LLM Scripture Split) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-08-03 — Phase 34 execution started
 
 ## ★ v1.4 AUTONOMOUS RUN — standing decisions (2026-07-28)
@@ -792,6 +792,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 34 P01 | 15min | 2 tasks | 2 files |
 | Phase 34 P02 | 10min | 2 tasks | 2 files |
 | Phase 34 P03 | 12min | 2 tasks | 2 files |
+| Phase 34 P04 | 35min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -1004,6 +1005,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 34-02: Split model contract into SplitSection/SPLIT_SCHEMA (integer boundary indices + speaker enum, additionalProperties:false everywhere) and validateSplitResult() with total-rejection semantics — a single adjacency equality check rejects gap/overlap/out-of-order identically; no repair, coercion, or re-sort.
 - [Phase ?]: Combined PLAN.md's two tasks (call shape / failure paths) into a single feat commit rather than four RED/GREEN commits, since both tasks' tests were authored coherently in one describe block with no scope/design impact
 - [Phase ?]: jsonSchemaOutputFormat() deep-clones/transforms SPLIT_SCHEMA before request attachment; call-shape tests assert the transformed schema's shape (properties.sections present) rather than strict identity against SPLIT_SCHEMA
+- [Phase ?]: 34-04: wholesale-replace-on-success + untouched-plus-toast-on-any-failure is the additive AI pattern (canAiSplit gated by 34-01's hasSplittableBoundaries; onAiSplit never merges, never partially applies)
+- [Phase ?]: 34-04: sectionsSnapshot() in tests reads the DOM rather than exposing sections internally — matches the component's existing minimal test seam (only currentReadingId is exposed, for the unrelated E4 backstop)
 
 ### Roadmap Evolution
 
@@ -1065,6 +1068,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-03T07:56:25.497Z
-Stopped at: Completed 34-03-PLAN.md
+Last session: 2026-08-03T08:13:49.511Z
+Stopped at: Completed 34-04-PLAN.md (phase 34 complete, all four plans executed)
 Resume file: None

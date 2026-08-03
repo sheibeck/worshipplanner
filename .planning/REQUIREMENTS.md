@@ -170,7 +170,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 - [x] **R063** (core-capability): Slide-editing options vary by service-item type — a scripture item
       offers options a song item does not.
 
-- [ ] **R064** (core-capability): A scripture item can be split into a congregational responsive reading
+- [x] **R064** (core-capability): A scripture item can be split into a congregational responsive reading
       with leader/congregation attribution. **The model returns only index ranges and speaker labels
       into already-fetched ESV text — never scripture words** — so altered or hallucinated scripture is
       structurally impossible rather than prompt-discouraged. Splits fall on clause/verse boundaries,
@@ -256,7 +256,7 @@ Acknowledged, deferred, not in this roadmap.
 | R061 | Phase 35 | Pending |
 | R062 | Phase 37 | Pending |
 | R063 | Phase 33 | Complete |
-| R064 | Phase 34 | Pending |
+| R064 | Phase 34 | Complete |
 | R065 | Phase 35 | Pending |
 | R066 | Phase 35 | Pending |
 | R067 | Phase 36 | Pending |
