@@ -47,12 +47,6 @@
         <!-- lyric -->
         <template v-if="slideKind === 'lyric'">
           <p
-            data-testid="presentation-label"
-            class="text-2xl font-semibold leading-[1.3] text-indigo-400 uppercase tracking-wider mb-8"
-          >
-            {{ (currentSlide.slide as LyricSlide).sectionLabel }}
-          </p>
-          <p
             data-testid="presentation-body"
             class="text-gray-100 whitespace-pre-line text-5xl font-normal leading-[1.4]"
           >

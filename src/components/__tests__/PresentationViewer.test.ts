@@ -193,7 +193,7 @@ describe('PresentationViewer', () => {
     await Promise.resolve()
 
     expect(body().find('[data-testid="presentation-viewer"]').exists()).toBe(true)
-    expect(slideText()).toContain('Verse 1')
+    expect(slideText()).toContain('Amazing grace, how sweet the sound')
     expect(body().find('[data-testid="presentation-progress"]').text()).toBe('Worship · 1 / 3')
   })
 
@@ -247,7 +247,7 @@ describe('PresentationViewer', () => {
     expect(slideText()).toContain('Amazing Grace')
 
     await viewer.trigger('keydown', { key: 'Backspace' })
-    expect(slideText()).toContain('Verse 1')
+    expect(slideText()).toContain('Amazing grace, how sweet the sound')
   })
 
   it('ArrowRight at the last index does not change the rendered slide; ArrowLeft at index 0 does not change it', async () => {
@@ -257,7 +257,7 @@ describe('PresentationViewer', () => {
 
     const viewer = body().find('[data-testid="presentation-viewer"]')
     await viewer.trigger('keydown', { key: 'ArrowLeft' })
-    expect(slideText()).toContain('Verse 1')
+    expect(slideText()).toContain('Amazing grace, how sweet the sound')
 
     await viewer.trigger('keydown', { key: 'ArrowRight' })
     expect(slideText()).toContain('Amazing Grace')
@@ -457,11 +457,23 @@ describe('PresentationViewer', () => {
 
   // ── Task 2: per-slide-kind rendering ──────────────────────────────────────
 
-  it('a LyricSlide renders sectionLabel in presentation-label and lines joined by newline in presentation-body', async () => {
+  it('R059: a LyricSlide renders no sectionLabel in presentation-label, and lines joined by newline in presentation-body', async () => {
     mount(PresentationViewer, { props: { slides: [lyricSlide('a')] } })
     await Promise.resolve()
 
-    expect(body().find('[data-testid="presentation-label"]').text()).toBe('Verse 1')
+    expect(body().find('[data-testid="presentation-label"]').exists()).toBe(false)
+    const bodyText = body().find('[data-testid="presentation-body"]').text()
+    expect(bodyText).toContain('Amazing grace, how sweet the sound')
+    expect(bodyText).toContain('That saved a wretch like me')
+  })
+
+  it('R059: a LyricSlide with an empty-string sectionLabel still renders no presentation-label element', async () => {
+    const emptyLabelSlide = lyricSlide('a')
+    ;(emptyLabelSlide.slide as import('@/types/slide').LyricSlide).sectionLabel = ''
+    mount(PresentationViewer, { props: { slides: [emptyLabelSlide] } })
+    await Promise.resolve()
+
+    expect(body().find('[data-testid="presentation-label"]').exists()).toBe(false)
     const bodyText = body().find('[data-testid="presentation-body"]').text()
     expect(bodyText).toContain('Amazing grace, how sweet the sound')
     expect(bodyText).toContain('That saved a wretch like me')
