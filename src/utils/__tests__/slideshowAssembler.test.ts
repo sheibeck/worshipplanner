@@ -13,7 +13,7 @@ import type {
 import type { SongLyrics } from '@/types/songLyrics'
 import type { ScriptureReading } from '@/types/scriptureReading'
 import type { ImportedDeck } from '@/types/importedDeck'
-import type { ScriptureSlide, CopyrightSlide, LyricSlide, TextSlide, ImageSlide, VideoSlide } from '@/types/slide'
+import type { ScriptureSlide, CopyrightSlide, LyricSlide, TextSlide, ImageSlide, VideoSlide, CongregationalSection } from '@/types/slide'
 import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
 import type { Timestamp } from 'firebase/firestore'
 import { slotLabel, reindexSlots, orderSlotsBySection } from '@/utils/slotTypes'
@@ -453,6 +453,118 @@ describe('assembleSlideshow — scripture resolution', () => {
     const result = assembleSlideshow(service, makeInputs())
     expect(result).toHaveLength(1)
     expect((result[0]!.slide as ScriptureSlide).reference).toBe('John 3:16-18')
+  })
+})
+
+function makeCongregationalSection(overrides: Partial<CongregationalSection> = {}): CongregationalSection {
+  return {
+    speaker: 'LEADER',
+    text: 'The Lord is my shepherd;',
+    ...overrides,
+  }
+}
+
+// R064: both scripture call sites (resolveEntryContent's stored-group path
+// and the SCRIPTURE fallback branch) must spread the identical shared
+// helper. The parity case is load-bearing: it assembles ONE slot fixture
+// through both paths and asserts the emitted scripture slides agree.
+describe('assembleSlideshow — congregational reading (R064)', () => {
+  function assembleViaStoredGroup(slot: ScriptureSlot) {
+    const entry = makeGroupSlideEntry({ id: 'entry-scripture', order: 0, sourceRef: { kind: 'scripture' } })
+    const group = makeSlideGroup({ id: slot.id, slotId: slot.id, slides: [entry] })
+    const inputs = makeInputs({ groupsBySlotId: new Map([[slot.id, group]]) })
+    return assembleSlideshow(makeService([slot]), inputs)
+  }
+
+  function assembleViaFallback(slot: ScriptureSlot) {
+    return assembleSlideshow(makeService([slot]), makeInputs())
+  }
+
+  it('dual-path parity: a slot WITH congregationalSections yields deep-equal readingMode/sections on both paths', () => {
+    const sections = [
+      makeCongregationalSection({ speaker: 'LEADER', text: 'One' }),
+      makeCongregationalSection({ speaker: 'CONGREGATION', text: 'Two' }),
+    ]
+    const slot = scriptureSlot({ id: 'slot-scripture-0', congregationalSections: sections })
+
+    const storedResult = assembleViaStoredGroup(slot)
+    const fallbackResult = assembleViaFallback(slot)
+
+    const storedSlide = storedResult[0]!.slide as ScriptureSlide
+    const fallbackSlide = fallbackResult[0]!.slide as ScriptureSlide
+
+    expect(storedSlide.readingMode).toBe(fallbackSlide.readingMode)
+    expect(storedSlide.sections).toEqual(fallbackSlide.sections)
+    expect(storedSlide.readingMode).toBe('congregational')
+    expect(storedSlide.sections).toEqual(sections)
+  })
+
+  it('dual-path parity: a slot with NO congregationalSections yields the identical backward-compatible shape on both paths', () => {
+    const slot = scriptureSlot({ id: 'slot-scripture-0' })
+
+    const storedResult = assembleViaStoredGroup(slot)
+    const fallbackResult = assembleViaFallback(slot)
+
+    const storedSlide = storedResult[0]!.slide as ScriptureSlide
+    const fallbackSlide = fallbackResult[0]!.slide as ScriptureSlide
+
+    for (const slide of [storedSlide, fallbackSlide]) {
+      expect(slide.readingMode).toBe('normal')
+      expect(Object.prototype.hasOwnProperty.call(slide, 'sections')).toBe(false)
+    }
+    expect(storedSlide.readingMode).toBe(fallbackSlide.readingMode)
+  })
+
+  it('a slot with congregationalSections yields congregational mode and the stored sections array, in stored order', () => {
+    const sections = [
+      makeCongregationalSection({ speaker: 'LEADER', text: 'First' }),
+      makeCongregationalSection({ speaker: 'CONGREGATION', text: 'Second' }),
+      makeCongregationalSection({ speaker: 'LEADER', text: 'Third' }),
+    ]
+    const slot = scriptureSlot({ congregationalSections: sections })
+    const result = assembleSlideshow(makeService([slot]), makeInputs())
+    const slide = result[0]!.slide as ScriptureSlide
+    expect(slide.readingMode).toBe('congregational')
+    expect(slide.sections).toEqual(sections)
+    expect(slide.sections!.map((s) => s.text)).toEqual(['First', 'Second', 'Third'])
+  })
+
+  it('same-speaker adjacent sections both survive to the slide, unmerged', () => {
+    const sections = [
+      makeCongregationalSection({ speaker: 'CONGREGATION', text: 'Part A' }),
+      makeCongregationalSection({ speaker: 'CONGREGATION', text: 'Part B' }),
+    ]
+    const slot = scriptureSlot({ congregationalSections: sections })
+    const result = assembleSlideshow(makeService([slot]), makeInputs())
+    const slide = result[0]!.slide as ScriptureSlide
+    expect(slide.sections).toHaveLength(2)
+    expect(slide.sections![0]!.speaker).toBe('CONGREGATION')
+    expect(slide.sections![1]!.speaker).toBe('CONGREGATION')
+  })
+
+  it('non-ASCII section text survives to the slide with strict === equality', () => {
+    const text = '‘He restores my soul’ — “he leads me”'
+    const slot = scriptureSlot({ congregationalSections: [makeCongregationalSection({ text })] })
+    const result = assembleSlideshow(makeService([slot]), makeInputs())
+    const slide = result[0]!.slide as ScriptureSlide
+    expect(slide.sections![0]!.text === text).toBe(true)
+  })
+
+  it('adding congregationalSections to a slot does not change the slide id, position, sourceId, groupId or groupSlideId', () => {
+    const withoutSections = scriptureSlot({ id: 'slot-scripture-0' })
+    const withSections = scriptureSlot({
+      id: 'slot-scripture-0',
+      congregationalSections: [makeCongregationalSection()],
+    })
+
+    const resultWithout = assembleViaStoredGroup(withoutSections)
+    const resultWith = assembleViaStoredGroup(withSections)
+
+    expect(resultWith[0]!.slide.id).toBe(resultWithout[0]!.slide.id)
+    expect(resultWith[0]!.slide.position).toBe(resultWithout[0]!.slide.position)
+    expect(resultWith[0]!.sourceId).toBe(resultWithout[0]!.sourceId)
+    expect(resultWith[0]!.groupId).toBe(resultWithout[0]!.groupId)
+    expect(resultWith[0]!.groupSlideId).toBe(resultWithout[0]!.groupSlideId)
   })
 })
 

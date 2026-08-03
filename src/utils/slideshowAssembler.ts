@@ -33,7 +33,7 @@ import type { ScriptureReading } from '@/types/scriptureReading'
 import type { ImportedDeck } from '@/types/importedDeck'
 import type { SlideGroup, GroupSlideEntry, SourceRef } from '@/types/slideGroup'
 import { slotLabel } from './slotTypes'
-import { formatScriptureReference, scriptureRefFromSlot } from './scripture'
+import { formatScriptureReference, scriptureRefFromSlot, congregationalSlideFieldsFromSlot } from './scripture'
 
 /** Content maps the assembly engine resolves slots against. Pre-loaded by the caller. */
 export interface AssemblyInputs {
@@ -151,7 +151,7 @@ function resolveEntryContent(
         bookRef: scriptureRef,
         text: '',
         verseRange: '',
-        readingMode: 'normal',
+        ...congregationalSlideFieldsFromSlot(slot),
       }
       return content
     }
@@ -408,7 +408,7 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
           bookRef: scriptureRef,
           text: '',
           verseRange: '',
-          readingMode: 'normal',
+          ...congregationalSlideFieldsFromSlot(slot),
         }
         // No canonical record id behind a slot-derived reference — same
         // convention `sourceIdForRef` now applies to a payload-free ref.
