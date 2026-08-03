@@ -32,6 +32,7 @@ vi.mock('firebase/firestore', () => {
     query: vi.fn((ref: unknown) => ref),
     orderBy: vi.fn(),
     serverTimestamp: vi.fn(() => ({ seconds: 1000000, nanoseconds: 0 })),
+    deleteField: vi.fn(() => '__deleteField__'),
   }
 })
 
@@ -303,6 +304,50 @@ describe('useSongLyricsStore', () => {
 
       expect(getDoc).toHaveBeenCalledOnce()
       expect(addDoc).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('setSongBackground', () => {
+    it('writes the supplied URL to the background field, plus updatedAt', async () => {
+      const { updateDoc, serverTimestamp } = await import('firebase/firestore')
+      const { useSongLyricsStore } = await import('../songLyrics')
+      const store = useSongLyricsStore()
+
+      await store.setSongBackground('org-1', 'song-1', 'lyrics-1', 'https://example.com/bg.jpg')
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const data = callArgs[1] as unknown as Record<string, unknown>
+      expect(data.backgroundImageUrl).toBe('https://example.com/bg.jpg')
+      expect(data.updatedAt).toBeDefined()
+      expect(serverTimestamp).toHaveBeenCalled()
+    })
+
+    it('clears the background field via an explicit deleteField() sentinel, not undefined, when called with null', async () => {
+      const { updateDoc, deleteField } = await import('firebase/firestore')
+      const { useSongLyricsStore } = await import('../songLyrics')
+      const store = useSongLyricsStore()
+
+      await store.setSongBackground('org-1', 'song-1', 'lyrics-1', null)
+
+      expect(deleteField).toHaveBeenCalled()
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const data = callArgs[1] as unknown as Record<string, unknown>
+      expect(data.backgroundImageUrl).toBe('__deleteField__')
+      expect(data.backgroundImageUrl).not.toBeUndefined()
+    })
+
+    it('never writes sections or performanceOrder', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useSongLyricsStore } = await import('../songLyrics')
+      const store = useSongLyricsStore()
+
+      await store.setSongBackground('org-1', 'song-1', 'lyrics-1', 'https://example.com/bg.jpg')
+
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const data = callArgs[1] as unknown as Record<string, unknown>
+      expect(data.sections).toBeUndefined()
+      expect(data.performanceOrder).toBeUndefined()
     })
   })
 
