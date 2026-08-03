@@ -170,12 +170,16 @@ contract exists to prevent.
 Produced by the ui-consideration-probe over four described surfaces (E1 `SlideActionMenu.vue`, E2 the
 per-type menu item list, E3 the three background controls, E4 card-level provenance legibility).
 
-**Applicable: 32 — 23 covered, 8 backstop, 1 unresolved.**
+**Applicable: 32 — 24 covered, 7 backstop, 1 unresolved.**
 
-*(Count corrected 2026-08-02. The engine reports 8 categories × 4 elements = 32. The first draft of
-this section stated 26, omitted E1 `partial` entirely, and resolved E2 `overflow` by cross-reference
-rather than on its own row — both are now resolved explicitly below, so the no-silent-drop equality
-holds: 32 surfaced = 32 authored.)*
+Per-element: E1 6 covered / 2 backstop · E2 6 / 2 · E3 5 / 2 / 1 unresolved · E4 7 / 1.
+
+*(Corrected twice on 2026-08-02, both times to close a counting error rather than a dropped item.
+First: the engine reports 8 categories × 4 elements = 32, but the original draft stated 26, omitted
+E1 `partial` entirely, and resolved E2 `overflow` by cross-reference instead of on its own row — both
+are now resolved explicitly below. Second: the corrected header then said 23/8/1, which did not match
+the tables it heads; the per-element tally above is authoritative. No-silent-drop equality holds:
+32 surfaced = 32 authored.)*
 
 ### E1 — `SlideActionMenu.vue`
 
