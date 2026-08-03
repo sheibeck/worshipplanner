@@ -1,8 +1,18 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { jsonSchemaOutputFormat } from '@anthropic-ai/sdk/helpers/json-schema'
 import type { Song } from '@/types/song'
 import type { ScriptureRef } from '@/types/service'
+import type { CongregationalSection } from '@/types/slide'
 import { BIBLE_BOOKS } from '@/utils/scripture'
 import { getAppAuthHeaders } from '@/utils/appAuth'
+import {
+  computeBoundaries,
+  hasSplittableBoundaries,
+  embedBoundaryMarkers,
+  sliceAtBoundaries,
+  stripVerseMarkers,
+  verseRangeForSlice,
+} from '@/utils/scriptureBoundaries'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -444,4 +454,85 @@ export function validateSplitResult(
   if (prevEnd !== maxIndex) return null
 
   return sections as SplitSection[]
+}
+
+/**
+ * The system prompt for the split call. Structural, not creative: it tells
+ * the model the passage is annotated with numbered legal-split markers and
+ * that it must choose only among those marker indices — never reproduce,
+ * retype, or quote any word of the passage itself (P-02).
+ */
+const SPLIT_SYSTEM_PROMPT = `You are structuring a scripture passage into a responsive reading for a church service.
+
+The passage below is annotated with numbered markers like ⟦0⟧, ⟦1⟧, ⟦2⟧ at every position where a section may legally start or end. You must NOT reproduce, retype, or quote any word of the passage — you only choose marker indices.
+
+Rules:
+- Return a list of sections, each identified only by the marker index it starts at (startBoundary) and the marker index it ends at (endBoundary), plus a speaker.
+- Speakers alternate, starting with LEADER.
+- Sections must cover the whole passage with no gap and no overlap: each section's endBoundary must equal the next section's startBoundary.
+- The first section must start at index 0, and the last section must end at the highest marker index in the passage.
+- If a congregational refrain repeats within the passage, give each occurrence of it to CONGREGATION.
+- Respond only with the structured data requested — no prose, no passage text.`
+
+/**
+ * The AI-assisted congregational-reading split. Computes the legal boundary
+ * positions once, shows the model a marked-up copy of the passage, and
+ * constrains its reply to indices + a speaker label via `SPLIT_SCHEMA`. The
+ * model's response never contributes a single character to the returned
+ * sections' `text` — every character comes from `sliceAtBoundaries` against
+ * the untouched `rawText` passed in.
+ *
+ * Two invariants a future editor is most likely to break:
+ * 1. `boundaries` is computed exactly once here and threaded unchanged
+ *    through prompt-building, validation, and slicing. Recomputing it
+ *    anywhere in this function (even by calling `computeBoundaries` again on
+ *    the same `rawText`) risks desyncing the indices the model saw from the
+ *    indices used to validate/slice its answer (RESEARCH Pitfall 5). This is
+ *    not an optional discipline — do not "simplify" it away.
+ * 2. A `validateSplitResult` failure discards the ENTIRE result. There is no
+ *    partial-application path here, and none should ever be added — a
+ *    result that fails validation must never leak a single section to the
+ *    caller.
+ *
+ * Returns `null` on any failure — no internal boundary to split on, a source
+ * already containing a marker delimiter, a network/API error, an unparseable
+ * reply, or a reply that fails validation. A caller can never be handed a
+ * rejected promise or a partial split.
+ */
+export async function splitCongregationalReading(
+  rawText: string,
+): Promise<CongregationalSection[] | null> {
+  try {
+    const boundaries = computeBoundaries(rawText)
+    if (!hasSplittableBoundaries(boundaries)) return null
+
+    const markedUp = embedBoundaryMarkers(rawText, boundaries)
+    if (markedUp === null) return null
+
+    const response = await getClient().messages.parse(
+      {
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        system: SPLIT_SYSTEM_PROMPT,
+        output_config: { format: jsonSchemaOutputFormat(SPLIT_SCHEMA) },
+        messages: [{ role: 'user', content: markedUp }],
+      },
+      { headers: await getAppAuthHeaders() },
+    )
+
+    const validated = validateSplitResult(response.parsed_output, boundaries)
+    if (!validated) return null
+
+    return validated.map(({ speaker, startBoundary, endBoundary }) => {
+      const slice = sliceAtBoundaries(rawText, boundaries, startBoundary, endBoundary)
+      return {
+        speaker,
+        text: stripVerseMarkers(slice),
+        verseRange: verseRangeForSlice(slice),
+      }
+    })
+  } catch (err) {
+    console.error('[claudeApi] splitCongregationalReading failed:', err)
+    return null
+  }
 }

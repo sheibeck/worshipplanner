@@ -1,9 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// Use vi.hoisted to ensure mockCreate is available at mock factory hoisting time
-const { mockCreate } = vi.hoisted(() => {
+// Use vi.hoisted to ensure mockCreate/mockParse are available at mock factory
+// hoisting time. `messages.parse()` is a distinct SDK method from
+// `messages.create()` (it wraps create() + parseMessage() internally, per the
+// installed SDK's own source — see 34-03-PLAN.md's "Resolved spike"), so the
+// mock needs its own key: a call to `.parse()` against a factory exposing
+// only `create` would throw.
+const { mockCreate, mockParse } = vi.hoisted(() => {
   const mockCreate = vi.fn()
-  return { mockCreate }
+  const mockParse = vi.fn()
+  return { mockCreate, mockParse }
 })
 
 // The proxy holds the real key server-side; the client only attaches an app-auth
@@ -12,12 +18,13 @@ vi.mock('@/utils/appAuth', () => ({
   getAppAuthHeaders: vi.fn().mockResolvedValue({ 'X-App-Auth': 'test-token' }),
 }))
 
-// Mock the Anthropic SDK using the hoisted mockCreate
+// Mock the Anthropic SDK using the hoisted mockCreate/mockParse.
 vi.mock('@anthropic-ai/sdk', () => {
   function MockAnthropic() {
     return {
       messages: {
         create: mockCreate,
+        parse: mockParse,
       },
     }
   }
@@ -34,8 +41,16 @@ import {
   getScriptureSuggestions,
   SPLIT_SCHEMA,
   validateSplitResult,
+  splitCongregationalReading,
 } from '@/utils/claudeApi'
 import type { AiSongSuggestion, AiScriptureSuggestion } from '@/utils/claudeApi'
+import {
+  computeBoundaries,
+  sliceAtBoundaries,
+  stripVerseMarkers,
+  verseRangeForSlice,
+  BOUNDARY_MARKER_OPEN,
+} from '@/utils/scriptureBoundaries'
 
 describe('safeParseJsonArray', () => {
   it('parses clean JSON array', () => {
@@ -633,5 +648,258 @@ describe('validateSplitResult', () => {
       ],
     }
     expect(validateSplitResult(bad, boundaries)).toBeNull()
+  })
+})
+
+// ─── Congregational Split (34-03) — splitCongregationalReading ────────────────
+//
+// This is the one place the model's output and real scripture meet. Every
+// guarantee built in 34-01/34-02 either holds here or is bypassed here:
+// section text must be sliced from the untouched source (never
+// model-echoed), the call shape must match this pre-4.6-family model exactly
+// (no thinking, no effort), and every failure path — unsplittable passage,
+// poisoned source, network error, unparseable reply, invalid reply — must
+// resolve to `null` with no partial application and no thrown error.
+
+describe('splitCongregationalReading', () => {
+  const RAW_TEXT =
+    '[1] The Lord is my shepherd; I shall not want. [2] He makes me lie down in green pastures.'
+  const boundaries = computeBoundaries(RAW_TEXT)
+  const maxIndex = boundaries.length - 1
+  const midIndex = Math.max(1, Math.floor(maxIndex / 2))
+
+  // No verse marker and no clause-ending punctuation followed by whitespace
+  // — computeBoundaries collapses to just the two anchors [0, length], which
+  // is below hasSplittableBoundaries' 3-entry minimum.
+  const NO_BOUNDARY_TEXT = 'HelloWorld'
+
+  // Has plenty of internal boundaries (same shape as RAW_TEXT) but already
+  // contains the marker delimiter character, forcing embedBoundaryMarkers'
+  // hard refusal.
+  const DELIMITER_COLLISION_TEXT = `${RAW_TEXT}${BOUNDARY_MARKER_OPEN}`
+
+  beforeEach(() => {
+    mockParse.mockReset()
+  })
+
+  it('resolves to CongregationalSection[] whose text is a byte-exact slice of the source and whose speaker is carried through from the model', async () => {
+    mockParse.mockResolvedValueOnce({
+      parsed_output: {
+        sections: [
+          { speaker: 'LEADER', startBoundary: 0, endBoundary: midIndex },
+          { speaker: 'CONGREGATION', startBoundary: midIndex, endBoundary: maxIndex },
+        ],
+      },
+    })
+
+    const result = await splitCongregationalReading(RAW_TEXT)
+
+    expect(result).not.toBeNull()
+    expect(result).toHaveLength(2)
+    expect(result![0]!.speaker).toBe('LEADER')
+    expect(result![0]!.text).toBe(
+      stripVerseMarkers(sliceAtBoundaries(RAW_TEXT, boundaries, 0, midIndex)),
+    )
+    expect(result![1]!.speaker).toBe('CONGREGATION')
+    expect(result![1]!.text).toBe(
+      stripVerseMarkers(sliceAtBoundaries(RAW_TEXT, boundaries, midIndex, maxIndex)),
+    )
+  })
+
+  it('every returned section text is a substring of the marker-stripped source — proving it was sliced, not echoed', async () => {
+    mockParse.mockResolvedValueOnce({
+      parsed_output: {
+        sections: [
+          { speaker: 'LEADER', startBoundary: 0, endBoundary: midIndex },
+          { speaker: 'CONGREGATION', startBoundary: midIndex, endBoundary: maxIndex },
+        ],
+      },
+    })
+
+    const result = await splitCongregationalReading(RAW_TEXT)
+    const strippedSource = stripVerseMarkers(RAW_TEXT)
+
+    expect(result).not.toBeNull()
+    for (const section of result!) {
+      expect(strippedSource.includes(section.text)).toBe(true)
+    }
+  })
+
+  it('(call shape) sends the exact dated Haiku model id', async () => {
+    mockParse.mockResolvedValueOnce({
+      parsed_output: { sections: [{ speaker: 'LEADER', startBoundary: 0, endBoundary: maxIndex }] },
+    })
+
+    await splitCongregationalReading(RAW_TEXT)
+
+    const request = mockParse.mock.calls[0]![0] as Record<string, unknown>
+    expect(request.model).toBe('claude-haiku-4-5-20251001')
+  })
+
+  it('(call shape) sets max_tokens to 1024', async () => {
+    mockParse.mockResolvedValueOnce({
+      parsed_output: { sections: [{ speaker: 'LEADER', startBoundary: 0, endBoundary: maxIndex }] },
+    })
+
+    await splitCongregationalReading(RAW_TEXT)
+
+    const request = mockParse.mock.calls[0]![0] as Record<string, unknown>
+    expect(request.max_tokens).toBe(1024)
+  })
+
+  it('(call shape) sets output_config.format to a json_schema-typed format constraining the reply to indices', async () => {
+    mockParse.mockResolvedValueOnce({
+      parsed_output: { sections: [{ speaker: 'LEADER', startBoundary: 0, endBoundary: maxIndex }] },
+    })
+
+    await splitCongregationalReading(RAW_TEXT)
+
+    const request = mockParse.mock.calls[0]![0] as {
+      output_config: { format: { type: string; schema: { properties: Record<string, unknown> } } }
+    }
+    expect(request.output_config).toBeDefined()
+    expect(request.output_config.format).toBeDefined()
+    expect(request.output_config.format.type).toBe('json_schema')
+    // The schema passed through jsonSchemaOutputFormat is transformed (deep
+    // cloned), so it will not be `===` SPLIT_SCHEMA — assert its shape
+    // instead: it still constrains the reply to a `sections` array, never a
+    // free-text field.
+    expect(request.output_config.format.schema.properties).toHaveProperty('sections')
+  })
+
+  it('(call shape) never sets thinking or effort — both error on this pre-4.6-family model', async () => {
+    mockParse.mockResolvedValueOnce({
+      parsed_output: { sections: [{ speaker: 'LEADER', startBoundary: 0, endBoundary: maxIndex }] },
+    })
+
+    await splitCongregationalReading(RAW_TEXT)
+
+    const request = mockParse.mock.calls[0]![0] as Record<string, unknown>
+    expect('thinking' in request).toBe(false)
+    expect('effort' in request).toBe(false)
+    expect('effort' in (request.output_config as Record<string, unknown>)).toBe(false)
+  })
+
+  it('(call shape) sends the marked-up passage as the sole user message and forwards the app-auth header', async () => {
+    mockParse.mockResolvedValueOnce({
+      parsed_output: { sections: [{ speaker: 'LEADER', startBoundary: 0, endBoundary: maxIndex }] },
+    })
+
+    await splitCongregationalReading(RAW_TEXT)
+
+    const request = mockParse.mock.calls[0]![0] as {
+      messages: { role: string; content: string }[]
+    }
+    const options = mockParse.mock.calls[0]![1] as { headers: Record<string, string> }
+    expect(request.messages).toHaveLength(1)
+    expect(request.messages[0]!.role).toBe('user')
+    expect(request.messages[0]!.content).toContain(BOUNDARY_MARKER_OPEN)
+    expect(options.headers).toEqual({ 'X-App-Auth': 'test-token' })
+  })
+
+  it('(P-02) the system prompt never asks for or quotes passage text', async () => {
+    mockParse.mockResolvedValueOnce({
+      parsed_output: { sections: [{ speaker: 'LEADER', startBoundary: 0, endBoundary: maxIndex }] },
+    })
+
+    await splitCongregationalReading(RAW_TEXT)
+
+    const request = mockParse.mock.calls[0]![0] as { system: string }
+    expect(typeof request.system).toBe('string')
+    expect(request.system.length).toBeGreaterThan(0)
+    // The system prompt instructs the model about markers/indices only — it
+    // must never itself carry scripture words from the passage.
+    expect(request.system).not.toContain('shepherd')
+    expect(request.system).not.toContain('pastures')
+  })
+
+  it('returns null and never calls the API when the passage has no internal boundary', async () => {
+    const result = await splitCongregationalReading(NO_BOUNDARY_TEXT)
+
+    expect(result).toBeNull()
+    expect(mockParse).not.toHaveBeenCalled()
+  })
+
+  it('returns null and never calls the API when the source already contains a boundary-marker delimiter', async () => {
+    const result = await splitCongregationalReading(DELIMITER_COLLISION_TEXT)
+
+    expect(result).toBeNull()
+    expect(mockParse).not.toHaveBeenCalled()
+  })
+
+  it('returns null (not a rejected promise) when the API call rejects, and logs once', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockParse.mockRejectedValueOnce(new Error('Network error'))
+
+    const result = await splitCongregationalReading(RAW_TEXT)
+
+    expect(result).toBeNull()
+    expect(consoleErrorSpy).toHaveBeenCalledTimes(1)
+    consoleErrorSpy.mockRestore()
+  })
+
+  it('returns null when the reply has no parsed output', async () => {
+    mockParse.mockResolvedValueOnce({ parsed_output: null })
+
+    const result = await splitCongregationalReading(RAW_TEXT)
+
+    expect(result).toBeNull()
+  })
+
+  it('returns null with no partial array when a section has an out-of-range index', async () => {
+    mockParse.mockResolvedValueOnce({
+      parsed_output: {
+        sections: [
+          { speaker: 'LEADER', startBoundary: 0, endBoundary: midIndex },
+          { speaker: 'CONGREGATION', startBoundary: midIndex, endBoundary: maxIndex + 50 },
+        ],
+      },
+    })
+
+    const result = await splitCongregationalReading(RAW_TEXT)
+
+    expect(result).toBeNull()
+  })
+
+  it('returns null with no partial array when there is a gap between sections', async () => {
+    mockParse.mockResolvedValueOnce({
+      parsed_output: {
+        sections: [
+          { speaker: 'LEADER', startBoundary: 0, endBoundary: 1 },
+          { speaker: 'CONGREGATION', startBoundary: 2, endBoundary: maxIndex },
+        ],
+      },
+    })
+
+    const result = await splitCongregationalReading(RAW_TEXT)
+
+    expect(result).toBeNull()
+  })
+
+  it('(boundary identity) the highest index the validator accepts agrees with the highest marker index embedded in the prompt', async () => {
+    mockParse.mockResolvedValueOnce({
+      parsed_output: { sections: [{ speaker: 'LEADER', startBoundary: 0, endBoundary: maxIndex }] },
+    })
+
+    const result = await splitCongregationalReading(RAW_TEXT)
+
+    const request = mockParse.mock.calls[0]![0] as { messages: { content: string }[] }
+    const markerIndices = [...request.messages[0]!.content.matchAll(/⟦(\d+)⟧/g)].map((m) =>
+      Number(m[1]),
+    )
+    const highestMarkerIndexInPrompt = Math.max(...markerIndices)
+
+    // The reply's endBoundary was set to `maxIndex` above and was ACCEPTED
+    // (result is non-null) — proving the highest index the validator accepts
+    // is the same highest index embedded in the prompt, i.e. one single
+    // `boundaries` array/length was threaded through both, never recomputed.
+    expect(result).not.toBeNull()
+    expect(highestMarkerIndexInPrompt).toBe(maxIndex)
+  })
+
+  it('no failure path throws out of splitCongregationalReading', async () => {
+    mockParse.mockResolvedValueOnce({ parsed_output: { sections: 'not-an-array' } })
+
+    await expect(splitCongregationalReading(RAW_TEXT)).resolves.toBeNull()
   })
 })
