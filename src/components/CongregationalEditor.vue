@@ -32,6 +32,22 @@
           </svg>
           {{ isFetching ? 'Fetching...' : 'Fetch Passage' }}
         </button>
+        <button
+          type="button"
+          data-testid="ai-split-btn"
+          :disabled="!canAiSplit || isSplitting"
+          @click="onAiSplit"
+          class="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors border"
+          :class="canAiSplit && !isSplitting
+            ? 'text-indigo-400 bg-gray-800 border-gray-700 hover:bg-gray-700'
+            : 'text-gray-600 bg-gray-900 border-gray-800 cursor-not-allowed'"
+        >
+          <svg v-if="isSplitting" class="h-3.5 w-3.5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
+          {{ isSplitting ? 'Splitting...' : 'Split with AI' }}
+        </button>
       </div>
 
       <!-- Fetch error -->
@@ -115,9 +131,12 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { parseScriptureInput } from '@/utils/scripture'
 import { fetchPassageText } from '@/utils/esvApi'
 import { splitPassage } from '@/utils/scriptureSplitter'
+import { splitCongregationalReading } from '@/utils/claudeApi'
+import { computeBoundaries, hasSplittableBoundaries } from '@/utils/scriptureBoundaries'
 import { useAutoSave } from '@/composables/useAutoSave'
 import { useScriptureSlides } from '@/stores/scriptureSlides'
 import { useSaveStatus } from '@/stores/saveStatus'
+import { useToasts } from '@/stores/toasts'
 import SaveStatusIndicator from './SaveStatusIndicator.vue'
 import type { CongregationalSection } from '@/types/slide'
 import type { ScriptureRef } from '@/types/service'
@@ -203,6 +222,30 @@ async function onFetchPassage() {
     fetchError.value = true
   } finally {
     isFetching.value = false
+  }
+}
+
+// 34-04: the opt-in "Split with AI" affordance. Additive only — it never
+// runs automatically and never merges with the manual result; it either
+// replaces `sections.value` wholesale on success or (Task 2) leaves it
+// completely untouched and surfaces a failure toast. `canAiSplit` reuses
+// 34-01's `hasSplittableBoundaries` so a passage with no legal internal
+// division never offers (or is asked to attempt) a split.
+const isSplitting = ref(false)
+const canAiSplit = computed(
+  () => rawText.value.length > 0 && hasSplittableBoundaries(computeBoundaries(rawText.value)),
+)
+
+async function onAiSplit() {
+  if (!canAiSplit.value || isSplitting.value) return
+  isSplitting.value = true
+  try {
+    const result = await splitCongregationalReading(rawText.value)
+    if (result) {
+      sections.value = result
+    }
+  } finally {
+    isSplitting.value = false
   }
 }
 
