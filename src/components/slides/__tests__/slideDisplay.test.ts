@@ -7,10 +7,13 @@ import {
   slideFooterLabel,
   bedAudioLabel,
   deleteSlideConfirmBody,
+  slideActionMenuItems,
+  backgroundImageLabel,
+  type MenuItemKey,
 } from '../slideDisplay'
 import type { ServiceSlot, SlotKind } from '@/types/service'
 import type { Slide } from '@/types/slide'
-import type { GroupSlideEntry } from '@/types/slideGroup'
+import type { GroupSlideEntry, SourceRef } from '@/types/slideGroup'
 
 const ALL_KINDS: SlotKind[] = ['SONG', 'SCRIPTURE', 'PRAYER', 'MESSAGE', 'HYMN', 'IMPORTED']
 
@@ -370,6 +373,134 @@ describe('slideDisplay', () => {
       expect(body.toLowerCase()).not.toContain('group')
       expect(body.toLowerCase()).not.toContain('bed')
       expect(body.toLowerCase()).not.toContain('shared')
+    })
+  })
+
+  describe('backgroundImageLabel', () => {
+    it('extracts the filename from a Firebase Storage download URL', () => {
+      const url =
+        'https://firebasestorage.googleapis.com/v0/b/bucket/o/orgs%2Forg1%2Fbackgrounds%2Fid1%2Fstage_photo.jpg?alt=media&token=abc'
+      expect(backgroundImageLabel(url)).toBe('stage_photo.jpg')
+    })
+
+    it('falls back to a generic label for a malformed URL', () => {
+      expect(backgroundImageLabel('%')).toBe('Background image')
+    })
+  })
+
+  describe('slideActionMenuItems (R063, 33-UI-SPEC.md §3)', () => {
+    function keysOf(entry: GroupSlideEntry, planItemKind: SlotKind | undefined, canMutate: boolean): MenuItemKey[] {
+      return slideActionMenuItems(entry, planItemKind, canMutate).map((item) => item.key)
+    }
+
+    function makeMenuEntry(sourceRef: SourceRef, overrides: Partial<GroupSlideEntry> = {}): GroupSlideEntry {
+      return { id: 'entry-1', order: 0, sourceRef, ...overrides }
+    }
+
+    it('P-03: a lyric entry with canMutate: true returns exactly edit-details and edit-in-song', () => {
+      const entry = makeMenuEntry({ kind: 'lyric', songId: 'song-1', sectionId: 'sec-1' })
+      expect(keysOf(entry, 'SONG', true)).toEqual(['edit-details', 'edit-in-song'])
+    })
+
+    it('P-03: a copyright entry with canMutate: true returns exactly edit-details and edit-in-song', () => {
+      const entry = makeMenuEntry({ kind: 'copyright', songId: 'song-1' })
+      expect(keysOf(entry, 'SONG', true)).toEqual(['edit-details', 'edit-in-song'])
+    })
+
+    it('a scripture entry with mutation allowed returns edit-details, edit-in-scripture, duplicate, delete', () => {
+      const entry = makeMenuEntry({ kind: 'scripture' })
+      expect(keysOf(entry, 'SCRIPTURE', true)).toEqual([
+        'edit-details',
+        'edit-in-scripture',
+        'duplicate',
+        'delete',
+      ])
+    })
+
+    it('a hand-authored text entry with a defined body returns edit-details, edit-lyrics, duplicate, delete', () => {
+      const entry = makeMenuEntry({ kind: 'text', body: 'Please stand.' })
+      expect(keysOf(entry, 'PRAYER', true)).toEqual(['edit-details', 'edit-lyrics', 'duplicate', 'delete'])
+    })
+
+    it('a text entry with undefined body includes edit-lyrics for planItemKind PRAYER', () => {
+      const entry = makeMenuEntry({ kind: 'text' })
+      expect(keysOf(entry, 'PRAYER', true)).toContain('edit-lyrics')
+    })
+
+    it('a text entry with undefined body includes edit-lyrics for planItemKind MESSAGE', () => {
+      const entry = makeMenuEntry({ kind: 'text' })
+      expect(keysOf(entry, 'MESSAGE', true)).toContain('edit-lyrics')
+    })
+
+    it('Hymn discriminator: a still-pristine Hymn text entry (no body) excludes edit-lyrics; a hand-added blank one (body: "") includes it', () => {
+      const pristine = makeMenuEntry({ kind: 'text' })
+      expect(keysOf(pristine, 'HYMN', true)).toEqual(['edit-details', 'duplicate', 'delete'])
+      expect(keysOf(pristine, 'HYMN', true)).not.toContain('edit-lyrics')
+
+      const handAdded = makeMenuEntry({ kind: 'text', body: '' })
+      expect(keysOf(handAdded, 'HYMN', true)).toContain('edit-lyrics')
+    })
+
+    it('an imported entry returns edit-details, duplicate, delete', () => {
+      const entry = makeMenuEntry({ kind: 'imported', importId: 'import-1', innerSlideId: 'inner-1' })
+      expect(keysOf(entry, 'IMPORTED', true)).toEqual(['edit-details', 'duplicate', 'delete'])
+    })
+
+    it('a video entry returns edit-details, duplicate, delete', () => {
+      const entry = makeMenuEntry({ kind: 'video', videoSrc: 'https://example.com/clip.mp4' })
+      expect(keysOf(entry, 'IMPORTED', true)).toEqual(['edit-details', 'duplicate', 'delete'])
+    })
+
+    it('mutation not allowed: duplicate and delete are absent entirely from every kind, not present-and-disabled', () => {
+      const kinds: Array<{ sourceRef: SourceRef; planItemKind: SlotKind }> = [
+        { sourceRef: { kind: 'scripture' }, planItemKind: 'SCRIPTURE' },
+        { sourceRef: { kind: 'text', body: 'x' }, planItemKind: 'PRAYER' },
+        { sourceRef: { kind: 'imported', importId: 'i', innerSlideId: 'x' }, planItemKind: 'IMPORTED' },
+        { sourceRef: { kind: 'video', videoSrc: 'x' }, planItemKind: 'IMPORTED' },
+      ]
+      for (const { sourceRef, planItemKind } of kinds) {
+        const keys = keysOf(makeMenuEntry(sourceRef), planItemKind, false)
+        expect(keys).not.toContain('duplicate')
+        expect(keys).not.toContain('delete')
+      }
+    })
+
+    it('backstop: planItemKind undefined with an undefined body yields a list without edit-lyrics', () => {
+      const entry = makeMenuEntry({ kind: 'text' })
+      expect(keysOf(entry, undefined, true)).not.toContain('edit-lyrics')
+    })
+
+    it('backstop: an unknown source kind yields exactly one item, edit-details — the most conservative list', () => {
+      const entry = makeMenuEntry({ kind: 'unknown-future-kind' } as unknown as SourceRef)
+      expect(keysOf(entry, 'PRAYER', true)).toEqual(['edit-details'])
+    })
+
+    it('every kind\'s list is non-empty', () => {
+      const entries: SourceRef[] = [
+        { kind: 'lyric', songId: 's', sectionId: 'sec' },
+        { kind: 'copyright', songId: 's' },
+        { kind: 'scripture' },
+        { kind: 'text' },
+        { kind: 'imported', importId: 'i', innerSlideId: 'x' },
+        { kind: 'video', videoSrc: 'x' },
+      ]
+      for (const sourceRef of entries) {
+        expect(keysOf(makeMenuEntry(sourceRef), undefined, false).length).toBeGreaterThan(0)
+      }
+    })
+
+    it('every item carries a tone of default, nav or destructive', () => {
+      const entry = makeMenuEntry({ kind: 'scripture' })
+      const items = slideActionMenuItems(entry, 'SCRIPTURE', true)
+      for (const item of items) {
+        expect(['default', 'nav', 'destructive']).toContain(item.tone)
+      }
+      const navItem = slideActionMenuItems(makeMenuEntry({ kind: 'scripture' }), 'SCRIPTURE', true).find(
+        (item) => item.key === 'edit-in-scripture',
+      )
+      expect(navItem?.tone).toBe('nav')
+      const deleteItem = items.find((item) => item.key === 'delete')
+      expect(deleteItem?.tone).toBe('destructive')
     })
   })
 })

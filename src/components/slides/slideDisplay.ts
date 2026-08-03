@@ -13,6 +13,22 @@ import type { GroupSlideEntry } from '@/types/slideGroup'
 import { slotLabel } from '@/utils/slotTypes'
 import { formatScriptureReference, scriptureRefFromSlot } from '@/utils/scripture'
 
+/** One key in the 3-dot slide action menu (33-UI-SPEC.md § Copywriting Contract). */
+export type MenuItemKey =
+  | 'edit-details'
+  | 'edit-lyrics'
+  | 'edit-in-song'
+  | 'edit-in-scripture'
+  | 'duplicate'
+  | 'delete'
+
+/** One rendered row of `SlideActionMenu.vue` — `slideActionMenuItems` is the only producer. */
+export interface MenuItem {
+  key: MenuItemKey
+  label: string
+  tone: 'default' | 'nav' | 'destructive'
+}
+
 /**
  * Static, fully-spelled-out kind-badge class map keyed by `SlotKind` — per
  * 25-UI-SPEC.md's Color § "Kind badge color map". Tailwind v4 silently
@@ -189,5 +205,131 @@ export function bedAudioLabel(url: string): string {
     return last && last.trim() ? last : 'Group music'
   } catch {
     return 'Group music'
+  }
+}
+
+/**
+ * Extracts a human-readable filename from a Firebase Storage download URL,
+ * structurally mirroring `bedAudioLabel` above (split off the query string,
+ * `decodeURIComponent`, take the last path segment, try/catch). Defined as
+ * its own function rather than reusing `bedAudioLabel` because the fallback
+ * text differs — a background is never "Group music" — per 33-UI-SPEC.md's
+ * Task 1 behavior contract.
+ */
+export function backgroundImageLabel(url: string): string {
+  try {
+    const withoutQuery = url.split('?')[0] ?? url
+    const decoded = decodeURIComponent(withoutQuery)
+    const segments = decoded.split('/')
+    const last = segments[segments.length - 1]
+    return last && last.trim() ? last : 'Background image'
+  } catch {
+    return 'Background image'
+  }
+}
+
+/** Fixed enum labels, verbatim from 33-UI-SPEC.md § Copywriting Contract — never user-supplied text. */
+const MENU_ITEM_LABELS: Record<MenuItemKey, string> = {
+  'edit-details': 'Edit details',
+  'edit-lyrics': 'Edit lyrics',
+  'edit-in-song': 'Edit in song',
+  'edit-in-scripture': 'Edit in scripture',
+  duplicate: 'Duplicate',
+  delete: 'Delete Slide',
+}
+
+function menuItemToneFor(key: MenuItemKey): MenuItem['tone'] {
+  if (key === 'edit-in-song' || key === 'edit-in-scripture') return 'nav'
+  if (key === 'delete') return 'destructive'
+  return 'default'
+}
+
+function menuItem(key: MenuItemKey): MenuItem {
+  return { key, label: MENU_ITEM_LABELS[key], tone: menuItemToneFor(key) }
+}
+
+/**
+ * Pure per-kind 3-dot slide action menu item list (R063), matching
+ * 33-UI-SPEC.md § Phase-Specific Component Contracts §3's table exhaustively,
+ * including row 3a's Hymn refinement. Synchronous, no store/composable reads —
+ * follows this file's established pure-helper convention (`KIND_BADGE_CLASSES`,
+ * `deleteSlideConfirmBody`). Item order is fixed and identical across kinds for
+ * shared items: edit-details, then edit-lyrics, then the navigation item, then
+ * duplicate, then delete.
+ *
+ * ★ Deliberate divergence from §3's stated 4-parameter signature: the fourth
+ * parameter `canMutateBackground` is NOT threaded through. Nothing in §3's
+ * table branches on it — per §11, "Edit details" is unconditional, since the
+ * drawer it opens is a view affordance too — so it would be an unused
+ * parameter the lint config's default `args: 'after-used'` rule would flag.
+ * Do not "restore" it; background-mutation gating lives entirely inside
+ * `EditSlideDrawer.vue`'s own `canMutateBackground` computed.
+ *
+ * ★ The Hymn discriminator (§3 row 3a): `sourceRef.kind` ALONE cannot express
+ * "hand-authored". A HYMN group's auto-derived text slide is also `kind:
+ * 'text'`, created by `slideGroupMaterializer.ts` with NO `body` at all, while
+ * `SlideGrid.vue`'s add-slide path always sets `body: ''`. The discriminator
+ * is therefore `entry.sourceRef.body !== undefined` combined with
+ * `planItemKind`: offer `edit-lyrics` when the body is defined (any plan item
+ * kind), or when the body is undefined and the plan item kind is `PRAYER` or
+ * `MESSAGE`. Withhold it when the body is undefined and every other case
+ * (including `HYMN` and `undefined` itself) — that slide's canonical source is
+ * the Service Order tab's own Hymn fields, and a second silently-diverging
+ * editor here would create exactly the shadow copy the song/scripture
+ * read-only routing exists to prevent.
+ *
+ * ★ Backstops: when `planItemKind` is `undefined`, the conservative branch
+ * (no `edit-lyrics`) is taken automatically by the same condition above — a
+ * partially-resolved plan item never grants an affordance the phase
+ * deliberately withholds. When `sourceRef.kind` matches no known union
+ * member, the `default` arm returns `[{ key: 'edit-details', ... }]` — the
+ * most conservative list, never the most permissive — implemented via an
+ * explicit `default` rather than relying on exhaustiveness alone, since a
+ * future union member would otherwise fall through to nothing.
+ *
+ * ★ Prohibition P-03 is structural here: `lyric` and `copyright` entries are
+ * always inside a SONG group (R054), and their rows never include
+ * `edit-lyrics`, `duplicate` or `delete` under any argument combination — not
+ * even when `canMutate` is true. Both branches return immediately after
+ * pushing their two fixed items, so `canMutate` is never consulted for them.
+ */
+export function slideActionMenuItems(
+  entry: GroupSlideEntry,
+  planItemKind: SlotKind | undefined,
+  canMutate: boolean,
+): MenuItem[] {
+  const kind = entry.sourceRef.kind
+  switch (kind) {
+    case 'lyric':
+    case 'copyright':
+      // P-03/R054: always inside a SONG group — canMutate is never consulted.
+      return [menuItem('edit-details'), menuItem('edit-in-song')]
+
+    case 'scripture': {
+      const items = [menuItem('edit-details'), menuItem('edit-in-scripture')]
+      if (canMutate) items.push(menuItem('duplicate'), menuItem('delete'))
+      return items
+    }
+
+    case 'text': {
+      const items = [menuItem('edit-details')]
+      const hasBody = entry.sourceRef.body !== undefined
+      const offersEditLyrics = hasBody || planItemKind === 'PRAYER' || planItemKind === 'MESSAGE'
+      if (offersEditLyrics) items.push(menuItem('edit-lyrics'))
+      if (canMutate) items.push(menuItem('duplicate'), menuItem('delete'))
+      return items
+    }
+
+    case 'imported':
+    case 'video': {
+      const items = [menuItem('edit-details')]
+      if (canMutate) items.push(menuItem('duplicate'), menuItem('delete'))
+      return items
+    }
+
+    default:
+      // Backstop: an unrecognised/future sourceRef.kind falls back to the
+      // single most conservative item, never a permissive branch.
+      return [menuItem('edit-details')]
   }
 }
