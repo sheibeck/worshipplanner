@@ -4,6 +4,7 @@ import { ref, reactive, computed } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import CongregationalEditor from '../CongregationalEditor.vue'
 import { useSaveStatus } from '@/stores/saveStatus'
+import { useToasts } from '@/stores/toasts'
 import type { ScriptureSlide, CongregationalSection } from '@/types/slide'
 import type { ScriptureReading } from '@/types/scriptureReading'
 
@@ -78,6 +79,15 @@ vi.mock('@/utils/esvApi', () => ({
 const mockSplitPassage = vi.fn()
 vi.mock('@/utils/scriptureSplitter', () => ({
   splitPassage: (...args: unknown[]) => mockSplitPassage(...args),
+}))
+
+// 34-04: splitCongregationalReading is mocked wholesale — this test file
+// exercises the component's wiring (gating, wholesale replace, failure
+// toast), not the already-tested-elsewhere (34-03) call shape/validation
+// behavior of the real function.
+const mockSplitCongregationalReading = vi.fn()
+vi.mock('@/utils/claudeApi', () => ({
+  splitCongregationalReading: (...args: unknown[]) => mockSplitCongregationalReading(...args),
 }))
 
 function makeSampleSlides(): ScriptureSlide[] {
@@ -395,5 +405,137 @@ describe('CongregationalEditor', () => {
     expect(wrapper.find('[data-testid="preview-label-0"]').text()).toBe('Leader:')
     await wrapper.find('[data-testid="speaker-toggle-0"]').trigger('click')
     expect(wrapper.find('[data-testid="preview-label-0"]').text()).toBe('Congregation:')
+  })
+
+  // ── 34-04 Task 1: the opt-in "Split with AI" affordance ────────────────────
+
+  describe('AI split (34-04, Task 1: affordance + success path)', () => {
+    beforeEach(() => {
+      mockSplitCongregationalReading.mockReset()
+    })
+
+    it('is the only new data-testid, and is disabled before a passage has been fetched', () => {
+      const wrapper = mountEditor()
+      const btn = wrapper.find('[data-testid="ai-split-btn"]')
+      expect(btn.exists()).toBe(true)
+      expect(btn.attributes('disabled')).toBeDefined()
+    })
+
+    it('is enabled after a fetch whose text has internal boundaries', async () => {
+      const wrapper = mountEditor()
+      await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
+      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="ai-split-btn"]').attributes('disabled')).toBeUndefined()
+    })
+
+    it('empty edge: stays disabled and issues no split call when the fetched text offers no internal boundary, leaving the manual sections untouched', async () => {
+      mockFetchPassageText.mockResolvedValueOnce('no boundaries here at all')
+      const wrapper = mountEditor()
+      await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
+      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
+      await flushPromises()
+
+      const manualToggleCount = wrapper.findAll('[data-testid^="speaker-toggle-"]').length
+      const btn = wrapper.find('[data-testid="ai-split-btn"]')
+      expect(btn.attributes('disabled')).toBeDefined()
+
+      await btn.trigger('click')
+      await flushPromises()
+
+      expect(mockSplitCongregationalReading).not.toHaveBeenCalled()
+      expect(wrapper.findAll('[data-testid^="speaker-toggle-"]').length).toBe(manualToggleCount)
+    })
+
+    it('disables the button and switches its label while a split is in flight', async () => {
+      const wrapper = mountEditor()
+      await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
+      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
+      await flushPromises()
+
+      let resolveSplit!: (value: CongregationalSection[] | null) => void
+      mockSplitCongregationalReading.mockReturnValueOnce(
+        new Promise<CongregationalSection[] | null>((resolve) => {
+          resolveSplit = resolve
+        }),
+      )
+
+      const clickPromise = wrapper.find('[data-testid="ai-split-btn"]').trigger('click')
+      await Promise.resolve()
+      await Promise.resolve()
+
+      const inFlightBtn = wrapper.find('[data-testid="ai-split-btn"]')
+      expect(inFlightBtn.attributes('disabled')).toBeDefined()
+      expect(inFlightBtn.text()).toContain('Splitting...')
+
+      resolveSplit([
+        { speaker: 'LEADER', text: 'a' },
+        { speaker: 'CONGREGATION', text: 'b' },
+      ])
+      await clickPromise
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="ai-split-btn"]').text()).not.toContain('Splitting...')
+    })
+
+    it('on success, replaces sections wholesale in the returned order — never merged, appended, or re-sorted', async () => {
+      const wrapper = mountEditor()
+      await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
+      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
+      await flushPromises()
+
+      const aiSections: CongregationalSection[] = [
+        { speaker: 'CONGREGATION', text: 'Second thing first', verseRange: 'v. 2' },
+        { speaker: 'LEADER', text: 'Then this', verseRange: 'v. 1' },
+      ]
+      mockSplitCongregationalReading.mockResolvedValueOnce(aiSections)
+
+      await wrapper.find('[data-testid="ai-split-btn"]').trigger('click')
+      await flushPromises()
+
+      const toggles = wrapper.findAll('[data-testid^="speaker-toggle-"]')
+      expect(toggles).toHaveLength(2)
+      expect(wrapper.find('[data-testid="preview-section-0"]').text()).toContain('Second thing first')
+      expect(wrapper.find('[data-testid="preview-section-1"]').text()).toContain('Then this')
+      expect(wrapper.find('[data-testid="preview-label-0"]').text()).toBe('Congregation:')
+      expect(wrapper.find('[data-testid="preview-label-1"]').text()).toBe('Leader:')
+    })
+
+    it('encoding backstop: rendered section text is strictly === to the mocked section text, including curly quotes and an em dash', async () => {
+      const wrapper = mountEditor()
+      await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
+      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
+      await flushPromises()
+
+      const NON_ASCII_TEXT = '“He restores—my soul,” said the shepherd’s voice'
+      mockSplitCongregationalReading.mockResolvedValueOnce([
+        { speaker: 'LEADER', text: NON_ASCII_TEXT },
+      ])
+
+      await wrapper.find('[data-testid="ai-split-btn"]').trigger('click')
+      await flushPromises()
+
+      const rendered = wrapper.find('[data-testid="preview-section-0"] span:last-child')
+      expect(rendered.text() === NON_ASCII_TEXT).toBe(true)
+    })
+
+    it('a successful split leaves the manual speaker-toggle affordance working on the new sections', async () => {
+      const wrapper = mountEditor()
+      await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
+      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
+      await flushPromises()
+
+      mockSplitCongregationalReading.mockResolvedValueOnce([
+        { speaker: 'LEADER', text: 'a' },
+        { speaker: 'CONGREGATION', text: 'b' },
+      ])
+      await wrapper.find('[data-testid="ai-split-btn"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="speaker-toggle-0"]').text()).toBe('Leader')
+      await wrapper.find('[data-testid="speaker-toggle-0"]').trigger('click')
+      expect(wrapper.find('[data-testid="speaker-toggle-0"]').text()).toBe('Congregation')
+    })
   })
 })
