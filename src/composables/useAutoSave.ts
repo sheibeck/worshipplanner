@@ -130,6 +130,17 @@ export function useAutoSave(
    * Only saves if there is a pending change (status is 'pending').
    */
   async function flush(): Promise<void> {
+    // CR-02: check for an inflight save BEFORE clearing the debounce timer,
+    // not after. A newer mutation can have set status back to 'pending' and
+    // armed its own follow-up timer while a PREVIOUS save is still in
+    // flight; clearing the timer unconditionally here — as this used to —
+    // destroys that follow-up timer, and then the `if (saving) return`
+    // below no-ops without ever performing a save. The edit becomes
+    // unreachable: no timer is armed, and this call already returned. By
+    // returning here first, the already-armed timer survives to retry the
+    // edit on its own schedule once the inflight save clears `saving`.
+    if (saving) return
+
     clearDebounceTimer()
 
     // Only flush if there is something pending
@@ -140,9 +151,6 @@ export function useAutoSave(
       status.value = 'idle'
       return
     }
-
-    // Wait for any inflight save to complete
-    if (saving) return
 
     saving = true
     status.value = 'saving'

@@ -481,4 +481,49 @@ describe('useAutoSave', () => {
     expect(status.value).toBe('pending')
   })
 
+  it("CR-02: flush() does not cancel a newer edit's just-armed timer when a previous save is still in flight", async () => {
+    const source = ref({ count: 0 })
+    let resolveFirst: () => void
+    let callCount = 0
+    const saveFn = vi.fn().mockImplementation(() => {
+      callCount++
+      if (callCount === 1) {
+        return new Promise<void>((resolve) => { resolveFirst = resolve })
+      }
+      return Promise.resolve()
+    })
+    const { status, flush } = useAutoSave(() => source.value, saveFn, undefined, { debounceMs: 100 })
+
+    // Skip initialized guard
+    source.value = { count: 1 }
+    await nextTick()
+
+    // First edit -> debounce -> saving (held open)
+    source.value = { count: 2 }
+    await nextTick()
+    await vi.advanceTimersByTimeAsync(100)
+    expect(saveFn).toHaveBeenCalledTimes(1)
+    expect(status.value).toBe('saving')
+
+    // A second, distinct edit lands while the first save is still in
+    // flight — it arms its own follow-up timer.
+    source.value = { count: 3 }
+    await nextTick()
+    expect(status.value).toBe('pending')
+
+    // flush() is called while the first save is still in flight (e.g.
+    // onMarkAsPlanned). Before the fix this cleared the just-armed timer
+    // FIRST, then no-op'd on `if (saving) return` — the edit becomes
+    // unreachable: no timer is armed, and this call already returned.
+    await flush()
+
+    // The armed timer must have survived flush()'s no-op.
+    resolveFirst!()
+    await vi.advanceTimersByTimeAsync(0)
+    await vi.advanceTimersByTimeAsync(100)
+
+    expect(saveFn).toHaveBeenCalledTimes(2)
+    expect(status.value).toBe('saved')
+  })
+
 })

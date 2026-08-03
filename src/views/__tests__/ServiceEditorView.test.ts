@@ -4352,4 +4352,52 @@ describe('ServiceEditorView - 32-REVIEW: CR-01/CR-02/CR-03', () => {
     expect(payload.notes).toBe('edit A')
   })
 
+  it("CR-02: Mark as Planned's flush() does not destroy a newer edit's only retry path while an earlier save is still in flight", async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    const vm = wrapper.vm as unknown as {
+      localService: { notes: string; name: string; status: string }
+      onMarkAsPlanned: () => Promise<void>
+    }
+
+    await warmUp(wrapper, vm)
+
+    // Edit A: hold its write open.
+    let resolveA!: () => void
+    mockUpdateService.mockImplementationOnce(
+      () => new Promise<void>((resolve) => { resolveA = resolve }),
+    )
+    vm.localService.notes = 'edit A'
+    await wrapper.vm.$nextTick()
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    await flushPromises()
+    expect(mockUpdateService).toHaveBeenCalledTimes(1)
+
+    // Edit B lands while A's write is still in flight — arms its own timer.
+    vm.localService.name = 'edit B while A is still in flight'
+    await wrapper.vm.$nextTick()
+
+    // Mark as Planned is clicked now — flush() runs while A is still
+    // saving. The transition itself is made to fail so applyTransitionLocally
+    // never runs and the (separate, already-tested) cancel-on-lock watcher
+    // cannot be what clears B's timer — isolating flush()'s own behavior.
+    mockMarkAsPlanned.mockRejectedValueOnce(new Error('transition failed'))
+    await vm.onMarkAsPlanned()
+    expect(vm.localService.status).toBe('draft')
+
+    // A's write resolves.
+    resolveA()
+    await flushPromises()
+
+    // Before the fix, flush() cleared B's just-armed timer up front, then
+    // no-op'd on `if (saving) return` — B became unreachable by any
+    // mechanism, with no error, no toast, and the service never even locked.
+    mockUpdateService.mockClear()
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    await flushPromises()
+
+    expect(mockUpdateService).toHaveBeenCalledTimes(1)
+    const payload = mockUpdateService.mock.calls[0]![1] as { name?: string }
+    expect(payload.name).toBe('edit B while A is still in flight')
+  })
 })
