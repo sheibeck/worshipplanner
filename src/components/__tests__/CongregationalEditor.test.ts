@@ -657,7 +657,7 @@ describe('CongregationalEditor', () => {
     it('does not add any new data-testid beyond ai-split-btn', () => {
       const wrapper = mountEditor()
       const html = wrapper.html()
-      const testIds = [...html.matchAll(/data-testid="([^"]+)"/g)].map((m) => m[1])
+      const testIds = [...html.matchAll(/data-testid="([^"]+)"/g)].map((m) => m[1]!)
       const knownPrefixes = [
         'reference-input',
         'fetch-btn',

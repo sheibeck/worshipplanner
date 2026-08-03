@@ -148,6 +148,7 @@ const props = defineProps<{
 
 const store = useScriptureSlides()
 const saveStatus = useSaveStatus()
+const toasts = useToasts()
 
 const referenceText = ref('')
 const isFetching = ref(false)
@@ -236,6 +237,9 @@ const canAiSplit = computed(
   () => rawText.value.length > 0 && hasSplittableBoundaries(computeBoundaries(rawText.value)),
 )
 
+const AI_SPLIT_FAILURE_TEXT =
+  "Couldn't split this passage — your reading is unchanged. Build it by hand or try again."
+
 async function onAiSplit() {
   if (!canAiSplit.value || isSplitting.value) return
   isSplitting.value = true
@@ -243,7 +247,16 @@ async function onAiSplit() {
     const result = await splitCongregationalReading(rawText.value)
     if (result) {
       sections.value = result
+    } else {
+      toasts.push(AI_SPLIT_FAILURE_TEXT)
     }
+  } catch {
+    // R064 "additive and never blocking", in code: a failed split must leave
+    // the editor exactly as usable as it was a moment before — sections.value
+    // is left completely untouched (no clearing, no placeholder, no partial
+    // array) and the only externally visible effect of a failure is this one
+    // toast.
+    toasts.push(AI_SPLIT_FAILURE_TEXT)
   } finally {
     isSplitting.value = false
   }
