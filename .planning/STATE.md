@@ -477,7 +477,62 @@ action bar were deferred from Phase 33 into 36 by the ROADMAP's own reasoning.
 
 **Also still open from this run:** Phase 34's reachability gap (`/gsd-plan-phase 34 --gaps`) — see below.
 
-## ⏸ RUN STATE — autonomous run in progress, 2026-08-03 (written for compaction safety)
+## ✅ v1.4 AUTONOMOUS RUN COMPLETE — 2026-08-03
+
+**Scope run:** Phases 32, 33, 34, 35, 37. **Phase 36 deferred by owner decision** (see above).
+
+| Phase | Result |
+|---|---|
+| 32 Save Reliability | ✅ complete · 3/3 must-haves · **3 Critical review findings fixed** |
+| 33 Backgrounds & Slide Editing | ✅ complete · 5/5 criteria, 7/7 requirements · 4 findings fixed |
+| 34 LLM Scripture Split | ⚠ **PARTIAL** · 7/8 · structural guarantee done, **feature unreachable** |
+| 35 Presentation Correctness | ✅ complete · **5/5 criteria** · 1 Warning + 1 Info fixed |
+| 37 PPTX Server-Side Rendering | ⚠ **PARTIAL** · 3/4 · pipeline built & tested, **undeployed by instruction** |
+
+**Suites at end of run:** app 2221/2222 scoped (1 = `RosterView.test.ts` baseline) ·
+`functions/` 70/70 · `render-service/` 39/39 · `npm run type-check` clean · `npm run build` succeeds.
+
+### Phase 37 — built, tested, NOT deployed
+
+**`37-VERIFICATION.md` is `human_needed`. R062 is `[~]` partial — the honest call, confirmed by the
+verifier.** Criterion 1 ("displays as a true visual rendering") is **uncertain, not failed**: the
+pipeline is complete and tested, but the service is **undeployed by explicit owner instruction** and
+**no UI consumes the rendered images** (37-CONTEXT.md scoped client-side display out).
+
+**★ NOTHING WAS DEPLOYED, CONTAINERIZED, OR PROVISIONED.** Independently audited twice — every
+`gcloud` / `firebase deploy` / `docker build` hit across all Phase 37 commits is documentation prose.
+**`render-service/DEPLOY.md` is the handoff**: both IAM directions, Artifact Registry, region,
+memory/CPU, timeout, concurrency, and env vars including `STORAGE_BUCKET` and
+`PPTX_RENDER_CLEANUP_ENABLED` (documented as safe when unset).
+
+**⚠ A gap in this phase's treatment, stated plainly: no code review was run for Phase 37.** Phases 32,
+33 and 35 each got one and each surfaced real defects. Phase 37 was skipped for orchestrator context
+budget, not because it was judged unnecessary. **Consider `/gsd-code-review 37`** — its test discipline
+was unusually strong (three separate load-bearing proofs), but that is not a substitute.
+
+**⚠ Client-side display of rendered images has NO HOME in the roadmap.** It is not deferred to a later
+phase — no phase picks it up (36 is unrelated UI work). It is an owner-decision item, recorded as
+`PENDING-VERIFICATION.md` items 37.1/37.4.
+
+**Two package-legitimacy checkpoints are DEFERRED, never approved** — `express`,
+`@google-cloud/storage`, `@types/*` (37-01) and `google-auth-library` (37-03). Item 37.5.
+
+**⚠ Bare `npx vitest run src/` is contaminated** — it picks up `render-service/src/render.test.ts` via
+substring matching and fails on a Vitest version mismatch (root `4.0.18` vs `4.1.10`). **Not a
+regression.** Scope the app run, or run each suite from its own directory.
+
+### What needs the owner, in priority order
+
+1. **`/gsd-plan-phase 34 --gaps`** — the scripture split is unreachable. R047 explicitly handed the
+   mount to Phase 34 and it wasn't done. Direction is already decided (slot-as-source-of-truth): extend
+   `ScriptureSlot` with `congregationalSections` through `slideGroupMaterializer`, then mount.
+2. **`/gsd-autonomous --only 36`** — now unblocked; the wireframe's Turn 3 covers the Service Order
+   rebuild. Its action-bar half (R068) remains original design work.
+3. **`.planning/PENDING-VERIFICATION.md`** — the human-verify pass across Phases 31-35 and 37.
+4. **`render-service/DEPLOY.md`** — when you want the renderer live.
+5. **CCLI's primary licence text** — failed retrieval twice; R060's criterion isn't final without it.
+
+## ⏸ RUN STATE (superseded by the completion block above — kept for provenance)
 
 **Owner scoped this run to Phases 35 and 37; Phase 36 deferred (see the decision above).**
 
