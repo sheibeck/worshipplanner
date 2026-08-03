@@ -365,14 +365,21 @@ describe('assembleSlideshow — R060 copyright bracket (fallback path)', () => {
     for (const assembled of result) {
       expect(isCopyrightSlide(assembled)).toBe(true)
       const copyright = assembled.slide as CopyrightSlide
-      expect(copyright.title).not.toBe('undefined')
-      expect(copyright.ccliSongNumber).not.toBe('undefined')
-      expect(copyright.ccliLicenseNumber).not.toBe('undefined')
+      // Assert the actual empty-string identity the fixture sets, not a
+      // stringified guess — `.toBe('')` fails for both the real `undefined`
+      // value and the literal string `"undefined"`, whereas
+      // `.not.toBe('undefined')` is trivially satisfied by a real `undefined`
+      // (Object.is(undefined, 'undefined') === false).
+      expect(copyright.title).toBe('')
+      expect(copyright.ccliSongNumber).toBe('')
+      expect(copyright.ccliLicenseNumber).toBe('')
       for (const line of copyright.copyrightLines) {
-        expect(line).not.toBe('undefined')
+        expect(line).not.toBeUndefined()
+        expect(typeof line).toBe('string')
       }
       for (const author of copyright.authors) {
-        expect(author).not.toBe('undefined')
+        expect(author).not.toBeUndefined()
+        expect(typeof author).toBe('string')
       }
     }
   })
