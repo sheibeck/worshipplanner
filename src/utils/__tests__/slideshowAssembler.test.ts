@@ -257,6 +257,135 @@ describe('assembleSlideshow — song resolution', () => {
   })
 })
 
+// R060 — the fallback (not-yet-materialized) path's copyright bracket. Every
+// song group carries a copyright entry at its first and last position as a
+// deliberate safety margin beyond the documented convention (at least once
+// per song) — never framed here as a licensing mandate. `emitFallback` is
+// called once before the section loop and once after it
+// (slideshowAssembler.ts:379,393), neither gated on `order.length`, so this
+// block PINS existing, already-shipped behavior; it adds no new emission.
+describe('assembleSlideshow — R060 copyright bracket (fallback path)', () => {
+  // Classifies an assembled slide as "copyright" by the presence of
+  // `ccliSongNumber` on its slide payload — NOT by `contentKind`, which is
+  // `'lyric'` for both `CopyrightSlide` and `LyricSlide` (src/types/slide.ts)
+  // and would therefore classify every lyric slide as copyright too.
+  function isCopyrightSlide(assembled: { slide: unknown }): boolean {
+    return Object.prototype.hasOwnProperty.call(assembled.slide as object, 'ccliSongNumber')
+  }
+
+  function copyrightIndices(result: { slide: unknown }[]): number[] {
+    return result.reduce<number[]>((acc, assembled, index) => {
+      if (isCopyrightSlide(assembled)) acc.push(index)
+      return acc
+    }, [])
+  }
+
+  it('an empty performanceOrder still assembles exactly 2 adjacent copyright slides, nothing between them', () => {
+    const slot = songSlot({ songId: 'song-1' })
+    const service = makeService([slot])
+    const lyrics = makeSongLyrics({ performanceOrder: [] })
+    const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result).toHaveLength(2)
+    expect(isCopyrightSlide(result[0]!)).toBe(true)
+    expect(isCopyrightSlide(result[1]!)).toBe(true)
+  })
+
+  it('a one-section song assembles to copyright, lyric, copyright — the two copyright slides never merge', () => {
+    const slot = songSlot({ songId: 'song-1' })
+    const service = makeService([slot])
+    const lyrics = makeSongLyrics({ performanceOrder: ['verse-1'] })
+    const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result).toHaveLength(3)
+    expect(isCopyrightSlide(result[0]!)).toBe(true)
+    expect(isCopyrightSlide(result[1]!)).toBe(false)
+    expect((result[1]!.slide as LyricSlide).sectionId).toBe('verse-1')
+    expect(isCopyrightSlide(result[2]!)).toBe(true)
+  })
+
+  it.each([0, 1, 2, 5])(
+    'for an order of length %i, the first and last assembled slides are copyright and nothing strictly between them is',
+    (orderLength) => {
+      const sections = Array.from({ length: Math.max(orderLength, 2) }, (_, i) => ({
+        id: `verse-${i}`,
+        label: `Verse ${i}`,
+        lines: [`Line ${i}`],
+      }))
+      const performanceOrder = sections.slice(0, orderLength).map((s) => s.id)
+      const slot = songSlot({ songId: 'song-1' })
+      const service = makeService([slot])
+      const lyrics = makeSongLyrics({ sections, performanceOrder })
+      const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
+
+      const result = assembleSlideshow(service, inputs)
+
+      expect(result).toHaveLength(orderLength + 2)
+      expect(isCopyrightSlide(result[0]!)).toBe(true)
+      expect(isCopyrightSlide(result[result.length - 1]!)).toBe(true)
+      for (let i = 1; i < result.length - 1; i++) {
+        expect(isCopyrightSlide(result[i]!)).toBe(false)
+      }
+    },
+  )
+
+  it('the bracket is structural, not sorted: copyright indices are exactly [0, length - 1]', () => {
+    const slot = songSlot({ songId: 'song-1' })
+    const service = makeService([slot])
+    const lyrics = makeSongLyrics({ performanceOrder: ['verse-1', 'chorus'] })
+    const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(copyrightIndices(result)).toEqual([0, result.length - 1])
+  })
+
+  it('an empty copyright object still produces both bracket slides, with no field rendering the literal undefined', () => {
+    const slot = songSlot({ songId: 'song-1' })
+    const service = makeService([slot])
+    const lyrics = makeSongLyrics({
+      performanceOrder: [],
+      copyright: {
+        title: '',
+        authors: [],
+        ccliSongNumber: '',
+        copyrightLines: [],
+        ccliLicenseNumber: '',
+      },
+    })
+    const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result).toHaveLength(2)
+    for (const assembled of result) {
+      expect(isCopyrightSlide(assembled)).toBe(true)
+      const copyright = assembled.slide as CopyrightSlide
+      expect(copyright.title).not.toBe('undefined')
+      expect(copyright.ccliSongNumber).not.toBe('undefined')
+      expect(copyright.ccliLicenseNumber).not.toBe('undefined')
+      for (const line of copyright.copyrightLines) {
+        expect(line).not.toBe('undefined')
+      }
+      for (const author of copyright.authors) {
+        expect(author).not.toBe('undefined')
+      }
+    }
+  })
+
+  it('a SONG slot whose songId has no entry in songLyricsById emits zero slides — never one copyright without its pair', () => {
+    const slot = songSlot({ songId: 'unresolvable-song' })
+    const service = makeService([slot])
+    const result = assembleSlideshow(service, makeInputs())
+
+    expect(result).toHaveLength(0)
+  })
+})
+
 describe('assembleSlideshow — scripture resolution', () => {
   it('emits exactly ONE reference-only slide, built from the slot\'s own reference (R047)', () => {
     const slot = scriptureSlot()
