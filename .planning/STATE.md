@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Service and Slides
-current_phase: 32
-current_phase_name: Save Reliability — Autosave Fix & Persistent Status
-status: verifying
-stopped_at: Completed 32-06-PLAN.md
-last_updated: "2026-08-03T00:44:09.823Z"
+current_phase: 33
+current_phase_name: Backgrounds & Slide Editing
+status: executing
+stopped_at: Completed 33-01-PLAN.md
+last_updated: "2026-08-03T03:29:30.174Z"
 last_activity: 2026-08-02
-last_activity_desc: Phase 32 execution started
+last_activity_desc: Phase 33 execution started
 progress:
   total_phases: 9
   completed_phases: 4
-  total_plans: 21
-  completed_plans: 21
+  total_plans: 30
+  completed_plans: 22
   percent: 44
 ---
 
@@ -65,7 +65,7 @@ to-do for when they return.
 See: .planning/PROJECT.md (updated 2026-07-28)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 32 — Save Reliability — Autosave Fix & Persistent Status
+**Current focus:** Phase 33 — Backgrounds & Slide Editing
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -75,10 +75,10 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 
 ## Current Position
 
-Phase: 32 (Save Reliability — Autosave Fix & Persistent Status) — EXECUTING
-Plan: 6 of 6
-Status: Phase complete — ready for verification
-Last activity: 2026-08-02 — Phase 32 execution started
+Phase: 33 (Backgrounds & Slide Editing) — EXECUTING
+Plan: 2 of 9
+Status: Ready to execute
+Last activity: 2026-08-02 — Phase 33 execution started
 
 ## ★ v1.4 AUTONOMOUS RUN — standing decisions (2026-07-28)
 
@@ -393,6 +393,7 @@ plan rail, slide grid, the single Edit Slide drawer) and Turn 2 (Song lyrics edi
 
 1. Phase 33's note — *"Confirm against the Claude Design wireframes at plan time which drawer a given
    slide's 3-dot menu opens"* — cannot be satisfied; the mockup predates the menu.
+
 2. **Phase 36's goal — *"The Service Order tab is rebuilt against the Claude Design wireframes"* — has
    no wireframe behind it, nor behind the action-bar half.**
 
@@ -439,6 +440,7 @@ to the prior research record are worth carrying forward:
   the server-ack snapshot is the emission that actually defeats the JSON diff. A view-scoped fix would
   have left the D-15 immediate reorder-save (a second entry point through the same `updateService`)
   still broken.
+
 - **A second layer compounds it:** a pending `serverTimestamp()` resolves as `null` in the optimistic
   snapshot and as a real value on server ack — two emissions per save, so the swallow window can open
   twice.
@@ -710,6 +712,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 32 P04 | 20min | 3 tasks | 5 files |
 | Phase 32 P05 | ~2h | 3 tasks | 3 files |
 | Phase 32 P06 | 1h 40min | 3 tasks | 8 files |
+| Phase 33 P01 | 5min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -902,6 +905,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 32-06: capture-once surface id (a dedicated ref assigned exactly once when the driving record id/prop first resolves) applied identically across all three editors, closing the E4 partial/loading backstops
 - [Phase ?]: 32-06: added defineExpose({ currentReadingId }) to CongregationalEditor.vue/ScriptureSlideEditor.vue as a minimal, precedented test-only seam to drive the E4 partial backstop
 - [Phase ?]: 32-06: SongLyricEditor's E4 partial backstop is written defensively (not a live repro) since a mid-mount songId swap is not reachable in production today
+- [Phase ?]: 33-01: backgroundImageUrl/backgroundSource live on SlideBase only (not mirrored onto AssembledSlide) so the pair can never drift apart like audioUrl/audioFromBed did
+- [Phase ?]: 33-01: background cascade computed before resolveEntryMedia's video early-return and returned from that branch too — a video slide inherits a background but never inherits bed audio (deliberate divergence)
 
 ### Roadmap Evolution
 
@@ -963,6 +968,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-03T00:44:09.794Z
-Stopped at: Completed 32-06-PLAN.md
+Last session: 2026-08-03T03:29:30.144Z
+Stopped at: Completed 33-01-PLAN.md
 Resume file: None

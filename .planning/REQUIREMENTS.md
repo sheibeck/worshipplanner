@@ -125,16 +125,16 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 
 ### Backgrounds and Media
 
-- [ ] **R055** (core-capability): A background image can be set for all slides in a group, mirroring the
+- [x] **R055** (core-capability): A background image can be set for all slides in a group, mirroring the
       existing group-level music control.
 
-- [ ] **R056** (core-capability): A background image can be set on a single slide, overriding the
+- [x] **R056** (core-capability): A background image can be set on a single slide, overriding the
       group's. **Most specific wins:** a slide's own background beats its group's, which beats the
       song's. (Stated as prose deliberately — arrow notation for this cascade appeared in both
       directions during planning and reads as backwards half the time.) Extends the existing
       slide-beats-bed audio precedent. `[FEAT]` `[ARCH]`
 
-- [ ] **R057** (core-capability): A background image can be set for a song from the Song Lyrics editor,
+- [x] **R057** (core-capability): A background image can be set for a song from the Song Lyrics editor,
       applying wherever that song appears.
 
 - [ ] **R058** (quality-attribute): Per-slide audio loses its "all slides in this group" scope option —
@@ -247,9 +247,9 @@ Acknowledged, deferred, not in this roadmap.
 | R052 | Phase 33 | Pending |
 | R053 | Phase 36 | Pending |
 | R054 | Phase 30 | Complete |
-| R055 | Phase 33 | Pending |
-| R056 | Phase 33 | Pending |
-| R057 | Phase 33 | Pending |
+| R055 | Phase 33 | Complete |
+| R056 | Phase 33 | Complete |
+| R057 | Phase 33 | Complete |
 | R058 | Phase 33 | Pending |
 | R059 | Phase 35 | Pending |
 | R060 | Phase 35 | Pending |
