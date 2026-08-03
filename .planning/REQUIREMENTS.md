@@ -194,10 +194,10 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 
 ### Lyric Editor
 
-- [ ] **R065** (quality-attribute): Pasting lyrics detects missing copyright information and warns,
+- [x] **R065** (quality-attribute): Pasting lyrics detects missing copyright information and warns,
       rather than accepting silently.
 
-- [ ] **R066** (quality-attribute): Paste-lyrics happens inline in the editor, not in a modal, per the
+- [x] **R066** (quality-attribute): Paste-lyrics happens inline in the editor, not in a modal, per the
       design wireframes.
 
 ### UI Rework
@@ -271,8 +271,8 @@ Acknowledged, deferred, not in this roadmap.
 | R062 | Phase 37 | Pending |
 | R063 | Phase 33 | Complete |
 | R064 | Phase 34 | Partial — structural guarantee done, reachability NOT delivered |
-| R065 | Phase 35 | Pending |
-| R066 | Phase 35 | Pending |
+| R065 | Phase 35 | Complete |
+| R066 | Phase 35 | Complete |
 | R067 | Phase 36 | Pending |
 | R068 | Phase 36 | Pending |
 | R069 | Phase 36 | Pending |
