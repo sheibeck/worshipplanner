@@ -1973,6 +1973,13 @@ const autoSave = useAutoSave(
   computed(() => isDirty.value && canEditService.value), // folds the lock in
 )
 
+// Declared before the watcher below (rather than down with the rest of the
+// R037 transition state) because CR-03's `!editable` branch reads it —
+// hoisting keeps that read after its own declaration rather than relying on
+// the (currently true, but fragile) fact that `status` can't be 'error' on
+// the watcher's own `{ immediate: true }` first run.
+const lifecycleError = ref<string | null>(null)
+
 // Reports status into the shared store; belt-and-braces (31-RESEARCH),
 // cancels an already-armed timer the instant the lock engages (the
 // Mark-as-Planned-while-typing race Phase 31 fixed). Skips 'error' —
@@ -1982,6 +1989,25 @@ watch(
   ([editable, status]) => {
     if (!editable) {
       autoSave.cleanup()
+      // CR-03: an outstanding 'error' means a real, unsaved edit is still
+      // sitting in localService — handleAutosaveFailure's "kept dirty"
+      // branch deliberately never reverts it, precisely so it can be
+      // retried. Silently reporting 'idle' here would make that edit vanish
+      // with zero on-screen trace the instant the service locks: the status
+      // bar disappears along with `canEditService` regardless of what this
+      // writes, so route the failure into `lifecycleError` instead — it is
+      // NOT gated behind `canEditService` in the locked banner path
+      // (31-UI-SPEC § 1) — rather than reporting a falsely-clean 'idle'.
+      // Leave the saveStatus entry itself untouched: it already holds the
+      // definitive 'error' entry handleAutosaveFailure wrote, and
+      // overwriting it to 'idle' would be exactly the "quieter indicator"
+      // P-01 forbids.
+      if (status === 'error') {
+        lifecycleError.value =
+          saveStatus.entryFor(surfaceId.value).errorText ??
+          "Couldn't save your changes — they're still here. Try again."
+        return
+      }
       saveStatus.set(surfaceId.value, { status: 'idle' })
       return
     }
@@ -2197,7 +2223,8 @@ function getCcliNumber(songId: string): string | null {
 // Center export (D-03).
 
 const isTransitioning = ref(false)
-const lifecycleError = ref<string | null>(null)
+// lifecycleError is declared earlier (with the autosave watcher block) —
+// see CR-03's comment there for why.
 
 /**
  * ★ Reflect a transition in the UI only AFTER the store write has resolved.

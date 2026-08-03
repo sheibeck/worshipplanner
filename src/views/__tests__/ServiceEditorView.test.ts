@@ -4400,4 +4400,43 @@ describe('ServiceEditorView - 32-REVIEW: CR-01/CR-02/CR-03', () => {
     const payload = mockUpdateService.mock.calls[0]![1] as { name?: string }
     expect(payload.name).toBe('edit B while A is still in flight')
   })
+
+  it('CR-03: an outstanding autosave error stays visible in the lock banner instead of vanishing when Mark as Planned locks the service', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    const vm = wrapper.vm as unknown as {
+      localService: { notes: string; status: string }
+      onMarkAsPlanned: () => Promise<void>
+    }
+
+    await warmUp(wrapper, vm)
+    mockUpdateService.mockRejectedValueOnce(new Error('network error'))
+    vm.localService.notes = 'an edit that fails to save, still unsaved when the lock lands'
+    await wrapper.vm.$nextTick()
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    await flushPromises()
+
+    expect(saveStatusEntry('service-1').status).toBe('error')
+
+    // Mark as Planned is not gated on an outstanding autosave error (CR-03's
+    // own point) — the user can click it with the failed, still-unsaved edit
+    // on screen. `onMarkAsPlanned` nulls `lifecycleError` at its own start,
+    // then locks the service — the exact sequence that, before the fix, left
+    // both surfaces silently reporting "nothing is wrong."
+    await vm.onMarkAsPlanned()
+    await wrapper.vm.$nextTick()
+    await flushPromises()
+    expect(vm.localService.status).toBe('planned')
+
+    // The status bar (canEditService-gated) is gone, as designed — but before
+    // the fix the failure vanished completely: `onMarkAsPlanned` had already
+    // nulled `lifecycleError`, and the cancel-on-lock watcher unconditionally
+    // overwrote the saveStatus entry to 'idle', with nothing re-populating
+    // either surface. The lock banner's error line is NOT gated behind
+    // canEditService (31-UI-SPEC § 1), so it must show the failure instead.
+    expect(wrapper.find('[data-testid="service-save-status-bar"]').exists()).toBe(false)
+    const bannerError = wrapper.find('[data-testid="service-lock-banner-error"]')
+    expect(bannerError.exists()).toBe(true)
+    expect(bannerError.text()).toBe("Couldn't save your changes — they're still here. Try again.")
+  })
 })
