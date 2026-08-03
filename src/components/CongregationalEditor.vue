@@ -1,9 +1,19 @@
 <template>
   <div class="flex flex-col h-full">
-    <!-- Header with status -->
+    <!-- Header -->
     <div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-gray-800 shrink-0">
       <h3 class="text-sm font-semibold text-gray-100">Congregational Reading</h3>
-      <SaveStatusIndicator :surface-id="surfaceId ?? ''" />
+      <button
+        type="button"
+        data-testid="congregational-close-btn"
+        aria-label="Close"
+        @click="onClose"
+        class="text-gray-400 hover:text-gray-200 transition-colors rounded-md p-1"
+      >
+        <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
     </div>
 
     <div class="flex-1 overflow-y-auto p-4 space-y-4">
@@ -60,9 +70,9 @@
       </div>
 
       <!-- Section assignment -->
-      <div v-if="sections.length > 0" class="space-y-3" data-testid="sections-container">
+      <div v-if="draftSections.length > 0" class="space-y-3" data-testid="sections-container">
         <div
-          v-for="(section, idx) in sections"
+          v-for="(section, idx) in draftSections"
           :key="idx"
           class="rounded-lg border p-4"
           :class="section.speaker === 'LEADER'
@@ -97,11 +107,11 @@
       </div>
 
       <!-- Preview panel -->
-      <div v-if="sections.length > 0" data-testid="preview-panel" class="mt-6 rounded-lg bg-gray-900/50 border border-gray-700/30 p-4">
+      <div v-if="draftSections.length > 0" data-testid="preview-panel" class="mt-6 rounded-lg bg-gray-900/50 border border-gray-700/30 p-4">
         <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Preview</h4>
         <div class="space-y-2">
           <div
-            v-for="(section, idx) in sections"
+            v-for="(section, idx) in draftSections"
             :key="`preview-${idx}`"
             :data-testid="`preview-section-${idx}`"
           >
@@ -127,58 +137,57 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { parseScriptureInput } from '@/utils/scripture'
+// 34-06: this component is a controlled prop/emit component — it persists
+// NOTHING itself. Under slot-as-source-of-truth (R064, see 34-05) the parent
+// (34-07's ServiceEditorView modal) owns the ScriptureSlot write; this
+// component's only job is to render a draft and report every change upward
+// via `update:sections` / `update:reference`. It replaced the earlier model
+// where this component wrote directly to a separate `ScriptureReading`
+// Firestore document via `useScriptureSlides` — the model R047 rejected.
+import { ref, computed } from 'vue'
+import { parseScriptureInput, formatScriptureReference } from '@/utils/scripture'
 import { fetchPassageText } from '@/utils/esvApi'
 import { splitPassage } from '@/utils/scriptureSplitter'
 import { splitCongregationalReading } from '@/utils/claudeApi'
 import { computeBoundaries, hasSplittableBoundaries } from '@/utils/scriptureBoundaries'
-import { useAutoSave } from '@/composables/useAutoSave'
-import { useScriptureSlides } from '@/stores/scriptureSlides'
-import { useSaveStatus } from '@/stores/saveStatus'
 import { useToasts } from '@/stores/toasts'
-import SaveStatusIndicator from './SaveStatusIndicator.vue'
 import type { CongregationalSection } from '@/types/slide'
 import type { ScriptureRef } from '@/types/service'
 
 const props = defineProps<{
-  orgId: string
-  readingId?: string
+  reference: ScriptureRef | null
+  sections: CongregationalSection[]
 }>()
 
-const store = useScriptureSlides()
-const saveStatus = useSaveStatus()
+const emit = defineEmits<{
+  'update:sections': [sections: CongregationalSection[]]
+  'update:reference': [reference: ScriptureRef]
+  close: []
+}>()
+
 const toasts = useToasts()
 
-const referenceText = ref('')
+const referenceText = ref(props.reference ? formatScriptureReference(props.reference) : '')
 const isFetching = ref(false)
 const fetchError = ref(false)
-const sections = ref<CongregationalSection[]>([])
-const currentReadingId = ref<string | null>(props.readingId ?? null)
+// Seeded ONCE, as a shallow copy, from props.sections — never re-synced from
+// a later prop change. The caller (34-07) must mount this component with a
+// `:key` tied to whichever slot it is editing, exactly as the previous
+// currentReadingId-driven contract required (WR-04, 34-PATTERNS.md).
+const draftSections = ref<CongregationalSection[]>([...props.sections])
 const parsedRef = computed<ScriptureRef | null>(() => parseScriptureInput(referenceText.value))
 const canFetch = computed(() => parsedRef.value !== null)
+// rawText is local-only state, never persisted anywhere (not even emitted).
+// Re-opening the editor on a slot that already has sections therefore starts
+// with rawText empty, so canAiSplit is false until the user clicks Fetch
+// Passage again. Deliberate: storing a second copy of the ESV text alongside
+// the section text that already contains it would duplicate data for no
+// reason, and Fetch Passage sits directly next to Split with AI.
 const rawText = ref('')
 
-// 32-06: the surface id is captured ONCE, the first time currentReadingId
-// resolves to a non-null value, and never re-derived while mounted. Reading
-// it reactively at render time would be wrong: onFetchPassage sets
-// `sections.value` (which arms useAutoSave's watcher) BEFORE the awaited
-// `createReading` resolves and assigns `currentReadingId`, so a naive
-// binding would transition from a `congregational:null`-suffixed key to a
-// real-id key while the save that key's mutation armed is still pending
-// (32-UI-SPEC.md § UI Considerations E4 `partial`). While unresolved,
-// nothing is registered in the store at all, and the indicator is bound to
-// an empty string, which `entryFor` resolves to idle.
-const surfaceId = ref<string | null>(null)
-watch(
-  currentReadingId,
-  (id) => {
-    if (id && !surfaceId.value) {
-      surfaceId.value = `congregational:${id}`
-    }
-  },
-  { immediate: true },
-)
+function emitSections(): void {
+  emit('update:sections', draftSections.value)
+}
 
 function buildAlternatingSections(text: string, scriptureRef: ScriptureRef): CongregationalSection[] {
   const slides = splitPassage(text, scriptureRef)
@@ -201,24 +210,12 @@ async function onFetchPassage() {
   try {
     const text = await fetchPassageText(query)
     rawText.value = text
-    sections.value = buildAlternatingSections(text, scriptureRef)
-
-    if (!currentReadingId.value) {
-      const id = await store.createReading(props.orgId, {
-        reference: scriptureRef,
-        displayReference: query,
-        rawText: text,
-        readingMode: 'congregational',
-        slides: [],
-        congregationalSections: sections.value,
-      })
-      currentReadingId.value = id
-    } else {
-      await store.updateReading(props.orgId, currentReadingId.value, {
-        readingMode: 'congregational',
-        congregationalSections: sections.value,
-      })
-    }
+    // The reference the user actually fetched is what the sections belong
+    // to — emit it first so the slot's own reference fields never end up
+    // recording a different passage than the sections that follow.
+    emit('update:reference', scriptureRef)
+    draftSections.value = buildAlternatingSections(text, scriptureRef)
+    emitSections()
   } catch {
     fetchError.value = true
   } finally {
@@ -228,10 +225,11 @@ async function onFetchPassage() {
 
 // 34-04: the opt-in "Split with AI" affordance. Additive only — it never
 // runs automatically and never merges with the manual result; it either
-// replaces `sections.value` wholesale on success or (Task 2) leaves it
+// replaces `draftSections.value` wholesale on success or leaves it
 // completely untouched and surfaces a failure toast. `canAiSplit` reuses
 // 34-01's `hasSplittableBoundaries` so a passage with no legal internal
-// division never offers (or is asked to attempt) a split.
+// division never offers (or is asked to attempt) a split. Reachable only
+// from this control's click handler — never from a watcher or onMounted.
 const isSplitting = ref(false)
 const canAiSplit = computed(
   () => rawText.value.length > 0 && hasSplittableBoundaries(computeBoundaries(rawText.value)),
@@ -246,16 +244,17 @@ async function onAiSplit() {
   try {
     const result = await splitCongregationalReading(rawText.value)
     if (result) {
-      sections.value = result
+      draftSections.value = result
+      emitSections()
     } else {
       toasts.push(AI_SPLIT_FAILURE_TEXT)
     }
   } catch {
     // R064 "additive and never blocking", in code: a failed split must leave
-    // the editor exactly as usable as it was a moment before — sections.value
-    // is left completely untouched (no clearing, no placeholder, no partial
-    // array) and the only externally visible effect of a failure is this one
-    // toast.
+    // the editor exactly as usable as it was a moment before —
+    // draftSections.value is left completely untouched (no clearing, no
+    // placeholder, no partial array, no emission) and the only externally
+    // visible effect of a failure is this one toast.
     toasts.push(AI_SPLIT_FAILURE_TEXT)
   } finally {
     isSplitting.value = false
@@ -263,12 +262,13 @@ async function onAiSplit() {
 }
 
 function toggleSpeaker(idx: number) {
-  const section = sections.value[idx]
+  const section = draftSections.value[idx]
   if (!section) return
-  sections.value[idx] = {
+  draftSections.value[idx] = {
     ...section,
     speaker: section.speaker === 'LEADER' ? 'CONGREGATION' : 'LEADER',
   }
+  emitSections()
 }
 
 function formatQuery(scriptureRef: ScriptureRef): string {
@@ -282,96 +282,7 @@ function formatQuery(scriptureRef: ScriptureRef): string {
   return base
 }
 
-async function doAutoSave() {
-  if (!currentReadingId.value) return
-  await store.updateReading(props.orgId, currentReadingId.value, {
-    readingMode: 'congregational',
-    congregationalSections: sections.value,
-  })
+function onClose(): void {
+  emit('close')
 }
-
-const { status: autoSaveStatus, cleanup: cleanupAutoSave } = useAutoSave(
-  sections,
-  doAutoSave,
-)
-
-// Reports useAutoSave's status into the shared store, keyed by the captured
-// surfaceId, skipping entirely while it is unresolved (nothing to attribute
-// a status to yet). The generic failure sentence is the only error copy
-// this editor ever uses — it has no reorder concept, so a caught error's
-// own message never reaches this text (T-32-17).
-watch(
-  () => autoSaveStatus.value,
-  (status) => {
-    if (!surfaceId.value) return
-    if (status === 'saved') {
-      saveStatus.set(surfaceId.value, { status: 'saved', savedAt: new Date() })
-      return
-    }
-    if (status === 'error') {
-      saveStatus.set(surfaceId.value, {
-        status: 'error',
-        errorText: "Couldn't save your changes — they're still here. Try again.",
-      })
-      return
-    }
-    saveStatus.set(surfaceId.value, { status })
-  },
-)
-
-onMounted(async () => {
-  if (props.readingId) {
-    store.subscribeReadings(props.orgId)
-    const reading = await store.getReading(props.orgId, props.readingId)
-    if (reading) {
-      referenceText.value = reading.displayReference
-      rawText.value = reading.rawText
-      if (reading.congregationalSections?.length) {
-        sections.value = reading.congregationalSections
-      } else if (reading.slides.length > 0) {
-        sections.value = reading.slides.map((slide, idx) => ({
-          speaker: (idx % 2 === 0 ? 'LEADER' : 'CONGREGATION') as 'LEADER' | 'CONGREGATION',
-          text: slide.text,
-          verseRange: slide.verseRange,
-        }))
-      }
-    }
-  }
-})
-
-onUnmounted(() => {
-  cleanupAutoSave()
-  if (surfaceId.value) saveStatus.clear(surfaceId.value)
-  if (props.readingId) {
-    store.unsubscribeReadings()
-  }
-})
-
-// Test-only seam (matches PptxImportModal.vue's existing defineExpose
-// precedent): currentReadingId has no reactive prop-watcher wired to it in
-// production — it is set once at ref-init and once more inside
-// onFetchPassage — so the E4 `partial` backstop test needs a way to force
-// the id-resolution race described above without re-implementing internal
-// timing. No other internal state is exposed.
-//
-// ★ WR-04 (32-REVIEW), CALL-SITE CONTRACT — read before wiring this
-// component up anywhere (Phase 34): `currentReadingId` (and everything
-// seeded from it — `surfaceId`, `sections`, `referenceText`, `rawText`) is
-// captured ONCE at mount and is NOT reactive to `props.readingId` changing
-// afterward. Reusing one mounted instance across different `readingId`
-// values (e.g. a parent that swaps the prop in place instead of remounting)
-// silently misattributes every later save's status to the FIRST reading
-// this instance ever saw. The caller MUST always mount this component with
-// a `:key` tied to `readingId` (forcing a fresh instance, and therefore a
-// fresh onMounted load, per reading) — swapping `readingId` in place on a
-// persistent instance is not a supported usage. A prop-watcher that resets
-// `currentReadingId`/`surfaceId` alone was considered and rejected as a
-// fix: `sections`/`referenceText`/`rawText` are ALSO seeded only in
-// onMounted, so a partial reset would leave those stale while surfaceId
-// looked correct — a worse, more subtly wrong state than today's
-// unreactive-but-consistent one. A correct fix needs the whole onMounted
-// load path to re-run reactively, which is a real (if currently unreachable
-// and untestable, since nothing mounts this component yet) design change
-// for whoever wires this up, not a one-line watch.
-defineExpose({ currentReadingId })
 </script>
