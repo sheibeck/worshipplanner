@@ -137,7 +137,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 - [x] **R057** (core-capability): A background image can be set for a song from the Song Lyrics editor,
       applying wherever that song appears.
 
-- [ ] **R058** (quality-attribute): Per-slide audio loses its "all slides in this group" scope option —
+- [x] **R058** (quality-attribute): Per-slide audio loses its "all slides in this group" scope option —
       group-wide audio is set only at group level. Per-slide audio remains. Supersedes the scope toggle
       shipped in **R030**.
 
@@ -250,7 +250,7 @@ Acknowledged, deferred, not in this roadmap.
 | R055 | Phase 33 | Complete |
 | R056 | Phase 33 | Complete |
 | R057 | Phase 33 | Complete |
-| R058 | Phase 33 | Pending |
+| R058 | Phase 33 | Complete |
 | R059 | Phase 35 | Pending |
 | R060 | Phase 35 | Pending |
 | R061 | Phase 35 | Pending |
