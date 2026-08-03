@@ -377,3 +377,71 @@ export const SPLIT_SCHEMA = {
   required: ['sections'],
   additionalProperties: false,
 } as const
+
+/**
+ * The sole gate between untrusted model output and scripture a congregation
+ * will read aloud. Every check below exists in code, not in `SPLIT_SCHEMA`,
+ * because the structured-outputs JSON Schema subset supports no numerical
+ * constraint and no cross-field relationship: shape conformance says nothing
+ * about range, ordering, adjacency, or coverage.
+ *
+ * A single violation discards the ENTIRE result — never a partial array,
+ * never a repair, never a re-sort. `boundaries` MUST be the exact same array
+ * used to build the prompt (scriptureBoundaries.ts's Pitfall 5 discipline —
+ * never recompute it here).
+ */
+export function validateSplitResult(
+  parsed: unknown,
+  boundaries: number[],
+): SplitSection[] | null {
+  if (parsed === null || typeof parsed !== 'object') return null
+  if (!('sections' in parsed)) return null
+
+  const sections = (parsed as { sections: unknown }).sections
+  if (!Array.isArray(sections) || sections.length === 0) return null
+
+  const maxIndex = boundaries.length - 1
+  let prevEnd: number | null = null
+
+  for (const section of sections) {
+    if (section === null || typeof section !== 'object') return null
+
+    const keys = Object.keys(section)
+    if (
+      keys.length !== 3 ||
+      !keys.includes('speaker') ||
+      !keys.includes('startBoundary') ||
+      !keys.includes('endBoundary')
+    ) {
+      return null
+    }
+
+    const { speaker, startBoundary, endBoundary } = section as {
+      speaker: unknown
+      startBoundary: unknown
+      endBoundary: unknown
+    }
+
+    if (speaker !== 'LEADER' && speaker !== 'CONGREGATION') return null
+    if (!Number.isInteger(startBoundary) || !Number.isInteger(endBoundary)) return null
+
+    const start = startBoundary as number
+    const end = endBoundary as number
+
+    if (start < 0 || start > maxIndex) return null
+    if (end < 0 || end > maxIndex) return null
+    if (start >= end) return null
+    // A single equality rejects a gap and an overlap identically, and makes
+    // an out-of-order result unrepresentable without also being
+    // non-contiguous.
+    if (prevEnd !== null && start !== prevEnd) return null
+
+    prevEnd = end
+  }
+
+  const first = sections[0] as { startBoundary: number }
+  if (first.startBoundary !== 0) return null
+  if (prevEnd !== maxIndex) return null
+
+  return sections as SplitSection[]
+}
