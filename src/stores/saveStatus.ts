@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import type { AutoSaveStatus } from '@/composables/useAutoSave'
 import { useToasts } from '@/stores/toasts'
@@ -16,26 +16,25 @@ export interface SaveStatusEntry {
 // separately-maintained copies never drifting apart.
 export const GENERIC_ERROR_TEXT = "Couldn't save your changes — they're still here. Try again."
 
-// One place the urgency ordering lives — no consumer re-derives it in a
-// template v-if chain.
-const URGENCY: Record<AutoSaveStatus, number> = {
-  error: 4,
-  saving: 3,
-  pending: 2,
-  saved: 1,
-  idle: 0,
-}
-
 /**
  * Per-surface save-status aggregator (R040). Sits strictly ABOVE
  * useAutoSave — it does not re-implement any of useAutoSave's own timing,
  * inflight guard, flush() or cleanup() machinery; it only records what each
- * surface reports and derives a "most urgent" rollup across all of them.
+ * surface reports.
  *
  * Keyed by surfaceId so several autosaving surfaces can be mounted
  * simultaneously without one surface's 'saved' erasing another's 'saving'.
  * This store holds no Firestore state at all — no orgId, no subscribe, no
  * unsubscribeAll.
+ *
+ * WR-03 (32-REVIEW): a `mostUrgent` cross-surface rollup (deterministic
+ * urgency ranking + tie-break) used to live here, fully built and tested,
+ * with no production consumer anywhere in `src/` — dead code as shipped.
+ * Removed rather than kept "for later," per this codebase's own "don't
+ * build more than is needed" convention (32-UI-SPEC § 4's toast-stacking
+ * note makes the same call). Re-add it if/when a real cross-surface
+ * indicator is planned — the deleted logic is in this phase's own review
+ * fix commit for reference.
  */
 export const useSaveStatus = defineStore('saveStatus', () => {
   const entries = ref<Record<string, SaveStatusEntry>>({})
@@ -66,23 +65,5 @@ export const useSaveStatus = defineStore('saveStatus', () => {
     return entries.value[surfaceId] ?? { status: 'idle' }
   }
 
-  const mostUrgent = computed<SaveStatusEntry | null>(() => {
-    // Iterate keys sorted lexicographically before reducing, so that when
-    // two surfaces report the same status the winner is the
-    // lexicographically-first surface id, identically on every
-    // re-evaluation. Ties resolving by insertion order would be
-    // non-deterministic across remounts.
-    const keys = Object.keys(entries.value).sort()
-    if (keys.length === 0) return null
-
-    let bestKey = keys[0]!
-    for (const key of keys.slice(1)) {
-      if (URGENCY[entries.value[key]!.status] > URGENCY[entries.value[bestKey]!.status]) {
-        bestKey = key
-      }
-    }
-    return entries.value[bestKey]!
-  })
-
-  return { entries, set, clear, entryFor, mostUrgent }
+  return { entries, set, clear, entryFor }
 })
