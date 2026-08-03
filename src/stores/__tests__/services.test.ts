@@ -297,6 +297,66 @@ describe('useServiceStore', () => {
       store.unsubscribeAll()
       expect(store.ownWriteEchoIds).toEqual([])
     })
+
+    // ── WR-02 (32-REVIEW): the multi-document case ───────────────────────────
+    //
+    // Every test above exercises exactly one document. These prove the
+    // pending/settle-edge computation is derived independently per document,
+    // never cross-contaminated, for the two shapes the review specifically
+    // flagged as needing coverage.
+
+    it('two documents whose own-writes overlap and settle on different snapshots are each classified independently', async () => {
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      const svcA = makeService({ id: 'service-a' })
+      const svcB = makeService({ id: 'service-b' })
+
+      // Both writes go pending in the same snapshot.
+      triggerSnapshot([svcA, svcB], ['service-a', 'service-b'])
+      expect(store.ownWriteEchoIds.sort()).toEqual(['service-a', 'service-b'])
+      expect(store.isOwnWriteEcho('service-a')).toBe(true)
+      expect(store.isOwnWriteEcho('service-b')).toBe(true)
+
+      // A settles first — B is still pending. A's settle edge must not leak
+      // onto B, and B's continued pending state must not be lost.
+      triggerSnapshot([svcA, svcB], ['service-b'])
+      expect(store.ownWriteEchoIds.sort()).toEqual(['service-a', 'service-b'])
+      expect(store.isOwnWriteEcho('service-a')).toBe(true) // settle edge
+      expect(store.isOwnWriteEcho('service-b')).toBe(true) // still pending
+
+      // B settles on the NEXT snapshot, one full emission after A. A is no
+      // longer anywhere near pending/settling — it must drop out cleanly,
+      // proving the settle edge doesn't linger past its own single emission.
+      triggerSnapshot([svcA, svcB], [])
+      expect(store.ownWriteEchoIds).toEqual(['service-b']) // B's settle edge only
+      expect(store.isOwnWriteEcho('service-a')).toBe(false)
+      expect(store.isOwnWriteEcho('service-b')).toBe(true)
+    })
+
+    it('a snapshot mixing one document\'s settle edge with a second, genuinely external document\'s change classifies only the settling one as an echo', async () => {
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      const svcA = makeService({ id: 'service-a', name: 'A original' })
+      const svcB = makeService({ id: 'service-b', name: 'B original' })
+
+      // Only A has an own write in flight.
+      triggerSnapshot([svcA, svcB], ['service-a'])
+      expect(store.isOwnWriteEcho('service-a')).toBe(true)
+      expect(store.isOwnWriteEcho('service-b')).toBe(false)
+
+      // A's write settles in the SAME emission that a different writer's
+      // genuinely external change to B arrives — B is never pending here at
+      // all, so it must never be misclassified as an echo despite the
+      // simultaneous settle edge on A.
+      const svcBExternallyChanged = makeService({ id: 'service-b', name: 'B changed by another editor' })
+      triggerSnapshot([svcA, svcBExternallyChanged], [])
+      expect(store.ownWriteEchoIds).toEqual(['service-a'])
+      expect(store.isOwnWriteEcho('service-a')).toBe(true)
+      expect(store.isOwnWriteEcho('service-b')).toBe(false)
+      expect(store.services.find((s) => s.id === 'service-b')?.name).toBe('B changed by another editor')
+    })
   })
 
   describe('createService', () => {
