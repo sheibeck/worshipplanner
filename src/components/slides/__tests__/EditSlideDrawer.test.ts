@@ -50,6 +50,28 @@ vi.mock('@/composables/useMediaUpload', () => ({
   }),
 }))
 
+// --- 33-07 Task 2: background file attach goes through useBackgroundUpload
+// (never a second uploader) — mocked with the same shape/convention as the
+// audio mock above, so these tests never touch real Firebase Storage. ---
+const backgroundUploadProgressRef = ref(0)
+const backgroundUploadErrorRef = ref<string | null>(null)
+const backgroundUploadIsUploadingRef = ref(false)
+const mockUploadBackground = vi.fn<(file: File, orgId: string) => Promise<string>>()
+const mockResetBackgroundUpload = vi.fn(() => {
+  backgroundUploadProgressRef.value = 0
+  backgroundUploadErrorRef.value = null
+  backgroundUploadIsUploadingRef.value = false
+})
+vi.mock('@/composables/useBackgroundUpload', () => ({
+  useBackgroundUpload: () => ({
+    progress: backgroundUploadProgressRef,
+    error: backgroundUploadErrorRef,
+    isUploading: backgroundUploadIsUploadingRef,
+    uploadBackground: mockUploadBackground,
+    reset: mockResetBackgroundUpload,
+  }),
+}))
+
 // Teleported content — established codebase convention (26-RESEARCH.md Pitfall 3).
 enableAutoUnmount(afterEach)
 
@@ -189,6 +211,32 @@ async function selectAudioAttachFile(file: File = makeAudioFile()) {
   await flushPromises()
 }
 
+function makeImageFile(name = 'new.jpg'): File {
+  return new File(['fake-bytes'], name, { type: 'image/jpeg' })
+}
+
+async function selectBackgroundAttachFile(file: File = makeImageFile()) {
+  const input = body().find('[data-testid="background-attach-input"]')
+  Object.defineProperty(input.element, 'files', { value: [file], configurable: true })
+  await input.trigger('change')
+  await flushPromises()
+}
+
+/**
+ * `resolvedBackgroundUrl`/`backgroundSource` are read from `assembledSlide`,
+ * NEVER re-derived from `entry.backgroundImageUrl` (33-UI-SPEC.md §5) — so a
+ * fixture asserting State 3 (the entry's own background actually resolving)
+ * must set BOTH the entry's own field AND a matching `assembledSlide` with
+ * `backgroundSource: 'slide'`, exactly as the real resolver would produce.
+ */
+function makeOwnBackgroundFixtures(url = 'https://example.com/orgs/org-1/backgrounds/b1/sunset.jpg') {
+  const entry = makeEntry({ id: 'entry-1', backgroundImageUrl: url })
+  const assembledSlide = makeAssembled({
+    slide: { id: 'entry-1', position: 0, contentKind: 'text', body: 'Hello', backgroundImageUrl: url, backgroundSource: 'slide' } as never,
+  })
+  return { entry, assembledSlide }
+}
+
 function mountDrawer(props: Partial<InstanceType<typeof EditSlideDrawer>['$props']> = {}) {
   const entry = 'entry' in props ? props.entry : makeEntry({ id: 'entry-1' })
   return mount(EditSlideDrawer, {
@@ -226,7 +274,10 @@ describe('EditSlideDrawer (Phase 26-05 Task 1 — shell)', () => {
 
   it('renders the title, the close control and its accessible name', () => {
     mountDrawer()
-    expect(body().find('[data-testid="edit-slide-drawer-title"]').text()).toBe('Edit Slide')
+    // 33-07: the title is now mode-bound — 'details' (the prop default)
+    // renders 'Edit Slide Details'. See the "mode" describe block for
+    // exhaustive title-per-mode coverage.
+    expect(body().find('[data-testid="edit-slide-drawer-title"]').text()).toBe('Edit Slide Details')
     const close = body().find('[data-testid="edit-slide-drawer-close"]')
     expect(close.exists()).toBe(true)
     expect(close.attributes('aria-label')).toBe('Close')
@@ -554,9 +605,9 @@ describe('EditSlideDrawer (Phase 26-07 Task 1 — per-kind Slide Text)', () => {
     expect(body().find('[data-testid="drawer-slide-text-section"]').exists()).toBe(false)
   })
 
-  it('renders an editable field, not a read-only block, for a hand-written slide', () => {
+  it('renders an editable field, not a read-only block, for a hand-written slide (lyrics mode — 33-07 relocated this control here)', () => {
     const { entry, assembledSlide } = makeAuthoredTextFixtures('My own words')
-    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }), mode: 'lyrics' })
     expect(body().find('[data-testid="drawer-slide-text-editable"]').exists()).toBe(true)
     expect((body().find('[data-testid="drawer-slide-text-editable"]').element as HTMLTextAreaElement).value).toBe('My own words')
   })
@@ -588,7 +639,7 @@ describe('EditSlideDrawer (Phase 26-07 Task 1 — per-kind Slide Text)', () => {
   })
 })
 
-describe('EditSlideDrawer (Phase 26-07 Task 2 — hand-written slide edited here)', () => {
+describe('EditSlideDrawer (Phase 26-07 Task 2 — hand-written slide edited here) [33-07: relocated to mode: "lyrics"]', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     mockReplaceGroupSlides.mockReset()
@@ -601,7 +652,7 @@ describe('EditSlideDrawer (Phase 26-07 Task 2 — hand-written slide edited here
 
   it("renders the hand-written slide's editable field with its current text", () => {
     const { entry, assembledSlide } = makeAuthoredTextFixtures('Current body')
-    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }), mode: 'lyrics' })
     expect((body().find('[data-testid="drawer-slide-text-editable"]').element as HTMLTextAreaElement).value).toBe('Current body')
   })
 
@@ -609,7 +660,7 @@ describe('EditSlideDrawer (Phase 26-07 Task 2 — hand-written slide edited here
     const entryOne = makeEntry({ id: 'entry-1', sourceRef: { kind: 'text', title: 'New slide', body: '' } })
     const entryTwo = makeEntry({ id: 'entry-2', label: 'Untouched', sourceRef: { kind: 'text', title: 'Other', body: 'Other body' } })
     const assembledSlide = makeAssembled({ slide: { id: 'entry-1', position: 0, contentKind: 'text', body: '' } as never })
-    mountDrawer({ entry: entryOne, assembledSlide, group: makeGroup({ slides: [entryOne, entryTwo] }) })
+    mountDrawer({ entry: entryOne, assembledSlide, group: makeGroup({ slides: [entryOne, entryTwo] }), mode: 'lyrics' })
 
     await body().find('[data-testid="drawer-slide-text-editable"]').setValue('New body text')
     expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
@@ -627,7 +678,7 @@ describe('EditSlideDrawer (Phase 26-07 Task 2 — hand-written slide edited here
   it("preserves the source ref's other members (the short default title) across the write", async () => {
     const entry = makeEntry({ id: 'entry-1', sourceRef: { kind: 'text', title: 'New slide', body: '' } })
     const assembledSlide = makeAssembled({ slide: { id: 'entry-1', position: 0, contentKind: 'text', body: '' } as never })
-    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }), mode: 'lyrics' })
 
     await body().find('[data-testid="drawer-slide-text-editable"]').setValue('Body only changed')
     await vi.advanceTimersByTimeAsync(800)
@@ -641,7 +692,7 @@ describe('EditSlideDrawer (Phase 26-07 Task 2 — hand-written slide edited here
   it('never re-mints the entry id or order while editing', async () => {
     const entry = makeEntry({ id: 'entry-1', order: 3, sourceRef: { kind: 'text', title: 'New slide', body: '' } })
     const assembledSlide = makeAssembled({ slide: { id: 'entry-1', position: 0, contentKind: 'text', body: '' } as never })
-    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }), mode: 'lyrics' })
 
     await body().find('[data-testid="drawer-slide-text-editable"]').setValue('Changed')
     await vi.advanceTimersByTimeAsync(800)
@@ -656,7 +707,7 @@ describe('EditSlideDrawer (Phase 26-07 Task 2 — hand-written slide edited here
     const entryOne = makeEntry({ id: 'entry-1', sourceRef: { kind: 'text', title: 'New slide', body: '' } })
     const entryTwo = makeEntry({ id: 'entry-2', sourceRef: { kind: 'text', title: 'Other', body: 'Other body' } })
     const assembledSlide = makeAssembled({ slide: { id: 'entry-1', position: 0, contentKind: 'text', body: '' } as never })
-    const wrapper = mountDrawer({ entry: entryOne, assembledSlide, group: makeGroup({ slides: [entryOne, entryTwo] }) })
+    const wrapper = mountDrawer({ entry: entryOne, assembledSlide, group: makeGroup({ slides: [entryOne, entryTwo] }), mode: 'lyrics' })
 
     await body().find('[data-testid="drawer-slide-text-editable"]').setValue('Changed before leaving')
     await wrapper.setProps({
@@ -674,7 +725,7 @@ describe('EditSlideDrawer (Phase 26-07 Task 2 — hand-written slide edited here
     mockReplaceGroupSlides.mockRejectedValueOnce(new Error('write failed'))
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const { entry, assembledSlide } = makeAuthoredTextFixtures('')
-    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }), mode: 'lyrics' })
 
     await body().find('[data-testid="drawer-slide-text-editable"]').setValue('Changed')
     await vi.advanceTimersByTimeAsync(800)
@@ -687,7 +738,7 @@ describe('EditSlideDrawer (Phase 26-07 Task 2 — hand-written slide edited here
 
   it('renders no editable field for a user without write capability, while the text still reads', () => {
     const { entry, assembledSlide } = makeAuthoredTextFixtures('Read me')
-    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }), isEditor: false })
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }), isEditor: false, mode: 'lyrics' })
     expect(body().find('[data-testid="drawer-slide-text-editable"]').exists()).toBe(false)
     expect(body().find('[data-testid="drawer-slide-text-readonly"]').text()).toBe('Read me')
   })
@@ -1314,9 +1365,13 @@ describe('EditSlideDrawer (R054 — song groups are read-only)', () => {
     expect(body().find('[data-testid="audio-remove"]').exists()).toBe(false)
   })
 
-  it('renders no editable slide-text textarea for a song group, even for a text-kind entry', () => {
+  it('renders no editable slide-text textarea for a song group, even for a text-kind entry, even in lyrics mode', () => {
     const { entry, assembledSlide } = makeAuthoredTextFixtures('Should not be editable here')
-    mountDrawer({ planItem: songPlanItem, entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+    // 33-07: explicit `mode: 'lyrics'` — the ONE mode that would otherwise
+    // show the editable textarea — so this keeps testing R054's gate
+    // (canMutate false for a song group) rather than passing trivially
+    // because `details` mode never shows it regardless of song-group status.
+    mountDrawer({ planItem: songPlanItem, entry, assembledSlide, group: makeGroup({ slides: [entry] }), mode: 'lyrics' })
 
     expect(body().find('[data-testid="drawer-slide-text-editable"]').exists()).toBe(false)
   })
@@ -1554,5 +1609,364 @@ describe('EditSlideDrawer - locked service (R036)', () => {
     await vm.writeField('label', 'entry-1', 'renamed')
     await flushPromises()
     expect(mockReplaceGroupSlides).toHaveBeenCalled()
+  })
+})
+
+// ── 33-07 Task 1: the mode prop and its per-mode section gating ────────────
+describe('EditSlideDrawer (Phase 33-07 Task 1 — mode: details | lyrics)', () => {
+  beforeEach(() => {
+    mockReplaceGroupSlides.mockReset()
+    mockReplaceGroupSlides.mockResolvedValue(undefined)
+  })
+
+  it('titles the header "Edit Slide Details" in details mode (the prop default)', () => {
+    mountDrawer()
+    expect(body().find('[data-testid="edit-slide-drawer-title"]').text()).toBe('Edit Slide Details')
+  })
+
+  it('titles the header "Edit Slide Lyrics" in lyrics mode', () => {
+    mountDrawer({ mode: 'lyrics' })
+    expect(body().find('[data-testid="edit-slide-drawer-title"]').text()).toBe('Edit Slide Lyrics')
+  })
+
+  it('renders the context line and preview identically in both modes', () => {
+    const detailsWrapper = mountDrawer()
+    expect(body().find('[data-testid="drawer-context-line"]').exists()).toBe(true)
+    expect(body().find('[data-testid="drawer-preview"]').exists()).toBe(true)
+    detailsWrapper.unmount()
+
+    mountDrawer({ mode: 'lyrics' })
+    expect(body().find('[data-testid="drawer-context-line"]').exists()).toBe(true)
+    expect(body().find('[data-testid="drawer-preview"]').exists()).toBe(true)
+  })
+
+  it('renders no Slide Label, Slide Audio, Notes or footer-actions section in lyrics mode', () => {
+    mountDrawer({ mode: 'lyrics' })
+    expect(body().find('[data-testid="drawer-label-input"]').exists()).toBe(false)
+    expect(body().find('[data-testid="drawer-audio-section"]').exists()).toBe(false)
+    expect(body().find('[data-testid="drawer-notes-input"]').exists()).toBe(false)
+    expect(body().find('[data-testid="drawer-footer-actions"]').exists()).toBe(false)
+  })
+
+  it('renders all four of those sections in details mode (the prop default), unchanged', () => {
+    mountDrawer()
+    expect(body().find('[data-testid="drawer-label-input"]').exists()).toBe(true)
+    expect(body().find('[data-testid="drawer-audio-section"]').exists()).toBe(true)
+    expect(body().find('[data-testid="drawer-notes-input"]').exists()).toBe(true)
+    expect(body().find('[data-testid="drawer-footer-actions"]').exists()).toBe(true)
+  })
+
+  it('renders no editable textarea for a hand-authored entry in details mode — a read-only preview and the "Edit lyrics" caption render instead', () => {
+    const { entry, assembledSlide } = makeAuthoredTextFixtures('Original words')
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+    expect(body().find('[data-testid="drawer-slide-text-editable"]').exists()).toBe(false)
+    const readonly = body().find('[data-testid="drawer-slide-text-readonly"]')
+    expect(readonly.exists()).toBe(true)
+    expect(readonly.text()).toBe('Original words')
+    expect(body().text()).toContain("Edit this slide's text via Edit lyrics")
+  })
+
+  it('renders the editable textarea, with its existing markup and test id, for a hand-authored entry in lyrics mode', () => {
+    const { entry, assembledSlide } = makeAuthoredTextFixtures('Original words')
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }), mode: 'lyrics' })
+    const textarea = body().find('[data-testid="drawer-slide-text-editable"]')
+    expect(textarea.exists()).toBe(true)
+    expect((textarea.element as HTMLTextAreaElement).value).toBe('Original words')
+  })
+
+  it('defaults to details mode when the prop is omitted, so an existing fixture behaves exactly as before', () => {
+    mountDrawer()
+    expect(body().find('[data-testid="edit-slide-drawer-title"]').text()).toBe('Edit Slide Details')
+    expect(body().find('[data-testid="drawer-label-input"]').exists()).toBe(true)
+  })
+
+  it('swaps the body in place on a mode change for the SAME entry, without re-running the entry-change flush', async () => {
+    vi.useFakeTimers()
+    mockReplaceGroupSlides.mockClear()
+    const { entry } = makeAuthoredTextFixtures('Original')
+    const wrapper = mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+
+    await body().find('[data-testid="drawer-label-input"]').setValue('Changed')
+    await wrapper.setProps({ mode: 'lyrics' })
+    // The entry never changed — only mode did — so the entry-change flush
+    // path must not have fired; the pending label write is still debouncing.
+    expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
+    expect(body().find('[data-testid="edit-slide-drawer-title"]').text()).toBe('Edit Slide Lyrics')
+
+    await vi.advanceTimersByTimeAsync(800)
+    expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+    vi.useRealTimers()
+  })
+})
+
+// ── 33-07 Task 2: the Slide Background section and its three states ────────
+describe('EditSlideDrawer (Phase 33-07 Task 2 — Slide Background)', () => {
+  beforeEach(() => {
+    mockReplaceGroupSlides.mockReset()
+    mockReplaceGroupSlides.mockResolvedValue(undefined)
+    mockUploadBackground.mockReset()
+    mockResetBackgroundUpload.mockClear()
+    backgroundUploadProgressRef.value = 0
+    backgroundUploadErrorRef.value = null
+    backgroundUploadIsUploadingRef.value = false
+  })
+
+  it('State 1 — renders "No background" and no thumbnail when nothing resolved at any level', () => {
+    const entry = makeEntry({ id: 'entry-1' })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+
+    expect(body().text()).toContain('No background')
+    expect(body().find('[data-testid="background-thumbnail"]').exists()).toBe(false)
+    expect(body().find('[data-testid="background-attach"]').exists()).toBe(true)
+  })
+
+  it('State 2 — renders the resolved thumbnail, background provenance and the override control when the entry has none but a group supplies one', () => {
+    const entry = makeEntry({ id: 'entry-1' })
+    const assembledSlide = makeAssembled({
+      slide: { id: 'entry-1', position: 0, contentKind: 'text', body: 'Hello', backgroundImageUrl: 'https://example.com/g.jpg', backgroundSource: 'group' } as never,
+    })
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry], backgroundImageUrl: 'https://example.com/g.jpg' }) })
+
+    expect(body().find('[data-testid="background-provenance"]').text()).toBe('Inherited from group')
+    expect(body().find('[data-testid="background-set-override"]').exists()).toBe(true)
+  })
+
+  it('★ State 2 — the override control never renders when the entry already has its own background (paired inverse of State 3)', () => {
+    const entry = makeEntry({ id: 'entry-1', backgroundImageUrl: 'https://example.com/own.jpg' })
+    const assembledSlide = makeAssembled({
+      slide: { id: 'entry-1', position: 0, contentKind: 'text', body: 'Hello', backgroundImageUrl: 'https://example.com/own.jpg', backgroundSource: 'slide' } as never,
+    })
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+
+    expect(body().find('[data-testid="background-set-override"]').exists()).toBe(false)
+    expect(body().find('[data-testid="background-remove"]').exists()).toBe(true)
+  })
+
+  it('★ State 3 — Remove never renders when the entry has no background of its own (paired inverse of the own-set case)', () => {
+    const entry = makeEntry({ id: 'entry-1' })
+    const assembledSlide = makeAssembled({
+      slide: { id: 'entry-1', position: 0, contentKind: 'text', body: 'Hello', backgroundImageUrl: 'https://example.com/g.jpg', backgroundSource: 'group' } as never,
+    })
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry], backgroundImageUrl: 'https://example.com/g.jpg' }) })
+
+    expect(body().find('[data-testid="background-remove"]').exists()).toBe(false)
+  })
+
+  it('renders "Inherited from song" when the resolved background provenance is the song tier', () => {
+    const entry = makeEntry({ id: 'entry-1' })
+    const assembledSlide = makeAssembled({
+      slide: { id: 'entry-1', position: 0, contentKind: 'text', body: 'Hello', backgroundImageUrl: 'https://example.com/s.jpg', backgroundSource: 'song' } as never,
+    })
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+
+    expect(body().find('[data-testid="background-provenance"]').text()).toBe('Inherited from song')
+  })
+
+  it('State 3 — renders the thumbnail, decoded filename and Remove when the entry has its own background', () => {
+    const { entry, assembledSlide } = makeOwnBackgroundFixtures()
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+
+    expect(body().find('[data-testid="background-thumbnail"]').exists()).toBe(true)
+    expect(body().find('[data-testid="background-filename"]').text()).toBe('sunset.jpg')
+    expect(body().find('[data-testid="background-remove"]').exists()).toBe(true)
+  })
+
+  it('renders the remove-caption naming the group when both a group and the entry\'s own background exist', () => {
+    const { entry, assembledSlide } = makeOwnBackgroundFixtures('https://example.com/own.jpg')
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry], backgroundImageUrl: 'https://example.com/g.jpg' }) })
+
+    const caption = body().find('[data-testid="background-remove-caption"]')
+    expect(caption.exists()).toBe(true)
+    expect(caption.text()).toMatch(/the group's still applies\.$/)
+  })
+
+  it('renders no remove-caption when the entry has its own and nothing else resolves beneath it', () => {
+    const { entry, assembledSlide } = makeOwnBackgroundFixtures('https://example.com/own.jpg')
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+
+    expect(body().find('[data-testid="background-remove-caption"]').exists()).toBe(false)
+  })
+
+  it('★ renders the Slide Background section for a video-kind entry, while the Slide Audio section stays absent', () => {
+    const { entry, assembledSlide } = makeVideoFixtures()
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+
+    expect(body().find('[data-testid="drawer-background-section"]').exists()).toBe(true)
+    expect(body().find('[data-testid="drawer-audio-section"]').exists()).toBe(false)
+  })
+
+  it('★ a SONG-group entry can still reach the background attach control while every other mutation control stays absent', () => {
+    const { entry, assembledSlide } = makeLyricFixtures()
+    const songPlanItem = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songTitle: 'This Is Our God' } as never)
+    mountDrawer({ planItem: songPlanItem, entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+
+    expect(body().find('[data-testid="background-attach"]').exists()).toBe(true)
+    expect(body().find('[data-testid="drawer-label-input"]').exists()).toBe(false)
+    expect(body().find('[data-testid="drawer-notes-input"]').exists()).toBe(false)
+    expect(body().find('[data-testid="drawer-footer-actions"]').exists()).toBe(false)
+  })
+
+  it('with the service locked, add/override/remove are all absent while the thumbnail still renders', () => {
+    const { entry, assembledSlide } = makeOwnBackgroundFixtures('https://example.com/own.jpg')
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }), serviceLocked: true })
+
+    expect(body().find('[data-testid="background-attach"]').exists()).toBe(false)
+    expect(body().find('[data-testid="background-set-override"]').exists()).toBe(false)
+    expect(body().find('[data-testid="background-remove"]').exists()).toBe(false)
+    expect(body().find('[data-testid="background-thumbnail"]').exists()).toBe(true)
+  })
+
+  it('a video slide never excludes the Slide Background section — same section-presence check from the opposite direction', () => {
+    const { entry, assembledSlide } = makeVideoFixtures()
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }), serviceLocked: false })
+    expect(body().find('[data-testid="drawer-background-section"]').exists()).toBe(true)
+  })
+
+  it('a successful upload attaches the returned url as the entry\'s own background', async () => {
+    const entry = makeEntry({ id: 'entry-1' })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+    mockUploadBackground.mockResolvedValueOnce('https://example.com/orgs/org-1/backgrounds/b1/new.jpg')
+
+    await selectBackgroundAttachFile()
+
+    expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+    const written = mockReplaceGroupSlides.mock.calls[0]![2] as GroupSlideEntry[]
+    expect(written.find((e) => e.id === 'entry-1')?.backgroundImageUrl).toBe('https://example.com/orgs/org-1/backgrounds/b1/new.jpg')
+  })
+
+  it('a failed upload emits no write call and leaves the resolved background state untouched', async () => {
+    // The attach input only renders in State 1 (nothing resolved at any
+    // level) — the only state a fresh attach is offered from (State 2/3
+    // replace via "Set for this slide only" or Remove-then-reattach, never
+    // a direct re-upload over an existing value). This still exercises the
+    // full failure/no-write contract this test targets.
+    const entry = makeEntry({ id: 'entry-1' })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+    mockUploadBackground.mockRejectedValueOnce(new Error('Unsupported file type'))
+
+    await selectBackgroundAttachFile()
+
+    expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
+    expect(body().text()).toContain('No background')
+  })
+
+  it('the remove write payload for the patched entry does not contain the backgroundImageUrl key at all', async () => {
+    const { entry, assembledSlide } = makeOwnBackgroundFixtures('https://example.com/own.jpg')
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+
+    await body().find('[data-testid="background-remove"]').trigger('click')
+    await flushPromises()
+
+    expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+    const written = mockReplaceGroupSlides.mock.calls[0]![2] as GroupSlideEntry[]
+    const writtenEntry = written.find((e) => e.id === 'entry-1')!
+    expect('backgroundImageUrl' in writtenEntry).toBe(false)
+  })
+
+  it('"Set for this slide only" writes the currently resolved url as the entry\'s own — a copy, not a fresh upload', async () => {
+    const entry = makeEntry({ id: 'entry-1' })
+    const assembledSlide = makeAssembled({
+      slide: { id: 'entry-1', position: 0, contentKind: 'text', body: 'Hello', backgroundImageUrl: 'https://example.com/g.jpg', backgroundSource: 'group' } as never,
+    })
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry], backgroundImageUrl: 'https://example.com/g.jpg' }) })
+
+    await body().find('[data-testid="background-set-override"]').trigger('click')
+    await flushPromises()
+
+    expect(mockUploadBackground).not.toHaveBeenCalled()
+    expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+    const written = mockReplaceGroupSlides.mock.calls[0]![2] as GroupSlideEntry[]
+    expect(written.find((e) => e.id === 'entry-1')?.backgroundImageUrl).toBe('https://example.com/g.jpg')
+  })
+
+  it('the drawer preview box carries the resolved image as a CSS background when one resolved', () => {
+    const { entry, assembledSlide } = makeOwnBackgroundFixtures('https://example.com/own.jpg')
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+
+    const preview = body().find('[data-testid="drawer-preview"]')
+    expect(preview.attributes('style') ?? '').toContain('https://example.com/own.jpg')
+  })
+
+  it('the drawer preview box carries no background-image style when none resolved', () => {
+    const entry = makeEntry({ id: 'entry-1' })
+    mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+
+    const preview = body().find('[data-testid="drawer-preview"]')
+    expect(preview.attributes('style') ?? '').not.toContain('background-image')
+  })
+})
+
+// ── 33-07 Task 3: the pendingAction seam for Duplicate/Delete from the menu ─
+describe('EditSlideDrawer (Phase 33-07 Task 3 — pendingAction seam for Duplicate/Delete)', () => {
+  beforeEach(() => {
+    mockReplaceGroupSlides.mockReset()
+    mockReplaceGroupSlides.mockResolvedValue(undefined)
+  })
+
+  it('★ P-01: a delete pendingAction lands on the existing inline confirm and never calls the delete store action directly', async () => {
+    const entry = makeEntry({ id: 'entry-1' })
+    const wrapper = mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+    await wrapper.setProps({ pendingAction: { key: 'delete', nonce: 1 } })
+
+    expect(body().find('[data-testid="drawer-delete-confirm"]').exists()).toBe(true)
+    expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
+  })
+
+  it("the confirm body rendered by that path equals the same wording the footer trigger produces for the same entry", async () => {
+    const entry = makeEntry({ id: 'entry-1', audioUrl: 'https://example.com/a.mp3' })
+    const directWrapper = mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+    await body().find('[data-testid="drawer-delete-trigger"]').trigger('click')
+    const expectedBody = body().find('[data-testid="drawer-delete-confirm-body"]').text()
+    directWrapper.unmount()
+
+    const pendingWrapper = mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+    await pendingWrapper.setProps({ pendingAction: { key: 'delete', nonce: 1 } })
+    expect(body().find('[data-testid="drawer-delete-confirm-body"]').text()).toBe(expectedBody)
+  })
+
+  it('a duplicate pendingAction results in exactly one duplicate write call', async () => {
+    const entry = makeEntry({ id: 'entry-1' })
+    const wrapper = mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+    await wrapper.setProps({ pendingAction: { key: 'duplicate', nonce: 1 } })
+    await flushPromises()
+
+    expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+    expect(wrapper.emitted('duplicate')).toBeTruthy()
+  })
+
+  it('emits pending-action-consumed exactly once per handled transition', async () => {
+    const entry = makeEntry({ id: 'entry-1' })
+    const wrapper = mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+    await wrapper.setProps({ pendingAction: { key: 'delete', nonce: 1 } })
+    await flushPromises()
+
+    expect(wrapper.emitted('pending-action-consumed')).toHaveLength(1)
+  })
+
+  it('the same key delivered twice with different nonces fires twice', async () => {
+    const entry = makeEntry({ id: 'entry-1' })
+    const wrapper = mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
+    await wrapper.setProps({ pendingAction: { key: 'delete', nonce: 1 } })
+    await wrapper.setProps({ pendingAction: { key: 'delete', nonce: 2 } })
+    await flushPromises()
+
+    expect(wrapper.emitted('pending-action-consumed')).toHaveLength(2)
+  })
+
+  it('neither key does anything when the service is locked', async () => {
+    const entry = makeEntry({ id: 'entry-1' })
+    const wrapper = mountDrawer({ entry, group: makeGroup({ slides: [entry] }), serviceLocked: true })
+    await wrapper.setProps({ pendingAction: { key: 'delete', nonce: 1 } })
+    expect(body().find('[data-testid="drawer-delete-confirm"]').exists()).toBe(false)
+
+    await wrapper.setProps({ pendingAction: { key: 'duplicate', nonce: 2 } })
+    await flushPromises()
+    expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
+    expect(wrapper.emitted('duplicate')).toBeUndefined()
+  })
+
+  it('defaults pendingAction to null, so an existing mount fixture is unaffected', () => {
+    mountDrawer()
+    expect(body().find('[data-testid="drawer-delete-confirm"]').exists()).toBe(false)
   })
 })
