@@ -220,30 +220,6 @@
           <div v-if="!isVideo" data-testid="drawer-audio-section">
             <label class="block text-xs font-medium text-gray-400 mb-1">Slide Audio</label>
 
-            <!-- Scope choice (D-09): governs which write route the NEXT
-                 attach takes. Rendered in every audio state (not just
-                 "nothing attached") so it can still be changed ahead of a
-                 future attach — changing it here never moves an
-                 already-attached file (26-UI-SPEC.md § Slide Audio, last
-                 paragraph). -->
-            <div v-if="canMutate" class="flex flex-wrap items-center gap-2 mb-2" data-testid="audio-scope-choice">
-              <span class="text-[11px] text-gray-500">Play this audio for</span>
-              <button
-                type="button"
-                class="px-2.5 py-1 rounded-md text-xs font-medium border transition-colors"
-                :class="scopeChoice === 'slide' ? AUDIO_SCOPE_ACTIVE_CLASS : AUDIO_SCOPE_INACTIVE_CLASS"
-                data-testid="audio-scope-slide"
-                @click="scopeChoice = 'slide'"
-              >This slide only</button>
-              <button
-                type="button"
-                class="px-2.5 py-1 rounded-md text-xs font-medium border transition-colors"
-                :class="scopeChoice === 'group' ? AUDIO_SCOPE_ACTIVE_CLASS : AUDIO_SCOPE_INACTIVE_CLASS"
-                data-testid="audio-scope-group"
-                @click="scopeChoice = 'group'"
-              >All slides in this group</button>
-            </div>
-
             <!-- File row: whichever audio actually covers this slide right
                  now (the slide's own audio wins over the group bed, D-10).
                  Rendered regardless of isEditor so a viewer still hears/sees
@@ -279,15 +255,23 @@
                  — the same empty-state markup pattern used by every other
                  audio-attach control in the slides area (same copy, same
                  file input) rather than a second upload UI. -->
-            <div v-else-if="canMutate" class="flex items-center gap-1.5" data-testid="audio-attach">
-              <label class="text-[11px] font-medium text-gray-400">Audio</label>
-              <input
-                type="file"
-                accept="audio/*"
-                data-testid="audio-attach-input"
-                class="text-[11px] text-gray-400 file:mr-1 file:rounded file:border-0 file:bg-gray-700 file:px-2 file:py-0.5 file:text-gray-200 w-40"
-                @change="onAudioFileSelected"
-              />
+            <div v-else-if="canMutate" data-testid="audio-attach">
+              <div class="flex items-center gap-1.5">
+                <label class="text-[11px] font-medium text-gray-400">Audio</label>
+                <input
+                  type="file"
+                  accept="audio/*"
+                  data-testid="audio-attach-input"
+                  class="text-[11px] text-gray-400 file:mr-1 file:rounded file:border-0 file:bg-gray-700 file:px-2 file:py-0.5 file:text-gray-200 w-40"
+                  @change="onAudioFileSelected"
+                />
+              </div>
+              <!-- R058: the per-slide "whole group" scope option is gone —
+                   group-wide audio is set from SlideGroupMusicControl.vue,
+                   one control up from this drawer. Shown only in this
+                   "nothing attached" branch, the moment a user might look
+                   for the removed scope choice and not find it. -->
+              <p class="mt-1 text-[11px] text-gray-500" data-testid="audio-scope-hint">For audio across the whole group, use the group's music control above the grid.</p>
             </div>
 
             <p v-if="audioUploadIsUploading" data-testid="audio-upload-progress" class="mt-1 text-[11px] text-indigo-400">
@@ -571,26 +555,12 @@ const SONG_TEXT_CAPTION = "From the song's Lyrics tab — editing there updates 
 const SCRIPTURE_TEXT_CAPTION = 'Pulled from the passage reference — editing the reference updates this slide.'
 const IMPORTED_TEXT_CAPTION = 'From the imported file — re-import to change it.'
 
-// ── Phase 26-08: Slide Audio — scope, loop, and the video omission (D-09..D-12) ──
-
-/** Reserved accent (26-UI-SPEC.md § Color) — applied to exactly the selected scope pill, never the inactive one. Static class maps, never a built string (Tailwind v4 purge safety). */
-const AUDIO_SCOPE_ACTIVE_CLASS = 'bg-indigo-600 border-indigo-500 text-white'
-const AUDIO_SCOPE_INACTIVE_CLASS = 'border-gray-700 text-gray-300'
-
-/**
- * The user's pending choice for the NEXT attach (D-09) — reset from the
- * entry's stored `audioScope` whenever the edited entry changes (see
- * `resetLocalFields`), defaulting to `'slide'` when unset (26-UI-SPEC.md's
- * declared default). Changing this NEVER moves an already-attached file —
- * it only governs which write route a future attach takes.
- */
-const scopeChoice = ref<'slide' | 'group'>('slide')
+// ── Phase 26-08: Slide Audio — loop and the video omission (D-10..D-12) ──
 
 /**
  * Which audio actually covers this slide right now, in the assembler's own
- * precedence order (D-10: a slide's own audio wins while it is up) —
- * independent of `scopeChoice`, which is only the pending choice for a
- * FUTURE attach. `null` means neither exists yet ("nothing attached").
+ * precedence order (D-10: a slide's own audio wins while it is up). `null`
+ * means neither exists yet ("nothing attached").
  */
 const audioState = computed<'slide' | 'group' | null>(() => {
   if (props.entry?.audioUrl) return 'slide'
@@ -670,31 +640,12 @@ const {
   reset: resetAudioUpload,
 } = useMediaUpload()
 
-/** This-slide-only attach (D-09): writes the entry's own `audioUrl` through the fresh-base helper and stamps the entry's scope for round-trip display. */
+/** This-slide-only attach (R058: the only remaining attach route): writes the entry's own `audioUrl` through the fresh-base helper. */
 async function attachSlideAudio(url: string): Promise<void> {
   if (!props.group || !props.entry) return
   const entryId = props.entry.id
   const base = props.group.slides
-  const next = base.map((e) => (e.id === entryId ? { ...e, audioUrl: url, audioScope: 'slide' as const } : e))
-  await slideGroupsStore.replaceGroupSlides(props.orgId, props.group.slotId, next, props.group.sourceSignature, base)
-}
-
-/**
- * Whole-group attach (D-09): writes the GROUP'S shared music via the same
- * `setGroupBedMedia` the grid's own music bar uses — never a per-entry copy
- * of the URL — then stamps this entry's `audioScope` for round-trip display
- * only, leaving `audioUrl` unset (attach only ever runs from the "nothing
- * attached" state, so there is nothing to unset here).
- */
-async function attachGroupAudio(url: string): Promise<void> {
-  if (!props.group || !props.entry) return
-  await slideGroupsStore.setGroupBedMedia(props.orgId, props.group.slotId, {
-    serviceId: props.serviceId,
-    bedAudioUrl: url,
-  })
-  const entryId = props.entry.id
-  const base = props.group.slides
-  const next = base.map((e) => (e.id === entryId ? { ...e, audioScope: 'group' as const } : e))
+  const next = base.map((e) => (e.id === entryId ? { ...e, audioUrl: url } : e))
   await slideGroupsStore.replaceGroupSlides(props.orgId, props.group.slotId, next, props.group.sourceSignature, base)
 }
 
@@ -708,11 +659,7 @@ async function onAudioFileSelected(event: Event): Promise<void> {
   resetAudioUpload()
   try {
     const url = await uploadAudioMedia(file, props.orgId)
-    if (scopeChoice.value === 'group') {
-      await attachGroupAudio(url)
-    } else {
-      await attachSlideAudio(url)
-    }
+    await attachSlideAudio(url)
   } catch {
     // uploadAudioMedia already set the composable's reactive `error` —
     // surfaced via audio-upload-error above. Deliberately no write on
@@ -722,7 +669,7 @@ async function onAudioFileSelected(event: Event): Promise<void> {
   }
 }
 
-/** Targets whichever audio is actually shown right now (`audioState`), never `scopeChoice` — Remove always acts on what's covering the slide, not on the pending choice for a future attach. */
+/** Targets whichever audio is actually shown right now (`audioState`) — Remove always acts on what's covering the slide. */
 async function onRemoveAudio(): Promise<void> {
   if (!canMutate.value) return
   if (audioState.value === 'slide') {
@@ -926,10 +873,6 @@ function resetLocalFields(entry: GroupSlideEntry | null): void {
   localLabel.value = entry?.label ?? ''
   localNotes.value = entry?.notes ?? ''
   localBody.value = entry?.sourceRef.kind === 'text' ? (entry.sourceRef.body ?? '') : ''
-  // 26-08: the pending scope choice for a FUTURE attach — restored from the
-  // entry's own stored value so a reload shows the right pill selected
-  // (26-UI-SPEC.md's declared default of 'slide' when unset).
-  scopeChoice.value = entry?.audioScope ?? 'slide'
   void nextTick().then(() => {
     syncing = false
   })

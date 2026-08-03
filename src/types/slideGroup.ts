@@ -68,8 +68,6 @@ export interface GroupSlideEntry {
   notes?: string
   /** Per-slide audio (R030) — audio only, there is no per-slide video layer. */
   audioUrl?: string
-  /** UI toggle: apply this slide's audio to just this slide, or set it as the group's bed. */
-  audioScope?: 'slide' | 'group'
   /** D-04: loop is a per-slide flag only — a group bed never loops. */
   audioLoop?: boolean
   /** Per-slide background image (R056) — the most specific tier of the slide/group/song cascade `resolveEntryMedia` resolves; greenfield, no migration (D-19). */

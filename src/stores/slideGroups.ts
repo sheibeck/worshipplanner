@@ -209,13 +209,6 @@ export const useSlideGroups = defineStore('slideGroups', () => {
    * reconciled slide list lives in 24-03's pure functions and 24-05's
    * composable, never here.
    *
-   * Open Question 1 (RESEARCH.md) resolved: a `GroupSlideEntry` whose
-   * `audioScope` is `'group'` is persisted by the Phase 26 UI as a write to
-   * the PARENT group's `bedAudioUrl` (via `setGroupBedMedia`) with the
-   * entry's own `audioUrl` cleared. The stored `audioScope` value exists only
-   * so the drawer can round-trip the toggle's visual state — the assembler
-   * never interprets it.
-   *
    * CR-02: every call site (add-slide, import, video-append, drag-reorder in
    * `SlideGrid.vue`, and the reconciliation watcher in
    * `useSlideshowAssembly.ts`) reads a LOCAL snapshot of the group's current
