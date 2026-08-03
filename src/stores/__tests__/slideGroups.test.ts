@@ -509,6 +509,111 @@ describe('useSlideGroups', () => {
     })
   })
 
+  describe('setGroupBackground', () => {
+    it('issues an updateDoc touching only the background field and updatedAt against an existing group — no slides key, no bed key', async () => {
+      const { getDoc, updateDoc } = await import('firebase/firestore')
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => true,
+        id: 'slot-1',
+        data: () => makeGroupDoc(),
+      } as ReturnType<typeof getDoc> extends Promise<infer T> ? T : never)
+
+      const { useSlideGroups } = await import('../slideGroups')
+      const store = useSlideGroups()
+
+      await store.setGroupBackground('org-1', 'slot-1', {
+        serviceId: 'service-1',
+        backgroundImageUrl: 'https://example.com/bg.jpg',
+      })
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const payload = callArgs[1] as unknown as Record<string, unknown>
+      expect(payload.backgroundImageUrl).toBe('https://example.com/bg.jpg')
+      expect(payload.updatedAt).toBeDefined()
+      expect(Object.keys(payload).sort()).toEqual(['backgroundImageUrl', 'updatedAt'])
+      expect('slides' in payload).toBe(false)
+      expect('bedAudioUrl' in payload).toBe(false)
+    })
+
+    it('passes the deleteField() sentinel (not undefined or null) when clearBackground is true', async () => {
+      const { getDoc, updateDoc, deleteField } = await import('firebase/firestore')
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => true,
+        id: 'slot-1',
+        data: () => makeGroupDoc({ backgroundImageUrl: 'https://example.com/old.jpg' }),
+      } as ReturnType<typeof getDoc> extends Promise<infer T> ? T : never)
+
+      const { useSlideGroups } = await import('../slideGroups')
+      const store = useSlideGroups()
+
+      await store.setGroupBackground('org-1', 'slot-1', {
+        serviceId: 'service-1',
+        clearBackground: true,
+      })
+
+      expect(deleteField).toHaveBeenCalled()
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const payload = callArgs[1] as unknown as Record<string, unknown>
+      expect(payload.backgroundImageUrl).toBe('__deleteField__')
+      expect(payload.backgroundImageUrl).not.toBeUndefined()
+      expect(payload.backgroundImageUrl).not.toBeNull()
+    })
+
+    it('creates a skeleton document with slides: [] and merge enabled when the group does not exist yet', async () => {
+      const { getDoc, setDoc } = await import('firebase/firestore')
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => false,
+        id: 'slot-1',
+        data: () => undefined,
+      } as ReturnType<typeof getDoc> extends Promise<infer T> ? T : never)
+
+      const { useSlideGroups } = await import('../slideGroups')
+      const store = useSlideGroups()
+
+      await expect(
+        store.setGroupBackground('org-1', 'slot-1', {
+          serviceId: 'service-1',
+          backgroundImageUrl: 'https://example.com/bg.jpg',
+        }),
+      ).resolves.toBeUndefined()
+
+      expect(setDoc).toHaveBeenCalledOnce()
+      const callArgs = vi.mocked(setDoc).mock.calls[0]!
+      const payload = callArgs[1] as Record<string, unknown>
+      expect(payload.slides).toEqual([])
+      expect(payload.backgroundImageUrl).toBe('https://example.com/bg.jpg')
+      expect(payload.serviceId).toBe('service-1')
+      expect(callArgs[2]).toEqual({ merge: true })
+    })
+
+    it('never writes the slides array of an existing document, on either the update or the clear branch', async () => {
+      const { getDoc, updateDoc } = await import('firebase/firestore')
+      vi.mocked(getDoc).mockResolvedValue({
+        exists: () => true,
+        id: 'slot-1',
+        data: () => makeGroupDoc({ slides: [{ id: 'e1', order: 0, sourceRef: { kind: 'text' } }] }),
+      } as ReturnType<typeof getDoc> extends Promise<infer T> ? T : never)
+
+      const { useSlideGroups } = await import('../slideGroups')
+      const store = useSlideGroups()
+
+      await store.setGroupBackground('org-1', 'slot-1', {
+        serviceId: 'service-1',
+        backgroundImageUrl: 'https://example.com/bg.jpg',
+      })
+      await store.setGroupBackground('org-1', 'slot-1', {
+        serviceId: 'service-1',
+        clearBackground: true,
+      })
+
+      for (const call of vi.mocked(updateDoc).mock.calls) {
+        const payload = call[1] as unknown as Record<string, unknown>
+        expect('slides' in payload).toBe(false)
+      }
+    })
+  })
+
   describe('replaceGroupSlides', () => {
     it('writes slides and sourceSignature together with updatedAt, touching no bed field', async () => {
       const { updateDoc, doc: docFn } = await import('firebase/firestore')

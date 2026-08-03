@@ -203,6 +203,61 @@ export const useSlideGroups = defineStore('slideGroups', () => {
     )
   }
 
+  interface GroupBackgroundPatch {
+    serviceId: string
+    backgroundImageUrl?: string
+    clearBackground?: boolean
+  }
+
+  /**
+   * Scoped group-background write (R055) — structurally mirrors
+   * `setGroupBedMedia` above exactly rather than extending its patch type: the
+   * same existence check, the same single-field `updateDoc` on the existing
+   * branch, the same explicit `clearBackground` flag (an undefined url would
+   * be stripped by `stripUndefined()` before the intent reached Firestore —
+   * `deleteField()` is the only way to actually remove the field), and the
+   * same merging skeleton `setDoc` on the missing branch for the identical
+   * WR-01 race reason documented on `setGroupBedMedia`.
+   *
+   * Touches only `backgroundImageUrl` and `updatedAt` on the existing-doc
+   * branch — never `slides`, never `bedAudioUrl`. Setting a group's
+   * background must never overwrite or clear any slide's own background (the
+   * R055 adjacency truth) — this function reads and writes nothing about
+   * `slides` at all.
+   */
+  async function setGroupBackground(
+    orgId: string,
+    slotId: string,
+    patch: GroupBackgroundPatch,
+  ): Promise<void> {
+    const ref = doc(db, 'organizations', orgId, 'slideGroups', slotId)
+    const existing = await getDoc(ref)
+
+    if (existing.exists()) {
+      const update: Record<string, unknown> = { updatedAt: serverTimestamp() }
+      if (patch.clearBackground) update.backgroundImageUrl = deleteField()
+      else if (patch.backgroundImageUrl !== undefined) update.backgroundImageUrl = patch.backgroundImageUrl
+      await updateDoc(ref, update)
+      return
+    }
+
+    await setDoc(
+      ref,
+      {
+        ...stripUndefined({
+          id: slotId,
+          slotId,
+          serviceId: patch.serviceId,
+          slides: [],
+          backgroundImageUrl: patch.backgroundImageUrl,
+        }),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    )
+  }
+
   /**
    * The apply half of reconciliation — writes only `slides`/`sourceSignature`/
    * `updatedAt`, never a bed field. The decision of WHETHER to apply a
@@ -331,6 +386,7 @@ export const useSlideGroups = defineStore('slideGroups', () => {
     materializeGroupIfMissing,
     deleteGroup,
     setGroupBedMedia,
+    setGroupBackground,
     replaceGroupSlides,
   }
 })
