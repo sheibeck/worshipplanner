@@ -481,7 +481,50 @@ action bar were deferred from Phase 33 into 36 by the ROADMAP's own reasoning.
 
 | Phase | State | Resume |
 |-------|-------|--------|
-| 36 | deferred_by_owner — no wireframes | re-pull the design file, then /gsd-autonomous --only 36 |
+| 35 | verification_deferred_human | /gsd-verify-work 35 |
+| 36 | deferred_by_owner — **wireframe now EXISTS** (Turn 3) | /gsd-autonomous --only 36 |
+
+### v1.4 Phase 35 — Presentation Correctness & Lyric Editor (2026-08-03)
+
+**Code complete, all gates green. `35-VERIFICATION.md` is `human_needed` — not `passed`.**
+**5/5 success criteria verified against live source.** The four open items are genuinely
+jsdom-unverifiable (projector legibility, the congregation-facing presented view, whether a mid-deck
+start *feels* natural, wireframe fidelity of the paste region) and are logged as
+`PENDING-VERIFICATION.md` items 35.1–35.4.
+
+| Artifact | Outcome |
+|---|---|
+| Plans | 4/4 across 2 waves |
+| Verification | `human_needed`, **5/5 criteria verified** |
+| Code review | 0 Critical, 1 Warning, 3 Info; the Warning and one Info fixed (`a409c6e`, `9749385`) |
+| Gates at `bd93726` | `npm run type-check` clean · `npx vitest run src/` 2253 passed / 9 failed (the two documented baseline files only) · `npm run build` succeeds |
+
+**R060 was already satisfied and was closed with TESTS ONLY.** All three construction paths already
+emitted the leading+trailing copyright bracket unconditionally — verified by `git diff` on
+`slideshowAssembler.ts` and `slideGroupMaterializer.ts` coming back **empty for the whole phase**.
+17 regression tests now pin it, including the rebuild path's self-healing from 0, 1 and 3 stored
+copyright entries converging to exactly 2. **Adding emission code would have triple-emitted.**
+
+**A test that passed for the wrong reason, found and fixed (WR-01).** `slideshowAssembler.test.ts`
+asserted `expect(x).not.toBe('undefined')` — comparing against the **string**, so it passed trivially
+even when the value was real JS `undefined`. Fixed test-only and **proven load-bearing** by
+temporarily hardcoding `title: undefined`, confirming the corrected assertion fails, then reverting.
+That is the fourth test-passing-for-the-wrong-reason found this run.
+
+**Deliberate deletions** (recorded so they never read as breakage): `PresentationViewer.vue`'s
+`sectionLabel` render (R059 — the field survives for grid organization at `slideDisplay.ts:95,143`);
+`LyricPasteDialog.vue` and its test, replaced by the inline `LyricPasteRegion.vue` (R066 permits
+exactly one paste path — `grep -rc 'LyricPasteDialog' src/` is 0).
+
+**R065 followed the wireframe over my discuss-time call.** I had decided "advise, never block"; the
+wireframe blocks with an **always-available override** (`Add anyway — I'll enter credits later`,
+`slides-tab.dc.html:644`). The wireframe is right — an advisory line can be dismissed unread, an
+override checkbox guarantees the user saw it, and it is not the hard block I was guarding against.
+
+**CCLI's primary licence text failed retrieval a SECOND time (2026-08-03).** R060 says it "should be
+pulled before this criterion is treated as final." Nothing in the phase cites CCLI as a mandate —
+`grep -rEin 'ccli (requires|mandates|requirement)' src/` returns 0 — so this does not block, but the
+criterion is not finalised until the owner pulls that text from their CCLI account.
 | 32 | verification_deferred_human | /gsd-verify-work 32 |
 | 33 | verification_deferred_human | /gsd-verify-work 33 |
 | 34 | verification_deferred_gaps | /gsd-plan-phase 34 --gaps |
