@@ -387,6 +387,66 @@ the underlying R060 criterion formally finalised against the primary source text
 
 ---
 
+## Phase 37 — PowerPoint Server-Side Rendering
+
+This phase built and automated-tested the render service, its Dockerfile, the bridging
+function, the completeness check, both IAM contract directions (as reviewable, unexecuted
+documentation), the font policy, and the orphan-cleanup dry-run default — `render-service/`
+(39/39 tests) and `functions/` (70/70 tests) are both green. **Nothing was deployed. No
+container was built. No GCP resource was created**, by explicit owner instruction
+(STATE.md v1.4: BUILD BUT DO NOT DEPLOY). Every item below is open.
+
+- ☐ **37.1 Real visual fidelity (R062 criterion 1).** Only a deployed service can render.
+  Instructions: run `render-service/DEPLOY.md`'s deploy command, then import a **real
+  multi-font, multi-slide deck** — the ROADMAP is explicit that a 2-slide fixture proves
+  nothing about fidelity or cost. Compare backgrounds, fonts, layout and effects against
+  PowerPoint's own rendering. Note that static-frame export means transitions and animations
+  are not rendered, which is expected: R062 asks for a true visual representation, not motion.
+- ☐ **37.2 Font substitution actually happened (R062 criterion 3's *effect*).** The Dockerfile
+  test proves the right packages are installed and no Microsoft font is bundled; it cannot
+  prove LibreOffice actually maps Calibri to Carlito and Cambria to Caladea. A fontconfig
+  alias file was shipped for exactly this reason, but 37-RESEARCH.md records it as an
+  assumption until seen. Instructions: import a deck authored in Calibri and Cambria and
+  confirm the rendering is metrically correct rather than falling back to Liberation Sans.
+- ☐ **37.3 Cost and latency.** Cannot be estimated credibly without running it, and this run
+  refused to estimate and call it validated. Instructions: render several real decks; record
+  CPU-seconds and wall time. Cold starts likely dominate. Revisit `--memory=2Gi`, `--cpu=2`
+  and `--max-instances=5` against the observed numbers.
+- ☐ **37.4 The deploy itself.** Every command in `render-service/DEPLOY.md` provisions
+  billable infrastructure and is the owner's call. Instructions: review
+  `render-service/DEPLOY.md`, confirm the region against the project's actual
+  Firestore/Functions region, then run the prerequisites, the deploy, and the
+  `roles/run.invoker` binding. Afterwards set `PPTX_RENDER_SERVICE_URL` and redeploy
+  `functions/`.
+- ☐ **37.5 Sign-off on the new dependencies.** Two package-legitimacy checkpoints were
+  deferred during this phase, never self-approved:
+  - **37-01** (`render-service/`): `express`, `@google-cloud/storage`, `@types/express`,
+    `@types/node`. Mechanical `npm view ... repository` checks resolved `express` to
+    `github.com/expressjs/express` (128.3M/wk downloads, Approved), `@google-cloud/storage`
+    to `github.com/googleapis/google-cloud-node` (15.5M/wk, Approved), and both `@types/*`
+    packages to `github.com/DefinitelyTyped/DefinitelyTyped` (canonical convention).
+  - **37-03** (`functions/`): `google-auth-library`, resolved to
+    `github.com/googleapis/google-cloud-node` (`core/packages/google-auth-library-nodejs`),
+    latest `11.0.0` published 4 days before that plan ran, by Google's official npm bot,
+    77.5M weekly downloads. Flagged `[SUS]` by the package checker on a pure `too-new`
+    heuristic — running the identical checker against this repo's own already-shipping
+    `firebase-admin` and `firebase-functions` produces the same `[SUS]`/`too-new` verdict, so
+    this reads as a false positive from Google's fast Node-client release cadence rather than
+    a real risk signal. It is recorded rather than hidden, per protocol, and still requires
+    sign-off.
+
+  Instructions: confirm you are comfortable with `google-auth-library` in `functions/`, and
+  with `express`, `@google-cloud/storage`, `@types/express` and `@types/node` in
+  `render-service/`.
+- ☐ **37.6 Review a cleanup dry-run before enabling deletion.** `cleanupOrphanRenders` runs
+  daily at 03:00 UTC and is dry-run-by-default; `PPTX_RENDER_CLEANUP_ENABLED` must stay unset
+  until a real log has been read. Instructions: after the service has run for a while, read a
+  dry-run log and confirm the would-delete list contains only stale `pending`/`failed`
+  renders and their `rendered/` objects — never a `source.pptx`, never anything under
+  `images/`, never a `ready` render.
+
+---
+
 ## Notes and failures
 
 _(Record anything that failed here, with what you saw versus what was expected.)_
