@@ -24,7 +24,7 @@
       >
         <!-- Header — 16px padding (md token), not SongSlideOver's 20px (no 20px in this spec). -->
         <div class="flex items-center justify-between gap-3 px-4 py-4 border-b border-gray-800 shrink-0">
-          <h2 class="text-sm font-medium text-gray-100" data-testid="edit-slide-drawer-title">Edit Slide</h2>
+          <h2 class="text-sm font-medium text-gray-100" data-testid="edit-slide-drawer-title">{{ drawerTitle }}</h2>
           <div class="flex items-center gap-2">
             <span class="text-xs text-gray-400" data-testid="drawer-status">{{ statusText }}</span>
             <button
@@ -78,7 +78,8 @@
           </div>
 
           <div
-            class="aspect-video rounded-md bg-gray-950 border border-gray-800 flex items-center justify-center overflow-hidden"
+            class="aspect-video rounded-md bg-gray-950 border border-gray-800 flex items-center justify-center overflow-hidden bg-cover bg-center"
+            :style="resolvedBackgroundUrl ? { backgroundImage: `url(${resolvedBackgroundUrl})` } : {}"
             data-testid="drawer-preview"
           >
             <img
@@ -103,8 +104,9 @@
           </div>
 
           <!-- Task 3: label/notes fields render here, gated on canMutate
-               (R054: absent entirely for a song group, never merely disabled). -->
-          <div v-if="canMutate">
+               (R054: absent entirely for a song group, never merely disabled).
+               Phase 33-07: also gated on mode — details mode only. -->
+          <div v-if="canMutate && mode === 'details'">
             <label class="block text-xs font-medium text-gray-400 mb-1" for="edit-slide-drawer-label">Slide Label</label>
             <input
               id="edit-slide-drawer-label"
@@ -193,21 +195,34 @@
 
             <template v-else-if="sourceKind === 'text'">
               <!-- D-13's one exception: no canonical source exists for a
-                   hand-written slide, so the drawer IS its home — editable
-                   right here, no caption, no link, and (D-13, closed) no
-                   per-service override control of any kind. -->
-              <textarea
-                v-if="canMutate"
-                v-model="localBody"
-                rows="3"
-                class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
-                data-testid="drawer-slide-text-editable"
-              ></textarea>
-              <p
-                v-else
-                class="text-[13px] leading-normal text-gray-200 whitespace-pre-line"
-                data-testid="drawer-slide-text-readonly"
-              >{{ localBody }}</p>
+                   hand-written slide, so the drawer IS its home. Phase 33-07:
+                   relocated to `lyrics` mode only — `details` mode never
+                   shows the editable field, even for an editor; it shows a
+                   read-only preview and a caption pointing at `lyrics` mode
+                   instead (33-UI-SPEC.md §4). The `lyrics`-mode markup below
+                   is byte-identical to what this branch rendered before this
+                   phase — no per-service override control of any kind. -->
+              <template v-if="mode === 'lyrics'">
+                <textarea
+                  v-if="canMutate"
+                  v-model="localBody"
+                  rows="3"
+                  class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
+                  data-testid="drawer-slide-text-editable"
+                ></textarea>
+                <p
+                  v-else
+                  class="text-[13px] leading-normal text-gray-200 whitespace-pre-line"
+                  data-testid="drawer-slide-text-readonly"
+                >{{ localBody }}</p>
+              </template>
+              <template v-else>
+                <p
+                  class="text-[13px] leading-normal text-gray-200 whitespace-pre-line"
+                  data-testid="drawer-slide-text-readonly"
+                >{{ localBody }}</p>
+                <p class="mt-1 text-xs text-gray-500" data-testid="drawer-slide-text-caption">Edit this slide's text via Edit lyrics</p>
+              </template>
             </template>
           </div>
 
@@ -217,7 +232,7 @@
                for its own duration (25-REVIEW-FIX WR-01), so offering a
                second audio attachment here would recreate the exact
                conflict the model was built to prevent. -->
-          <div v-if="!isVideo" data-testid="drawer-audio-section">
+          <div v-if="!isVideo && mode === 'details'" data-testid="drawer-audio-section">
             <label class="block text-xs font-medium text-gray-400 mb-1">Slide Audio</label>
 
             <!-- File row: whichever audio actually covers this slide right
@@ -297,7 +312,73 @@
             </div>
           </div>
 
-          <div v-if="canMutate">
+          <!-- Phase 33-07: Slide Background — details mode only, but
+               ★ deliberately NOT wrapped in `!isVideo` the way Slide Audio
+               immediately above it is. Two audio sources collide audibly;
+               two visual layers do not, and a video's own picture already
+               covers whatever is behind it (33-UI-SPEC.md §9 — a deliberate
+               divergence from the audio precedent, do not "fix" it into
+               matching). -->
+          <div v-if="mode === 'details'" data-testid="drawer-background-section">
+            <label class="block text-xs font-medium text-gray-400 mb-1">Slide Background</label>
+
+            <!-- State 1: nothing resolved at any level. -->
+            <template v-if="!resolvedBackgroundUrl">
+              <p class="text-[11px] text-gray-500 mb-1.5">No background</p>
+              <label
+                v-if="canMutateBackground"
+                class="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-gray-700 px-2.5 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:bg-gray-800"
+                data-testid="background-attach"
+              >
+                &#65291; Add background
+                <input
+                  type="file"
+                  accept="image/*"
+                  class="hidden"
+                  data-testid="background-attach-input"
+                  @change="onBackgroundFileSelected"
+                />
+              </label>
+            </template>
+
+            <!-- State 2: the entry has none but a group or song supplies one. -->
+            <template v-else-if="!ownBackgroundUrl">
+              <div class="flex items-center gap-2 rounded-md bg-gray-800 border border-gray-700 p-2">
+                <img :src="resolvedBackgroundUrl" class="h-8 w-8 rounded object-cover flex-none" alt="" />
+                <span class="text-[11px] text-gray-400" data-testid="background-provenance">{{ backgroundSource === 'group' ? 'Inherited from group' : 'Inherited from song' }}</span>
+                <button
+                  v-if="canMutateBackground"
+                  type="button"
+                  class="ml-auto text-xs font-medium text-indigo-400 hover:text-indigo-300"
+                  data-testid="background-set-override"
+                  @click="onSetOverrideFromResolved"
+                >Set for this slide only</button>
+              </div>
+            </template>
+
+            <!-- State 3: the entry has its own. -->
+            <template v-else>
+              <div class="flex items-center gap-2 rounded-md bg-gray-800 border border-gray-700 p-2">
+                <img :src="ownBackgroundUrl" class="h-8 w-8 rounded object-cover flex-none" alt="" data-testid="background-thumbnail" />
+                <span class="min-w-0 flex-1 truncate text-[13px] text-gray-200" data-testid="background-filename">{{ backgroundFileName }}</span>
+                <button
+                  v-if="canMutateBackground"
+                  type="button"
+                  class="text-xs text-gray-500 hover:text-red-400 transition-colors"
+                  data-testid="background-remove"
+                  @click="onRemoveSlideBackground"
+                >Remove</button>
+              </div>
+              <p v-if="lowerLevelBackgroundLabel" class="mt-1 text-[11px] text-gray-500" data-testid="background-remove-caption">Removing only this slide's background — the {{ lowerLevelBackgroundLabel }}'s still applies.</p>
+            </template>
+
+            <p v-if="backgroundUploadIsUploading" data-testid="background-upload-progress" class="mt-1 text-[11px] text-indigo-400">
+              Uploading... {{ Math.round(backgroundUploadProgress) }}%
+            </p>
+            <p v-if="backgroundUploadError" data-testid="background-upload-error" class="mt-1 text-[11px] text-red-400">{{ backgroundUploadError }}</p>
+          </div>
+
+          <div v-if="canMutate && mode === 'details'">
             <label class="block text-xs font-medium text-gray-400 mb-1" for="edit-slide-drawer-notes">Notes (operator only)</label>
             <textarea
               id="edit-slide-drawer-notes"
@@ -312,7 +393,7 @@
                Slide (right), above a border-t divider (26-UI-SPEC.md §
                "Duplicate and Delete Slide"), matching SongSlideOver.vue's own
                "Delete Song" block placement convention. -->
-          <div v-if="canMutate" class="border-t border-gray-800 pt-4" data-testid="drawer-footer-actions">
+          <div v-if="canMutate && mode === 'details'" class="border-t border-gray-800 pt-4" data-testid="drawer-footer-actions">
             <div v-if="!showDeleteConfirm" class="flex items-center justify-between">
               <button
                 type="button"
@@ -378,10 +459,11 @@ import type { ServiceSlot } from '@/types/service'
 import type { AssembledSlide, ImageSlide, CopyrightSlide, ScriptureSlide } from '@/types/slide'
 import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
 import { useSlideGroups } from '@/stores/slideGroups'
-import { KIND_BADGE_CLASSES, slotDisplayTitle, slideBodyText, bedAudioLabel, deleteSlideConfirmBody } from './slideDisplay'
+import { KIND_BADGE_CLASSES, slotDisplayTitle, slideBodyText, bedAudioLabel, backgroundImageLabel, deleteSlideConfirmBody } from './slideDisplay'
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import { buildSongEditLink, type SongEditTab } from '@/utils/songEditLink'
 import { useMediaUpload } from '@/composables/useMediaUpload'
+import { useBackgroundUpload } from '@/composables/useBackgroundUpload'
 import AudioPlayer from '../AudioPlayer.vue'
 
 const props = withDefaults(defineProps<{
@@ -414,7 +496,24 @@ const props = withDefaults(defineProps<{
    * needed.
    */
   serviceLocked?: boolean
-}>(), { serviceLocked: false })
+  /**
+   * Phase 33-07 (R052) — which body this ONE component shows. Not two
+   * components, not tabs: the scrimless floating-panel shell, positioning
+   * and follows-selection behaviour are all shared (Phase 26), only the body
+   * differs (33-CONTEXT.md's explicit decision). Defaults `'details'`, so
+   * every pre-33-07 fixture that mounts this drawer without it behaves
+   * exactly as before.
+   */
+  mode?: 'details' | 'lyrics'
+  /**
+   * Phase 33-07 — a menu-dispatched Duplicate/Delete request, keyed on a
+   * changing `nonce` (not the `key` alone) so the same action can re-fire on
+   * a repeat. Watched below; the delete key sets the EXISTING confirm state
+   * and never calls the delete action directly (P-01). Defaults `null`, so
+   * every pre-33-07 fixture is unaffected.
+   */
+  pendingAction?: { key: 'duplicate' | 'delete'; nonce: number } | null
+}>(), { serviceLocked: false, mode: 'details', pendingAction: null })
 
 const emit = defineEmits<{
   close: []
@@ -422,6 +521,8 @@ const emit = defineEmits<{
   'edit-in-scripture': []
   /** Phase 26-09 Task 2: carries the freshly-minted copy's id, only once the write has actually succeeded — `SlidesTab.vue` relays it into `selectSlideById` so the panel follows the copy. */
   duplicate: [entryId: string]
+  /** Phase 33-07 — fired once per handled `pendingAction` nonce so the parent (which owns the pending state) can clear it. */
+  'pending-action-consumed': []
 }>()
 
 const slideGroupsStore = useSlideGroups()
@@ -486,6 +587,17 @@ onUnmounted(() => {
   window.removeEventListener('keydown', onKeydown)
 })
 
+// ── Phase 33-07 Task 1: the mode prop and its header title ─────────────────
+
+/**
+ * Both strings are R052's own fixed naming, applied per 33-CONTEXT.md to
+ * every hand-authored text kind, not only song sections — it reads slightly
+ * oddly over a Prayer slide's plain paragraph, but 33-CONTEXT.md's
+ * discretion grant covers labels BEYOND these two names, never the two
+ * names themselves. Do not relabel.
+ */
+const drawerTitle = computed(() => (props.mode === 'lyrics' ? 'Edit Slide Lyrics' : 'Edit Slide Details'))
+
 // ── Context line and preview ────────────────────────────────────────────────
 
 const kindLabel = computed(() => props.assembledSlide?.slotKind ?? '')
@@ -504,6 +616,15 @@ const imageAlt = computed(() => (props.assembledSlide?.slide as ImageSlide | und
 const previewText = computed(() =>
   props.assembledSlide && !isImage.value && !isVideo.value ? slideBodyText(props.assembledSlide.slide) : '',
 )
+
+/**
+ * Phase 33-07 (R055/R056/R057): the RESOLVED background url/source, read
+ * straight off the already-assembled slide (`resolveEntryMedia`'s output,
+ * 33-01) — never re-derived here. Feeds both the compact drawer preview
+ * (§8's `background-image` treatment) and the Slide Background section (§5).
+ */
+const resolvedBackgroundUrl = computed(() => props.assembledSlide?.slide.backgroundImageUrl)
+const backgroundSource = computed(() => props.assembledSlide?.slide.backgroundSource)
 
 // ── Phase 26-07 Task 1: Slide Text, keyed on the STORED entry's sourceRef.kind ──
 // (see the template comment above the section for why this must never branch
@@ -700,6 +821,104 @@ async function removeGroupAudio(): Promise<void> {
     serviceId: props.serviceId,
     clearAudio: true,
   })
+}
+
+// ── Phase 33-07 Task 2: Slide Background — the three-state section (R055/R056/R057) ──
+
+/** The entry's OWN background, read the same way every other own-vs-resolved comparison in this section reads it — never the resolved value. */
+const ownBackgroundUrl = computed(() => props.entry?.backgroundImageUrl)
+
+const backgroundFileName = computed(() => (ownBackgroundUrl.value ? backgroundImageLabel(ownBackgroundUrl.value) : ''))
+
+/**
+ * ★ Deliberately NOT `canMutate` — omits the song-group exclusion.
+ * `canMutate` (`isEditor && !serviceLocked && !isSongGroup`, above) governs
+ * label/notes/audio/duplicate/delete, all of which R054 keeps
+ * song-slide-canonical. A per-slide background is a genuinely new,
+ * independent property R054's "canonical, edited only from Song Lyrics" rule
+ * was never written to cover — 33-CONTEXT.md explicitly states a song
+ * group's reduced menu still offers background-setting. This is the ONE
+ * mutation gate in this drawer that is not `canMutate` — do not "fix" it to
+ * match the surrounding pattern.
+ */
+const canMutateBackground = computed(() => props.isEditor && !props.serviceLocked)
+
+/**
+ * ★ Data-availability note (documented in 33-07-SUMMARY.md as a known,
+ * scoped gap): this drawer receives `group` (with its own
+ * `backgroundImageUrl`) but no `song` document — no plan in this phase
+ * threads a song-level background lookup into this component. The GROUP
+ * branch below reads `props.group.backgroundImageUrl` directly (a raw field
+ * read, not a re-derivation of resolution precedence). The SONG branch
+ * cannot be verified from available props — rather than assert a caption
+ * this component cannot confirm (which would risk the INVERSE of this
+ * phase's own "override the user cannot see" risk: a false claim that a
+ * background survives when none does), the caption renders only for the
+ * provable group case.
+ */
+const lowerLevelBackgroundLabel = computed<'group' | 'song' | null>(() => {
+  if (!ownBackgroundUrl.value) return null
+  if (props.group?.backgroundImageUrl) return 'group'
+  return null
+})
+
+const {
+  progress: backgroundUploadProgress,
+  error: backgroundUploadError,
+  isUploading: backgroundUploadIsUploading,
+  uploadBackground,
+  reset: resetBackgroundUpload,
+} = useBackgroundUpload()
+
+/** Writes the entry's own `backgroundImageUrl` through the same fresh-base helper `attachSlideAudio` uses. */
+async function attachSlideBackground(url: string): Promise<void> {
+  if (!props.group || !props.entry) return
+  const entryId = props.entry.id
+  const base = props.group.slides
+  const next = base.map((e) => (e.id === entryId ? { ...e, backgroundImageUrl: url } : e))
+  await slideGroupsStore.replaceGroupSlides(props.orgId, props.group.slotId, next, props.group.sourceSignature, base)
+}
+
+async function onBackgroundFileSelected(event: Event): Promise<void> {
+  if (!canMutateBackground.value) return
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+
+  resetBackgroundUpload()
+  try {
+    const url = await uploadBackground(file, props.orgId)
+    await attachSlideBackground(url)
+  } catch {
+    // uploadBackground already set the composable's reactive `error` —
+    // surfaced via background-upload-error above. Deliberately no write on
+    // failure, so a failed upload can never clear or overwrite an existing
+    // background (matches the audio attach's identical contract).
+  }
+}
+
+/** "Set for this slide only" — a copy-then-override of the CURRENTLY
+ * RESOLVED url, not a fresh upload (this plan's key_links). */
+async function onSetOverrideFromResolved(): Promise<void> {
+  if (!canMutateBackground.value) return
+  if (!resolvedBackgroundUrl.value) return
+  await attachSlideBackground(resolvedBackgroundUrl.value)
+}
+
+/** Writes the entry WITHOUT the `backgroundImageUrl` key (never the key set to `undefined`), mirroring `removeSlideAudio`'s identical contract. */
+async function onRemoveSlideBackground(): Promise<void> {
+  if (!canMutateBackground.value) return
+  if (!props.group || !props.entry) return
+  const entryId = props.entry.id
+  const base = props.group.slides
+  const next = base.map((e) => {
+    if (e.id !== entryId) return e
+    const rest = { ...e }
+    delete rest.backgroundImageUrl
+    return rest
+  })
+  await slideGroupsStore.replaceGroupSlides(props.orgId, props.group.slotId, next, props.group.sourceSignature, base)
 }
 
 // ── Task 3: label/notes/body fields, applied live through a fresh-base write ──
@@ -1076,4 +1295,47 @@ async function onConfirmDelete(): Promise<void> {
     isDeleting.value = false
   }
 }
+
+// ── Phase 33-07 Task 3: the pendingAction seam for Duplicate/Delete from the menu ──
+
+/**
+ * Tracks the last handled nonce so a repeated `key` with an unchanged nonce
+ * never re-fires — the transition is keyed on the CHANGING nonce, never on
+ * the key's value alone (this plan's key_links).
+ */
+const lastHandledPendingActionNonce = ref<number | null>(null)
+
+/**
+ * ★ P-01: the delete key sets the EXISTING `showDeleteConfirm` state and
+ * never calls the delete action directly. A menu puts destruction one click
+ * closer than the drawer did; it must not also make it quieter. The existing
+ * inline confirm — which names whether attached audio and operator notes go
+ * with the slide (`deleteConfirmBody`, unchanged) — stays byte-unchanged and
+ * remains unavoidable.
+ *
+ * ★ T-33-15: re-checks `canMutate` before acting on either key, so a
+ * dispatched action cannot bypass the editor / not-locked / not-a-song-group
+ * composition even if the menu that sent it were wrong.
+ *
+ * `pending-action-consumed` is emitted once per handled nonce regardless of
+ * whether `canMutate` permitted the action — so the parent (which owns the
+ * pending state) never gets stuck holding a request this drawer correctly
+ * refused, while the ACTUAL mutation (confirm-state flip / duplicate write)
+ * only ever happens when permitted.
+ */
+watch(
+  () => props.pendingAction,
+  (action) => {
+    if (!action || action.nonce === lastHandledPendingActionNonce.value) return
+    lastHandledPendingActionNonce.value = action.nonce
+    if (canMutate.value) {
+      if (action.key === 'delete') {
+        showDeleteConfirm.value = true
+      } else if (action.key === 'duplicate') {
+        void onDuplicate()
+      }
+    }
+    emit('pending-action-consumed')
+  },
+)
 </script>
