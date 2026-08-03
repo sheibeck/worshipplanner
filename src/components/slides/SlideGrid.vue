@@ -371,6 +371,21 @@ const cards = computed<CardEntry[]>(() => {
  */
 const openMenuEntryId = ref<string | null>(null)
 
+// WR-02: reset whenever the selected plan item changes. `openMenuEntryId` is
+// local, persistent state on this instance — it is NOT remounted when
+// `SlidesTab.vue`'s rail selection changes plan item, only `selectedSlot`/
+// `group` props change and `cards` recomputes to a different filtered list.
+// Without this, returning to a previously-selected plan item whose group
+// still contains a `GroupSlideEntry.id` matching the stale `openMenuEntryId`
+// (stable ids, so this reliably recurs) makes that card's menu reopen with
+// no click, tap, or keypress from the user.
+watch(
+  () => props.selectedSlot?.id,
+  () => {
+    openMenuEntryId.value = null
+  },
+)
+
 function onCardMenuToggle(slideId: string): void {
   openMenuEntryId.value = openMenuEntryId.value === slideId ? null : slideId
 }

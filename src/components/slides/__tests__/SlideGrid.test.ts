@@ -861,6 +861,28 @@ describe('SlideGrid', () => {
       expect(wrapper.findComponent(SlideCard).props('menuOpen')).toBe(false)
     })
 
+    it("WR-02: opening a menu, selecting a DIFFERENT plan item, then returning to the original does not silently reopen the menu", async () => {
+      const slotA = makeSlot({ kind: 'PRAYER', id: 'slot-a', position: 0 })
+      const slotB = makeSlot({ kind: 'PRAYER', id: 'slot-b', position: 1 })
+      // Same GroupSlideEntry id ('c1') reachable from BOTH plan items' props —
+      // this is the reproduction: stable entry ids mean re-selecting slot A
+      // re-renders a card whose id matches the stale `openMenuEntryId`.
+      const groupA = makeGroup({ id: 'slot-a', slotId: 'slot-a', slides: [makeTextEntry('c1', '')] })
+      const assembledForA = [makeAssembled(0, 'c1')]
+      const wrapper = mountGrid({ selectedSlot: slotA, slotArrayIndex: 0, assembledSlideshow: assembledForA, group: groupA })
+
+      await wrapper.findComponent(SlideCard).vm.$emit('menu-toggle', 'c1')
+      expect(wrapper.findComponent(SlideCard).props('menuOpen')).toBe(true)
+
+      // Select a different plan item — no card matches 'c1' anymore.
+      await wrapper.setProps({ selectedSlot: slotB, slotArrayIndex: 1, assembledSlideshow: [], group: null })
+      expect(wrapper.findComponent(SlideCard).exists()).toBe(false)
+
+      // Return to the original plan item — same entry id, freshly (re)rendered.
+      await wrapper.setProps({ selectedSlot: slotA, slotArrayIndex: 0, assembledSlideshow: assembledForA, group: groupA })
+      expect(wrapper.findComponent(SlideCard).props('menuOpen')).toBe(false)
+    })
+
     it('a card whose slide id matches no stored entry receives menuItems of length 0', () => {
       const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
       const group = makeGroup({ slides: [] })
