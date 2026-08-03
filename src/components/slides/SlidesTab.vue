@@ -117,11 +117,17 @@
  * `GroupSlideEntry.id` verbatim (26-RESEARCH.md Pattern 1), so no mapping
  * layer exists or is needed. A selection with no matching entry (the
  * pre-materialization fallback-id window, Pitfall 1) resolves to `null` and
- * the drawer renders nothing — not a loading state. `drawerOpen` is set true
- * on every slide selection (including re-selecting the same slide after a
- * close) and false only by the drawer's own `close` emit; it is NEVER cleared
- * by a selection change, so the drawer follows the selection instead of
- * closing and reopening (D-03).
+ * the drawer renders nothing — not a loading state.
+ *
+ * Phase 33-09 (R051): selecting a card no longer opens the drawer — that
+ * coupling is exactly what R051 exists to break, so a slide can be dragged
+ * without triggering edit. `drawerOpen` is now set true only by
+ * `onMenuAction`'s two edit keys and by the post-duplicate follow-selection
+ * handler (`selectSlideById`), and false only by the drawer's own `close`
+ * emit or by the selection itself disappearing (below). It is still NEVER
+ * cleared by a selection CHANGE to a still-valid slide, so once open the
+ * drawer keeps following the selection instead of closing and reopening
+ * (D-03) — this part of the original design is unchanged.
  */
 import { ref, computed, watch } from 'vue'
 import type { ServiceSlot } from '@/types/service'
@@ -244,17 +250,23 @@ function onSelectSlot(slotId: string): void {
   selectedSlotId.value = slotId
 }
 
-// True whenever a slide has been selected and the drawer hasn't been
-// explicitly closed since. Set on every selection (including re-selecting
-// the same slide after a close) and cleared only by the drawer's own `close`
+// Phase 33-09 (R051): no longer set true on every selection — that was the
+// coupling this plan exists to break. Set true only by `onMenuAction`'s two
+// edit keys and by the post-duplicate follow-selection handler
+// (`selectSlideById`) below, and cleared only by the drawer's own `close`
 // emit or by the selection itself disappearing (below) — never by a
-// selection CHANGE, so the drawer follows the selection instead of closing
-// and reopening (D-03).
+// selection CHANGE to a still-valid slide, so once open the drawer still
+// follows the selection instead of closing and reopening (D-03).
 const drawerOpen = ref(false)
 
+// R051: selection only. Selecting a card must never also open the drawer —
+// that coupling is what blocked dragging a slide without triggering edit.
+// Selection itself stays fully load-bearing: it still drives the plan
+// rail's active accent (via the card's `selected` prop), it is still what
+// resolves the drawer's `entry`/`assembledSlide` props below, and the
+// dangling-selection watcher above still depends on it.
 function onSelectSlide(slideId: string): void {
   selectedSlideId.value = slideId
-  drawerOpen.value = true
 }
 
 function onDrawerClose(): void {

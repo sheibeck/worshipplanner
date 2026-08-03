@@ -314,7 +314,7 @@ describe('SlidesTab', () => {
   })
 
   describe('Edit Slide drawer wiring (Phase 26-05 Task 2)', () => {
-    it('resolves the selected slide to its stored entry by a direct id lookup and mounts the drawer with it', async () => {
+    it('resolves the selected slide to its stored entry by a direct id lookup, but does NOT open the drawer (33-09, R051 — region-scoped gate for the deleted `onSelectSlide` line)', async () => {
       const slots: ServiceSlot[] = [makeSlot({ kind: 'SONG', id: 'slot-a', position: 0 })]
       const entryOne = makeEntry({ id: 'entry-1', label: 'First' })
       const entryTwo = makeEntry({ id: 'entry-2', label: 'Second' })
@@ -332,7 +332,7 @@ describe('SlidesTab', () => {
 
       const drawer = wrapper.findComponent(EditSlideDrawer)
       expect(drawer.exists()).toBe(true)
-      expect(drawer.props('open')).toBe(true)
+      expect(drawer.props('open')).toBe(false)
       expect(drawer.props('entry')).toEqual(entryOne)
     })
 
@@ -355,7 +355,7 @@ describe('SlidesTab', () => {
       expect(drawer.props('entry')).toBeNull()
     })
 
-    it('swaps to the second entry and stays open when a different slide is selected while open', async () => {
+    it('swaps to the second entry (and leaves the drawer closed) when a different slide is selected', async () => {
       const slots: ServiceSlot[] = [makeSlot({ kind: 'SONG', id: 'slot-a', position: 0 })]
       const entryOne = makeEntry({ id: 'entry-1' })
       const entryTwo = makeEntry({ id: 'entry-2' })
@@ -370,11 +370,11 @@ describe('SlidesTab', () => {
       await wrapper.vm.$nextTick()
 
       const drawer = wrapper.findComponent(EditSlideDrawer)
-      expect(drawer.props('open')).toBe(true)
+      expect(drawer.props('open')).toBe(false)
       expect(drawer.props('entry')).toEqual(entryTwo)
     })
 
-    it('reopens the drawer when the same slide is re-selected after it was closed', async () => {
+    it('does NOT reopen the drawer when the same slide is merely re-selected after it was closed (33-09 — selection alone never opens it; only a menu action does)', async () => {
       const slots: ServiceSlot[] = [makeSlot({ kind: 'SONG', id: 'slot-a', position: 0 })]
       const entryOne = makeEntry({ id: 'entry-1' })
       const group = makeGroup({ id: 'slot-a', slotId: 'slot-a', slides: [entryOne] })
@@ -382,7 +382,11 @@ describe('SlidesTab', () => {
       const wrapper = mountTab({ slots, assembledSlideshow, groupsBySlotId: new Map([['slot-a', group]]) })
       await wrapper.vm.$nextTick()
 
-      wrapper.findComponent(SlideGrid).vm.$emit('select', 'entry-1')
+      // Opened via the exposed select-by-id function (unaffected by this
+      // plan — mirrors the post-duplicate follow-selection path), since a
+      // plain card `select` no longer opens the drawer at all.
+      const vm = wrapper.vm as unknown as { selectSlideById: (id: string) => void }
+      vm.selectSlideById('entry-1')
       await wrapper.vm.$nextTick()
       expect(wrapper.findComponent(EditSlideDrawer).props('open')).toBe(true)
 
@@ -390,9 +394,10 @@ describe('SlidesTab', () => {
       await wrapper.vm.$nextTick()
       expect(wrapper.findComponent(EditSlideDrawer).props('open')).toBe(false)
 
+      // Re-selecting the SAME slide via a plain card select must NOT reopen it.
       wrapper.findComponent(SlideGrid).vm.$emit('select', 'entry-1')
       await wrapper.vm.$nextTick()
-      expect(wrapper.findComponent(EditSlideDrawer).props('open')).toBe(true)
+      expect(wrapper.findComponent(EditSlideDrawer).props('open')).toBe(false)
       expect(wrapper.findComponent(EditSlideDrawer).props('entry')).toEqual(entryOne)
     })
 
@@ -407,7 +412,11 @@ describe('SlidesTab', () => {
       const wrapper = mountTab({ slots, assembledSlideshow, groupsBySlotId: new Map([['slot-a', group]]) })
       await wrapper.vm.$nextTick()
 
-      wrapper.findComponent(SlideGrid).vm.$emit('select', 'entry-1')
+      // Opened via the exposed select-by-id function so this exercises the
+      // "drawer was actually open" case rather than the no-longer-true
+      // "select opens it".
+      const vm = wrapper.vm as unknown as { selectSlideById: (id: string) => void }
+      vm.selectSlideById('entry-1')
       await wrapper.vm.$nextTick()
       expect(wrapper.findComponent(EditSlideDrawer).props('open')).toBe(true)
 
