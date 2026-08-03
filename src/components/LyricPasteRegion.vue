@@ -20,7 +20,6 @@
     </p>
 
     <textarea
-      ref="pasteTextareaRef"
       v-model="rawText"
       data-testid="paste-textarea"
       placeholder="Paste lyrics from CCLI SongSelect..."
@@ -135,7 +134,6 @@ const rawText = ref('')
 const isSaving = ref(false)
 const overrideCopyright = ref(false)
 const pasteSaveError = ref(false)
-const pasteTextareaRef = ref<HTMLTextAreaElement | null>(null)
 
 const songLyricsStore = useSongLyricsStore()
 
