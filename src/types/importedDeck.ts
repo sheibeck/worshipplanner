@@ -16,4 +16,16 @@ export interface ImportedDeck {
   slides: (TextSlide | ImageSlide)[]
   createdAt: Timestamp
   updatedAt: Timestamp
+  /**
+   * The Storage-side import id (Phase 37, R062) -- the same crypto.randomUUID()
+   * value pptxUpload.ts's generateImportId() produces, which scopes
+   * orgs/{orgId}/pptx-imports/{importId}/ and organizations/{orgId}/pptxRenders/{importId}.
+   * Deliberately distinct from this interface's own `id`, which Firestore assigns
+   * via addDoc() when importedSlidesStore.createDeck() confirms the deck. Without
+   * this field nothing can join a confirmed deck to its render record -- the two
+   * identifiers were structurally unlinked before this field existed.
+   * Optional because decks confirmed before this phase have no render record, and
+   * because image-only imports (no source.pptx, nothing to render) never produce one.
+   */
+  renderImportId?: string
 }

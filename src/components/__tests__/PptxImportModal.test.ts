@@ -227,6 +227,101 @@ describe('PptxImportModal', () => {
     expect(wrapper.emitted('confirmed')![0]).toEqual([{ importId: 'new-image-import-id', section: 'message' }])
   })
 
+  it('persists renderImportId onto the confirmed deck, equal to the id used for the Storage upload (not merely UUID-shaped)', async () => {
+    mockUploadPptx.mockResolvedValueOnce('orgs/org-1/pptx-imports/import-abc/source.pptx')
+    mockParsePptxCallable.mockResolvedValueOnce({
+      data: { slides: [{ contentKind: 'text', body: 'hello' }] },
+    })
+    mockCreateDeck.mockResolvedValueOnce('new-import-id')
+
+    mountModal()
+    const file = new File(['bytes'], 'deck.pptx')
+    const input = body().find('[data-testid="pptx-file-input"]').element as HTMLInputElement
+    setInputFiles(input, [file])
+    await flushPromises()
+
+    await body().find('[data-testid="confirm-btn"]').trigger('click')
+    await flushPromises()
+
+    const uploadedImportId = mockUploadPptx.mock.calls[0]?.[1]
+    expect(typeof uploadedImportId).toBe('string')
+    const createDeckPayload = mockCreateDeck.mock.calls[0]?.[1] as { renderImportId?: string }
+    // Equality with the exact id passed to uploadPptx -- proving the LINK,
+    // not just that some UUID-shaped value happens to be present.
+    expect(createDeckPayload.renderImportId).toBe(uploadedImportId)
+  })
+
+  it('image-only imports never carry a renderImportId key on the createDeck payload', async () => {
+    mockUploadImage.mockImplementation((...args: unknown[]) => {
+      const [orgId, importId, , index] = args as [string, string, File, number]
+      return Promise.resolve(`orgs/${orgId}/pptx-imports/${importId}/images/${index}.png`)
+    })
+    mockResolveImageUrl.mockImplementation((...args: unknown[]) => {
+      const [path] = args as [string]
+      return Promise.resolve(`https://example.com/${path}`)
+    })
+    mockCreateDeck.mockResolvedValueOnce('new-image-import-id')
+
+    mountModal()
+    const file = new File(['a'], 'one.png', { type: 'image/png' })
+    const input = body().find('[data-testid="image-file-input"]').element as HTMLInputElement
+    setInputFiles(input, [file])
+    await flushPromises()
+
+    await body().find('[data-testid="confirm-btn"]').trigger('click')
+    await flushPromises()
+
+    const createDeckPayload = mockCreateDeck.mock.calls[0]?.[1] as Record<string, unknown>
+    expect(createDeckPayload).not.toHaveProperty('renderImportId')
+  })
+
+  it('cancelling a PPTX import at preview, then running an image import, never leaks the id onto the image payload', async () => {
+    mockUploadPptx.mockResolvedValueOnce('orgs/org-1/pptx-imports/import-abc/source.pptx')
+    mockParsePptxCallable.mockResolvedValueOnce({
+      data: { slides: [{ contentKind: 'text', body: 'hi' }] },
+    })
+
+    const wrapper = mountModal()
+    const pptxFile = new File(['bytes'], 'deck.pptx')
+    const pptxInput = body().find('[data-testid="pptx-file-input"]').element as HTMLInputElement
+    setInputFiles(pptxInput, [pptxFile])
+    await flushPromises()
+    expect(body().find('[data-testid="step-preview"]').exists()).toBe(true)
+
+    await body().find('[data-testid="cancel-btn"]').trigger('click')
+    expect(wrapper.emitted('cancel')).toBeTruthy()
+
+    // Cancel itself only emits; a real parent closes the modal (open -> false)
+    // and reopens it for the next import, which is what actually fires the
+    // watch(props.open)-driven resetToIdle() and returns the modal to its
+    // idle step (where the image-file-input lives). Simulate that here.
+    await wrapper.setProps({ open: false })
+    await wrapper.setProps({ open: true })
+    expect(body().find('[data-testid="step-idle"]').exists()).toBe(true)
+
+    // Same mounted modal instance, now runs an image-only import.
+    mockUploadImage.mockImplementation((...args: unknown[]) => {
+      const [orgId, importId, , index] = args as [string, string, File, number]
+      return Promise.resolve(`orgs/${orgId}/pptx-imports/${importId}/images/${index}.png`)
+    })
+    mockResolveImageUrl.mockImplementation((...args: unknown[]) => {
+      const [path] = args as [string]
+      return Promise.resolve(`https://example.com/${path}`)
+    })
+    mockCreateDeck.mockResolvedValueOnce('new-image-import-id')
+
+    const imageFile = new File(['a'], 'one.png', { type: 'image/png' })
+    const imageInput = body().find('[data-testid="image-file-input"]').element as HTMLInputElement
+    setInputFiles(imageInput, [imageFile])
+    await flushPromises()
+
+    await body().find('[data-testid="confirm-btn"]').trigger('click')
+    await flushPromises()
+
+    const createDeckPayload = mockCreateDeck.mock.calls[0]?.[1] as Record<string, unknown>
+    expect(createDeckPayload).not.toHaveProperty('renderImportId')
+  })
+
   it('a rejected parse transitions to the error step with the friendly copy, offers retry, and never deletes the source', async () => {
     mockUploadPptx.mockResolvedValue('orgs/org-1/pptx-imports/import-abc/source.pptx')
     mockParsePptxCallable.mockRejectedValueOnce(new Error('officeparser blew up'))

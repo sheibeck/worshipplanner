@@ -245,6 +245,14 @@ const uploadProgress = ref(0)
 const previewSlides = ref<(TextSlide | ImageSlide)[]>([])
 const previewSourceFileName = ref('')
 
+// The Storage-side import id (Phase 37, R062) -- set only on the PPTX path,
+// where it is the exact id already used for the Storage upload path and the
+// parsePptx call. Left null for image-only imports: those upload directly to
+// images/ with no source.pptx, so there is nothing for the render service to
+// convert and no organizations/{orgId}/pptxRenders/{importId} record will
+// ever exist for them.
+const renderImportId = ref<string | null>(null)
+
 const pptxInputRef = ref<HTMLInputElement | null>(null)
 const imagesInputRef = ref<HTMLInputElement | null>(null)
 
@@ -267,6 +275,8 @@ function resetToIdle() {
   previewSlides.value = []
   previewSourceFileName.value = ''
   lastRetry.value = null
+  // A cancelled PPTX import's id must never leak onto a subsequent image import.
+  renderImportId.value = null
   if (pptxInputRef.value) pptxInputRef.value.value = ''
   if (imagesInputRef.value) imagesInputRef.value.value = ''
 }
@@ -286,6 +296,9 @@ async function importPptx(file: File) {
 
   try {
     const importId = generateImportId()
+    // The same id used below for the Storage path and the parsePptx call --
+    // this is what links the confirmed deck to its render record (R062).
+    renderImportId.value = importId
     const storagePath = await uploadPptx(props.orgId, importId, file, (pct) => {
       uploadProgress.value = pct
     })
@@ -350,6 +363,11 @@ async function importImages(files: File[]) {
   errorMessage.value = ''
   uploadProgress.value = 0
   step.value = 'uploading'
+  // Image-only imports never produce a render record: there is no source.pptx
+  // for the render service to convert, so this always stays null -- explicitly
+  // cleared here (not just left at its default) so a PPTX import cancelled
+  // earlier in this same modal session can never leak its id onto this import.
+  renderImportId.value = null
 
   try {
     const importId = generateImportId()
@@ -388,6 +406,11 @@ async function onConfirm() {
       sourceFileName: previewSourceFileName.value,
       section: props.section,
       slides: previewSlides.value,
+      // Only spread when set, keeping the image-only payload byte-identical
+      // to what it was before this field existed (store's stripUndefined
+      // already guards Firestore's rejection of `undefined`, but this keeps
+      // the key itself absent rather than present-with-undefined).
+      ...(renderImportId.value !== null && { renderImportId: renderImportId.value }),
     })
     emit('confirmed', { importId, section: props.section })
   } catch (err) {
