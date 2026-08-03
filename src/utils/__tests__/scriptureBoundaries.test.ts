@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { computeBoundaries, hasSplittableBoundaries } from '@/utils/scriptureBoundaries'
+import {
+  BOUNDARY_MARKER_CLOSE,
+  BOUNDARY_MARKER_OPEN,
+  computeBoundaries,
+  embedBoundaryMarkers,
+  hasSplittableBoundaries,
+  sliceAtBoundaries,
+  stripVerseMarkers,
+  verseRangeForSlice,
+} from '@/utils/scriptureBoundaries'
 
 /** Every fixture in this suite must satisfy the same three structural
  * invariants: the array starts at 0, ends at text.length, and is strictly
@@ -113,5 +122,131 @@ describe('hasSplittableBoundaries', () => {
   it('returns true once at least one internal boundary exists', () => {
     const boundaries = computeBoundaries('First sentence. Second sentence.')
     expect(hasSplittableBoundaries(boundaries)).toBe(true)
+  })
+})
+
+/** Removes every `⟦N⟧` marker token so a marked-up copy can be compared
+ * back against its untouched source. Used only by the tests below — never
+ * a stand-in for the module's own `stripVerseMarkers`, which strips verse
+ * numbers, not boundary markers. */
+function stripAllMarkerTokens(marked: string): string {
+  return marked.replace(/⟦\d+⟧/g, '')
+}
+
+// Encoding backstop fixture: curly opening/closing double quotes (U+201C/U+201D),
+// a curly apostrophe (U+2019), and an em dash (U+2014). Source-match equality
+// must hold over this exact string with strict `===`, no normalization.
+const NON_ASCII_FIXTURE =
+  '[1] She said, “It’s good”—very good. ' +
+  '[2] The Lord reigns; let the earth rejoice.'
+
+describe('embedBoundaryMarkers', () => {
+  it('inserts exactly boundaries.length markers, and stripping them reproduces the input exactly (===)', () => {
+    const text = '[1] In the beginning God created the heavens. [2] And the earth was without form.'
+    const boundaries = computeBoundaries(text)
+    const marked = embedBoundaryMarkers(text, boundaries)
+    expect(marked).not.toBeNull()
+
+    const markerCount = [...marked!.matchAll(/⟦\d+⟧/g)].length
+    expect(markerCount).toBe(boundaries.length)
+
+    const stripped = stripAllMarkerTokens(marked!)
+    expect(stripped === text).toBe(true)
+  })
+
+  it('places the marker at array position i immediately before the character at boundaries[i]', () => {
+    const text = 'One. Two. Three.'
+    const boundaries = computeBoundaries(text)
+    const marked = embedBoundaryMarkers(text, boundaries)
+    expect(marked).not.toBeNull()
+
+    boundaries.forEach((boundary, i) => {
+      const markerToken = `${BOUNDARY_MARKER_OPEN}${i}${BOUNDARY_MARKER_CLOSE}`
+      const markerIndex = marked!.indexOf(markerToken)
+      expect(markerIndex).toBeGreaterThanOrEqual(0)
+      // Everything before this marker token, with every marker token
+      // stripped out, must equal the source text up to this boundary.
+      const prefixWithoutMarkers = stripAllMarkerTokens(marked!.slice(0, markerIndex))
+      expect(prefixWithoutMarkers).toBe(text.slice(0, boundary))
+    })
+  })
+
+  it('returns null when the source text already contains a marker delimiter', () => {
+    const text = `Already has ${BOUNDARY_MARKER_OPEN}0${BOUNDARY_MARKER_CLOSE} embedded in it.`
+    const boundaries = computeBoundaries(text)
+    expect(embedBoundaryMarkers(text, boundaries)).toBeNull()
+  })
+
+  it('returns null when the source text already contains only the close delimiter', () => {
+    const text = `Stray close delimiter ${BOUNDARY_MARKER_CLOSE} here.`
+    const boundaries = computeBoundaries(text)
+    expect(embedBoundaryMarkers(text, boundaries)).toBeNull()
+  })
+
+  it('encoding backstop: marker round-trip survives non-ASCII punctuation with strict === equality', () => {
+    const boundaries = computeBoundaries(NON_ASCII_FIXTURE)
+    const marked = embedBoundaryMarkers(NON_ASCII_FIXTURE, boundaries)
+    expect(marked).not.toBeNull()
+
+    const stripped = stripAllMarkerTokens(marked!)
+    expect(stripped === NON_ASCII_FIXTURE).toBe(true)
+  })
+})
+
+describe('sliceAtBoundaries', () => {
+  it('encoding backstop: returns text.slice(boundaries[i], boundaries[i+1]) exactly, strict ===', () => {
+    const boundaries = computeBoundaries(NON_ASCII_FIXTURE)
+    for (let i = 0; i < boundaries.length - 1; i++) {
+      const sliced = sliceAtBoundaries(NON_ASCII_FIXTURE, boundaries, i, i + 1)
+      const expected = NON_ASCII_FIXTURE.slice(boundaries[i]!, boundaries[i + 1]!)
+      expect(sliced === expected).toBe(true)
+    }
+  })
+
+  it('concatenating every adjacent-pair slice reproduces the whole source exactly (partition proof)', () => {
+    const boundaries = computeBoundaries(NON_ASCII_FIXTURE)
+    let reconstructed = ''
+    for (let i = 0; i < boundaries.length - 1; i++) {
+      reconstructed += sliceAtBoundaries(NON_ASCII_FIXTURE, boundaries, i, i + 1)
+    }
+    expect(reconstructed).toBe(NON_ASCII_FIXTURE)
+  })
+
+  it('performs exactly one slice call with no normalizing/trimming/comparison operation in its body', () => {
+    // Guards the encoding backstop at the source level: this function must
+    // never grow a .normalize()/.trim()/.replace()/.toLowerCase() call,
+    // since any of those would silently defeat R064's byte-exactness claim.
+    const src = sliceAtBoundaries.toString()
+    expect(src).not.toMatch(/\.normalize\(/)
+    expect(src).not.toMatch(/\.trim\(/)
+    expect(src).not.toMatch(/\.replace\(/)
+    expect(src).not.toMatch(/\.toLowerCase\(/)
+    expect((src.match(/\.slice\(/g) ?? []).length).toBe(1)
+  })
+})
+
+describe('stripVerseMarkers', () => {
+  it('removes bracketed-digit runs and trims outer whitespace, changing nothing else', () => {
+    const slice = ' [3] “It’s good”—very good. '
+    expect(stripVerseMarkers(slice)).toBe('“It’s good”—very good.')
+  })
+
+  it('removes multiple verse markers throughout the slice', () => {
+    const slice = '[5] one two [6] three four'
+    expect(stripVerseMarkers(slice)).toBe('one two three four')
+  })
+})
+
+describe('verseRangeForSlice', () => {
+  it('returns a single number as a string when the slice carries one verse marker', () => {
+    expect(verseRangeForSlice('[5] For God so loved the world.')).toBe('5')
+  })
+
+  it('returns a hyphenated range when the slice carries several verse markers', () => {
+    expect(verseRangeForSlice('[5] one [6] two [7] three')).toBe('5-7')
+  })
+
+  it('returns undefined when the slice carries no verse marker', () => {
+    expect(verseRangeForSlice('no markers here')).toBeUndefined()
   })
 })
