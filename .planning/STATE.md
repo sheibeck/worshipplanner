@@ -372,6 +372,38 @@ it directly or transitively. Phase 37 (PowerPoint Server-Side Rendering) is deli
 uncertainty, independently cuttable without disturbing anything else. See `.planning/ROADMAP.md` for the
 full phase table, success criteria, dependency graph, and per-phase research/notes.
 
+## ✅ RESOLVED 2026-08-03 — the wireframes were re-pulled, and Turn 3 covers the Service Order tab
+
+**The stale-wireframe blocker below is now PARTLY resolved — I fetched the file myself.**
+
+`DesignSync` can read the Claude Design project directly, so no manual export was needed:
+
+```
+DesignSync get_project  projectId=e8e6c287-3e88-402f-88e1-7ad6d5101fa2   → readable, canEdit:true
+DesignSync list_files   → "Slides Tab.dc.html", support.js, 11 uploads
+DesignSync get_file     path="Slides Tab.dc.html"
+```
+
+The file had grown **49 KB → 93 KB** since 2026-07-25 and gained **Turn 3 — Service Order tab**
+(variant `3a`, "Inline editing inside section bands": five section bands, per-section ＋ Add item,
+the add-to-service palette, a slide count on every row). `docs/design/slides-tab.dc.html` and its
+README are refreshed.
+
+**What this changes:**
+
+| | Before | Now |
+|---|---|---|
+| **Phase 35 (R065, R066)** | design source unavailable | ✅ **available** — Turn 3 carries `Paste lyrics` and `No copyright information found`, the exact wireframe for the inline paste treatment and the missing-copyright warning |
+| **Phase 36 — Service Order rebuild** | no wireframe | ✅ **Turn 3 is the wireframe** |
+| **Phase 36 — contextual action bar (R068)** | no wireframe | ❌ **still absent** — zero matches for `action bar`/`contextual` in the refreshed file |
+| Phase 33's affordances | absent | still absent — Phase 33 correctly shipped them as original design work |
+
+**So Phase 36's blocker is half-removed.** Its rebuild half now has a real wireframe; its action-bar
+half is still original design work. The owner skipped 36 earlier **on the premise that neither half
+had one** — that premise is now outdated and the decision is worth revisiting.
+
+**The original open item, kept for provenance:**
+
 ## ⚠ OPEN ITEM FOR THE OWNER — the design wireframes are stale, and Phase 36 depends on them
 
 **Found 2026-08-02 during Phase 33 discuss. Survives compaction deliberately — re-read before Phase 36.**

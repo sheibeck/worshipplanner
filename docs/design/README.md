@@ -3,17 +3,48 @@
 ## `slides-tab.dc.html`
 
 Verbatim export of `Slides Tab.dc.html` from the Claude Design project
-**"Worship Planner Slideshow Design"** (`e8e6c287-3e88-402f-88e1-7ad6d5101fa2`),
-pulled 2026-07-25. Source of truth for the v1.3 Slides-tab rework.
+**"Worship Planner Slideshow Design"** (`e8e6c287-3e88-402f-88e1-7ad6d5101fa2`).
+
+**RE-PULLED 2026-08-03 via the `DesignSync` tool** (`get_project` → `list_files` →
+`get_file`). It had grown 49 KB → 93 KB since the 2026-07-25 pull, gaining a whole
+new turn. **This is how to re-pull it** — no manual export needed:
+
+```
+DesignSync get_file  projectId=e8e6c287-3e88-402f-88e1-7ad6d5101fa2  path="Slides Tab.dc.html"
+```
+
+The project reports `type: PROJECT_TYPE_PROJECT` (not a design *system*), so it is
+readable but not pushable via DesignSync — pull only.
 
 **The single remote file is cumulative across design turns and is overwritten in
-place — re-pull before planning any phase against it.** As of this export it holds
-two turns, newest first:
+place — re-pull before planning any phase against it.** As of the 2026-08-03 export
+it holds **three** turns, newest first:
 
-| Turn | Screen | Options |
-|------|--------|---------|
-| **Turn 2** | Song lyrics editor (`Edit Song` → Lyrics tab) | `2a` and `2b` — **a choice, not both** |
-| **Turn 1** | Slides tab | `1a`, drawn in **two states** (drawer closed / `State 2 — Edit Slide open`) |
+| Turn | Screen | Options | Added |
+|------|--------|---------|-------|
+| **Turn 3** | **Service Order tab** | `3a` only — "Inline editing inside section bands" | **new since 2026-07-25** |
+| **Turn 2** | Song lyrics editor (`Edit Song` → Lyrics tab) | `2a` and `2b` — **a choice, not both** | |
+| **Turn 1** | Slides tab | `1a`, drawn in **two states** (drawer closed / `State 2 — Edit Slide open`) | |
+
+**Turn 3 — Service Order tab** (`3a`). Everything stays inline — song pickers, passage
+search, link fields, ✕ to clear. Added on top: the five section bands, per-section
+＋ Add item, the add-to-service palette, and a slide count on every row. It also carries
+the **`Paste lyrics`** affordance and the **`No copyright information found`** warning —
+i.e. the wireframe for **R065 and R066 (Phase 35)**.
+
+### ⚠ What is STILL not in the mockup (verified 2026-08-03, after the re-pull)
+
+Checked by direct search of the refreshed file. These remain **original design work**,
+not wireframe transcription:
+
+| Needed by | Still absent |
+|---|---|
+| **Phase 36 (R068)** | **any contextual action bar** — zero matches for `action bar` / `contextual`. Turn 3 covers the Service Order *rebuild*, not the action-bar pattern. |
+| Phase 33 (R051, R052) | any 3-dot / kebab menu; "Edit details" / "Edit lyrics" |
+| Phase 33 (R055–R057) | background images as a feature |
+
+Phase 33 shipped its affordances as original design work on exactly this basis, and its
+UI-SPEC records which decisions were its own.
 
 **Turn 1 — Slides tab.** Plan rail · slide grid · Edit Slide drawer. The rail mirrors
 plan order and is *not* draggable — reordering happens on the Service Order tab. The
