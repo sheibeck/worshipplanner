@@ -1299,6 +1299,46 @@ describe('assembleSlideshow — background cascade (R055/R056/R057)', () => {
     expect(result[0]!.slide.audioUrl).toBe('https://example.com/bed.mp3')
     expect(result[0]!.audioFromBed).toBe(true)
   })
+
+  // WR-01 regression: a SONG group's `slides` array can legitimately contain
+  // a `text`/`video` entry alongside its `lyric`/`copyright` entries
+  // (slideGroupMaterializer.ts's reconciler carries such entries through by
+  // value). Both must resolve the SAME song's background — keying the song
+  // lookup on the entry's own `sourceRef.kind` alone left the `text` entry
+  // unable to see the song tier even though its `lyric` sibling could.
+  it('a SONG group containing one lyric entry and one text entry both resolve the song background — WR-01', () => {
+    const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+    const service = makeService([slot])
+    const lyrics = makeSongLyrics({ backgroundImageUrl: 'https://example.com/song-bg.png' })
+    const lyricEntry = makeGroupSlideEntry({
+      id: 'entry-lyric',
+      order: 0,
+      sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+    })
+    const textEntry = makeGroupSlideEntry({
+      id: 'entry-text',
+      order: 1,
+      sourceRef: { kind: 'text', title: 'Note', body: 'hand-added note' },
+    })
+    const group = makeSlideGroup({
+      id: 'slot-song-0',
+      slotId: 'slot-song-0',
+      slides: [lyricEntry, textEntry],
+    })
+    const inputs = makeInputs({
+      songLyricsById: new Map([['song-1', lyrics]]),
+      groupsBySlotId: new Map([['slot-song-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    const lyricSlide = result.find((r) => r.slide.id === 'entry-lyric')
+    const textSlide = result.find((r) => r.slide.id === 'entry-text')
+    expect(lyricSlide!.slide.backgroundImageUrl).toBe('https://example.com/song-bg.png')
+    expect(lyricSlide!.slide.backgroundSource).toBe('song')
+    expect(textSlide!.slide.backgroundImageUrl).toBe('https://example.com/song-bg.png')
+    expect(textSlide!.slide.backgroundSource).toBe('song')
+  })
 })
 
 describe('assembleSlideshow — R045 order lock (permutation property)', () => {

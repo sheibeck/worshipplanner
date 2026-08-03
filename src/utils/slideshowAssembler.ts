@@ -310,13 +310,22 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
     entry: GroupSlideEntry,
     content: SlideContent,
   ): void => {
-    // Song lookup only for source kinds that carry a songId — every other
-    // kind (PRAYER/SCRIPTURE/MESSAGE/HYMN/IMPORTED/video/text) has no owning
-    // song document, so `song` is `undefined` for them (★ Pitfall 3).
+    // WR-01: song lookup keyed on the GROUP's owning song (via the slot),
+    // not the individual entry's own `sourceRef.kind`. A SONG group's
+    // `slides` array can legitimately contain `text`/`video` entries
+    // (slideGroupMaterializer.ts's reconciler carries them through by value,
+    // preserved from before R054's Phase-30 lockdown) — keying on
+    // `entry.sourceRef.kind` alone left those entries unable to resolve the
+    // song background tier even though every sibling lyric/copyright slide
+    // in the SAME group correctly fell through to it. Every other slot kind
+    // (PRAYER/SCRIPTURE/MESSAGE/HYMN/IMPORTED) has no owning song document,
+    // so `song` stays `undefined` for them (★ Pitfall 3).
     const song =
-      entry.sourceRef.kind === 'lyric' || entry.sourceRef.kind === 'copyright'
-        ? inputs.songLyricsById.get(entry.sourceRef.songId)
-        : undefined
+      slot.kind === 'SONG' && slot.songId
+        ? inputs.songLyricsById.get(slot.songId)
+        : entry.sourceRef.kind === 'lyric' || entry.sourceRef.kind === 'copyright'
+          ? inputs.songLyricsById.get(entry.sourceRef.songId)
+          : undefined
     const media = resolveEntryMedia(group, entry, song)
     const slide = {
       ...content,
