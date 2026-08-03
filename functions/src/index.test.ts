@@ -6,7 +6,10 @@ import { getFirestore } from "firebase-admin/firestore";
 import type { CallableRequest } from "firebase-functions/v2/https";
 import {
   cleanupExpiredMediaHandler,
+  cleanupOrphanRendersHandler,
   MEDIA_PATH_GUARD,
+  ORPHAN_RENDER_STALE_HOURS,
+  RENDERED_OBJECT_GUARD,
   RETENTION_DAYS,
   parsePptxHandler,
   requestPptxRenderHandler,
@@ -677,5 +680,270 @@ describe("requestPptxRenderHandler", () => {
     const outcome = await requestPptxRenderHandler({ orgId: ORG_ID, importId: IMPORT_ID });
 
     expect(outcome).toEqual({ status: "ready", renderedCount: 12 });
+  });
+});
+
+describe("RENDERED_OBJECT_GUARD", () => {
+  it("matches objects under a pptx-imports rendered/ prefix", () => {
+    expect(RENDERED_OBJECT_GUARD.test("orgs/orgA/pptx-imports/i1/rendered/page-0001.png")).toBe(true);
+  });
+
+  it("does not match source.pptx or anything under images/ at the same importId", () => {
+    expect(RENDERED_OBJECT_GUARD.test("orgs/orgA/pptx-imports/i1/source.pptx")).toBe(false);
+    expect(RENDERED_OBJECT_GUARD.test("orgs/orgA/pptx-imports/i1/images/0.png")).toBe(false);
+  });
+
+  it("does not match a media path or any other unrelated path", () => {
+    expect(RENDERED_OBJECT_GUARD.test("orgs/orgA/media/m1/old.mp4")).toBe(false);
+    expect(RENDERED_OBJECT_GUARD.test("some/other/path.txt")).toBe(false);
+  });
+});
+
+describe("cleanupOrphanRendersHandler", () => {
+  const ORG_ID = "orgA";
+  const STALE_HOURS = ORPHAN_RENDER_STALE_HOURS + 24; // comfortably past the staleness window
+  const FRESH_HOURS = 1; // comfortably inside it
+
+  interface FakeOrphanDocOptions {
+    orgId?: string | null;
+    importId?: string;
+    status?: "pending" | "failed" | "ready";
+    ageHours?: number; // omit to simulate an unreadable/missing createdAt
+  }
+
+  function fakeOrphanDoc(opts: FakeOrphanDocOptions = {}) {
+    const orgId = opts.orgId === undefined ? ORG_ID : opts.orgId;
+    const importId = opts.importId ?? "i1";
+    const status = opts.status ?? "failed";
+    const createdAt =
+      opts.ageHours === undefined
+        ? undefined
+        : { toMillis: () => Date.now() - opts.ageHours! * 60 * 60 * 1000 };
+    const deleteSpy = vi.fn(async () => undefined);
+    return {
+      id: importId,
+      data: () => ({ status, createdAt }),
+      ref: {
+        parent: { parent: orgId === null ? null : { id: orgId } },
+        path: `organizations/${orgId}/pptxRenders/${importId}`,
+        delete: deleteSpy,
+      },
+    };
+  }
+
+  /**
+   * A fake collectionGroup("pptxRenders").where("status", "in", [...]).get()
+   * chain. The where() simulation actually filters by status -- mirroring
+   * what a real Firestore query does server-side -- so a "ready" doc is
+   * provably never returned to the handler at all, not just skipped in-memory.
+   */
+  function mockOrphanDb(allDocs: ReturnType<typeof fakeOrphanDoc>[]) {
+    const whereSpy = vi.fn((field: string, op: string, values: string[]) => {
+      const filtered =
+        field === "status" && op === "in"
+          ? allDocs.filter((d) => values.includes(d.data().status as string))
+          : allDocs;
+      return { get: vi.fn(async () => ({ docs: filtered })) };
+    });
+    const collectionGroupSpy = vi.fn((name: string) => {
+      if (name !== "pptxRenders") {
+        throw new Error(`mockOrphanDb: unexpected collectionGroup "${name}"`);
+      }
+      return { where: whereSpy };
+    });
+    vi.mocked(getFirestore).mockReturnValue({ collectionGroup: collectionGroupSpy } as never);
+    return { collectionGroupSpy, whereSpy };
+  }
+
+  interface FakeRenderedObject {
+    name: string;
+    delete: ReturnType<typeof vi.fn>;
+  }
+
+  function fakeRenderedObject(name: string): FakeRenderedObject {
+    return { name, delete: vi.fn(async () => undefined) };
+  }
+
+  function mockOrphanBucket(files: FakeRenderedObject[]) {
+    const getFiles = vi.fn(async () => [files]);
+    vi.mocked(getStorage).mockReturnValue({
+      bucket: () => ({ getFiles }),
+    } as never);
+    return { getFiles };
+  }
+
+  afterEach(() => {
+    vi.mocked(getFirestore).mockReset();
+    vi.mocked(getStorage).mockReset();
+    delete process.env.PPTX_RENDER_CLEANUP_ENABLED;
+  });
+
+  it("deletes both rendered objects and the doc when explicitly enabled", async () => {
+    process.env.PPTX_RENDER_CLEANUP_ENABLED = "true";
+    const stale = fakeOrphanDoc({ status: "failed", ageHours: STALE_HOURS });
+    mockOrphanDb([stale]);
+    const obj1 = fakeRenderedObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0001.png`);
+    const obj2 = fakeRenderedObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0002.png`);
+    mockOrphanBucket([obj1, obj2]);
+
+    const summary = await cleanupOrphanRendersHandler();
+
+    expect(obj1.delete).toHaveBeenCalledTimes(1);
+    expect(obj2.delete).toHaveBeenCalledTimes(1);
+    expect(stale.ref.delete).toHaveBeenCalledTimes(1);
+    expect(summary).toMatchObject({ dryRun: false, deletedDocCount: 1, deletedObjectCount: 2 });
+  });
+
+  it("FAILS SAFE: unset PPTX_RENDER_CLEANUP_ENABLED deletes nothing, even for a stale failed doc with rendered objects", async () => {
+    const stale = fakeOrphanDoc({ status: "failed", ageHours: STALE_HOURS });
+    mockOrphanDb([stale]);
+    const obj1 = fakeRenderedObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0001.png`);
+    mockOrphanBucket([obj1]);
+
+    const summary = await cleanupOrphanRendersHandler();
+
+    expect(obj1.delete).not.toHaveBeenCalled();
+    expect(stale.ref.delete).not.toHaveBeenCalled();
+    expect(summary).toMatchObject({ dryRun: true, deletedObjectCount: 1, deletedDocCount: 1 });
+  });
+
+  it("FAILS SAFE: an empty-string PPTX_RENDER_CLEANUP_ENABLED behaves identically to unset", async () => {
+    process.env.PPTX_RENDER_CLEANUP_ENABLED = "";
+    const stale = fakeOrphanDoc({ status: "failed", ageHours: STALE_HOURS });
+    mockOrphanDb([stale]);
+    const obj1 = fakeRenderedObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0001.png`);
+    mockOrphanBucket([obj1]);
+
+    const summary = await cleanupOrphanRendersHandler();
+
+    expect(obj1.delete).not.toHaveBeenCalled();
+    expect(summary.dryRun).toBe(true);
+  });
+
+  it('FAILS SAFE: PPTX_RENDER_CLEANUP_ENABLED="false" does not enable deletion', async () => {
+    process.env.PPTX_RENDER_CLEANUP_ENABLED = "false";
+    const stale = fakeOrphanDoc({ status: "failed", ageHours: STALE_HOURS });
+    mockOrphanDb([stale]);
+    const obj1 = fakeRenderedObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0001.png`);
+    mockOrphanBucket([obj1]);
+
+    const summary = await cleanupOrphanRendersHandler();
+
+    expect(obj1.delete).not.toHaveBeenCalled();
+    expect(summary.dryRun).toBe(true);
+  });
+
+  it('FAILS SAFE: a non-"true" value ("1") does not enable deletion', async () => {
+    process.env.PPTX_RENDER_CLEANUP_ENABLED = "1";
+    const stale = fakeOrphanDoc({ status: "failed", ageHours: STALE_HOURS });
+    mockOrphanDb([stale]);
+    const obj1 = fakeRenderedObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0001.png`);
+    mockOrphanBucket([obj1]);
+
+    const summary = await cleanupOrphanRendersHandler();
+
+    expect(obj1.delete).not.toHaveBeenCalled();
+    expect(summary.dryRun).toBe(true);
+  });
+
+  it('FAILS SAFE: a case-typo value ("True") does not enable deletion -- the comparison is exact and case-sensitive', async () => {
+    process.env.PPTX_RENDER_CLEANUP_ENABLED = "True";
+    const stale = fakeOrphanDoc({ status: "failed", ageHours: STALE_HOURS });
+    mockOrphanDb([stale]);
+    const obj1 = fakeRenderedObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0001.png`);
+    mockOrphanBucket([obj1]);
+
+    const summary = await cleanupOrphanRendersHandler();
+
+    expect(obj1.delete).not.toHaveBeenCalled();
+    expect(summary.dryRun).toBe(true);
+  });
+
+  it("never touches a ready render, even with the gate enabled -- excluded by the status filter itself", async () => {
+    process.env.PPTX_RENDER_CLEANUP_ENABLED = "true";
+    const ready = fakeOrphanDoc({ status: "ready", ageHours: 90 * 24 });
+    const { whereSpy } = mockOrphanDb([ready]);
+    const obj1 = fakeRenderedObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0001.png`);
+    mockOrphanBucket([obj1]);
+
+    const summary = await cleanupOrphanRendersHandler();
+
+    expect(ready.ref.delete).not.toHaveBeenCalled();
+    expect(obj1.delete).not.toHaveBeenCalled();
+    expect(summary.scannedCount).toBe(0);
+    expect(whereSpy).toHaveBeenCalledWith("status", "in", ["pending", "failed"]);
+  });
+
+  it("never touches a fresh pending render -- a render in flight is not an orphan", async () => {
+    process.env.PPTX_RENDER_CLEANUP_ENABLED = "true";
+    const fresh = fakeOrphanDoc({ status: "pending", ageHours: FRESH_HOURS });
+    mockOrphanDb([fresh]);
+    const obj1 = fakeRenderedObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0001.png`);
+    mockOrphanBucket([obj1]);
+
+    const summary = await cleanupOrphanRendersHandler();
+
+    expect(fresh.ref.delete).not.toHaveBeenCalled();
+    expect(obj1.delete).not.toHaveBeenCalled();
+    expect(summary.scannedCount).toBe(0);
+  });
+
+  it("★ never deletes outside the rendered/ prefix -- source.pptx and images/ are structurally unreachable", async () => {
+    process.env.PPTX_RENDER_CLEANUP_ENABLED = "true";
+    const stale = fakeOrphanDoc({ status: "failed", ageHours: STALE_HOURS });
+    mockOrphanDb([stale]);
+    const sourceFile = fakeRenderedObject(`orgs/${ORG_ID}/pptx-imports/i1/source.pptx`);
+    const imageFile = fakeRenderedObject(`orgs/${ORG_ID}/pptx-imports/i1/images/0.png`);
+    const renderedFile = fakeRenderedObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0001.png`);
+    mockOrphanBucket([sourceFile, imageFile, renderedFile]);
+
+    const summary = await cleanupOrphanRendersHandler();
+
+    expect(sourceFile.delete).not.toHaveBeenCalled();
+    expect(imageFile.delete).not.toHaveBeenCalled();
+    expect(renderedFile.delete).toHaveBeenCalledTimes(1);
+    expect(summary.deletedObjectCount).toBe(1);
+  });
+
+  it("an unreadable createdAt is skipped even with the gate enabled -- fail safe", async () => {
+    process.env.PPTX_RENDER_CLEANUP_ENABLED = "true";
+    const unreadable = fakeOrphanDoc({ status: "failed" }); // ageHours omitted -> unreadable createdAt
+    mockOrphanDb([unreadable]);
+    const obj1 = fakeRenderedObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0001.png`);
+    mockOrphanBucket([obj1]);
+
+    const summary = await cleanupOrphanRendersHandler();
+
+    expect(unreadable.ref.delete).not.toHaveBeenCalled();
+    expect(obj1.delete).not.toHaveBeenCalled();
+    expect(summary.scannedCount).toBe(0);
+  });
+
+  it("partial-failure tolerance: one rejecting object delete does not abort the run -- the second object and the doc are still deleted", async () => {
+    process.env.PPTX_RENDER_CLEANUP_ENABLED = "true";
+    const stale = fakeOrphanDoc({ status: "failed", ageHours: STALE_HOURS });
+    mockOrphanDb([stale]);
+    const failing = fakeRenderedObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0001.png`);
+    failing.delete.mockRejectedValueOnce(new Error("network blip"));
+    const succeeding = fakeRenderedObject(`orgs/${ORG_ID}/pptx-imports/i1/rendered/page-0002.png`);
+    mockOrphanBucket([failing, succeeding]);
+
+    const summary = await cleanupOrphanRendersHandler();
+
+    expect(succeeding.delete).toHaveBeenCalledTimes(1);
+    expect(stale.ref.delete).toHaveBeenCalledTimes(1);
+    expect(summary.deletedObjectCount).toBe(1);
+  });
+
+  it('★ SOURCE INSPECTION: the dry-run gate direction is pinned against the 2026-07-28 inverted-gate incident (9f1b881)', () => {
+    const source = readFileSync(path.join(__dirname, "index.ts"), "utf-8");
+    const start = source.indexOf("export async function cleanupOrphanRendersHandler(");
+    const wrapperStart = source.indexOf("export const cleanupOrphanRenders = onSchedule(");
+    expect(start).toBeGreaterThan(-1);
+    expect(wrapperStart).toBeGreaterThan(start);
+    const handlerBody = source.slice(start, wrapperStart);
+    expect(handlerBody).toMatch(
+      /const dryRun = process\.env\.PPTX_RENDER_CLEANUP_ENABLED !== "true";/,
+    );
   });
 });
