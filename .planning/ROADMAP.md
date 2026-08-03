@@ -215,12 +215,12 @@ Plans:
   4. The 3-dot menu opens separate "Edit details" and "Edit lyrics" drawers instead of one multi-tab drawer
   5. The editing options offered for a slide vary by the service-item type it belongs to — a scripture item offers options a song item does not
 
-**Plans**: 2/9 plans executed
+**Plans**: 3/9 plans executed
 Plans:
 
 - [x] 33-01-PLAN.md — Three background fields + the slide/group/song cascade in `resolveEntryMedia` (wave 1)
 - [x] 33-02-PLAN.md — `slideActionMenuItems` pure per-kind helper + `SlideActionMenu.vue`, the codebase's first ARIA menu (wave 1)
-- [ ] 33-03-PLAN.md — `useBackgroundUpload` composable + shared `BackgroundControl.vue` (wave 2)
+- [x] 33-03-PLAN.md — `useBackgroundUpload` composable + shared `BackgroundControl.vue` (wave 2)
 - [ ] 33-04-PLAN.md — R058: delete the per-slide audio scope option, its field, and its test block (wave 2)
 - [ ] 33-05-PLAN.md — `SlideCard`: root element swap for legal menu nesting + background provenance chip (wave 2)
 - [ ] 33-06-PLAN.md — Song-level background in the Song Lyrics editor + `setSongBackground` (wave 3)
@@ -317,7 +317,7 @@ Plans:
 | 30. Slides Mirror the Plan — Hard Lock & Reconciliation Removed | v1.4 | 4/4 | Complete    | 2026-07-29 |
 | 31. Service Lifecycle — Draft Lock & Reopen | v1.4 | 6/6 | Complete    | 2026-07-30 |
 | 32. Save Reliability — Autosave Fix & Persistent Status | v1.4 | 6/6 | In Progress|  |
-| 33. Backgrounds & Slide Editing | v1.4 | 2/9 | In Progress|  |
+| 33. Backgrounds & Slide Editing | v1.4 | 3/9 | In Progress|  |
 | 34. Smarter Content — LLM Scripture Split | v1.4 | 0/TBD | Not started | - |
 | 35. Presentation Correctness & Lyric Editor | v1.4 | 0/TBD | Not started | - |
 | 36. UI Rework — Service Order & Contextual Action Bars | v1.4 | 0/TBD | Not started | - |
