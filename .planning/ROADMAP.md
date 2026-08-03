@@ -316,9 +316,19 @@ Plans:
   3. Only metric-compatible open fonts (Carlito/Caladea/Liberation) are used server-side; no Microsoft fonts are bundled
   4. Orphan cleanup for failed renders defaults to dry-run/report-only
 
-**Plans**: TBD
+**Plans**: 6 plans
+Plans:
+
+- [ ] 37-01-PLAN.md — Scaffold the standalone render-service/ project, its Dockerfile, and the font-policy gate as a text test (wave 1)
+- [ ] 37-02-PLAN.md — The render service: soffice/pdftoppm orchestration, zero-padded page ordering, POST /render (wave 2)
+- [ ] 37-03-PLAN.md — Bridging foundation: the ID-token invoker seam and the additive pptxRenders queue write (wave 1)
+- [ ] 37-04-PLAN.md — The completeness check: independent Storage recount gates the ready flip (wave 2)
+- [ ] 37-05-PLAN.md — Orphan-render cleanup (dry-run by default) and the deck↔render renderImportId bridge (wave 3)
+- [ ] 37-06-PLAN.md — The gcloud run deploy handoff, the Phase 37 pending-verification section, and the three-suite gate (wave 4)
+
 **UI hint**: no
 **Research flag**: needs research — highest-uncertainty item in the milestone; needs a real multi-font, multi-slide test deck and cost/latency validation, not a 2-slide fixture.
+**Planning note (2026-08-03):** planned under **BUILD BUT DO NOT DEPLOY** (STATE.md v1.4 standing decisions). No plan runs `gcloud`, `firebase deploy`, `docker build`/`push`, or creates any GCP resource. The exact deploy command is handed over in `render-service/DEPLOY.md` for the owner to run. Six plans rather than the `coarse` granularity's usual 1-3 because the phase spans three separate test suites — `render-service/` (new), `functions/`, and the app's `src/` — and a 3-plan shape would need six tasks per plan.
 **Notes**: Standalone Cloud Run service (custom Dockerfile, LibreOffice + Poppler) — Firebase Functions buildpacks cannot install these; a new Cloud Function bridges via service-to-service IAM auth, invoked asynchronously with a completeness check (only flip the deck to "ready" once every expected image is confirmed uploaded). Rendered images land under the existing `orgs/{orgId}/pptx-imports/{importId}/rendered/` prefix — sibling to `images/`, structurally exempt from `cleanupExpiredMedia`'s regex guard with zero changes to that function. Any new deletion path this introduces must default to dry-run — the inverse default already caused a real incident in this codebase (`cleanupExpiredMedia`'s doc-comment-vs-code-default mismatch, fixed 2026-07-28). **User decision:** kept in v1.4 but scheduled deliberately last so an overrun or cut disturbs nothing else.
 
 ## Progress
@@ -337,7 +347,7 @@ Plans:
 | 34. Smarter Content — LLM Scripture Split | v1.4 | 4/4 | In Progress|  |
 | 35. Presentation Correctness & Lyric Editor | v1.4 | 4/4 | In Progress|  |
 | 36. UI Rework — Service Order & Contextual Action Bars | v1.4 | 0/TBD | Not started | - |
-| 37. PowerPoint Server-Side Rendering | v1.4 | 0/TBD | Not started | - |
+| 37. PowerPoint Server-Side Rendering | v1.4 | 0/6 | Planned | - |
 
 ## Backlog
 
