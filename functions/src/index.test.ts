@@ -9,9 +9,15 @@ import {
   MEDIA_PATH_GUARD,
   RETENTION_DAYS,
   parsePptxHandler,
+  requestPptxRenderHandler,
 } from "./index";
 import { parsePptxBuffer } from "./pptxParser";
 import { invokeRenderService } from "./renderInvoker";
+
+// A per-test variable the mocked defineString's value() reads, so each
+// requestPptxRenderHandler test case can set/clear PPTX_RENDER_SERVICE_URL
+// independently without needing to re-import the module.
+let fakeRenderServiceUrl = "";
 
 // index.ts's module-scope initializeApp()/defineSecret() calls, and its
 // getAuth/getFirestore/getStorage imports, must be neutralized so importing
@@ -33,6 +39,10 @@ vi.mock("firebase-admin/storage", () => ({
 }));
 vi.mock("firebase-functions/params", () => ({
   defineSecret: vi.fn(() => ({ value: () => "fake-secret" })),
+  defineString: vi.fn(() => ({ value: () => fakeRenderServiceUrl })),
+}));
+vi.mock("firebase-functions/v2/firestore", () => ({
+  onDocumentCreated: vi.fn((_path: string, handler: unknown) => handler),
 }));
 vi.mock("./pptxParser", () => ({
   parsePptxBuffer: vi.fn(),
@@ -379,5 +389,275 @@ describe("parsePptxHandler", () => {
     expect(onCallStart).toBeGreaterThan(start);
     const handlerBody = source.slice(start, onCallStart);
     expect(handlerBody).not.toMatch(/invokeRenderService/);
+  });
+});
+
+describe("requestPptxRenderHandler", () => {
+  const ORG_ID = "org1";
+  const IMPORT_ID = "import1";
+  const STORAGE_PATH = `orgs/${ORG_ID}/pptx-imports/${IMPORT_ID}/source.pptx`;
+  const RENDERED_PREFIX = `orgs/${ORG_ID}/pptx-imports/${IMPORT_ID}/rendered/`;
+  const SERVICE_URL = "https://pptx-render-xyz.run.app";
+
+  interface FakeRenderDocOptions {
+    exists?: boolean;
+    storagePath?: string | null;
+  }
+
+  function fakeRenderDoc(opts: FakeRenderDocOptions = {}) {
+    const exists = opts.exists ?? true;
+    const storagePath = opts.storagePath === undefined ? STORAGE_PATH : opts.storagePath;
+    const get = vi.fn(async () => ({
+      exists,
+      data: () => (exists ? { status: "pending", storagePath } : undefined),
+    }));
+    const set = vi.fn(async (_payload?: unknown, _opts?: unknown) => undefined);
+    return { get, set };
+  }
+
+  /**
+   * A minimal fake Firestore builder supporting exactly the chain
+   * pptxRenderDocRef uses: organizations/{orgId}/pptxRenders/{importId}.
+   * Returns the orgDoc.collection spy too, so a test can assert no
+   * subcollection other than "pptxRenders" was ever touched.
+   */
+  function mockRenderDb(pptxRendersDoc: { get: ReturnType<typeof vi.fn>; set: ReturnType<typeof vi.fn> }) {
+    const orgCollectionSpy = vi.fn((name: string) => {
+      if (name === "pptxRenders") return { doc: vi.fn(() => pptxRendersDoc) };
+      throw new Error(`mockRenderDb: unexpected subcollection "${name}"`);
+    });
+    const orgDoc = { collection: orgCollectionSpy };
+    const db = {
+      collection: vi.fn((name: string) => {
+        if (name === "organizations") return { doc: vi.fn(() => orgDoc) };
+        throw new Error(`mockRenderDb: unexpected collection "${name}"`);
+      }),
+    };
+    vi.mocked(getFirestore).mockReturnValue(db as never);
+    return { db, orgCollectionSpy };
+  }
+
+  function mockRenderBucket(objectNames: string[]) {
+    const files = objectNames.map((name) => ({ name: RENDERED_PREFIX + name }));
+    const getFiles = vi.fn(async () => [files]);
+    vi.mocked(getStorage).mockReturnValue({
+      bucket: () => ({ getFiles }),
+    } as never);
+    return { getFiles };
+  }
+
+  afterEach(() => {
+    vi.mocked(getFirestore).mockReset();
+    vi.mocked(getStorage).mockReset();
+    vi.mocked(invokeRenderService).mockReset();
+    fakeRenderServiceUrl = "";
+  });
+
+  it("case 1: ready when reported, actual and contiguity all agree", async () => {
+    fakeRenderServiceUrl = SERVICE_URL;
+    vi.mocked(invokeRenderService).mockResolvedValue({ renderedCount: 6 });
+    const docSpy = fakeRenderDoc();
+    mockRenderDb(docSpy);
+    mockRenderBucket([
+      "page-0001.png",
+      "page-0002.png",
+      "page-0003.png",
+      "page-0004.png",
+      "page-0005.png",
+      "page-0006.png",
+    ]);
+
+    const outcome = await requestPptxRenderHandler({ orgId: ORG_ID, importId: IMPORT_ID });
+
+    expect(outcome).toEqual({ status: "ready", renderedCount: 6 });
+    expect(docSpy.set).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "ready", renderedCount: 6 }),
+      { merge: true },
+    );
+  });
+
+  it("case 2: ★ failed when the counts disagree -- never ready", async () => {
+    fakeRenderServiceUrl = SERVICE_URL;
+    vi.mocked(invokeRenderService).mockResolvedValue({ renderedCount: 5 });
+    const docSpy = fakeRenderDoc();
+    mockRenderDb(docSpy);
+    mockRenderBucket(["page-0001.png", "page-0002.png", "page-0003.png"]);
+
+    const outcome = await requestPptxRenderHandler({ orgId: ORG_ID, importId: IMPORT_ID });
+
+    expect(outcome.status).not.toBe("ready");
+    expect(outcome).toEqual({
+      status: "failed",
+      renderedCount: 3,
+      failureReason: "incomplete-render",
+    });
+  });
+
+  it("case 3: ★ failed on a zero-page render (empty deck)", async () => {
+    fakeRenderServiceUrl = SERVICE_URL;
+    vi.mocked(invokeRenderService).mockResolvedValue({ renderedCount: 0 });
+    const docSpy = fakeRenderDoc();
+    const { orgCollectionSpy } = mockRenderDb(docSpy);
+    mockRenderBucket([]);
+
+    const outcome = await requestPptxRenderHandler({ orgId: ORG_ID, importId: IMPORT_ID });
+
+    expect(outcome).toEqual({ status: "failed", renderedCount: 0, failureReason: "incomplete-render" });
+    // storagePath was never cleared -- the merge write omits it entirely, and
+    // the only subcollection touched is pptxRenders (the parsed text layer,
+    // which lives elsewhere, is untouched).
+    expect(docSpy.set).toHaveBeenCalledTimes(1);
+    expect(docSpy.set.mock.calls[0]?.[0]).not.toHaveProperty("storagePath");
+    expect(orgCollectionSpy).toHaveBeenCalledWith("pptxRenders");
+    expect(orgCollectionSpy).not.toHaveBeenCalledWith("members");
+  });
+
+  it("case 4: ★ failed on a page-number gap even when the counts match", async () => {
+    // Reported 3, three objects present -- counts agree at 3, but the
+    // sequence page-0001/0002/0004 is not contiguous 1..3. A count-only
+    // check would incorrectly pass this as complete.
+    fakeRenderServiceUrl = SERVICE_URL;
+    vi.mocked(invokeRenderService).mockResolvedValue({ renderedCount: 3 });
+    const docSpy = fakeRenderDoc();
+    mockRenderDb(docSpy);
+    mockRenderBucket(["page-0001.png", "page-0002.png", "page-0004.png"]);
+
+    const outcome = await requestPptxRenderHandler({ orgId: ORG_ID, importId: IMPORT_ID });
+
+    expect(outcome.status).toBe("failed");
+    expect(outcome.failureReason).toBe("incomplete-render");
+  });
+
+  it("case 5: ★ trap 1 -- the parser's slide count is never consulted", async () => {
+    // Simulates the deck where mapAstToSlides's heuristic MappedSlide[]
+    // length would be 4 (a 6-slide deck with one skipped content-free slide
+    // and one 3-image collage slide emitting 3 entries), while the renderer
+    // reports 6 pages and six objects genuinely exist. If the implementation
+    // had derived the expected count from the parser, it would read 4 here
+    // and (wrongly) fail. parsePptxBuffer is never even mocked to resolve in
+    // this test -- proving the handler cannot be consulting it.
+    fakeRenderServiceUrl = SERVICE_URL;
+    vi.mocked(invokeRenderService).mockResolvedValue({ renderedCount: 6 });
+    const docSpy = fakeRenderDoc();
+    mockRenderDb(docSpy);
+    mockRenderBucket([
+      "page-0001.png",
+      "page-0002.png",
+      "page-0003.png",
+      "page-0004.png",
+      "page-0005.png",
+      "page-0006.png",
+    ]);
+
+    const outcome = await requestPptxRenderHandler({ orgId: ORG_ID, importId: IMPORT_ID });
+
+    expect(outcome).toEqual({ status: "ready", renderedCount: 6 });
+    expect(vi.mocked(parsePptxBuffer)).not.toHaveBeenCalled();
+
+    // Source-inspection companion: requestPptxRenderHandler's body region
+    // contains no parsePptxBuffer, MappedSlide or slides reference.
+    const source = readFileSync(path.join(__dirname, "index.ts"), "utf-8");
+    const start = source.indexOf("export async function requestPptxRenderHandler(");
+    const triggerStart = source.indexOf("export const requestPptxRender = onDocumentCreated(");
+    expect(start).toBeGreaterThan(-1);
+    expect(triggerStart).toBeGreaterThan(start);
+    const handlerBody = source.slice(start, triggerStart);
+    expect(handlerBody).not.toMatch(/parsePptxBuffer/);
+    expect(handlerBody).not.toMatch(/MappedSlide/);
+    expect(handlerBody).not.toMatch(/\bslides\b/);
+  });
+
+  it("case 6: unconfigured service URL never invokes the render service and cannot reach ready", async () => {
+    fakeRenderServiceUrl = "";
+    const docSpy = fakeRenderDoc();
+    mockRenderDb(docSpy);
+
+    const outcome = await requestPptxRenderHandler({ orgId: ORG_ID, importId: IMPORT_ID });
+
+    expect(outcome).toEqual({
+      status: "failed",
+      renderedCount: 0,
+      failureReason: "render-service-not-configured",
+    });
+    expect(invokeRenderService).not.toHaveBeenCalled();
+  });
+
+  it("case 7: invoker rejection resolves to failed with render-service-error, never a ready flip", async () => {
+    fakeRenderServiceUrl = SERVICE_URL;
+    vi.mocked(invokeRenderService).mockRejectedValue(new Error("network unreachable"));
+    const docSpy = fakeRenderDoc();
+    mockRenderDb(docSpy);
+
+    const outcome = await requestPptxRenderHandler({ orgId: ORG_ID, importId: IMPORT_ID });
+
+    expect(outcome).toEqual({
+      status: "failed",
+      renderedCount: 0,
+      failureReason: "render-service-error",
+    });
+  });
+
+  it("case 8: stray objects under the prefix are not counted -- cannot inflate the recount into agreement", async () => {
+    fakeRenderServiceUrl = SERVICE_URL;
+    vi.mocked(invokeRenderService).mockResolvedValue({ renderedCount: 3 });
+    const docSpy = fakeRenderDoc();
+    mockRenderDb(docSpy);
+    mockRenderBucket(["page-0001.png", "page-0002.png", "thumbnail.jpg"]);
+
+    const outcome = await requestPptxRenderHandler({ orgId: ORG_ID, importId: IMPORT_ID });
+
+    expect(outcome.renderedCount).toBe(2);
+    expect(outcome.status).toBe("failed");
+  });
+
+  it("case 9: the listing uses the exact rendered/ prefix", async () => {
+    fakeRenderServiceUrl = SERVICE_URL;
+    vi.mocked(invokeRenderService).mockResolvedValue({ renderedCount: 1 });
+    const docSpy = fakeRenderDoc();
+    mockRenderDb(docSpy);
+    const { getFiles } = mockRenderBucket(["page-0001.png"]);
+
+    await requestPptxRenderHandler({ orgId: ORG_ID, importId: IMPORT_ID });
+
+    expect(getFiles).toHaveBeenCalledWith({ prefix: RENDERED_PREFIX });
+  });
+
+  it("case 10: missing render doc returns a failed outcome and writes nothing", async () => {
+    fakeRenderServiceUrl = SERVICE_URL;
+    const docSpy = fakeRenderDoc({ exists: false });
+    mockRenderDb(docSpy);
+
+    const outcome = await requestPptxRenderHandler({ orgId: ORG_ID, importId: IMPORT_ID });
+
+    expect(outcome.status).toBe("failed");
+    expect(docSpy.set).not.toHaveBeenCalled();
+    expect(invokeRenderService).not.toHaveBeenCalled();
+  });
+
+  it("case 11: zero-padded names sort to render order regardless of listing order", async () => {
+    fakeRenderServiceUrl = SERVICE_URL;
+    vi.mocked(invokeRenderService).mockResolvedValue({ renderedCount: 12 });
+    const docSpy = fakeRenderDoc();
+    mockRenderDb(docSpy);
+    // Deliberately hostile listing order: page-0010 before page-0002 before
+    // page-0001, etc. -- the fake bucket returns these AS LISTED, not sorted.
+    mockRenderBucket([
+      "page-0010.png",
+      "page-0002.png",
+      "page-0001.png",
+      "page-0012.png",
+      "page-0003.png",
+      "page-0011.png",
+      "page-0004.png",
+      "page-0009.png",
+      "page-0005.png",
+      "page-0008.png",
+      "page-0006.png",
+      "page-0007.png",
+    ]);
+
+    const outcome = await requestPptxRenderHandler({ orgId: ORG_ID, importId: IMPORT_ID });
+
+    expect(outcome).toEqual({ status: "ready", renderedCount: 12 });
   });
 });
