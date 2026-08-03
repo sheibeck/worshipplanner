@@ -143,7 +143,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 
 ### Presentation Correctness
 
-- [ ] **R059** (quality-attribute): Organizational labels never render when presenting or previewing —
+- [x] **R059** (quality-attribute): Organizational labels never render when presenting or previewing —
       they exist only to organize slides within a group.
 
 - [ ] **R060** (quality-attribute): Copyright/CCLI information is visible on the first **and** last
@@ -152,7 +152,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
       starts and songs cut short. Must not be justified as a CCLI mandate; CCLI's primary license text
       remains unretrieved and should be pulled before this criterion is treated as final. `[FEAT]`
 
-- [ ] **R061** (primary-user-loop): Previewing the slideshow starts at the highlighted group and its
+- [x] **R061** (primary-user-loop): Previewing the slideshow starts at the highlighted group and its
       highlighted slide, or that group's first slide when none is highlighted.
 
 ### Smarter Content
@@ -265,9 +265,9 @@ Acknowledged, deferred, not in this roadmap.
 | R056 | Phase 33 | Complete |
 | R057 | Phase 33 | Complete |
 | R058 | Phase 33 | Complete |
-| R059 | Phase 35 | Pending |
+| R059 | Phase 35 | Complete |
 | R060 | Phase 35 | Pending |
-| R061 | Phase 35 | Pending |
+| R061 | Phase 35 | Complete |
 | R062 | Phase 37 | Pending |
 | R063 | Phase 33 | Complete |
 | R064 | Phase 34 | Partial — structural guarantee done, reachability NOT delivered |

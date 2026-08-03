@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Service and Slides
-current_phase: 34
-current_phase_name: Smarter Content — LLM Scripture Split
-status: verifying
-stopped_at: Completed 34-04-PLAN.md (phase 34 complete, all four plans executed)
-last_updated: "2026-08-03T08:13:49.541Z"
+current_phase: 35
+current_phase_name: Presentation Correctness & Lyric Editor
+status: executing
+stopped_at: Completed 35-01-PLAN.md
+last_updated: "2026-08-03T13:38:51.378Z"
 last_activity: 2026-08-03
-last_activity_desc: Phase 34 execution started
+last_activity_desc: Phase 35 execution started
 progress:
   total_phases: 9
   completed_phases: 6
-  total_plans: 34
-  completed_plans: 34
+  total_plans: 38
+  completed_plans: 35
   percent: 67
 ---
 
@@ -65,7 +65,7 @@ to-do for when they return.
 See: .planning/PROJECT.md (updated 2026-07-28)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 34 — Smarter Content — LLM Scripture Split
+**Current focus:** Phase 35 — Presentation Correctness & Lyric Editor
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -75,10 +75,10 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 
 ## Current Position
 
-Phase: 34 (Smarter Content — LLM Scripture Split) — EXECUTING
-Plan: 4 of 4
-Status: Phase complete — ready for verification
-Last activity: 2026-08-03 — Phase 34 execution started
+Phase: 35 (Presentation Correctness & Lyric Editor) — EXECUTING
+Plan: 2 of 4
+Status: Ready to execute
+Last activity: 2026-08-03 — Phase 35 execution started
 
 ## ★ v1.4 AUTONOMOUS RUN — standing decisions (2026-07-28)
 
@@ -878,6 +878,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 34 P02 | 10min | 2 tasks | 2 files |
 | Phase 34 P03 | 12min | 2 tasks | 2 files |
 | Phase 34 P04 | 35min | 3 tasks | 3 files |
+| Phase 35 P01 | 14min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -1092,6 +1093,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: jsonSchemaOutputFormat() deep-clones/transforms SPLIT_SCHEMA before request attachment; call-shape tests assert the transformed schema's shape (properties.sections present) rather than strict identity against SPLIT_SCHEMA
 - [Phase ?]: 34-04: wholesale-replace-on-success + untouched-plus-toast-on-any-failure is the additive AI pattern (canAiSplit gated by 34-01's hasSplittableBoundaries; onAiSplit never merges, never partially applies)
 - [Phase ?]: 34-04: sectionsSnapshot() in tests reads the DOM rather than exposing sections internally — matches the component's existing minimal test seam (only currentReadingId is exposed, for the unrelated E4 backstop)
+- [Phase ?]: R059/R061 (35-01): sectionLabel render deleted from PresentationViewer lyric branch; presentStartIndex computed in SlidesTab, threaded via initialIndex prop through ServiceEditorView, reusing the existing clamp formula
 
 ### Roadmap Evolution
 
@@ -1153,6 +1155,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-03T08:13:49.511Z
-Stopped at: Completed 34-04-PLAN.md (phase 34 complete, all four plans executed)
+Last session: 2026-08-03T13:38:51.340Z
+Stopped at: Completed 35-01-PLAN.md
 Resume file: None
