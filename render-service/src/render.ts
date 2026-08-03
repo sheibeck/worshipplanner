@@ -25,8 +25,16 @@ const storage = new Storage();
 // resolves an app-configured default bucket with no argument, the plain @google-cloud/
 // storage client's Storage#bucket() REQUIRES an explicit bucket name. This is a plain Cloud
 // Run container, not a Firebase Function, so there is no admin-app default to fall back on
-// -- the bucket name must be supplied as a container env var at deploy time.
-const BUCKET_NAME = process.env.STORAGE_BUCKET;
+// -- the bucket name must be supplied as a container env var at deploy time. Read lazily
+// (inside the request handler, not at module scope) so a test can set/change
+// process.env.STORAGE_BUCKET per-case without needing to re-import the module.
+function requiredBucketName(): string {
+  const name = process.env.STORAGE_BUCKET;
+  if (!name) {
+    throw new Error("STORAGE_BUCKET environment variable is required");
+  }
+  return name;
+}
 
 export interface RenderRequest {
   orgId: string;
@@ -97,10 +105,7 @@ export async function renderPptxToImages(req: RenderRequest): Promise<RenderResu
     );
   }
 
-  if (!BUCKET_NAME) {
-    throw new Error("STORAGE_BUCKET environment variable is required");
-  }
-  const bucket = storage.bucket(BUCKET_NAME);
+  const bucket = storage.bucket(requiredBucketName());
   const workDir = await mkdtemp(path.join(os.tmpdir(), "pptx-"));
   // Per-request-unique profile directory INSIDE the request's own working directory.
   // LibreOffice's own lock file makes a shared/reused UserInstallation profile unreliable
