@@ -32,6 +32,7 @@ import {
   validateScriptureSuggestions,
   getSongSuggestions,
   getScriptureSuggestions,
+  SPLIT_SCHEMA,
 } from '@/utils/claudeApi'
 import type { AiSongSuggestion, AiScriptureSuggestion } from '@/utils/claudeApi'
 
@@ -357,5 +358,63 @@ describe('getScriptureSuggestions', () => {
     })
 
     expect(result).toBeNull()
+  })
+})
+
+// ─── Congregational Split (34-02) — SPLIT_SCHEMA ──────────────────────────────
+//
+// SPLIT_SCHEMA is half of R064's entire correctness guarantee: the contract the
+// model is allowed to speak must contain no field capable of carrying scripture
+// words. These tests assert that structurally, not by eye.
+
+describe('SPLIT_SCHEMA', () => {
+  it('has additionalProperties: false at the root object and the per-section object', () => {
+    expect(SPLIT_SCHEMA.additionalProperties).toBe(false)
+    expect(SPLIT_SCHEMA.properties.sections.items.additionalProperties).toBe(false)
+  })
+
+  it('declares exactly the three expected properties on a section, all required', () => {
+    const itemProps = SPLIT_SCHEMA.properties.sections.items.properties
+    expect(Object.keys(itemProps).sort()).toEqual(['endBoundary', 'speaker', 'startBoundary'])
+    expect([...SPLIT_SCHEMA.properties.sections.items.required].sort()).toEqual([
+      'endBoundary',
+      'speaker',
+      'startBoundary',
+    ])
+    expect([...SPLIT_SCHEMA.required]).toEqual(['sections'])
+  })
+
+  it('(P-02) has no string-typed property anywhere except speaker, and speaker enum is exactly LEADER/CONGREGATION', () => {
+    // A deep walk of the whole schema — not a spot-check — because P-02 says
+    // there must be NO field anywhere the model could populate with scripture
+    // words, including one added later without anyone re-reading this test.
+    const stringTypedNodes: { path: string; node: { type: string; enum?: readonly string[] } }[] = []
+
+    function walk(node: unknown, path: string): void {
+      if (node === null || typeof node !== 'object') return
+      if (Array.isArray(node)) {
+        node.forEach((child, i) => walk(child, `${path}[${i}]`))
+        return
+      }
+      const obj = node as Record<string, unknown>
+      if (obj.type === 'string') {
+        stringTypedNodes.push({ path, node: obj as { type: string; enum?: readonly string[] } })
+      }
+      for (const [key, value] of Object.entries(obj)) {
+        walk(value, `${path}.${key}`)
+      }
+    }
+
+    walk(SPLIT_SCHEMA, 'SPLIT_SCHEMA')
+
+    expect(stringTypedNodes).toHaveLength(1)
+    expect(stringTypedNodes[0]!.path.endsWith('.speaker')).toBe(true)
+    expect(stringTypedNodes[0]!.node.enum).toEqual(['LEADER', 'CONGREGATION'])
+  })
+
+  it('declares startBoundary and endBoundary as integer type', () => {
+    const itemProps = SPLIT_SCHEMA.properties.sections.items.properties
+    expect(itemProps.startBoundary.type).toBe('integer')
+    expect(itemProps.endBoundary.type).toBe('integer')
   })
 })
