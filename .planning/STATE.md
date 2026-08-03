@@ -428,10 +428,28 @@ character offsets, constraining the model to integer indices into a pre-computed
 positions. This makes mid-sentence splits **structurally unrepresentable** rather than merely
 validated-against — strictly stronger than R064 asks for.
 
+## ★ OWNER DECISION 2026-08-03 — Phase 36 is DEFERRED, this run does 35 and 37 only
+
+Asked mid-run and answered by the owner: **"Do 35 and 37, skip 36."**
+
+**Why 36 was skipped:** its goal — *"the Service Order tab is rebuilt against the Claude Design
+wireframes, and one contextual action-bar pattern is applied across every tabbed screen"* — has **no
+wireframe behind either half** (see the OPEN ITEM above). Phase 33 absorbed the same gap by treating
+its affordances as original design work, but 36 is a *rebuild against* wireframes, so building it from
+invented ones risks doing it twice.
+
+**To resume Phase 36:** re-pull `Slides Tab.dc.html` from the Claude Design project
+`e8e6c287-3e88-402f-88e1-7ad6d5101fa2` into `docs/design/`, then `/gsd-autonomous --only 36`.
+**R053 rides along with it** — the drop-zone-as-import rework and moving Add-slide/Add-music into the
+action bar were deferred from Phase 33 into 36 by the ROADMAP's own reasoning.
+
+**Also still open from this run:** Phase 34's reachability gap (`/gsd-plan-phase 34 --gaps`) — see below.
+
 ## Deferred Verification
 
 | Phase | State | Resume |
 |-------|-------|--------|
+| 36 | deferred_by_owner — no wireframes | re-pull the design file, then /gsd-autonomous --only 36 |
 | 32 | verification_deferred_human | /gsd-verify-work 32 |
 | 33 | verification_deferred_human | /gsd-verify-work 33 |
 | 34 | verification_deferred_gaps | /gsd-plan-phase 34 --gaps |
