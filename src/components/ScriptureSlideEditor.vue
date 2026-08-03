@@ -239,5 +239,14 @@ onUnmounted(() => {
 // Test-only seam (matches PptxImportModal.vue's existing defineExpose
 // precedent and CongregationalEditor.vue's identical comment) — needed for
 // the E4 `partial` backstop test.
+//
+// ★ WR-04 (32-REVIEW), CALL-SITE CONTRACT — same as CongregationalEditor.vue:
+// `currentReadingId`/`surfaceId`/`referenceText`/`rawText`/`localSlides` are
+// all captured/seeded ONCE at mount and are NOT reactive to `props.readingId`
+// changing afterward. The caller MUST always mount this component with a
+// `:key` tied to `readingId` — swapping the prop in place on a persistent
+// instance is not supported and would silently misattribute saves to the
+// wrong reading. See CongregationalEditor.vue's identical comment for why a
+// partial (surfaceId-only) prop-watcher was considered and rejected.
 defineExpose({ currentReadingId })
 </script>

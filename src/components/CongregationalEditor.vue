@@ -297,5 +297,25 @@ onUnmounted(() => {
 // onFetchPassage — so the E4 `partial` backstop test needs a way to force
 // the id-resolution race described above without re-implementing internal
 // timing. No other internal state is exposed.
+//
+// ★ WR-04 (32-REVIEW), CALL-SITE CONTRACT — read before wiring this
+// component up anywhere (Phase 34): `currentReadingId` (and everything
+// seeded from it — `surfaceId`, `sections`, `referenceText`, `rawText`) is
+// captured ONCE at mount and is NOT reactive to `props.readingId` changing
+// afterward. Reusing one mounted instance across different `readingId`
+// values (e.g. a parent that swaps the prop in place instead of remounting)
+// silently misattributes every later save's status to the FIRST reading
+// this instance ever saw. The caller MUST always mount this component with
+// a `:key` tied to `readingId` (forcing a fresh instance, and therefore a
+// fresh onMounted load, per reading) — swapping `readingId` in place on a
+// persistent instance is not a supported usage. A prop-watcher that resets
+// `currentReadingId`/`surfaceId` alone was considered and rejected as a
+// fix: `sections`/`referenceText`/`rawText` are ALSO seeded only in
+// onMounted, so a partial reset would leave those stale while surfaceId
+// looked correct — a worse, more subtly wrong state than today's
+// unreactive-but-consistent one. A correct fix needs the whole onMounted
+// load path to re-run reactively, which is a real (if currently unreachable
+// and untestable, since nothing mounts this component yet) design change
+// for whoever wires this up, not a one-line watch.
 defineExpose({ currentReadingId })
 </script>
