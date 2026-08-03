@@ -58,6 +58,7 @@
          `selectedSlideId` (D-03): it never closes on a selection change,
          only on its own `close` emit. -->
     <EditSlideDrawer
+      ref="editSlideDrawerRef"
       :open="drawerOpen"
       :mode="drawerMode"
       :pending-action="pendingDrawerAction"
@@ -183,6 +184,14 @@ const router = useRouter()
 
 const selectedSlotId = ref<string | null>(null)
 const selectedSlideId = ref<string | null>(null)
+
+/**
+ * WR-04: a ref to the mounted drawer so `onMenuAction`'s navigation keys
+ * ("edit-in-song"/"edit-in-scripture") can gate on the drawer's OWN unsaved
+ * edit guard before routing away — the one path this component owns that the
+ * drawer itself cannot self-guard, since 33-09 relocated the navigation here.
+ */
+const editSlideDrawerRef = ref<InstanceType<typeof EditSlideDrawer> | null>(null)
 
 /**
  * Whether there is anything assembled to present — the same condition
@@ -402,8 +411,22 @@ function requestEditInScripture(): void {
  * confirm) — this dispatcher itself never calls a delete or duplicate store
  * action; it only ever sets a pending request for the drawer to act on
  * (P-01).
+ *
+ * WR-04: "edit-in-song"/"edit-in-scripture" are checked against the OPEN
+ * drawer's own unsaved-edit guard BEFORE `selectedSlideId` is reassigned
+ * below — the drawer's own `watch(() => props.entry)` starts flushing/
+ * resetting for the new entry the moment the selection changes, so asking
+ * afterward would already be asking about the wrong entry. A cancelled
+ * confirm leaves the selection and drawer state untouched, so an in-flight
+ * edit on the entry being left is never silently abandoned.
  */
+function confirmLeavingOpenDrawer(): boolean {
+  if (!drawerOpen.value) return true
+  return editSlideDrawerRef.value?.confirmDiscard() ?? true
+}
+
 function onMenuAction(slideId: string, key: MenuItemKey): void {
+  if ((key === 'edit-in-song' || key === 'edit-in-scripture') && !confirmLeavingOpenDrawer()) return
   selectedSlideId.value = slideId
   switch (key) {
     case 'edit-details':

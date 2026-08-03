@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { defineComponent } from 'vue'
 import { shallowMount } from '@vue/test-utils'
 import SlidesTab from '../SlidesTab.vue'
 import SlidePlanRail from '../SlidePlanRail.vue'
@@ -714,6 +715,114 @@ describe('SlidesTab', () => {
 
       expect(wrapper.findComponent(SlideGrid).props('selectedSlideId')).toBe('entry-2')
       expect(wrapper.findComponent(EditSlideDrawer).props('entry')).toEqual(entryTwo)
+    })
+  })
+
+  describe('WR-04 — unsaved-edit guard gates menu-dispatched navigation', () => {
+    beforeEach(() => {
+      mockRouterPush.mockClear()
+    })
+
+    // The default `mountTab` auto-stub of `EditSlideDrawer` exposes nothing,
+    // so `editSlideDrawerRef.value?.confirmDiscard()` resolves via the `??
+    // true` fallback — every OTHER test in this file relies on that safe
+    // default. These tests substitute a minimal real stub that DOES expose a
+    // controllable `confirmDiscard`, so `onMenuAction`'s own gating logic
+    // (not the drawer's internals, already covered by EditSlideDrawer.test.ts)
+    // can be exercised directly.
+    function mountWithControllableGuard(
+      sourceRef: GroupSlideEntry['sourceRef'],
+      confirmDiscardResult: boolean,
+    ) {
+      const confirmDiscard = vi.fn(() => confirmDiscardResult)
+      const EditSlideDrawerStub = defineComponent({
+        name: 'EditSlideDrawer',
+        props: [
+          'open', 'mode', 'pendingAction', 'entry', 'group', 'planItem',
+          'assembledSlide', 'position', 'total', 'orgId', 'serviceId',
+          'isEditor', 'serviceLocked',
+        ],
+        emits: ['close', 'duplicate', 'pending-action-consumed'],
+        setup(_, { expose }) {
+          expose({ confirmDiscard })
+          return () => null
+        },
+      })
+
+      const slots: ServiceSlot[] = [makeSlot({ kind: 'SONG', id: 'slot-a', position: 0 })]
+      const entry = makeEntry({ id: 'entry-1', sourceRef })
+      const group = makeGroup({ id: 'slot-a', slotId: 'slot-a', slides: [entry] })
+      const assembledSlideshow: AssembledSlide[] = [makeAssembled(0, 'entry-1')]
+
+      const wrapper = shallowMount(SlidesTab, {
+        props: {
+          slots,
+          serviceId: 'service-1',
+          orgId: 'org-1',
+          assembledSlideshow,
+          groupsBySlotId: new Map([['slot-a', group]]),
+          isEditor: true,
+          groupsLoading: false,
+          active: true,
+          ensureGroupMaterialized: vi.fn().mockResolvedValue(undefined),
+        },
+        global: { stubs: { EditSlideDrawer: EditSlideDrawerStub } },
+      })
+      return { wrapper, confirmDiscard }
+    }
+
+    it('a cancelled confirm blocks edit-in-song navigation and leaves the selection untouched', async () => {
+      const { wrapper, confirmDiscard } = mountWithControllableGuard(
+        { kind: 'lyric', songId: 'song-1', sectionId: 'sec-1' },
+        false,
+      )
+      await wrapper.vm.$nextTick()
+      const grid = wrapper.findComponent(SlideGrid)
+
+      // Open the drawer first — the guard only asks `confirmDiscard` when a
+      // drawer is actually open (`drawerOpen.value` true).
+      grid.vm.$emit('menu-action', 'entry-1', 'edit-details')
+      await wrapper.vm.$nextTick()
+      expect(grid.props('selectedSlideId')).toBe('entry-1')
+
+      grid.vm.$emit('menu-action', 'entry-1', 'edit-in-song')
+      await wrapper.vm.$nextTick()
+
+      expect(confirmDiscard).toHaveBeenCalledTimes(1)
+      expect(mockRouterPush).not.toHaveBeenCalled()
+      expect(grid.props('selectedSlideId')).toBe('entry-1')
+    })
+
+    it('a confirmed discard allows edit-in-song navigation to proceed', async () => {
+      const { wrapper, confirmDiscard } = mountWithControllableGuard(
+        { kind: 'lyric', songId: 'song-1', sectionId: 'sec-1' },
+        true,
+      )
+      await wrapper.vm.$nextTick()
+      const grid = wrapper.findComponent(SlideGrid)
+
+      grid.vm.$emit('menu-action', 'entry-1', 'edit-details')
+      await wrapper.vm.$nextTick()
+
+      grid.vm.$emit('menu-action', 'entry-1', 'edit-in-song')
+      await wrapper.vm.$nextTick()
+
+      expect(confirmDiscard).toHaveBeenCalledTimes(1)
+      expect(mockRouterPush).toHaveBeenCalledWith({ name: 'songs', query: { edit: 'song-1', tab: 'lyrics' } })
+    })
+
+    it('never calls confirmDiscard for edit-in-scripture when the drawer was never opened this session', async () => {
+      const { wrapper, confirmDiscard } = mountWithControllableGuard(
+        { kind: 'scripture', scriptureReadingId: 'read-1', innerSlideId: 'inner-1' },
+        false,
+      )
+      await wrapper.vm.$nextTick()
+
+      wrapper.findComponent(SlideGrid).vm.$emit('menu-action', 'entry-1', 'edit-in-scripture')
+      await wrapper.vm.$nextTick()
+
+      expect(confirmDiscard).not.toHaveBeenCalled()
+      expect(wrapper.emitted('navigate-to-scripture-editor')).toBeTruthy()
     })
   })
 })

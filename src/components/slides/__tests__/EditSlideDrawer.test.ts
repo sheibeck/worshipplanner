@@ -304,6 +304,73 @@ describe('EditSlideDrawer (Phase 26-05 Task 1 — shell)', () => {
     expect(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))).not.toThrow()
   })
 
+  // WR-04: `useUnsavedGuard`'s `confirmDiscard()` used to be dead code in
+  // this file — `capture()` was called but nothing ever read `isDirty`/
+  // `confirmDiscard`, unlike every other consumer (AvailabilityDrawer.vue,
+  // RosterView.vue, SongSlideOver.vue). Restored on the × button and Escape,
+  // matching those siblings exactly, and exposed for `SlidesTab.vue`'s own
+  // menu-dispatched-navigation guard (see SlidesTab.test.ts's own WR-04
+  // coverage for that half).
+  describe('WR-04 — unsaved-edit guard on close/Escape', () => {
+    afterEach(() => {
+      vi.restoreAllMocks()
+    })
+
+    it('with an unsaved (not-yet-written) label edit, the × button prompts, and cancelling keeps the drawer open', async () => {
+      const wrapper = mountDrawer()
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+
+      await body().find('[data-testid="drawer-label-input"]').setValue('Changed label')
+      await body().find('[data-testid="edit-slide-drawer-close"]').trigger('click')
+
+      expect(confirmSpy).toHaveBeenCalledTimes(1)
+      expect(wrapper.emitted('close')).toBeUndefined()
+    })
+
+    it('with an unsaved label edit, confirming the prompt lets the × button close the drawer', async () => {
+      const wrapper = mountDrawer()
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+      await body().find('[data-testid="drawer-label-input"]').setValue('Changed label')
+      await body().find('[data-testid="edit-slide-drawer-close"]').trigger('click')
+
+      expect(confirmSpy).toHaveBeenCalledTimes(1)
+      expect(wrapper.emitted('close')).toBeTruthy()
+    })
+
+    it('with an unsaved label edit, Escape prompts too, and cancelling leaves the drawer open', async () => {
+      const wrapper = mountDrawer()
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+
+      await body().find('[data-testid="drawer-label-input"]').setValue('Changed label')
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+
+      expect(confirmSpy).toHaveBeenCalledTimes(1)
+      expect(wrapper.emitted('close')).toBeUndefined()
+    })
+
+    it('with no unsaved edits, closing never calls window.confirm at all', async () => {
+      const wrapper = mountDrawer()
+      const confirmSpy = vi.spyOn(window, 'confirm')
+
+      await body().find('[data-testid="edit-slide-drawer-close"]').trigger('click')
+
+      expect(confirmSpy).not.toHaveBeenCalled()
+      expect(wrapper.emitted('close')).toBeTruthy()
+    })
+
+    it('exposes confirmDiscard so a parent can gate its own menu-dispatched navigation on this drawer\'s dirty state', async () => {
+      const wrapper = mountDrawer()
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+
+      await body().find('[data-testid="drawer-label-input"]').setValue('Changed label')
+
+      const exposed = wrapper.vm as unknown as { confirmDiscard: () => boolean }
+      expect(exposed.confirmDiscard()).toBe(false)
+      expect(confirmSpy).toHaveBeenCalledTimes(1)
+    })
+  })
+
   it("shows the context line's kind badge, source title and position within the group", () => {
     mountDrawer({ planItem: makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songTitle: 'This Is Our God' } as never) })
     expect(body().find('[data-testid="drawer-kind-badge"]').text()).toBe('SONG')
