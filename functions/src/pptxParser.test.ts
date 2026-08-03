@@ -36,6 +36,7 @@ vi.mock("firebase-admin/firestore", () => ({
 }));
 vi.mock("firebase-functions/params", () => ({
   defineSecret: vi.fn(() => ({ value: () => "fake-secret" })),
+  defineString: vi.fn(() => ({ value: () => "" })),
 }));
 
 // officeparser's real parseOffice is preserved by default (the fixture-based

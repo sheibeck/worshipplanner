@@ -91,6 +91,10 @@ describe("MEDIA_PATH_GUARD", () => {
     expect(MEDIA_PATH_GUARD.test("orgs/orgA/pptx-imports/i1/deck.pptx")).toBe(false);
     expect(MEDIA_PATH_GUARD.test("some/other/path.txt")).toBe(false);
   });
+
+  it("R062: does not match the new rendered/ path shape -- this structural exemption is why cleanupExpiredMedia needs zero changes", () => {
+    expect(MEDIA_PATH_GUARD.test("orgs/orgA/pptx-imports/i1/rendered/page-0001.png")).toBe(false);
+  });
 });
 
 describe("cleanupExpiredMediaHandler", () => {
@@ -167,6 +171,20 @@ describe("cleanupExpiredMediaHandler", () => {
     await cleanupExpiredMediaHandler();
 
     expect(oldPptx.delete).not.toHaveBeenCalled();
+  });
+
+  it("R062: never deletes a rendered/ page even 60 days old and MEDIA_CLEANUP_ENABLED=true -- the guard rejects it before the age check is even reached", async () => {
+    process.env.MEDIA_CLEANUP_ENABLED = "true";
+    const oldRenderedPage = fakeFile(
+      "orgs/orgA/pptx-imports/i1/rendered/page-0001.png",
+      60,
+    );
+    mockBucket([oldRenderedPage]);
+
+    const summary = await cleanupExpiredMediaHandler();
+
+    expect(oldRenderedPage.delete).not.toHaveBeenCalled();
+    expect(summary.scannedCount).toBe(0);
   });
 
   it("dry-run mode counts/logs an old media file but calls no delete, and reports deletedCount via the dry-run count", async () => {
