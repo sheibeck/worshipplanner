@@ -5,6 +5,7 @@ import type { Options as SortableOptions } from 'sortablejs'
 import SlideGrid from '../SlideGrid.vue'
 import SlideCard from '../SlideCard.vue'
 import SlideGroupMusicControl from '../SlideGroupMusicControl.vue'
+import BackgroundControl from '../BackgroundControl.vue'
 import SlideDropTarget from '../SlideDropTarget.vue'
 import PptxImportModal from '@/components/PptxImportModal.vue'
 import type { ServiceSlot } from '@/types/service'
@@ -17,10 +18,12 @@ import { UNSUPPORTED_FILE_MESSAGE } from '../dropRouting'
 // --- 25-06 Task 2: also calls setGroupBedMedia directly for the group music bar ---
 const mockReplaceGroupSlides = vi.fn().mockResolvedValue(undefined)
 const mockSetGroupBedMedia = vi.fn().mockResolvedValue(undefined)
+const mockSetGroupBackground = vi.fn().mockResolvedValue(undefined)
 vi.mock('@/stores/slideGroups', () => ({
   useSlideGroups: () => ({
     replaceGroupSlides: mockReplaceGroupSlides,
     setGroupBedMedia: mockSetGroupBedMedia,
+    setGroupBackground: mockSetGroupBackground,
   }),
 }))
 
@@ -188,9 +191,14 @@ function makeSlot(overrides: Partial<ServiceSlot> & { kind: ServiceSlot['kind'];
   return { ...overrides } as ServiceSlot
 }
 
-function makeAssembled(slotIndex: number, id: string, slotKind: AssembledSlide['slotKind'] = 'PRAYER'): AssembledSlide {
+function makeAssembled(
+  slotIndex: number,
+  id: string,
+  slotKind: AssembledSlide['slotKind'] = 'PRAYER',
+  slideOverrides: Record<string, unknown> = {},
+): AssembledSlide {
   return {
-    slide: { id, position: 0, contentKind: 'text', body: `body-${id}` },
+    slide: { id, position: 0, contentKind: 'text', body: `body-${id}`, ...slideOverrides },
     slotIndex,
     slotKind,
     sourceId: null,
@@ -244,6 +252,7 @@ function mountGrid(props: {
 beforeEach(() => {
   mockReplaceGroupSlides.mockClear()
   mockSetGroupBedMedia.mockClear()
+  mockSetGroupBackground.mockClear()
   mockUpdateService.mockClear()
   mockSortableDestroy.mockClear()
   capturedSortableOptions = undefined
@@ -647,6 +656,143 @@ describe('SlideGrid', () => {
       }).not.toThrow()
       await Promise.resolve()
       await Promise.resolve()
+    })
+  })
+
+  // --- 33-08 Task 2: group background control mounted below the music control (R055) ---
+  describe('group background control (33-08 Task 2)', () => {
+    it('renders the thumbnail, the filename and the caption with the real card count substituted', () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const group = makeGroup({
+        backgroundImageUrl: 'https://storage.example.com/backgrounds/mtn.jpg',
+        slides: [
+          { id: 'e1', order: 0, sourceRef: { kind: 'text' } },
+          { id: 'e2', order: 1, sourceRef: { kind: 'text' } },
+          { id: 'e3', order: 2, sourceRef: { kind: 'text' } },
+        ],
+      })
+      const assembledSlideshow = [makeAssembled(0, 'e1'), makeAssembled(0, 'e2'), makeAssembled(0, 'e3')]
+      const wrapper = mountGrid({ selectedSlot: slot, assembledSlideshow, group })
+
+      const control = wrapper.findComponent(BackgroundControl)
+      expect(control.props('imageUrl')).toBe('https://storage.example.com/backgrounds/mtn.jpg')
+      expect(control.props('caption')).toBe('applies to all 3 slides in this group, unless a slide sets its own')
+    })
+
+    it('does not render the wrapper when there is no group background and no write permission', () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const wrapper = mountGrid({ selectedSlot: slot, isEditor: false, group: null })
+      expect(wrapper.find('[data-testid="slide-grid-group-background"]').exists()).toBe(false)
+    })
+
+    it('renders the wrapper when there is a group background but no write permission', () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const group = makeGroup({ backgroundImageUrl: 'https://storage.example.com/bg.jpg', slides: [] })
+      const wrapper = mountGrid({ selectedSlot: slot, isEditor: false, group })
+      expect(wrapper.find('[data-testid="slide-grid-group-background"]').exists()).toBe(true)
+    })
+
+    it('renders the empty-state add affordance label when permitted and nothing is set', () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const wrapper = mountGrid({ selectedSlot: slot, isEditor: true, group: null })
+      const control = wrapper.findComponent(BackgroundControl)
+      expect(control.props('addLabel')).toBe('+ Add background for this group')
+    })
+
+    it("relays the control's attach emit to setGroupBackground with the URL, and remove with the clear flag — carrying no slides key", async () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const wrapper = mountGrid({ selectedSlot: slot, serviceId: 'service-9' })
+
+      await wrapper.findComponent(BackgroundControl).vm.$emit('attach', 'https://storage.example.com/new.jpg')
+      await Promise.resolve()
+
+      expect(mockSetGroupBackground).toHaveBeenCalledTimes(1)
+      expect(mockSetGroupBackground).toHaveBeenCalledWith('org-1', 'slot-1', {
+        serviceId: 'service-9',
+        backgroundImageUrl: 'https://storage.example.com/new.jpg',
+      })
+      expect('slides' in mockSetGroupBackground.mock.calls[0]![2]).toBe(false)
+
+      await wrapper.findComponent(BackgroundControl).vm.$emit('remove')
+      await Promise.resolve()
+
+      expect(mockSetGroupBackground).toHaveBeenCalledTimes(2)
+      const removePatch = mockSetGroupBackground.mock.calls[1]![2]
+      expect(removePatch).toEqual({ serviceId: 'service-9', clearBackground: true })
+      expect('slides' in removePatch).toBe(false)
+    })
+
+    it('shows the inherited display for a SONG group with no own background whose slides resolve from the song tier, and undefined for a PRAYER group in the same shape', () => {
+      const songSlot = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: 'Grace', songKey: null, requiredVwType: 1 } as never)
+      const songGroup = makeGroup({ slides: [{ id: 'e1', order: 0, sourceRef: { kind: 'lyric', songId: 's1', sectionId: 'v1' } }] })
+      const songAssembled = [
+        makeAssembled(0, 'e1', 'SONG', {
+          backgroundSource: 'song',
+          backgroundImageUrl: 'https://storage.example.com/backgrounds/song-bg.jpg',
+        }),
+      ]
+      const songWrapper = mountGrid({ selectedSlot: songSlot, assembledSlideshow: songAssembled, group: songGroup })
+      const songControl = songWrapper.findComponent(BackgroundControl)
+      expect(songControl.props('inheritedFrom')).toEqual({
+        url: 'https://storage.example.com/backgrounds/song-bg.jpg',
+        label: 'song-bg.jpg',
+      })
+
+      const prayerSlot = makeSlot({ kind: 'PRAYER', id: 'slot-2', position: 0 })
+      const prayerGroup = makeGroup({ id: 'slot-2', slotId: 'slot-2', slides: [{ id: 'e2', order: 0, sourceRef: { kind: 'text' } }] })
+      const prayerAssembled = [
+        makeAssembled(0, 'e2', 'PRAYER', {
+          backgroundSource: 'song',
+          backgroundImageUrl: 'https://storage.example.com/backgrounds/song-bg.jpg',
+        }),
+      ]
+      const prayerWrapper = mountGrid({ selectedSlot: prayerSlot, assembledSlideshow: prayerAssembled, group: prayerGroup })
+      expect(prayerWrapper.findComponent(BackgroundControl).props('inheritedFrom')).toBeUndefined()
+    })
+
+    it('does not show the inherited display for a SONG group that already has its own background', () => {
+      const songSlot = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: 'Grace', songKey: null, requiredVwType: 1 } as never)
+      const songGroup = makeGroup({
+        backgroundImageUrl: 'https://storage.example.com/own.jpg',
+        slides: [{ id: 'e1', order: 0, sourceRef: { kind: 'lyric', songId: 's1', sectionId: 'v1' } }],
+      })
+      const songAssembled = [
+        makeAssembled(0, 'e1', 'SONG', {
+          backgroundSource: 'slide',
+          backgroundImageUrl: 'https://storage.example.com/own.jpg',
+        }),
+      ]
+      const wrapper = mountGrid({ selectedSlot: songSlot, assembledSlideshow: songAssembled, group: songGroup })
+      expect(wrapper.findComponent(BackgroundControl).props('inheritedFrom')).toBeUndefined()
+    })
+
+    it('a SONG group renders the control (background is group media, unlike the read-only slide structure)', () => {
+      const songSlot = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: 'Grace', songKey: null, requiredVwType: 1 } as never)
+      const wrapper = mountGrid({ selectedSlot: songSlot, isEditor: true, group: null })
+      expect(wrapper.find('[data-testid="slide-grid-group-background"]').exists()).toBe(true)
+      expect(wrapper.findComponent(BackgroundControl).exists()).toBe(true)
+    })
+
+    it('a group with zero slides still renders the control when permitted', () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const wrapper = mountGrid({ selectedSlot: slot, isEditor: true, assembledSlideshow: [], group: null })
+      expect(wrapper.findComponent(BackgroundControl).exists()).toBe(true)
+      expect(wrapper.findComponent(BackgroundControl).props('caption')).toBe(
+        'applies to all 0 slides in this group, unless a slide sets its own',
+      )
+    })
+
+    it("leaves the music control's own wrapper, props and write path unchanged", async () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const group = makeGroup({ bedAudioUrl: 'https://storage.example.com/pad.mp3', slides: [] })
+      const wrapper = mountGrid({ selectedSlot: slot, group })
+
+      expect(wrapper.find('[data-testid="slide-group-music-control"]').exists()).toBe(true)
+      expect(wrapper.findComponent(SlideGroupMusicControl).props('audioUrl')).toBe('https://storage.example.com/pad.mp3')
+
+      await wrapper.findComponent(SlideGroupMusicControl).vm.$emit('attach', 'https://storage.example.com/new.mp3')
+      await Promise.resolve()
+      expect(mockSetGroupBedMedia).toHaveBeenCalledTimes(1)
     })
   })
 

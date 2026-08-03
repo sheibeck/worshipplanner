@@ -81,6 +81,25 @@
         />
       </div>
 
+      <!-- Group background control (R055, 33-08) — a NEW sibling row directly
+           below the music control, same "don't render an empty box" wrapper
+           gate for the same recorded reason (31-UI-SPEC E5). Background is
+           group MEDIA exactly like the bed audio beside it, so it uses the
+           SAME `canWriteGroupMedia` gate — never `canMutateGroup` — including
+           that gate's deliberate song-group carve-out. -->
+      <div v-if="group?.backgroundImageUrl || canWriteGroupMedia" class="px-6 pt-2" data-testid="slide-grid-group-background">
+        <BackgroundControl
+          :image-url="group?.backgroundImageUrl"
+          :caption="groupBackgroundCaption"
+          :inherited-from="songBackgroundForInheritedDisplay"
+          :is-editor="canWriteGroupMedia"
+          :org-id="orgId"
+          add-label="+ Add background for this group"
+          @attach="onAttachGroupBackground"
+          @remove="onRemoveGroupBackground"
+        />
+      </div>
+
       <div
         v-if="rejectionNotice"
         class="mx-6 mt-3 rounded-md border border-red-800 bg-red-900/20 px-3 py-2 text-[12px] text-red-300"
@@ -207,10 +226,11 @@ import { useMediaUpload } from '@/composables/useMediaUpload'
 import { slotLabel } from '@/utils/slotTypes'
 import SlideCard from './SlideCard.vue'
 import SlideGroupMusicControl from './SlideGroupMusicControl.vue'
+import BackgroundControl from './BackgroundControl.vue'
 import SlideDropTarget from './SlideDropTarget.vue'
 import PptxImportModal from '@/components/PptxImportModal.vue'
 import { resolveDrop, UNSUPPORTED_FILE_MESSAGE } from './dropRouting'
-import { slotDisplayTitle, type EnsureGroupMaterializedResult } from './slideDisplay'
+import { slotDisplayTitle, backgroundImageLabel, type EnsureGroupMaterializedResult } from './slideDisplay'
 
 const props = withDefaults(defineProps<{
   /** The currently-selected plan item, or null when no plan item is selected. */
@@ -347,6 +367,70 @@ async function onRemoveGroupMusic(): Promise<void> {
     })
   } catch (err) {
     console.error('Failed to remove group music:', err)
+  }
+}
+
+// --- Task 2: group background control — the caller-does-the-write idiom,
+// mirroring `onAttachGroupMusic`/`onRemoveGroupMusic` exactly. Background is
+// group MEDIA, so writes go through `canWriteGroupMedia`, never
+// `canMutateGroup` (same reasoning as the music control above). No
+// on-demand materialization step is needed for the same reason the music
+// handlers need none — `setGroupBackground`'s own merging skeleton-create
+// already covers a plan item with no group document yet (WR-01). ---
+
+/**
+ * `applies to all {N} slides in this group, unless a slide sets its own` —
+ * the Copywriting Contract's group-background caption, with the real card
+ * count substituted (R055).
+ */
+const groupBackgroundCaption = computed(
+  () => `applies to all ${cards.value.length} slides in this group, unless a slide sets its own`,
+)
+
+/**
+ * Populated ONLY for a SONG group whose own background is empty while the
+ * song's own is set — derived from the ALREADY-RESOLVED provenance on this
+ * group's own assembled slides (`backgroundSource === 'song'`), never from a
+ * new song-lyrics prop or a second cascade derivation. `undefined` for every
+ * non-SONG group (no associated song, nothing to inherit from at this
+ * level) and whenever the group already has its own background.
+ */
+const songBackgroundForInheritedDisplay = computed<{ url: string; label: string } | undefined>(() => {
+  if (!isSongGroup.value) return undefined
+  if (props.group?.backgroundImageUrl) return undefined
+  const songSourced = cards.value.find((card) => card.assembledSlide.slide.backgroundSource === 'song')
+  const url = songSourced?.assembledSlide.slide.backgroundImageUrl
+  if (!url) return undefined
+  return { url, label: backgroundImageLabel(url) }
+})
+
+async function onAttachGroupBackground(url: string): Promise<void> {
+  if (!canWriteGroupMedia.value) return
+  if (!props.selectedSlot) return
+  try {
+    await slideGroupsStore.setGroupBackground(props.orgId, props.selectedSlot.id, {
+      serviceId: props.serviceId,
+      backgroundImageUrl: url,
+    })
+  } catch (err) {
+    console.error('Failed to attach group background:', err)
+  }
+}
+
+// The explicit `clearBackground` flag mirrors `onRemoveGroupMusic`'s own
+// `clearAudio` flag — `stripUndefined()` would otherwise erase the intent
+// before it reached Firestore, and `deleteField()` is the only way to
+// actually remove the field.
+async function onRemoveGroupBackground(): Promise<void> {
+  if (!canWriteGroupMedia.value) return
+  if (!props.selectedSlot) return
+  try {
+    await slideGroupsStore.setGroupBackground(props.orgId, props.selectedSlot.id, {
+      serviceId: props.serviceId,
+      clearBackground: true,
+    })
+  } catch (err) {
+    console.error('Failed to remove group background:', err)
   }
 }
 
