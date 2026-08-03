@@ -109,10 +109,10 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 - [x] **R050** (quality-attribute): Adding a slide appends it to the end of the group, not before the
       last slide.
 
-- [ ] **R051** (primary-user-loop): A slide enters edit mode only via an explicit action in a 3-dot
+- [x] **R051** (primary-user-loop): A slide enters edit mode only via an explicit action in a 3-dot
       menu — never by clicking the slide — so slides can be dragged without triggering edit.
 
-- [ ] **R052** (core-capability): The 3-dot menu offers "Edit details" and "Edit lyrics" as separate
+- [x] **R052** (core-capability): The 3-dot menu offers "Edit details" and "Edit lyrics" as separate
       drawers, replacing the arrow affordance and the multi-tab single drawer.
 
 - [ ] **R053** (quality-attribute): The group's drag-and-drop zone doubles as the import affordance when
@@ -167,7 +167,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
       **defaults to dry-run**; the inverse default already caused a real incident in this codebase.
       `[STACK]` `[PITFALL]`
 
-- [ ] **R063** (core-capability): Slide-editing options vary by service-item type — a scripture item
+- [x] **R063** (core-capability): Slide-editing options vary by service-item type — a scripture item
       offers options a song item does not.
 
 - [ ] **R064** (core-capability): A scripture item can be split into a congregational responsive reading
@@ -243,8 +243,8 @@ Acknowledged, deferred, not in this roadmap.
 | R048 | Phase 30 | Complete |
 | R049 | Phase 29 | Complete |
 | R050 | Phase 29 | Complete |
-| R051 | Phase 33 | Pending |
-| R052 | Phase 33 | Pending |
+| R051 | Phase 33 | Complete |
+| R052 | Phase 33 | Complete |
 | R053 | Phase 36 | Pending |
 | R054 | Phase 30 | Complete |
 | R055 | Phase 33 | Complete |
@@ -255,7 +255,7 @@ Acknowledged, deferred, not in this roadmap.
 | R060 | Phase 35 | Pending |
 | R061 | Phase 35 | Pending |
 | R062 | Phase 37 | Pending |
-| R063 | Phase 33 | Pending |
+| R063 | Phase 33 | Complete |
 | R064 | Phase 34 | Pending |
 | R065 | Phase 35 | Pending |
 | R066 | Phase 35 | Pending |

@@ -5,15 +5,15 @@ milestone_name: Service and Slides
 current_phase: 33
 current_phase_name: Backgrounds & Slide Editing
 status: executing
-stopped_at: Completed 33-01-PLAN.md
-last_updated: "2026-08-03T03:29:30.174Z"
+stopped_at: Completed 33-02-PLAN.md
+last_updated: "2026-08-03T03:40:31.607Z"
 last_activity: 2026-08-02
 last_activity_desc: Phase 33 execution started
 progress:
   total_phases: 9
   completed_phases: 4
   total_plans: 30
-  completed_plans: 22
+  completed_plans: 23
   percent: 44
 ---
 
@@ -76,7 +76,7 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 ## Current Position
 
 Phase: 33 (Backgrounds & Slide Editing) — EXECUTING
-Plan: 2 of 9
+Plan: 3 of 9
 Status: Ready to execute
 Last activity: 2026-08-02 — Phase 33 execution started
 
@@ -713,6 +713,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 32 P05 | ~2h | 3 tasks | 3 files |
 | Phase 32 P06 | 1h 40min | 3 tasks | 8 files |
 | Phase 33 P01 | 5min | 2 tasks | 5 files |
+| Phase 33 P02 | 25min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -907,6 +908,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 32-06: SongLyricEditor's E4 partial backstop is written defensively (not a live repro) since a mid-mount songId swap is not reachable in production today
 - [Phase ?]: 33-01: backgroundImageUrl/backgroundSource live on SlideBase only (not mirrored onto AssembledSlide) so the pair can never drift apart like audioUrl/audioFromBed did
 - [Phase ?]: 33-01: background cascade computed before resolveEntryMedia's video early-return and returned from that branch too — a video slide inherits a background but never inherits bed audio (deliberate divergence)
+- [Phase ?]: canMutateBackground is not threaded into slideActionMenuItems (33-02) — nothing in UI-SPEC §3's table branches on it, and it would trip the lint config's args:'after-used' rule
+- [Phase ?]: Hymn discriminator (33-02) is entry.sourceRef.body !== undefined combined with planItemKind, not sourceRef.kind alone — a HYMN group's auto-derived text slide has no body while a hand-added blank slide always does
 
 ### Roadmap Evolution
 
@@ -968,6 +971,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-03T03:29:30.144Z
-Stopped at: Completed 33-01-PLAN.md
+Last session: 2026-08-03T03:40:31.576Z
+Stopped at: Completed 33-02-PLAN.md
 Resume file: None
