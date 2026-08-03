@@ -245,7 +245,7 @@ Plans:
   3. Splits fall only on clause/verse boundaries, never mid-sentence
   4. If the split call fails, the scripture slide still renders and remains usable — the feature never blocks editing
 
-**Plans**: 4/4 plans executed
+**Plans**: 8 plans (4/8 executed — 34-05..34-08 are the gap closure, planned 2026-08-03)
 
 Plans:
 
@@ -253,6 +253,10 @@ Plans:
 - [x] 34-02-PLAN.md — SPLIT_SCHEMA and validateSplitResult() tested against every individual failure mode
 - [x] 34-03-PLAN.md — splitCongregationalReading(): call shape, slicing, and every failure path
 - [x] 34-04-PLAN.md — Opt-in "Split with AI" affordance, failure toast, manual-path regression
+- [ ] 34-05-PLAN.md — ScriptureSlot.congregationalSections, the one derivation helper, and BOTH assembler call sites (wave 1, gap closure)
+- [ ] 34-06-PLAN.md — CongregationalEditor persistence rewrite: off the rejected reading document, onto a prop/emit contract (wave 1, gap closure)
+- [ ] 34-07-PLAN.md — Mount it: Service Order affordance, the WR-04 keyed mount, and stale-reading clearing (wave 2, gap closure)
+- [ ] 34-08-PLAN.md — Composed slot→group→slide pipeline proof, validation/PENDING/R064 records, phase gate (wave 3, gap closure)
 
 **UI hint**: no
 **Research flag**: needs research — re-verify the current `@anthropic-ai/sdk` version and `output_config.format` call shape at implementation time (consult the `claude-api` skill again, details may have drifted); validate Haiku split determinism empirically against real passages.
