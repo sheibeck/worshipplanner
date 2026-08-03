@@ -1,4 +1,5 @@
 import type { ScriptureRef, ScriptureSlot } from '@/types/service'
+import type { CongregationalSection } from '@/types/slide'
 
 export const BIBLE_BOOKS: readonly string[] = [
   // Old Testament (39 books)
@@ -193,4 +194,75 @@ export function scripturesOverlap(reading: ScriptureRef, sermon: ScriptureRef): 
   if (reading.book !== sermon.book || reading.chapter !== sermon.chapter) return false
   if (!reading.verseStart || !reading.verseEnd || !sermon.verseStart || !sermon.verseEnd) return true
   return reading.verseStart <= sermon.verseEnd && reading.verseEnd >= sermon.verseStart
+}
+
+/**
+ * R064: the ONE congregational-ness predicate in the slot -> slide path.
+ *
+ * Deliberately ignores `ScriptureSlot.readingMode` — that field is declared
+ * but written by no code today, and gating on both it and the sections array
+ * would create two fields that can disagree, the same defect shape as Phase
+ * 28's two competing `performanceOrder` fields and Phase 33's
+ * partially-applied cascade. The single rule, matching `PresentationViewer`'s
+ * `isCongregational` computed (Phase 35, unchanged by this plan): sections
+ * present and non-empty means congregational.
+ *
+ * Pure passthrough — no copying, sorting, filtering, mapping, slicing or
+ * string transformation of any kind. Section text is projected verbatim to a
+ * congregation, so this function must be provably byte-exact by source
+ * inspection, not merely by sampling. When there are no sections (or the
+ * array is empty), `sections` is entirely absent from the returned object —
+ * not present-and-undefined — so a slide built from a slot with no
+ * congregational reading is byte-identical to today's shape.
+ */
+export function congregationalSlideFieldsFromSlot(
+  slot: ScriptureSlot,
+): { readingMode: 'normal' | 'congregational'; sections?: CongregationalSection[] } {
+  if (Array.isArray(slot.congregationalSections) && slot.congregationalSections.length > 0) {
+    return { readingMode: 'congregational', sections: slot.congregationalSections }
+  }
+  return { readingMode: 'normal' }
+}
+
+/**
+ * Writes a new reference onto a `ScriptureSlot` (the same four-field spread
+ * `ServiceEditorView.onScriptureChange` performs inline today) and owns ONE
+ * additional rule: a stored congregational reading is never carried onto a
+ * passage it was not derived from. Section text is projected verbatim to a
+ * congregation, so leaving one passage's words attached to a slot that now
+ * reads a different reference would project scripture under the wrong
+ * heading — a correctness failure the assembler cannot detect, because by
+ * then the sections look perfectly valid. Clearing on a reference change is
+ * the only clearing rule; no other slot mutation clears sections, because the
+ * reference is the only thing that changes which passage a stored reading
+ * belongs to.
+ *
+ * Uses the canonical `formatScriptureReference` formatter on both sides
+ * (ME-02: one canonical formatter, not a second inline copy of the
+ * book/chapter/verse comparison).
+ */
+export function scriptureSlotAfterReferenceChange(
+  slot: ScriptureSlot,
+  ref: ScriptureRef | null,
+): ScriptureSlot {
+  const currentRef = scriptureRefFromSlot(slot)
+  const currentText = currentRef ? formatScriptureReference(currentRef) : ''
+  const newText = ref ? formatScriptureReference(ref) : ''
+
+  const nextSlot: ScriptureSlot = {
+    ...slot,
+    book: ref?.book ?? null,
+    chapter: ref?.chapter ?? null,
+    verseStart: ref?.verseStart ?? null,
+    verseEnd: ref?.verseEnd ?? null,
+  }
+
+  const referenceChanged = currentText !== newText
+  const hasSections = Array.isArray(slot.congregationalSections) && slot.congregationalSections.length > 0
+
+  if (referenceChanged && hasSections) {
+    delete nextSlot.congregationalSections
+  }
+
+  return nextSlot
 }

@@ -1,5 +1,6 @@
 import type { Timestamp } from 'firebase/firestore'
 import type { VWType } from './song'
+import type { CongregationalSection } from './slide'
 
 export type Progression = '1-2-2-3' | '1-2-3-3'
 export type ServiceStatus = 'draft' | 'planned' | 'exported'
@@ -65,6 +66,7 @@ export interface ScriptureSlot extends MediaAttachableSlot {
   verseEnd: number | null
   scriptureReadingId?: string | null
   readingMode?: 'normal' | 'congregational'
+  congregationalSections?: CongregationalSection[]
   section?: ServiceSection
 }
 
