@@ -245,10 +245,18 @@ Plans:
   3. Splits fall only on clause/verse boundaries, never mid-sentence
   4. If the split call fails, the scripture slide still renders and remains usable — the feature never blocks editing
 
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 34-01-PLAN.md — Boundary computation, marker embedding, and byte-exact slicing (pure functions)
+- [ ] 34-02-PLAN.md — SPLIT_SCHEMA and validateSplitResult() tested against every individual failure mode
+- [ ] 34-03-PLAN.md — splitCongregationalReading(): call shape, slicing, and every failure path
+- [ ] 34-04-PLAN.md — Opt-in "Split with AI" affordance, failure toast, manual-path regression
+
 **UI hint**: no
 **Research flag**: needs research — re-verify the current `@anthropic-ai/sdk` version and `output_config.format` call shape at implementation time (consult the `claude-api` skill again, details may have drifted); validate Haiku split determinism empirically against real passages.
 **Notes**: Upgrading `@anthropic-ai/sdk` from the current `^0.78.0` pin is a hard prerequisite — it predates the structured-outputs support this feature depends on; schedule the upgrade as the first task in this phase. Never let the model regenerate or re-type scripture text — constrain output to structural indices/spans only, validated against a strict schema at the existing single Cloud Function proxy choke point, and treat any offset that fails to byte-match the source as a hard validation failure with fallback, never a silent near-match. Haiku-tier, consistent with the app's existing cost-efficient-model precedent; AI remains additive and never blocking.
+**Planning corrections (2026-08-03)**: three premises above are false and the plans do NOT follow them. (a) The SDK upgrade is **not** a prerequisite — structured outputs went GA in SDK `0.72.0` and the installed `0.78.0` already ships `output_config.format`, `messages.parse()` and `jsonSchemaOutputFormat`; no package is installed or upgraded in this phase. (b) Validation **cannot** live at the Cloud Function proxy — it is a byte-blind pass-through that never sees the ESV source text, so validation is client-side in `src/utils/claudeApi.ts`; no file under `functions/` is touched. (c) `CongregationalEditor.vue` is **mounted nowhere in production**, so success criterion 1 is not true for a user today; mounting it is blocked on an owner decision recorded in `.planning/PENDING-VERIFICATION.md`. The design also exceeds the requirement: boundary **indices** into a pre-computed array of legal split positions, rather than raw character offsets, make a mid-sentence split structurally unrepresentable.
 
 ### Phase 35: Presentation Correctness & Lyric Editor
 
