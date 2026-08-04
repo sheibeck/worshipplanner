@@ -273,7 +273,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
       Slides and Roles tabs; carries the Present button placement from design "1a". Sequenced after the
       Service Order and Slides layouts finalize, to avoid rework. `[SUMMARY]`
 
-- [ ] **R069** (quality-attribute): The Roles tab is last in the tab order, being the least used.
+- [x] **R069** (quality-attribute): The Roles tab is last in the tab order, being the least used.
 
 ---
 
@@ -338,7 +338,7 @@ Acknowledged, deferred, not in this roadmap.
 | R066 | Phase 35 | Complete |
 | R067 | Phase 36 | Pending |
 | R068 | Phase 36 | Complete |
-| R069 | Phase 36 | Pending |
+| R069 | Phase 36 | Complete |
 | R070 | Phase 34 | Complete |
 | R071 | Phase 34 | Complete |
 

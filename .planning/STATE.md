@@ -4,15 +4,15 @@ milestone: v1.4
 milestone_name: Service and Slides
 current_phase: 36
 status: executing
-stopped_at: Completed 36-02-PLAN.md
-last_updated: "2026-08-04T03:42:32.635Z"
+stopped_at: Completed 36-03-PLAN.md
+last_updated: "2026-08-04T04:10:42.512Z"
 last_activity: 2026-08-03
 last_activity_desc: Completed 36-01-PLAN.md (SlideDropTarget clickable variant, SlideGrid import-button deletion, R053)
 progress:
   total_phases: 9
   completed_phases: 8
   total_plans: 57
-  completed_plans: 54
+  completed_plans: 55
   percent: 89
 current_phase_name: PowerPoint Server-Side Rendering
 ---
@@ -76,7 +76,7 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 ## Current Position
 
 Phase: 36 — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 Status: Ready to execute
 Last activity: 2026-08-03 — Completed 36-01-PLAN.md (SlideDropTarget clickable variant, SlideGrid import-button deletion, R053)
 
@@ -1057,6 +1057,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 34 P08 | 60min | 3 tasks | 5 files |
 | Phase 36 P01 | 8min | 2 tasks | 4 files |
 | Phase 36 P02 | 20min | 2 tasks | 5 files |
+| Phase 36 P03 | 35min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -1304,6 +1305,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 36-01: SlideDropTarget's clickable prop is independent of audioOnly; SlideGrid alone binds :clickable="canMutateGroup" (never canWriteGroupMedia), replicating the deleted import button's exact prior gating
 - [Phase ?]: 36-02: Preserved ServiceEditorView.vue's live ungated Export/Copy-to-PC gate over 36-UI-SPEC's illustrative canEditService-gated code and its inaccurate E3 row
 - [Phase ?]: 36-02: Implemented R071's future hint as a dynamic hint-{key} slot on ContextualActionBar instead of the spec's lossy hint?: string field
+- [Phase ?]: 36-03: SlidesTab exposes canPresent/onPresentClick; header's Present handler is a zero-argument relay with no logic of its own, keeping R061's index math in one place
+- [Phase ?]: 36-03: preserved the live ungated export/copy visibility (36-02's recorded divergence) rather than 36-UI-SPEC's illustrative canEditService-gated version
+- [Phase ?]: 36-03: unstubbed ContextualActionBar across all 24 pre-existing ServiceEditorView.test.ts mountView helpers (one replace_all edit) rather than rewriting selectors — every pre-existing assertion passed unmodified
 
 ### Roadmap Evolution
 
@@ -1365,6 +1369,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-04T03:42:32.592Z
-Stopped at: Completed 36-02-PLAN.md
+Last session: 2026-08-04T04:10:42.471Z
+Stopped at: Completed 36-03-PLAN.md
 Resume file: None
