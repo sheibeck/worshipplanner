@@ -16,6 +16,15 @@ export interface SaveStatusEntry {
 // separately-maintained copies never drifting apart.
 export const GENERIC_ERROR_TEXT = "Couldn't save your changes — they're still here. Try again."
 
+// 34-10 (UAT F4): module-level, same reasoning as GENERIC_ERROR_TEXT above —
+// a consumer that needs to know whether SaveStatusIndicator will render
+// anything for a given entry asks THIS, rather than keeping a second copy
+// of the indicator's branch list (idle -> nothing, everything else ->
+// something) in another file where the two can silently drift apart.
+export function hasVisibleSaveStatus(entry: SaveStatusEntry): boolean {
+  return entry.status !== 'idle'
+}
+
 /**
  * Per-surface save-status aggregator (R040). Sits strictly ABOVE
  * useAutoSave — it does not re-implement any of useAutoSave's own timing,

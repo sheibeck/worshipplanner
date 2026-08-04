@@ -2,7 +2,25 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import SaveStatusIndicator from '../SaveStatusIndicator.vue'
-import { useSaveStatus } from '@/stores/saveStatus'
+import { useSaveStatus, hasVisibleSaveStatus } from '@/stores/saveStatus'
+import type { AutoSaveStatus } from '@/composables/useAutoSave'
+
+// 34-10: enumerate the union with a TOTAL RECORD, not a typed array. An
+// array literal annotated as an array of AutoSaveStatus elements only
+// constrains each ELEMENT to be a union member — it never requires the
+// array to hold every member, so it keeps compiling unchanged after a
+// sixth status is added and omitted here, and the completeness guard this
+// test exists to provide would silently stop existing while the test kept
+// passing. A record keyed by the union IS missing-key-checked by the
+// compiler (the same idiom as `slideDisplay.ts`'s `KIND_BADGE_CLASSES` and
+// `MENU_ITEM_LABELS`), which is the property this test actually needs.
+const ALL_SAVE_STATUSES: Record<AutoSaveStatus, true> = {
+  idle: true,
+  pending: true,
+  saving: true,
+  saved: true,
+  error: true,
+}
 
 const REORDER_ERROR_TEXT = "Couldn't save this order — reverted. Try dragging again."
 const GENERIC_ERROR_TEXT = "Couldn't save your changes — they're still here. Try again."
@@ -150,5 +168,39 @@ describe('SaveStatusIndicator', () => {
     expect(GENERIC_ERROR_TEXT.length).toBe(59)
 
     wrapper.unmount()
+  })
+})
+
+// 34-10 (UAT F4): agreement between `hasVisibleSaveStatus` and what the
+// indicator actually renders, across every member of AutoSaveStatus. The
+// list iterated is DERIVED from ALL_SAVE_STATUSES above, never re-typed by
+// hand, so the two cannot silently drift apart.
+describe('hasVisibleSaveStatus agrees with SaveStatusIndicator for every status', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+
+  const statuses = Object.keys(ALL_SAVE_STATUSES) as AutoSaveStatus[]
+
+  it('iterates exactly 5 statuses — one per union member', () => {
+    expect(statuses).toHaveLength(5)
+  })
+
+  for (const status of statuses) {
+    it(`status "${status}": hasVisibleSaveStatus matches whether the indicator renders non-empty text`, async () => {
+      const entry = { status, errorText: status === 'error' ? GENERIC_ERROR_TEXT : undefined }
+      useSaveStatus().set('service:svc-1', entry)
+      const wrapper = mount(SaveStatusIndicator, { props: { surfaceId: 'service:svc-1' } })
+      await wrapper.vm.$nextTick()
+
+      const rendersNonEmpty = wrapper.text() !== ''
+      expect(rendersNonEmpty).toBe(hasVisibleSaveStatus(entry))
+    })
+  }
+
+  it("hasVisibleSaveStatus is false for the fresh idle object entryFor returns for an unknown surface id", () => {
+    const entry = useSaveStatus().entryFor('service:never-registered')
+    expect(entry).toEqual({ status: 'idle' })
+    expect(hasVisibleSaveStatus(entry)).toBe(false)
   })
 })
