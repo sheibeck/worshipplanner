@@ -487,6 +487,46 @@ container was built. No GCP resource was created**, by explicit owner instructio
 
 ---
 
+## Phase 36 — UI Rework: Service Order & Contextual Action Bars (2026-08-04)
+
+- ☐ **36.1 ★ OWNER DECISION — ROADMAP criterion 4's `＋ Add slide` clause is not literally met.**
+  This is a **gap recorded by `36-VERIFICATION.md`, not a pass, and it was deliberately not
+  self-approved.** Criterion 4 reads *"'＋ Add slide' lives in the contextual action bar."* It does
+  not — Phase 36 kept it in `SlideGrid.vue`'s own header, a separate component from
+  `ContextualActionBar.vue`.
+
+  The reasoning is sound and was disclosed consistently rather than discovered at verification: the
+  wireframe (design "1a") draws `＋ Add slide` in the grid's own header and never in a page-level bar,
+  and `36-CONTEXT.md`'s own stated precedence rule is that the wireframe wins. It is recorded in
+  `36-UI-SPEC.md` § Finding 2, in three plans' frontmatter, and in a SUMMARY.
+
+  **What makes it an open item rather than a closed one:** the sibling clause of the same criterion
+  ("Add music to this group") received a *dated, evidence-cited correction* in both `ROADMAP.md` and
+  `REQUIREMENTS.md` before planning began. This clause never did. Two options, both legitimate:
+  1. **Accept the override** — a ready-to-paste block sits in `36-VERIFICATION.md`'s frontmatter.
+     Choosing this means R053 is delivered as "interaction pattern, not visual unification", and
+     criterion 4 should get the same dated correction its sibling clause got.
+  2. **Commission the full relocation** — materially more expensive, and the UI-SPEC recommends
+     against it rather than forbidding it. This is a real scope addition, not a bug fix.
+
+- ☐ **36.2 Look at the rebuilt Service Order tab on a real screen.** Every structural claim is
+  test-asserted, but the wireframe match itself is a visual judgment: the five section bands with
+  their slide counts and per-band `＋ Add item` chips, the dashed `＋ Add to the service` palette that
+  replaced the dropdown, and the tab strip now reading Service Order · Slides · Roles.
+
+- ☐ **36.3 Confirm the action bar reads right on each tab.** Switch between all three tabs and confirm
+  only that tab's actions appear — in particular that `Suggest All Songs` and `Copy for PC` are gone
+  from Slides and Roles, that Present sits immediately left of Save, and that the Roles tab's empty
+  action-bar slot looks deliberate rather than broken. **The Roles empty slot is one of the UI-SPEC's
+  two `unresolved` items** — the design never drew it.
+
+- ☐ **36.4 Two affordances the wireframe draws but nobody implemented — confirm this was right.**
+  Turn 3 shows a row-level `⋯` kebab and a `Change` link on service items. Neither has any
+  current-code equivalent or defined behavior, so both were **deliberately left unbuilt and recorded
+  rather than guessed at.** If you wanted them, they are new work with no spec.
+
+---
+
 ## Notes and failures
 
 _(Record anything that failed here, with what you saw versus what was expected.)_

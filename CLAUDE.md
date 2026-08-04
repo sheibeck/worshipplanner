@@ -49,6 +49,16 @@ plan or phase is type-clean.
 
 - `npx vitest run` — the app suite. **Excludes `src/rules.test.ts`** (see `vite.config.ts`), so it
   proves nothing about Firestore security rules.
+
+> ⚠ **Neither obvious way of scoping the app suite is correct on its own** — verified 2026-08-04.
+> - `npx vitest run src/` picks up **`render-service/src/render.test.ts`** by substring match and dies
+>   on a Vitest version mismatch (root `4.0.18` vs `4.1.10`).
+> - `npx vitest run --dir src` fixes that but **bypasses `vite.config.ts`'s relative exclude**, so
+>   `src/rules.test.ts` runs and fails whenever no Firestore emulator is up.
+>
+> Use **`npx vitest run --dir src --exclude '**/rules.test.ts'`**, or bare `npx vitest run`.
+> A run that reports `src/rules.test.ts` failing is a **tooling artifact of the command**, not a
+> regression — do not chase it, and do not let it mask the real 2-file baseline below.
 - `npm run test:rules` — the rules suite, via `firebase emulators:exec`, which starts its **own**
   emulator. **It fails with "port taken" if an emulator is already running.** In that case run
   `npx vitest run --config vitest.rules.config.ts` directly against the running one instead — the

@@ -304,6 +304,13 @@ Plans:
   2. Every tabbed screen (Service Order, Slides, Roles) shows only the actions relevant to that tab through one shared contextual action-bar pattern — "Suggest All Songs"/"Copy to PC" no longer appear on the Slides or Roles tabs
   3. The Present button appears in the position specified by design "1a Plan rail · slide grid · Edit Slide drawer — two states"
   4. "Add slide" lives in the contextual action bar, and a group's own drag-and-drop zone doubles as the import affordance — the separate "Import into this Group" button is gone. *(Corrected 2026-08-03 by 36-UI-SPEC: the "Add music to this group" clause is **superseded**. Design "1a" shows group music as its own inline panel, never in a bar, and owner UAT finding F2 — landed as `34-11` — explicitly asked for group music and background to sit together in one panel. R053 corrected in REQUIREMENTS.md with the same evidence.)*
+     **⚠ OPEN OWNER DECISION (2026-08-04):** the remaining `＋ Add slide` clause is **also not literally
+     met.** Phase 36 kept the button in `SlideGrid.vue`'s own header — a wireframe-backed UI-SPEC
+     discretionary call, disclosed in `36-UI-SPEC.md` § Finding 2, three plans' frontmatter and one
+     SUMMARY. `36-VERIFICATION.md` records this as a **gap, not a pass**: the reasoning is sound but,
+     unlike the "Add music" clause, it never received an owner-approved correction. Either accept the
+     override recorded in `36-VERIFICATION.md`'s frontmatter, or commission the full relocation — which
+     is materially more expensive and which the UI-SPEC recommends against rather than forbids.
   5. The Roles tab is last in the tab order
 
 **Plans**: 5/5 plans executed
