@@ -111,25 +111,6 @@
               Undo
             </button>
 
-            <!-- Suggest All Songs button: editor only, removed while locked
-                 (31-UI-SPEC § 3, class B — it carried no lock term at all).
-                 Its `:disabled` keeps the OTHER two terms (31-03 dropped only
-                 the `isExportedLocked` one): without them the button would be
-                 clickable with no sermon context and re-clickable mid-flight. -->
-            <button
-              v-if="canEditService"
-              type="button"
-              @click="suggestAllSongs"
-              :disabled="!hasSermonContext || aiSuggestingAll"
-              :title="!hasSermonContext ? 'Add a sermon topic or passage for AI suggestions' : undefined"
-              class="print:hidden inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-gray-200 bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-indigo-400" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2l1.5 4.5L18 8l-4.5 1.5L12 14l-1.5-4.5L6 8l4.5-1.5L12 2zM5 16l1 3 3 1-3 1-1 3-1-3-3-1 3-1 1-3zM19 15l.75 2.25L22 18l-2.25.75L19 21l-.75-2.25L16 18l2.25-.75L19 15z"/>
-              </svg>
-              {{ aiSuggestingAll ? 'Suggesting...' : 'Suggest All Songs' }}
-            </button>
-
             <!-- D-02: Mark as Planned — the draft half of the two named
                  transitions that replace the deleted cycle. Placed immediately
                  left of Export so the lifecycle reads left-to-right in the
@@ -162,87 +143,32 @@
               data-testid="lifecycle-error"
             >{{ lifecycleError }}</span>
 
-            <!-- Export to PC button: shown when credentials configured, enabled only for planned services -->
-            <button
-              v-if="authStore.hasPcCredentials"
-              type="button"
-              data-testid="export-pc-btn"
-              @click="onExportToPC"
-              :disabled="isExporting || localService.status !== 'planned'"
-              :title="localService.status === 'draft' ? 'Mark service as Planned to export' : localService.status === 'exported' ? 'Already exported to Planning Center' : undefined"
-              class="print:hidden inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors border"
-              :class="localService.status === 'exported'
-                ? 'text-gray-500 bg-gray-800/50 border-gray-700 cursor-not-allowed'
-                : localService.status !== 'planned'
-                  ? 'text-gray-500 bg-gray-800/50 border-gray-700 cursor-not-allowed'
-                  : isExporting
-                    ? 'text-gray-400 bg-gray-800 border-gray-700 cursor-wait'
-                    : 'text-gray-200 bg-gray-800 hover:bg-gray-700 border-gray-700'"
-            >
-              <!-- Spinner during export -->
-              <svg v-if="isExporting" class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              <!-- Check icon when already exported -->
-              <svg v-else-if="localService.status === 'exported'" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-              <!-- Upload icon default -->
-              <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-              </svg>
-              {{ isExporting ? 'Exporting...' : localService.status === 'exported' ? 'Exported' : 'Export to PC' }}
-            </button>
-
-            <!-- Copy for PC button: shown when NO credentials OR service is draft -->
-            <button
-              v-else
-              type="button"
-              data-testid="copy-pc-btn"
-              @click="onCopyForPC"
-              :disabled="!localService"
-              class="print:hidden inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-gray-200 bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700"
-            >
-              <svg v-if="!pcCopied" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
-              <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-              {{ pcCopied ? 'Copied!' : 'Copy for PC' }}
-            </button>
-
-            <!-- 34-12 (UAT F5): the owner read the credential-gated swap to Copy for PC
-                 as the Export to PC feature having been deleted — it wasn't; the export
-                 button above is untouched and stays gated. This note is the actual fix:
-                 an editor whose organization has no Planning Center credentials is told
-                 so, right beside the fallback, with a route to fix it (R071). Gated on
-                 `canEditService` so a viewer — who has no route to Settings anyway — is
-                 never shown an editor-only configuration prompt. -->
-            <span
-              v-if="canEditService && !authStore.hasPcCredentials"
-              data-testid="pc-credentials-missing-note"
-              class="print:hidden text-xs text-gray-500"
-            >
-              Planning Center export needs credentials for this organization —
-              <router-link :to="{ name: 'settings' }" class="text-indigo-400 hover:text-indigo-300 underline">configure them in Settings</router-link>.
-            </span>
-
-            <!-- Save button: editor only, removed while locked (31-UI-SPEC § 3)
-                 — there is nothing to save. -->
-            <button
-              v-if="canEditService"
-              type="button"
-              @click="onSave"
-              :disabled="!isDirty || isSaving"
-              class="inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white transition-colors"
-              :class="isDirty && !isSaving
-                ? 'bg-indigo-600 hover:bg-indigo-500'
-                : 'bg-indigo-600/40 cursor-not-allowed text-white/50'"
-            >
-              {{ isSaving ? 'Saving...' : 'Save' }}
-            </button>
+            <!-- 36-03 (R068): the one shared, declarative action bar
+                 (ContextualActionBar.vue / buildActionBarItems, 36-02)
+                 replaces the four unconditional buttons this comment block
+                 used to sit above — Suggest All Songs, Export/Copy for PC,
+                 and Save now render per-tab from `activeActionItems` instead
+                 of unconditionally on every tab. Present (design 1a) also
+                 renders here while the Slides tab is active, immediately
+                 left of Save, driven by `slidesTabRef`. -->
+            <ContextualActionBar :items="activeActionItems">
+              <!-- 34-12/R071 note, MOVED VERBATIM from its former position
+                   beside the Export/Copy buttons — same testid, same gate,
+                   same copy, same live router-link. `ContextualActionBar`
+                   renders this slot only when a `copy-pc` item is in the
+                   list, which already excludes the Slides/Roles tabs and the
+                   credentialed/locked/viewer cases for free. -->
+              <template #hint-copy-pc>
+                <span
+                  v-if="canEditService && !authStore.hasPcCredentials"
+                  data-testid="pc-credentials-missing-note"
+                  class="print:hidden text-xs text-gray-500"
+                >
+                  Planning Center export needs credentials for this organization —
+                  <router-link :to="{ name: 'settings' }" class="text-indigo-400 hover:text-indigo-300 underline">configure them in Settings</router-link>.
+                </span>
+              </template>
+            </ContextualActionBar>
           </div>
         </div>
 
@@ -1321,6 +1247,7 @@
         <div v-show="activeTab === 'slides'">
           <SlidesTab
             v-if="localService"
+            ref="slidesTabRef"
             :slots="localService.slots"
             :service-id="localService.id"
             :org-id="authStore.orgId!"
@@ -1435,6 +1362,8 @@ import ServicePrintLayout from '@/components/ServicePrintLayout.vue'
 import PresentationViewer from '@/components/PresentationViewer.vue'
 import SlidesTab from '@/components/slides/SlidesTab.vue'
 import CongregationalEditor from '@/components/CongregationalEditor.vue'
+import ContextualActionBar from '@/components/ContextualActionBar.vue'
+import { buildActionBarItems } from '@/views/serviceEditorActionBar'
 import { useSlideshowAssembly } from '@/composables/useSlideshowAssembly'
 import { useAutoSave } from '@/composables/useAutoSave'
 import { formatForPlanningCenter } from '@/utils/planningCenterExport'
@@ -1852,6 +1781,11 @@ const {
   suppressMaterialization,
   drainGroupWrites,
 } = useSlideshowAssembly(localService, orgIdRef, { canWrite: canWriteSlideGroups })
+/** 36-03 — a ref to the mounted SlidesTab instance so the relocated header
+ * Present button (design 1a) can read its exposed `canPresent` and fire its
+ * exposed `onPresentClick()` without duplicating either the condition or the
+ * emit logic that still lives inside SlidesTab itself. */
+const slidesTabRef = ref<InstanceType<typeof SlidesTab> | null>(null)
 const presenting = ref(false)
 /** R061 — the flat deck index PresentationViewer should open on, set by
  * onPresent() BEFORE `presenting` flips true so the viewer never mounts
@@ -2078,6 +2012,42 @@ const isDirty = computed(() => {
 
 const hasSermonContext = computed(
   () => !!(localService.value?.sermonTopic?.trim() || localService.value?.sermonPassage),
+)
+
+/**
+ * 36-03 (R068) — the page-header's per-tab action list, replacing the four
+ * unconditional buttons that used to render regardless of `activeTab`.
+ * Threads the view's OWN existing state into `buildActionBarItems` (36-02);
+ * `handlers` passes EXISTING functions by reference, except `onPresent`,
+ * which contains no logic of its own — it only calls the exposed
+ * `SlidesTab.onPresentClick()`, which still does the actual emitting.
+ * `@present="onPresent"` on the `<SlidesTab>` element below still receives
+ * that emit and still owns opening `PresentationViewer` at the computed
+ * start index. Routing through the emit (not calling the view's own
+ * `onPresent` directly from here) keeps the start-index computation in the
+ * one place that owns it.
+ */
+const activeActionItems = computed(() =>
+  buildActionBarItems(activeTab.value, {
+    canEditService: canEditService.value,
+    hasService: !!localService.value,
+    hasSermonContext: hasSermonContext.value,
+    aiSuggestingAll: aiSuggestingAll.value,
+    hasPcCredentials: authStore.hasPcCredentials,
+    isExporting: isExporting.value,
+    pcCopied: pcCopied.value,
+    serviceStatus: localService.value?.status ?? 'draft',
+    isDirty: isDirty.value,
+    isSaving: isSaving.value,
+    canPresent: slidesTabRef.value?.canPresent ?? false,
+    handlers: {
+      suggestAllSongs,
+      onExportToPC,
+      onCopyForPC,
+      onSave,
+      onPresent: () => slidesTabRef.value?.onPresentClick(),
+    },
+  }),
 )
 
 const recentServiceSongIds = computed<string[]>(() => {

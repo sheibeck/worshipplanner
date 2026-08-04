@@ -545,6 +545,12 @@ describe('ServiceEditorView - Print and Copy for PC buttons', () => {
       global: {
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
+          // 36-03: Suggest/Export/Copy/Save/Present all moved into this real
+          // child component (ContextualActionBar.vue) — every mountView in
+          // this file must render it for real (`false` opts a component OUT
+          // of shallowMount's default auto-stub) or none of those controls'
+          // pre-existing testids/text are reachable in the DOM anymore.
+          ContextualActionBar: false,
           RouterLink: { template: '<a><slot /></a>' },
           // 32-05: render the real SaveStatusIndicator (not a shallow stub)
           // so its data-testid="save-status"/"save-status-error" handles are
@@ -604,6 +610,12 @@ describe('ServiceEditorView - Planning Center credentials-missing note (34-12 Ta
       global: {
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
+          // 36-03: Suggest/Export/Copy/Save/Present all moved into this real
+          // child component (ContextualActionBar.vue) — every mountView in
+          // this file must render it for real (`false` opts a component OUT
+          // of shallowMount's default auto-stub) or none of those controls'
+          // pre-existing testids/text are reachable in the DOM anymore.
+          ContextualActionBar: false,
           RouterLink: {
             props: ['to'],
             template:
@@ -678,6 +690,231 @@ describe('ServiceEditorView - Planning Center credentials-missing note (34-12 Ta
   })
 })
 
+// ── 36-03 (R068 mounted proof / R069): the per-tab header action bar ───────────
+// 36-02 already proved the gating invariant as DATA over the full cartesian
+// product of context flags (serviceEditorActionBar.test.ts). This block is the
+// MOUNTED proof named in 36-03's acceptance criteria — that wiring the real
+// `ContextualActionBar` into the header, per tab, actually renders (and stops
+// rendering) the right controls, and that the relocated Present button still
+// reaches PresentationViewer through the real `slidesTabRef` plumbing.
+//
+// `SlidesTab` is replaced with a purpose-built stub (not the real component)
+// so `canPresent`/`onPresentClick` are deterministic without driving the real
+// `useSlideshowAssembly` pipeline (Firestore-backed lyrics/materialization) —
+// this block is testing the HEADER's wiring, which 36-02's data-level suite
+// and SlidesTab.test.ts's own R061 suite (36-03 Task 1) already prove in
+// isolation. The stub still emits the SAME `present` event with the SAME
+// payload shape the real component emits, so the relay through
+// `@present="onPresent"` into `PresentationViewer` is exercised for real.
+describe('ServiceEditorView - contextual action bar wiring (36-03, R068)', () => {
+  const PRESENT_STUB_START_INDEX = 5
+
+  const slidesTabPresentStub = {
+    name: 'SlidesTab',
+    emits: ['present', 'navigate-to-scripture-editor'],
+    data() {
+      return { canPresent: true }
+    },
+    methods: {
+      onPresentClick(this: { $emit: (e: string, i: number) => void }) {
+        this.$emit('present', PRESENT_STUB_START_INDEX)
+      },
+    },
+    template: '<div data-testid="slides-tab-stub" />',
+  }
+
+  async function mountView(overrides: Partial<Service> = {}) {
+    mockServicesList = [{ ...mockService, ...overrides }]
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          ContextualActionBar: false,
+          RouterLink: {
+            props: ['to'],
+            template: '<a :data-route-name="to && to.name"><slot /></a>',
+          },
+          SaveStatusIndicator: false,
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+          SlidesTab: slidesTabPresentStub,
+          PresentationViewer: {
+            props: ['slides', 'isLoading', 'initialIndex'],
+            template: '<div data-testid="presentation-viewer-stub" />',
+          },
+        },
+      },
+    })
+  }
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockAuthState.hasPcCredentials = false
+    mockAuthState.pcCredentials = null
+    mockQuarters = []
+    mockRosterOrgId = null
+    mockQuartersOrgId = null
+  })
+
+  afterEach(() => {
+    mockAuthState.hasPcCredentials = false
+    mockAuthState.pcCredentials = null
+  })
+
+  function barButtons(wrapper: Awaited<ReturnType<typeof mountView>>) {
+    return wrapper.find('[data-testid="contextual-action-bar"]').findAll('button')
+  }
+
+  async function clickTab(wrapper: Awaited<ReturnType<typeof mountView>>, label: string) {
+    const btn = wrapper.findAll('button').find((b) => b.text() === label)
+    await btn!.trigger('click')
+    await wrapper.vm.$nextTick()
+  }
+
+  it('Service Order + editor + unlocked + no credentials: Suggest, Copy for PC, Save and the R071 note all render', async () => {
+    const wrapper = await mountView({ status: 'draft' })
+    await wrapper.vm.$nextTick()
+
+    const texts = barButtons(wrapper).map((b) => b.text())
+    expect(texts.some((t) => t.includes('Suggest All Songs'))).toBe(true)
+    expect(wrapper.find('[data-testid="copy-pc-btn"]').exists()).toBe(true)
+    expect(texts.some((t) => t.includes('Save'))).toBe(true)
+    const note = wrapper.find('[data-testid="pc-credentials-missing-note"]')
+    expect(note.exists()).toBe(true)
+    expect(note.find('a').attributes('data-route-name')).toBe('settings')
+  })
+
+  it('Service Order + editor + unlocked + credentialed: export-pc-btn renders, the R071 note does not', async () => {
+    mockAuthState.hasPcCredentials = true
+    mockAuthState.pcCredentials = { appId: 'placeholder-app-id', secret: 'placeholder-secret' }
+    const wrapper = await mountView({ status: 'planned' })
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('[data-testid="export-pc-btn"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="pc-credentials-missing-note"]').exists()).toBe(false)
+  })
+
+  it('ROADMAP criterion 2, mounted: Slides tab shows neither Suggest All Songs nor Export/Copy nor the R071 note', async () => {
+    const wrapper = await mountView({ status: 'draft' })
+    await wrapper.vm.$nextTick()
+    await clickTab(wrapper, 'Slides')
+
+    const texts = barButtons(wrapper).map((b) => b.text())
+    expect(texts.some((t) => t.includes('Suggest All Songs'))).toBe(false)
+    expect(wrapper.find('[data-testid="copy-pc-btn"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="export-pc-btn"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="pc-credentials-missing-note"]').exists()).toBe(false)
+  })
+
+  it('Roles tab: the bar renders zero buttons, no leaked Service Order actions, and Mark as Planned/Undo still render outside it', async () => {
+    const wrapper = await mountView({ status: 'draft' })
+    await wrapper.vm.$nextTick()
+    // Force a previousService snapshot directly (bypassing the real autosave
+    // debounce/flow, which is exercised elsewhere) so the Undo button's own
+    // `v-if="canEditService && previousService"` has something to gate on.
+    ;(wrapper.vm as unknown as { previousService: Service | null }).previousService = { ...mockService }
+    await wrapper.vm.$nextTick()
+
+    await clickTab(wrapper, 'Roles')
+
+    expect(wrapper.find('[data-testid="contextual-action-bar"]').exists()).toBe(true)
+    expect(barButtons(wrapper)).toHaveLength(0)
+    const texts = wrapper.findAll('button').map((b) => b.text())
+    expect(texts.some((t) => t.includes('Suggest All Songs'))).toBe(false)
+    expect(wrapper.find('[data-testid="copy-pc-btn"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="export-pc-btn"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="pc-credentials-missing-note"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="mark-planned-btn"]').exists()).toBe(true)
+    expect(texts.some((t) => t.includes('Undo'))).toBe(true)
+  })
+
+  it('design 1a: Present renders in the page header on the Slides tab, immediately before Save, and NOT inside the slides tab panel', async () => {
+    const wrapper = await mountView({ status: 'draft' })
+    await wrapper.vm.$nextTick()
+    await clickTab(wrapper, 'Slides')
+
+    const bar = wrapper.find('[data-testid="contextual-action-bar"]')
+    const present = bar.find('[data-testid="action-bar-item-present"]')
+    expect(present.exists()).toBe(true)
+    // Not inside the (stubbed) tab panel — it lives in the page header only.
+    expect(wrapper.find('[data-testid="slides-tab-stub"]').find('[data-testid="action-bar-item-present"]').exists()).toBe(false)
+
+    const testIds = barButtons(wrapper).map((b) => b.attributes('data-testid'))
+    expect(testIds).toEqual(['action-bar-item-present', 'action-bar-item-save'])
+  })
+
+  it('clicking the relocated Present button opens PresentationViewer at the start index SlidesTab.onPresentClick() computed', async () => {
+    const wrapper = await mountView({ status: 'draft' })
+    await wrapper.vm.$nextTick()
+    await clickTab(wrapper, 'Slides')
+
+    expect(wrapper.find('[data-testid="presentation-viewer-stub"]').exists()).toBe(false)
+
+    await wrapper.find('[data-testid="action-bar-item-present"]').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    const viewer = wrapper.findComponent(PresentationViewer)
+    expect(viewer.exists()).toBe(true)
+    expect(viewer.props('initialIndex')).toBe(PRESENT_STUB_START_INDEX)
+  })
+
+  it('viewer (isEditor false) on Service Order: no Suggest, no Save, no R071 note, but the export-or-copy control still renders — the preserved pre-phase gate (36-02-SUMMARY.md)', async () => {
+    mockAuthState.isEditor = false
+    const wrapper = await mountView({ status: 'draft' })
+    await wrapper.vm.$nextTick()
+
+    const texts = barButtons(wrapper).map((b) => b.text())
+    expect(texts.some((t) => t.includes('Suggest All Songs'))).toBe(false)
+    expect(texts.some((t) => t.includes('Save'))).toBe(false)
+    expect(wrapper.find('[data-testid="pc-credentials-missing-note"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="copy-pc-btn"]').exists()).toBe(true)
+  })
+
+  it('locked editor (status planned) on Service Order: same expectation as the viewer row above — Export/Copy still renders', async () => {
+    const wrapper = await mountView({ status: 'planned' })
+    await wrapper.vm.$nextTick()
+
+    const texts = barButtons(wrapper).map((b) => b.text())
+    expect(texts.some((t) => t.includes('Suggest All Songs'))).toBe(false)
+    expect(texts.some((t) => t.includes('Save'))).toBe(false)
+    expect(wrapper.find('[data-testid="pc-credentials-missing-note"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="copy-pc-btn"]').exists()).toBe(true)
+  })
+
+  // ★ 34-10 SURVIVES (named regression guard): this plan relocates the
+  // buttons directly above this element in the template, and the save-status
+  // bar's wrapper condition/chrome-only conditional (34-10/34-07) is
+  // explicitly NOT to be touched. Verified here, adjacent to the new bar's
+  // own coverage, rather than trusting the pre-existing 34-10 describe block
+  // alone to catch a regression this plan could introduce beside it.
+  it('34-10 guard: the save-status bar stays mounted at idle with no chrome classes and a mounted SaveStatusIndicator', async () => {
+    const wrapper = await mountView({ status: 'draft' })
+    await wrapper.vm.$nextTick()
+
+    const bar = wrapper.find('[data-testid="service-save-status-bar"]')
+    expect(bar.exists()).toBe(true)
+    expect(bar.classes()).toEqual([])
+    expect(bar.find('[data-testid="save-status"]').exists()).toBe(true)
+  })
+
+  it('R068 edge/idempotency, mounted: Service Order -> Slides -> Roles -> Service Order returns the header to the identical button set', async () => {
+    const wrapper = await mountView({ status: 'draft' })
+    await wrapper.vm.$nextTick()
+    const before = barButtons(wrapper).map((b) => b.attributes('data-testid'))
+
+    await clickTab(wrapper, 'Slides')
+    await clickTab(wrapper, 'Roles')
+    await clickTab(wrapper, 'Service Order')
+
+    const after = barButtons(wrapper).map((b) => b.attributes('data-testid'))
+    expect(after).toEqual(before)
+  })
+})
+
 describe('ServiceEditorView - Roles tab (Phase 17-04)', () => {
   async function mountView() {
     const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
@@ -685,6 +922,12 @@ describe('ServiceEditorView - Roles tab (Phase 17-04)', () => {
       global: {
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
+          // 36-03: Suggest/Export/Copy/Save/Present all moved into this real
+          // child component (ContextualActionBar.vue) — every mountView in
+          // this file must render it for real (`false` opts a component OUT
+          // of shallowMount's default auto-stub) or none of those controls'
+          // pre-existing testids/text are reachable in the DOM anymore.
+          ContextualActionBar: false,
           RouterLink: { template: '<a><slot /></a>' },
           // 32-05: render the real SaveStatusIndicator (not a shallow stub)
           // so its data-testid="save-status"/"save-status-error" handles are
@@ -892,6 +1135,12 @@ describe('ServiceEditorView - Section headers and slideshow preview (Phase 20-04
       global: {
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
+          // 36-03: Suggest/Export/Copy/Save/Present all moved into this real
+          // child component (ContextualActionBar.vue) — every mountView in
+          // this file must render it for real (`false` opts a component OUT
+          // of shallowMount's default auto-stub) or none of those controls'
+          // pre-existing testids/text are reachable in the DOM anymore.
+          ContextualActionBar: false,
           RouterLink: { template: '<a><slot /></a>' },
           // 32-05: render the real SaveStatusIndicator (not a shallow stub)
           // so its data-testid="save-status"/"save-status-error" handles are
@@ -1117,6 +1366,12 @@ describe('ServiceEditorView - slot id backfill on load (Phase 24-06 Task 1)', ()
       global: {
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
+          // 36-03: Suggest/Export/Copy/Save/Present all moved into this real
+          // child component (ContextualActionBar.vue) — every mountView in
+          // this file must render it for real (`false` opts a component OUT
+          // of shallowMount's default auto-stub) or none of those controls'
+          // pre-existing testids/text are reachable in the DOM anymore.
+          ContextualActionBar: false,
           RouterLink: { template: '<a><slot /></a>' },
           // 32-05: render the real SaveStatusIndicator (not a shallow stub)
           // so its data-testid="save-status"/"save-status-error" handles are
@@ -1296,6 +1551,12 @@ describe("ServiceEditorView - R039: a save's own Firestore echo must not swallow
       global: {
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
+          // 36-03: Suggest/Export/Copy/Save/Present all moved into this real
+          // child component (ContextualActionBar.vue) — every mountView in
+          // this file must render it for real (`false` opts a component OUT
+          // of shallowMount's default auto-stub) or none of those controls'
+          // pre-existing testids/text are reachable in the DOM anymore.
+          ContextualActionBar: false,
           RouterLink: { template: '<a><slot /></a>' },
           // 32-05: render the real SaveStatusIndicator (not a shallow stub)
           // so its data-testid="save-status"/"save-status-error" handles are
@@ -1456,6 +1717,12 @@ describe('ServiceEditorView - slot delete cascades to its group (Phase 24-06 Tas
       global: {
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
+          // 36-03: Suggest/Export/Copy/Save/Present all moved into this real
+          // child component (ContextualActionBar.vue) — every mountView in
+          // this file must render it for real (`false` opts a component OUT
+          // of shallowMount's default auto-stub) or none of those controls'
+          // pre-existing testids/text are reachable in the DOM anymore.
+          ContextualActionBar: false,
           RouterLink: { template: '<a><slot /></a>' },
           // 32-05: render the real SaveStatusIndicator (not a shallow stub)
           // so its data-testid="save-status"/"save-status-error" handles are
@@ -1742,6 +2009,12 @@ describe('ServiceEditorView - Slides tab (Phase 25-03)', () => {
       global: {
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
+          // 36-03: Suggest/Export/Copy/Save/Present all moved into this real
+          // child component (ContextualActionBar.vue) — every mountView in
+          // this file must render it for real (`false` opts a component OUT
+          // of shallowMount's default auto-stub) or none of those controls'
+          // pre-existing testids/text are reachable in the DOM anymore.
+          ContextualActionBar: false,
           RouterLink: { template: '<a><slot /></a>' },
           // 32-05: render the real SaveStatusIndicator (not a shallow stub)
           // so its data-testid="save-status"/"save-status-error" handles are
@@ -1886,6 +2159,12 @@ describe('ServiceEditorView - Edit in scripture plumbing (Phase 26-03)', () => {
       global: {
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
+          // 36-03: Suggest/Export/Copy/Save/Present all moved into this real
+          // child component (ContextualActionBar.vue) — every mountView in
+          // this file must render it for real (`false` opts a component OUT
+          // of shallowMount's default auto-stub) or none of those controls'
+          // pre-existing testids/text are reachable in the DOM anymore.
+          ContextualActionBar: false,
           RouterLink: { template: '<a><slot /></a>' },
           // 32-05: render the real SaveStatusIndicator (not a shallow stub)
           // so its data-testid="save-status"/"save-status-error" handles are
@@ -2047,6 +2326,12 @@ describe('ServiceEditorView - congregational reading (34-07)', () => {
       global: {
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
+          // 36-03: Suggest/Export/Copy/Save/Present all moved into this real
+          // child component (ContextualActionBar.vue) — every mountView in
+          // this file must render it for real (`false` opts a component OUT
+          // of shallowMount's default auto-stub) or none of those controls'
+          // pre-existing testids/text are reachable in the DOM anymore.
+          ContextualActionBar: false,
           RouterLink: { template: '<a><slot /></a>' },
           SaveStatusIndicator: false,
           ServicePrintLayout: true,
@@ -2280,6 +2565,12 @@ describe('ServiceEditorView - WR-04 keyed mount (34-07 Task 3)', () => {
       global: {
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
+          // 36-03: Suggest/Export/Copy/Save/Present all moved into this real
+          // child component (ContextualActionBar.vue) — every mountView in
+          // this file must render it for real (`false` opts a component OUT
+          // of shallowMount's default auto-stub) or none of those controls'
+          // pre-existing testids/text are reachable in the DOM anymore.
+          ContextualActionBar: false,
           RouterLink: { template: '<a><slot /></a>' },
           SaveStatusIndicator: false,
           ServicePrintLayout: true,
@@ -2395,6 +2686,12 @@ describe('ServiceEditorView - no deck editing or deck import on the Service Orde
       global: {
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
+          // 36-03: Suggest/Export/Copy/Save/Present all moved into this real
+          // child component (ContextualActionBar.vue) — every mountView in
+          // this file must render it for real (`false` opts a component OUT
+          // of shallowMount's default auto-stub) or none of those controls'
+          // pre-existing testids/text are reachable in the DOM anymore.
+          ContextualActionBar: false,
           RouterLink: { template: '<a><slot /></a>' },
           // 32-05: render the real SaveStatusIndicator (not a shallow stub)
           // so its data-testid="save-status"/"save-status-error" handles are
@@ -2491,6 +2788,12 @@ describe('ServiceEditorView - Phase 29 reorder repro', () => {
       global: {
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
+          // 36-03: Suggest/Export/Copy/Save/Present all moved into this real
+          // child component (ContextualActionBar.vue) — every mountView in
+          // this file must render it for real (`false` opts a component OUT
+          // of shallowMount's default auto-stub) or none of those controls'
+          // pre-existing testids/text are reachable in the DOM anymore.
+          ContextualActionBar: false,
           RouterLink: { template: '<a><slot /></a>' },
           // 32-05: render the real SaveStatusIndicator (not a shallow stub)
           // so its data-testid="save-status"/"save-status-error" handles are
@@ -2875,6 +3178,12 @@ describe('ServiceEditorView - R047 scripture reference is the slide source', () 
       global: {
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
+          // 36-03: Suggest/Export/Copy/Save/Present all moved into this real
+          // child component (ContextualActionBar.vue) — every mountView in
+          // this file must render it for real (`false` opts a component OUT
+          // of shallowMount's default auto-stub) or none of those controls'
+          // pre-existing testids/text are reachable in the DOM anymore.
+          ContextualActionBar: false,
           RouterLink: { template: '<a><slot /></a>' },
           // 32-05: render the real SaveStatusIndicator (not a shallow stub)
           // so its data-testid="save-status"/"save-status-error" handles are
@@ -2962,6 +3271,12 @@ describe('ServiceEditorView - ME-02 scripture reference round-trips in its own e
       global: {
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
+          // 36-03: Suggest/Export/Copy/Save/Present all moved into this real
+          // child component (ContextualActionBar.vue) — every mountView in
+          // this file must render it for real (`false` opts a component OUT
+          // of shallowMount's default auto-stub) or none of those controls'
+          // pre-existing testids/text are reachable in the DOM anymore.
+          ContextualActionBar: false,
           RouterLink: { template: '<a><slot /></a>' },
           // 32-05: render the real SaveStatusIndicator (not a shallow stub)
           // so its data-testid="save-status"/"save-status-error" handles are
@@ -3066,6 +3381,12 @@ describe('ServiceEditorView - no slide-group writes on a locked service (R036)',
       global: {
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
+          // 36-03: Suggest/Export/Copy/Save/Present all moved into this real
+          // child component (ContextualActionBar.vue) — every mountView in
+          // this file must render it for real (`false` opts a component OUT
+          // of shallowMount's default auto-stub) or none of those controls'
+          // pre-existing testids/text are reachable in the DOM anymore.
+          ContextualActionBar: false,
           RouterLink: { template: '<a><slot /></a>' },
           // 32-05: render the real SaveStatusIndicator (not a shallow stub)
           // so its data-testid="save-status"/"save-status-error" handles are
@@ -3158,6 +3479,12 @@ describe('ServiceEditorView - service lifecycle transitions (R036, R037)', () =>
       global: {
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
+          // 36-03: Suggest/Export/Copy/Save/Present all moved into this real
+          // child component (ContextualActionBar.vue) — every mountView in
+          // this file must render it for real (`false` opts a component OUT
+          // of shallowMount's default auto-stub) or none of those controls'
+          // pre-existing testids/text are reachable in the DOM anymore.
+          ContextualActionBar: false,
           RouterLink: { template: '<a><slot /></a>' },
           // 32-05: render the real SaveStatusIndicator (not a shallow stub)
           // so its data-testid="save-status"/"save-status-error" handles are
@@ -3577,6 +3904,12 @@ describe('ServiceEditorView - locked service renders all three tabs read-only (R
       global: {
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
+          // 36-03: Suggest/Export/Copy/Save/Present all moved into this real
+          // child component (ContextualActionBar.vue) — every mountView in
+          // this file must render it for real (`false` opts a component OUT
+          // of shallowMount's default auto-stub) or none of those controls'
+          // pre-existing testids/text are reachable in the DOM anymore.
+          ContextualActionBar: false,
           RouterLink: { template: '<a><slot /></a>' },
           // 32-05: render the real SaveStatusIndicator (not a shallow stub)
           // so its data-testid="save-status"/"save-status-error" handles are
@@ -4021,6 +4354,12 @@ describe('ServiceEditorView - BL-02: a rejected autosave must not strand the sta
       global: {
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
+          // 36-03: Suggest/Export/Copy/Save/Present all moved into this real
+          // child component (ContextualActionBar.vue) — every mountView in
+          // this file must render it for real (`false` opts a component OUT
+          // of shallowMount's default auto-stub) or none of those controls'
+          // pre-existing testids/text are reachable in the DOM anymore.
+          ContextualActionBar: false,
           RouterLink: { template: '<a><slot /></a>' },
           // 32-05: render the real SaveStatusIndicator (not a shallow stub)
           // so its data-testid="save-status"/"save-status-error" handles are
@@ -4198,6 +4537,12 @@ describe('ServiceEditorView - ME-01: export failure copy and the pre-flight stat
       global: {
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
+          // 36-03: Suggest/Export/Copy/Save/Present all moved into this real
+          // child component (ContextualActionBar.vue) — every mountView in
+          // this file must render it for real (`false` opts a component OUT
+          // of shallowMount's default auto-stub) or none of those controls'
+          // pre-existing testids/text are reachable in the DOM anymore.
+          ContextualActionBar: false,
           RouterLink: { template: '<a><slot /></a>' },
           // 32-05: render the real SaveStatusIndicator (not a shallow stub)
           // so its data-testid="save-status"/"save-status-error" handles are
@@ -4338,6 +4683,12 @@ describe('ServiceEditorView - ME-02/ME-03: the lastUsedAt bump on Mark as Planne
       global: {
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
+          // 36-03: Suggest/Export/Copy/Save/Present all moved into this real
+          // child component (ContextualActionBar.vue) — every mountView in
+          // this file must render it for real (`false` opts a component OUT
+          // of shallowMount's default auto-stub) or none of those controls'
+          // pre-existing testids/text are reachable in the DOM anymore.
+          ContextualActionBar: false,
           RouterLink: { template: '<a><slot /></a>' },
           // 32-05: render the real SaveStatusIndicator (not a shallow stub)
           // so its data-testid="save-status"/"save-status-error" handles are
@@ -4457,6 +4808,12 @@ describe('ServiceEditorView - 32-05: migrated onto useAutoSave/useSaveStatus, st
       global: {
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
+          // 36-03: Suggest/Export/Copy/Save/Present all moved into this real
+          // child component (ContextualActionBar.vue) — every mountView in
+          // this file must render it for real (`false` opts a component OUT
+          // of shallowMount's default auto-stub) or none of those controls'
+          // pre-existing testids/text are reachable in the DOM anymore.
+          ContextualActionBar: false,
           RouterLink: { template: '<a><slot /></a>' },
           ServicePrintLayout: true,
           SongBadge: true,
@@ -4843,6 +5200,12 @@ describe('ServiceEditorView - 32-REVIEW: CR-01/CR-02/CR-03', () => {
       global: {
         stubs: {
           AppShell: { template: '<div><slot /></div>' },
+          // 36-03: Suggest/Export/Copy/Save/Present all moved into this real
+          // child component (ContextualActionBar.vue) — every mountView in
+          // this file must render it for real (`false` opts a component OUT
+          // of shallowMount's default auto-stub) or none of those controls'
+          // pre-existing testids/text are reachable in the DOM anymore.
+          ContextualActionBar: false,
           RouterLink: { template: '<a><slot /></a>' },
           ServicePrintLayout: true,
           SongBadge: true,
