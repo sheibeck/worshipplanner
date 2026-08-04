@@ -10,6 +10,7 @@ import type { Timestamp } from 'firebase/firestore'
 import type { SlideGroup } from '@/types/slideGroup'
 import PresentationViewer from '@/components/PresentationViewer.vue'
 import SlidesTab from '@/components/slides/SlidesTab.vue'
+import CongregationalEditor from '@/components/CongregationalEditor.vue'
 // 32-05: ServiceEditorView now consumes the REAL, Firestore-free useSaveStatus
 // store directly (not vi.mock-ed) — the same new-precedent choice 32-03/32-04
 // already made for their own store/component tests.
@@ -1803,6 +1804,10 @@ describe('ServiceEditorView - Edit in scripture plumbing (Phase 26-03)', () => {
           SongBadge: true,
           SongSlotPicker: true,
           ScriptureInput: true,
+          // 34-07: the congregational-editor modal is a <Teleport to="body">
+          // block, same as the export/reopen/delete dialogs elsewhere in this
+          // file — shallowMount discards teleported children unless opted out.
+          teleport: false,
         },
       },
     })
@@ -1814,17 +1819,16 @@ describe('ServiceEditorView - Edit in scripture plumbing (Phase 26-03)', () => {
     mockServicesList = [mockService]
   })
 
-  // R047 rewrote what "edit in scripture" navigates TO. There is no expandable
-  // slides-editor panel any more: the reference on the plan item row IS the
-  // slide's source, so the request switches tabs and scrolls that row into
-  // view. The rows are rendered unconditionally, so these tests assert the
-  // tab switch and the absence of the old panel/button rather than an
-  // expand/collapse state that no longer exists.
-  it('switches to the Service Order tab when a scripture plan item is requested', async () => {
+  // ★ REVISED 34-07 (owner UAT F1) — the relay is REUSED, the destination is
+  // REPLACED. R047's tab-switch-plus-scroll destination is gone; relaying
+  // the event now opens the congregational-reading MODAL for that slot and
+  // leaves `activeTab` untouched — the disorientation of dragging the user
+  // off the Slides tab (where the request originates) was the point of F1.
+  it('opens the congregational-editor modal for the requested SCRIPTURE slot, and leaves activeTab unchanged (Slides stays active)', async () => {
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
 
-    // Start on the Slides tab so the tab switch is observable.
+    // Start on the Slides tab, where both routes to this relay originate.
     const slidesBtn = wrapper.findAll('button').find((b) => b.text() === 'Slides')
     await slidesBtn!.trigger('click')
     await wrapper.vm.$nextTick()
@@ -1835,20 +1839,38 @@ describe('ServiceEditorView - Edit in scripture plumbing (Phase 26-03)', () => {
     await wrapper.vm.$nextTick()
     await wrapper.vm.$nextTick()
 
-    expect(isVShowHidden(wrapper.find('[data-testid="service-order-panel"]'))).toBe(false)
-    expect(wrapper.find('[data-scripture-slot-index="1"]').exists()).toBe(true)
+    // activeTab is unchanged — the Slides tab stays hidden-false the same
+    // way it was before the relay; the Service Order panel does NOT reappear.
+    // The modal is Teleported to body — queried via document, not `wrapper`.
+    expect(isVShowHidden(wrapper.find('[data-testid="service-order-panel"]'))).toBe(true)
+    const body = new DOMWrapper(document.body)
+    expect(body.find('[data-testid="congregational-editor-modal"]').exists()).toBe(true)
+    expect(body.find('[data-testid="congregational-editor-panel"]').exists()).toBe(true)
   })
 
-  it('asking twice is idempotent and does not throw', async () => {
+  it('asking twice for the same slot is idempotent and does not throw — the modal stays open on that slot', async () => {
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
+    const body = new DOMWrapper(document.body)
 
     for (let i = 0; i < 2; i++) {
       await wrapper.findComponent(SlidesTab).vm.$emit('navigate-to-scripture-editor', 1)
       await wrapper.vm.$nextTick()
       await wrapper.vm.$nextTick()
-      expect(wrapper.find('[data-scripture-slot-index="1"]').exists()).toBe(true)
+      expect(body.find('[data-testid="congregational-editor-modal"]').exists()).toBe(true)
     }
+  })
+
+  it('relaying for a service whose status is not draft (planned/locked) renders no modal', async () => {
+    mockServicesList = [{ ...mockService, status: 'planned' }]
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    await wrapper.findComponent(SlidesTab).vm.$emit('navigate-to-scripture-editor', 1)
+    await wrapper.vm.$nextTick()
+    await wrapper.vm.$nextTick()
+
+    expect(new DOMWrapper(document.body).find('[data-testid="congregational-editor-modal"]').exists()).toBe(false)
   })
 
   // R047: the "Edit Scripture Slides" button and its panel are gone from this
@@ -1866,7 +1888,7 @@ describe('ServiceEditorView - Edit in scripture plumbing (Phase 26-03)', () => {
     expect(wrapper.find('[data-testid="congregational-editor"]').exists()).toBe(false)
   })
 
-  it('an out-of-range index changes nothing and does not throw', async () => {
+  it('an out-of-range index changes nothing, does not throw, and renders no modal', async () => {
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
 
@@ -1878,9 +1900,10 @@ describe('ServiceEditorView - Edit in scripture plumbing (Phase 26-03)', () => {
     await wrapper.vm.$nextTick()
 
     expect(isVShowHidden(wrapper.find('[data-testid="service-order-panel"]'))).toBe(wasHidden)
+    expect(new DOMWrapper(document.body).find('[data-testid="congregational-editor-modal"]').exists()).toBe(false)
   })
 
-  it('a request naming a non-scripture plan item does not switch tabs', async () => {
+  it('a request naming a non-scripture plan item does not switch tabs and renders no modal', async () => {
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
 
@@ -1894,6 +1917,7 @@ describe('ServiceEditorView - Edit in scripture plumbing (Phase 26-03)', () => {
     await wrapper.vm.$nextTick()
 
     expect(isVShowHidden(wrapper.find('[data-testid="service-order-panel"]'))).toBe(true)
+    expect(new DOMWrapper(document.body).find('[data-testid="congregational-editor-modal"]').exists()).toBe(false)
   })
 
   it('every scripture plan item row carries its own index marker', async () => {
@@ -1911,6 +1935,238 @@ describe('ServiceEditorView - Edit in scripture plumbing (Phase 26-03)', () => {
 
     expect(wrapper.find('[data-scripture-slot-index="1"]').exists()).toBe(true)
     expect(wrapper.find('[data-scripture-slot-index="4"]').exists()).toBe(true)
+  })
+})
+
+// ── 34-07 (owner UAT F1) — the congregational-reading editor is now MOUNTED ──
+// (the reachability gap 34-VERIFICATION.md recorded). Unlike the block above
+// (which shallow-stubs everything, including CongregationalEditor itself),
+// this block mounts CongregationalEditor for REAL so its props and emits are
+// actually exercised — the literal gap-closure check
+// (`grep -rl "CongregationalEditor" src --include=*.vue`) now finds a real
+// component instance being driven through its props/emits contract, not just
+// an import statement.
+describe('ServiceEditorView - congregational reading (34-07)', () => {
+  async function mountView(overrides: Partial<Service> = {}) {
+    if (Object.keys(overrides).length > 0) {
+      mockServicesList = [{ ...mockService, ...overrides }]
+    }
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          RouterLink: { template: '<a><slot /></a>' },
+          SaveStatusIndicator: false,
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+          // CongregationalEditor is deliberately NOT stubbed here — this
+          // block's whole point is to mount it for real.
+          teleport: false,
+        },
+      },
+    })
+  }
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockServicesList = [mockService]
+    mockUpdateService.mockClear()
+  })
+
+  function body() {
+    return new DOMWrapper(document.body)
+  }
+
+  it('relays navigate-to-scripture-editor for a SCRIPTURE slot: update:sections lands on that slot, book/chapter/verseStart/verseEnd/id/position unchanged, and no free-text field exists', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    await wrapper.findComponent(SlidesTab).vm.$emit('navigate-to-scripture-editor', 1)
+    await wrapper.vm.$nextTick()
+
+    expect(body().find('[data-testid="congregational-editor-modal"]').exists()).toBe(true)
+    const editor = wrapper.findComponent(CongregationalEditor)
+    expect(editor.exists()).toBe(true)
+
+    // No free-text scripture override exists anywhere in the delivered
+    // surface — the fetched-then-split passage is the only source of text.
+    expect(body().find('textarea').exists()).toBe(false)
+
+    const newSections = [
+      { speaker: 'LEADER' as const, text: 'The Lord is my shepherd' },
+      { speaker: 'CONGREGATION' as const, text: 'I shall not want' },
+    ]
+    editor.vm.$emit('update:sections', newSections)
+    await wrapper.vm.$nextTick()
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    await flushPromises()
+
+    const written = mockUpdateService.mock.calls
+      .map(([, patch]) => (patch as { slots?: Array<Record<string, unknown>> }).slots)
+      .filter((slots): slots is Array<Record<string, unknown>> => Array.isArray(slots))
+      .pop()
+    const scriptureSlot = written?.find((s) => s.id === 'slot-1')
+    expect(scriptureSlot).toBeDefined()
+    expect(scriptureSlot!.congregationalSections).toEqual(newSections)
+    expect(scriptureSlot!.book).toBe('Psalms')
+    expect(scriptureSlot!.chapter).toBe(23)
+    expect(scriptureSlot!.verseStart).toBe(1)
+    expect(scriptureSlot!.verseEnd).toBe(6)
+    expect(scriptureSlot!.id).toBe('slot-1')
+    expect(scriptureSlot!.position).toBe(1)
+  })
+
+  it('does not change activeTab (the Slides tab stays selected)', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    const slidesBtn = wrapper.findAll('button').find((b) => b.text() === 'Slides')
+    await slidesBtn!.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    await wrapper.findComponent(SlidesTab).vm.$emit('navigate-to-scripture-editor', 1)
+    await wrapper.vm.$nextTick()
+
+    // Service Order stays hidden — the relay never flips activeTab back.
+    expect(isVShowHidden(wrapper.find('[data-testid="service-order-panel"]'))).toBe(true)
+  })
+
+  it('for a service whose status is planned (locked), relaying renders no modal', async () => {
+    const wrapper = await mountView({ status: 'planned' })
+    await wrapper.vm.$nextTick()
+
+    await wrapper.findComponent(SlidesTab).vm.$emit('navigate-to-scripture-editor', 1)
+    await wrapper.vm.$nextTick()
+
+    expect(body().find('[data-testid="congregational-editor-modal"]').exists()).toBe(false)
+  })
+
+  it('an out-of-range index and a non-SCRIPTURE index each render no modal', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    await wrapper.findComponent(SlidesTab).vm.$emit('navigate-to-scripture-editor', 999)
+    await wrapper.vm.$nextTick()
+    expect(body().find('[data-testid="congregational-editor-modal"]').exists()).toBe(false)
+
+    // slot-0 is SONG.
+    await wrapper.findComponent(SlidesTab).vm.$emit('navigate-to-scripture-editor', 0)
+    await wrapper.vm.$nextTick()
+    expect(body().find('[data-testid="congregational-editor-modal"]').exists()).toBe(false)
+  })
+
+  it('the modal header renders a save-status element', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    await wrapper.findComponent(SlidesTab).vm.$emit('navigate-to-scripture-editor', 1)
+    await wrapper.vm.$nextTick()
+
+    const modal = body().find('[data-testid="congregational-editor-modal"]')
+    expect(modal.find('[data-testid="save-status"]').exists()).toBe(true)
+  })
+
+  // T-34-07-06 — exactly ONE save-status region exists on the
+  // `service:{serviceId}` surface at any moment. The modal is Teleported to
+  // body, so this assertion is DOCUMENT-scoped (not `wrapper`-scoped) — a
+  // wrapper-scoped query would only ever count the page's own copy and prove
+  // nothing about the modal's.
+  it('exactly one [data-testid="save-status"] exists in the whole document while the modal is open, and it is the one inside the modal; the page bar is absent', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    // Seed a non-idle status so the page bar would have visible chrome if it
+    // were rendered — the absence assertion below needs real chrome to be
+    // meaningful, not just an always-idle empty box.
+    const saveStatus = useSaveStatus()
+    saveStatus.set('service:service-1', { status: 'saved', savedAt: new Date() })
+    await wrapper.vm.$nextTick()
+
+    await wrapper.findComponent(SlidesTab).vm.$emit('navigate-to-scripture-editor', 1)
+    await wrapper.vm.$nextTick()
+
+    const documentSaveStatusNodes = body().findAll('[data-testid="save-status"]')
+    expect(documentSaveStatusNodes).toHaveLength(1)
+    const modal = body().find('[data-testid="congregational-editor-modal"]')
+    expect(modal.find('[data-testid="save-status"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="service-save-status-bar"]').exists()).toBe(false)
+  })
+
+  it('the page save-status bar returns once the modal closes', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    const saveStatus = useSaveStatus()
+    saveStatus.set('service:service-1', { status: 'saved', savedAt: new Date() })
+    await wrapper.vm.$nextTick()
+
+    await wrapper.findComponent(SlidesTab).vm.$emit('navigate-to-scripture-editor', 1)
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('[data-testid="service-save-status-bar"]').exists()).toBe(false)
+
+    const editor = wrapper.findComponent(CongregationalEditor)
+    editor.vm.$emit('close')
+    await wrapper.vm.$nextTick()
+
+    expect(body().find('[data-testid="congregational-editor-modal"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="service-save-status-bar"]').exists()).toBe(true)
+  })
+
+  it('the close control unmounts the panel and writes nothing', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    await wrapper.findComponent(SlidesTab).vm.$emit('navigate-to-scripture-editor', 1)
+    await wrapper.vm.$nextTick()
+
+    await body().find('[data-testid="congregational-editor-close"]').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    expect(body().find('[data-testid="congregational-editor-modal"]').exists()).toBe(false)
+    expect(mockUpdateService).not.toHaveBeenCalled()
+  })
+
+  it('update:reference routes through onScriptureChange: updates the reference fields and clears a reading that no longer belongs to the slot', async () => {
+    const withReading: Service = {
+      ...mockService,
+      slots: mockService.slots.map((slot) =>
+        slot.id === 'slot-1'
+          ? { ...slot, congregationalSections: [{ speaker: 'LEADER' as const, text: 'Old passage text' }] }
+          : slot,
+      ),
+    }
+    const wrapper = await mountView(withReading)
+    await wrapper.vm.$nextTick()
+
+    await wrapper.findComponent(SlidesTab).vm.$emit('navigate-to-scripture-editor', 1)
+    await wrapper.vm.$nextTick()
+
+    const editor = wrapper.findComponent(CongregationalEditor)
+    editor.vm.$emit('update:reference', { book: 'John', chapter: 3, verseStart: 16, verseEnd: 16 })
+    await wrapper.vm.$nextTick()
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    await flushPromises()
+
+    const written = mockUpdateService.mock.calls
+      .map(([, patch]) => (patch as { slots?: Array<Record<string, unknown>> }).slots)
+      .filter((slots): slots is Array<Record<string, unknown>> => Array.isArray(slots))
+      .pop()
+    const scriptureSlot = written?.find((s) => s.id === 'slot-1')
+    expect(scriptureSlot).toBeDefined()
+    expect(scriptureSlot!.book).toBe('John')
+    expect(scriptureSlot!.chapter).toBe(3)
+    expect(scriptureSlot!.congregationalSections).toBeUndefined()
+  })
+
+  it('exactly one CongregationalEditor element exists in the rendered tree when the modal is open', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    await wrapper.findComponent(SlidesTab).vm.$emit('navigate-to-scripture-editor', 1)
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.findAllComponents(CongregationalEditor)).toHaveLength(1)
   })
 })
 

@@ -257,9 +257,23 @@
              padding, no margin, no sticky positioning — an empty block
              element around an empty block element, contributing zero
              height. The box is the chrome; removing the chrome removes the
-             box and keeps the region mounted. -->
+             box and keeps the region mounted.
+
+             34-07 (T-34-07-06) — ADDITIONALLY requires
+             `congregationalSlotIndex === null`. A Teleported modal leaves
+             this page mounted underneath it, and the clause above already
+             keeps this region mounted at idle (34-10), so without this
+             extra condition the congregational-editor modal's own
+             SaveStatusIndicator (same `service:{serviceId}` surface id)
+             would coexist with this one — two polite live regions carrying
+             identical text, which double-announce and make a
+             `[data-testid="save-status"]` selector ambiguous about which
+             node it matched. Do NOT "simplify" this back to a permission-only
+             gate, and do NOT fix the collision by giving the modal a
+             different surface id — that would create two DISAGREEING
+             statuses instead, which is worse. -->
         <div
-          v-if="canEditService"
+          v-if="canEditService && congregationalSlotIndex === null"
           :class="serviceSaveStatusVisible
             ? 'sticky top-0 z-10 mb-3 flex items-center gap-2 rounded-md border border-gray-800 bg-gray-900 px-4 py-2'
             : ''"
@@ -493,6 +507,60 @@
                   >{{ isExporting ? 'Exporting...' : exportMode === 'existing' ? 'Add to Plan' : 'Export' }}</button>
                 </div>
               </template>
+            </div>
+          </div>
+        </Teleport>
+
+        <!-- 34-07 (owner UAT F1) — the congregational-reading editor modal.
+             Teleported to body, same scrim/panel shape as the export dialog
+             above (an established pattern in this file, not a new one).
+             `ServiceEditorView` is the only place that can host it: it owns
+             `localService`, `canEditService` and the one `useAutoSave` over
+             `localService`. Keyed on `congregationalSlot.id` (WR-04,
+             34-PATTERNS.md) — `CongregationalEditor` seeds its editable
+             state ONCE at mount and is not reactive to a later prop change,
+             so swapping which slot is being edited MUST force a fresh
+             instance or a save would silently misattribute to the first
+             slot the instance ever saw. -->
+        <Teleport to="body">
+          <div
+            v-if="congregationalSlot !== null"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+            data-testid="congregational-editor-modal"
+          >
+            <div class="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col">
+              <div class="flex items-center justify-between gap-3 px-6 py-4 border-b border-gray-800 shrink-0">
+                <h2 class="text-base font-semibold text-gray-100">Congregational Reading</h2>
+                <div class="flex items-center gap-3">
+                  <!-- R041/T-34-07-05: the shared indicator on the SAME
+                       `service:{serviceId}` surface id the page's sticky bar
+                       uses — one aggregator, one save path, one surface id,
+                       status visible while this panel is open. -->
+                  <SaveStatusIndicator :surface-id="`service:${serviceId}`" />
+                  <button
+                    type="button"
+                    class="p-1.5 rounded-md text-gray-500 hover:text-gray-300 hover:bg-gray-800 transition-colors"
+                    aria-label="Close"
+                    data-testid="congregational-editor-close"
+                    @click="closeCongregationalEditor"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div class="flex-1 overflow-y-auto px-6 py-4">
+                <CongregationalEditor
+                  :key="congregationalSlot.id"
+                  data-testid="congregational-editor-panel"
+                  :reference="slotToScriptureRef(congregationalSlot)"
+                  :sections="congregationalSlot.congregationalSections ?? []"
+                  @update:sections="onCongregationalSectionsChange(congregationalSlotIndex!, $event)"
+                  @update:reference="onScriptureChange(congregationalSlotIndex!, $event)"
+                  @close="closeCongregationalEditor"
+                />
+              </div>
             </div>
           </div>
         </Teleport>
@@ -1333,7 +1401,8 @@ import { useQuartersStore } from '@/stores/quarters'
 import { useSlideGroups } from '@/stores/slideGroups'
 import { useSaveStatus, hasVisibleSaveStatus } from '@/stores/saveStatus'
 import { slotLabel, createSlot, reindexSlots, backfillSlotIds, groupBySection, flattenBySection, orderSlotsBySection } from '@/utils/slotTypes'
-import { scripturesOverlap, scriptureRefFromSlot, formatScriptureReference } from '@/utils/scripture'
+import { scripturesOverlap, scriptureRefFromSlot, formatScriptureReference, scriptureSlotAfterReferenceChange } from '@/utils/scripture'
+import type { CongregationalSection } from '@/types/slide'
 import { getPrimaryKey } from '@/utils/songSearch'
 import { resolveServiceRoleAssignments, findQuarterForDate } from '@/utils/serviceRoles'
 import type { ResolvedRoleAssignment } from '@/utils/serviceRoles'
@@ -1349,6 +1418,7 @@ import ScriptureInput from '@/components/ScriptureInput.vue'
 import ServicePrintLayout from '@/components/ServicePrintLayout.vue'
 import PresentationViewer from '@/components/PresentationViewer.vue'
 import SlidesTab from '@/components/slides/SlidesTab.vue'
+import CongregationalEditor from '@/components/CongregationalEditor.vue'
 import { useSlideshowAssembly } from '@/composables/useSlideshowAssembly'
 import { useAutoSave } from '@/composables/useAutoSave'
 import { formatForPlanningCenter } from '@/utils/planningCenterExport'
@@ -1514,23 +1584,68 @@ const deleteServiceConfirmBody = computed(() => {
 
 // ── Scripture editor expansion state ──────────────────────────────────────────
 /**
- * Handles the "Edit in scripture" request relayed up through SlidesTab's
- * `navigate-to-scripture-editor` event (T-26-03-01: validates the index
- * against the current plan item list and its kind before touching any state,
- * so an unhonourable request — out of range, or naming a non-scripture plan
- * item — is a no-op rather than switching tabs or scrolling to an unrelated
- * row). Switches to the Service Order tab and brings the plan item's ROW into
- * view: R047 removed the expandable slides-editor panel, so the row's own
- * `ScriptureInput` is now the thing being navigated to — it is where the
- * reference, and therefore the slide, is edited.
+ * 34-07 (owner UAT F1) — which SCRIPTURE slot's congregational-reading editor
+ * is open, or `null` when none is. Defaults `null` so no panel is open on
+ * load.
  */
-async function handleNavigateToScriptureEditor(index: number): Promise<void> {
+const congregationalSlotIndex = ref<number | null>(null)
+
+/**
+ * The one place that decides whether there is something to show — the
+ * template's `v-if` and the mount's `:key` both read THIS, so they can never
+ * disagree about whether a panel should be up. `null` whenever the index is
+ * null or no longer resolves to a SCRIPTURE slot (e.g. the slot was removed
+ * or changed kind while the modal was open).
+ */
+const congregationalSlot = computed<ScriptureSlot | null>(() => {
+  const index = congregationalSlotIndex.value
+  if (index === null || !localService.value) return null
+  const slot = localService.value.slots[index]
+  return slot && slot.kind === 'SCRIPTURE' ? slot : null
+})
+
+/**
+ * Handles the "Edit scripture text" / "Edit in scripture" request relayed up
+ * through SlidesTab's `navigate-to-scripture-editor` event (T-26-03-01: the
+ * index is validated against the current plan item list and its kind before
+ * touching any state, so an unhonourable request — out of range, or naming a
+ * non-scripture plan item — is a no-op).
+ *
+ * ★ REVISED 34-07 (owner UAT F1) — the relay is REUSED, the handler body is
+ * REPLACED. R047 had deleted the panel this relay used to reveal, which is
+ * why it degraded to a tab-switch-plus-scroll. The owner's finding restored
+ * a real destination: the scripture slide's edit route now opens the
+ * congregational-reading editor as a modal over the Slides tab where the
+ * request originated — dragging the user off to the Service Order tab to
+ * reach it was the disorientation that made the feature read as absent.
+ */
+function handleNavigateToScriptureEditor(index: number): void {
   const slot = localService.value?.slots[index]
   if (!slot || slot.kind !== 'SCRIPTURE') return
-  activeTab.value = 'service-order'
-  await nextTick()
-  const row = document.querySelector(`[data-scripture-slot-index="${index}"]`)
-  row?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' })
+  if (!canEditService.value) return
+  congregationalSlotIndex.value = index
+}
+
+/** Closes the congregational-reading modal without writing anything. */
+function closeCongregationalEditor(): void {
+  congregationalSlotIndex.value = null
+}
+
+/**
+ * `CongregationalEditor`'s `update:sections` — the same slot-mutation shape
+ * `onScriptureChange` uses (spread + reassign the array index), so the
+ * existing `useAutoSave(localService, ...)` is the one persistence path for
+ * this write too. No save call of any kind belongs here.
+ */
+function onCongregationalSectionsChange(index: number, sections: CongregationalSection[]): void {
+  if (!canEditService.value) return
+  if (!localService.value) return
+  const slot = localService.value.slots[index]
+  if (!slot || slot.kind !== 'SCRIPTURE') return
+  localService.value.slots[index] = {
+    ...slot,
+    congregationalSections: sections,
+  } as ScriptureSlot
 }
 
 
@@ -2848,13 +2963,12 @@ function onScriptureChange(index: number, ref: ScriptureRef | null) {
   const slot = localService.value.slots[index]
   if (!slot) return
   if (slot.kind === 'SCRIPTURE') {
-    localService.value.slots[index] = {
-      ...slot,
-      book: ref?.book ?? null,
-      chapter: ref?.chapter ?? null,
-      verseStart: ref?.verseStart ?? null,
-      verseEnd: ref?.verseEnd ?? null,
-    } as ScriptureSlot
+    // 34-05/34-07: `scriptureSlotAfterReferenceChange` owns both the
+    // four-field reference write AND the rule that a reference change to a
+    // different passage drops `congregationalSections` — a stored
+    // congregational reading must never be projected under a passage it was
+    // not derived from. Do not restate either rule here.
+    localService.value.slots[index] = scriptureSlotAfterReferenceChange(slot, ref)
   }
 }
 
