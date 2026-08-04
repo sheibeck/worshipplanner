@@ -5,15 +5,15 @@ milestone_name: Service and Slides
 current_phase: 37
 current_phase_name: PowerPoint Server-Side Rendering
 status: verifying
-stopped_at: "Completed 34-07-PLAN.md (R064 reachability gap closed: CongregationalEditor mounted as a keyed modal on the scripture slide, two routes converge on one relay, WR-04 keyed-mount proven by swap test)"
-last_updated: "2026-08-04T01:15:47.647Z"
+stopped_at: "Completed 34-12-PLAN.md (UAT F5 diagnosed: hasPcCredentials gate behaves correctly, cause 1 confirmed; R071 written and delivered as no-credentials explanation note beside Copy for PC)"
+last_updated: "2026-08-04T01:43:36.685Z"
 last_activity: 2026-08-03
 last_activity_desc: Phase 37 execution started
 progress:
   total_phases: 9
   completed_phases: 7
   total_plans: 52
-  completed_plans: 50
+  completed_plans: 51
   percent: 78
 ---
 
@@ -1032,6 +1032,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 34 P10 | 35min | 2 tasks | 4 files |
 | Phase 34 P11 | 25min | 2 tasks | 2 files |
 | Phase 34 P07 | 45min | 3 tasks | 8 files |
+| Phase 34 P12 | 35min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -1274,6 +1275,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 34-11: merged group music and group background into one panel (UAT F2); corrected Task 2's permission-carve-out test direction to match verified canWriteGroupMedia behavior (song groups keep group-media write access) rather than the plan's literal wording, which contradicted the gate's own code comment and a pre-existing pinned test
 - [Phase ?]: 34-07: mount seam for CongregationalEditor is the scripture slide (menu + drawer, converging on one relay), per owner UAT finding F1 — closes the R064 reachability gap 34-VERIFICATION.md recorded
 - [Phase ?]: 34-07: no free-text scripture override anywhere — owner shown the D-13/D-15 shadow-copy tension and declined it; fetch-then-split inside CongregationalEditor is the only route to slide text
+- [Phase ?]: 34-12: F5 diagnosed as cause 1 (org doc lacks credentials, not a load-order regression); no fix to auth.ts, R071 written and delivered as a UX explanation note beside Copy for PC
 
 ### Roadmap Evolution
 
@@ -1335,6 +1337,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-04T01:15:47.594Z
-Stopped at: Completed 34-07-PLAN.md (R064 reachability gap closed: CongregationalEditor mounted as a keyed modal on the scripture slide, two routes converge on one relay, WR-04 keyed-mount proven by swap test)
+Last session: 2026-08-04T01:43:36.622Z
+Stopped at: Completed 34-12-PLAN.md (UAT F5 diagnosed: hasPcCredentials gate behaves correctly, cause 1 confirmed; R071 written and delivered as no-credentials explanation note beside Copy for PC)
 Resume file: None
