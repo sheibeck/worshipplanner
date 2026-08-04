@@ -31,6 +31,14 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 - [x] **R038** (quality-attribute): Creating a service defaults the date to the nearest Sunday that does
       not already have a service plan, rather than the nearest Sunday outright.
 
+- [ ] **R071** (quality-attribute): An editor who cannot export to Planning Center is told why, with a
+      route to fix it. When Planning Center credentials are not configured for the organization, the
+      service editor says so plainly beside the copy-for-Planning-Center fallback and links to Settings,
+      instead of silently substituting a differently-named button. The export affordance itself stays
+      gated — an export that cannot authenticate is never offered.
+      *(Added 2026-08-03 from owner UAT finding F5, where the silent substitution read as the export
+      feature having been deleted.)* `[FEAT]`
+
 ### Save Reliability
 
 - [x] **R039** (quality-attribute): Every mutation on the Service Order fires autosave, including
@@ -297,11 +305,12 @@ Acknowledged, deferred, not in this roadmap.
 | R068 | Phase 36 | Pending |
 | R069 | Phase 36 | Pending |
 | R070 | Phase 34 | Complete |
+| R071 | Phase 34 | Pending |
 
 **Coverage:**
 
-- v1.4 requirements: 35 total (R036–R070)
-- Mapped to phases: 35
+- v1.4 requirements: 36 total (R036–R071)
+- Mapped to phases: 36
 - Unmapped: 0 ✓
 
 **Phase → requirement-count summary:**
@@ -313,7 +322,7 @@ Acknowledged, deferred, not in this roadmap.
 | 31 | Service Lifecycle — Draft Lock & Reopen | R036, R037, R038 (3) |
 | 32 | Save Reliability — Autosave Fix & Persistent Status | R039, R040, R041 (3) |
 | 33 | Backgrounds & Slide Editing | R051, R052, R055, R056, R057, R058, R063 (7) |
-| 34 | Smarter Content — LLM Scripture Split | R064, R070 (2) |
+| 34 | Smarter Content — LLM Scripture Split | R064, R070, R071 (3) |
 | 35 | Presentation Correctness & Lyric Editor | R059, R060, R061, R065, R066 (5) |
 | 36 | UI Rework — Service Order & Contextual Action Bars | R053, R067, R068, R069 (4) |
 | 37 | PowerPoint Server-Side Rendering | R062 (1) |
