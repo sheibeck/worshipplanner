@@ -245,7 +245,7 @@ Plans:
   3. Splits fall only on clause/verse boundaries, never mid-sentence
   4. If the split call fails, the scripture slide still renders and remains usable — the feature never blocks editing
 
-**Plans**: 8/12 plans executed
+**Plans**: 9/12 plans executed
 
 Plans:
 
@@ -259,7 +259,7 @@ Plans:
 - [ ] 34-08-PLAN.md — Composed slot→group→slide pipeline proof, validation/PENDING/R064+R070+R071 records, phase gate (wave 4, gap closure)
 - [x] 34-09-PLAN.md — UAT F3: render the resolved background on the Present screen; propose and write R070 (wave 1, UAT)
 - [x] 34-10-PLAN.md — UAT F4: gate the sticky save-status wrapper so no empty bordered box renders (wave 1, UAT)
-- [ ] 34-11-PLAN.md — UAT F2: merge group music and group background into one panel, layout only (wave 1, UAT)
+- [x] 34-11-PLAN.md — UAT F2: merge group music and group background into one panel, layout only (wave 1, UAT)
 - [ ] 34-12-PLAN.md — UAT F5: diagnose the Export to PC gate, then explain the no-credentials state; propose and write R071 (wave 3, UAT)
 
 **UI hint**: no
@@ -352,7 +352,7 @@ Plans:
 | 31. Service Lifecycle — Draft Lock & Reopen | v1.4 | 6/6 | Complete    | 2026-07-30 |
 | 32. Save Reliability — Autosave Fix & Persistent Status | v1.4 | 6/6 | In Progress|  |
 | 33. Backgrounds & Slide Editing | v1.4 | 9/9 | In Progress|  |
-| 34. Smarter Content — LLM Scripture Split | v1.4 | 8/12 | In Progress|  |
+| 34. Smarter Content — LLM Scripture Split | v1.4 | 9/12 | In Progress|  |
 | 35. Presentation Correctness & Lyric Editor | v1.4 | 4/4 | In Progress|  |
 | 36. UI Rework — Service Order & Contextual Action Bars | v1.4 | 0/TBD | Not started | - |
 | 37. PowerPoint Server-Side Rendering | v1.4 | 6/6 | In Progress|  |
