@@ -823,6 +823,24 @@ describe('SlidesTab', () => {
       expect(wrapper.findComponent(EditSlideDrawer).props('open')).toBe(false)
     })
 
+    // 34-07 (owner UAT F1) — the drawer's Slide Text scripture-route control
+    // converges on the SAME requestEditInScripture() the menu path calls.
+    it('drawer: the edit-scripture-text emit produces exactly one navigate-to-scripture-editor with the selected slot\'s array index, and leaves the drawer closed', async () => {
+      // Uses the default auto-stub (no drawer opened first) — the
+      // `mountWithControllableGuard` tests below in the WR-04 describe block
+      // separately prove the guard/close interaction when a drawer IS open.
+      const wrapper = mountWithEntry({ kind: 'scripture', scriptureReadingId: 'read-1', innerSlideId: 'inner-1' })
+      await wrapper.vm.$nextTick()
+      expect(wrapper.findComponent(EditSlideDrawer).props('open')).toBe(false)
+
+      wrapper.findComponent(EditSlideDrawer).vm.$emit('edit-scripture-text')
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.emitted('navigate-to-scripture-editor')).toHaveLength(1)
+      expect(wrapper.emitted('navigate-to-scripture-editor')?.[0]).toEqual([0])
+      expect(wrapper.findComponent(EditSlideDrawer).props('open')).toBe(false)
+    })
+
     it('menu: a menu action on a slide id that was NOT already selected selects it first, so the grid receives it as selectedSlideId', async () => {
       const slots: ServiceSlot[] = [makeSlot({ kind: 'SONG', id: 'slot-a', position: 0 })]
       const entryOne = makeEntry({ id: 'entry-1' })
@@ -865,7 +883,7 @@ describe('SlidesTab', () => {
           'assembledSlide', 'position', 'total', 'orgId', 'serviceId',
           'isEditor', 'serviceLocked',
         ],
-        emits: ['close', 'duplicate', 'pending-action-consumed'],
+        emits: ['close', 'duplicate', 'pending-action-consumed', 'edit-scripture-text'],
         setup(_, { expose }) {
           expose({ confirmDiscard })
           return () => null
@@ -946,6 +964,50 @@ describe('SlidesTab', () => {
 
       expect(confirmDiscard).not.toHaveBeenCalled()
       expect(wrapper.emitted('navigate-to-scripture-editor')).toBeTruthy()
+    })
+
+    // 34-07 (owner UAT F1) — the drawer route runs the SAME guard the menu
+    // route runs: a cancelled confirm leaves the drawer open and relays
+    // nothing.
+    it('drawer route: a cancelled confirm from the drawer emit blocks the relay and leaves the drawer open', async () => {
+      const { wrapper, confirmDiscard } = mountWithControllableGuard(
+        { kind: 'scripture', scriptureReadingId: 'read-1', innerSlideId: 'inner-1' },
+        false,
+      )
+      await wrapper.vm.$nextTick()
+      const grid = wrapper.findComponent(SlideGrid)
+
+      // Open the drawer first — the guard only asks `confirmDiscard` when a
+      // drawer is actually open (`drawerOpen.value` true).
+      grid.vm.$emit('menu-action', 'entry-1', 'edit-details')
+      await wrapper.vm.$nextTick()
+      expect(wrapper.findComponent(EditSlideDrawer).props('open')).toBe(true)
+
+      wrapper.findComponent(EditSlideDrawer).vm.$emit('edit-scripture-text')
+      await wrapper.vm.$nextTick()
+
+      expect(confirmDiscard).toHaveBeenCalledTimes(1)
+      expect(wrapper.emitted('navigate-to-scripture-editor')).toBeUndefined()
+      expect(wrapper.findComponent(EditSlideDrawer).props('open')).toBe(true)
+    })
+
+    it('drawer route: a confirmed discard allows the drawer emit to relay and close the drawer', async () => {
+      const { wrapper, confirmDiscard } = mountWithControllableGuard(
+        { kind: 'scripture', scriptureReadingId: 'read-1', innerSlideId: 'inner-1' },
+        true,
+      )
+      await wrapper.vm.$nextTick()
+      const grid = wrapper.findComponent(SlideGrid)
+
+      grid.vm.$emit('menu-action', 'entry-1', 'edit-details')
+      await wrapper.vm.$nextTick()
+
+      wrapper.findComponent(EditSlideDrawer).vm.$emit('edit-scripture-text')
+      await wrapper.vm.$nextTick()
+
+      expect(confirmDiscard).toHaveBeenCalledTimes(1)
+      expect(wrapper.emitted('navigate-to-scripture-editor')).toHaveLength(1)
+      expect(wrapper.findComponent(EditSlideDrawer).props('open')).toBe(false)
     })
   })
 })

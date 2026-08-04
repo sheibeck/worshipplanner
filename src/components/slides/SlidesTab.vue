@@ -76,6 +76,7 @@
       @close="onDrawerClose"
       @duplicate="selectSlideById"
       @pending-action-consumed="onPendingActionConsumed"
+      @edit-scripture-text="onDrawerEditScriptureText"
     />
   </div>
 </template>
@@ -318,6 +319,22 @@ function onDrawerClose(): void {
   drawerOpen.value = false
 }
 
+/**
+ * 34-07 (owner UAT F1) — the drawer's Slide Text scripture-route control.
+ * Runs the SAME unsaved-drawer guard the menu path runs (WR-04), then closes
+ * the drawer and calls the SAME `requestEditInScripture` relay the menu's
+ * `edit-in-scripture` key calls, so both routes converge on one relay and
+ * therefore one mounted editor. The drawer is closed because the editor now
+ * opens as a modal over this tab rather than by navigating away — leaving
+ * the drawer open behind it would leave two editing surfaces stacked on the
+ * same entry.
+ */
+function onDrawerEditScriptureText(): void {
+  if (!confirmLeavingOpenDrawer()) return
+  drawerOpen.value = false
+  requestEditInScripture()
+}
+
 /** Moves the selection onto an entry just created by id — bound directly to the drawer's `duplicate` emit (26-09 Task 2), which only fires once the copy's write has actually succeeded. */
 function selectSlideById(slideId: string): void {
   selectedSlideId.value = slideId
@@ -484,8 +501,11 @@ function onMenuAction(slideId: string, key: MenuItemKey): void {
       break
     }
     case 'edit-in-scripture':
-      // Not a navigation — relays through the existing plumbing up to the
-      // service editor, unchanged from the drawer's own former emit.
+      // 34-07: the editor now opens as a modal over this tab rather than by
+      // navigating away, so the drawer is closed first — leaving it open
+      // behind the modal would leave two editing surfaces stacked on the
+      // same entry (the same reason `onDrawerEditScriptureText` closes it).
+      drawerOpen.value = false
       requestEditInScripture()
       break
     case 'duplicate':

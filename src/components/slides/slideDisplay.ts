@@ -233,13 +233,20 @@ const MENU_ITEM_LABELS: Record<MenuItemKey, string> = {
   'edit-details': 'Edit details',
   'edit-lyrics': 'Edit lyrics',
   'edit-in-song': 'Edit in song',
-  'edit-in-scripture': 'Edit in scripture',
+  // 34-07 (owner UAT F1): this key now opens the congregational-reading
+  // editor in place (a modal over the Slides tab), not a navigation away
+  // from it — 'edit-in-song' stays 'nav' below because IT still routes to
+  // the song editor. The label is relabelled to name what actually opens.
+  'edit-in-scripture': 'Edit scripture text',
   duplicate: 'Duplicate',
   delete: 'Delete Slide',
 }
 
 function menuItemToneFor(key: MenuItemKey): MenuItem['tone'] {
-  if (key === 'edit-in-song' || key === 'edit-in-scripture') return 'nav'
+  // 34-07: 'edit-in-scripture' no longer routes away — it opens an editor in
+  // place, so it takes the default tone like 'edit-details' rather than the
+  // navigation tone. 'edit-in-song' is unchanged: it still routes away.
+  if (key === 'edit-in-song') return 'nav'
   if (key === 'delete') return 'destructive'
   return 'default'
 }

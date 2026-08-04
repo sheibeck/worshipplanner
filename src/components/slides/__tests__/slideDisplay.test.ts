@@ -417,6 +417,32 @@ describe('slideDisplay', () => {
       ])
     })
 
+    // 34-07 (owner UAT F1): the scripture route's label/tone changed — it now
+    // opens an editor in place rather than routing away — but the key order
+    // is unchanged, and no item may mention a lyrics route it does not offer.
+    it('34-07: the scripture route item is labelled "Edit scripture text" with a default (non-nav) tone, key order unchanged', () => {
+      for (const canMutate of [true, false]) {
+        const entry = makeMenuEntry({ kind: 'scripture' })
+        const items = slideActionMenuItems(entry, 'SCRIPTURE', canMutate)
+        expect(items.map((item) => item.key)).toEqual(
+          canMutate ? ['edit-details', 'edit-in-scripture', 'duplicate', 'delete'] : ['edit-details', 'edit-in-scripture'],
+        )
+        const routeItem = items.find((item) => item.key === 'edit-in-scripture')
+        expect(routeItem?.label).toBe('Edit scripture text')
+        expect(routeItem?.tone).toBe('default')
+      }
+    })
+
+    it('34-07: no item returned for a scripture entry ever mentions lyrics, for either canMutate value', () => {
+      for (const canMutate of [true, false]) {
+        const entry = makeMenuEntry({ kind: 'scripture' })
+        const items = slideActionMenuItems(entry, 'SCRIPTURE', canMutate)
+        for (const item of items) {
+          expect(item.label).not.toMatch(/lyric/i)
+        }
+      }
+    })
+
     it('a hand-authored text entry with a defined body returns edit-details, edit-lyrics, duplicate, delete', () => {
       const entry = makeMenuEntry({ kind: 'text', body: 'Please stand.' })
       expect(keysOf(entry, 'PRAYER', true)).toEqual(['edit-details', 'edit-lyrics', 'duplicate', 'delete'])
@@ -495,10 +521,17 @@ describe('slideDisplay', () => {
       for (const item of items) {
         expect(['default', 'nav', 'destructive']).toContain(item.tone)
       }
-      const navItem = slideActionMenuItems(makeMenuEntry({ kind: 'scripture' }), 'SCRIPTURE', true).find(
-        (item) => item.key === 'edit-in-scripture',
-      )
-      expect(navItem?.tone).toBe('nav')
+      // 34-07: 'edit-in-scripture' no longer routes away — it opens an editor
+      // in place — so it now carries the default tone, not 'nav'.
+      // 'edit-in-song' still routes away and keeps the 'nav' tone.
+      const scriptureRouteItem = items.find((item) => item.key === 'edit-in-scripture')
+      expect(scriptureRouteItem?.tone).toBe('default')
+      const songNavItem = slideActionMenuItems(
+        makeMenuEntry({ kind: 'lyric', songId: 'song-1', sectionId: 'sec-1' }),
+        'SONG',
+        true,
+      ).find((item) => item.key === 'edit-in-song')
+      expect(songNavItem?.tone).toBe('nav')
       const deleteItem = items.find((item) => item.key === 'delete')
       expect(deleteItem?.tone).toBe('destructive')
     })

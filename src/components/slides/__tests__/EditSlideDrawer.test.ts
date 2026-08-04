@@ -615,7 +615,7 @@ describe('EditSlideDrawer (Phase 26-07 Task 1 — per-kind Slide Text)', () => {
   it.each([
     { name: 'lyric', fixtures: makeLyricFixtures(), expectedCaption: "From the song's Lyrics tab — editing there updates every service using this song." },
     { name: 'copyright', fixtures: makeCopyrightFixtures(), expectedCaption: "From the song's Lyrics tab — editing there updates every service using this song." },
-    { name: 'scripture', fixtures: makeScriptureFixtures(), expectedCaption: 'Pulled from the passage reference — editing the reference updates this slide.' },
+    { name: 'scripture', fixtures: makeScriptureFixtures(), expectedCaption: 'The passage reference drives this slide. Open the congregational-reading editor to fetch the passage and split it into Leader and Congregation parts.' },
     { name: 'imported (text)', fixtures: makeImportedTextFixtures(), expectedCaption: 'From the imported file — re-import to change it.' },
   ])('renders the matrix treatment and caption for a $name-kind entry', ({ fixtures, expectedCaption }) => {
     mountDrawer({ entry: fixtures.entry, assembledSlide: fixtures.assembledSlide, group: makeGroup({ slides: [fixtures.entry] }) })
@@ -643,6 +643,47 @@ describe('EditSlideDrawer (Phase 26-07 Task 1 — per-kind Slide Text)', () => {
     const { entry, assembledSlide } = makeScriptureFixtures()
     mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
     expect(body().find('[data-testid="drawer-slide-text-readonly"]').text()).toBe('For God so loved the world')
+  })
+
+  // 34-07 (owner UAT F1): the scripture branch's new route control — the
+  // slide's second route to the congregational-reading editor, converging
+  // with the 3-dot menu's `edit-in-scripture` on the same `SlidesTab`
+  // handler.
+  describe('34-07 — the drawer Slide Text route to the scripture editor', () => {
+    it('renders drawer-edit-scripture-text-btn for a scripture entry when the drawer can mutate, and emits edit-scripture-text once per click', async () => {
+      const { entry, assembledSlide } = makeScriptureFixtures()
+      const wrapper = mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }), isEditor: true })
+      const btn = body().find('[data-testid="drawer-edit-scripture-text-btn"]')
+      expect(btn.exists()).toBe(true)
+
+      await btn.trigger('click')
+      expect(wrapper.emitted('edit-scripture-text')).toHaveLength(1)
+
+      await btn.trigger('click')
+      expect(wrapper.emitted('edit-scripture-text')).toHaveLength(2)
+    })
+
+    it('renders no drawer-edit-scripture-text-btn when the drawer cannot mutate (viewer)', () => {
+      const { entry, assembledSlide } = makeScriptureFixtures()
+      mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }), isEditor: false })
+      expect(body().find('[data-testid="drawer-edit-scripture-text-btn"]').exists()).toBe(false)
+    })
+
+    it('renders no drawer-edit-scripture-text-btn when the drawer cannot mutate (locked service)', () => {
+      const { entry, assembledSlide } = makeScriptureFixtures()
+      mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }), isEditor: true, serviceLocked: true })
+      expect(body().find('[data-testid="drawer-edit-scripture-text-btn"]').exists()).toBe(false)
+    })
+
+    it('the scripture caption names the editor it opens AND fails a case-insensitive /lyric/ test, scoped to the caption element', () => {
+      const { entry, assembledSlide } = makeScriptureFixtures()
+      mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+      const caption = body().find('[data-testid="drawer-slide-text-caption"]').text()
+      expect(caption).toBe(
+        'The passage reference drives this slide. Open the congregational-reading editor to fetch the passage and split it into Leader and Congregation parts.',
+      )
+      expect(caption).not.toMatch(/lyric/i)
+    })
   })
 
   it('renders an imported slide whose resolved content is TEXT as read-only text (by its shared source kind)', () => {

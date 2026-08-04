@@ -158,6 +158,18 @@
                 data-testid="drawer-slide-text-readonly"
               >{{ scripturePassageText }}</p>
               <p class="mt-1 text-xs text-gray-500" data-testid="drawer-slide-text-caption">{{ SCRIPTURE_TEXT_CAPTION }}</p>
+              <!-- 34-07 (owner UAT F1): the route out of this read-only block
+                   — opens the congregational-reading editor (ServiceEditorView's
+                   modal, same relay the 3-dot menu's edit-in-scripture uses).
+                   No free-text scripture override; canMutate-gated like the
+                   drawer's other mutation controls. -->
+              <button
+                v-if="canMutate"
+                type="button"
+                class="mt-2 px-2.5 py-1 rounded-md text-xs font-medium border border-gray-700 text-gray-300 hover:bg-gray-800 transition-colors"
+                data-testid="drawer-edit-scripture-text-btn"
+                @click="emit('edit-scripture-text')"
+              >Edit scripture text</button>
             </template>
 
             <template v-else-if="sourceKind === 'imported'">
@@ -514,6 +526,14 @@ const emit = defineEmits<{
   duplicate: [entryId: string]
   /** Phase 33-07 — fired once per handled `pendingAction` nonce so the parent (which owns the pending state) can clear it. */
   'pending-action-consumed': []
+  /**
+   * 34-07 (owner UAT F1) — the Slide Text section's scripture-route control.
+   * Carries no payload: this drawer does not know the slot index, and must
+   * not invent one — `SlidesTab.vue` already owns `selectedSlotArrayIndex`
+   * and relays this into the same `requestEditInScripture()` the 3-dot
+   * menu's `edit-in-scripture` key calls.
+   */
+  'edit-scripture-text': []
 }>()
 
 const slideGroupsStore = useSlideGroups()
@@ -675,7 +695,15 @@ const importedText = computed(() => {
 // 8 removed the mockup's cut clause implying a per-service override — do not
 // reintroduce that clause here).
 const SONG_TEXT_CAPTION = "From the song's Lyrics tab — editing there updates every service using this song."
-const SCRIPTURE_TEXT_CAPTION = 'Pulled from the passage reference — editing the reference updates this slide.'
+/**
+ * 34-07 (owner UAT F1) — rewritten to name what the control below it opens:
+ * the passage reference drives this slide, and the congregational-reading
+ * editor is where the passage is fetched and split into Leader/Congregation
+ * parts. Never mentions a lyrics route — a scripture entry has never had
+ * one, and pointing at one is the exact confusion F1 reported.
+ */
+const SCRIPTURE_TEXT_CAPTION =
+  'The passage reference drives this slide. Open the congregational-reading editor to fetch the passage and split it into Leader and Congregation parts.'
 const IMPORTED_TEXT_CAPTION = 'From the imported file — re-import to change it.'
 
 // ── Phase 26-08: Slide Audio — loop and the video omission (D-10..D-12) ──
