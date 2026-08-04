@@ -1962,8 +1962,11 @@ describe('ServiceEditorView - congregational reading (34-07)', () => {
           SongBadge: true,
           SongSlotPicker: true,
           ScriptureInput: true,
-          // CongregationalEditor is deliberately NOT stubbed here — this
-          // block's whole point is to mount it for real.
+          // shallowMount auto-stubs EVERY child regardless of whether it's
+          // listed here — `CongregationalEditor: false` is what actually
+          // opts it out of that and mounts the real component, which this
+          // block's whole point requires.
+          CongregationalEditor: false,
           teleport: false,
         },
       },
@@ -2167,6 +2170,115 @@ describe('ServiceEditorView - congregational reading (34-07)', () => {
     await wrapper.vm.$nextTick()
 
     expect(wrapper.findAllComponents(CongregationalEditor)).toHaveLength(1)
+  })
+})
+
+// ── 34-07 Task 3 — WR-04 keyed-mount contract, proven by a slot-swap test ──
+// `CongregationalEditor.vue` seeds its editable state ONCE at setup and is
+// deliberately not reactive to a later prop change (34-06,
+// CongregationalEditor.vue:357-376's original contract comment, restated in
+// `PENDING-VERIFICATION.md` item 34.2). A parent that swaps which slot the
+// panel shows without forcing a fresh instance would silently misattribute a
+// save to the first slot the instance ever saw — no error, no warning, no
+// visual tell. This block exists because that failure is silent; a comment
+// asserting the `:key` is present is not evidence, a swap test is.
+describe('ServiceEditorView - WR-04 keyed mount (34-07 Task 3)', () => {
+  async function mountView() {
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          RouterLink: { template: '<a><slot /></a>' },
+          SaveStatusIndicator: false,
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+          // shallowMount auto-stubs EVERY child regardless of whether it's
+          // listed here — `CongregationalEditor: false` opts it out and
+          // mounts the real component, which the seeding-text and
+          // vm-identity assertions below both need.
+          CongregationalEditor: false,
+          teleport: false,
+        },
+      },
+    })
+  }
+
+  function body() {
+    return new DOMWrapper(document.body)
+  }
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockUpdateService.mockClear()
+  })
+
+  // Two SCRIPTURE slots (slot-1, slot-4 — both already present in
+  // mockService), each given its own reference and its own
+  // congregationalSections whose text is distinguishable between the two.
+  const twoReadingsService: Service = {
+    ...mockService,
+    slots: mockService.slots.map((slot) => {
+      if (slot.id === 'slot-1') {
+        return { ...slot, congregationalSections: [{ speaker: 'LEADER' as const, text: 'FIRST-SLOT-ONLY-TEXT' }] }
+      }
+      if (slot.id === 'slot-4') {
+        return {
+          ...slot,
+          book: 'John',
+          chapter: 3,
+          verseStart: 16,
+          verseEnd: 16,
+          congregationalSections: [{ speaker: 'LEADER' as const, text: 'SECOND-SLOT-ONLY-TEXT' }],
+        }
+      }
+      return slot
+    }),
+  }
+
+  it('a slot swap yields a fresh CongregationalEditor instance, re-seeds from the new slot, and a post-swap write lands on the second slot only', async () => {
+    mockServicesList = [twoReadingsService]
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    // Open the panel on the first slot (array index 1).
+    await wrapper.findComponent(SlidesTab).vm.$emit('navigate-to-scripture-editor', 1)
+    await wrapper.vm.$nextTick()
+    const firstPanelText = body().find('[data-testid="congregational-editor-panel"]').text()
+    expect(firstPanelText).toContain('FIRST-SLOT-ONLY-TEXT')
+    const firstVm = wrapper.findComponent(CongregationalEditor).vm
+
+    // Swap to the second slot (array index 4) — the misattribution guard.
+    await wrapper.findComponent(SlidesTab).vm.$emit('navigate-to-scripture-editor', 4)
+    await wrapper.vm.$nextTick()
+    const secondVm = wrapper.findComponent(CongregationalEditor).vm
+    expect(secondVm).not.toBe(firstVm)
+
+    // The seeding guard — the fresh instance really re-seeded from the new
+    // props, not retained once-at-setup state from the first slot.
+    const secondPanelText = body().find('[data-testid="congregational-editor-panel"]').text()
+    expect(secondPanelText).toContain('SECOND-SLOT-ONLY-TEXT')
+    expect(secondPanelText).not.toContain('FIRST-SLOT-ONLY-TEXT')
+
+    // The write-attribution guard — a post-swap update:sections lands on the
+    // SECOND slot only, leaving the first slot's sections byte-unchanged.
+    const editor = wrapper.findComponent(CongregationalEditor)
+    editor.vm.$emit('update:sections', [{ speaker: 'LEADER', text: 'UPDATED-SECOND-SLOT-TEXT' }])
+    await wrapper.vm.$nextTick()
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    await flushPromises()
+
+    const written = mockUpdateService.mock.calls
+      .map(([, patch]) => (patch as { slots?: Array<Record<string, unknown>> }).slots)
+      .filter((slots): slots is Array<Record<string, unknown>> => Array.isArray(slots))
+      .pop()
+    const slot1 = written?.find((s) => s.id === 'slot-1')
+    const slot4 = written?.find((s) => s.id === 'slot-4')
+    expect(slot4?.congregationalSections).toEqual([{ speaker: 'LEADER', text: 'UPDATED-SECOND-SLOT-TEXT' }])
+    expect(slot1?.congregationalSections).toEqual([{ speaker: 'LEADER', text: 'FIRST-SLOT-ONLY-TEXT' }])
   })
 })
 
