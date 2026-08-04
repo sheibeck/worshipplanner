@@ -4,15 +4,15 @@ milestone: v1.4
 milestone_name: Service and Slides
 current_phase: 36
 status: executing
-stopped_at: Completed 36-03-PLAN.md
-last_updated: "2026-08-04T04:10:42.512Z"
+stopped_at: Completed 36-04-PLAN.md
+last_updated: "2026-08-04T13:22:40.646Z"
 last_activity: 2026-08-03
 last_activity_desc: Completed 36-01-PLAN.md (SlideDropTarget clickable variant, SlideGrid import-button deletion, R053)
 progress:
   total_phases: 9
   completed_phases: 8
   total_plans: 57
-  completed_plans: 55
+  completed_plans: 56
   percent: 89
 current_phase_name: PowerPoint Server-Side Rendering
 ---
@@ -76,7 +76,7 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 ## Current Position
 
 Phase: 36 — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
 Last activity: 2026-08-03 — Completed 36-01-PLAN.md (SlideDropTarget clickable variant, SlideGrid import-button deletion, R053)
 
@@ -1058,6 +1058,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 36 P01 | 8min | 2 tasks | 4 files |
 | Phase 36 P02 | 20min | 2 tasks | 5 files |
 | Phase 36 P03 | 35min | 3 tasks | 4 files |
+| Phase 36 P04 | 25min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -1308,6 +1309,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 36-03: SlidesTab exposes canPresent/onPresentClick; header's Present handler is a zero-argument relay with no logic of its own, keeping R061's index math in one place
 - [Phase ?]: 36-03: preserved the live ungated export/copy visibility (36-02's recorded divergence) rather than 36-UI-SPEC's illustrative canEditService-gated version
 - [Phase ?]: 36-03: unstubbed ContextualActionBar across all 24 pre-existing ServiceEditorView.test.ts mountView helpers (one replace_all edit) rather than rewriting selectors — every pre-existing assertion passed unmodified
+- [Phase ?]: 36-04: addSlot gains additive targetSection param; section-band headers gain slide count + per-band Add item chip row; Task 1 unit-observable only via Task 2's UI (no defineExpose on ServiceEditorView)
 
 ### Roadmap Evolution
 
@@ -1369,6 +1371,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-04T04:10:42.471Z
-Stopped at: Completed 36-03-PLAN.md
+Last session: 2026-08-04T13:22:32.557Z
+Stopped at: Completed 36-04-PLAN.md
 Resume file: None

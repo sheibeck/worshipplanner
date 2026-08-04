@@ -265,7 +265,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 
 ### UI Rework
 
-- [ ] **R067** (primary-user-loop): The Service Order tab is rebuilt against Claude Design "Turn 3 —
+- [x] **R067** (primary-user-loop): The Service Order tab is rebuilt against Claude Design "Turn 3 —
       Service Order tab".
 
 - [x] **R068** (quality-attribute): Every tabbed screen shows only actions relevant to the open tab, via
@@ -336,7 +336,7 @@ Acknowledged, deferred, not in this roadmap.
 | R064 | Phase 34 | Complete — reachability gap closed by 34-07 (2026-08-03) |
 | R065 | Phase 35 | Complete |
 | R066 | Phase 35 | Complete |
-| R067 | Phase 36 | Pending |
+| R067 | Phase 36 | Complete |
 | R068 | Phase 36 | Complete |
 | R069 | Phase 36 | Complete |
 | R070 | Phase 34 | Complete |
