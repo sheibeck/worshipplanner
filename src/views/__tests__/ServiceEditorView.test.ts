@@ -1357,6 +1357,224 @@ describe('ServiceEditorView - Section headers and slideshow preview (Phase 20-04
   })
 })
 
+// ── Section-band headers: slide count + per-band add (36-04, R067) ─────────────
+
+describe('ServiceEditorView - section-band slide count and per-band add (36-04, R067)', () => {
+  async function mountView() {
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          // 36-03: Suggest/Export/Copy/Save/Present all moved into this real
+          // child component (ContextualActionBar.vue) — every mountView in
+          // this file must render it for real (`false` opts a component OUT
+          // of shallowMount's default auto-stub) or none of those controls'
+          // pre-existing testids/text are reachable in the DOM anymore.
+          ContextualActionBar: false,
+          RouterLink: { template: '<a><slot /></a>' },
+          SaveStatusIndicator: false,
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+          PresentationViewer: true,
+        },
+      },
+    })
+  }
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockServicesList = [buildSectionedService()]
+  })
+
+  function headerCountText(wrapper: Awaited<ReturnType<typeof mountView>>, key: string): string {
+    return wrapper.find(`[data-testid="section-slide-count-${key}"]`).text()
+  }
+
+  async function openBand(wrapper: Awaited<ReturnType<typeof mountView>>, key: string) {
+    await wrapper.find(`[data-testid="section-add-item-${key}"]`).trigger('click')
+    await wrapper.vm.$nextTick()
+  }
+
+  async function clickChip(wrapper: Awaited<ReturnType<typeof mountView>>, key: string, kind: string) {
+    await wrapper.find(`[data-testid="section-add-${kind}-${key}"]`).trigger('click')
+    await wrapper.vm.$nextTick()
+  }
+
+  it('all five band headers carry a label, a slide count and an add-item link for an editor on an unlocked service', async () => {
+    const wrapper = await mountView()
+
+    const headers = wrapper.findAll('[data-testid^="section-header-"]')
+    expect(headers).toHaveLength(5)
+    for (const key of ['pre-service', 'worship', 'message', 'sending', 'post-service']) {
+      const header = wrapper.find(`[data-testid="section-header-${key}"]`)
+      expect(header.exists()).toBe(true)
+      expect(header.find(`[data-testid="section-slide-count-${key}"]`).exists()).toBe(true)
+      expect(header.find(`[data-testid="section-add-item-${key}"]`).exists()).toBe(true)
+    }
+  })
+
+  it('still renders exactly 5 headers with a legacy ungrouped slot present, and the ungrouped bucket gets no count or add-item', async () => {
+    mockServicesList = [{
+      ...buildSectionedService(),
+      slots: [...buildSectionedService().slots, { kind: 'PRAYER', id: 'legacy-1', position: 4 }],
+    }]
+    const wrapper = await mountView()
+
+    expect(wrapper.findAll('[data-testid^="section-header-"]')).toHaveLength(5)
+    expect(wrapper.find('[data-testid="section-list-ungrouped"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="section-slide-count-ungrouped"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="section-add-item-ungrouped"]').exists()).toBe(false)
+  })
+
+  it('reads singular "1 slide" for worship and message, and "0 slides" for the sending band whose one slot contributes no assembled slide', async () => {
+    // buildSectionedService: worship = [SONG w/ songId but no lyrics loaded (0) + SCRIPTURE (1)] = 1;
+    // message = [MESSAGE (1)] = 1; sending = [SONG w/ no songId (0)] = 0 despite having one slot.
+    const wrapper = await mountView()
+
+    expect(headerCountText(wrapper, 'worship')).toBe('1 slide')
+    expect(headerCountText(wrapper, 'message')).toBe('1 slide')
+    expect(headerCountText(wrapper, 'sending')).toBe('0 slides')
+  })
+
+  it('reads plural "2 slides" for a band whose slots contribute more than one assembled slide', async () => {
+    // makeSectionedService's message band holds MESSAGE (1) + PRAYER (1) = 2.
+    mockServicesList = [makeSectionedService()]
+    const wrapper = await mountView()
+
+    expect(headerCountText(wrapper, 'message')).toBe('2 slides')
+  })
+
+  it('an empty band (pre-service, no slots in this fixture) still renders its header, a "0 slides" count, its add-item link, and the existing empty-band placeholder verbatim', async () => {
+    const wrapper = await mountView()
+
+    expect(wrapper.find('[data-testid="section-header-pre-service"]').exists()).toBe(true)
+    expect(headerCountText(wrapper, 'pre-service')).toBe('0 slides')
+    expect(wrapper.find('[data-testid="section-add-item-pre-service"]').exists()).toBe(true)
+    const placeholder = wrapper.find('[data-testid="section-empty-pre-service"]')
+    expect(placeholder.exists()).toBe(true)
+    expect(placeholder.text()).toContain('No items yet')
+    expect(placeholder.text()).toContain('Drag an item here, or set its Section to Pre-Service.')
+  })
+
+  it('clicking a band add-item link opens exactly 5 chips; clicking it again closes it; opening another band closes the first', async () => {
+    const wrapper = await mountView()
+
+    await openBand(wrapper, 'worship')
+    const menu = wrapper.find('[data-testid="section-add-menu-worship"]')
+    expect(menu.exists()).toBe(true)
+    expect(menu.findAll('button')).toHaveLength(5)
+
+    await openBand(wrapper, 'worship') // toggle closed
+    expect(wrapper.find('[data-testid="section-add-menu-worship"]').exists()).toBe(false)
+
+    await openBand(wrapper, 'worship')
+    await openBand(wrapper, 'sending') // opening sending closes worship
+    expect(wrapper.find('[data-testid="section-add-menu-worship"]').exists()).toBe(false)
+    expect(wrapper.findAll('[data-testid^="section-add-menu-"]')).toHaveLength(1)
+    expect(wrapper.find('[data-testid="section-add-menu-sending"]').exists()).toBe(true)
+  })
+
+  it('backstop: clicking worship\'s add-item then the Prayer chip lands the new slot in worship while the service\'s last slot (sending) is unchanged', async () => {
+    // buildSectionedService's last slot (slot-3) is in 'sending'.
+    const wrapper = await mountView()
+
+    const worshipBefore = wrapper.find('[data-testid="section-list-worship"]').findAll('.slot-item')
+    expect(worshipBefore).toHaveLength(2)
+
+    await openBand(wrapper, 'worship')
+    await clickChip(wrapper, 'worship', 'prayer')
+
+    const worshipAfter = wrapper.find('[data-testid="section-list-worship"]').findAll('.slot-item')
+    expect(worshipAfter).toHaveLength(3)
+    const sendingAfter = wrapper.find('[data-testid="section-list-sending"]').findAll('.slot-item')
+    expect(sendingAfter.map((c) => c.attributes('data-slot-id'))).toEqual(['slot-3'])
+    // the chip row closes itself after adding
+    expect(wrapper.find('[data-testid="section-add-menu-worship"]').exists()).toBe(false)
+  })
+
+  it('clicking a chip twice, reopening the row between clicks, adds exactly two slots', async () => {
+    const wrapper = await mountView()
+
+    await openBand(wrapper, 'sending')
+    await clickChip(wrapper, 'sending', 'song')
+    await openBand(wrapper, 'sending')
+    await clickChip(wrapper, 'sending', 'song')
+
+    const sendingCards = wrapper.find('[data-testid="section-list-sending"]').findAll('.slot-item')
+    // sending started with 1 slot (slot-3); +2 = 3
+    expect(sendingCards).toHaveLength(3)
+  })
+
+  it('two successive targeted adds into two different bands each land in their own band', async () => {
+    const wrapper = await mountView()
+
+    await openBand(wrapper, 'worship')
+    await clickChip(wrapper, 'worship', 'scripture')
+    await openBand(wrapper, 'sending')
+    await clickChip(wrapper, 'sending', 'hymn')
+
+    expect(wrapper.find('[data-testid="section-list-worship"]').findAll('.slot-item')).toHaveLength(3)
+    expect(wrapper.find('[data-testid="section-list-sending"]').findAll('.slot-item')).toHaveLength(2)
+  })
+
+  it('an empty band\'s add-item routes the new slot into that band as its only entry (E5)', async () => {
+    const wrapper = await mountView()
+    expect(wrapper.find('[data-testid="section-list-pre-service"]').findAll('.slot-item')).toHaveLength(0)
+
+    await openBand(wrapper, 'pre-service')
+    await clickChip(wrapper, 'pre-service', 'song')
+
+    const preServiceCards = wrapper.find('[data-testid="section-list-pre-service"]').findAll('.slot-item')
+    expect(preServiceCards).toHaveLength(1)
+    expect(wrapper.find('[data-testid="section-empty-pre-service"]').exists()).toBe(false)
+  })
+
+  it('locked service: no per-band add-item links or chip menus render, while every header, label and count still does', async () => {
+    mockServicesList = [{ ...buildSectionedService(), status: 'planned' }]
+    const wrapper = await mountView()
+
+    expect(wrapper.findAll('[data-testid^="section-add-item-"]')).toHaveLength(0)
+    expect(wrapper.findAll('[data-testid^="section-add-menu-"]')).toHaveLength(0)
+    expect(wrapper.findAll('[data-testid^="section-header-"]')).toHaveLength(5)
+    for (const key of ['pre-service', 'worship', 'message', 'sending', 'post-service']) {
+      expect(wrapper.find(`[data-testid="section-slide-count-${key}"]`).exists()).toBe(true)
+    }
+  })
+
+  it('viewer: no per-band add-item links or chip menus render, while every header, label and count still does', async () => {
+    mockAuthState.isEditor = false
+    const wrapper = await mountView()
+
+    expect(wrapper.findAll('[data-testid^="section-add-item-"]')).toHaveLength(0)
+    expect(wrapper.findAll('[data-testid^="section-add-menu-"]')).toHaveLength(0)
+    expect(wrapper.findAll('[data-testid^="section-header-"]')).toHaveLength(5)
+  })
+
+  it('re-rendering a band does not duplicate its header, its count or its add-item link (idempotency)', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.findAll('[data-testid="section-header-worship"]')).toHaveLength(1)
+    expect(wrapper.findAll('[data-testid="section-slide-count-worship"]')).toHaveLength(1)
+    expect(wrapper.findAll('[data-testid="section-add-item-worship"]')).toHaveLength(1)
+  })
+
+  it('drag-reorder is untouched by the header rebuild: the total slot-item count matches the fixture and every Sortable capture still targets a section-list container', async () => {
+    resetSortableCaptures()
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.findAll('.slot-item')).toHaveLength(buildSectionedService().slots.length)
+    expect(captureForSection('worship')).toBeDefined()
+    expect(captureForSection('sending')).toBeDefined()
+  })
+})
+
 // ── Slot id backfill on load (Phase 24-06 Task 1, R028) ─────────────────────────
 
 describe('ServiceEditorView - slot id backfill on load (Phase 24-06 Task 1)', () => {

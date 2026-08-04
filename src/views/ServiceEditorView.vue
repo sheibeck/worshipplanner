@@ -744,8 +744,35 @@
               class="section-header flex items-center gap-2 pt-3 pb-1 first:pt-0"
               :data-testid="`section-header-${group.key}`"
             >
-              <span class="text-xs font-semibold text-indigo-300 uppercase tracking-wider">{{ group.label }}</span>
-              <span class="flex-1 border-t border-gray-800"></span>
+              <span class="text-[11px] uppercase tracking-[.14em] text-indigo-300/80">{{ group.label }}</span>
+              <span class="h-px flex-1 bg-gradient-to-r from-gray-800 to-transparent"></span>
+              <span class="text-[11px] text-gray-500" :data-testid="`section-slide-count-${group.key}`">{{ sectionSlideCount(group.entries) }} {{ sectionSlideCount(group.entries) === 1 ? 'slide' : 'slides' }}</span>
+              <button
+                v-if="canEditService"
+                type="button"
+                class="text-[11.5px] font-medium text-indigo-400 hover:text-indigo-300"
+                :data-testid="`section-add-item-${group.key}`"
+                @click="toggleSectionAdd(group.key as ServiceSection)"
+              >＋ Add item</button>
+            </div>
+
+            <!-- Per-band inline add chip row (36-04, UI-SPEC §9 discretionary call: inline,
+                 not a popover). A sibling of BOTH the header above and the section list
+                 container below — never a member of either, so it never enters that
+                 section's Sortable instance. `group.key` is safely cast: this row only ever
+                 opens for a real section (`openSectionAddKey` is `ServiceSection | null` and
+                 is only ever set from the add-item button above, itself gated on
+                 `group.label`, i.e. never rendered for the trailing ungrouped bucket). -->
+            <div
+              v-if="canEditService && openSectionAddKey === group.key"
+              class="flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-gray-700 px-4 py-3"
+              :data-testid="`section-add-menu-${group.key}`"
+            >
+              <button type="button" class="rounded-md border border-gray-700 px-2 py-1 text-[11px] font-medium text-gray-300 hover:bg-gray-800 transition-colors" :data-testid="`section-add-song-${group.key}`" @click="addSlot('SONG', 2, group.key as ServiceSection); openSectionAddKey = null">Song</button>
+              <button type="button" class="rounded-md border border-gray-700 px-2 py-1 text-[11px] font-medium text-gray-300 hover:bg-gray-800 transition-colors" :data-testid="`section-add-scripture-${group.key}`" @click="addSlot('SCRIPTURE', undefined, group.key as ServiceSection); openSectionAddKey = null">Scripture</button>
+              <button type="button" class="rounded-md border border-gray-700 px-2 py-1 text-[11px] font-medium text-gray-300 hover:bg-gray-800 transition-colors" :data-testid="`section-add-prayer-${group.key}`" @click="addSlot('PRAYER', undefined, group.key as ServiceSection); openSectionAddKey = null">Prayer</button>
+              <button type="button" class="rounded-md border border-gray-700 px-2 py-1 text-[11px] font-medium text-gray-300 hover:bg-gray-800 transition-colors" :data-testid="`section-add-message-${group.key}`" @click="addSlot('MESSAGE', undefined, group.key as ServiceSection); openSectionAddKey = null">Message</button>
+              <button type="button" class="rounded-md border border-gray-700 px-2 py-1 text-[11px] font-medium text-gray-300 hover:bg-gray-800 transition-colors" :data-testid="`section-add-hymn-${group.key}`" @click="addSlot('HYMN', undefined, group.key as ServiceSection); openSectionAddKey = null">Hymn</button>
             </div>
 
             <!-- Section list container: always rendered — populated or not — so it is always a live
