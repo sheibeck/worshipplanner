@@ -141,7 +141,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
       group-wide audio is set only at group level. Per-slide audio remains. Supersedes the scope toggle
       shipped in **R030**.
 
-- [ ] **R070** (core-capability): A slide's resolved background image is displayed while presenting, not
+- [x] **R070** (core-capability): A slide's resolved background image is displayed while presenting, not
       only while authoring. The presented slide renders the single background the slide → group → song
       cascade already resolved (R055/R056/R057) — the presentation surface consumes that resolved value
       and never re-derives the cascade — with a legibility treatment so projected text stays readable
@@ -301,7 +301,7 @@ Acknowledged, deferred, not in this roadmap.
 | R067 | Phase 36 | Pending |
 | R068 | Phase 36 | Pending |
 | R069 | Phase 36 | Pending |
-| R070 | Phase 34 | Pending |
+| R070 | Phase 34 | Complete |
 
 **Coverage:**
 

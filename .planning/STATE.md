@@ -5,15 +5,15 @@ milestone_name: Service and Slides
 current_phase: 37
 current_phase_name: PowerPoint Server-Side Rendering
 status: verifying
-stopped_at: Completed 34-06-PLAN.md (gap-closure Task 2/12 of 12 planned; Phase 37 remains the tracked current phase; 34-07 mounts the editor next)
-last_updated: "2026-08-03T23:54:16.905Z"
+stopped_at: Completed 34-09-PLAN.md (R070 written to REQUIREMENTS.md/ROADMAP.md; background rendering shipped in PresentationViewer.vue, UAT F3 closed)
+last_updated: "2026-08-04T00:01:37.390Z"
 last_activity: 2026-08-03
 last_activity_desc: Phase 37 execution started
 progress:
   total_phases: 9
   completed_phases: 7
   total_plans: 52
-  completed_plans: 46
+  completed_plans: 47
   percent: 78
 ---
 
@@ -1028,6 +1028,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 37 P06 | 50min | 3 tasks | 3 files |
 | Phase 34 P05 | 55min | 3 tasks | 6 files |
 | Phase 34 P06 | 35min | 2 tasks | 2 files |
+| Phase 34 P09 | 25min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -1263,6 +1264,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 34-05: slideGroupMaterializer.ts needs no structural change for congregational sections — sections resolve live at assembly time, proven by executable test and git diff --exit-code rather than assumed
 - [Phase ?]: 34-06: CongregationalEditor.vue converted to a controlled prop/emit component (reference/sections in, update:sections/update:reference/close out) — no store, no auto-save, no save-status of its own; the rejected separate-ScriptureReading-document persistence model (useScriptureSlides) is fully removed from this file
 - [Phase ?]: 34-06: draftSections/referenceText seeded once at setup from props, not reactive to later prop changes — carries forward the pre-existing WR-04 keyed-mount contract into 34-07's mount point
+- [Phase ?]: R070 written as a NEW requirement (not folded under R055/R056) — owner UAT F3 exposed that R055/R056 only ever described SETTING a background, never rendering it while presenting
+- [Phase ?]: PresentationViewer's currentBackgroundUrl consumes the single already-resolved slide.backgroundImageUrl with zero re-derivation (no group/song lookup, no branch on backgroundSource) — negative-grep enforced to avoid the two-disagreeing-fields defect class hit twice before
 
 ### Roadmap Evolution
 
@@ -1324,6 +1327,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-03T23:54:16.861Z
-Stopped at: Completed 34-06-PLAN.md (gap-closure Task 2/12 of 12 planned; Phase 37 remains the tracked current phase; 34-07 mounts the editor next)
+Last session: 2026-08-04T00:01:37.353Z
+Stopped at: Completed 34-09-PLAN.md (R070 written to REQUIREMENTS.md/ROADMAP.md; background rendering shipped in PresentationViewer.vue, UAT F3 closed)
 Resume file: None
