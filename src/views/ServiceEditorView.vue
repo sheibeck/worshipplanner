@@ -231,10 +231,38 @@
         </div>
 
         <!-- 32-05/32-UI-SPEC § 3: sticky save-status bar, mutually exclusive
-             with the lock banner below (canEditService vs isLocked). -->
+             with the lock banner below (canEditService vs isLocked).
+
+             34-10 (UAT F4) — repro: mark the service Planned, reopen it for
+             editing, land on this element rendered with a full border/
+             background/padding and nothing inside it (SaveStatusIndicator's
+             idle branch renders nothing) — an empty bordered box pinned to
+             the top of the scrollport.
+
+             Rule being honored: 31-UI-SPEC E5, "don't render an empty box",
+             already applied here by SlideGrid.vue:68-73 and :84-90 via
+             `v-if` on the wrapper.
+
+             Why THIS wrapper diverges from that mechanism: it contains the
+             aria-live region below. Assistive technology announces
+             MUTATIONS to a region it is already monitoring, not content a
+             region was created already holding — unmounting this wrapper at
+             idle (the v-if approach) would cost the first status
+             announcement of every session, a real R041 regression traded
+             for a cosmetic fix. So `v-if="canEditService"` stays (a viewer
+             or a locked service still renders nothing here — a permission
+             concern, not a status one), and instead only the CHROME is
+             conditional on `serviceSaveStatusVisible`: at idle the element
+             carries no classes at all — no border, no background, no
+             padding, no margin, no sticky positioning — an empty block
+             element around an empty block element, contributing zero
+             height. The box is the chrome; removing the chrome removes the
+             box and keeps the region mounted. -->
         <div
           v-if="canEditService"
-          class="sticky top-0 z-10 mb-3 flex items-center gap-2 rounded-md border border-gray-800 bg-gray-900 px-4 py-2"
+          :class="serviceSaveStatusVisible
+            ? 'sticky top-0 z-10 mb-3 flex items-center gap-2 rounded-md border border-gray-800 bg-gray-900 px-4 py-2'
+            : ''"
           data-testid="service-save-status-bar"
         >
           <SaveStatusIndicator :surface-id="`service:${serviceId}`" />
@@ -1303,7 +1331,7 @@ import { useSongStore } from '@/stores/songs'
 import { useRosterStore } from '@/stores/roster'
 import { useQuartersStore } from '@/stores/quarters'
 import { useSlideGroups } from '@/stores/slideGroups'
-import { useSaveStatus } from '@/stores/saveStatus'
+import { useSaveStatus, hasVisibleSaveStatus } from '@/stores/saveStatus'
 import { slotLabel, createSlot, reindexSlots, backfillSlotIds, groupBySection, flattenBySection, orderSlotsBySection } from '@/utils/slotTypes'
 import { scripturesOverlap, scriptureRefFromSlot, formatScriptureReference } from '@/utils/scripture'
 import { getPrimaryKey } from '@/utils/songSearch'
@@ -1963,6 +1991,13 @@ const recentScriptureRefs = computed<ScriptureRef[]>(() => {
 // Declared before the remote-merge watcher below, whose immediate guard reads
 // autoSave.status.value on first run.
 const surfaceId = computed(() => `service:${serviceId.value}`)
+
+// 34-10 (UAT F4): decides whether the sticky save-status bar's CHROME shows,
+// not whether the bar exists at all — see the wrapper's own comment in the
+// template for why those are different gates.
+const serviceSaveStatusVisible = computed(() =>
+  hasVisibleSaveStatus(saveStatus.entryFor(surfaceId.value)),
+)
 
 const autoSave = useAutoSave(
   localService,

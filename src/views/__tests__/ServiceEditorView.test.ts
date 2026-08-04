@@ -13,7 +13,7 @@ import SlidesTab from '@/components/slides/SlidesTab.vue'
 // 32-05: ServiceEditorView now consumes the REAL, Firestore-free useSaveStatus
 // store directly (not vi.mock-ed) — the same new-precedent choice 32-03/32-04
 // already made for their own store/component tests.
-import { useSaveStatus } from '@/stores/saveStatus'
+import { useSaveStatus, GENERIC_ERROR_TEXT } from '@/stores/saveStatus'
 
 // Every test in this file mounts ServiceEditorView (a large component with a
 // live autosave debounce timer + Sortable instance) but historically never
@@ -3059,6 +3059,49 @@ describe('ServiceEditorView - service lifecycle transitions (R036, R037)', () =>
     // The retired tooltip named a control that no longer exists.
     expect(suggestBtn!.attributes('title')).not.toContain('cycle badge')
   })
+
+  // ── 34-10 (UAT F4): the exact reproduction path the owner walked ────────────
+  //
+  // "When I marked as planned, then re-open for editing, this panel gets left
+  // at the top of the screen and it's now empty since we're no longer
+  // locked." This must walk the REAL transitions, not merely assert idle
+  // strips the chrome in isolation.
+  it('mark as planned, then reopen, leaves the save-status bar with no chrome classes', async () => {
+    mockServicesList = [{ ...mockService, status: 'draft' }]
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    await wrapper.find('[data-testid="mark-planned-btn"]').trigger('click')
+    await flushPromises()
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('[data-testid="service-status-pill"]').text()).toContain('Planned')
+    expect(wrapper.find('[data-testid="service-save-status-bar"]').exists()).toBe(false)
+
+    await wrapper.find('[data-testid="reopen-service-btn"]').trigger('click')
+    await flushPromises()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('[data-testid="service-status-pill"]').text()).toContain('Draft')
+    const bar = wrapper.find('[data-testid="service-save-status-bar"]')
+    expect(bar.exists()).toBe(true)
+    expect(bar.classes()).toEqual([])
+  })
+
+  it('a locked service renders the lock banner and no save-status bar; a viewer renders neither', async () => {
+    mockServicesList = [{ ...mockService, status: 'planned' }]
+    const lockedWrapper = await mountView()
+    await lockedWrapper.vm.$nextTick()
+
+    expect(lockedWrapper.find('[data-testid="service-lock-banner"]').exists()).toBe(true)
+    expect(lockedWrapper.find('[data-testid="service-save-status-bar"]').exists()).toBe(false)
+
+    mockAuthState.isEditor = false
+    const viewerWrapper = await mountView()
+    await viewerWrapper.vm.$nextTick()
+
+    expect(viewerWrapper.find('[data-testid="service-lock-banner"]').exists()).toBe(false)
+    expect(viewerWrapper.find('[data-testid="service-save-status-bar"]').exists()).toBe(false)
+  })
 })
 
 // ── 31-04: the three tabs go read-only when the service is locked (R036) ──────
@@ -4017,6 +4060,75 @@ describe('ServiceEditorView - 32-05: migrated onto useAutoSave/useSaveStatus, st
     await wrapper.vm.$nextTick()
 
     expect(wrapper.find('[data-testid="service-save-status-bar"]').exists()).toBe(false)
+  })
+
+  // ── Chrome visibility (34-10 / UAT F4) ──────────────────────────────────────
+  //
+  // The bar element itself stays mounted for an editor (v-if="canEditService"
+  // is untouched); only its CHROME — border, background, padding, margin,
+  // sticky positioning — is conditional on whether there is a status to
+  // report. Idle carries no classes at all, so nothing is pinned to the top
+  // of the scrollport and nothing occupies vertical space.
+
+  it('an editor on an unedited draft service sees the bar element with no chrome classes at all', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const bar = wrapper.find('[data-testid="service-save-status-bar"]')
+    expect(bar.exists()).toBe(true)
+    expect(bar.classes()).toEqual([])
+  })
+
+  for (const status of ['pending', 'saving', 'saved', 'error'] as const) {
+    it(`status "${status}": the bar carries its full chrome class list`, async () => {
+      const wrapper = await mountView()
+      await wrapper.vm.$nextTick()
+
+      useSaveStatus().set('service:service-1', { status, errorText: status === 'error' ? GENERIC_ERROR_TEXT : undefined })
+      await wrapper.vm.$nextTick()
+
+      const bar = wrapper.find('[data-testid="service-save-status-bar"]')
+      expect(bar.classes()).toEqual(
+        expect.arrayContaining(['sticky', 'top-0', 'z-10', 'rounded-md', 'border', 'border-gray-800', 'bg-gray-900']),
+      )
+    })
+  }
+
+  it('going from saved back to idle strips the chrome again', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    useSaveStatus().set('service:service-1', { status: 'saved', savedAt: new Date() })
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('[data-testid="service-save-status-bar"]').classes().length).toBeGreaterThan(0)
+
+    useSaveStatus().set('service:service-1', { status: 'idle' })
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('[data-testid="service-save-status-bar"]').classes()).toEqual([])
+  })
+
+  it('the aria-live element is the SAME DOM node across idle -> pending -> saving -> saved, with changing text', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const idleNode = wrapper.find('[data-testid="save-status"]').element
+    expect(wrapper.find('[data-testid="save-status"]').text()).toBe('')
+
+    useSaveStatus().set('service:service-1', { status: 'pending' })
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('[data-testid="save-status"]').element).toBe(idleNode)
+    expect(wrapper.find('[data-testid="save-status"]').text()).toBe('Saving soon…')
+
+    useSaveStatus().set('service:service-1', { status: 'saving' })
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('[data-testid="save-status"]').element).toBe(idleNode)
+    expect(wrapper.find('[data-testid="save-status"]').text()).toBe('Saving…')
+
+    const savedAt = new Date()
+    useSaveStatus().set('service:service-1', { status: 'saved', savedAt })
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('[data-testid="save-status"]').element).toBe(idleNode)
+    expect(wrapper.find('[data-testid="save-status"]').text()).toContain('Saved')
   })
 
   it('the header Save area keeps Undo, Suggest All Songs, Mark as Planned and Export/Copy once the inline status block is removed', async () => {
