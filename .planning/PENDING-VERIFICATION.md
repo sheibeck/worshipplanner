@@ -321,6 +321,10 @@ self-approved.
   is honored: the modal is mounted `:key="congregationalSlot.id"`, proven by a dedicated slot-swap test
   (`ServiceEditorView.test.ts` — "WR-04 keyed mount (34-07 Task 3)") that asserts a fresh component
   instance, correct re-seeding, and correct write attribution after the swap. See `34-07-SUMMARY.md`.
+  **The 2026-08-03 owner decision that produced this mount seam, stated explicitly:** the scripture
+  slide's own edit route opens `CongregationalEditor`; no free-text scripture override was added
+  anywhere — the owner was shown the shadow-copy tension a free-text field would create and declined
+  it, so the only route to slide text remains fetch-then-split inside the editor itself.
   ~~No route, no parent component, no dynamic import references it anywhere outside its own
   test file — so as of this plan, no user can reach either the manual congregational-reading editor or
   the AI split added on top of it. This makes ROADMAP success criterion 1 ("A scripture item can be
@@ -342,6 +346,32 @@ self-approved.
   must mount it keyed on `readingId` (e.g. `:key="readingId"`) so a record swap forces a fresh
   instance; reusing one mounted instance across different `readingId` values is not a supported usage and
   will silently misattribute later saves to the first reading the instance ever saw.~~
+
+The four items below are new, opened by 34-08's phase gate. Each is deferred under the standing
+autonomy grant and explicitly **not** self-approved — none checks a box this run cannot actually verify.
+
+- ☐ **34.3** **The now-reachable feature (34-07's R064 close, end to end).** Open a draft service,
+  reach the congregational panel from a scripture slide by BOTH routes (the 3-dot menu and the drawer's
+  Slide Text section), build a reading by hand and with the AI split, present the service, and confirm
+  the Leader/Congregation layout projects correctly and legibly. Also confirm that changing the passage
+  on a slot that already has a reading clears it as intended rather than surprising the user.
+
+- ☐ **34.4** (from 34-09 / UAT F3) **Background scrim legibility on a real projector.** Set a
+  background on a group, present the service, and confirm the image appears behind every slide of that
+  group and that the projected words stay readable over it on a real projector. The scrim opacity
+  (`bg-black/50`) is the knob to revisit if they do not.
+
+- ☐ **34.5** (from 34-11 / UAT F2) **The merged group-media panel reads as one panel.** Confirm the
+  merged group-media panel reads as one panel rather than two rows in a box, and that a locked service
+  still shows what it has without an empty box.
+
+- ☐ **34.6** (from 34-12 / UAT F5) **The org document's actual Planning Center credential fields.**
+  Open the Firebase console for this organization's document and confirm whether the `pcAppId` and
+  `pcSecret` fields exist and are non-empty. **Report presence or absence only — never the values.**
+  This is the half of the F5 diagnosis that cannot be observed from a test environment, and it decides
+  whether the symptom was cause 1 (no credentials configured) or something else. 34-12 Task 1's verdict
+  (the reactivity self-heal test) already settled cause 2 (a load-order/reactivity regression) as
+  unlikely — this item settles the remaining half.
 
 ---
 
