@@ -2572,15 +2572,43 @@ function toggleTeam(team: string) {
 
 // ── Dynamic slot add/remove ────────────────────────────────────────────────────
 
-function addSlot(kind: SlotKind, vwType?: VWType) {
+/** Per-band assembled-slide count for a section-band header's "{n} slides" caption
+ *  (36-04, UI-SPEC §9). Deliberately mirrors `SlidePlanRail.vue`'s own per-row
+ *  derivation — filtering `assembledSlideshow` by `AssembledSlide.slotIndex` — rather
+ *  than reading `group.slides.length` off a `SlideGroup` document, because an
+ *  unmaterialized group reads zero slides there while the grid (and this count)
+ *  show the full fallback-path group. Takes the band's own `entries` (the same
+ *  `{ slot, index }[]` shape `slotSectionGroups` already produces) rather than a bare
+ *  `ServiceSection` key — same output as UI-SPEC §9's illustrative
+ *  `sectionSlideCount(group.key)`, without re-deriving the section-to-slots mapping
+ *  `slotSectionGroups` already computed. Builds one `Set` of the band's indices and
+ *  filters once, rather than calling `.filter` per entry. */
+function sectionSlideCount(entries: { slot: ServiceSlot; index: number }[]): number {
+  const indices = new Set(entries.map((entry) => entry.index))
+  return assembledSlideshow.value.filter((s) => indices.has(s.slotIndex)).length
+}
+
+/** 36-04 — which band's inline "＋ Add item" chip row is open (Task 2's UI). UI
+ *  state only; performs no writes. */
+const openSectionAddKey = ref<ServiceSection | null>(null)
+function toggleSectionAdd(key: ServiceSection): void {
+  openSectionAddKey.value = openSectionAddKey.value === key ? null : key
+}
+
+function addSlot(kind: SlotKind, vwType?: VWType, targetSection?: ServiceSection) {
   if (!canEditService.value) return
   if (!localService.value) return
   // New slot inherits the current last slot's section — on a fully sectioned
   // service it lands at the end of that section rather than in the ungrouped
   // bucket. `createSlot` omits the `section` key entirely when this is
   // `undefined` (a legacy, section-less service), preserving today's shape.
+  // 36-04: an explicit `targetSection` (passed by a per-band "＋ Add item" chip)
+  // bypasses that inherit-from-last-slot fallback entirely — this is what makes a
+  // per-band add land correctly even into an EMPTY band, which has no "last slot
+  // in this section" to inherit from.
   const currentSlots = localService.value.slots
-  const newSlot = createSlot(kind, vwType, currentSlots[currentSlots.length - 1]?.section)
+  const section = targetSection ?? currentSlots[currentSlots.length - 1]?.section
+  const newSlot = createSlot(kind, vwType, section)
   localService.value.slots.push(newSlot)
   localService.value.slots = reindexSlots(orderSlotsBySection(localService.value.slots))
   showAddMenu.value = false
