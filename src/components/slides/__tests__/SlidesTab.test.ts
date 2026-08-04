@@ -511,30 +511,56 @@ describe('SlidesTab', () => {
     })
   })
 
-  describe('Present CTA (D-05, Phase 27-05, WR-01)', () => {
-    it('renders the Present button', () => {
+  describe('Present CTA (D-05, Phase 27-05, WR-01) — relocated to the header in 36-03', () => {
+    // MOVED-CONTROL: 36-03 deletes this component's own Present button and
+    // relocates it into ServiceEditorView's header, driven via `slidesTabRef`.
+    // The condition, the emit and the payload are all identical — only the
+    // render site changed — so these assertions now target the exposed API
+    // (`canPresent`/`onPresentClick`) instead of a DOM click on the old CTA.
+    function exposedVm(wrapper: ReturnType<typeof mountTab>) {
+      return wrapper.vm as unknown as { canPresent: boolean; onPresentClick: () => void }
+    }
+
+    it('renders no Present button of its own — the control moved to the page header', () => {
       const wrapper = mountTab({ slots: [] })
-      expect(wrapper.find('[data-testid="present-slideshow-cta"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="present-slideshow-cta"]').exists()).toBe(false)
     })
 
-    it('disables the Present button when there are no assembled slides, and enables it once there are', async () => {
+    it('canPresent is false with no assembled slides, and true once there are', async () => {
       const wrapper = mountTab({ slots: [], assembledSlideshow: [] })
       await wrapper.vm.$nextTick()
-      expect(wrapper.find('[data-testid="present-slideshow-cta"]').attributes('disabled')).toBeDefined()
+      expect(exposedVm(wrapper).canPresent).toBe(false)
 
       await wrapper.setProps({ assembledSlideshow: [makeAssembled(0, 'slide-1')] })
       await wrapper.vm.$nextTick()
-      expect(wrapper.find('[data-testid="present-slideshow-cta"]').attributes('disabled')).toBeUndefined()
+      expect(exposedVm(wrapper).canPresent).toBe(true)
     })
 
-    it('emits present exactly once when clicked while enabled', async () => {
+    it('onPresentClick() emits present exactly once', async () => {
       const wrapper = mountTab({ slots: [], assembledSlideshow: [makeAssembled(0, 'slide-1')] })
       await wrapper.vm.$nextTick()
 
-      await wrapper.find('[data-testid="present-slideshow-cta"]').trigger('click')
+      exposedVm(wrapper).onPresentClick()
 
       expect(wrapper.emitted('present')).toBeTruthy()
       expect(wrapper.emitted('present')).toHaveLength(1)
+    })
+
+    it('exposes the four pre-existing members alongside the two new ones', () => {
+      const wrapper = mountTab({ slots: [] })
+      const vm = wrapper.vm as unknown as Record<string, unknown>
+      expect(vm.selectedSlotId).toBeDefined()
+      expect(vm.selectedSlideId).toBeDefined()
+      expect(vm.requestEditInScripture).toBeDefined()
+      expect(vm.selectSlideById).toBeDefined()
+      expect(vm.canPresent).toBeDefined()
+      expect(vm.onPresentClick).toBeDefined()
+    })
+
+    it('the rail and grid still render — the deleted wrapper was the tab root\'s only other child', () => {
+      const wrapper = mountTab({ slots: [] })
+      expect(wrapper.find('[data-testid="slides-tab"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="slides-tab-content"]').exists()).toBe(true)
     })
   })
 
@@ -563,11 +589,13 @@ describe('SlidesTab', () => {
       return mountTab({ slots, assembledSlideshow, active: true })
     }
 
-    /** Clicks the CTA and returns the payload of the LATEST `present` emit —
-     * the only public surface `presentStartIndex` has (it is deliberately
-     * not in `defineExpose`). */
+    /** MOVED-CONTROL (36-03): calls the exposed `onPresentClick()` instead of
+     * clicking the now-deleted CTA, and returns the payload of the LATEST
+     * `present` emit — the only public surface `presentStartIndex` has (it
+     * is deliberately not in `defineExpose`). */
     async function presentPayload(wrapper: ReturnType<typeof mountWithSelection>): Promise<number> {
-      await wrapper.find('[data-testid="present-slideshow-cta"]').trigger('click')
+      ;(wrapper.vm as unknown as { onPresentClick: () => void }).onPresentClick()
+      await wrapper.vm.$nextTick()
       const emitted = wrapper.emitted('present')
       return (emitted?.[emitted.length - 1] as [number])[0]
     }
@@ -648,14 +676,15 @@ describe('SlidesTab', () => {
       expect(await presentPayload(wrapper)).toBe(6)
     })
 
-    it('clicking present-slideshow-cta emits present with the computed start index as its payload', async () => {
+    it('calling onPresentClick() emits present with the computed start index as its payload', async () => {
+      // MOVED-CONTROL (36-03): was a DOM click on the deleted CTA.
       const wrapper = mountWithSelection()
       await wrapper.vm.$nextTick()
-      const vm = wrapper.vm as unknown as { selectedSlideId: string | null }
+      const vm = wrapper.vm as unknown as { selectedSlideId: string | null; onPresentClick: () => void }
       vm.selectedSlideId = 'g1-2'
       await wrapper.vm.$nextTick()
 
-      await wrapper.find('[data-testid="present-slideshow-cta"]').trigger('click')
+      vm.onPresentClick()
 
       expect(wrapper.emitted('present')?.[0]).toEqual([3])
     })
@@ -1051,9 +1080,11 @@ describe('SlidesTab - lifecycle lock threading (R036)', () => {
     expect(wrapper.findComponent(EditSlideDrawer).props('isEditor')).toBe(true)
   })
 
-  it('D-08: Present stays enabled while locked — it is not an editing action', () => {
+  it('D-08: canPresent stays true while locked — Present is not an editing action', () => {
+    // MOVED-CONTROL (36-03): the CTA and its `disabled` attribute no longer
+    // render here; `serviceLocked` never fed `canPresent`'s condition either
+    // way, so the assertion moves to the exposed boolean the header now reads.
     const wrapper = mountLockedTab(true)
-    const cta = wrapper.get('[data-testid="present-slideshow-cta"]')
-    expect(cta.attributes('disabled')).toBeUndefined()
+    expect((wrapper.vm as unknown as { canPresent: boolean }).canPresent).toBe(true)
   })
 })

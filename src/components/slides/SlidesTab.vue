@@ -1,26 +1,5 @@
 <template>
   <div class="flex h-full min-h-0 flex-col" data-testid="slides-tab">
-    <!-- Present entry point (D-05, Phase 27-05): the only trigger for
-         Phase 23's PresentationViewer since SlideshowPreview was removed
-         from the Service Order tab. Mirrors the mockup's page-header
-         treatment (docs/design/slides-tab.dc.html) — a bordered, low-emphasis
-         "▶ Present" button — but lives on this tab since presenting now
-         belongs alongside the slide content it presents. Disabled/enabled
-         state follows the same canPresent/hasAnySlides condition
-         SlideshowPreview's own present control used (Phase 23-04): whether
-         there is anything assembled to present at all. -->
-    <div class="flex items-center justify-end gap-2 border-b border-gray-800 px-3 py-2 flex-none">
-      <button
-        type="button"
-        data-testid="present-slideshow-cta"
-        :disabled="!canPresent"
-        :title="canPresent ? undefined : 'Add songs or scripture to build a slideshow to present.'"
-        class="inline-flex items-center gap-1.5 rounded-md border border-indigo-400/60 px-3 py-1.5 text-xs font-medium text-indigo-300 transition-colors hover:bg-indigo-500/10 disabled:cursor-not-allowed disabled:opacity-50"
-        @click="onPresentClick"
-      >
-        <span aria-hidden="true">&#9654;</span> Present
-      </button>
-    </div>
     <div class="flex flex-1 min-h-0">
       <SlidePlanRail
         :slots="slots"
@@ -203,6 +182,12 @@ const editSlideDrawerRef = ref<InstanceType<typeof EditSlideDrawer> | null>(null
  * 23-04) used, restated directly against `assembledSlideshow` rather than
  * reintroducing the `AssembledSection[]` grouping that only existed to
  * render the removed preview list.
+ *
+ * Phase 36-03 (design 1a): the `▶ Present` button this gates now renders in
+ * `ServiceEditorView`'s page header, immediately left of Save, instead of
+ * inside this tab. This component still owns the condition and the `present`
+ * emit below — only the rendered button moved. Exposed (with
+ * `onPresentClick`) so the header can read/drive both from a `slidesTabRef`.
  */
 const canPresent = computed(() => props.assembledSlideshow.length > 0)
 
@@ -521,5 +506,12 @@ function onMenuAction(slideId: string, key: MenuItemKey): void {
   }
 }
 
-defineExpose({ selectedSlotId, selectedSlideId, requestEditInScripture, selectSlideById })
+defineExpose({
+  selectedSlotId,
+  selectedSlideId,
+  requestEditInScripture,
+  selectSlideById,
+  canPresent,
+  onPresentClick,
+})
 </script>
