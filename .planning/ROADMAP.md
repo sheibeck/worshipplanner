@@ -303,7 +303,7 @@ Plans:
   1. The Service Order tab matches the Claude Design "Turn 3 — Service Order tab" wireframes
   2. Every tabbed screen (Service Order, Slides, Roles) shows only the actions relevant to that tab through one shared contextual action-bar pattern — "Suggest All Songs"/"Copy to PC" no longer appear on the Slides or Roles tabs
   3. The Present button appears in the position specified by design "1a Plan rail · slide grid · Edit Slide drawer — two states"
-  4. "Add slide" and "Add music to this group" live in the contextual action bar, and a group's own drag-and-drop zone doubles as the import affordance — the separate "Import into this Group" button is gone
+  4. "Add slide" lives in the contextual action bar, and a group's own drag-and-drop zone doubles as the import affordance — the separate "Import into this Group" button is gone. *(Corrected 2026-08-03 by 36-UI-SPEC: the "Add music to this group" clause is **superseded**. Design "1a" shows group music as its own inline panel, never in a bar, and owner UAT finding F2 — landed as `34-11` — explicitly asked for group music and background to sit together in one panel. R053 corrected in REQUIREMENTS.md with the same evidence.)*
   5. The Roles tab is last in the tab order
 
 **Plans**: TBD

@@ -132,8 +132,19 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
       drawers, replacing the arrow affordance and the multi-tab single drawer.
 
 - [ ] **R053** (quality-attribute): The group's drag-and-drop zone doubles as the import affordance when
-      clicked; the separate "Import into this Group" button is removed. "Add slide" and "Add music to
-      this group" move into the contextual action bar (R068).
+      clicked; the separate "Import into this Group" button is removed. "Add slide" moves into the
+      contextual action bar (R068).
+      **Correction (2026-08-03, Phase 36 UI-SPEC):** the "Add music to this group" clause is
+      **superseded by owner UAT finding F2** (`34-11-PLAN.md`, commits `98fdd29`/`2938d01`), which
+      merged group music and group background into one panel in `SlideGrid.vue`
+      (`slide-grid-group-media-panel`) in direct response to the owner reading the two controls as
+      "two unrelated sections" when separated. The re-pulled wireframe (`docs/design/slides-tab.dc.html`,
+      "1a Plan rail · slide grid · Edit Slide drawer") shows group music as its own inline panel below
+      the grid header — not inside any action bar — and shows no background-image feature anywhere
+      (confirmed absent, `docs/design/README.md`). Pulling music back out into the action bar would
+      re-fragment the exact pairing the owner asked to have merged, on the strength of a mockup that
+      does not itself show the bar placement. **Group music and group background stay together in the
+      existing merged panel; only "Add slide" moves into the action bar.**
 
 - [x] **R054** (core-capability): Song groups are read-only in the Slides tab — no create, update,
       delete, or reorder of their slides. Songs are edited only from the Song Lyrics screen, keeping the
