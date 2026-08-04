@@ -1150,39 +1150,18 @@
           </template>
         </div>
 
-        <!-- Add Element button + menu: editor only, hidden while locked. CLASS A.
-             The tab does not read as broken with it gone — the sticky lock
-             banner is in view at every scroll position and says why. -->
-        <div v-if="canEditService" class="mt-2 relative">
-          <button
-            type="button"
-            @click="showAddMenu = !showAddMenu"
-            class="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-gray-300 bg-gray-900 hover:bg-gray-800 transition-colors border border-gray-700 border-dashed"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-            </svg>
-            Add Element
-          </button>
-
-          <!-- Click-away backdrop -->
-          <div
-            v-if="showAddMenu"
-            class="fixed inset-0 z-10"
-            @click="showAddMenu = false"
-          ></div>
-
-          <!-- Dropdown menu (opens upward) -->
-          <div
-            v-if="showAddMenu"
-            class="absolute left-0 bottom-full mb-1 w-44 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-20 overflow-hidden"
-          >
-            <button type="button" @click="addSlot('SONG', 2)" class="px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 w-full text-left transition-colors">Song</button>
-            <button type="button" @click="addSlot('SCRIPTURE')" class="px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 w-full text-left transition-colors">Scripture Reading</button>
-            <button type="button" @click="addSlot('PRAYER')" class="px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 w-full text-left transition-colors">Prayer</button>
-            <button type="button" @click="addSlot('MESSAGE')" class="px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 w-full text-left transition-colors">Message</button>
-            <button type="button" @click="addSlot('HYMN')" class="px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 w-full text-left transition-colors">Hymn</button>
-          </div>
+        <!-- Add-to-service palette: editor only, hidden while locked. CLASS A.
+             36-05: replaces the old Add Element dropdown with a single-state dashed
+             chip row (UI-SPEC §8) — no open/closed state, every chip directly
+             clickable. The tab does not read as broken with it gone while locked —
+             the sticky lock banner is in view at every scroll position and says why. -->
+        <div v-if="canEditService" class="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-gray-700 px-4 py-3" data-testid="add-to-service-palette">
+          <span class="text-[11px] text-indigo-400">＋ Add to the service</span>
+          <button type="button" class="rounded-md border border-gray-700 px-2 py-1 text-[11px] font-medium text-gray-300 hover:bg-gray-800 transition-colors" data-testid="palette-add-song" @click="addSlot('SONG', 2)">Song</button>
+          <button type="button" class="rounded-md border border-gray-700 px-2 py-1 text-[11px] font-medium text-gray-300 hover:bg-gray-800 transition-colors" data-testid="palette-add-scripture" @click="addSlot('SCRIPTURE')">Scripture</button>
+          <button type="button" class="rounded-md border border-gray-700 px-2 py-1 text-[11px] font-medium text-gray-300 hover:bg-gray-800 transition-colors" data-testid="palette-add-prayer" @click="addSlot('PRAYER')">Prayer</button>
+          <button type="button" class="rounded-md border border-gray-700 px-2 py-1 text-[11px] font-medium text-gray-300 hover:bg-gray-800 transition-colors" data-testid="palette-add-message" @click="addSlot('MESSAGE')">Message</button>
+          <button type="button" class="rounded-md border border-gray-700 px-2 py-1 text-[11px] font-medium text-gray-300 hover:bg-gray-800 transition-colors" data-testid="palette-add-hymn" @click="addSlot('HYMN')">Hymn</button>
         </div>
 
         </div>
@@ -1485,7 +1464,6 @@ const autosaveErrorSource = ref<'reorder' | 'autosave'>('reorder')
 const isSharing = ref(false)
 const shareCopied = ref(false)
 const shareError = ref<string | null>(null)
-const showAddMenu = ref(false)
 const showDeleteConfirm = ref(false)
 const isDeleting = ref(false)
 // D-14: slot delete confirmation
@@ -2638,7 +2616,6 @@ function addSlot(kind: SlotKind, vwType?: VWType, targetSection?: ServiceSection
   const newSlot = createSlot(kind, vwType, section)
   localService.value.slots.push(newSlot)
   localService.value.slots = reindexSlots(orderSlotsBySection(localService.value.slots))
-  showAddMenu.value = false
 }
 
 // ── Slot populated check (D-14) ────────────────────────────────────────────────

@@ -1283,11 +1283,10 @@ describe('ServiceEditorView - Section headers and slideshow preview (Phase 20-04
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
 
-    const addElementBtn = wrapper.findAll('button').find((b) => b.text() === 'Add Element')
-    await addElementBtn!.trigger('click')
-    await wrapper.vm.$nextTick()
-    const songBtn = wrapper.findAll('button').find((b) => b.text() === 'Song')
-    await songBtn!.trigger('click')
+    // 36-05: moved-and-restyled-control edit — the bottom-of-list add control is now the
+    // always-visible palette (no open/closed state); `addSlot`'s logic and arguments are unchanged.
+    const songBtn = wrapper.find('[data-testid="palette-add-song"]')
+    await songBtn.trigger('click')
     await wrapper.vm.$nextTick()
 
     const sendingCards = wrapper.find('[data-testid="section-list-sending"]').findAll('.slot-item')
@@ -1572,6 +1571,161 @@ describe('ServiceEditorView - section-band slide count and per-band add (36-04, 
     expect(wrapper.findAll('.slot-item')).toHaveLength(buildSectionedService().slots.length)
     expect(captureForSection('worship')).toBeDefined()
     expect(captureForSection('sending')).toBeDefined()
+  })
+})
+
+// ── Add-to-service palette (36-05, R067) ─────────────────────────────────────────
+
+describe('ServiceEditorView - add-to-service palette (36-05, R067)', () => {
+  interface SlotsVm {
+    localService: { slots: Array<Record<string, unknown>> }
+  }
+
+  async function mountView() {
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          // 36-03: Suggest/Export/Copy/Save/Present all moved into this real
+          // child component (ContextualActionBar.vue) — every mountView in
+          // this file must render it for real (`false` opts a component OUT
+          // of shallowMount's default auto-stub) or none of those controls'
+          // pre-existing testids/text are reachable in the DOM anymore.
+          ContextualActionBar: false,
+          RouterLink: { template: '<a><slot /></a>' },
+          SaveStatusIndicator: false,
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+          PresentationViewer: true,
+        },
+      },
+    })
+  }
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockServicesList = [buildSectionedService()]
+  })
+
+  it('renders exactly five chips in order, with the five palette-add-* testids and the labels Song/Scripture/Prayer/Message/Hymn', async () => {
+    const wrapper = await mountView()
+
+    const palette = wrapper.find('[data-testid="add-to-service-palette"]')
+    expect(palette.exists()).toBe(true)
+    const buttons = palette.findAll('button')
+    expect(buttons).toHaveLength(5)
+    expect(buttons.map((b) => b.attributes('data-testid'))).toEqual([
+      'palette-add-song',
+      'palette-add-scripture',
+      'palette-add-prayer',
+      'palette-add-message',
+      'palette-add-hymn',
+    ])
+    expect(buttons.map((b) => b.text())).toEqual(['Song', 'Scripture', 'Prayer', 'Message', 'Hymn'])
+  })
+
+  it('no button anywhere in the view has the old "Add Element" label, and there is no click-away backdrop or floating panel', async () => {
+    const wrapper = await mountView()
+
+    expect(wrapper.findAll('button').some((b) => b.text() === 'Add Element')).toBe(false)
+    // the old dropdown's click-away backdrop was `class="fixed inset-0 z-10"` — asserting
+    // no such element exists anywhere proves it was deleted, not merely hidden.
+    expect(wrapper.find('.fixed.inset-0.z-10').exists()).toBe(false)
+  })
+
+  it('the palette chips are queryable and clickable immediately after mount, with no prior interaction: clicking palette-add-song on first render still adds a slot', async () => {
+    const wrapper = await mountView()
+    const before = (wrapper.vm as unknown as SlotsVm).localService.slots.length
+
+    await wrapper.find('[data-testid="palette-add-song"]').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    expect((wrapper.vm as unknown as SlotsVm).localService.slots).toHaveLength(before + 1)
+    // the palette itself has no open/closed state — it is still fully rendered after the click
+    expect(wrapper.find('[data-testid="add-to-service-palette"]').exists()).toBe(true)
+  })
+
+  it('clicking palette-add-song appends a SONG slot with the same vw-type the old menu entry produced (requiredVwType 2), inheriting the last slot\'s section', async () => {
+    const wrapper = await mountView()
+    const beforeIds = new Set((wrapper.vm as unknown as SlotsVm).localService.slots.map((s) => s.id))
+
+    await wrapper.find('[data-testid="palette-add-song"]').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    const slots = (wrapper.vm as unknown as SlotsVm).localService.slots
+    const created = slots.find((s) => !beforeIds.has(s.id))
+    expect(created).toBeDefined()
+    const { id, position, ...rest } = created!
+    expect(id).toEqual(expect.any(String))
+    expect(position).toEqual(expect.any(Number))
+    // buildSectionedService's last slot (slot-3) is in 'sending' — the palette omits a
+    // targetSection, so addSlot's inherit-from-last-slot fallback applies, exactly as the
+    // dropdown entry it replaces did.
+    expect(rest).toEqual({
+      kind: 'SONG',
+      requiredVwType: 2,
+      songId: null,
+      songTitle: null,
+      songKey: null,
+      section: 'sending',
+    })
+  })
+
+  it.each([
+    ['palette-add-scripture', 'SCRIPTURE'],
+    ['palette-add-prayer', 'PRAYER'],
+    ['palette-add-message', 'MESSAGE'],
+    ['palette-add-hymn', 'HYMN'],
+  ])('clicking %s appends a slot of kind %s', async (testid, kind) => {
+    const wrapper = await mountView()
+    const before = (wrapper.vm as unknown as SlotsVm).localService.slots.length
+
+    await wrapper.find(`[data-testid="${testid}"]`).trigger('click')
+    await wrapper.vm.$nextTick()
+
+    const slots = (wrapper.vm as unknown as SlotsVm).localService.slots
+    expect(slots).toHaveLength(before + 1)
+    expect(slots[slots.length - 1]!.kind).toBe(kind)
+  })
+
+  it('clicking palette-add-prayer twice, with no intervening open/close, appends exactly two slots', async () => {
+    const wrapper = await mountView()
+    const before = (wrapper.vm as unknown as SlotsVm).localService.slots.length
+
+    await wrapper.find('[data-testid="palette-add-prayer"]').trigger('click')
+    await wrapper.vm.$nextTick()
+    await wrapper.find('[data-testid="palette-add-prayer"]').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    const slots = (wrapper.vm as unknown as SlotsVm).localService.slots
+    expect(slots).toHaveLength(before + 2)
+    expect(slots.slice(-2).every((s) => s.kind === 'PRAYER')).toBe(true)
+  })
+
+  it('no import/PowerPoint entry exists in the palette', async () => {
+    const wrapper = await mountView()
+
+    const palette = wrapper.find('[data-testid="add-to-service-palette"]')
+    expect(palette.text()).not.toContain('Import')
+    expect(palette.text()).not.toContain('PowerPoint')
+  })
+
+  it('viewer: the palette does not render', async () => {
+    mockAuthState.isEditor = false
+    const wrapper = await mountView()
+
+    expect(wrapper.find('[data-testid="add-to-service-palette"]').exists()).toBe(false)
+  })
+
+  it('locked (planned) service: the palette does not render', async () => {
+    mockServicesList = [{ ...buildSectionedService(), status: 'planned' }]
+    const wrapper = await mountView()
+
+    expect(wrapper.find('[data-testid="add-to-service-palette"]').exists()).toBe(false)
   })
 })
 
@@ -2945,30 +3099,27 @@ describe('ServiceEditorView - no deck editing or deck import on the Service Orde
     expect(wrapper.find('[data-testid="imported-editor-panel"]').exists()).toBe(false)
   })
 
-  it('offers no PowerPoint/image import action in the Add Element menu, and the modal it opened is gone', async () => {
+  // 36-05: moved-and-restyled-control edit — the palette has no open/closed state (every chip
+  // is directly clickable), so this test no longer needs to trigger a click to reveal it.
+  // `addSlot`'s logic and every argument it receives are unchanged.
+  it('offers no PowerPoint/image import action in the add-to-service palette, and the modal it opened is gone', async () => {
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
 
-    const addElementBtn = wrapper.findAll('button').find((b) => b.text() === 'Add Element')
-    expect(addElementBtn?.exists()).toBe(true)
-    await addElementBtn!.trigger('click')
-    await wrapper.vm.$nextTick()
-
+    expect(wrapper.find('[data-testid="add-to-service-palette"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="add-import-announcements"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="add-import-sermon"]').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('Import PowerPoint')
   })
 
-  it('still offers the five non-import Add Element entries', async () => {
+  it('still offers the five non-import palette chips', async () => {
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
 
-    const addElementBtn = wrapper.findAll('button').find((b) => b.text() === 'Add Element')
-    await addElementBtn!.trigger('click')
-    await wrapper.vm.$nextTick()
-
-    const menuLabels = wrapper.findAll('button').map((b) => b.text())
-    expect(menuLabels).toEqual(expect.arrayContaining(['Song', 'Scripture Reading', 'Prayer', 'Message', 'Hymn']))
+    const palette = wrapper.find('[data-testid="add-to-service-palette"]')
+    expect(palette.exists()).toBe(true)
+    const chipLabels = palette.findAll('button').map((b) => b.text())
+    expect(chipLabels).toEqual(expect.arrayContaining(['Song', 'Scripture', 'Prayer', 'Message', 'Hymn']))
   })
 
   it('an existing imported plan item with a deck still renders its heading', async () => {
@@ -4231,12 +4382,14 @@ describe('ServiceEditorView - locked service renders all three tabs read-only (R
   // ---- Service Order (D-06) -------------------------------------------------
 
   for (const status of LOCKED_STATUSES) {
-    it(`${status}: Service Order offers no drag handle, Add Element, section select or remove control`, async () => {
+    it(`${status}: Service Order offers no drag handle, add-to-service palette, section select or remove control`, async () => {
       mockServicesList = [{ ...mockService, status }]
       const wrapper = await mountView()
 
       expect(wrapper.findAll('.drag-handle')).toHaveLength(0)
-      expect(wrapper.findAll('button').some((b) => b.text().includes('Add Element'))).toBe(false)
+      // 36-05: moved-and-restyled-control edit — the locked-service absence assertion moves
+      // from the old "Add Element" button label to the palette's testid.
+      expect(wrapper.find('[data-testid="add-to-service-palette"]').exists()).toBe(false)
       expect(wrapper.findAll('[data-testid="section-select"]')).toHaveLength(0)
       expect(wrapper.findAll('button').some((b) => b.attributes('title') === 'Remove element')).toBe(false)
       expect(wrapper.findAll('button').some((b) => b.attributes('title') === 'Remove song')).toBe(false)
