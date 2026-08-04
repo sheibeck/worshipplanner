@@ -103,13 +103,17 @@ page-level `ContextualActionBar` would require new event plumbing (`SlideGrid` �
 `ServiceEditorView` → bar → back down to `SlideGrid`) for a control whose enabled state depends on
 per-group selection state the page-level bar does not otherwise track. **Recommendation: `＋ Add slide`
 stays physically rendered inside `SlideGrid.vue`'s own header row, matching the wireframe's layout
-exactly, but is restyled to the exact same ghost-button classes `ContextualActionBar` uses** (§ Phase-
-Specific Component Contracts §2) so it reads as the same visual/interaction *pattern* R068 asks for, even
-though it is a second DOM instance rather than a second entry in the bar's declarative list. Flag this
-explicitly to the planner: R053's literal text ("`Add slide`... move into the contextual action bar
-(R068)") is satisfied in visual pattern, not in single-component architecture — the alternative (full
-relocation with cross-component plumbing) is a legitimate but materially more expensive choice a planner
-could still make; this spec does not forbid it, it recommends against it on cost/benefit grounds.
+exactly, with its existing classes carried over verbatim** (§ Phase-Specific Component Contracts §5 —
+this phase does NOT restyle it to match `ContextualActionBar`'s button treatment; its pre-existing
+`px-2.5 py-1.5` padding is out of scope, see § Spacing Scale's exceptions note). It reads as the same
+*interaction* pattern R068 asks for (a bordered ghost button that performs a contextual, tab/group-scoped
+action) without being visually identical or a shared DOM instance — a second, deliberately un-unified
+button, not a second entry in the bar's declarative list. Flag this explicitly to the planner: R053's
+literal text ("`Add slide`... move into the contextual action bar (R068)") is satisfied in interaction
+pattern only, not in visual unification or single-component architecture — the alternative (full
+relocation with cross-component plumbing, restyled to match) is a legitimate but materially more expensive
+choice a planner could still make; this spec does not forbid it, it recommends against it on cost/benefit
+grounds.
 
 ### Finding 3 — The Present button's placement, quoted directly from "1a."
 
@@ -212,18 +216,29 @@ Declared values (must be multiples of 4):
 
 | Token | Value | Usage in this phase |
 |-------|-------|---------------------|
-| xs | 4px | `gap-1` inside the action bar between an icon glyph and its label (matches existing button classes verbatim, e.g. `ServiceEditorView.vue:127-130`) |
-| sm | 8px | `gap-2` between action-bar items (`ServiceEditorView.vue:97`'s existing `flex items-center gap-3` header row is the nearest precedent — this phase's bar reuses `gap-2`/`gap-3` verbatim, not a new value) |
-| md | 16px | section-band vertical rhythm (`space-y-4`-equivalent between bands), matching the existing `mb-3` rhythm already used between Service Order's stacked cards |
+| xs | 4px | `SlideDropTarget.vue:3`'s existing `gap-1` (unchanged by this phase's `clickable`-prop addition, § Phase-Specific Component Contracts §5); `py-1` on the new palette chips (§8) |
+| sm | 8px | `gap-2`/`px-2` on the new `＋ Add to the service` palette row and its chips (§8); `gap-2` on the new section-band header row (§9) |
+| md | 16px | section-band vertical rhythm (`space-y-4`-equivalent between bands), matching the existing `mb-3` rhythm already used between Service Order's stacked cards; `px-4` on the new palette row's outer padding (§8) |
 | lg | 24px | not newly introduced — cited for the page's existing `px-6 py-4` shell (`ServiceEditorView.vue:4`), unchanged |
 | xl | 32px | not used |
 | 2xl | 48px | not used |
 | 3xl | 64px | not used |
-| — | 12px (`px-3 py-2`) | action-bar button padding — verbatim reuse of the existing header button class (`ServiceEditorView.vue:119-131`'s `px-3 py-2`) |
-| — | 6px (`px-2.5 py-1.5`) | the relocated `＋ Add slide` button and the `SlideDropTarget` click affordance's focus ring padding — verbatim reuse of `SlideGrid.vue:23`'s existing class |
+| — | 12px (`px-3 py-2` / `gap-3` / `py-3`) | action-bar button padding — verbatim reuse of the existing header button class (`ServiceEditorView.vue:119-131`'s `px-3 py-2`); `ContextualActionBar.vue`'s own outer `gap-3` (§2, matches the page header's existing `flex items-center gap-3` container, `ServiceEditorView.vue:97`, unchanged); `py-3` on the new palette row's outer padding (§8) |
+| — | 6px (`gap-1.5`) | icon-to-label gap inside every action-bar button — **verbatim reuse** of the SAME pre-existing `gap-1.5` already present in `ServiceEditorView.vue:125`'s `Suggest All Songs` button class and in `SlideGrid.vue:23`'s `＋ Add slide` class (both quoted in full in § Phase-Specific Component Contracts §2/§5). Not itself a 4-multiple, but not a NEW value either — it is the exact spacing every ghost button in this codebase already uses; declared here explicitly rather than folded silently into the `xs` row, which would misstate it as 4px. |
 
-**Exceptions: none.** Every value above is either an existing declared token or a verbatim-reused existing
-Tailwind class from the files this phase touches — no new spacing value is introduced.
+**Exceptions: `SlideGrid.vue:23`'s existing `px-2.5 py-1.5` on `＋ Add slide` (10px / 6px, neither a
+multiple of 4).** This is a **pre-existing** class this phase does not touch — `＋ Add slide` stays
+exactly where it is, with its class string carried over verbatim, unchanged (§ Phase-Specific Component
+Contracts §5); only its sibling Import button is deleted from beside it. Its non-4-multiple padding is not
+this phase's to fix. Modernizing it to `px-3 py-2` (to match `ContextualActionBar`'s own button padding)
+would be an unrequested visual change to a control this phase's own contract says it only *moves and
+reasons about* — exactly the quiet scope drift this contract exists to prevent. **Not declared as a
+token, and not to be copied into any NEW control** — every genuinely new element this phase authors (the
+action bar, the palette row, the section-band header) uses only the 4-multiple tokens declared above, plus
+the one verbatim-reused `gap-1.5` noted in the table (existing spacing being carried forward, not a fresh
+choice). The markup in §8/§9 below has been corrected to `px-2 py-1` (chips), `px-4 py-3` (palette
+wrapper) and `gap-2` (section-band header) — none of the originally-drafted `px-2.5`/`px-3.5`/`gap-2.5`/
+`px-0.5` values survive in the final markup.
 
 ---
 
@@ -294,7 +309,7 @@ Applicable: **18 — 12 covered, 4 backstop, 2 unresolved.**
 | populated | Service Order action-bar list | ✅ covered | Exactly `Suggest All Songs`, `Export to PC`/`Copy for PC` (+ R071 note), `Save` — enumerated in § Finding 1 and § Copywriting Contract, sourced directly from Turn 3's header row |
 | populated | Slides action-bar list | ✅ covered | Exactly `▶ Present`, `Save` — enumerated in § Finding 3, sourced directly from 1a's header row |
 | populated | The five section bands | ✅ covered | Enumerated 1:1 against the existing `SERVICE_SECTIONS` constant, no new section invented |
-| zero-one-many | Action-bar declarative list, per tab | ✅ covered | The bar renders `v-for` over a per-tab array; zero items renders nothing (Roles today), one-to-many items render as a row — no cap logic needed since the longest list (Service Order, 3 items) already fits the existing header's `flex gap-2` row unchanged |
+| zero-one-many | Action-bar declarative list, per tab | ✅ covered | The bar renders `v-for` over a per-tab array; zero items renders nothing (Roles today), one-to-many items render as a row — no cap logic needed since the longest list (Service Order, 3 items) already fits the existing header's `flex gap-3` row unchanged (`ServiceEditorView.vue:97`) |
 | overflow | Action-bar row at narrow viewport | 🧪 backstop | **Statement:** the existing header row already wraps via `flex-wrap` behaviour on small screens (unchanged from current `ServiceEditorView.vue:97` container) — the relocated/consolidated bar must not regress this. **verification: backstop** — a viewport-width test asserting the action-bar row does not force horizontal scroll at the narrowest supported width. |
 | long-text | Per-band "＋ Add item" label, palette chip labels | ✅ covered | Every label is a fixed enum string (§ Copywriting Contract) — no user-supplied text reaches these controls |
 | empty | Section band with zero items | ✅ covered | Unchanged from today: `No items yet` (editor) / `No items in this section.` (locked/viewer), `ServiceEditorView.vue:849` — this phase does not alter that branch |
@@ -472,16 +487,22 @@ only their template consumer moves (§3's `slidesTabRef.value?.canPresent` / `.o
 `present-slideshow-cta` need updating to the new testid, a "moved control" edit per 36-CONTEXT.md
 § Specific Ideas.
 
-### 5. `SlideGrid.vue` — delete the Import button, restyle `＋ Add slide`, wire the click-to-import affordance
+### 5. `SlideGrid.vue` — delete the Import button, `＋ Add slide` carries over verbatim, wire the click-to-import affordance
 
 ```html
 <!-- DELETE (SlideGrid.vue:27-33) -->
 <button v-if="canMutateGroup" ... data-testid="slide-grid-import" @click="openImportModal">⇪ Import into this group</button>
 ```
 
-`＋ Add slide` (`:20-26`) stays in place, testid unchanged (`slide-grid-add-slide`) — only its class
-updates to the shared ghost-button treatment §2 defines (cosmetic parity only; the button already uses
-that exact class today, so this is likely a no-op edit, confirm at plan time).
+`＋ Add slide` (`:20-26`) stays exactly in place — same testid (`slide-grid-add-slide`), **same class
+string, unchanged, byte-for-byte**: `ml-auto inline-flex items-center gap-1.5 rounded-md border
+border-gray-700 bg-gray-800 px-2.5 py-1.5 text-xs font-medium text-gray-300 transition-colors
+hover:bg-gray-700`. **★ Do NOT restyle it to match `ContextualActionBar`'s `px-3 py-2 text-sm` class
+(§2).** This button's existing padding (`px-2.5 py-1.5` — 10px/6px, not 4-multiples) is a pre-existing,
+out-of-scope value (§ Spacing Scale's exceptions note) — this phase relocates and reasons about the
+control, per § Finding 2's discretionary call, but does not touch its visual treatment. `＋ Add slide` and
+the page-level bar's buttons will read as two visually distinct button sizes after this phase — that is
+correct and expected, not a defect to reconcile.
 
 `openImportModal()` (`:605-608`) is unchanged — it already guards on `canMutateGroup`, exactly the gate
 § Finding 2's discretionary resolution needs.
@@ -573,13 +594,13 @@ Restyle the existing dropdown-menu button into a dashed-border chip row matching
 treatment (lines 330-341), narrowed to 5 chips per § Finding 4 item 7:
 
 ```html
-<div v-if="canEditService" class="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-gray-700 px-3.5 py-3" data-testid="add-to-service-palette">
+<div v-if="canEditService" class="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-gray-700 px-4 py-3" data-testid="add-to-service-palette">
   <span class="text-[11px] text-indigo-400">＋ Add to the service</span>
-  <button type="button" class="rounded-md border border-gray-700 px-2.5 py-1.5 text-[11px] font-medium text-gray-300 hover:bg-gray-800 transition-colors" data-testid="palette-add-song" @click="addSlot('SONG', 2)">Song</button>
-  <button type="button" class="rounded-md border border-gray-700 px-2.5 py-1.5 text-[11px] font-medium text-gray-300 hover:bg-gray-800 transition-colors" data-testid="palette-add-scripture" @click="addSlot('SCRIPTURE')">Scripture</button>
-  <button type="button" class="rounded-md border border-gray-700 px-2.5 py-1.5 text-[11px] font-medium text-gray-300 hover:bg-gray-800 transition-colors" data-testid="palette-add-prayer" @click="addSlot('PRAYER')">Prayer</button>
-  <button type="button" class="rounded-md border border-gray-700 px-2.5 py-1.5 text-[11px] font-medium text-gray-300 hover:bg-gray-800 transition-colors" data-testid="palette-add-message" @click="addSlot('MESSAGE')">Message</button>
-  <button type="button" class="rounded-md border border-gray-700 px-2.5 py-1.5 text-[11px] font-medium text-gray-300 hover:bg-gray-800 transition-colors" data-testid="palette-add-hymn" @click="addSlot('HYMN')">Hymn</button>
+  <button type="button" class="rounded-md border border-gray-700 px-2 py-1 text-[11px] font-medium text-gray-300 hover:bg-gray-800 transition-colors" data-testid="palette-add-song" @click="addSlot('SONG', 2)">Song</button>
+  <button type="button" class="rounded-md border border-gray-700 px-2 py-1 text-[11px] font-medium text-gray-300 hover:bg-gray-800 transition-colors" data-testid="palette-add-scripture" @click="addSlot('SCRIPTURE')">Scripture</button>
+  <button type="button" class="rounded-md border border-gray-700 px-2 py-1 text-[11px] font-medium text-gray-300 hover:bg-gray-800 transition-colors" data-testid="palette-add-prayer" @click="addSlot('PRAYER')">Prayer</button>
+  <button type="button" class="rounded-md border border-gray-700 px-2 py-1 text-[11px] font-medium text-gray-300 hover:bg-gray-800 transition-colors" data-testid="palette-add-message" @click="addSlot('MESSAGE')">Message</button>
+  <button type="button" class="rounded-md border border-gray-700 px-2 py-1 text-[11px] font-medium text-gray-300 hover:bg-gray-800 transition-colors" data-testid="palette-add-hymn" @click="addSlot('HYMN')">Hymn</button>
 </div>
 ```
 
@@ -597,7 +618,7 @@ per-band header label today (bands are only distinguished by their empty-state c
 `section-select`). Add, directly above each band's item list:
 
 ```html
-<div class="flex items-center gap-2.5 px-0.5">
+<div class="flex items-center gap-2">
   <span class="text-[11px] uppercase tracking-[.14em] text-indigo-300/80">{{ group.label }}</span>
   <span class="h-px flex-1 bg-gradient-to-r from-gray-800 to-transparent"></span>
   <span class="text-[10.5px] text-gray-500">{{ sectionSlideCount(group.key) }}</span>
@@ -648,6 +669,17 @@ is drawn expanded).
 - **Tab strip:** unchanged — still plain `<button>` elements, no `role="tab"`/`tablist` introduced by this
   phase (§1); the reorder does not add or remove any accessibility semantics, it only changes visual/DOM
   order of the three existing buttons.
+- **Row-level `✕` remove-slot button (`ServiceEditorView.vue:1179-1189`):** unchanged, not touched by
+  this phase. Its accessible name today is a `title="Remove element"` attribute only — no `aria-label`,
+  no visible text (icon-only `<svg>` content). `title` is not a reliably-announced accessible name across
+  screen readers (unlike `aria-label`, which every other icon-only control this phase and its predecessors
+  ship carries — e.g. `SlideActionMenu`'s `aria-label="Slide options"`, 33-UI-SPEC §2). This is a
+  **pre-existing gap, explicitly out of scope for this phase** — recorded here so a planner does not have
+  to go find this out by reading `ServiceEditorView.vue` directly, not because this phase is fixing it.
+- **Row-level `⋯` kebab:** has no accessible-name contract at all, because it has no defined behaviour —
+  it is undrawn in the wireframe and not implemented this phase (§ Finding 4 item 6, § UI Considerations
+  `unresolved`). If a future phase gives it real behaviour, it inherits that phase's own accessibility
+  contract; this spec makes no claim about it either way.
 
 ---
 
@@ -676,3 +708,4 @@ is drawn expanded).
 | Date | Change |
 |------|--------|
 | 2026-08-03 | Initial draft |
+| 2026-08-03 | UI-checker fix pass: removed the self-contradicting `6px (px-2.5 py-1.5)` Spacing Scale row and replaced it with an explicit pre-existing exception (`＋ Add slide` is relocated/reasoned-about only, never restyled — its padding is out of scope, not a licence to modernize it to match the action bar); corrected two follow-on inaccuracies found during the same pass (the `xs` row's false `gap-1` citation, actually `gap-1.5` verbatim reuse; and non-4-multiple values — `px-2.5`/`py-1.5`/`px-3.5`/`gap-2.5`/`px-0.5` — introduced in the NEW palette-row and section-band-header markup in §8/§9, corrected to `px-2 py-1`/`px-4 py-3`/`gap-2`); added the missing `✕` remove-slot and `⋯` kebab lines to the Accessibility Note. |
