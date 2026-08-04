@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
+import { flushPromises } from '@vue/test-utils'
 
 // Mock firebase/auth module
 vi.mock('firebase/auth', () => {
@@ -318,6 +319,166 @@ describe('useAuthStore', () => {
 
       await store.logout()
       expect(store.vwModeEnabled).toBe(true)
+    })
+  })
+
+  // ── 34-12 Task 1 — DIAGNOSIS for owner UAT finding F5 ────────────────────────────
+  // pcSecret is a live secret and this file is committed. Every fixture below uses an
+  // obviously-synthetic placeholder string, and every assertion is on hasPcCredentials
+  // or on ref presence/absence (=== null / !== null) — never on a credential value.
+  describe('hasPcCredentials (34-12 Task 1 — field-shape matrix)', () => {
+    it('is true when both pcAppId and pcSecret are present on the org document', async () => {
+      mockOrgDocPath({
+        name: 'Test Org',
+        pcAppId: 'placeholder-app-id',
+        pcSecret: 'placeholder-secret',
+      })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.hasPcCredentials).toBe(true)
+    })
+
+    it('is false when pcAppId is absent from the org document', async () => {
+      mockOrgDocPath({ name: 'Test Org', pcSecret: 'placeholder-secret' })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.hasPcCredentials).toBe(false)
+      expect(store.pcAppId).toBeNull()
+    })
+
+    it('is false when pcSecret is absent from the org document', async () => {
+      mockOrgDocPath({ name: 'Test Org', pcAppId: 'placeholder-app-id' })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.hasPcCredentials).toBe(false)
+      expect(store.pcSecret).toBeNull()
+    })
+
+    it('is false when pcAppId is the empty string', async () => {
+      mockOrgDocPath({ name: 'Test Org', pcAppId: '', pcSecret: 'placeholder-secret' })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.hasPcCredentials).toBe(false)
+    })
+
+    it('is false when pcSecret is the empty string', async () => {
+      mockOrgDocPath({ name: 'Test Org', pcAppId: 'placeholder-app-id', pcSecret: '' })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.hasPcCredentials).toBe(false)
+    })
+
+    it('is false when the org document does not exist at all', async () => {
+      mockOrgDocPath(null)
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.hasPcCredentials).toBe(false)
+      expect(store.pcAppId).toBeNull()
+      expect(store.pcSecret).toBeNull()
+    })
+
+    it('is false when the user belongs to no organization', async () => {
+      vi.mocked(doc).mockImplementation(
+        (_db: unknown, ...segments: string[]) => ({ path: segments.join('/') }) as never,
+      )
+      vi.mocked(getDoc).mockImplementation((ref: unknown) => {
+        const path = (ref as { path?: string }).path
+        if (path === 'users/test-uid') {
+          return Promise.resolve({
+            exists: () => true,
+            data: () => ({ orgIds: [] }),
+          }) as never
+        }
+        return Promise.resolve({ exists: () => false, data: () => null }) as never
+      })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.hasPcCredentials).toBe(false)
+      expect(store.pcAppId).toBeNull()
+      expect(store.pcSecret).toBeNull()
+    })
+
+    it('is false after logout, even when the org had credentials configured', async () => {
+      mockOrgDocPath({
+        name: 'Test Org',
+        pcAppId: 'placeholder-app-id',
+        pcSecret: 'placeholder-secret',
+      })
+      vi.mocked(signOut).mockResolvedValueOnce(undefined)
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.hasPcCredentials).toBe(true)
+
+      await store.logout()
+      expect(store.hasPcCredentials).toBe(false)
+      expect(store.pcAppId).toBeNull()
+      expect(store.pcSecret).toBeNull()
+    })
+
+    // OBSERVATION, not an endorsement: auth.ts's hasPcCredentials checks `!== ''` only,
+    // not `.trim()`, so a whitespace-only pcAppId currently reads as "present". Settings
+    // trims on write (SettingsView.vue), so this value cannot arrive through that form —
+    // only through a manual document write. This plan does not change that behaviour.
+    it('records the CURRENT behaviour for a whitespace-only pcAppId (observation, not endorsement)', async () => {
+      mockOrgDocPath({ name: 'Test Org', pcAppId: '   ', pcSecret: 'placeholder-secret' })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.hasPcCredentials).toBe(true)
+    })
+  })
+
+  describe('Planning Center credential load order (34-12 Task 1 — reactivity)', () => {
+    it('hasPcCredentials is false while the org-document read is in flight, and true once it resolves — same store instance, no remount', async () => {
+      let resolveOrgDoc: (value: unknown) => void = () => {}
+      const orgDocPromise = new Promise((resolve) => {
+        resolveOrgDoc = resolve
+      })
+
+      vi.mocked(doc).mockImplementation(
+        (_db: unknown, ...segments: string[]) => ({ path: segments.join('/') }) as never,
+      )
+      vi.mocked(getDoc).mockImplementation((ref: unknown) => {
+        const path = (ref as { path?: string }).path
+        if (path === 'users/test-uid') {
+          return Promise.resolve({
+            exists: () => true,
+            data: () => ({ orgIds: ['org-1'] }),
+          }) as never
+        }
+        if (path === 'organizations/org-1') {
+          return orgDocPromise as never
+        }
+        return Promise.resolve({ exists: () => false, data: () => null }) as never
+      })
+
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+
+      const authChangePromise = triggerAuthStateChange(mockUser)
+      // Drain the microtask queue: ensureUserDocument's own reads/writes and
+      // loadOrgContext's user-document read all run before the org-document read is
+      // reached, so this only settles once the store is genuinely blocked on it.
+      await flushPromises()
+
+      expect(store.hasPcCredentials).toBe(false)
+      expect(store.pcAppId).toBeNull()
+
+      resolveOrgDoc({
+        exists: () => true,
+        data: () => ({ pcAppId: 'placeholder-app-id', pcSecret: 'placeholder-secret' }),
+      })
+      await authChangePromise
+
+      expect(store.hasPcCredentials).toBe(true)
     })
   })
 })
