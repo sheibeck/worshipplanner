@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Service and Slides
-current_phase: 37
-current_phase_name: PowerPoint Server-Side Rendering
-status: verifying
+status: executing
 stopped_at: "Completed 34-08-PLAN.md (Phase 34 gap closure complete: composed pipeline proof, validation/PENDING-VERIFICATION records, R064/R070/R071 corrected, phase gate green, 12/12 plans executed)"
-last_updated: "2026-08-04T02:07:24.085Z"
+last_updated: "2026-08-04T02:25:55.047Z"
 last_activity: 2026-08-03
-last_activity_desc: Phase 37 execution started
+last_activity_desc: Phase null execution started
 progress:
   total_phases: 9
   completed_phases: 8
   total_plans: 52
   completed_plans: 52
   percent: 89
+current_phase: 37
+current_phase_name: PowerPoint Server-Side Rendering
 ---
 
 # Project State
@@ -65,7 +65,7 @@ to-do for when they return.
 See: .planning/PROJECT.md (updated 2026-07-28)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 37 — PowerPoint Server-Side Rendering
+**Current focus:** Phase null
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -75,10 +75,10 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 
 ## Current Position
 
-Phase: 37 (PowerPoint Server-Side Rendering) — EXECUTING
-Plan: 6 of 6
-Status: Phase complete — ready for verification
-Last activity: 2026-08-03 — Phase 37 execution started
+Phase: null — EXECUTING
+Plan: 1 of ?
+Status: Executing Phase null
+Last activity: 2026-08-03 — Phase null execution started
 
 ## ★ v1.4 AUTONOMOUS RUN — standing decisions (2026-07-28)
 
@@ -477,7 +477,28 @@ action bar were deferred from Phase 33 into 36 by the ROADMAP's own reasoning.
 
 **Also still open from this run:** Phase 34's reachability gap (`/gsd-plan-phase 34 --gaps`) — see below.
 
-## ✅ v1.4 AUTONOMOUS RUN COMPLETE — 2026-08-03
+## ▶ v1.4 AUTONOMOUS RUN — SECOND PASS IN PROGRESS (2026-08-03)
+
+**Invoked:** `/gsd-autonomous` (no flags) after the owner supplied five hands-on UAT findings.
+
+**Done this pass:** **Phase 34 COMPLETE** — 8 gap-closure plans (34-05..34-12), 35 commits, re-verified
+`human_needed` at **12/12 truths**, zero gaps. The reachability gap that made Phase 34 partial is closed:
+`CongregationalEditor` is mounted at `ServiceEditorView.vue:570`, keyed on the slot id, reachable from
+two converging slide-side routes. Owner findings F1–F5 all addressed; **R070** (background at
+presentation) and **R071** (PC-export gating UX) added. F5 was a misdiagnosis — Export to PC was never
+removed, the org document simply has no credentials; no fix was manufactured. ROADMAP checklist
+corrected for Phases 32–35, which the first pass left unchecked.
+
+**Remaining in this pass:** **Phase 36** — discuss → ui-phase → plan → execute, then the milestone audit.
+Phase 36 is now unblocked: both wireframes its success criteria name (`Turn 3 — Service Order tab` and
+`1a Plan rail · slide grid · Edit Slide drawer — two states`) are confirmed present in the re-pulled
+`docs/design/slides-tab.dc.html`. R068's action-bar half remains original design work with no wireframe.
+
+**Open human items:** `PENDING-VERIFICATION.md` 34.1, 34.3, 34.4, 34.5, 34.6 — none self-approved.
+
+---
+
+## ✅ v1.4 AUTONOMOUS RUN COMPLETE — 2026-08-03 (first pass)
 
 **Scope run:** Phases 32, 33, 34, 35, 37. **Phase 36 deferred by owner decision** (see above).
 
