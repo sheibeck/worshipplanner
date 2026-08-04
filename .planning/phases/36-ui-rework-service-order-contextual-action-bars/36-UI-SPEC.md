@@ -301,7 +301,10 @@ choice for the identical affordance.
 
 ## UI Considerations
 
-Applicable: **18 — 12 covered, 4 backstop, 2 unresolved.**
+Applicable: **18 — 13 covered, 3 backstop, 2 unresolved.** *(Count corrected 2026-08-03: this header
+previously read "12 covered, 4 backstop" and disagreed with the table below it. Both the planner and the
+plan-checker recounted the rows independently and got 13/3/2. **No row was reclassified to make the tally
+match** — the header was wrong, not the table.)*
 
 | Category | Element(s) | Status | Resolution / Reason |
 |----------|------------|--------|---------------------|
