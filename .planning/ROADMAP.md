@@ -306,9 +306,18 @@ Plans:
   4. "Add slide" lives in the contextual action bar, and a group's own drag-and-drop zone doubles as the import affordance — the separate "Import into this Group" button is gone. *(Corrected 2026-08-03 by 36-UI-SPEC: the "Add music to this group" clause is **superseded**. Design "1a" shows group music as its own inline panel, never in a bar, and owner UAT finding F2 — landed as `34-11` — explicitly asked for group music and background to sit together in one panel. R053 corrected in REQUIREMENTS.md with the same evidence.)*
   5. The Roles tab is last in the tab order
 
-**Plans**: TBD
+**Plans**: 5 plans
+Plans:
+
+- [ ] 36-01-PLAN.md — R053: the group drop zone becomes the click-to-import affordance; the separate Import button is deleted (wave 1)
+- [ ] 36-02-PLAN.md — R068a: the shared ContextualActionBar component and the PURE per-tab item builder that makes R068's acceptance test data-level (wave 1)
+- [ ] 36-03-PLAN.md — R068b + R069: the bar wired into the page header, Present relocated per design 1a, tabs reordered to Service Order · Slides · Roles (wave 2)
+- [ ] 36-04-PLAN.md — R067a: per-band section headers with slide counts and per-band ＋ Add item; addSlot gains an additive targetSection (wave 3)
+- [ ] 36-05-PLAN.md — R067b: the dashed ＋ Add to the service palette replaces the Add Element dropdown, plus the Service Order preservation sweep and the phase gate (wave 4)
+
 **UI hint**: yes
 **Research flag**: standard/UI-heavy — no deep technical uncertainty, but real sequencing risk: this phase must land LAST among UI work, after Phase 31's Service Order layout and Phase 33's Slides layout both finalize, or the action bar needs rework.
+**Planning note (2026-08-03):** planned with `--skip-research`, so there is **no `36-RESEARCH.md`, no `36-VALIDATION.md` and no `36-PATTERNS.md`** — a recorded choice, not a gap. The approved `36-UI-SPEC.md` supplies the design contract and `36-CONTEXT.md`'s verified file:line table supplies the pattern inventory; validation criteria are authored inline as per-task `<automated>` commands. Five plans rather than `coarse` granularity's usual 1-3 because `ServiceEditorView.vue` (3,690 lines) is the center of gravity for R067, R068 and R069 — those three cannot parallelize, so fewer plans would mean 5-6 task plans in the project's largest file. Waves are 1, 1, 2, 3, 4; only 36-01 and 36-02 run in parallel, and they share no files.
 **Design source**: Claude Design project "Worship Planner Slideshow Design" (`e8e6c287-3e88-402f-88e1-7ad6d5101fa2`), read via DesignSync (`/design-login` if unauthorized) — the Service Order rebuild is "Turn 3 — Service Order tab"; the Present button placement is "1a Plan rail · slide grid · Edit Slide drawer — two states."
 **Notes**: This phase is explicitly sequenced last among the milestone's UI work — R068 depends on R067 and the Slides tab layout (Phase 33) both being final, and R053's "move Add slide/Add music into the contextual action bar" only makes sense once that action bar exists, which is why R053 is grouped here rather than with the rest of Slides interaction (Phase 29/33). This is a deliberate departure from a literal reading of the "Slides Interaction" requirement category — R053's own text names R068 as its target.
 
