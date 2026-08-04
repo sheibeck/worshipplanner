@@ -325,7 +325,11 @@ describe('SlideGrid', () => {
     const wrapper = mountGrid({ selectedSlot: slot, slotArrayIndex: 0, assembledSlideshow: [] })
     expect(wrapper.find('[data-testid="slide-grid-reading-order"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="slide-grid-empty-state"]').text()).toContain('No slides in this group yet')
-    expect(wrapper.text()).toContain('Add a slide, or drop a file below.')
+    // Moved-control edit (Phase 36 R053): the copy's verb changed from "drop"
+    // to "click ... or drop" because the button it used to point at
+    // ("Import into this group") is gone and the tile's own click affordance
+    // is now the more discoverable path — text change, not a behavior change.
+    expect(wrapper.text()).toContain('Add a slide, or click below to import.')
     expect(wrapper.findAllComponents(SlideCard)).toHaveLength(0)
   })
 
@@ -1267,18 +1271,46 @@ describe('SlideGrid', () => {
     })
   })
 
-  // --- 25-07 Task 3: the group header's import action ---
-  describe('import action and PPTX/image append (25-07 Task 3)', () => {
-    it('renders the import action for an editor, not for a viewer, and opens the modal on click', async () => {
+  // --- 25-07 Task 3 / Phase 36 (R053): the group's import action, now the drop tile itself ---
+  describe('import action and PPTX/image append (25-07 Task 3, relocated onto the tile by 36-01)', () => {
+    // Moved-control edit: the separate import button is deleted (36-01); its
+    // testid no longer exists, and the affordance is now the drop tile's own
+    // `clickable`/`browse` wiring. `openImportModal`'s own `canMutateGroup`
+    // guard is unchanged — this proves the SAME editor/viewer split still
+    // gates it, just through the tile instead of a dedicated button.
+    it('the separate import button no longer exists in the rendered output for either fixture', () => {
       const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
       const editorWrapper = mountGrid({ selectedSlot: slot, isEditor: true })
       const viewerWrapper = mountGrid({ selectedSlot: slot, isEditor: false })
-      expect(editorWrapper.find('[data-testid="slide-grid-import"]').exists()).toBe(true)
+      expect(editorWrapper.find('[data-testid="slide-grid-import"]').exists()).toBe(false)
       expect(viewerWrapper.find('[data-testid="slide-grid-import"]').exists()).toBe(false)
+    })
+
+    it('an editor on an unlocked non-song group gets a clickable tile; emitting browse from it opens the grid\'s own modal', async () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const editorWrapper = mountGrid({ selectedSlot: slot, isEditor: true })
+      expect(editorWrapper.findComponent(SlideDropTarget).props('clickable')).toBe(true)
 
       expect(editorWrapper.findComponent(PptxImportModal).props('open')).toBe(false)
-      await editorWrapper.get('[data-testid="slide-grid-import"]').trigger('click')
+      await editorWrapper.findComponent(SlideDropTarget).vm.$emit('browse')
       expect(editorWrapper.findComponent(PptxImportModal).props('open')).toBe(true)
+    })
+
+    it('a viewer renders no drop tile at all — no clickable affordance to browse from', () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const viewerWrapper = mountGrid({ selectedSlot: slot, isEditor: false })
+      expect(viewerWrapper.findComponent(SlideDropTarget).exists()).toBe(false)
+    })
+
+    it("a song group's tile renders but is not clickable — emitting browse leaves the modal closed", async () => {
+      const songSlot = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: 'Grace', songKey: null, requiredVwType: 1 } as never)
+      const wrapper = mountGrid({ selectedSlot: songSlot, isEditor: true })
+      const tile = wrapper.findComponent(SlideDropTarget)
+      expect(tile.exists()).toBe(true)
+      expect(tile.props('clickable')).toBe(false)
+
+      await tile.vm.$emit('browse')
+      expect(wrapper.findComponent(PptxImportModal).props('open')).toBe(false)
     })
 
     it("passes the selected plan item's own section to the modal, falling back to the first service section when absent", () => {
@@ -1335,7 +1367,9 @@ describe('SlideGrid', () => {
       const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
       mockGetDeck.mockResolvedValue({ id: 'deck-1', sourceFileName: 'deck.pptx', section: 'pre-service', slides: [] })
       const wrapper = mountGrid({ selectedSlot: slot })
-      await wrapper.get('[data-testid="slide-grid-import"]').trigger('click')
+      // Moved-control edit: was a click on the deleted `slide-grid-import`
+      // button; the same modal-opening path is now the tile's `browse` emit.
+      await wrapper.findComponent(SlideDropTarget).vm.$emit('browse')
       expect(wrapper.findComponent(PptxImportModal).props('open')).toBe(true)
 
       await wrapper.findComponent(PptxImportModal).vm.$emit('confirmed', { importId: 'deck-1', section: 'pre-service' })
@@ -1367,6 +1401,66 @@ describe('SlideGrid', () => {
 
       expect(wrapper.findComponent(PptxImportModal).props('open')).toBe(true)
       expect(mockUploadImage).toHaveBeenCalledWith('org-1', 'import-abc', file, 0)
+    })
+  })
+
+  // --- Phase 36 (R053), the phase invariant: relocating the affordance must
+  // not change ＋ Add slide, the merged media panel, or the drag path. ---
+  describe('36-01 phase invariant — moved controls only, nothing re-implemented', () => {
+    it('＋ Add slide keeps its class attribute byte-for-byte, including its px-2.5 py-1.5 pre-existing exception', () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const wrapper = mountGrid({ selectedSlot: slot, isEditor: true })
+      expect(wrapper.get('[data-testid="slide-grid-add-slide"]').attributes('class')).toBe(
+        'ml-auto inline-flex items-center gap-1.5 rounded-md border border-gray-700 bg-gray-800 px-2.5 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:bg-gray-700',
+      )
+    })
+
+    it('the deleted import button block is gone from source entirely, not merely hidden', async () => {
+      const fs = await import('node:fs')
+      const path = await import('node:path')
+      const source = fs.readFileSync(
+        path.resolve(__dirname, '../SlideGrid.vue'),
+        'utf-8',
+      )
+      const withoutComments = source
+        .split('\n')
+        .filter((line) => !line.trim().startsWith('<!--'))
+        .join('\n')
+      expect(withoutComments).not.toContain('slide-grid-import')
+    })
+
+    it('the merged group-media panel still renders both music and background controls, unchanged, for an editable group', () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const wrapper = mountGrid({ selectedSlot: slot, isEditor: true })
+      const panel = wrapper.get('[data-testid="slide-grid-group-media-panel"]')
+      expect(panel.findComponent(SlideGroupMusicControl).exists()).toBe(true)
+      expect(panel.find('[data-testid="slide-grid-group-background"]').exists()).toBe(true)
+    })
+
+    it('the drop tile is still the last child of the cards container, keeping SortableJS index arithmetic unchanged', () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const assembledSlideshow = [makeAssembled(0, 'c1'), makeAssembled(0, 'c2')]
+      const wrapper = mountGrid({ selectedSlot: slot, assembledSlideshow, isEditor: true })
+      const container = wrapper.get('[data-testid="slide-grid-cards"]')
+      const lastChild = container.element.children[container.element.children.length - 1]!
+      expect(lastChild.getAttribute('data-testid')).toBe('slide-drop-target')
+      expect(lastChild.classList.contains('slide-card')).toBe(false)
+    })
+
+    it('with the import button deleted, ＋ Add slide is still the last control in the header row, keeping its ml-auto right-alignment', () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const wrapper = mountGrid({ selectedSlot: slot, isEditor: true })
+      const addSlide = wrapper.get('[data-testid="slide-grid-add-slide"]')
+      expect(addSlide.attributes('class')).toContain('ml-auto')
+    })
+
+    it('on a zero-slide non-song editable group, the empty-state tile is clickable under the same condition as the populated branch', () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const wrapper = mountGrid({ selectedSlot: slot, assembledSlideshow: [], isEditor: true })
+      expect(wrapper.get('[data-testid="slide-grid-empty-state"]').text()).toContain(
+        'Add a slide, or click below to import.',
+      )
+      expect(wrapper.findComponent(SlideDropTarget).props('clickable')).toBe(true)
     })
   })
 
@@ -1519,15 +1613,21 @@ describe('SlideGrid', () => {
       return makeSlot({ kind: 'SONG', id, position: 0, songId: 's1', songTitle: 'X', songKey: null, requiredVwType: 1 } as never)
     }
 
-    it('renders no Add slide or Import button for a song group, and both for a non-song group', () => {
+    // Moved-control edit (Phase 36 R053): the deleted import button's own
+    // testid assertion is kept (it must never exist); the equivalent
+    // "import affordance is present for a non-song group, absent for a song
+    // group" is now expressed as the tile's `clickable` prop.
+    it('renders no Add slide button, and a non-clickable tile, for a song group; both the add-slide button and a clickable tile for a non-song group', () => {
       const songWrapper = mountGrid({ selectedSlot: makeSongSlot() })
       expect(songWrapper.find('[data-testid="slide-grid-add-slide"]').exists()).toBe(false)
       expect(songWrapper.find('[data-testid="slide-grid-import"]').exists()).toBe(false)
+      expect(songWrapper.findComponent(SlideDropTarget).props('clickable')).toBe(false)
 
       const otherSlot = makeSlot({ kind: 'PRAYER', id: 'slot-2', position: 0 })
       const otherWrapper = mountGrid({ selectedSlot: otherSlot })
       expect(otherWrapper.find('[data-testid="slide-grid-add-slide"]').exists()).toBe(true)
-      expect(otherWrapper.find('[data-testid="slide-grid-import"]').exists()).toBe(true)
+      expect(otherWrapper.find('[data-testid="slide-grid-import"]').exists()).toBe(false)
+      expect(otherWrapper.findComponent(SlideDropTarget).props('clickable')).toBe(true)
     })
 
     it('shows a read-only badge for a song group and none for a non-song group', () => {
@@ -1854,7 +1954,10 @@ describe('SlideGrid - locked service (R036)', () => {
     return makeSlot({ kind: 'SONG', id, position: 0, songId: 'song-1', songTitle: 'This Is Our God', songKey: null, requiredVwType: 1 } as never)
   }
 
-  it('removes ＋ Add slide, ⇪ Import and the drop tile — removed, never disabled (D-05)', () => {
+  // The `⇪ Import` testid check stays even though the button no longer
+  // exists at all (36-01) — it is still a valid regression guard that the
+  // deleted control never resurfaces.
+  it('removes ＋ Add slide and the drop tile — removed, never disabled (D-05)', () => {
     const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
     const wrapper = mountGrid({ selectedSlot: slot, serviceLocked: true })
 

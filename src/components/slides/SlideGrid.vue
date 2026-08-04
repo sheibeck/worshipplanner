@@ -24,13 +24,6 @@
           data-testid="slide-grid-add-slide"
           @click="onAddSlide"
         >＋ Add slide</button>
-        <button
-          v-if="canMutateGroup"
-          type="button"
-          class="inline-flex items-center gap-1.5 rounded-md border border-gray-700 bg-gray-800 px-2.5 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:bg-gray-700"
-          data-testid="slide-grid-import"
-          @click="openImportModal"
-        >⇪ Import into this group</button>
         <!-- R054: a song group's slides are canonical, edited only from the
              Song Lyrics screen — a quiet marker rather than silence, matching
              the drawer's own read-only affordance.
@@ -183,7 +176,13 @@
           <!-- Always the LAST grid item (D-13) — deliberately NOT given the
                `.slide-card` class SortableJS is scoped to. Gone when locked: the
                card grid simply ends at the last real card. -->
-          <SlideDropTarget v-if="canWriteGroupMedia" :audio-only="isSongGroup" @drop="onFilesDropped" />
+          <SlideDropTarget
+            v-if="canWriteGroupMedia"
+            :audio-only="isSongGroup"
+            :clickable="canMutateGroup"
+            @drop="onFilesDropped"
+            @browse="openImportModal"
+          />
         </div>
         <template v-else>
           <!-- ★ R036 locked variant (31-UI-SPEC E2). "Add a slide, or drop a file
@@ -199,10 +198,16 @@
                 ? 'A song\'s slides come from its lyrics — add them in Song Lyrics.'
                 : serviceLocked
                   ? 'Reopen the service for editing to add slides.'
-                  : 'Add a slide, or drop a file below.' }}
+                  : 'Add a slide, or click below to import.' }}
             </p>
           </div>
-          <SlideDropTarget v-if="canWriteGroupMedia" :audio-only="isSongGroup" @drop="onFilesDropped" />
+          <SlideDropTarget
+            v-if="canWriteGroupMedia"
+            :audio-only="isSongGroup"
+            :clickable="canMutateGroup"
+            @drop="onFilesDropped"
+            @browse="openImportModal"
+          />
         </template>
       </div>
     </template>
