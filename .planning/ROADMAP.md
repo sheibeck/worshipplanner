@@ -352,7 +352,7 @@ Plans:
 | 31. Service Lifecycle — Draft Lock & Reopen | v1.4 | 6/6 | Complete    | 2026-07-30 |
 | 32. Save Reliability — Autosave Fix & Persistent Status | v1.4 | 6/6 | In Progress|  |
 | 33. Backgrounds & Slide Editing | v1.4 | 9/9 | In Progress|  |
-| 34. Smarter Content — LLM Scripture Split | v1.4 | 11/12 | In Progress|  |
+| 34. Smarter Content — LLM Scripture Split | v1.4 | 12/12 | In Progress|  |
 | 35. Presentation Correctness & Lyric Editor | v1.4 | 4/4 | In Progress|  |
 | 36. UI Rework — Service Order & Contextual Action Bars | v1.4 | 0/TBD | Not started | - |
 | 37. PowerPoint Server-Side Rendering | v1.4 | 6/6 | In Progress|  |
