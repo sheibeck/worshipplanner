@@ -3,17 +3,17 @@ gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Service and Slides
 current_phase: 36
-status: executing
-stopped_at: Completed 36-04-PLAN.md
-last_updated: "2026-08-04T13:22:40.646Z"
+status: verifying
+stopped_at: Completed 36-05-PLAN.md (phase 36 code-complete)
+last_updated: "2026-08-04T14:06:28.863Z"
 last_activity: 2026-08-03
 last_activity_desc: Completed 36-01-PLAN.md (SlideDropTarget clickable variant, SlideGrid import-button deletion, R053)
 progress:
   total_phases: 9
-  completed_phases: 8
+  completed_phases: 9
   total_plans: 57
-  completed_plans: 56
-  percent: 89
+  completed_plans: 57
+  percent: 100
 current_phase_name: PowerPoint Server-Side Rendering
 ---
 
@@ -77,7 +77,7 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 
 Phase: 36 — EXECUTING
 Plan: 5 of 5
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-08-03 — Completed 36-01-PLAN.md (SlideDropTarget clickable variant, SlideGrid import-button deletion, R053)
 
 ## ★ v1.4 AUTONOMOUS RUN — standing decisions (2026-07-28)
@@ -1059,6 +1059,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 36 P02 | 20min | 2 tasks | 5 files |
 | Phase 36 P03 | 35min | 3 tasks | 4 files |
 | Phase 36 P04 | 25min | 2 tasks | 2 files |
+| Phase 36 P05 | 65min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -1310,6 +1311,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 36-03: preserved the live ungated export/copy visibility (36-02's recorded divergence) rather than 36-UI-SPEC's illustrative canEditService-gated version
 - [Phase ?]: 36-03: unstubbed ContextualActionBar across all 24 pre-existing ServiceEditorView.test.ts mountView helpers (one replace_all edit) rather than rewriting selectors — every pre-existing assertion passed unmodified
 - [Phase ?]: 36-04: addSlot gains additive targetSection param; section-band headers gain slide count + per-band Add item chip row; Task 1 unit-observable only via Task 2's UI (no defineExpose on ServiceEditorView)
+- [Phase ?]: 36-05: ROADMAP criterion 4 stays recorded as satisfied in interaction pattern only (Add slide stays grid-local per 36-UI-SPEC Finding 2; Add music superseded by owner F2) — dated corrections in REQUIREMENTS.md/ROADMAP.md re-confirmed, not upgraded.
+- [Phase ?]: 36-05: the mandated gate command 'npx vitest run --dir src' bypasses vite.config.ts's relative exclude for src/rules.test.ts (path-rebase side effect of --dir), leaking the emulator-dependent rules suite in as a false third failure in this environment; documented and worked around with an explicit basename exclude, not silently smoothed over.
 
 ### Roadmap Evolution
 
@@ -1371,6 +1374,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-04T13:22:32.557Z
-Stopped at: Completed 36-04-PLAN.md
+Last session: 2026-08-04T14:06:28.828Z
+Stopped at: Completed 36-05-PLAN.md (phase 36 code-complete)
 Resume file: None

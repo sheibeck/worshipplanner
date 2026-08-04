@@ -306,14 +306,14 @@ Plans:
   4. "Add slide" lives in the contextual action bar, and a group's own drag-and-drop zone doubles as the import affordance — the separate "Import into this Group" button is gone. *(Corrected 2026-08-03 by 36-UI-SPEC: the "Add music to this group" clause is **superseded**. Design "1a" shows group music as its own inline panel, never in a bar, and owner UAT finding F2 — landed as `34-11` — explicitly asked for group music and background to sit together in one panel. R053 corrected in REQUIREMENTS.md with the same evidence.)*
   5. The Roles tab is last in the tab order
 
-**Plans**: 4/5 plans executed
+**Plans**: 5/5 plans executed
 Plans:
 
 - [x] 36-01-PLAN.md — R053: the group drop zone becomes the click-to-import affordance; the separate Import button is deleted (wave 1)
 - [x] 36-02-PLAN.md — R068a: the shared ContextualActionBar component and the PURE per-tab item builder that makes R068's acceptance test data-level (wave 1)
 - [x] 36-03-PLAN.md — R068b + R069: the bar wired into the page header, Present relocated per design 1a, tabs reordered to Service Order · Slides · Roles (wave 2)
 - [x] 36-04-PLAN.md — R067a: per-band section headers with slide counts and per-band ＋ Add item; addSlot gains an additive targetSection (wave 3)
-- [ ] 36-05-PLAN.md — R067b: the dashed ＋ Add to the service palette replaces the Add Element dropdown, plus the Service Order preservation sweep and the phase gate (wave 4)
+- [x] 36-05-PLAN.md — R067b: the dashed ＋ Add to the service palette replaces the Add Element dropdown, plus the Service Order preservation sweep and the phase gate (wave 4)
 
 **UI hint**: yes
 **Research flag**: standard/UI-heavy — no deep technical uncertainty, but real sequencing risk: this phase must land LAST among UI work, after Phase 31's Service Order layout and Phase 33's Slides layout both finalize, or the action bar needs rework.
@@ -363,7 +363,7 @@ Plans:
 | 33. Backgrounds & Slide Editing | v1.4 | 9/9 | In Progress|  |
 | 34. Smarter Content — LLM Scripture Split | v1.4 | 12/12 | In Progress|  |
 | 35. Presentation Correctness & Lyric Editor | v1.4 | 4/4 | In Progress|  |
-| 36. UI Rework — Service Order & Contextual Action Bars | v1.4 | 4/5 | In Progress|  |
+| 36. UI Rework — Service Order & Contextual Action Bars | v1.4 | 5/5 | In Progress|  |
 | 37. PowerPoint Server-Side Rendering | v1.4 | 6/6 | In Progress|  |
 
 ## Backlog
