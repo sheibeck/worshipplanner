@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Service and Slides
+current_phase: 36
 status: executing
-stopped_at: "Completed 34-08-PLAN.md (Phase 34 gap closure complete: composed pipeline proof, validation/PENDING-VERIFICATION records, R064/R070/R071 corrected, phase gate green, 12/12 plans executed)"
-last_updated: "2026-08-04T02:25:55.047Z"
+stopped_at: Completed 36-01-PLAN.md
+last_updated: "2026-08-04T03:30:15.172Z"
 last_activity: 2026-08-03
-last_activity_desc: Phase null execution started
+last_activity_desc: Completed 36-01-PLAN.md (SlideDropTarget clickable variant, SlideGrid import-button deletion, R053)
 progress:
   total_phases: 9
   completed_phases: 8
-  total_plans: 52
-  completed_plans: 52
+  total_plans: 57
+  completed_plans: 53
   percent: 89
-current_phase: 37
 current_phase_name: PowerPoint Server-Side Rendering
 ---
 
@@ -75,10 +75,10 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 
 ## Current Position
 
-Phase: null — EXECUTING
-Plan: 1 of ?
-Status: Executing Phase null
-Last activity: 2026-08-03 — Phase null execution started
+Phase: 36 — EXECUTING
+Plan: 2 of 5
+Status: Ready to execute
+Last activity: 2026-08-03 — Completed 36-01-PLAN.md (SlideDropTarget clickable variant, SlideGrid import-button deletion, R053)
 
 ## ★ v1.4 AUTONOMOUS RUN — standing decisions (2026-07-28)
 
@@ -1055,6 +1055,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 34 P07 | 45min | 3 tasks | 8 files |
 | Phase 34 P12 | 35min | 3 tasks | 5 files |
 | Phase 34 P08 | 60min | 3 tasks | 5 files |
+| Phase 36 P01 | 8min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -1299,6 +1300,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 34-07: no free-text scripture override anywhere — owner shown the D-13/D-15 shadow-copy tension and declined it; fetch-then-split inside CongregationalEditor is the only route to slide text
 - [Phase ?]: 34-12: F5 diagnosed as cause 1 (org doc lacks credentials, not a load-order regression); no fix to auth.ts, R071 written and delivered as a UX explanation note beside Copy for PC
 - [Phase ?]: Phase 34 gap closure complete (34-08): composed slot->group->slide pipeline proven end to end; phase gate green (type-check, vitest --dir src at documented baseline, build); R064/R070/R071 corrected to match delivery; 12/12 Phase 34 plans executed.
+- [Phase ?]: 36-01: SlideDropTarget's clickable prop is independent of audioOnly; SlideGrid alone binds :clickable="canMutateGroup" (never canWriteGroupMedia), replicating the deleted import button's exact prior gating
 
 ### Roadmap Evolution
 
@@ -1360,6 +1362,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-04T02:07:24.017Z
-Stopped at: Completed 34-08-PLAN.md (Phase 34 gap closure complete: composed pipeline proof, validation/PENDING-VERIFICATION records, R064/R070/R071 corrected, phase gate green, 12/12 plans executed)
+Last session: 2026-08-04T03:29:36.788Z
+Stopped at: Completed 36-01-PLAN.md
 Resume file: None

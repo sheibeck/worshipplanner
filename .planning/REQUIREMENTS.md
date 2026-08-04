@@ -131,7 +131,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 - [x] **R052** (core-capability): The 3-dot menu offers "Edit details" and "Edit lyrics" as separate
       drawers, replacing the arrow affordance and the multi-tab single drawer.
 
-- [ ] **R053** (quality-attribute): The group's drag-and-drop zone doubles as the import affordance when
+- [x] **R053** (quality-attribute): The group's drag-and-drop zone doubles as the import affordance when
       clicked; the separate "Import into this Group" button is removed. "Add slide" moves into the
       contextual action bar (R068).
       **Correction (2026-08-03, Phase 36 UI-SPEC):** the "Add music to this group" clause is
@@ -322,7 +322,7 @@ Acknowledged, deferred, not in this roadmap.
 | R050 | Phase 29 | Complete |
 | R051 | Phase 33 | Complete |
 | R052 | Phase 33 | Complete |
-| R053 | Phase 36 | Pending |
+| R053 | Phase 36 | Complete |
 | R054 | Phase 30 | Complete |
 | R055 | Phase 33 | Complete |
 | R056 | Phase 33 | Complete |
