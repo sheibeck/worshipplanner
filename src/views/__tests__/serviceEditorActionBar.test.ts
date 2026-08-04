@@ -33,7 +33,6 @@ function makeHandlers() {
   return {
     suggestAllSongs: vi.fn(),
     onExportToPC: vi.fn(),
-    onCopyForPC: vi.fn(),
     onSave: vi.fn(),
     onPresent: vi.fn(),
   }
@@ -42,12 +41,10 @@ function makeHandlers() {
 function makeContext(overrides: Partial<ActionBarContext> = {}): ActionBarContext {
   return {
     canEditService: true,
-    hasService: true,
     hasSermonContext: true,
     aiSuggestingAll: false,
     hasPcCredentials: true,
     isExporting: false,
-    pcCopied: false,
     serviceStatus: 'planned',
     isDirty: true,
     isSaving: false,
@@ -67,11 +64,9 @@ const BOOLEAN_FLAG_KEYS = [
   'aiSuggestingAll',
   'hasPcCredentials',
   'isExporting',
-  'pcCopied',
   'isDirty',
   'isSaving',
   'canPresent',
-  'hasService',
 ] as const
 
 const STATUSES: ActionBarContext['serviceStatus'][] = ['draft', 'planned', 'exported']
@@ -122,10 +117,12 @@ describe('buildActionBarItems', () => {
         expected: ['suggest-all-songs', 'export-pc', 'save'],
       },
       {
-        name: 'service-order, canEditService true, hasPcCredentials false',
+        // Owner follow-up: Copy for PC deleted entirely — no export/copy item
+        // renders at all when there are no credentials, only suggest + save.
+        name: 'service-order, canEditService true, hasPcCredentials false — no export/copy item at all',
         tab: 'service-order',
         overrides: { canEditService: true, hasPcCredentials: false },
-        expected: ['suggest-all-songs', 'copy-pc', 'save'],
+        expected: ['suggest-all-songs', 'save'],
       },
       {
         name: 'service-order, canEditService false, hasPcCredentials true (preserves the ungated export)',
@@ -134,10 +131,13 @@ describe('buildActionBarItems', () => {
         expected: ['export-pc'],
       },
       {
-        name: 'service-order, canEditService false, hasPcCredentials false (preserves the ungated copy)',
+        // Owner follow-up: with no credentials AND no edit permission, the bar
+        // is now completely empty — there is no replacement affordance for
+        // the deleted Copy for PC button.
+        name: 'service-order, canEditService false, hasPcCredentials false — empty bar, no replacement affordance',
         tab: 'service-order',
         overrides: { canEditService: false, hasPcCredentials: false },
-        expected: ['copy-pc'],
+        expected: [],
       },
     ]
 
@@ -155,12 +155,14 @@ describe('buildActionBarItems', () => {
     expect(keys.indexOf('present')).toBe(keys.indexOf('save') - 1)
   })
 
-  it('ORDERING: service-order with canEditService true is suggest, then export-or-copy, then save', () => {
+  it('ORDERING: service-order with canEditService true is suggest, then export (when credentialed), then save', () => {
     const credentialed = keysOf('service-order', makeContext({ canEditService: true, hasPcCredentials: true }))
     expect(credentialed).toEqual(['suggest-all-songs', 'export-pc', 'save'])
 
+    // Owner follow-up: uncredentialed no longer inserts a copy-pc item — the
+    // export slot is simply absent, so suggest sits directly before save.
     const uncredentialed = keysOf('service-order', makeContext({ canEditService: true, hasPcCredentials: false }))
-    expect(uncredentialed).toEqual(['suggest-all-songs', 'copy-pc', 'save'])
+    expect(uncredentialed).toEqual(['suggest-all-songs', 'save'])
   })
 
   it('IDEMPOTENCY: two successive calls with the same context return equal key arrays', () => {
@@ -201,10 +203,6 @@ describe('buildActionBarItems', () => {
     expect(suggest?.onClick).toBe(ctx.handlers.suggestAllSongs)
     expect(exportItem?.onClick).toBe(ctx.handlers.onExportToPC)
     expect(save?.onClick).toBe(ctx.handlers.onSave)
-
-    const copyCtx = makeContext({ canEditService: true, hasPcCredentials: false })
-    const copyItem = buildActionBarItems('service-order', copyCtx).find((item) => item.key === 'copy-pc')
-    expect(copyItem?.onClick).toBe(copyCtx.handlers.onCopyForPC)
 
     const slidesCtx = makeContext({ canEditService: false })
     const present = buildActionBarItems('slides', slidesCtx).find((item) => item.key === 'present')
@@ -275,41 +273,32 @@ describe('buildActionBarItems', () => {
       expect(planned?.disabled).toBe(false)
     })
 
-    it('copy-pc label/icon toggle on pcCopied, and is disabled exactly when !hasService', () => {
-      const notCopied = buildActionBarItems(
+    // Owner follow-up: Copy for PC is deleted entirely, not merely relabeled —
+    // `buildExportOrCopyItem` returns `undefined` with no credentials, so no
+    // `copy-pc` key can ever appear in a built item list. Restated here (the
+    // LEAK TEST and GATING MATRIX above already assert this at the array
+    // level) as a direct pin against the specific find-by-key lookup this
+    // block otherwise exercises for every other key.
+    it('no copy-pc item is ever produced, with or without canEditService, once credentials are absent', () => {
+      const editorNoCreds = buildActionBarItems(
         'service-order',
-        makeContext({ canEditService: true, hasPcCredentials: false, pcCopied: false, hasService: true }),
+        makeContext({ canEditService: true, hasPcCredentials: false }),
       ).find((i) => i.key === 'copy-pc')
-      expect(notCopied?.label).toBe('Copy for PC')
-      expect(notCopied?.icon).toBe('copy')
-      expect(notCopied?.disabled).toBe(false)
+      expect(editorNoCreds).toBeUndefined()
 
-      const copied = buildActionBarItems(
+      const viewerNoCreds = buildActionBarItems(
         'service-order',
-        makeContext({ canEditService: true, hasPcCredentials: false, pcCopied: true }),
+        makeContext({ canEditService: false, hasPcCredentials: false }),
       ).find((i) => i.key === 'copy-pc')
-      expect(copied?.label).toBe('Copied!')
-      expect(copied?.icon).toBe('check')
-
-      const noService = buildActionBarItems(
-        'service-order',
-        makeContext({ canEditService: true, hasPcCredentials: false, hasService: false }),
-      ).find((i) => i.key === 'copy-pc')
-      expect(noService?.disabled).toBe(true)
+      expect(viewerNoCreds).toBeUndefined()
     })
 
-    it('export-pc and copy-pc carry their preserved testids', () => {
+    it('export-pc carries its preserved testid', () => {
       const exportItem = buildActionBarItems(
         'service-order',
         makeContext({ canEditService: true, hasPcCredentials: true }),
       ).find((i) => i.key === 'export-pc')
       expect(exportItem?.testId).toBe('export-pc-btn')
-
-      const copyItem = buildActionBarItems(
-        'service-order',
-        makeContext({ canEditService: true, hasPcCredentials: false }),
-      ).find((i) => i.key === 'copy-pc')
-      expect(copyItem?.testId).toBe('copy-pc-btn')
     })
 
     it('present carries the disabled title and testid exactly', () => {

@@ -5,11 +5,16 @@
  * separate from the component file, so a pure per-tab builder can import
  * just the types without pulling in any Vue runtime code.
  *
- * `ActionBarIcon` gains a `copy` member over 36-UI-SPEC §2's illustrative
- * union (`'none' | 'ai-sparkle' | 'upload' | 'check' | 'present' |
- * 'spinner'`) — the live `copy-pc` button renders a clipboard glyph and this
- * phase must not drop it just because the spec's own union omitted it
+ * `ActionBarIcon` originally gained a `copy` member over 36-UI-SPEC §2's
+ * illustrative union for the `copy-pc` button's clipboard glyph
  * (★ FLAGGED SPEC EXTENSION, 36-02-PLAN.md frontmatter `assumptions`).
+ * Removed along with the `Copy for PC` button itself per direct owner
+ * feedback on the running app ("let's get rid of the Copy for PC button all
+ * together, it's not useful at all") — an organization with no Planning
+ * Center credentials now has no export affordance in the action bar at all,
+ * only the credentials-missing note pointing at Settings
+ * (`ServiceEditorView.vue`). That is the owner's explicit, accepted
+ * consequence — do not add a replacement affordance.
  *
  * `ActionBarTone` originally gained a fourth `present` member per 36-UI-SPEC
  * §2's prose (outlined indigo), distinct from `primary` (filled indigo) so
@@ -32,7 +37,6 @@ export type ActionBarIcon =
   | 'ai-sparkle'
   | 'upload'
   | 'check'
-  | 'copy'
   | 'present'
   | 'spinner'
 

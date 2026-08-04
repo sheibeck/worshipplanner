@@ -527,7 +527,13 @@ beforeAll(async () => {
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-describe('ServiceEditorView - Print and Copy for PC buttons', () => {
+// Copy for PC was deleted entirely per direct owner feedback on the running
+// app ("let's get rid of the Copy for PC button all together, it's not
+// useful at all") — this describe block's two Copy-for-PC tests (clicking
+// showed "Copied!", clicking called navigator.clipboard.writeText) asserted
+// behavior the owner has now removed, so they are deleted rather than
+// updated. Print is unaffected and its coverage stays as-is.
+describe('ServiceEditorView - Print button', () => {
   beforeEach(() => {
     vi.spyOn(window, 'print').mockImplementation(() => {})
     Object.defineProperty(navigator, 'clipboard', {
@@ -573,23 +579,13 @@ describe('ServiceEditorView - Print and Copy for PC buttons', () => {
     expect(window.print).toHaveBeenCalledTimes(1)
   })
 
-  it('Copy for PC button exists and clicking it shows "Copied!" text', async () => {
+  // Owner follow-up: Copy for PC no longer renders at all, with no
+  // replacement affordance — the default (no-credentials) mock state this
+  // block mounts with used to render it.
+  it('Copy for PC no longer renders — deleted per owner feedback, no replacement affordance', async () => {
     const wrapper = await mountView()
-    const copyBtn = wrapper.find('[data-testid="copy-pc-btn"]')
-    expect(copyBtn.exists()).toBe(true)
-    await copyBtn.trigger('click')
-    await wrapper.vm.$nextTick()
-    expect(copyBtn.text()).toContain('Copied!')
-  })
-
-  it('Copy for PC button calls navigator.clipboard.writeText with a non-empty string', async () => {
-    const wrapper = await mountView()
-    const copyBtn = wrapper.find('[data-testid="copy-pc-btn"]')
-    await copyBtn.trigger('click')
-    await wrapper.vm.$nextTick()
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-      expect.stringContaining('ORDER OF SERVICE'),
-    )
+    expect(wrapper.find('[data-testid="copy-pc-btn"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="export-pc-btn"]').exists()).toBe(false)
   })
 })
 
@@ -668,7 +664,10 @@ describe('ServiceEditorView - Planning Center credentials-missing note (34-12 Ta
   it('never ungates the export affordance: export-pc-btn does not exist for a planned service without credentials', async () => {
     const wrapper = await mountView({ status: 'planned' })
     expect(wrapper.find('[data-testid="export-pc-btn"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="copy-pc-btn"]').exists()).toBe(true)
+    // Owner follow-up: Copy for PC is deleted, not merely still-gated — there
+    // is no replacement affordance for a credentials-less org. Do NOT read
+    // this false as a bug to "fix" by ungating export-pc-btn instead.
+    expect(wrapper.find('[data-testid="copy-pc-btn"]').exists()).toBe(false)
   })
 
   it('a viewer (cannot edit) never sees the credentials-missing note, even with no credentials configured', async () => {
@@ -677,16 +676,43 @@ describe('ServiceEditorView - Planning Center credentials-missing note (34-12 Ta
     expect(wrapper.find('[data-testid="pc-credentials-missing-note"]').exists()).toBe(false)
   })
 
-  // Regression: this plan added no condition to the Copy for PC button itself
-  // (only to the sibling note beside it) — its pre-existing behavior for the
-  // no-credentials case, which this file's "Print and Copy for PC buttons"
-  // block already exercises, is unaffected. Restated here for a status this
-  // plan explicitly names in its behavior list.
-  it('Copy for PC still renders and is clickable for a draft service with no credentials configured — unchanged by this plan', async () => {
+  // Owner follow-up superseded this test's original premise ("Copy for PC
+  // still renders ... unchanged by this plan"): the button is now deleted
+  // entirely, with the note as the sole affordance for a draft service with
+  // no credentials configured.
+  it('a draft service with no credentials configured shows the note and NO export/copy button of any kind', async () => {
     const wrapper = await mountView({ status: 'draft' })
-    const copyBtn = wrapper.find('[data-testid="copy-pc-btn"]')
-    expect(copyBtn.exists()).toBe(true)
-    expect(copyBtn.attributes('disabled')).toBeUndefined()
+    expect(wrapper.find('[data-testid="copy-pc-btn"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="export-pc-btn"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="pc-credentials-missing-note"]').exists()).toBe(true)
+  })
+
+  // ★★ THE TRAP (owner follow-up 3/4): the note used to render only when a
+  // `copy-pc` item existed in the action-bar list, which incidentally kept
+  // it off Slides/Roles — the exact R068 leak defect this codebase already
+  // fixed once (`Suggest All Songs`/`Copy for PC` bleeding onto every tab).
+  // Deleting `copy-pc` destroyed that free coupling, so the note now carries
+  // an EXPLICIT `activeTab === 'service-order'` gate — pinned here as its
+  // own dedicated regression, not merely inferred from the general
+  // contextual-action-bar-wiring suite below.
+  it('the note is Service-Order-only: present on Service Order, absent on Slides and on Roles, for the identical no-credentials editor state', async () => {
+    const wrapper = await mountView({ status: 'draft' })
+    expect(wrapper.find('[data-testid="pc-credentials-missing-note"]').exists()).toBe(true)
+
+    const slidesTab = wrapper.findAll('button').find((b) => b.text() === 'Slides')
+    await slidesTab!.trigger('click')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('[data-testid="pc-credentials-missing-note"]').exists()).toBe(false)
+
+    const rolesTab = wrapper.findAll('button').find((b) => b.text() === 'Roles')
+    await rolesTab!.trigger('click')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('[data-testid="pc-credentials-missing-note"]').exists()).toBe(false)
+
+    const serviceOrderTab = wrapper.findAll('button').find((b) => b.text() === 'Service Order')
+    await serviceOrderTab!.trigger('click')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('[data-testid="pc-credentials-missing-note"]').exists()).toBe(true)
   })
 })
 
@@ -775,13 +801,17 @@ describe('ServiceEditorView - contextual action bar wiring (36-03, R068)', () =>
     await wrapper.vm.$nextTick()
   }
 
-  it('Service Order + editor + unlocked + no credentials: Suggest, Copy for PC, Save and the R071 note all render', async () => {
+  it('Service Order + editor + unlocked + no credentials: Suggest, Save and the R071 note all render, with no export/copy button', async () => {
     const wrapper = await mountView({ status: 'draft' })
     await wrapper.vm.$nextTick()
 
     const texts = barButtons(wrapper).map((b) => b.text())
     expect(texts.some((t) => t.includes('Suggest All Songs'))).toBe(true)
-    expect(wrapper.find('[data-testid="copy-pc-btn"]').exists()).toBe(true)
+    // Owner follow-up: Copy for PC is deleted, and no replacement takes its
+    // place in the bar — the note (below the bar, asserted next) is the
+    // sole affordance for a credentials-less org.
+    expect(wrapper.find('[data-testid="copy-pc-btn"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="export-pc-btn"]').exists()).toBe(false)
     expect(texts.some((t) => t.includes('Save'))).toBe(true)
     const note = wrapper.find('[data-testid="pc-credentials-missing-note"]')
     expect(note.exists()).toBe(true)
@@ -862,7 +892,27 @@ describe('ServiceEditorView - contextual action bar wiring (36-03, R068)', () =>
     expect(viewer.props('initialIndex')).toBe(PRESENT_STUB_START_INDEX)
   })
 
-  it('viewer (isEditor false) on Service Order: no Suggest, no Save, no R071 note, but the export-or-copy control still renders — the preserved pre-phase gate (36-02-SUMMARY.md)', async () => {
+  // Owner follow-up: with the default no-credentials mock state, there is no
+  // export/copy item at all any more (Copy for PC deleted, no replacement),
+  // so this pair now sets credentials to prove the underlying invariant this
+  // test always meant to pin — export-pc renders unconditionally on
+  // `canEditService` (36-02-SUMMARY.md's preserved pre-phase gate) — using
+  // the ONE item that can still demonstrate it now that copy-pc is gone.
+  it('viewer (isEditor false) on Service Order, credentialed: no Suggest, no Save, no R071 note, but export-pc still renders — the preserved pre-phase gate (36-02-SUMMARY.md)', async () => {
+    mockAuthState.isEditor = false
+    mockAuthState.hasPcCredentials = true
+    mockAuthState.pcCredentials = { appId: 'placeholder-app-id', secret: 'placeholder-secret' }
+    const wrapper = await mountView({ status: 'planned' })
+    await wrapper.vm.$nextTick()
+
+    const texts = barButtons(wrapper).map((b) => b.text())
+    expect(texts.some((t) => t.includes('Suggest All Songs'))).toBe(false)
+    expect(texts.some((t) => t.includes('Save'))).toBe(false)
+    expect(wrapper.find('[data-testid="pc-credentials-missing-note"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="export-pc-btn"]').exists()).toBe(true)
+  })
+
+  it('viewer (isEditor false) on Service Order, uncredentialed: no Suggest, no Save, no R071 note (viewers never see it), and no export/copy button of any kind', async () => {
     mockAuthState.isEditor = false
     const wrapper = await mountView({ status: 'draft' })
     await wrapper.vm.$nextTick()
@@ -871,10 +921,13 @@ describe('ServiceEditorView - contextual action bar wiring (36-03, R068)', () =>
     expect(texts.some((t) => t.includes('Suggest All Songs'))).toBe(false)
     expect(texts.some((t) => t.includes('Save'))).toBe(false)
     expect(wrapper.find('[data-testid="pc-credentials-missing-note"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="copy-pc-btn"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="copy-pc-btn"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="export-pc-btn"]').exists()).toBe(false)
   })
 
-  it('locked editor (status planned) on Service Order: same expectation as the viewer row above — Export/Copy still renders', async () => {
+  it('locked editor (status planned), credentialed: same expectation as the credentialed viewer row above — export-pc still renders', async () => {
+    mockAuthState.hasPcCredentials = true
+    mockAuthState.pcCredentials = { appId: 'placeholder-app-id', secret: 'placeholder-secret' }
     const wrapper = await mountView({ status: 'planned' })
     await wrapper.vm.$nextTick()
 
@@ -882,7 +935,19 @@ describe('ServiceEditorView - contextual action bar wiring (36-03, R068)', () =>
     expect(texts.some((t) => t.includes('Suggest All Songs'))).toBe(false)
     expect(texts.some((t) => t.includes('Save'))).toBe(false)
     expect(wrapper.find('[data-testid="pc-credentials-missing-note"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="copy-pc-btn"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="export-pc-btn"]').exists()).toBe(true)
+  })
+
+  it('locked editor (status planned), uncredentialed: no export/copy button of any kind — the deleted Copy for PC leaves no replacement, and the note stays absent (canEditService is false while locked)', async () => {
+    const wrapper = await mountView({ status: 'planned' })
+    await wrapper.vm.$nextTick()
+
+    const texts = barButtons(wrapper).map((b) => b.text())
+    expect(texts.some((t) => t.includes('Suggest All Songs'))).toBe(false)
+    expect(texts.some((t) => t.includes('Save'))).toBe(false)
+    expect(wrapper.find('[data-testid="pc-credentials-missing-note"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="copy-pc-btn"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="export-pc-btn"]').exists()).toBe(false)
   })
 
   // ★ 34-10 SURVIVES (named regression guard): this plan relocates the
@@ -4697,7 +4762,10 @@ describe('ServiceEditorView - locked service renders all three tabs read-only (R
 
     // ---- D-08: the non-editing carve-outs stay live --------------------------
 
-    it(`${status}: Print, Share, Copy for PC and Delete all stay rendered and enabled`, async () => {
+    // Owner follow-up: Copy for PC dropped from this D-08 carve-out list — it
+    // no longer exists, deleted rather than gated, and no replacement takes
+    // its place. Print, Share and Delete are unaffected by that deletion.
+    it(`${status}: Print, Share and Delete all stay rendered and enabled; no export/copy button of any kind`, async () => {
       mockServicesList = [{ ...mockService, status }]
       const wrapper = await mountView()
 
@@ -4705,9 +4773,8 @@ describe('ServiceEditorView - locked service renders all three tabs read-only (R
       expect(printBtn.exists()).toBe(true)
       expect(printBtn.attributes('disabled')).toBeUndefined()
 
-      const copyBtn = wrapper.find('[data-testid="copy-pc-btn"]')
-      expect(copyBtn.exists()).toBe(true)
-      expect(copyBtn.attributes('disabled')).toBeUndefined()
+      expect(wrapper.find('[data-testid="copy-pc-btn"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="export-pc-btn"]').exists()).toBe(false)
 
       const shareBtn = wrapper.findAll('button').find((b) => b.text() === 'Share')
       expect(shareBtn).toBeDefined()
@@ -5560,17 +5627,22 @@ describe('ServiceEditorView - 32-05: migrated onto useAutoSave/useSaveStatus, st
     expect(wrapper.find('[data-testid="save-status"]').text()).toContain('Saved')
   })
 
-  it('the header Save area keeps Undo, Suggest All Songs, Mark as Planned and Export/Copy once the inline status block is removed', async () => {
+  // Owner follow-up: with the default no-credentials mock state, there is no
+  // export/copy button any more — Copy for PC was deleted, with no
+  // replacement. The credentials-missing note (now rendered below the
+  // button row rather than beside it) is the only surviving export-related
+  // affordance for this state, so it stands in for the old "Export/Copy"
+  // assertion here.
+  it('the header Save area keeps Undo, Suggest All Songs and Mark as Planned once the inline status block is removed; the credentials-missing note is the sole export affordance', async () => {
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
 
     expect(wrapper.find('[data-testid="mark-planned-btn"]').exists()).toBe(true)
     const buttons = wrapper.findAll('button')
     expect(buttons.some((b) => b.text().includes('Suggest All Songs'))).toBe(true)
-    const exportOrCopy =
-      wrapper.find('[data-testid="export-pc-btn"]').exists() ||
-      wrapper.find('[data-testid="copy-pc-btn"]').exists()
-    expect(exportOrCopy).toBe(true)
+    expect(wrapper.find('[data-testid="export-pc-btn"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="copy-pc-btn"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="pc-credentials-missing-note"]').exists()).toBe(true)
   })
 
   // ── Reporting into useSaveStatus ────────────────────────────────────────────

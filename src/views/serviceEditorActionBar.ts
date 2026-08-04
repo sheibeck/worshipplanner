@@ -20,14 +20,25 @@
  * ★ FLAGGED SPEC DIVERGENCE (36-02-PLAN.md frontmatter `assumptions`,
  * threat T-36-02-01): 36-UI-SPEC.md §3's illustrative code and its E3 row
  * both assert every Service Order item is `canEditService`-gated. Live
- * source disagrees — `ServiceEditorView.vue:166`'s Export to PC gate is
- * `authStore.hasPcCredentials` ALONE, and `:199`'s Copy for PC is a bare
- * `v-else`; neither carries `canEditService`, nor does the enclosing div at
- * `:97`. This module preserves that: `buildServiceOrderItems` pushes the
- * export/copy item unconditionally, only suggest-all-songs and save are
- * gated on `canEditService`. Preserving the phase invariant ("moving a
- * control must not change who can press it") outranks the spec's
- * illustrative code, per this plan's own stated central invariant.
+ * source disagrees — the export affordance's gate is
+ * `authStore.hasPcCredentials` ALONE, with no `canEditService` involved, nor
+ * does the enclosing div. This module preserves that: `buildServiceOrderItems`
+ * pushes the export item unconditionally (when one exists at all), only
+ * suggest-all-songs and save are gated on `canEditService`. Preserving the
+ * phase invariant ("moving a control must not change who can press it")
+ * outranks the spec's illustrative code, per this plan's own stated central
+ * invariant.
+ *
+ * ★ Owner follow-up (post-36-02): the `copy-pc` fallback item described
+ * below no longer exists. `buildExportOrCopyItem` now returns `undefined`
+ * when `hasPcCredentials` is false — direct owner feedback on the running
+ * app: "let's get rid of the Copy for PC button all together, it's not
+ * useful at all." An organization with no Planning Center credentials now
+ * has NO export affordance in the action bar; only the credentials-missing
+ * note (`ServiceEditorView.vue`, rendered below the bar and gated to the
+ * Service Order tab) points them at Settings. That is the owner's explicit,
+ * accepted consequence — do not add a replacement affordance and do not
+ * ungate `export-pc`.
  */
 import type { ActionBarItem } from '@/components/actionBarItems'
 
@@ -36,19 +47,16 @@ export type ActionBarTab = 'service-order' | 'roles' | 'slides'
 export interface ActionBarHandlers {
   suggestAllSongs: () => void
   onExportToPC: () => void
-  onCopyForPC: () => void
   onSave: () => void
   onPresent: () => void
 }
 
 export interface ActionBarContext {
   canEditService: boolean
-  hasService: boolean
   hasSermonContext: boolean
   aiSuggestingAll: boolean
   hasPcCredentials: boolean
   isExporting: boolean
-  pcCopied: boolean
   serviceStatus: 'draft' | 'planned' | 'exported'
   isDirty: boolean
   isSaving: boolean
@@ -67,30 +75,29 @@ function buildSuggestItem(ctx: ActionBarContext): ActionBarItem {
   }
 }
 
-function buildExportOrCopyItem(ctx: ActionBarContext): ActionBarItem {
-  if (ctx.hasPcCredentials) {
-    return {
-      key: 'export-pc',
-      testId: 'export-pc-btn',
-      label: ctx.isExporting ? 'Exporting...' : ctx.serviceStatus === 'exported' ? 'Exported' : 'Export to PC',
-      disabled: ctx.isExporting || ctx.serviceStatus !== 'planned',
-      title:
-        ctx.serviceStatus === 'draft'
-          ? 'Mark service as Planned to export'
-          : ctx.serviceStatus === 'exported'
-            ? 'Already exported to Planning Center'
-            : undefined,
-      icon: ctx.isExporting ? 'spinner' : ctx.serviceStatus === 'exported' ? 'check' : 'upload',
-      onClick: ctx.handlers.onExportToPC,
-    }
-  }
+/**
+ * Owner follow-up (post-36-02): returns `undefined` — no item at all — when
+ * there are no Planning Center credentials, instead of the `copy-pc`
+ * fallback button this used to build. Direct owner instruction: "let's get
+ * rid of the Copy for PC button all together, it's not useful at all." Do
+ * NOT ungate `export-pc` to fill the gap this leaves for an uncredentialed
+ * org — that consequence is intentional (see this file's head comment).
+ */
+function buildExportOrCopyItem(ctx: ActionBarContext): ActionBarItem | undefined {
+  if (!ctx.hasPcCredentials) return undefined
   return {
-    key: 'copy-pc',
-    testId: 'copy-pc-btn',
-    label: ctx.pcCopied ? 'Copied!' : 'Copy for PC',
-    disabled: !ctx.hasService,
-    icon: ctx.pcCopied ? 'check' : 'copy',
-    onClick: ctx.handlers.onCopyForPC,
+    key: 'export-pc',
+    testId: 'export-pc-btn',
+    label: ctx.isExporting ? 'Exporting...' : ctx.serviceStatus === 'exported' ? 'Exported' : 'Export to PC',
+    disabled: ctx.isExporting || ctx.serviceStatus !== 'planned',
+    title:
+      ctx.serviceStatus === 'draft'
+        ? 'Mark service as Planned to export'
+        : ctx.serviceStatus === 'exported'
+          ? 'Already exported to Planning Center'
+          : undefined,
+    icon: ctx.isExporting ? 'spinner' : ctx.serviceStatus === 'exported' ? 'check' : 'upload',
+    onClick: ctx.handlers.onExportToPC,
   }
 }
 
@@ -135,9 +142,13 @@ function buildServiceOrderItems(ctx: ActionBarContext): ActionBarItem[] {
   if (ctx.canEditService) {
     items.push(buildSuggestItem(ctx))
   }
-  // Export/copy renders regardless of canEditService, matching live source
-  // (see the flagged spec divergence in this file's head comment).
-  items.push(buildExportOrCopyItem(ctx))
+  // Export renders regardless of canEditService, matching live source (see
+  // the flagged spec divergence in this file's head comment) — and renders
+  // NOTHING at all when there are no PC credentials (owner follow-up).
+  const exportItem = buildExportOrCopyItem(ctx)
+  if (exportItem) {
+    items.push(exportItem)
+  }
   if (ctx.canEditService) {
     items.push(buildSaveItem(ctx))
   }

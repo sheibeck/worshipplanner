@@ -146,30 +146,42 @@
             <!-- 36-03 (R068): the one shared, declarative action bar
                  (ContextualActionBar.vue / buildActionBarItems, 36-02)
                  replaces the four unconditional buttons this comment block
-                 used to sit above — Suggest All Songs, Export/Copy for PC,
-                 and Save now render per-tab from `activeActionItems` instead
-                 of unconditionally on every tab. Present (design 1a) also
-                 renders here while the Slides tab is active, immediately
-                 left of Save, driven by `slidesTabRef`. -->
-            <ContextualActionBar :items="activeActionItems">
-              <!-- 34-12/R071 note, MOVED VERBATIM from its former position
-                   beside the Export/Copy buttons — same testid, same gate,
-                   same copy, same live router-link. `ContextualActionBar`
-                   renders this slot only when a `copy-pc` item is in the
-                   list, which already excludes the Slides/Roles tabs and the
-                   credentialed/locked/viewer cases for free. -->
-              <template #hint-copy-pc>
-                <span
-                  v-if="canEditService && !authStore.hasPcCredentials"
-                  data-testid="pc-credentials-missing-note"
-                  class="print:hidden text-xs text-gray-500"
-                >
-                  Planning Center export needs credentials for this organization —
-                  <router-link :to="{ name: 'settings' }" class="text-indigo-400 hover:text-indigo-300 underline">configure them in Settings</router-link>.
-                </span>
-              </template>
-            </ContextualActionBar>
+                 used to sit above — Suggest All Songs, Export to PC (no more
+                 Copy for PC fallback, owner follow-up), and Save now render
+                 per-tab from `activeActionItems` instead of unconditionally
+                 on every tab. Present (design 1a) also renders here while
+                 the Slides tab is active, immediately left of Save, driven
+                 by `slidesTabRef`. -->
+            <ContextualActionBar :items="activeActionItems" />
           </div>
+        </div>
+
+        <!-- 34-12/R071 note — owner follow-up moved it BELOW the button row
+             instead of inline beside it ("can we put [it] under the buttons
+             instead of alongside them"), at the same time `Copy for PC` was
+             deleted entirely. Same testid, same copy, same live router-link
+             as before the move.
+
+             ★ THE TRAP: this note used to render only when a `copy-pc` item
+             was in the action-bar list — a coupling that kept it off the
+             Slides/Roles tabs for free (R068's own regression: `Suggest All
+             Songs`/`Copy for PC` leaking onto every tab). Deleting `copy-pc`
+             destroys that coupling, so `activeTab === 'service-order'` is
+             now an EXPLICIT condition here, alongside the pre-existing
+             `canEditService && !authStore.hasPcCredentials` gate — asserted
+             absent on Slides and Roles in
+             `ServiceEditorView.test.ts` (R068 regression suite). -->
+        <div
+          v-if="activeTab === 'service-order' && canEditService && !authStore.hasPcCredentials"
+          class="flex justify-end -mt-1 mb-3"
+        >
+          <span
+            data-testid="pc-credentials-missing-note"
+            class="print:hidden text-xs text-gray-500"
+          >
+            Planning Center export needs credentials for this organization —
+            <router-link :to="{ name: 'settings' }" class="text-indigo-400 hover:text-indigo-300 underline">configure them in Settings</router-link>.
+          </span>
         </div>
 
         <!-- 32-05/32-UI-SPEC § 3: sticky save-status bar, mutually exclusive
@@ -1376,7 +1388,6 @@ import ContextualActionBar from '@/components/ContextualActionBar.vue'
 import { buildActionBarItems } from '@/views/serviceEditorActionBar'
 import { useSlideshowAssembly } from '@/composables/useSlideshowAssembly'
 import { useAutoSave } from '@/composables/useAutoSave'
-import { formatForPlanningCenter } from '@/utils/planningCenterExport'
 import { fetchServiceTypes, fetchTemplates, fetchServiceTypeTeams, fetchPlans, fetchPlanItems, createPlan, fetchTemplateItems, addSlotAsItem, buildPlanTitle, createItem, updateItem, deleteItem, createPlanTime, fetchPlanNeededPositionTeamIds, fetchTeamPositions, addNeededPosition } from '@/utils/planningCenterApi'
 import { serverTimestamp } from 'firebase/firestore'
 import Sortable from 'sortablejs'
@@ -1452,7 +1463,6 @@ const statusBadgeClasses: Record<string, string> = {
 const localService = ref<Service | null>(null)
 const originalService = ref<Service | null>(null)
 const isSaving = ref(false)
-const pcCopied = ref(false)
 
 // ── Autosave state ─────────────────────────────────────────────────────────────
 // 32-05: the hand-rolled status/timer/initialized/saving refs are gone —
@@ -2039,12 +2049,10 @@ const hasSermonContext = computed(
 const activeActionItems = computed(() =>
   buildActionBarItems(activeTab.value, {
     canEditService: canEditService.value,
-    hasService: !!localService.value,
     hasSermonContext: hasSermonContext.value,
     aiSuggestingAll: aiSuggestingAll.value,
     hasPcCredentials: authStore.hasPcCredentials,
     isExporting: isExporting.value,
-    pcCopied: pcCopied.value,
     serviceStatus: localService.value?.status ?? 'draft',
     isDirty: isDirty.value,
     isSaving: isSaving.value,
@@ -2052,7 +2060,6 @@ const activeActionItems = computed(() =>
     handlers: {
       suggestAllSongs,
       onExportToPC,
-      onCopyForPC,
       onSave,
       onPresent: () => slidesTabRef.value?.onPresentClick(),
     },
@@ -3011,22 +3018,14 @@ function checkScriptureOverlap(slot: ScriptureSlot): boolean {
 // Suppress unused warning — this function is available for future template use
 void checkScriptureOverlap
 
-// ── Print & Copy for PC ────────────────────────────────────────────────────────
+// ── Print ──────────────────────────────────────────────────────────────────────
+// Copy for PC was removed per direct owner feedback on the running app
+// ("let's get rid of the Copy for PC button all together, it's not useful
+// at all") — see serviceEditorActionBar.ts's head comment for the accepted
+// consequence (no export affordance at all for an uncredentialed org).
 
 function onPrint() {
   window.print()
-}
-
-async function onCopyForPC() {
-  if (!localService.value) return
-  const text = formatForPlanningCenter(localService.value, songStore.songs)
-  if (navigator.clipboard) {
-    await navigator.clipboard.writeText(text)
-  }
-  pcCopied.value = true
-  setTimeout(() => {
-    pcCopied.value = false
-  }, 2000)
 }
 
 async function checkForExistingPlan() {
