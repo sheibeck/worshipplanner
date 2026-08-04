@@ -2035,10 +2035,14 @@ describe('ServiceEditorView - Slides tab (Phase 25-03)', () => {
     mockServicesList = [mockService]
   })
 
-  it('renders three tab buttons, the third reading Slides', async () => {
+  // MOVED-CONTROL (36-03, R069): the rendered order changed from
+  // Service Order · Roles · Slides to Service Order · Slides · Roles — the
+  // buttons, their gates and their click behaviour are unchanged, only their
+  // position. Was 'renders three tab buttons, the third reading Slides'.
+  it('renders three tab buttons in order Service Order, Slides, Roles', async () => {
     const wrapper = await mountView()
     const tabButtons = wrapper.findAll('button').filter((b) => ['Service Order', 'Roles', 'Slides'].includes(b.text()))
-    expect(tabButtons.map((b) => b.text())).toEqual(['Service Order', 'Roles', 'Slides'])
+    expect(tabButtons.map((b) => b.text())).toEqual(['Service Order', 'Slides', 'Roles'])
   })
 
   it('viewer: the Slides button is present while the Roles button is not', async () => {
@@ -2130,9 +2134,12 @@ describe('ServiceEditorView - Slides tab (Phase 25-03)', () => {
     expect(wrapper.find('[data-testid="page-level-import"]').exists()).toBe(false)
   })
 
+  // MOVED-CONTROL (36-03, R069): the index-based lookup itself is unaffected
+  // by the reorder (Service Order is still index 0 either way), restated here
+  // only so the filter's own literal order documents the new rendered order.
   it('the first tab button still reads Service Order', async () => {
     const wrapper = await mountView()
-    const firstTabBtn = wrapper.findAll('button').filter((b) => ['Service Order', 'Roles', 'Slides'].includes(b.text()))[0]
+    const firstTabBtn = wrapper.findAll('button').filter((b) => ['Service Order', 'Slides', 'Roles'].includes(b.text()))[0]
     expect(firstTabBtn?.text()).toBe('Service Order')
   })
 

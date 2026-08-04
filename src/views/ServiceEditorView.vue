@@ -584,7 +584,11 @@
           </button>
         </div>
 
-        <!-- Tab bar: Service Order / Roles (Roles tab is editor-only — Phase 16.2 removal decision) -->
+        <!-- Tab bar: Service Order / Slides / Roles (Roles tab is editor-only
+             — Phase 16.2 removal decision). R069 (36-03): Slides sits between
+             Service Order and Roles — a reposition of the existing three
+             buttons, not a restyle; each button keeps its own class strings,
+             `:class` expression and `@click` assignment unchanged. -->
         <div class="flex items-center gap-1 mb-3 border-b border-gray-800 pb-0">
           <button
             type="button"
@@ -596,19 +600,8 @@
           >
             Service Order
           </button>
-          <button
-            v-if="authStore.isEditor"
-            type="button"
-            class="px-4 py-2 text-sm font-medium rounded-t-md transition-colors -mb-px border-b-2"
-            :class="activeTab === 'roles'
-              ? 'text-indigo-300 border-indigo-500 bg-gray-900'
-              : 'text-gray-400 border-transparent hover:text-gray-200 hover:border-gray-600'"
-            @click="activeTab = 'roles'"
-          >
-            Roles
-          </button>
           <!-- Slides tab: visible to viewers as well as editors (R031) — not
-               gated like Roles above. Write controls inside the panel are
+               gated like Roles below. Write controls inside the panel are
                gated separately by the editor flag SlidesTab receives. Label
                stays "Slides" here; the first tab was renamed to
                "Service Order" in Phase 27 (UI-SPEC Mockup Correction 5). -->
@@ -621,6 +614,17 @@
             @click="activeTab = 'slides'"
           >
             Slides
+          </button>
+          <button
+            v-if="authStore.isEditor"
+            type="button"
+            class="px-4 py-2 text-sm font-medium rounded-t-md transition-colors -mb-px border-b-2"
+            :class="activeTab === 'roles'
+              ? 'text-indigo-300 border-indigo-500 bg-gray-900'
+              : 'text-gray-400 border-transparent hover:text-gray-200 hover:border-gray-600'"
+            @click="activeTab = 'roles'"
+          >
+            Roles
           </button>
         </div>
 
