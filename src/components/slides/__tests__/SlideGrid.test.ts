@@ -879,6 +879,133 @@ describe('SlideGrid', () => {
     })
   })
 
+  // --- 34-11 Task 2 (34-UAT F2): the merge changed layout, not behaviour —
+  // pinned as executable assertions rather than a commit-message claim. ---
+  describe('group media panel — no-behaviour-change regression (34-11 Task 2)', () => {
+    it('renders the caption inside the panel with the real card count for two different card counts', () => {
+      const slotA = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const groupA = makeGroup({
+        slides: [
+          { id: 'e1', order: 0, sourceRef: { kind: 'text' } },
+          { id: 'e2', order: 1, sourceRef: { kind: 'text' } },
+        ],
+      })
+      const assembledA = [makeAssembled(0, 'e1'), makeAssembled(0, 'e2')]
+      const wrapperA = mountGrid({ selectedSlot: slotA, group: groupA, assembledSlideshow: assembledA, isEditor: true })
+      expect(wrapperA.findComponent(BackgroundControl).props('caption')).toBe(
+        'applies to all 2 slides in this group, unless a slide sets its own',
+      )
+
+      const slotB = makeSlot({ kind: 'PRAYER', id: 'slot-2', position: 0 })
+      const groupB = makeGroup({
+        id: 'slot-2',
+        slotId: 'slot-2',
+        slides: Array.from(
+          { length: 5 },
+          (_, i) => ({ id: `f${i}`, order: i, sourceRef: { kind: 'text' } }) as GroupSlideEntry,
+        ),
+      })
+      const assembledB = Array.from({ length: 5 }, (_, i) => makeAssembled(0, `f${i}`))
+      const wrapperB = mountGrid({ selectedSlot: slotB, group: groupB, assembledSlideshow: assembledB, isEditor: true })
+      expect(wrapperB.findComponent(BackgroundControl).props('caption')).toBe(
+        'applies to all 5 slides in this group, unless a slide sets its own',
+      )
+    })
+
+    it('renders the inherited-from label in the DOM for a song group inheriting the song background, and omits it once the group has its own', () => {
+      const songSlot = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: 'Grace', songKey: null, requiredVwType: 1 } as never)
+      const songGroup = makeGroup({ slides: [{ id: 'e1', order: 0, sourceRef: { kind: 'lyric', songId: 's1', sectionId: 'v1' } }] })
+      const inheritingAssembled = [
+        makeAssembled(0, 'e1', 'SONG', {
+          backgroundSource: 'song',
+          backgroundImageUrl: 'https://storage.example.com/backgrounds/song-bg.jpg',
+        }),
+      ]
+      const inheritingWrapper = mountGrid({
+        selectedSlot: songSlot,
+        assembledSlideshow: inheritingAssembled,
+        group: songGroup,
+        isEditor: true,
+      })
+      const inheritedEl = inheritingWrapper.get('[data-testid="background-control-inherited"]')
+      expect(inheritedEl.text()).toBe('inherited from the song — song-bg.jpg')
+
+      const ownGroup = makeGroup({
+        backgroundImageUrl: 'https://storage.example.com/own.jpg',
+        slides: [{ id: 'e1', order: 0, sourceRef: { kind: 'lyric', songId: 's1', sectionId: 'v1' } }],
+      })
+      const ownAssembled = [
+        makeAssembled(0, 'e1', 'SONG', { backgroundSource: 'slide', backgroundImageUrl: 'https://storage.example.com/own.jpg' }),
+      ]
+      const ownWrapper = mountGrid({ selectedSlot: songSlot, assembledSlideshow: ownAssembled, group: ownGroup, isEditor: true })
+      expect(ownWrapper.find('[data-testid="background-control-inherited"]').exists()).toBe(false)
+    })
+
+    it('omits the inherited-from label for a non-song group even when its slides resolve a "song" backgroundSource', () => {
+      const prayerSlot = makeSlot({ kind: 'PRAYER', id: 'slot-2', position: 0 })
+      const prayerGroup = makeGroup({ id: 'slot-2', slotId: 'slot-2', slides: [{ id: 'e2', order: 0, sourceRef: { kind: 'text' } }] })
+      const prayerAssembled = [
+        makeAssembled(0, 'e2', 'PRAYER', {
+          backgroundSource: 'song',
+          backgroundImageUrl: 'https://storage.example.com/backgrounds/song-bg.jpg',
+        }),
+      ]
+      const wrapper = mountGrid({ selectedSlot: prayerSlot, assembledSlideshow: prayerAssembled, group: prayerGroup, isEditor: true })
+      expect(wrapper.find('[data-testid="background-control-inherited"]').exists()).toBe(false)
+    })
+
+    // ★ Deviation from the plan's literal wording (see 34-11-SUMMARY.md): the
+    // acceptance criteria describe this as "a song group renders no
+    // group-media add affordance ... for an editor on a draft service," but
+    // `canWriteGroupMedia`'s own comment and the pre-existing "a song group
+    // on a DRAFT service keeps its group-media affordance" test (above, in
+    // the locked-service describe block) both establish the OPPOSITE: the
+    // gate deliberately OMITS the song-group exclusion that `canMutateGroup`
+    // applies, so group media stays writable for a song group. This test
+    // pins the real (byte-unchanged) behaviour and still catches a
+    // wrong-gate regression: if a future edit routed background through
+    // `canMutateGroup` instead of `canWriteGroupMedia`, the add affordance
+    // would disappear here and this assertion would fail.
+    it('a song group can still write group media on a draft service (canWriteGroupMedia carve-out), while remaining unable to mutate its slides (canMutateGroup)', () => {
+      const songSlot = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: 'Grace', songKey: null, requiredVwType: 1 } as never)
+      const wrapper = mountGrid({ selectedSlot: songSlot, isEditor: true, serviceLocked: false, group: null })
+
+      const panel = wrapper.get('[data-testid="slide-grid-group-media-panel"]')
+      expect(panel.find('[data-testid="background-control-add"]').exists()).toBe(true)
+      expect(panel.find('[data-testid="group-music-add"]').exists()).toBe(true)
+
+      // The DISTINCT gate: slide mutation (add/import/reorder) stays locked
+      // for a song group even though group-media writes do not (R054).
+      expect(wrapper.find('[data-testid="slide-grid-add-slide"]').exists()).toBe(false)
+    })
+
+    it('attaching group music inside the merged panel reaches the same store call with the same arguments as before the merge', async () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const wrapper = mountGrid({ selectedSlot: slot, serviceId: 'service-9', isEditor: true })
+
+      await wrapper.findComponent(SlideGroupMusicControl).vm.$emit('attach', 'https://storage.example.com/new.mp3')
+      await Promise.resolve()
+
+      expect(mockSetGroupBedMedia).toHaveBeenCalledWith('org-1', 'slot-1', {
+        serviceId: 'service-9',
+        bedAudioUrl: 'https://storage.example.com/new.mp3',
+      })
+    })
+
+    it('removing group background inside the merged panel still uses the explicit clear flag rather than an undefined url', async () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const wrapper = mountGrid({ selectedSlot: slot, serviceId: 'service-9', isEditor: true })
+
+      await wrapper.findComponent(BackgroundControl).vm.$emit('remove')
+      await Promise.resolve()
+
+      expect(mockSetGroupBackground).toHaveBeenCalledTimes(1)
+      const patch = mockSetGroupBackground.mock.calls[0]![2]
+      expect(patch).toEqual({ serviceId: 'service-9', clearBackground: true })
+      expect('backgroundImageUrl' in patch).toBe(false)
+    })
+  })
+
   // --- 33-08 Task 3: menu ownership — one open at a time, per-card items, the action relay ---
   describe('menu ownership (33-08 Task 3)', () => {
     function makeTextEntry(id: string, body?: string): GroupSlideEntry {
