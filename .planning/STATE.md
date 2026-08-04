@@ -4,15 +4,15 @@ milestone: v1.4
 milestone_name: Service and Slides
 current_phase: 36
 status: executing
-stopped_at: Completed 36-01-PLAN.md
-last_updated: "2026-08-04T03:30:15.172Z"
+stopped_at: Completed 36-02-PLAN.md
+last_updated: "2026-08-04T03:42:32.635Z"
 last_activity: 2026-08-03
 last_activity_desc: Completed 36-01-PLAN.md (SlideDropTarget clickable variant, SlideGrid import-button deletion, R053)
 progress:
   total_phases: 9
   completed_phases: 8
   total_plans: 57
-  completed_plans: 53
+  completed_plans: 54
   percent: 89
 current_phase_name: PowerPoint Server-Side Rendering
 ---
@@ -76,7 +76,7 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 ## Current Position
 
 Phase: 36 — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
 Last activity: 2026-08-03 — Completed 36-01-PLAN.md (SlideDropTarget clickable variant, SlideGrid import-button deletion, R053)
 
@@ -1056,6 +1056,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 34 P12 | 35min | 3 tasks | 5 files |
 | Phase 34 P08 | 60min | 3 tasks | 5 files |
 | Phase 36 P01 | 8min | 2 tasks | 4 files |
+| Phase 36 P02 | 20min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -1301,6 +1302,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 34-12: F5 diagnosed as cause 1 (org doc lacks credentials, not a load-order regression); no fix to auth.ts, R071 written and delivered as a UX explanation note beside Copy for PC
 - [Phase ?]: Phase 34 gap closure complete (34-08): composed slot->group->slide pipeline proven end to end; phase gate green (type-check, vitest --dir src at documented baseline, build); R064/R070/R071 corrected to match delivery; 12/12 Phase 34 plans executed.
 - [Phase ?]: 36-01: SlideDropTarget's clickable prop is independent of audioOnly; SlideGrid alone binds :clickable="canMutateGroup" (never canWriteGroupMedia), replicating the deleted import button's exact prior gating
+- [Phase ?]: 36-02: Preserved ServiceEditorView.vue's live ungated Export/Copy-to-PC gate over 36-UI-SPEC's illustrative canEditService-gated code and its inaccurate E3 row
+- [Phase ?]: 36-02: Implemented R071's future hint as a dynamic hint-{key} slot on ContextualActionBar instead of the spec's lossy hint?: string field
 
 ### Roadmap Evolution
 
@@ -1362,6 +1365,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-04T03:29:36.788Z
-Stopped at: Completed 36-01-PLAN.md
+Last session: 2026-08-04T03:42:32.592Z
+Stopped at: Completed 36-02-PLAN.md
 Resume file: None

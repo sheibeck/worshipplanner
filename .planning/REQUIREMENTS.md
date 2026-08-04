@@ -268,7 +268,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 - [ ] **R067** (primary-user-loop): The Service Order tab is rebuilt against Claude Design "Turn 3 —
       Service Order tab".
 
-- [ ] **R068** (quality-attribute): Every tabbed screen shows only actions relevant to the open tab, via
+- [x] **R068** (quality-attribute): Every tabbed screen shows only actions relevant to the open tab, via
       one shared contextual-action-bar pattern. Fixes "Suggest All Songs"/"Copy to PC" appearing on the
       Slides and Roles tabs; carries the Present button placement from design "1a". Sequenced after the
       Service Order and Slides layouts finalize, to avoid rework. `[SUMMARY]`
@@ -337,7 +337,7 @@ Acknowledged, deferred, not in this roadmap.
 | R065 | Phase 35 | Complete |
 | R066 | Phase 35 | Complete |
 | R067 | Phase 36 | Pending |
-| R068 | Phase 36 | Pending |
+| R068 | Phase 36 | Complete |
 | R069 | Phase 36 | Pending |
 | R070 | Phase 34 | Complete |
 | R071 | Phase 34 | Complete |
