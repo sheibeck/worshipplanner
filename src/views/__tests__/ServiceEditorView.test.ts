@@ -587,6 +587,97 @@ describe('ServiceEditorView - Print and Copy for PC buttons', () => {
   })
 })
 
+// ── 34-12 Task 3 (UAT F5): the no-credentials explanation ──────────────────────
+// The owner read the credential-gated swap to Copy for PC as the Export to PC
+// feature having been deleted. It wasn't — 34-12 Task 1 diagnosed the gate as
+// behaving correctly. This block covers the actual fix: an editor with no
+// Planning Center credentials is told so, beside the fallback, with a route to
+// Settings, and the export affordance stays exactly as gated as it was.
+describe('ServiceEditorView - Planning Center credentials-missing note (34-12 Task 3, R071)', () => {
+  // This block's own RouterLink stub exposes the `to` prop (as a data attribute)
+  // instead of discarding it, so the settings-route assertion below can check
+  // it resolves by NAME rather than a hardcoded path string.
+  async function mountView(overrides: Partial<Service> = {}) {
+    mockServicesList = [{ ...mockService, ...overrides }]
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          RouterLink: {
+            props: ['to'],
+            template:
+              '<a :data-route-name="to && to.name"><slot /></a>',
+          },
+          SaveStatusIndicator: false,
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+        },
+      },
+    })
+  }
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockAuthState.hasPcCredentials = false
+    mockAuthState.pcCredentials = null
+  })
+
+  afterEach(() => {
+    mockAuthState.hasPcCredentials = false
+    mockAuthState.pcCredentials = null
+  })
+
+  it('renders the note, with no credentials configured, for an editor on a draft service', async () => {
+    const wrapper = await mountView({ status: 'draft' })
+    const note = wrapper.find('[data-testid="pc-credentials-missing-note"]')
+    expect(note.exists()).toBe(true)
+  })
+
+  it('does not render the note when credentials are configured', async () => {
+    mockAuthState.hasPcCredentials = true
+    mockAuthState.pcCredentials = { appId: 'placeholder-app-id', secret: 'placeholder-secret' }
+    const wrapper = await mountView({ status: 'draft' })
+    const note = wrapper.find('[data-testid="pc-credentials-missing-note"]')
+    expect(note.exists()).toBe(false)
+  })
+
+  it('the note links to the settings route by NAME, not a hardcoded path', async () => {
+    const wrapper = await mountView({ status: 'draft' })
+    const note = wrapper.find('[data-testid="pc-credentials-missing-note"]')
+    const link = note.find('a')
+    expect(link.exists()).toBe(true)
+    expect(link.attributes('data-route-name')).toBe('settings')
+  })
+
+  it('never ungates the export affordance: export-pc-btn does not exist for a planned service without credentials', async () => {
+    const wrapper = await mountView({ status: 'planned' })
+    expect(wrapper.find('[data-testid="export-pc-btn"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="copy-pc-btn"]').exists()).toBe(true)
+  })
+
+  it('a viewer (cannot edit) never sees the credentials-missing note, even with no credentials configured', async () => {
+    mockAuthState.isEditor = false
+    const wrapper = await mountView({ status: 'draft' })
+    expect(wrapper.find('[data-testid="pc-credentials-missing-note"]').exists()).toBe(false)
+  })
+
+  // Regression: this plan added no condition to the Copy for PC button itself
+  // (only to the sibling note beside it) — its pre-existing behavior for the
+  // no-credentials case, which this file's "Print and Copy for PC buttons"
+  // block already exercises, is unaffected. Restated here for a status this
+  // plan explicitly names in its behavior list.
+  it('Copy for PC still renders and is clickable for a draft service with no credentials configured — unchanged by this plan', async () => {
+    const wrapper = await mountView({ status: 'draft' })
+    const copyBtn = wrapper.find('[data-testid="copy-pc-btn"]')
+    expect(copyBtn.exists()).toBe(true)
+    expect(copyBtn.attributes('disabled')).toBeUndefined()
+  })
+})
+
 describe('ServiceEditorView - Roles tab (Phase 17-04)', () => {
   async function mountView() {
     const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')

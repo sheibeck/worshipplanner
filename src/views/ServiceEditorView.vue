@@ -213,6 +213,22 @@
               {{ pcCopied ? 'Copied!' : 'Copy for PC' }}
             </button>
 
+            <!-- 34-12 (UAT F5): the owner read the credential-gated swap to Copy for PC
+                 as the Export to PC feature having been deleted — it wasn't; the export
+                 button above is untouched and stays gated. This note is the actual fix:
+                 an editor whose organization has no Planning Center credentials is told
+                 so, right beside the fallback, with a route to fix it (R071). Gated on
+                 `canEditService` so a viewer — who has no route to Settings anyway — is
+                 never shown an editor-only configuration prompt. -->
+            <span
+              v-if="canEditService && !authStore.hasPcCredentials"
+              data-testid="pc-credentials-missing-note"
+              class="print:hidden text-xs text-gray-500"
+            >
+              Planning Center export needs credentials for this organization —
+              <router-link :to="{ name: 'settings' }" class="text-indigo-400 hover:text-indigo-300 underline">configure them in Settings</router-link>.
+            </span>
+
             <!-- Save button: editor only, removed while locked (31-UI-SPEC § 3)
                  — there is nothing to save. -->
             <button
