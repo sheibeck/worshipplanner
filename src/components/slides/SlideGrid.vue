@@ -59,46 +59,66 @@
         @cancel="showImportModal = false"
       />
 
-      <!-- Group music bar (25-06, R032) — between the grid header and the
-           card grid, per the UI-SPEC's layout reference. Emit-only control;
-           this component intercepts both events and writes the selected
-           group's bed via the slideGroups store's scoped write (the sole
-           surviving attach/remove surface for group-bed audio; the Service
-           Order tab's equivalent control was removed in Phase 27-04). -->
-      <!-- ★ 31-UI-SPEC E5: gate the WRAPPER, not just the control's contents.
-           With no bed audio and no add affordance the control renders an empty
-           bordered box, which a locked service hits constantly. The condition
-           incidentally fixes the pre-existing viewer case too — a two-token side
-           effect of the correct condition, not a scope expansion. -->
-      <div v-if="group?.bedAudioUrl || canWriteGroupMedia" class="px-6 pt-3">
-        <SlideGroupMusicControl
-          :audio-url="group?.bedAudioUrl"
-          :slide-count="cards.length"
-          :org-id="orgId"
-          :is-editor="canWriteGroupMedia"
-          @attach="onAttachGroupMusic"
-          @remove="onRemoveGroupMusic"
-        />
-      </div>
+      <!-- Group media panel (34-11, 34-UAT F2) — music and background merged
+           into ONE panel rather than the two separate sibling rows 25-06 and
+           33-08 built, per owner feedback that the two-row layout read as
+           two unrelated sections. Phase 36 owns this surface's broader
+           rework (Service Order rebuild + contextual action bars); this
+           change is deliberately confined to the wrapper structure — no new
+           component, no restyle of either control, no relocation out of
+           this file.
 
-      <!-- Group background control (R055, 33-08) — a NEW sibling row directly
-           below the music control, same "don't render an empty box" wrapper
-           gate for the same recorded reason (31-UI-SPEC E5). Background is
-           group MEDIA exactly like the bed audio beside it, so it uses the
-           SAME `canWriteGroupMedia` gate — never `canMutateGroup` — including
-           that gate's deliberate song-group carve-out. -->
-      <div v-if="group?.backgroundImageUrl || canWriteGroupMedia" class="px-6 pt-2" data-testid="slide-grid-group-background">
-        <BackgroundControl
-          :image-url="group?.backgroundImageUrl"
-          :caption="groupBackgroundCaption"
-          :inherited-from="songBackgroundForInheritedDisplay"
-          :is-editor="canWriteGroupMedia"
-          :org-id="orgId"
-          add-label="+ Add background for this group"
-          remove-label="Remove group background"
-          @attach="onAttachGroupBackground"
-          @remove="onRemoveGroupBackground"
-        />
+           ★ 31-UI-SPEC E5 now applies at the PANEL level too, not just to
+           each control inside it: two controls that each correctly decline
+           to render an empty box on their own would together produce an
+           empty PANEL if the panel's own wrapper were left ungated — so the
+           panel carries the disjunction of both controls' conditions one
+           level up. -->
+      <div
+        v-if="showGroupMusicControl || showGroupBackgroundControl"
+        class="space-y-2 px-6 pt-3"
+        data-testid="slide-grid-group-media-panel"
+      >
+        <!-- Group music bar (25-06, R032). Emit-only control; this component
+             intercepts both events and writes the selected group's bed via
+             the slideGroups store's scoped write (the sole surviving
+             attach/remove surface for group-bed audio; the Service Order
+             tab's equivalent control was removed in Phase 27-04). -->
+        <!-- ★ 31-UI-SPEC E5: gate the WRAPPER, not just the control's contents.
+             With no bed audio and no add affordance the control renders an empty
+             bordered box, which a locked service hits constantly. The condition
+             incidentally fixes the pre-existing viewer case too — a two-token side
+             effect of the correct condition, not a scope expansion. -->
+        <div v-if="showGroupMusicControl">
+          <SlideGroupMusicControl
+            :audio-url="group?.bedAudioUrl"
+            :slide-count="cards.length"
+            :org-id="orgId"
+            :is-editor="canWriteGroupMedia"
+            @attach="onAttachGroupMusic"
+            @remove="onRemoveGroupMusic"
+          />
+        </div>
+
+        <!-- Group background control (R055, 33-08), same "don't render an
+             empty box" wrapper gate for the same recorded reason
+             (31-UI-SPEC E5). Background is group MEDIA exactly like the bed
+             audio above it, so it uses the SAME `canWriteGroupMedia` gate —
+             never `canMutateGroup` — including that gate's deliberate
+             song-group carve-out. -->
+        <div v-if="showGroupBackgroundControl" data-testid="slide-grid-group-background">
+          <BackgroundControl
+            :image-url="group?.backgroundImageUrl"
+            :caption="groupBackgroundCaption"
+            :inherited-from="songBackgroundForInheritedDisplay"
+            :is-editor="canWriteGroupMedia"
+            :org-id="orgId"
+            add-label="+ Add background for this group"
+            remove-label="Remove group background"
+            @attach="onAttachGroupBackground"
+            @remove="onRemoveGroupBackground"
+          />
+        </div>
       </div>
 
       <div
@@ -334,6 +354,18 @@ const isSongGroup = computed(() => props.selectedSlot?.kind === 'SONG')
  */
 const canMutateGroup = computed(() => props.isEditor && !props.serviceLocked && !isSongGroup.value)
 const canWriteGroupMedia = computed(() => props.isEditor && !props.serviceLocked)
+
+/**
+ * 34-11 (34-UAT F2): each control's own wrapper-visibility condition, copied
+ * VERBATIM from the two sibling wrapper `v-if`s the merged group-media panel
+ * (below) replaces. The media-present half is not simplified away to
+ * `canWriteGroupMedia` alone — it is what keeps a locked service showing
+ * what it already has (31-UI-SPEC E5), independent of write permission.
+ */
+const showGroupMusicControl = computed(() => Boolean(props.group?.bedAudioUrl) || canWriteGroupMedia.value)
+const showGroupBackgroundControl = computed(
+  () => Boolean(props.group?.backgroundImageUrl) || canWriteGroupMedia.value,
+)
 
 interface CardEntry {
   assembledSlide: AssembledSlide

@@ -805,6 +805,80 @@ describe('SlideGrid', () => {
     })
   })
 
+  // --- 34-11 Task 1 (34-UAT F2): the merged group-media panel — render matrix ---
+  describe('group media panel (34-11 Task 1)', () => {
+    it('shows one panel containing both controls, music first, when both would render', () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const group = makeGroup({
+        bedAudioUrl: 'https://storage.example.com/pad.mp3',
+        backgroundImageUrl: 'https://storage.example.com/bg.jpg',
+        slides: [],
+      })
+      const wrapper = mountGrid({ selectedSlot: slot, group, isEditor: true })
+
+      const panel = wrapper.get('[data-testid="slide-grid-group-media-panel"]')
+      expect(panel.findComponent(SlideGroupMusicControl).exists()).toBe(true)
+      expect(panel.findComponent(BackgroundControl).exists()).toBe(true)
+
+      const html = panel.html()
+      expect(html.indexOf('slide-group-music-control')).toBeLessThan(html.indexOf('background-control'))
+    })
+
+    it('shows the panel with only the music control for bed audio and no write permission', () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const group = makeGroup({ bedAudioUrl: 'https://storage.example.com/pad.mp3', slides: [] })
+      const wrapper = mountGrid({ selectedSlot: slot, group, isEditor: false })
+
+      const panel = wrapper.get('[data-testid="slide-grid-group-media-panel"]')
+      expect(panel.findComponent(SlideGroupMusicControl).exists()).toBe(true)
+      expect(panel.findComponent(BackgroundControl).exists()).toBe(false)
+    })
+
+    it('shows the panel with only the background control for a group background and no write permission', () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const group = makeGroup({ backgroundImageUrl: 'https://storage.example.com/bg.jpg', slides: [] })
+      const wrapper = mountGrid({ selectedSlot: slot, group, isEditor: false })
+
+      const panel = wrapper.get('[data-testid="slide-grid-group-media-panel"]')
+      expect(panel.findComponent(BackgroundControl).exists()).toBe(true)
+      expect(panel.findComponent(SlideGroupMusicControl).exists()).toBe(false)
+    })
+
+    it('renders no panel element at all with neither bed audio nor background and no write permission', () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const wrapper = mountGrid({ selectedSlot: slot, group: null, isEditor: false })
+      expect(wrapper.find('[data-testid="slide-grid-group-media-panel"]').exists()).toBe(false)
+    })
+
+    it('shows the panel with both controls for anyone who can write group media, regardless of current group state', () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const wrapper = mountGrid({ selectedSlot: slot, group: null, isEditor: true })
+
+      const panel = wrapper.get('[data-testid="slide-grid-group-media-panel"]')
+      expect(panel.findComponent(SlideGroupMusicControl).exists()).toBe(true)
+      expect(panel.findComponent(BackgroundControl).exists()).toBe(true)
+    })
+
+    it('leaves the media error and reorder error elements as unaffected siblings positioned below the panel', async () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const group = makeGroup({ bedAudioUrl: 'https://storage.example.com/pad.mp3', slides: [] })
+      mediaUploadErrorRef.value = 'Upload failed'
+      const wrapper = mountGrid({ selectedSlot: slot, group, isEditor: true })
+      ;(wrapper.vm as unknown as { reorderError: string | null }).reorderError =
+        "Couldn't save this change — reverted. Try again."
+      await wrapper.vm.$nextTick()
+
+      const html = wrapper.html()
+      const panelIndex = html.indexOf('slide-grid-group-media-panel')
+      const errorIndex = html.indexOf('slide-grid-media-error')
+      const reorderIndex = html.indexOf('slide-grid-reorder-error')
+      expect(panelIndex).toBeGreaterThan(-1)
+      expect(errorIndex).toBeGreaterThan(panelIndex)
+      expect(reorderIndex).toBeGreaterThan(errorIndex)
+      expect(wrapper.get('[data-testid="slide-grid-media-error"]').text()).toBe('Upload failed')
+    })
+  })
+
   // --- 33-08 Task 3: menu ownership — one open at a time, per-card items, the action relay ---
   describe('menu ownership (33-08 Task 3)', () => {
     function makeTextEntry(id: string, body?: string): GroupSlideEntry {
