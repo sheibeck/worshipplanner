@@ -310,28 +310,38 @@ self-approved.
   **deliberate exclusion of the comma** from `scriptureBoundaries.ts`'s `CLAUSE_END_PATTERN` (34-01) — a
   tuning change to a regex, not a change to any validation logic.
 
-- ☐ **34.2** ★ **The owner decision blocking reachability — `CongregationalEditor.vue` is mounted
-  nowhere.** No route, no parent component, no dynamic import references it anywhere outside its own
-  test file — so as of this plan, **no user can reach either the manual congregational-reading editor or
-  the AI split added on top of it.** This makes ROADMAP success criterion 1 ("A scripture item can be
-  split into a leader/congregation congregational reading") **false today** for an actual user, despite
+- ✅ **34.2 RESOLVED (34-07, 2026-08-03).** ~~The owner decision blocking reachability —
+  `CongregationalEditor.vue` is mounted nowhere.~~ Resolved per owner UAT finding F1 (`34-UAT.md`): the
+  mount seam is the SCRIPTURE **slide**, not the Service Order row (34-05/34-06 landed direction (b) —
+  `ScriptureSlot.congregationalSections` threaded through `slideGroupMaterializer`/`slideshowAssembler`;
+  no re-link to the rejected separate `ScriptureReading` document model). `CongregationalEditor.vue` is
+  now mounted by `ServiceEditorView.vue` as a `Teleport`ed modal, reachable from the scripture slide's
+  3-dot action menu (`edit-in-scripture`, relabelled "Edit scripture text") and the Edit Slide Drawer's
+  new Slide Text control, both converging on the same relay. The `WR-04` call-site contract flagged below
+  is honored: the modal is mounted `:key="congregationalSlot.id"`, proven by a dedicated slot-swap test
+  (`ServiceEditorView.test.ts` — "WR-04 keyed mount (34-07 Task 3)") that asserts a fresh component
+  instance, correct re-seeding, and correct write attribution after the swap. See `34-07-SUMMARY.md`.
+  ~~No route, no parent component, no dynamic import references it anywhere outside its own
+  test file — so as of this plan, no user can reach either the manual congregational-reading editor or
+  the AI split added on top of it. This makes ROADMAP success criterion 1 ("A scripture item can be
+  split into a leader/congregation congregational reading") false today for an actual user, despite
   `34-CONTEXT.md`'s initial (later self-corrected) claim that it was "already true, manually." Phase 30's
   R047 deliberately left both `CongregationalEditor.vue` and its sibling `ScriptureSlideEditor.vue` "on
   disk, unmounted, for Phase 34/R064 to reuse" — without specifying where they should be mounted.
   Mounting requires choosing between two data-model shapes, and the owner has already ruled against one
   of them once: (a) re-link the editor's separate `ScriptureReading` document to the `SCRIPTURE` slot —
-  the model R047 **explicitly rejected** in favour of slot-as-source-of-truth (`3da5fe4` superseded by
+  the model R047 explicitly rejected in favour of slot-as-source-of-truth (`3da5fe4` superseded by
   `5c531b1`); or (b) add `congregationalSections` onto `ScriptureSlot` itself and carry it through
   `slideGroupMaterializer`, matching the direction R047 actually took for the scripture reference. No
   plan in this phase picked a default, because a default already exists and the owner overturned it once
-  in the opposite direction — this is the owner's call to make, not a planner's to assume. **Also
-  record, for whoever mounts it:** `CongregationalEditor.vue`'s own `WR-04` call-site-contract comment
+  in the opposite direction — this is the owner's call to make, not a planner's to assume. Also
+  record, for whoever mounts it: `CongregationalEditor.vue`'s own `WR-04` call-site-contract comment
   (added 32-REVIEW, addressed by name to Phase 34) — `currentReadingId` and everything seeded from it
-  (`surfaceId`, `sections`, `referenceText`, `rawText`) are captured **once** at mount and are **not**
+  (`surfaceId`, `sections`, `referenceText`, `rawText`) are captured once at mount and are not
   reactive to `props.readingId` changing afterward. Whoever wires this component into a route or parent
-  **must** mount it keyed on `readingId` (e.g. `:key="readingId"`) so a record swap forces a fresh
+  must mount it keyed on `readingId` (e.g. `:key="readingId"`) so a record swap forces a fresh
   instance; reusing one mounted instance across different `readingId` values is not a supported usage and
-  will silently misattribute later saves to the first reading the instance ever saw.
+  will silently misattribute later saves to the first reading the instance ever saw.~~
 
 ---
 

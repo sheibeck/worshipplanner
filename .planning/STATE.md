@@ -5,15 +5,15 @@ milestone_name: Service and Slides
 current_phase: 37
 current_phase_name: PowerPoint Server-Side Rendering
 status: verifying
-stopped_at: "Completed 34-11-PLAN.md (UAT F2 closed: group music and group background merged into one slide-grid-group-media-panel, permission gate/caption/inherited-display/handlers proven byte-unchanged)"
-last_updated: "2026-08-04T00:32:32.109Z"
+stopped_at: "Completed 34-07-PLAN.md (R064 reachability gap closed: CongregationalEditor mounted as a keyed modal on the scripture slide, two routes converge on one relay, WR-04 keyed-mount proven by swap test)"
+last_updated: "2026-08-04T01:15:47.647Z"
 last_activity: 2026-08-03
 last_activity_desc: Phase 37 execution started
 progress:
   total_phases: 9
   completed_phases: 7
   total_plans: 52
-  completed_plans: 49
+  completed_plans: 50
   percent: 78
 ---
 
@@ -485,7 +485,7 @@ action bar were deferred from Phase 33 into 36 by the ROADMAP's own reasoning.
 |---|---|
 | 32 Save Reliability | ✅ complete · 3/3 must-haves · **3 Critical review findings fixed** |
 | 33 Backgrounds & Slide Editing | ✅ complete · 5/5 criteria, 7/7 requirements · 4 findings fixed |
-| 34 LLM Scripture Split | ⚠ **PARTIAL** · 7/8 · structural guarantee done, **feature unreachable** |
+| 34 LLM Scripture Split | ✅ **RESOLVED 2026-08-03 (34-07)** · reachability gap closed — `CongregationalEditor` mounted on the scripture slide, R064 marked complete |
 | 35 Presentation Correctness | ✅ complete · **5/5 criteria** · 1 Warning + 1 Info fixed |
 | 37 PPTX Server-Side Rendering | ⚠ **PARTIAL** · 3/4 · pipeline built & tested, **undeployed by instruction** |
 
@@ -1031,6 +1031,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 34 P09 | 25min | 2 tasks | 4 files |
 | Phase 34 P10 | 35min | 2 tasks | 4 files |
 | Phase 34 P11 | 25min | 2 tasks | 2 files |
+| Phase 34 P07 | 45min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -1271,6 +1272,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 34-10: chrome-only gate on the save-status bar (not v-if on the wrapper) — this wrapper hosts the aria-live region, so unmounting at idle would cost the first status announcement of every session
 - [Phase ?]: 34-10: exhaustiveness enumeration for the save-status agreement test is Record<AutoSaveStatus, true>, not a typed array — arrays only constrain elements, never completeness, so a typed array would silently stop guarding after a sixth status was added and omitted
 - [Phase ?]: 34-11: merged group music and group background into one panel (UAT F2); corrected Task 2's permission-carve-out test direction to match verified canWriteGroupMedia behavior (song groups keep group-media write access) rather than the plan's literal wording, which contradicted the gate's own code comment and a pre-existing pinned test
+- [Phase ?]: 34-07: mount seam for CongregationalEditor is the scripture slide (menu + drawer, converging on one relay), per owner UAT finding F1 — closes the R064 reachability gap 34-VERIFICATION.md recorded
+- [Phase ?]: 34-07: no free-text scripture override anywhere — owner shown the D-13/D-15 shadow-copy tension and declined it; fetch-then-split inside CongregationalEditor is the only route to slide text
 
 ### Roadmap Evolution
 
@@ -1332,6 +1335,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-04T00:32:32.054Z
-Stopped at: Completed 34-11-PLAN.md (UAT F2 closed: group music and group background merged into one slide-grid-group-media-panel, permission gate/caption/inherited-display/handlers proven byte-unchanged)
+Last session: 2026-08-04T01:15:47.594Z
+Stopped at: Completed 34-07-PLAN.md (R064 reachability gap closed: CongregationalEditor mounted as a keyed modal on the scripture slide, two routes converge on one relay, WR-04 keyed-mount proven by swap test)
 Resume file: None

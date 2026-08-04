@@ -195,21 +195,16 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 - [x] **R063** (core-capability): Slide-editing options vary by service-item type — a scripture item
       offers options a song item does not.
 
-- [~] **R064** — ⚠ **PARTIALLY DELIVERED (Phase 34, 2026-08-03). Was marked `[x]` in error; corrected.**
-      The structural guarantee is **complete and verified against live source**: the schema permits no
-      string field except the speaker enum, section text is sliced byte-exactly from the untouched ESV
-      source, boundaries are computed once, and 19 distinct rejection cases cover the validator.
-      **What is NOT delivered is reachability.** `CongregationalEditor.vue` is mounted nowhere — no
-      route, no parent, no dynamic import outside its own test — so no user can reach the feature.
-      **R047 explicitly handed this to Phase 34** ("both editor components remain on disk, unmounted,
-      for Phase 34/R064 to reuse"), and Phase 34 did not do it.
-      **The direction is already decided, not open:** R047 landed slot-as-source-of-truth and the owner
-      *rejected* the separate-reading-document model (`3da5fe4` superseded by `5c531b1`), so closing
-      this means extending `ScriptureSlot` with `congregationalSections` and threading it through
-      `slideGroupMaterializer` — a data-model + assembler change, not a one-line mount.
-      Tracked as `PENDING-VERIFICATION.md` item 34.2. Original requirement text follows:
+- [x] **R064** — ✅ **RECHABILITY GAP CLOSED (34-07, 2026-08-03).** The structural guarantee (schema
+      permits no string field except the speaker enum, section text sliced byte-exactly from the
+      untouched ESV source, boundaries computed once, 19 distinct validator rejection cases) was already
+      complete. What was missing — `CongregationalEditor.vue` being mounted nowhere in production — is
+      now closed: it is mounted by `ServiceEditorView.vue` as a keyed modal, reachable from the scripture
+      slide's 3-dot menu and its Edit Slide Drawer, with sections written onto
+      `ScriptureSlot.congregationalSections` through the existing autosave. `PENDING-VERIFICATION.md`
+      item 34.2 is resolved. Original requirement text follows:
 
-- [ ] **R064** (core-capability): A scripture item can be split into a congregational responsive reading
+- [x] **R064** (core-capability): A scripture item can be split into a congregational responsive reading
       with leader/congregation attribution. **The model returns only index ranges and speaker labels
       into already-fetched ESV text — never scripture words** — so altered or hallucinated scripture is
       structurally impossible rather than prompt-discouraged. Splits fall on clause/verse boundaries,
@@ -295,7 +290,7 @@ Acknowledged, deferred, not in this roadmap.
 | R061 | Phase 35 | Complete |
 | R062 | Phase 37 | Partial — pipeline built + automated-tested end to end; deploy and UI consumption NOT delivered (owner instruction: build but do not deploy) |
 | R063 | Phase 33 | Complete |
-| R064 | Phase 34 | Partial — structural guarantee done, reachability NOT delivered |
+| R064 | Phase 34 | Complete — reachability gap closed by 34-07 (2026-08-03) |
 | R065 | Phase 35 | Complete |
 | R066 | Phase 35 | Complete |
 | R067 | Phase 36 | Pending |
