@@ -219,6 +219,28 @@ describe('SlideGroupMusicControl', () => {
     expect(wrapper.findComponent(AudioPlayer).exists()).toBe(true)
   })
 
+  it('defaults to its own bordered/background root chrome when flush is not passed', () => {
+    const wrapper = mount(SlideGroupMusicControl, {
+      props: { slideCount: 6, orgId: 'org-1', isEditor: true },
+    })
+    const classes = wrapper.get('[data-testid="slide-group-music-control"]').classes()
+    expect(classes).toContain('rounded-md')
+    expect(classes).toContain('border')
+    expect(classes).toContain('border-gray-800')
+    expect(classes).toContain('bg-gray-900')
+  })
+
+  it('flush: true drops the border/background/rounding root chrome so it can render inside a shared panel wrapper', () => {
+    const wrapper = mount(SlideGroupMusicControl, {
+      props: { slideCount: 6, orgId: 'org-1', isEditor: true, flush: true },
+    })
+    const classes = wrapper.get('[data-testid="slide-group-music-control"]').classes()
+    expect(classes).not.toContain('rounded-md')
+    expect(classes).not.toContain('border')
+    expect(classes).not.toContain('border-gray-800')
+    expect(classes).not.toContain('bg-gray-900')
+  })
+
   it('mounted as a viewer with no bed audio, renders no add affordance', () => {
     const wrapper = mount(SlideGroupMusicControl, {
       props: { slideCount: 6, orgId: 'org-1', isEditor: false },

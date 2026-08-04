@@ -1,5 +1,5 @@
 <template>
-  <div class="rounded-md border border-gray-800 bg-gray-900 px-3 py-2" data-testid="background-control">
+  <div :class="flush ? '' : 'rounded-md border border-gray-800 bg-gray-900 px-3 py-2'" data-testid="background-control">
     <template v-if="imageUrl">
       <div class="flex flex-wrap items-center gap-3">
         <img
@@ -118,7 +118,16 @@ const props = withDefaults(defineProps<{
   isEditor: boolean
   /** Org id, passed straight through to `useBackgroundUpload`. */
   orgId: string
-}>(), { removeLabel: 'Remove background' })
+  /**
+   * Owner follow-up (merged group-media panel): when true, drops this
+   * control's own border/background/rounding/padding so it can render flush
+   * inside a shared panel wrapper that supplies its own chrome instead.
+   * Defaults false so both pre-existing call sites (this group-level one AND
+   * `SongLyricEditor.vue`'s song-level one, which does not pass this prop)
+   * are visually unchanged.
+   */
+  flush?: boolean
+}>(), { removeLabel: 'Remove background', flush: false })
 
 const emit = defineEmits<{
   attach: [url: string]

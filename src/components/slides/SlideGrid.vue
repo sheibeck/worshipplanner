@@ -52,24 +52,31 @@
         @cancel="showImportModal = false"
       />
 
-      <!-- Group media panel (34-11, 34-UAT F2) — music and background merged
-           into ONE panel rather than the two separate sibling rows 25-06 and
-           33-08 built, per owner feedback that the two-row layout read as
-           two unrelated sections. Phase 36 owns this surface's broader
-           rework (Service Order rebuild + contextual action bars); this
-           change is deliberately confined to the wrapper structure — no new
-           component, no restyle of either control, no relocation out of
-           this file.
+      <!-- Group media panel (34-11, 34-UAT F2; owner follow-up) — music and
+           background merged into ONE VISUAL panel, not just one structural
+           wrapper. 34-11 already merged the two controls under one
+           `data-testid="slide-grid-group-media-panel"` element, but each
+           control still painted its OWN `rounded-md border border-gray-800
+           bg-gray-900` root, so the page still showed two bordered boxes.
+           Per direct owner feedback on the running app ("let's at least
+           merge them into a single panel instead of two, but we'll leave
+           them there") the chrome moves UP to this wrapper — a single
+           border/background around both controls, `divide-y` drawing the
+           one seam between them — and each control drops its own chrome via
+           the opt-in `flush` prop (default false, so every OTHER call site,
+           e.g. `SongLyricEditor.vue`'s song-level BackgroundControl, is
+           visually untouched). Deliberately still confined to wrapper/prop
+           plumbing: no new component, no relocation out of this file, no
+           restyle of either control's internals.
 
-           ★ 31-UI-SPEC E5 now applies at the PANEL level too, not just to
-           each control inside it: two controls that each correctly decline
-           to render an empty box on their own would together produce an
-           empty PANEL if the panel's own wrapper were left ungated — so the
-           panel carries the disjunction of both controls' conditions one
-           level up. -->
+           ★ 31-UI-SPEC E5 still applies at the PANEL level, not just to each
+           control inside it: two controls that each correctly decline to
+           render an empty box on their own would together produce an empty
+           PANEL if the panel's own wrapper were left ungated — so the panel
+           carries the disjunction of both controls' conditions one level up. -->
       <div
         v-if="showGroupMusicControl || showGroupBackgroundControl"
-        class="space-y-2 px-6 pt-3"
+        class="mx-6 mt-3 divide-y divide-gray-800 rounded-md border border-gray-800 bg-gray-900"
         data-testid="slide-grid-group-media-panel"
       >
         <!-- Group music bar (25-06, R032). Emit-only control; this component
@@ -82,12 +89,13 @@
              bordered box, which a locked service hits constantly. The condition
              incidentally fixes the pre-existing viewer case too — a two-token side
              effect of the correct condition, not a scope expansion. -->
-        <div v-if="showGroupMusicControl">
+        <div v-if="showGroupMusicControl" class="px-3 py-2">
           <SlideGroupMusicControl
             :audio-url="group?.bedAudioUrl"
             :slide-count="cards.length"
             :org-id="orgId"
             :is-editor="canWriteGroupMedia"
+            flush
             @attach="onAttachGroupMusic"
             @remove="onRemoveGroupMusic"
           />
@@ -99,7 +107,7 @@
              audio above it, so it uses the SAME `canWriteGroupMedia` gate —
              never `canMutateGroup` — including that gate's deliberate
              song-group carve-out. -->
-        <div v-if="showGroupBackgroundControl" data-testid="slide-grid-group-background">
+        <div v-if="showGroupBackgroundControl" data-testid="slide-grid-group-background" class="px-3 py-2">
           <BackgroundControl
             :image-url="group?.backgroundImageUrl"
             :caption="groupBackgroundCaption"
@@ -108,6 +116,7 @@
             :org-id="orgId"
             add-label="+ Add background for this group"
             remove-label="Remove group background"
+            flush
             @attach="onAttachGroupBackground"
             @remove="onRemoveGroupBackground"
           />

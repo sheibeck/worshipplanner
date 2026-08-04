@@ -268,6 +268,28 @@ describe('BackgroundControl', () => {
     expect(songWrapper.get('[data-testid="background-control-remove"]').attributes('aria-label')).toBe('Remove song background')
   })
 
+  it('defaults to its own bordered/background root chrome when flush is not passed (SongLyricEditor.vue call site stays visually unchanged)', () => {
+    const wrapper = mount(BackgroundControl, {
+      props: { caption: GROUP_CAPTION, addLabel: GROUP_ADD_LABEL, isEditor: true, orgId: 'org-1' },
+    })
+    const classes = wrapper.get('[data-testid="background-control"]').classes()
+    expect(classes).toContain('rounded-md')
+    expect(classes).toContain('border')
+    expect(classes).toContain('border-gray-800')
+    expect(classes).toContain('bg-gray-900')
+  })
+
+  it('flush: true drops the border/background/rounding root chrome so it can render inside a shared panel wrapper', () => {
+    const wrapper = mount(BackgroundControl, {
+      props: { caption: GROUP_CAPTION, addLabel: GROUP_ADD_LABEL, isEditor: true, orgId: 'org-1', flush: true },
+    })
+    const classes = wrapper.get('[data-testid="background-control"]').classes()
+    expect(classes).not.toContain('rounded-md')
+    expect(classes).not.toContain('border')
+    expect(classes).not.toContain('border-gray-800')
+    expect(classes).not.toContain('bg-gray-900')
+  })
+
   it('the filename display span carries the truncate class so a long filename cannot overflow the row', () => {
     const wrapper = mount(BackgroundControl, {
       props: {

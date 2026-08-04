@@ -1,5 +1,5 @@
 <template>
-  <div class="rounded-md border border-gray-800 bg-gray-900 px-3 py-2" data-testid="slide-group-music-control">
+  <div :class="flush ? '' : 'rounded-md border border-gray-800 bg-gray-900 px-3 py-2'" data-testid="slide-group-music-control">
     <template v-if="audioUrl">
       <div class="flex flex-wrap items-center gap-3">
         <span class="text-indigo-400" aria-hidden="true">&#9834;</span>
@@ -94,7 +94,7 @@ import { useMediaUpload } from '@/composables/useMediaUpload'
 import AudioPlayer from '../AudioPlayer.vue'
 import { bedAudioLabel } from './slideDisplay'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   /** The selected group's stored bed audio URL, or undefined when it has none. */
   audioUrl?: string
   /** The selected group's current slide count — feeds the "plays across all N slides" line. */
@@ -103,7 +103,14 @@ const props = defineProps<{
   orgId: string
   /** Gates the add-music affordance and the remove control; a viewer can still hear what's attached. */
   isEditor: boolean
-}>()
+  /**
+   * Owner follow-up (merged group-media panel): when true, drops this
+   * control's own border/background/rounding/padding so it can render flush
+   * inside a shared panel wrapper that supplies its own chrome instead.
+   * Defaults false so every pre-existing call site is visually unchanged.
+   */
+  flush?: boolean
+}>(), { flush: false })
 
 const emit = defineEmits<{
   attach: [url: string]

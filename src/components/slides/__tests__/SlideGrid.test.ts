@@ -854,6 +854,43 @@ describe('SlideGrid', () => {
       expect(wrapper.find('[data-testid="slide-grid-group-media-panel"]').exists()).toBe(false)
     })
 
+    // Owner follow-up: "let's at least merge them into a single panel instead
+    // of two". 34-11 already merged the STRUCTURE (one wrapper element); this
+    // pins the VISUAL merge — one bordered box, not two — by asserting the
+    // panel wrapper carries the border/background chrome and both inner
+    // controls render `flush` (i.e. neither paints its own).
+    it('renders ONE bordered/background box for the merged panel, not two — both controls render flush inside the panel chrome', () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const group = makeGroup({
+        bedAudioUrl: 'https://storage.example.com/pad.mp3',
+        backgroundImageUrl: 'https://storage.example.com/bg.jpg',
+        slides: [],
+      })
+      const wrapper = mountGrid({ selectedSlot: slot, group, isEditor: true })
+
+      const panel = wrapper.get('[data-testid="slide-grid-group-media-panel"]')
+      const panelClasses = panel.classes()
+      expect(panelClasses).toContain('rounded-md')
+      expect(panelClasses).toContain('border')
+      expect(panelClasses).toContain('border-gray-800')
+      expect(panelClasses).toContain('bg-gray-900')
+
+      const musicRoot = wrapper.get('[data-testid="slide-group-music-control"]')
+      const backgroundRoot = wrapper.get('[data-testid="background-control"]')
+      for (const el of [musicRoot, backgroundRoot]) {
+        const classes = el.classes()
+        expect(classes).not.toContain('border')
+        expect(classes).not.toContain('border-gray-800')
+        expect(classes).not.toContain('bg-gray-900')
+      }
+
+      // Zero DESCENDANTS carry the bordered/background chrome — only the
+      // panel wrapper itself does (asserted above) — so the subtree contains
+      // exactly one bordered box, not one per control.
+      expect(panel.findAll('.border-gray-800').length).toBe(0)
+      expect(panel.findAll('.bg-gray-900').length).toBe(0)
+    })
+
     it('shows the panel with both controls for anyone who can write group media, regardless of current group state', () => {
       const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
       const wrapper = mountGrid({ selectedSlot: slot, group: null, isEditor: true })
