@@ -86,10 +86,19 @@ describe('ContextualActionBar', () => {
     expect(wrapper.get('[data-testid="action-bar-item-without-title"]').attributes('title')).toBeUndefined()
   })
 
-  it('tone: primary is filled indigo; tone: present is outlined indigo — the two never collapse into one treatment', () => {
+  // Owner follow-up: the Present button used to carry a dedicated `present`
+  // tone (outlined indigo) so it would never visually collapse into Save.
+  // The owner asked for the opposite — Present should "match the other
+  // buttons" — so `ActionBarTone` no longer has a `present` member at all;
+  // an item with no `tone` (Present's real shape now, see
+  // `serviceEditorActionBar.ts`'s `buildPresentItem`) falls back to
+  // `default`, the same gray treatment every untoned button gets. `primary`
+  // (Save) and `default` (Present, and everything else) remain two
+  // different treatments — just not the spec's original dedicated pairing.
+  it('tone: primary is filled indigo; an item with no tone (e.g. Present, post owner-feedback) falls back to default gray — the two remain visually distinct', () => {
     const items: ActionBarItem[] = [
       { key: 'save', label: 'Save', onClick: vi.fn(), tone: 'primary' },
-      { key: 'present', label: 'Present', onClick: vi.fn(), tone: 'present' },
+      { key: 'present', label: 'Present', onClick: vi.fn() },
     ]
     const wrapper = mount(ContextualActionBar, { props: { items } })
 
@@ -97,9 +106,10 @@ describe('ContextualActionBar', () => {
     expect(primaryClass).toContain('bg-indigo-600')
 
     const presentClass = wrapper.get('[data-testid="action-bar-item-present"]').attributes('class') ?? ''
-    expect(presentClass).toContain('border-indigo-400/60')
-    expect(presentClass).toContain('text-indigo-300')
+    expect(presentClass).toContain('bg-gray-800')
+    expect(presentClass).toContain('border-gray-700')
     expect(presentClass).not.toContain('bg-indigo-600')
+    expect(presentClass).not.toContain('border-indigo-400/60')
   })
 
   it('icon: present renders an aria-hidden glyph element and the button text still contains the label; every rendered svg carries aria-hidden="true"', () => {

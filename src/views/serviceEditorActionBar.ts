@@ -109,7 +109,20 @@ function buildPresentItem(ctx: ActionBarContext): ActionBarItem {
     key: 'present',
     label: 'Present',
     icon: 'present',
-    tone: 'present',
+    // Owner follow-up: "Update the Present Button so that it matches the
+    // other buttons, right now it stands out because it's so visually
+    // different." Deliberately omits `tone` (falls back to `default`,
+    // ContextualActionBar.vue's own fallback) rather than the outlined-
+    // indigo `present` tone 36-UI-SPEC.md §2 originally called for.
+    //
+    // ★ DIVERGES FROM 36-UI-SPEC.md §2, which explicitly asked for a fourth
+    // `present` tone so Present and Save would never collapse into one
+    // visual treatment. The owner has now asked for the opposite — do not
+    // "restore" the spec's outlined-indigo present tone. Present and Save
+    // remain visually distinguishable anyway: Save keeps `tone: 'primary'`
+    // (filled indigo), Present is now `default` (gray) — two different
+    // treatments, just not the spec's original pairing. The `▶` icon is
+    // untouched; the owner objected to the button's styling, not its glyph.
     disabled: !ctx.canPresent,
     title: !ctx.canPresent ? 'Add songs or scripture to build a slideshow to present.' : undefined,
     testId: 'action-bar-item-present',

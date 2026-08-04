@@ -121,7 +121,6 @@ const BASE_CLASS =
 
 const TONE_CLASSES: Record<ActionBarTone, string> = {
   primary: 'text-white bg-indigo-600 hover:bg-indigo-500 border-transparent',
-  present: 'bg-transparent border-indigo-400/60 text-indigo-300 hover:bg-indigo-500/10',
   destructive: 'text-red-300 bg-transparent hover:bg-red-950/30 border-red-800',
   default: 'text-gray-200 bg-gray-800 hover:bg-gray-700 border-gray-700',
 }

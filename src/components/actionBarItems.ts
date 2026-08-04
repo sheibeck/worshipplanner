@@ -11,12 +11,21 @@
  * phase must not drop it just because the spec's own union omitted it
  * (★ FLAGGED SPEC EXTENSION, 36-02-PLAN.md frontmatter `assumptions`).
  *
- * `ActionBarTone` gains the fourth `present` member the spec's §2 prose
- * explicitly calls for (outlined indigo), distinct from `primary` (filled
- * indigo) so Present and Save never collapse into one visual treatment.
+ * `ActionBarTone` originally gained a fourth `present` member per 36-UI-SPEC
+ * §2's prose (outlined indigo), distinct from `primary` (filled indigo) so
+ * Present and Save would never collapse into one visual treatment. Removed
+ * per direct owner feedback on the running app ("Update the Present Button
+ * so that it matches the other buttons, right now it stands out because
+ * it's so visually different") — `buildPresentItem`
+ * (`src/views/serviceEditorActionBar.ts`) now omits `tone` entirely, falling
+ * back to `default` like every other non-Save button. Present and Save stay
+ * visually distinguishable anyway (`primary` filled indigo vs `default`
+ * gray) — just not via the spec's dedicated outlined-indigo treatment. Do
+ * NOT re-add this member to "restore" the spec; the owner asked for the
+ * opposite of what §2 specified.
  */
 
-export type ActionBarTone = 'default' | 'primary' | 'destructive' | 'present'
+export type ActionBarTone = 'default' | 'primary' | 'destructive'
 
 export type ActionBarIcon =
   | 'none'
