@@ -31,13 +31,21 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 - [x] **R038** (quality-attribute): Creating a service defaults the date to the nearest Sunday that does
       not already have a service plan, rather than the nearest Sunday outright.
 
-- [ ] **R071** (quality-attribute): An editor who cannot export to Planning Center is told why, with a
+- [x] **R071** (quality-attribute): An editor who cannot export to Planning Center is told why, with a
       route to fix it. When Planning Center credentials are not configured for the organization, the
       service editor says so plainly beside the copy-for-Planning-Center fallback and links to Settings,
       instead of silently substituting a differently-named button. The export affordance itself stays
       gated — an export that cannot authenticate is never offered.
       *(Added 2026-08-03 from owner UAT finding F5, where the silent substitution read as the export
       feature having been deleted.)* `[FEAT]`
+      **Delivered (34-12):** a `canEditService && !authStore.hasPcCredentials`-gated note beside Copy for
+      PC names Planning Center credentials as the reason and links to Settings by route name; the Export
+      to PC button's `v-if`/handler/modal are byte-unchanged and never ungated. F5's diagnosis verdict
+      (`34-12-SUMMARY.md`): `hasPcCredentials` behaves correctly — a reactivity test proved it self-heals
+      the instant the org document resolves — so the org document genuinely lacking credentials is the
+      remaining explanation, not a load-order regression. Whether this organization's document actually
+      has `pcAppId`/`pcSecret` cannot be observed from this environment — `PENDING-VERIFICATION.md` item
+      34.6 (presence/absence only, never values) is open.
 
 ### Save Reliability
 
@@ -157,6 +165,10 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
       slide. *(Added 2026-08-03 from owner UAT finding F3. R055 and R056 both describe SETTING a
       background and neither ever asked for it to render while presenting, which is why Phase 33
       verified green with authoring and preview complete and display absent.)* `[FEAT]`
+      **Delivered (34-09):** `PresentationViewer.vue`'s `currentBackgroundUrl` computed reads the
+      already-resolved `slide.backgroundImageUrl` with zero re-derivation, rendered behind a fixed scrim
+      layer, and returns `null` whenever a video is playing (video-precedence rule). The perceptual
+      legibility check on a real projector remains open — `PENDING-VERIFICATION.md` item 34.4.
 
 ### Presentation Correctness
 
@@ -203,14 +215,26 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 - [x] **R063** (core-capability): Slide-editing options vary by service-item type — a scripture item
       offers options a song item does not.
 
-- [x] **R064** — ✅ **RECHABILITY GAP CLOSED (34-07, 2026-08-03).** The structural guarantee (schema
-      permits no string field except the speaker enum, section text sliced byte-exactly from the
-      untouched ESV source, boundaries computed once, 19 distinct validator rejection cases) was already
-      complete. What was missing — `CongregationalEditor.vue` being mounted nowhere in production — is
-      now closed: it is mounted by `ServiceEditorView.vue` as a keyed modal, reachable from the scripture
-      slide's 3-dot menu and its Edit Slide Drawer, with sections written onto
-      `ScriptureSlot.congregationalSections` through the existing autosave. `PENDING-VERIFICATION.md`
-      item 34.2 is resolved. Original requirement text follows:
+- [x] **R064** — ✅ **DELIVERED, GAP CLOSED (34-08 phase gate, 2026-08-03).** Two halves, both now
+      closed. **Structural guarantee (34-01..34-04):** the schema permits no string field except the
+      `speaker` enum, section text is sliced byte-exactly from the untouched ESV source, boundaries are
+      computed once, and 19 distinct validator rejection cases cover the failure space — never
+      hallucinated or regenerated scripture, by construction, not by prompt discipline.
+      **Reachability closure (34-05..34-08):** `ScriptureSlot.congregationalSections` plus one shared
+      derivation helper (`congregationalSlideFieldsFromSlot`) thread through both `slideshowAssembler.ts`
+      call sites; `CongregationalEditor.vue`'s persistence was rewritten off the rejected separate
+      reading-document model onto a prop/emit contract; and the editor is mounted by `ServiceEditorView.vue`
+      as a keyed (`:key="congregationalSlot.id"`, WR-04) `Teleport`ed modal reached from the scripture
+      **slide** itself (its 3-dot menu and Edit Slide Drawer) — the 2026-08-03 owner decision (UAT F1),
+      with no free-text scripture override added anywhere. `34-08-SUMMARY.md`'s
+      `congregationalReadingPipeline.test.ts` proves the composition end to end: both materialization
+      paths agree, a group rebuild does not disturb stored sections, and the assembled slide satisfies
+      `PresentationViewer`'s own `isCongregational` predicate. `PENDING-VERIFICATION.md` item 34.2 is
+      resolved. **Two checks remain human-only and open, in the same breath as this delivery, not a
+      footnote:** item 34.1 (empirical split determinism against Psalm 136 and Psalm 24, run more than
+      once each) and item 34.3 (the mounted affordance itself and its projection, reached by both
+      routes). This note describes R064 only — plans 34-09..34-12 close four owner UAT findings (F2, F3,
+      F4, F5) that are not R064 scope; see R070 and R071 for those. Original requirement text follows:
 
 - [x] **R064** (core-capability): A scripture item can be split into a congregational responsive reading
       with leader/congregation attribution. **The model returns only index ranges and speaker labels
@@ -305,7 +329,7 @@ Acknowledged, deferred, not in this roadmap.
 | R068 | Phase 36 | Pending |
 | R069 | Phase 36 | Pending |
 | R070 | Phase 34 | Complete |
-| R071 | Phase 34 | Pending |
+| R071 | Phase 34 | Complete |
 
 **Coverage:**
 
