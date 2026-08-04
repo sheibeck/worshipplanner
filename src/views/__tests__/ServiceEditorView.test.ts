@@ -1729,6 +1729,241 @@ describe('ServiceEditorView - add-to-service palette (36-05, R067)', () => {
   })
 })
 
+// ── Service Order preservation sweep and the phase gate (36-05, R067) ────────────
+//
+// This block proves the rebuild across 36-01..36-05 removed nothing from the
+// Service Order tab's pre-existing capability set — behaviourally, not merely by
+// existence check, per 36-05-PLAN.md Task 2. It re-asserts, in one place, every
+// capability 36-CONTEXT.md names as load-bearing: drag-reorder, per-row section
+// select, per-row remove, the scripture slot editor, the sermon-context inputs,
+// the teams row, the lock banner and the save-status bar (34-10).
+
+describe('ServiceEditorView - Service Order preservation sweep (36-05, R067)', () => {
+  interface SweepVm {
+    localService: {
+      teams: string[]
+      sermonTopic: string | null
+      slots: Array<Record<string, unknown>>
+    }
+  }
+
+  async function mountView() {
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          ContextualActionBar: false,
+          RouterLink: { template: '<a><slot /></a>' },
+          SaveStatusIndicator: false,
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+          PresentationViewer: true,
+          // D-14's slot-delete confirmation renders via <Teleport to="body"> —
+          // opt it out of shallowMount's default auto-stub or the confirm
+          // dialog's content never reaches document.body.
+          teleport: false,
+        },
+      },
+    })
+  }
+
+  function body() {
+    return new DOMWrapper(document.body)
+  }
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockServicesList = [buildSectionedService()]
+  })
+
+  it('drag-reorder: .slot-item elements exist for every fixture slot, and every populated section-list container is still configured with draggable: ".slot-item"', async () => {
+    resetSortableCaptures()
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.findAll('.slot-item')).toHaveLength(buildSectionedService().slots.length)
+    for (const key of ['worship', 'message', 'sending']) {
+      const capture = captureForSection(key)
+      expect(capture).toBeDefined()
+      expect(capture!.options.draggable).toBe('.slot-item')
+    }
+  })
+
+  it('per-row section select exists for each row, and changing one moves the slot into the chosen band, reordering the array section-major', async () => {
+    const wrapper = await mountView()
+
+    const selects = wrapper.findAll('[data-testid="section-select"]')
+    expect(selects).toHaveLength(buildSectionedService().slots.length)
+
+    // slot-2 (MESSAGE) starts in 'message' — retarget it to 'pre-service' and
+    // confirm it actually moved, not merely that the control exists.
+    expect(wrapper.find('[data-testid="section-list-message"]').findAll('.slot-item')).toHaveLength(1)
+    expect(wrapper.find('[data-testid="section-list-pre-service"]').findAll('.slot-item')).toHaveLength(0)
+
+    const messageSelect = wrapper.find('[data-testid="section-list-message"]').find('[data-testid="section-select"]')
+    await messageSelect.setValue('pre-service')
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('[data-testid="section-list-message"]').findAll('.slot-item')).toHaveLength(0)
+    expect(wrapper.find('[data-testid="section-list-pre-service"]').findAll('.slot-item')).toHaveLength(1)
+  })
+
+  it('per-row remove control exists for each row, and confirming removal decreases localService.slots.length by exactly 1', async () => {
+    const wrapper = await mountView()
+    const before = (wrapper.vm as unknown as SweepVm).localService.slots.length
+
+    const removeButtons = wrapper.findAll('button[title="Remove element"]')
+    expect(removeButtons.length).toBeGreaterThan(0)
+    await removeButtons[0]!.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    // D-14: remove opens a confirm dialog (Teleport to body) rather than
+    // removing immediately — confirm it, then assert the slot is actually gone.
+    const confirmBtn = body().findAll('button').find((b) => b.text() === 'Remove')
+    expect(confirmBtn).toBeDefined()
+    await confirmBtn!.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    expect((wrapper.vm as unknown as SweepVm).localService.slots).toHaveLength(before - 1)
+  })
+
+  it('teams row, sermon topic input and sermon passage input all render for an editor and write to localService', async () => {
+    const wrapper = await mountView()
+
+    // Teams row
+    const orchestraLabel = wrapper.findAll('label').find((l) => l.text() === 'Orchestra')
+    expect(orchestraLabel).toBeDefined()
+    const orchestraCheckbox = orchestraLabel!.find('input[type="checkbox"]')
+    expect(orchestraCheckbox.exists()).toBe(true)
+    await orchestraCheckbox.setValue(true)
+    await wrapper.vm.$nextTick()
+    expect((wrapper.vm as unknown as SweepVm).localService.teams).toContain('Orchestra')
+
+    // Sermon Topic input
+    const topicInput = wrapper.find('input[placeholder="e.g. Grace and forgiveness, The prodigal son"]')
+    expect(topicInput.exists()).toBe(true)
+    await topicInput.setValue('Grace')
+    await wrapper.vm.$nextTick()
+    expect((wrapper.vm as unknown as SweepVm).localService.sermonTopic).toBe('Grace')
+
+    // Sermon Passage input — a ScriptureInput distinct from any per-row scripture
+    // slot editor (this fixture's SCRIPTURE row uses its own, separate instance).
+    const sermonPassageInputs = wrapper
+      .findAllComponents({ name: 'ScriptureInput' })
+      .filter((c) => c.props('label') === 'Sermon Passage')
+    expect(sermonPassageInputs).toHaveLength(1)
+  })
+
+  it("the scripture slot's editor still renders for a scripture slot", async () => {
+    const wrapper = await mountView()
+
+    const scriptureRow = wrapper.find('[data-scripture-slot-index="1"]')
+    expect(scriptureRow.exists()).toBe(true)
+    expect(scriptureRow.findComponent({ name: 'ScriptureInput' }).exists()).toBe(true)
+  })
+
+  it('the lock banner renders for a locked editor', async () => {
+    mockServicesList = [{ ...buildSectionedService(), status: 'planned' }]
+    const wrapper = await mountView()
+
+    expect(wrapper.find('[data-testid="service-lock-banner-text"]').exists()).toBe(true)
+  })
+
+  it('service-save-status-bar (34-10) renders for an unlocked editor with no chrome classes at idle, re-asserted at phase close', async () => {
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const bar = wrapper.find('[data-testid="service-save-status-bar"]')
+    expect(bar.exists()).toBe(true)
+    expect(bar.classes()).toEqual([])
+  })
+
+  it('five section headers, five band labels, five counts; the empty-band placeholder still renders its pre-phase copy verbatim for the editor variant', async () => {
+    const wrapper = await mountView()
+
+    const headers = wrapper.findAll('[data-testid^="section-header-"]')
+    expect(headers).toHaveLength(5)
+    for (const key of ['pre-service', 'worship', 'message', 'sending', 'post-service']) {
+      expect(wrapper.find(`[data-testid="section-header-${key}"]`).exists()).toBe(true)
+      expect(wrapper.find(`[data-testid="section-slide-count-${key}"]`).exists()).toBe(true)
+    }
+    const placeholder = wrapper.find('[data-testid="section-empty-pre-service"]')
+    expect(placeholder.text()).toContain('No items yet')
+    expect(placeholder.text()).toContain('Drag an item here, or set its Section to Pre-Service.')
+  })
+
+  it('five section headers, five band labels, five counts; the empty-band placeholder still renders its pre-phase copy verbatim for the LOCKED variant', async () => {
+    mockServicesList = [{ ...buildSectionedService(), status: 'planned' }]
+    const wrapper = await mountView()
+
+    const headers = wrapper.findAll('[data-testid^="section-header-"]')
+    expect(headers).toHaveLength(5)
+    const placeholder = wrapper.find('[data-testid="section-empty-pre-service"]')
+    expect(placeholder.text()).toBe('No items in this section.')
+  })
+})
+
+describe('ServiceEditorView - Service Order locked/viewer sweep — write affordances absent, view stays (36-05, R067)', () => {
+  async function mountView() {
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          ContextualActionBar: false,
+          RouterLink: { template: '<a><slot /></a>' },
+          SaveStatusIndicator: false,
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+          PresentationViewer: true,
+        },
+      },
+    })
+  }
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockServicesList = [buildSectionedService()]
+  })
+
+  it('locked service: every write affordance introduced or moved by Phase 36 is absent, while band labels and counts stay visible', async () => {
+    mockServicesList = [{ ...buildSectionedService(), status: 'planned' }]
+    const wrapper = await mountView()
+
+    expect(wrapper.find('[data-testid="add-to-service-palette"]').exists()).toBe(false)
+    expect(wrapper.findAll('[data-testid^="section-add-item-"]')).toHaveLength(0)
+    expect(wrapper.findAll('[data-testid^="section-add-menu-"]')).toHaveLength(0)
+    expect(wrapper.findAll('button').some((b) => b.text().includes('Save'))).toBe(false)
+
+    expect(wrapper.findAll('[data-testid^="section-header-"]')).toHaveLength(5)
+    for (const key of ['pre-service', 'worship', 'message', 'sending', 'post-service']) {
+      expect(wrapper.find(`[data-testid="section-slide-count-${key}"]`).exists()).toBe(true)
+    }
+  })
+
+  it('viewer: every write affordance introduced or moved by Phase 36 is absent, while band labels and counts stay visible', async () => {
+    mockAuthState.isEditor = false
+    const wrapper = await mountView()
+
+    expect(wrapper.find('[data-testid="add-to-service-palette"]').exists()).toBe(false)
+    expect(wrapper.findAll('[data-testid^="section-add-item-"]')).toHaveLength(0)
+    expect(wrapper.findAll('[data-testid^="section-add-menu-"]')).toHaveLength(0)
+    expect(wrapper.findAll('button').some((b) => b.text().includes('Save'))).toBe(false)
+
+    expect(wrapper.findAll('[data-testid^="section-header-"]')).toHaveLength(5)
+    for (const key of ['pre-service', 'worship', 'message', 'sending', 'post-service']) {
+      expect(wrapper.find(`[data-testid="section-slide-count-${key}"]`).exists()).toBe(true)
+    }
+  })
+})
+
 // ── Slot id backfill on load (Phase 24-06 Task 1, R028) ─────────────────────────
 
 describe('ServiceEditorView - slot id backfill on load (Phase 24-06 Task 1)', () => {
