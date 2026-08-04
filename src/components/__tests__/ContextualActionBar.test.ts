@@ -110,8 +110,7 @@ describe('ContextualActionBar', () => {
     const wrapper = mount(ContextualActionBar, { props: { items } })
 
     const presentButton = wrapper.get('[data-testid="action-bar-item-present"]')
-    const glyph = presentButton.get('[aria-hidden="true"]')
-    expect(glyph.exists()).toBe(true)
+    expect(presentButton.find('[aria-hidden="true"]').exists()).toBe(true)
     expect(presentButton.text()).toContain('Present')
 
     const svgs = wrapper.findAll('svg')
