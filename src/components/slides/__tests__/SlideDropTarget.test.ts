@@ -63,4 +63,55 @@ describe('SlideDropTarget', () => {
     // the caller's (SlideGrid's) job via dropRouting.ts.
     expect(wrapper.emitted('drop')![0]).toEqual([[file]])
   })
+
+  // --- Phase 36 (R053): the tile doubles as the click-to-import affordance ---
+  describe('clickable variant (Phase 36 R053)', () => {
+    it('default (no clickable prop): no role/tabindex/aria-label, and a click emits nothing', async () => {
+      const wrapper = mount(SlideDropTarget)
+      expect(wrapper.attributes('role')).toBeUndefined()
+      expect(wrapper.attributes('tabindex')).toBeUndefined()
+      expect(wrapper.attributes('aria-label')).toBeUndefined()
+      await wrapper.trigger('click')
+      expect(wrapper.emitted('browse')).toBeUndefined()
+    })
+
+    it('clickable=true: role=button, tabindex=0, aria-label set', () => {
+      const wrapper = mount(SlideDropTarget, { props: { clickable: true } })
+      expect(wrapper.attributes('role')).toBe('button')
+      expect(wrapper.attributes('tabindex')).toBe('0')
+      expect(wrapper.attributes('aria-label')).toBe('Click to import, or drag files here')
+    })
+
+    it('clickable=true: click, Enter and Space each emit exactly one browse', async () => {
+      const wrapper = mount(SlideDropTarget, { props: { clickable: true } })
+      await wrapper.trigger('click')
+      await wrapper.trigger('keydown.enter')
+      await wrapper.trigger('keydown.space')
+      expect(wrapper.emitted('browse')).toHaveLength(3)
+    })
+
+    it('audioOnly=true, clickable=true: caption stays the audio-only string, no browse clause', () => {
+      const wrapper = mount(SlideDropTarget, { props: { audioOnly: true, clickable: true } })
+      expect(wrapper.text()).toContain('Drop audio')
+      expect(wrapper.text()).not.toContain('Click to browse')
+    })
+
+    it('audioOnly=false, clickable=true: caption gains the leading browse clause', () => {
+      const wrapper = mount(SlideDropTarget, { props: { audioOnly: false, clickable: true } })
+      expect(wrapper.text()).toContain('Click to browse')
+    })
+
+    it('audioOnly=false, clickable=false: caption is byte-identical to the pre-phase caption', () => {
+      const wrapper = mount(SlideDropTarget, { props: { audioOnly: false, clickable: false } })
+      expect(wrapper.text()).toContain(
+        "PPTX, image, and video appends a slide · audio sets this group's music",
+      )
+      expect(wrapper.text()).not.toContain('Click to browse')
+    })
+
+    it('audioOnly does not itself gate clickable — the component applies each prop independently; SlideGrid is what binds clickable to canMutateGroup for a song group', () => {
+      const wrapper = mount(SlideDropTarget, { props: { audioOnly: true, clickable: false } })
+      expect(wrapper.attributes('role')).toBeUndefined()
+    })
+  })
 })
