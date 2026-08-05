@@ -25,6 +25,16 @@ import type { Timestamp } from 'firebase/firestore'
  *    there is no per-service text override and no "Generate missing slides"
  *    step, because groups are always populated from the live source.
  *
+ *    EXCEPTION (Phase 38, D1/D2): a scripture group's CONGREGATIONAL-state
+ *    entries are the one deliberate departure from this invariant. Converting
+ *    a scripture reading to congregational sections detaches the group from
+ *    the slot on purpose — the whole point is per-slide editing and deletion
+ *    with no write-back to the reading — so once detached there is no
+ *    canonical record left for a section entry to resolve against; its own
+ *    `speaker`/`text`/`verseRange` ARE the group's stored words. Nothing else
+ *    stores text this way: every other entry kind on every other slot kind
+ *    still resolves live, exactly as this invariant states.
+ *
  * `slides` is an EMBEDDED ARRAY field on this document, NOT a nested
  * Firestore subcollection — a nested `slideGroups/{slotId}/slides/{id}`
  * subcollection would fall through the existing `firestore.rules` generic
@@ -43,11 +53,13 @@ export interface SlideGroup {
   backgroundImageUrl?: string
   /**
    * Opaque signature of the source content this group was last rebuilt
-   * against — a stored change-detector only, consulted by nothing (Phase 30
-   * deleted the confirm-gated reconciler that used to compare against it;
-   * every rebuild path now decides purely from a fresh derivation diff). Kept
-   * for storage parity across group documents and because deleting it would
-   * be a write against every existing document for no reader.
+   * against. Phase 30 deleted the confirm-gated reconciler that used to
+   * compare against it, but Phase 38 (D1) gives it a new reader:
+   * `rebuildScriptureGroup` consults it as the ONE durable marker
+   * distinguishing "this group was already materialized from the slot's
+   * CURRENT reading" (detached, freely editable) from "not yet" (still
+   * slot-derived). Every other rebuild path still treats it as a stored
+   * change-detector only, written for storage parity and not read back.
    */
   sourceSignature?: string
   slides: GroupSlideEntry[]
@@ -103,23 +115,41 @@ export interface GroupSlideEntry {
  * which stays correct for the auto-derived PRAYER/MESSAGE/HYMN entry. Both
  * fields are optional so every entry written before this change stays valid.
  *
- * `scripture` carries NO required payload (Phase 30, R047). Its content comes
- * from the owning SCRIPTURE slot's own reference fields, resolved live at
- * render time — exactly like the auto-derived `text` entry, and for the same
- * reason: the slot IS the canonical record. A `scriptureReadingId` pointing at
- * a separately-fetched reading document was the previous source, and it never
- * worked — nothing wrote the id back onto the slot, so a scripture item
- * produced no slide at all.
+ * `scripture` (Phase 38, D1/D2) is either of TWO shapes — a scripture group
+ * has exactly two states, never a mix:
+ *
+ * - REFERENCE (default, Phase 30's hard lock, unchanged): the ref carries NO
+ *   payload at all (R047). Content comes from the owning SCRIPTURE slot's own
+ *   reference fields, resolved live at render time — exactly like the
+ *   auto-derived `text` entry, and for the same reason: the slot IS the
+ *   canonical record. A `scriptureReadingId` pointing at a separately-fetched
+ *   reading document was the previous source, and it never worked — nothing
+ *   wrote the id back onto the slot, so a scripture item produced no slide.
+ * - CONGREGATIONAL (opt-in, D1): the ref carries `speaker` — its PRESENCE is
+ *   the discriminator, the same present-or-absent test the `text` member's
+ *   `body` already uses above — plus that section's own `text` and, when the
+ *   section has one, `verseRange`. This entry's words are the GROUP's, not
+ *   the slot's (D2): converting to congregational deliberately detaches the
+ *   group from slot-driven re-derivation, so there is no live source left to
+ *   resolve against. `derivedIdentityKey` still keys every scripture ref —
+ *   Reference or Congregational — on the ref KIND alone, so this widening
+ *   changes nothing about how a stored entry is matched during a rebuild.
  *
  * Both `scriptureReadingId` and `innerSlideId` stay in the union as OPTIONAL
- * legacy fields rather than being removed: Phase 34 widens this derivation
- * back to per-fragment entries for congregational splits, and every entry
- * written before this change stays readable (both fields are ignored on read).
+ * legacy fields rather than being removed: every entry written before Phase
+ * 38 stays readable (both fields are ignored on read).
  */
 export type SourceRef =
   | { kind: 'lyric'; songId: string; sectionId: string }
   | { kind: 'copyright'; songId: string }
-  | { kind: 'scripture'; scriptureReadingId?: string; innerSlideId?: string }
+  | {
+      kind: 'scripture'
+      scriptureReadingId?: string
+      innerSlideId?: string
+      speaker?: 'LEADER' | 'CONGREGATION'
+      text?: string
+      verseRange?: string
+    }
   | { kind: 'imported'; importId: string; innerSlideId: string }
   | { kind: 'text'; title?: string; body?: string }
   | { kind: 'video'; videoSrc: string; originalFileName?: string }

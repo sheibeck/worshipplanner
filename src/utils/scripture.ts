@@ -1,5 +1,6 @@
 import type { ScriptureRef, ScriptureSlot } from '@/types/service'
 import type { CongregationalSection } from '@/types/slide'
+import type { SourceRef } from '@/types/slideGroup'
 
 export const BIBLE_BOOKS: readonly string[] = [
   // Old Testament (39 books)
@@ -197,31 +198,52 @@ export function scripturesOverlap(reading: ScriptureRef, sermon: ScriptureRef): 
 }
 
 /**
- * R064: the ONE congregational-ness predicate in the slot -> slide path.
+ * R064/D1: the ONE congregational-ness predicate on the SLOT side — which
+ * sections seed a Reference -> Congregational conversion (`deriveGroupEntries`
+ * SCRIPTURE case) and, once seeded, which sections a rebuild diffs the stored
+ * signature against (`sourceSignature` SCRIPTURE case).
  *
  * Deliberately ignores `ScriptureSlot.readingMode` — that field is declared
  * but written by no code today, and gating on both it and the sections array
  * would create two fields that can disagree, the same defect shape as Phase
  * 28's two competing `performanceOrder` fields and Phase 33's
  * partially-applied cascade. The single rule, matching `PresentationViewer`'s
- * `isCongregational` computed (Phase 35, unchanged by this plan): sections
- * present and non-empty means congregational.
+ * `isCongregational` computed: sections present and non-empty means
+ * congregational.
  *
  * Pure passthrough — no copying, sorting, filtering, mapping, slicing or
  * string transformation of any kind. Section text is projected verbatim to a
  * congregation, so this function must be provably byte-exact by source
- * inspection, not merely by sampling. When there are no sections (or the
- * array is empty), `sections` is entirely absent from the returned object —
- * not present-and-undefined — so a slide built from a slot with no
- * congregational reading is byte-identical to today's shape.
+ * inspection, not merely by sampling. Returns the slot's OWN array by
+ * reference when non-empty (never a copy); returns `[]` — never `undefined`,
+ * never the stored array with elements removed — for a slot with no sections
+ * or an empty sections array.
  */
-export function congregationalSlideFieldsFromSlot(
-  slot: ScriptureSlot,
-): { readingMode: 'normal' | 'congregational'; sections?: CongregationalSection[] } {
+export function congregationalSectionsFromSlot(slot: ScriptureSlot): CongregationalSection[] {
   if (Array.isArray(slot.congregationalSections) && slot.congregationalSections.length > 0) {
-    return { readingMode: 'congregational', sections: slot.congregationalSections }
+    return slot.congregationalSections
   }
-  return { readingMode: 'normal' }
+  return []
+}
+
+/**
+ * R064/D1: the mirror predicate on the ENTRY side — the ONLY place any
+ * consumer decides whether a stored `GroupSlideEntry` is a congregational
+ * section slide (`resolveEntryContent`'s scripture case, and
+ * `rebuildScriptureGroup`'s cleared-reference branch). `speaker` present is
+ * the discriminator (matching the `text` member's authored-`body` precedent
+ * in `SourceRef`'s doc comment) — a Reference-state entry and a legacy
+ * pre-Phase-38 entry both have no `speaker`, so both correctly return `null`
+ * here regardless of any `scriptureReadingId`/`innerSlideId` they still
+ * carry.
+ */
+export function congregationalSectionFromRef(ref: SourceRef): CongregationalSection | null {
+  if (ref.kind !== 'scripture' || ref.speaker === undefined) return null
+  return {
+    speaker: ref.speaker,
+    text: ref.text ?? '',
+    ...(ref.verseRange !== undefined ? { verseRange: ref.verseRange } : {}),
+  }
 }
 
 /**

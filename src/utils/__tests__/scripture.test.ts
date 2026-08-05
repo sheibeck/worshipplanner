@@ -6,11 +6,13 @@ import {
   parseScriptureInput,
   formatScriptureReference,
   scriptureRefFromSlot,
-  congregationalSlideFieldsFromSlot,
+  congregationalSectionsFromSlot,
+  congregationalSectionFromRef,
   scriptureSlotAfterReferenceChange,
 } from '@/utils/scripture'
 import type { ScriptureRef, ScriptureSlot } from '@/types/service'
 import type { CongregationalSection } from '@/types/slide'
+import type { SourceRef } from '@/types/slideGroup'
 
 function makeSlot(overrides: Partial<ScriptureSlot> = {}): ScriptureSlot {
   return {
@@ -284,42 +286,30 @@ function makeSection(overrides: Partial<CongregationalSection> = {}): Congregati
   }
 }
 
-// R064: congregationalSlideFieldsFromSlot is the ONE congregational-ness
-// predicate in the slot -> slide path. Every case here backstops the
-// byte-exactness claim the assembler tests (34-05 Task 2) depend on.
-describe('congregationalSlideFieldsFromSlot', () => {
-  it('a slot with no congregationalSections returns normal mode with NO own "sections" property', () => {
+// R064/D1: congregationalSectionsFromSlot is the ONE congregational-ness
+// predicate on the SLOT side. Every case here backstops the byte-exactness
+// claim the materializer/assembler tests depend on.
+describe('congregationalSectionsFromSlot', () => {
+  it('returns [] for a slot with no congregationalSections', () => {
     const slot = makeSlot({ congregationalSections: undefined })
-    const result = congregationalSlideFieldsFromSlot(slot)
-    expect(result.readingMode).toBe('normal')
-    expect(Object.prototype.hasOwnProperty.call(result, 'sections')).toBe(false)
+    expect(congregationalSectionsFromSlot(slot)).toEqual([])
   })
 
-  it('a slot with an empty congregationalSections array also returns normal mode with no "sections" property', () => {
+  it('returns [] for an empty congregationalSections array', () => {
     const slot = makeSlot({ congregationalSections: [] })
-    const result = congregationalSlideFieldsFromSlot(slot)
-    expect(result.readingMode).toBe('normal')
-    expect(Object.prototype.hasOwnProperty.call(result, 'sections')).toBe(false)
+    expect(congregationalSectionsFromSlot(slot)).toEqual([])
   })
 
-  it('a slot with one section returns congregational mode and that one-element array', () => {
-    const sections = [makeSection()]
-    const slot = makeSlot({ congregationalSections: sections })
-    const result = congregationalSlideFieldsFromSlot(slot)
-    expect(result.readingMode).toBe('congregational')
-    expect(result.sections).toBe(sections)
-  })
-
-  it('a slot with three sections returns all three, in stored order, with no re-sorting', () => {
+  it('returns the stored array itself — same reference, same order, no copying — when non-empty', () => {
     const sections = [
       makeSection({ speaker: 'LEADER', text: 'One' }),
       makeSection({ speaker: 'CONGREGATION', text: 'Two' }),
       makeSection({ speaker: 'LEADER', text: 'Three' }),
     ]
     const slot = makeSlot({ congregationalSections: sections })
-    const result = congregationalSlideFieldsFromSlot(slot)
-    expect(result.sections).toEqual(sections)
-    expect(result.sections!.map((s) => s.text)).toEqual(['One', 'Two', 'Three'])
+    const result = congregationalSectionsFromSlot(slot)
+    expect(result).toBe(sections)
+    expect(result.map((s) => s.text)).toEqual(['One', 'Two', 'Three'])
   })
 
   it('two adjacent sections sharing the same speaker are both returned, unmerged', () => {
@@ -328,22 +318,22 @@ describe('congregationalSlideFieldsFromSlot', () => {
       makeSection({ speaker: 'CONGREGATION', text: 'Part B' }),
     ]
     const slot = makeSlot({ congregationalSections: sections })
-    const result = congregationalSlideFieldsFromSlot(slot)
-    expect(result.sections).toHaveLength(2)
-    expect(result.sections![0]!.speaker).toBe('CONGREGATION')
-    expect(result.sections![1]!.speaker).toBe('CONGREGATION')
+    const result = congregationalSectionsFromSlot(slot)
+    expect(result).toHaveLength(2)
+    expect(result[0]!.speaker).toBe('CONGREGATION')
+    expect(result[1]!.speaker).toBe('CONGREGATION')
   })
 
   it('a section containing curly quotes and an em dash round-trips with strict === equality', () => {
     const text = '‘He restores my soul’ — “he leads me”'
     const sections = [makeSection({ text })]
     const slot = makeSlot({ congregationalSections: sections })
-    const result = congregationalSlideFieldsFromSlot(slot)
-    expect(result.sections![0]!.text === text).toBe(true)
+    const result = congregationalSectionsFromSlot(slot)
+    expect(result[0]!.text === text).toBe(true)
   })
 
   it('source inspection: performs no string-transforming or array-reordering operation', () => {
-    const src = congregationalSlideFieldsFromSlot.toString()
+    const src = congregationalSectionsFromSlot.toString()
     expect(src).not.toMatch(/\.normalize\(/)
     expect(src).not.toMatch(/\.trim\(/)
     expect(src).not.toMatch(/\.replace\(/)
@@ -355,6 +345,74 @@ describe('congregationalSlideFieldsFromSlot', () => {
     expect(src).not.toMatch(/\.slice\(/)
     expect(src).not.toMatch(/\.concat\(/)
     expect(src).not.toMatch(/\[\s*\.\.\./)
+  })
+})
+
+// R064/D1: congregationalSectionFromRef is the mirror predicate on the ENTRY
+// side — the ONLY place any consumer decides whether a stored GroupSlideEntry
+// is a congregational section slide.
+describe('congregationalSectionFromRef', () => {
+  it('returns null for every non-scripture ref', () => {
+    const refs: SourceRef[] = [
+      { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+      { kind: 'copyright', songId: 'song-1' },
+      { kind: 'imported', importId: 'import-1', innerSlideId: 'inner-1' },
+      { kind: 'text' },
+      { kind: 'video', videoSrc: 'https://example.com/v.mp4' },
+    ]
+    for (const ref of refs) {
+      expect(congregationalSectionFromRef(ref)).toBeNull()
+    }
+  })
+
+  it('returns null for a payload-free scripture ref', () => {
+    expect(congregationalSectionFromRef({ kind: 'scripture' })).toBeNull()
+  })
+
+  it('returns null for a legacy scripture ref carrying only scriptureReadingId/innerSlideId', () => {
+    const ref: SourceRef = { kind: 'scripture', scriptureReadingId: 'reading-1', innerSlideId: 'scripture-0' }
+    expect(congregationalSectionFromRef(ref)).toBeNull()
+  })
+
+  it('returns the reconstructed CongregationalSection when the ref carries a speaker', () => {
+    const ref: SourceRef = { kind: 'scripture', speaker: 'LEADER', text: 'The Lord is my shepherd;' }
+    expect(congregationalSectionFromRef(ref)).toEqual({ speaker: 'LEADER', text: 'The Lord is my shepherd;' })
+  })
+
+  it('a section reconstructed from a ref carrying a verseRange has that verseRange', () => {
+    const ref: SourceRef = { kind: 'scripture', speaker: 'CONGREGATION', text: 'I shall not want.', verseRange: '1' }
+    const section = congregationalSectionFromRef(ref)
+    expect(section?.verseRange).toBe('1')
+  })
+
+  it('a section reconstructed from a ref with no verseRange has no verseRange key at all', () => {
+    const ref: SourceRef = { kind: 'scripture', speaker: 'LEADER', text: 'No range here' }
+    const section = congregationalSectionFromRef(ref)
+    expect(Object.prototype.hasOwnProperty.call(section, 'verseRange')).toBe(false)
+  })
+
+  it('a ref carrying a speaker but no text reconstructs to an empty string, not undefined', () => {
+    const ref: SourceRef = { kind: 'scripture', speaker: 'LEADER' }
+    expect(congregationalSectionFromRef(ref)).toEqual({ speaker: 'LEADER', text: '' })
+  })
+
+  it('round trip: a three-section fixture including curly quotes and an em dash reconstructs with strictly === equal text', () => {
+    const sections: CongregationalSection[] = [
+      { speaker: 'LEADER', text: 'One' },
+      { speaker: 'CONGREGATION', text: '‘He restores my soul’ — “he leads me”' },
+      { speaker: 'LEADER', text: 'Three', verseRange: '3' },
+    ]
+    for (const section of sections) {
+      const ref: SourceRef = {
+        kind: 'scripture',
+        speaker: section.speaker,
+        text: section.text,
+        ...(section.verseRange !== undefined ? { verseRange: section.verseRange } : {}),
+      }
+      const reconstructed = congregationalSectionFromRef(ref)
+      expect(reconstructed?.text === section.text).toBe(true)
+      expect(reconstructed).toEqual(section)
+    }
   })
 })
 
