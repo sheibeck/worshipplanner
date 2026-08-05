@@ -597,8 +597,18 @@ vitest run` passes 39/39 directly. Logged in the phase's `deferred-items.md`. Us
 
 | Phase | State | Resume |
 |-------|-------|--------|
+| 32 | verification_deferred_human | /gsd-verify-work 32 |
+| 33 | verification_deferred_human | /gsd-verify-work 33 |
+| 34 | verification_deferred_human | /gsd-verify-work 34 |
 | 35 | verification_deferred_human | /gsd-verify-work 35 |
 | 36 | deferred_by_owner — **wireframe now EXISTS** (Turn 3) | /gsd-autonomous --only 36 |
+| 37 | verification_deferred_human | /gsd-verify-work 37 |
+
+> **Table corrected 2026-08-05 (autonomous re-entry).** Rows 32/33/34/37 were always deferred in
+> substance — code-complete, `human_needed`, and itemised in `PENDING-VERIFICATION.md` under the
+> standing autonomy grant — but earlier passes recorded them only there, not here. Autonomous phase
+> discovery reads THIS table, so without these rows a re-entry would have re-queued four finished
+> phases for discuss→plan→execute. Nothing about their status changed; only the bookkeeping did.
 
 ### v1.4 Phase 35 — Presentation Correctness & Lyric Editor (2026-08-03)
 
