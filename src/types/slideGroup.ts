@@ -64,6 +64,14 @@ export interface GroupSlideEntry {
   id: string
   order: number
   sourceRef: SourceRef
+  /**
+   * LEGACY, no longer authored. The Slide Label input that wrote this field was
+   * removed once it turned out nothing read it back — not the slide card, the
+   * grid, the projected slide, or the PPTX export. The field stays declared so
+   * documents written before the removal remain valid, and stays OPTIONAL so
+   * nothing new is obliged to set it. Do not reintroduce an editor for it; if a
+   * per-slide caption is ever wanted, give it a name that says where it shows.
+   */
   label?: string
   notes?: string
   /** Per-slide audio (R030) — audio only, there is no per-slide video layer. */

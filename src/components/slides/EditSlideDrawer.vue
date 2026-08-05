@@ -107,18 +107,12 @@
             >{{ previewText }}</p>
           </div>
 
-          <!-- Task 3: label/notes fields render here, gated on canMutate
-               (R054: absent entirely for a song group, never merely disabled). -->
-          <div v-if="canMutate">
-            <label class="block text-xs font-medium text-gray-400 mb-1" for="edit-slide-drawer-label">Slide Label</label>
-            <input
-              id="edit-slide-drawer-label"
-              v-model="localLabel"
-              type="text"
-              class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
-              data-testid="drawer-label-input"
-            />
-          </div>
+          <!-- The Slide Label input used to render here. It was removed: the
+               entry `label` it wrote was never read back by anything — not the
+               slide card, not the grid, not the projected slide, not the PPTX
+               export — so it was a field users could fill in and never see
+               again. `notes` is NOT dead (slideDisplay's `hasNotes` drives a
+               card indicator) and keeps its own field further down. -->
 
           <!-- Phase 26-07: Slide Text — branch keyed on the STORED entry's
                `sourceRef.kind`, NEVER the resolved slide's `contentKind`
@@ -267,12 +261,6 @@
                   @change="onAudioFileSelected"
                 />
               </div>
-              <!-- R058: the per-slide "whole group" scope option is gone —
-                   group-wide audio is set from SlideGroupMusicControl.vue,
-                   one control up from this drawer. Shown only in this
-                   "nothing attached" branch, the moment a user might look
-                   for the removed scope choice and not find it. -->
-              <p class="mt-1 text-[11px] text-gray-500" data-testid="audio-scope-hint">For audio across the whole group, use the group's music control above the grid.</p>
             </div>
 
             <p v-if="audioUploadIsUploading" data-testid="audio-upload-progress" class="mt-1 text-[11px] text-indigo-400">
@@ -362,6 +350,21 @@
             </p>
             <p v-if="backgroundUploadError" data-testid="background-upload-error" class="mt-1 text-[11px] text-red-400">{{ backgroundUploadError }}</p>
           </div>
+
+          <!-- R058: the per-slide "whole group" scope option is gone — both
+               group-wide audio and a group-wide background are set one level
+               up, from the group media panel above the grid
+               (SlideGroupMusicControl + BackgroundControl). This hint used to
+               live inside the audio "nothing attached" branch and named audio
+               only, which left the identical question about backgrounds
+               unanswered. It now sits below BOTH sections it speaks for, and
+               is no longer conditioned on the audio empty state — the scope
+               question is just as live once something is already attached. -->
+          <p
+            v-if="canMutate || canMutateBackground"
+            class="text-[11px] text-gray-500"
+            data-testid="audio-scope-hint"
+          >For audio or a background across the whole group, use the group's music and background controls above the grid.</p>
 
           <div v-if="canMutate">
             <label class="block text-xs font-medium text-gray-400 mb-1" for="edit-slide-drawer-notes">Notes (operator only)</label>
@@ -941,7 +944,6 @@ type FieldStatus = 'idle' | 'saving' | 'saved' | 'error'
 const DEBOUNCE_MS = 800
 const SAVED_FLASH_MS = 1800
 
-const localLabel = ref('')
 const localNotes = ref('')
 /** Only meaningful when `sourceKind === 'text'` (D-13's one editable exception) — stays '' and unwritten-to for every other kind. */
 const localBody = ref('')
@@ -956,7 +958,6 @@ const status = ref<FieldStatus>('idle')
  * composable's existing wording verbatim.
  */
 const unsavedGuard = useUnsavedGuard(() => ({
-  label: localLabel.value,
   notes: localNotes.value,
   body: localBody.value,
 }))
@@ -1078,14 +1079,12 @@ async function flushAll(): Promise<void> {
   // second flush's `writeField` reads the post-commit base the first
   // flush just wrote (props.group updates from the store's own snapshot
   // round-trip before the next await resumes), so both edits survive.
-  await flushField('label')
   await flushField('notes')
   await flushField('body')
 }
 
 function resetLocalFields(entry: GroupSlideEntry | null): void {
   syncing = true
-  localLabel.value = entry?.label ?? ''
   localNotes.value = entry?.notes ?? ''
   localBody.value = entry?.sourceRef.kind === 'text' ? (entry.sourceRef.body ?? '') : ''
   void nextTick().then(() => {
@@ -1113,13 +1112,6 @@ watch(
     // drawer's own write, or a concurrent edit) — re-sync only the field with
     // no write of its own still pending, so an in-flight edit is never
     // clobbered by a stale round trip.
-    if (!pendingWrite.label && entry && entry.label !== oldEntry.label) {
-      syncing = true
-      localLabel.value = entry.label ?? ''
-      void nextTick().then(() => {
-        syncing = false
-      })
-    }
     if (!pendingWrite.notes && entry && entry.notes !== oldEntry.notes) {
       syncing = true
       localNotes.value = entry.notes ?? ''
@@ -1147,11 +1139,6 @@ watch(
   },
   { immediate: true },
 )
-
-watch(localLabel, (value) => {
-  if (syncing || !props.entry) return
-  scheduleWrite('label', props.entry.id, value)
-})
 
 watch(localNotes, (value) => {
   if (syncing || !props.entry) return

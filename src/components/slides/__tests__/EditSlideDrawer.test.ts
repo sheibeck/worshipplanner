@@ -319,7 +319,7 @@ describe('EditSlideDrawer (Phase 26-05 Task 1 — shell)', () => {
       const wrapper = mountDrawer()
       const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
 
-      await body().find('[data-testid="drawer-label-input"]').setValue('Changed label')
+      await body().find('[data-testid="drawer-notes-input"]').setValue('Changed label')
       await body().find('[data-testid="edit-slide-drawer-close"]').trigger('click')
 
       expect(confirmSpy).toHaveBeenCalledTimes(1)
@@ -330,7 +330,7 @@ describe('EditSlideDrawer (Phase 26-05 Task 1 — shell)', () => {
       const wrapper = mountDrawer()
       const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
 
-      await body().find('[data-testid="drawer-label-input"]').setValue('Changed label')
+      await body().find('[data-testid="drawer-notes-input"]').setValue('Changed label')
       await body().find('[data-testid="edit-slide-drawer-close"]').trigger('click')
 
       expect(confirmSpy).toHaveBeenCalledTimes(1)
@@ -341,7 +341,7 @@ describe('EditSlideDrawer (Phase 26-05 Task 1 — shell)', () => {
       const wrapper = mountDrawer()
       const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
 
-      await body().find('[data-testid="drawer-label-input"]').setValue('Changed label')
+      await body().find('[data-testid="drawer-notes-input"]').setValue('Changed label')
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
 
       expect(confirmSpy).toHaveBeenCalledTimes(1)
@@ -362,7 +362,7 @@ describe('EditSlideDrawer (Phase 26-05 Task 1 — shell)', () => {
       const wrapper = mountDrawer()
       const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
 
-      await body().find('[data-testid="drawer-label-input"]').setValue('Changed label')
+      await body().find('[data-testid="drawer-notes-input"]').setValue('Changed label')
 
       const exposed = wrapper.vm as unknown as { confirmDiscard: () => boolean }
       expect(exposed.confirmDiscard()).toBe(false)
@@ -442,17 +442,22 @@ describe('EditSlideDrawer (Phase 26-05 Task 3 — label/notes live-apply)', () =
     vi.useRealTimers()
   })
 
-  it("shows both fields with the entry's current values and the UI-SPEC's labels", () => {
+  it("shows the Notes field with the entry's current value, and no Slide Label field at all", () => {
     mountDrawer({ entry: makeEntry({ id: 'entry-1', label: 'Verse 1', notes: 'Dim the lights' }) })
-    expect(body().find('[data-testid="drawer-label-input"]').element.getAttribute('value') ?? (body().find('[data-testid="drawer-label-input"]').element as HTMLInputElement).value).toBe('Verse 1')
     expect((body().find('[data-testid="drawer-notes-input"]').element as HTMLTextAreaElement).value).toBe('Dim the lights')
-    expect(body().text()).toContain('Slide Label')
     expect(body().text()).toContain('Notes')
+    // The Slide Label field was removed: nothing ever read the `label` it
+    // wrote back. Asserted positively on the rendered copy rather than on the
+    // absence of a testid, which would pass trivially forever.
+    expect(body().text()).not.toContain('Slide Label')
+    // An entry that still carries a persisted `label` must not surface it
+    // anywhere in the drawer — the field is legacy data, not hidden state.
+    expect(body().text()).not.toContain('Verse 1')
   })
 
-  it('writes exactly once after the debounce period following a single label edit', async () => {
-    mountDrawer({ entry: makeEntry({ id: 'entry-1', label: '' }) })
-    await body().find('[data-testid="drawer-label-input"]').setValue('New Label')
+  it('writes exactly once after the debounce period following a single notes edit', async () => {
+    mountDrawer({ entry: makeEntry({ id: 'entry-1', notes: '' }) })
+    await body().find('[data-testid="drawer-notes-input"]').setValue('New note')
     expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
 
     await vi.advanceTimersByTimeAsync(800)
@@ -461,7 +466,7 @@ describe('EditSlideDrawer (Phase 26-05 Task 3 — label/notes live-apply)', () =
 
   it('collapses several rapid keystrokes into a single write, not one per keystroke', async () => {
     mountDrawer({ entry: makeEntry({ id: 'entry-1', label: '' }) })
-    const input = body().find('[data-testid="drawer-label-input"]')
+    const input = body().find('[data-testid="drawer-notes-input"]')
     await input.setValue('N')
     await input.setValue('Ne')
     await input.setValue('New')
@@ -477,12 +482,12 @@ describe('EditSlideDrawer (Phase 26-05 Task 3 — label/notes live-apply)', () =
     const entryTwo = makeEntry({ id: 'entry-2', label: 'Untouched', notes: 'Keep me' })
     mountDrawer({ entry: entryOne, group: makeGroup({ slides: [entryOne, entryTwo] }) })
 
-    await body().find('[data-testid="drawer-label-input"]').setValue('Changed')
+    await body().find('[data-testid="drawer-notes-input"]').setValue('Changed')
     await vi.advanceTimersByTimeAsync(800)
 
     expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
     const written = mockReplaceGroupSlides.mock.calls[0]![2] as GroupSlideEntry[]
-    expect(written.find((e) => e.id === 'entry-1')?.label).toBe('Changed')
+    expect(written.find((e) => e.id === 'entry-1')?.notes).toBe('Changed')
     expect(written.find((e) => e.id === 'entry-2')).toEqual(entryTwo)
   })
 
@@ -496,7 +501,7 @@ describe('EditSlideDrawer (Phase 26-05 Task 3 — label/notes live-apply)', () =
     const updatedGroup = makeGroup({ slides: [entryOne, entryTwo] })
     await wrapper.setProps({ group: updatedGroup })
 
-    await body().find('[data-testid="drawer-label-input"]').setValue('Changed')
+    await body().find('[data-testid="drawer-notes-input"]').setValue('Changed')
     await vi.advanceTimersByTimeAsync(800)
 
     expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
@@ -516,50 +521,54 @@ describe('EditSlideDrawer (Phase 26-05 Task 3 — label/notes live-apply)', () =
     const group = makeGroup({ slides: [entryOne, entryTwo] })
     const wrapper = mountDrawer({ entry: entryOne, group })
 
-    await body().find('[data-testid="drawer-label-input"]').setValue('Changed before leaving')
+    await body().find('[data-testid="drawer-notes-input"]').setValue('Changed before leaving')
     // Switch away before the debounce fires — the pending write must flush now.
     await wrapper.setProps({ entry: entryTwo })
     await flushPromises()
 
     expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
     const written = mockReplaceGroupSlides.mock.calls[0]![2] as GroupSlideEntry[]
-    expect(written.find((e) => e.id === 'entry-1')?.label).toBe('Changed before leaving')
+    expect(written.find((e) => e.id === 'entry-1')?.notes).toBe('Changed before leaving')
   })
 
-  it('CR-01 regression: flushing a Label edit and a Notes edit on the SAME entry together (switching entries before either debounce fires) commits BOTH edits, not just one', async () => {
-    const entryOne = makeEntry({ id: 'entry-1', label: 'Original label', notes: 'Original notes' })
-    const entryTwo = makeEntry({ id: 'entry-2', label: 'Other' })
+  // CR-01's guarantee predates the Slide Label removal and outlives it: it is
+  // about `flushAll` being sequential, not about which two fields are pending.
+  // Re-expressed over the two fields that remain (Notes and Slide Text), which
+  // flush in that order.
+  it('CR-01 regression: flushing a Notes edit and a Slide Text edit on the SAME entry together (switching entries before either debounce fires) commits BOTH edits, not just one', async () => {
+    const entryOne = makeEntry({ id: 'entry-1', notes: 'Original notes', sourceRef: { kind: 'text', title: 'New slide', body: 'Original body' } })
+    const entryTwo = makeEntry({ id: 'entry-2', notes: 'Other' })
     const group = makeGroup({ slides: [entryOne, entryTwo] })
     const wrapper = mountDrawer({ entry: entryOne, group })
 
-    await body().find('[data-testid="drawer-label-input"]').setValue('New label')
     await body().find('[data-testid="drawer-notes-input"]').setValue('New notes')
+    await body().find('[data-testid="drawer-slide-text-editable"]').setValue('New body')
 
-    // `flushAll` must await the label flush before starting the notes flush,
-    // so the notes write's `writeField` reads a base that already reflects
-    // the label write's result — exactly what the store's own snapshot
-    // round-trip would deliver between the two sequential awaits in real use.
-    // Simulate that round-trip here: resolving the FIRST (label) write updates
-    // the live `group` prop before the SECOND (notes) write reads it.
+    // `flushAll` must await the notes flush before starting the body flush, so
+    // the body write's `writeField` reads a base that already reflects the
+    // notes write's result — exactly what the store's own snapshot round-trip
+    // would deliver between the two sequential awaits in real use. Simulate
+    // that round-trip: resolving the FIRST (notes) write updates the live
+    // `group` prop before the SECOND (body) write reads it.
     mockReplaceGroupSlides.mockImplementationOnce(async () => {
-      const withLabelApplied = { ...entryOne, label: 'New label' }
-      await wrapper.setProps({ group: makeGroup({ slides: [withLabelApplied, entryTwo] }) })
+      const withNotesApplied = { ...entryOne, notes: 'New notes' }
+      await wrapper.setProps({ group: makeGroup({ slides: [withNotesApplied, entryTwo] }) })
     })
 
     // Switching to a different entry before the 800ms debounce fires triggers
-    // `flushAll`, which must flush both the pending label and notes writes.
+    // `flushAll`, which must flush both the pending notes and body writes.
     await wrapper.setProps({ entry: entryTwo })
     await flushPromises()
 
     expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(2)
-    // The SECOND write to land (notes) is the one whose `next` must carry
-    // BOTH edits — under the old parallel `Promise.all` bug, this write's
-    // `next` was computed from the pre-label-write base and would silently
-    // discard the label edit.
+    // The SECOND write to land (body) is the one whose `next` must carry BOTH
+    // edits — under the old parallel `Promise.all` bug, this write's `next`
+    // was computed from the pre-notes-write base and silently discarded the
+    // notes edit.
     const secondWriteNext = mockReplaceGroupSlides.mock.calls[1]![2] as GroupSlideEntry[]
     const written = secondWriteNext.find((e) => e.id === 'entry-1')
-    expect(written?.label).toBe('New label')
     expect(written?.notes).toBe('New notes')
+    expect(written?.sourceRef).toEqual({ kind: 'text', title: 'New slide', body: 'New body' })
   })
 
   it('shows a saving state during the write and a saved state after it resolves', async () => {
@@ -569,7 +578,7 @@ describe('EditSlideDrawer (Phase 26-05 Task 3 — label/notes live-apply)', () =
     )
     mountDrawer({ entry: makeEntry({ id: 'entry-1', label: '' }) })
 
-    await body().find('[data-testid="drawer-label-input"]').setValue('Changed')
+    await body().find('[data-testid="drawer-notes-input"]').setValue('Changed')
     await vi.advanceTimersByTimeAsync(800)
     expect(body().find('[data-testid="drawer-status"]').text()).toBe('Saving…')
 
@@ -583,30 +592,29 @@ describe('EditSlideDrawer (Phase 26-05 Task 3 — label/notes live-apply)', () =
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     mountDrawer({ entry: makeEntry({ id: 'entry-1', label: '' }) })
 
-    await body().find('[data-testid="drawer-label-input"]').setValue('Changed')
+    await body().find('[data-testid="drawer-notes-input"]').setValue('Changed')
     await vi.advanceTimersByTimeAsync(800)
     await flushPromises()
 
     expect(body().find('[data-testid="drawer-status"]').text()).not.toBe('Saved')
-    expect((body().find('[data-testid="drawer-label-input"]').element as HTMLInputElement).value).toBe('Changed')
+    expect((body().find('[data-testid="drawer-notes-input"]').element as HTMLTextAreaElement).value).toBe('Changed')
     consoleErrorSpy.mockRestore()
   })
 
-  it('renders neither field for a user without write capability, while the slide information still reads', () => {
-    mountDrawer({ entry: makeEntry({ id: 'entry-1', label: 'Verse 1' }), isEditor: false })
-    expect(body().find('[data-testid="drawer-label-input"]').exists()).toBe(false)
+  it('renders no write field for a user without write capability, while the slide information still reads', () => {
+    mountDrawer({ entry: makeEntry({ id: 'entry-1', notes: 'Dim the lights' }), isEditor: false })
     expect(body().find('[data-testid="drawer-notes-input"]').exists()).toBe(false)
     expect(body().find('[data-testid="drawer-preview-text"]').exists()).toBe(true)
   })
 
   it("re-syncs the panel's own field copy when the persisted entry changes", async () => {
-    const entryOne = makeEntry({ id: 'entry-1', label: 'Original' })
+    const entryOne = makeEntry({ id: 'entry-1', notes: 'Original' })
     const wrapper = mountDrawer({ entry: entryOne, group: makeGroup({ slides: [entryOne] }) })
 
-    const updatedEntry = makeEntry({ id: 'entry-1', label: 'Updated elsewhere' })
+    const updatedEntry = makeEntry({ id: 'entry-1', notes: 'Updated elsewhere' })
     await wrapper.setProps({ entry: updatedEntry, group: makeGroup({ slides: [updatedEntry] }) })
 
-    expect((body().find('[data-testid="drawer-label-input"]').element as HTMLInputElement).value).toBe('Updated elsewhere')
+    expect((body().find('[data-testid="drawer-notes-input"]').element as HTMLTextAreaElement).value).toBe('Updated elsewhere')
   })
 })
 
@@ -938,23 +946,43 @@ describe('EditSlideDrawer (Phase 26-08 Task 2 — loop where it means something,
     expect(body().find('[data-testid="audio-shared-caption"]').text()).toBe('Shared with every other slide in this group')
   })
 
-  it('★ P-02: the audio-scope-hint renders only in the nothing-attached state, naming the group music control as the replacement', () => {
+  // P-02's original assertion — hint present ONLY in the audio nothing-attached
+  // state — was deliberately inverted. The hint now speaks for the background
+  // section too, so scoping it to the audio empty state would hide the
+  // background half of the answer from anyone who already attached audio.
+  it('★ P-02: the group-scope hint names BOTH the group music and background controls, and stays put once audio is attached', () => {
     const emptyEntry = makeEntry({ id: 'entry-1' })
     const emptyGroup = makeGroup({ slides: [emptyEntry] })
     const emptyWrapper = mountDrawer({ entry: emptyEntry, group: emptyGroup })
     expect(body().find('[data-testid="audio-attach"]').exists()).toBe(true)
-    expect(body().find('[data-testid="audio-scope-hint"]').text()).toBe("For audio across the whole group, use the group's music control above the grid.")
+    expect(body().find('[data-testid="audio-scope-hint"]').text()).toBe("For audio or a background across the whole group, use the group's music and background controls above the grid.")
     emptyWrapper.unmount()
 
+    // Own audio attached — the hint must persist, because the "how do I set
+    // this for the whole group?" question is still unanswered for backgrounds.
     const ownAudioEntry = makeEntry({ id: 'entry-1', audioUrl: 'https://example.com/orgs/org-1/media/m1/song.mp3' })
     const ownAudioWrapper = mountDrawer({ entry: ownAudioEntry, group: makeGroup({ slides: [ownAudioEntry] }) })
-    expect(body().find('[data-testid="audio-scope-hint"]').exists()).toBe(false)
+    expect(body().find('[data-testid="audio-scope-hint"]').exists()).toBe(true)
     ownAudioWrapper.unmount()
 
     const bedEntry = makeEntry({ id: 'entry-1' })
     const bedGroup = makeGroup({ slides: [bedEntry], bedAudioUrl: 'https://example.com/orgs/org-1/media/m1/bed.mp3' })
-    mountDrawer({ entry: bedEntry, group: bedGroup })
+    const bedWrapper = mountDrawer({ entry: bedEntry, group: bedGroup })
+    expect(body().find('[data-testid="audio-scope-hint"]').exists()).toBe(true)
+    bedWrapper.unmount()
+
+    // A viewer with no write capability gets no call-to-action they can't act on.
+    mountDrawer({ entry: makeEntry({ id: 'entry-1' }), isEditor: false })
     expect(body().find('[data-testid="audio-scope-hint"]').exists()).toBe(false)
+  })
+
+  it('the group-scope hint sits below the background section, not inside the audio block, so it reads as covering both', () => {
+    mountDrawer({ entry: makeEntry({ id: 'entry-1' }), group: makeGroup({ slides: [makeEntry({ id: 'entry-1' })] }) })
+    const html = body().html()
+    expect(html.indexOf('data-testid="drawer-background-section"')).toBeGreaterThan(-1)
+    expect(html.indexOf('data-testid="audio-scope-hint"')).toBeGreaterThan(
+      html.indexOf('data-testid="drawer-background-section"'),
+    )
   })
 
   it('★ concurrency backstop: the surviving attach route writes only audioUrl on the patched entry — a stale local copy cannot reintroduce the removed scope field', async () => {
@@ -1383,7 +1411,7 @@ describe('EditSlideDrawer (R054 — song groups are read-only)', () => {
     const { entry, assembledSlide } = makeLyricFixtures()
     mountDrawer({ planItem: songPlanItem, entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
 
-    expect(body().find('[data-testid="drawer-label-input"]').exists()).toBe(false)
+    expect(body().find('[data-testid="drawer-notes-input"]').exists()).toBe(false)
     expect(body().find('[data-testid="drawer-notes-input"]').exists()).toBe(false)
     expect(body().find('[data-testid="audio-scope-choice"]').exists()).toBe(false)
     expect(body().find('[data-testid="audio-attach-input"]').exists()).toBe(false)
@@ -1454,7 +1482,7 @@ describe('EditSlideDrawer (R054 — song groups are read-only)', () => {
     const { entry, assembledSlide } = makeLyricFixtures()
     mountDrawer({ planItem: songPlanItem, entry, assembledSlide, group: makeGroup({ slides: [entry] }), isEditor: false })
 
-    expect(body().find('[data-testid="drawer-label-input"]').exists()).toBe(false)
+    expect(body().find('[data-testid="drawer-notes-input"]').exists()).toBe(false)
     expect(body().find('[data-testid="drawer-notes-input"]').exists()).toBe(false)
     expect(body().find('[data-testid="drawer-footer-actions"]').exists()).toBe(false)
     expect(body().find('[data-testid="drawer-edit-in-song-link"]').exists()).toBe(false)
@@ -1514,7 +1542,7 @@ describe('EditSlideDrawer (R054 — song groups are read-only)', () => {
     const entry = makeEntry({ id: 'entry-1', label: 'Verse 1' })
     mountDrawer({ entry, group: makeGroup({ slides: [entry] }) }) // default planItem is MESSAGE
 
-    expect(body().find('[data-testid="drawer-label-input"]').exists()).toBe(true)
+    expect(body().find('[data-testid="drawer-notes-input"]').exists()).toBe(true)
     expect(body().find('[data-testid="drawer-notes-input"]').exists()).toBe(true)
     expect(body().find('[data-testid="drawer-footer-actions"]').exists()).toBe(true)
     expect(body().find('[data-testid="drawer-duplicate"]').exists()).toBe(true)
@@ -1557,7 +1585,7 @@ describe('EditSlideDrawer - locked service (R036)', () => {
   it('drops every mutation control when locked', () => {
     mountDrawer({ serviceLocked: true })
 
-    expect(body().find('[data-testid="drawer-label-input"]').exists()).toBe(false)
+    expect(body().find('[data-testid="drawer-notes-input"]').exists()).toBe(false)
     expect(body().find('[data-testid="drawer-notes-input"]').exists()).toBe(false)
     expect(body().find('[data-testid="audio-scope-choice"]').exists()).toBe(false)
     expect(body().find('[data-testid="audio-attach"]').exists()).toBe(false)
@@ -1671,7 +1699,7 @@ describe('EditSlideDrawer (D2 260805-bvo — one drawer body, no mode prop)', ()
   it("renders the owner's ask: Slide Label, the editable Slide Text, Slide Audio, Notes and the footer actions all together in ONE body", () => {
     const { entry, assembledSlide } = makeAuthoredTextFixtures('My own words')
     mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
-    expect(body().find('[data-testid="drawer-label-input"]').exists()).toBe(true)
+    expect(body().find('[data-testid="drawer-notes-input"]').exists()).toBe(true)
     const textarea = body().find('[data-testid="drawer-slide-text-editable"]')
     expect(textarea.exists()).toBe(true)
     expect((textarea.element as HTMLTextAreaElement).value).toBe('My own words')
@@ -1682,7 +1710,7 @@ describe('EditSlideDrawer (D2 260805-bvo — one drawer body, no mode prop)', ()
 
   it('renders all four of those sections for a mutator regardless of slide kind, unchanged', () => {
     mountDrawer()
-    expect(body().find('[data-testid="drawer-label-input"]').exists()).toBe(true)
+    expect(body().find('[data-testid="drawer-notes-input"]').exists()).toBe(true)
     expect(body().find('[data-testid="drawer-audio-section"]').exists()).toBe(true)
     expect(body().find('[data-testid="drawer-notes-input"]').exists()).toBe(true)
     expect(body().find('[data-testid="drawer-footer-actions"]').exists()).toBe(true)
@@ -1701,7 +1729,7 @@ describe('EditSlideDrawer (D2 260805-bvo — one drawer body, no mode prop)', ()
   it('renders the single-body shape identically whether the entry prop is supplied at mount or arrives later — no second body to default to', () => {
     mountDrawer()
     expect(body().find('[data-testid="edit-slide-drawer-title"]').text()).toBe('Edit Slide Details')
-    expect(body().find('[data-testid="drawer-label-input"]').exists()).toBe(true)
+    expect(body().find('[data-testid="drawer-notes-input"]').exists()).toBe(true)
   })
 
   it('a non-entry prop change (position) does not re-run the entry-change flush', async () => {
@@ -1710,7 +1738,7 @@ describe('EditSlideDrawer (D2 260805-bvo — one drawer body, no mode prop)', ()
     const { entry } = makeAuthoredTextFixtures('Original')
     const wrapper = mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
 
-    await body().find('[data-testid="drawer-label-input"]').setValue('Changed')
+    await body().find('[data-testid="drawer-notes-input"]').setValue('Changed')
     await wrapper.setProps({ position: 4 })
     // The entry never changed — only an unrelated prop did — so the
     // entry-change flush path must not have fired; the pending label write
@@ -1859,7 +1887,7 @@ describe('EditSlideDrawer (Phase 33-07 Task 2 — Slide Background)', () => {
     mountDrawer({ planItem: songPlanItem, entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
 
     expect(body().find('[data-testid="background-attach"]').exists()).toBe(true)
-    expect(body().find('[data-testid="drawer-label-input"]').exists()).toBe(false)
+    expect(body().find('[data-testid="drawer-notes-input"]').exists()).toBe(false)
     expect(body().find('[data-testid="drawer-notes-input"]').exists()).toBe(false)
     expect(body().find('[data-testid="drawer-footer-actions"]').exists()).toBe(false)
   })
