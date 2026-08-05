@@ -78,7 +78,7 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 Phase: 36 — EXECUTING
 Plan: 5 of 5
 Status: Phase complete — ready for verification
-Last activity: 2026-08-03 — Completed 36-01-PLAN.md (SlideDropTarget clickable variant, SlideGrid import-button deletion, R053)
+Last activity: 2026-08-05 — Completed quick task 260805-b5h: group media panel laid out side by side (owner visual check pending)
 
 ## ★ v1.4 AUTONOMOUS RUN — standing decisions (2026-07-28)
 
@@ -1361,6 +1361,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 | 260714-dlt | Schedule matrix redesign: pills replaced with plain comma-separated names + same-size unfilled/conflict/group markers; whole date-row clickable opening a single full-row drawer (all roles, Clear/Swap/Add/gap-fill); store `lastRegenerate` diffs prev vs new calendar to flag changed dates; "Show changes (N)" checkbox highlights changed rows (accent bar + tint + badge). QuarterGrid tests rewritten to row-drawer model (52 tests pass) | 2026-07-14 | 2cdeccd, 977014d, b7cab81 | [260714-dlt-regenerate-change-highlights-and-row-dra](.planning/quick/260714-dlt-regenerate-change-highlights-and-row-dra/) |
 | 260714-e7o | Roles tab (Volunteers → Roles) Save buttons now give visible feedback: per-role Save shows "Saving…" then a green "Saved ✓" flash (~1.8s); Add Role flashes "Added ✓" | 2026-07-14 | 895af68 | [260714-e7o-roles-save-button-feedback](.planning/quick/260714-e7o-roles-save-button-feedback/) |
 | 260714-f4p | PC song import: "Import new songs only" checkbox (default on) skips already-imported songs; matching centralized into exported `partitionPcSongs()` (pcSongId OR non-empty ccliNumber OR lowercased title) with 8 new unit tests; checkbox drives preview counts, confirm upsert, and done summary | 2026-07-14 | fed36d8, d3ceb87 | [260714-f4p-on-song-import-from-pc-only-look-for-son](.planning/quick/260714-f4p-on-song-import-from-pc-only-look-for-son/) |
+| 260805-b5h | Slide-grid group media panel laid out as a wrapping horizontal row (`flex flex-wrap items-start gap-x-6 gap-y-3`) so add-music and add-background sit side by side; both children carry `min-w-[14rem] flex-1` to wrap to stacked on narrow rails instead of crushing. Owner visual checkpoint (Task 2) still pending. | 2026-08-05 | 8cc6c28 | [260805-b5h-put-the-group-add-music-and-add-backgrou](.planning/quick/260805-b5h-put-the-group-add-music-and-add-backgrou/) |
 
 ### Blockers/Concerns
 
