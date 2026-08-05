@@ -736,26 +736,20 @@ describe('SlidesTab', () => {
       expect(drawer.props('open')).toBe(true)
     })
 
-    // D2 (260805-bvo): 'edit-lyrics' still exists as a MenuItemKey until
-    // Task 3 removes it from slideDisplay.ts — it opens the identical
-    // single-body drawer in the meantime.
-    it('menu: the edit-lyrics key opens the drawer', async () => {
-      const wrapper = mountWithEntry({ kind: 'text', title: 'New slide', body: '' })
-      await wrapper.vm.$nextTick()
+    // D2 (260805-bvo): the 'edit-lyrics' key no longer exists in
+    // MenuItemKey — removed below along with its dispatch case. Its
+    // inverse (a text entry's menu never offers a second edit affordance)
+    // is pinned much more strongly at the source by slideDisplay.test.ts's
+    // and SlideGrid.test.ts's exact-list assertions, so no guard is lost by
+    // deleting this test rather than trying to dispatch a key that can no
+    // longer be constructed.
 
-      wrapper.findComponent(SlideGrid).vm.$emit('menu-action', 'entry-1', 'edit-lyrics')
-      await wrapper.vm.$nextTick()
-
-      const drawer = wrapper.findComponent(EditSlideDrawer)
-      expect(drawer.props('open')).toBe(true)
-    })
-
-    it('menu: dispatching the lyrics key then the details key on the SAME entry leaves the drawer open throughout', async () => {
+    it('menu: dispatching edit-details twice in a row on the SAME entry leaves the drawer open throughout', async () => {
       const wrapper = mountWithEntry({ kind: 'text', title: 'New slide', body: '' })
       await wrapper.vm.$nextTick()
 
       const grid = wrapper.findComponent(SlideGrid)
-      grid.vm.$emit('menu-action', 'entry-1', 'edit-lyrics')
+      grid.vm.$emit('menu-action', 'entry-1', 'edit-details')
       await wrapper.vm.$nextTick()
       let drawer = wrapper.findComponent(EditSlideDrawer)
       expect(drawer.props('open')).toBe(true)

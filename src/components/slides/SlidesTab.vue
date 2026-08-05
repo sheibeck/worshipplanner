@@ -106,7 +106,7 @@
  * Phase 33-09 (R051): selecting a card no longer opens the drawer — that
  * coupling is exactly what R051 exists to break, so a slide can be dragged
  * without triggering edit. `drawerOpen` is now set true only by
- * `onMenuAction`'s two edit keys and by the post-duplicate follow-selection
+ * `onMenuAction`'s edit key and by the post-duplicate follow-selection
  * handler (`selectSlideById`), and false only by the drawer's own `close`
  * emit or by the selection itself disappearing (below). It is still NEVER
  * cleared by a selection CHANGE to a still-valid slide, so once open the
@@ -255,8 +255,8 @@ function onSelectSlot(slotId: string): void {
 }
 
 // Phase 33-09 (R051): no longer set true on every selection — that was the
-// coupling this plan exists to break. Set true only by `onMenuAction`'s two
-// edit keys and by the post-duplicate follow-selection handler
+// coupling this plan exists to break. Set true only by `onMenuAction`'s
+// edit key and by the post-duplicate follow-selection handler
 // (`selectSlideById`) below, and cleared only by the drawer's own `close`
 // emit or by the selection itself disappearing (below) — never by a
 // selection CHANGE to a still-valid slide, so once open the drawer still
@@ -422,21 +422,22 @@ function requestEditInScripture(): void {
 }
 
 /**
- * Phase 33-09 (R051/R052) — the single dispatcher for every one of the six
- * 3-dot menu keys (`SlideGrid`'s `menu-action` emit, 33-08). A menu action
- * always implies its own card is the one being acted on, so this selects
- * the entry FIRST — mirroring `onSelectSlide`'s own selection line — before
- * dispatching on the key, since both the drawer's entry resolution and the
- * song-navigation lookup below depend on the selection already being
- * current (even when the acted-on card was not already selected).
+ * Phase 33-09 (R051/R052) — the single dispatcher for every one of the five
+ * 3-dot menu keys (`SlideGrid`'s `menu-action` emit, 33-08; D2 260805-bvo
+ * dropped the sixth, `edit-lyrics`, from `MenuItemKey` entirely). A menu
+ * action always implies its own card is the one being acted on, so this
+ * selects the entry FIRST — mirroring `onSelectSlide`'s own selection line —
+ * before dispatching on the key, since both the drawer's entry resolution
+ * and the song-navigation lookup below depend on the selection already
+ * being current (even when the acted-on card was not already selected).
  *
- * Only the two edit keys and Duplicate/Delete ever touch `drawerOpen` — the
- * two navigation keys are pure routes/relays and never open it. D2
- * (260805-bvo): the drawer has one body now, so there is no mode to set —
- * Duplicate and Delete simply open it, because that is where their EXISTING
- * write paths live (the duplicate write, the inline delete confirm) — this
- * dispatcher itself never calls a delete or duplicate store action; it only
- * ever sets a pending request for the drawer to act on (P-01).
+ * Only edit-details and Duplicate/Delete ever touch `drawerOpen` — the two
+ * navigation keys are pure routes/relays and never open it. D2 (260805-bvo):
+ * the drawer has one body, so there is no mode to set — Duplicate and Delete
+ * simply open it, because that is where their EXISTING write paths live (the
+ * duplicate write, the inline delete confirm) — this dispatcher itself never
+ * calls a delete or duplicate store action; it only ever sets a pending
+ * request for the drawer to act on (P-01).
  *
  * WR-04: "edit-in-song"/"edit-in-scripture" are checked against the OPEN
  * drawer's own unsaved-edit guard BEFORE `selectedSlideId` is reassigned
@@ -456,10 +457,6 @@ function onMenuAction(slideId: string, key: MenuItemKey): void {
   selectedSlideId.value = slideId
   switch (key) {
     case 'edit-details':
-    // D2 (260805-bvo): 'edit-lyrics' still exists as a MenuItemKey until
-    // Task 3 removes it from slideDisplay.ts; it opens the identical
-    // single-body drawer in the meantime, which is harmless.
-    case 'edit-lyrics':
       drawerOpen.value = true
       break
     case 'edit-in-song': {

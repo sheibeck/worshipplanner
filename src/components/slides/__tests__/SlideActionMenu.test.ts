@@ -6,7 +6,9 @@ import type { MenuItem } from '../slideDisplay'
 // Fixed enum labels from 33-UI-SPEC.md § Copywriting Contract — used for the
 // E2 overflow backstop below, kept local since this test asserts against the
 // contract's exact wording, not against slideDisplay's internal map.
-const ALL_LABELS = ['Edit details', 'Edit lyrics', 'Edit in song', 'Edit in scripture', 'Duplicate', 'Delete Slide']
+// D2 (260805-bvo): 'Edit lyrics' removed — the drawer has one edit
+// affordance now, so this vocabulary is five labels, not six.
+const ALL_LABELS = ['Edit details', 'Edit in song', 'Edit in scripture', 'Duplicate', 'Delete Slide']
 
 const FOUR_ITEMS: MenuItem[] = [
   { key: 'edit-details', label: 'Edit details', tone: 'default' },
@@ -153,7 +155,7 @@ describe('SlideActionMenu', () => {
     const longestWord = Math.max(...ALL_LABELS.flatMap((label) => label.split(' ').map((word) => word.length)))
     // w-40 (160px) with px-3 py-2 padding and text-sm comfortably fits words
     // well under 20 characters without wrapping; the longest word among all
-    // six fixed labels ("scripture", 9 chars) is far under this ceiling.
+    // five fixed labels ("scripture", 9 chars) is far under this ceiling.
     expect(longestWord).toBeLessThanOrEqual(12)
   })
 })

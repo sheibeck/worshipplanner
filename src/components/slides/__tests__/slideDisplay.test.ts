@@ -443,28 +443,37 @@ describe('slideDisplay', () => {
       }
     })
 
-    it('a hand-authored text entry with a defined body returns edit-details, edit-lyrics, duplicate, delete', () => {
+    it('D2 (260805-bvo): a hand-authored text entry with a defined body returns exactly edit-details, duplicate, delete — no separate edit-lyrics affordance', () => {
       const entry = makeMenuEntry({ kind: 'text', body: 'Please stand.' })
-      expect(keysOf(entry, 'PRAYER', true)).toEqual(['edit-details', 'edit-lyrics', 'duplicate', 'delete'])
+      expect(keysOf(entry, 'PRAYER', true)).toEqual(['edit-details', 'duplicate', 'delete'])
     })
 
-    it('a text entry with undefined body includes edit-lyrics for planItemKind PRAYER', () => {
+    it('D2 (260805-bvo): a text entry with an undefined body for planItemKind PRAYER returns the SAME exact list — the plan-item-kind branch of the old discriminator is gone', () => {
       const entry = makeMenuEntry({ kind: 'text' })
-      expect(keysOf(entry, 'PRAYER', true)).toContain('edit-lyrics')
+      expect(keysOf(entry, 'PRAYER', true)).toEqual(['edit-details', 'duplicate', 'delete'])
     })
 
-    it('a text entry with undefined body includes edit-lyrics for planItemKind MESSAGE', () => {
+    it('D2 (260805-bvo): a text entry with an undefined body for planItemKind MESSAGE returns the SAME exact list', () => {
       const entry = makeMenuEntry({ kind: 'text' })
-      expect(keysOf(entry, 'MESSAGE', true)).toContain('edit-lyrics')
+      expect(keysOf(entry, 'MESSAGE', true)).toEqual(['edit-details', 'duplicate', 'delete'])
     })
 
-    it('Hymn discriminator: a still-pristine Hymn text entry (no body) excludes edit-lyrics; a hand-added blank one (body: "") includes it', () => {
+    it('D2 (260805-bvo), owner-authorised reversal of the Hymn carve-out: a still-pristine Hymn text entry (no body) and a hand-added blank one (body: "") return IDENTICAL menu lists', () => {
       const pristine = makeMenuEntry({ kind: 'text' })
-      expect(keysOf(pristine, 'HYMN', true)).toEqual(['edit-details', 'duplicate', 'delete'])
-      expect(keysOf(pristine, 'HYMN', true)).not.toContain('edit-lyrics')
-
       const handAdded = makeMenuEntry({ kind: 'text', body: '' })
-      expect(keysOf(handAdded, 'HYMN', true)).toContain('edit-lyrics')
+      expect(keysOf(pristine, 'HYMN', true)).toEqual(['edit-details', 'duplicate', 'delete'])
+      expect(keysOf(handAdded, 'HYMN', true)).toEqual(['edit-details', 'duplicate', 'delete'])
+      expect(keysOf(pristine, 'HYMN', true)).toEqual(keysOf(handAdded, 'HYMN', true))
+    })
+
+    it('D2 (260805-bvo): no item returned for a text entry ever mentions lyrics, for either canMutate value', () => {
+      for (const canMutate of [true, false]) {
+        const entry = makeMenuEntry({ kind: 'text' })
+        const items = slideActionMenuItems(entry, 'PRAYER', canMutate)
+        for (const item of items) {
+          expect(item.label).not.toMatch(/lyric/i)
+        }
+      }
     })
 
     it('an imported entry returns edit-details, duplicate, delete', () => {
@@ -491,9 +500,9 @@ describe('slideDisplay', () => {
       }
     })
 
-    it('backstop: planItemKind undefined with an undefined body yields a list without edit-lyrics', () => {
+    it('D2 (260805-bvo): planItemKind undefined with an undefined body yields the same exact list — the parameter is no longer consulted by this branch', () => {
       const entry = makeMenuEntry({ kind: 'text' })
-      expect(keysOf(entry, undefined, true)).not.toContain('edit-lyrics')
+      expect(keysOf(entry, undefined, true)).toEqual(['edit-details', 'duplicate', 'delete'])
     })
 
     it('backstop: an unknown source kind yields exactly one item, edit-details — the most conservative list', () => {

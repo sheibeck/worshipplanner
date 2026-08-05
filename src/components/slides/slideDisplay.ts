@@ -16,7 +16,6 @@ import { formatScriptureReference, scriptureRefFromSlot } from '@/utils/scriptur
 /** One key in the 3-dot slide action menu (33-UI-SPEC.md § Copywriting Contract). */
 export type MenuItemKey =
   | 'edit-details'
-  | 'edit-lyrics'
   | 'edit-in-song'
   | 'edit-in-scripture'
   | 'duplicate'
@@ -231,7 +230,6 @@ export function backgroundImageLabel(url: string): string {
 /** Fixed enum labels, verbatim from 33-UI-SPEC.md § Copywriting Contract — never user-supplied text. */
 const MENU_ITEM_LABELS: Record<MenuItemKey, string> = {
   'edit-details': 'Edit details',
-  'edit-lyrics': 'Edit lyrics',
   'edit-in-song': 'Edit in song',
   // 34-07 (owner UAT F1): this key now opens the congregational-reading
   // editor in place (a modal over the Slides tab), not a navigation away
@@ -256,49 +254,56 @@ function menuItem(key: MenuItemKey): MenuItem {
 }
 
 /**
- * Pure per-kind 3-dot slide action menu item list (R063), matching
- * 33-UI-SPEC.md § Phase-Specific Component Contracts §3's table exhaustively,
- * including row 3a's Hymn refinement. Synchronous, no store/composable reads —
- * follows this file's established pure-helper convention (`KIND_BADGE_CLASSES`,
- * `deleteSlideConfirmBody`). Item order is fixed and identical across kinds for
- * shared items: edit-details, then edit-lyrics, then the navigation item, then
- * duplicate, then delete.
+ * Pure per-kind 3-dot slide action menu item list (R063). Synchronous, no
+ * store/composable reads — follows this file's established pure-helper
+ * convention (`KIND_BADGE_CLASSES`, `deleteSlideConfirmBody`). Item order is
+ * fixed and identical across kinds for shared items: edit-details, then the
+ * navigation item (where one exists), then duplicate, then delete.
  *
- * ★ Deliberate divergence from §3's stated 4-parameter signature: the fourth
- * parameter `canMutateBackground` is NOT threaded through. Nothing in §3's
- * table branches on it — per §11, "Edit details" is unconditional, since the
- * drawer it opens is a view affordance too — so it would be an unused
- * parameter the lint config's default `args: 'after-used'` rule would flag.
- * Do not "restore" it; background-mutation gating lives entirely inside
- * `EditSlideDrawer.vue`'s own `canMutateBackground` computed.
+ * ★ Deliberate divergence from 33-UI-SPEC.md §3's stated 4-parameter
+ * signature: the fourth parameter `canMutateBackground` is NOT threaded
+ * through. Nothing in §3's table branches on it — per §11, "Edit details" is
+ * unconditional, since the drawer it opens is a view affordance too — so it
+ * would be an unused parameter the lint config's default `args: 'after-used'`
+ * rule would flag. Do not "restore" it; background-mutation gating lives
+ * entirely inside `EditSlideDrawer.vue`'s own `canMutateBackground` computed.
  *
- * ★ The Hymn discriminator (§3 row 3a): `sourceRef.kind` ALONE cannot express
- * "hand-authored". A HYMN group's auto-derived text slide is also `kind:
- * 'text'`, created by `slideGroupMaterializer.ts` with NO `body` at all, while
- * `SlideGrid.vue`'s add-slide path always sets `body: ''`. The discriminator
- * is therefore `entry.sourceRef.body !== undefined` combined with
- * `planItemKind`: offer `edit-lyrics` when the body is defined (any plan item
- * kind), or when the body is undefined and the plan item kind is `PRAYER` or
- * `MESSAGE`. Withhold it when the body is undefined and every other case
- * (including `HYMN` and `undefined` itself) — that slide's canonical source is
- * the Service Order tab's own Hymn fields, and a second silently-diverging
- * editor here would create exactly the shadow copy the song/scripture
- * read-only routing exists to prevent.
+ * ★ D2 (260805-bvo) — the Hymn carve-out is REVERSED, on the owner's explicit
+ * authority, superseding 33-UI-SPEC.md §3 row 3a and §4. This paragraph used
+ * to describe an anti-shadow-copy discriminator (`sourceRef.body !==
+ * undefined` combined with `planItemKind`) that withheld a second edit
+ * affordance from a HYMN group's auto-derived pristine text slide. That
+ * discriminator, and the second affordance it gated, are both gone. Owner
+ * verbatim: *"This only non-editable thing should be Song. Everything else
+ * can be editable. Hymns are a special thing for now only. In the future
+ * we'll get rid of that item and just make them regular songs again, but not
+ * yet."* Every `text` entry now returns the SAME menu regardless of whether
+ * its body is defined or which plan item kind it belongs to — including a
+ * HYMN group's auto-derived slide, which can now diverge from its Service
+ * Order Hymn fields when edited here. The owner accepts that divergence as
+ * temporary (T-bvo-03). R054/P-03 is explicitly NOT dropped by this reversal
+ * — see the paragraph below.
  *
- * ★ Backstops: when `planItemKind` is `undefined`, the conservative branch
- * (no `edit-lyrics`) is taken automatically by the same condition above — a
- * partially-resolved plan item never grants an affordance the phase
- * deliberately withholds. When `sourceRef.kind` matches no known union
- * member, the `default` arm returns `[{ key: 'edit-details', ... }]` — the
- * most conservative list, never the most permissive — implemented via an
- * explicit `default` rather than relying on exhaustiveness alone, since a
- * future union member would otherwise fall through to nothing.
+ * ★ `planItemKind` is now UNCONSULTED by every branch below — kept as part
+ * of R063's signature rather than removed, since removing it would churn
+ * eight call sites for no behavioural gain: the root tsconfigs do not set
+ * `noUnusedParameters`, and this repo's ESLint runs the default `args:
+ * 'after-used'`, under which an unused parameter followed by a used one
+ * (`canMutate`) is not reported. If tooling ever does flag it, prefix it
+ * with an underscore rather than changing the signature's arity.
+ *
+ * ★ Backstop: when `sourceRef.kind` matches no known union member, the
+ * `default` arm returns `[{ key: 'edit-details', ... }]` — the most
+ * conservative list, never the most permissive — implemented via an explicit
+ * `default` rather than relying on exhaustiveness alone, since a future union
+ * member would otherwise fall through to nothing.
  *
  * ★ Prohibition P-03 is structural here: `lyric` and `copyright` entries are
  * always inside a SONG group (R054), and their rows never include
- * `edit-lyrics`, `duplicate` or `delete` under any argument combination — not
- * even when `canMutate` is true. Both branches return immediately after
- * pushing their two fixed items, so `canMutate` is never consulted for them.
+ * `duplicate` or `delete` under any argument combination — not even when
+ * `canMutate` is true. Both branches return immediately after pushing their
+ * two fixed items, so `canMutate` is never consulted for them. D2 does not
+ * touch this: those two branches are unchanged by the reversal above.
  */
 export function slideActionMenuItems(
   entry: GroupSlideEntry,
@@ -318,11 +323,12 @@ export function slideActionMenuItems(
       return items
     }
 
+    // D2 (260805-bvo): kept as its own case even though it now returns the
+    // same list as the imported/video branch below — deliberately, because
+    // `text` is the one kind whose body the drawer edits and whose contract
+    // is the likeliest to diverge again.
     case 'text': {
       const items = [menuItem('edit-details')]
-      const hasBody = entry.sourceRef.body !== undefined
-      const offersEditLyrics = hasBody || planItemKind === 'PRAYER' || planItemKind === 'MESSAGE'
-      if (offersEditLyrics) items.push(menuItem('edit-lyrics'))
       if (canMutate) items.push(menuItem('duplicate'), menuItem('delete'))
       return items
     }

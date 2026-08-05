@@ -1212,8 +1212,13 @@ describe('SlideGrid', () => {
       const cards = wrapper.findAllComponents(SlideCard)
       const textKeys = (cards[0]!.props('menuItems') as MenuItem[]).map((i) => i.key)
       const scriptureKeys = (cards[1]!.props('menuItems') as MenuItem[]).map((i) => i.key)
-      expect(textKeys).toContain('edit-lyrics')
-      expect(scriptureKeys).not.toContain('edit-lyrics')
+      // D2 (260805-bvo): exact-list assertion — a negative containment check
+      // on the text card would go vacuous once 'edit-lyrics' stops existing
+      // at all, so this pins the whole list instead. The scripture card's
+      // OWN negative assertion is dropped as redundant, not weakened: the
+      // very next line already asserts its route key positively, which is
+      // strictly stronger.
+      expect(textKeys).toEqual(['edit-details', 'duplicate', 'delete'])
       expect(scriptureKeys).toContain('edit-in-scripture')
     })
 
@@ -1304,18 +1309,19 @@ describe('SlideGrid', () => {
       expect(keys).not.toContain('delete')
     })
 
-    it('for a SONG group, no card menuItems contains edit-lyrics, duplicate or delete', () => {
+    it('R054/P-03: for a SONG group, every card menuItems equals exactly edit-details, edit-in-song', () => {
       const slot = makeSlot({ kind: 'SONG', id: 'slot-1', position: 0, songId: 's1', songTitle: 'X', songKey: null, requiredVwType: 1 } as never)
       const group = makeGroup({ slides: [{ id: 'c1', order: 0, sourceRef: { kind: 'lyric', songId: 's1', sectionId: 'v1' } }] })
       const assembledSlideshow = [makeAssembled(0, 'c1', 'SONG')]
       const wrapper = mountGrid({ selectedSlot: slot, assembledSlideshow, group })
       const keys = (wrapper.findComponent(SlideCard).props('menuItems') as MenuItem[]).map((i) => i.key)
-      expect(keys).not.toContain('edit-lyrics')
-      expect(keys).not.toContain('duplicate')
-      expect(keys).not.toContain('delete')
+      // D2 (260805-bvo): a single exact-list assertion subsumes the three
+      // negative containment checks this replaces, and cannot go vacuous —
+      // R054/P-03 is explicitly NOT dropped by D2.
+      expect(keys).toEqual(['edit-details', 'edit-in-song'])
     })
 
-    it("a HYMN group's auto-derived pristine text entry has no edit-lyrics key, while a hand-added blank entry in the same group does", () => {
+    it("D2 (260805-bvo), owner-authorised reversal: a HYMN group's auto-derived pristine text entry and a hand-added blank entry in the same group get IDENTICAL menu key lists", () => {
       const slot = makeSlot({ kind: 'HYMN', id: 'slot-1', position: 0, hymnName: 'Amazing Grace', hymnNumber: '1' } as never)
       const group = makeGroup({ slides: [makeTextEntry('pristine'), makeTextEntry('handadded', '')] })
       const assembledSlideshow = [makeAssembled(0, 'pristine', 'HYMN'), makeAssembled(0, 'handadded', 'HYMN')]
@@ -1323,8 +1329,9 @@ describe('SlideGrid', () => {
       const cards = wrapper.findAllComponents(SlideCard)
       const pristineKeys = (cards[0]!.props('menuItems') as MenuItem[]).map((i) => i.key)
       const handAddedKeys = (cards[1]!.props('menuItems') as MenuItem[]).map((i) => i.key)
-      expect(pristineKeys).not.toContain('edit-lyrics')
-      expect(handAddedKeys).toContain('edit-lyrics')
+      expect(pristineKeys).toEqual(['edit-details', 'duplicate', 'delete'])
+      expect(handAddedKeys).toEqual(['edit-details', 'duplicate', 'delete'])
+      expect(pristineKeys).toEqual(handAddedKeys)
     })
   })
 
