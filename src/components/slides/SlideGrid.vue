@@ -52,62 +52,71 @@
         @cancel="showImportModal = false"
       />
 
-      <!-- Group media panel (34-11, 34-UAT F2; owner follow-up) — music and
+      <!-- Group media panel (34-11, 34-UAT F2; owner follow-up x2) — music and
            background merged into ONE VISUAL panel, not just one structural
-           wrapper. 34-11 already merged the two controls under one
-           `data-testid="slide-grid-group-media-panel"` element, but each
-           control still painted its OWN `rounded-md border border-gray-800
-           bg-gray-900` root, so the page still showed two bordered boxes.
-           Per direct owner feedback on the running app ("let's at least
-           merge them into a single panel instead of two, but we'll leave
-           them there") the chrome moves UP to this wrapper — a single
-           border/background around both controls, `divide-y` drawing the
-           one seam between them — and each control drops its own chrome via
-           the opt-in `flush` prop (default false, so every OTHER call site,
-           e.g. `SongLyricEditor.vue`'s song-level BackgroundControl, is
-           visually untouched). Deliberately still confined to wrapper/prop
-           plumbing: no new component, no relocation out of this file, no
-           restyle of either control's internals.
+           wrapper. 34-11 merged the two controls under one
+           `data-testid="slide-grid-group-media-panel"` element and moved the
+           border/background chrome up to this wrapper via the `flush` prop,
+           but the wrapper still carried `divide-y divide-gray-800` PLUS each
+           control still sat in its own `px-3 py-2` child div — the divider
+           line and the two separate padded blocks together still read as two
+           stacked panels on screen. Per direct owner feedback on the running
+           app ("get rid of the extra panel ... instead the background button
+           should go in the same panel as the add music button") the divider
+           and the per-control padding are removed: padding lives ONCE on the
+           panel itself, `gap-3` keeps the two controls from colliding
+           without drawing a seam between them. Deliberately still confined to
+           wrapper/prop plumbing: no new component, no relocation out of this
+           file, no restyle of either control's internals.
 
            ★ 31-UI-SPEC E5 still applies at the PANEL level, not just to each
            control inside it: two controls that each correctly decline to
            render an empty box on their own would together produce an empty
            PANEL if the panel's own wrapper were left ungated — so the panel
-           carries the disjunction of both controls' conditions one level up. -->
+           carries the disjunction of both controls' conditions one level up.
+           Each control's own gate (`showGroupMusicControl` /
+           `showGroupBackgroundControl`) now lives directly on the control
+           (or, for background, on the minimal testid wrapper below) rather
+           than on a padded child div — there is no padded child div left. -->
       <div
         v-if="showGroupMusicControl || showGroupBackgroundControl"
-        class="mx-6 mt-3 divide-y divide-gray-800 rounded-md border border-gray-800 bg-gray-900"
+        class="mx-6 mt-3 flex flex-col gap-3 rounded-md border border-gray-800 bg-gray-900 px-3 py-2"
         data-testid="slide-grid-group-media-panel"
       >
         <!-- Group music bar (25-06, R032). Emit-only control; this component
              intercepts both events and writes the selected group's bed via
              the slideGroups store's scoped write (the sole surviving
              attach/remove surface for group-bed audio; the Service Order
-             tab's equivalent control was removed in Phase 27-04). -->
-        <!-- ★ 31-UI-SPEC E5: gate the WRAPPER, not just the control's contents.
-             With no bed audio and no add affordance the control renders an empty
-             bordered box, which a locked service hits constantly. The condition
-             incidentally fixes the pre-existing viewer case too — a two-token side
-             effect of the correct condition, not a scope expansion. -->
-        <div v-if="showGroupMusicControl" class="px-3 py-2">
-          <SlideGroupMusicControl
-            :audio-url="group?.bedAudioUrl"
-            :slide-count="cards.length"
-            :org-id="orgId"
-            :is-editor="canWriteGroupMedia"
-            flush
-            @attach="onAttachGroupMusic"
-            @remove="onRemoveGroupMusic"
-          />
-        </div>
+             tab's equivalent control was removed in Phase 27-04). Gate moved
+             directly onto the component (no wrapper needed — no testid was
+             ever attached to its old child div). -->
+        <SlideGroupMusicControl
+          v-if="showGroupMusicControl"
+          :audio-url="group?.bedAudioUrl"
+          :slide-count="cards.length"
+          :org-id="orgId"
+          :is-editor="canWriteGroupMedia"
+          flush
+          @attach="onAttachGroupMusic"
+          @remove="onRemoveGroupMusic"
+        />
 
         <!-- Group background control (R055, 33-08), same "don't render an
-             empty box" wrapper gate for the same recorded reason
-             (31-UI-SPEC E5). Background is group MEDIA exactly like the bed
-             audio above it, so it uses the SAME `canWriteGroupMedia` gate —
-             never `canMutateGroup` — including that gate's deliberate
-             song-group carve-out. -->
-        <div v-if="showGroupBackgroundControl" data-testid="slide-grid-group-background" class="px-3 py-2">
+             empty box" gate for the same recorded reason (31-UI-SPEC E5).
+             Background is group MEDIA exactly like the bed audio above it,
+             so it uses the SAME `canWriteGroupMedia` gate — never
+             `canMutateGroup` — including that gate's deliberate song-group
+             carve-out.
+
+             This wrapper div is intentionally NOT deleted along with the
+             padding: `data-testid="slide-grid-group-background"` used to
+             live on the (now-removed) `px-3 py-2` child div, and existing
+             assertions depend on it. `BackgroundControl`'s own root already
+             carries `data-testid="background-control"`, so the testid can't
+             move onto the component without a collision. This div carries
+             ONLY the testid and the `v-if` gate — no padding, no border, no
+             background — so it adds no visual chrome of its own. -->
+        <div v-if="showGroupBackgroundControl" data-testid="slide-grid-group-background">
           <BackgroundControl
             :image-url="group?.backgroundImageUrl"
             :caption="groupBackgroundCaption"

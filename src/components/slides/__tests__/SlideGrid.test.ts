@@ -891,6 +891,42 @@ describe('SlideGrid', () => {
       expect(panel.findAll('.bg-gray-900').length).toBe(0)
     })
 
+    // Owner follow-up #2 (direct feedback on the running app, pasted DOM
+    // included two `<div class="px-3 py-2">` children plus `divide-y` on the
+    // panel): "you still have add music and add background for group
+    // buttons in their own panels ... get rid of the extra panel". The
+    // previous test (34-11 Task 1) only proved the CHROME (border/bg) lived
+    // once on the panel — it did not catch the divider line plus two
+    // separately-padded child wrappers, which is what actually made the two
+    // controls still read as stacked panels on screen. This pins that: no
+    // divider class on the panel, and no nested child element carrying its
+    // own `px-3`+`py-2` padding pair — both controls share ONE padded
+    // region.
+    it('has no divider seam and no per-control padded child wrapper — one padded region for both controls', () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const group = makeGroup({
+        bedAudioUrl: 'https://storage.example.com/pad.mp3',
+        backgroundImageUrl: 'https://storage.example.com/bg.jpg',
+        slides: [],
+      })
+      const wrapper = mountGrid({ selectedSlot: slot, group, isEditor: true })
+
+      const panel = wrapper.get('[data-testid="slide-grid-group-media-panel"]')
+      const panelClasses = panel.classes()
+      expect(panelClasses).not.toContain('divide-y')
+      expect(panelClasses).not.toContain('divide-gray-800')
+      // Padding lives once, on the panel itself.
+      expect(panelClasses).toContain('px-3')
+      expect(panelClasses).toContain('py-2')
+
+      // No descendant re-introduces its own px-3 + py-2 padded block — that
+      // was the "second panel" the owner was pointing at.
+      const paddedDescendants = panel
+        .findAll('*')
+        .filter((el) => el.classes().includes('px-3') && el.classes().includes('py-2'))
+      expect(paddedDescendants.length).toBe(0)
+    })
+
     it('shows the panel with both controls for anyone who can write group media, regardless of current group state', () => {
       const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
       const wrapper = mountGrid({ selectedSlot: slot, group: null, isEditor: true })
