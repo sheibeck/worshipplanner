@@ -117,7 +117,7 @@
           </p>
           <template v-if="isCongregational">
             <div
-              v-for="(section, idx) in (currentSlide.slide as ScriptureSlide).sections"
+              v-for="(section, idx) in [(currentSlide.slide as ScriptureSlide).section].filter((s): s is CongregationalSection => !!s)"
               :key="idx"
               :data-testid="`presentation-congregational-section-${idx}`"
               class="mb-8 text-left w-full"
@@ -313,6 +313,7 @@ import type {
   LyricSlide,
   CopyrightSlide,
   ScriptureSlide,
+  CongregationalSection,
   TextSlide,
   ImageSlide,
   VideoSlide,
@@ -493,7 +494,7 @@ const isCongregational = computed(() => {
   const slide = currentSlide.value?.slide
   if (!slide || slide.contentKind !== 'scripture') return false
   const scripture = slide as ScriptureSlide
-  return scripture.readingMode === 'congregational' && Array.isArray(scripture.sections) && scripture.sections.length > 0
+  return scripture.readingMode === 'congregational' && scripture.section !== undefined
 })
 
 // A live edit that shortens the show cannot leave currentIndex out of range.

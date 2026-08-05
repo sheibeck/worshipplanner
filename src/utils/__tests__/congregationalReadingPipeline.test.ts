@@ -132,12 +132,11 @@ function assembleAfterRebuild(slot: ScriptureSlot): ScriptureSlide[] {
 /** Restates `PresentationViewer.vue`'s own `isCongregational` computed
  * (lines ~492-497) rather than importing the component — the point of this
  * assertion is that the two conditions AGREE, so restating it is itself the
- * proof, not a shortcut around one. Unchanged by this plan: each assembled
- * congregational slide still carries `readingMode: 'congregational'` and a
- * non-empty `sections` array (now always length 1 — plan 38-02 replaces the
- * array field with a singular one, per `resolveEntryContent`'s comment). */
+ * proof, not a shortcut around one. Each assembled congregational slide
+ * carries `readingMode: 'congregational'` and the singular `section` field
+ * (38-02) — a Reference-state slide has no `section` at all. */
 function presentationPredicate(slide: ScriptureSlide): boolean {
-  return slide.readingMode === 'congregational' && Array.isArray(slide.sections) && slide.sections.length > 0
+  return slide.readingMode === 'congregational' && slide.section !== undefined
 }
 
 describe('congregational reading pipeline — composed slot -> group -> slide contract (D1, 34-VERIFICATION.md Truth 1)', () => {
@@ -154,7 +153,7 @@ describe('congregational reading pipeline — composed slot -> group -> slide co
     for (let i = 0; i < 3; i++) {
       expect(slides[i]!.contentKind).toBe('scripture')
       expect(slides[i]!.readingMode).toBe('congregational')
-      expect(slides[i]!.sections).toEqual([THREE_SECTIONS[i]])
+      expect(slides[i]!.section).toEqual(THREE_SECTIONS[i])
       expect(slides[i]!.text).toBe(THREE_SECTIONS[i]!.text)
     }
   })
@@ -167,9 +166,9 @@ describe('congregational reading pipeline — composed slot -> group -> slide co
     expect(fallback).toHaveLength(3)
     for (let i = 0; i < 3; i++) {
       expect(storedGroup[i]!.readingMode).toBe(fallback[i]!.readingMode)
-      expect(storedGroup[i]!.sections).toEqual(fallback[i]!.sections)
+      expect(storedGroup[i]!.section).toEqual(fallback[i]!.section)
       expect(storedGroup[i]!.readingMode).toBe('congregational')
-      expect(storedGroup[i]!.sections).toEqual([THREE_SECTIONS[i]])
+      expect(storedGroup[i]!.section).toEqual(THREE_SECTIONS[i])
     }
   })
 
@@ -181,8 +180,8 @@ describe('congregational reading pipeline — composed slot -> group -> slide co
     expect(afterRebuild).toHaveLength(3)
     for (let i = 0; i < 3; i++) {
       expect(afterRebuild[i]!.readingMode).toBe('congregational')
-      expect(afterRebuild[i]!.sections).toEqual(beforeRebuild[i]!.sections)
-      expect(afterRebuild[i]!.sections).toEqual([THREE_SECTIONS[i]])
+      expect(afterRebuild[i]!.section).toEqual(beforeRebuild[i]!.section)
+      expect(afterRebuild[i]!.section).toEqual(THREE_SECTIONS[i])
     }
   })
 
@@ -236,8 +235,8 @@ describe('congregational reading pipeline — composed slot -> group -> slide co
 
     for (const slides of [fallback, storedGroup]) {
       expect(slides).toHaveLength(3)
-      expect(slides[1]!.sections![0]!.speaker).toBe('CONGREGATION')
-      expect(slides[2]!.sections![0]!.speaker).toBe('CONGREGATION')
+      expect(slides[1]!.section!.speaker).toBe('CONGREGATION')
+      expect(slides[2]!.section!.speaker).toBe('CONGREGATION')
       expect(slides[1]!.text).not.toBe(slides[2]!.text)
     }
   })
@@ -252,7 +251,7 @@ describe('congregational reading pipeline — composed slot -> group -> slide co
     }
   })
 
-  it('backward compatibility, absent: a slot with no congregationalSections assembles to exactly ONE slide, readingMode normal, empty text, empty verseRange, no sections key, on both paths', () => {
+  it('backward compatibility, absent: a slot with no congregationalSections assembles to exactly ONE slide, readingMode normal, empty text, empty verseRange, no section key, on both paths', () => {
     const slot = baseSlot()
     const { fallback, storedGroup } = assembleBothPaths(slot)
 
@@ -262,7 +261,7 @@ describe('congregational reading pipeline — composed slot -> group -> slide co
       expect(slide.readingMode).toBe('normal')
       expect(slide.text).toBe('')
       expect(slide.verseRange).toBe('')
-      expect(Object.prototype.hasOwnProperty.call(slide, 'sections')).toBe(false)
+      expect(Object.prototype.hasOwnProperty.call(slide, 'section')).toBe(false)
     }
   })
 
@@ -276,7 +275,7 @@ describe('congregational reading pipeline — composed slot -> group -> slide co
       expect(slide.readingMode).toBe('normal')
       expect(slide.text).toBe('')
       expect(slide.verseRange).toBe('')
-      expect(Object.prototype.hasOwnProperty.call(slide, 'sections')).toBe(false)
+      expect(Object.prototype.hasOwnProperty.call(slide, 'section')).toBe(false)
     }
   })
 
@@ -286,8 +285,8 @@ describe('congregational reading pipeline — composed slot -> group -> slide co
 
     for (const slides of [fallback, storedGroup]) {
       expect(slides).toHaveLength(1)
-      expect(slides[0]!.sections).toHaveLength(1)
-      expect(slides[0]!.sections![0]!.text === NON_ASCII_SECTION.text).toBe(true)
+      expect(slides[0]!.section).toBeDefined()
+      expect(slides[0]!.section!.text === NON_ASCII_SECTION.text).toBe(true)
       expect(slides[0]!.text === NON_ASCII_SECTION.text).toBe(true)
     }
   })

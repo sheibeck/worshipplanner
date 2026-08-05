@@ -518,8 +518,8 @@ describe('assembleSlideshow — congregational reading (D1)', () => {
       expect(storedSlide.readingMode).toBe('congregational')
       expect(storedSlide.text).toBe(fallbackSlide.text)
       expect(storedSlide.text).toBe(sections[i]!.text)
-      expect(storedSlide.sections).toEqual([sections[i]])
-      expect(fallbackSlide.sections).toEqual([sections[i]])
+      expect(storedSlide.section).toEqual(sections[i])
+      expect(fallbackSlide.section).toEqual(sections[i])
     }
   })
 
@@ -539,7 +539,7 @@ describe('assembleSlideshow — congregational reading (D1)', () => {
       expect(slide.readingMode).toBe('normal')
       expect(slide.text).toBe('')
       expect(slide.verseRange).toBe('')
-      expect(Object.prototype.hasOwnProperty.call(slide, 'sections')).toBe(false)
+      expect(Object.prototype.hasOwnProperty.call(slide, 'section')).toBe(false)
     }
     expect(storedSlide.readingMode).toBe(fallbackSlide.readingMode)
   })
@@ -558,7 +558,7 @@ describe('assembleSlideshow — congregational reading (D1)', () => {
     expect(slides.map((s) => s.text)).toEqual(['First', 'Second', 'Third'])
     for (let i = 0; i < 3; i++) {
       expect(slides[i]!.readingMode).toBe('congregational')
-      expect(slides[i]!.sections).toEqual([sections[i]])
+      expect(slides[i]!.section).toEqual(sections[i])
       // Every section slide carries the same reference/bookRef.
       expect(slides[i]!.reference).toBe(slides[0]!.reference)
       expect(slides[i]!.bookRef).toEqual(slides[0]!.bookRef)
@@ -575,8 +575,8 @@ describe('assembleSlideshow — congregational reading (D1)', () => {
 
     expect(result).toHaveLength(2)
     const slides = result.map((r) => r.slide as ScriptureSlide)
-    expect(slides[0]!.sections![0]!.speaker).toBe('CONGREGATION')
-    expect(slides[1]!.sections![0]!.speaker).toBe('CONGREGATION')
+    expect(slides[0]!.section!.speaker).toBe('CONGREGATION')
+    expect(slides[1]!.section!.speaker).toBe('CONGREGATION')
     expect(slides[0]!.text).toBe('Part A')
     expect(slides[1]!.text).toBe('Part B')
   })
@@ -587,7 +587,7 @@ describe('assembleSlideshow — congregational reading (D1)', () => {
     const result = assembleSlideshow(makeService([slot]), makeInputs())
     const slide = result[0]!.slide as ScriptureSlide
     expect(slide.text === text).toBe(true)
-    expect(slide.sections![0]!.text === text).toBe(true)
+    expect(slide.section!.text === text).toBe(true)
   })
 
   it('each section slide\'s id is its own group entry\'s id — distinct ids matching the stored entries', () => {

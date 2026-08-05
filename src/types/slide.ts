@@ -81,7 +81,14 @@ export interface ScriptureSlide extends SlideBase {
   text: string
   verseRange: string
   readingMode: 'normal' | 'congregational'
-  sections?: CongregationalSection[]
+  /**
+   * The ONE congregational section this slide carries, when it is a
+   * Congregational-state slide (38-02). A congregational reading materializes
+   * one slide per section (D1, phase 38-01) — this field is deliberately
+   * singular, not a list, so "several sections stacked on one slide" is
+   * unrepresentable. Absent entirely on a Reference-state slide.
+   */
+  section?: CongregationalSection
 }
 
 /**

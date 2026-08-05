@@ -155,16 +155,11 @@ function resolveEntryContent(
       // D1/D2: `congregationalSectionFromRef` is the ONE place this function
       // decides which of the group's two states `entry` belongs to.
       // - null (a Reference entry): today's shape exactly — empty text/verseRange,
-      //   readingMode 'normal', no `sections` key at all.
+      //   readingMode 'normal', no `section` key at all.
       // - a section (a Congregational entry, D2): the entry's OWN stored words
       //   — there is no canonical record to resolve against once detached —
-      //   with readingMode 'congregational' and a ONE-element `sections` array.
-      //   That one-element array is a deliberate INTERMEDIATE shape, not the
-      //   destination: it keeps `PresentationViewer.vue` compiling and
-      //   rendering correctly with no changes in this plan, while plan 38-02
-      //   replaces the array field with a singular one and reworks the
-      //   projected layout. Do not "tidy" this into a stacked multi-section
-      //   array again — each assembled slide carries exactly one section.
+      //   with readingMode 'congregational' and the singular `section` field.
+      //   Each assembled slide carries exactly one section (38-02).
       const section = congregationalSectionFromRef(entry.sourceRef)
       const content: Omit<ScriptureSlide, 'id' | 'position'> =
         section === null
@@ -183,7 +178,7 @@ function resolveEntryContent(
               text: section.text,
               verseRange: section.verseRange ?? '',
               readingMode: 'congregational',
-              sections: [section],
+              section,
             }
       return content
     }
@@ -464,7 +459,7 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
             text: section.text,
             verseRange: section.verseRange ?? '',
             readingMode: 'congregational',
-            sections: [section],
+            section,
           }
           emitFallback(slot, index, content, null, localSeq)
         })
