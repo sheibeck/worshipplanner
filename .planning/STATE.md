@@ -5,15 +5,15 @@ milestone_name: Service and Slides
 current_phase: 38
 current_phase_name: Congregational Readings Become Real Slides
 status: executing
-stopped_at: Completed 38-01-PLAN.md
-last_updated: "2026-08-05T21:11:53.742Z"
+stopped_at: Completed 38-02-PLAN.md
+last_updated: "2026-08-05T21:27:26.121Z"
 last_activity: 2026-08-05
 last_activity_desc: Phase 38 execution started
 progress:
   total_phases: 10
   completed_phases: 9
   total_plans: 61
-  completed_plans: 58
+  completed_plans: 59
   percent: 90
 ---
 
@@ -76,7 +76,7 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 ## Current Position
 
 Phase: 38 (Congregational Readings Become Real Slides) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-08-05 — Phase 38 execution started
 
@@ -1071,6 +1071,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 36 P04 | 25min | 2 tasks | 2 files |
 | Phase 36 P05 | 65min | 2 tasks | 3 files |
 | Phase 38 P01 | 40min | 3 tasks | 8 files |
+| Phase 38 P02 | 30min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -1325,6 +1326,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 36-05: ROADMAP criterion 4 stays recorded as satisfied in interaction pattern only (Add slide stays grid-local per 36-UI-SPEC Finding 2; Add music superseded by owner F2) — dated corrections in REQUIREMENTS.md/ROADMAP.md re-confirmed, not upgraded.
 - [Phase ?]: 36-05: the mandated gate command 'npx vitest run --dir src' bypasses vite.config.ts's relative exclude for src/rules.test.ts (path-rebase side effect of --dir), leaking the emulator-dependent rules suite in as a false third failure in this environment; documented and worked around with an explicit basename exclude, not silently smoothed over.
 - [Phase ?]: D1 signature encoding: formatted reference alone with no sections, else reference + ASCII-control-char-separated field-explicit section encoding (no JSON.stringify, key-order independent) — the durable marker rebuildScriptureGroup reads to decide DETACH vs rebuild
+- [Phase ?]: 38-02: ScriptureSlide.section (singular) replaces sections[] — compiler-enforced one-section-per-slide; testid anchors presentation-speaker/presentation-congregational-section finalized for 38-03/38-04
 
 ### Roadmap Evolution
 
@@ -1389,6 +1391,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-05T21:11:53.609Z
-Stopped at: Completed 38-01-PLAN.md
+Last session: 2026-08-05T21:27:26.082Z
+Stopped at: Completed 38-02-PLAN.md
 Resume file: None
