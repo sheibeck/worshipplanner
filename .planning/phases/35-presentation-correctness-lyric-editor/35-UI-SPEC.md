@@ -264,6 +264,15 @@ slides within a group' — describes precisely that surviving use").
 and the text branch's `presentation-label` (title, `:126-131`) are NOT organizational labels — they are the
 slide's actual content — and are out of scope for R059. Do not remove them; R059 targets exactly one line.
 
+> **Superseded in part by quick task `260805-kzd` (2026-08-05, owner-decided).** See
+> `.planning/quick/260805-kzd-remove-slide-labels-unify-slide-text-size/260805-kzd-PLAN.md`. The text
+> branch's title label was deleted outright under its D2 — the owner reported never using it, so this
+> paragraph's "do not remove them" no longer holds for that half. The scripture branch's reference
+> SURVIVES, under D1, but as body-treatment content under `data-testid="presentation-scripture-reference"`
+> rather than as a label — the assembler builds scripture slides with an empty passage string, so a
+> reference-only slide must still project something. The congregational speaker tags were unified to the
+> same body treatment in the same pass, under D3, keeping their words and testids.
+
 **Projector legibility note (per the additional context's own framing):** the presented slide is a
 projector surface, not app chrome — the remaining lyric body text (`text-5xl`, `:57`) already has no
 legibility dependency on the removed label; it was always the dominant visual element on the slide.
