@@ -69,6 +69,24 @@
            wrapper/prop plumbing: no new component, no relocation out of this
            file, no restyle of either control's internals.
 
+           Owner follow-up #3 (direct feedback on the running app, third pass
+           on this same panel): "I want add music for group and add
+           background for group to be next to each other, not on top of each
+           other." The visual merge above is unchanged; the remaining
+           complaint was purely the AXIS — the panel was `flex-col`, so the
+           two controls still stacked. Fix is axis-only: the panel becomes a
+           wrapping row (`flex-wrap`) and both direct children carry
+           `min-w-[14rem] flex-1` — the shrink floor is paired with the grow
+           factor deliberately, NOT the common `min-w-0 flex-1` idiom, because
+           `min-w-0` lets an item shrink to zero and `flex-wrap` would never
+           engage, crushing the two controls together on a narrow rail
+           instead of wrapping them to stacked. `items-start` is required
+           because the two controls differ in height (the background control
+           stacks a caption line above its button; either can grow a
+           filename/progress/error row once attached) and would otherwise
+           center against each other's differing heights instead of
+           top-aligning.
+
            ★ 31-UI-SPEC E5 still applies at the PANEL level, not just to each
            control inside it: two controls that each correctly decline to
            render an empty box on their own would together produce an empty
@@ -80,7 +98,7 @@
            than on a padded child div — there is no padded child div left. -->
       <div
         v-if="showGroupMusicControl || showGroupBackgroundControl"
-        class="mx-6 mt-3 flex flex-col gap-3 rounded-md border border-gray-800 bg-gray-900 px-3 py-2"
+        class="mx-6 mt-3 flex flex-wrap items-start gap-x-6 gap-y-3 rounded-md border border-gray-800 bg-gray-900 px-3 py-2"
         data-testid="slide-grid-group-media-panel"
       >
         <!-- Group music bar (25-06, R032). Emit-only control; this component
@@ -92,6 +110,7 @@
              ever attached to its old child div). -->
         <SlideGroupMusicControl
           v-if="showGroupMusicControl"
+          class="min-w-[14rem] flex-1"
           :audio-url="group?.bedAudioUrl"
           :slide-count="cards.length"
           :org-id="orgId"
@@ -116,7 +135,11 @@
              move onto the component without a collision. This div carries
              ONLY the testid and the `v-if` gate — no padding, no border, no
              background — so it adds no visual chrome of its own. -->
-        <div v-if="showGroupBackgroundControl" data-testid="slide-grid-group-background">
+        <div
+          v-if="showGroupBackgroundControl"
+          class="min-w-[14rem] flex-1"
+          data-testid="slide-grid-group-background"
+        >
           <BackgroundControl
             :image-url="group?.backgroundImageUrl"
             :caption="groupBackgroundCaption"

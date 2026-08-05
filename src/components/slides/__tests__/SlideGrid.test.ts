@@ -927,6 +927,39 @@ describe('SlideGrid', () => {
       expect(paddedDescendants.length).toBe(0)
     })
 
+    // Owner follow-up #3 (direct feedback on the running app, third pass on
+    // this same panel): "I want add music for group and add background for
+    // group to be next to each other, not on top of each other." The panel
+    // is visually merged (one border, one padded region, no divider) but is
+    // still `flex-col`, so the two controls stack vertically. This pins the
+    // AXIS fix: the panel becomes a wrapping row, and both direct children
+    // carry a shrink floor paired with a grow factor so they wrap back to
+    // stacked on a narrow rail instead of crushing side by side.
+    it('lays the panel out as a wrapping horizontal row with both controls as flex items', () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const group = makeGroup({
+        bedAudioUrl: 'https://storage.example.com/pad.mp3',
+        backgroundImageUrl: 'https://storage.example.com/bg.jpg',
+        slides: [],
+      })
+      const wrapper = mountGrid({ selectedSlot: slot, group, isEditor: true })
+
+      const panel = wrapper.get('[data-testid="slide-grid-group-media-panel"]')
+      const panelClasses = panel.classes()
+      expect(panelClasses).toContain('flex')
+      expect(panelClasses).toContain('flex-wrap')
+      expect(panelClasses).toContain('items-start')
+      expect(panelClasses).not.toContain('flex-col')
+
+      const musicRoot = wrapper.get('[data-testid="slide-group-music-control"]')
+      const backgroundWrapper = wrapper.get('[data-testid="slide-grid-group-background"]')
+      for (const el of [musicRoot, backgroundWrapper]) {
+        const classes = el.classes()
+        expect(classes).toContain('flex-1')
+        expect(classes).toContain('min-w-[14rem]')
+      }
+    })
+
     it('shows the panel with both controls for anyone who can write group media, regardless of current group state', () => {
       const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
       const wrapper = mountGrid({ selectedSlot: slot, group: null, isEditor: true })
