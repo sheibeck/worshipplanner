@@ -5,15 +5,15 @@ milestone_name: Service and Slides
 current_phase: 38
 current_phase_name: Congregational Readings Become Real Slides
 status: executing
-stopped_at: Completed 38-02-PLAN.md
-last_updated: "2026-08-05T21:27:26.121Z"
+stopped_at: Completed 38-03-PLAN.md
+last_updated: "2026-08-05T21:50:51.809Z"
 last_activity: 2026-08-05
 last_activity_desc: Phase 38 execution started
 progress:
   total_phases: 10
   completed_phases: 9
   total_plans: 61
-  completed_plans: 59
+  completed_plans: 60
   percent: 90
 ---
 
@@ -76,7 +76,7 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 ## Current Position
 
 Phase: 38 (Congregational Readings Become Real Slides) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-08-05 — Phase 38 execution started
 
@@ -1072,6 +1072,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 36 P05 | 65min | 2 tasks | 3 files |
 | Phase 38 P01 | 40min | 3 tasks | 8 files |
 | Phase 38 P02 | 30min | 3 tasks | 6 files |
+| Phase 38 P03 | 30min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -1327,6 +1328,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 36-05: the mandated gate command 'npx vitest run --dir src' bypasses vite.config.ts's relative exclude for src/rules.test.ts (path-rebase side effect of --dir), leaking the emulator-dependent rules suite in as a false third failure in this environment; documented and worked around with an explicit basename exclude, not silently smoothed over.
 - [Phase ?]: D1 signature encoding: formatted reference alone with no sections, else reference + ASCII-control-char-separated field-explicit section encoding (no JSON.stringify, key-order independent) — the durable marker rebuildScriptureGroup reads to decide DETACH vs rebuild
 - [Phase ?]: 38-02: ScriptureSlide.section (singular) replaces sections[] — compiler-enforced one-section-per-slide; testid anchors presentation-speaker/presentation-congregational-section finalized for 38-03/38-04
+- [Phase ?]: 38-03: slideActionMenuItems needed no change for section entries — confirmed by reading, duplicate/delete were already offered under canMutate regardless of speaker
+- [Phase ?]: 38-03: the editable scripture passage field's stable test-id is drawer-slide-text-editable-scripture; the speaker control's are drawer-speaker-toggle/drawer-speaker-readonly/drawer-speaker-row
+- [Phase ?]: 38-03: the speaker flip write is deliberately not debounced (mirrors onLoopToggle's immediate-write shape) to avoid losing a flip to a pending flush for a different field
 
 ### Roadmap Evolution
 
@@ -1391,6 +1395,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-05T21:27:26.082Z
-Stopped at: Completed 38-02-PLAN.md
+Last session: 2026-08-05T21:50:51.771Z
+Stopped at: Completed 38-03-PLAN.md
 Resume file: None
