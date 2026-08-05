@@ -891,6 +891,95 @@ describe("EditSlideDrawer (Phase 38-03 Task 2 — the drawer edits one section's
   })
 })
 
+describe('EditSlideDrawer (Phase 38-03 Task 3 — flip a section between Leader and Congregation)', () => {
+  beforeEach(() => {
+    mockReplaceGroupSlides.mockReset()
+    mockReplaceGroupSlides.mockResolvedValue(undefined)
+  })
+
+  it('renders a speaker control showing the current speaker when mutation is allowed', () => {
+    const { entry, assembledSlide } = makeScriptureSectionFixtures({ speaker: 'LEADER' })
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+    const toggle = body().find('[data-testid="drawer-speaker-toggle"]')
+    expect(toggle.exists()).toBe(true)
+    expect(toggle.text()).toBe('Leader')
+    expect(body().find('[data-testid="drawer-speaker-readonly"]').exists()).toBe(false)
+  })
+
+  it('activating it writes only that entry\'s speaker flipped — id, order, words, notes and audio unchanged, every sibling byte-identical', async () => {
+    const { entry: entryOne } = makeScriptureSectionFixtures({ speaker: 'LEADER', text: 'Leader words' })
+    entryOne.notes = 'Keep these notes'
+    entryOne.audioUrl = 'https://example.com/a.mp3'
+    const { entry: entryTwo, assembledSlide } = makeScriptureSectionFixtures({
+      id: 'entry-2',
+      speaker: 'CONGREGATION',
+      text: 'Congregation words',
+    })
+    entryTwo.order = 1
+    // Mount on entry-2 so entry-1 is the untouched sibling being asserted on.
+    const group = makeGroup({ slides: [entryOne, entryTwo], sourceSignature: 'sig-flip' })
+    mountDrawer({ entry: entryTwo, assembledSlide, group })
+
+    await body().find('[data-testid="drawer-speaker-toggle"]').trigger('click')
+    await flushPromises()
+
+    expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+    const written = mockReplaceGroupSlides.mock.calls[0]![2] as GroupSlideEntry[]
+    const writtenTwo = written.find((e) => e.id === 'entry-2')!
+    expect(writtenTwo.sourceRef).toEqual({ kind: 'scripture', speaker: 'LEADER', text: 'Congregation words' })
+    expect(writtenTwo.id).toBe('entry-2')
+    expect(writtenTwo.order).toBe(entryTwo.order)
+    // The untouched sibling (entry-1) is byte-identical, including its own
+    // words, notes and audio.
+    expect(written.find((e) => e.id === 'entry-1')).toEqual(entryOne)
+  })
+
+  it("passes the group's stored sourceSignature through unchanged on the flip", async () => {
+    const { entry, assembledSlide } = makeScriptureSectionFixtures({ speaker: 'LEADER' })
+    const group = makeGroup({ slides: [entry], sourceSignature: 'sig-flip-2' })
+    mountDrawer({ entry, assembledSlide, group })
+
+    await body().find('[data-testid="drawer-speaker-toggle"]').trigger('click')
+    await flushPromises()
+
+    expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+    expect(mockReplaceGroupSlides.mock.calls[0]![3]).toBe('sig-flip-2')
+  })
+
+  it('renders the speaker as plain text with no control when mutation is disallowed', () => {
+    const { entry, assembledSlide } = makeScriptureSectionFixtures({ speaker: 'CONGREGATION' })
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }), isEditor: false })
+    expect(body().find('[data-testid="drawer-speaker-toggle"]').exists()).toBe(false)
+    expect(body().find('[data-testid="drawer-speaker-readonly"]').text()).toBe('Congregation')
+  })
+
+  it('renders no speaker control at all for a Reference-state scripture entry', () => {
+    const { entry, assembledSlide } = makeScriptureFixtures()
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+    expect(body().find('[data-testid="drawer-speaker-toggle"]').exists()).toBe(false)
+    expect(body().find('[data-testid="drawer-speaker-readonly"]').exists()).toBe(false)
+    expect(body().find('[data-testid="drawer-speaker-row"]').exists()).toBe(false)
+  })
+
+  it('updates what the drawer displays immediately after a flip, without the drawer being reopened', async () => {
+    const { entry, assembledSlide } = makeScriptureSectionFixtures({ speaker: 'LEADER' })
+    const group = makeGroup({ slides: [entry] })
+    const wrapper = mountDrawer({ entry, assembledSlide, group })
+    expect(body().find('[data-testid="drawer-speaker-toggle"]').text()).toBe('Leader')
+
+    await body().find('[data-testid="drawer-speaker-toggle"]').trigger('click')
+    await flushPromises()
+
+    // Simulates the store's own snapshot round-trip updating the live prop —
+    // the same mechanism every other write in this drawer relies on for its
+    // re-sync watcher; this control must read reactively off props.entry too.
+    const flipped: GroupSlideEntry = { ...entry, sourceRef: { ...entry.sourceRef, speaker: 'CONGREGATION' } as SourceRef }
+    await wrapper.setProps({ entry: flipped, group: makeGroup({ slides: [flipped] }) })
+
+    expect(body().find('[data-testid="drawer-speaker-toggle"]').text()).toBe('Congregation')
+  })
+})
+
 describe('EditSlideDrawer (Phase 26-07 Task 2 — hand-written slide edited here) [D2 260805-bvo: the drawer has one body]', () => {
   beforeEach(() => {
     vi.useFakeTimers()

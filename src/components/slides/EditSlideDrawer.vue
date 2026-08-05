@@ -161,6 +161,28 @@
                    congregational-reading editor stay exactly as Phase 30/34-07
                    left them. -->
               <template v-if="sectionFromEntry">
+                <!-- Phase 38-03 Task 3: the speaker control sits ABOVE the
+                     passage field so the drawer's own order matches the
+                     projected slide's order (presentation-speaker, then
+                     presentation-congregational-section). Deliberately NOT
+                     routed through the debounced `body` machinery — it's a
+                     discrete two-value choice, not a stream of keystrokes,
+                     and doing so would risk a flip being lost to a pending
+                     flush for a different field. -->
+                <div class="mb-2 flex items-center gap-2" data-testid="drawer-speaker-row">
+                  <span class="text-xs font-medium text-gray-400">Speaker</span>
+                  <button
+                    v-if="canMutate"
+                    type="button"
+                    data-testid="drawer-speaker-toggle"
+                    class="text-xs font-semibold uppercase tracking-wider px-2 py-1 rounded transition-colors"
+                    :class="sectionFromEntry.speaker === 'LEADER'
+                      ? 'text-indigo-300 bg-indigo-900/50'
+                      : 'text-amber-300 bg-amber-900/50'"
+                    @click="onSpeakerToggle"
+                  >{{ speakerLabel }}</button>
+                  <span v-else class="text-[13px] text-gray-300" data-testid="drawer-speaker-readonly">{{ speakerLabel }}</span>
+                </div>
                 <textarea
                   v-if="canMutate"
                   v-model="localBody"
@@ -474,7 +496,7 @@ import type { ServiceSlot } from '@/types/service'
 import type { AssembledSlide, ImageSlide, CopyrightSlide, ScriptureSlide } from '@/types/slide'
 import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
 import { useSlideGroups } from '@/stores/slideGroups'
-import { KIND_BADGE_CLASSES, slotDisplayTitle, slideBodyText, bedAudioLabel, backgroundImageLabel, deleteSlideConfirmBody } from './slideDisplay'
+import { KIND_BADGE_CLASSES, slotDisplayTitle, slideBodyText, bedAudioLabel, backgroundImageLabel, deleteSlideConfirmBody, speakerDisplayName } from './slideDisplay'
 import { congregationalSectionFromRef } from '@/utils/scripture'
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import { useMediaUpload } from '@/composables/useMediaUpload'
@@ -670,6 +692,53 @@ const sourceKind = computed(() => props.entry?.sourceRef.kind ?? null)
 const sectionFromEntry = computed(() =>
   props.entry ? congregationalSectionFromRef(props.entry.sourceRef) : null,
 )
+
+/**
+ * Phase 38-03 Task 3: the readable speaker name shown by both the editable
+ * toggle and its read-only fallback — reads `sectionFromEntry` (which itself
+ * reads `props.entry`, a reactive prop), so a speaker flip landing on
+ * `props.entry` updates what's displayed here without the drawer needing to
+ * be reopened. Uses `slideDisplay.ts`'s single producer of these two words so
+ * the drawer, the slide card and the projected slide can never drift into
+ * three different spellings of the same two words.
+ */
+const speakerLabel = computed(() =>
+  sectionFromEntry.value ? speakerDisplayName(sectionFromEntry.value.speaker) : '',
+)
+
+/**
+ * Flips the selected section entry's speaker. Modeled on `onLoopToggle`'s
+ * immediate-write shape (this plan's key_links): re-checks `canMutate` inside
+ * the handler (not just the template `v-if`), reads the group's CURRENT
+ * slides as the base, maps only the selected entry, and awaits the store call
+ * so a rejected write reaches Vue's handler like every other write here.
+ * Deliberately NOT debounced — a discrete two-value choice, not a stream of
+ * keystrokes, so routing it through the debounced `body` machinery could lose
+ * a flip to a pending flush for a different field. Passes the group's stored
+ * `sourceSignature` through unchanged, for the same reason `writeField` does.
+ */
+async function onSpeakerToggle(): Promise<void> {
+  if (!canMutate.value) return
+  if (!props.group || !props.entry) return
+  const section = congregationalSectionFromRef(props.entry.sourceRef)
+  if (!section) return
+  const nextSpeaker: 'LEADER' | 'CONGREGATION' = section.speaker === 'LEADER' ? 'CONGREGATION' : 'LEADER'
+  const entryId = props.entry.id
+  const base = props.group.slides
+  const next = base.map((e) => {
+    if (e.id !== entryId) return e
+    // Guard on the entry's own ref shape (same predicate the template and
+    // `writeField` use), so this write can never be reached by a
+    // Reference-state scripture entry or any other kind.
+    if (e.sourceRef.kind !== 'scripture' || !congregationalSectionFromRef(e.sourceRef)) return e
+    return { ...e, sourceRef: { ...e.sourceRef, speaker: nextSpeaker } }
+  })
+  try {
+    await slideGroupsStore.replaceGroupSlides(props.orgId, props.group.slotId, next, props.group.sourceSignature, base)
+  } catch (err) {
+    console.error('Failed to flip section speaker:', err)
+  }
+}
 
 /** `lyric`-kind entries resolve to a `LyricSlide` (has `sectionId`) — `slideBodyText` already narrows that shape and produces exactly what's needed (its joined lines), so this reuses it rather than re-deriving. */
 const lyricLinesText = computed(() =>
