@@ -528,6 +528,43 @@ describe('PresentationViewer', () => {
     expect(text).toBe('For God so loved the world '.repeat(15).trim())
   })
 
+  it('D1: a normal-mode ScriptureSlide renders its reference as white slide content, not an accented label', async () => {
+    mount(PresentationViewer, { props: { slides: [longScriptureSlide('a')] } })
+    await Promise.resolve()
+
+    const classes = body().find('[data-testid="presentation-label"]').classes()
+    expect(classes).toContain('text-gray-100')
+    expect(classes).not.toContain('text-indigo-400')
+    expect(classes).not.toContain('uppercase')
+    expect(classes).not.toContain('tracking-wider')
+    expect(classes).toContain('text-2xl')
+    expect(classes).toContain('font-semibold')
+    expect(classes).toContain('mb-8')
+  })
+
+  it('D1: a congregational ScriptureSlide renders its reference as white slide content too, without washing out the speaker tags', async () => {
+    const sections = [
+      { speaker: 'LEADER' as const, text: 'Give thanks to the LORD, for he is good.' },
+      { speaker: 'CONGREGATION' as const, text: 'His love endures forever.' },
+    ]
+    mount(PresentationViewer, { props: { slides: [congregationalScriptureSlide('a', sections)] } })
+    await Promise.resolve()
+
+    const classes = body().find('[data-testid="presentation-label"]').classes()
+    expect(classes).toContain('text-gray-100')
+    expect(classes).not.toContain('text-indigo-400')
+    expect(classes).not.toContain('uppercase')
+    expect(classes).not.toContain('tracking-wider')
+    expect(classes).toContain('text-2xl')
+    expect(classes).toContain('font-semibold')
+    expect(classes).toContain('mb-8')
+
+    const leaderTag = body().find('[data-testid="presentation-speaker-0"]')
+    expect(leaderTag.classes()).toContain('text-indigo-300')
+    expect(leaderTag.classes()).toContain('uppercase')
+    expect(leaderTag.classes()).toContain('tracking-wider')
+  })
+
   it('a congregational ScriptureSlide with two sections renders Leader/Congregation blocks with the correct classes', async () => {
     const sections = [
       { speaker: 'LEADER' as const, text: 'Give thanks to the LORD, for he is good.' },

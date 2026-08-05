@@ -102,9 +102,20 @@
 
         <!-- scripture -->
         <template v-else-if="slideKind === 'scripture'">
+          <!--
+            D1: the reference is slide CONTENT, not a label. Under R047 a
+            scripture slide defaults to reference-only, so this element is
+            frequently the entire visible content of the projected slide.
+            The size/weight step against the text-5xl body below is the
+            ONLY hierarchy signal, mirroring the copyright branch's
+            title-over-authors treatment. NOTE: the TextSlide title label
+            further down this file still carries the accented label
+            treatment — that divergence is known, was scoped out of this
+            fix by the owner, and must not be "fixed" as drive-by cleanup.
+          -->
           <p
             data-testid="presentation-label"
-            class="text-2xl font-semibold leading-[1.3] text-indigo-400 uppercase tracking-wider mb-8"
+            class="text-2xl font-semibold leading-[1.3] text-gray-100 mb-8"
           >
             {{ (currentSlide.slide as ScriptureSlide).reference }}
           </p>
