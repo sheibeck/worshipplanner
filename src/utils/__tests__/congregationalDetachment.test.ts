@@ -115,20 +115,26 @@ function asScriptureRef(entry: GroupSlideEntry): Extract<SourceRef, { kind: 'scr
  * Applies ONE rebuild tick the way `useSlideshowAssembly`'s
  * `applyRebuildOutcomes` actually does (`src/composables/useSlideshowAssembly.ts`):
  * run `rebuildGroup`, and when it reports a change, write BOTH the returned
- * slides AND a freshly recomputed `sourceSignature` back onto the group —
- * never only the slides. The composable computes `freshSignature` via a
- * SEPARATE call to `sourceSignature(slot, inputs)`, not by reading it off
- * `result`, so this helper mirrors that exactly rather than assuming the two
- * are the same call.
+ * slides AND a signature back onto the group — never only the slides.
  *
- * The freshly written signature is applied through a conditional spread —
- * `sourceSignature` can legitimately be `undefined` (a slot with no
- * reference), and the composable's own write path
- * (`slideGroupsStore.replaceGroupSlides`) runs every field through
- * `stripUndefined` before the Firestore `updateDoc`, so an `undefined`
- * signature leaves the STORED field untouched rather than clearing it.
- * Assigning `sourceSignature: undefined` directly here would silently erase
- * a previously-detached group's marker, which is not what production does.
+ * 38-REVIEW CR-01: the signature to write is a TRI-STATE, mirroring the
+ * composable's own `freshSignature` computation exactly — `result.sourceSignature`
+ * (set only by `rebuildScriptureGroup`'s CLEARED REFERENCE branch) takes
+ * precedence when present; otherwise it falls back to a fresh
+ * `sourceSignature(slot, inputs)` call, matching every other branch. The
+ * three cases then map onto the production write path
+ * (`slideGroupsStore.replaceGroupSlides`, which runs `stripUndefined` for
+ * "no opinion" but an explicit `deleteField()` for "clear") exactly:
+ *
+ * - `undefined` ("no opinion"): the STORED field is left untouched — mirrors
+ *   `stripUndefined` omitting the key from the Firestore update.
+ * - `null` ("explicitly clear"): the STORED field is removed from the group
+ *   object entirely — mirrors a Firestore `deleteField()` write. Before this
+ *   fix, this helper (like production) could only ever omit-or-set, never
+ *   clear, which is exactly the gap CR-01 found: a cleared congregational
+ *   reference left the OLD signature stored, so a later identical re-entry
+ *   hit the DETACHED short-circuit against a permanently-empty `slides` array.
+ * - a string ("set"): the STORED field is set to that value, as before.
  *
  * If this helper wrote the slides but not the refreshed signature, every
  * detachment case below would still look like it passed by coincidence —
@@ -145,11 +151,14 @@ function tick(
 ): { group: SlideGroup; changed: boolean } {
   const result = rebuildGroup(group, slot, inputs)
   if (!result.changed) return { group, changed: false }
-  const freshSignature = sourceSignature(slot, inputs)
-  const nextGroup: SlideGroup = {
-    ...group,
-    slides: result.slides,
-    ...(freshSignature !== undefined ? { sourceSignature: freshSignature } : {}),
+  const freshSignature =
+    result.sourceSignature !== undefined ? result.sourceSignature : sourceSignature(slot, inputs)
+
+  const nextGroup: SlideGroup = { ...group, slides: result.slides }
+  if (freshSignature === null) {
+    delete nextGroup.sourceSignature
+  } else if (freshSignature !== undefined) {
+    nextGroup.sourceSignature = freshSignature
   }
   return { group: nextGroup, changed: true }
 }
@@ -373,6 +382,59 @@ describe('congregational detachment — composed durability across repeated rebu
     expect(videoEntries).toHaveLength(1)
     expect(videoEntries[0]!.id).toBe(videoEntry.id)
     expect(videoEntries[0]!.sourceRef).toEqual(videoEntry.sourceRef)
+  })
+
+  it('CR-01 REGRESSION: clearing the reference then re-entering the IDENTICAL reading does not strand the group at zero slides', () => {
+    // 38-REVIEW CR-01: CONVERT -> CLEAR REFERENCE -> RE-CONVERT WITH
+    // IDENTICAL CONTENT. Before the fix, clearing the reference emptied
+    // `slides` but left the OLD congregational `sourceSignature` stored
+    // (the fresh signature for a no-reference slot is `undefined`, and the
+    // write path's `stripUndefined` treats `undefined` as "no opinion, leave
+    // it alone"). Re-entering the exact same reading then reproduces the
+    // exact same signature string, which matches the stale stored one, so
+    // `rebuildScriptureGroup`'s DETACHED short-circuit returned the group's
+    // now-permanently-empty `slides` array forever — the group never
+    // re-converts. This test fails on the pre-fix code with `tick3.group.slides`
+    // stuck at length 0, and passes once the CLEARED REFERENCE branch
+    // explicitly clears the stored signature (`RebuildResult.sourceSignature: null`).
+    const sectionsSlot = baseSlot({ congregationalSections: THREE_SECTIONS })
+    const inputs = makeInputs()
+    const converted = convertedGroup(sectionsSlot, inputs)
+    expect(converted.slides).toHaveLength(3)
+    const originalSignature = converted.sourceSignature
+    expect(originalSignature).toBe(sourceSignature(sectionsSlot, inputs))
+
+    // Clear the reference entirely (mirrors DESTROY ON CLEARED REFERENCE).
+    const clearedSlot = scriptureSlotAfterReferenceChange(sectionsSlot, null)
+    expect(clearedSlot.congregationalSections).toBeUndefined()
+    expect(scriptureRefFromSlot(clearedSlot)).toBeNull()
+
+    const tick1 = tick(converted, clearedSlot, inputs)
+    expect(tick1.changed).toBe(true)
+    expect(tick1.group.slides).toHaveLength(0)
+    // The load-bearing assertion this regression closes: the stale
+    // congregational signature must actually be CLEARED, not merely
+    // survive because the fresh no-reference signature is `undefined`.
+    expect(tick1.group.sourceSignature).toBeUndefined()
+
+    const tick2 = tick(tick1.group, clearedSlot, inputs)
+    expect(tick2.changed).toBe(false)
+    expect(tick2.group.slides).toHaveLength(0)
+
+    // Re-enter the reference AND sections, reproducing the IDENTICAL
+    // reading byte-for-byte (same sectionsSlot as the original conversion) —
+    // this recomputes the exact same signature as `originalSignature`.
+    expect(sourceSignature(sectionsSlot, inputs)).toBe(originalSignature)
+
+    const tick3 = tick(tick2.group, sectionsSlot, inputs)
+    expect(tick3.changed).toBe(true)
+    expect(tick3.group.slides).toHaveLength(3)
+    expect(tick3.group.slides.map((entry) => congregationalSectionFromRef(entry.sourceRef))).toEqual(THREE_SECTIONS)
+
+    // Settles: a further identical tick reports no change once re-detached.
+    const tick4 = tick(tick3.group, sectionsSlot, inputs)
+    expect(tick4.changed).toBe(false)
+    expect(tick4.group.slides).toHaveLength(3)
   })
 
   it('RE-CONVERT: after a destroy-by-reference-change, giving the new slot three sections and running a tick converts again to three section entries — the owner must opt back in, and opting back in must work', () => {

@@ -437,8 +437,20 @@ export function useSlideshowAssembly(
     orgId: string
     group: SlideGroup
     result: RebuildResult
-    /** Precomputed here (synchronously, inside the tracked computed) rather than re-derived in the async apply step. */
-    freshSignature?: string
+    /**
+     * Precomputed here (synchronously, inside the tracked computed) rather
+     * than re-derived in the async apply step.
+     *
+     * 38-REVIEW CR-01: `undefined` means "no opinion, leave the stored
+     * signature alone"; `null` means "explicitly clear it." `result.sourceSignature`
+     * (set only by `rebuildScriptureGroup`'s CLEARED REFERENCE branch) takes
+     * precedence over the ordinary recomputed `sourceSignature(slot, inputs)`
+     * when present, because that branch's freshly-computed signature is
+     * `undefined` for the wrong reason (no reference to sign, not "no
+     * opinion") and would otherwise leave a stale value stored via
+     * `stripUndefined`.
+     */
+    freshSignature?: string | null
   }
 
   const rebuildOutcomes = computed<RebuildOutcome[]>(() => {
@@ -464,7 +476,7 @@ export function useSlideshowAssembly(
         orgId,
         group,
         result,
-        freshSignature: sourceSignature(slot, inputs),
+        freshSignature: result.sourceSignature !== undefined ? result.sourceSignature : sourceSignature(slot, inputs),
       })
     }
     return outcomes

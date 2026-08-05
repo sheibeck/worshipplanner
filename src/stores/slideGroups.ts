@@ -300,19 +300,40 @@ export const useSlideGroups = defineStore('slideGroups', () => {
    * against a live array it never saw. `baseSlides` is optional: omitting it
    * keeps the previous plain-overwrite behavior for any caller that has not
    * been updated to track a base snapshot.
+   *
+   * 38-REVIEW CR-01: `sourceSignature` is a tri-state, mirroring
+   * `setGroupBedMedia`'s `clearAudio` precedent (documented above) — an
+   * `undefined` value means "no opinion, leave the stored field alone" and is
+   * simply omitted from the write (via `stripUndefined`, as before); an
+   * explicit `null` means "clear this field" and is written as a real
+   * `deleteField()` sentinel, because `stripUndefined` cannot distinguish
+   * "no opinion" from "clear" for a plain `undefined`. Only
+   * `rebuildScriptureGroup`'s CLEARED REFERENCE branch (via
+   * `useSlideshowAssembly.ts`'s `freshSignature`) passes `null` today — the
+   * one rebuild path that empties a Congregational group's derived slides
+   * without any reference left to sign, where leaving the OLD signature
+   * stored would let a later identical re-entry hit the DETACHED
+   * short-circuit against a permanently-empty `slides` array.
    */
   async function replaceGroupSlides(
     orgId: string,
     slotId: string,
     slides: GroupSlideEntry[],
-    sourceSignature?: string,
+    sourceSignature?: string | null,
     baseSlides?: GroupSlideEntry[],
   ): Promise<void> {
     const ref = doc(db, 'organizations', orgId, 'slideGroups', slotId)
+    const signatureField: Record<string, unknown> =
+      sourceSignature === null
+        ? { sourceSignature: deleteField() }
+        : sourceSignature !== undefined
+          ? { sourceSignature }
+          : {}
 
     if (!baseSlides) {
       await updateDoc(ref, {
-        ...stripUndefined({ slides, sourceSignature }),
+        ...stripUndefined({ slides }),
+        ...signatureField,
         updatedAt: serverTimestamp(),
       })
       return
@@ -325,7 +346,8 @@ export const useSlideGroups = defineStore('slideGroups', () => {
         | undefined
       const merged = mergeConcurrentlyAddedEntries(baseSlides, liveSlides ?? [], slides)
       tx.update(ref, {
-        ...stripUndefined({ slides: merged, sourceSignature }),
+        ...stripUndefined({ slides: merged }),
+        ...signatureField,
         updatedAt: serverTimestamp(),
       })
     })

@@ -704,10 +704,30 @@ export function rebuildSongGroup(group: SlideGroup, slot: SongSlot, inputs: Asse
   return changed ? { changed: true, slides: merged } : { changed: false, slides: group.slides }
 }
 
-/** Two-field result shape shared by every `rebuild*Group` function, dispatched via {@link rebuildGroup}. Phase 30 deleted the old six-field confirm-shaped result along with the confirm gate itself — every rebuild now decides and writes unconditionally. */
+/**
+ * Two-field result shape shared by every `rebuild*Group` function, dispatched via {@link rebuildGroup}. Phase 30 deleted the old six-field confirm-shaped result along with the confirm gate itself — every rebuild now decides and writes unconditionally.
+ *
+ * 38-REVIEW CR-01: `sourceSignature` is an OPTIONAL third field, read only by
+ * the composable's write step (`useSlideshowAssembly.ts`) when present.
+ * `undefined` (the field simply absent, the default for every branch except
+ * the one below) means "no opinion — the composable's own freshly-recomputed
+ * signature governs, exactly as before this field existed." An explicit
+ * `null` means "clear the stored signature," which the composable and
+ * `replaceGroupSlides` must turn into a real Firestore `deleteField()`, not
+ * an omitted key — `stripUndefined` treats an omitted key and `undefined` as
+ * "no change," which cannot express "remove this," the same distinction
+ * `setGroupBedMedia`'s `clearAudio` flag exists to make. Only
+ * `rebuildScriptureGroup`'s CLEARED REFERENCE branch sets this today: it is
+ * the one branch that empties a group's derived slides via a path where the
+ * freshly-computed signature is `undefined` for a reason OTHER than "no
+ * opinion" (there is no reference left to sign at all), so the ordinary
+ * fall-through would leave a stale congregational signature on the group
+ * forever.
+ */
 export interface RebuildResult {
   changed: boolean
   slides: GroupSlideEntry[]
+  sourceSignature?: string | null
 }
 
 /**
@@ -826,7 +846,16 @@ export function rebuildScriptureGroup(group: SlideGroup, slot: ScriptureSlot, in
     )
     if (hasSectionEntries) {
       const slides = renumbered(survivingEntries(group, slot))
-      return { changed: !slidesEqual(slides, group.slides), slides }
+      // 38-REVIEW CR-01: this is the one branch that empties a Congregational
+      // group's section entries via a reference clear, where the freshly
+      // computed `sourceSignature(slot, inputs)` is `undefined` because there
+      // is no reference left to sign — NOT because there is "no opinion."
+      // Without an explicit `sourceSignature: null` here, the write path's
+      // `stripUndefined` would leave the group's stale congregational
+      // signature stored, and a later re-entry of the identical reading would
+      // hit the DETACHED short-circuit above against a permanently-empty
+      // `slides` array. See `RebuildResult`'s doc comment.
+      return { changed: !slidesEqual(slides, group.slides), slides, sourceSignature: null }
     }
   }
 
