@@ -8,12 +8,13 @@ import {
   rebuildImportedGroup,
   rebuildGroup,
 } from '@/utils/slideGroupMaterializer'
+import { congregationalSectionFromRef } from '@/utils/scripture'
 import type { AssemblyInputs } from '@/utils/slideshowAssembler'
 import type { SongSlot, ScriptureSlot, NonAssignableSlot, HymnSlot, ImportedSlot } from '@/types/service'
 import type { SongLyrics } from '@/types/songLyrics'
 import type { ScriptureReading } from '@/types/scriptureReading'
 import type { ImportedDeck } from '@/types/importedDeck'
-import type { ScriptureSlide, TextSlide, ImageSlide } from '@/types/slide'
+import type { ScriptureSlide, TextSlide, ImageSlide, CongregationalSection } from '@/types/slide'
 import type { SlideGroup } from '@/types/slideGroup'
 import type { Timestamp } from 'firebase/firestore'
 
@@ -126,6 +127,14 @@ function scriptureSlot(overrides: Partial<ScriptureSlot> = {}): ScriptureSlot {
   }
 }
 
+function makeSection(overrides: Partial<CongregationalSection> = {}): CongregationalSection {
+  return {
+    speaker: 'LEADER',
+    text: 'The Lord is my shepherd;',
+    ...overrides,
+  }
+}
+
 function importedSlot(overrides: Partial<ImportedSlot> = {}): ImportedSlot {
   return {
     kind: 'IMPORTED',
@@ -222,6 +231,68 @@ describe('deriveGroupEntries — SCRIPTURE', () => {
   })
 })
 
+// D1: a SCRIPTURE slot with congregational sections derives N entries — one
+// per section, carrying that section's own content — the same
+// one-entry-per-fragment shape IMPORTED already uses.
+describe('deriveGroupEntries — SCRIPTURE congregational (D1)', () => {
+  it('a slot with three sections derives three entries in stored order, each carrying that section\'s own speaker and text', () => {
+    const sections = [
+      makeSection({ speaker: 'LEADER', text: 'One' }),
+      makeSection({ speaker: 'CONGREGATION', text: 'Two' }),
+      makeSection({ speaker: 'LEADER', text: 'Three' }),
+    ]
+    const slot = scriptureSlot({ congregationalSections: sections })
+
+    const entries = deriveGroupEntries(slot, makeInputs())
+
+    expect(entries).toHaveLength(3)
+    expect(entries.map((e) => e.order)).toEqual([0, 1, 2])
+    expect(entries.map((e) => (e.sourceRef as { speaker?: string }).speaker)).toEqual([
+      'LEADER',
+      'CONGREGATION',
+      'LEADER',
+    ])
+    expect(entries.map((e) => (e.sourceRef as { text?: string }).text)).toEqual(['One', 'Two', 'Three'])
+  })
+
+  it('each derived section entry has a distinct freshly minted id', () => {
+    const sections = [makeSection({ text: 'One' }), makeSection({ text: 'Two' }), makeSection({ text: 'Three' })]
+    const slot = scriptureSlot({ congregationalSections: sections })
+
+    const entries = deriveGroupEntries(slot, makeInputs())
+
+    expect(new Set(entries.map((e) => e.id)).size).toBe(3)
+  })
+
+  it('a section with a verseRange carries it onto the entry; a section without one leaves the entry with no verseRange key at all', () => {
+    const sections = [makeSection({ text: 'With range', verseRange: '1' }), makeSection({ text: 'No range' })]
+    const slot = scriptureSlot({ congregationalSections: sections })
+
+    const entries = deriveGroupEntries(slot, makeInputs())
+
+    expect((entries[0]!.sourceRef as { verseRange?: string }).verseRange).toBe('1')
+    expect(Object.prototype.hasOwnProperty.call(entries[1]!.sourceRef, 'verseRange')).toBe(false)
+  })
+
+  it('a SCRIPTURE slot with sections but no reference still derives zero entries', () => {
+    const slot = scriptureSlot({
+      book: null,
+      chapter: null,
+      verseStart: null,
+      verseEnd: null,
+      congregationalSections: [makeSection()],
+    })
+    expect(deriveGroupEntries(slot, makeInputs())).toEqual([])
+  })
+
+  it('an empty congregationalSections array still derives exactly ONE payload-free entry, unchanged from the no-sections case', () => {
+    const slot = scriptureSlot({ congregationalSections: [] })
+    const entries = deriveGroupEntries(slot, makeInputs())
+    expect(entries).toHaveLength(1)
+    expect(entries[0]!.sourceRef).toEqual({ kind: 'scripture' })
+  })
+})
+
 describe('deriveGroupEntries — IMPORTED', () => {
   it('derives one imported entry per deck slide', () => {
     const slot = importedSlot({ importId: 'deck-1' })
@@ -301,6 +372,72 @@ describe('sourceSignature', () => {
     const reading = makeScriptureReading()
     const inputs = makeInputs({ scriptureReadingsById: new Map([['reading-1', reading]]) })
     expect(sourceSignature(slot, inputs)).toBeDefined()
+  })
+
+  // D1: sourceSignature is now the durable marker `rebuildScriptureGroup`
+  // decides DETACH vs rebuild against, so it must fold sections IN (the
+  // reverse of R064's original claim, which this plan reverses).
+  describe('SCRIPTURE — congregational sections fold into the signature (D1)', () => {
+    it('with NO sections, the signature is byte-identical to the bare formatted reference — unchanged from before this phase', () => {
+      const slot = scriptureSlot()
+      const inputs = makeInputs()
+      expect(sourceSignature(slot, inputs)).toBe('John 3:16-18')
+    })
+
+    it('differs between no sections, one section, and three sections', () => {
+      const inputs = makeInputs()
+      const sigNone = sourceSignature(scriptureSlot(), inputs)
+      const sigOne = sourceSignature(scriptureSlot({ congregationalSections: [makeSection()] }), inputs)
+      const sigThree = sourceSignature(
+        scriptureSlot({
+          congregationalSections: [
+            makeSection({ text: 'One' }),
+            makeSection({ speaker: 'CONGREGATION', text: 'Two' }),
+            makeSection({ text: 'Three' }),
+          ],
+        }),
+        inputs,
+      )
+      expect(sigNone).not.toBe(sigOne)
+      expect(sigOne).not.toBe(sigThree)
+      expect(sigNone).not.toBe(sigThree)
+    })
+
+    it('differs when a single section\'s text changes', () => {
+      const inputs = makeInputs()
+      const sigA = sourceSignature(scriptureSlot({ congregationalSections: [makeSection({ text: 'Alpha' })] }), inputs)
+      const sigB = sourceSignature(scriptureSlot({ congregationalSections: [makeSection({ text: 'Beta' })] }), inputs)
+      expect(sigA).not.toBe(sigB)
+    })
+
+    it('differs when a single section\'s speaker flips', () => {
+      const inputs = makeInputs()
+      const sigLeader = sourceSignature(
+        scriptureSlot({ congregationalSections: [makeSection({ speaker: 'LEADER' })] }),
+        inputs,
+      )
+      const sigCongregation = sourceSignature(
+        scriptureSlot({ congregationalSections: [makeSection({ speaker: 'CONGREGATION' })] }),
+        inputs,
+      )
+      expect(sigLeader).not.toBe(sigCongregation)
+    })
+
+    it('is order-sensitive: the same two sections in reversed order sign differently', () => {
+      const inputs = makeInputs()
+      const a = makeSection({ speaker: 'LEADER', text: 'First' })
+      const b = makeSection({ speaker: 'CONGREGATION', text: 'Second' })
+      const sigAB = sourceSignature(scriptureSlot({ congregationalSections: [a, b] }), inputs)
+      const sigBA = sourceSignature(scriptureSlot({ congregationalSections: [b, a] }), inputs)
+      expect(sigAB).not.toBe(sigBA)
+    })
+
+    it('an empty congregationalSections array signs identically to no sections at all', () => {
+      const inputs = makeInputs()
+      expect(sourceSignature(scriptureSlot({ congregationalSections: [] }), inputs)).toBe(
+        sourceSignature(scriptureSlot(), inputs),
+      )
+    })
   })
 })
 
@@ -1500,21 +1637,19 @@ describe('HI-01 — a pre-R047 scripture group collapses to exactly ONE entry', 
   })
 })
 
-// R064: PATTERNS.md claimed `slideGroupMaterializer.ts` needs no structural
-// change for congregational sections. This describe block converts that
-// claim into an executable assertion rather than an assumed one — an
-// unverified claim of this exact shape is what produced the Phase 34 gap in
-// the first place. No production code changes accompany this task; the
-// `git diff --exit-code` verification step proves it.
-describe('R064 — congregationalSections requires no structural change to slideGroupMaterializer', () => {
-  it('deriveGroupEntries on a SCRIPTURE slot WITH congregationalSections returns exactly one entry, payload-free', () => {
-    // (1) The entry stays payload-free and singular. R047's design keeps the
-    // scripture SourceRef empty so `derivedIdentityKey` treats the ref KIND
-    // alone as the group's identity, which is what lets
-    // `carryStoredDerivedEntries` carry a stored entry's id and attached
-    // audio forward across a passage change instead of minting a fresh id.
-    // Baking sections into the entry would break that; resolving them live
-    // at assembly time (Task 2) is what preserves it.
+// R064/D1: Phase 34's PATTERNS.md claimed `slideGroupMaterializer.ts` needs NO
+// structural change for congregational sections, and that claim held through
+// Phase 34 — a scripture group stayed exactly one payload-free entry and its
+// signature stayed byte-identical regardless of sections, because sections
+// were resolved LIVE off the slot at assembly time with no group involvement.
+// Phase 38 (D1) reverses BOTH halves of that claim on purpose: converting to
+// congregational now DOES change the group's structure (N entries, one per
+// section) and DOES change what the signature folds in (the sections
+// themselves), because the whole point of D1 is a group that detaches from
+// the slot instead of resolving it live. This block is the positive
+// replacement for the old claim, not a deletion of it.
+describe('R064/D1 — congregational sections DO reshape the group and DO fold into the signature', () => {
+  it('deriveGroupEntries on a SCRIPTURE slot WITH congregationalSections returns one entry PER section, not one payload-free entry', () => {
     const slot = scriptureSlot({
       congregationalSections: [
         { speaker: 'LEADER', text: 'The Lord is my shepherd;' },
@@ -1525,11 +1660,12 @@ describe('R064 — congregationalSections requires no structural change to slide
 
     const entries = deriveGroupEntries(slot, inputs)
 
-    expect(entries).toHaveLength(1)
-    expect(entries[0]!.sourceRef).toEqual({ kind: 'scripture' })
+    expect(entries).toHaveLength(2)
+    expect(entries.every((e) => e.sourceRef.kind === 'scripture')).toBe(true)
+    expect(entries.every((e) => congregationalSectionFromRef(e.sourceRef) !== null)).toBe(true)
   })
 
-  it('entry count and sourceRef shape are identical with and without congregationalSections', () => {
+  it('entry count differs with and without congregationalSections — one entry without, N entries with', () => {
     const withoutSections = scriptureSlot()
     const withSections = scriptureSlot({
       congregationalSections: [{ speaker: 'LEADER', text: 'Section text' }],
@@ -1539,19 +1675,13 @@ describe('R064 — congregationalSections requires no structural change to slide
     const entriesWithout = deriveGroupEntries(withoutSections, inputs)
     const entriesWith = deriveGroupEntries(withSections, inputs)
 
-    expect(entriesWith).toHaveLength(entriesWithout.length)
-    expect(entriesWith[0]!.sourceRef).toEqual(entriesWithout[0]!.sourceRef)
-    expect(entriesWith[0]!.sourceRef).toEqual({ kind: 'scripture' })
+    expect(entriesWithout).toHaveLength(1)
+    expect(entriesWithout[0]!.sourceRef).toEqual({ kind: 'scripture' })
+    expect(entriesWith).toHaveLength(1)
+    expect(congregationalSectionFromRef(entriesWith[0]!.sourceRef)).not.toBeNull()
   })
 
-  it('sourceSignature is byte-identical across slots that differ only in congregationalSections (absent, one section, three different sections)', () => {
-    // (2) sourceSignature must NOT fold in the sections. Editing a reading is
-    // not a source change that warrants a group rebuild: the sections are
-    // resolved live off the slot on every assembly, so they already reach
-    // the slide with no signature involvement. Folding them in would
-    // invalidate the group signature on every keystroke-level section edit
-    // and route through the rebuild path, minting fresh entry ids and
-    // dropping attached slide audio.
+  it('sourceSignature now DIFFERS across slots that differ only in congregationalSections (absent, one section, three different sections)', () => {
     const inputs = makeInputs()
     const slotAbsent = scriptureSlot()
     const slotOneSection = scriptureSlot({
@@ -1569,9 +1699,191 @@ describe('R064 — congregationalSections requires no structural change to slide
     const sigOne = sourceSignature(slotOneSection, inputs)
     const sigThree = sourceSignature(slotThreeSections, inputs)
 
-    expect(sigAbsent).toBe(sigOne)
-    expect(sigOne).toBe(sigThree)
+    expect(sigAbsent).not.toBe(sigOne)
+    expect(sigOne).not.toBe(sigThree)
+    // The no-sections case is unchanged from before this phase — the guard
+    // against Phase 30's hard lock being disturbed for every existing
+    // Reference-state group.
     expect(sigAbsent).toBe('John 3:16-18')
+  })
+})
+
+// D1: `rebuildScriptureGroup`'s two-state machine — DETACHED (materialized
+// from the current reading, freely editable, never re-derived) vs the
+// Reference state's original slot-driven rebuild. `congregationalSectionFromRef`
+// import above is reused for these assertions.
+describe('rebuildScriptureGroup — the two-state machine (D1)', () => {
+  function inSyncCongregationalGroup(slot: ScriptureSlot, inputs: AssemblyInputs): SlideGroup {
+    return makeGroup({
+      sourceSignature: sourceSignature(slot, inputs),
+      slides: deriveGroupEntries(slot, inputs),
+    })
+  }
+
+  const threeSections: CongregationalSection[] = [
+    { speaker: 'LEADER', text: 'The Lord is my shepherd; I shall not want.' },
+    { speaker: 'CONGREGATION', text: 'He makes me lie down in green pastures.' },
+    { speaker: 'LEADER', text: 'He leads me beside still waters.' },
+  ]
+
+  it('DETACH: a group already materialized from the slot\'s current reading rebuilds to changed: false, slides reference-equal to the stored ones', () => {
+    const slot = scriptureSlot({ congregationalSections: threeSections })
+    const inputs = makeInputs()
+    const group = inSyncCongregationalGroup(slot, inputs)
+
+    const result = rebuildScriptureGroup(group, slot, inputs)
+
+    expect(result.changed).toBe(false)
+    expect(result.slides).toBe(group.slides)
+  })
+
+  it('DETACH: still changed: false after the caller has removed one entry', () => {
+    const slot = scriptureSlot({ congregationalSections: threeSections })
+    const inputs = makeInputs()
+    const group = inSyncCongregationalGroup(slot, inputs)
+    const withOneDeleted: SlideGroup = { ...group, slides: group.slides.slice(0, 2) }
+
+    const result = rebuildScriptureGroup(withOneDeleted, slot, inputs)
+
+    expect(result.changed).toBe(false)
+    expect(result.slides).toBe(withOneDeleted.slides)
+    expect(result.slides).toHaveLength(2)
+  })
+
+  it('DETACH: still changed: false, empty, after the caller has removed every entry', () => {
+    const slot = scriptureSlot({ congregationalSections: threeSections })
+    const inputs = makeInputs()
+    const group = inSyncCongregationalGroup(slot, inputs)
+    const emptied: SlideGroup = { ...group, slides: [] }
+
+    const result = rebuildScriptureGroup(emptied, slot, inputs)
+
+    expect(result).toEqual({ changed: false, slides: [] })
+  })
+
+  it('CONVERT: a group holding one payload-free entry, on a slot with three sections and a stale signature, rebuilds to three section entries in section order, the first carrying the stored entry\'s id and audioUrl', () => {
+    const slot = scriptureSlot()
+    const inputs = makeInputs()
+    const group = makeGroup({
+      sourceSignature: sourceSignature(slot, inputs),
+      slides: [{ ...deriveGroupEntries(slot, inputs)[0]!, audioUrl: 'https://example.com/call-to-worship.mp3' }],
+    })
+    const storedId = group.slides[0]!.id
+
+    const congregationalSlot = scriptureSlot({ congregationalSections: threeSections })
+    const result = rebuildScriptureGroup(group, congregationalSlot, inputs)
+
+    expect(result.changed).toBe(true)
+    expect(result.slides).toHaveLength(3)
+    expect(result.slides.map((e) => congregationalSectionFromRef(e.sourceRef)?.text)).toEqual(
+      threeSections.map((s) => s.text),
+    )
+    expect(result.slides[0]!.id).toBe(storedId)
+    expect(result.slides[0]!.audioUrl).toBe('https://example.com/call-to-worship.mp3')
+  })
+
+  it('RE-SPLIT: a converted group re-run against a slot whose sections changed to two rebuilds to exactly two section entries — never five, never growing', () => {
+    const slot = scriptureSlot({ congregationalSections: threeSections })
+    const inputs = makeInputs()
+    const group = inSyncCongregationalGroup(slot, inputs)
+
+    const twoSections: CongregationalSection[] = [
+      { speaker: 'LEADER', text: 'Reworded first half.' },
+      { speaker: 'CONGREGATION', text: 'Reworded second half.' },
+    ]
+    const resplitSlot = scriptureSlot({ congregationalSections: twoSections })
+
+    const result = rebuildScriptureGroup(group, resplitSlot, inputs)
+
+    expect(result.changed).toBe(true)
+    expect(result.slides).toHaveLength(2)
+    expect(result.slides.map((e) => congregationalSectionFromRef(e.sourceRef)?.text)).toEqual(
+      twoSections.map((s) => s.text),
+    )
+  })
+
+  it('DESTROY: a group holding three section entries, on a slot whose reference changed and whose sections were therefore cleared, rebuilds to exactly ONE payload-free entry', () => {
+    const slot = scriptureSlot({ congregationalSections: threeSections })
+    const inputs = makeInputs()
+    const group = inSyncCongregationalGroup(slot, inputs)
+
+    // scriptureSlotAfterReferenceChange clears congregationalSections on a
+    // reference change — model the slot AFTER that clearing, with the NEW
+    // reference already written.
+    const newPassageSlot = scriptureSlot({ book: 'Psalms', chapter: 100, verseStart: 1, verseEnd: 5 })
+
+    const result = rebuildScriptureGroup(group, newPassageSlot, inputs)
+
+    expect(result.changed).toBe(true)
+    expect(result.slides).toHaveLength(1)
+    expect(result.slides[0]!.sourceRef).toEqual({ kind: 'scripture' })
+  })
+
+  it('CLEARED REFERENCE: a group holding three section entries, on a slot whose reference is now null, rebuilds to zero scripture entries while retaining a hand-added video entry', () => {
+    const slot = scriptureSlot({ congregationalSections: threeSections })
+    const inputs = makeInputs()
+    const inSync = inSyncCongregationalGroup(slot, inputs)
+    const group: SlideGroup = {
+      ...inSync,
+      slides: [
+        ...inSync.slides,
+        { id: 'e-video', order: 3, sourceRef: { kind: 'video', videoSrc: 'https://example.com/dropped.mp4' } },
+      ],
+    }
+
+    const clearedSlot = scriptureSlot({ book: null, chapter: null, verseStart: null, verseEnd: null })
+    const result = rebuildScriptureGroup(group, clearedSlot, inputs)
+
+    expect(result.changed).toBe(true)
+    expect(result.slides).toEqual([{ id: 'e-video', order: 0, sourceRef: { kind: 'video', videoSrc: 'https://example.com/dropped.mp4' } }])
+  })
+
+  it('CLEARED REFERENCE, Reference state: a group holding one payload-free entry, on a slot whose reference is now null, still rebuilds to changed: false with the group untouched (T-30-02-04 unchanged)', () => {
+    const slot = scriptureSlot()
+    const inputs = makeInputs()
+    const group = inSyncCongregationalGroup(slot, inputs)
+
+    const clearedSlot = scriptureSlot({ book: null, chapter: null, verseStart: null, verseEnd: null })
+    const result = rebuildScriptureGroup(group, clearedSlot, inputs)
+
+    expect(result).toEqual({ changed: false, slides: group.slides })
+  })
+
+  it('IDEMPOTENCE: DETACH, CONVERT, RE-SPLIT and DESTROY are all changed: false on a second pass', () => {
+    const inputs = makeInputs()
+
+    // DETACH is trivially idempotent by construction (branch 1 always
+    // returns changed: false) — proven above. Prove the other three by
+    // feeding each result back in as the new stored group.
+    const convertSlotBase = scriptureSlot()
+    const convertGroup = makeGroup({
+      sourceSignature: sourceSignature(convertSlotBase, inputs),
+      slides: deriveGroupEntries(convertSlotBase, inputs),
+    })
+    const convertSlot = scriptureSlot({ congregationalSections: threeSections })
+    const convertFirst = rebuildScriptureGroup(convertGroup, convertSlot, inputs)
+    const convertRegrouped: SlideGroup = { ...convertGroup, sourceSignature: sourceSignature(convertSlot, inputs), slides: convertFirst.slides }
+    const convertSecond = rebuildScriptureGroup(convertRegrouped, convertSlot, inputs)
+    expect(convertSecond.changed).toBe(false)
+    expect(convertSecond.slides).toEqual(convertFirst.slides)
+
+    const resplitSections: CongregationalSection[] = [
+      { speaker: 'LEADER', text: 'Reworded first half.' },
+      { speaker: 'CONGREGATION', text: 'Reworded second half.' },
+    ]
+    const resplitSlot = scriptureSlot({ congregationalSections: resplitSections })
+    const resplitFirst = rebuildScriptureGroup(convertRegrouped, resplitSlot, inputs)
+    const resplitRegrouped: SlideGroup = { ...convertRegrouped, sourceSignature: sourceSignature(resplitSlot, inputs), slides: resplitFirst.slides }
+    const resplitSecond = rebuildScriptureGroup(resplitRegrouped, resplitSlot, inputs)
+    expect(resplitSecond.changed).toBe(false)
+    expect(resplitSecond.slides).toEqual(resplitFirst.slides)
+
+    const destroySlot = scriptureSlot({ book: 'Psalms', chapter: 100, verseStart: 1, verseEnd: 5 })
+    const destroyFirst = rebuildScriptureGroup(resplitRegrouped, destroySlot, inputs)
+    const destroyRegrouped: SlideGroup = { ...resplitRegrouped, sourceSignature: sourceSignature(destroySlot, inputs), slides: destroyFirst.slides }
+    const destroySecond = rebuildScriptureGroup(destroyRegrouped, destroySlot, inputs)
+    expect(destroySecond.changed).toBe(false)
+    expect(destroySecond.slides).toEqual(destroyFirst.slides)
   })
 })
 

@@ -25,7 +25,12 @@
 import type { ServiceSlot, SongSlot, ScriptureSlot, ImportedSlot } from '@/types/service'
 import type { SlideGroup, GroupSlideEntry, SourceRef, SlideGroupInput } from '@/types/slideGroup'
 import type { AssemblyInputs } from '@/utils/slideshowAssembler'
-import { formatScriptureReference, scriptureRefFromSlot } from '@/utils/scripture'
+import {
+  formatScriptureReference,
+  scriptureRefFromSlot,
+  congregationalSectionsFromSlot,
+  congregationalSectionFromRef,
+} from '@/utils/scripture'
 
 /**
  * Derives a slide group's structure from its slot's canonical source.
@@ -69,19 +74,41 @@ export function deriveGroupEntries(slot: ServiceSlot, inputs: AssemblyInputs): G
     }
 
     case 'SCRIPTURE': {
-      // R047: exactly ONE reference-only entry, derived from the slot's OWN
-      // reference fields — the passage the user typed on the Service Order
-      // tab. No reading document, no ESV fetch, no id to link: entering or
-      // changing the reference IS the source change, so the slide appears and
-      // is replaced the same way a song swap replaces a song's slides.
+      // R047/D1: no reference means no slides, exactly as before. Once a
+      // reference exists, the group has exactly two possible shapes — never a
+      // mix — decided by `congregationalSectionsFromSlot`, R064's ONE
+      // congregational-ness predicate:
       //
-      // The ref carries no payload. `derivedIdentityKey` treats the ref KIND
-      // alone as this group's identity, which is what lets a passage change
-      // carry the stored entry's id/audio forward through
-      // `carryStoredDerivedEntries` instead of minting a fresh id and
-      // silently dropping attached audio.
+      // - Reference state (default, unchanged): no sections, so ONE
+      //   reference-only entry, derived from the slot's OWN reference fields —
+      //   the passage the user typed on the Service Order tab. The ref
+      //   carries no payload. `derivedIdentityKey` treats the ref KIND alone
+      //   as this group's identity, which is what lets a passage change carry
+      //   the stored entry's id/audio forward through
+      //   `carryStoredDerivedEntries` instead of minting a fresh id and
+      //   silently dropping attached audio.
+      // - Congregational state (D1, opt-in): sections present, so ONE entry
+      //   PER SECTION — the same one-entry-per-fragment shape the IMPORTED
+      //   case above already uses — each carrying that section's own
+      //   `speaker`/`text`/`verseRange`. This is what `deriveGroupEntries`
+      //   produces on a fresh conversion; `rebuildScriptureGroup` below is
+      //   what keeps a group that has ALREADY converted from re-deriving
+      //   here on every pass.
       if (!scriptureRefFromSlot(slot)) return []
-      return [{ id: crypto.randomUUID(), order: 0, sourceRef: { kind: 'scripture' as const } }]
+      const sections = congregationalSectionsFromSlot(slot)
+      if (sections.length === 0) {
+        return [{ id: crypto.randomUUID(), order: 0, sourceRef: { kind: 'scripture' as const } }]
+      }
+      return sections.map((section, index) => ({
+        id: crypto.randomUUID(),
+        order: index,
+        sourceRef: {
+          kind: 'scripture' as const,
+          speaker: section.speaker,
+          text: section.text,
+          ...(section.verseRange !== undefined ? { verseRange: section.verseRange } : {}),
+        },
+      }))
     }
 
     case 'IMPORTED': {
@@ -130,11 +157,31 @@ export function sourceSignature(slot: ServiceSlot, inputs: AssemblyInputs): stri
     }
 
     case 'SCRIPTURE': {
-      // R047: the slot's reference IS the source, so the formatted reference
-      // is the whole signature — it changes exactly when the rendered slide
-      // would change.
+      // R047/D1: the slot's reference is always the base of the signature.
+      // With no sections it is the WHOLE signature, byte-identical to before
+      // this phase — every existing Reference-state group's stored signature
+      // stays unchanged, so deploying this phase rebuilds nothing that was
+      // not already congregational.
+      //
+      // With sections present, this is no longer only a stored
+      // change-detector: `rebuildScriptureGroup` reads it back as the ONE
+      // durable marker of "already materialized from THIS reading" (detached)
+      // vs "not yet" (rebuild). So the encoding must be deterministic,
+      // order-sensitive and field-explicit — NOT `JSON.stringify` on the
+      // section objects, whose key order is not guaranteed to match between
+      // the AI-split path and the manual path; a signature that flips on key
+      // order would rebuild groups at random. Separators are ASCII control
+      // characters (\x1e/\x1f) that cannot occur in typed or ESV-sourced
+      // scripture text.
       const scriptureRef = scriptureRefFromSlot(slot)
-      return scriptureRef ? formatScriptureReference(scriptureRef) : undefined
+      if (!scriptureRef) return undefined
+      const formatted = formatScriptureReference(scriptureRef)
+      const sections = congregationalSectionsFromSlot(slot)
+      if (sections.length === 0) return formatted
+      const encodedSections = sections
+        .map((section) => `${section.speaker}\x1f${section.verseRange ?? ''}\x1f${section.text}`)
+        .join('\x1e')
+      return `${formatted}\x1e${sections.length}\x1e${encodedSections}`
     }
 
     case 'IMPORTED': {
@@ -667,13 +714,80 @@ function rebuildUnstableIdGroup(
  * Scripture inner slide ids are purely positional (`id: \`scripture-${position}\``,
  * minted in `src/utils/scriptureSplitter.ts::buildSlide`) and are reassigned
  * wholesale by every re-split of the passage — there is no content-stable key
- * to diff a single inner slide against. R047 sidesteps this entirely: a
- * scripture group derives exactly ONE reference-only entry, so
- * `derivedIdentityKey` treats the ref kind alone as identity, letting a
- * passage change or a reading swap carry the stored entry's id/audio forward
- * (T-30-02-03) with no id-matching scheme needed.
+ * to diff a single inner slide against. R047 sidesteps this entirely for the
+ * Reference state: a scripture group derives exactly ONE reference-only
+ * entry, so `derivedIdentityKey` treats the ref kind alone as identity,
+ * letting a passage change or a reading swap carry the stored entry's
+ * id/audio forward (T-30-02-03) with no id-matching scheme needed.
+ *
+ * D1 adds a second state on top of that: once a scripture group has been
+ * materialized from the slot's CURRENT congregational reading, it is
+ * DETACHED — freely editable, and no longer re-derived on every rebuild pass,
+ * even when entries have been edited or deleted. Two states, decided in
+ * order:
+ *
+ * 1. DETACHED: the slot has sections AND the group's stored
+ *    `sourceSignature` already equals `sourceSignature(slot, inputs)` — this
+ *    group was materialized from EXACTLY this reading. Return the stored
+ *    slides untouched, `changed: false`, unconditionally — not gated on the
+ *    group being non-empty, because a user who deleted every section slide
+ *    must get an empty group that STAYS empty until the scripture itself
+ *    changes. This is the one branch that makes a per-slide edit survive and
+ *    a deletion stick.
+ * 2. NOT YET MATERIALIZED: the slot has sections but the signature does not
+ *    match — first conversion, a re-split from the congregational editor, or
+ *    an existing Phase-34 service reaching this code for the first time.
+ *    Delegate to `rebuildUnstableIdGroup` exactly as the Reference state
+ *    always has: `deriveGroupEntries` now yields the N section entries, and
+ *    the existing carry/order/renumber machinery does the rest with no
+ *    change. `carryStoredDerivedEntries`'s scripture-surplus suppression
+ *    (HI-01) is what collapses this back down to exactly one entry on a
+ *    DESTROY (case 4 below) — that suppression was written for pre-5c531b1
+ *    multi-fragment groups, which is structurally the SAME shape a
+ *    congregational group has. It is reused here, not reimplemented; do not
+ *    "fix" it into re-emitting surplus, or a destroyed conversion will
+ *    silently resurrect N reference slides instead of collapsing to one.
+ * 3. CLEARED REFERENCE: the slot has no sections AND no reference at all, AND
+ *    the group still holds at least one section entry — the reference is
+ *    gone, so the group must be emptied of its derived section entries,
+ *    retaining only what `survivingEntries` classifies as user work
+ *    (renumbered). For SCRIPTURE an absent reference is a REAL absent
+ *    reference, never a loading race (R047: the slot IS the source) — unlike
+ *    `rebuildUnstableIdGroup`'s loading-race guard, which exists for
+ *    IMPORTED's asynchronously-arriving deck. Without this branch a section
+ *    entry keeps projecting its stored words under a reference that no
+ *    longer exists, because its content comes from ITSELF, not the slot. A
+ *    group with NO section entries and an absent reference falls through to
+ *    case 4 unchanged — `rebuildUnstableIdGroup`'s own loading-race guard
+ *    already leaves it alone (T-30-02-04), and widening this branch to cover
+ *    it too would be a behaviour change this plan does not make.
+ * 4. Otherwise (Reference state throughout, or a DESTROY — sections were
+ *    just cleared by a reference change): delegate to `rebuildUnstableIdGroup`
+ *    unchanged. Its carry/collapse machinery (case 2's HI-01 note) is what
+ *    turns N stored section entries into exactly ONE payload-free entry when
+ *    the fresh derivation is the single-entry Reference shape.
  */
 export function rebuildScriptureGroup(group: SlideGroup, slot: ScriptureSlot, inputs: AssemblyInputs): RebuildResult {
+  const sections = congregationalSectionsFromSlot(slot)
+
+  if (sections.length > 0) {
+    if (group.sourceSignature !== undefined && group.sourceSignature === sourceSignature(slot, inputs)) {
+      return { changed: false, slides: group.slides }
+    }
+    return rebuildUnstableIdGroup(group, slot, inputs)
+  }
+
+  const hasReference = scriptureRefFromSlot(slot) !== null
+  if (!hasReference) {
+    const hasSectionEntries = group.slides.some(
+      (entry) => entry.sourceRef.kind === 'scripture' && congregationalSectionFromRef(entry.sourceRef) !== null,
+    )
+    if (hasSectionEntries) {
+      const slides = renumbered(survivingEntries(group, slot))
+      return { changed: !slidesEqual(slides, group.slides), slides }
+    }
+  }
+
   return rebuildUnstableIdGroup(group, slot, inputs)
 }
 
