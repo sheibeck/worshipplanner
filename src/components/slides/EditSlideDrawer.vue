@@ -125,7 +125,11 @@
                hand an imported picture a lyrics-editing route — do not
                "simplify" this to `contentKind`. Read-only for every kind
                except `text` (D-13's one exception, D-15: "the drawer IS its
-               home"). Omitted entirely for `video` — see the outer `v-if`. -->
+               home") and, as of Phase 38-03, a Congregational-state scripture
+               SECTION entry (D2) — a Reference-state scripture entry stays
+               hard-locked exactly as Phase 30 left it; see the scripture
+               branch below for that split. Omitted entirely for `video` —
+               see the outer `v-if`. -->
           <div v-if="sourceKind && sourceKind !== 'video'" data-testid="drawer-slide-text-section">
             <label class="block text-xs font-medium text-gray-400 mb-1">Slide Text</label>
 
@@ -148,23 +152,47 @@
             </template>
 
             <template v-else-if="sourceKind === 'scripture'">
-              <p
-                class="text-[13px] leading-normal text-gray-200 whitespace-pre-line"
-                data-testid="drawer-slide-text-readonly"
-              >{{ scripturePassageText }}</p>
-              <p class="mt-1 text-xs text-gray-500" data-testid="drawer-slide-text-caption">{{ SCRIPTURE_TEXT_CAPTION }}</p>
-              <!-- 34-07 (owner UAT F1): the route out of this read-only block
-                   — opens the congregational-reading editor (ServiceEditorView's
-                   modal, same relay the 3-dot menu's edit-in-scripture uses).
-                   No free-text scripture override; canMutate-gated like the
-                   drawer's other mutation controls. -->
-              <button
-                v-if="canMutate"
-                type="button"
-                class="mt-2 px-2.5 py-1 rounded-md text-xs font-medium border border-gray-700 text-gray-300 hover:bg-gray-800 transition-colors"
-                data-testid="drawer-edit-scripture-text-btn"
-                @click="emit('edit-scripture-text')"
-              >Edit scripture text</button>
+              <!-- Phase 38-03 (D2): a Congregational-state SECTION entry
+                   (sectionFromEntry non-null) is an ordinary editable slide —
+                   no write-back-to-the-reading path, no per-slide override
+                   concept, no route-out button. A Reference-state entry
+                   (sectionFromEntry null) is completely unchanged: the
+                   read-only block, the caption and the route out to the
+                   congregational-reading editor stay exactly as Phase 30/34-07
+                   left them. -->
+              <template v-if="sectionFromEntry">
+                <textarea
+                  v-if="canMutate"
+                  v-model="localBody"
+                  rows="3"
+                  class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
+                  data-testid="drawer-slide-text-editable-scripture"
+                ></textarea>
+                <p
+                  v-else
+                  class="text-[13px] leading-normal text-gray-200 whitespace-pre-line"
+                  data-testid="drawer-slide-text-readonly"
+                >{{ scripturePassageText }}</p>
+              </template>
+              <template v-else>
+                <p
+                  class="text-[13px] leading-normal text-gray-200 whitespace-pre-line"
+                  data-testid="drawer-slide-text-readonly"
+                >{{ scripturePassageText }}</p>
+                <p class="mt-1 text-xs text-gray-500" data-testid="drawer-slide-text-caption">{{ SCRIPTURE_TEXT_CAPTION }}</p>
+                <!-- 34-07 (owner UAT F1): the route out of this read-only block
+                     — opens the congregational-reading editor (ServiceEditorView's
+                     modal, same relay the 3-dot menu's edit-in-scripture uses).
+                     No free-text scripture override; canMutate-gated like the
+                     drawer's other mutation controls. -->
+                <button
+                  v-if="canMutate"
+                  type="button"
+                  class="mt-2 px-2.5 py-1 rounded-md text-xs font-medium border border-gray-700 text-gray-300 hover:bg-gray-800 transition-colors"
+                  data-testid="drawer-edit-scripture-text-btn"
+                  @click="emit('edit-scripture-text')"
+                >Edit scripture text</button>
+              </template>
             </template>
 
             <template v-else-if="sourceKind === 'imported'">
@@ -447,6 +475,7 @@ import type { AssembledSlide, ImageSlide, CopyrightSlide, ScriptureSlide } from 
 import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
 import { useSlideGroups } from '@/stores/slideGroups'
 import { KIND_BADGE_CLASSES, slotDisplayTitle, slideBodyText, bedAudioLabel, backgroundImageLabel, deleteSlideConfirmBody } from './slideDisplay'
+import { congregationalSectionFromRef } from '@/utils/scripture'
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import { useMediaUpload } from '@/composables/useMediaUpload'
 import { useBackgroundUpload } from '@/composables/useBackgroundUpload'
@@ -630,6 +659,18 @@ const backgroundSource = computed(() => props.assembledSlide?.slide.backgroundSo
 /** The one decision key for the whole Slide Text section (D-15). `null` when nothing is selected. */
 const sourceKind = computed(() => props.entry?.sourceRef.kind ?? null)
 
+/**
+ * Phase 38-03: `congregationalSectionFromRef` is the SINGLE predicate
+ * deciding whether the selected scripture entry is a Congregational-state
+ * section (editable, D2) or a Reference-state entry (still hard-locked,
+ * Phase 30) — do not add a second inline speaker check anywhere in this
+ * component. `null` for every non-scripture kind and for a Reference-state
+ * scripture entry.
+ */
+const sectionFromEntry = computed(() =>
+  props.entry ? congregationalSectionFromRef(props.entry.sourceRef) : null,
+)
+
 /** `lyric`-kind entries resolve to a `LyricSlide` (has `sectionId`) — `slideBodyText` already narrows that shape and produces exactly what's needed (its joined lines), so this reuses it rather than re-deriving. */
 const lyricLinesText = computed(() =>
   sourceKind.value === 'lyric' && props.assembledSlide ? slideBodyText(props.assembledSlide.slide) : '',
@@ -643,11 +684,12 @@ const copyrightSlide = computed(() =>
 /**
  * `scripture`-kind entries: the UI-SPEC calls for the passage text alone, not
  * `slideBodyText`'s reference-prefixed form (the reference is already shown
- * in the context line above). R047 ripple (30-03-PLAN.md): a reference-only
- * scripture slide now always resolves with empty `text` — falling back to
- * the slide's own `reference` keeps this block from going blank, while a
- * future Phase 34 slide that DOES carry text (the congregational reading
- * widening) still shows that text unchanged.
+ * in the context line above). R047 ripple (30-03-PLAN.md): a Reference-state
+ * scripture slide always resolves with empty `text` — falling back to the
+ * slide's own `reference` keeps this block from going blank. A
+ * Congregational-state section slide (Phase 38) DOES carry text and shows it
+ * unchanged; this computed is also read by the section entry's own read-only
+ * fallback (mutation disallowed) further down.
  */
 const scripturePassageText = computed(() => {
   if (sourceKind.value !== 'scripture' || !props.assembledSlide) return ''
@@ -1032,7 +1074,15 @@ async function writeField(field: FieldName, entryId: string, value: string): Pro
         // with, SlideGrid.vue's `onAddSlide`). Guards on `sourceRef.kind`
         // itself (only a `text`-kind entry ever schedules a body write) so
         // this never re-mints an unrelated source ref shape.
-        return e.sourceRef.kind === 'text' ? { ...e, sourceRef: { ...e.sourceRef, body: value } } : e
+        if (e.sourceRef.kind === 'text') return { ...e, sourceRef: { ...e.sourceRef, body: value } }
+        // Phase 38-03 Task 2: a Congregational-state scripture SECTION entry
+        // writes its own `text`, never `body` — writing the wrong key would
+        // silently discard every edit. Guarded on `congregationalSectionFromRef`
+        // (the SAME single predicate the template branches on), so this can
+        // never be reached by a Reference-state scripture entry or any other
+        // kind, no matter which entry's write happens to land here.
+        if (congregationalSectionFromRef(e.sourceRef)) return { ...e, sourceRef: { ...e.sourceRef, text: value } }
+        return e
       }
       return { ...e, [field]: value }
     })
@@ -1083,10 +1133,24 @@ async function flushAll(): Promise<void> {
   await flushField('body')
 }
 
+/**
+ * The stored words this drawer's `body` field seeds from — a `text`-kind
+ * entry's own `body`, a Congregational-state scripture section entry's own
+ * `text` (38-03 Task 2, via the SAME `congregationalSectionFromRef` predicate
+ * the template and `writeField` use), or '' for every other kind that has no
+ * words of its own.
+ */
+function bodySeed(entry: GroupSlideEntry | null): string {
+  if (!entry) return ''
+  if (entry.sourceRef.kind === 'text') return entry.sourceRef.body ?? ''
+  const section = congregationalSectionFromRef(entry.sourceRef)
+  return section ? section.text : ''
+}
+
 function resetLocalFields(entry: GroupSlideEntry | null): void {
   syncing = true
   localNotes.value = entry?.notes ?? ''
-  localBody.value = entry?.sourceRef.kind === 'text' ? (entry.sourceRef.body ?? '') : ''
+  localBody.value = bodySeed(entry)
   void nextTick().then(() => {
     syncing = false
   })
@@ -1119,18 +1183,24 @@ watch(
         syncing = false
       })
     }
-    if (
-      !pendingWrite.body &&
-      entry &&
-      entry.sourceRef.kind === 'text' &&
-      oldEntry.sourceRef.kind === 'text' &&
-      entry.sourceRef.body !== oldEntry.sourceRef.body
-    ) {
-      syncing = true
-      localBody.value = entry.sourceRef.body ?? ''
-      void nextTick().then(() => {
-        syncing = false
-      })
+    if (!pendingWrite.body && entry) {
+      const textChanged =
+        entry.sourceRef.kind === 'text' &&
+        oldEntry.sourceRef.kind === 'text' &&
+        entry.sourceRef.body !== oldEntry.sourceRef.body
+      // Phase 38-03 Task 2: a Congregational-state section entry's words
+      // changing on the stored group re-syncs too, under the same
+      // "only when nothing is pending" condition above.
+      const newSection = congregationalSectionFromRef(entry.sourceRef)
+      const oldSection = congregationalSectionFromRef(oldEntry.sourceRef)
+      const sectionTextChanged = newSection && oldSection && newSection.text !== oldSection.text
+      if (textChanged || sectionTextChanged) {
+        syncing = true
+        localBody.value = bodySeed(entry)
+        void nextTick().then(() => {
+          syncing = false
+        })
+      }
     }
     // Same entry, no local write in flight for anything that changed above —
     // re-capture so a concurrent OTHER agent's edit landing doesn't get
@@ -1146,7 +1216,13 @@ watch(localNotes, (value) => {
 })
 
 watch(localBody, (value) => {
-  if (syncing || !props.entry || props.entry.sourceRef.kind !== 'text') return
+  if (syncing || !props.entry) return
+  // Phase 38-03 Task 2: widened to admit a Congregational-state scripture
+  // SECTION entry as well (via the same predicate `writeField` guards on),
+  // and no further — a Reference-state scripture entry and every other kind
+  // still schedule no write from typing here.
+  const isEditableBodyKind = props.entry.sourceRef.kind === 'text' || congregationalSectionFromRef(props.entry.sourceRef) !== null
+  if (!isEditableBodyKind) return
   scheduleWrite('body', props.entry.id, value)
 })
 

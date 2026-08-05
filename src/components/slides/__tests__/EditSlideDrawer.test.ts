@@ -4,7 +4,7 @@ import { mount, flushPromises, DOMWrapper, enableAutoUnmount } from '@vue/test-u
 import EditSlideDrawer from '../EditSlideDrawer.vue'
 import type { ServiceSlot } from '@/types/service'
 import type { AssembledSlide } from '@/types/slide'
-import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
+import type { SlideGroup, GroupSlideEntry, SourceRef } from '@/types/slideGroup'
 
 // --- 26-05 Task 3: the drawer calls the slideGroups store directly for its
 // fresh-base label/notes writes (Pattern 2/Pitfall 2). Mocked here so Task 1's
@@ -149,6 +149,43 @@ function makeScriptureFixtures() {
         text: 'For God so loved the world',
         verseRange: '16',
         readingMode: 'normal',
+      } as never,
+    }),
+  }
+}
+
+/**
+ * Phase 38-03: a Congregational-state scripture SECTION entry — `speaker`
+ * present on `sourceRef` is the discriminator (`congregationalSectionFromRef`),
+ * distinct from `makeScriptureFixtures`' Reference-state entry (no `speaker`,
+ * no `text`, `readingMode: 'normal'`) above.
+ */
+function makeScriptureSectionFixtures(
+  overrides: { speaker?: 'LEADER' | 'CONGREGATION'; text?: string; verseRange?: string; id?: string } = {},
+) {
+  const speaker = overrides.speaker ?? 'LEADER'
+  const text = overrides.text ?? 'For God so loved the world'
+  const id = overrides.id ?? 'entry-1'
+  const sourceRef = {
+    kind: 'scripture' as const,
+    speaker,
+    text,
+    ...(overrides.verseRange !== undefined ? { verseRange: overrides.verseRange } : {}),
+  }
+  return {
+    entry: makeEntry({ id, sourceRef }),
+    assembledSlide: makeAssembled({
+      slotKind: 'SCRIPTURE',
+      slide: {
+        id,
+        position: 0,
+        contentKind: 'scripture',
+        reference: 'John 3:16',
+        bookRef: { book: 'John', chapter: 3 },
+        text,
+        verseRange: overrides.verseRange ?? '',
+        readingMode: 'congregational',
+        section: { speaker, text, ...(overrides.verseRange !== undefined ? { verseRange: overrides.verseRange } : {}) },
       } as never,
     }),
   }
@@ -744,6 +781,113 @@ describe('EditSlideDrawer (Phase 26-07 Task 1 — per-kind Slide Text)', () => {
       expect(text).not.toMatch(/override/i)
       expect(text).not.toMatch(/copy.*this service/i)
     }
+  })
+})
+
+describe("EditSlideDrawer (Phase 38-03 Task 2 — the drawer edits one section's words)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    mockReplaceGroupSlides.mockReset()
+    mockReplaceGroupSlides.mockResolvedValue(undefined)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it("renders an editable passage field seeded with the section's stored words when mutation is allowed", () => {
+    const { entry, assembledSlide } = makeScriptureSectionFixtures({ text: 'For God so loved the world' })
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+    const field = body().find('[data-testid="drawer-slide-text-editable-scripture"]')
+    expect(field.exists()).toBe(true)
+    expect((field.element as HTMLTextAreaElement).value).toBe('For God so loved the world')
+    expect(body().find('[data-testid="drawer-slide-text-readonly"]').exists()).toBe(false)
+  })
+
+  it("writes only the edited entry's stored words after the debounce, leaving every sibling entry byte-identical — id, order and speaker included", async () => {
+    const { entry: entryOne, assembledSlide } = makeScriptureSectionFixtures({
+      speaker: 'LEADER',
+      text: 'Original leader words',
+    })
+    const { entry: entryTwo } = makeScriptureSectionFixtures({
+      id: 'entry-2',
+      speaker: 'CONGREGATION',
+      text: 'Original congregation words',
+    })
+    entryTwo.order = 1
+    const group = makeGroup({ slides: [entryOne, entryTwo], sourceSignature: 'sig-abc' })
+    mountDrawer({ entry: entryOne, assembledSlide, group })
+
+    await body().find('[data-testid="drawer-slide-text-editable-scripture"]').setValue('New leader words')
+    expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(800)
+    expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+
+    const written = mockReplaceGroupSlides.mock.calls[0]![2] as GroupSlideEntry[]
+    const writtenOne = written.find((e) => e.id === 'entry-1')!
+    expect(writtenOne.sourceRef).toEqual({ kind: 'scripture', speaker: 'LEADER', text: 'New leader words' })
+    expect(writtenOne.order).toBe(entryOne.order)
+    expect(written.find((e) => e.id === 'entry-2')).toEqual(entryTwo)
+  })
+
+  it("passes the group's stored sourceSignature through unchanged on the write", async () => {
+    const { entry, assembledSlide } = makeScriptureSectionFixtures()
+    const group = makeGroup({ slides: [entry], sourceSignature: 'sig-xyz' })
+    mountDrawer({ entry, assembledSlide, group })
+
+    await body().find('[data-testid="drawer-slide-text-editable-scripture"]').setValue('Changed')
+    await vi.advanceTimersByTimeAsync(800)
+
+    expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+    expect(mockReplaceGroupSlides.mock.calls[0]![3]).toBe('sig-xyz')
+  })
+
+  it('renders the existing read-only block and the existing route out for a Reference-state entry — no editable scripture field appears', () => {
+    const { entry, assembledSlide } = makeScriptureFixtures()
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+    expect(body().find('[data-testid="drawer-slide-text-editable-scripture"]').exists()).toBe(false)
+    expect(body().find('[data-testid="drawer-slide-text-readonly"]').exists()).toBe(true)
+    expect(body().find('[data-testid="drawer-edit-scripture-text-btn"]').exists()).toBe(true)
+  })
+
+  it("renders the section's words read-only, with no editable field, when mutation is disallowed", () => {
+    const { entry, assembledSlide } = makeScriptureSectionFixtures({ text: 'Read only words' })
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }), isEditor: false })
+    expect(body().find('[data-testid="drawer-slide-text-editable-scripture"]').exists()).toBe(false)
+    expect(body().find('[data-testid="drawer-slide-text-readonly"]').text()).toBe('Read only words')
+  })
+
+  it("re-seeds the field when the section's words change on the stored group with no edit pending", async () => {
+    const { entry, assembledSlide } = makeScriptureSectionFixtures({ text: 'Original' })
+    const wrapper = mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+
+    const updatedEntry: GroupSlideEntry = {
+      ...entry,
+      sourceRef: { ...entry.sourceRef, text: 'Updated elsewhere' } as SourceRef,
+    }
+    await wrapper.setProps({ entry: updatedEntry, group: makeGroup({ slides: [updatedEntry] }) })
+
+    expect((body().find('[data-testid="drawer-slide-text-editable-scripture"]').element as HTMLTextAreaElement).value).toBe(
+      'Updated elsewhere',
+    )
+  })
+
+  it("does not clobber an edit in progress when the section's words change on the stored group WHILE an edit is pending", async () => {
+    const { entry, assembledSlide } = makeScriptureSectionFixtures({ text: 'Original' })
+    const wrapper = mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+
+    await body().find('[data-testid="drawer-slide-text-editable-scripture"]').setValue('My in-progress edit')
+
+    const updatedEntry: GroupSlideEntry = {
+      ...entry,
+      sourceRef: { ...entry.sourceRef, text: 'Concurrent external change' } as SourceRef,
+    }
+    await wrapper.setProps({ entry: updatedEntry, group: makeGroup({ slides: [updatedEntry] }) })
+
+    expect((body().find('[data-testid="drawer-slide-text-editable-scripture"]').element as HTMLTextAreaElement).value).toBe(
+      'My in-progress edit',
+    )
   })
 })
 
