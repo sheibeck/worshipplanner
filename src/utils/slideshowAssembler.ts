@@ -33,7 +33,12 @@ import type { ScriptureReading } from '@/types/scriptureReading'
 import type { ImportedDeck } from '@/types/importedDeck'
 import type { SlideGroup, GroupSlideEntry, SourceRef } from '@/types/slideGroup'
 import { slotLabel } from './slotTypes'
-import { formatScriptureReference, scriptureRefFromSlot, congregationalSlideFieldsFromSlot } from './scripture'
+import {
+  formatScriptureReference,
+  scriptureRefFromSlot,
+  congregationalSectionsFromSlot,
+  congregationalSectionFromRef,
+} from './scripture'
 
 /** Content maps the assembly engine resolves slots against. Pre-loaded by the caller. */
 export interface AssemblyInputs {
@@ -137,22 +142,49 @@ function resolveEntryContent(
     }
 
     case 'scripture': {
-      // R047: a scripture entry is reference-only — never the passage text —
-      // and its reference is resolved LIVE from the owning slot, so editing
-      // the passage on the Service Order tab changes the slide with no group
-      // write and no second step. Legacy `scriptureReadingId`/`innerSlideId`
-      // on a stored entry are deliberately ignored.
+      // R047 (unchanged): `reference`/`bookRef` are ALWAYS resolved LIVE from
+      // the owning slot — the slot is the canonical record for both a
+      // Reference entry and a Congregational section entry — so an entry
+      // whose slot has lost its reference still resolves to nothing here,
+      // and editing the passage on the Service Order tab changes every
+      // section slide's reference with no group write.
       if (slot.kind !== 'SCRIPTURE') return undefined
       const scriptureRef = scriptureRefFromSlot(slot)
       if (!scriptureRef) return undefined
-      const content: Omit<ScriptureSlide, 'id' | 'position'> = {
-        contentKind: 'scripture',
-        reference: formatScriptureReference(scriptureRef),
-        bookRef: scriptureRef,
-        text: '',
-        verseRange: '',
-        ...congregationalSlideFieldsFromSlot(slot),
-      }
+
+      // D1/D2: `congregationalSectionFromRef` is the ONE place this function
+      // decides which of the group's two states `entry` belongs to.
+      // - null (a Reference entry): today's shape exactly — empty text/verseRange,
+      //   readingMode 'normal', no `sections` key at all.
+      // - a section (a Congregational entry, D2): the entry's OWN stored words
+      //   — there is no canonical record to resolve against once detached —
+      //   with readingMode 'congregational' and a ONE-element `sections` array.
+      //   That one-element array is a deliberate INTERMEDIATE shape, not the
+      //   destination: it keeps `PresentationViewer.vue` compiling and
+      //   rendering correctly with no changes in this plan, while plan 38-02
+      //   replaces the array field with a singular one and reworks the
+      //   projected layout. Do not "tidy" this into a stacked multi-section
+      //   array again — each assembled slide carries exactly one section.
+      const section = congregationalSectionFromRef(entry.sourceRef)
+      const content: Omit<ScriptureSlide, 'id' | 'position'> =
+        section === null
+          ? {
+              contentKind: 'scripture',
+              reference: formatScriptureReference(scriptureRef),
+              bookRef: scriptureRef,
+              text: '',
+              verseRange: '',
+              readingMode: 'normal',
+            }
+          : {
+              contentKind: 'scripture',
+              reference: formatScriptureReference(scriptureRef),
+              bookRef: scriptureRef,
+              text: section.text,
+              verseRange: section.verseRange ?? '',
+              readingMode: 'congregational',
+              sections: [section],
+            }
       return content
     }
 
@@ -398,21 +430,44 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
         const scriptureRef = scriptureRefFromSlot(slot)
         if (!scriptureRef) break
 
-        // R047: exactly one reference-only slide, resolved from the slot's own
-        // reference — identical to the stored-group resolution path above, so
-        // a slot never visibly changes slide content the moment its group
-        // document materializes.
-        const content: Omit<ScriptureSlide, 'id' | 'position'> = {
-          contentKind: 'scripture',
-          reference: formatScriptureReference(scriptureRef),
-          bookRef: scriptureRef,
-          text: '',
-          verseRange: '',
-          ...congregationalSlideFieldsFromSlot(slot),
+        // D1: the fallback path must agree slide-for-slide with the
+        // stored-group path (`resolveEntryContent`'s scripture case) — a
+        // slot's slide content must not visibly change the moment its group
+        // document materializes. With no sections this is R047's original
+        // single reference-only slide, unchanged. With sections present,
+        // emit one fallback slide per section, same fields as the
+        // stored-group path, advancing the local sequence number per
+        // section so derived fallback ids stay distinct and stable.
+        const sections = congregationalSectionsFromSlot(slot)
+        const reference = formatScriptureReference(scriptureRef)
+
+        if (sections.length === 0) {
+          const content: Omit<ScriptureSlide, 'id' | 'position'> = {
+            contentKind: 'scripture',
+            reference,
+            bookRef: scriptureRef,
+            text: '',
+            verseRange: '',
+            readingMode: 'normal',
+          }
+          // No canonical record id behind a slot-derived reference — same
+          // convention `sourceIdForRef` now applies to a payload-free ref.
+          emitFallback(slot, index, content, null, 0)
+          break
         }
-        // No canonical record id behind a slot-derived reference — same
-        // convention `sourceIdForRef` now applies to a payload-free ref.
-        emitFallback(slot, index, content, null, 0)
+
+        sections.forEach((section, localSeq) => {
+          const content: Omit<ScriptureSlide, 'id' | 'position'> = {
+            contentKind: 'scripture',
+            reference,
+            bookRef: scriptureRef,
+            text: section.text,
+            verseRange: section.verseRange ?? '',
+            readingMode: 'congregational',
+            sections: [section],
+          }
+          emitFallback(slot, index, content, null, localSeq)
+        })
         break
       }
 

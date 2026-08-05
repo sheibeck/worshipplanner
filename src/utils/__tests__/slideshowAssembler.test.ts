@@ -464,14 +464,32 @@ function makeCongregationalSection(overrides: Partial<CongregationalSection> = {
   }
 }
 
-// R064: both scripture call sites (resolveEntryContent's stored-group path
-// and the SCRIPTURE fallback branch) must spread the identical shared
-// helper. The parity case is load-bearing: it assembles ONE slot fixture
-// through both paths and asserts the emitted scripture slides agree.
-describe('assembleSlideshow — congregational reading (R064)', () => {
-  function assembleViaStoredGroup(slot: ScriptureSlot) {
-    const entry = makeGroupSlideEntry({ id: 'entry-scripture', order: 0, sourceRef: { kind: 'scripture' } })
-    const group = makeSlideGroup({ id: slot.id, slotId: slot.id, slides: [entry] })
+// D1: a congregational scripture slot now produces N slides — one per
+// section — not one slide carrying a stacked `sections` array. Both scripture
+// call sites (resolveEntryContent's stored-group path and the SCRIPTURE
+// fallback branch) must agree slide-for-slide; the parity cases are
+// load-bearing: they assemble ONE slot fixture through both paths and assert
+// the emitted scripture slides agree.
+describe('assembleSlideshow — congregational reading (D1)', () => {
+  function sectionEntry(section: CongregationalSection, order: number, id: string): GroupSlideEntry {
+    return makeGroupSlideEntry({
+      id,
+      order,
+      sourceRef: {
+        kind: 'scripture',
+        speaker: section.speaker,
+        text: section.text,
+        ...(section.verseRange !== undefined ? { verseRange: section.verseRange } : {}),
+      },
+    })
+  }
+
+  function assembleViaStoredGroup(slot: ScriptureSlot, sections: CongregationalSection[]) {
+    const entries =
+      sections.length === 0
+        ? [makeGroupSlideEntry({ id: 'entry-scripture', order: 0, sourceRef: { kind: 'scripture' } })]
+        : sections.map((section, i) => sectionEntry(section, i, `entry-scripture-${i}`))
+    const group = makeSlideGroup({ id: slot.id, slotId: slot.id, slides: entries })
     const inputs = makeInputs({ groupsBySlotId: new Map([[slot.id, group]]) })
     return assembleSlideshow(makeService([slot]), inputs)
   }
@@ -480,42 +498,53 @@ describe('assembleSlideshow — congregational reading (R064)', () => {
     return assembleSlideshow(makeService([slot]), makeInputs())
   }
 
-  it('dual-path parity: a slot WITH congregationalSections yields deep-equal readingMode/sections on both paths', () => {
+  it('dual-path parity: a slot WITH congregationalSections yields the same number of slides, same readingMode/section content, on both paths', () => {
     const sections = [
       makeCongregationalSection({ speaker: 'LEADER', text: 'One' }),
       makeCongregationalSection({ speaker: 'CONGREGATION', text: 'Two' }),
     ]
     const slot = scriptureSlot({ id: 'slot-scripture-0', congregationalSections: sections })
 
-    const storedResult = assembleViaStoredGroup(slot)
+    const storedResult = assembleViaStoredGroup(slot, sections)
     const fallbackResult = assembleViaFallback(slot)
 
-    const storedSlide = storedResult[0]!.slide as ScriptureSlide
-    const fallbackSlide = fallbackResult[0]!.slide as ScriptureSlide
+    expect(storedResult).toHaveLength(2)
+    expect(fallbackResult).toHaveLength(2)
 
-    expect(storedSlide.readingMode).toBe(fallbackSlide.readingMode)
-    expect(storedSlide.sections).toEqual(fallbackSlide.sections)
-    expect(storedSlide.readingMode).toBe('congregational')
-    expect(storedSlide.sections).toEqual(sections)
+    for (let i = 0; i < 2; i++) {
+      const storedSlide = storedResult[i]!.slide as ScriptureSlide
+      const fallbackSlide = fallbackResult[i]!.slide as ScriptureSlide
+      expect(storedSlide.readingMode).toBe(fallbackSlide.readingMode)
+      expect(storedSlide.readingMode).toBe('congregational')
+      expect(storedSlide.text).toBe(fallbackSlide.text)
+      expect(storedSlide.text).toBe(sections[i]!.text)
+      expect(storedSlide.sections).toEqual([sections[i]])
+      expect(fallbackSlide.sections).toEqual([sections[i]])
+    }
   })
 
   it('dual-path parity: a slot with NO congregationalSections yields the identical backward-compatible shape on both paths', () => {
     const slot = scriptureSlot({ id: 'slot-scripture-0' })
 
-    const storedResult = assembleViaStoredGroup(slot)
+    const storedResult = assembleViaStoredGroup(slot, [])
     const fallbackResult = assembleViaFallback(slot)
+
+    expect(storedResult).toHaveLength(1)
+    expect(fallbackResult).toHaveLength(1)
 
     const storedSlide = storedResult[0]!.slide as ScriptureSlide
     const fallbackSlide = fallbackResult[0]!.slide as ScriptureSlide
 
     for (const slide of [storedSlide, fallbackSlide]) {
       expect(slide.readingMode).toBe('normal')
+      expect(slide.text).toBe('')
+      expect(slide.verseRange).toBe('')
       expect(Object.prototype.hasOwnProperty.call(slide, 'sections')).toBe(false)
     }
     expect(storedSlide.readingMode).toBe(fallbackSlide.readingMode)
   })
 
-  it('a slot with congregationalSections yields congregational mode and the stored sections array, in stored order', () => {
+  it('a slot with three sections assembles to three slides, in stored order, each carrying its own section', () => {
     const sections = [
       makeCongregationalSection({ speaker: 'LEADER', text: 'First' }),
       makeCongregationalSection({ speaker: 'CONGREGATION', text: 'Second' }),
@@ -523,23 +552,33 @@ describe('assembleSlideshow — congregational reading (R064)', () => {
     ]
     const slot = scriptureSlot({ congregationalSections: sections })
     const result = assembleSlideshow(makeService([slot]), makeInputs())
-    const slide = result[0]!.slide as ScriptureSlide
-    expect(slide.readingMode).toBe('congregational')
-    expect(slide.sections).toEqual(sections)
-    expect(slide.sections!.map((s) => s.text)).toEqual(['First', 'Second', 'Third'])
+
+    expect(result).toHaveLength(3)
+    const slides = result.map((r) => r.slide as ScriptureSlide)
+    expect(slides.map((s) => s.text)).toEqual(['First', 'Second', 'Third'])
+    for (let i = 0; i < 3; i++) {
+      expect(slides[i]!.readingMode).toBe('congregational')
+      expect(slides[i]!.sections).toEqual([sections[i]])
+      // Every section slide carries the same reference/bookRef.
+      expect(slides[i]!.reference).toBe(slides[0]!.reference)
+      expect(slides[i]!.bookRef).toEqual(slides[0]!.bookRef)
+    }
   })
 
-  it('same-speaker adjacent sections both survive to the slide, unmerged', () => {
+  it('same-speaker adjacent sections produce two separate slides, unmerged', () => {
     const sections = [
       makeCongregationalSection({ speaker: 'CONGREGATION', text: 'Part A' }),
       makeCongregationalSection({ speaker: 'CONGREGATION', text: 'Part B' }),
     ]
     const slot = scriptureSlot({ congregationalSections: sections })
     const result = assembleSlideshow(makeService([slot]), makeInputs())
-    const slide = result[0]!.slide as ScriptureSlide
-    expect(slide.sections).toHaveLength(2)
-    expect(slide.sections![0]!.speaker).toBe('CONGREGATION')
-    expect(slide.sections![1]!.speaker).toBe('CONGREGATION')
+
+    expect(result).toHaveLength(2)
+    const slides = result.map((r) => r.slide as ScriptureSlide)
+    expect(slides[0]!.sections![0]!.speaker).toBe('CONGREGATION')
+    expect(slides[1]!.sections![0]!.speaker).toBe('CONGREGATION')
+    expect(slides[0]!.text).toBe('Part A')
+    expect(slides[1]!.text).toBe('Part B')
   })
 
   it('non-ASCII section text survives to the slide with strict === equality', () => {
@@ -547,24 +586,49 @@ describe('assembleSlideshow — congregational reading (R064)', () => {
     const slot = scriptureSlot({ congregationalSections: [makeCongregationalSection({ text })] })
     const result = assembleSlideshow(makeService([slot]), makeInputs())
     const slide = result[0]!.slide as ScriptureSlide
+    expect(slide.text === text).toBe(true)
     expect(slide.sections![0]!.text === text).toBe(true)
   })
 
-  it('adding congregationalSections to a slot does not change the slide id, position, sourceId, groupId or groupSlideId', () => {
+  it('each section slide\'s id is its own group entry\'s id — distinct ids matching the stored entries', () => {
+    const sections = [
+      makeCongregationalSection({ text: 'One' }),
+      makeCongregationalSection({ text: 'Two' }),
+      makeCongregationalSection({ text: 'Three' }),
+    ]
+    const slot = scriptureSlot({ id: 'slot-scripture-0', congregationalSections: sections })
+    const result = assembleViaStoredGroup(slot, sections)
+
+    expect(result.map((r) => r.slide.id)).toEqual(['entry-scripture-0', 'entry-scripture-1', 'entry-scripture-2'])
+    expect(new Set(result.map((r) => r.slide.id)).size).toBe(3)
+  })
+
+  it('concatenating the assembled slides\' section text, in order, reproduces the source with nothing duplicated or dropped', () => {
+    const sourcePassage = 'The Lord is my shepherd; I shall not want. He makes me lie down in green pastures.'
+    const sections = [
+      makeCongregationalSection({ speaker: 'LEADER', text: 'The Lord is my shepherd; I shall not want. ' }),
+      makeCongregationalSection({ speaker: 'CONGREGATION', text: 'He makes me lie down in green pastures.' }),
+    ]
+    const slot = scriptureSlot({ congregationalSections: sections })
+    const result = assembleSlideshow(makeService([slot]), makeInputs())
+
+    const reconstructed = result.map((r) => (r.slide as ScriptureSlide).text).join('')
+    expect(reconstructed).toBe(sourcePassage)
+  })
+
+  it('adding congregationalSections to a slot does not change slide id/position/sourceId/groupId/groupSlideId for the stored-group path\'s first slide', () => {
     const withoutSections = scriptureSlot({ id: 'slot-scripture-0' })
     const withSections = scriptureSlot({
       id: 'slot-scripture-0',
       congregationalSections: [makeCongregationalSection()],
     })
 
-    const resultWithout = assembleViaStoredGroup(withoutSections)
-    const resultWith = assembleViaStoredGroup(withSections)
+    const resultWithout = assembleViaStoredGroup(withoutSections, [])
+    const resultWith = assembleViaStoredGroup(withSections, [makeCongregationalSection()])
 
-    expect(resultWith[0]!.slide.id).toBe(resultWithout[0]!.slide.id)
     expect(resultWith[0]!.slide.position).toBe(resultWithout[0]!.slide.position)
     expect(resultWith[0]!.sourceId).toBe(resultWithout[0]!.sourceId)
     expect(resultWith[0]!.groupId).toBe(resultWithout[0]!.groupId)
-    expect(resultWith[0]!.groupSlideId).toBe(resultWithout[0]!.groupSlideId)
   })
 })
 
