@@ -20,7 +20,7 @@
           @click="onRemove"
         >&times;</button>
       </div>
-      <p class="mt-1 text-[11px] text-gray-500" data-testid="background-control-caption">{{ caption }}</p>
+      <p v-if="!hideCaption" class="mt-1 text-[11px] text-gray-500" data-testid="background-control-caption">{{ caption }}</p>
     </template>
 
     <template v-else>
@@ -35,7 +35,7 @@
           inherited from the song &mdash; {{ inheritedFrom.label }}
         </span>
       </div>
-      <p v-else class="mb-1.5 text-[11px] text-gray-500" data-testid="background-control-caption">{{ caption }}</p>
+      <p v-else-if="!hideCaption" class="mb-1.5 text-[11px] text-gray-500" data-testid="background-control-caption">{{ caption }}</p>
 
       <label
         v-if="isEditor"
@@ -127,7 +127,21 @@ const props = withDefaults(defineProps<{
    * are visually unchanged.
    */
   flush?: boolean
-}>(), { removeLabel: 'Remove background', flush: false })
+  /**
+   * Owner follow-up (side-by-side group media panel): when true, this control
+   * renders NO caption line of its own in either state — the caller is taking
+   * responsibility for placing `caption`'s copy itself. `SlideGrid.vue` sets
+   * this so the group caption can sit on its own full-width line BELOW both
+   * add-buttons rather than stacked above only this one, which is what forced
+   * the two buttons out of horizontal alignment.
+   *
+   * Deliberately does NOT suppress the `inheritedFrom` block — that is a
+   * different affordance (a thumbnail plus provenance line for a song-sourced
+   * background) and belongs with the control it describes. Defaults false so
+   * `SongLyricEditor.vue`'s call site keeps its caption exactly where it is.
+   */
+  hideCaption?: boolean
+}>(), { removeLabel: 'Remove background', flush: false, hideCaption: false })
 
 const emit = defineEmits<{
   attach: [url: string]

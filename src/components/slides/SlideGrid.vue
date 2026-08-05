@@ -72,20 +72,42 @@
            Owner follow-up #3 (direct feedback on the running app, third pass
            on this same panel): "I want add music for group and add
            background for group to be next to each other, not on top of each
-           other." The visual merge above is unchanged; the remaining
-           complaint was purely the AXIS — the panel was `flex-col`, so the
-           two controls still stacked. Fix is axis-only: the panel becomes a
-           wrapping row (`flex-wrap`) and both direct children carry
-           `min-w-[14rem] flex-1` — the shrink floor is paired with the grow
-           factor deliberately, NOT the common `min-w-0 flex-1` idiom, because
-           `min-w-0` lets an item shrink to zero and `flex-wrap` would never
-           engage, crushing the two controls together on a narrow rail
-           instead of wrapping them to stacked. `items-start` is required
-           because the two controls differ in height (the background control
-           stacks a caption line above its button; either can grow a
-           filename/progress/error row once attached) and would otherwise
-           center against each other's differing heights instead of
-           top-aligning.
+           other." The panel became a wrapping row (`flex-wrap`) instead of
+           `flex-col`.
+
+           Owner follow-up #4 (fourth pass, pasted DOM again): "now you have
+           them in their own <div> containers. Let's use flex, and don't
+           containerize each button. Move the label for 'applies to all
+           slides, ...' so that it shows below the buttons." Two distinct
+           corrections:
+
+           (a) Follow-up #3's `min-w-[14rem] flex-1` on each child turned the
+               two buttons into two half-width COLUMNS — a grow factor makes
+               each child claim an equal share of the row whether or not its
+               content needs it, which reads as a container per button. The
+               children now carry no grow factor and no width floor at all,
+               so each flex item sizes to its own button and the two sit
+               adjacent. `min-w-0 max-w-full` is retained deliberately and is
+               NOT layout-shaping: it exists only so an attached state with a
+               long filename is capped at the panel width and lets the
+               control's own inner `truncate` engage, instead of running off
+               the right edge. Without a grow factor there is no `flex-wrap`
+               crush risk, so no width floor is needed to force wrapping.
+
+           (b) The group caption was rendered INSIDE `BackgroundControl`,
+               stacked above only that control's button — which is precisely
+               what pushed the two buttons out of alignment with each other.
+               It moves out here via the control's `hide-caption` prop and
+               renders as a `basis-full` flex item, i.e. its own full-width
+               line BELOW both buttons. `groupBackgroundCaption` stays the
+               single source of that copy — it is still passed to the control
+               as `caption` (the prop remains part of the component's
+               contract and the song-level call site still renders it), it is
+               simply painted here instead.
+
+           `items-start` is retained because either control can grow a
+           filename/progress/error row once attached, and they would
+           otherwise center against each other's differing heights.
 
            ★ 31-UI-SPEC E5 still applies at the PANEL level, not just to each
            control inside it: two controls that each correctly decline to
@@ -98,7 +120,7 @@
            than on a padded child div — there is no padded child div left. -->
       <div
         v-if="showGroupMusicControl || showGroupBackgroundControl"
-        class="mx-6 mt-3 flex flex-wrap items-start gap-x-6 gap-y-3 rounded-md border border-gray-800 bg-gray-900 px-3 py-2"
+        class="mx-6 mt-3 flex flex-wrap items-start gap-x-3 gap-y-2 rounded-md border border-gray-800 bg-gray-900 px-3 py-2"
         data-testid="slide-grid-group-media-panel"
       >
         <!-- Group music bar (25-06, R032). Emit-only control; this component
@@ -110,7 +132,7 @@
              ever attached to its old child div). -->
         <SlideGroupMusicControl
           v-if="showGroupMusicControl"
-          class="min-w-[14rem] flex-1"
+          class="min-w-0 max-w-full"
           :audio-url="group?.bedAudioUrl"
           :slide-count="cards.length"
           :org-id="orgId"
@@ -137,7 +159,7 @@
              background — so it adds no visual chrome of its own. -->
         <div
           v-if="showGroupBackgroundControl"
-          class="min-w-[14rem] flex-1"
+          class="min-w-0 max-w-full"
           data-testid="slide-grid-group-background"
         >
           <BackgroundControl
@@ -149,10 +171,24 @@
             add-label="+ Add background for this group"
             remove-label="Remove group background"
             flush
+            hide-caption
             @attach="onAttachGroupBackground"
             @remove="onRemoveGroupBackground"
           />
         </div>
+
+        <!-- The group caption, relocated out of `BackgroundControl` (owner
+             follow-up #4 (b) above). `basis-full` makes it take a whole flex
+             line of its own, so it sits BELOW both add-buttons rather than
+             above one of them. Suppressed while `songBackgroundForInheritedDisplay`
+             is set, because in that case the control renders the "inherited
+             from the song" provenance line in the caption's place — showing
+             both would state two different things about the same background. -->
+        <p
+          v-if="showGroupBackgroundControl && !songBackgroundForInheritedDisplay"
+          class="basis-full text-[11px] text-gray-500"
+          data-testid="slide-grid-group-background-caption"
+        >{{ groupBackgroundCaption }}</p>
       </div>
 
       <div

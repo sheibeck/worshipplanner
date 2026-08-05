@@ -927,14 +927,11 @@ describe('SlideGrid', () => {
       expect(paddedDescendants.length).toBe(0)
     })
 
-    // Owner follow-up #3 (direct feedback on the running app, third pass on
-    // this same panel): "I want add music for group and add background for
-    // group to be next to each other, not on top of each other." The panel
-    // is visually merged (one border, one padded region, no divider) but is
-    // still `flex-col`, so the two controls stack vertically. This pins the
-    // AXIS fix: the panel becomes a wrapping row, and both direct children
-    // carry a shrink floor paired with a grow factor so they wrap back to
-    // stacked on a narrow rail instead of crushing side by side.
+    // Owner follow-up #3 (third pass on this same panel): "I want add music
+    // for group and add background for group to be next to each other, not
+    // on top of each other." The panel is visually merged (one border, one
+    // padded region, no divider) but was still `flex-col`, so the two
+    // controls stacked vertically. This pins the AXIS fix.
     it('lays the panel out as a wrapping horizontal row with both controls as flex items', () => {
       const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
       const group = makeGroup({
@@ -950,14 +947,82 @@ describe('SlideGrid', () => {
       expect(panelClasses).toContain('flex-wrap')
       expect(panelClasses).toContain('items-start')
       expect(panelClasses).not.toContain('flex-col')
+    })
+
+    // Owner follow-up #4 (fourth pass, pasted DOM again): "now you have them
+    // in their own <div> containers. Let's use flex, and don't containerize
+    // each button." Follow-up #3's `min-w-[14rem] flex-1` satisfied the AXIS
+    // but made each child claim an equal half of the row regardless of its
+    // content — two half-width columns, one per button. The grow factor and
+    // the width floor are what produced that, so both must stay gone; the
+    // retained `min-w-0 max-w-full` only caps an attached long filename.
+    it('sizes each control to its own content — no grow factor or width floor turning the buttons into columns', () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const group = makeGroup({
+        bedAudioUrl: 'https://storage.example.com/pad.mp3',
+        backgroundImageUrl: 'https://storage.example.com/bg.jpg',
+        slides: [],
+      })
+      const wrapper = mountGrid({ selectedSlot: slot, group, isEditor: true })
 
       const musicRoot = wrapper.get('[data-testid="slide-group-music-control"]')
       const backgroundWrapper = wrapper.get('[data-testid="slide-grid-group-background"]')
       for (const el of [musicRoot, backgroundWrapper]) {
         const classes = el.classes()
-        expect(classes).toContain('flex-1')
-        expect(classes).toContain('min-w-[14rem]')
+        expect(classes).not.toContain('flex-1')
+        expect(classes).not.toContain('min-w-[14rem]')
+        expect(classes).toContain('min-w-0')
+        expect(classes).toContain('max-w-full')
       }
+    })
+
+    // Owner follow-up #4, second half: "Move the label for 'applies to all
+    // slides, ...' so that it shows below the buttons." The caption used to
+    // render inside `BackgroundControl`, stacked ABOVE that control's button
+    // — which is what knocked the two buttons out of horizontal alignment.
+    it('renders the group caption on its own full-width line below both buttons, not inside the background control', () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const group = makeGroup({ slides: [] })
+      const wrapper = mountGrid({ selectedSlot: slot, group, isEditor: true })
+
+      const panel = wrapper.get('[data-testid="slide-grid-group-media-panel"]')
+      const caption = panel.get('[data-testid="slide-grid-group-background-caption"]')
+      expect(caption.text()).toBe(
+        'applies to all 0 slides in this group, unless a slide sets its own',
+      )
+      // `basis-full` is what gives it a whole flex line to itself.
+      expect(caption.classes()).toContain('basis-full')
+
+      // The control no longer paints a caption of its own — otherwise the
+      // copy would appear twice, and the stacked one would still be pushing
+      // the background button out of line with the music button.
+      const backgroundRoot = wrapper.get('[data-testid="background-control"]')
+      expect(backgroundRoot.find('[data-testid="background-control-caption"]').exists()).toBe(false)
+
+      // It sits AFTER both controls in source order, so it reads as a line
+      // below the button row rather than a heading above it.
+      const html = panel.html()
+      expect(html.indexOf('slide-grid-group-background-caption')).toBeGreaterThan(
+        html.indexOf('background-control-add'),
+      )
+      expect(html.indexOf('slide-grid-group-background-caption')).toBeGreaterThan(
+        html.indexOf('group-music-add'),
+      )
+    })
+
+    // The relocated caption is still the background's caption — it must not
+    // survive when the background control itself is absent.
+    it('does not render the relocated caption when only the music control shows', () => {
+      const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+      const group = makeGroup({ bedAudioUrl: 'https://storage.example.com/pad.mp3', slides: [] })
+      const wrapper = mountGrid({ selectedSlot: slot, group, isEditor: false })
+
+      const panel = wrapper.get('[data-testid="slide-grid-group-media-panel"]')
+      expect(panel.findComponent(SlideGroupMusicControl).exists()).toBe(true)
+      expect(panel.findComponent(BackgroundControl).exists()).toBe(false)
+      expect(
+        panel.find('[data-testid="slide-grid-group-background-caption"]').exists(),
+      ).toBe(false)
     })
 
     it('shows the panel with both controls for anyone who can write group media, regardless of current group state', () => {
@@ -1049,6 +1114,18 @@ describe('SlideGrid', () => {
       ]
       const ownWrapper = mountGrid({ selectedSlot: songSlot, assembledSlideshow: ownAssembled, group: ownGroup, isEditor: true })
       expect(ownWrapper.find('[data-testid="background-control-inherited"]').exists()).toBe(false)
+
+      // The relocated caption (owner follow-up #4) stands in the same
+      // either/or relationship to the inherited line that the control's own
+      // caption used to: exactly one of them describes the background at a
+      // time. Moving the caption out of the control must not turn that into
+      // "both at once".
+      expect(
+        inheritingWrapper.find('[data-testid="slide-grid-group-background-caption"]').exists(),
+      ).toBe(false)
+      expect(
+        ownWrapper.find('[data-testid="slide-grid-group-background-caption"]').exists(),
+      ).toBe(true)
     })
 
     it('omits the inherited-from label for a non-song group even when its slides resolve a "song" backgroundSource', () => {
