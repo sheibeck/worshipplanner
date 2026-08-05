@@ -5,6 +5,7 @@ import {
   slideContentLabel,
   slideBodyText,
   slideFooterLabel,
+  speakerDisplayName,
   bedAudioLabel,
   deleteSlideConfirmBody,
   slideActionMenuItems,
@@ -209,6 +210,39 @@ describe('slideDisplay', () => {
       expect(slideContentLabel(withTitle)).toBe('WELCOME')
       expect(slideContentLabel(withoutTitle)).toBe('TEXT')
     })
+
+    // Phase 38-03: a Congregational-state section slide names its speaker in
+    // the eyebrow instead of the generic 'SCRIPTURE' word, so N section
+    // slides from one reading are told apart at a glance.
+    it('names the speaker in the eyebrow for a LEADER or CONGREGATION section slide, and keeps SCRIPTURE for a Reference-state slide', () => {
+      const leader = {
+        id: 's8',
+        position: 0,
+        contentKind: 'scripture',
+        reference: 'John 3:16',
+        section: { speaker: 'LEADER', text: 'For God so loved the world' },
+      } as Slide
+      const congregation = {
+        id: 's9',
+        position: 0,
+        contentKind: 'scripture',
+        reference: 'John 3:16',
+        section: { speaker: 'CONGREGATION', text: 'that he gave his only Son' },
+      } as Slide
+      const referenceState = { id: 's10', position: 0, contentKind: 'scripture', reference: 'John 3:16' } as Slide
+      expect(slideContentLabel(leader)).toBe('LEADER')
+      expect(slideContentLabel(congregation)).toBe('CONGREGATION')
+      expect(slideContentLabel(referenceState)).toBe('SCRIPTURE')
+      expect(slideContentLabel(leader)).not.toBe(slideContentLabel(congregation))
+      expect(slideContentLabel(leader)).not.toBe(slideContentLabel(referenceState))
+    })
+  })
+
+  describe('speakerDisplayName (Phase 38-03)', () => {
+    it('returns readable natural-case names for both speakers', () => {
+      expect(speakerDisplayName('LEADER')).toBe('Leader')
+      expect(speakerDisplayName('CONGREGATION')).toBe('Congregation')
+    })
   })
 
   describe('slideBodyText', () => {
@@ -257,6 +291,21 @@ describe('slideDisplay', () => {
       expect(slideBodyText(scripture)).toBe('Psalms 23:1-6')
     })
 
+    // Phase 38-03: no logic change from the case above — a section slide
+    // already carries its words in `text`, so the existing joined form
+    // applies unchanged.
+    it('combines the reference and text for a Congregational-state section slide', () => {
+      const scripture = {
+        id: 's3b',
+        position: 0,
+        contentKind: 'scripture',
+        reference: 'John 3:16',
+        text: 'For God so loved the world',
+        section: { speaker: 'LEADER', text: 'For God so loved the world' },
+      } as Slide
+      expect(slideBodyText(scripture)).toBe('John 3:16\nFor God so loved the world')
+    })
+
     it('returns the body for a text slide', () => {
       const text = { id: 's4', position: 0, contentKind: 'text', body: 'Please stand.' } as Slide
       expect(slideBodyText(text)).toBe('Please stand.')
@@ -297,6 +346,28 @@ describe('slideDisplay', () => {
     it('returns the reference for a scripture slide', () => {
       const scripture = { id: 's3', position: 0, contentKind: 'scripture', reference: 'John 3:16' } as Slide
       expect(slideFooterLabel(scripture)).toBe('John 3:16')
+    })
+
+    // Phase 38-03: a Congregational-state section slide's footer names both
+    // the reference AND its speaker; a Reference-state slide (asserted above)
+    // keeps the bare reference.
+    it('names the reference AND the readable speaker name for a section slide', () => {
+      const leader = {
+        id: 's3c',
+        position: 0,
+        contentKind: 'scripture',
+        reference: 'John 3:16',
+        section: { speaker: 'LEADER', text: 'x' },
+      } as Slide
+      const congregation = {
+        id: 's3d',
+        position: 0,
+        contentKind: 'scripture',
+        reference: 'John 3:16',
+        section: { speaker: 'CONGREGATION', text: 'x' },
+      } as Slide
+      expect(slideFooterLabel(leader)).toBe('John 3:16 · Leader')
+      expect(slideFooterLabel(congregation)).toBe('John 3:16 · Congregation')
     })
 
     it("returns the title for a text slide, 'Text' otherwise", () => {
@@ -409,6 +480,21 @@ describe('slideDisplay', () => {
 
     it('a scripture entry with mutation allowed returns edit-details, edit-in-scripture, duplicate, delete', () => {
       const entry = makeMenuEntry({ kind: 'scripture' })
+      expect(keysOf(entry, 'SCRIPTURE', true)).toEqual([
+        'edit-details',
+        'edit-in-scripture',
+        'duplicate',
+        'delete',
+      ])
+    })
+
+    // Phase 38-03: standing guard that a later menu change cannot quietly
+    // remove deletion from a Congregational-state section entry — this menu
+    // already offered duplicate/delete for every scripture-kind entry before
+    // this phase (the `kind === 'scripture'` branch does not consult
+    // `speaker`), so this asserts that finding holds for a section entry too.
+    it('a Congregational-state scripture SECTION entry with mutation allowed still includes duplicate and delete', () => {
+      const entry = makeMenuEntry({ kind: 'scripture', speaker: 'LEADER', text: 'For God so loved the world' })
       expect(keysOf(entry, 'SCRIPTURE', true)).toEqual([
         'edit-details',
         'edit-in-scripture',

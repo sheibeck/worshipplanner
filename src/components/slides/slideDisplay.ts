@@ -8,7 +8,7 @@
  * so it is the cheapest place to unit-test the badge map's completeness.
  */
 import type { ServiceSlot, SlotKind } from '@/types/service'
-import type { Slide } from '@/types/slide'
+import type { CongregationalSection, Slide } from '@/types/slide'
 import type { GroupSlideEntry } from '@/types/slideGroup'
 import { slotLabel } from '@/utils/slotTypes'
 import { formatScriptureReference, scriptureRefFromSlot } from '@/utils/scripture'
@@ -81,6 +81,20 @@ export function slotDisplayTitle(slot: ServiceSlot): string {
 }
 
 /**
+ * Readable, natural-case speaker name for a congregational section's
+ * `speaker` enum value (Phase 38-03) — `'LEADER'` -> `'Leader'`,
+ * `'CONGREGATION'` -> `'Congregation'`. This module already exists so the
+ * rail and the grid never fork the kind-badge vocabulary; the two speaker
+ * words are exactly that kind of vocabulary, so this is the ONE producer of
+ * them — `slideContentLabel`'s eyebrow (uppercased from this),
+ * `slideFooterLabel`'s footer, and `EditSlideDrawer.vue`'s speaker control
+ * all read through this rather than re-deriving the spelling.
+ */
+export function speakerDisplayName(speaker: CongregationalSection['speaker']): string {
+  return speaker === 'LEADER' ? 'Leader' : 'Congregation'
+}
+
+/**
  * Short uppercase content-kind label for one assembled slide — defined here
  * (rather than in 25-04) because it shares the exact same kind vocabulary
  * the rail's title helper draws on; 25-04's slide card consumes this
@@ -93,7 +107,14 @@ export function slideContentLabel(slide: Slide): string {
       // and are distinguished by shape — CopyrightSlide has no sectionId.
       return 'sectionId' in slide ? slide.sectionLabel.toUpperCase() : 'TITLE'
     case 'scripture':
-      return 'SCRIPTURE'
+      // Phase 38-03: a Congregational-state section slide names its speaker
+      // in the eyebrow instead of the generic kind word — the same rule the
+      // lyric case above already follows, where the eyebrow carries the
+      // section's own label rather than a generic kind word. Without this, N
+      // section slides from one reading show N identical SCRIPTURE badges
+      // and the planner cannot tell which is which. A Reference-state slide
+      // (no `section`) keeps today's bare 'SCRIPTURE' value.
+      return slide.section ? speakerDisplayName(slide.section.speaker).toUpperCase() : 'SCRIPTURE'
     case 'text':
       return slide.title && slide.title.trim() ? slide.title.toUpperCase() : 'TEXT'
     case 'image':
@@ -117,10 +138,11 @@ export function slideBodyText(slide: Slide): string {
     case 'lyric':
       return 'sectionId' in slide ? slide.lines.join('\n') : slide.title
     case 'scripture':
-      // R047: a scripture slide defaults to reference-only (empty text) —
-      // return just the reference, with no trailing blank line. Phase 34's
-      // congregational reading feature will populate `text` again, at which
-      // point the joined form below applies.
+      // R047: a Reference-state slide (no congregational section) defaults
+      // to reference-only (empty text) — return just the reference, with no
+      // trailing blank line. A Congregational-state section slide (Phase
+      // 38-01/38-02) carries that section's own words in `text`, so the
+      // joined form applies for that slide only.
       return slide.text ? `${slide.reference}\n${slide.text}` : slide.reference
     case 'text':
       return slide.body
@@ -141,7 +163,11 @@ export function slideFooterLabel(slide: Slide): string {
     case 'lyric':
       return 'sectionId' in slide ? slide.sectionLabel : slide.title
     case 'scripture':
-      return slide.reference
+      // Phase 38-03: a Congregational-state section slide names its speaker
+      // alongside the reference, using the same "·" separator the drawer's
+      // context line already uses — a Reference-state slide (no `section`)
+      // keeps the bare reference, unchanged.
+      return slide.section ? `${slide.reference} · ${speakerDisplayName(slide.section.speaker)}` : slide.reference
     case 'text':
       return slide.title && slide.title.trim() ? slide.title : 'Text'
     case 'image':
