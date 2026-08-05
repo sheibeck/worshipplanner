@@ -541,6 +541,68 @@ container was built. No GCP resource was created**, by explicit owner instructio
 
 ---
 
+## Phase 38 — Congregational Readings Become Real Slides (2026-08-05)
+
+D1's two-state mechanism (Reference/Congregational), the singular `ScriptureSlide.section` field
+and speaker-above-passage projected layout, the drawer's per-section edit/speaker-flip/delete, and
+the composed multi-tick durability contract (convert, delete-one, delete-all, edit, speaker-flip,
+reorder, destroy-on-reference-change, destroy-on-cleared-reference, re-convert, re-split, both
+migration shapes, and a non-ASCII encoding backstop) are all automated-tested end to end across
+38-01/38-02/38-03/38-04 — `npm run type-check` clean, full app suite 2490/2499 passing with the 9
+failures confined to the documented two-file baseline (`src/storage.rules.test.ts`,
+`src/views/__tests__/RosterView.test.ts`). **38-04's own Task 3 checkpoint (owner verification of
+the split/edit/delete/present flow) was deferred under the standing autonomy grant and is recorded
+below — it was never run, and nothing in this item was self-approved.**
+
+- ☐ **38.1 Split a scripture item into congregational sections and confirm one card per section.**
+  Run the app against a DRAFT service, do not deploy anything.
+  1. Service Order tab: add a Scripture item and give it a reference (e.g. `Psalm 136:1-9`).
+  2. Slides tab: confirm that item's group shows ONE card, showing the reference only.
+  3. On that card, open the 3-dot menu and choose the scripture-text action. In the modal, click
+     **Fetch Passage**, then **Split with AI** (or leave the alternating manual split). Close the
+     modal.
+  4. Slides tab: confirm the group now shows one card PER SECTION, and that each card names its
+     speaker — Leader or Congregation — rather than all reading the same generic label.
+
+- ☐ **38.2 Edit a section's words in isolation.** Open the Edit Slide drawer on the SECOND card.
+  Change some of its words. Close the drawer. Confirm the second card changed and that NO other
+  card did.
+
+- ☐ **38.3 Flip a section's speaker in isolation.** Reopen that same drawer and flip the speaker
+  (Leader to Congregation or back). Confirm only that card changed.
+
+- ☐ **38.4 ★ Delete one section and confirm it survives a reload.** Delete the THIRD card. Reload
+  the page. Confirm it is still gone, and that the remaining cards kept their order and their
+  words. **This is the criterion that has failed before (a rebuild reverting on a LATER reactive
+  tick, not the first one) — check it twice, waiting a few seconds after the reload before
+  judging.** 38-04's own automated durability suite (`congregationalDetachment.test.ts`) proves this
+  across repeated `rebuildGroup` ticks in isolation; this item is the same claim against a real
+  Firestore round-trip and a real page reload, which no unit test can substitute for.
+
+- ☐ **38.5 Present the split reading and confirm the projected layout.** Click Present. Step
+  through the reading. On each section slide confirm: the reference at the top, the speaker on its
+  OWN LINE below it, and that section's words below the speaker — one section per slide, never
+  several stacked. This also closes out item **37.1**'s open sub-point 3 (whether Leader/Congregation
+  read as distinguishable at projection distance without an indigo/amber accent) — judge that here
+  rather than separately.
+
+- ☐ **38.6 Confirm a scripture change destroys the split (intended data loss, D1).** Return to the
+  Service Order tab and change that item's scripture to a DIFFERENT passage. Go back to the Slides
+  tab and confirm the group has collapsed to ONE card showing the new reference. This is intended:
+  the split is gone and must be chosen again — per-slide edits made in the congregational state do
+  not survive a scripture change on the service item.
+
+- ☐ **38.7 An existing pre-Phase-38 congregational reading upgrades itself with no action.** If you
+  have an EXISTING service that already had a congregational reading before this phase, open its
+  Slides tab and confirm it now shows one card per section without any action from you. If you do
+  not have one, say so rather than guessing — the automated migration case
+  (`congregationalDetachment.test.ts`'s "MIGRATION, congregational") proves the mechanism, but only a
+  real pre-existing document proves the deploy didn't miss a shape.
+
+**Report which of 38.1-38.7 passed and which did not, by number.**
+
+---
+
 ## Notes and failures
 
 _(Record anything that failed here, with what you saw versus what was expected.)_
