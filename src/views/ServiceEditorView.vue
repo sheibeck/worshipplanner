@@ -133,16 +133,6 @@
               Mark as Planned
             </button>
 
-            <!-- Failed-transition surface while DRAFT. The locked counterpart
-                 lives in the lock banner, because the autosave error line above
-                 is removed at locked statuses (31-04) — precisely when a failed
-                 Reopen fires. -->
-            <span
-              v-if="canEditService && lifecycleError"
-              class="text-sm text-red-400"
-              data-testid="lifecycle-error"
-            >{{ lifecycleError }}</span>
-
             <!-- 36-03 (R068): the one shared, declarative action bar
                  (ContextualActionBar.vue / buildActionBarItems, 36-02)
                  replaces the four unconditional buttons this comment block
@@ -154,6 +144,36 @@
                  by `slidesTabRef`. -->
             <ContextualActionBar :items="activeActionItems" />
           </div>
+        </div>
+
+        <!-- Failed-transition surface while DRAFT. The locked counterpart
+             lives in the lock banner, because the autosave error line above
+             is removed at locked statuses (31-04) — precisely when a failed
+             Reopen fires.
+
+             Owner follow-up (2026-08-05) moved this BELOW the button row
+             instead of inline beside it, the same request and the same
+             treatment the R071 note below already got. It matters more here
+             than there: this string is the long one —
+             "Couldn't save your changes — they're still here. Check your
+             connection; editing again will retry." — and inline inside a
+             `flex items-center gap-3` row it competed with the buttons for
+             width and pushed the action bar around at the exact moment a save
+             had just failed. Below the row it gets the full width and the
+             buttons never move.
+
+             Same testid, same copy, same `canEditService && lifecycleError`
+             condition as before the move — the existing assertions
+             (ServiceEditorView.test.ts:4445, :5147) check existence and text,
+             never position, and pass unchanged. -->
+        <div
+          v-if="canEditService && lifecycleError"
+          class="flex justify-end -mt-1 mb-3"
+        >
+          <span
+            class="text-sm text-red-400"
+            data-testid="lifecycle-error"
+          >{{ lifecycleError }}</span>
         </div>
 
         <!-- 34-12/R071 note — owner follow-up moved it BELOW the button row
