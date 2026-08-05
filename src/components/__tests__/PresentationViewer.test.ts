@@ -183,7 +183,7 @@ function markupSlide(id: string): AssembledSlide {
       position: 3,
       contentKind: 'text',
       title: '<script>alert(1)</script>',
-      body: '<b>bold</b> & <i>italic</i>',
+      body: '<script>alert(1)</script> <b>bold</b> & <i>italic</i>',
     },
     slotIndex: 2,
     slotKind: 'MESSAGE',
@@ -478,23 +478,24 @@ describe('PresentationViewer', () => {
 
   // ── Task 2: per-slide-kind rendering ──────────────────────────────────────
 
-  it('R059: a LyricSlide renders no sectionLabel in presentation-label, and lines joined by newline in presentation-body', async () => {
+  it('R059: a LyricSlide does not project its sectionLabel, and renders exactly one paragraph of body text', async () => {
     mount(PresentationViewer, { props: { slides: [lyricSlide('a')] } })
     await Promise.resolve()
 
-    expect(body().find('[data-testid="presentation-label"]').exists()).toBe(false)
+    expect(slideText()).not.toContain('Verse 1')
+    expect(body().find('[data-testid="presentation-slide"]').findAll('p')).toHaveLength(1)
     const bodyText = body().find('[data-testid="presentation-body"]').text()
     expect(bodyText).toContain('Amazing grace, how sweet the sound')
     expect(bodyText).toContain('That saved a wretch like me')
   })
 
-  it('R059: a LyricSlide with an empty-string sectionLabel still renders no presentation-label element', async () => {
+  it('R059: a LyricSlide with an empty-string sectionLabel still adds no extra element beyond the single body paragraph', async () => {
     const emptyLabelSlide = lyricSlide('a')
     ;(emptyLabelSlide.slide as import('@/types/slide').LyricSlide).sectionLabel = ''
     mount(PresentationViewer, { props: { slides: [emptyLabelSlide] } })
     await Promise.resolve()
 
-    expect(body().find('[data-testid="presentation-label"]').exists()).toBe(false)
+    expect(body().find('[data-testid="presentation-slide"]').findAll('p')).toHaveLength(1)
     const bodyText = body().find('[data-testid="presentation-body"]').text()
     expect(bodyText).toContain('Amazing grace, how sweet the sound')
     expect(bodyText).toContain('That saved a wretch like me')
@@ -518,31 +519,35 @@ describe('PresentationViewer', () => {
     expect(slideText()).not.toContain('…')
   })
 
-  it('a normal-mode ScriptureSlide renders reference in presentation-label and the FULL text in presentation-body', async () => {
+  it('a normal-mode ScriptureSlide renders reference in presentation-scripture-reference and the FULL text in presentation-body', async () => {
     mount(PresentationViewer, { props: { slides: [longScriptureSlide('a')] } })
     await Promise.resolve()
 
-    expect(body().find('[data-testid="presentation-label"]').text()).toBe('John 3:16')
+    expect(body().find('[data-testid="presentation-scripture-reference"]').text()).toBe('John 3:16')
     const text = body().find('[data-testid="presentation-body"]').text()
     expect(text.length).toBeGreaterThan(400)
     expect(text).toBe('For God so loved the world '.repeat(15).trim())
   })
 
-  it('D1: a normal-mode ScriptureSlide renders its reference as white slide content, not an accented label', async () => {
+  it('D1: a normal-mode ScriptureSlide renders its reference in the same treatment as song lyrics, not an accented label', async () => {
     mount(PresentationViewer, { props: { slides: [longScriptureSlide('a')] } })
     await Promise.resolve()
 
-    const classes = body().find('[data-testid="presentation-label"]').classes()
+    const classes = body().find('[data-testid="presentation-scripture-reference"]').classes()
     expect(classes).toContain('text-gray-100')
+    expect(classes).toContain('text-5xl')
+    expect(classes).toContain('font-normal')
+    expect(classes).toContain('leading-[1.4]')
+    expect(classes).toContain('whitespace-pre-line')
+    expect(classes).toContain('mb-8')
+    expect(classes).not.toContain('text-2xl')
+    expect(classes).not.toContain('font-semibold')
     expect(classes).not.toContain('text-indigo-400')
     expect(classes).not.toContain('uppercase')
     expect(classes).not.toContain('tracking-wider')
-    expect(classes).toContain('text-2xl')
-    expect(classes).toContain('font-semibold')
-    expect(classes).toContain('mb-8')
   })
 
-  it('D1: a congregational ScriptureSlide renders its reference as white slide content too, without washing out the speaker tags', async () => {
+  it('D1: a congregational ScriptureSlide renders its reference in the unified body treatment too, and its speaker tag loses its accent while keeping its words', async () => {
     const sections = [
       { speaker: 'LEADER' as const, text: 'Give thanks to the LORD, for he is good.' },
       { speaker: 'CONGREGATION' as const, text: 'His love endures forever.' },
@@ -550,22 +555,44 @@ describe('PresentationViewer', () => {
     mount(PresentationViewer, { props: { slides: [congregationalScriptureSlide('a', sections)] } })
     await Promise.resolve()
 
-    const classes = body().find('[data-testid="presentation-label"]').classes()
+    const classes = body().find('[data-testid="presentation-scripture-reference"]').classes()
     expect(classes).toContain('text-gray-100')
+    expect(classes).toContain('text-5xl')
+    expect(classes).toContain('font-normal')
+    expect(classes).toContain('leading-[1.4]')
+    expect(classes).toContain('whitespace-pre-line')
+    expect(classes).toContain('mb-8')
+    expect(classes).not.toContain('text-2xl')
+    expect(classes).not.toContain('font-semibold')
     expect(classes).not.toContain('text-indigo-400')
     expect(classes).not.toContain('uppercase')
     expect(classes).not.toContain('tracking-wider')
-    expect(classes).toContain('text-2xl')
-    expect(classes).toContain('font-semibold')
-    expect(classes).toContain('mb-8')
 
     const leaderTag = body().find('[data-testid="presentation-speaker-0"]')
-    expect(leaderTag.classes()).toContain('text-indigo-300')
-    expect(leaderTag.classes()).toContain('uppercase')
-    expect(leaderTag.classes()).toContain('tracking-wider')
+    expect(leaderTag.classes()).toContain('text-gray-100')
+    expect(leaderTag.classes()).toContain('text-5xl')
+    expect(leaderTag.classes()).toContain('font-normal')
+    expect(leaderTag.classes()).toContain('leading-[1.4]')
+    expect(leaderTag.classes()).not.toContain('text-indigo-300')
+    expect(leaderTag.classes()).not.toContain('uppercase')
+    expect(leaderTag.classes()).not.toContain('tracking-wider')
+    expect(leaderTag.text()).toBe('Leader:')
   })
 
-  it('a congregational ScriptureSlide with two sections renders Leader/Congregation blocks with the correct classes', async () => {
+  it('N-1 (D1 regression): an unfetched scripture passage still projects its reference as the entire visible content of the slide, never a blank one', async () => {
+    const emptyPassageSlide = scriptureSlide('a')
+    ;(emptyPassageSlide.slide as import('@/types/slide').ScriptureSlide).text = ''
+    mount(PresentationViewer, { props: { slides: [emptyPassageSlide] } })
+    await Promise.resolve()
+
+    const reference = body().find('[data-testid="presentation-scripture-reference"]')
+    expect(reference.text()).toBe('Romans 8:28-30')
+    expect(reference.classes()).toContain('text-gray-100')
+    expect(reference.classes()).toContain('text-5xl')
+    expect(slideText().replace(/\s+/g, ' ').trim()).toBe('Romans 8:28-30')
+  })
+
+  it('a congregational ScriptureSlide with two sections renders Leader/Congregation blocks with an identical, unified class list', async () => {
     const sections = [
       { speaker: 'LEADER' as const, text: 'Give thanks to the LORD, for he is good.' },
       { speaker: 'CONGREGATION' as const, text: 'His love endures forever.' },
@@ -578,11 +605,12 @@ describe('PresentationViewer', () => {
 
     const leaderTag = body().find('[data-testid="presentation-speaker-0"]')
     expect(leaderTag.text()).toBe('Leader:')
-    expect(leaderTag.classes()).toContain('text-indigo-300')
 
     const congregationTag = body().find('[data-testid="presentation-speaker-1"]')
     expect(congregationTag.text()).toBe('Congregation:')
-    expect(congregationTag.classes()).toContain('text-amber-300')
+
+    expect(leaderTag.classes().slice().sort()).toEqual(congregationTag.classes().slice().sort())
+    expect(leaderTag.classes()).toContain('text-5xl')
 
     const congregationSection = body().find('[data-testid="presentation-congregational-section-1"]')
     expect(congregationSection.html()).toContain('pl-8')
@@ -608,24 +636,65 @@ describe('PresentationViewer', () => {
     expect(body().find('[data-testid="presentation-congregational-section-0"]').exists()).toBe(false)
   })
 
-  it('a TextSlide with a title renders it in presentation-label and body in presentation-body', async () => {
+  it('D2: a TextSlide with a title projects only its body — the title never reaches the projector', async () => {
     mount(PresentationViewer, { props: { slides: [textSlide('a', 'Message')] } })
     await Promise.resolve()
 
-    expect(body().find('[data-testid="presentation-label"]').text()).toBe('Message')
     expect(body().find('[data-testid="presentation-body"]').text()).toContain(
       'Please stand for the reading of the Word.',
     )
+    expect(slideText()).not.toContain('Message')
+    expect(body().find('[data-testid="presentation-slide"]').findAll('p')).toHaveLength(1)
   })
 
-  it('a TextSlide without a title renders only the body (no presentation-label)', async () => {
+  it('D2: a TextSlide without a title projects identically to one with a title — same single-paragraph structure', async () => {
     mount(PresentationViewer, { props: { slides: [textSlide('a')] } })
     await Promise.resolve()
 
-    expect(body().find('[data-testid="presentation-label"]').exists()).toBe(false)
     expect(body().find('[data-testid="presentation-body"]').text()).toContain(
       'Please stand for the reading of the Word.',
     )
+    expect(body().find('[data-testid="presentation-slide"]').findAll('p')).toHaveLength(1)
+  })
+
+  // D1/D2/D3: every projected text element converges on the same size,
+  // proven per kind. The copyright branch is deliberately EXCLUDED from this
+  // group — a credits card is a different layout from projected reading
+  // text, and CONTEXT.md's discretion default leaves it untouched.
+  describe('unified text-5xl size across every projected kind (D1/D2/D3)', () => {
+    it('a lyric slide body renders at text-5xl', async () => {
+      mount(PresentationViewer, { props: { slides: [lyricSlide('a')] } })
+      await Promise.resolve()
+
+      expect(body().find('[data-testid="presentation-body"]').classes()).toContain('text-5xl')
+    })
+
+    it('a normal-mode scripture slide renders both its reference and its body at text-5xl', async () => {
+      mount(PresentationViewer, { props: { slides: [scriptureSlide('a')] } })
+      await Promise.resolve()
+
+      expect(body().find('[data-testid="presentation-scripture-reference"]').classes()).toContain('text-5xl')
+      expect(body().find('[data-testid="presentation-body"]').classes()).toContain('text-5xl')
+    })
+
+    it('a congregational scripture slide renders both its reference and its speaker tag at text-5xl', async () => {
+      const sections = [
+        { speaker: 'LEADER' as const, text: 'Give thanks to the LORD, for he is good.' },
+        { speaker: 'CONGREGATION' as const, text: 'His love endures forever.' },
+      ]
+      mount(PresentationViewer, { props: { slides: [congregationalScriptureSlide('a', sections)] } })
+      await Promise.resolve()
+
+      expect(body().find('[data-testid="presentation-scripture-reference"]').classes()).toContain('text-5xl')
+      expect(body().find('[data-testid="presentation-speaker-0"]').classes()).toContain('text-5xl')
+    })
+
+    it('a text slide body renders at text-5xl', async () => {
+      mount(PresentationViewer, { props: { slides: [textSlide('a', 'Message')] } })
+      await Promise.resolve()
+
+      expect(body().find('[data-testid="presentation-body"]').classes()).toContain('text-5xl')
+    })
   })
 
   it('an ImageSlide renders an img with src/alt and object-contain/max-h-[80vh] classes', async () => {
