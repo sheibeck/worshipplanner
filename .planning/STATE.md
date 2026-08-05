@@ -4,17 +4,17 @@ milestone: v1.4
 milestone_name: Service and Slides
 current_phase: 38
 current_phase_name: Congregational Readings Become Real Slides
-status: executing
-stopped_at: Completed 38-03-PLAN.md
-last_updated: "2026-08-05T21:50:51.809Z"
+status: verifying
+stopped_at: Completed 38-04-PLAN.md (Phase 38 code-complete; owner checkpoint deferred, PENDING-VERIFICATION.md 38.1-38.7)
+last_updated: "2026-08-05T22:07:43.262Z"
 last_activity: 2026-08-05
 last_activity_desc: Phase 38 execution started
 progress:
   total_phases: 10
-  completed_phases: 9
+  completed_phases: 10
   total_plans: 61
-  completed_plans: 60
-  percent: 90
+  completed_plans: 61
+  percent: 100
 ---
 
 # Project State
@@ -77,7 +77,7 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 
 Phase: 38 (Congregational Readings Become Real Slides) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-08-05 — Phase 38 execution started
 
 ## ★ v1.4 AUTONOMOUS RUN — standing decisions (2026-07-28)
@@ -1073,6 +1073,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 38 P01 | 40min | 3 tasks | 8 files |
 | Phase 38 P02 | 30min | 3 tasks | 6 files |
 | Phase 38 P03 | 30min | 3 tasks | 4 files |
+| Phase 38 P04 | 35min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -1331,6 +1332,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 38-03: slideActionMenuItems needed no change for section entries — confirmed by reading, duplicate/delete were already offered under canMutate regardless of speaker
 - [Phase ?]: 38-03: the editable scripture passage field's stable test-id is drawer-slide-text-editable-scripture; the speaker control's are drawer-speaker-toggle/drawer-speaker-readonly/drawer-speaker-row
 - [Phase ?]: 38-03: the speaker flip write is deliberately not debounced (mirrors onLoopToggle's immediate-write shape) to avoid losing a flip to a pending flush for a different field
+- [Phase ?]: 38-04: tick() helper mirrors useSlideshowAssembly's apply shape exactly (writes slides AND freshly recomputed sourceSignature); its own fidelity is asserted against the written signature value, not just the changed flag, since carry-by-position idempotence can mask a broken helper
+- [Phase ?]: 38-04: comment audit found slideGroup.ts/slideshowAssembler.ts/scripture.ts already reconciled by 38-01/38-02; only slideGroupMaterializer.ts had 4 stale unqualified claims, all fixed with no behavioral change
+- [Phase ?]: 38-04: Task 3's owner-verification checkpoint deferred under the standing autonomy grant, recorded as PENDING-VERIFICATION.md items 38.1-38.7 — not run, not self-approved
 
 ### Roadmap Evolution
 
@@ -1395,6 +1399,6 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-05T21:50:51.771Z
-Stopped at: Completed 38-03-PLAN.md
+Last session: 2026-08-05T22:07:43.224Z
+Stopped at: Completed 38-04-PLAN.md (Phase 38 code-complete; owner checkpoint deferred, PENDING-VERIFICATION.md 38.1-38.7)
 Resume file: None

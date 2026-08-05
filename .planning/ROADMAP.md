@@ -370,13 +370,13 @@ Plans:
   4. A section slide can be deleted on its own, and stays deleted — it must not reappear when the group is next derived
   5. Existing services with a stored congregational reading keep working; nothing that reads today's shape breaks
 
-**Plans**: 3/4 plans executed
+**Plans**: 4/4 plans executed
 Plans:
 
 - [x] 38-01-PLAN.md — The two states in the pure layer: section payload on SourceRef, N-entry derivation, sections-aware signature, detach/convert/destroy rebuild (wave 1)
 - [x] 38-02-PLAN.md — One section per slide in the type system and on the projector: singular field, speaker above the passage (wave 2)
 - [x] 38-03-PLAN.md — Edit and delete a section slide: drawer passage field, speaker control, speaker-named cards (wave 3)
-- [ ] 38-04-PLAN.md — Composed multi-tick durability and migration contract, comment reconciliation, owner verification (wave 4)
+- [x] 38-04-PLAN.md — Composed multi-tick durability and migration contract, comment reconciliation, owner verification (wave 4)
 
 **UI hint**: yes — touches the slide grid, the 3-dot menu, and the projected slide
 **Research flag**: no external research needed; the uncertainty is internal design, resolved by discussion
@@ -422,7 +422,7 @@ Plans:
 | 35. Presentation Correctness & Lyric Editor | v1.4 | 4/4 | In Progress|  |
 | 36. UI Rework — Service Order & Contextual Action Bars | v1.4 | 5/5 | In Progress|  |
 | 37. PowerPoint Server-Side Rendering | v1.4 | 6/6 | In Progress|  |
-| 38. Congregational Readings Become Real Slides | v1.4 | 3/4 | In Progress|  |
+| 38. Congregational Readings Become Real Slides | v1.4 | 4/4 | In Progress|  |
 
 ## Backlog
 

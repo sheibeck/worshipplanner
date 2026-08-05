@@ -348,7 +348,7 @@ Acknowledged, deferred, not in this roadmap.
 | R069 | Phase 36 | Complete |
 | R070 | Phase 34 | Complete |
 | R071 | Phase 34 | Complete |
-| R072 | Phase 38 | Planned |
+| R072 | Phase 38 | Complete — composed multi-tick durability contract added by 38-04; owner-verification checkpoint deferred, see PENDING-VERIFICATION.md 38.1-38.7 |
 
 **Coverage:**
 
