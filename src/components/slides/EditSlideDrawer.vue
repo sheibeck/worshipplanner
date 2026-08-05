@@ -24,7 +24,9 @@
       >
         <!-- Header — 16px padding (md token), not SongSlideOver's 20px (no 20px in this spec). -->
         <div class="flex items-center justify-between gap-3 px-4 py-4 border-b border-gray-800 shrink-0">
-          <h2 class="text-sm font-medium text-gray-100" data-testid="edit-slide-drawer-title">{{ drawerTitle }}</h2>
+          <!-- D2 (260805-bvo): the drawer has ONE body and ONE fixed title —
+               do not relabel or reintroduce a second mode-dependent title. -->
+          <h2 class="text-sm font-medium text-gray-100" data-testid="edit-slide-drawer-title">Edit Slide Details</h2>
           <div class="flex items-center gap-2">
             <span class="text-xs text-gray-400" data-testid="drawer-status">{{ statusText }}</span>
             <button
@@ -106,9 +108,8 @@
           </div>
 
           <!-- Task 3: label/notes fields render here, gated on canMutate
-               (R054: absent entirely for a song group, never merely disabled).
-               Phase 33-07: also gated on mode — details mode only. -->
-          <div v-if="canMutate && mode === 'details'">
+               (R054: absent entirely for a song group, never merely disabled). -->
+          <div v-if="canMutate">
             <label class="block text-xs font-medium text-gray-400 mb-1" for="edit-slide-drawer-label">Slide Label</label>
             <input
               id="edit-slide-drawer-label"
@@ -188,34 +189,26 @@
 
             <template v-else-if="sourceKind === 'text'">
               <!-- D-13's one exception: no canonical source exists for a
-                   hand-written slide, so the drawer IS its home. Phase 33-07:
-                   relocated to `lyrics` mode only — `details` mode never
-                   shows the editable field, even for an editor; it shows a
-                   read-only preview and a caption pointing at `lyrics` mode
-                   instead (33-UI-SPEC.md §4). The `lyrics`-mode markup below
-                   is byte-identical to what this branch rendered before this
-                   phase — no per-service override control of any kind. -->
-              <template v-if="mode === 'lyrics'">
-                <textarea
-                  v-if="canMutate"
-                  v-model="localBody"
-                  rows="3"
-                  class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
-                  data-testid="drawer-slide-text-editable"
-                ></textarea>
-                <p
-                  v-else
-                  class="text-[13px] leading-normal text-gray-200 whitespace-pre-line"
-                  data-testid="drawer-slide-text-readonly"
-                >{{ localBody }}</p>
-              </template>
-              <template v-else>
-                <p
-                  class="text-[13px] leading-normal text-gray-200 whitespace-pre-line"
-                  data-testid="drawer-slide-text-readonly"
-                >{{ localBody }}</p>
-                <p class="mt-1 text-xs text-gray-500" data-testid="drawer-slide-text-caption">Edit this slide's text via Edit lyrics</p>
-              </template>
+                   hand-written slide, so the drawer IS its home. D2
+                   (260805-bvo, owner-authorised reversal): this drawer now
+                   has ONE body, and this is the only branch in it that is
+                   ever editable — `lyric`/`copyright`/`scripture`/`imported`
+                   above are unchanged. 33-UI-SPEC.md §4's details-vs-lyrics
+                   mode split is superseded by this reversal; there is no
+                   longer a caption pointing at a second mode, because there
+                   is no second mode. -->
+              <textarea
+                v-if="canMutate"
+                v-model="localBody"
+                rows="3"
+                class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
+                data-testid="drawer-slide-text-editable"
+              ></textarea>
+              <p
+                v-else
+                class="text-[13px] leading-normal text-gray-200 whitespace-pre-line"
+                data-testid="drawer-slide-text-readonly"
+              >{{ localBody }}</p>
             </template>
           </div>
 
@@ -225,7 +218,7 @@
                for its own duration (25-REVIEW-FIX WR-01), so offering a
                second audio attachment here would recreate the exact
                conflict the model was built to prevent. -->
-          <div v-if="!isVideo && mode === 'details'" data-testid="drawer-audio-section">
+          <div v-if="!isVideo" data-testid="drawer-audio-section">
             <label class="block text-xs font-medium text-gray-400 mb-1">Slide Audio</label>
 
             <!-- File row: whichever audio actually covers this slide right
@@ -305,14 +298,13 @@
             </div>
           </div>
 
-          <!-- Phase 33-07: Slide Background — details mode only, but
-               ★ deliberately NOT wrapped in `!isVideo` the way Slide Audio
-               immediately above it is. Two audio sources collide audibly;
-               two visual layers do not, and a video's own picture already
-               covers whatever is behind it (33-UI-SPEC.md §9 — a deliberate
-               divergence from the audio precedent, do not "fix" it into
-               matching). -->
-          <div v-if="mode === 'details'" data-testid="drawer-background-section">
+          <!-- Phase 33-07: Slide Background — ★ deliberately NOT wrapped in
+               `!isVideo` the way Slide Audio immediately above it is. Two
+               audio sources collide audibly; two visual layers do not, and a
+               video's own picture already covers whatever is behind it
+               (33-UI-SPEC.md §9 — a deliberate divergence from the audio
+               precedent, do not "fix" it into matching). -->
+          <div data-testid="drawer-background-section">
             <label class="block text-xs font-medium text-gray-400 mb-1">Slide Background</label>
 
             <!-- State 1: nothing resolved at any level. -->
@@ -371,7 +363,7 @@
             <p v-if="backgroundUploadError" data-testid="background-upload-error" class="mt-1 text-[11px] text-red-400">{{ backgroundUploadError }}</p>
           </div>
 
-          <div v-if="canMutate && mode === 'details'">
+          <div v-if="canMutate">
             <label class="block text-xs font-medium text-gray-400 mb-1" for="edit-slide-drawer-notes">Notes (operator only)</label>
             <textarea
               id="edit-slide-drawer-notes"
@@ -386,7 +378,7 @@
                Slide (right), above a border-t divider (26-UI-SPEC.md §
                "Duplicate and Delete Slide"), matching SongSlideOver.vue's own
                "Delete Song" block placement convention. -->
-          <div v-if="canMutate && mode === 'details'" class="border-t border-gray-800 pt-4" data-testid="drawer-footer-actions">
+          <div v-if="canMutate" class="border-t border-gray-800 pt-4" data-testid="drawer-footer-actions">
             <div v-if="!showDeleteConfirm" class="flex items-center justify-between">
               <button
                 type="button"
@@ -488,15 +480,6 @@ const props = withDefaults(defineProps<{
    */
   serviceLocked?: boolean
   /**
-   * Phase 33-07 (R052) — which body this ONE component shows. Not two
-   * components, not tabs: the scrimless floating-panel shell, positioning
-   * and follows-selection behaviour are all shared (Phase 26), only the body
-   * differs (33-CONTEXT.md's explicit decision). Defaults `'details'`, so
-   * every pre-33-07 fixture that mounts this drawer without it behaves
-   * exactly as before.
-   */
-  mode?: 'details' | 'lyrics'
-  /**
    * Phase 33-07 — a menu-dispatched Duplicate/Delete request, keyed on a
    * changing `nonce` (not the `key` alone) so the same action can re-fire on
    * a repeat. Watched below; the delete key sets the EXISTING confirm state
@@ -518,7 +501,7 @@ const props = withDefaults(defineProps<{
    * shares with that precedent.
    */
   groupAssembledSlides?: AssembledSlide[]
-}>(), { serviceLocked: false, mode: 'details', pendingAction: null, groupAssembledSlides: () => [] })
+}>(), { serviceLocked: false, pendingAction: null, groupAssembledSlides: () => [] })
 
 const emit = defineEmits<{
   close: []
@@ -608,17 +591,6 @@ watch(
 onUnmounted(() => {
   window.removeEventListener('keydown', onKeydown)
 })
-
-// ── Phase 33-07 Task 1: the mode prop and its header title ─────────────────
-
-/**
- * Both strings are R052's own fixed naming, applied per 33-CONTEXT.md to
- * every hand-authored text kind, not only song sections — it reads slightly
- * oddly over a Prayer slide's plain paragraph, but 33-CONTEXT.md's
- * discretion grant covers labels BEYOND these two names, never the two
- * names themselves. Do not relabel.
- */
-const drawerTitle = computed(() => (props.mode === 'lyrics' ? 'Edit Slide Lyrics' : 'Edit Slide Details'))
 
 // ── Context line and preview ────────────────────────────────────────────────
 

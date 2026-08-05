@@ -267,9 +267,8 @@ describe('EditSlideDrawer (Phase 26-05 Task 1 — shell)', () => {
 
   it('renders the title, the close control and its accessible name', () => {
     mountDrawer()
-    // 33-07: the title is now mode-bound — 'details' (the prop default)
-    // renders 'Edit Slide Details'. See the "mode" describe block for
-    // exhaustive title-per-mode coverage.
+    // D2 (260805-bvo): the drawer has one body and one fixed title. See
+    // the "one drawer body" describe block for the exhaustive coverage.
     expect(body().find('[data-testid="edit-slide-drawer-title"]').text()).toBe('Edit Slide Details')
     const close = body().find('[data-testid="edit-slide-drawer-close"]')
     expect(close.exists()).toBe(true)
@@ -706,9 +705,9 @@ describe('EditSlideDrawer (Phase 26-07 Task 1 — per-kind Slide Text)', () => {
     expect(body().find('[data-testid="drawer-slide-text-section"]').exists()).toBe(false)
   })
 
-  it('renders an editable field, not a read-only block, for a hand-written slide (lyrics mode — 33-07 relocated this control here)', () => {
+  it('renders an editable field, not a read-only block, for a hand-written slide (D2 260805-bvo — the drawer has one body)', () => {
     const { entry, assembledSlide } = makeAuthoredTextFixtures('My own words')
-    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }), mode: 'lyrics' })
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
     expect(body().find('[data-testid="drawer-slide-text-editable"]').exists()).toBe(true)
     expect((body().find('[data-testid="drawer-slide-text-editable"]').element as HTMLTextAreaElement).value).toBe('My own words')
   })
@@ -740,7 +739,7 @@ describe('EditSlideDrawer (Phase 26-07 Task 1 — per-kind Slide Text)', () => {
   })
 })
 
-describe('EditSlideDrawer (Phase 26-07 Task 2 — hand-written slide edited here) [33-07: relocated to mode: "lyrics"]', () => {
+describe('EditSlideDrawer (Phase 26-07 Task 2 — hand-written slide edited here) [D2 260805-bvo: the drawer has one body]', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     mockReplaceGroupSlides.mockReset()
@@ -753,7 +752,7 @@ describe('EditSlideDrawer (Phase 26-07 Task 2 — hand-written slide edited here
 
   it("renders the hand-written slide's editable field with its current text", () => {
     const { entry, assembledSlide } = makeAuthoredTextFixtures('Current body')
-    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }), mode: 'lyrics' })
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
     expect((body().find('[data-testid="drawer-slide-text-editable"]').element as HTMLTextAreaElement).value).toBe('Current body')
   })
 
@@ -761,7 +760,7 @@ describe('EditSlideDrawer (Phase 26-07 Task 2 — hand-written slide edited here
     const entryOne = makeEntry({ id: 'entry-1', sourceRef: { kind: 'text', title: 'New slide', body: '' } })
     const entryTwo = makeEntry({ id: 'entry-2', label: 'Untouched', sourceRef: { kind: 'text', title: 'Other', body: 'Other body' } })
     const assembledSlide = makeAssembled({ slide: { id: 'entry-1', position: 0, contentKind: 'text', body: '' } as never })
-    mountDrawer({ entry: entryOne, assembledSlide, group: makeGroup({ slides: [entryOne, entryTwo] }), mode: 'lyrics' })
+    mountDrawer({ entry: entryOne, assembledSlide, group: makeGroup({ slides: [entryOne, entryTwo] }) })
 
     await body().find('[data-testid="drawer-slide-text-editable"]').setValue('New body text')
     expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
@@ -779,7 +778,7 @@ describe('EditSlideDrawer (Phase 26-07 Task 2 — hand-written slide edited here
   it("preserves the source ref's other members (the short default title) across the write", async () => {
     const entry = makeEntry({ id: 'entry-1', sourceRef: { kind: 'text', title: 'New slide', body: '' } })
     const assembledSlide = makeAssembled({ slide: { id: 'entry-1', position: 0, contentKind: 'text', body: '' } as never })
-    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }), mode: 'lyrics' })
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
 
     await body().find('[data-testid="drawer-slide-text-editable"]').setValue('Body only changed')
     await vi.advanceTimersByTimeAsync(800)
@@ -793,7 +792,7 @@ describe('EditSlideDrawer (Phase 26-07 Task 2 — hand-written slide edited here
   it('never re-mints the entry id or order while editing', async () => {
     const entry = makeEntry({ id: 'entry-1', order: 3, sourceRef: { kind: 'text', title: 'New slide', body: '' } })
     const assembledSlide = makeAssembled({ slide: { id: 'entry-1', position: 0, contentKind: 'text', body: '' } as never })
-    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }), mode: 'lyrics' })
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
 
     await body().find('[data-testid="drawer-slide-text-editable"]').setValue('Changed')
     await vi.advanceTimersByTimeAsync(800)
@@ -808,7 +807,7 @@ describe('EditSlideDrawer (Phase 26-07 Task 2 — hand-written slide edited here
     const entryOne = makeEntry({ id: 'entry-1', sourceRef: { kind: 'text', title: 'New slide', body: '' } })
     const entryTwo = makeEntry({ id: 'entry-2', sourceRef: { kind: 'text', title: 'Other', body: 'Other body' } })
     const assembledSlide = makeAssembled({ slide: { id: 'entry-1', position: 0, contentKind: 'text', body: '' } as never })
-    const wrapper = mountDrawer({ entry: entryOne, assembledSlide, group: makeGroup({ slides: [entryOne, entryTwo] }), mode: 'lyrics' })
+    const wrapper = mountDrawer({ entry: entryOne, assembledSlide, group: makeGroup({ slides: [entryOne, entryTwo] }) })
 
     await body().find('[data-testid="drawer-slide-text-editable"]').setValue('Changed before leaving')
     await wrapper.setProps({
@@ -826,7 +825,7 @@ describe('EditSlideDrawer (Phase 26-07 Task 2 — hand-written slide edited here
     mockReplaceGroupSlides.mockRejectedValueOnce(new Error('write failed'))
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const { entry, assembledSlide } = makeAuthoredTextFixtures('')
-    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }), mode: 'lyrics' })
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
 
     await body().find('[data-testid="drawer-slide-text-editable"]').setValue('Changed')
     await vi.advanceTimersByTimeAsync(800)
@@ -839,7 +838,7 @@ describe('EditSlideDrawer (Phase 26-07 Task 2 — hand-written slide edited here
 
   it('renders no editable field for a user without write capability, while the text still reads', () => {
     const { entry, assembledSlide } = makeAuthoredTextFixtures('Read me')
-    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }), isEditor: false, mode: 'lyrics' })
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }), isEditor: false })
     expect(body().find('[data-testid="drawer-slide-text-editable"]').exists()).toBe(false)
     expect(body().find('[data-testid="drawer-slide-text-readonly"]').text()).toBe('Read me')
   })
@@ -1402,13 +1401,14 @@ describe('EditSlideDrawer (R054 — song groups are read-only)', () => {
     expect(body().find('[data-testid="audio-remove"]').exists()).toBe(false)
   })
 
-  it('renders no editable slide-text textarea for a song group, even for a text-kind entry, even in lyrics mode', () => {
+  it('renders no editable slide-text textarea for a song group, even for a text-kind entry (R054/P-03)', () => {
     const { entry, assembledSlide } = makeAuthoredTextFixtures('Should not be editable here')
-    // 33-07: explicit `mode: 'lyrics'` — the ONE mode that would otherwise
-    // show the editable textarea — so this keeps testing R054's gate
-    // (canMutate false for a song group) rather than passing trivially
-    // because `details` mode never shows it regardless of song-group status.
-    mountDrawer({ planItem: songPlanItem, entry, assembledSlide, group: makeGroup({ slides: [entry] }), mode: 'lyrics' })
+    // D2 (260805-bvo): the drawer now has ONE body and the textarea is no
+    // longer hidden behind a mode nobody could reach from the menu — this
+    // test is MORE load-bearing than it was, since `canMutate` (isSongGroup
+    // excluded) is now the ONLY thing standing between a song-group text
+    // entry and an editable field.
+    mountDrawer({ planItem: songPlanItem, entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
 
     expect(body().find('[data-testid="drawer-slide-text-editable"]').exists()).toBe(false)
   })
@@ -1649,43 +1649,38 @@ describe('EditSlideDrawer - locked service (R036)', () => {
   })
 })
 
-// ── 33-07 Task 1: the mode prop and its per-mode section gating ────────────
-describe('EditSlideDrawer (Phase 33-07 Task 1 — mode: details | lyrics)', () => {
+// ── D2 (260805-bvo), superseding 33-07 Task 1: the drawer has ONE body ─────
+describe('EditSlideDrawer (D2 260805-bvo — one drawer body, no mode prop)', () => {
   beforeEach(() => {
     mockReplaceGroupSlides.mockReset()
     mockReplaceGroupSlides.mockResolvedValue(undefined)
   })
 
-  it('titles the header "Edit Slide Details" in details mode (the prop default)', () => {
+  it('titles the header "Edit Slide Details" — the only title this drawer has', () => {
     mountDrawer()
     expect(body().find('[data-testid="edit-slide-drawer-title"]').text()).toBe('Edit Slide Details')
+    expect(body().find('[data-testid="edit-slide-drawer-title"]').text()).not.toContain('Lyrics')
   })
 
-  it('titles the header "Edit Slide Lyrics" in lyrics mode', () => {
-    mountDrawer({ mode: 'lyrics' })
-    expect(body().find('[data-testid="edit-slide-drawer-title"]').text()).toBe('Edit Slide Lyrics')
-  })
-
-  it('renders the context line and preview identically in both modes', () => {
-    const detailsWrapper = mountDrawer()
-    expect(body().find('[data-testid="drawer-context-line"]').exists()).toBe(true)
-    expect(body().find('[data-testid="drawer-preview"]').exists()).toBe(true)
-    detailsWrapper.unmount()
-
-    mountDrawer({ mode: 'lyrics' })
+  it('renders the context line and preview', () => {
+    mountDrawer()
     expect(body().find('[data-testid="drawer-context-line"]').exists()).toBe(true)
     expect(body().find('[data-testid="drawer-preview"]').exists()).toBe(true)
   })
 
-  it('renders no Slide Label, Slide Audio, Notes or footer-actions section in lyrics mode', () => {
-    mountDrawer({ mode: 'lyrics' })
-    expect(body().find('[data-testid="drawer-label-input"]').exists()).toBe(false)
-    expect(body().find('[data-testid="drawer-audio-section"]').exists()).toBe(false)
-    expect(body().find('[data-testid="drawer-notes-input"]').exists()).toBe(false)
-    expect(body().find('[data-testid="drawer-footer-actions"]').exists()).toBe(false)
+  it("renders the owner's ask: Slide Label, the editable Slide Text, Slide Audio, Notes and the footer actions all together in ONE body", () => {
+    const { entry, assembledSlide } = makeAuthoredTextFixtures('My own words')
+    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
+    expect(body().find('[data-testid="drawer-label-input"]').exists()).toBe(true)
+    const textarea = body().find('[data-testid="drawer-slide-text-editable"]')
+    expect(textarea.exists()).toBe(true)
+    expect((textarea.element as HTMLTextAreaElement).value).toBe('My own words')
+    expect(body().find('[data-testid="drawer-audio-section"]').exists()).toBe(true)
+    expect(body().find('[data-testid="drawer-notes-input"]').exists()).toBe(true)
+    expect(body().find('[data-testid="drawer-footer-actions"]').exists()).toBe(true)
   })
 
-  it('renders all four of those sections in details mode (the prop default), unchanged', () => {
+  it('renders all four of those sections for a mutator regardless of slide kind, unchanged', () => {
     mountDrawer()
     expect(body().find('[data-testid="drawer-label-input"]').exists()).toBe(true)
     expect(body().find('[data-testid="drawer-audio-section"]').exists()).toBe(true)
@@ -1693,42 +1688,34 @@ describe('EditSlideDrawer (Phase 33-07 Task 1 — mode: details | lyrics)', () =
     expect(body().find('[data-testid="drawer-footer-actions"]').exists()).toBe(true)
   })
 
-  it('renders no editable textarea for a hand-authored entry in details mode — a read-only preview and the "Edit lyrics" caption render instead', () => {
+  it('renders the editable textarea seeded with the entry\'s own body, and renders NO read-only block and NO caption in the text branch, for a hand-authored entry', () => {
     const { entry, assembledSlide } = makeAuthoredTextFixtures('Original words')
     mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }) })
-    expect(body().find('[data-testid="drawer-slide-text-editable"]').exists()).toBe(false)
-    const readonly = body().find('[data-testid="drawer-slide-text-readonly"]')
-    expect(readonly.exists()).toBe(true)
-    expect(readonly.text()).toBe('Original words')
-    expect(body().text()).toContain("Edit this slide's text via Edit lyrics")
-  })
-
-  it('renders the editable textarea, with its existing markup and test id, for a hand-authored entry in lyrics mode', () => {
-    const { entry, assembledSlide } = makeAuthoredTextFixtures('Original words')
-    mountDrawer({ entry, assembledSlide, group: makeGroup({ slides: [entry] }), mode: 'lyrics' })
     const textarea = body().find('[data-testid="drawer-slide-text-editable"]')
     expect(textarea.exists()).toBe(true)
     expect((textarea.element as HTMLTextAreaElement).value).toBe('Original words')
+    expect(body().find('[data-testid="drawer-slide-text-readonly"]').exists()).toBe(false)
+    expect(body().find('[data-testid="drawer-slide-text-caption"]').exists()).toBe(false)
   })
 
-  it('defaults to details mode when the prop is omitted, so an existing fixture behaves exactly as before', () => {
+  it('renders the single-body shape identically whether the entry prop is supplied at mount or arrives later — no second body to default to', () => {
     mountDrawer()
     expect(body().find('[data-testid="edit-slide-drawer-title"]').text()).toBe('Edit Slide Details')
     expect(body().find('[data-testid="drawer-label-input"]').exists()).toBe(true)
   })
 
-  it('swaps the body in place on a mode change for the SAME entry, without re-running the entry-change flush', async () => {
+  it('a non-entry prop change (position) does not re-run the entry-change flush', async () => {
     vi.useFakeTimers()
     mockReplaceGroupSlides.mockClear()
     const { entry } = makeAuthoredTextFixtures('Original')
     const wrapper = mountDrawer({ entry, group: makeGroup({ slides: [entry] }) })
 
     await body().find('[data-testid="drawer-label-input"]').setValue('Changed')
-    await wrapper.setProps({ mode: 'lyrics' })
-    // The entry never changed — only mode did — so the entry-change flush
-    // path must not have fired; the pending label write is still debouncing.
+    await wrapper.setProps({ position: 4 })
+    // The entry never changed — only an unrelated prop did — so the
+    // entry-change flush path must not have fired; the pending label write
+    // is still debouncing.
     expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
-    expect(body().find('[data-testid="edit-slide-drawer-title"]').text()).toBe('Edit Slide Lyrics')
 
     await vi.advanceTimersByTimeAsync(800)
     expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)

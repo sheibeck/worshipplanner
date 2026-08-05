@@ -39,7 +39,6 @@
     <EditSlideDrawer
       ref="editSlideDrawerRef"
       :open="drawerOpen"
-      :mode="drawerMode"
       :pending-action="pendingDrawerAction"
       :entry="selectedEntry"
       :group="selectedGroup"
@@ -265,14 +264,6 @@ function onSelectSlot(slotId: string): void {
 const drawerOpen = ref(false)
 
 /**
- * Phase 33-09 (R052) — which body the drawer shows, set exclusively by
- * `onMenuAction`'s two edit keys. Defaults `'details'` so the post-duplicate
- * follow-selection path (`selectSlideById`) and every pre-existing fixture
- * that never touches this ref keep opening the details view, unchanged.
- */
-const drawerMode = ref<'details' | 'lyrics'>('details')
-
-/**
  * Phase 33-09 — a menu-dispatched Duplicate/Delete request, relayed
  * verbatim into the drawer's own `pendingAction` prop (33-07's seam). Keyed
  * on a monotonically incrementing nonce (never the `key` alone) so the same
@@ -440,12 +431,12 @@ function requestEditInScripture(): void {
  * current (even when the acted-on card was not already selected).
  *
  * Only the two edit keys and Duplicate/Delete ever touch `drawerOpen` — the
- * two navigation keys are pure routes/relays and never open it. Duplicate
- * and Delete open the drawer in `details` mode because that is where their
- * EXISTING write paths live (the duplicate write, the inline delete
- * confirm) — this dispatcher itself never calls a delete or duplicate store
- * action; it only ever sets a pending request for the drawer to act on
- * (P-01).
+ * two navigation keys are pure routes/relays and never open it. D2
+ * (260805-bvo): the drawer has one body now, so there is no mode to set —
+ * Duplicate and Delete simply open it, because that is where their EXISTING
+ * write paths live (the duplicate write, the inline delete confirm) — this
+ * dispatcher itself never calls a delete or duplicate store action; it only
+ * ever sets a pending request for the drawer to act on (P-01).
  *
  * WR-04: "edit-in-song"/"edit-in-scripture" are checked against the OPEN
  * drawer's own unsaved-edit guard BEFORE `selectedSlideId` is reassigned
@@ -465,11 +456,10 @@ function onMenuAction(slideId: string, key: MenuItemKey): void {
   selectedSlideId.value = slideId
   switch (key) {
     case 'edit-details':
-      drawerMode.value = 'details'
-      drawerOpen.value = true
-      break
+    // D2 (260805-bvo): 'edit-lyrics' still exists as a MenuItemKey until
+    // Task 3 removes it from slideDisplay.ts; it opens the identical
+    // single-body drawer in the meantime, which is harmless.
     case 'edit-lyrics':
-      drawerMode.value = 'lyrics'
       drawerOpen.value = true
       break
     case 'edit-in-song': {
@@ -494,12 +484,10 @@ function onMenuAction(slideId: string, key: MenuItemKey): void {
       requestEditInScripture()
       break
     case 'duplicate':
-      drawerMode.value = 'details'
       pendingDrawerAction.value = { key: 'duplicate', nonce: ++pendingActionNonce }
       drawerOpen.value = true
       break
     case 'delete':
-      drawerMode.value = 'details'
       pendingDrawerAction.value = { key: 'delete', nonce: ++pendingActionNonce }
       drawerOpen.value = true
       break

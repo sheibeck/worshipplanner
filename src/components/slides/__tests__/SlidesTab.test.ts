@@ -725,7 +725,7 @@ describe('SlidesTab', () => {
       return mountTab({ slots, assembledSlideshow, groupsBySlotId: new Map([['slot-a', group]]) })
     }
 
-    it('menu: the edit-details key opens the drawer with mode "details"', async () => {
+    it('menu: the edit-details key opens the drawer', async () => {
       const wrapper = mountWithEntry({ kind: 'text', title: 'New slide', body: '' })
       await wrapper.vm.$nextTick()
 
@@ -734,10 +734,12 @@ describe('SlidesTab', () => {
 
       const drawer = wrapper.findComponent(EditSlideDrawer)
       expect(drawer.props('open')).toBe(true)
-      expect(drawer.props('mode')).toBe('details')
     })
 
-    it('menu: the edit-lyrics key opens the drawer with mode "lyrics"', async () => {
+    // D2 (260805-bvo): 'edit-lyrics' still exists as a MenuItemKey until
+    // Task 3 removes it from slideDisplay.ts — it opens the identical
+    // single-body drawer in the meantime.
+    it('menu: the edit-lyrics key opens the drawer', async () => {
       const wrapper = mountWithEntry({ kind: 'text', title: 'New slide', body: '' })
       await wrapper.vm.$nextTick()
 
@@ -746,10 +748,9 @@ describe('SlidesTab', () => {
 
       const drawer = wrapper.findComponent(EditSlideDrawer)
       expect(drawer.props('open')).toBe(true)
-      expect(drawer.props('mode')).toBe('lyrics')
     })
 
-    it('menu: dispatching the lyrics key then the details key on the SAME entry leaves the drawer open throughout and only flips mode', async () => {
+    it('menu: dispatching the lyrics key then the details key on the SAME entry leaves the drawer open throughout', async () => {
       const wrapper = mountWithEntry({ kind: 'text', title: 'New slide', body: '' })
       await wrapper.vm.$nextTick()
 
@@ -758,13 +759,11 @@ describe('SlidesTab', () => {
       await wrapper.vm.$nextTick()
       let drawer = wrapper.findComponent(EditSlideDrawer)
       expect(drawer.props('open')).toBe(true)
-      expect(drawer.props('mode')).toBe('lyrics')
 
       grid.vm.$emit('menu-action', 'entry-1', 'edit-details')
       await wrapper.vm.$nextTick()
       drawer = wrapper.findComponent(EditSlideDrawer)
       expect(drawer.props('open')).toBe(true)
-      expect(drawer.props('mode')).toBe('details')
     })
 
     it("menu: the delete key sets the drawer's pendingAction to a { key: 'delete' } request — this component calls no delete action itself (P-01; it has no store import at all, see its own file header)", async () => {
@@ -777,7 +776,6 @@ describe('SlidesTab', () => {
       const drawer = wrapper.findComponent(EditSlideDrawer)
       expect(drawer.props('pendingAction')).toMatchObject({ key: 'delete' })
       expect(drawer.props('open')).toBe(true)
-      expect(drawer.props('mode')).toBe('details')
     })
 
     it("menu: the duplicate key sets the drawer's pendingAction to a { key: 'duplicate' } request", async () => {
@@ -908,7 +906,7 @@ describe('SlidesTab', () => {
       const EditSlideDrawerStub = defineComponent({
         name: 'EditSlideDrawer',
         props: [
-          'open', 'mode', 'pendingAction', 'entry', 'group', 'planItem',
+          'open', 'pendingAction', 'entry', 'group', 'planItem',
           'assembledSlide', 'position', 'total', 'orgId', 'serviceId',
           'isEditor', 'serviceLocked',
         ],
