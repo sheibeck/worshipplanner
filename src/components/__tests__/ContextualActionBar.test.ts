@@ -129,21 +129,4 @@ describe('ContextualActionBar', () => {
       expect(svg.attributes('aria-hidden')).toBe('true')
     }
   })
-
-  it('a hint-{key} slot renders nothing when that key is absent from items, and renders after that button when present', () => {
-    const items: ActionBarItem[] = [{ key: 'copy-pc', label: 'Copy for PC', onClick: vi.fn() }]
-
-    const wrapperWithoutMatchingKey = mount(ContextualActionBar, {
-      props: { items: [{ key: 'save', label: 'Save', onClick: vi.fn() }] },
-      slots: { 'hint-export-pc': '<span data-testid="the-hint">unrelated hint</span>' },
-    })
-    expect(wrapperWithoutMatchingKey.find('[data-testid="the-hint"]').exists()).toBe(false)
-
-    const wrapperWithMatchingKey = mount(ContextualActionBar, {
-      props: { items },
-      slots: { 'hint-copy-pc': '<span data-testid="the-hint">configure them in Settings</span>' },
-    })
-    expect(wrapperWithMatchingKey.find('[data-testid="the-hint"]').exists()).toBe(true)
-    expect(wrapperWithMatchingKey.text()).toContain('configure them in Settings')
-  })
 })

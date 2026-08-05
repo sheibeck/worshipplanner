@@ -67,7 +67,6 @@
         <span v-else-if="item.icon === 'present'" aria-hidden="true">&#9654;</span>
         {{ item.label }}
       </button>
-      <slot :name="`hint-${item.key}`" />
     </template>
   </div>
 </template>

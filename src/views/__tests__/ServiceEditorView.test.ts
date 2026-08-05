@@ -372,8 +372,9 @@ vi.mock('@/stores/auth', () => ({
 // ── ME-01: Planning Center API surface ────────────────────────────────────────
 // Only `onExportToPC`/`onConfirmExport` reach these, and no test before the
 // ME-01 block below invokes either — so stubbing the module is behaviour-neutral
-// for everything above it. `formatForPlanningCenter` (the Copy-for-PC path) is
-// deliberately NOT mocked: those tests assert its real output.
+// for everything above it. The `Copy for PC` path (`formatForPlanningCenter`)
+// was removed entirely per owner feedback; only the real `Export to PC` path
+// (`planningCenterApi.ts`) remains, and it is what this mock stands in for.
 const mockCreatePlan = vi.fn(async () => 'pc-plan-new')
 const mockAddSlotAsItem = vi.fn(async () => undefined)
 const mockFetchPlanItems = vi.fn(async () => [])
