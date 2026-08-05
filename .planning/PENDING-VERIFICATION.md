@@ -525,6 +525,20 @@ container was built. No GCP resource was created**, by explicit owner instructio
   current-code equivalent or defined behavior, so both were **deliberately left unbuilt and recorded
   rather than guessed at.** If you wanted them, they are new work with no spec.
 
+- ☐ **37.1 (quick 260805-kzd) Confirm the label-free slides read right in a running Present view.**
+  Automated tests pin the markup, but "does this project legibly" is a visual judgment no test makes.
+  Open Present on a real service and check four cases:
+  1. A scripture slide whose passage has **not** been fetched — it must show the reference (e.g.
+     "John 3:16") in large white text, **not a blank slide**. This is the specific hazard the change
+     was designed around; the assembler builds these with `text: ''`.
+  2. A scripture slide **with** the passage fetched — reference above, passage below, both the same
+     size now. Confirm the loss of the old size hierarchy doesn't make the two run together.
+  3. A congregational reading — "Leader:" / "Congregation:" are now plain white at body size with no
+     indigo/amber accent. Confirm you can still tell the parts apart at projection distance; if not,
+     say so, because the congregational-split phase can address it.
+  4. A **Message** and a **Prayer** item — the blue heading should be gone entirely, leaving only the
+     white body text.
+
 ---
 
 ## Notes and failures
