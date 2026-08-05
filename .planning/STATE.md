@@ -75,10 +75,45 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 
 ## Current Position
 
-Phase: 38 (Congregational Readings Become Real Slides) — EXECUTING
+Phase: 38 (Congregational Readings Become Real Slides) — CODE COMPLETE, verification deferred
 Plan: 4 of 4
-Status: Phase complete — ready for verification
-Last activity: 2026-08-05 — Phase 38 execution started
+Status: All 4 plans executed · 5/5 success criteria verified against live source ·
+        `38-VERIFICATION.md` is `human_needed` · 1 code-review BLOCKER found and fixed
+Last activity: 2026-08-05 — Phase 38 complete; CR-01 fixed (203e599); autonomous run STOPPED
+               before the milestone lifecycle (see below)
+
+## ⛔ AUTONOMOUS RUN STOPPED BEFORE MILESTONE LIFECYCLE — 2026-08-05, and why
+
+Phase 38 was the last phase with implementation work. The autonomous workflow's next step is the
+milestone lifecycle: **audit → complete → cleanup**, which archives v1.4 and deletes phase
+directories. **That was deliberately NOT run.**
+
+**Why.** Every phase from 32 onward is code-complete but carries owner verification that has never
+been run — 32, 33, 34, 35, 37 and now 38 are all `verification_deferred_human`, and 36 is
+`deferred_by_owner`. Archiving the milestone in that state would, in substance, bless six phases of
+deferred checks. The standing autonomy grant is explicit that this is the one thing deferral must
+never become:
+
+> "**Never record a deferred check as passed.** 'Skip the checkpoint' means defer and disclose, not
+> self-approve."
+
+Completing and archiving a milestone whose every remaining phase is unverified is self-approval by
+another name, so the run stops here rather than doing it. This is the grant's own boundary —
+"outstanding issues that must have answers" — reached at the lifecycle gate, not at a blocker.
+
+**Nothing is lost by stopping.** No phase work remains; only the owner's verification pass does.
+
+### What the owner does on return
+
+1. Work through `.planning/PENDING-VERIFICATION.md` — items for phases 31–38, with **38.1–38.7**
+   newest. Item 38.4 is starred as historically the hardest: delete one section slide, reload, and
+   confirm it stays deleted.
+2. `/gsd-verify-work 32` · `33` · `34` · `35` · `37` · `38` as each phase's items pass.
+3. Phase 36 is a separate decision — its wireframe now exists (Turn 3), so `/gsd-autonomous --only 36`
+   is unblocked whenever wanted.
+4. Only then `/gsd-audit-milestone` → `/gsd-complete-milestone v1.4` → `/gsd-cleanup`.
+
+## ★ v1.4 AUTONOMOUS RUN — standing decisions (2026-07-28)
 
 ## ★ v1.4 AUTONOMOUS RUN — standing decisions (2026-07-28)
 
@@ -603,6 +638,7 @@ vitest run` passes 39/39 directly. Logged in the phase's `deferred-items.md`. Us
 | 35 | verification_deferred_human | /gsd-verify-work 35 |
 | 36 | deferred_by_owner — **wireframe now EXISTS** (Turn 3) | /gsd-autonomous --only 36 |
 | 37 | verification_deferred_human | /gsd-verify-work 37 |
+| 38 | verification_deferred_human | /gsd-verify-work 38 |
 
 > **Table corrected 2026-08-05 (autonomous re-entry).** Rows 32/33/34/37 were always deferred in
 > substance — code-complete, `human_needed`, and itemised in `PENDING-VERIFICATION.md` under the
