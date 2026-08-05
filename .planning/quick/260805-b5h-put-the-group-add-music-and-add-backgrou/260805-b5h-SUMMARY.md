@@ -137,3 +137,66 @@ Task 1's automated evidence is complete and clean. Task 2 remains open: the owne
 - FOUND: src/components/slides/__tests__/SlideGrid.test.ts
 - FOUND: .planning/quick/260805-b5h-put-the-group-add-music-and-add-backgrou/260805-b5h-SUMMARY.md
 - FOUND commit: 8cc6c28
+
+---
+
+## Post-plan owner follow-up (commit `c3dc559`)
+
+Task 1 shipped `8cc6c28` as planned, but on visual inspection the owner
+rejected two aspects of it. Recorded here because the correction is NOT what
+the plan specified — the plan's own prescription was part of the problem.
+
+**Owner report (verbatim):** "but, now you have them in their own `<div>`
+containers. Let's use flex, and don't containerize each button. Move the label
+for 'applies to all slides, ...' so that it shows below the buttons."
+
+### What the plan got wrong
+
+The plan mandated `min-w-[14rem] flex-1` on both panel children, reasoning that
+a shrink floor paired with a grow factor was needed so `flex-wrap` would engage
+on a narrow rail. That reasoning is sound in isolation but produced the wrong
+visual: `flex-1` makes each child claim an equal share of the row **whether or
+not its content needs it**, so two small buttons rendered as two half-width
+columns. That is what the owner saw as "their own `<div>` containers".
+
+The grow factor was also the only reason a width floor was needed at all. With
+no `flex-1`, each item sizes to content, so there is no crush to protect
+against and no floor to add. `min-w-0 max-w-full` remains, serving a different
+purpose: capping an attached long filename at the panel width so the control's
+own inner `truncate` engages instead of overflowing.
+
+### The caption was the real alignment culprit
+
+`BackgroundControl` renders its caption stacked ABOVE its add-button. So even
+with a correct row axis, the background button sat one line lower than the
+music button. No amount of flex tuning on the panel could fix that — the extra
+line was inside one of the children. Fixed by adding an opt-in `hideCaption`
+prop (default `false`, so `SongLyricEditor.vue`'s call site is byte-identical)
+and painting the caption in `SlideGrid.vue` as a `basis-full` flex item, i.e.
+its own full-width line below both buttons. `groupBackgroundCaption` remains
+the single source of that copy.
+
+Suppressed while `songBackgroundForInheritedDisplay` is set, preserving the
+either/or relationship the control's own caption had with the "inherited from
+the song" line.
+
+### Verification (re-run after the follow-up)
+
+- `npx vitest run src/components/slides/__tests__/SlideGrid.test.ts` — 120/120
+- `npx vitest run src/components/slides/__tests__/BackgroundControl.test.ts src/components/__tests__/SongLyricEditor.test.ts` — 84/84 (both existing caption assertions unchanged and passing, proving the song-level call site is unaffected)
+- `npm run type-check` — clean
+- `npx vitest run --dir src --exclude '**/rules.test.ts'` — 2421 passed, failing files exactly the documented baseline (`src/storage.rules.test.ts`, `src/views/__tests__/RosterView.test.ts`)
+
+### Test changes
+
+The plan's own regression test asserted `flex-1` + `min-w-[14rem]` on both
+children. That assertion was pinning the rejected behaviour, so it was replaced
+with its inverse, plus two new tests covering caption placement (full-width,
+after both buttons in source order, absent from inside the control) and caption
+absence when only the music control renders.
+
+### Task 2 status: still pending
+
+Unchanged — the blocking `checkpoint:human-verify` gate has not been approved.
+The checklist in the Task 2 section still applies, with one addition: confirm
+the caption reads as a single line under both buttons, not beside or above one.
