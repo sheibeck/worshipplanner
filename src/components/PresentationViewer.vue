@@ -116,25 +116,26 @@
             {{ (currentSlide.slide as ScriptureSlide).reference }}
           </p>
           <template v-if="isCongregational">
-            <div
-              v-for="(section, idx) in [(currentSlide.slide as ScriptureSlide).section].filter((s): s is CongregationalSection => !!s)"
-              :key="idx"
-              :data-testid="`presentation-congregational-section-${idx}`"
-              class="mb-8 text-left w-full"
+            <!--
+              38-02: one slide carries exactly one section — the speaker sits
+              on its own line above the section's words, both at the same
+              body treatment the reference above them uses (no accent
+              colour, no size/weight step). There is nothing left to
+              distinguish visually between stacked sections, because there
+              is no longer a stack.
+            -->
+            <p
+              data-testid="presentation-speaker"
+              class="text-gray-100 text-5xl font-normal leading-[1.4] mb-2"
             >
-              <span
-                :data-testid="`presentation-speaker-${idx}`"
-                class="text-gray-100 text-5xl font-normal leading-[1.4] mr-4"
-              >
-                {{ section.speaker === 'LEADER' ? 'Leader:' : 'Congregation:' }}
-              </span>
-              <span
-                class="text-5xl leading-[1.4]"
-                :class="section.speaker === 'LEADER' ? 'text-gray-100 font-semibold' : 'text-gray-300 font-normal pl-8'"
-              >
-                {{ section.text }}
-              </span>
-            </div>
+              {{ ((currentSlide.slide as ScriptureSlide).section as CongregationalSection).speaker === 'LEADER' ? 'Leader:' : 'Congregation:' }}
+            </p>
+            <p
+              data-testid="presentation-congregational-section"
+              class="text-gray-100 whitespace-pre-line text-5xl font-normal leading-[1.4]"
+            >
+              {{ ((currentSlide.slide as ScriptureSlide).section as CongregationalSection).text }}
+            </p>
           </template>
           <p
             v-else
@@ -485,10 +486,10 @@ function cardKind(slide: Slide): CardKind {
 const slideKind = computed<CardKind | null>(() => (currentSlide.value ? cardKind(currentSlide.value.slide) : null))
 
 /**
- * A congregational scripture slide only renders the Leader/Congregation block
- * layout when it actually carries at least one section — a readingMode of
- * 'congregational' with an empty/undefined `sections` array falls back to the
- * normal (plain-text) rendering rather than a blank/broken slide.
+ * A scripture slide renders the speaker block only when it actually carries
+ * a `section` (38-02: the field is singular — a slide has at most one). A
+ * slide marked `readingMode: 'congregational'` but with no `section` degrades
+ * to the normal plain-text rendering rather than projecting an empty block.
  */
 const isCongregational = computed(() => {
   const slide = currentSlide.value?.slide
