@@ -312,6 +312,7 @@ Plans:
      unlike the "Add music" clause, it never received an owner-approved correction. Either accept the
      override recorded in `36-VERIFICATION.md`'s frontmatter, or commission the full relocation — which
      is materially more expensive and which the UI-SPEC recommends against rather than forbids.
+
   5. The Roles tab is last in the tab order
 
 **Plans**: 5/5 plans executed
@@ -369,10 +370,10 @@ Plans:
   4. A section slide can be deleted on its own, and stays deleted — it must not reappear when the group is next derived
   5. Existing services with a stored congregational reading keep working; nothing that reads today's shape breaks
 
-**Plans**: 4 plans
+**Plans**: 1/4 plans executed
 Plans:
 
-- [ ] 38-01-PLAN.md — The two states in the pure layer: section payload on SourceRef, N-entry derivation, sections-aware signature, detach/convert/destroy rebuild (wave 1)
+- [x] 38-01-PLAN.md — The two states in the pure layer: section payload on SourceRef, N-entry derivation, sections-aware signature, detach/convert/destroy rebuild (wave 1)
 - [ ] 38-02-PLAN.md — One section per slide in the type system and on the projector: singular field, speaker above the passage (wave 2)
 - [ ] 38-03-PLAN.md — Edit and delete a section slide: drawer passage field, speaker control, speaker-named cards (wave 3)
 - [ ] 38-04-PLAN.md — Composed multi-tick durability and migration contract, comment reconciliation, owner verification (wave 4)
@@ -385,17 +386,21 @@ Plans:
 - Sections are **slot-owned, not slide-owned**: `ServiceSlot.congregationalSections` (`src/types/service.ts:69`).
 - A SCRIPTURE slot materializes **exactly one** entry with no payload:
   `[{ order: 0, sourceRef: { kind: 'scripture' } }]` (`src/utils/slideGroupMaterializer.ts:84`).
+
 - `congregationalSlideFieldsFromSlot` (`src/utils/scripture.ts:218-225`) copies **all** sections onto
   that single slide at assembly time, which is why `PresentationViewer` renders them stacked.
+
 - **The precedent to follow already exists**: an `IMPORTED` slot emits one entry per inner slide
   (`slideGroupMaterializer.ts:92-96`), discriminated by `innerSlideId`. Multi-entry groups from one
   slot are established, not novel. The `slideGroup.ts` `SourceRef` doc comment already anticipates
   this exact widening for congregational splits.
+
 - **The hard problem is criterion 4.** Group membership is re-derived from the slot, so a deleted
   section slide will come back unless deletion changes the slot's sections or something records the
   deletion. The re-derivation trigger is a structural signature that, for scripture, is just the
   formatted reference (`slideGroupMaterializer.ts:133-137`) — so today a sections change does **not**
   re-derive. Both halves of that need deciding together: what re-derives, and what a delete means.
+
 - **Related correctness rule not to break**: changing a slot's reference clears its stored sections
   on purpose (`scripture.ts:227-238`) — projecting one passage's words under another reference is a
   failure the assembler cannot detect.
@@ -417,7 +422,7 @@ Plans:
 | 35. Presentation Correctness & Lyric Editor | v1.4 | 4/4 | In Progress|  |
 | 36. UI Rework — Service Order & Contextual Action Bars | v1.4 | 5/5 | In Progress|  |
 | 37. PowerPoint Server-Side Rendering | v1.4 | 6/6 | In Progress|  |
-| 38. Congregational Readings Become Real Slides | v1.4 | 0/0 | Not Started|  |
+| 38. Congregational Readings Become Real Slides | v1.4 | 1/4 | In Progress|  |
 
 ## Backlog
 

@@ -275,7 +275,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 
 - [x] **R069** (quality-attribute): The Roles tab is last in the tab order, being the least used.
 
-- [ ] **R072** (functional): Converting a scripture item into a congregational reading produces one
+- [x] **R072** (functional): Converting a scripture item into a congregational reading produces one
       slide per Leader/Congregation section — speaker above that section's passage — and each of
       those slides is independently editable and deletable. Conversion detaches the group from
       slot-driven re-derivation; any change to the slot's scripture destroys the group and rebuilds
