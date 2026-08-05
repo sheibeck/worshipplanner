@@ -100,6 +100,7 @@ can see, slides that always mirror the plan — and finish them against the Clau
 - [x] **Phase 35: Presentation Correctness & Lyric Editor** - No organizational labels when presenting, CCLI on first+last slide, inline paste-lyrics warnings (completed 2026-08-03)
 - [ ] **Phase 36: UI Rework — Service Order & Contextual Action Bars** - Rebuild the Service Order tab and apply one contextual action bar across every tab
 - [ ] **Phase 37: PowerPoint Server-Side Rendering** - Render imported PowerPoint decks server-side to true-fidelity images
+- [ ] **Phase 38: Congregational Readings Become Real Slides** - Each Leader/Congregation section becomes its own slide, individually editable and deletable
 
 ## Phase Details
 
@@ -355,6 +356,44 @@ Plans:
 **Planning note (2026-08-03):** planned under **BUILD BUT DO NOT DEPLOY** (STATE.md v1.4 standing decisions). No plan runs `gcloud`, `firebase deploy`, `docker build`/`push`, or creates any GCP resource. The exact deploy command is handed over in `render-service/DEPLOY.md` for the owner to run. Six plans rather than the `coarse` granularity's usual 1-3 because the phase spans three separate test suites — `render-service/` (new), `functions/`, and the app's `src/` — and a 3-plan shape would need six tasks per plan.
 **Notes**: Standalone Cloud Run service (custom Dockerfile, LibreOffice + Poppler) — Firebase Functions buildpacks cannot install these; a new Cloud Function bridges via service-to-service IAM auth, invoked asynchronously with a completeness check (only flip the deck to "ready" once every expected image is confirmed uploaded). Rendered images land under the existing `orgs/{orgId}/pptx-imports/{importId}/rendered/` prefix — sibling to `images/`, structurally exempt from `cleanupExpiredMedia`'s regex guard with zero changes to that function. Any new deletion path this introduces must default to dry-run — the inverse default already caused a real incident in this codebase (`cleanupExpiredMedia`'s doc-comment-vs-code-default mismatch, fixed 2026-07-28). **User decision:** kept in v1.4 but scheduled deliberately last so an overrun or cut disturbs nothing else.
 
+### Phase 38: Congregational Readings Become Real Slides
+
+**Goal:** A congregational scripture reading produces one slide per section — speaker on top, passage below — and each of those slides can be edited or deleted on its own.
+**Depends on**: Phase 34 (which produced `ServiceSlot.congregationalSections`) and Phase 30 (whose hard lock governs group membership)
+**Requirements**: Owner request 2026-08-05 — no R-number yet; assign one during planning if this survives as milestone scope.
+**Success Criteria** (what must be TRUE):
+
+  1. Turning a scripture item into a congregational reading yields N slides in the slide grid, one per section — not one slide carrying N sections
+  2. Each section slide shows its speaker (Leader / Congregation) above that section's passage text
+  3. A section slide can be edited on its own without altering its siblings
+  4. A section slide can be deleted on its own, and stays deleted — it must not reappear when the group is next derived
+  5. Existing services with a stored congregational reading keep working; nothing that reads today's shape breaks
+
+**Plans**: not yet planned
+
+**UI hint**: yes — touches the slide grid, the 3-dot menu, and the projected slide
+**Research flag**: no external research needed; the uncertainty is internal design, resolved by discussion
+
+**Scoping notes (scouted 2026-08-05, verify before planning — these are the facts that make this a phase and not a quick task):**
+
+- Sections are **slot-owned, not slide-owned**: `ServiceSlot.congregationalSections` (`src/types/service.ts:69`).
+- A SCRIPTURE slot materializes **exactly one** entry with no payload:
+  `[{ order: 0, sourceRef: { kind: 'scripture' } }]` (`src/utils/slideGroupMaterializer.ts:84`).
+- `congregationalSlideFieldsFromSlot` (`src/utils/scripture.ts:218-225`) copies **all** sections onto
+  that single slide at assembly time, which is why `PresentationViewer` renders them stacked.
+- **The precedent to follow already exists**: an `IMPORTED` slot emits one entry per inner slide
+  (`slideGroupMaterializer.ts:92-96`), discriminated by `innerSlideId`. Multi-entry groups from one
+  slot are established, not novel. The `slideGroup.ts` `SourceRef` doc comment already anticipates
+  this exact widening for congregational splits.
+- **The hard problem is criterion 4.** Group membership is re-derived from the slot, so a deleted
+  section slide will come back unless deletion changes the slot's sections or something records the
+  deletion. The re-derivation trigger is a structural signature that, for scripture, is just the
+  formatted reference (`slideGroupMaterializer.ts:133-137`) — so today a sections change does **not**
+  re-derive. Both halves of that need deciding together: what re-derives, and what a delete means.
+- **Related correctness rule not to break**: changing a slot's reference clears its stored sections
+  on purpose (`scripture.ts:227-238`) — projecting one passage's words under another reference is a
+  failure the assembler cannot detect.
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -372,6 +411,7 @@ Plans:
 | 35. Presentation Correctness & Lyric Editor | v1.4 | 4/4 | In Progress|  |
 | 36. UI Rework — Service Order & Contextual Action Bars | v1.4 | 5/5 | In Progress|  |
 | 37. PowerPoint Server-Side Rendering | v1.4 | 6/6 | In Progress|  |
+| 38. Congregational Readings Become Real Slides | v1.4 | 0/0 | Not Started|  |
 
 ## Backlog
 
