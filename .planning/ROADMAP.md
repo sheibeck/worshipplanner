@@ -360,7 +360,7 @@ Plans:
 
 **Goal:** A congregational scripture reading produces one slide per section — speaker on top, passage below — and each of those slides can be edited or deleted on its own.
 **Depends on**: Phase 34 (which produced `ServiceSlot.congregationalSections`) and Phase 30 (whose hard lock governs group membership)
-**Requirements**: Owner request 2026-08-05 — no R-number yet; assign one during planning if this survives as milestone scope.
+**Requirements**: R072 (assigned during planning 2026-08-05, from the owner request of the same day)
 **Success Criteria** (what must be TRUE):
 
   1. Turning a scripture item into a congregational reading yields N slides in the slide grid, one per section — not one slide carrying N sections
@@ -369,7 +369,13 @@ Plans:
   4. A section slide can be deleted on its own, and stays deleted — it must not reappear when the group is next derived
   5. Existing services with a stored congregational reading keep working; nothing that reads today's shape breaks
 
-**Plans**: not yet planned
+**Plans**: 4 plans
+Plans:
+
+- [ ] 38-01-PLAN.md — The two states in the pure layer: section payload on SourceRef, N-entry derivation, sections-aware signature, detach/convert/destroy rebuild (wave 1)
+- [ ] 38-02-PLAN.md — One section per slide in the type system and on the projector: singular field, speaker above the passage (wave 2)
+- [ ] 38-03-PLAN.md — Edit and delete a section slide: drawer passage field, speaker control, speaker-named cards (wave 3)
+- [ ] 38-04-PLAN.md — Composed multi-tick durability and migration contract, comment reconciliation, owner verification (wave 4)
 
 **UI hint**: yes — touches the slide grid, the 3-dot menu, and the projected slide
 **Research flag**: no external research needed; the uncertainty is internal design, resolved by discussion

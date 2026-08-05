@@ -275,6 +275,13 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 
 - [x] **R069** (quality-attribute): The Roles tab is last in the tab order, being the least used.
 
+- [ ] **R072** (functional): Converting a scripture item into a congregational reading produces one
+      slide per Leader/Congregation section — speaker above that section's passage — and each of
+      those slides is independently editable and deletable. Conversion detaches the group from
+      slot-driven re-derivation; any change to the slot's scripture destroys the group and rebuilds
+      it as a plain reference slide, which the planner must then opt to split again. Owner request
+      2026-08-05; ID assigned during Phase 38 planning.
+
 ---
 
 ## Future Requirements
@@ -341,11 +348,12 @@ Acknowledged, deferred, not in this roadmap.
 | R069 | Phase 36 | Complete |
 | R070 | Phase 34 | Complete |
 | R071 | Phase 34 | Complete |
+| R072 | Phase 38 | Planned |
 
 **Coverage:**
 
-- v1.4 requirements: 36 total (R036–R071)
-- Mapped to phases: 36
+- v1.4 requirements: 37 total (R036–R072)
+- Mapped to phases: 37
 - Unmapped: 0 ✓
 
 **Phase → requirement-count summary:**
@@ -361,6 +369,7 @@ Acknowledged, deferred, not in this roadmap.
 | 35 | Presentation Correctness & Lyric Editor | R059, R060, R061, R065, R066 (5) |
 | 36 | UI Rework — Service Order & Contextual Action Bars | R053, R067, R068, R069 (4) |
 | 37 | PowerPoint Server-Side Rendering | R062 (1) |
+| 38 | Congregational Readings Become Real Slides | R072 (1) |
 
 ---
 *Requirements defined: 2026-07-28*
