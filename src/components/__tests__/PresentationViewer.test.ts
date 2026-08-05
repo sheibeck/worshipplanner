@@ -80,9 +80,12 @@ function scriptureSlide(id: string, section: AssembledSlide['section'] = 'messag
   }
 }
 
+// 38-02: a ScriptureSlide carries at most ONE congregational section — the
+// fixture takes a single section (or undefined for the no-section fallback
+// case), never a list.
 function congregationalScriptureSlide(
   id: string,
-  sections: import('@/types/slide').CongregationalSection[] | undefined,
+  section: import('@/types/slide').CongregationalSection | undefined,
 ): AssembledSlide {
   return {
     slide: {
@@ -91,10 +94,10 @@ function congregationalScriptureSlide(
       contentKind: 'scripture',
       reference: 'Psalm 136:1-4',
       bookRef: { book: 'Psalm', chapter: 136, verseStart: 1, verseEnd: 4 },
-      text: 'Give thanks to the LORD, for he is good. His love endures forever.',
+      text: section?.text ?? 'Give thanks to the LORD, for he is good. His love endures forever.',
       verseRange: 'vv. 1-4',
       readingMode: 'congregational',
-      ...(sections !== undefined && { sections }),
+      ...(section !== undefined && { section }),
     },
     slotIndex: 1,
     slotKind: 'SCRIPTURE',
@@ -547,12 +550,9 @@ describe('PresentationViewer', () => {
     expect(classes).not.toContain('tracking-wider')
   })
 
-  it('D1: a congregational ScriptureSlide renders its reference in the unified body treatment too, and its speaker tag loses its accent while keeping its words', async () => {
-    const sections = [
-      { speaker: 'LEADER' as const, text: 'Give thanks to the LORD, for he is good.' },
-      { speaker: 'CONGREGATION' as const, text: 'His love endures forever.' },
-    ]
-    mount(PresentationViewer, { props: { slides: [congregationalScriptureSlide('a', sections)] } })
+  it('D1: a congregational ScriptureSlide renders its reference in the unified body treatment too, and its speaker tag carries no accent, in a LEADER section slide showing that section\'s words', async () => {
+    const section = { speaker: 'LEADER' as const, text: 'Give thanks to the LORD, for he is good.' }
+    mount(PresentationViewer, { props: { slides: [congregationalScriptureSlide('a', section)] } })
     await Promise.resolve()
 
     const classes = body().find('[data-testid="presentation-scripture-reference"]').classes()
@@ -568,7 +568,7 @@ describe('PresentationViewer', () => {
     expect(classes).not.toContain('uppercase')
     expect(classes).not.toContain('tracking-wider')
 
-    const leaderTag = body().find('[data-testid="presentation-speaker-0"]')
+    const leaderTag = body().find('[data-testid="presentation-speaker"]')
     expect(leaderTag.classes()).toContain('text-gray-100')
     expect(leaderTag.classes()).toContain('text-5xl')
     expect(leaderTag.classes()).toContain('font-normal')
@@ -577,6 +577,10 @@ describe('PresentationViewer', () => {
     expect(leaderTag.classes()).not.toContain('uppercase')
     expect(leaderTag.classes()).not.toContain('tracking-wider')
     expect(leaderTag.text()).toBe('Leader:')
+
+    const words = body().find('[data-testid="presentation-congregational-section"]')
+    expect(words.exists()).toBe(true)
+    expect(words.text()).toBe(section.text)
   })
 
   it('N-1 (D1 regression): an unfetched scripture passage still projects its reference as the entire visible content of the slide, never a blank one', async () => {
@@ -592,48 +596,55 @@ describe('PresentationViewer', () => {
     expect(slideText().replace(/\s+/g, ' ').trim()).toBe('Romans 8:28-30')
   })
 
-  it('a congregational ScriptureSlide with two sections renders Leader/Congregation blocks with an identical, unified class list', async () => {
-    const sections = [
-      { speaker: 'LEADER' as const, text: 'Give thanks to the LORD, for he is good.' },
-      { speaker: 'CONGREGATION' as const, text: 'His love endures forever.' },
-    ]
-    mount(PresentationViewer, { props: { slides: [congregationalScriptureSlide('a', sections)] } })
+  it('two consecutive sections produce two slides, each showing only its own speaker and words, in document order speaker-then-words', async () => {
+    const leaderSection = { speaker: 'LEADER' as const, text: 'Give thanks to the LORD, for he is good.' }
+    const congregationSection = { speaker: 'CONGREGATION' as const, text: 'His love endures forever.' }
+    mount(PresentationViewer, {
+      props: {
+        slides: [
+          congregationalScriptureSlide('a', leaderSection),
+          congregationalScriptureSlide('b', congregationSection),
+        ],
+      },
+    })
     await Promise.resolve()
 
-    expect(body().find('[data-testid="presentation-congregational-section-0"]').exists()).toBe(true)
-    expect(body().find('[data-testid="presentation-congregational-section-1"]').exists()).toBe(true)
+    // Slide 1: only the LEADER section's speaker and words are present.
+    const speaker1 = body().find('[data-testid="presentation-speaker"]')
+    const words1 = body().find('[data-testid="presentation-congregational-section"]')
+    expect(speaker1.text()).toBe('Leader:')
+    expect(words1.text()).toBe(leaderSection.text)
+    expect(slideText()).not.toContain(congregationSection.text)
 
-    const leaderTag = body().find('[data-testid="presentation-speaker-0"]')
-    expect(leaderTag.text()).toBe('Leader:')
+    // Document order: the speaker element precedes the section-text element.
+    expect(speaker1.element.compareDocumentPosition(words1.element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 
-    const congregationTag = body().find('[data-testid="presentation-speaker-1"]')
-    expect(congregationTag.text()).toBe('Congregation:')
+    // Advance to slide 2: only the CONGREGATION section's speaker and words —
+    // slide 1's speaker/words do not leak onto it.
+    await body().find('[data-testid="presentation-next"]').trigger('click')
+    const speaker2 = body().find('[data-testid="presentation-speaker"]')
+    const words2 = body().find('[data-testid="presentation-congregational-section"]')
+    expect(speaker2.text()).toBe('Congregation:')
+    expect(words2.text()).toBe(congregationSection.text)
+    expect(slideText()).not.toContain(leaderSection.text)
+    expect(
+      speaker2.element.compareDocumentPosition(words2.element) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
 
-    expect(leaderTag.classes().slice().sort()).toEqual(congregationTag.classes().slice().sort())
-    expect(leaderTag.classes()).toContain('text-5xl')
-
-    const congregationSection = body().find('[data-testid="presentation-congregational-section-1"]')
-    expect(congregationSection.html()).toContain('pl-8')
+    // Both slides render the speaker/words at the same, unified class treatment.
+    expect(speaker1.classes().slice().sort()).toEqual(speaker2.classes().slice().sort())
+    expect(words1.classes().slice().sort()).toEqual(words2.classes().slice().sort())
   })
 
-  it('readingMode congregational with sections undefined falls back to normal-mode rendering', async () => {
+  it('readingMode congregational with no section falls back to normal-mode rendering', async () => {
     mount(PresentationViewer, { props: { slides: [congregationalScriptureSlide('a', undefined)] } })
     await Promise.resolve()
 
     expect(body().find('[data-testid="presentation-body"]').text()).toContain(
       'Give thanks to the LORD, for he is good.',
     )
-    expect(body().find('[data-testid="presentation-congregational-section-0"]').exists()).toBe(false)
-  })
-
-  it('readingMode congregational with sections: [] falls back to normal-mode rendering', async () => {
-    mount(PresentationViewer, { props: { slides: [congregationalScriptureSlide('a', [])] } })
-    await Promise.resolve()
-
-    expect(body().find('[data-testid="presentation-body"]').text()).toContain(
-      'Give thanks to the LORD, for he is good.',
-    )
-    expect(body().find('[data-testid="presentation-congregational-section-0"]').exists()).toBe(false)
+    expect(body().find('[data-testid="presentation-speaker"]').exists()).toBe(false)
+    expect(body().find('[data-testid="presentation-congregational-section"]').exists()).toBe(false)
   })
 
   it('D2: a TextSlide with a title projects only its body — the title never reaches the projector', async () => {
@@ -677,16 +688,14 @@ describe('PresentationViewer', () => {
       expect(body().find('[data-testid="presentation-body"]').classes()).toContain('text-5xl')
     })
 
-    it('a congregational scripture slide renders both its reference and its speaker tag at text-5xl', async () => {
-      const sections = [
-        { speaker: 'LEADER' as const, text: 'Give thanks to the LORD, for he is good.' },
-        { speaker: 'CONGREGATION' as const, text: 'His love endures forever.' },
-      ]
-      mount(PresentationViewer, { props: { slides: [congregationalScriptureSlide('a', sections)] } })
+    it('a congregational scripture slide renders its reference, its speaker and its section text all at text-5xl', async () => {
+      const section = { speaker: 'LEADER' as const, text: 'Give thanks to the LORD, for he is good.' }
+      mount(PresentationViewer, { props: { slides: [congregationalScriptureSlide('a', section)] } })
       await Promise.resolve()
 
       expect(body().find('[data-testid="presentation-scripture-reference"]').classes()).toContain('text-5xl')
-      expect(body().find('[data-testid="presentation-speaker-0"]').classes()).toContain('text-5xl')
+      expect(body().find('[data-testid="presentation-speaker"]').classes()).toContain('text-5xl')
+      expect(body().find('[data-testid="presentation-congregational-section"]').classes()).toContain('text-5xl')
     })
 
     it('a text slide body renders at text-5xl', async () => {
@@ -1418,18 +1427,15 @@ describe('PresentationViewer', () => {
       expect(body().find('[data-testid="presentation-video"]').exists()).toBe(true)
     })
 
-    it('a congregational scripture slide with a background renders the background AND every congregational section', async () => {
-      const sections = [
-        { speaker: 'LEADER' as const, text: 'Give thanks to the LORD, for he is good.' },
-        { speaker: 'CONGREGATION' as const, text: 'His love endures forever.' },
-      ]
-      const slide = withBackground(congregationalScriptureSlide('a', sections), 'https://example.com/bg.jpg')
+    it('a congregational scripture slide with a background renders the background AND its one section', async () => {
+      const section = { speaker: 'LEADER' as const, text: 'Give thanks to the LORD, for he is good.' }
+      const slide = withBackground(congregationalScriptureSlide('a', section), 'https://example.com/bg.jpg')
       mount(PresentationViewer, { props: { slides: [slide] } })
       await Promise.resolve()
 
       expect(body().find('[data-testid="presentation-background"]').exists()).toBe(true)
-      expect(body().find('[data-testid="presentation-congregational-section-0"]').exists()).toBe(true)
-      expect(body().find('[data-testid="presentation-congregational-section-1"]').exists()).toBe(true)
+      expect(body().find('[data-testid="presentation-speaker"]').exists()).toBe(true)
+      expect(body().find('[data-testid="presentation-congregational-section"]').text()).toBe(section.text)
     })
 
     it('advancing from a slide with a background to a slide without one removes both elements', async () => {
