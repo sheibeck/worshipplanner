@@ -198,7 +198,14 @@ Plans:
   3. A signed-in member who has not yet received the claim (pre-rollout) still passes on the existing Firestore-membership branch, and a user who belongs to no organization is denied on both branches — proven by tests covering both arms of the dual-read OR, not just one
   4. The idempotent, resumable backfill script for existing users, and the exact two-deploy sequence — (a) deploy the dual-read rule and the claims function, hold for one full max-token-lifetime (1 hour) soak, then (b) deploy again removing the Firestore-membership fallback — are written and handed to the owner as the next action. Reaching this state IS the phase goal; neither deploy runs during this phase
 
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 40-01-PLAN.md — `storage.rules` dual-read (claim OR Firestore, claim first) and the non-vacuous rules test matrix; turns the two measured allow-case failures green [wave 1]
+- [ ] 40-02-PLAN.md — `syncOrgMembershipClaim` `onDocumentWritten` trigger plus the shared `decideMembershipClaim` module and its unit tests [wave 1]
+- [ ] 40-03-PLAN.md — forced `getIdTokenResult(true)` on org-context load with a bounded retry scoped to the just-created-membership path [wave 1]
+- [ ] 40-04-PLAN.md — idempotent dry-run-by-default backfill script and `functions/DEPLOY-ORG-CLAIMS.md`, the two-deploy handoff [wave 2]
+
 **UI hint**: no
 **Research flag**: needs research — dual-read rollout design, the 1000-byte claim-payload budget against live multi-org membership (`users/{uid}.orgIds` is already an array), and the race condition at invite-acceptance time.
 **Notes**: Scoped to `storage.rules` only — `firestore.rules` uses same-service `exists()`/`get()`, unaffected by firebase-js-sdk#6803, and migrating it too would trade one staleness class for a worse, unnecessary one (role changes lagging a token refresh). This phase's success is measured entirely by emulator evidence and a written handoff, never by a live deploy — see the v1.5 standing autonomy grant in STATE.md. **This phase structurally cannot fully close inside an autonomous run** — the soak-and-fallback-removal step needs the owner's clock, not just their command.
