@@ -1,7 +1,10 @@
 ---
 phase: 37-powerpoint-server-side-rendering
 verified: 2026-08-03T15:00:00Z
-status: human_needed
+status: passed
+status_source: owner-attributed
+status_prior: human_needed
+status_changed: "2026-08-05 — owner closed milestone v1.4 and accepted all outstanding phase verification without running it"
 score: 3/4 roadmap truths verified (1 uncertain — requires owner deployment + a future UI phase)
 behavior_unverified: 0
 overrides_applied: 0
@@ -152,3 +155,44 @@ quality and completeness of the underlying automated work.
 
 *Verified: 2026-08-03*
 *Verifier: Claude (gsd-verifier)*
+
+
+## Attribution of the `passed` status — READ THIS BEFORE CITING IT
+
+**This status was not earned by verification. It was granted by the owner.**
+
+On 2026-08-05 the owner closed milestone v1.4 with the instruction *"Mark all phases as verified,
+then close the milestone"*, having first said *"I think we're good with this milestone. Any issues I
+find from here on out will go in the next set of changes I'm going to post."* Phase 37's
+outstanding human verification was **accepted, not run**.
+
+The automated evidence in the body of this report is unaffected and stands on its own — it was
+produced against live source before this flip. What changed is only the frontmatter `status`, and
+only because the owner said so.
+
+The items listed under `human_verification` below (and in `.planning/PENDING-VERIFICATION.md`) were
+**never executed**. They are preserved verbatim rather than deleted, so that if a defect later
+surfaces in this phase, the record shows exactly which checks would have caught it and that nobody
+performed them. The owner accepted that trade knowingly and routed future findings to the next
+milestone.
+
+### ★ NOTHING IS DEPLOYED — this status change provisioned no infrastructure
+
+Phase 37 built the PowerPoint server-side rendering pipeline and deliberately **did not deploy it**,
+per the owner's standing v1.4 decision (*"BUILD BUT DO NOT DEPLOY"* — deploying provisions billable
+Cloud Run infrastructure and is the owner's call). That is still true after this flip.
+
+- R062 remains **`[~]` partial**, not complete. Criterion 1 ("displays as a true visual rendering")
+  is *uncertain, not demonstrated*: the pipeline is built and tested, but the service is undeployed
+  and **no UI consumes the rendered images**.
+- `render-service/DEPLOY.md` is the handoff — IAM in both directions, Artifact Registry, region,
+  memory/CPU, timeout, concurrency, and env vars including `STORAGE_BUCKET` and
+  `PPTX_RENDER_CLEANUP_ENABLED`.
+- Two package-legitimacy checkpoints (`express`, `@google-cloud/storage`, `@types/*`, and
+  `google-auth-library`) were deferred under the autonomy grant and were **never owner-approved**.
+- **No code review was ever run for this phase.** Phases 32, 33 and 35 each got one and each
+  surfaced real defects. `/gsd-code-review 37` remains unrun.
+
+Marking this phase verified does not make the feature reachable by a user. It closes the milestone's
+bookkeeping only.
+

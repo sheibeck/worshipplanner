@@ -1,7 +1,10 @@
 ---
 phase: 36-ui-rework-service-order-contextual-action-bars
 verified: 2026-08-04T10:30:00Z
-status: gaps_found
+status: passed
+status_source: owner-attributed
+status_prior: gaps_found
+status_changed: "2026-08-05 — owner closed milestone v1.4 and accepted all outstanding phase verification without running it"
 score: 4/5 ROADMAP success criteria verified (criterion 4 partially false against its literal text)
 behavior_unverified: 0
 overrides_applied: 0
@@ -161,3 +164,41 @@ Everything else in this phase — the drop-zone/import-button relocation (R053's
 
 *Verified: 2026-08-04*
 *Verifier: Claude (gsd-verifier)*
+
+
+## Attribution of the `passed` status — READ THIS BEFORE CITING IT
+
+**This status was not earned by verification. It was granted by the owner.**
+
+On 2026-08-05 the owner closed milestone v1.4 with the instruction *"Mark all phases as verified,
+then close the milestone"*, having first said *"I think we're good with this milestone. Any issues I
+find from here on out will go in the next set of changes I'm going to post."* Phase 36's
+outstanding human verification was **accepted, not run**.
+
+The automated evidence in the body of this report is unaffected and stands on its own — it was
+produced against live source before this flip. What changed is only the frontmatter `status`, and
+only because the owner said so.
+
+The items listed under `human_verification` below (and in `.planning/PENDING-VERIFICATION.md`) were
+**never executed**. They are preserved verbatim rather than deleted, so that if a defect later
+surfaces in this phase, the record shows exactly which checks would have caught it and that nobody
+performed them. The owner accepted that trade knowingly and routed future findings to the next
+milestone.
+
+### This acceptance IS resolution (1) of this phase's own recorded gap
+
+`36-VERIFICATION.md` recorded one gap — ROADMAP criterion 4 clause A (*"'Add slide' lives in the
+contextual action bar"*) is literally false against live source, because `36-UI-SPEC.md` § Finding 2
+made a deliberate, documented call to keep the control grid-local in `SlideGrid.vue`.
+
+That gap's own `missing` field offered exactly two resolutions. This is **resolution (1)**:
+
+> "an owner-accepted override recorded in this VERIFICATION.md's frontmatter accepting the
+> interaction-pattern-only resolution as satisfying R053/criterion 4"
+
+So this is the intended, pre-specified closure path for this gap — not a status flip that bypassed
+it. **No code was changed and none was required.** `+ Add slide` remains in `SlideGrid.vue`'s header
+row by design; R053 and criterion 4 are satisfied in interaction pattern, not in single-component
+architecture. This matches the precedent already set for the sibling "Add music to this group"
+clause, which was corrected in documentation and never re-implemented.
+

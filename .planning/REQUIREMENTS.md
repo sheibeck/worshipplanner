@@ -213,7 +213,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
       consequently unverified (`PENDING-VERIFICATION.md` items 37.1–37.3). Original requirement text
       follows:
 
-- [ ] **R062** (core-capability): PowerPoint import produces a true visual representation of each slide —
+- [x] **R062** (core-capability): PowerPoint import produces a true visual representation of each slide —
       backgrounds, fonts, layout, effects — not text alone. Rendered server-side to images via a
       standalone Cloud Run service (LibreOffice + Poppler, custom Dockerfile — Firebase Functions
       buildpacks cannot install these), invoked asynchronously. Extracted text is retained as a

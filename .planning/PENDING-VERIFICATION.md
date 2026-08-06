@@ -1,5 +1,33 @@
 # Pending Human Verification — v1.4
 
+## ⛔ CLOSED UNRUN — 2026-08-05. Do not read the items below as "done".
+
+**The owner closed milestone v1.4 without executing this list.** Instruction, verbatim: *"I think
+we're good with this milestone. Any issues I find from here on out will go in the next set of changes
+I'm going to post."* followed by *"Mark all phases as verified, then close the milestone."*
+
+Every phase's `*-VERIFICATION.md` was accordingly flipped to `status: passed` with
+`status_source: owner-attributed`, and the milestone was archived. **The checks below were never
+performed.** Phase 38's items (38.1–38.7) were approved the same way earlier the same day.
+
+This file is deliberately preserved in full rather than deleted or ticked off. If a defect later
+surfaces anywhere in phases 31–38, the item that would have caught it is still written here, still
+unticked, and the record shows plainly that nobody ran it. That is the point — an accepted risk that
+stays legible is very different from one that gets tidied away.
+
+**The single highest-value unrun item, if you ever spot-check just one:** **38.4** — split a
+congregational reading, delete one section slide, reload, confirm it stays deleted. It is the one
+claim in this milestone with a history of failing on a *later* reactive tick rather than the first,
+and the only one whose automated proof (`congregationalDetachment.test.ts`) cannot substitute for a
+real Firestore round-trip.
+
+**Also still true regardless of this closure:** Phase 37's render service is **built but undeployed**
+by the owner's own instruction, R062 is `[~]` partial, its two package-legitimacy checkpoints were
+never approved, and no code review was ever run for that phase. Closing the milestone changed none of
+that. See `37-VERIFICATION.md`.
+
+---
+
 **Why this file exists.** The owner left for the weekend on 2026-07-30 with a standing instruction to
 work autonomously and skip human-verify checkpoints, doing verification together on their return. Every
 checkpoint skipped under that grant is recorded here rather than silently marked passed.

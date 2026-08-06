@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Service and Slides
-current_phase: 36
-current_phase_name: UI Rework — Service Order & Contextual Action Bars
+current_phase: 38
+current_phase_name: Congregational Readings Become Real Slides
 status: planning
 stopped_at: Completed 38-04-PLAN.md (Phase 38 code-complete; owner checkpoint deferred, PENDING-VERIFICATION.md 38.1-38.7)
-last_updated: "2026-08-06T02:52:43.625Z"
+last_updated: "2026-08-06T03:01:03.073Z"
 last_activity: 2026-08-05
-last_activity_desc: Phase 38 complete, transitioned to Phase 36
+last_activity_desc: Phase 37 complete, transitioned to Phase 38
 progress:
   total_phases: 10
   completed_phases: 10
@@ -75,11 +75,11 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 
 ## Current Position
 
-Phase: 36 — UI Rework — Service Order & Contextual Action Bars
+Phase: 38 — Congregational Readings Become Real Slides
 Plan: Not started
-Status: Ready for GAP CLOSURE, not fresh planning — 36 is already code-complete (5/5 plans,
+Status: Ready to plan
         executed 2026-08-04). `36-VERIFICATION.md` is `gaps_found` at 4/5 criteria.
-Last activity: 2026-08-05 — Phase 38 complete and owner-approved; transitioned to Phase 36
+Last activity: 2026-08-05 — Phase 37 complete, transitioned to Phase 38
 
 > Two lines of garbage were removed from this block on 2026-08-05 — orphaned fragments of the
 > previous phase's multi-line Status/Last-activity entries that `phase.complete` left behind when
@@ -101,6 +101,7 @@ The gap's own `missing` field offers two resolutions, neither of which is "move 
 
 1. an owner-accepted override recorded in `36-VERIFICATION.md`'s frontmatter, accepting the
    interaction-pattern-only resolution as satisfying R053 / criterion 4; **or**
+
 2. a dated ROADMAP.md / REQUIREMENTS.md correction rewriting criterion 4's first clause to describe
    the actual resolution — **the precedent already exists**: the sibling "Add music to this group"
    clause was corrected exactly this way and never re-implemented.

@@ -98,8 +98,8 @@ can see, slides that always mirror the plan — and finish them against the Clau
 - [x] **Phase 33: Backgrounds & Slide Editing** - Backgrounds at group/slide/song level and a split 3-dot Edit Slide menu (completed 2026-08-03)
 - [x] **Phase 34: Smarter Content — LLM Scripture Split** - LLM-assisted congregational reading splits, index-only, never regenerating scripture text (completed 2026-08-03; 12/12 truths, 5 human-verify items open)
 - [x] **Phase 35: Presentation Correctness & Lyric Editor** - No organizational labels when presenting, CCLI on first+last slide, inline paste-lyrics warnings (completed 2026-08-03)
-- [ ] **Phase 36: UI Rework — Service Order & Contextual Action Bars** - Rebuild the Service Order tab and apply one contextual action bar across every tab
-- [ ] **Phase 37: PowerPoint Server-Side Rendering** - Render imported PowerPoint decks server-side to true-fidelity images
+- [x] **Phase 36: UI Rework — Service Order & Contextual Action Bars** - Rebuild the Service Order tab and apply one contextual action bar across every tab (completed 2026-08-05)
+- [x] **Phase 37: PowerPoint Server-Side Rendering** - Render imported PowerPoint decks server-side to true-fidelity images (completed 2026-08-05)
 - [x] **Phase 38: Congregational Readings Become Real Slides** - Each Leader/Congregation section becomes its own slide, individually editable and deletable (completed 2026-08-05)
 
 ## Phase Details
@@ -416,12 +416,12 @@ Plans:
 | 29. Order Structure — Stable Reordering & Post-Service | v1.4 | 5/5 | Complete    | 2026-07-28 |
 | 30. Slides Mirror the Plan — Hard Lock & Reconciliation Removed | v1.4 | 4/4 | Complete    | 2026-07-29 |
 | 31. Service Lifecycle — Draft Lock & Reopen | v1.4 | 6/6 | Complete    | 2026-07-30 |
-| 32. Save Reliability — Autosave Fix & Persistent Status | v1.4 | 6/6 | In Progress|  |
-| 33. Backgrounds & Slide Editing | v1.4 | 9/9 | In Progress|  |
-| 34. Smarter Content — LLM Scripture Split | v1.4 | 12/12 | In Progress|  |
-| 35. Presentation Correctness & Lyric Editor | v1.4 | 4/4 | In Progress|  |
-| 36. UI Rework — Service Order & Contextual Action Bars | v1.4 | 5/5 | In Progress|  |
-| 37. PowerPoint Server-Side Rendering | v1.4 | 6/6 | In Progress|  |
+| 32. Save Reliability — Autosave Fix & Persistent Status | v1.4 | 6/6 | Complete    | 2026-08-05 |
+| 33. Backgrounds & Slide Editing | v1.4 | 9/9 | Complete    | 2026-08-05 |
+| 34. Smarter Content — LLM Scripture Split | v1.4 | 12/12 | Complete    | 2026-08-05 |
+| 35. Presentation Correctness & Lyric Editor | v1.4 | 4/4 | Complete    | 2026-08-05 |
+| 36. UI Rework — Service Order & Contextual Action Bars | v1.4 | 5/5 | Complete    | 2026-08-05 |
+| 37. PowerPoint Server-Side Rendering | v1.4 | 6/6 | Complete    | 2026-08-05 |
 | 38. Congregational Readings Become Real Slides | v1.4 | 4/4 | Complete    | 2026-08-05 |
 
 ## Backlog

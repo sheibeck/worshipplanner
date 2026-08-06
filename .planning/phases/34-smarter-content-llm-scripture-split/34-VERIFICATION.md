@@ -1,7 +1,10 @@
 ---
 phase: 34-smarter-content-llm-scripture-split
 verified: 2026-08-03T22:30:00Z
-status: human_needed
+status: passed
+status_source: owner-attributed
+status_prior: human_needed
+status_changed: "2026-08-05 — owner closed milestone v1.4 and accepted all outstanding phase verification without running it"
 score: 12/12 must-haves verified
 behavior_unverified: 0
 overrides_applied: 0
@@ -213,3 +216,24 @@ as passed.
 
 *Verified: 2026-08-03*
 *Verifier: Claude (gsd-verifier)*
+
+
+## Attribution of the `passed` status — READ THIS BEFORE CITING IT
+
+**This status was not earned by verification. It was granted by the owner.**
+
+On 2026-08-05 the owner closed milestone v1.4 with the instruction *"Mark all phases as verified,
+then close the milestone"*, having first said *"I think we're good with this milestone. Any issues I
+find from here on out will go in the next set of changes I'm going to post."* Phase 34's
+outstanding human verification was **accepted, not run**.
+
+The automated evidence in the body of this report is unaffected and stands on its own — it was
+produced against live source before this flip. What changed is only the frontmatter `status`, and
+only because the owner said so.
+
+The items listed under `human_verification` below (and in `.planning/PENDING-VERIFICATION.md`) were
+**never executed**. They are preserved verbatim rather than deleted, so that if a defect later
+surfaces in this phase, the record shows exactly which checks would have caught it and that nobody
+performed them. The owner accepted that trade knowingly and routed future findings to the next
+milestone.
+
