@@ -163,7 +163,7 @@ merge gaps. Full reasoning recorded in `.planning/STATE.md` § "v1.5 ROADMAP.md 
 ### Phase 39: Org Settings Infrastructure & Feature Toggles
 
 **Goal:** A church's org-level settings persist safely on every existing org document, and a church can turn AI and Planning Center integrations off entirely.
-**Depends on**: Nothing (first phase of v1.5)
+**Depends on**: Nothing — first phase of this milestone
 **Requirements**: R073, R088, R089
 **Success Criteria** (what must be TRUE):
 
@@ -180,7 +180,7 @@ merge gaps. Full reasoning recorded in `.planning/STATE.md` § "v1.5 ROADMAP.md 
 ### Phase 40: Custom Auth Claim for Org Membership
 
 **Goal:** Storage-rules membership checks are provably correct in both the Storage emulator and production, via a custom auth claim that never locks out or under-authorizes an existing member.
-**Depends on**: Independent of Phase 39 — sequenced early deliberately, ahead of most other work, because its dual-read soak window is the longest-running thing in the milestone
+**Depends on**: Nothing — sequenced early deliberately, ahead of most other work, because its dual-read soak window is the longest-running thing in the milestone. Independent of Phase 39.
 **Requirements**: R074, R075
 **Success Criteria** (what must be TRUE):
 
@@ -232,7 +232,7 @@ merge gaps. Full reasoning recorded in `.planning/STATE.md` § "v1.5 ROADMAP.md 
 ### Phase 43: Service Item Types
 
 **Goal:** A planner has the right set of service item types — Announcements and Miscellaneous added, Message reduced to plain text, Hymn retired from the add-item palette — and every type exports to Planning Center as itself.
-**Depends on**: Independent of Phases 40-42
+**Depends on**: Nothing — independent of the sharing and rules work
 **Requirements**: R081, R082, R083, R084, R085
 **Success Criteria** (what must be TRUE):
 
@@ -300,7 +300,7 @@ merge gaps. Full reasoning recorded in `.planning/STATE.md` § "v1.5 ROADMAP.md 
 ### Phase 47: Congregational Reading Divider UX
 
 **Goal:** A user can hand-divide a scripture passage into Leader, Congregation, and All sections, with the AI-proposed split, one-click alternating assignment, and starting blank offered as equally-available starting points.
-**Depends on**: Phase 39 (the AI toggle gates the AI-seeded option), Phase 45 (the translation/attribution the divider's text is drawn from); benefits from, but does not require, Phase 46's typography being final
+**Depends on**: Phase 39 (the AI toggle gates the AI-seeded option), Phase 45 (the translation/attribution the divider's text is drawn from). Benefits from typography being final, but does not require it.
 **Requirements**: R095, R096, R097
 **Success Criteria** (what must be TRUE):
 
