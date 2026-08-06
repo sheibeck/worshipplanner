@@ -154,8 +154,21 @@ export async function backfillOrgMembershipClaims(
 //
 // Credentials resolve from GOOGLE_APPLICATION_CREDENTIALS or
 // `gcloud auth application-default login`, exactly like any other Admin SDK script.
-if (require.main === module) {
-  void (async () => {
+//
+// WR-02: the whole body is wrapped in try/catch. The initial
+// `getFirestore().collectionGroup('members').get()` inside backfillOrgMembershipClaims
+// is NOT covered by that function's own per-account try/catch (only the loop body is) --
+// a rejection there (bad/expired credentials, wrong project, network failure) previously
+// propagated out of this IIFE as a raw unhandled rejection instead of the script's own
+// diagnostic output, with no process.exitCode set. The owner runs this by hand against
+// production credentials, so a readable "aborted before processing any account" message
+// plus a non-zero exit code mirrors the per-account failure reporting already present.
+//
+// Extracted into a named, exported function (mirrors syncOrgMembershipClaimHandler's
+// separation from the onDocumentWritten wrapper) so this top-level error path itself is
+// unit-testable without requiring `require.main === module`.
+export async function runBackfillCli(): Promise<void> {
+  try {
     initializeApp();
 
     const apply = process.argv.includes("--apply");
@@ -177,5 +190,15 @@ if (require.main === module) {
       );
       process.exitCode = 1;
     }
-  })();
+  } catch (err) {
+    console.error(
+      "[backfillOrgClaims] aborted before processing any account -- top-level failure:",
+      err,
+    );
+    process.exitCode = 1;
+  }
+}
+
+if (require.main === module) {
+  void runBackfillCli();
 }

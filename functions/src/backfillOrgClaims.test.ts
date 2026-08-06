@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
-import { backfillOrgMembershipClaims } from "./backfillOrgClaims";
+import { backfillOrgMembershipClaims, runBackfillCli } from "./backfillOrgClaims";
 
 // Mirrors functions/src/orgMembershipClaims.test.ts's established mocking seams.
 // backfillOrgClaims.ts imports decideMembershipClaim from ./orgMembershipClaims,
@@ -288,5 +288,37 @@ describe("backfillOrgMembershipClaims", () => {
 
     expect(summary).toEqual({ processed: 0, skipped: 1, failed: [] });
     expect(setCustomUserClaims).not.toHaveBeenCalled();
+  });
+});
+
+describe("runBackfillCli", () => {
+  afterEach(() => {
+    process.exitCode = undefined;
+  });
+
+  it("top-level Firestore query failure: catches the rejection, logs a diagnostic, and sets a non-zero exit code instead of throwing (WR-02)", async () => {
+    vi.mocked(getFirestore).mockReturnValue({
+      collectionGroup: vi.fn((name: string) => {
+        if (name !== "members") throw new Error(`unexpected collectionGroup "${name}"`);
+        return {
+          get: vi.fn(async () => {
+            throw new Error("PERMISSION_DENIED: wrong project or expired credentials");
+          }),
+        };
+      }),
+    } as never);
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+
+    await expect(runBackfillCli()).resolves.toBeUndefined();
+
+    expect(process.exitCode).toBe(1);
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      "[backfillOrgClaims] aborted before processing any account -- top-level failure:",
+      expect.any(Error),
+    );
+
+    consoleErrorSpy.mockRestore();
+    consoleLogSpy.mockRestore();
   });
 });
