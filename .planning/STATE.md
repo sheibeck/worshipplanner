@@ -77,10 +77,47 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 
 Phase: 36 — UI Rework — Service Order & Contextual Action Bars
 Plan: Not started
-Status: Ready to plan
-        `38-VERIFICATION.md` is `human_needed` · 1 code-review BLOCKER found and fixed
-Last activity: 2026-08-05 — Phase 38 complete, transitioned to Phase 36
-               before the milestone lifecycle (see below)
+Status: Ready for GAP CLOSURE, not fresh planning — 36 is already code-complete (5/5 plans,
+        executed 2026-08-04). `36-VERIFICATION.md` is `gaps_found` at 4/5 criteria.
+Last activity: 2026-08-05 — Phase 38 complete and owner-approved; transitioned to Phase 36
+
+> Two lines of garbage were removed from this block on 2026-08-05 — orphaned fragments of the
+> previous phase's multi-line Status/Last-activity entries that `phase.complete` left behind when
+> it rewrote the single-line fields around them. Keep these four fields to ONE line each.
+
+## ★ Phase 36's remaining gap is a DECISION, not missing code — read before planning it
+
+`36-VERIFICATION.md` records exactly one gap: ROADMAP criterion 4 clause A says *"'Add slide' lives
+in the contextual action bar"*, and it does not — it lives in `SlideGrid.vue`'s own header row
+(`slide-grid-add-slide`), and `serviceEditorActionBar.ts` never emits an `add-slide` key.
+
+**This was deliberate.** `36-UI-SPEC.md` § Finding 2 made a reasoned discretionary call to keep the
+control grid-local (cross-component event plumbing for a control whose enabled state depends on
+per-group selection the page-level bar does not track), and 36-01-PLAN, 36-05-PLAN and 36-05-SUMMARY
+all restate it verbatim. The verifier's own assessment: *"honest, well-reasoned, and disclosed at
+every layer — but it is a requirement deviation, not a completed criterion."*
+
+The gap's own `missing` field offers two resolutions, neither of which is "move the button":
+
+1. an owner-accepted override recorded in `36-VERIFICATION.md`'s frontmatter, accepting the
+   interaction-pattern-only resolution as satisfying R053 / criterion 4; **or**
+2. a dated ROADMAP.md / REQUIREMENTS.md correction rewriting criterion 4's first clause to describe
+   the actual resolution — **the precedent already exists**: the sibling "Add music to this group"
+   clause was corrected exactly this way and never re-implemented.
+
+Do not plan an implementation for this without first deciding between (1) and (2). Reimplementing to
+satisfy stale ROADMAP prose would undo a documented design decision.
+
+## ⚠ Three UI changes landed OUT OF BAND on 2026-08-05 — one inside Phase 36's own territory
+
+Owner requests made during the Phase 38 run, committed but belonging to no phase or quick task. Listed
+here because a Phase 36 gap-closure pass will touch the same button row as the first one.
+
+| Commit | Change | Why Phase 36 cares |
+|---|---|---|
+| `136fd0a` | The autosave failure message moved OUT of the save-area button row onto its own `flex justify-end -mt-1 mb-3` line below it | **Directly adjacent to `ContextualActionBar`** — it used to render inline between "Mark as Planned" and the bar. Anything re-laying-out that row must not put it back inline. |
+| `58000e0` | Leader/Congregation speaker tags on projected slides coloured sky/amber | Partially reverses 260805-kzd (colour only — size, weight and casing stay stripped) |
+| `d70104c` | 3-dot menu item "Edit scripture text" → "Set up congregational reading" | Renamed in both the menu (`slideDisplay.ts`) and the drawer button (`EditSlideDrawer.vue`); emit name and testid deliberately unchanged |
 
 ## ⛔ AUTONOMOUS RUN STOPPED BEFORE MILESTONE LIFECYCLE — 2026-08-05, and why
 
