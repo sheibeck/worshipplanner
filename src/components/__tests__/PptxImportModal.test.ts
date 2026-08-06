@@ -17,6 +17,11 @@ vi.mock('@/utils/pptxUpload', () => ({
   uploadPptx: (...args: unknown[]) => mockUploadPptx(...args),
   uploadImage: (...args: unknown[]) => mockUploadImage(...args),
   resolveImageUrl: (...args: unknown[]) => mockResolveImageUrl(...args),
+  // Faithful copy of the real one-line predicate. This factory REPLACES the
+  // module wholesale, so anything the component imports from it must appear
+  // here or it is `undefined` at runtime — which is how the size-guard change
+  // first broke this file's "friendly copy" test.
+  isPptxFileTooLarge: (e: unknown) => e instanceof Error && e.name === 'PptxFileTooLargeError',
 }))
 
 // The onCall RPC. The modal must invoke this with { orgId, importId, storagePath }
@@ -349,6 +354,47 @@ describe('PptxImportModal', () => {
     expect(mockParsePptxCallable).toHaveBeenCalledTimes(2)
     expect(body().find('[data-testid="step-preview"]').exists()).toBe(true)
     expect(mockDeleteObject).not.toHaveBeenCalled()
+  })
+
+  // 2026-08-06 incident: an over-cap deck was rejected by storage.rules as
+  // `storage/unauthorized`. That is a PERMISSION error, byte-identical to a real
+  // auth failure, and the modal then replaced it with "try re-exporting from
+  // PowerPoint" — advice that cannot possibly help. The two failures were
+  // indistinguishable from the console, and ruling either out took a deploy.
+  it('an oversized file shows its own size message, NOT the generic friendly copy', async () => {
+    const tooLarge = new Error('This file is 34.0MB, over the 25MB limit. Try removing large images or splitting the deck.')
+    tooLarge.name = 'PptxFileTooLargeError'
+    mockUploadPptx.mockRejectedValueOnce(tooLarge)
+
+    mountModal()
+    const input = body().find('[data-testid="pptx-file-input"]').element as HTMLInputElement
+    setInputFiles(input, [new File(['x'], 'huge.pptx')])
+    await flushPromises()
+
+    const shown = body().find('[data-testid="error-message"]').text()
+    expect(body().find('[data-testid="step-error"]').exists()).toBe(true)
+    expect(shown).toContain('34.0MB')
+    expect(shown).toContain('25MB')
+    // The specific failure must not be flattened into the generic copy.
+    expect(shown).not.toContain('re-exporting from PowerPoint')
+    // ...and must not read as a permission problem, which is what sent this
+    // debugging session down the wrong path in the first place.
+    expect(shown.toLowerCase()).not.toContain('permission')
+    expect(shown.toLowerCase()).not.toContain('unauthorized')
+  })
+
+  it('a non-size upload failure still shows the generic friendly copy', async () => {
+    // Guards the other direction: the size branch must not swallow everything.
+    mockUploadPptx.mockRejectedValueOnce(new Error('network went away'))
+
+    mountModal()
+    const input = body().find('[data-testid="pptx-file-input"]').element as HTMLInputElement
+    setInputFiles(input, [new File(['x'], 'deck.pptx')])
+    await flushPromises()
+
+    expect(body().find('[data-testid="error-message"]').text()).toBe(
+      "We couldn't read this file — try re-exporting from PowerPoint.",
+    )
   })
 
   it('cancel emits cancel without creating a deck', async () => {

@@ -213,7 +213,13 @@ import { ref, watch } from 'vue'
 import { httpsCallable } from 'firebase/functions'
 import { functions } from '@/firebase'
 import { useImportedSlides } from '@/stores/importedSlides'
-import { generateImportId, uploadPptx, uploadImage, resolveImageUrl } from '@/utils/pptxUpload'
+import {
+  generateImportId,
+  uploadPptx,
+  uploadImage,
+  resolveImageUrl,
+  isPptxFileTooLarge,
+} from '@/utils/pptxUpload'
 import type { ServiceSection } from '@/types/service'
 import type { TextSlide, ImageSlide } from '@/types/slide'
 
@@ -346,7 +352,16 @@ async function importPptx(file: File) {
     step.value = 'preview'
   } catch (err) {
     console.error('[PptxImportModal] PPTX import failed:', err)
-    errorMessage.value = FRIENDLY_ERROR
+    // A too-large file keeps its own message. FRIENDLY_ERROR tells the user to
+    // re-export from PowerPoint, which is useless advice for an oversized deck
+    // and sends them down the same dead end the raw storage/unauthorized did.
+    //
+    // Matched by NAME, not `instanceof`. This module is `vi.mock`ed with a
+    // full-replacement factory in PptxImportModal.test.ts, so the class binding
+    // is `undefined` there and `instanceof undefined` throws outright — turning
+    // every unrelated import failure into a crash. Name matching also survives
+    // the class being duplicated across bundle chunks or realms.
+    errorMessage.value = isPptxFileTooLarge(err) ? err.message : FRIENDLY_ERROR
     step.value = 'error'
   }
 }
