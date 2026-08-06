@@ -5,16 +5,16 @@ milestone_name: Settings, Sharing, and Fidelity
 current_phase: 39
 current_phase_name: org-settings-infrastructure-feature-toggles
 status: in_progress
-stopped_at: Completed 39-05-PLAN.md
-last_updated: "2026-08-06T20:14:40.948Z"
+stopped_at: Completed 39-06-PLAN.md
+last_updated: "2026-08-06T20:22:23.993Z"
 last_activity: 2026-08-06
 last_activity_desc: "Phase 39 Plan 02 executed: OrgSettings/DEFAULT_ORG_SETTINGS type"
 progress:
   total_phases: 10
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 6
-  completed_plans: 5
-  percent: 0
+  completed_plans: 6
+  percent: 10
 ---
 
 # Project State
@@ -113,7 +113,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 39 of 48 (Org Settings Infrastructure & Feature Toggles)
-Plan: 5 of 6 in current phase (39-03 next)
+Plan: 6 of 6 in current phase (39-03 next)
 Status: Plan 02 (org settings infrastructure) complete — settings shape and dual-read merged
 Last activity: 2026-08-06 — Phase 39 Plan 02 executed: OrgSettings/DEFAULT_ORG_SETTINGS type
 module, authStore.settings merged once in loadOrgContext, vwModeEnabled dual-read, R073 test
@@ -1272,6 +1272,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 39 P03 | 20min | 3 tasks | 2 files |
 | Phase 39 P04 | 18min | 3 tasks | 8 files |
 | Phase 39 P05 | 35min | 2 tasks | 7 files |
+| Phase 39 P06 | 15min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -1542,6 +1543,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 39-04: AI split button v-if reads authStore.settings.aiEnabled alone (not AND-composed with canAiSplit) to preserve pre-existing E5 states exactly
 - [Phase ?]: 39-05: buildExportOrCopyItem's PC gate stays one composed early return (hasPcCredentials || pcEnabled), not two competing checks
 - [Phase ?]: 39-05: RosterView.test.ts's bare hand-rolled auth mock extended with getter-backed settings.pcEnabled, proactively avoiding the breakage class 39-04 found in ServiceEditorView.test.ts
+- [Phase ?]: Phase 39 gate closed: type-check and full suite clean at documented baseline; R073/R088/R089 each traced to a real passing command; firestore.rules org-write rule reconfirmed to already cover nested settings.* writes with no rule change needed; all five UI-SPEC manual backstops recorded DEFERRED in PENDING-VERIFICATION.md (39-03 had recorded 4 of 5; this plan added the missing congregational-editor button-row reflow item).
 
 ### Roadmap Evolution
 
@@ -1853,8 +1855,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-06T20:14:40.907Z
-Stopped at: Completed 39-05-PLAN.md
+Last session: 2026-08-06T20:22:23.953Z
+Stopped at: Completed 39-06-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
