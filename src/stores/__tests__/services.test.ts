@@ -2,16 +2,23 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import type { Service } from '@/types/service'
 
-// Mock crypto.getRandomValues for deterministic token generation
+// Mock crypto.getRandomValues for deterministic token generation, and
+// crypto.randomUUID (Phase 24, D-01) so createSlot()/buildSlots()'s slot-id
+// minting doesn't throw "crypto.randomUUID is not a function" now that
+// createService's buildSlots() call requires it.
+let uuidCounter = 0
 vi.stubGlobal('crypto', {
   getRandomValues: vi.fn((arr: Uint8Array) => {
     for (let i = 0; i < arr.length; i++) arr[i] = i + 1
     return arr
   }),
+  randomUUID: vi.fn(() => `mock-uuid-${++uuidCounter}`),
 })
 
 // Track onSnapshot callbacks and unsubscribe fns
-let snapshotCallback: ((snap: { docs: { id: string; data: () => Record<string, unknown> }[] }) => void) | null = null
+type SnapshotDoc = { id: string; data: () => Record<string, unknown>; metadata?: { hasPendingWrites: boolean } }
+let snapshotCallback: ((snap: { docs: SnapshotDoc[] }) => void) | null = null
+let snapshotOptions: { includeMetadataChanges?: boolean } | undefined
 const mockUnsubscribe = vi.fn()
 
 // Mock firebase/firestore module
@@ -20,10 +27,27 @@ vi.mock('firebase/firestore', () => {
     getFirestore: vi.fn(() => ({})),
     collection: vi.fn((db, ...segments) => ({ path: segments.join('/') })),
     doc: vi.fn((db, ...segments) => ({ id: segments[segments.length - 1] ?? 'mock-id', path: segments.join('/') })),
-    onSnapshot: vi.fn((_query, callback) => {
-      snapshotCallback = callback
-      return mockUnsubscribe
-    }),
+    // R039 (32-01): widened to accept BOTH the pre-existing two-argument
+    // form (query, callback) and the new three-argument form
+    // (query, options, callback) — whichever of argument 2/3 is a function
+    // is the real callback, so every existing call site in this file keeps
+    // working unmodified.
+    onSnapshot: vi.fn(
+      (
+        _query: unknown,
+        optionsOrCallback: unknown,
+        maybeCallback?: (snap: { docs: SnapshotDoc[] }) => void,
+      ) => {
+        if (typeof optionsOrCallback === 'function') {
+          snapshotOptions = undefined
+          snapshotCallback = optionsOrCallback as (snap: { docs: SnapshotDoc[] }) => void
+        } else {
+          snapshotOptions = optionsOrCallback as { includeMetadataChanges?: boolean } | undefined
+          snapshotCallback = maybeCallback ?? null
+        }
+        return mockUnsubscribe
+      },
+    ),
     addDoc: vi.fn(() => Promise.resolve({ id: 'new-service-id' })),
     updateDoc: vi.fn(() => Promise.resolve()),
     deleteDoc: vi.fn(() => Promise.resolve()),
@@ -104,7 +128,7 @@ function makeService(overrides: Partial<{
   name: string
   progression: '1-2-2-3' | '1-2-3-3'
   teams: string[]
-  status: 'draft' | 'planned'
+  status: 'draft' | 'planned' | 'exported'
   slots: unknown[]
   sermonPassage: null
   notes: string
@@ -117,7 +141,7 @@ function makeService(overrides: Partial<{
     name: 'Sunday Service',
     progression: '1-2-2-3' as '1-2-2-3' | '1-2-3-3',
     teams: [],
-    status: 'draft' as 'draft' | 'planned',
+    status: 'draft' as 'draft' | 'planned' | 'exported',
     slots: [],
     sermonPassage: null,
     notes: '',
@@ -127,7 +151,11 @@ function makeService(overrides: Partial<{
   }
 }
 
-function triggerSnapshot(services: ReturnType<typeof makeService>[]) {
+// R039 (32-01): `pendingIds` names which of `services`' ids this emission
+// reports as `metadata.hasPendingWrites === true` — omitted/empty means
+// every doc in this snapshot reports no pending write (the everyday case
+// every pre-32-01 test below already exercises).
+function triggerSnapshot(services: ReturnType<typeof makeService>[], pendingIds: string[] = []) {
   if (snapshotCallback) {
     snapshotCallback({
       docs: services.map((s) => ({
@@ -136,6 +164,7 @@ function triggerSnapshot(services: ReturnType<typeof makeService>[]) {
           const { id: _id, ...rest } = s
           return rest
         },
+        metadata: { hasPendingWrites: pendingIds.includes(s.id) },
       })),
     })
   }
@@ -146,6 +175,7 @@ describe('useServiceStore', () => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
     snapshotCallback = null
+    snapshotOptions = undefined
   })
 
   describe('initial state', () => {
@@ -209,6 +239,123 @@ describe('useServiceStore', () => {
       store.subscribe('org-1')
       store.subscribe('org-2')
       expect(mockUnsubscribe).toHaveBeenCalledOnce()
+    })
+
+    // ── R039 (32-01): own-write echo classification ─────────────────────────
+
+    it('subscribes with includeMetadataChanges: true — without it, the settle edge never reaches this callback', async () => {
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      expect(snapshotOptions).toEqual({ includeMetadataChanges: true })
+    })
+
+    it('a snapshot reporting a pending write puts that doc id in ownWriteEchoIds and isOwnWriteEcho', async () => {
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService()], ['service-1'])
+      expect(store.ownWriteEchoIds).toEqual(['service-1'])
+      expect(store.isOwnWriteEcho('service-1')).toBe(true)
+    })
+
+    it('the following snapshot with no pending write for that doc STILL classifies it as an echo (the settle edge)', async () => {
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService()], ['service-1'])
+      expect(store.isOwnWriteEcho('service-1')).toBe(true)
+
+      // Server-ack snapshot: no longer pending. This is the emission whose
+      // resolved serverTimestamp() value is what defeats a naive updatedAt
+      // diff — it must classify as an echo too, or only half the window closes.
+      triggerSnapshot([makeService()], [])
+      expect(store.ownWriteEchoIds).toEqual(['service-1'])
+      expect(store.isOwnWriteEcho('service-1')).toBe(true)
+    })
+
+    it('a third snapshot with no pending writes anywhere leaves ownWriteEchoIds empty — a genuinely external change is not misclassified', async () => {
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService()], ['service-1']) // optimistic edge
+      triggerSnapshot([makeService()], []) // settle edge — still an echo
+      expect(store.isOwnWriteEcho('service-1')).toBe(true)
+
+      // A later, unrelated snapshot — nothing pending anywhere.
+      triggerSnapshot([makeService()], [])
+      expect(store.ownWriteEchoIds).toEqual([])
+      expect(store.isOwnWriteEcho('service-1')).toBe(false)
+    })
+
+    it('unsubscribeAll empties ownWriteEchoIds', async () => {
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService()], ['service-1'])
+      expect(store.ownWriteEchoIds).toEqual(['service-1'])
+      store.unsubscribeAll()
+      expect(store.ownWriteEchoIds).toEqual([])
+    })
+
+    // ── WR-02 (32-REVIEW): the multi-document case ───────────────────────────
+    //
+    // Every test above exercises exactly one document. These prove the
+    // pending/settle-edge computation is derived independently per document,
+    // never cross-contaminated, for the two shapes the review specifically
+    // flagged as needing coverage.
+
+    it('two documents whose own-writes overlap and settle on different snapshots are each classified independently', async () => {
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      const svcA = makeService({ id: 'service-a' })
+      const svcB = makeService({ id: 'service-b' })
+
+      // Both writes go pending in the same snapshot.
+      triggerSnapshot([svcA, svcB], ['service-a', 'service-b'])
+      expect(store.ownWriteEchoIds.sort()).toEqual(['service-a', 'service-b'])
+      expect(store.isOwnWriteEcho('service-a')).toBe(true)
+      expect(store.isOwnWriteEcho('service-b')).toBe(true)
+
+      // A settles first — B is still pending. A's settle edge must not leak
+      // onto B, and B's continued pending state must not be lost.
+      triggerSnapshot([svcA, svcB], ['service-b'])
+      expect(store.ownWriteEchoIds.sort()).toEqual(['service-a', 'service-b'])
+      expect(store.isOwnWriteEcho('service-a')).toBe(true) // settle edge
+      expect(store.isOwnWriteEcho('service-b')).toBe(true) // still pending
+
+      // B settles on the NEXT snapshot, one full emission after A. A is no
+      // longer anywhere near pending/settling — it must drop out cleanly,
+      // proving the settle edge doesn't linger past its own single emission.
+      triggerSnapshot([svcA, svcB], [])
+      expect(store.ownWriteEchoIds).toEqual(['service-b']) // B's settle edge only
+      expect(store.isOwnWriteEcho('service-a')).toBe(false)
+      expect(store.isOwnWriteEcho('service-b')).toBe(true)
+    })
+
+    it('a snapshot mixing one document\'s settle edge with a second, genuinely external document\'s change classifies only the settling one as an echo', async () => {
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      const svcA = makeService({ id: 'service-a', name: 'A original' })
+      const svcB = makeService({ id: 'service-b', name: 'B original' })
+
+      // Only A has an own write in flight.
+      triggerSnapshot([svcA, svcB], ['service-a'])
+      expect(store.isOwnWriteEcho('service-a')).toBe(true)
+      expect(store.isOwnWriteEcho('service-b')).toBe(false)
+
+      // A's write settles in the SAME emission that a different writer's
+      // genuinely external change to B arrives — B is never pending here at
+      // all, so it must never be misclassified as an echo despite the
+      // simultaneous settle edge on A.
+      const svcBExternallyChanged = makeService({ id: 'service-b', name: 'B changed by another editor' })
+      triggerSnapshot([svcA, svcBExternallyChanged], [])
+      expect(store.ownWriteEchoIds).toEqual(['service-a'])
+      expect(store.isOwnWriteEcho('service-a')).toBe(true)
+      expect(store.isOwnWriteEcho('service-b')).toBe(false)
+      expect(store.services.find((s) => s.id === 'service-b')?.name).toBe('B changed by another editor')
     })
   })
 
@@ -648,6 +795,213 @@ describe('useServiceStore', () => {
       expect(token).toMatch(/^[0-9a-f]{36}$/)
       expect(consoleErrorSpy).toHaveBeenCalled()
       consoleErrorSpy.mockRestore()
+    })
+  })
+
+  // ── R036 / R037 — the store's draft-only write guard + status transitions ────
+  //
+  // Layer 2 of 3. These assertions deliberately mirror the `/services`
+  // `allow update` clause in firestore.rules shape-for-shape: the guard exists
+  // to make a client-side bug legible locally, so if it ever drifts from the
+  // rule it becomes either a phantom lock or an opaque round-trip failure.
+  //
+  // Every "refused" case asserts `updateDoc` was NOT called, not merely that
+  // the promise rejected — a guard that throws AFTER writing is no guard.
+  describe('draft-only write guard (R036)', () => {
+    async function storeAtStatus(status: 'draft' | 'planned' | 'exported', extra = {}) {
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService({ status, ...extra })])
+      return store
+    }
+
+    it('allows an ordinary update while the stored status is draft', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const store = await storeAtStatus('draft')
+
+      await store.updateService('service-1', { notes: 'edited' })
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+    })
+
+    for (const status of ['planned', 'exported'] as const) {
+      it(`refuses an ordinary update locally when the stored status is ${status}`, async () => {
+        const { updateDoc } = await import('firebase/firestore')
+        const store = await storeAtStatus(status)
+
+        await expect(store.updateService('service-1', { notes: 'edited' })).rejects.toThrow(
+          /R036/,
+        )
+        expect(updateDoc).not.toHaveBeenCalled()
+      })
+    }
+
+    // The status is read from the STORED snapshot, never from the payload —
+    // otherwise any write that also sets `status: 'draft'` would edit a locked
+    // service, which is precisely the payload an attacker would send. The
+    // reopen carve-out is why `{ status: 'draft' }` ALONE is allowed; adding a
+    // second key must not inherit that permission.
+    it('refuses a locked update that smuggles other fields alongside status: draft', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const store = await storeAtStatus('exported')
+
+      await expect(
+        store.updateService('service-1', { status: 'draft', slots: [] }),
+      ).rejects.toThrow(/R036/)
+      expect(updateDoc).not.toHaveBeenCalled()
+    })
+
+    it('allows the reopen-shaped update (status alone) at planned and exported', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const store = await storeAtStatus('exported')
+
+      await store.updateService('service-1', { status: 'draft' })
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+    })
+
+    // ★ D-09 — if this ever fails, `exported` has become unreachable and the
+    // primary Planning Center workflow is broken.
+    it('allows the Planning Center export write from planned (D-09)', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const store = await storeAtStatus('planned')
+
+      await store.updateService('service-1', {
+        pcExportedAt: { seconds: 1, nanoseconds: 0 },
+        pcPlanId: 'plan-1',
+        status: 'exported',
+      })
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+    })
+
+    it('refuses an export-shaped write from an already-exported service', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const store = await storeAtStatus('exported')
+
+      await expect(
+        store.updateService('service-1', {
+          pcExportedAt: { seconds: 1, nanoseconds: 0 },
+          pcPlanId: 'plan-2',
+          status: 'exported',
+        }),
+      ).rejects.toThrow(/R036/)
+      expect(updateDoc).not.toHaveBeenCalled()
+    })
+
+    // D-15 — delete stays available at every status; the UI warns instead.
+    // Keep in step with firestore.rules' unconditional `allow delete`.
+    for (const status of ['draft', 'planned', 'exported'] as const) {
+      it(`allows delete while the stored status is ${status} (D-15)`, async () => {
+        const { deleteDoc } = await import('firebase/firestore')
+        const store = await storeAtStatus(status)
+
+        await store.deleteService('service-1')
+
+        expect(deleteDoc).toHaveBeenCalledOnce()
+      })
+    }
+
+    // ★ The Roles tab does not go through updateService. Without these two the
+    // store layer does not cover it at all.
+    it('refuses setRoleOverride on a locked service', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const store = await storeAtStatus('planned')
+
+      await expect(store.setRoleOverride('service-1', 'role-1', ['p1'])).rejects.toThrow(/R036/)
+      expect(updateDoc).not.toHaveBeenCalled()
+    })
+
+    it('refuses clearRoleOverride on a locked service', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const store = await storeAtStatus('exported')
+
+      await expect(store.clearRoleOverride('service-1', 'role-1')).rejects.toThrow(/R036/)
+      expect(updateDoc).not.toHaveBeenCalled()
+    })
+
+    it('still allows setRoleOverride and clearRoleOverride on a draft service', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const store = await storeAtStatus('draft')
+
+      await store.setRoleOverride('service-1', 'role-1', ['p1'])
+      await store.clearRoleOverride('service-1', 'role-1')
+
+      expect(updateDoc).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  describe('status transitions (R037)', () => {
+    async function storeAtStatus(status: 'draft' | 'planned' | 'exported', extra = {}) {
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService({ status, ...extra })])
+      return store
+    }
+
+    it('markAsPlanned writes status and updatedAt, and nothing else', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const store = await storeAtStatus('draft')
+
+      await store.markAsPlanned('service-1')
+
+      const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+      expect(Object.keys(data).sort()).toEqual(['status', 'updatedAt'])
+      expect(data.status).toBe('planned')
+    })
+
+    for (const status of ['planned', 'exported'] as const) {
+      it(`markAsPlanned refuses when the stored status is already ${status}`, async () => {
+        const { updateDoc } = await import('firebase/firestore')
+        const store = await storeAtStatus(status)
+
+        await expect(store.markAsPlanned('service-1')).rejects.toThrow(/R036/)
+        expect(updateDoc).not.toHaveBeenCalled()
+      })
+    }
+
+    // ★ D-11 — the rule's hasOnly(['status','updatedAt']) reads affectedKeys().
+    // Re-writing pcExportedAt/pcPlanId here, even to their existing values, can
+    // surface in that diff and get the whole reopen denied. The fields survive
+    // by being left alone, which is also what keeps the Planning Center plan
+    // linked for a re-export and what D-04's evidence gate reads on a SECOND
+    // reopen. This test is the guard against a future "let's also clear the
+    // export fields" edit.
+    it('reopenService writes ONLY status and updatedAt — never pcExportedAt/pcPlanId', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const store = await storeAtStatus('exported', {
+        pcExportedAt: { seconds: 5, nanoseconds: 0 },
+        pcPlanId: 'plan-9',
+      })
+
+      await store.reopenService('service-1')
+
+      const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+      expect(Object.keys(data).sort()).toEqual(['status', 'updatedAt'])
+      expect(data.status).toBe('draft')
+      expect(data).not.toHaveProperty('pcExportedAt')
+      expect(data).not.toHaveProperty('pcPlanId')
+    })
+
+    it('reopenService works from planned as well as exported', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const store = await storeAtStatus('planned')
+
+      await store.reopenService('service-1')
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+    })
+
+    it('there is no generic status setter on the store (D-03)', async () => {
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      // `exported` must be reachable ONLY through a real Planning Center
+      // export. A setStatus/toggleStatus escape hatch would re-admit the
+      // hand-set "Exported" defect D-01 deletes.
+      expect(store).not.toHaveProperty('setStatus')
+      expect(store).not.toHaveProperty('toggleStatus')
     })
   })
 })

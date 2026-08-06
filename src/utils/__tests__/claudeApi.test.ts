@@ -1,9 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// Use vi.hoisted to ensure mockCreate is available at mock factory hoisting time
-const { mockCreate } = vi.hoisted(() => {
+// Use vi.hoisted to ensure mockCreate/mockParse are available at mock factory
+// hoisting time. `messages.parse()` is a distinct SDK method from
+// `messages.create()` (it wraps create() + parseMessage() internally, per the
+// installed SDK's own source — see 34-03-PLAN.md's "Resolved spike"), so the
+// mock needs its own key: a call to `.parse()` against a factory exposing
+// only `create` would throw.
+const { mockCreate, mockParse } = vi.hoisted(() => {
   const mockCreate = vi.fn()
-  return { mockCreate }
+  const mockParse = vi.fn()
+  return { mockCreate, mockParse }
 })
 
 // The proxy holds the real key server-side; the client only attaches an app-auth
@@ -12,12 +18,13 @@ vi.mock('@/utils/appAuth', () => ({
   getAppAuthHeaders: vi.fn().mockResolvedValue({ 'X-App-Auth': 'test-token' }),
 }))
 
-// Mock the Anthropic SDK using the hoisted mockCreate
+// Mock the Anthropic SDK using the hoisted mockCreate/mockParse.
 vi.mock('@anthropic-ai/sdk', () => {
   function MockAnthropic() {
     return {
       messages: {
         create: mockCreate,
+        parse: mockParse,
       },
     }
   }
@@ -32,8 +39,18 @@ import {
   validateScriptureSuggestions,
   getSongSuggestions,
   getScriptureSuggestions,
+  SPLIT_SCHEMA,
+  validateSplitResult,
+  splitCongregationalReading,
 } from '@/utils/claudeApi'
 import type { AiSongSuggestion, AiScriptureSuggestion } from '@/utils/claudeApi'
+import {
+  computeBoundaries,
+  sliceAtBoundaries,
+  stripVerseMarkers,
+  verseRangeForSlice,
+  BOUNDARY_MARKER_OPEN,
+} from '@/utils/scriptureBoundaries'
 
 describe('safeParseJsonArray', () => {
   it('parses clean JSON array', () => {
@@ -357,5 +374,532 @@ describe('getScriptureSuggestions', () => {
     })
 
     expect(result).toBeNull()
+  })
+})
+
+// ─── Congregational Split (34-02) — SPLIT_SCHEMA ──────────────────────────────
+//
+// SPLIT_SCHEMA is half of R064's entire correctness guarantee: the contract the
+// model is allowed to speak must contain no field capable of carrying scripture
+// words. These tests assert that structurally, not by eye.
+
+describe('SPLIT_SCHEMA', () => {
+  it('has additionalProperties: false at the root object and the per-section object', () => {
+    expect(SPLIT_SCHEMA.additionalProperties).toBe(false)
+    expect(SPLIT_SCHEMA.properties.sections.items.additionalProperties).toBe(false)
+  })
+
+  it('declares exactly the three expected properties on a section, all required', () => {
+    const itemProps = SPLIT_SCHEMA.properties.sections.items.properties
+    expect(Object.keys(itemProps).sort()).toEqual(['endBoundary', 'speaker', 'startBoundary'])
+    expect([...SPLIT_SCHEMA.properties.sections.items.required].sort()).toEqual([
+      'endBoundary',
+      'speaker',
+      'startBoundary',
+    ])
+    expect([...SPLIT_SCHEMA.required]).toEqual(['sections'])
+  })
+
+  it('(P-02) has no string-typed property anywhere except speaker, and speaker enum is exactly LEADER/CONGREGATION', () => {
+    // A deep walk of the whole schema — not a spot-check — because P-02 says
+    // there must be NO field anywhere the model could populate with scripture
+    // words, including one added later without anyone re-reading this test.
+    const stringTypedNodes: { path: string; node: { type: string; enum?: readonly string[] } }[] = []
+
+    function walk(node: unknown, path: string): void {
+      if (node === null || typeof node !== 'object') return
+      if (Array.isArray(node)) {
+        node.forEach((child, i) => walk(child, `${path}[${i}]`))
+        return
+      }
+      const obj = node as Record<string, unknown>
+      if (obj.type === 'string') {
+        stringTypedNodes.push({ path, node: obj as { type: string; enum?: readonly string[] } })
+      }
+      for (const [key, value] of Object.entries(obj)) {
+        walk(value, `${path}.${key}`)
+      }
+    }
+
+    walk(SPLIT_SCHEMA, 'SPLIT_SCHEMA')
+
+    expect(stringTypedNodes).toHaveLength(1)
+    expect(stringTypedNodes[0]!.path.endsWith('.speaker')).toBe(true)
+    expect(stringTypedNodes[0]!.node.enum).toEqual(['LEADER', 'CONGREGATION'])
+  })
+
+  it('declares startBoundary and endBoundary as integer type', () => {
+    const itemProps = SPLIT_SCHEMA.properties.sections.items.properties
+    expect(itemProps.startBoundary.type).toBe('integer')
+    expect(itemProps.endBoundary.type).toBe('integer')
+  })
+})
+
+// ─── Congregational Split (34-02) — validateSplitResult ───────────────────────
+//
+// validateSplitResult() is the sole gate between untrusted model output and
+// scripture a congregation will read aloud. A happy-path-only suite would be
+// the single most misleading form of green available in this phase — every
+// bullet below is its own rejection test.
+
+describe('validateSplitResult', () => {
+  const boundaries = [0, 10, 20, 30] // maxIndex = 3
+
+  it('accepts a well-formed result: ascending, gapless, alternating speakers, spanning the whole passage, and does not mutate the input', () => {
+    const wellFormed = {
+      sections: [
+        { speaker: 'LEADER', startBoundary: 0, endBoundary: 1 },
+        { speaker: 'CONGREGATION', startBoundary: 1, endBoundary: 2 },
+        { speaker: 'LEADER', startBoundary: 2, endBoundary: 3 },
+      ],
+    }
+    // Freezing every level means any attempted mutation inside
+    // validateSplitResult throws (this file is compiled as an ES module,
+    // which is strict-mode by default) — a structural proof of "does not
+    // mutate the input," not just a before/after equality check.
+    wellFormed.sections.forEach((s) => Object.freeze(s))
+    Object.freeze(wellFormed.sections)
+    Object.freeze(wellFormed)
+
+    const result = validateSplitResult(wellFormed, boundaries)
+
+    expect(result).not.toBeNull()
+    expect(result).toEqual(wellFormed.sections)
+  })
+
+  it('rejects null', () => {
+    expect(validateSplitResult(null, boundaries)).toBeNull()
+  })
+
+  it('rejects a non-object', () => {
+    expect(validateSplitResult('not an object', boundaries)).toBeNull()
+  })
+
+  it('rejects an object with no sections key', () => {
+    expect(validateSplitResult({ notSections: [] }, boundaries)).toBeNull()
+  })
+
+  it('rejects sections that is not an array', () => {
+    expect(validateSplitResult({ sections: 'not-an-array' }, boundaries)).toBeNull()
+  })
+
+  it('rejects an empty sections array', () => {
+    expect(validateSplitResult({ sections: [] }, boundaries)).toBeNull()
+  })
+
+  it('rejects a startBoundary below 0', () => {
+    const bad = {
+      sections: [
+        { speaker: 'LEADER', startBoundary: -1, endBoundary: 1 },
+        { speaker: 'CONGREGATION', startBoundary: 1, endBoundary: 2 },
+        { speaker: 'LEADER', startBoundary: 2, endBoundary: 3 },
+      ],
+    }
+    expect(validateSplitResult(bad, boundaries)).toBeNull()
+  })
+
+  it('rejects an endBoundary above the last valid index', () => {
+    const bad = {
+      sections: [
+        { speaker: 'LEADER', startBoundary: 0, endBoundary: 1 },
+        { speaker: 'CONGREGATION', startBoundary: 1, endBoundary: 2 },
+        { speaker: 'LEADER', startBoundary: 2, endBoundary: 4 },
+      ],
+    }
+    expect(validateSplitResult(bad, boundaries)).toBeNull()
+  })
+
+  it('rejects a non-integer float index', () => {
+    const bad = {
+      sections: [
+        { speaker: 'LEADER', startBoundary: 0, endBoundary: 1.5 },
+        { speaker: 'CONGREGATION', startBoundary: 1.5, endBoundary: 2 },
+        { speaker: 'LEADER', startBoundary: 2, endBoundary: 3 },
+      ],
+    }
+    expect(validateSplitResult(bad, boundaries)).toBeNull()
+  })
+
+  it('rejects a NaN index', () => {
+    const bad = {
+      sections: [
+        { speaker: 'LEADER', startBoundary: 0, endBoundary: Number.NaN },
+        { speaker: 'CONGREGATION', startBoundary: 1, endBoundary: 2 },
+        { speaker: 'LEADER', startBoundary: 2, endBoundary: 3 },
+      ],
+    }
+    expect(validateSplitResult(bad, boundaries)).toBeNull()
+  })
+
+  it('rejects a numeric-string index', () => {
+    const bad = {
+      sections: [
+        { speaker: 'LEADER', startBoundary: '0', endBoundary: 1 },
+        { speaker: 'CONGREGATION', startBoundary: 1, endBoundary: 2 },
+        { speaker: 'LEADER', startBoundary: 2, endBoundary: 3 },
+      ],
+    }
+    expect(validateSplitResult(bad, boundaries)).toBeNull()
+  })
+
+  it('rejects a startBoundary greater than or equal to its endBoundary (inverted or zero-length)', () => {
+    const bad = {
+      sections: [{ speaker: 'LEADER', startBoundary: 1, endBoundary: 1 }],
+    }
+    expect(validateSplitResult(bad, boundaries)).toBeNull()
+  })
+
+  it('rejects overlapping sections (section N+1 starts before section N ends)', () => {
+    const bad = {
+      sections: [
+        { speaker: 'LEADER', startBoundary: 0, endBoundary: 2 },
+        { speaker: 'CONGREGATION', startBoundary: 1, endBoundary: 3 },
+      ],
+    }
+    expect(validateSplitResult(bad, boundaries)).toBeNull()
+  })
+
+  it('rejects a gap (section N+1 starts after section N ends)', () => {
+    const bad = {
+      sections: [
+        { speaker: 'LEADER', startBoundary: 0, endBoundary: 1 },
+        { speaker: 'CONGREGATION', startBoundary: 2, endBoundary: 3 },
+      ],
+    }
+    expect(validateSplitResult(bad, boundaries)).toBeNull()
+  })
+
+  it('rejects a result that does not start at boundary 0', () => {
+    const bad = {
+      sections: [
+        { speaker: 'LEADER', startBoundary: 1, endBoundary: 2 },
+        { speaker: 'CONGREGATION', startBoundary: 2, endBoundary: 3 },
+      ],
+    }
+    expect(validateSplitResult(bad, boundaries)).toBeNull()
+  })
+
+  it('rejects a result that does not end at the last boundary index', () => {
+    const bad = {
+      sections: [
+        { speaker: 'LEADER', startBoundary: 0, endBoundary: 1 },
+        { speaker: 'CONGREGATION', startBoundary: 1, endBoundary: 2 },
+      ],
+    }
+    expect(validateSplitResult(bad, boundaries)).toBeNull()
+  })
+
+  it('rejects an out-of-order result, and a companion assertion proves it was not silently re-sorted to accept it', () => {
+    const outOfOrder = {
+      sections: [
+        { speaker: 'LEADER', startBoundary: 1, endBoundary: 2 },
+        { speaker: 'CONGREGATION', startBoundary: 0, endBoundary: 1 },
+        { speaker: 'LEADER', startBoundary: 2, endBoundary: 3 },
+      ],
+    }
+    expect(validateSplitResult(outOfOrder, boundaries)).toBeNull()
+
+    // If validateSplitResult secretly sorted its input before validating, the
+    // rejection above would be meaningless — it would just mean "the raw
+    // input order was wrong," not "out-of-order input is rejected." This
+    // proves the function truly rejects rather than repairs: the identical
+    // set of sections, pre-sorted by the TEST (not by the function under
+    // test), IS accepted, showing the function only ever validates the order
+    // it is given and never silently re-sorts to rescue a bad result.
+    const sorted = {
+      sections: [...outOfOrder.sections].sort((a, b) => a.startBoundary - b.startBoundary),
+    }
+    expect(validateSplitResult(sorted, boundaries)).not.toBeNull()
+  })
+
+  it('rejects an unrecognised speaker value', () => {
+    const bad = {
+      sections: [
+        { speaker: 'NARRATOR', startBoundary: 0, endBoundary: 1 },
+        { speaker: 'CONGREGATION', startBoundary: 1, endBoundary: 2 },
+        { speaker: 'LEADER', startBoundary: 2, endBoundary: 3 },
+      ],
+    }
+    expect(validateSplitResult(bad, boundaries)).toBeNull()
+  })
+
+  it('rejects a lowercase variant of a legal speaker value', () => {
+    const bad = {
+      sections: [
+        { speaker: 'leader', startBoundary: 0, endBoundary: 1 },
+        { speaker: 'CONGREGATION', startBoundary: 1, endBoundary: 2 },
+        { speaker: 'LEADER', startBoundary: 2, endBoundary: 3 },
+      ],
+    }
+    expect(validateSplitResult(bad, boundaries)).toBeNull()
+  })
+
+  it('(P-02 defence in depth) rejects a section carrying an extra property beyond the three expected, including one carrying scripture words', () => {
+    const bad = {
+      sections: [
+        {
+          speaker: 'LEADER',
+          startBoundary: 0,
+          endBoundary: 1,
+          text: 'For God so loved the world that he gave his only Son',
+        },
+        { speaker: 'CONGREGATION', startBoundary: 1, endBoundary: 2 },
+        { speaker: 'LEADER', startBoundary: 2, endBoundary: 3 },
+      ],
+    }
+    expect(validateSplitResult(bad, boundaries)).toBeNull()
+  })
+})
+
+// ─── Congregational Split (34-03) — splitCongregationalReading ────────────────
+//
+// This is the one place the model's output and real scripture meet. Every
+// guarantee built in 34-01/34-02 either holds here or is bypassed here:
+// section text must be sliced from the untouched source (never
+// model-echoed), the call shape must match this pre-4.6-family model exactly
+// (no thinking, no effort), and every failure path — unsplittable passage,
+// poisoned source, network error, unparseable reply, invalid reply — must
+// resolve to `null` with no partial application and no thrown error.
+
+describe('splitCongregationalReading', () => {
+  const RAW_TEXT =
+    '[1] The Lord is my shepherd; I shall not want. [2] He makes me lie down in green pastures.'
+  const boundaries = computeBoundaries(RAW_TEXT)
+  const maxIndex = boundaries.length - 1
+  const midIndex = Math.max(1, Math.floor(maxIndex / 2))
+
+  // No verse marker and no clause-ending punctuation followed by whitespace
+  // — computeBoundaries collapses to just the two anchors [0, length], which
+  // is below hasSplittableBoundaries' 3-entry minimum.
+  const NO_BOUNDARY_TEXT = 'HelloWorld'
+
+  // Has plenty of internal boundaries (same shape as RAW_TEXT) but already
+  // contains the marker delimiter character, forcing embedBoundaryMarkers'
+  // hard refusal.
+  const DELIMITER_COLLISION_TEXT = `${RAW_TEXT}${BOUNDARY_MARKER_OPEN}`
+
+  beforeEach(() => {
+    mockParse.mockReset()
+  })
+
+  it('resolves to CongregationalSection[] whose text is a byte-exact slice of the source and whose speaker is carried through from the model', async () => {
+    mockParse.mockResolvedValueOnce({
+      parsed_output: {
+        sections: [
+          { speaker: 'LEADER', startBoundary: 0, endBoundary: midIndex },
+          { speaker: 'CONGREGATION', startBoundary: midIndex, endBoundary: maxIndex },
+        ],
+      },
+    })
+
+    const result = await splitCongregationalReading(RAW_TEXT)
+
+    expect(result).not.toBeNull()
+    expect(result).toHaveLength(2)
+    expect(result![0]!.speaker).toBe('LEADER')
+    expect(result![0]!.text).toBe(
+      stripVerseMarkers(sliceAtBoundaries(RAW_TEXT, boundaries, 0, midIndex)),
+    )
+    expect(result![1]!.speaker).toBe('CONGREGATION')
+    expect(result![1]!.text).toBe(
+      stripVerseMarkers(sliceAtBoundaries(RAW_TEXT, boundaries, midIndex, maxIndex)),
+    )
+  })
+
+  it('every returned section text is a substring of the marker-stripped source — proving it was sliced, not echoed', async () => {
+    mockParse.mockResolvedValueOnce({
+      parsed_output: {
+        sections: [
+          { speaker: 'LEADER', startBoundary: 0, endBoundary: midIndex },
+          { speaker: 'CONGREGATION', startBoundary: midIndex, endBoundary: maxIndex },
+        ],
+      },
+    })
+
+    const result = await splitCongregationalReading(RAW_TEXT)
+    const strippedSource = stripVerseMarkers(RAW_TEXT)
+
+    expect(result).not.toBeNull()
+    for (const section of result!) {
+      expect(strippedSource.includes(section.text)).toBe(true)
+    }
+  })
+
+  it('(call shape) sends the exact dated Haiku model id', async () => {
+    mockParse.mockResolvedValueOnce({
+      parsed_output: { sections: [{ speaker: 'LEADER', startBoundary: 0, endBoundary: maxIndex }] },
+    })
+
+    await splitCongregationalReading(RAW_TEXT)
+
+    const request = mockParse.mock.calls[0]![0] as Record<string, unknown>
+    expect(request.model).toBe('claude-haiku-4-5-20251001')
+  })
+
+  it('(call shape) sets max_tokens to 1024', async () => {
+    mockParse.mockResolvedValueOnce({
+      parsed_output: { sections: [{ speaker: 'LEADER', startBoundary: 0, endBoundary: maxIndex }] },
+    })
+
+    await splitCongregationalReading(RAW_TEXT)
+
+    const request = mockParse.mock.calls[0]![0] as Record<string, unknown>
+    expect(request.max_tokens).toBe(1024)
+  })
+
+  it('(call shape) sets output_config.format to a json_schema-typed format constraining the reply to indices', async () => {
+    mockParse.mockResolvedValueOnce({
+      parsed_output: { sections: [{ speaker: 'LEADER', startBoundary: 0, endBoundary: maxIndex }] },
+    })
+
+    await splitCongregationalReading(RAW_TEXT)
+
+    const request = mockParse.mock.calls[0]![0] as {
+      output_config: { format: { type: string; schema: { properties: Record<string, unknown> } } }
+    }
+    expect(request.output_config).toBeDefined()
+    expect(request.output_config.format).toBeDefined()
+    expect(request.output_config.format.type).toBe('json_schema')
+    // The schema passed through jsonSchemaOutputFormat is transformed (deep
+    // cloned), so it will not be `===` SPLIT_SCHEMA — assert its shape
+    // instead: it still constrains the reply to a `sections` array, never a
+    // free-text field.
+    expect(request.output_config.format.schema.properties).toHaveProperty('sections')
+  })
+
+  it('(call shape) never sets thinking or effort — both error on this pre-4.6-family model', async () => {
+    mockParse.mockResolvedValueOnce({
+      parsed_output: { sections: [{ speaker: 'LEADER', startBoundary: 0, endBoundary: maxIndex }] },
+    })
+
+    await splitCongregationalReading(RAW_TEXT)
+
+    const request = mockParse.mock.calls[0]![0] as Record<string, unknown>
+    expect('thinking' in request).toBe(false)
+    expect('effort' in request).toBe(false)
+    expect('effort' in (request.output_config as Record<string, unknown>)).toBe(false)
+  })
+
+  it('(call shape) sends the marked-up passage as the sole user message and forwards the app-auth header', async () => {
+    mockParse.mockResolvedValueOnce({
+      parsed_output: { sections: [{ speaker: 'LEADER', startBoundary: 0, endBoundary: maxIndex }] },
+    })
+
+    await splitCongregationalReading(RAW_TEXT)
+
+    const request = mockParse.mock.calls[0]![0] as {
+      messages: { role: string; content: string }[]
+    }
+    const options = mockParse.mock.calls[0]![1] as { headers: Record<string, string> }
+    expect(request.messages).toHaveLength(1)
+    expect(request.messages[0]!.role).toBe('user')
+    expect(request.messages[0]!.content).toContain(BOUNDARY_MARKER_OPEN)
+    expect(options.headers).toEqual({ 'X-App-Auth': 'test-token' })
+  })
+
+  it('(P-02) the system prompt never asks for or quotes passage text', async () => {
+    mockParse.mockResolvedValueOnce({
+      parsed_output: { sections: [{ speaker: 'LEADER', startBoundary: 0, endBoundary: maxIndex }] },
+    })
+
+    await splitCongregationalReading(RAW_TEXT)
+
+    const request = mockParse.mock.calls[0]![0] as { system: string }
+    expect(typeof request.system).toBe('string')
+    expect(request.system.length).toBeGreaterThan(0)
+    // The system prompt instructs the model about markers/indices only — it
+    // must never itself carry scripture words from the passage.
+    expect(request.system).not.toContain('shepherd')
+    expect(request.system).not.toContain('pastures')
+  })
+
+  it('returns null and never calls the API when the passage has no internal boundary', async () => {
+    const result = await splitCongregationalReading(NO_BOUNDARY_TEXT)
+
+    expect(result).toBeNull()
+    expect(mockParse).not.toHaveBeenCalled()
+  })
+
+  it('returns null and never calls the API when the source already contains a boundary-marker delimiter', async () => {
+    const result = await splitCongregationalReading(DELIMITER_COLLISION_TEXT)
+
+    expect(result).toBeNull()
+    expect(mockParse).not.toHaveBeenCalled()
+  })
+
+  it('returns null (not a rejected promise) when the API call rejects, and logs once', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockParse.mockRejectedValueOnce(new Error('Network error'))
+
+    const result = await splitCongregationalReading(RAW_TEXT)
+
+    expect(result).toBeNull()
+    expect(consoleErrorSpy).toHaveBeenCalledTimes(1)
+    consoleErrorSpy.mockRestore()
+  })
+
+  it('returns null when the reply has no parsed output', async () => {
+    mockParse.mockResolvedValueOnce({ parsed_output: null })
+
+    const result = await splitCongregationalReading(RAW_TEXT)
+
+    expect(result).toBeNull()
+  })
+
+  it('returns null with no partial array when a section has an out-of-range index', async () => {
+    mockParse.mockResolvedValueOnce({
+      parsed_output: {
+        sections: [
+          { speaker: 'LEADER', startBoundary: 0, endBoundary: midIndex },
+          { speaker: 'CONGREGATION', startBoundary: midIndex, endBoundary: maxIndex + 50 },
+        ],
+      },
+    })
+
+    const result = await splitCongregationalReading(RAW_TEXT)
+
+    expect(result).toBeNull()
+  })
+
+  it('returns null with no partial array when there is a gap between sections', async () => {
+    mockParse.mockResolvedValueOnce({
+      parsed_output: {
+        sections: [
+          { speaker: 'LEADER', startBoundary: 0, endBoundary: 1 },
+          { speaker: 'CONGREGATION', startBoundary: 2, endBoundary: maxIndex },
+        ],
+      },
+    })
+
+    const result = await splitCongregationalReading(RAW_TEXT)
+
+    expect(result).toBeNull()
+  })
+
+  it('(boundary identity) the highest index the validator accepts agrees with the highest marker index embedded in the prompt', async () => {
+    mockParse.mockResolvedValueOnce({
+      parsed_output: { sections: [{ speaker: 'LEADER', startBoundary: 0, endBoundary: maxIndex }] },
+    })
+
+    const result = await splitCongregationalReading(RAW_TEXT)
+
+    const request = mockParse.mock.calls[0]![0] as { messages: { content: string }[] }
+    const markerIndices = [...request.messages[0]!.content.matchAll(/⟦(\d+)⟧/g)].map((m) =>
+      Number(m[1]),
+    )
+    const highestMarkerIndexInPrompt = Math.max(...markerIndices)
+
+    // The reply's endBoundary was set to `maxIndex` above and was ACCEPTED
+    // (result is non-null) — proving the highest index the validator accepts
+    // is the same highest index embedded in the prompt, i.e. one single
+    // `boundaries` array/length was threaded through both, never recomputed.
+    expect(result).not.toBeNull()
+    expect(highestMarkerIndexInPrompt).toBe(maxIndex)
+  })
+
+  it('no failure path throws out of splitCongregationalReading', async () => {
+    mockParse.mockResolvedValueOnce({ parsed_output: { sections: 'not-an-array' } })
+
+    await expect(splitCongregationalReading(RAW_TEXT)).resolves.toBeNull()
   })
 })

@@ -166,6 +166,7 @@
     <NewServiceDialog
       v-if="authStore.isEditor"
       :open="dialogOpen"
+      :taken-dates="takenServiceDates"
       @close="dialogOpen = false"
       @create="onCreateService"
     />
@@ -222,6 +223,10 @@ const pastServices = computed(() =>
     .filter((s) => s.date < todayStr.value)
     .sort((a, b) => b.date.localeCompare(a.date)),
 )
+
+// R038 / D-14: dates that already have a plan, fed to NewServiceDialog so its default
+// date skips them. This view already subscribes to the service list, so no new I/O.
+const takenServiceDates = computed(() => serviceStore.services.map((s) => s.date))
 
 // Rotation window: services within 4 weeks past and 4 weeks ahead of today
 const rotationServices = computed(() => {

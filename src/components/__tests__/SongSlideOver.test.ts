@@ -25,7 +25,12 @@ let mockVwModeEnabled = true
 vi.mock('@/stores/auth', () => ({
   useAuthStore: () => ({
     get vwModeEnabled() { return mockVwModeEnabled },
+    orgId: 'org-1',
   }),
+}))
+
+vi.mock('../SongLyricEditor.vue', () => ({
+  default: { name: 'SongLyricEditor', template: '<div data-testid="song-lyric-editor" />', props: ['songId', 'orgId'] },
 }))
 
 function makeSong(overrides: Partial<Song> = {}): Song {
@@ -53,9 +58,9 @@ function makeSong(overrides: Partial<Song> = {}): Song {
 // The drawer's watch(() => props.open, ...) seeds form state from a false->true
 // transition (mirrors real usage — SongsView mounts it once with open=false and
 // flips it true on edit-click). Mount closed, then open it so that seeding runs.
-async function mountDrawer(song: Song | null) {
+async function mountDrawer(song: Song | null, initialTab?: 'details' | 'lyrics') {
   const wrapper = mount(SongSlideOver, {
-    props: { open: false, song },
+    props: { open: false, song, initialTab },
     global: {
       // Render Teleport's default slot in place — content actually teleported to
       // document.body isn't reachable via wrapper.find/findAll.
@@ -140,5 +145,133 @@ describe('SongSlideOver — save', () => {
     expect(mockUpdateSong).toHaveBeenCalledTimes(1)
     const [, data] = mockUpdateSong.mock.calls[0]!
     expect(data.removedThemes).toEqual(['Old'])
+  })
+})
+
+describe('SongSlideOver — tabs', () => {
+  beforeEach(() => {
+    mockVwModeEnabled = true
+    mockAddSong.mockClear()
+    mockUpdateSong.mockClear()
+    mockDeleteSong.mockClear()
+  })
+
+  it('shows Details and Lyrics tabs in edit mode', async () => {
+    const song = makeSong()
+    const wrapper = await mountDrawer(song)
+    expect(wrapper.find('[data-testid="tab-details"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="tab-lyrics"]').exists()).toBe(true)
+  })
+
+  it('does not show tabs in create mode', async () => {
+    const wrapper = await mountDrawer(null)
+    expect(wrapper.find('[data-testid="tab-details"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="tab-lyrics"]').exists()).toBe(false)
+  })
+
+  it('defaults to Details tab showing the form fields', async () => {
+    const song = makeSong()
+    const wrapper = await mountDrawer(song)
+    expect(wrapper.find('input[placeholder="Song title"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="lyrics-tab-content"]').exists()).toBe(false)
+  })
+
+  it('switches to Lyrics tab on click', async () => {
+    const song = makeSong()
+    const wrapper = await mountDrawer(song)
+    await wrapper.find('[data-testid="tab-lyrics"]').trigger('click')
+    expect(wrapper.find('[data-testid="lyrics-tab-content"]').exists()).toBe(true)
+    expect(wrapper.find('input[placeholder="Song title"]').exists()).toBe(false)
+  })
+
+  // 28-02 Task 3 (R035/D-01): the Lyrics tab mounts ONE editor and no second
+  // list — PerformanceOrderBuilder is deleted from disk, so the Lyrics tab's
+  // only child surface is the lyric editor (plus version history, out of
+  // scope here). Regression guard against reintroducing a second list.
+  it('mounts the lyric editor and no second list on the Lyrics tab', async () => {
+    const song = makeSong()
+    const wrapper = await mountDrawer(song)
+    await wrapper.find('[data-testid="tab-lyrics"]').trigger('click')
+    expect(wrapper.find('[data-testid="song-lyric-editor"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="performance-order-builder"]').exists()).toBe(false)
+  })
+
+  // Task 1 (28-04, R035): the Lyrics tab panel itself must stop scrolling — the
+  // editor owns the sole scroll region. With SongLyricEditor stubbed out here,
+  // this proves SongSlideOver's OWN markup contributes zero scroll containers;
+  // the real editor's single scroll region is verified against the actual
+  // component in SongLyricEditor.test.ts.
+  it('renders the Lyrics tab as a non-scrolling flex column with no scroll wrapper of its own', async () => {
+    const song = makeSong()
+    const wrapper = await mountDrawer(song)
+    await wrapper.find('[data-testid="tab-lyrics"]').trigger('click')
+
+    const tabContent = wrapper.find('[data-testid="lyrics-tab-content"]')
+    expect(tabContent.exists()).toBe(true)
+    expect(tabContent.classes().join(' ')).not.toMatch(/overflow-y-auto|overflow-auto/)
+    expect(wrapper.findAll('[class*="overflow-y-auto"]')).toHaveLength(0)
+  })
+})
+
+// Task 2 (26-02): an opening-tab input, read inside the SAME watcher that resets
+// the tab on every open — a value applied anywhere else is discarded, since that
+// watcher unconditionally resets the tab today.
+describe('SongSlideOver — opening tab (initialTab prop)', () => {
+  beforeEach(() => {
+    mockVwModeEnabled = true
+    mockAddSong.mockClear()
+    mockUpdateSong.mockClear()
+    mockDeleteSong.mockClear()
+  })
+
+  it('opens on Details when no opening tab is supplied (unchanged default)', async () => {
+    const song = makeSong()
+    const wrapper = await mountDrawer(song)
+    expect(wrapper.find('input[placeholder="Song title"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="lyrics-tab-content"]').exists()).toBe(false)
+  })
+
+  it('opens on Lyrics when the lyrics tab is requested', async () => {
+    const song = makeSong()
+    const wrapper = await mountDrawer(song, 'lyrics')
+    expect(wrapper.find('[data-testid="lyrics-tab-content"]').exists()).toBe(true)
+    expect(wrapper.find('input[placeholder="Song title"]').exists()).toBe(false)
+  })
+
+  it('opens on Details when the details tab is explicitly requested', async () => {
+    const song = makeSong()
+    const wrapper = await mountDrawer(song, 'details')
+    expect(wrapper.find('input[placeholder="Song title"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="lyrics-tab-content"]').exists()).toBe(false)
+  })
+
+  it('honours a newly requested tab on close-then-reopen rather than the previous request', async () => {
+    const song = makeSong()
+    const wrapper = await mountDrawer(song, 'lyrics')
+    expect(wrapper.find('[data-testid="lyrics-tab-content"]').exists()).toBe(true)
+
+    await wrapper.setProps({ open: false })
+    await wrapper.setProps({ initialTab: 'details' })
+    await wrapper.setProps({ open: true })
+
+    expect(wrapper.find('input[placeholder="Song title"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="lyrics-tab-content"]').exists()).toBe(false)
+  })
+
+  it('still allows a manual tab click after opening on a requested tab', async () => {
+    const song = makeSong()
+    const wrapper = await mountDrawer(song, 'lyrics')
+    expect(wrapper.find('[data-testid="lyrics-tab-content"]').exists()).toBe(true)
+
+    await wrapper.find('[data-testid="tab-details"]').trigger('click')
+
+    expect(wrapper.find('input[placeholder="Song title"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="lyrics-tab-content"]').exists()).toBe(false)
+  })
+
+  it('leaves create mode unaffected — no tab bar even with an opening tab requested', async () => {
+    const wrapper = await mountDrawer(null, 'lyrics')
+    expect(wrapper.find('[data-testid="tab-bar"]').exists()).toBe(false)
+    expect(wrapper.find('input[placeholder="Song title"]').exists()).toBe(true)
   })
 })

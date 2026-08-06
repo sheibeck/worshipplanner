@@ -120,10 +120,22 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { nextFreeSunday } from '@/utils/quarterDates'
 
-const props = defineProps<{
-  open: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    open: boolean
+    /**
+     * R038 / D-14: dates (YYYY-MM-DD) that already have a service plan, so the default
+     * date can skip them. A PROP, not a store read — `ServicesView` is the only mount
+     * site and already subscribes to the service list, and keeping this component
+     * store-free is what lets it be unit-tested without a Pinia instance.
+     * Defaults to empty so any other mount site keeps the plain next-Sunday behaviour.
+     */
+    takenDates?: readonly string[]
+  }>(),
+  { takenDates: () => [] },
+)
 
 const emit = defineEmits<{
   close: []
@@ -131,19 +143,6 @@ const emit = defineEmits<{
 }>()
 
 const availableTeams = ['Choir', 'Orchestra', 'Communion', 'Special']
-
-// Compute next Sunday
-function nextSunday(): string {
-  const now = new Date()
-  const day = now.getDay() // 0=Sun, 6=Sat
-  const daysUntilSunday = day === 0 ? 7 : 7 - day
-  const sunday = new Date(now)
-  sunday.setDate(now.getDate() + daysUntilSunday)
-  const y = sunday.getFullYear()
-  const m = String(sunday.getMonth() + 1).padStart(2, '0')
-  const d = String(sunday.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
-}
 
 /** Returns which Sunday of the month (1-5) a date falls on, or 0 if not a Sunday */
 function sundayOrdinal(dateStr: string): number {
@@ -160,7 +159,14 @@ interface FormState {
 }
 
 function defaultForm(): FormState {
-  const date = nextSunday()
+  // R038: the nearest FUTURE Sunday with no plan yet. `nextFreeSunday` carries the
+  // D-13 bound and falls back to the plain next Sunday itself, so this is the single
+  // date source — the old private nextSunday() (and its inline copy of the date
+  // formatter) is gone deliberately; do not reintroduce a second one.
+  const date = nextFreeSunday(new Date(), props.takenDates)
+  // ★ Known, deliberate side effect of R038: the default TEAM selection below is
+  // derived from the date's ordinal-of-month, so skipping a taken Sunday can change
+  // which teams are pre-checked. Covered by NewServiceDialog.test.ts.
   const ordinal = sundayOrdinal(date)
   let teams: string[] = []
   if (ordinal === 1) teams = ['Orchestra', 'Communion']

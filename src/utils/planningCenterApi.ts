@@ -2,6 +2,7 @@ import type { Service, ServiceSlot, ScriptureRef } from '@/types/service'
 import type { Song } from '@/types/song'
 import type { UpsertPersonInput } from '@/types/roster'
 import { formatScriptureRef } from '@/utils/planningCenterExport'
+import { formatScriptureReference, scriptureRefFromSlot } from '@/utils/scripture'
 import { fetchPassageText } from '@/utils/esvApi'
 
 /**
@@ -957,9 +958,14 @@ export async function addSlotAsItem(
   }
 
   if (slot.kind === 'SCRIPTURE') {
-    const verseRange =
-      slot.verseStart && slot.verseEnd ? `:${slot.verseStart}-${slot.verseEnd}` : ''
-    const refText = `${slot.book ?? ''} ${slot.chapter ?? ''}${verseRange}`.trim()
+    // ME-01: routed through the canonical primitives rather than the old inline
+    // `verseStart && verseEnd` rule. That rule dropped the verse from a
+    // single-verse reading (verseEnd is null unless the reference is a RANGE),
+    // so the plan item was titled "Scripture - Romans 8" AND fetchPassageText
+    // pulled the whole chapter into the item description, while the projected
+    // slide read "Romans 8:28".
+    const ref = scriptureRefFromSlot(slot)
+    const refText = ref ? formatScriptureReference(ref) : ''
     const title = `Scripture - ${refText}`
 
     let description: string | undefined

@@ -66,8 +66,34 @@
           </div>
         </div>
 
-        <!-- Scrollable body -->
-        <div class="flex-1 overflow-y-auto px-5 py-5 space-y-5">
+        <!-- Tabs (edit mode only) -->
+        <div v-if="!isCreateMode" class="flex border-b border-gray-800 shrink-0 px-5" data-testid="tab-bar">
+          <button
+            type="button"
+            data-testid="tab-details"
+            class="px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px"
+            :class="activeTab === 'details'
+              ? 'text-indigo-400 border-indigo-500'
+              : 'text-gray-400 border-transparent hover:text-gray-300'"
+            @click="activeTab = 'details'"
+          >
+            Details
+          </button>
+          <button
+            type="button"
+            data-testid="tab-lyrics"
+            class="px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px"
+            :class="activeTab === 'lyrics'
+              ? 'text-indigo-400 border-indigo-500'
+              : 'text-gray-400 border-transparent hover:text-gray-300'"
+            @click="activeTab = 'lyrics'"
+          >
+            Lyrics
+          </button>
+        </div>
+
+        <!-- Details tab (also shown always in create mode) -->
+        <div v-if="activeTab === 'details' || isCreateMode" class="flex-1 overflow-y-auto px-5 py-5 space-y-5">
 
           <!-- Title -->
           <div>
@@ -244,6 +270,17 @@
           </div>
 
         </div>
+
+        <!-- Lyrics tab: a non-scrolling flex column that fills the remaining
+             height and lets its child shrink — SongLyricEditor owns the sole
+             scroll region (R035). This mounts the editor and nothing else. -->
+        <div v-if="activeTab === 'lyrics' && !isCreateMode" class="flex flex-1 min-h-0 flex-col" data-testid="lyrics-tab-content">
+          <SongLyricEditor
+            :song-id="props.song!.id"
+            :org-id="orgId"
+          />
+        </div>
+
       </div>
     </Transition>
   </Teleport>
@@ -254,11 +291,15 @@ import { ref, computed, watch } from 'vue'
 import { useSongStore } from '@/stores/songs'
 import { useAuthStore } from '@/stores/auth'
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
+import SongLyricEditor from './SongLyricEditor.vue'
 import type { Song, Arrangement, VWType } from '@/types/song'
+import type { SongEditTab } from '@/utils/songEditLink'
 
 const props = defineProps<{
   open: boolean
   song: Song | null
+  /** Tab to open on (26-02's arriving-link seam). Falls back to 'details' when absent — the default is unchanged. */
+  initialTab?: SongEditTab
 }>()
 
 const emit = defineEmits<{
@@ -269,6 +310,9 @@ const emit = defineEmits<{
 
 const songStore = useSongStore()
 const authStore = useAuthStore()
+
+const activeTab = ref<'details' | 'lyrics'>('details')
+const orgId = computed(() => authStore.orgId ?? '')
 
 // ── Form state ────────────────────────────────────────────────────────────────
 
@@ -342,6 +386,9 @@ watch(
       userTagInput.value = ''
       titleError.value = false
       showDeleteConfirm.value = false
+      // 26-02: prefer the requested opening tab; fall back to the existing default
+      // when none is supplied so this remains a no-op for every other caller.
+      activeTab.value = props.initialTab ?? 'details'
       unsavedGuard.capture()
     }
   },
@@ -505,4 +552,5 @@ async function onDelete() {
     isDeleting.value = false
   }
 }
+
 </script>

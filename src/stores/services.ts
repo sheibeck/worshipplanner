@@ -22,7 +22,7 @@ import { useQuartersStore } from '@/stores/quarters'
 import { deriveSlug, claimSlug } from '@/utils/slug'
 import { resolveServiceRoleAssignments } from '@/utils/serviceRoles'
 import { buildSlots } from '@/utils/slotTypes'
-import type { Service } from '@/types/service'
+import type { Service, ServiceStatus } from '@/types/service'
 import type { SongSlot } from '@/types/service'
 
 type CreateServiceInput = {
@@ -31,10 +31,53 @@ type CreateServiceInput = {
   teams: string[]
 }
 
+/**
+ * R036 — thrown by the store's draft-only write guard (enforcement layer 2 of 3).
+ *
+ * The guard is defence-in-depth, NOT the primary enforcement: the Firestore rule
+ * added in 31-01 is what actually stops a determined client. This exists so a
+ * client-side bug — a control that should have been removed when the service
+ * locked, or a handler that forgot its early return — surfaces as a named local
+ * error naming R036 and the stored status, instead of an opaque
+ * `FirebaseError: Missing or insufficient permissions` from a round trip.
+ *
+ * It THROWS rather than silently returning (`createService`'s precedent, not
+ * `updateService`'s `if (!orgId.value) return`) deliberately. A swallowed write
+ * is indistinguishable from a successful one to the caller, which is precisely
+ * the "it didn't save" defect class this milestone exists to close. Note this is
+ * not a new failure mode for any caller: since 31-01 these same writes already
+ * rejected at the rules layer — the guard only makes the rejection immediate and
+ * legible.
+ */
+export class ServiceLockedError extends Error {
+  readonly serviceId: string
+  readonly storedStatus: ServiceStatus
+
+  constructor(serviceId: string, storedStatus: ServiceStatus, action: string) {
+    super(
+      `R036: refusing to ${action} service ${serviceId} — its stored status is ` +
+        `"${storedStatus}", not "draft". Reopen it for editing first.`,
+    )
+    this.name = 'ServiceLockedError'
+    this.serviceId = serviceId
+    this.storedStatus = storedStatus
+  }
+}
+
 export const useServiceStore = defineStore('services', () => {
   const services = ref<Service[]>([])
   const isLoading = ref(true)
   const orgId = ref<string | null>(null)
+
+  // R039 (32-01) — own-write echo classification. `ownWriteEchoIds` is the
+  // public signal (a service id in this array means "the most recent
+  // snapshot for this document is this client's own write settling, not a
+  // genuinely external change"); `pendingWriteIds` is private closure state
+  // remembering which ids were mid-flight as of the PREVIOUS snapshot, so
+  // the settle edge (pending -> not-pending) can be detected across two
+  // consecutive emissions rather than read off a single one.
+  const ownWriteEchoIds = ref<string[]>([])
+  let pendingWriteIds: string[] = []
 
   let unsubscribeFn: Unsubscribe | null = null
 
@@ -47,7 +90,25 @@ export const useServiceStore = defineStore('services', () => {
       collection(db, 'organizations', orgIdValue, 'services'),
       orderBy('date', 'desc'),
     )
-    unsubscribeFn = onSnapshot(q, (snap) => {
+    // The metadata-changes option below is what makes BOTH edges of
+    // `hasPendingWrites` observable: without it, the metadata-only emission
+    // marking a pending write as settled never reaches this callback at all.
+    unsubscribeFn = onSnapshot(q, { includeMetadataChanges: true }, (snap) => {
+      // Optional chaining on `d.metadata` is deliberate: a doc without
+      // metadata (every pre-32-01 test fixture) must classify as
+      // not-pending rather than throw.
+      const nowPending = snap.docs
+        .filter((d) => d.metadata?.hasPendingWrites === true)
+        .map((d) => d.id)
+      // The settle edge — a doc that WAS pending as of the previous
+      // emission and is no longer pending now — is the server-ack snapshot
+      // whose resolved `serverTimestamp()` value is what defeats a naive
+      // updatedAt diff. Both edges must classify as an echo, or only half
+      // the R039 window closes.
+      const justSettled = pendingWriteIds.filter((id) => !nowPending.includes(id))
+      ownWriteEchoIds.value = [...nowPending, ...justSettled]
+      pendingWriteIds = nowPending
+
       services.value = snap.docs.map((d) => {
         const data = d.data()
         return { id: d.id, name: '', notes: '', ...data } as Service
@@ -62,6 +123,17 @@ export const useServiceStore = defineStore('services', () => {
     orgId.value = null
     services.value = []
     isLoading.value = true
+    ownWriteEchoIds.value = []
+    pendingWriteIds = []
+  }
+
+  /** R039 — true when `serviceId`'s most recent snapshot is this client's
+   *  own write settling (optimistic OR server-ack edge), never a
+   *  field-by-field diff. Firestore's `metadata.hasPendingWrites` is local
+   *  SDK state a remote writer cannot set, so this cannot be spoofed by a
+   *  genuinely external change (T-32-02). */
+  function isOwnWriteEcho(serviceId: string): boolean {
+    return ownWriteEchoIds.value.includes(serviceId)
   }
 
   async function createService(data: CreateServiceInput): Promise<string> {
@@ -81,14 +153,109 @@ export const useServiceStore = defineStore('services', () => {
     return ref.id
   }
 
+  // ── R036 draft-only write guard ──────────────────────────────────────────────
+  //
+  // The three shapes below mirror `firestore.rules`' `/services` `allow update`
+  // clause one-for-one. They deliberately do NOT invent a fourth policy: any
+  // divergence would either refuse a write the server accepts (a phantom lock)
+  // or wave through one the server denies (an opaque round-trip failure).
+  //
+  //   rule 1  storedStatus() == 'draft'                       → ordinary editing
+  //   rule 2  planned → exported carrying export evidence     → D-09
+  //   rule 3  → draft, touching only status                   → R037 reopen
+  //
+  // `updateService` appends `updatedAt` itself, so the caller-supplied key sets
+  // checked here are the rules' `affectedKeys()` minus `updatedAt`.
+
+  /** The status as STORED, from the live snapshot — never an incoming value.
+   *  `?? 'draft'` matches the rule's own `resource.data.get('status','draft')`
+   *  so legacy documents with no status field agree across both layers. */
+  function storedStatusOf(id: string): ServiceStatus {
+    return services.value.find((s) => s.id === id)?.status ?? 'draft'
+  }
+
+  // D-09 — the Planning Center export write, the one mutation that must survive
+  // the lock or `exported` becomes unreachable and the primary workflow breaks.
+  // ★ Do not "simplify" this carve-out away.
+  const EXPORT_WRITE_KEYS = ['status', 'pcExportedAt', 'pcPlanId']
+  function isExportWrite(data: Record<string, unknown>): boolean {
+    const keys = Object.keys(data)
+    return (
+      data.status === 'exported' &&
+      keys.includes('pcExportedAt') &&
+      keys.every((k) => EXPORT_WRITE_KEYS.includes(k))
+    )
+  }
+
+  // R037 — the reopen write. `status` alone: anything else riding along is the
+  // smuggled-edit case the rule's `hasOnly(['status','updatedAt'])` rejects.
+  function isReopenWrite(data: Record<string, unknown>): boolean {
+    const keys = Object.keys(data)
+    return data.status === 'draft' && keys.length === 1 && keys[0] === 'status'
+  }
+
+  function assertWritable(id: string, data: Record<string, unknown>): void {
+    const stored = storedStatusOf(id)
+    if (stored === 'draft') return
+    if (stored === 'planned' && isExportWrite(data)) return
+    if (isReopenWrite(data)) return
+    throw new ServiceLockedError(id, stored, 'update')
+  }
+
   async function updateService(id: string, data: Record<string, unknown>) {
     if (!orgId.value) return
+    assertWritable(id, data)
     await updateDoc(doc(db, 'organizations', orgId.value, 'services', id), {
       ...data,
       updatedAt: serverTimestamp(),
     })
   }
 
+  // ── R037 status transitions ──────────────────────────────────────────────────
+  //
+  // D-02: explicit, named actions — one per legal transition — replacing the
+  // deleted `toggleStatus` cycle. There is deliberately NO generic status
+  // setter: a `setStatus(id, s)` would re-admit hand-setting `exported` without
+  // an export, which is exactly the defect D-03 closes. `exported` is reachable
+  // ONLY through the export write above.
+  //
+  // Both throw on refusal. The caller must AWAIT them and only then reflect the
+  // new status in the UI — a status that flips before the write lands is the
+  // "it didn't save" defect class this milestone exists to close.
+
+  async function markAsPlanned(id: string): Promise<void> {
+    if (!orgId.value) throw new Error('No orgId set — call subscribe() first')
+    const stored = storedStatusOf(id)
+    if (stored !== 'draft') throw new ServiceLockedError(id, stored, 'mark as planned')
+    await updateDoc(doc(db, 'organizations', orgId.value, 'services', id), {
+      status: 'planned',
+      updatedAt: serverTimestamp(),
+    })
+  }
+
+  /**
+   * R037 — reopen a locked service for editing.
+   *
+   * ★ The payload is `status` + `updatedAt` and NOTHING ELSE. The rule's
+   * `keys().hasOnly(['status','updatedAt'])` reads `affectedKeys()`, so adding
+   * `pcExportedAt`/`pcPlanId` here — even to re-write their existing values —
+   * can surface in that diff and get the whole write denied. D-11 keeps both
+   * fields precisely by NOT touching them: the Planning Center plan stays
+   * linked, so a re-export updates it instead of creating a duplicate, and
+   * D-04's evidence gate still fires on a second reopen.
+   */
+  async function reopenService(id: string): Promise<void> {
+    if (!orgId.value) throw new Error('No orgId set — call subscribe() first')
+    await updateDoc(doc(db, 'organizations', orgId.value, 'services', id), {
+      status: 'draft',
+      updatedAt: serverTimestamp(),
+    })
+  }
+
+  // D-15: deliberately NOT guarded. Delete stays available at every status —
+  // the UI warns about an orphaned Planning Center plan instead of locking.
+  // `firestore.rules`' `allow delete` carries no status condition for the same
+  // reason; keep the two in step.
   async function deleteService(id: string) {
     if (!orgId.value) return
     await deleteDoc(doc(db, 'organizations', orgId.value, 'services', id))
@@ -152,6 +319,16 @@ export const useServiceStore = defineStore('services', () => {
     personIds: string[],
   ): Promise<void> {
     if (!orgId.value) return
+    // ★ R036 — the Roles tab does NOT go through updateService. These two
+    // actions carry their own updateDoc, so without their own guard the store
+    // layer would not cover the Roles tab at all. The scoped dot-path surfaces
+    // in affectedKeys() as the top-level `roleAssignmentOverrides`, which
+    // appears in neither rules carve-out, so the server denies it on a locked
+    // service — this makes that refusal local and legible.
+    const stored = storedStatusOf(serviceId)
+    if (stored !== 'draft') {
+      throw new ServiceLockedError(serviceId, stored, 'set a role override on')
+    }
     await updateDoc(doc(db, 'organizations', orgId.value, 'services', serviceId), {
       [`roleAssignmentOverrides.${roleId}`]: personIds,
       updatedAt: serverTimestamp(),
@@ -162,6 +339,11 @@ export const useServiceStore = defineStore('services', () => {
   // leaving every sibling role's override entry (and the schedule) untouched.
   async function clearRoleOverride(serviceId: string, roleId: string): Promise<void> {
     if (!orgId.value) return
+    // R036 — same reasoning as setRoleOverride above.
+    const stored = storedStatusOf(serviceId)
+    if (stored !== 'draft') {
+      throw new ServiceLockedError(serviceId, stored, 'clear a role override on')
+    }
     await updateDoc(doc(db, 'organizations', orgId.value, 'services', serviceId), {
       [`roleAssignmentOverrides.${roleId}`]: deleteField(),
       updatedAt: serverTimestamp(),
@@ -262,10 +444,14 @@ export const useServiceStore = defineStore('services', () => {
     services,
     isLoading,
     orgId,
+    ownWriteEchoIds,
+    isOwnWriteEcho,
     subscribe,
     unsubscribeAll,
     createService,
     updateService,
+    markAsPlanned,
+    reopenService,
     deleteService,
     assignSongToSlot,
     clearSongFromSlot,

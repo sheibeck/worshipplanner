@@ -147,6 +147,9 @@ function slotLabel(slot: ServiceSlot): string {
       return 'Message'
     case 'HYMN':
       return slot.hymnName ? `Hymn — ${slot.hymnName}${slot.hymnNumber ? ` #${slot.hymnNumber}` : ''}` : 'Hymn — Empty'
+    case 'IMPORTED':
+      // Matches the canonical label used by utils/slotTypes.ts's slotLabel().
+      return 'Imported Slides'
   }
 }
 

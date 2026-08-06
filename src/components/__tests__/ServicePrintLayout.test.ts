@@ -76,15 +76,15 @@ const mockService: Service = {
   teams: ['Choir', 'Orchestra'],
   status: 'draft',
   slots: [
-    { kind: 'SONG', position: 0, requiredVwType: 1, songId: 'song-0', songTitle: 'Come Thou Fount', songKey: 'G' },
-    { kind: 'SCRIPTURE', position: 1, book: 'Psalms', chapter: 23, verseStart: 1, verseEnd: 6 },
-    { kind: 'SONG', position: 2, requiredVwType: 2, songId: 'song-2', songTitle: 'Great Is Thy Faithfulness', songKey: 'D' },
-    { kind: 'PRAYER', position: 3 },
-    { kind: 'SCRIPTURE', position: 4, book: 'John', chapter: 3, verseStart: 16, verseEnd: 17 },
-    { kind: 'SONG', position: 5, requiredVwType: 2, songId: null, songTitle: null, songKey: null },
-    { kind: 'SONG', position: 6, requiredVwType: 3, songId: null, songTitle: null, songKey: null },
-    { kind: 'MESSAGE', position: 7 },
-    { kind: 'SONG', position: 8, requiredVwType: 3, songId: null, songTitle: null, songKey: null },
+    { kind: 'SONG', id: 'slot-0', position: 0, requiredVwType: 1, songId: 'song-0', songTitle: 'Come Thou Fount', songKey: 'G' },
+    { kind: 'SCRIPTURE', id: 'slot-1', position: 1, book: 'Psalms', chapter: 23, verseStart: 1, verseEnd: 6 },
+    { kind: 'SONG', id: 'slot-2', position: 2, requiredVwType: 2, songId: 'song-2', songTitle: 'Great Is Thy Faithfulness', songKey: 'D' },
+    { kind: 'PRAYER', id: 'slot-3', position: 3 },
+    { kind: 'SCRIPTURE', id: 'slot-4', position: 4, book: 'John', chapter: 3, verseStart: 16, verseEnd: 17 },
+    { kind: 'SONG', id: 'slot-5', position: 5, requiredVwType: 2, songId: null, songTitle: null, songKey: null },
+    { kind: 'SONG', id: 'slot-6', position: 6, requiredVwType: 3, songId: null, songTitle: null, songKey: null },
+    { kind: 'MESSAGE', id: 'slot-7', position: 7 },
+    { kind: 'SONG', id: 'slot-8', position: 8, requiredVwType: 3, songId: null, songTitle: null, songKey: null },
   ],
   sermonPassage: { book: 'Romans', chapter: 8, verseStart: 1, verseEnd: 11 },
   notes: 'Communion Sunday — extended prayer time',
@@ -172,5 +172,27 @@ describe('ServicePrintLayout', () => {
     })
     expect(wrapper.text()).toContain('Choir')
     expect(wrapper.text()).toContain('Orchestra')
+  })
+
+  // 29-05: confirmation-by-test, not rework — this component has no section
+  // awareness at all (PATTERNS.md), it renders `service.slots` in array order.
+  // The section model guarantees section-major array order, so a Post-Service
+  // item placed last in the array renders last on the printed page for free.
+  it('renders a Post-Service item last for a section-major slots array (29-05)', () => {
+    const sectionMajorService: Service = {
+      ...mockService,
+      slots: [
+        { kind: 'SONG', id: 'slot-worship', position: 0, requiredVwType: 1, songId: 'song-0', songTitle: 'Come Thou Fount', songKey: 'G', section: 'worship' },
+        { kind: 'MESSAGE', id: 'slot-message', position: 1, section: 'message' },
+        { kind: 'SONG', id: 'slot-sending', position: 2, requiredVwType: 3, songId: 'song-2', songTitle: 'Great Is Thy Faithfulness', songKey: 'D', section: 'sending' },
+        { kind: 'PRAYER', id: 'slot-post-service', position: 3, section: 'post-service' },
+      ],
+    }
+    const wrapper = mount(ServicePrintLayout, {
+      props: { service: sectionMajorService, songs: mockSongs },
+    })
+    const slotRows = wrapper.findAll('[data-slot-row]')
+    expect(slotRows).toHaveLength(4)
+    expect(slotRows[slotRows.length - 1]!.text()).toContain('Prayer')
   })
 })

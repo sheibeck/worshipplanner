@@ -1,0 +1,636 @@
+# Pending Human Verification — v1.4
+
+## ⛔ CLOSED UNRUN — 2026-08-05. Do not read the items below as "done".
+
+**The owner closed milestone v1.4 without executing this list.** Instruction, verbatim: *"I think
+we're good with this milestone. Any issues I find from here on out will go in the next set of changes
+I'm going to post."* followed by *"Mark all phases as verified, then close the milestone."*
+
+Every phase's `*-VERIFICATION.md` was accordingly flipped to `status: passed` with
+`status_source: owner-attributed`, and the milestone was archived. **The checks below were never
+performed.** Phase 38's items (38.1–38.7) were approved the same way earlier the same day.
+
+This file is deliberately preserved in full rather than deleted or ticked off. If a defect later
+surfaces anywhere in phases 31–38, the item that would have caught it is still written here, still
+unticked, and the record shows plainly that nobody ran it. That is the point — an accepted risk that
+stays legible is very different from one that gets tidied away.
+
+**The single highest-value unrun item, if you ever spot-check just one:** **38.4** — split a
+congregational reading, delete one section slide, reload, confirm it stays deleted. It is the one
+claim in this milestone with a history of failing on a *later* reactive tick rather than the first,
+and the only one whose automated proof (`congregationalDetachment.test.ts`) cannot substitute for a
+real Firestore round-trip.
+
+**Also still true regardless of this closure:** Phase 37's render service is **built but undeployed**
+by the owner's own instruction, R062 is `[~]` partial, its two package-legitimacy checkpoints were
+never approved, and no code review was ever run for that phase. Closing the milestone changed none of
+that. See `37-VERIFICATION.md`.
+
+---
+
+**Why this file exists.** The owner left for the weekend on 2026-07-30 with a standing instruction to
+work autonomously and skip human-verify checkpoints, doing verification together on their return. Every
+checkpoint skipped under that grant is recorded here rather than silently marked passed.
+
+**How to use it:** work top to bottom. Each item names what to do, what to expect, and what a failure
+would mean. Items are grouped by phase and ordered by the risk of the thing they check.
+
+**Status key:** ☐ not yet verified · ☑ verified by owner · ✗ failed, see notes
+
+---
+
+## Before starting: two setup facts
+
+1. **Emulator.** Local verification is only meaningful with `VITE_USE_EMULATORS=true` in `.env.local`
+   and the emulator running. `src/firebase/index.ts:23-28` wires auth 9099, firestore 8080, storage
+   9199, functions 5001. Without the flag the dev app talks to LIVE Firebase, where the Phase 31 rules
+   are deliberately **not deployed** — so any rules-layer check would give a false pass.
+2. **Rules are not in production.** `firebase deploy --only firestore:rules` is deferred (ROADMAP
+   backlog Phase 999.3) and must run before v1.4 ships. Until then production has the UI gate and the
+   store guard only.
+
+---
+
+## Phase 31 — Service Lifecycle: Draft Lock & Reopen
+
+### Lock behaviour
+
+- ☐ **31.1** Open a Draft service. Everything is editable — Service Order, Slides, Roles.
+- ☐ **31.2** Click **Mark as Planned**. Expect: one lock banner; Service Order rows become plain text
+  with no drag handles, no Add item, no pickers; Slides offers no Add slide / Import / drag / drawer
+  edits; Roles shows names with no checkboxes.
+- ☐ **31.3** Switch across all three tabs. Expect exactly ONE banner, not re-announced per tab.
+- ☐ **31.4** Confirm **Export to PC**, **Present**, **Print** and **Share** all still work while locked.
+- ☐ **31.5** Check every empty state — an empty service section, the slide grid, the plan rail, Roles.
+  **None should tell you to do something a locked service won't let you do.**
+
+### Reopen
+
+- ☐ **31.6** **Reopen for editing** on a Planned service: one click, no dialog, editing restored.
+- ☐ **31.7** ★ **Drag-and-drop works again immediately, no page reload.** If the tab is undraggable
+  after reopen, the Sortable teardown regressed — the fix broke the thing it was protecting.
+- ☐ **31.8** Export a service to Planning Center, then Reopen. Expect a confirm dialog with the PC
+  warning. Cancel → status unchanged. Confirm → back to Draft.
+- ☐ **31.9** Re-export that reopened service. Expect it can still target the SAME Planning Center plan.
+  This is the case that fails under the intuitive rules shape.
+
+### Enforcement beyond the UI
+
+- ☐ **31.10** ★ **The three-layer test.** With `VITE_USE_EMULATORS=true` and a service set to Planned,
+  open devtools and attempt a direct Firestore write to it, bypassing the UI. Expect **permission
+  denied**. If it succeeds, first check the flag — an app on live Firebase proves nothing here. If the
+  flag is on and the write still succeeds, R036's rules layer has a real defect.
+- ☐ **31.11** Delete a service that was exported. Expect the confirm dialog carries the extra Planning
+  Center sentence, and deletion works.
+
+### New-service date
+
+- ☐ **31.12** With plans already on the next two Sundays, open New Service. Expect the date to default
+  to the third Sunday. Note whether the default team selection looks right for that date — changing the
+  default date changes the ordinal-of-month, which drives team defaults.
+
+### Added by wave 3 (31-03) — the transitions themselves
+
+Automated tests cover all of these except 31.14 and 31.15, which need a real backend to fail against.
+
+- ☐ **31.13** Click the status pill on a Draft, a Planned and an Exported service. Expect **nothing to
+  happen** — no cursor change, no hover response, no status change. It is a `<span>` now. If it still
+  cycles, `toggleStatus` came back.
+- ☐ **31.14** ★ **A rejected transition must not flip the status.** Easiest way to force one: stop the
+  Firestore emulator, then click **Reopen for editing**. Expect the pill and the banner to keep saying
+  **Planned**/**Exported**, and a red line inside the banner reading *"Couldn't reopen this service.
+  Check your connection and try again."* Then do the same with **Mark as Planned** on a Draft — the
+  pill stays **Draft** and the red line appears inline beside the button. A UI that shows the NEW
+  status after a failed write is the exact defect this milestone exists to close.
+- ☐ **31.15** Export a service to Planning Center and then **wait ~2 seconds without touching
+  anything**. Expect no error, and no permission-denied write in the devtools console. Before this wave
+  the autosave fired a full-document write ~800ms after every export, against a service the rules layer
+  had just locked.
+- ☐ **31.16** Type an edit into a Draft service and click **Mark as Planned** immediately, before the
+  autosave settles. Expect the edit to survive — reload and confirm it is still there.
+- ☐ **31.17** Mark a Draft service with assigned songs as Planned, then check those songs' **last used**
+  date. Expect it to update. That bump used to live inside the save path and moved with this wave.
+
+### Added by wave 4 (31-04) — the read-only tabs themselves
+
+52 automated tests cover the gates, the copy and the Sortable lifecycle at BOTH `planned` and
+`exported`. The five below are the parts a jsdom test cannot honestly assert: real pointer dragging,
+and whether a stripped screen *reads* as deliberate rather than broken.
+
+- ☐ **31.18** ★ **Reopen, then actually drag.** On a `planned` service, confirm the Service Order rows
+  have no drag grips and the Slides grid cards have none either. Click **Reopen for editing**, then —
+  **without reloading the page** — drag a Service Order row to a different section, and drag a slide
+  card within its group. Both must work. The unit tests prove the Sortable instances are destroyed and
+  re-created; only a real pointer proves the re-created instances are actually live. If dragging is
+  dead after a reopen, that is the regression this wave was written to prevent.
+- ☐ **31.19** Scroll to the bottom of a long locked Service Order tab. Expect the amber lock banner to
+  still be pinned at the top of the scrollport, and expect the tab NOT to read as broken with **Add
+  Element** gone. That "is it broken or is it locked?" judgement is the whole reason the banner is
+  sticky, and no test can make it.
+- ☐ **31.20** On a locked service, open the Slides tab and click a slide card. The **Edit Slide drawer
+  must still open**, showing the preview at size, the kind badge, the context line and any attached
+  audio with a working player — and a gray notice reading *"This service is locked — reopen it for
+  editing to change this slide."* If the drawer refuses to open, the lock over-reached: it removed a
+  view affordance in the name of a write lock.
+- ☐ **31.21** On a locked service, select a slide group that has **no** background music. Expect **no
+  empty bordered rectangle** where the group-music control used to be — the whole control should be
+  absent. Then select a group that DOES have music: the filename, the "plays across all N slides" line
+  and the ▶ preview must all still be there, with no × remove button.
+- ☐ **31.22** Eyeball the four locked empty states for tone: an empty Service Order section
+  (*"No items in this section."*, no second line), an empty slide group (*"No slides in this group." /
+  "Reopen the service for editing to add slides."*), the Slides rail on a service with no plan items,
+  and the Roles tab with no quarter schedule (*"No schedule found for this date."*). None may instruct
+  the reader to perform an action they cannot perform.
+
+### Added by wave 5 (31-05) — the next-free-Sunday default
+
+31 automated tests cover the date walk and the team side effect (`quarterDates.test.ts`,
+`NewServiceDialog.test.ts`, both green). 31.12 above remains the primary human check; these two are
+the judgement calls a unit test cannot make. **Neither has been performed — recorded as outstanding,
+not as passed.**
+
+- ☐ **31.23** ★ **The team side effect, seen with real data.** Create a plan on the next upcoming
+  Sunday, then open **New Service** again. The date must skip to the Sunday after it — and the
+  pre-checked TEAMS will change with it, because team defaults are derived from which Sunday-of-the-
+  month the date is (1st → Orchestra + Communion, 3rd → Choir, otherwise none). This is intended and
+  now tested, but it is a visible change from before: the dialog no longer always opens on the same
+  ordinal. Confirm the teams shown are the ones you would actually want for the *skipped-to* date; if
+  they are not, that is a product decision to revisit, not a bug in the walk.
+- ☐ **31.24** Open **New Service** on a Sunday (or with the machine clock set to one). The default must
+  be the FOLLOWING Sunday, never today — the strictly-forward convention this wave locked in and
+  commented in `quarterDates.ts`. Also confirm the date field is never blank in the pathological case
+  where every upcoming Sunday for a year already has a plan; it should fall back to the plain next
+  Sunday and let you type over it.
+
+### Added by the 31-REVIEW fix pass — copy and behaviour changed by BL-01/BL-02/HI-01/ME-01/ME-03
+
+All of these are proven by automated regression tests; what is deferred is only the human judgement on
+**wording and feel**, which no test can make. Nothing below was visually confirmed by the run.
+
+- ☐ **31.25** ★ **The service date on a locked service.** Open a `planned` service. The date in the
+  header must now be plain text — no hover colour change, no cursor pointer, no picker on click. Reopen
+  it and the picker must come straight back with no page reload. Before this fix the picker still opened
+  on a locked service and silently discarded the date you chose.
+- ☐ **31.26** **The autosave-failure message, draft.** Hard to stage deliberately; if you ever see it,
+  check the wording reads right: *"Couldn't save your changes — they're still here. Check your
+  connection; editing again will retry."* The claim "they're still here" is load-bearing — a transport
+  failure deliberately KEEPS your typing rather than reverting it, so confirm your text really is still
+  in the field when this appears.
+- ☐ **31.27** **The autosave-failure message, locked.** Stage this with two browsers on the same
+  service: type in one, and Mark as Planned in the other within ~800ms. The typing browser should show
+  *"This service is locked, so that change wasn't saved. Reopen it for editing and try again."* in the
+  amber lock banner, and — this is the part that was broken — must then keep receiving later changes to
+  that service instead of freezing silently for the rest of the session.
+- ☐ **31.28** **Reorder-failure copy is unchanged.** The drag-failure line still reads *"Couldn't save
+  this order — reverted. Try dragging again."* It now shares a state with the autosave failure above but
+  must NOT have inherited its wording.
+- ☐ **31.29** ★ **Export copy after a status change.** Two browsers, same `planned` service. Export in
+  one; then export in the other. The second must refuse *before* contacting Planning Center — check your
+  real PC account afterwards and confirm **no duplicate or orphaned plan was created**. This is the one
+  item with a real-world side effect that a unit test cannot observe.
+- ☐ **31.30** **Mark-as-Planned failure copy.** A store-guard refusal should now say *"This service
+  changed status somewhere else. Reload to see where it stands."* rather than blaming your connection.
+  A genuine offline failure should still say *"Check your connection and try again."*
+
+---
+
+## Later phases
+
+Appended as each phase completes.
+
+## Phase 32 — Save Reliability: Autosave Fix & Persistent Status
+
+> ⚠ **Read before verifying: the code moved after these items were written.** A code review found
+> **3 Critical + 4 Warning** findings and all seven were fixed in commits `5a68288`…`2e76d8b`, which
+> land *after* `32-VERIFICATION.md` was produced. Three of those fixes change behaviour you may be
+> about to look at:
+>
+> - **CR-01** — an edit made *during* an in-flight save was being marked clean without ever being
+>   written (silent data loss). `onSave()` now marks clean against the payload actually sent, not
+>   against live `localService`. **Worth exercising deliberately:** edit, and keep editing while the
+>   save is in flight; nothing you typed should be lost.
+> - **CR-02** — `flush()` used to destroy a newer edit's only retry path. Reachable via
+>   **Mark as Planned** — flush now checks for an in-flight save before clearing the debounce timer.
+> - **CR-03** — an outstanding autosave **error** used to vanish silently the instant a service
+>   locked. It now routes into `lifecycleError` and stays visible in the lock banner. **Worth
+>   exercising:** force a save failure, then Mark as Planned, and confirm the failure is still
+>   reported rather than swallowed by the lock.
+>
+> Full dispositions in `32-REVIEW-FIX.md`. Gates at the fixed HEAD: `npm run type-check` clean,
+> `npx vitest run src/` 1981 passed / 9 failed (the two documented baseline files only).
+>
+> **`32-VERIFICATION.md` is `human_needed`, not `passed`** — the eight items below are why. Nothing
+> here has been self-approved.
+
+### Plan 32-04 — `SaveStatusIndicator.vue` and `ToastHost.vue`
+
+- ☐ **32-04.1** ★ **E1 overflow backstop, visual confirmation.** The automated test
+  (`src/components/__tests__/SaveStatusIndicator.test.ts`, "E1 overflow backstop") only proves — via
+  jsdom, which cannot measure real layout — that the 59-character generic error sentence renders with
+  no truncation class and its full text content present inside a 120px-wide mounted parent. It does
+  **not** prove the text visually wraps instead of clipping in a real browser. Open `SongLyricEditor.vue`
+  (the narrowest of the three editor headers per 32-UI-SPEC.md § E1), force its status into the error
+  state, and confirm the sentence *"Couldn't save your changes — they're still here. Try again."* wraps
+  onto multiple lines rather than being clipped or causing horizontal overflow of the header row.
+- ☐ **32-04.2** Trigger a real save failure (e.g. stop the Firestore emulator, then edit a saving
+  surface) and confirm the toast appears bottom-right on a normal-width window, and full-width-minus-
+  margins at the bottom on a narrow/mobile width, without overlapping the sticky status bar or the
+  Phase 31 lock banner at the top of the viewport.
+
+### Plan 32-05 — `ServiceEditorView` migrated onto `useAutoSave`/`useSaveStatus`; sticky status bar
+
+- ☐ **32-05.1** Open a Service Order with enough items to scroll. Scroll to the bottom of the list.
+  Confirm the save-status bar is still pinned at the top of the editing surface, not scrolled out of
+  view — this is the exact "it didn't save" failure mode the sticky placement exists to prevent.
+- ☐ **32-05.2** Make one edit, then wait at least **ten real seconds** without touching anything else.
+  Confirm `Saved h:mm` is still on screen the whole time. The automated suite uses fake timers, which
+  proves the 3-second fade is gone but does not prove the text visually stays on screen in a real
+  browser tab over real wall-clock time.
+- ☐ **32-05.3** With the Firestore emulator running: edit a field so a debounced save fires, wait for
+  its own echo to land, then immediately pick a song on a slot. Confirm the pick's save lands against
+  the real Firestore `serverTimestamp()` resolution (both the optimistic and the server-ack snapshot) —
+  jsdom's mocked `updatedAt`/`hasPendingWrites` values simulate this but do not prove it against a real
+  backend.
+- ☐ **32-05.4** ★ **The "above the fold" reading.** This plan's own `<flagged_reading>` section records
+  that R040's "never above the fold" was read as "not parked in the global app header, far from the
+  content" — which is why the status lives in a sticky sub-header of the editing surface itself, rather
+  than (for example) the app's top-level header bar. That reading was Claude's recommendation, accepted
+  under the standing autonomy grant — **not an owner statement**. Confirm this is what was actually
+  meant; if not, only this plan's Task 2 template change (the `service-save-status-bar` placement) needs
+  revisiting, not the store/composable layer beneath it.
+
+### Plan 32-06 — `CongregationalEditor`/`ScriptureSlideEditor`/`SongLyricEditor` onto `SaveStatusIndicator`
+
+- ☐ **32-06.1** Open the song lyrics editor, edit a section, and confirm the header shows `Saving…` then
+  a persisting `Saved h:mm` rather than the old dot-and-tick. `CongregationalEditor.vue` and
+  `ScriptureSlideEditor.vue` are currently unmounted dead weight pending Phase 34, so this check is only
+  possible against `SongLyricEditor.vue` today — reconfirm the other two once Phase 34 mounts them.
+- ☐ **32-06.2** Resize below 640px with a failure showing and confirm the sentence *"Couldn't save your
+  changes — they're still here. Try again."* wraps rather than clipping in the narrowest header
+  (`SongLyricEditor.vue`'s `flex items-center gap-2` group). The automated E1/E4 overflow backstop
+  (`src/components/__tests__/SongLyricEditor.test.ts`) only proves — via jsdom, which cannot measure real
+  layout — that no truncation class is present and the full text renders; it does not prove the sentence
+  visually wraps in a real browser.
+- ☐ **32-06.3** With a screen reader active, confirm a routine save (`Saving soon…` / `Saving…` /
+  `Saved h:mm`) is announced politely and does not interrupt, while a failure raises the assertive toast
+  in addition to the polite inline announcement.
+
+---
+
+## Phase 33 — Backgrounds & Slide Editing
+
+Recorded from 33-09-PLAN.md's `<verification>` § Manual-only list — the phase's own last plan. These are
+the items the phase's plans deliberately deferred under the standing autonomy grant rather than
+attempting to fake with jsdom.
+
+- ☐ **33.1** With a screen reader active, tab to a slide card's 3-dot menu trigger, open it with Enter
+  or Space, move through the items, close with Escape, and confirm focus returns to the trigger and the
+  reader announces the menu correctly. The automated suite proves `role="menu"`/`role="menuitem"`/
+  `aria-haspopup`/`aria-expanded` are present and that Escape closes the panel in jsdom; it cannot prove
+  a real screen reader announces it correctly, and there is **no arrow-key roving-tabindex navigation**
+  (a stated, deliberate gap — 33-UI-SPEC.md § Accessibility Note).
+- ☐ **33.2** Confirm the 3-dot menu (its trigger, its open panel, its click-away backdrop) does not
+  interfere with dragging a slide card via its own drag handle — open a menu, close it, then drag-reorder
+  the same card, and drag a card whose menu was never opened.
+- ☐ **33.3** ★ **Inheritance legibility across all three background levels** — this phase's own named
+  sharpest UI risk. Set a song background, confirm it shows on the song editor, on every group of that
+  song with no group override, and on every slide with neither a group nor a slide override, each with
+  the correct "From song"/"Inherited from song" wording. Then set a group override and confirm slides
+  flip to "From group". Then set one slide's own override and confirm only that card shows "Background"
+  (indigo) while its siblings are unaffected. An override that is not visibly distinguishable at a glance
+  is the exact failure mode this phase exists to prevent.
+- ☐ **33.4** The per-type 3-dot menu item list (33-UI-SPEC.md §3's table) is **original design work with
+  no wireframe to check it against** — review the table directly against what each slide type (song
+  lyric/copyright, scripture, hand-authored text, Hymn-pristine text, image, video, other imported)
+  should actually offer, and confirm it matches the owner's intent, not just internal consistency.
+- ☐ **33.5** (33-09, R051) Drag-reorder a slide card without opening its menu first — confirm the drag
+  starts and completes cleanly with no drawer flashing open, on both a freshly-loaded grid and one where
+  a different card's drawer is already open.
+- ☐ **33.6** (33-09, R052) Open a lyric or scripture slide's 3-dot menu and confirm "Edit in song"/"Edit
+  in scripture" still navigate correctly now that the trigger lives in the menu rather than the drawer's
+  body — including while the drawer for a DIFFERENT slide is already open (the navigation must not
+  require the drawer to be open at all).
+
+---
+
+## Phase 34 — Smarter Content: LLM Scripture Split
+
+R064's structural guarantee (boundary-index contract, schema, validator, call shape, additive/
+non-blocking failure path) is complete and automated-tested end to end across 34-01/34-02/34-03/34-04.
+The two items below are the ones this phase genuinely cannot close by itself — one needs a live
+Anthropic API call this environment cannot make, the other needs an owner decision this phase's plans
+were explicitly told not to make on the owner's behalf. Neither is marked passed, resolved, or
+self-approved.
+
+- ☐ **34.1** ★ **Empirical split determinism (manual-only — no live Anthropic API access here).**
+  Simulating this with a fixture would give false confidence about model behaviour, which is exactly
+  what is under test, so it was not attempted. Run the "Split with AI" affordance against **Psalm 136**
+  (the archetypal responsive reading, with a repeated congregational refrain — the case most likely to
+  expose a boundary-tuning problem) and **Psalm 24** (a natural call-and-response shape), each **more
+  than once**, and compare the runs. Confirm: every returned section's text matches the ESV source
+  exactly (no rewording, no dropped/added words); no split falls mid-sentence; the LEADER/CONGREGATION
+  assignment reads as sensible (in particular, a repeated congregational refrain like Psalm 136's "for
+  his steadfast love endures forever" should land on CONGREGATION consistently); and repeated runs on
+  the *same* passage give a stable (or at least reasonably consistent) result. A split that validates on
+  every offset but varies noticeably run-to-run is a **usability problem, not a correctness one** —
+  record it either way, don't treat it as a pass/fail gate on its own. If the sections read as too long,
+  or the split misses a natural sub-verse break a human would take, the first knob to revisit is the
+  **deliberate exclusion of the comma** from `scriptureBoundaries.ts`'s `CLAUSE_END_PATTERN` (34-01) — a
+  tuning change to a regex, not a change to any validation logic.
+
+- ✅ **34.2 RESOLVED (34-07, 2026-08-03).** ~~The owner decision blocking reachability —
+  `CongregationalEditor.vue` is mounted nowhere.~~ Resolved per owner UAT finding F1 (`34-UAT.md`): the
+  mount seam is the SCRIPTURE **slide**, not the Service Order row (34-05/34-06 landed direction (b) —
+  `ScriptureSlot.congregationalSections` threaded through `slideGroupMaterializer`/`slideshowAssembler`;
+  no re-link to the rejected separate `ScriptureReading` document model). `CongregationalEditor.vue` is
+  now mounted by `ServiceEditorView.vue` as a `Teleport`ed modal, reachable from the scripture slide's
+  3-dot action menu (`edit-in-scripture`, relabelled "Edit scripture text") and the Edit Slide Drawer's
+  new Slide Text control, both converging on the same relay. The `WR-04` call-site contract flagged below
+  is honored: the modal is mounted `:key="congregationalSlot.id"`, proven by a dedicated slot-swap test
+  (`ServiceEditorView.test.ts` — "WR-04 keyed mount (34-07 Task 3)") that asserts a fresh component
+  instance, correct re-seeding, and correct write attribution after the swap. See `34-07-SUMMARY.md`.
+  **The 2026-08-03 owner decision that produced this mount seam, stated explicitly:** the scripture
+  slide's own edit route opens `CongregationalEditor`; no free-text scripture override was added
+  anywhere — the owner was shown the shadow-copy tension a free-text field would create and declined
+  it, so the only route to slide text remains fetch-then-split inside the editor itself.
+  ~~No route, no parent component, no dynamic import references it anywhere outside its own
+  test file — so as of this plan, no user can reach either the manual congregational-reading editor or
+  the AI split added on top of it. This makes ROADMAP success criterion 1 ("A scripture item can be
+  split into a leader/congregation congregational reading") false today for an actual user, despite
+  `34-CONTEXT.md`'s initial (later self-corrected) claim that it was "already true, manually." Phase 30's
+  R047 deliberately left both `CongregationalEditor.vue` and its sibling `ScriptureSlideEditor.vue` "on
+  disk, unmounted, for Phase 34/R064 to reuse" — without specifying where they should be mounted.
+  Mounting requires choosing between two data-model shapes, and the owner has already ruled against one
+  of them once: (a) re-link the editor's separate `ScriptureReading` document to the `SCRIPTURE` slot —
+  the model R047 explicitly rejected in favour of slot-as-source-of-truth (`3da5fe4` superseded by
+  `5c531b1`); or (b) add `congregationalSections` onto `ScriptureSlot` itself and carry it through
+  `slideGroupMaterializer`, matching the direction R047 actually took for the scripture reference. No
+  plan in this phase picked a default, because a default already exists and the owner overturned it once
+  in the opposite direction — this is the owner's call to make, not a planner's to assume. Also
+  record, for whoever mounts it: `CongregationalEditor.vue`'s own `WR-04` call-site-contract comment
+  (added 32-REVIEW, addressed by name to Phase 34) — `currentReadingId` and everything seeded from it
+  (`surfaceId`, `sections`, `referenceText`, `rawText`) are captured once at mount and are not
+  reactive to `props.readingId` changing afterward. Whoever wires this component into a route or parent
+  must mount it keyed on `readingId` (e.g. `:key="readingId"`) so a record swap forces a fresh
+  instance; reusing one mounted instance across different `readingId` values is not a supported usage and
+  will silently misattribute later saves to the first reading the instance ever saw.~~
+
+The four items below are new, opened by 34-08's phase gate. Each is deferred under the standing
+autonomy grant and explicitly **not** self-approved — none checks a box this run cannot actually verify.
+
+- ☐ **34.3** **The now-reachable feature (34-07's R064 close, end to end).** Open a draft service,
+  reach the congregational panel from a scripture slide by BOTH routes (the 3-dot menu and the drawer's
+  Slide Text section), build a reading by hand and with the AI split, present the service, and confirm
+  the Leader/Congregation layout projects correctly and legibly. Also confirm that changing the passage
+  on a slot that already has a reading clears it as intended rather than surprising the user.
+
+- ☐ **34.4** (from 34-09 / UAT F3) **Background scrim legibility on a real projector.** Set a
+  background on a group, present the service, and confirm the image appears behind every slide of that
+  group and that the projected words stay readable over it on a real projector. The scrim opacity
+  (`bg-black/50`) is the knob to revisit if they do not.
+
+- ☐ **34.5** (from 34-11 / UAT F2) **The merged group-media panel reads as one panel.** Confirm the
+  merged group-media panel reads as one panel rather than two rows in a box, and that a locked service
+  still shows what it has without an empty box.
+
+- ☐ **34.6** (from 34-12 / UAT F5) **The org document's actual Planning Center credential fields.**
+  Open the Firebase console for this organization's document and confirm whether the `pcAppId` and
+  `pcSecret` fields exist and are non-empty. **Report presence or absence only — never the values.**
+  This is the half of the F5 diagnosis that cannot be observed from a test environment, and it decides
+  whether the symptom was cause 1 (no credentials configured) or something else. 34-12 Task 1's verdict
+  (the reactivity self-heal test) already settled cause 2 (a load-order/reactivity regression) as
+  unlikely — this item settles the remaining half.
+
+---
+
+## Phase 35 — Presentation Correctness & Lyric Editor
+
+R059/R060/R061's structural work and R065/R066's inline-paste behavior are all automated-tested
+across 35-01/35-02/35-03/35-04 — including the R065 copyright gate, the always-available override
+checkbox, the E4 save-rejection backstop, and R066's modal-to-inline swap (`LyricPasteDialog.vue`
+and its test file are deleted; `grep -rc 'LyricPasteDialog' src/` returns 0). The four items below
+are 35-VALIDATION.md's Manual-Only Verifications table — jsdom cannot judge projector legibility,
+what a congregation actually sees, or subjective feel-against-a-mockup fidelity. None is marked
+passed, resolved, or self-approved.
+
+- ☐ **35.1** **Copyright slide legibility at projector distance (R060 long-text backstop).** A song
+  with an unusually long title, a long author list, or many `copyrightLines` must not overflow the
+  projected copyright slide or push the **CCLI licence number** off-screen — that number is the one
+  element that must always be visible. Needs a real projector or a fixed-viewport render; not
+  settleable in jsdom. **Instructions:** project a song with a long title and 4+ authors. Confirm the
+  licence number is visible on both the leading and trailing copyright slide.
+
+- ☐ **35.2** **Presented lyric slide shows no organizational label (R059).** The `sectionLabel`
+  render was deleted from `PresentationViewer.vue`'s `lyric` branch — confirmed by
+  `grep -c 'sectionLabel' src/components/PresentationViewer.vue` returning 0 — but the point of R059
+  is what a congregation actually sees on the projected surface. **Instructions:** present a song.
+  Confirm no VERSE / CHORUS / BRIDGE label appears on any lyric slide, and that the slide grid still
+  shows them (the field itself is untouched — only the presented render changed).
+
+- ☐ **35.3** **Presenting starts where you were looking (R061).** The start-index threading is
+  automated-tested (`SlidesTab.vue` → `ServiceEditorView.vue` → `PresentationViewer.vue`), but
+  whether it *feels* like a natural start rather than a jarring mid-deck jump is a UX judgment, not
+  an index-arithmetic one. **Instructions:** highlight a slide mid-deck, press Present — it should
+  open there with no "you skipped ahead" indication. Then highlight only a group (no slide within it)
+  and confirm it starts at that group's first slide, never slide 0 of the whole deck.
+
+- ☐ **35.4** ★ **The inline paste region reads as designed (R066, 35-03's D7).** Compare against
+  Turn 3 of the wireframe (`docs/design/slides-tab.dc.html:358-654`). State transitions and gating
+  logic are exhaustively covered by `LyricPasteRegion.test.ts` (16 tests) and
+  `SongLyricEditor.test.ts`'s "paste mode" block (9 tests, including both entry points, the
+  header/body swap, the reopen-reset, and both exits' unsaved-changes guard) — but visual/interaction
+  fidelity against the mockup is not settleable by jsdom assertions. **Instructions:** open the
+  editor, click "Paste lyrics" (and separately, from an empty song, "Paste Lyrics from SongSelect")
+  and confirm the drawer swaps to the paste view in place rather than opening a modal. Paste a real
+  CCLI song with a copyright block, and one without. Confirm the second shows the amber warning card,
+  disables **Replace lyrics**, and that ticking "Add anyway — I'll enter credits later" alone
+  re-enables it with nothing else required.
+
+**Also noted, not blocking:** 35-VALIDATION.md records that a second attempt to retrieve CCLI's
+primary licence text failed (2026-08-03; a prior attempt returned marketing copy). Nothing in this
+phase cites CCLI as a mandate — every warning card and instructional copy this phase ships was
+reworded specifically to avoid that claim (`grep -rEin 'ccli (requires|mandates|requirement)|licen[cs]e requires' src/`
+returns 0 matches) — so this omission does not block anything; it is only relevant if the owner wants
+the underlying R060 criterion formally finalised against the primary source text.
+
+---
+
+## Phase 37 — PowerPoint Server-Side Rendering
+
+This phase built and automated-tested the render service, its Dockerfile, the bridging
+function, the completeness check, both IAM contract directions (as reviewable, unexecuted
+documentation), the font policy, and the orphan-cleanup dry-run default — `render-service/`
+(39/39 tests) and `functions/` (70/70 tests) are both green. **Nothing was deployed. No
+container was built. No GCP resource was created**, by explicit owner instruction
+(STATE.md v1.4: BUILD BUT DO NOT DEPLOY). Every item below is open.
+
+- ☐ **37.1 Real visual fidelity (R062 criterion 1).** Only a deployed service can render.
+  Instructions: run `render-service/DEPLOY.md`'s deploy command, then import a **real
+  multi-font, multi-slide deck** — the ROADMAP is explicit that a 2-slide fixture proves
+  nothing about fidelity or cost. Compare backgrounds, fonts, layout and effects against
+  PowerPoint's own rendering. Note that static-frame export means transitions and animations
+  are not rendered, which is expected: R062 asks for a true visual representation, not motion.
+- ☐ **37.2 Font substitution actually happened (R062 criterion 3's *effect*).** The Dockerfile
+  test proves the right packages are installed and no Microsoft font is bundled; it cannot
+  prove LibreOffice actually maps Calibri to Carlito and Cambria to Caladea. A fontconfig
+  alias file was shipped for exactly this reason, but 37-RESEARCH.md records it as an
+  assumption until seen. Instructions: import a deck authored in Calibri and Cambria and
+  confirm the rendering is metrically correct rather than falling back to Liberation Sans.
+- ☐ **37.3 Cost and latency.** Cannot be estimated credibly without running it, and this run
+  refused to estimate and call it validated. Instructions: render several real decks; record
+  CPU-seconds and wall time. Cold starts likely dominate. Revisit `--memory=2Gi`, `--cpu=2`
+  and `--max-instances=5` against the observed numbers.
+- ☐ **37.4 The deploy itself.** Every command in `render-service/DEPLOY.md` provisions
+  billable infrastructure and is the owner's call. Instructions: review
+  `render-service/DEPLOY.md`, confirm the region against the project's actual
+  Firestore/Functions region, then run the prerequisites, the deploy, and the
+  `roles/run.invoker` binding. Afterwards set `PPTX_RENDER_SERVICE_URL` and redeploy
+  `functions/`.
+- ☐ **37.5 Sign-off on the new dependencies.** Two package-legitimacy checkpoints were
+  deferred during this phase, never self-approved:
+  - **37-01** (`render-service/`): `express`, `@google-cloud/storage`, `@types/express`,
+    `@types/node`. Mechanical `npm view ... repository` checks resolved `express` to
+    `github.com/expressjs/express` (128.3M/wk downloads, Approved), `@google-cloud/storage`
+    to `github.com/googleapis/google-cloud-node` (15.5M/wk, Approved), and both `@types/*`
+    packages to `github.com/DefinitelyTyped/DefinitelyTyped` (canonical convention).
+  - **37-03** (`functions/`): `google-auth-library`, resolved to
+    `github.com/googleapis/google-cloud-node` (`core/packages/google-auth-library-nodejs`),
+    latest `11.0.0` published 4 days before that plan ran, by Google's official npm bot,
+    77.5M weekly downloads. Flagged `[SUS]` by the package checker on a pure `too-new`
+    heuristic — running the identical checker against this repo's own already-shipping
+    `firebase-admin` and `firebase-functions` produces the same `[SUS]`/`too-new` verdict, so
+    this reads as a false positive from Google's fast Node-client release cadence rather than
+    a real risk signal. It is recorded rather than hidden, per protocol, and still requires
+    sign-off.
+
+  Instructions: confirm you are comfortable with `google-auth-library` in `functions/`, and
+  with `express`, `@google-cloud/storage`, `@types/express` and `@types/node` in
+  `render-service/`.
+- ☐ **37.6 Review a cleanup dry-run before enabling deletion.** `cleanupOrphanRenders` runs
+  daily at 03:00 UTC and is dry-run-by-default; `PPTX_RENDER_CLEANUP_ENABLED` must stay unset
+  until a real log has been read. Instructions: after the service has run for a while, read a
+  dry-run log and confirm the would-delete list contains only stale `pending`/`failed`
+  renders and their `rendered/` objects — never a `source.pptx`, never anything under
+  `images/`, never a `ready` render.
+
+---
+
+## Phase 36 — UI Rework: Service Order & Contextual Action Bars (2026-08-04)
+
+- ☐ **36.1 ★ OWNER DECISION — ROADMAP criterion 4's `＋ Add slide` clause is not literally met.**
+  This is a **gap recorded by `36-VERIFICATION.md`, not a pass, and it was deliberately not
+  self-approved.** Criterion 4 reads *"'＋ Add slide' lives in the contextual action bar."* It does
+  not — Phase 36 kept it in `SlideGrid.vue`'s own header, a separate component from
+  `ContextualActionBar.vue`.
+
+  The reasoning is sound and was disclosed consistently rather than discovered at verification: the
+  wireframe (design "1a") draws `＋ Add slide` in the grid's own header and never in a page-level bar,
+  and `36-CONTEXT.md`'s own stated precedence rule is that the wireframe wins. It is recorded in
+  `36-UI-SPEC.md` § Finding 2, in three plans' frontmatter, and in a SUMMARY.
+
+  **What makes it an open item rather than a closed one:** the sibling clause of the same criterion
+  ("Add music to this group") received a *dated, evidence-cited correction* in both `ROADMAP.md` and
+  `REQUIREMENTS.md` before planning began. This clause never did. Two options, both legitimate:
+  1. **Accept the override** — a ready-to-paste block sits in `36-VERIFICATION.md`'s frontmatter.
+     Choosing this means R053 is delivered as "interaction pattern, not visual unification", and
+     criterion 4 should get the same dated correction its sibling clause got.
+  2. **Commission the full relocation** — materially more expensive, and the UI-SPEC recommends
+     against it rather than forbidding it. This is a real scope addition, not a bug fix.
+
+- ☐ **36.2 Look at the rebuilt Service Order tab on a real screen.** Every structural claim is
+  test-asserted, but the wireframe match itself is a visual judgment: the five section bands with
+  their slide counts and per-band `＋ Add item` chips, the dashed `＋ Add to the service` palette that
+  replaced the dropdown, and the tab strip now reading Service Order · Slides · Roles.
+
+- ☐ **36.3 Confirm the action bar reads right on each tab.** Switch between all three tabs and confirm
+  only that tab's actions appear — in particular that `Suggest All Songs` and `Copy for PC` are gone
+  from Slides and Roles, that Present sits immediately left of Save, and that the Roles tab's empty
+  action-bar slot looks deliberate rather than broken. **The Roles empty slot is one of the UI-SPEC's
+  two `unresolved` items** — the design never drew it.
+
+- ☐ **36.4 Two affordances the wireframe draws but nobody implemented — confirm this was right.**
+  Turn 3 shows a row-level `⋯` kebab and a `Change` link on service items. Neither has any
+  current-code equivalent or defined behavior, so both were **deliberately left unbuilt and recorded
+  rather than guessed at.** If you wanted them, they are new work with no spec.
+
+- ☐ **37.1 (quick 260805-kzd) Confirm the label-free slides read right in a running Present view.**
+  Automated tests pin the markup, but "does this project legibly" is a visual judgment no test makes.
+  Open Present on a real service and check four cases:
+  1. A scripture slide whose passage has **not** been fetched — it must show the reference (e.g.
+     "John 3:16") in large white text, **not a blank slide**. This is the specific hazard the change
+     was designed around; the assembler builds these with `text: ''`.
+  2. A scripture slide **with** the passage fetched — reference above, passage below, both the same
+     size now. Confirm the loss of the old size hierarchy doesn't make the two run together.
+  3. A congregational reading — "Leader:" / "Congregation:" are now plain white at body size with no
+     indigo/amber accent. Confirm you can still tell the parts apart at projection distance; if not,
+     say so, because the congregational-split phase can address it.
+  4. A **Message** and a **Prayer** item — the blue heading should be gone entirely, leaving only the
+     white body text.
+
+---
+
+## Phase 38 — Congregational Readings Become Real Slides (2026-08-05)
+
+D1's two-state mechanism (Reference/Congregational), the singular `ScriptureSlide.section` field
+and speaker-above-passage projected layout, the drawer's per-section edit/speaker-flip/delete, and
+the composed multi-tick durability contract (convert, delete-one, delete-all, edit, speaker-flip,
+reorder, destroy-on-reference-change, destroy-on-cleared-reference, re-convert, re-split, both
+migration shapes, and a non-ASCII encoding backstop) are all automated-tested end to end across
+38-01/38-02/38-03/38-04 — `npm run type-check` clean, full app suite 2490/2499 passing with the 9
+failures confined to the documented two-file baseline (`src/storage.rules.test.ts`,
+`src/views/__tests__/RosterView.test.ts`). **38-04's own Task 3 checkpoint (owner verification of
+the split/edit/delete/present flow) was deferred under the standing autonomy grant and is recorded
+below — it was never run, and nothing in this item was self-approved.**
+
+- ☐ **38.1 Split a scripture item into congregational sections and confirm one card per section.**
+  Run the app against a DRAFT service, do not deploy anything.
+  1. Service Order tab: add a Scripture item and give it a reference (e.g. `Psalm 136:1-9`).
+  2. Slides tab: confirm that item's group shows ONE card, showing the reference only.
+  3. On that card, open the 3-dot menu and choose the scripture-text action. In the modal, click
+     **Fetch Passage**, then **Split with AI** (or leave the alternating manual split). Close the
+     modal.
+  4. Slides tab: confirm the group now shows one card PER SECTION, and that each card names its
+     speaker — Leader or Congregation — rather than all reading the same generic label.
+
+- ☐ **38.2 Edit a section's words in isolation.** Open the Edit Slide drawer on the SECOND card.
+  Change some of its words. Close the drawer. Confirm the second card changed and that NO other
+  card did.
+
+- ☐ **38.3 Flip a section's speaker in isolation.** Reopen that same drawer and flip the speaker
+  (Leader to Congregation or back). Confirm only that card changed.
+
+- ☐ **38.4 ★ Delete one section and confirm it survives a reload.** Delete the THIRD card. Reload
+  the page. Confirm it is still gone, and that the remaining cards kept their order and their
+  words. **This is the criterion that has failed before (a rebuild reverting on a LATER reactive
+  tick, not the first one) — check it twice, waiting a few seconds after the reload before
+  judging.** 38-04's own automated durability suite (`congregationalDetachment.test.ts`) proves this
+  across repeated `rebuildGroup` ticks in isolation; this item is the same claim against a real
+  Firestore round-trip and a real page reload, which no unit test can substitute for.
+
+- ☐ **38.5 Present the split reading and confirm the projected layout.** Click Present. Step
+  through the reading. On each section slide confirm: the reference at the top, the speaker on its
+  OWN LINE below it, and that section's words below the speaker — one section per slide, never
+  several stacked. This also closes out item **37.1**'s open sub-point 3 (whether Leader/Congregation
+  read as distinguishable at projection distance without an indigo/amber accent) — judge that here
+  rather than separately.
+
+- ☐ **38.6 Confirm a scripture change destroys the split (intended data loss, D1).** Return to the
+  Service Order tab and change that item's scripture to a DIFFERENT passage. Go back to the Slides
+  tab and confirm the group has collapsed to ONE card showing the new reference. This is intended:
+  the split is gone and must be chosen again — per-slide edits made in the congregational state do
+  not survive a scripture change on the service item.
+
+- ☐ **38.7 An existing pre-Phase-38 congregational reading upgrades itself with no action.** If you
+  have an EXISTING service that already had a congregational reading before this phase, open its
+  Slides tab and confirm it now shows one card per section without any action from you. If you do
+  not have one, say so rather than guessing — the automated migration case
+  (`congregationalDetachment.test.ts`'s "MIGRATION, congregational") proves the mechanism, but only a
+  real pre-existing document proves the deploy didn't miss a shape.
+
+**Report which of 38.1-38.7 passed and which did not, by number.**
+
+---
+
+## Notes and failures
+
+_(Record anything that failed here, with what you saw versus what was expected.)_

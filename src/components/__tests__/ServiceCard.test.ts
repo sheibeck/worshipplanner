@@ -35,6 +35,7 @@ const mockService: Service = {
   slots: [
     {
       kind: 'SONG',
+      id: 'slot-song-1',
       position: 1,
       requiredVwType: 1,
       songId: 'song-1',
@@ -43,6 +44,7 @@ const mockService: Service = {
     },
     {
       kind: 'SONG',
+      id: 'slot-song-2',
       position: 2,
       requiredVwType: 2,
       songId: null,
@@ -51,14 +53,15 @@ const mockService: Service = {
     },
     {
       kind: 'SONG',
+      id: 'slot-song-3',
       position: 3,
       requiredVwType: 2,
       songId: 'song-3',
       songTitle: 'Holy Holy Holy',
       songKey: 'E',
     },
-    { kind: 'PRAYER', position: 4 },
-    { kind: 'MESSAGE', position: 5 },
+    { kind: 'PRAYER', id: 'slot-prayer-4', position: 4 },
+    { kind: 'MESSAGE', id: 'slot-message-5', position: 5 },
   ],
   sermonPassage: null,
   notes: '',

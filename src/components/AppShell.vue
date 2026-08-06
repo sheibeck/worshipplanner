@@ -34,6 +34,8 @@
       <main class="flex-1 overflow-y-auto">
         <slot />
       </main>
+
+      <ToastHost />
     </div>
   </div>
 </template>
@@ -41,6 +43,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import AppSidebar from '@/components/AppSidebar.vue'
+import ToastHost from '@/components/ToastHost.vue'
 
 const sidebarOpen = ref(false)
 </script>

@@ -1,0 +1,46 @@
+rules_version = '2';
+
+// Org-scoped Storage access control, mirroring firestore.rules' isOrgMember pattern.
+// The generic orgs/{orgId} prefix is intentional (not PPTX-specific) so Phase 22's media
+// attachments and any future Storage-backed feature can reuse this same rule.
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Cloud Storage rules do NOT cascade between sibling `match` blocks — this
+    // more-specific `orgs/{orgId}/media/**` match is evaluated independently of
+    // the generic `orgs/{orgId}/{allPaths=**}` block below (proven by the media
+    // rules tests in src/storage.rules.test.ts, not merely assumed).
+    //
+    // Phase 22 (R014) media attachments (audio/video) run larger than the
+    // researched PPTX-import cap, so this path gets its own, higher size
+    // ceiling while every other org-scoped path (pptx-imports, etc.) keeps the
+    // original 25MB cap unchanged below.
+    match /orgs/{orgId}/media/{allPaths=**} {
+      allow read: if request.auth != null
+                     && firestore.exists(
+                          /databases/(default)/documents/organizations/$(orgId)/members/$(request.auth.uid));
+
+      // 50MB (52428800 bytes) — the researched media cap (22-RESEARCH.md) for
+      // audio/video attachments, mirrored by useMediaUpload's MEDIA_MAX_BYTES.
+      allow write: if request.auth != null
+                      && firestore.exists(
+                           /databases/(default)/documents/organizations/$(orgId)/members/$(request.auth.uid))
+                      && request.resource.size < 52428800;
+    }
+
+    match /orgs/{orgId}/{allPaths=**} {
+      // Cross-service read: resolves the caller's membership doc in Firestore, the same
+      // check firestore.rules' isOrgMember(orgId) performs for Firestore access.
+      allow read: if request.auth != null
+                     && firestore.exists(
+                          /databases/(default)/documents/organizations/$(orgId)/members/$(request.auth.uid));
+
+      // Same membership condition for write, plus a per-upload size ceiling. 25MB
+      // (26214400 bytes) is the researched starting cap for this milestone's PPTX
+      // imports (21-RESEARCH.md Open Question 3) — tunable, not a hard product limit.
+      allow write: if request.auth != null
+                      && firestore.exists(
+                           /databases/(default)/documents/organizations/$(orgId)/members/$(request.auth.uid))
+                      && request.resource.size < 26214400;
+    }
+  }
+}

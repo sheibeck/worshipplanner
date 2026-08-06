@@ -1,4 +1,16 @@
-import type { Progression, ServiceSlot, SongSlot, ScriptureSlot, NonAssignableSlot, HymnSlot, SlotKind } from '@/types/service'
+import {
+  SERVICE_SECTIONS,
+  type Progression,
+  type Service,
+  type ServiceSlot,
+  type SongSlot,
+  type ScriptureSlot,
+  type NonAssignableSlot,
+  type HymnSlot,
+  type ImportedSlot,
+  type SlotKind,
+  type ServiceSection,
+} from '@/types/service'
 import type { VWType } from '@/types/song'
 
 export const PROGRESSION_SLOT_TYPES: Record<Progression, Record<number, VWType>> = {
@@ -34,6 +46,8 @@ export function slotLabel(slot: ServiceSlot, _index?: number | string): string {
       return 'Message'
     case 'HYMN':
       return 'Hymn'
+    case 'IMPORTED':
+      return 'Imported Slides'
   }
 }
 
@@ -41,41 +55,195 @@ export function slotLabel(slot: ServiceSlot, _index?: number | string): string {
  * Factory function to create a new slot of the given kind.
  * Position defaults to 0 — it will be set to the array index via reindexSlots.
  */
-export function createSlot(kind: SlotKind, vwType?: VWType): ServiceSlot {
+export function createSlot(kind: SlotKind, vwType?: VWType, section?: ServiceSection): ServiceSlot {
+  // Omit the `section` key entirely when not provided — preserves the legacy
+  // (section === undefined, key absent) shape for backward compatibility.
+  const sectionFields = section ? { section } : {}
+  // `id` is ALWAYS written (D-01) — unlike `section`, there is no legacy
+  // absent-id shape to preserve for a brand-new slot; every new slot gets a
+  // real, stable id immediately.
+  const id = crypto.randomUUID()
   switch (kind) {
     case 'SONG':
       return {
         kind: 'SONG',
+        id,
         position: 0,
         requiredVwType: vwType ?? 2,
         songId: null,
         songTitle: null,
         songKey: null,
+        ...sectionFields,
       } as SongSlot
     case 'SCRIPTURE':
       return {
         kind: 'SCRIPTURE',
+        id,
         position: 0,
         book: null,
         chapter: null,
         verseStart: null,
         verseEnd: null,
+        ...sectionFields,
       } as ScriptureSlot
     case 'PRAYER':
-      return { kind: 'PRAYER', position: 0 } as NonAssignableSlot
+      return { kind: 'PRAYER', id, position: 0, ...sectionFields } as NonAssignableSlot
     case 'MESSAGE':
-      return { kind: 'MESSAGE', position: 0 } as NonAssignableSlot
+      return { kind: 'MESSAGE', id, position: 0, ...sectionFields } as NonAssignableSlot
     case 'HYMN':
-      return { kind: 'HYMN', position: 0, hymnName: '', hymnNumber: '', verses: '' } as HymnSlot
+      return { kind: 'HYMN', id, position: 0, hymnName: '', hymnNumber: '', verses: '', ...sectionFields } as HymnSlot
+    case 'IMPORTED':
+      return { kind: 'IMPORTED', id, position: 0, importId: null, ...sectionFields } as ImportedSlot
   }
 }
 
 /**
  * Normalizes slot positions to match their array index.
  * Call this after any add, remove, or reorder operation.
+ *
+ * NO CHANGE needed for `id` (D-01): the spread (`{ ...slot, position: index }`)
+ * already carries every existing key — including `id` — through every
+ * reorder. Do not "helpfully" rebuild the slot object here; that would
+ * re-mint or drop the stable id a slide group is anchored to.
  */
 export function reindexSlots(slots: ServiceSlot[]): ServiceSlot[] {
   return slots.map((slot, index) => ({ ...slot, position: index }))
+}
+
+/**
+ * Groups any section-bearing collection into `SERVICE_SECTIONS`-ordered
+ * buckets, plus a trailing `legacy` bucket for members whose section is
+ * absent or not a recognized `SERVICE_SECTIONS` member (D005). Total and
+ * stable: every input item lands in exactly one bucket, in its original
+ * relative order within that bucket — nothing is dropped, cloned, or
+ * reordered within a bucket.
+ *
+ * Generic on purpose: the editor view groups `{ slot, index }` pairs for
+ * rendering while a reorder handler groups bare `ServiceSlot`s for
+ * persistence, and both must use the identical bucketing rule.
+ *
+ * Every `SERVICE_SECTIONS` key is initialized to an empty array up front, so
+ * an empty section is always present as a key — this is what lets the view
+ * render an empty section unconditionally (R043), and it's why the "adding a
+ * fifth section" story is free: this function iterates `SERVICE_SECTIONS`
+ * and never names a section as a string literal.
+ *
+ * `legacy` mirrors the trailing "Ungrouped" bucket `useSlideshowAssembly.ts`'s
+ * `assembledSections` (lines 544-559) already ships for section-less slides —
+ * do not invent a second placement rule for section-less members. A section
+ * value that is present but outside `SERVICE_SECTIONS` (production data
+ * corruption, or a stale value from a since-removed section) also routes to
+ * `legacy` rather than being silently dropped (T-29-03).
+ */
+export function groupBySection<T>(
+  items: readonly T[],
+  getSection: (item: T) => ServiceSection | undefined,
+): { sections: Record<ServiceSection, T[]>; legacy: T[] } {
+  const sections = Object.fromEntries(SERVICE_SECTIONS.map((section) => [section, [] as T[]])) as Record<
+    ServiceSection,
+    T[]
+  >
+  const legacy: T[] = []
+
+  for (const item of items) {
+    const section = getSection(item)
+    if (section !== undefined && SERVICE_SECTIONS.includes(section)) {
+      sections[section].push(item)
+    } else {
+      legacy.push(item)
+    }
+  }
+
+  return { sections, legacy }
+}
+
+/**
+ * Flattens a `groupBySection` result back into a single array: the section
+ * buckets concatenated in `SERVICE_SECTIONS` order, then the `legacy` bucket
+ * last. Pure — never mutates the input buckets.
+ */
+export function flattenBySection<T>(grouped: { sections: Record<ServiceSection, T[]>; legacy: T[] }): T[] {
+  const result: T[] = []
+  for (const section of SERVICE_SECTIONS) {
+    result.push(...grouped.sections[section])
+  }
+  result.push(...grouped.legacy)
+  return result
+}
+
+/**
+ * Composition of `groupBySection` + `flattenBySection` over `slot.section` —
+ * the one source of truth for "what order are the slots in," shared by the
+ * rendered grouping and the array that gets persisted, so the two can never
+ * disagree.
+ *
+ * Identity-preserving: when the section-major result is element-for-element
+ * reference-equal to the input, returns the ORIGINAL `slots` array rather
+ * than the freshly-built one. Same reason `backfillSlotIds` (above) returns
+ * the original `service` reference when nothing changed — a fresh array
+ * reference in an autosave-watched view manufactures a false `isDirty`, and
+ * on the load path's remote-merge branch, a comparison that never converges.
+ *
+ * Does NOT call `reindexSlots` — ordering and position-renumbering are
+ * separate concerns. Callers compose `reindexSlots(orderSlotsBySection(slots))`.
+ */
+export function orderSlotsBySection(slots: ServiceSlot[]): ServiceSlot[] {
+  const ordered = flattenBySection(groupBySection(slots, (slot) => slot.section))
+
+  const alreadyOrdered = ordered.length === slots.length && ordered.every((slot, index) => slot === slots[index])
+
+  return alreadyOrdered ? slots : ordered
+}
+
+/**
+ * Backfills a missing `ServiceSlot.id` (D-01) for services read before this
+ * field existed. Pure — returns the ORIGINAL `service` object reference when
+ * every slot already has an id, so folding this into a load watcher can never
+ * manufacture a false `isDirty`.
+ *
+ * Two-argument form (a planner correction to a single-argument backfill):
+ * `ServiceEditorView`'s load watcher has a remote-merge branch that compares
+ * `JSON.stringify(remote)` against `JSON.stringify(local)`. A legacy
+ * Firestore document has no slot ids, so a one-argument backfill would mint
+ * fresh UUIDs on every snapshot; the comparison would never match, and each
+ * snapshot would re-anchor every group to a brand-new slot id, silently
+ * orphaning group documents. Reusing the `reference` service's id at the
+ * same array index (guarded by matching `kind`) makes the comparison stable.
+ *
+ * Accepted residual limitation: if a concurrent editor inserts or removes a
+ * slot in the same window, positional alignment can shift and one slot may
+ * take a fresh id. The window closes permanently on the first real save,
+ * which persists the ids to Firestore.
+ */
+export function backfillSlotIds(service: Service, reference?: Service | null): Service {
+  let changed = false
+  const slots = service.slots.map((slot, index) => {
+    if (slot.id) return slot
+    const refSlot = reference?.slots[index]
+    const id = refSlot && refSlot.id && refSlot.kind === slot.kind ? refSlot.id : crypto.randomUUID()
+    changed = true
+    return { ...slot, id }
+  })
+  return changed ? { ...service, slots } : service
+}
+
+/**
+ * Default position -> section mapping for the M001 progression template (D005).
+ * There is no default Pre-Service slot in the template (announcements arrive
+ * in Phase 21) — positions 0-6 are 'worship', 7 (MESSAGE) is 'message',
+ * 8 (sending song) is 'sending'.
+ *
+ * Intentionally position-keyed, not section-count-keyed: it contains no
+ * arithmetic over `SERVICE_SECTIONS.length` and no "last section" derivation,
+ * so widening `SERVICE_SECTIONS` (Phase 29 adds Post-Service) does not change
+ * which default section a template slot gets. Audited by reading during
+ * Phase 29 plan 02 — confirmed, not assumed; pinned by the
+ * `buildSlots section defaults` test block for both progressions.
+ */
+function defaultSectionForPosition(position: number): ServiceSection {
+  if (position === 7) return 'message'
+  if (position === 8) return 'sending'
+  return 'worship'
 }
 
 export function buildSlots(progression: Progression): ServiceSlot[] {
@@ -83,20 +251,24 @@ export function buildSlots(progression: Progression): ServiceSlot[] {
 
   const songSlot = (position: number): SongSlot => ({
     kind: 'SONG',
+    id: crypto.randomUUID(),
     position,
     requiredVwType: songTypeMap[position] as VWType,
     songId: null,
     songTitle: null,
     songKey: null,
+    section: defaultSectionForPosition(position),
   })
 
   const scriptureSlot = (position: number): ScriptureSlot => ({
     kind: 'SCRIPTURE',
+    id: crypto.randomUUID(),
     position,
     book: null,
     chapter: null,
     verseStart: null,
     verseEnd: null,
+    section: defaultSectionForPosition(position),
   })
 
   const nonAssignableSlot = (
@@ -104,7 +276,9 @@ export function buildSlots(progression: Progression): ServiceSlot[] {
     position: number,
   ): NonAssignableSlot => ({
     kind,
+    id: crypto.randomUUID(),
     position,
+    section: defaultSectionForPosition(position),
   })
 
   return [

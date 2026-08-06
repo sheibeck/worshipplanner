@@ -47,20 +47,123 @@ service cloud.firestore {
         allow delete: if isOrgEditor(orgId) || (isSignedIn() && request.auth.token.email.lower() == email);
       }
 
-      // Services — viewers can read, only editors write
+      // Services — viewers read; editors write only while the STORED status is
+      // draft, with two explicit carve-outs (reopen, Planning Center export).
+      //
+      // Note the read is of `resource.data.status` (STORED), never
+      // `request.resource.data.status` (INCOMING) — reading the incoming value
+      // would let any write that also sets `status: 'draft'` edit a locked
+      // service, which is precisely the payload an attacker would send.
       match /services/{docId} {
+        function storedStatus() { return resource.data.get('status', 'draft'); }
+        function keys() { return request.resource.data.diff(resource.data).affectedKeys(); }
+
+        allow read:   if isOrgMember(orgId);
+        allow create: if isOrgEditor(orgId) && request.resource.data.status == 'draft';
+        allow delete: if isOrgEditor(orgId);
+        allow update: if isOrgEditor(orgId) && (
+          // 1. Ordinary editing — allowed only while the STORED status is draft.
+          //    This also covers the draft -> planned transition (D-02).
+          storedStatus() == 'draft'
+
+          // 2. D-09 — the Planning Center export write. planned -> exported,
+          //    carrying real export evidence. `hasAll(['pcExportedAt'])` (not
+          //    pcPlanId) because affectedKeys() only reports CHANGED keys and a
+          //    re-export to the same plan writes an unchanged pcPlanId.
+          || (storedStatus() == 'planned'
+              && request.resource.data.status == 'exported'
+              && keys().hasOnly(['status','pcExportedAt','pcPlanId','updatedAt'])
+              && keys().hasAll(['pcExportedAt'])
+              && request.resource.data.pcPlanId is string)
+
+          // 3. R037 — Reopen. The ONLY status-reverting write. hasOnly() is what
+          //    stops "reopen" being used to smuggle a slots rewrite alongside the
+          //    status change. D-11's pcExportedAt/pcPlanId are untouched by design.
+          || (request.resource.data.status == 'draft'
+              && keys().hasOnly(['status','updatedAt']))
+        );
+      }
+
+      // Slide groups — one doc per slot (doc id IS the slot id), so the parent
+      // service is reachable only via the serviceId FIELD. Two extra billed
+      // reads per write (exists + get); 3 of the 10-call budget once
+      // isOrgEditor's own get() is counted.
+      match /slideGroups/{groupId} {
+        function svcPath(sid) {
+          return /databases/$(database)/documents/organizations/$(orgId)/services/$(sid);
+        }
+        function parentDraft(sid) {
+          return exists(svcPath(sid)) && get(svcPath(sid)).data.get('status','draft') == 'draft';
+        }
+        function parentGone(sid) { return !exists(svcPath(sid)); }
+
         allow read: if isOrgMember(orgId);
-        allow write: if isOrgEditor(orgId);
+
+        allow create: if isOrgEditor(orgId)
+          && request.resource.data.keys().hasAll(['serviceId'])
+          && parentDraft(request.resource.data.serviceId);
+
+        // serviceId is immutable (mirrors quarterShares' orgId immutability,
+        // firestore.rules:118) — otherwise a group could be re-parented from a
+        // draft service onto a locked one and edited through the seam.
+        allow update: if isOrgEditor(orgId)
+          && resource.data.keys().hasAll(['serviceId'])
+          && request.resource.data.serviceId == resource.data.serviceId
+          && parentDraft(resource.data.serviceId);
+
+        // Delete is deliberately MORE permissive than update: an orphan (parent
+        // service deleted) or a legacy doc with no serviceId must remain
+        // deletable, or it is wedged in the database forever with no cleanup path.
+        allow delete: if isOrgEditor(orgId)
+          && (!resource.data.keys().hasAll(['serviceId'])
+              || parentGone(resource.data.serviceId)
+              || parentDraft(resource.data.serviceId));
       }
 
       // Songs — editors only (viewers cannot read songs)
-      match /songs/{docId} {
+      match /songs/{songId} {
         allow read, write: if isOrgEditor(orgId);
+
+        // Lyrics versions subcollection (Phase 18) — editors only.
+        // Required explicitly: the /{collection}/{docId} catch-all below only
+        // matches single-segment subcollections directly under the org, so this
+        // deeper path would otherwise fall through to the global deny-all,
+        // breaking the Lyrics tab and slideshow auto-assembly with permission-denied.
+        match /lyrics/{lyricsId} {
+          allow read, write: if isOrgEditor(orgId);
+        }
       }
 
-      // All other nested collections — editors only
+      // All other nested collections — editors only.
+      //
+      // ★ `collection != 'services'` and `collection != 'slideGroups'` are both
+      // LOAD-BEARING. Do not remove either.
+      // `{collection}` is a single-segment wildcard, so this rule also matches
+      // /organizations/{orgId}/services/{docId}, and Firestore rules are
+      // OR-evaluated: a broader rule that grants access wins over a narrower one
+      // that denies. Without this exclusion the status guard in the /services
+      // block above is a complete NO-OP — an editor's write to a planned or
+      // exported service succeeds through THIS rule, 20 lines away, even if the
+      // /services block reads literally `allow write: if false`. Verified against
+      // the Firestore emulator (31-RESEARCH.md, probe A1/A2).
+      //
+      // Because the exclusion removes the backstop, the /services block must
+      // itself grant read, create, update AND delete — it does.
+      //
+      // NOTE: only `write` is excluded. `read` still falls through here
+      // harmlessly; both blocks grant read to any org member, which is strictly
+      // broader than isOrgEditor.
+      //
+      // The slideGroups exclusion had to land in the SAME commit as the
+      // /slideGroups block above: before that block existed, THIS wildcard was
+      // the only rule granting write to slide groups, so excluding it alone
+      // would have denied every slide-group write — including the load-time
+      // materialization that runs on DRAFT services.
       match /{collection}/{docId} {
-        allow read, write: if isOrgEditor(orgId);
+        allow read: if isOrgEditor(orgId);
+        allow write: if isOrgEditor(orgId)
+          && collection != 'services'
+          && collection != 'slideGroups';
       }
     }
 

@@ -1,269 +1,169 @@
 # Project Research Summary
 
-**Project:** WorshipPlanner — Church Worship Service Planning Web App
-**Domain:** Collaborative worship service planning (Vue 3 + Firebase SPA)
-**Researched:** 2026-03-03
+**Project:** WorshipPlanner
+**Domain:** Brownfield milestone on a shipped Vue 3 + Firebase worship-planning app (v1.4 "Service and Slides")
+**Researched:** 2026-07-28
 **Confidence:** MEDIUM-HIGH
 
 ## Executive Summary
 
-WorshipPlanner is a purpose-built, single-organization web app for planning Sunday worship services around the Vertical Worship 1-2-3 methodology. Research confirms this is a well-understood SPA problem domain (auth + CRUD + algorithm) with a mature, low-risk stack (Vue 3 + Firestore + Firebase Auth), but with one genuine differentiator: no existing competitor — Planning Center, WorshipTools, WorshipPlanning.com, or Worship Planner — implements smart song suggestions that combine category type, rotation recency, and team configuration in a single recommendation. That gap is the reason to build this app at all, and it must ship in v1.
+v1.4 is a trust-repair milestone on a shipped app: 26 user-reported items reduce to about ten root causes. The drag-and-drop corruption reported in service ZTXcpNRcJTalEQp42fTx is caused by three compounding bugs in ServiceEditorView.vue's onEnd handler: using evt.oldIndex/newIndex (which count non-draggable section-header DOM siblings) instead of evt.oldDraggableIndex/newDraggableIndex, a DOM-revert that only undoes a single adjacent swap, and an unstable v-for key that changes on every reorder. The same pattern is copy-pasted into SlideGrid.vue. PITFALLS.md independently confirms the D-16 DOM-revert fix already exists and works correctly in both files -- the two researchers agree on the underlying SortableJS/Vue divergence mechanism, but the deeper trace found it is not sufficient on its own: the wrong-index-source and unstable-key bugs are separate, still-unfixed defects. No re-application of D-16 is needed; what is needed is fixing the index source and the v-for key, plus restructuring the five sections as independent per-section Sortable.create() containers.
 
-The recommended approach is a Vue 3 Composition API SPA with Firestore as the backend, structured around org-scoped collections, embedded service slot data (not normalized joins), and a composable-based suggestion algorithm. The architecture is intentionally lean for a 2-3 planner team: one Pinia store per domain, Firestore `onSnapshot` listeners managed through stores (not VueFire composables in stores), and PapaParse for the Planning Center CSV import that bootstraps the song library. Firebase Hosting deploys the Vite build with zero infrastructure overhead.
+The remaining work splits into two categories. Six items are structural fixes to production data (Service/ServiceSlot) that must preserve existing user documents: the ordering-model fix, adding Post-Service, hard-locking slide groups to service order (deleting reconciliation), draft-only editing with a genuine three-layer lock (Firestore rules -- currently absent -- plus store guard plus UI), the autosave race fix, and a save-status aggregator. Four items are net-new capability with infrastructure risk: server-side PPTX-to-image rendering (needs a standalone Cloud Run service with a custom Dockerfile since Firebase Functions buildpacks cannot install LibreOffice/Poppler), LLM-assisted scripture splitting (needs an Anthropic SDK upgrade from the stale pin for structured outputs), background images (low risk, additive), and a contextual-action-bar audit. PPTX rendering is the single highest-uncertainty item -- STACK.md's cost/latency figures are grounded estimates, not benchmarked against this app's real deck corpus, and PITFALLS.md flags cold starts, OOM, silent font substitution, and orphaned partial-render Storage objects as failure modes requiring async job architecture.
 
-The primary risks are all preventable if addressed in Phase 1: the Firebase Auth race condition that causes redirect loops on page refresh, Firestore security rules shipped open during development, over-normalized data that produces N+1 reads for service plans, and CSV import that silently corrupts song records from real Planning Center exports. Addressing these in the foundation phase prevents high-recovery-cost rewrites later. The secondary risk — the suggestion algorithm degenerating to a fixed 20-song playlist — must be built correctly the first time by including staleness-boosting in the algorithm, not added as a patch after users complain.
-
----
+The mitigation strategy threads through every phase: fix cheap/foundational things first (stable key, then ordering model) before anything that depends on trustworthy ordering; treat the autosave bug as MEDIUM-confidence and unreproduced -- write a failing repro test before fixing, since the evidenced mechanism (a self-echo updatedAt mismatch resetting an autosaveInitialized flag) is strongly argued but never run against the live app; and keep the AI feature narrowly scoped to structural labeling (indices into already-fetched ESV text, never model-regenerated text) so scripture correctness is structurally guaranteed.
 
 ## Key Findings
 
 ### Recommended Stack
 
-The stack is well-defined and mostly non-negotiable: Vue 3 (team constraint) + Firebase (team constraint) + Vite 7 (official Vue build tool). The key decisions on top of those constraints are PrimeVue 4 for UI components (90+ components, avoids weeks of UI work, superior to Vuetify for a non-Material design), Tailwind CSS 4 for layout/spacing, and VueFire 3 for component-level Firestore bindings — with the important caveat that VueFire composables should not be used inside Pinia stores due to known reactivity context issues; use raw `onSnapshot` in stores instead.
-
-Supporting libraries are well-chosen for specific needs: PapaParse for CSV (the only serious JS CSV parser, handles all Planning Center export edge cases), VeeValidate + Zod for form validation (Vue-native composables + TypeScript inference), date-fns for recency calculations in the suggestion engine, and `pinia-plugin-persistedstate` for preserving filter state and auth across page refreshes. The PWA (`vite-plugin-pwa`) is deferred to v2+ per feature research, though the architecture supports it.
+Server-side PPTX rendering uses self-hosted headless LibreOffice + Poppler on a dedicated Cloud Run service, invoked asynchronously from the existing parsePptx Cloud Function via service-to-service IAM auth. LLM scripture splitting requires upgrading the Anthropic SDK from the old, stale pin (predates structured outputs) to current, using output_config.format to constrain output to verse/clause indices only on claude-haiku-4-5. Background images need no new libraries -- add backgroundImageUrl at three data-model levels and install the official storage-resize-images Firebase Extension. Save-status/toast should be hand-rolled on top of a new Pinia useSaveStatus aggregator (vue-toastification is stale since 2022; vue-sonner is fine but unnecessary here). Drag-and-drop stays on sortablejs 1.15.7 (confirmed current) -- the fix is in how onEnd calls it, not a library swap; keyboard-accessible reordering uses up/down buttons calling the same reorder function.
 
 **Core technologies:**
-- Vue 3 (^3.5.x) + Vite 7: Frontend framework + build tool — team constraint, current standard
-- Firebase JS SDK (^12.x) + Firebase Auth: Backend + auth — team constraint, modular API tree-shakes well
-- VueFire (^3.2.2): Reactive Firestore bindings for components — use in views/components, NOT in Pinia stores
-- Pinia (^3.0.4): State management — one store per domain (songs, services, tasks, auth)
-- PrimeVue (^4.4.x): UI components — DataTable, Dropdown, Calendar, Dialog eliminate weeks of work
-- Tailwind CSS (^4.x): Layout and utility styling — complements PrimeVue in unstyled mode
-- PapaParse (^5.5.3): CSV parsing — handles Planning Center exports with embedded commas, BOM, CRLF
-- VeeValidate + Zod: Form validation — Vue-native composables with TypeScript schema inference
-- date-fns (^4.x): Date calculations — recency scoring in suggestion algorithm
-
-**What to avoid:** Vuex (maintenance mode), Vue CLI/webpack (maintenance mode), moment.js (deprecated by authors), PDF generation libraries for print (CSS `@media print` is superior), VueFire 2.x (incompatible with Firebase SDK v9+), `signInWithRedirect` without custom auth domain (broken in Chrome M115+, Firefox 109+, Safari 16.1+).
+- LibreOffice + Poppler on Cloud Run (custom Dockerfile) -- real PPTX layout fidelity, MPL 2.0, near-zero cost, must be a separate deployment surface from firebase deploy --only functions
+- Anthropic SDK upgrade + structured outputs (output_config.format) -- the only way to make scripture-split output schema-validated rather than free-text-parsed
+- storage-resize-images Firebase Extension -- zero-code server-side image optimization
+- Hand-rolled save-status component + aria-live regions -- no toast library warranted
 
 ### Expected Features
 
-No competitor encodes a worship methodology into the planning flow. The Vertical Worship 1-2-3 type system is the foundational differentiator that makes every other feature coherent — it must be implemented before service order builder, suggestion algorithm, or seasonal overview, because all three reference it.
+**Must have:** Draft-only editability with state-scoped lock (an improvement over Planning Center's role-only permissions, not a copy); explicit Reopen-for-editing with export-aware warning; persistent inline Saving/Saved status with toast-on-failure-only; copyright/CCLI notice at least once per song group with correct content; group-level background with per-slide override; consistent contextual action bar per tab, primary actions always visible; Post-Service as a purely structural fifth section.
 
-**Must have (table stakes — v1):**
-- CSV import from Planning Center export — without this, onboarding requires manual entry of 100+ songs; no team will do it
-- Song library management (add/edit/search/filter) — with Vertical Worship category (1/2/3) and arrangement support
-- Service order builder with fixed Vertical Worship slot structure (1-2-2-3 or 1-2-3-3 progression)
-- Smart song suggestions (category + rotation recency + team configuration) — the core differentiator
-- Song usage history tracking — feeds the suggestion engine; recorded when songs are placed in plans
-- Team configuration per service (choir/orchestra present) — constrains available song pool
-- Print formatted order of service — teams print for Wednesday rehearsal and Sunday
-- Google OAuth authentication — team preference; email/password as fallback
-- Shareable read-only plan link — team pulls up plans on phones during rehearsal
+**Should have:** Song-level background inherited from the canonical Song Lyrics editor; LLM-assisted responsive-reading split with role-tagged segments (only MediaShout has a manual comparable); compliance-margin CCLI placement (first AND last slide) explicitly documented as exceeding the legal once-per-song floor.
 
-**Should have (competitive — v1.x after validation):**
-- Collaborator invites (2-3 planners)
-- Seasonal/quarterly overview (visualize rotation patterns across weeks)
-- Recurring task checklist with pre-categorized worship team categories
-- Scripture selection guidance and pastor's passage tracking
-- Export for Planning Center manual entry
-
-**Defer (v2+):**
-- Progressive Web App offline support
-- Musician/team read-only view
-- Historical analytics
-- Multiple service types
-
-**Anti-features — do not build:**
-- Planning Center API sync (OAuth app registration + rate limits + schema fragility)
-- Real-time collaborative editing (CRDT complexity, 2-3 planners take turns in practice)
-- ProPresenter integration (requires native OS access; impossible from web)
-- CCLI automatic reporting (requires CCLI licensing agreement)
-- Musician scheduling (Planning Center solves this; duplicating it adds cost without displacing PC)
+**Defer:** Live auto-advance/loop timer engine (belongs to the live-presentation layer this app does not own); full audit-log screen for reopen actions; approval workflow on reopening.
 
 ### Architecture Approach
 
-The architecture is a layered Vue 3 SPA: Pages/Views compose Feature Components which read from Pinia Stores, which in turn manage Firestore subscriptions and writes. Business logic (suggestion algorithm, CSV parsing, print formatting) lives in composables — not stores — keeping stores thin and logic unit-testable without Firebase mocking. The feature-based folder structure (`src/features/songs/`, `src/features/services/`) groups all files for a domain together.
-
-The Firestore schema is org-scoped (`/organizations/{orgId}/songs`, `/organizations/{orgId}/services`) and intentionally denormalized: service slots embed song snapshots (title, key, BPM, category) to avoid join reads at print/display time. Service slots are embedded arrays in the service document (not a subcollection), eliminating N+1 reads. Usage history is a separate lightweight subcollection queried independently by the suggestion engine.
+Service/ServiceSlot are the production data boundary (must preserve); SlideGroup/ImportedDeck/SongLyrics are greenfield (reshape freely). The core move is collapsing three overlapping concerns onto single sources of truth: per-section Sortable containers for ordering, one unconditional slide-group rebuild path (replacing reconciliation's three-branch logic with two), and one save-status aggregator above the existing useAutoSave composable (ServiceEditorView.vue still hand-rolls a duplicate ~150-line implementation predating that extraction).
 
 **Major components:**
-1. `authStore` + `LoginView` + router `beforeEach` guard — Firebase Auth with `authReady` promise to prevent race condition
-2. `songsStore` + `SongsView` + `CsvImportWizard` — Song stable with Firestore `onSnapshot`, PapaParse import, category management
-3. `servicesStore` + `ServiceEditor` + `SuggestionPanel` — Core planning workspace; embeds slot data; calls suggestion composable
-4. `useSongSuggestions` composable — Filters by category → team config → scores by recency + staleness; returns ranked top 10
-5. `useCsvImport` composable — PapaParse in worker mode → row validation → preview UI before Firestore batch write
-6. `ServicePrint` view + `usePrint` composable — CSS `@media print` layout; no PDF library
-
-**Key patterns to follow:**
-- Thin stores (CRUD + reactive state), fat composables (business logic)
-- `onSnapshot` in Pinia stores with explicit `unsubscribe` cleanup, not VueFire `useCollection` in stores
-- Org-scoped Firestore paths with membership-checked security rules from day one
-- Denormalize `songTitle` into service slots; avoid joins at read time
-- `authReady` Promise in auth store; router guard `await authStore.authReady` before checking user
+1. Per-section Sortable.create() containers -- makes oldIndex/newIndex trustworthy again, makes sections structurally non-draggable
+2. slideGroupMaterializer.ts reconcile functions stripped of confirm branches -- unconditional replace, no dismissedSignature, no ReconcileConfirmModal
+3. Three-layer draft lock (Firestore rules -- currently absent -- plus store guard plus UI) -- only rules are adversary-proof
+4. New Cloud Function plus Cloud Run render service for PPTX, writing under orgs/orgId/pptx-imports/importId/rendered/ (exempt from cleanupExpiredMedia by prefix)
+5. useSaveStatus Pinia aggregator above per-surface useAutoSave instances
 
 ### Critical Pitfalls
 
-1. **Firebase Auth race condition with Vue Router** — Implement an `authReady` Promise that resolves after `onAuthStateChanged` fires once; `await` it in `router.beforeEach`. Without this, page refresh bounces authenticated users to login. Address in Phase 1.
-
-2. **Firestore over-normalization (SQL mental model)** — Embed service slots and arrangement data in parent documents; denormalize `songTitle` into slots. A join-based schema causes N+1 reads and cost explosions. Design the data model in Phase 1 before building any feature — migration is expensive.
-
-3. **Open Firestore security rules in production** — Write minimum viable rules in Phase 1 (default deny, require auth, scope writes to org members). Firebase projects with `allow read, write: if true` are actively exploited. Rules must ship with v1, not as a follow-up.
-
-4. **Runaway Firestore listeners causing memory leaks** — Always capture the `unsubscribe` function from `onSnapshot` and call it in `onUnmounted` or store cleanup. Establish this composable pattern in Phase 1 before building any features that use listeners.
-
-5. **CSV import silently corrupting song data** — Use PapaParse (not a hand-rolled parser) for all Planning Center CSV parsing. Always validate each row and show a validation summary before committing to Firestore. Real PC exports contain embedded commas, BOM markers, CRLF, and smart quotes. Address in Phase 1 when CSV import is built.
-
-6. **Song suggestion algorithm degenerating to fixed playlist** — Sort eligible songs by `daysSinceLastUsed` descending (longest gap first). Add staleness boost (+score) for songs unused 8+ weeks. Track `lastSuggestedDate` separately from `lastUsedDate`. Build this correctly in Phase 2; retrofitting after user complaints requires backfilling Firestore data.
-
----
+1. **SortableJS/Vue DOM divergence** -- D-16 DOM-revert already works; still-open bugs are index source and unstable key. Fix both, do not reapply D-16.
+2. **Optimistic state racing its own Firestore echo** -- ServiceEditorView.vue already gates on autosaveStatus; Slides tab's separate slideGroupsStore subscription lacks this guard.
+3. **UI-only lock enforcement** -- firestore.rules has zero status-based write guard today; all three layers (rules, store, UI) must be built, rules first, plus any Cloud Function writing to a locked service (Admin SDK bypasses rules).
+4. **Headless PPTX rendering in serverless** -- cold starts, OOM, silent font substitution, orphaned partial-render objects. Must be async-job architecture; orphan-cleanup deletion must default to dry-run (this exact mismatch already caused a real incident in this codebase).
+5. **Deleting reconciliation leaves orphaned fields, dead imports, vacuous tests** -- dismissedSignature is a persisted Firestore field; trace via knowledge graph before deletion, record the leave-vs-backfill decision explicitly.
+6. **Post-Service touches production data with scattered section lists and non-exhaustive switches** -- convert switches to exhaustiveness-guarded patterns before adding the fifth section.
 
 ## Implications for Roadmap
 
-Based on research, the dependency graph from FEATURES.md and the build order from ARCHITECTURE.md strongly suggest a 5-phase structure. The Vertical Worship category system and Firestore data model are the foundational decisions that everything else depends on — they must be resolved before any feature is built.
+The ~26 scoped items reduce to roughly 8-10 phases, sequenced by dependency:
 
-### Phase 1: Foundation — Auth, Data Model, Firebase Integration
+### Phase 1: Stable v-for key + fixed ordering model
+**Rationale:** Cheapest fix plus foundational restructuring must land before anything depending on trustworthy order.
+**Delivers:** Correct drag-and-drop in ServiceEditorView.vue and SlideGrid.vue together (same root-cause fix).
+**Addresses:** Order structure; half of Slides interaction.
+**Avoids:** Pitfall 1 -- note DOM-revert is NOT broken, only index source and key are.
 
-**Rationale:** All 6 critical pitfalls listed above must be addressed before building features, because fixing them after the fact is expensive (data migration for schema, Firestore cost explosion for N+1 reads, security exposure for open rules). The `authReady` pattern, org-scoped security rules, and listener cleanup composable pattern must be established here and reused consistently.
+### Phase 2: Post-Service section
+**Rationale:** Additive type change, only safe once ordering is trustworthy.
+**Delivers:** Fifth section with section-list inventory + exhaustiveness-guard conversion as prerequisite.
+**Addresses:** Post-Service milestone item; audit print/share/plan-rail/PC export.
+**Avoids:** Pitfall 9.
 
-**Delivers:** Working auth flow (Google OAuth + email/password), protected routes, Firebase initialization singleton, org-scoped Firestore schema with TypeScript interfaces, security rules with member-check, Firebase Emulator integration for local dev/test.
+### Phase 3: Delete reconciliation, hard-lock slide groups
+**Rationale:** Depends on ordering being stable first; is one unit of work, not two phases.
+**Delivers:** Unconditional slide-group rebuild; removal of ReconcileConfirmModal, dismissedSignature, confirm branches.
+**Addresses:** Slides mirror the plan.
+**Avoids:** Pitfall 8 -- graph-trace consumers before deletion, delete (not skip) the test suite.
 
-**Addresses:** Auth, team membership model, TypeScript types for Song/ServicePlan/Task/User
+### Phase 4: Draft-only editing + reopen (three-layer lock)
+**Rationale:** Independent, can build in parallel, but rules change must be sequenced against Phase 1's immediate-save path.
+**Delivers:** Firestore rules status check + store guard + centralized UI isEditable + dedicated reopenService action.
+**Addresses:** Service lifecycle.
+**Avoids:** Pitfall 5 -- extend firestore.rules.test.ts, not just UI tests.
 
-**Avoids:** Auth race condition, open security rules, over-normalized schema, monolithic Pinia store, listener memory leaks
+### Phase 5: Save-status aggregator + autosave bug fix
+**Rationale:** Root-cause fix must land before the global UI is wired to it.
+**Delivers:** useSaveStatus aggregator; persistent inline status; toast-on-failure-only; autosave bug fix.
+**Addresses:** Save reliability.
+**Avoids:** Pitfall 4 -- write the failing repro test FIRST; the root cause is MEDIUM confidence, not reproduced live.
 
-**Research flag:** Standard patterns — well-documented Vue Router + Firebase Auth integration. No additional research needed.
+### Phase 6: PPTX server-side rendering
+**Rationale:** Independent, can run in parallel; highest-uncertainty item in the milestone, should not sit adjacent to a tight deadline.
+**Delivers:** Standalone Cloud Run service (custom Dockerfile, LibreOffice + Poppler + Carlito/Caladea/Liberation fonts) + bridging Cloud Function; async job architecture with completeness checks.
+**Note on tension:** STACK.md frames async-Cloud-Run as the cost-driven recommendation; PITFALLS.md arrives at the same architecture from a risk-mitigation angle (cold starts/OOM/font substitution) -- convergence from two angles raises confidence, but neither source's latency/cost figures are benchmarked against real decks, so budget real test-deck validation time.
 
----
+### Phase 7: LLM-assisted scripture splitting
+**Rationale:** Enhances existing AI integration; SDK upgrade is a hard prerequisite since structured outputs postdate the current pin.
+**Delivers:** Upgraded SDK; new Cloud Function proxy path using output_config.format constrained to indices only.
+**Addresses:** Smarter content.
 
-### Phase 2: Song Library + CSV Import
+### Phase 8: Backgrounds + drawer split
+**Rationale:** Depends on Phase 3's unconditional rebuild being stable; drawer split sequenced after backgrounds exist as fields to display.
+**Delivers:** Three-tier background cascade (song > group > slide); EditSlideDrawer split into Edit details / Edit lyrics via 3-dot menu.
+**Addresses:** Backgrounds; part of Slides interaction.
 
-**Rationale:** The song stable is the prerequisite for every other feature. Smart suggestions, service planning, usage tracking, and team configuration all require songs to exist. CSV import must ship with the song library — not as a follow-up — because manual entry of 100+ songs is the onboarding blocker. The import validation UI (row-level error reporting, preview before commit) must ship with the feature to prevent silent data corruption.
-
-**Delivers:** Song library view with search/filter, add/edit/delete, Vertical Worship category (1/2/3) classification, arrangement management, Planning Center CSV import with validation preview and PapaParse worker mode.
-
-**Uses:** PapaParse in `worker: true` mode, VeeValidate + Zod for song edit form, PrimeVue DataTable for song list
-
-**Implements:** `songsStore` with `onSnapshot` + `startListening`/`stopListening`, `useCsvImport` composable, `CsvImportWizard` multi-step UI
-
-**Avoids:** CSV silent corruption pitfall, lazy per-slot song loading anti-pattern (load stable once), performance trap of `reactive({})` for arrays
-
-**Research flag:** Standard patterns for PapaParse + Vue 3. No additional research needed.
-
----
-
-### Phase 3: Service Planning + Core Suggestion Engine
-
-**Rationale:** Service planning is the core workflow; it depends on Phase 2 songs being loaded. The smart suggestion algorithm — the product's primary differentiator — ships here, built correctly with staleness scoring from the start. Team configuration per service also ships here because it's a prerequisite input to the suggestion filter. Usage history writes begin here (recorded when songs are placed), enabling the rotation awareness that makes suggestions meaningful.
-
-**Delivers:** Week-by-week services calendar, service editor with Vertical Worship slot structure (1-2-2-3 / 1-2-3-3 progression), suggestion panel with ranked top-10 songs (filtered by category + team config, scored by recency + staleness), per-service team configuration (choir/orchestra), automatic usage history recording.
-
-**Uses:** `useSongSuggestions` composable (category filter → team filter → recency/staleness scoring), `useServiceOrder` composable (slot management), `servicesStore`, PrimeVue Dropdown/Dialog
-
-**Implements:** Core planning workspace (`ServiceEditor`), `SuggestionPanel`, `usageHistory` subcollection writes
-
-**Avoids:** Suggestion degeneration pitfall (staleness boost built in from start), subcollection anti-pattern for slots (embedded array)
-
-**Research flag:** Suggestion algorithm scoring weights (recency vs. staleness vs. category balance) may benefit from a short design spike to validate the scoring formula before implementation. The algorithm logic itself is clear from research; the tuning is domain-specific.
-
----
-
-### Phase 4: Output — Print, Share, Export
-
-**Rationale:** Print and share are table stakes that every competitor offers, but they depend on the service plan existing (Phase 3). CSS `@media print` with a dedicated `ServicePrint` view is the correct approach — PDF generation libraries produce inconsistent output for text-heavy layouts. The read-only shareable link enables rehearsal use on phones and replaces the current email-the-spreadsheet workflow. Export for Planning Center manual entry is low complexity and high value once the plan data is structured.
-
-**Delivers:** Formatted printable order of service (`ServicePrint` view with `@media print` stylesheet), shareable read-only plan link, structured export for Planning Center manual entry.
-
-**Uses:** CSS `@media print` + `window.print()`, `usePrint` and `useShareLink` composables
-
-**Avoids:** Print layout pitfall (flexbox/grid with poor print page-break support), PDF library pitfall (`html2pdf.js`/`jsPDF`), mobile view untested pitfall (read-only share view tested on physical device)
-
-**Research flag:** Standard patterns. CSS print media queries are well-documented. No additional research needed.
-
----
-
-### Phase 5: Collaboration + v1.x Features
-
-**Rationale:** Collaborator invites require auth and membership infrastructure (Phase 1) but no new architecture. The seasonal/quarterly overview requires multiple weeks of service data (Phase 3). Recurring tasks are a secondary workflow that becomes valuable once the core planning loop is validated. These features add depth without changing the core data model.
-
-**Delivers:** Collaborator invites with expiring tokens, role-based UI guards (admin vs. planner vs. viewer), seasonal/quarterly multi-week overview for spotting rotation patterns, recurring task checklist with pre-categorized worship team categories, scripture selection guidance with pastor's passage tracking.
-
-**Uses:** `members` subcollection CRUD, invite token storage with `expiresAt` in Firestore, `tasksStore`
-
-**Implements:** `InviteAccept` flow, role-based conditional rendering, `TasksView`, quarterly overview calendar
-
-**Avoids:** Invite without expiry security pitfall, invite link exposing full song stable (read-only share uses separate rendering path)
-
-**Research flag:** Invite token pattern (store in Firestore with expiry, validate on claim) is a well-known Firebase pattern. No additional research needed. Role-based security rules (admin vs. planner) may need a brief rules design spike to get right.
-
----
+### Phase 9: Presentation correctness + CCLI placement + contextual action bars
+**Rationale:** Lower-complexity, trails the structural work; CCLI documentation-language fix belongs here.
+**Delivers:** No org labels when presenting; copyright first+last slide (documented as safety margin, not CCLI mandate); one action-bar pattern audited across every tab, after Service Order/Slides layouts finalize.
+**Addresses:** Presentation correctness; UI rework.
 
 ### Phase Ordering Rationale
 
-- **Foundation before features:** All 6 critical pitfalls map to Phase 1 decisions. Deferring the data model, security rules, or auth pattern means expensive migration or security exposure.
-- **Songs before services:** The dependency graph is explicit — suggestions, service planning, and usage tracking all require a populated song stable. CSV import ships with songs, not after.
-- **Suggestions in Phase 3 (not later):** The suggestion algorithm is the primary differentiator. If it ships in a later phase, the app is not meaningfully better than a spreadsheet until that phase is complete.
-- **Output in Phase 4:** Print/share are needed before the app can replace the existing workflow, but they depend on the service plan structure being stable.
-- **Collaboration last:** The app is usable by a single planner before invites are built. Starting with one user simplifies testing and validation.
+- Ordering must be trustworthy before Post-Service, the slide-group hard-lock, or draft-lock rules interacting with the immediate-save path
+- Reconciliation deletion and background data model are coupled -- sequence backgrounds after the unconditional rebuild lands
+- Claude SDK upgrade is a hard gate for the scripture-split feature
+- Draft-lock, autosave-fix, and PPTX rendering are mutually independent and can run in parallel once Phase 1 lands
+- Contextual action bar work is explicitly last -- building it before the two tab reworks finalize risks rework
 
 ### Research Flags
 
-Phases likely needing deeper design work during planning:
-- **Phase 3:** Suggestion algorithm scoring weights (recency decay curve, staleness threshold at 8 weeks, tie-breaking) are domain-specific and need a brief design spike. The algorithm structure is clear; the tuning is not independently verifiable from research.
-- **Phase 5 (security rules):** Admin vs. planner vs. viewer rule differentiation should be sketched before implementation to avoid rule rewrites.
+Needs deeper research during planning:
+- **Phase 4:** Firestore rules field-level diff logic for the reopen-transition special case
+- **Phase 6:** Highest-uncertainty item -- needs a real multi-font, multi-slide test deck and cost/latency validation
+- **Phase 7:** Re-verify SDK version and output_config.format call shape at implementation time; validate Haiku split determinism empirically
+- **Phase 3:** Needs a graph-trace pass to build the full reconciliation consumer inventory before deletion
 
-Phases with standard, well-documented patterns (no additional research needed):
-- **Phase 1:** Firebase Auth + Vue Router race condition fix is well-documented with code examples
-- **Phase 2:** PapaParse + Vue 3 CSV import is a standard pattern
-- **Phase 4:** CSS `@media print` service order is straightforward
-- **Phase 5:** Invite token pattern with Firestore expiry is a standard Firebase pattern
-
----
+Standard patterns (skip research-phase):
+- **Phase 1:** Root cause and fix already fully derived with line-level citations
+- **Phase 2:** Well-enumerated consumer checklist already exists
+- **Phase 5:** Fix shape well-evidenced, only needs repro-test-first discipline
+- **Phase 8:** Directly extends an existing precedent (audio's slide-beats-bed); no new libraries
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Core stack (Vue 3, Vite 7, Firebase 12, VueFire 3.2.2, Pinia 3, Vue Router 5) verified via official docs and npm. PrimeVue 4.4.1 released Feb 2026. Supporting libraries verified. |
-| Features | MEDIUM | Competitor features verified via official sources (MEDIUM-HIGH). Smart suggestion gap confirmed by absence across all reviewed tools (MEDIUM). Vertical Worship 1/2/3 methodology from project context only — no independent source (LOW for external validation). |
-| Architecture | MEDIUM-HIGH | Core Vue 3 + Firestore patterns (Pinia, onSnapshot, security rules, data structure) from official Firebase docs (HIGH). Feature-based folder structure from community consensus (MEDIUM). VueFire/Pinia context issue from GitHub discussions (MEDIUM — single source but widely reproduced). |
-| Pitfalls | MEDIUM-HIGH | Auth race condition, open security rules, listener cleanup from official Firebase docs (HIGH). CSV corruption, suggestion degeneration, performance traps from multiple community sources (MEDIUM). Domain-specific UX pitfalls from single sources (LOW — but low risk to address). |
+| Stack | HIGH for versions (npm registry, 2026-07-28); MEDIUM for PPTX cost/latency (grounded estimates, not benchmarked) |
+| Features | MEDIUM -- websearch-only, cross-checked across 2+ sources per finding; CCLI section flags an unresolved primary source |
+| Architecture | HIGH -- cited to real file/line reads; autosave root cause explicitly flagged MEDIUM (strong hypothesis, not reproduced) |
+| Pitfalls | HIGH for codebase-specific findings; MEDIUM for general SortableJS/LibreOffice/LLM integration patterns |
 
-**Overall confidence:** MEDIUM-HIGH
+**Overall confidence:** MEDIUM-HIGH -- brownfield-specific findings are unusually well-grounded, all traced to actual code. External/competitive findings are solid but MEDIUM by design given limited authoritative documentation for this niche domain.
 
 ### Gaps to Address
 
-- **Vertical Worship methodology specifics:** The 1/2/3 category system and its constraints (which slot types require which category, when 1-2-2-3 vs. 1-2-3-3 is chosen) are defined by the project context (`PROJECT.md`) but not independently sourced. Before Phase 3, confirm with the team the exact rules for slot type enforcement and progression selection — these determine how the suggestion algorithm's category filter operates.
-
-- **Suggestion algorithm scoring weights:** Research identifies the correct shape of the algorithm (category filter → team filter → recency/staleness scoring), but the specific weight values (-80 for last 2 weeks, -20 for weeks 3-8, +10 for never used, +staleness boost at 8 weeks) are reasoned from first principles. Validate these weights against the team's actual song library before treating them as final.
-
-- **Planning Center CSV export column schema:** The CSV import feature depends on Planning Center's specific export format (column headers, arrangement column naming convention, multi-arrangement layout). Research identifies that PC exports use per-arrangement columns and may have trailing spaces in headers, but the exact column schema should be validated against a real export file before finalizing `useCsvImport` column mapping.
-
-- **`signInWithRedirect` vs. `signInWithPopup`:** Pitfalls research flags `signInWithRedirect` as broken in Chrome M115+, Firefox 109+, and Safari 16.1+ without a custom auth domain. Stack research recommends `signInWithPopup` as default. Confirm Firebase Hosting custom domain configuration in Phase 1 if redirect-based login is preferred for mobile.
-
----
+- Autosave root cause is a hypothesis, not confirmed -- write a failing repro test before fixing.
+- CCLI's own binding license text was never directly retrieved (site returned marketing copy / 403) -- fix the internal justification language ("exceeds the legal minimum," not "CCLI requires this"), not the requirement itself.
+- PPTX rendering latency/cost are estimates -- budget real test-deck validation in Phase 6.
+- slideshowAssembler.ts and Planning Center export's exact section-count assumptions were flagged "likely automatic" but not fully confirmed -- verify at Phase 2 plan time.
+- Whether Haiku's scripture splits are reliably near-deterministic on real passages is asserted, not validated -- add an explicit evaluation step in Phase 7.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-
-- [VueFire Official Docs](https://vuefire.vuejs.org/guide/getting-started.html) — VueFire 3.2.2 installation, peer dependencies, Pinia caveats
-- [Firebase Firestore Best Practices](https://firebase.google.com/docs/firestore/best-practices) — document size limits, write limits, subcollection vs. embed tradeoffs
-- [Firebase Firestore — Secure data access for users and groups](https://firebase.google.com/docs/firestore/solutions/role-based-access) — RBAC pattern with membership subcollection
-- [Firebase Fix Insecure Rules](https://firebase.google.com/docs/firestore/security/insecure-rules) — open rules exploitation
-- [Firebase Auth Redirect Best Practices](https://firebase.google.com/docs/auth/web/redirect-best-practices) — Chrome M115+ breaking change
-- [Firebase Custom Claims](https://firebase.google.com/docs/auth/admin/custom-claims) — server-side claim assignment
-- [Pinia Introduction](https://pinia.vuejs.org/introduction.html) — one store per domain, replaces Vuex
-- [Vue Router Migration v4-to-v5](https://router.vuejs.org/guide/migration/v4-to-v5) — no breaking changes confirmed
-- [Vite 7.0 Announcement](https://vite.dev/blog/announcing-vite7) — current stable
-- [PapaParse npm](https://www.npmjs.com/package/papaparse) — v5.5.3, no dependencies
+- Direct repository reads: ServiceEditorView.vue, SlideGrid.vue, slideGroupMaterializer.ts, useSlideshowAssembly.ts, slideGroups.ts, slideGroup.ts, service.ts, slotTypes.ts, useAutoSave.ts, services.ts, functions/src/index.ts, pptxParser.ts, firestore.rules, router/index.ts, sortablejs v1.15.7 source
+- npm registry version checks, run 2026-07-28
+- .planning/PROJECT.md, .planning/STATE.md
 
 ### Secondary (MEDIUM confidence)
+- claude-api skill (cached 2026-06-24 pricing)
+- WebSearch: Gotenberg/LibreOffice/Cloud Run buildpacks, CloudConvert/Aspose/Syncfusion pricing, storage-resize-images docs, accessible drag-and-drop patterns
+- Planning Center Help, Google Docs/Notion/Linear/Primer save-feedback patterns, ProPresenter/EasyWorship/FreeShow/MediaShout docs, CCLI placement blogs, Adobe Spectrum/Mobbin toolbar patterns
 
-- [WorshipTools Songs in Planning documentation](https://www.worshiptools.com/en-us/docs/83-pl-songs) — confirms sort-by-last-used, no smart suggestions
-- [Planning Center Services features](https://www.planningcenter.com/services) — competitor feature baseline
-- [ChurchSuite filters announcement, August 2025](https://churchsuite.com/blog/2025-08-13-new-filters-to-help-you-find-what-matters-most/) — industry trend toward recency filtering
-- [The Church Collective: Worship Planning Song Types](https://thechurchcollective.com/worship-planning/worship-planning-song-types/) — three-category song typology as established framework
-- [VueFire + Pinia known issues](https://github.com/vuejs/vuefire/discussions/1453) — why to use onSnapshot directly in stores
-- [Vue 3 feature-based folder structure — Vue School](https://vueschool.io/articles/vuejs-tutorials/how-to-structure-a-large-scale-vue-js-application/) — feature module organization
-
-### Tertiary (LOW confidence — needs validation)
-
-- [Worship Planner features](https://worshipplanner.com/features) — page returned JS bundle; description from search snippet only
-- Project context `PROJECT.md` — Vertical Worship 1/2/3 methodology definition (HIGH for project requirements, but unverified externally)
-- [Common Worship Service Planning Mistakes — Ministry Brands](https://www.ministrybrands.com/blog/common-worship-service-planning-mistakes-and-how-to-avoid-them) — domain context only
+### Tertiary (LOW confidence)
+- Great Plains UMC CCLI blog post -- single-source, not cross-checked
+- CCLI's own site -- attempted fetch returned only marketing copy, flagged as unresolved primary source
 
 ---
-
-*Research completed: 2026-03-03*
+*Research completed: 2026-07-28*
 *Ready for roadmap: yes*
