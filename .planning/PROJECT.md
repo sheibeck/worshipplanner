@@ -26,8 +26,13 @@ of changes I'm going to post."*
 
 Two items are not merely unverified but **incomplete**, and are carried into Active below:
 
-1. **PPTX server-side rendering is built but undeployed** (Phase 37, R062 `[~]`). Nothing was
-   containerized or provisioned; `render-service/DEPLOY.md` is the handoff.
+1. **PPTX server-side rendering — backend DEPLOYED 2026-08-06, no UI consumes it** (Phase 37,
+   R062 still `[~]`). The Cloud Run service is live at `pptx-render` in `us-central1`, verified
+   private (unauthenticated requests get 403), and `PPTX_RENDER_SERVICE_URL` is wired into the
+   deployed functions. What remains is the half that was always out of scope: **nothing in `src/`
+   reads the rendered PNGs**, so a PPTX import produces images in Storage that the app never
+   displays. R062's "looks like the original PowerPoint" is not satisfied until that display work
+   is built — and no phase owns it.
 2. **`firestore.rules` is not deployed** (backlog 999.3). Phase 31's draft lock is a three-layer
    control whose third layer ships separately from the bundle and is currently not live.
 
@@ -150,11 +155,16 @@ only after a page refresh.
 
 <!-- v1.5 has not been scoped. Run /gsd-new-milestone to define it. -->
 
-- [ ] **PowerPoint imports look like the original PowerPoint** — carried forward from v1.4 as
-      **incomplete**. Phase 37 built the whole server-side render pipeline (Cloud Run service,
-      Dockerfile, bridging Cloud Function, cleanup job, 39 tests) but it was **never deployed**, by the
-      owner's own instruction, and **no UI consumes the rendered images**. R062 is `[~]` partial.
-      Finishing it means deploying per `render-service/DEPLOY.md` and building a client-side display.
+- [ ] **PowerPoint imports look like the original PowerPoint** — carried forward from v1.4, now
+      **half done**. The backend was deployed 2026-08-06: Cloud Run `pptx-render` (us-central1,
+      private — 403 unauthenticated), `PPTX_RENDER_SERVICE_URL` wired into functions, all five
+      functions redeployed. R062 stays `[~]` because the remaining half is the one that makes the
+      requirement true for a user: **build the client-side display.** Nothing in `src/` reads
+      `pptxRenders` or the `rendered/*.png` objects, so imports currently render images into Storage
+      that the app never shows. This is the piece that has never had a home in the roadmap.
+      <br>Two things to confirm on the first real import (see STATE.md's deploy note): whether the
+      `run.invoker` IAM binding was granted, and whether `STORAGE_BUCKET` was set to
+      `.firebasestorage.app` rather than the `.appspot.com` the docs originally said.
 - [ ] **Confirm the production draft lock by hand** (backlog Phase 999.3, deploy half done) — the
       rules layer was deployed 2026-08-05, so Phase 31's lock now runs on all three layers. What is
       still unverified is its *behaviour* in production: set a service to Planned, open devtools,

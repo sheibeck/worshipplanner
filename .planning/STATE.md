@@ -1497,9 +1497,41 @@ itself clearly.**
    against `dist/` — not by trusting the CLI. `firebase deploy --only hosting` then completed the
    release. **`file upload complete` is not `release complete`; check the asset hash.**
 
-**Still NOT deployed, by design:** the Phase 37 Cloud Run render service (`render-service/`). Nothing
-containerized or provisioned. R062 remains `[~]` partial and no UI consumes rendered images.
-`render-service/DEPLOY.md` is the handoff.
+**~~Still NOT deployed, by design~~ — DEPLOYED 2026-08-06.** See the render-service note below.
+
+## 🚀 RENDER SERVICE DEPLOYED — 2026-08-06
+
+The owner deployed Cloud Run `pptx-render` and added its URL to `functions/.env`; I redeployed
+functions so `requestPptxRender` picks it up. All five functions updated successfully.
+
+- **Service:** `https://pptx-render-666677495069.us-central1.run.app`
+- **Verified private:** unauthenticated `GET /render` and `POST /render` (with a real JSON body) both
+  return `403 Forbidden` from the Google front end. `--no-allow-unauthenticated` was honored.
+  *(A body-less POST returns `411 Length Required` — that is the front end rejecting the request
+  before IAM, not the service being open. Always probe with a body.)*
+- **`PPTX_RENDER_SERVICE_URL`** is set in `functions/.env` (gitignored), replacing the empty value
+  that selected the `render-service-not-configured` fail-closed branch.
+
+### Two things NOT verifiable from here — check them on the first real import
+
+Both need `gcloud`, which is not installed on this machine. Neither is a defect; both are unconfirmed.
+
+1. **The `run.invoker` IAM binding.** Without it `invokeRenderService` mints a valid OIDC token and
+   still gets a 403 from Cloud Run, because the platform IAM check precedes application code. The
+   symptom is a render doc with `failureReason: "render-service-error"` (NOT
+   `"render-service-not-configured"` — that one now means the URL is unset, which it no longer is).
+   Grant with:
+   `gcloud run services add-iam-policy-binding pptx-render --region=us-central1 --member="serviceAccount:worship-planner-bc515@appspot.gserviceaccount.com" --role="roles/run.invoker" --project=worship-planner-bc515`
+
+2. **`STORAGE_BUCKET` on the Cloud Run service.** Must be `worship-planner-bc515.firebasestorage.app`.
+   `DEPLOY.md` originally said `.appspot.com` — corrected in `a58a06b`, but if the deploy ran against
+   the old text the container will throw on its first render.
+
+### Still true: NO UI CONSUMES THE RENDERED IMAGES
+
+Deploying changed nothing a user can see. Nothing in `src/` reads `pptxRenders` or `rendered/*.png` —
+grep finds only a comment and a type doc. R062 stays `[~]` partial for exactly this reason, and the
+display work still has no home in any roadmap.
 
 **One genuinely open item:** backlog 999.3's *verification* half. The rules are live, but nobody has
 opened devtools against production and attempted a direct write to a locked service. Live-ness is
