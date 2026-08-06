@@ -257,6 +257,18 @@ const vwModeInput = ref(authStore.vwModeEnabled)
 const vwSavedFeedback = ref(false)
 const vwSaveError = ref<string | null>(null)
 
+// ── AI Features toggle state (R073/R088) ───────────────────────────────────────
+
+const aiEnabledInput = ref(authStore.settings.aiEnabled)
+const aiSavedFeedback = ref(false)
+const aiSaveError = ref<string | null>(null)
+
+// ── Planning Center enable toggle state (R073/R089) ────────────────────────────
+
+const pcEnabledInput = ref(authStore.settings.pcEnabled)
+const pcEnabledSavedFeedback = ref(false)
+const pcEnabledSaveError = ref<string | null>(null)
+
 // ── Computed ───────────────────────────────────────────────────────────────────
 
 const isSaveDisabled = computed(() => {
@@ -318,6 +330,20 @@ watch(
   () => authStore.vwModeEnabled,
   (val) => {
     vwModeInput.value = val
+  },
+)
+
+watch(
+  () => authStore.settings.aiEnabled,
+  (val) => {
+    aiEnabledInput.value = val
+  },
+)
+
+watch(
+  () => authStore.settings.pcEnabled,
+  (val) => {
+    pcEnabledInput.value = val
   },
 )
 
@@ -478,7 +504,11 @@ async function onToggleVwMode() {
   vwSaveError.value = null
 
   try {
-    await updateDoc(doc(db, 'organizations', authStore.orgId), { vwModeEnabled: newValue })
+    // Lazy backfill (R073): write the nested leaf path, not the flat field.
+    // The next time any organization saves this toggle it gains a nested
+    // value; nothing else backfills and no migration script is ever run.
+    // The flat field stays untouched and still readable by the dual-read.
+    await updateDoc(doc(db, 'organizations', authStore.orgId), { 'settings.vwModeEnabled': newValue })
     authStore.vwModeEnabled = newValue
 
     vwSavedFeedback.value = true
@@ -490,6 +520,60 @@ async function onToggleVwMode() {
     vwSaveError.value = 'Failed to save. Please try again.'
     // Revert the local checkbox to reflect the unsaved state
     vwModeInput.value = !newValue
+  }
+}
+
+// ── AI Features toggle action (R073/R088) ──────────────────────────────────────
+// Mirror-write template follows onToggleVwMode: a quoted dot-path leaf key, never
+// a whole-map write, so a concurrent editor's write to a sibling settings.* key
+// is never clobbered.
+
+async function onToggleAiEnabled() {
+  if (!authStore.orgId || !authStore.isEditor) return
+
+  const newValue = aiEnabledInput.value
+  aiSaveError.value = null
+
+  try {
+    await updateDoc(doc(db, 'organizations', authStore.orgId), { 'settings.aiEnabled': newValue })
+    authStore.settings.aiEnabled = newValue
+
+    aiSavedFeedback.value = true
+    setTimeout(() => {
+      aiSavedFeedback.value = false
+    }, 2000)
+  } catch (err) {
+    console.error('[SettingsView] save aiEnabled error:', err)
+    aiSaveError.value = 'Failed to save. Please try again.'
+    // Revert the local checkbox to reflect the unsaved state
+    aiEnabledInput.value = !newValue
+  }
+}
+
+// ── Planning Center enable toggle action (R073/R089) ───────────────────────────
+// Display-only companion to the existing credentials block. This handler never
+// touches pcAppId/pcSecret and never calls onClearPcCredentials/setPcCredentials
+// — stored credentials are retained, not cleared, when the integration is off.
+
+async function onTogglePcEnabled() {
+  if (!authStore.orgId || !authStore.isEditor) return
+
+  const newValue = pcEnabledInput.value
+  pcEnabledSaveError.value = null
+
+  try {
+    await updateDoc(doc(db, 'organizations', authStore.orgId), { 'settings.pcEnabled': newValue })
+    authStore.settings.pcEnabled = newValue
+
+    pcEnabledSavedFeedback.value = true
+    setTimeout(() => {
+      pcEnabledSavedFeedback.value = false
+    }, 2000)
+  } catch (err) {
+    console.error('[SettingsView] save pcEnabled error:', err)
+    pcEnabledSaveError.value = 'Failed to save. Please try again.'
+    // Revert the local checkbox to reflect the unsaved state
+    pcEnabledInput.value = !newValue
   }
 }
 </script>
