@@ -329,12 +329,21 @@ describe('useAuthStore', () => {
     // and no other failing test. This org document has NO `settings` key at
     // all — only the legacy flat field — so the dual-read must fall through to
     // it rather than landing on the hardcoded `true` default.
+    //
+    // Both `store.vwModeEnabled` (the standalone ref) AND
+    // `store.settings.vwModeEnabled` (the typed OrgSettings object) must
+    // agree — CR-01: a prior defaults-merge bug computed these two values
+    // independently, so the standalone ref resolved correctly while
+    // `settings.vwModeEnabled` silently fell through to the hardcoded
+    // `DEFAULT_ORG_SETTINGS.vwModeEnabled` (`true`), re-enabling Vertical
+    // Worship for any consumer reading the canonical `settings` object.
     it('keeps a flat vwModeEnabled false when there is no settings key', async () => {
       mockOrgDocPath({ name: 'Test Org', vwModeEnabled: false })
       const { useAuthStore } = await import('../auth')
       const store = useAuthStore()
       await triggerAuthStateChange(mockUser)
       expect(store.vwModeEnabled).toBe(false)
+      expect(store.settings.vwModeEnabled).toBe(false)
     })
   })
 

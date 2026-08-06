@@ -122,18 +122,26 @@ export const useAuthStore = defineStore('auth', () => {
       // pre-v1.5 org document has no `settings` key at all; the optional
       // chain below is mandatory because noUncheckedIndexedAccess is on.
       const orgSettings = (orgData.settings as Partial<OrgSettings> | undefined) ?? {}
-      settings.value = { ...DEFAULT_ORG_SETTINGS, ...orgSettings }
 
       // Dual-read migration (R073): nested settings value first, then the
       // legacy flat field, then the hardcoded default. This is live
-      // production data — do NOT collapse this to `settings?.vwModeEnabled
+      // production data — do NOT collapse this to `orgSettings.vwModeEnabled
       // ?? true`, which would silently turn Vertical Worship back ON for a
       // church that deliberately turned it off via the flat field. No
       // read-triggered backfill is performed here; the backfill is
       // write-triggered, delivered by the Settings toggle's save handler
       // switching its write target to the `settings.vwModeEnabled` dot-path.
-      vwModeEnabled.value =
+      // Computed once and applied to BOTH `settings.value.vwModeEnabled` and
+      // the standalone `vwModeEnabled` ref so they can never disagree.
+      const resolvedVwModeEnabled =
         orgSettings.vwModeEnabled ?? (orgData.vwModeEnabled as boolean | undefined) ?? true
+
+      settings.value = {
+        ...DEFAULT_ORG_SETTINGS,
+        ...orgSettings,
+        vwModeEnabled: resolvedVwModeEnabled
+      }
+      vwModeEnabled.value = resolvedVwModeEnabled
     }
 
     // Unsubscribe from previous listener if any
