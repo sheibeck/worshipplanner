@@ -1526,6 +1526,32 @@ membership resolves correctly there.
 Storage emulator" and was "not a defect". It fails *with* the emulator running, and the failures are
 exactly the two **allow** cases while all deny cases pass. That mislabel is corrected in CLAUDE.md.
 
+**★ Most likely production cause, found 2026-08-06: `--non-interactive` suppressed the grant prompt.**
+
+Cross-service Rules need the **"Firebase Rules Firestore Service Agent"** role. Firebase's docs:
+*"once you create and save your first Cloud Storage Security Rules that use these Cloud Firestore
+functions, you'll be prompted in the Firebase console or Firebase CLI to enable permissions to connect
+the two products."*
+
+**Every deploy in this session passed `--non-interactive`**, which suppresses that prompt. The rules
+deployed successfully and the permission was never granted — with no warning. Fix, run interactively
+by the owner (no `gcloud` needed):
+
+```
+firebase deploy --only storage --project worship-planner-bc515
+```
+
+— deliberately WITHOUT `--non-interactive`, answering yes to the permission prompt. Manual fallback:
+grant "Firebase Rules Firestore Service Agent" on the Cloud Console IAM page.
+
+Documented constraints, both satisfied here: Storage rules may only read the **default** Firestore
+database (ours is `(default)`), and at most two Firestore documents per evaluation (ours reads one).
+
+**This does not make the rule testable.** `firestore.exists()` remains inert in the emulator, so
+`storage.rules.test.ts` keeps failing locally and this security-critical rule stays unverifiable on a
+dev machine — the exact gap that let it ship. That is the case for option 2 below, scoped as *"make
+this rule testable"*, not merely *"make it work"*.
+
 **Two ways out — decide before touching the rule.**
 
 1. **Grant the Firebase Storage service agent read access to Firestore** (production only). Cross-service
