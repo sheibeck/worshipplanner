@@ -241,16 +241,89 @@ Per the owner's `[FEAT]` research finding (hide entirely, never grey-out-with-to
 
 ## UI Considerations
 
-Applicable state considerations resolved: 5 covered, 1 backstop, 0 unresolved.
+**Source:** `ui-consideration-probe.cjs`, run after checker approval over the six surfaces this phase
+touches. The engine proposed **45 applicable considerations** (8 categories × E1–E5, 5 × E6).
 
-| Category | Element(s) | Status | Resolution / Reason |
-|----------|------------|--------|---------------------|
-| toggle-off / hidden | AI Picks block in `SongSlotPicker.vue` | ✅ covered | With `authStore.aiEnabled === false`, the entire "AI Picks" block including its trailing divider is absent from the DOM — "By Rotation" renders immediately below the search/tag bar with no visual gap where AI Picks used to be |
-| toggle-off / hidden | AI suggest block in `ScriptureInput.vue` | ✅ covered | With AI off, `showAiSuggest && authStore.aiEnabled` is false regardless of slot type, so the freeform text input is the first thing rendered in the component |
-| toggle-off / hidden | "Split with AI" button in `CongregationalEditor.vue` | ✅ covered | With AI off, only the AI-split button is absent; "Fetch Passage" and the reference input remain at full width of the button row, which reflows to two buttons instead of three (flex row, no fixed grid — reflow is automatic, not a layout bug) |
-| toggle-off / retained-not-cleared | PC credentials block | ✅ covered | Toggling PC off never calls `onClearPcCredentials` or touches Firestore `pcAppId`/`pcSecret` fields — only the `v-if="pcEnabledInput"` wrapper around the display changes; re-enabling re-shows the exact same masked "............" display state that was showing before, since `authStore.hasPcCredentials` is unaffected by the toggle |
-| no-org / defaults | Both toggles on an org doc created before v1.5 | ✅ covered | `loadOrgContext`'s single defaults-merge point (per 39-CONTEXT.md decisions) resolves `settings.aiEnabled` and `settings.pcEnabled` to `true` when absent, so both toggle checkboxes render checked and both feature sets render visible on first load of a pre-existing org — never a blank/undefined toggle state |
-| long-text | AI feature list item descriptions | 🧪 backstop | The three feature descriptions in the copywriting contract are short (under 80 characters) by design to avoid wrapping inside the `list-disc list-inside` layout at the section's `max-w-4xl` page width: hold out a visual check that no list item wraps past 2 lines on a standard desktop viewport |
+**Resolved: 40 covered, 5 backstop, 0 unresolved, 0 dismissed.**
+
+> **The governing fact for E3–E6:** this phase adds *only an outer `v-if`* to four pre-existing
+> surfaces. It changes no internal markup, no data flow, and no state machine inside any of them.
+> Every internal state below is therefore pre-existing and unmodified — carried as `covered` on that
+> basis, not re-litigated. The genuinely NEW state this phase introduces at each surface is
+> **absent**, and that is what the rows specify.
+
+### E1 — New "AI Features" settings section
+
+| Category | Status | Resolution |
+|---|---|---|
+| empty | ✅ covered | Structurally unreachable. The three-item feature list is a static template literal, not data-driven — there is no zero-item state. The section always renders heading, intro, all three features, toggle, and helper text. |
+| loading | ✅ covered | No async load exists. `loadOrgContext` resolves `settings.aiEnabled` to a real boolean *before* the Settings screen mounts, so the checkbox never binds to `undefined` and no skeleton or spinner is needed. |
+| error | ✅ covered | A failed Firestore write renders the `aiSaveError` red row below the toggle, reusing `vwSaveError`'s markup verbatim (`text-red-400 text-sm mt-2`). The checkbox reverts to its prior value so the UI never claims a state that was not persisted. |
+| populated | ✅ covered | One populated state only: heading → intro paragraph → three bulleted features → checkbox → helper text. No volume variation is possible. |
+| partial | ✅ covered | Structurally unreachable — the three descriptions are authored literals, never fetched fields, so no subset can be missing. |
+| overflow | ✅ covered | `list-disc list-inside` wraps naturally; the container has no fixed height and no `overflow-hidden`, so long content extends the card rather than clipping. |
+| zero-one-many | ✅ covered | Exactly one toggle and exactly three list items, always. No count varies, so no singular/plural copy exists to get wrong. |
+| long-text | 🧪 backstop | The three feature descriptions are authored under 80 characters *by design* to hold each list item to one line at `max-w-4xl`. Hold out a visual check that no item wraps past two lines on a standard desktop viewport. |
+
+### E2 — New "Enable Planning Center integration" toggle
+
+| Category | Status | Resolution |
+|---|---|---|
+| empty | ✅ covered | Structurally unreachable — a single checkbox bound to a resolved boolean. |
+| loading | ✅ covered | Same as E1: resolved by `loadOrgContext` before mount. |
+| error | ✅ covered | `pcEnabledSaveError` red row, reusing the `vwSaveError` pattern; checkbox reverts on failure. |
+| populated | ✅ covered | Single state: checkbox + label + helper text. |
+| partial | ✅ covered | Structurally unreachable — one boolean. |
+| overflow | ✅ covered | Single-line label and helper text wrap naturally; no fixed height. |
+| zero-one-many | ✅ covered | Exactly one control, always. |
+| long-text | ✅ covered | Label and helper are short authored static strings, not user or API content. |
+
+### E3 — "AI Picks" block, `SongSlotPicker.vue`
+
+| Category | Status | Resolution |
+|---|---|---|
+| empty | ✅ covered | Pre-existing "no sermon context" placeholder, unmodified. |
+| loading | ✅ covered | Pre-existing shimmer, unmodified. **With AI off the block never mounts**, so no shimmer can flash before the guard resolves — the guard is at `claudeApi.ts`, ahead of any request. |
+| error | ✅ covered | Pre-existing error + retry state, unmodified. With AI off no request fires, so this state is unreachable rather than merely hidden. |
+| populated | ✅ covered | Pre-existing results list, unmodified when AI is on. |
+| partial | ✅ covered | Pre-existing behavior, unmodified. |
+| overflow | ✅ covered | Pre-existing behavior, unmodified. |
+| zero-one-many | ✅ covered | Pre-existing behavior, unmodified. |
+| long-text | ✅ covered | Pre-existing behavior, unmodified. |
+| **absent (new)** | ✅ covered | With `authStore.aiEnabled === false` the entire block **including its trailing divider** leaves the DOM, so "By Rotation" renders directly beneath the search/tag bar with no orphaned separator and no gap. |
+
+### E4 — AI scripture discovery block, `ScriptureInput.vue`
+
+| Category | Status | Resolution |
+|---|---|---|
+| empty · loading · error · populated · partial · overflow · zero-one-many · long-text | ✅ covered | All eight are pre-existing states of this block, unmodified by this phase — the change is a single AND-composition on the existing `v-if`. |
+| **absent (new)** | ✅ covered | `showAiSuggest && authStore.aiEnabled` is false with AI off *regardless of slot type*, so the freeform scripture text input becomes the first rendered element in the component. Composing with the existing prop (rather than replacing it) preserves the reading-slot-only scoping. |
+
+### E5 — "Split with AI" button, `CongregationalEditor.vue`
+
+| Category | Status | Resolution |
+|---|---|---|
+| empty · loading · error · populated · partial · overflow · zero-one-many | ✅ covered | Pre-existing button states, unmodified. |
+| long-text | ✅ covered | Fixed authored button label. |
+| **absent (new)** | 🧪 backstop | Only the AI-split button leaves the row; "Fetch Passage", the reference input, and every hand-dividing affordance stay. The row is a flex container with no fixed grid, so three-buttons→two reflow is automatic. Hold out a visual check that the reflowed row is not visibly unbalanced, **and** a functional check that hand-dividing works identically with the button absent — the latter is R096's real guarantee. |
+
+### E6 — Planning Center credentials block
+
+| Category | Status | Resolution |
+|---|---|---|
+| empty | ✅ covered | Pre-existing no-credentials branch (app ID field, secret field, Save-and-validate, Cancel), unmodified. |
+| loading | ✅ covered | Pre-existing `pcValidating` state, unmodified. |
+| error | ✅ covered | Pre-existing `pcValidationError` state, unmodified. |
+| partial | ✅ covered | Pre-existing behavior, unmodified. |
+| long-text | ✅ covered | The masked credential display is a fixed-width literal. |
+| **absent (new)** | 🧪 backstop | Toggling PC off never calls `onClearPcCredentials` and never touches the Firestore `pcAppId`/`pcSecret` fields — only the `v-if="pcEnabledInput"` wrapper changes. Re-enabling must re-show the identical masked display, since `authStore.hasPcCredentials` is unaffected. Hold out a check: turn PC off, reload the page, turn it back on, confirm credentials are still present and unmodified. **This is the retention guarantee in R089 and is the one state here that could silently destroy user data if implemented wrongly.** |
+
+### Cross-cutting
+
+| Category | Status | Resolution |
+|---|---|---|
+| defaults on a pre-v1.5 org | 🧪 backstop | `loadOrgContext`'s single defaults-merge point resolves `settings.aiEnabled` and `settings.pcEnabled` to `true` when absent, so both checkboxes render **checked** and both feature sets render **visible** on first load of an organization document created before v1.5 — never a blank or indeterminate checkbox. Hold out a check against a real pre-v1.5 org document, not a fixture: this is success criterion 1 and the reason R073 exists. |
+| `vwModeEnabled` migration | 🧪 backstop | The dual-read (`settings?.vwModeEnabled ?? orgData.vwModeEnabled ?? true`) must preserve a church that deliberately turned Vertical Worship **off**. Hold out a check that an org with flat `vwModeEnabled: false` still renders the VW toggle unchecked after this phase. A naive `settings.vwModeEnabled ?? true` silently flips it back on — see 39-CONTEXT.md. |
 
 ---
 
