@@ -16,6 +16,30 @@ note buried in a plan SUMMARY.
 
 ## Prerequisites
 
+> ### ⚠ CORRECTION 2026-08-05 — the bucket name in this file was WRONG
+>
+> This file said the default bucket is `PROJECT_ID.appspot.com`. **It is not.** The live project's
+> bucket, read from the deployed client bundle's `storageBucket` config, is:
+>
+> ```
+> worship-planner-bc515.firebasestorage.app
+> ```
+>
+> `.firebasestorage.app` is the default for Firebase projects created after the October 2024 Storage
+> change; `.appspot.com` was the older convention and this doc assumed it. Following this file
+> literally would have (a) pointed the IAM binding at a bucket that does not exist, and (b) set
+> `STORAGE_BUCKET` to a name `requiredBucketName()` would hand to `@google-cloud/storage`, failing on
+> the first real render. Every command below is corrected. **Verify it yourself before running** —
+> `firebase apps:sdkconfig WEB --project worship-planner-bc515` prints the authoritative value.
+>
+> ### Two other facts confirmed against the live project on the same date
+>
+> - **Functions service account:** `functions/src/` configures none, so gen2 defaults apply →
+>   `worship-planner-bc515@appspot.gserviceaccount.com`. (The SA keeps the `appspot.gserviceaccount.com`
+>   suffix even though the *bucket* does not — these are unrelated namespaces. Do not "fix" it.)
+> - **Region:** functions are deployed in `us-central1`, and Firestore reported `nam5` (a US
+>   multi-region that contains us-central1). `--region=us-central1` below is correct.
+
 All three commands below are owner-run and each provisions a real GCP resource. Replace
 `PROJECT_ID` with the actual Firebase/GCP project id everywhere it appears.
 
@@ -29,7 +53,7 @@ gcloud iam service-accounts create pptx-render-sa \
 # 2. Grant it Storage access scoped to the project's default bucket ONLY — not a project-wide
 #    role. The service needs to read orgs/{orgId}/pptx-imports/{importId}/source.pptx and write
 #    .../rendered/*.png, and nothing else in the project.
-gcloud storage buckets add-iam-policy-binding gs://PROJECT_ID.appspot.com \
+gcloud storage buckets add-iam-policy-binding gs://PROJECT_ID.firebasestorage.app \
   --member="serviceAccount:pptx-render-sa@PROJECT_ID.iam.gserviceaccount.com" \
   --role="roles/storage.objectAdmin"
 
@@ -59,7 +83,7 @@ gcloud run deploy pptx-render \
   --concurrency=1 \
   --min-instances=0 \
   --max-instances=5 \
-  --set-env-vars=STORAGE_BUCKET=PROJECT_ID.appspot.com \
+  --set-env-vars=STORAGE_BUCKET=PROJECT_ID.firebasestorage.app \
   --project=PROJECT_ID
 ```
 
@@ -87,7 +111,7 @@ required on the owner's machine.
 
 | Variable | Set on | Required? | Notes |
 |---|---|---|---|
-| `STORAGE_BUCKET` | the Cloud Run service (`render-service`) | **Required** | ★ Not in the phase's original artifact table — discovered during 37-02. `@google-cloud/storage`'s `Storage#bucket()` requires an **explicit bucket name argument**; unlike `firebase-admin/storage`'s `getStorage().bucket()` used elsewhere in this repo, the plain client has no admin-app default bucket to fall back on. `render-service/src/render.ts`'s `requiredBucketName()` reads `process.env.STORAGE_BUCKET` and throws a clear error if it is unset — so an unset value fails loudly on the first render, not silently. Set it to the project's default bucket, e.g. `PROJECT_ID.appspot.com`. |
+| `STORAGE_BUCKET` | the Cloud Run service (`render-service`) | **Required** | ★ Not in the phase's original artifact table — discovered during 37-02. `@google-cloud/storage`'s `Storage#bucket()` requires an **explicit bucket name argument**; unlike `firebase-admin/storage`'s `getStorage().bucket()` used elsewhere in this repo, the plain client has no admin-app default bucket to fall back on. `render-service/src/render.ts`'s `requiredBucketName()` reads `process.env.STORAGE_BUCKET` and throws a clear error if it is unset — so an unset value fails loudly on the first render, not silently. Set it to the project's default bucket — **`PROJECT_ID.firebasestorage.app`, NOT `.appspot.com`**; see the CORRECTION banner at the top of this file. |
 | `PORT` | the Cloud Run service | Provided automatically by Cloud Run | `render-service/src/main.ts` reads `process.env.PORT \|\| 8080`; do not set this manually |
 | `PPTX_RENDER_SERVICE_URL` | the **Functions** codebase (`functions/`), not the Cloud Run service | Required for the pipeline to activate | See "Post-deploy configuration" below |
 | `PPTX_RENDER_CLEANUP_ENABLED` | the **Functions** codebase (`functions/`) | **Leave unset** | See "The cleanup toggle" below |
