@@ -172,7 +172,16 @@ merge gaps. Full reasoning recorded in `.planning/STATE.md` § "v1.5 ROADMAP.md 
   3. In Settings, a church can turn Planning Center integration off; its features hide without altering already-imported roster data or the status of services already exported
   4. Turning AI off never alters slide content an AI split already generated
 
-**Plans**: TBD
+**Plans**: 6 plans
+
+Plans:
+- [ ] 39-01-PLAN.md — Wave 0: create the two missing test harnesses (`SettingsView.test.ts`, `SongsView.test.ts`)
+- [ ] 39-02-PLAN.md — `Organization`/`OrgSettings`/`DEFAULT_ORG_SETTINGS`, the single defaults-merge point in `loadOrgContext`, and the `vwModeEnabled` dual-read
+- [ ] 39-03-PLAN.md — Settings screen: AI Features section, Planning Center enable toggle, dot-path writes, credentials block wrapped
+- [ ] 39-04-PLAN.md — AI guard at `claudeApi.ts`'s module entry point (3 of 7 exports) plus the three AI entry-point hides
+- [ ] 39-05-PLAN.md — the five remaining Planning Center entry points gated
+- [ ] 39-06-PLAN.md — phase gate (`npm run type-check`, suite baseline, requirement traceability) and the five manual backstops
+
 **UI hint**: yes
 **Research flag**: skip — both halves are flagged standard-pattern in SUMMARY.md (direct generalization of the existing `vwModeEnabled` pattern; a table-stakes toggle pattern with the choke point already designed for it).
 **Notes**: Merged from SUMMARY's separate Phase 39 (Org Settings Infrastructure) and Phase 45 (AI/PC Toggles) — see the departure note above. Build `src/types/organization.ts` (`Organization`, `OrgSettings`) and `DEFAULT_ORG_SETTINGS` first; every later phase that stores a setting (R086 in Phase 44, R090 in Phase 45, R093 in Phase 46) depends on this shape existing before it writes into it. The AI/PC guards must live at the module entry point (`claudeApi.ts`, the PC utility), never only in `.vue` files — hiding UI while leaving the code path callable is the exact anti-pattern research flags as Pitfall 5.
