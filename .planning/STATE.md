@@ -2,9 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Settings, Sharing, and Fidelity
+current_phase: 39
+current_phase_name: not yet planned
 status: planning
-last_updated: "2026-08-06T16:45:00.000Z"
+stopped_at: Phase 39 UI-SPEC approved
+last_updated: "2026-08-06T18:22:30.699Z"
 last_activity: 2026-08-06
+last_activity_desc: v1.5 ROADMAP.md created (Phases 39-48, 31/31 requirements mapped, 0 unmapped)
 progress:
   total_phases: 10
   completed_phases: 0
@@ -160,13 +164,17 @@ explicitly per the roadmapper's instructions:
 
 - Phase 40 (custom claims) and Phase 41 (sharing) both edit rules files — sequenced, not parallel
   (Phase 41 depends on Phase 40).
+
 - Phase 39 (AI toggle) and Phase 47 (congregational reading, whose AI-split option gates through the
   same toggle) both route through `claudeApi.ts` — sequenced, not parallel (Phase 47 depends on
   Phase 39).
+
 - Phase 43 (service item types, the finalized `SlotKind` palette) precedes Phase 44 (default template,
   whose editor needs that palette).
+
 - Phase 39 (settings infrastructure) is a hard prerequisite for every phase that stores a setting:
   Phase 44 (R086), Phase 45 (R090), Phase 46 (R093).
+
 - Phase 45 (Bible translation/attribution) precedes Phase 47 (congregational reading), since the
   divider operates on already-fetched, already-attributed scripture text.
 
@@ -177,8 +185,10 @@ tested, and undeployed, with the exact command handed to the owner:
   owner deploys with a mandatory 1-hour soak between them (dual-read first, fallback removal second).
   This phase cannot fully close inside an autonomous run — note this explicitly so it is never later
   mistaken for incomplete rather than deploy-gated-by-design.
+
 - **Phase 41** (`firestore.rules` update-rule loosening for `shareTokens`/`serviceShares`) — one owner
   deploy.
+
 - **Phase 45** (the new NLT proxy Cloud Function) — one owner deploy.
 
 **Rules-testing discipline mandate** — every phase touching `firestore.rules` or `storage.rules`
@@ -1827,9 +1837,9 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-05T22:07:43.224Z
-Stopped at: Completed 38-04-PLAN.md (Phase 38 code-complete; owner checkpoint deferred, PENDING-VERIFICATION.md 38.1-38.7)
-Resume file: None
+Last session: 2026-08-06T18:22:30.658Z
+Stopped at: Phase 39 UI-SPEC approved
+Resume file: .planning/phases/39-org-settings-infrastructure-feature-toggles/39-UI-SPEC.md
 
 ## Operator Next Steps
 
