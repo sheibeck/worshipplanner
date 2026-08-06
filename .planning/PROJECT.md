@@ -162,9 +162,10 @@ only after a page refresh.
       requirement true for a user: **build the client-side display.** Nothing in `src/` reads
       `pptxRenders` or the `rendered/*.png` objects, so imports currently render images into Storage
       that the app never shows. This is the piece that has never had a home in the roadmap.
-      <br>Two things to confirm on the first real import (see STATE.md's deploy note): whether the
-      `run.invoker` IAM binding was granted, and whether `STORAGE_BUCKET` was set to
-      `.firebasestorage.app` rather than the `.appspot.com` the docs originally said.
+      <br>**Infrastructure is confirmed working** — the owner exercised a real import against
+      production on 2026-08-06 and approved it, which resolves both prior unknowns (the `run.invoker`
+      binding and `STORAGE_BUCKET`) since each fails closed and loudly. The only thing standing
+      between here and R062 being genuinely true is the display work.
 - [ ] **Confirm the production draft lock by hand** (backlog Phase 999.3, deploy half done) — the
       rules layer was deployed 2026-08-05, so Phase 31's lock now runs on all three layers. What is
       still unverified is its *behaviour* in production: set a service to Planned, open devtools,

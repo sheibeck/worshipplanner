@@ -1616,6 +1616,28 @@ functions so `requestPptxRender` picks it up. All five functions updated success
 - **`PPTX_RENDER_SERVICE_URL`** is set in `functions/.env` (gitignored), replacing the empty value
   that selected the `render-service-not-configured` fail-closed branch.
 
+### ✅ VERIFIED BY OWNER 2026-08-06 — the import works end to end
+
+The owner exercised a real PPTX import against production after the storage.rules IAM grant landed,
+and approved it. That single successful run resolves **both** items below by implication, because each
+one fails closed and loudly:
+
+- **`run.invoker` binding is present.** Missing, `invokeRenderService` gets a platform 403 before any
+  application code runs, and the render doc lands on `render-service-error`.
+- **`STORAGE_BUCKET` is correct** (`.firebasestorage.app`, not the `.appspot.com` the docs originally
+  said). Wrong, `requiredBucketName()` throws on the first render.
+
+Owner-attributed, consistent with the rest of v1.4: approved from a working import rather than from an
+inspection of the `pptxRenders/{importId}` document. If a render ever silently fails later, that
+document's `failureReason` is still the first place to look.
+
+**R062 stays `[~]` partial regardless** — for the one reason that has nothing to do with infrastructure:
+nothing in `src/` reads the rendered PNGs, so the images exist in Storage and no user ever sees them.
+That is v1.5 work.
+
+<details>
+<summary>Original open items (kept for provenance — resolved above)</summary>
+
 ### Two things NOT verifiable from here — check them on the first real import
 
 Both need `gcloud`, which is not installed on this machine. Neither is a defect; both are unconfirmed.
@@ -1630,6 +1652,8 @@ Both need `gcloud`, which is not installed on this machine. Neither is a defect;
 2. **`STORAGE_BUCKET` on the Cloud Run service.** Must be `worship-planner-bc515.firebasestorage.app`.
    `DEPLOY.md` originally said `.appspot.com` — corrected in `a58a06b`, but if the deploy ran against
    the old text the container will throw on its first render.
+
+</details>
 
 ### Still true: NO UI CONSUMES THE RENDERED IMAGES
 
