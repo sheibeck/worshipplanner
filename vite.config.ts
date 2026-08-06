@@ -39,8 +39,46 @@ export default defineConfig(({ mode, command }) => {
     }
   }
 
+  // Fail the production build loudly if any emulator host reached the bundle.
+  //
+  // Sibling of the guard above, and added for the same reason: on 2026-08-05 a
+  // production build shipped with `connectAuthEmulator(auth, 'http://127.0.0.1:9099')`
+  // wired up, and the live site tried to authenticate against localhost. Root cause
+  // was that `src/firebase/index.ts` gated emulator wiring on VITE_USE_EMULATORS
+  // alone — and **Vite loads `.env.local` during a production build too**, so the
+  // dev flag was inlined into the shipped bundle. Every upstream signal was green:
+  // build succeeded, deploy succeeded, tests passed. It surfaced only at sign-in.
+  //
+  // The source-level fix is the `import.meta.env.DEV &&` conjunct in
+  // src/firebase/index.ts, which lets Vite tree-shake the block out entirely. This
+  // guard is the backstop that proves it worked, by inspecting the EMITTED CHUNKS
+  // rather than the source — the only place the bug was ever visible.
+  const assertNoEmulatorHostsInBundle = {
+    name: 'assert-no-emulator-hosts-in-bundle',
+    apply: 'build' as const,
+    generateBundle(_options: unknown, bundle: Record<string, { type: string; code?: string }>) {
+      // Split so this file's own literals never match themselves.
+      const LOOPBACK = ['127.0.0', '.1'].join('')
+      const offenders: string[] = []
+      for (const [fileName, chunk] of Object.entries(bundle)) {
+        if (chunk.type !== 'chunk' || !chunk.code) continue
+        if (chunk.code.includes(LOOPBACK) || chunk.code.includes('localhost:9099')) {
+          offenders.push(fileName)
+        }
+      }
+      if (offenders.length) {
+        throw new Error(
+          `Production build aborted: emulator host found in emitted bundle (${offenders.join(', ')}). ` +
+            'The Firebase emulator wiring in src/firebase/index.ts must be gated on `import.meta.env.DEV` ' +
+            'so it is tree-shaken from production builds. Note that Vite loads .env.local during ' +
+            '`vite build`, so VITE_USE_EMULATORS=true alone does NOT mean "dev only".',
+        )
+      }
+    },
+  }
+
   return {
-    plugins: [vue(), tailwindcss()],
+    plugins: [vue(), tailwindcss(), assertNoEmulatorHostsInBundle],
     define: {
       __APP_VERSION__: JSON.stringify(gitHash),
     },
