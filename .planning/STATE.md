@@ -15,35 +15,48 @@ progress:
 
 # Project State
 
-## ★★ STANDING AUTONOMY GRANT — 2026-07-30, owner away for the weekend
+## ★★ STANDING AUTONOMY GRANT — v1.5, granted 2026-08-06
 
-Owner instruction, verbatim: *"I'll be leaving for the weekend, so I want you to skip any human
-verification points. I want autonomous while I'm away and when we're you're done, we'll do human
-verification then. Keep working fully autonomously while I'm away until you get to a point where you
-literally can't work because of outstanding issues that must have answers, or until you finish."*
+**This supersedes the v1.4 grant of 2026-07-30, which was scoped to one weekend and is now
+historical (preserved below).** Re-read this before deciding to stop for a checkpoint — it survives
+context compaction.
 
-**In force until the owner returns and says otherwise.** This survives context compaction — re-read it
-before deciding to stop for a checkpoint.
+Owner request: run `/gsd-autonomous` for milestone v1.5. Boundaries settled by explicit question and
+answer at scoping time, 2026-08-06.
 
 ### What this authorizes
 
 - **Do not block on human-verify checkpoints.** Record each as DEFERRED in
-  `.planning/PENDING-VERIFICATION.md`, then continue to the next wave/phase.
+  `.planning/PENDING-VERIFICATION.md`, then continue to the next wave/phase. This applies to ALL
+  phases including the auth and security-rules work — the owner considered and declined a
+  stop-on-security-changes variant, because those phases build without deploying and therefore
+  cannot affect live users during the run.
 
-- Complete phases whose only outstanding gate is human verification, marking the gate deferred rather
-  than passed.
+- Complete phases whose only outstanding gate is human verification, marking the gate deferred
+  rather than passed.
 
-- Proceed through Phases 31 → 37 without pausing for approval on ordinary implementation decisions.
+- Proceed through every v1.5 phase without pausing for approval on ordinary implementation
+  decisions.
 
 ### What this does NOT authorize
 
 - **Never record a deferred check as passed.** "Skip the checkpoint" means defer and disclose, not
   self-approve. A phase whose verification was deferred says so in its VERIFICATION.md.
 
-- **No deploys.** `firebase deploy` stays the owner's step (backlog Phase 999.3). Phase 37 remains
-  "build but do not deploy" per the v1.4 standing decisions.
+- **NO DEPLOYS. `firebase deploy` and `gcloud run deploy` remain the owner's step** — reaffirmed
+  2026-08-06, not merely carried over. Every deployable artifact in v1.5 ships **built, tested, and
+  undeployed**, with the exact command handed to the owner, exactly as Phase 37 did. This covers:
+  the Cloud Function that sets custom auth claims, the one-time backfill over existing users,
+  `storage.rules`, `firestore.rules`, the NLT proxy function, and any snapshot-refresh trigger.
 
-- **No `.env.local` changes** — it holds live secrets and is gitignored.
+  **Why this matters more in v1.5 than it did in v1.4:** the custom-claims change rewrites how every
+  existing user's org membership is proven. Deployed carelessly it locks real people out of a live
+  app. Undeployed it is inert and harmless. Do not "helpfully" deploy to prove something works —
+  build the emulator evidence instead; making the rule verifiable in the emulator IS the phase goal.
+
+- **No `.env.local` changes** — it holds live secrets and is gitignored. `NLT_API_KEY` is needed for
+  the Bible-version phase; the owner has the key. Ask them to add it; never write the file.
+
 - **No destructive or irreversible actions** without asking: no `git stash` (multi-worktree repo), no
   project-wide `lint --fix`, no history rewrites, no bulk deletions of tracked files beyond what a
   plan explicitly scopes.
@@ -51,17 +64,41 @@ before deciding to stop for a checkpoint.
 - **Stop and ask** only when proceeding under any assumption would be unsafe or would make the work
   useless if the assumption is wrong. Otherwise pick the reasonable default, state it, and continue.
 
+### The one lesson from v1.4 that must not be repeated
+
+`src/storage.rules.test.ts` was labelled "not a defect, needs the emulator" for an entire milestone,
+and that mislabel let a deny-everyone rule reach production. **A test explained away as an
+environment quirk is an untested assertion.** When a security-rules test fails during v1.5, treat it
+as a real failure until proven otherwise — and prove it by making the assertion runnable, not by
+writing a comment. See CLAUDE.md.
+
 ### Where deferred items go
 
 `.planning/PENDING-VERIFICATION.md` — one running list across all phases, written as the owner's
 to-do for when they return.
 
+---
+
+<details>
+<summary>Historical — the v1.4 grant of 2026-07-30 (superseded, kept for provenance)</summary>
+
+Owner instruction, verbatim: *"I'll be leaving for the weekend, so I want you to skip any human
+verification points. I want autonomous while I'm away and when we're you're done, we'll do human
+verification then. Keep working fully autonomously while I'm away until you get to a point where you
+literally can't work because of outstanding issues that must have answers, or until you finish."*
+
+Authorized deferring human-verify checkpoints through Phases 31 → 37; prohibited deploys,
+`.env.local` changes, destructive actions, and recording any deferred check as passed. Its deploy
+prohibition and its never-self-approve rule are both carried forward above.
+
+</details>
+
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-07-28)
+See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 38 — Congregational Readings Become Real Slides
+**Current focus:** v1.5 Settings, Sharing, and Fidelity — defining requirements
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
