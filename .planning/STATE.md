@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Settings, Sharing, and Fidelity
 current_phase: 39
-current_phase_name: not yet planned
-status: planning
+current_phase_name: org-settings-infrastructure-feature-toggles
+status: in_progress
 stopped_at: Completed 39-02-PLAN.md
-last_updated: "2026-08-06T19:12:47.050Z"
+last_updated: "2026-08-06T19:14:25.617Z"
 last_activity: 2026-08-06
-last_activity_desc: v1.5 ROADMAP.md created (Phases 39-48, 31/31 requirements mapped, 0 unmapped)
+last_activity_desc: "Phase 39 Plan 02 executed: OrgSettings/DEFAULT_ORG_SETTINGS type"
 progress:
   total_phases: 10
   completed_phases: 0
@@ -112,10 +112,12 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 39 (not yet planned)
-Plan: —
-Status: Roadmap created — ready to plan Phase 39
-Last activity: 2026-08-06 — v1.5 ROADMAP.md created (Phases 39-48, 31/31 requirements mapped, 0 unmapped)
+Phase: 39 of 48 (Org Settings Infrastructure & Feature Toggles)
+Plan: 2 of 6 in current phase (39-03 next)
+Status: Plan 02 (org settings infrastructure) complete — settings shape and dual-read merged
+Last activity: 2026-08-06 — Phase 39 Plan 02 executed: OrgSettings/DEFAULT_ORG_SETTINGS type
+module, authStore.settings merged once in loadOrgContext, vwModeEnabled dual-read, R073 test
+coverage (src/stores/__tests__/auth.test.ts)
 
 ## ⏸ RESUME HERE (2026-08-06 — v1.5 ROADMAP.md created, ready to plan Phase 39)
 
@@ -1530,6 +1532,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 38-04: Task 3's owner-verification checkpoint deferred under the standing autonomy grant, recorded as PENDING-VERIFICATION.md items 38.1-38.7 — not run, not self-approved
 - [Phase ?]: Wave 0 harness auth-store mock: settings shape backed by per-key module-scope getters (SongTable.test.ts:39 precedent), not a single collapsed getter
 - [Phase ?]: findImportSongsButton typed as ReturnType<typeof mountSongsView> instead of VueWrapper<any> to satisfy eslint's no-explicit-any rule
+- [Phase ?]: 39-02: OrgSettings members are required, not optional — the auth.ts::loadOrgContext merge point is the single place any consumer coalesces to a default
+- [Phase ?]: 39-02: vwModeEnabled dual-read (settings.vwModeEnabled ?? orgData.vwModeEnabled ?? true) implemented once in loadOrgContext; backfill is write-triggered (39-03), never a bulk migration script
 
 ### Roadmap Evolution
 
