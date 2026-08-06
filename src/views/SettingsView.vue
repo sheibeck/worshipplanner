@@ -68,95 +68,125 @@
       <div class="rounded-lg bg-gray-900 border border-gray-800 p-4 mt-6">
         <h2 class="text-sm font-semibold text-gray-300 mb-3">Planning Center Integration</h2>
 
-        <!-- Display mode: credentials saved and not editing -->
-        <template v-if="authStore.hasPcCredentials && !editingPcCreds">
-          <div class="space-y-2 mb-3">
-            <div>
-              <span class="text-xs text-gray-400">App ID: </span>
-              <span class="font-mono text-sm text-gray-400">............</span>
-            </div>
-            <div>
-              <span class="text-xs text-gray-400">Secret: </span>
-              <span class="font-mono text-sm text-gray-400">............</span>
-            </div>
-          </div>
+        <!-- Enable/disable toggle (R073/R089) — always visible, above the credentials
+             block, so a church can always turn the integration back on. Display-only:
+             it never calls onClearPcCredentials or touches pcAppId/pcSecret. -->
+        <label
+          class="flex items-center gap-3"
+          :class="authStore.isEditor ? 'cursor-pointer' : 'opacity-60 cursor-not-allowed'"
+        >
+          <input
+            v-model="pcEnabledInput"
+            type="checkbox"
+            :disabled="!authStore.isEditor"
+            @change="onTogglePcEnabled"
+            class="h-4 w-4 rounded border-gray-700 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0"
+          />
+          <span class="text-sm text-gray-200">Enable Planning Center integration</span>
+        </label>
 
-          <!-- Success feedback after saving -->
-          <p v-if="pcSaveSuccess" class="text-green-400 text-sm mb-2">Credentials saved!</p>
+        <p class="text-xs text-gray-500 mt-2">
+          When off, roster import, song import, and Export to Planning Center are hidden, and the
+          credentials below are hidden too. Your saved credentials and already-imported data are
+          kept — turning this back on picks up right where you left off.
+        </p>
 
-          <div class="flex items-center gap-2 flex-wrap">
-            <button
-              type="button"
-              @click="startEditPcCreds"
-              class="bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-md px-4 py-2 text-sm font-medium transition-colors"
-            >
-              Edit Credentials
-            </button>
-            <button
-              type="button"
-              @click="onClearPcCredentials"
-              class="bg-red-900/20 hover:bg-red-900/40 text-red-400 rounded-md px-4 py-2 text-sm font-medium transition-colors"
-            >
-              Clear Credentials
-            </button>
-          </div>
-        </template>
+        <p v-if="pcEnabledSavedFeedback" class="text-green-400 text-sm mt-2">Saved!</p>
+        <p v-if="pcEnabledSaveError" class="text-red-400 text-sm mt-2">{{ pcEnabledSaveError }}</p>
 
-        <!-- Edit mode: no credentials yet, or editing existing -->
-        <template v-else>
-          <div class="space-y-3">
-            <div>
-              <label class="block text-xs text-gray-400 mb-1">App ID</label>
-              <input
-                v-model="pcAppIdInput"
-                type="text"
-                placeholder="Your Planning Center App ID"
-                class="w-full sm:w-80 bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500"
-              />
+        <!-- Existing credentials block, now conditionally hidden. Display condition
+             only — the credentials themselves are retained, not cleared, when off. -->
+        <div v-if="pcEnabledInput" class="mt-6 pt-6 border-t border-gray-800">
+          <!-- Display mode: credentials saved and not editing -->
+          <template v-if="authStore.hasPcCredentials && !editingPcCreds">
+            <div class="space-y-2 mb-3">
+              <div>
+                <span class="text-xs text-gray-400">App ID: </span>
+                <span class="font-mono text-sm text-gray-400">............</span>
+              </div>
+              <div>
+                <span class="text-xs text-gray-400">Secret: </span>
+                <span class="font-mono text-sm text-gray-400">............</span>
+              </div>
             </div>
-            <div>
-              <label class="block text-xs text-gray-400 mb-1">Secret</label>
-              <input
-                v-model="pcSecretInput"
-                type="password"
-                placeholder="Your Planning Center Secret"
-                class="w-full sm:w-80 bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500"
-              />
-            </div>
-            <p class="text-xs">
-              <a
-                href="https://planningcenteronline.com/api_passwords"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="text-indigo-400 hover:text-indigo-300"
+
+            <!-- Success feedback after saving -->
+            <p v-if="pcSaveSuccess" class="text-green-400 text-sm mb-2">Credentials saved!</p>
+
+            <div class="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                @click="startEditPcCreds"
+                class="bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-md px-4 py-2 text-sm font-medium transition-colors"
               >
-                Generate at planningcenteronline.com/api_passwords
-              </a>
-            </p>
-          </div>
+                Edit Credentials
+              </button>
+              <button
+                type="button"
+                @click="onClearPcCredentials"
+                class="bg-red-900/20 hover:bg-red-900/40 text-red-400 rounded-md px-4 py-2 text-sm font-medium transition-colors"
+              >
+                Clear Credentials
+              </button>
+            </div>
+          </template>
 
-          <p v-if="pcValidationError" class="text-red-400 text-sm mt-2">{{ pcValidationError }}</p>
-          <p v-if="pcSaveSuccess" class="text-green-400 text-sm mt-2">Credentials saved!</p>
+          <!-- Edit mode: no credentials yet, or editing existing -->
+          <template v-else>
+            <div class="space-y-3">
+              <div>
+                <label class="block text-xs text-gray-400 mb-1">App ID</label>
+                <input
+                  v-model="pcAppIdInput"
+                  type="text"
+                  placeholder="Your Planning Center App ID"
+                  class="w-full sm:w-80 bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500"
+                />
+              </div>
+              <div>
+                <label class="block text-xs text-gray-400 mb-1">Secret</label>
+                <input
+                  v-model="pcSecretInput"
+                  type="password"
+                  placeholder="Your Planning Center Secret"
+                  class="w-full sm:w-80 bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500"
+                />
+              </div>
+              <p class="text-xs">
+                <a
+                  href="https://planningcenteronline.com/api_passwords"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-indigo-400 hover:text-indigo-300"
+                >
+                  Generate at planningcenteronline.com/api_passwords
+                </a>
+              </p>
+            </div>
 
-          <div class="mt-3 flex items-center gap-2 flex-wrap">
-            <button
-              type="button"
-              @click="onSavePcCredentials"
-              :disabled="pcValidating || !pcAppIdInput.trim() || !pcSecretInput.trim()"
-              class="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white rounded-md px-4 py-2 text-sm font-medium transition-colors"
-            >
-              {{ pcValidating ? 'Validating...' : 'Save & Validate' }}
-            </button>
-            <button
-              v-if="editingPcCreds"
-              type="button"
-              @click="cancelEditPcCreds"
-              class="bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-md px-4 py-2 text-sm font-medium transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        </template>
+            <p v-if="pcValidationError" class="text-red-400 text-sm mt-2">{{ pcValidationError }}</p>
+            <p v-if="pcSaveSuccess" class="text-green-400 text-sm mt-2">Credentials saved!</p>
+
+            <div class="mt-3 flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                @click="onSavePcCredentials"
+                :disabled="pcValidating || !pcAppIdInput.trim() || !pcSecretInput.trim()"
+                class="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white rounded-md px-4 py-2 text-sm font-medium transition-colors"
+              >
+                {{ pcValidating ? 'Validating...' : 'Save & Validate' }}
+              </button>
+              <button
+                v-if="editingPcCreds"
+                type="button"
+                @click="cancelEditPcCreds"
+                class="bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-md px-4 py-2 text-sm font-medium transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </template>
+        </div>
       </div>
 
       <!-- Vertical Worship section (D-15/D-16) -->
@@ -211,6 +241,55 @@
 
         <p v-if="vwSavedFeedback" class="text-green-400 text-sm mt-2">Saved!</p>
         <p v-if="vwSaveError" class="text-red-400 text-sm mt-2">{{ vwSaveError }}</p>
+      </div>
+
+      <!-- AI Features section (R073/R088) — explains before offering the switch. -->
+      <div class="rounded-lg bg-gray-900 border border-gray-800 p-4 mt-6">
+        <h2 class="text-sm font-semibold text-gray-300 mb-3">AI Features</h2>
+
+        <!-- Explanatory copy FIRST -->
+        <p class="text-xs text-gray-400 mb-3">
+          This app uses AI to speed up planning in a few places. Turn it off and these disappear —
+          nothing else about your service plans changes.
+        </p>
+        <ul class="text-xs text-gray-400 space-y-1.5 mb-4 list-disc list-inside">
+          <li>
+            <span class="font-medium text-gray-200">Song suggestions:</span>
+            Ranks songs from your library that fit the slot and sermon context.
+          </li>
+          <li>
+            <span class="font-medium text-gray-200">Scripture discovery:</span>
+            Finds and suggests scripture passages based on your sermon topic or passage.
+          </li>
+          <li>
+            <span class="font-medium text-gray-200">Congregational reading split:</span>
+            Proposes one starting split of Leader/Congregation/All sections, which you can always
+            edit by hand.
+          </li>
+        </ul>
+
+        <!-- Toggle SECOND -->
+        <label
+          class="flex items-center gap-3"
+          :class="authStore.isEditor ? 'cursor-pointer' : 'opacity-60 cursor-not-allowed'"
+        >
+          <input
+            v-model="aiEnabledInput"
+            type="checkbox"
+            :disabled="!authStore.isEditor"
+            @change="onToggleAiEnabled"
+            class="h-4 w-4 rounded border-gray-700 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0"
+          />
+          <span class="text-sm text-gray-200">Enable AI features</span>
+        </label>
+        <p class="text-xs text-gray-500 mt-2">
+          When off, the three features above are hidden throughout the app. Content an AI already
+          generated (like an existing congregational split) is never changed and stays fully
+          editable.
+        </p>
+
+        <p v-if="aiSavedFeedback" class="text-green-400 text-sm mt-2">Saved!</p>
+        <p v-if="aiSaveError" class="text-red-400 text-sm mt-2">{{ aiSaveError }}</p>
       </div>
     </div>
   </AppShell>
