@@ -22,6 +22,8 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore'
 import { auth, db } from '@/firebase'
+import type { OrgSettings } from '@/types/organization'
+import { DEFAULT_ORG_SETTINGS } from '@/types/organization'
 
 let memberUnsub: Unsubscribe | null = null
 
@@ -44,6 +46,14 @@ export const useAuthStore = defineStore('auth', () => {
   // truth every VW surface gates on (D-16). Mirror-written from Settings; NOT
   // live-synced via onSnapshot (Pitfall 2).
   const vwModeEnabled = ref(true)
+
+  // The one typed org-settings object every consumer reads (R073). Merged with
+  // DEFAULT_ORG_SETTINGS at a single point (loadOrgContext) so no consumer ever
+  // writes its own `?? default` fallback. Mirror-written from Settings, exactly
+  // like vwModeEnabled above — NOT live-synced via onSnapshot. Initialized to a
+  // fresh spread copy, never the shared DEFAULT_ORG_SETTINGS constant itself, so
+  // nothing can mutate the default object.
+  const settings = ref<OrgSettings>({ ...DEFAULT_ORG_SETTINGS })
 
   const isAuthenticated = computed(() => user.value !== null)
   const isEditor = computed(() => userRole.value === 'editor')
@@ -93,6 +103,7 @@ export const useAuthStore = defineStore('auth', () => {
       pcAppId.value = null
       pcSecret.value = null
       vwModeEnabled.value = true
+      settings.value = { ...DEFAULT_ORG_SETTINGS }
       return
     }
 
@@ -106,7 +117,23 @@ export const useAuthStore = defineStore('auth', () => {
       orgSlug.value = (orgData.slug as string) ?? null
       pcAppId.value = (orgData.pcAppId as string) ?? null
       pcSecret.value = (orgData.pcSecret as string) ?? null
-      vwModeEnabled.value = (orgData.vwModeEnabled as boolean) ?? true
+
+      // R073 — the ONE defaults-merge point for the whole application. A
+      // pre-v1.5 org document has no `settings` key at all; the optional
+      // chain below is mandatory because noUncheckedIndexedAccess is on.
+      const orgSettings = (orgData.settings as Partial<OrgSettings> | undefined) ?? {}
+      settings.value = { ...DEFAULT_ORG_SETTINGS, ...orgSettings }
+
+      // Dual-read migration (R073): nested settings value first, then the
+      // legacy flat field, then the hardcoded default. This is live
+      // production data — do NOT collapse this to `settings?.vwModeEnabled
+      // ?? true`, which would silently turn Vertical Worship back ON for a
+      // church that deliberately turned it off via the flat field. No
+      // read-triggered backfill is performed here; the backfill is
+      // write-triggered, delivered by the Settings toggle's save handler
+      // switching its write target to the `settings.vwModeEnabled` dot-path.
+      vwModeEnabled.value =
+        orgSettings.vwModeEnabled ?? (orgData.vwModeEnabled as boolean | undefined) ?? true
     }
 
     // Unsubscribe from previous listener if any
@@ -150,6 +177,7 @@ export const useAuthStore = defineStore('auth', () => {
       orgSlug.value = null
       userRole.value = null
       vwModeEnabled.value = true
+      settings.value = { ...DEFAULT_ORG_SETTINGS }
       memberUnsub?.()
       memberUnsub = null
     }
@@ -294,6 +322,7 @@ export const useAuthStore = defineStore('auth', () => {
     pcAppId.value = null
     pcSecret.value = null
     vwModeEnabled.value = true
+    settings.value = { ...DEFAULT_ORG_SETTINGS }
     memberUnsub?.()
     memberUnsub = null
     await signOut(auth)
@@ -329,5 +358,6 @@ export const useAuthStore = defineStore('auth', () => {
     pcCredentials,
     setPcCredentials,
     vwModeEnabled,
+    settings,
   }
 })
