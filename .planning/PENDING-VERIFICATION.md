@@ -666,6 +666,17 @@ round-trip or judge visual wrapping.
   deliberate opt-out back on — `auth.test.ts`'s fixture-based regression test proves the merge
   function; only a real document proves the deployed read+write path.
 
+- ☐ **39.06-1 Congregational editor button-row reflow (R088).** With the AI toggle off, open a
+  congregational reading editor (via a scripture slide's 3-dot menu or the Edit Slide drawer's Slide
+  Text section). Confirm the button row shows two buttons ("Fetch Passage" and the reference input's
+  action, not three) rather than three, that the row reads as visually balanced rather than lopsided
+  now that "Split with AI" is gone, AND that hand-dividing a reading (adding/removing section breaks,
+  flipping Leader/Congregation by hand) works identically with the AI button absent — the functional
+  half is the real guarantee, per `39-UI-SPEC.md` § E5's `absent (new)` backstop.
+  `CongregationalEditor.test.ts`'s "AI toggle (39-04)" block proves the button hides and that hand
+  edits (a speaker toggle) still apply against an AI-off mount; only a real browser proves the row
+  reflow reads as deliberate rather than broken.
+
 ---
 
 ## Notes and failures
