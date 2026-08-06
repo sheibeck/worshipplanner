@@ -1499,6 +1499,46 @@ itself clearly.**
 
 **~~Still NOT deployed, by design~~ — DEPLOYED 2026-08-06.** See the render-service note below.
 
+## 🔴 OPEN BUG — PPTX upload is blocked in production by storage.rules (2026-08-06)
+
+**Symptom.** A real PPTX import fails at the *upload* step, before the render pipeline is ever
+reached: `403` / `storage/unauthorized` on
+`orgs/{orgId}/pptx-imports/{importId}/source.pptx`. This has nothing to do with the render service —
+that deploy is fine.
+
+**Cause, isolated by experiment (not inferred).** `storage.rules` gates every org path on a
+cross-service `firestore.exists(/databases/(default)/documents/organizations/$(orgId)/members/$(uid))`.
+That clause is what denies. Two controlled runs against the local emulator:
+
+| Rule under test | Result |
+|---|---|
+| `storage.rules` as written | **DENIED** |
+| identical, cross-service clause removed | ALLOWED |
+| clause alone, membership doc **present** (proven via admin read) | **DENIED** |
+| clause alone, membership doc **absent** | DENIED |
+
+Identical results present and absent ⇒ **`firestore.exists()` is inert in the Storage emulator — it
+always returns false.** The membership doc is not the problem; the app's own Firestore reads prove
+membership resolves correctly there.
+
+**Why it reached production.** `storage.rules` had never been deployed until 2026-08-05, and
+`src/storage.rules.test.ts` was recorded in CLAUDE.md as a known-failing baseline that "needs the
+Storage emulator" and was "not a defect". It fails *with* the emulator running, and the failures are
+exactly the two **allow** cases while all deny cases pass. That mislabel is corrected in CLAUDE.md.
+
+**Two ways out — decide before touching the rule.**
+
+1. **Grant the Firebase Storage service agent read access to Firestore** (production only). Cross-service
+   Rules require it. Cheapest if it works, but the emulator still cannot evaluate `firestore.exists()`,
+   so this rule would remain **permanently unverifiable locally** — the same condition that hid the bug.
+2. **Remove the cross-service dependency** by putting `orgId`/`role` on a custom auth claim, so the rule
+   reads `request.auth.token.orgId == orgId`. Works in emulator and production, and makes
+   `storage.rules.test.ts` meaningful. Costs real work: a Cloud Function on membership change, client
+   token refresh, and a backfill for existing users. This is a phase, not a quick task.
+
+**Do NOT relax the rule to `request.auth != null`.** It would unblock the upload by deleting org
+isolation — any authenticated user could read and write any org's Storage.
+
 ## 🚀 RENDER SERVICE DEPLOYED — 2026-08-06
 
 The owner deployed Cloud Run `pptx-render` and added its URL to `functions/.env`; I redeployed

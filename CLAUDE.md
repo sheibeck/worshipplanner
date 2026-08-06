@@ -65,8 +65,38 @@ plan or phase is type-clean.
   harness scopes to projectId `test-project` while the app uses `worship-planner-bc515`, so both the
   rules install and the per-test `clearFirestore()` leave real data alone.
 
-Known-failing baseline, not defects: `src/storage.rules.test.ts` (needs the Storage emulator) and
-`src/views/__tests__/RosterView.test.ts` (stale assertion).
+Known-failing baseline: `src/storage.rules.test.ts` and `src/views/__tests__/RosterView.test.ts`
+(stale assertion).
+
+> ### ⚠ `src/storage.rules.test.ts` IS A REAL DEFECT — corrected 2026-08-06
+>
+> This file used to say it "needs the Storage emulator" and label it *not a defect*. **That was
+> wrong, and the mislabel let a broken security rule ship to production.**
+>
+> Run it with the Storage emulator actually up and 2 of its tests still fail — and they are the two
+> **allow** cases (`allows an org member to write and read an object under their org path`, and the
+> media-path equivalent). Every *deny* case passes. That signature — all denies pass, all allows
+> fail — means the rule denies everyone, members included.
+>
+> **Root cause, isolated 2026-08-06:** `storage.rules` gates on a cross-service
+> `firestore.exists(/databases/(default)/documents/organizations/$(orgId)/members/$(uid))`, and
+> **`firestore.exists()` is inert in the Storage emulator — it returns false even for a document
+> proven to exist by an admin read.** A rule reduced to nothing but that clause denies identically
+> whether the membership doc is present or absent. Strip the clause and the same authenticated
+> member uploading the same bytes to the same path is allowed.
+>
+> **The production symptom:** a real PPTX import failed with
+> `storage/unauthorized` on `orgs/{orgId}/pptx-imports/{importId}/source.pptx` — the first time
+> `storage.rules` had ever been deployed (2026-08-05).
+>
+> **Do not "fix" this by relaxing the rule to `request.auth != null`.** That drops org isolation.
+> Either grant the Storage service agent Firestore access (production-only; the emulator still
+> cannot verify it, so this rule stays permanently untestable locally), or move org membership onto
+> a custom auth claim so the check works in both environments. See STATE.md's entry of the same date.
+>
+> **The general lesson, worth more than this instance:** a test explained away as an environment
+> quirk is an untested assertion. This one was labelled *not a defect* for an entire milestone while
+> being the only thing standing between a broken rule and production.
 
 ## Environment: `.env.local` is REQUIRED in every worktree
 
