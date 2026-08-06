@@ -56,7 +56,50 @@ Declared values, matching `SettingsView.vue`'s existing scale exactly — no new
 | Body / explanatory copy | 12px (`text-xs`) | 400 regular | 1.5 (`leading-relaxed` not applied to `text-xs` blocks in the existing pattern — use browser default, matching the VW explainer block exactly) |
 | Feature list item label (bold lead-in) | 12px (`text-xs`) | 500 medium (`font-medium`, matches `<span class="font-medium text-gray-200">` in the VW explainer) | inherits parent |
 
-This is 3 sizes (14px, 12px, and the inherited default for feedback text which is also `text-sm`/`text-xs` — no third size added) and 3 weights (400, 500, 600) — all already present in `SettingsView.vue`. Do not introduce a 4th weight or a 5th size for this phase's two new UI blocks.
+This is 3 sizes (14px, 12px, and the inherited default for feedback text which is also `text-sm`/`text-xs` — no third size added).
+
+### Weight ceiling exemption (3 weights declared vs. 2 allowed)
+
+This table declares 3 font weights — 400 regular, 500 `font-medium`, 600 `font-semibold` — against the
+design contract's default ceiling of 2. This is a deliberate, reasoned exemption, not an oversight:
+
+1. **What's being exempted, and by how much.** The 2-weight ceiling is exceeded by exactly one weight
+   (500 `font-medium`), verified live in `src/views/SettingsView.vue`:
+   - `font-semibold` (600) — every section `<h2>` (lines 6, 12, 69, 164) and the page `<h1>` (line 6).
+   - `font-medium` (500) — every button in the file (`Save`, line 30; `Save & Validate`, line 146;
+     `Edit Credentials`/`Clear Credentials`, lines 91/98; `Cancel`, line 154) **and** the bold lead-in
+     span on each Vertical Worship feature list item (lines 194, 198, 202: `<span class="font-medium
+     text-gray-200">Type 1 — Call to Worship (Gather):</span>`, etc.) — the exact block this phase's
+     new AI section list is specified to mirror (see Layout §1 above).
+   - 400 regular — all remaining body/label text (default, no class needed).
+
+2. **The scale is inherited, not introduced.** All three weights are already in live use throughout
+   `SettingsView.vue` today, before this phase touches the file. This phase adds two sections to a
+   page that already renders 3 weights; it does not invent a third weight for a page that currently
+   has 2. Zero new weights are introduced by this phase's two new UI blocks — every weight token used
+   in the AI section and the PC toggle block (`font-semibold` for the heading, `font-medium` for the
+   feature-list lead-ins, 400 for everything else) is a byte-identical reuse of a class already present
+   on this exact page.
+
+3. **Consequence of complying instead.** Collapsing to 2 weights would require either dropping
+   `font-semibold` from the new AI section's `<h2>` (making it visually inconsistent with the
+   Organization, Planning Center, and Vertical Worship headings it sits directly below in the same
+   page) or dropping `font-medium` from the AI feature list's bold lead-ins (making the new list look
+   different from the Vertical Worship list it is explicitly specified to mirror, per Layout §1: "AI
+   Features" reuses the VW explainer's list markup pattern). Either collapse produces the exact visual
+   incoherence the 2-weight ceiling exists to prevent — just relocated from "too many weights on one
+   page" to "this page's newest content doesn't match its established siblings."
+
+4. **Locked decision constraint.** 39-CONTEXT.md's Reusable Assets section directs this phase to reuse
+   `SettingsView.vue`'s existing toggle and section shapes verbatim (the `vwModeInput` checkbox markup,
+   the VW explainer list structure). `font-medium` is baked into that markup
+   (`<span class="font-medium text-gray-200">`). Stripping the weight would mean NOT reusing the
+   markup verbatim — contradicting that decision to satisfy a page-level count this phase did not
+   create.
+
+**Ceiling applies per-page-as-already-established, not per-phase-introduction:** this phase is held to
+"introduce zero new weights," which it satisfies exactly. Do not introduce a 4th weight or a 5th size
+for this phase's two new UI blocks.
 
 ---
 
