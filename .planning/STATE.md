@@ -1499,6 +1499,42 @@ itself clearly.**
 
 **~~Still NOT deployed, by design~~ — DEPLOYED 2026-08-06.** See the render-service note below.
 
+## ✅ RESOLVED 2026-08-06 — ALL Storage uploads were broken in production; fixed by one IAM grant
+
+**The fix, for anyone who hits this again:**
+
+On the Cloud Console **IAM** page (not Service Accounts) for `worship-planner-bc515`, **+ GRANT ACCESS**:
+
+- **Principal:** `service-666677495069@gcp-sa-firebasestorage.iam.gserviceaccount.com`
+- **Role:** **Firebase Rules Firestore Service Agent**
+
+No redeploy needed — IAM applies on its own. Uploads confirmed working immediately after.
+
+**Two things that made this hard to find, both worth remembering:**
+
+1. **The Storage service agent is invisible by default.** It is Google-managed, so it never appears on
+   IAM & Admin → *Service Accounts* (that page lists user-created accounts plus the App Engine/Compute
+   defaults). It appears on IAM & Admin → *IAM* only with **"Include Google-provided role grants"**
+   ticked. You do NOT need it listed to grant it — **+ GRANT ACCESS** accepts the email typed directly,
+   which works whether or not the identity has ever been provisioned.
+
+2. **This project has TWO similarly-named GCP projects** — display names "Worship Planner" and
+   "worship planner". The lowercase one is `worship-planner-bc515` (project number `666677495069`).
+   Display names are cosmetic; **always select by project ID.** Time was lost looking at the wrong
+   project's empty service-account list. `gcloud projects list --format="table(projectId,name,projectNumber)"`
+   disambiguates instantly.
+
+**Blast radius was wider than first reported.** The initial symptom was a failed PPTX import, but
+*every* Storage upload in the app was dead — an mp3 attach failed identically on the `media/` match.
+Both match blocks share the cross-service check, so both denied everyone. Media uploads had shipped
+and worked since v1.2; deploying `storage.rules` for the first time on 2026-08-05 without the
+accompanying grant took them out.
+
+---
+
+<details>
+<summary>Original investigation record (kept — the diagnostic method is reusable)</summary>
+
 ## 🔴 OPEN BUG — PPTX upload is blocked in production by storage.rules (2026-08-06)
 
 **Symptom.** A real PPTX import fails at the *upload* step, before the render pipeline is ever
@@ -1564,6 +1600,8 @@ this rule testable"*, not merely *"make it work"*.
 
 **Do NOT relax the rule to `request.auth != null`.** It would unblock the upload by deleting org
 isolation — any authenticated user could read and write any org's Storage.
+
+</details>
 
 ## 🚀 RENDER SERVICE DEPLOYED — 2026-08-06
 

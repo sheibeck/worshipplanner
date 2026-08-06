@@ -89,10 +89,16 @@ Known-failing baseline: `src/storage.rules.test.ts` and `src/views/__tests__/Ros
 > `storage/unauthorized` on `orgs/{orgId}/pptx-imports/{importId}/source.pptx` — the first time
 > `storage.rules` had ever been deployed (2026-08-05).
 >
+> **Production was fixed on 2026-08-06** by granting the role **Firebase Rules Firestore Service
+> Agent** to `service-666677495069@gcp-sa-firebasestorage.iam.gserviceaccount.com` on the Cloud
+> Console IAM page. Uploads work again. **The local test still fails and always will** — see
+> [firebase-js-sdk#6803](https://github.com/firebase/firebase-js-sdk/issues/6803): the Storage
+> emulator does not implement cross-service reads. Treat those 2 failures as an environment
+> limitation *of this specific rule*, and never as evidence the rule is correct.
+>
 > **Do not "fix" this by relaxing the rule to `request.auth != null`.** That drops org isolation.
-> Either grant the Storage service agent Firestore access (production-only; the emulator still
-> cannot verify it, so this rule stays permanently untestable locally), or move org membership onto
-> a custom auth claim so the check works in both environments. See STATE.md's entry of the same date.
+> The durable fix is moving org membership onto a custom auth claim so the check works in both
+> environments — scoped for v1.5. See STATE.md's entry of the same date.
 >
 > **The general lesson, worth more than this instance:** a test explained away as an environment
 > quirk is an untested assertion. This one was labelled *not a defect* for an entire milestone while
