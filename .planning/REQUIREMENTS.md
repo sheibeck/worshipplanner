@@ -35,7 +35,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 
 ### Storage Security and Testability
 
-- [ ] **R074**: An authenticated member of an organization can read and write objects under that
+- [x] **R074**: An authenticated member of an organization can read and write objects under that
       organization's Storage path, **and that permission is proven by an automated allow-case test that
       actually runs** in the Storage emulator.
       <br>`[STACK]` The fix works: firebase-js-sdk#6803 makes `firestore.exists()` inert in the Storage
@@ -47,7 +47,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
       `exists()`/`get()`, which #6803 does not affect; migrating it too would trade one staleness class
       for a worse one (role changes lagging a token refresh).
 
-- [ ] **R075**: The membership-claim rollout never locks out an existing signed-in member, and a user
+- [x] **R075**: The membership-claim rollout never locks out an existing signed-in member, and a user
       who belongs to no organization is still denied.
       <br>`[PITFALL]` Requires an **`OR`, never an `AND`**, between the new claim and the existing check,
       held through at least one full max-token-lifetime (1 hour) soak before the fallback is removed in a
@@ -258,8 +258,8 @@ Explicitly excluded. Documented to prevent scope creep.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | R073 | Phase 39 | Complete |
-| R074 | Phase 40 | Pending |
-| R075 | Phase 40 | Pending |
+| R074 | Phase 40 | Complete |
+| R075 | Phase 40 | Complete |
 | R076 | Phase 41 | Pending |
 | R077 | Phase 41 | Pending |
 | R078 | Phase 41 | Pending |

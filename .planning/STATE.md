@@ -5,15 +5,15 @@ milestone_name: Settings, Sharing, and Fidelity
 current_phase: 39
 current_phase_name: org-settings-infrastructure-feature-toggles
 status: in_progress
-stopped_at: Completed 39-06-PLAN.md
-last_updated: "2026-08-06T20:22:23.993Z"
+stopped_at: Completed 40-01-PLAN.md
+last_updated: "2026-08-06T22:51:02.619Z"
 last_activity: 2026-08-06
 last_activity_desc: "Phase 39 Plan 02 executed: OrgSettings/DEFAULT_ORG_SETTINGS type"
 progress:
   total_phases: 10
   completed_phases: 1
-  total_plans: 6
-  completed_plans: 6
+  total_plans: 10
+  completed_plans: 7
   percent: 10
 ---
 
@@ -1288,6 +1288,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 39 P04 | 18min | 3 tasks | 8 files |
 | Phase 39 P05 | 35min | 2 tasks | 7 files |
 | Phase 39 P06 | 15min | 2 tasks | 1 files |
+| Phase 40 P01 | 10min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -1559,6 +1560,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 39-05: buildExportOrCopyItem's PC gate stays one composed early return (hasPcCredentials || pcEnabled), not two competing checks
 - [Phase ?]: 39-05: RosterView.test.ts's bare hand-rolled auth mock extended with getter-backed settings.pcEnabled, proactively avoiding the breakage class 39-04 found in ServiceEditorView.test.ts
 - [Phase ?]: Phase 39 gate closed: type-check and full suite clean at documented baseline; R073/R088/R089 each traced to a real passing command; firestore.rules org-write rule reconfirmed to already cover nested settings.* writes with no rule change needed; all five UI-SPEC manual backstops recorded DEFERRED in PENDING-VERIFICATION.md (39-03 had recorded 4 of 5; this plan added the missing congregational-editor button-row reflow item).
+- [Phase ?]: Phase 40 Plan 01: storage.rules dual-read (isOrgMemberByClaim || isOrgMemberByFirestore, claim first) turned the measured baseline 2 failed|96 passed into 0 failed|103 passed. Helper-function form worked without needing the plan's inline-expression fallback.
 
 ### Roadmap Evolution
 
@@ -1870,8 +1872,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-06T20:22:23.953Z
-Stopped at: Completed 39-06-PLAN.md
+Last session: 2026-08-06T22:51:02.583Z
+Stopped at: Completed 40-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

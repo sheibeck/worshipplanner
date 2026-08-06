@@ -198,10 +198,11 @@ Plans:
   3. A signed-in member who has not yet received the claim (pre-rollout) still passes on the existing Firestore-membership branch, and a user who belongs to no organization is denied on both branches — proven by tests covering both arms of the dual-read OR, not just one
   4. The idempotent, resumable backfill script for existing users, and the exact two-deploy sequence — (a) deploy the dual-read rule and the claims function, hold for one full max-token-lifetime (1 hour) soak, then (b) deploy again removing the Firestore-membership fallback — are written and handed to the owner as the next action. Reaching this state IS the phase goal; neither deploy runs during this phase
 
-**Plans**: 4 plans
+**Plans**: 1/4 plans executed
 
 Plans:
-- [ ] 40-01-PLAN.md — `storage.rules` dual-read (claim OR Firestore, claim first) and the non-vacuous rules test matrix; turns the two measured allow-case failures green [wave 1]
+
+- [x] 40-01-PLAN.md — `storage.rules` dual-read (claim OR Firestore, claim first) and the non-vacuous rules test matrix; turns the two measured allow-case failures green [wave 1]
 - [ ] 40-02-PLAN.md — `syncOrgMembershipClaim` `onDocumentWritten` trigger plus the shared `decideMembershipClaim` module and its unit tests [wave 1]
 - [ ] 40-03-PLAN.md — forced `getIdTokenResult(true)` on org-context load with a bounded retry scoped to the just-created-membership path [wave 1]
 - [ ] 40-04-PLAN.md — idempotent dry-run-by-default backfill script and `functions/DEPLOY-ORG-CLAIMS.md`, the two-deploy handoff [wave 2]
@@ -357,7 +358,7 @@ Plans:
 | 24-28 | v1.3 | 33/33 | Complete (archived) | 2026-07-28 |
 | 29-38 | v1.4 | 61/61 | Complete (archived) | 2026-08-05 |
 | 39. Org Settings Infrastructure & Feature Toggles | v1.5 | 6/6 | In Progress|  |
-| 40. Custom Auth Claim for Org Membership | v1.5 | 0/? | Not started | - |
+| 40. Custom Auth Claim for Org Membership | v1.5 | 1/4 | In Progress|  |
 | 41. Sharing Correctness | v1.5 | 0/? | Not started | - |
 | 42. PowerPoint Rendered-Image Display | v1.5 | 0/? | Not started | - |
 | 43. Service Item Types | v1.5 | 0/? | Not started | - |
