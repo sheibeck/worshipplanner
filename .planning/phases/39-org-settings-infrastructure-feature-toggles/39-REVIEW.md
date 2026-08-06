@@ -29,9 +29,11 @@ findings:
   warning: 3
   info: 0
   total: 4
-status: resolved
+status: clean
 fixed_at: 2026-08-06T20:00:00Z
 fix_report: 39-REVIEW-FIX.md
+iteration2_verified_at: 2026-08-06T21:00:00Z
+iteration2_status: clean
 ---
 
 # Phase 39: Code Review Report
@@ -40,7 +42,8 @@ fix_report: 39-REVIEW-FIX.md
 **Depth:** standard
 **Files Reviewed:** 20
 **Status:** issues_found — all 4 in-scope findings (1 Critical, 3 Warning) fixed; see
-[39-REVIEW-FIX.md](./39-REVIEW-FIX.md) for commit-level detail.
+[39-REVIEW-FIX.md](./39-REVIEW-FIX.md) for commit-level detail. Iteration 2 re-verification (below)
+confirms all four fixes are correct with no new defects — final status: **clean**.
 
 ## Summary
 
@@ -88,6 +91,9 @@ One Critical and three Warnings follow.
 > confirmed to fail against the pre-fix code (pre-fix, `DEFAULT_ORG_SETTINGS
 > .vwModeEnabled` is `true`, so the added assertion would resolve to `true`
 > instead of the expected `false`).
+>
+> **Iteration 2 re-verified (2026-08-06):** confirmed correct for all four input shapes.
+> See "Iteration 2 — Fix Verification" below for the trace.
 
 **File:** `src/stores/auth.ts:121-136`
 
@@ -172,6 +178,10 @@ it('keeps a flat vwModeEnabled false when there is no settings key', async () =>
 > Test coverage added in `serviceEditorActionBar.test.ts` (`describe('aiEnabled
 > (WR-01)', ...)`) and folded into the file's cartesian gating matrix via
 > `BOOLEAN_FLAG_KEYS`.
+>
+> **Iteration 2 re-verified (2026-08-06):** confirmed the item is genuinely omitted
+> from the array (hide, not disable), and no second/parallel gating mechanism was
+> introduced. See "Iteration 2 — Fix Verification" below.
 
 **File:** `src/views/serviceEditorActionBar.ts:84-93` (`buildSuggestItem`), wired from
 `src/views/ServiceEditorView.vue:2807-2887` (`suggestAllSongs`)
@@ -233,6 +243,9 @@ aiEnabled: authStore.settings.aiEnabled,
 > is false. Verified against the full file run (242/242 passing) rather than a
 > `-t` filtered subset, since filtering skips sibling `beforeEach`/`afterEach`
 > hooks and produced an unrelated, pre-existing false failure in isolation.
+>
+> **Iteration 2 re-verified (2026-08-06):** test-only change, six new assertions
+> confirmed present and passing as part of the full 242/242 file run.
 
 **File:** `src/views/__tests__/ServiceEditorView.test.ts` (diff only adds a `settings` mock shape, no
 new assertions)
@@ -273,6 +286,10 @@ via the button) does not open the export dialog.
 > than rejecting — this is a genuinely new failure mode this suite did not
 > previously exercise (the pre-existing `aiEnabled: false` tests never reach
 > `useAuthStore()` throwing).
+>
+> **Iteration 2 re-verified (2026-08-06):** confirmed the guard moved inside `try`
+> in all three exports, the 3-of-7 boundary is unchanged, and the never-throw
+> contract genuinely holds. See "Iteration 2 — Fix Verification" below.
 
 **File:** `src/utils/claudeApi.ts:189, 310, 537`
 
@@ -334,8 +351,116 @@ Post-fix full-suite verification: `npm run type-check` clean; `npx vitest run --
 
 ---
 
+## Iteration 2 — Fix Verification
+
+**Verified:** 2026-08-06
+**Scope:** the four fix commits only (`git diff 69b4240..HEAD -- src/`), not a re-review of the whole
+phase. Verdict: **CLEAN** — all four fixes are correct, and no new defects were introduced.
+
+### CR-01 — genuinely closed
+
+Read `git show 5663b90 -- src/stores/auth.ts` directly. The fix replaces the two independently-computed
+values with a single `resolvedVwModeEnabled` const, applied to both `settings.value.vwModeEnabled`
+(via an explicit override key after the `DEFAULT_ORG_SETTINGS`/`orgSettings` spread) and
+`vwModeEnabled.value`. Traced all four input shapes by hand against the new code:
+
+| Input shape | `orgSettings` | dual-read result | `authStore.vwModeEnabled` | `authStore.settings.vwModeEnabled` |
+|---|---|---|---|---|
+| `{ settings: { vwModeEnabled: false } }` | `{ vwModeEnabled: false }` | `false` | `false` | `false` |
+| `{ vwModeEnabled: false }` (legacy flat, no `settings` key) | `{}` | falls through to `orgData.vwModeEnabled` → `false` | `false` | `false` |
+| `{ settings: {}, vwModeEnabled: false }` | `{}` | falls through to `orgData.vwModeEnabled` → `false` | `false` | `false` |
+| `{}` | `{}` | falls through to hardcoded default → `true` | `true` | `true` |
+
+All four agree — the two fields are now structurally incapable of disagreeing, since they are both
+assigned from the same `resolvedVwModeEnabled` variable in the same code path. This closes CR-01 for
+every input shape, not just the one shape the review's own reproduction used.
+
+The strengthened test (`git show 5663b90 -- src/stores/__tests__/auth.test.ts`) targets exactly the
+second row of that table — the legacy-flat-field case, which is the one the original bug got wrong —
+and now asserts `expect(store.settings.vwModeEnabled).toBe(false)` in addition to the pre-existing
+`expect(store.vwModeEnabled).toBe(false)`. Hand-traced against the pre-fix merge
+(`{ ...DEFAULT_ORG_SETTINGS, ...orgSettings }` with `orgSettings = {}`): the added assertion would
+resolve to `DEFAULT_ORG_SETTINGS.vwModeEnabled` (`true`) and fail. The added assertion is non-vacuous.
+
+Ran the test directly: `npx vitest run src/stores/__tests__/auth.test.ts` — all tests in the file pass
+(36 including the strengthened one).
+
+### WR-03 — 3-of-7 boundary intact, never-throw contract genuinely holds
+
+`grep -n "^export"` against `src/utils/claudeApi.ts` confirms 7 exports total:
+`safeParseJsonArray`, `validateSongSuggestions`, `getSongSuggestions`, `getScriptureSuggestions`,
+`validateSplitResult`, `splitCongregationalReading` (7th being `validateScriptureSuggestions`, adjacent
+to `validateSongSuggestions`). Exactly `getSongSuggestions`, `getScriptureSuggestions`,
+`splitCongregationalReading` carry the `if (!isAiEnabled()) return null` guard, now moved to be the
+first statement inside each function's `try` block rather than immediately before it — confirmed by
+reading `git show 6aa474b -- src/utils/claudeApi.ts` in full. The other four parse/validate helpers
+are untouched by this commit and remain ungated. The guard's underlying implementation
+(`function isAiEnabled(): boolean { return useAuthStore().settings.aiEnabled }`) is unchanged — only
+its call-site position moved — so a `useAuthStore()` throw (no active Pinia) is now caught by the
+`catch` block that already exists in each function and mapped to the same `null` every other failure
+mode returns, instead of escaping as a promise rejection.
+
+The new regression tests in `claudeApi.test.ts` add a `mockAuthStoreThrows` flag to the `useAuthStore`
+mock, unconditionally reset in `afterEach`, and assert `resolves.toBeNull()` (not a rejection) for all
+three gated exports when the store throws. This is a genuinely new failure mode — the pre-existing
+`aiEnabled: false` tests toggle a settings getter and never reach `useAuthStore()` itself throwing.
+Ran the file directly: `npx vitest run src/utils/__tests__/claudeApi.test.ts` — all tests pass
+(70 including the 3 new WR-03 cases).
+
+### WR-01 — single mechanism, hidden not disabled, no orphaned callers
+
+`ActionBarContext.aiEnabled` was added as a required (non-optional) field, following the exact shape of
+the pre-existing `pcEnabled` field immediately below it in the interface. Grepped for every construction
+site of `ActionBarContext`-shaped objects in `src/` — exactly two: `ServiceEditorView.vue`'s
+`activeActionItems` computed (`aiEnabled: authStore.settings.aiEnabled`, reading directly off the same
+`authStore.settings` object `pcEnabled` reads off, immediately adjacent in the object literal — no
+parallel/duplicate check), and `serviceEditorActionBar.test.ts`'s `makeContext()` test helper (updated
+in the same commit). No third caller was missed; `npm run type-check` (which fails hard on a missing
+required field on a typed object literal) is clean post-fix, which is independent confirmation no call
+site was left unthreaded.
+
+The gate itself (`if (ctx.canEditService && ctx.aiEnabled) { items.push(buildSuggestItem(ctx)) }`) omits
+the item from the array entirely when `aiEnabled` is false — this is the Hide-Don't-Disable Contract's
+required shape (the alternative, pushing the item with a computed `disabled` flag, was not used). The
+array is rendered via `<ContextualActionBar :items="activeActionItems" />`, so an omitted array entry
+never reaches the DOM. Ran `serviceEditorActionBar.test.ts` and `ServiceEditorView.test.ts` together:
+269 tests pass, including the four new `aiEnabled (WR-01)` cases (toggle-off hides the item, toggle-on
+control, composition with `canEditService`, and no-op on tabs where the item never appears).
+
+### WR-02 — test-only, no source risk
+
+Confirmed via `git show d6d7de0` that this commit touches only
+`src/views/__tests__/ServiceEditorView.test.ts`. No source file changed, so there is no fix-correctness
+question beyond "do the new assertions exercise real behavior and pass" — they do: six new `it` blocks
+(a toggle-off case and control case for each of the three named `pcEnabled` behaviors), reusing the
+file's existing `mountView` helper and `mockAuthState`. Ran the full file directly (not `-t` filtered,
+matching the project's real gate): `npx vitest run src/views/__tests__/ServiceEditorView.test.ts` —
+242/242 pass, including the six new WR-02 assertions.
+
+### Cross-commit regression check
+
+Ran all four affected test files together in a single invocation
+(`npx vitest run src/stores/__tests__/auth.test.ts src/utils/__tests__/claudeApi.test.ts
+src/views/__tests__/serviceEditorActionBar.test.ts src/views/__tests__/ServiceEditorView.test.ts`):
+**381/381 passing**, no failures. Ran `npm run type-check` (`vue-tsc --build`, the full gate including
+test files, per this project's CLAUDE.md): **clean, zero errors.** No new defects were introduced by
+threading the required `aiEnabled` field through `ActionBarContext`, by moving the `isAiEnabled()` guard
+inside three `try` blocks, or by the `settings.value` reassignment in `auth.ts`.
+
+### Verdict
+
+**CLEAN.** All four fixes (CR-01, WR-01, WR-02, WR-03) are verified correct against the specific defect
+each was written to close, traced by hand against edge-case input shapes rather than accepted on the
+fix report's word, and introduce no new findings. No BLOCKER or WARNING items remain open for this
+phase.
+
+---
+
 _Reviewed: 2026-08-06_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
 _Fixed: 2026-08-06_
 _Fixer: Claude (gsd-code-fixer)_
+_Iteration 2 verified: 2026-08-06_
+_Reviewer: Claude (gsd-code-reviewer)_
+</content>
