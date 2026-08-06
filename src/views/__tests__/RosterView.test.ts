@@ -23,8 +23,21 @@ const mockRoles: Role[] = [
 
 let mockPeople: Person[] = []
 
+// 39-05 (R089): `settings.pcEnabled` added as a getter-mock (SongTable.test.ts
+// precedent) so a test can flip it mid-suite without re-mounting a fresh
+// vi.mock. Defaults to true so every pre-existing test in this file keeps
+// its current behavior unchanged.
+let mockPcEnabled = true
+
 vi.mock('@/stores/auth', () => ({
-  useAuthStore: () => ({ orgId: 'org-1' }),
+  useAuthStore: () => ({
+    orgId: 'org-1',
+    settings: {
+      get pcEnabled() {
+        return mockPcEnabled
+      },
+    },
+  }),
 }))
 
 vi.mock('@/stores/roster', () => ({
@@ -75,6 +88,12 @@ function mountRosterView() {
     },
   })
 }
+
+// File-level reset so a mid-suite pcEnabled flip (39-05) never leaks into a
+// later describe block's tests.
+beforeEach(() => {
+  mockPcEnabled = true
+})
 
 describe('RosterView — roles-only Volunteer form (D-07)', () => {
   beforeEach(() => {
@@ -320,5 +339,26 @@ describe('RosterView — name/role sort (frequency sort removed)', () => {
     const wrapper = mountRosterView()
     const headers = wrapper.findAll('th').map((h) => h.text())
     expect(headers.some((h) => h.includes('Frequency'))).toBe(false)
+  })
+})
+
+describe('RosterView — pcEnabled (39-05, R089)', () => {
+  it('pcEnabled false: both "Import from Planning Center" triggers are absent, "Add person manually" still renders', () => {
+    mockPcEnabled = false
+    mockPeople = []
+    const wrapper = mountRosterView()
+
+    const buttons = wrapper.findAll('button').map((b) => b.text())
+    expect(buttons.some((t) => t.includes('Import from Planning Center'))).toBe(false)
+    expect(buttons.some((t) => t.includes('Add person manually'))).toBe(true)
+  })
+
+  it('pcEnabled true: the empty-state "Import from Planning Center" trigger renders', () => {
+    mockPcEnabled = true
+    mockPeople = []
+    const wrapper = mountRosterView()
+
+    const buttons = wrapper.findAll('button').map((b) => b.text())
+    expect(buttons.some((t) => t.includes('Import from Planning Center'))).toBe(true)
   })
 })

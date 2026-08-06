@@ -129,4 +129,14 @@ describe('SongsView (Wave 0 harness — Phase 39)', () => {
     const wrapper = mountSongsView()
     expect(findImportSongsButton(wrapper)).toBeTruthy()
   })
+
+  // 39-05 (R089): the trigger must leave the DOM entirely when the org has
+  // turned Planning Center off — reuses findImportSongsButton() verbatim
+  // (this file's own Wave 0 header comment) rather than forking a selector.
+  it('pcEnabled false: the "Import Songs" trigger is absent, other toolbar buttons still render', () => {
+    mockPcEnabled = false
+    const wrapper = mountSongsView()
+    expect(findImportSongsButton(wrapper)).toBeFalsy()
+    expect(wrapper.findAll('button').some((b) => b.text().includes('Add Song'))).toBe(true)
+  })
 })

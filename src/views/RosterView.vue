@@ -11,6 +11,7 @@
         </div>
         <div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-end gap-2 w-full sm:w-auto [&>*]:w-full sm:[&>*]:w-auto [&>*]:justify-center sm:[&>*]:justify-start">
           <button
+            v-if="authStore.settings.pcEnabled"
             @click="onOpenImport"
             class="inline-flex items-center gap-2 rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm font-medium text-gray-200 hover:bg-gray-700 hover:text-white transition-colors"
           >
@@ -71,6 +72,7 @@
         </p>
         <div class="flex flex-col sm:flex-row items-center gap-3">
           <button
+            v-if="authStore.settings.pcEnabled"
             @click="onOpenImport"
             class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 transition-colors"
           >
