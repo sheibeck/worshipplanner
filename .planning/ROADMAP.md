@@ -100,7 +100,7 @@ can see, slides that always mirror the plan — and finish them against the Clau
 - [x] **Phase 35: Presentation Correctness & Lyric Editor** - No organizational labels when presenting, CCLI on first+last slide, inline paste-lyrics warnings (completed 2026-08-03)
 - [ ] **Phase 36: UI Rework — Service Order & Contextual Action Bars** - Rebuild the Service Order tab and apply one contextual action bar across every tab
 - [ ] **Phase 37: PowerPoint Server-Side Rendering** - Render imported PowerPoint decks server-side to true-fidelity images
-- [ ] **Phase 38: Congregational Readings Become Real Slides** - Each Leader/Congregation section becomes its own slide, individually editable and deletable
+- [x] **Phase 38: Congregational Readings Become Real Slides** - Each Leader/Congregation section becomes its own slide, individually editable and deletable (completed 2026-08-05)
 
 ## Phase Details
 
@@ -422,7 +422,7 @@ Plans:
 | 35. Presentation Correctness & Lyric Editor | v1.4 | 4/4 | In Progress|  |
 | 36. UI Rework — Service Order & Contextual Action Bars | v1.4 | 5/5 | In Progress|  |
 | 37. PowerPoint Server-Side Rendering | v1.4 | 6/6 | In Progress|  |
-| 38. Congregational Readings Become Real Slides | v1.4 | 4/4 | In Progress|  |
+| 38. Congregational Readings Become Real Slides | v1.4 | 4/4 | Complete    | 2026-08-05 |
 
 ## Backlog
 

@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Service and Slides
-current_phase: 38
-current_phase_name: Congregational Readings Become Real Slides
-status: verifying
+current_phase: 36
+current_phase_name: UI Rework — Service Order & Contextual Action Bars
+status: planning
 stopped_at: Completed 38-04-PLAN.md (Phase 38 code-complete; owner checkpoint deferred, PENDING-VERIFICATION.md 38.1-38.7)
-last_updated: "2026-08-05T22:07:43.262Z"
+last_updated: "2026-08-06T02:52:43.625Z"
 last_activity: 2026-08-05
-last_activity_desc: Phase 38 execution started
+last_activity_desc: Phase 38 complete, transitioned to Phase 36
 progress:
   total_phases: 10
   completed_phases: 10
@@ -75,11 +75,11 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 
 ## Current Position
 
-Phase: 38 (Congregational Readings Become Real Slides) — CODE COMPLETE, verification deferred
-Plan: 4 of 4
-Status: All 4 plans executed · 5/5 success criteria verified against live source ·
+Phase: 36 — UI Rework — Service Order & Contextual Action Bars
+Plan: Not started
+Status: Ready to plan
         `38-VERIFICATION.md` is `human_needed` · 1 code-review BLOCKER found and fixed
-Last activity: 2026-08-05 — Phase 38 complete; CR-01 fixed (203e599); autonomous run STOPPED
+Last activity: 2026-08-05 — Phase 38 complete, transitioned to Phase 36
                before the milestone lifecycle (see below)
 
 ## ⛔ AUTONOMOUS RUN STOPPED BEFORE MILESTONE LIFECYCLE — 2026-08-05, and why
@@ -108,9 +108,11 @@ another name, so the run stops here rather than doing it. This is the grant's ow
 1. Work through `.planning/PENDING-VERIFICATION.md` — items for phases 31–38, with **38.1–38.7**
    newest. Item 38.4 is starred as historically the hardest: delete one section slide, reload, and
    confirm it stays deleted.
+
 2. `/gsd-verify-work 32` · `33` · `34` · `35` · `37` · `38` as each phase's items pass.
 3. Phase 36 is a separate decision — its wireframe now exists (Turn 3), so `/gsd-autonomous --only 36`
    is unblocked whenever wanted.
+
 4. Only then `/gsd-audit-milestone` → `/gsd-complete-milestone v1.4` → `/gsd-cleanup`.
 
 ## ★ v1.4 AUTONOMOUS RUN — standing decisions (2026-07-28)

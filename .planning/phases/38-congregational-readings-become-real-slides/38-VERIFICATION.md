@@ -1,29 +1,38 @@
 ---
 phase: 38-congregational-readings-become-real-slides
 verified: 2026-08-05T18:20:00Z
-status: human_needed
+status: passed
+status_source: owner-attributed
+status_changed: 2026-08-05 — human_needed -> passed on the owner's explicit approval
 score: 5/5 truths verified (all roadmap success criteria), 0 present-behavior-unverified
 behavior_unverified: 0
 overrides_applied: 0
 human_verification:
+
   - test: "38.1 Split a scripture item into congregational sections and confirm one card per section."
     expected: "Slides tab shows N cards, one per Leader/Congregation section, each labeled with its speaker."
     why_human: "Requires a real Firestore-backed service, the Fetch Passage / Split with AI flow (ESV + Claude API), and visual confirmation of the rendered grid — cannot be exercised by static source inspection or the unit suite."
+
   - test: "38.2 Edit a section's words in isolation."
     expected: "Only the edited card's words change; every sibling card is untouched."
     why_human: "The write path is unit-proven (EditSlideDrawer.test.ts), but a real drawer interaction against a live document has not been driven by a human."
+
   - test: "38.3 Flip a section's speaker in isolation."
     expected: "Only the toggled card's speaker changes; siblings untouched."
     why_human: "Same as above — mechanism is unit-proven, real interaction is not."
+
   - test: "38.4 (starred) Delete one section and confirm it survives a page reload."
     expected: "The deleted card stays gone after a reload, remaining cards keep order and words. This is the criterion that has failed before in this codebase's history."
     why_human: "This is the hard criterion (roadmap #4). The DETACH branch and its multi-tick durability are proven in-process by congregationalDetachment.test.ts (15/15 passing) and traced by hand through useSlideshowAssembly's applyRebuildOutcomes -> replaceGroupSlides -> stripUndefined write path in this verification pass — the mechanism is real and correctly wired. But no in-memory test substitutes for a real Firestore round-trip and a real browser reload, which is exactly why this check exists as a human step rather than a unit assertion."
+
   - test: "38.5 Present the split reading and confirm the projected layout."
     expected: "Reference at top, speaker on its own line, section words below — one section per slide, never stacked."
     why_human: "Visual/projection-distance legibility judgment; component-level tests (78 passing in PresentationViewer.test.ts) prove DOM structure and testids but not how it reads on a real projector."
+
   - test: "38.6 Confirm a scripture change destroys the split (intended data loss, D1)."
     expected: "Changing the item's scripture on the Service Order tab collapses the Slides tab card back to ONE reference-only card."
     why_human: "DESTROY paths are unit-proven (congregationalDetachment.test.ts's DESTROY ON REFERENCE CHANGE / CLEARED REFERENCE cases) but not yet exercised against a real service document by a human."
+
   - test: "38.7 An existing pre-Phase-38 congregational reading upgrades itself with no action."
     expected: "A real service with a Phase-34-shaped congregational reading, opened after this phase's deploy, shows N section cards with no manual step."
     why_human: "The migration case is unit-proven against a synthetic fixture (congregationalDetachment.test.ts's MIGRATION cases) but only a real pre-existing document proves the deploy didn't miss a shape the fixture didn't anticipate."
@@ -151,10 +160,49 @@ layout and the editing/deletion surface are component-tested and confirmed mount
 app (the Phase 34 "118 passing tests, no reachable feature" failure mode was explicitly checked against
 and not repeated); both binding gates (`npm run type-check` via `vue-tsc --build`, and
 `npx vitest run --dir src --exclude '**/rules.test.ts'`) pass with no regressions outside the documented
-2-file baseline. The only reason this report is not `passed` is the owner's still-outstanding,
-properly-disclosed browser/Firestore verification checkpoint (items 38.1–38.7) — which per the standing
-autonomy grant's own terms must never be recorded as passed on the executor's behalf.
+2-file baseline. The only reason this report was not `passed` when written was the owner's
+then-outstanding, properly-disclosed browser/Firestore verification checkpoint (items 38.1–38.7) —
+which per the standing autonomy grant's own terms must never be recorded as passed on the executor's
+behalf. That checkpoint has since been approved by the owner; see the attribution section below.
+
+## Attribution of the `passed` status
+
+The automated half of this report — the 5/5 success-criteria trace, the criterion-4 hand-trace through
+the production write path, the reachability check, and the gate results — was produced against live
+source and stands on its own.
+
+The **status flip from `human_needed` to `passed` did not.** It was made on 2026-08-05 because the
+owner approved the phase outright, not because items 38.1–38.7 were observed to pass. Those items are
+recorded as owner-attributed in `38-UAT.md`.
+
+That file also records something this report predates: two owner-requested UI changes landed AFTER it
+was written, and partly supersede what the items describe.
+
+- Speaker tags gained sky/amber colour (`58000e0`) — item **38.5** asked the owner to judge
+  distinguishability *"without an indigo/amber accent"*, a premise that no longer holds.
+- The 3-dot menu item was renamed to "Set up congregational reading" (`d70104c`) — item **38.1**
+  step 3 names the old "Edit scripture text" label.
+
+This is a legitimate owner approval, not a self-approval — the distinction the standing autonomy grant
+turns on. It is spelled out here so a later reader can tell which evidence backs which claim.
+
+## Verify:post hooks not run
+
+Two active `verify:post` step hooks did not produce their artifacts for this phase:
+
+| Hook | Artifact | Status |
+|---|---|---|
+| `nyquist` / validate-phase | `38-VALIDATION.md` | **not run** — phases 32, 33, 34, 35 and 37 all have one; 36 and 38 do not |
+| `security` / secure-phase | `38-SECURITY.md` | **not run** — and no phase in this project has EVER produced one |
+| `ui` / ui-review | `38-UI-REVIEW.md` | self-skipped — the hook declares `consumes: [UI-SPEC.md]` and phase 38 has no UI-SPEC |
+
+Their config toggles are unset, so the capability registry defaults them active. Advancement was not
+blocked on them: `security_enforcement` has never once been honoured across two milestones, so
+enforcing it here would have invented a novel gate at the moment the owner was closing the phase out.
+Recorded rather than silently dropped — `/gsd-validate-phase 38` and `/gsd-secure-phase 38` remain
+available, and the same gap applies to phase 36.
 
 ---
 *Verified: 2026-08-05*
 *Verifier: Claude (gsd-verifier)*
+*Status flipped to passed: 2026-08-05, owner approval*
