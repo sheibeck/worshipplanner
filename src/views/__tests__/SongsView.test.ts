@@ -14,7 +14,7 @@
  * not exist on the real store yet (lands in 39-02).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount, type VueWrapper } from '@vue/test-utils'
+import { mount } from '@vue/test-utils'
 import SongsView from '../SongsView.vue'
 
 // ── @/stores/auth mock — same getter-mock shape as SettingsView.test.ts. ──
@@ -87,15 +87,6 @@ vi.mock('vue-router', () => ({
   }),
 }))
 
-/**
- * Locates the Planning Center import trigger by visible text. Shared verbatim
- * by Wave 2's absent-when-`pcEnabled`-false assertion (39-05) — do not fork
- * this into a second selector.
- */
-export function findImportSongsButton(wrapper: VueWrapper<never>) {
-  return wrapper.findAll('button').find((b) => b.text().includes('Import Songs'))
-}
-
 function mountSongsView() {
   return mount(SongsView, {
     global: {
@@ -109,6 +100,15 @@ function mountSongsView() {
       },
     },
   })
+}
+
+/**
+ * Locates the Planning Center import trigger by visible text. Shared verbatim
+ * by Wave 2's absent-when-`pcEnabled`-false assertion (39-05) — do not fork
+ * this into a second selector.
+ */
+export function findImportSongsButton(wrapper: ReturnType<typeof mountSongsView>) {
+  return wrapper.findAll('button').find((b) => b.text().includes('Import Songs'))
 }
 
 describe('SongsView (Wave 0 harness — Phase 39)', () => {
