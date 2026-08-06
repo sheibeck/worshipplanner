@@ -3,8 +3,54 @@ rules_version = '2';
 // Org-scoped Storage access control, mirroring firestore.rules' isOrgMember pattern.
 // The generic orgs/{orgId} prefix is intentional (not PPTX-specific) so Phase 22's media
 // attachments and any future Storage-backed feature can reuse this same rule.
+//
+// v1.5 claim migration (phase 40): membership is a DUAL-READ during rollout —
+// `isOrgMemberByClaim(orgId) || isOrgMemberByFirestore(orgId)`, claim first. The claim
+// arm exists so this rule is verifiable in the Storage emulator, where the pre-existing
+// Firestore arm's cross-service call (firestore.exists()) is inert
+// (firebase-js-sdk#6803) — that inertness is exactly how a deny-everyone rule reached
+// production for a full milestone undetected (see CLAUDE.md). The Firestore arm is
+// removed ONLY by the owner's SECOND deploy, after a >=1-hour soak once every live
+// session has had a chance to pick up the claim — never in this phase, never here.
 service firebase.storage {
   match /b/{bucket}/o {
+    // Reads request.auth.token.orgId / .role — a direct JWT claim read set server-side
+    // by Cloud Function syncOrgMembershipClaim (functions/src/orgMembershipClaims.ts,
+    // phase 40-02) via the Admin SDK. Unaffected by firebase-js-sdk#6803: no
+    // cross-service call is involved. `role != null` (not a specific role) is the gate —
+    // any assigned role counts as membership, same as the Firestore arm below.
+    //
+    // KNOWN LIMITATION (D-01/D-04, locked in 40-CONTEXT.md): the claim carries only the
+    // user's PRIMARY org (orgIds[0]). A user belonging to more than one org is covered
+    // for their non-primary orgs by isOrgMemberByFirestore alone — documented, not an
+    // oversight.
+    function isOrgMemberByClaim(orgId) {
+      return request.auth != null
+        && request.auth.token.orgId == orgId
+        && request.auth.token.role != null;
+    }
+
+    // The pre-existing, production-proven cross-service check, moved verbatim from the
+    // four allow clauses below, never altered. Inert in the Storage emulator
+    // (firebase-js-sdk#6803): returns false even for a membership doc proven to exist by
+    // an admin read. Live and correct in production since the 2026-08-06 IAM grant
+    // (Firebase Rules Firestore Service Agent on the Storage service agent).
+    function isOrgMemberByFirestore(orgId) {
+      return request.auth != null
+        && firestore.exists(
+             /databases/(default)/documents/organizations/$(orgId)/members/$(request.auth.uid));
+    }
+
+    // Claim FIRST is load-bearing, not a micro-optimisation. Firebase Rules `||` is
+    // short-circuiting, so a matching claim means isOrgMemberByFirestore's cross-service
+    // call is never evaluated at all — that is precisely what lets a caller whose token
+    // carries the claim pass in an emulator where firestore.exists() is inert. OR, never
+    // AND (D-05, non-negotiable): an AND would lock out every member whose token
+    // predates the claim rollout.
+    function isOrgMember(orgId) {
+      return isOrgMemberByClaim(orgId) || isOrgMemberByFirestore(orgId);
+    }
+
     // Cloud Storage rules do NOT cascade between sibling `match` blocks — this
     // more-specific `orgs/{orgId}/media/**` match is evaluated independently of
     // the generic `orgs/{orgId}/{allPaths=**}` block below (proven by the media
@@ -15,31 +61,21 @@ service firebase.storage {
     // ceiling while every other org-scoped path (pptx-imports, etc.) keeps the
     // original 25MB cap unchanged below.
     match /orgs/{orgId}/media/{allPaths=**} {
-      allow read: if request.auth != null
-                     && firestore.exists(
-                          /databases/(default)/documents/organizations/$(orgId)/members/$(request.auth.uid));
+      allow read: if isOrgMember(orgId);
 
       // 50MB (52428800 bytes) — the researched media cap (22-RESEARCH.md) for
       // audio/video attachments, mirrored by useMediaUpload's MEDIA_MAX_BYTES.
-      allow write: if request.auth != null
-                      && firestore.exists(
-                           /databases/(default)/documents/organizations/$(orgId)/members/$(request.auth.uid))
+      allow write: if isOrgMember(orgId)
                       && request.resource.size < 52428800;
     }
 
     match /orgs/{orgId}/{allPaths=**} {
-      // Cross-service read: resolves the caller's membership doc in Firestore, the same
-      // check firestore.rules' isOrgMember(orgId) performs for Firestore access.
-      allow read: if request.auth != null
-                     && firestore.exists(
-                          /databases/(default)/documents/organizations/$(orgId)/members/$(request.auth.uid));
+      allow read: if isOrgMember(orgId);
 
       // Same membership condition for write, plus a per-upload size ceiling. 25MB
       // (26214400 bytes) is the researched starting cap for this milestone's PPTX
       // imports (21-RESEARCH.md Open Question 3) — tunable, not a hard product limit.
-      allow write: if request.auth != null
-                      && firestore.exists(
-                           /databases/(default)/documents/organizations/$(orgId)/members/$(request.auth.uid))
+      allow write: if isOrgMember(orgId)
                       && request.resource.size < 26214400;
     }
   }
