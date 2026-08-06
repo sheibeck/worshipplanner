@@ -65,7 +65,8 @@ import {
   sendPasswordResetEmail,
   signOut,
 } from 'firebase/auth'
-import { doc, getDoc } from 'firebase/firestore'
+import { doc, getDoc, updateDoc } from 'firebase/firestore'
+import { DEFAULT_ORG_SETTINGS } from '@/types/organization'
 
 const mockUser = {
   uid: 'test-uid',
@@ -319,6 +320,94 @@ describe('useAuthStore', () => {
 
       await store.logout()
       expect(store.vwModeEnabled).toBe(true)
+    })
+
+    // R073 regression: this is the case CLAUDE.md/39-CONTEXT.md call out as the
+    // single most important test in the phase. A naive `settings?.vwModeEnabled
+    // ?? true` (dropping the flat-field fallback) would silently flip a
+    // deliberately-off church's Vertical Worship setting back ON, with no error
+    // and no other failing test. This org document has NO `settings` key at
+    // all — only the legacy flat field — so the dual-read must fall through to
+    // it rather than landing on the hardcoded `true` default.
+    it('keeps a flat vwModeEnabled false when there is no settings key', async () => {
+      mockOrgDocPath({ name: 'Test Org', vwModeEnabled: false })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.vwModeEnabled).toBe(false)
+    })
+  })
+
+  describe('OrgSettings (R073)', () => {
+    it('resolves full OrgSettings from defaults when the org document has no settings key', async () => {
+      mockOrgDocPath({ name: 'Test Org' })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.settings).toEqual(DEFAULT_ORG_SETTINGS)
+      expect(store.vwModeEnabled).toBe(true)
+    })
+
+    it('resolves an absent key to its default when settings is partially populated', async () => {
+      mockOrgDocPath({ name: 'Test Org', settings: { aiEnabled: false } })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.settings.aiEnabled).toBe(false)
+      expect(store.settings.pcEnabled).toBe(true)
+      expect(store.settings.vwModeEnabled).toBe(true)
+    })
+
+    it('prefers a nested settings value over the flat legacy field', async () => {
+      mockOrgDocPath({
+        name: 'Test Org',
+        settings: { vwModeEnabled: true },
+        vwModeEnabled: false,
+      })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.vwModeEnabled).toBe(true)
+    })
+
+    it('does not write to Firestore while loading an org document that lacks settings', async () => {
+      mockOrgDocPath({ name: 'Test Org' })
+      const { useAuthStore } = await import('../auth')
+      useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(updateDoc).not.toHaveBeenCalled()
+    })
+
+    it('resets settings to defaults when the user belongs to no organization', async () => {
+      vi.mocked(doc).mockImplementation(
+        (_db: unknown, ...segments: string[]) => ({ path: segments.join('/') }) as never,
+      )
+      vi.mocked(getDoc).mockImplementation((ref: unknown) => {
+        const path = (ref as { path?: string }).path
+        if (path === 'users/test-uid') {
+          return Promise.resolve({
+            exists: () => true,
+            data: () => ({ orgIds: [] }),
+          }) as never
+        }
+        return Promise.resolve({ exists: () => false, data: () => null }) as never
+      })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.settings).toEqual(DEFAULT_ORG_SETTINGS)
+    })
+
+    it('resets settings to defaults on logout', async () => {
+      mockOrgDocPath({ name: 'Test Org', settings: { aiEnabled: false, pcEnabled: false } })
+      vi.mocked(signOut).mockResolvedValueOnce(undefined)
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.settings.aiEnabled).toBe(false)
+
+      await store.logout()
+      expect(store.settings).toEqual(DEFAULT_ORG_SETTINGS)
     })
   })
 
