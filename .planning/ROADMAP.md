@@ -132,10 +132,22 @@ Full details: [milestones/v1.4-ROADMAP.md](milestones/v1.4-ROADMAP.md) · phase 
 
 ## Backlog
 
-### ★ Phase 999.3: Deploy firestore.rules to production before v1.4 ships (BACKLOG — REQUIRED)
+### ✅ Phase 999.3: Deploy firestore.rules to production — DEPLOYED 2026-08-05
 
-**Goal:** run `firebase deploy --only firestore:rules`, then re-run the devtools bypass check that
-Phase 31 deliberately skipped.
+> **Deploy half DONE.** A full `firebase deploy` to `worship-planner-bc515` released
+> `firestore.rules` and `storage.rules` to production on 2026-08-05, alongside hosting, the
+> Firestore indexes and all five Cloud Functions. Confirmed independently: a follow-up
+> `firebase deploy --only firestore:rules,storage` reported *"latest version of firestore.rules
+> already up to date, skipping upload"*, which is Firebase comparing the local file against the
+> live ruleset and finding them identical. **Phase 31's draft lock now runs on all three layers.**
+>
+> **The verification half is still OPEN** — see "Verification after deploy" below. Nobody has yet
+> opened devtools against the PRODUCTION app and attempted a direct write to a locked service. The
+> rules are live; that they *behave* as intended in production is still inferred from the emulator
+> suite, not observed. This is the one item worth actually doing by hand.
+
+**Goal:** ~~run `firebase deploy --only firestore:rules`~~ (done), then re-run the devtools bypass
+check that Phase 31 deliberately skipped.
 **Why this is not optional:** Phase 31 (R036) added a three-layer draft lock. Two layers — the UI gate
 and the store guard — ship with the app bundle. **The third does not.** `firestore.rules` deploys
 separately, this repo has no CI, and `src/rules.test.ts` is excluded from the default vitest run
@@ -153,7 +165,9 @@ rules ARE active. This backlog item is specifically about production.)
 
 Plans:
 
-- [ ] TBD — must be done before the v1.4 milestone is considered shipped
+- [x] Deploy `firestore.rules` to production — done 2026-08-05 as part of a full `firebase deploy`
+- [ ] Devtools bypass check against PRODUCTION (set a service to Planned, attempt a direct write,
+      expect permission denied) — **still outstanding**
 
 ### Phase 999.2: Clearing a song should clear its slides, even when the song is reprised (BACKLOG)
 

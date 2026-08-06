@@ -155,9 +155,11 @@ only after a page refresh.
       Dockerfile, bridging Cloud Function, cleanup job, 39 tests) but it was **never deployed**, by the
       owner's own instruction, and **no UI consumes the rendered images**. R062 is `[~]` partial.
       Finishing it means deploying per `render-service/DEPLOY.md` and building a client-side display.
-- [ ] **Deploy `firestore.rules` to production** (backlog Phase 999.3) — Phase 31's draft lock has
-      three layers; the UI gate and store guard ship in the bundle, the rules layer does not. Until it
-      is deployed, the browser console can still write to a locked service.
+- [ ] **Confirm the production draft lock by hand** (backlog Phase 999.3, deploy half done) — the
+      rules layer was deployed 2026-08-05, so Phase 31's lock now runs on all three layers. What is
+      still unverified is its *behaviour* in production: set a service to Planned, open devtools,
+      attempt a direct Firestore write, expect permission denied. Currently inferred from the
+      emulator suite, never observed live.
 - [ ] Clearing a song should clear its slides, even when the song is reprised (backlog Phase 999.2)
 - [ ] Extract a shared song-browse component used by both the Songs page and the service-plan picker
       (backlog Phase 999.1)

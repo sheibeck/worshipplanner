@@ -1467,6 +1467,44 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - 22-04: media/autoplay e2e human-verify checkpoint (Task 3) pending before this plan is fully signed off
 - 28-06: this phase's human-verify batch (queued in 28-06-SUMMARY.md) is outstanding, alongside Phases 20-23/25-27 — deferred to /gsd-audit-milestone per the documented v1.3 convention.
 
+## 🚀 PRODUCTION DEPLOY — 2026-08-05, `worship-planner-bc515`
+
+v1.4 is **live**. Full `firebase deploy` from `master` at merge commit `3d04569`.
+
+| Target | Result |
+|---|---|
+| Hosting | ✅ `https://worship-planner-bc515.web.app` serving bundle `index-DaExv7Qk.js` |
+| **Firestore rules** | ✅ **released — Phase 31's draft lock now runs on all three layers** |
+| Storage rules | ✅ released |
+| Firestore indexes | ✅ deployed |
+| Functions | ✅ `api`, `parsePptx`, `requestPptxRender`, `cleanupExpiredMedia`, `cleanupOrphanRenders` (all Node 22, 2nd gen, us-central1) |
+
+**Two things went wrong on the first attempt; both are worth knowing about, because neither announced
+itself clearly.**
+
+1. **`firebase deploy --non-interactive` refused to start**, demanding a value for
+   `PPTX_RENDER_SERVICE_URL`. That param is `defineString(..., { default: "" })` and the EMPTY value
+   is a *tested fail-closed branch* (`render-service-not-configured`, T-37-15), not a placeholder —
+   but non-interactive mode won't assume a declared default. Fixed by creating `functions/.env` with
+   an explicit empty value. **That file is gitignored and holds no secret.** When the Cloud Run render
+   service is eventually deployed, set the real URL there and redeploy functions; nothing else changes.
+
+2. **Hosting uploaded but was never released.** The first run printed `file upload complete`, then
+   `requestPptxRender` failed on Eventarc service-agent propagation (a first-time-2nd-gen-functions
+   warm-up issue), and the whole deploy aborted **before `version finalized` / `release complete`**.
+   The retry targeted only the failed function, so production went on serving the OLD bundle while the
+   logs read as a mostly-successful deploy. Caught by diffing the live `index.html`'s asset hash
+   against `dist/` — not by trusting the CLI. `firebase deploy --only hosting` then completed the
+   release. **`file upload complete` is not `release complete`; check the asset hash.**
+
+**Still NOT deployed, by design:** the Phase 37 Cloud Run render service (`render-service/`). Nothing
+containerized or provisioned. R062 remains `[~]` partial and no UI consumes rendered images.
+`render-service/DEPLOY.md` is the handoff.
+
+**One genuinely open item:** backlog 999.3's *verification* half. The rules are live, but nobody has
+opened devtools against production and attempted a direct write to a locked service. Live-ness is
+confirmed; correct behaviour in production is still inferred from the emulator suite.
+
 ## Deferred Items
 
 Acknowledged and deferred at milestone close on 2026-08-05. The owner's instruction was to close v1.4
