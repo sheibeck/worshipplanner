@@ -1,20 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.4
-milestone_name: Service and Slides
-status: Awaiting next milestone
-stopped_at: Completed 38-04-PLAN.md (Phase 38 code-complete; owner checkpoint deferred, PENDING-VERIFICATION.md 38.1-38.7)
-last_updated: "2026-08-06T03:03:54.174Z"
-last_activity: 2026-08-05
-last_activity_desc: Milestone v1.4 completed and archived
+milestone: v1.5
+milestone_name: Settings, Sharing, and Fidelity
+status: planning
+last_updated: "2026-08-06T14:03:30.346Z"
+last_activity: 2026-08-06
 progress:
-  total_phases: 10
-  completed_phases: 10
-  total_plans: 61
-  completed_plans: 61
-  percent: 100
-current_phase: 38
-current_phase_name: Congregational Readings Become Real Slides
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -75,10 +71,10 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 
 ## Current Position
 
-Phase: Milestone v1.4 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-08-05 — Milestone v1.4 completed and archived
+Status: Defining requirements
+Last activity: 2026-08-06 — Milestone v1.5 started
 
 ## ★ Phase 36's remaining gap is a DECISION, not missing code — read before planning it
 
@@ -1593,6 +1589,7 @@ this rule testable"*, not merely *"make it work"*.
 1. **Grant the Firebase Storage service agent read access to Firestore** (production only). Cross-service
    Rules require it. Cheapest if it works, but the emulator still cannot evaluate `firestore.exists()`,
    so this rule would remain **permanently unverifiable locally** — the same condition that hid the bug.
+
 2. **Remove the cross-service dependency** by putting `orgId`/`role` on a custom auth claim, so the rule
    reads `request.auth.token.orgId == orgId`. Works in emulator and production, and makes
    `storage.rules.test.ts` meaningful. Costs real work: a Cloud Function on membership change, client
@@ -1613,6 +1610,7 @@ functions so `requestPptxRender` picks it up. All five functions updated success
   return `403 Forbidden` from the Google front end. `--no-allow-unauthenticated` was honored.
   *(A body-less POST returns `411 Length Required` — that is the front end rejecting the request
   before IAM, not the service being open. Always probe with a body.)*
+
 - **`PPTX_RENDER_SERVICE_URL`** is set in `functions/.env` (gitignored), replacing the empty value
   that selected the `render-service-not-configured` fail-closed branch.
 
@@ -1624,6 +1622,7 @@ one fails closed and loudly:
 
 - **`run.invoker` binding is present.** Missing, `invokeRenderService` gets a platform 403 before any
   application code runs, and the render doc lands on `render-service-error`.
+
 - **`STORAGE_BUCKET` is correct** (`.firebasestorage.app`, not the `.appspot.com` the docs originally
   said). Wrong, `requiredBucketName()` throws on the first render.
 

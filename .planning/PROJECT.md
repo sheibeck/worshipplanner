@@ -14,7 +14,7 @@ Smart weekly service planning that follows the Vertical Worship methodology (1�
 (Phases 18–23) · v1.3 Slides Tab Rework (Phases 24–28) · **v1.4 Service and Slides (Phases 29–38,
 shipped 2026-08-05)** — all archived.
 
-**Open:** nothing. v1.5 has not been scoped — run `/gsd-new-milestone`.
+**Open:** **v1.5 Settings, Sharing, and Fidelity** — scoped 2026-08-06, phases 39+.
 
 ### v1.4 shipped on owner acceptance, with two things left genuinely unfinished
 
@@ -49,6 +49,63 @@ per-phase verification.
 
 **Dropped 2026-07-28:** Collaboration / Tasks & Events (planned as Phase 5, never started) —
 `TASK-01..03`, `EVNT-01..04`. Still in backlog: **999.1**, extract a shared song-browse component.
+
+## Current Milestone: v1.5 Settings, Sharing, and Fidelity
+
+**Goal:** Make the app configurable per church — settings that turn features on and off and set the
+house style — while fixing the sharing and fidelity defects that make a service plan not match what
+was actually planned.
+
+**Target features:**
+
+- **Carryover from v1.4** — build the client-side display of rendered PPTX images (R062's missing
+  half: nothing in `src/` reads `pptxRenders` or the `rendered/*.png` objects today), and move org
+  membership onto a **custom auth claim** so `storage.rules` becomes testable in the emulator rather
+  than merely working in production.
+- **Sharing correctness** — one permanent share link per service that never rotates, with the shared
+  snapshot auto-refreshing on every service change so role overrides publish without re-sharing.
+- **Settings — new configurability** — an AI integration toggle gating every AI surface; a Planning
+  Center integration toggle; ESV-or-NLT Bible version selection; a Services slide-out defining the
+  default template for a new blank service; a Slides slide-out setting global font family, weight
+  and size.
+- **Service items** — add Announcements and Miscellaneous (both plain input boxes), reduce Message
+  to an input box with no URL link, and remove Hymn from the add-item palette.
+- **Congregational reading** — a real divider UX for Leader / Congregation / All settled by a UI
+  research phase, with the AI-assisted split retained but gated by the AI toggle; the first slide
+  shows the scripture reference and later slides show only speaker labels.
+- **Slides & media** — deterministic ordering for multi-image import (JPEG already imports fine; the
+  *order* is browser-supplied and effectively nondeterministic).
+- **Mobile & layout** — a mobile-friendly Slides tab; stacked buttons on the service edit screen as
+  the Schedule screen already does; Print and Share moved from the page bottom into the contextual
+  top action bar; Undo demoted to a link beside the last-saved text; a dismissible Getting Started
+  panel on the dashboard.
+
+**Resolved during scoping (2026-08-06) — three items were investigated rather than assumed:**
+
+| Question asked | What the code / cloud actually showed |
+|---|---|
+| Does `pptx-render-sa` exist, or is Cloud Run on a default identity? | **It exists and is in use.** `pptx-render` runs as `pptx-render-sa@worship-planner-bc515.iam.gserviceaccount.com`, exactly the least-privilege identity DEPLOY.md specifies. **No divergence — dropped from scope, not a phase.** |
+| Are JPEGs supported on image drop, and how are multiple images ordered? | **JPEG already works** — `dropRouting.ts:51` classifies on `file.type.startsWith('image/')`, so JPEG/PNG/WebP/GIF all route to the image bucket. **Ordering is the real gap:** `classifyFiles` preserves the browser's `DataTransfer` order, which for a multi-file OS drag is selection/filesystem order, not name order. |
+| Why does sharing mint a new link, and why are role overrides stale? | **One root cause, not two.** `services.ts:353` `createShareToken()` mints a fresh random 36-char token on *every* call and freezes a `serviceSnapshot` — including resolved `roleAssignments` — into it at that moment. A stable memorable URL (`serviceShares/{slug}__service-{date}`) already exists and is overwritten in place; it just carries the same frozen snapshot. |
+
+**Milestone decisions** (settled during scoping, 2026-08-06):
+
+| Question | Decision |
+|---|---|
+| Share link stability | **Persist the token on the service doc** — minted once, never rotated. Refresh the snapshot automatically whenever the service changes, so overrides publish without re-sharing. Keeps the D-04/D-24 PII guard (names only, no emails) intact — a live read would have needed roster access. |
+| Removing the Hymn item | **Palette-only removal.** `createSlot('HYMN')` leaves the add-item palette; `slotLabel`, the assembler and all rendering stay. Existing production HYMN slots keep working. No migration — HYMN carries free-text `hymnName`/`hymnNumber`/`verses` that SONG (which requires a catalog `songId`) cannot represent losslessly. |
+| Slide fonts | **Curated, self-hosted woff2 list — not the runtime Google Fonts API.** Chosen after the runtime-catalog option was first selected and then reversed: a projector without internet at service time cannot fetch a remote font. The model is **family + weight + size**, because "Helvetica Neue Light" is a weight and a family-only picker cannot reach it. **Inter** is the Helvetica Neue stand-in (Light = 300, Regular = 400). Final list settled by the UI research phase against projection legibility. |
+| Default service template vs. Vertical Worship | **The org template replaces `buildSlots()`** as the source of a new blank service's structure. When VW mode is on, the song slots in that template still receive required VW types from the chosen progression; with VW off they are untyped. `buildSlots()` becomes the fallback default template rather than the authority. |
+| PPTX rendered display | **The rendered PNG *is* the slide** — drawn in the grid and in the presenter. Parsed text stays in the document for search, labels and accessibility but is never drawn. The alternative (PNG as background with text overlaid) would draw the deck's own text twice. Owner's framing: *"import the powerpoint so that the slides look like they natively looked in the powerpoint presentation."* |
+| NLT Bible version | Key is already in hand. `NLT_API_KEY` joins `ESV_API_KEY` in `.env.local` and proxies through the same Cloud Function pattern. |
+| Milestone structure | **One v1.5, phased by theme** rather than split across v1.5/v1.6. |
+
+**Why the storage.rules item is scoped as "make it testable," not "make it work":** production was
+fixed on 2026-08-05 by an IAM grant, and uploads work. But
+[firebase-js-sdk#6803](https://github.com/firebase/firebase-js-sdk/issues/6803) means
+`firestore.exists()` is permanently inert in the Storage emulator, so the rule can never be verified
+locally. That is the precise blind spot that let a deny-everyone rule reach production. Moving
+membership onto a custom claim makes the check work in both environments. See CLAUDE.md.
 
 ## Previous Milestone: v1.4 Service and Slides (SHIPPED 2026-08-05)
 
@@ -153,7 +210,24 @@ only after a page refresh.
 
 ### Active
 
-<!-- v1.5 has not been scoped. Run /gsd-new-milestone to define it. -->
+<!-- v1.5 Settings, Sharing, and Fidelity — scoped 2026-08-06. REQUIREMENTS.md carries the
+     REQ-ID-level detail; this section is the narrative summary. -->
+
+**v1.5 — new this milestone**
+
+- [ ] Every church can turn AI features off, and turning them off removes all AI interaction
+- [ ] Every church can turn Planning Center integration off once they have fully ported off it
+- [ ] Scripture can be pulled from ESV or NLT, chosen in Settings
+- [ ] A church can define the default template for a new blank service
+- [ ] A church can set one font family, weight and size for every slide
+- [ ] A service's share link never changes, and always shows the current plan and role overrides
+- [ ] Announcements and Miscellaneous exist as service items; Message is a plain input box
+- [ ] Congregational readings can be divided into Leader / Congregation / All by hand, and the
+      first slide carries the scripture reference
+- [ ] Importing several images at once produces a predictable slide order
+- [ ] The Slides tab and the service edit screen are usable on a phone
+
+**Carried forward from v1.4**
 
 - [ ] **PowerPoint imports look like the original PowerPoint** — carried forward from v1.4, now
       **half done**. The backend was deployed 2026-08-06: Cloud Run `pptx-render` (us-central1,
@@ -177,6 +251,9 @@ only after a page refresh.
 
 ### Out of Scope
 
+- Migrating existing HYMN service slots to SONG — v1.5 removes Hymn from the palette only. HYMN carries free-text `hymnName`/`hymnNumber`/`verses`; SONG requires a catalog `songId`, so conversion is lossy and any hymn absent from the catalog would become an empty slot
+- Runtime Google Fonts API for slide fonts — considered and rejected in v1.5 scoping: a projector without internet at service time could not fetch the font. Curated self-hosted woff2 instead
+- Per-slide font overrides — font family/weight/size is set once for all slides, by owner instruction
 - Planning Center API integration — complement only, no sync (complexity too high; CSV import + manual transfer sufficient)
 - ProPresenter integration — plans are created here, ProPresenter is managed separately
 - Real-time collaborative editing — planners take turns, not simultaneous editing
@@ -266,6 +343,11 @@ Administrative, Communication, Rehearsal, Service time, Training, Physical setup
 | PPTX rendered server-side to images | Only way to get true fidelity — backgrounds, fonts, charts, effects. Trades in-app editing of imported decks, which was never a real workflow | — Pending (v1.4) |
 | Draft-only editing with explicit reopen | A planned/exported service has been communicated to people; silent edits desync rehearsal and Planning Center | — Pending (v1.4) |
 | Persistent inline save status over per-save toasts | A 500ms debounce makes success toasts constant noise; failures are the signal worth interrupting for | — Pending (v1.4) |
+| Share token persisted on the service, snapshot auto-refreshed | One root cause behind both "the link changed" and "my role overrides aren't showing" — the token was re-minted per share and the snapshot frozen at share time | — Pending (v1.5) |
+| Org membership on a custom auth claim | `firestore.exists()` is permanently inert in the Storage emulator (firebase-js-sdk#6803), so a cross-service rule can never be verified locally — the blind spot that shipped a deny-everyone rule | — Pending (v1.5) |
+| Curated self-hosted fonts over the Google Fonts API | A projector without internet at service time cannot fetch a remote font; slides must render identically offline | — Pending (v1.5) |
+| Org service template replaces `buildSlots()` | Churches outside this one do not run a 1-2-2-3 Vertical Worship order; the template is the structure, VW remains the song-typing layer on top | — Pending (v1.5) |
+| AI gated at the `claudeApi.ts` choke point | All three AI surfaces (song suggestions, scripture discovery, congregational split) already route through one module — the toggle has exactly one place to live, and it doubles as the future paywall seam | — Pending (v1.5) |
 
 ## Evolution
 
@@ -285,4 +367,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-05 after shipping milestone v1.4 (Service and Slides)*
+*Last updated: 2026-08-06 after scoping milestone v1.5 (Settings, Sharing, and Fidelity)*
