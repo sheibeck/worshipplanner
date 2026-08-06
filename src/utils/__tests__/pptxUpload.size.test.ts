@@ -73,12 +73,16 @@ describe('PPTX upload size validation (2026-08-06 incident)', () => {
       expect(msg.toLowerCase()).not.toContain('unauthorized')
     })
 
-    it('accepts the repo fixture, which is well under the cap', () => {
-      // docs/example.pptx is ~8.5MB and is the control file used to distinguish
-      // a size failure from a permission failure.
-      const real = readFileSync('docs/example.pptx')
-      expect(real.length).toBeLessThan(PPTX_MAX_BYTES)
-      expect(validatePptxSize(fileOfSize(real.length))).toBeNull()
+    it('accepts a realistically-sized deck', () => {
+      // 8.5MB — the size of docs/example.pptx, the control file used during the
+      // 2026-08-06 incident to separate a size failure from a permission one.
+      //
+      // Deliberately a LITERAL rather than `readFileSync('docs/example.pptx')`.
+      // That fixture is untracked (present locally, absent from the repo), so
+      // reading it made this test pass here and fail with ENOENT on any fresh
+      // clone — verified by hiding the file and re-running. A test that depends
+      // on a file git does not carry is not a test, it is a local coincidence.
+      expect(validatePptxSize(fileOfSize(Math.round(8.46 * 1024 * 1024)))).toBeNull()
     })
   })
 })
