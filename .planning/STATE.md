@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Settings, Sharing, and Fidelity
 status: planning
-last_updated: "2026-08-06T14:03:30.346Z"
+last_updated: "2026-08-06T16:45:00.000Z"
 last_activity: 2026-08-06
 progress:
-  total_phases: 0
+  total_phases: 10
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -98,7 +98,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** v1.5 Settings, Sharing, and Fidelity — defining requirements
+**Current focus:** v1.5 Settings, Sharing, and Fidelity — ROADMAP.md created, ready to plan Phase 39
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -108,10 +108,87 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 39 (not yet planned)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-08-06 — Milestone v1.5 started
+Status: Roadmap created — ready to plan Phase 39
+Last activity: 2026-08-06 — v1.5 ROADMAP.md created (Phases 39-48, 31/31 requirements mapped, 0 unmapped)
+
+## ⏸ RESUME HERE (2026-08-06 — v1.5 ROADMAP.md created, ready to plan Phase 39)
+
+**`.planning/ROADMAP.md` and `.planning/REQUIREMENTS.md` traceability are filled for v1.5** (Phases
+39-48, 31/31 requirements R073–R103 mapped, 0 unmapped). No plan has been created yet — the milestone
+is at the roadmap-approved, not-yet-planned stage.
+
+**Next step:** `/gsd-plan-phase 39` (optionally preceded by `/gsd-discuss-phase 39`) — Phase 39 (Org
+Settings Infrastructure & Feature Toggles) is first: every later phase that stores a setting (Phase 44
+default template, Phase 45 Bible version, Phase 46 typography) depends on the typed `OrgSettings` shape
+it establishes, and the AI/Planning Center toggles it also delivers are the first user-visible settings
+surface. Phase 40 (Custom Auth Claim) is independent of Phase 39 and is sequenced second deliberately —
+its dual-read soak window is the longest-running thing in the milestone, so starting it early leaves
+the most possible time for the owner's two gated deploys.
+
+See `.planning/ROADMAP.md` § Phase Details for the full phase table, dependencies, success criteria
+and research flags.
+
+## ★ v1.5 ROADMAP.md phase breakdown (created 2026-08-06)
+
+10 phases (39-48), derived from `research/SUMMARY.md`'s 12-phase default (Phases 39-50) with this
+project's `coarse` granularity setting applied. Departures from the research default, recorded
+explicitly per the roadmapper's instructions:
+
+- **Merged SUMMARY's Phase 39 (Org Settings Infrastructure, R073 alone) and Phase 45 (AI and Planning
+  Center Settings Toggles, R088–R089) into one Phase 39.** R073 by itself is a single-requirement,
+  UI-invisible infrastructure phase — a typed `OrgSettings` shape with no consuming screen until a
+  later phase writes into it — which reads as a task, not an observable outcome, under `coarse`
+  granularity. The AI/PC toggles are both flagged standard-pattern/skip-research in SUMMARY.md and are
+  the first feature that actually puts a control on a Settings screen, so folding them together gives
+  Phase 39 real user-observable success criteria while still landing first — ahead of every phase that
+  depends on R073 (R086 in Phase 44, R090 in Phase 45, R093 in Phase 46).
+
+- **Merged SUMMARY's Phase 49 (Multi-Image Import Ordering, R098 alone) and Phase 50 (Mobile & Layout
+  Polish, R099–R103) into one Phase 48.** R098 alone is a single-requirement bug-fix phase. SUMMARY's
+  own rationale for both phases already calls them "independent, low-risk... good candidate to slot in
+  wherever convenient" / "sequenced last... independent" — nothing in either phase's scope conflicts
+  with the other, so combining them under `coarse` granularity avoids two adjacent thin phases without
+  changing what either delivers.
+
+- **Renumbered** SUMMARY's Phase 46 (ESV/NLT) → Phase 45, Phase 47 (Typography) → Phase 46, and
+  Phase 48 (Congregational Reading) → Phase 47, purely to close the numbering gap left by the two
+  merges above. Ordering rationale, dependencies, and content are otherwise unchanged from SUMMARY.
+
+**Hard sequencing constraints applied, all from research and all grounded in read source:**
+
+- Phase 40 (custom claims) and Phase 41 (sharing) both edit rules files — sequenced, not parallel
+  (Phase 41 depends on Phase 40).
+- Phase 39 (AI toggle) and Phase 47 (congregational reading, whose AI-split option gates through the
+  same toggle) both route through `claudeApi.ts` — sequenced, not parallel (Phase 47 depends on
+  Phase 39).
+- Phase 43 (service item types, the finalized `SlotKind` palette) precedes Phase 44 (default template,
+  whose editor needs that palette).
+- Phase 39 (settings infrastructure) is a hard prerequisite for every phase that stores a setting:
+  Phase 44 (R086), Phase 45 (R090), Phase 46 (R093).
+- Phase 45 (Bible translation/attribution) precedes Phase 47 (congregational reading), since the
+  divider operates on already-fetched, already-attributed scripture text.
+
+**Deploy-gated phases** — per the v1.5 standing autonomy grant, every deployable artifact ships built,
+tested, and undeployed, with the exact command handed to the owner:
+
+- **Phase 40** (custom claims Cloud Function, its backfill, and `storage.rules`) — structurally TWO
+  owner deploys with a mandatory 1-hour soak between them (dual-read first, fallback removal second).
+  This phase cannot fully close inside an autonomous run — note this explicitly so it is never later
+  mistaken for incomplete rather than deploy-gated-by-design.
+- **Phase 41** (`firestore.rules` update-rule loosening for `shareTokens`/`serviceShares`) — one owner
+  deploy.
+- **Phase 45** (the new NLT proxy Cloud Function) — one owner deploy.
+
+**Rules-testing discipline mandate** — every phase touching `firestore.rules` or `storage.rules`
+(Phases 40 and 41) carries a success criterion requiring a positive (allow-case) test that actually
+runs against the real emulator, not merely a deny-case pass. This is non-negotiable per CLAUDE.md's
+documented incident: a deny-everyone `storage.rules` shipped to production behind an all-deny test
+suite for an entire milestone.
+
+Full phase table, success criteria, and per-phase research/notes: `.planning/ROADMAP.md`. Traceability:
+`.planning/REQUIREMENTS.md` (31/31 mapped, 0 unmapped).
 
 ## ★ Phase 36's remaining gap is a DECISION, not missing code — read before planning it
 

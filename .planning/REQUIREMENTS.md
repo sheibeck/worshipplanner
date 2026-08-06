@@ -255,47 +255,47 @@ Explicitly excluded. Documented to prevent scope creep.
 
 ## Traceability
 
-Populated during roadmap creation.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R073 | TBD | Pending |
-| R074 | TBD | Pending |
-| R075 | TBD | Pending |
-| R076 | TBD | Pending |
-| R077 | TBD | Pending |
-| R078 | TBD | Pending |
-| R079 | TBD | Pending |
-| R080 | TBD | Pending |
-| R081 | TBD | Pending |
-| R082 | TBD | Pending |
-| R083 | TBD | Pending |
-| R084 | TBD | Pending |
-| R085 | TBD | Pending |
-| R086 | TBD | Pending |
-| R087 | TBD | Pending |
-| R088 | TBD | Pending |
-| R089 | TBD | Pending |
-| R090 | TBD | Pending |
-| R091 | TBD | Pending |
-| R092 | TBD | Pending |
-| R093 | TBD | Pending |
-| R094 | TBD | Pending |
-| R095 | TBD | Pending |
-| R096 | TBD | Pending |
-| R097 | TBD | Pending |
-| R098 | TBD | Pending |
-| R099 | TBD | Pending |
-| R100 | TBD | Pending |
-| R101 | TBD | Pending |
-| R102 | TBD | Pending |
-| R103 | TBD | Pending |
+| R073 | Phase 39 | Pending |
+| R074 | Phase 40 | Pending |
+| R075 | Phase 40 | Pending |
+| R076 | Phase 41 | Pending |
+| R077 | Phase 41 | Pending |
+| R078 | Phase 41 | Pending |
+| R079 | Phase 42 | Pending |
+| R080 | Phase 42 | Pending |
+| R081 | Phase 43 | Pending |
+| R082 | Phase 43 | Pending |
+| R083 | Phase 43 | Pending |
+| R084 | Phase 43 | Pending |
+| R085 | Phase 43 | Pending |
+| R086 | Phase 44 | Pending |
+| R087 | Phase 44 | Pending |
+| R088 | Phase 39 | Pending |
+| R089 | Phase 39 | Pending |
+| R090 | Phase 45 | Pending |
+| R091 | Phase 45 | Pending |
+| R092 | Phase 45 | Pending |
+| R093 | Phase 46 | Pending |
+| R094 | Phase 46 | Pending |
+| R095 | Phase 47 | Pending |
+| R096 | Phase 47 | Pending |
+| R097 | Phase 47 | Pending |
+| R098 | Phase 48 | Pending |
+| R099 | Phase 48 | Pending |
+| R100 | Phase 48 | Pending |
+| R101 | Phase 48 | Pending |
+| R102 | Phase 48 | Pending |
+| R103 | Phase 48 | Pending |
 
 **Coverage:**
 - v1.5 requirements: 31 total
-- Mapped to phases: 0 (roadmap not yet created)
-- Unmapped: 31 ⚠️
+- Mapped to phases: 31 (Phases 39-48)
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-08-06*
-*Last updated: 2026-08-06 after v1.5 scoping*
+*Last updated: 2026-08-06 — ROADMAP.md created; Phases 39-48 (10 phases, compressed from SUMMARY.md's
+12-phase default under this project's `coarse` granularity setting), 31/31 requirements mapped, 0
+unmapped.*
