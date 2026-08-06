@@ -2078,6 +2078,7 @@ const activeActionItems = computed(() =>
     canEditService: canEditService.value,
     hasSermonContext: hasSermonContext.value,
     aiSuggestingAll: aiSuggestingAll.value,
+    aiEnabled: authStore.settings.aiEnabled,
     hasPcCredentials: authStore.hasPcCredentials,
     pcEnabled: authStore.settings.pcEnabled,
     isExporting: isExporting.value,

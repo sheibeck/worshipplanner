@@ -65,6 +65,14 @@ export interface ActionBarContext {
   canEditService: boolean
   hasSermonContext: boolean
   aiSuggestingAll: boolean
+  /**
+   * Org-level AI features toggle (WR-01, 39-REVIEW). Required (not
+   * optional) so the compiler forces every call site to supply it — an
+   * `undefined` here would silently show "Suggest All Songs" with AI off,
+   * the one AI entry point that was missed by 39-05's hide-don't-disable
+   * pass. Follows the same threading pattern as `pcEnabled` below.
+   */
+  aiEnabled: boolean
   hasPcCredentials: boolean
   /**
    * Org-level Planning Center integration toggle (R089, 39-05). Required
@@ -160,7 +168,11 @@ function buildPresentItem(ctx: ActionBarContext): ActionBarItem {
 
 function buildServiceOrderItems(ctx: ActionBarContext): ActionBarItem[] {
   const items: ActionBarItem[] = []
-  if (ctx.canEditService) {
+  // WR-01: "Suggest All Songs" is a live AI entry point (calls
+  // getSongSuggestions for every SONG slot) and must be hidden — not
+  // disabled — when the org has turned AI off, per the UI-SPEC's
+  // Hide-Don't-Disable Contract.
+  if (ctx.canEditService && ctx.aiEnabled) {
     items.push(buildSuggestItem(ctx))
   }
   // Export renders regardless of canEditService, matching live source (see

@@ -43,6 +43,7 @@ function makeContext(overrides: Partial<ActionBarContext> = {}): ActionBarContex
     canEditService: true,
     hasSermonContext: true,
     aiSuggestingAll: false,
+    aiEnabled: true,
     hasPcCredentials: true,
     pcEnabled: true,
     isExporting: false,
@@ -63,6 +64,7 @@ const BOOLEAN_FLAG_KEYS = [
   'canEditService',
   'hasSermonContext',
   'aiSuggestingAll',
+  'aiEnabled',
   'hasPcCredentials',
   'isExporting',
   'isDirty',
@@ -169,6 +171,35 @@ describe('buildActionBarItems', () => {
     it('pcEnabled false, hasPcCredentials false: export-pc is still absent (both gates agree)', () => {
       const ctx = makeContext({ canEditService: true, hasPcCredentials: false, pcEnabled: false })
       expect(keysOf('service-order', ctx)).toEqual(['suggest-all-songs', 'save'])
+    })
+  })
+
+  // WR-01 (39-REVIEW): "Suggest All Songs" is a live AI entry point
+  // (buildSuggestItem calls getSongSuggestions per SONG slot) that was never
+  // gated on the org's AI toggle. Hide-don't-disable, same as the other
+  // AI-gated surfaces this phase touches — named so `-t "aiEnabled"` selects
+  // exactly these cases.
+  describe('aiEnabled (WR-01)', () => {
+    it('aiEnabled false: suggest-all-songs is absent from service-order', () => {
+      const ctx = makeContext({ canEditService: true, aiEnabled: false })
+      expect(keysOf('service-order', ctx)).toEqual(['export-pc', 'save'])
+    })
+
+    it('aiEnabled true: suggest-all-songs is present in service-order', () => {
+      const ctx = makeContext({ canEditService: true, aiEnabled: true })
+      expect(keysOf('service-order', ctx)).toEqual(['suggest-all-songs', 'export-pc', 'save'])
+    })
+
+    it('aiEnabled false composes with canEditService: suggest-all-songs never appears regardless of edit permission', () => {
+      const editor = makeContext({ canEditService: true, aiEnabled: false, hasPcCredentials: false })
+      const viewer = makeContext({ canEditService: false, aiEnabled: false, hasPcCredentials: false })
+      expect(keysOf('service-order', editor)).not.toContain('suggest-all-songs')
+      expect(keysOf('service-order', viewer)).not.toContain('suggest-all-songs')
+    })
+
+    it('aiEnabled has no effect on slides or roles tabs (suggest-all-songs never appears there anyway)', () => {
+      expect(keysOf('slides', makeContext({ aiEnabled: false }))).not.toContain('suggest-all-songs')
+      expect(keysOf('roles', makeContext({ aiEnabled: false }))).not.toContain('suggest-all-songs')
     })
   })
 
