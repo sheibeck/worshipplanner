@@ -9,7 +9,7 @@
  * file with real assertions instead of first having to invent the mock shape.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import SettingsView from '../SettingsView.vue'
 
 // ── firebase/firestore mock (copied verbatim in shape from
@@ -19,7 +19,11 @@ import SettingsView from '../SettingsView.vue'
 //    assert the toggle save handlers' Firestore payload shape. ──
 const { mockUpdateDoc, mockGetDoc } = vi.hoisted(() => {
   return {
-    mockUpdateDoc: vi.fn(() => Promise.resolve()),
+    // Typed with explicit params (rather than `vi.fn(() => ...)`) so
+    // `mockUpdateDoc.mock.calls[N]![1]` resolves to a real tuple element
+    // instead of TS inferring an empty-tuple `[]` from a zero-arg signature
+    // (Wave 2 payload-shape assertions read this).
+    mockUpdateDoc: vi.fn((_ref: unknown, _data: Record<string, unknown>) => Promise.resolve()),
     mockGetDoc: vi.fn(() =>
       Promise.resolve({
         exists: () => false,
@@ -104,18 +108,36 @@ vi.mock('@/stores/auth', () => ({
     get vwModeEnabled() {
       return mockVwModeEnabled
     },
+    // Setter required (Task 3 — 39-03) so onToggleVwMode's mirror-write
+    // (`authStore.vwModeEnabled = newValue`) does not throw a TypeError on a
+    // getter-only accessor. Modules are strict-mode ESM, so an accessor with
+    // only a getter throws on assignment rather than silently no-opping.
+    set vwModeEnabled(v: boolean) {
+      mockVwModeEnabled = v
+    },
     setPcCredentials: mockSetPcCredentials,
-    // Forward-compatible shape — `settings` does not exist on the real store
-    // until 39-02. Seeded here so Waves 2/3 add assertions, not plumbing.
+    // `settings` — real shape as of 39-02. Setters mirror the vwModeEnabled
+    // setter above, required for the onToggleAiEnabled/onTogglePcEnabled
+    // mirror-writes (`authStore.settings.aiEnabled = newValue`, etc.) not to
+    // throw against a getter-only accessor.
     settings: {
       get aiEnabled() {
         return mockAiEnabled
       },
+      set aiEnabled(v: boolean) {
+        mockAiEnabled = v
+      },
       get pcEnabled() {
         return mockPcEnabled
       },
+      set pcEnabled(v: boolean) {
+        mockPcEnabled = v
+      },
       get vwModeEnabled() {
         return mockSettingsVwModeEnabled
+      },
+      set vwModeEnabled(v: boolean) {
+        mockSettingsVwModeEnabled = v
       },
     },
   }),
@@ -157,5 +179,182 @@ describe('SettingsView (Wave 0 harness — Phase 39)', () => {
   it('renders the Vertical Worship heading', () => {
     const wrapper = mountSettingsView()
     expect(wrapper.text()).toContain('Vertical Worship')
+  })
+})
+
+// ── Toggle checkbox indices, in DOM order (Task 2 markup order — Wave 2) ──────
+// 0: Planning Center enable toggle (top of the PC Integration section)
+// 1: Vertical Worship toggle
+// 2: AI Features toggle (last section on the page)
+const PC_CHECKBOX_INDEX = 0
+const VW_CHECKBOX_INDEX = 1
+const AI_CHECKBOX_INDEX = 2
+
+function toggleCheckboxes(wrapper: ReturnType<typeof mountSettingsView>) {
+  return wrapper.findAll('input[type="checkbox"]')
+}
+
+describe('SettingsView dot-path writes (R073) — Wave 2 (39-03)', () => {
+  beforeEach(() => {
+    mockOrgId = 'org-1'
+    mockOrgName = 'Test Church'
+    mockOrgSlug = 'test-church'
+    mockIsEditor = true
+    mockHasPcCredentials = false
+    mockPcAppId = null
+    mockPcSecret = null
+    mockVwModeEnabled = true
+    mockAiEnabled = true
+    mockPcEnabled = true
+    mockSettingsVwModeEnabled = true
+    mockUpdateDoc.mockClear()
+    mockGetDoc.mockClear()
+    mockSetPcCredentials.mockClear()
+  })
+
+  it('writes a dot-path leaf key when the AI toggle changes', async () => {
+    const wrapper = mountSettingsView()
+    const checkboxes = toggleCheckboxes(wrapper)
+    await checkboxes[AI_CHECKBOX_INDEX]!.setValue(false)
+    await flushPromises()
+
+    expect(mockUpdateDoc).toHaveBeenCalledTimes(1)
+    const payload = mockUpdateDoc.mock.calls[0]![1] as Record<string, unknown>
+    // Assert on the KEY SET, not merely that the expected key is present — a
+    // payload of { settings: {...wholeObject} } would also contain a key
+    // named differently, but a naive "has this key" check could still pass
+    // against other whole-map-shaped defects. Asserting exactly one key,
+    // and that it is the dotted leaf path, is what 39-RESEARCH.md Pitfall 1
+    // requires this test to rule out.
+    expect(Object.keys(payload)).toHaveLength(1)
+    expect(payload).toHaveProperty('settings.aiEnabled', false)
+    expect(payload).not.toHaveProperty('settings')
+  })
+
+  it('writes a dot-path leaf key when the PC toggle changes', async () => {
+    const wrapper = mountSettingsView()
+    const checkboxes = toggleCheckboxes(wrapper)
+    await checkboxes[PC_CHECKBOX_INDEX]!.setValue(false)
+    await flushPromises()
+
+    expect(mockUpdateDoc).toHaveBeenCalledTimes(1)
+    const payload = mockUpdateDoc.mock.calls[0]![1] as Record<string, unknown>
+    expect(Object.keys(payload)).toHaveLength(1)
+    expect(payload).toHaveProperty('settings.pcEnabled', false)
+    expect(payload).not.toHaveProperty('settings')
+  })
+
+  it('writes the nested leaf path when the Vertical Worship toggle changes (lazy backfill)', async () => {
+    const wrapper = mountSettingsView()
+    const checkboxes = toggleCheckboxes(wrapper)
+    await checkboxes[VW_CHECKBOX_INDEX]!.setValue(false)
+    await flushPromises()
+
+    expect(mockUpdateDoc).toHaveBeenCalledTimes(1)
+    const payload = mockUpdateDoc.mock.calls[0]![1] as Record<string, unknown>
+    expect(Object.keys(payload)).toHaveLength(1)
+    expect(payload).toHaveProperty('settings.vwModeEnabled', false)
+    // The flat field must never appear in the write payload again — this is
+    // the regression that would strand the vwModeEnabled migration forever.
+    expect(payload).not.toHaveProperty('vwModeEnabled')
+  })
+
+  it('mirrors the saved value onto the store for all three toggles', async () => {
+    const wrapper = mountSettingsView()
+    const checkboxes = toggleCheckboxes(wrapper)
+
+    await checkboxes[AI_CHECKBOX_INDEX]!.setValue(false)
+    await flushPromises()
+    expect(mockAiEnabled).toBe(false)
+
+    await checkboxes[PC_CHECKBOX_INDEX]!.setValue(false)
+    await flushPromises()
+    expect(mockPcEnabled).toBe(false)
+
+    await checkboxes[VW_CHECKBOX_INDEX]!.setValue(false)
+    await flushPromises()
+    expect(mockVwModeEnabled).toBe(false)
+  })
+
+  it('reverts the checkbox and surfaces the shared failure string when the write rejects', async () => {
+    mockUpdateDoc.mockRejectedValueOnce(new Error('network error'))
+    const wrapper = mountSettingsView()
+    const checkboxes = toggleCheckboxes(wrapper)
+
+    await checkboxes[AI_CHECKBOX_INDEX]!.setValue(false)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Failed to save. Please try again.')
+    const revertedCheckbox = toggleCheckboxes(wrapper)[AI_CHECKBOX_INDEX]!
+    expect((revertedCheckbox.element as HTMLInputElement).checked).toBe(true)
+    // The store must not have been mirror-written, since the Firestore write
+    // itself never succeeded.
+    expect(mockAiEnabled).toBe(true)
+  })
+})
+
+describe('SettingsView Planning Center credential retention (R089) — Wave 2 (39-03)', () => {
+  beforeEach(() => {
+    mockOrgId = 'org-1'
+    mockOrgName = 'Test Church'
+    mockOrgSlug = 'test-church'
+    mockIsEditor = true
+    mockHasPcCredentials = true
+    mockPcAppId = 'app-id-1'
+    mockPcSecret = 'secret-1'
+    mockVwModeEnabled = true
+    mockAiEnabled = true
+    mockPcEnabled = true
+    mockSettingsVwModeEnabled = true
+    mockUpdateDoc.mockClear()
+    mockGetDoc.mockClear()
+    mockSetPcCredentials.mockClear()
+  })
+
+  it('never clears Planning Center credentials when the integration is turned off', async () => {
+    const wrapper = mountSettingsView()
+    const checkboxes = toggleCheckboxes(wrapper)
+
+    await checkboxes[PC_CHECKBOX_INDEX]!.setValue(false)
+    await flushPromises()
+
+    // Neither onClearPcCredentials's Firestore write nor the store's
+    // setPcCredentials mutator is ever reached by turning the toggle off.
+    // Only the display-only v-if wrapper changes.
+    expect(mockSetPcCredentials).not.toHaveBeenCalled()
+    for (const call of mockUpdateDoc.mock.calls) {
+      const payload = call[1] as Record<string, unknown>
+      expect(payload).not.toHaveProperty('pcAppId')
+      expect(payload).not.toHaveProperty('pcSecret')
+    }
+
+    // NOTE: the durable half of this guarantee — that credentials actually
+    // SURVIVE a real off -> reload -> on cycle against live Firestore — is a
+    // backstop human check (39-03-PLAN.md must_haves) deferred to
+    // .planning/PENDING-VERIFICATION.md. jsdom cannot prove a real Firestore
+    // round-trip; this test only proves the handler never issues a
+    // credential-touching call.
+  })
+
+  it('hides the credentials block when the integration is off and shows it again when on', async () => {
+    const wrapper = mountSettingsView()
+
+    // Starts on: credentials display block (masked App ID/Secret) is visible.
+    expect(wrapper.text()).toContain('Edit Credentials')
+
+    const checkboxes = toggleCheckboxes(wrapper)
+    await checkboxes[PC_CHECKBOX_INDEX]!.setValue(false)
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('Edit Credentials')
+    expect(wrapper.text()).not.toContain('Clear Credentials')
+
+    await toggleCheckboxes(wrapper)[PC_CHECKBOX_INDEX]!.setValue(true)
+    await flushPromises()
+
+    // Re-enabling shows the identical masked display again — proof that
+    // authStore.hasPcCredentials (and therefore the stored credentials
+    // themselves) were never touched by the off state.
+    expect(wrapper.text()).toContain('Edit Credentials')
   })
 })
