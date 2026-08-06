@@ -679,6 +679,43 @@ round-trip or judge visual wrapping.
 
 ---
 
+## Phase 40 — Custom Auth Claim for Org Membership
+
+**Phase status: VERIFIED PASSED (4/4).** Nothing here is a defect. These are the owner-only steps
+that criterion 4 deliberately places *outside* the phase — the code is built, tested and handed over.
+
+**Full runbook with verbatim commands: `functions/DEPLOY-ORG-CLAIMS.md`.** This list is the tracker.
+
+- [ ] **40.1 — Deploy 1: dual-read rule + `syncOrgMembershipClaim`.** Additive and safe; the
+      Firestore fallback arm stays live. **Observe:** an existing member can still upload.
+- [ ] **40.2 — Run the backfill.** Dry-run first, then `--apply`. Population is 2 users, so read the
+      whole output. **Observe:** processed/skipped/failed counts, and no failures listed by uid.
+- [ ] **40.3 — Soak one full hour.** Every live token must expire and re-issue carrying the claim.
+      Skipping this is what locks people out at deploy 2.
+- [ ] **40.4 ★ MANDATORY PRE-CHECK before deploy 2** — confirm neither user's `orgIds` has more than
+      one entry. The claim carries `orgIds[0]` only; a multi-org user would lose access to their
+      non-primary orgs the moment the fallback is removed.
+- [ ] **40.5 — Deploy 2: remove the Firestore fallback.** **Observe:** both users still upload.
+      **Expected tripwire:** `src/storage.rules.test.ts`'s structural OR-guard test will FAIL BY
+      DESIGN once this edit lands. That failure is the signal it worked — do not chase it.
+- [ ] **40.6 — Exercise the real pending invite.** One never-accepted invite exists. Accept it and
+      confirm the claim is set and upload works with no manual refresh (this is what the bounded
+      retry, `CLAIM_REFRESH_MAX_ATTEMPTS=4` / `CLAIM_REFRESH_DELAY_MS=1500`, exists to cover).
+
+> **⚠ Security consideration to weigh BEFORE deploy 2 — code review WR-03.**
+> `firestore.rules:36-40` lets any signed-in user self-create a membership document in any org.
+> **This predates v1.5 and is not caused by Phase 40** — `firestore.rules` is explicitly out of this
+> phase's scope (R074) and rules changes are deploy-gated to you.
+>
+> But it interacts with deploy 2. Today that gap is bounded by a per-request Firestore check;
+> after deploy 2 the claim becomes the sole authority and revocation latency stretches to **up to
+> one hour**. The hole does not get wider — its consequences get slower to undo. Worth a decision
+> before you remove the fallback, not after.
+
+**Rollback at any point:** re-deploy the dual-read rule. The fallback arm restores access immediately.
+
+---
+
 ## Notes and failures
 
 _(Record anything that failed here, with what you saw versus what was expected.)_
