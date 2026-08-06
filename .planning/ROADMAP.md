@@ -180,7 +180,7 @@ merge gaps. Full reasoning recorded in `.planning/STATE.md` § "v1.5 ROADMAP.md 
 ### Phase 40: Custom Auth Claim for Org Membership
 
 **Goal:** Storage-rules membership checks are provably correct in both the Storage emulator and production, via a custom auth claim that never locks out or under-authorizes an existing member.
-**Depends on**: Nothing — sequenced early deliberately, ahead of most other work, because its dual-read soak window is the longest-running thing in the milestone. Independent of Phase 39.
+**Depends on**: Nothing — sequenced early deliberately, ahead of most other work, because its dual-read soak window is the longest-running thing in the milestone. It shares no code with the settings work that precedes it.
 **Requirements**: R074, R075
 **Success Criteria** (what must be TRUE):
 
