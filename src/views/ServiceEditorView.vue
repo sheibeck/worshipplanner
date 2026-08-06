@@ -190,9 +190,15 @@
              now an EXPLICIT condition here, alongside the pre-existing
              `canEditService && !authStore.hasPcCredentials` gate — asserted
              absent on Slides and Roles in
-             `ServiceEditorView.test.ts` (R068 regression suite). -->
+             `ServiceEditorView.test.ts` (R068 regression suite).
+
+             39-05 (R089): the org's integration toggle is now ALSO composed
+             into this condition. Nudging a church to configure a feature it
+             deliberately turned off is misleading, so the hint hides
+             whenever Planning Center is disabled — regardless of tab or
+             credential state. -->
         <div
-          v-if="activeTab === 'service-order' && canEditService && !authStore.hasPcCredentials"
+          v-if="activeTab === 'service-order' && canEditService && !authStore.hasPcCredentials && authStore.settings.pcEnabled"
           class="flex justify-end -mt-1 mb-3"
         >
           <span
@@ -2073,6 +2079,7 @@ const activeActionItems = computed(() =>
     hasSermonContext: hasSermonContext.value,
     aiSuggestingAll: aiSuggestingAll.value,
     hasPcCredentials: authStore.hasPcCredentials,
+    pcEnabled: authStore.settings.pcEnabled,
     isExporting: isExporting.value,
     serviceStatus: localService.value?.status ?? 'draft',
     isDirty: isDirty.value,
@@ -3072,7 +3079,12 @@ async function checkForExistingPlan() {
 
 async function onExportToPC() {
   if (!localService.value) return
-  if (!authStore.hasPcCredentials || !authStore.pcCredentials) return
+  // 39-05 (R089): belt-and-suspenders. Surface 1 (the action-bar item)
+  // already hides when the integration is off, so this guard exists to
+  // refuse invocation from a stale bundle or a residual DOM node — a
+  // function-level check that survives independently of whether the
+  // button rendered.
+  if (!authStore.hasPcCredentials || !authStore.pcCredentials || !authStore.settings.pcEnabled) return
 
   showExportDialog.value = true
   exportError.value = null

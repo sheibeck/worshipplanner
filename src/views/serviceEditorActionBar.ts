@@ -39,6 +39,16 @@
  * Service Order tab) points them at Settings. That is the owner's explicit,
  * accepted consequence — do not add a replacement affordance and do not
  * ungate `export-pc`.
+ *
+ * ★ 39-05 (R089): `buildExportOrCopyItem`'s single early return now also
+ * composes the org's Planning Center integration toggle (`ctx.pcEnabled`)
+ * alongside the pre-existing credentials check. Both conditions govern the
+ * SAME return — not two competing checks — so the item disappears when the
+ * integration is off even if credentials happen to be present, and the
+ * credentials-only gate is unchanged when the integration is on. This is
+ * the last of five entry points 39-05 gates; Planning Center has no single
+ * choke point the way `claudeApi.ts` does for AI, so each surface carries
+ * its own composed condition.
  */
 import type { ActionBarItem } from '@/components/actionBarItems'
 
@@ -56,6 +66,13 @@ export interface ActionBarContext {
   hasSermonContext: boolean
   aiSuggestingAll: boolean
   hasPcCredentials: boolean
+  /**
+   * Org-level Planning Center integration toggle (R089, 39-05). Required
+   * (not optional) so the compiler forces every call site to supply it —
+   * an `undefined` here would silently hide the export item for everyone,
+   * credentialed or not.
+   */
+  pcEnabled: boolean
   isExporting: boolean
   serviceStatus: 'draft' | 'planned' | 'exported'
   isDirty: boolean
@@ -82,9 +99,13 @@ function buildSuggestItem(ctx: ActionBarContext): ActionBarItem {
  * rid of the Copy for PC button all together, it's not useful at all." Do
  * NOT ungate `export-pc` to fill the gap this leaves for an uncredentialed
  * org — that consequence is intentional (see this file's head comment).
+ *
+ * 39-05 (R089): also returns `undefined` when the org has turned Planning
+ * Center off, independently of credentials — composed onto this SAME
+ * return, not a second check, so the two conditions can never drift apart.
  */
 function buildExportOrCopyItem(ctx: ActionBarContext): ActionBarItem | undefined {
-  if (!ctx.hasPcCredentials) return undefined
+  if (!ctx.hasPcCredentials || !ctx.pcEnabled) return undefined
   return {
     key: 'export-pc',
     testId: 'export-pc-btn',

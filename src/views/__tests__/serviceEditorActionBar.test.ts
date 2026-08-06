@@ -44,6 +44,7 @@ function makeContext(overrides: Partial<ActionBarContext> = {}): ActionBarContex
     hasSermonContext: true,
     aiSuggestingAll: false,
     hasPcCredentials: true,
+    pcEnabled: true,
     isExporting: false,
     serviceStatus: 'planned',
     isDirty: true,
@@ -147,6 +148,28 @@ describe('buildActionBarItems', () => {
         expect(keysOf(row.tab, ctx)).toEqual(row.expected)
       })
     }
+  })
+
+  // 39-05 (R089): pcEnabled composes with hasPcCredentials on the SAME
+  // return in buildExportOrCopyItem — asserted here at the data level
+  // (the keys the builder emits), matching this file's established style
+  // rather than mounting a component. Named so `-t "pcEnabled"` selects
+  // exactly these cases.
+  describe('pcEnabled (39-05, R089)', () => {
+    it('pcEnabled false, hasPcCredentials true: export-pc is absent from service-order', () => {
+      const ctx = makeContext({ canEditService: true, hasPcCredentials: true, pcEnabled: false })
+      expect(keysOf('service-order', ctx)).toEqual(['suggest-all-songs', 'save'])
+    })
+
+    it('pcEnabled true, hasPcCredentials true: export-pc is present in service-order', () => {
+      const ctx = makeContext({ canEditService: true, hasPcCredentials: true, pcEnabled: true })
+      expect(keysOf('service-order', ctx)).toEqual(['suggest-all-songs', 'export-pc', 'save'])
+    })
+
+    it('pcEnabled false, hasPcCredentials false: export-pc is still absent (both gates agree)', () => {
+      const ctx = makeContext({ canEditService: true, hasPcCredentials: false, pcEnabled: false })
+      expect(keysOf('service-order', ctx)).toEqual(['suggest-all-songs', 'save'])
+    })
   })
 
   it('ADJACENCY: on slides with canEditService true, present sits immediately before save', () => {
