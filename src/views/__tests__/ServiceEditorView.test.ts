@@ -958,6 +958,98 @@ describe('ServiceEditorView - contextual action bar wiring (36-03, R068)', () =>
     expect(wrapper.find('[data-testid="export-pc-btn"]').exists()).toBe(false)
   })
 
+  // WR-02 (39-REVIEW): mounted-level proof of the three `pcEnabled`-composed
+  // behaviors this phase added to ServiceEditorView.vue. serviceEditorActionBar
+  // .test.ts already proves the pure gating logic; these assert the VIEW
+  // actually wires `authStore.settings.pcEnabled` into it correctly — a
+  // regression that hard-coded `pcEnabled: true` in `activeActionItems`, or
+  // dropped the clause from either `v-if`/guard, was not caught by any test
+  // before this block existed.
+  describe('WR-02: authStore.settings.pcEnabled composition', () => {
+    beforeEach(() => {
+      mockAuthState.hasPcCredentials = true
+      mockAuthState.pcCredentials = { appId: 'placeholder-app-id', secret: 'placeholder-secret' }
+    })
+
+    afterEach(() => {
+      mockAuthState.settings.pcEnabled = true
+    })
+
+    // Behavior 1: `activeActionItems` passes `pcEnabled` into
+    // `buildActionBarItems`, so export-pc-btn disappears when the org has
+    // turned Planning Center off — even with credentials present.
+    it('pcEnabled false, credentialed: export-pc-btn does not render (action-bar context wiring)', async () => {
+      mockAuthState.settings.pcEnabled = false
+      const wrapper = await mountView({ status: 'planned' })
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('[data-testid="export-pc-btn"]').exists()).toBe(false)
+    })
+
+    it('pcEnabled true, credentialed: export-pc-btn renders (control case)', async () => {
+      mockAuthState.settings.pcEnabled = true
+      const wrapper = await mountView({ status: 'planned' })
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('[data-testid="export-pc-btn"]').exists()).toBe(true)
+    })
+
+    // Behavior 2: the credentials-missing hint row's v-if gained
+    // `&& authStore.settings.pcEnabled` — a church that turned PC off should
+    // not be nudged to configure credentials for a feature it disabled.
+    it('pcEnabled false, uncredentialed: the credentials-missing note does not render', async () => {
+      mockAuthState.hasPcCredentials = false
+      mockAuthState.pcCredentials = null
+      mockAuthState.settings.pcEnabled = false
+      const wrapper = await mountView({ status: 'draft' })
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('[data-testid="pc-credentials-missing-note"]').exists()).toBe(false)
+    })
+
+    it('pcEnabled true, uncredentialed: the credentials-missing note still renders (control case)', async () => {
+      mockAuthState.hasPcCredentials = false
+      mockAuthState.pcCredentials = null
+      mockAuthState.settings.pcEnabled = true
+      const wrapper = await mountView({ status: 'draft' })
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.find('[data-testid="pc-credentials-missing-note"]').exists()).toBe(true)
+    })
+
+    // Behavior 3: `onExportToPC`'s belt-and-suspenders early return
+    // (`|| !authStore.settings.pcEnabled`) — exercised directly on the vm
+    // since the action-bar button that would normally invoke it is itself
+    // hidden when pcEnabled is false (behavior 1 above), so a DOM click
+    // cannot reach this guard. Calling the handler directly proves the
+    // function-level guard holds independently of whether the button
+    // rendered, matching the guard's own "stale bundle / residual DOM node"
+    // rationale (ServiceEditorView.vue:3083-3087).
+    it('pcEnabled false: calling onExportToPC directly never opens the export dialog, even with credentials present', async () => {
+      mockAuthState.settings.pcEnabled = false
+      const wrapper = await mountView({ status: 'planned' })
+      await wrapper.vm.$nextTick()
+
+      const vm = wrapper.vm as unknown as { onExportToPC: () => Promise<void>; showExportDialog: boolean }
+      await vm.onExportToPC()
+      await wrapper.vm.$nextTick()
+
+      expect(vm.showExportDialog).toBe(false)
+    })
+
+    it('pcEnabled true: calling onExportToPC directly opens the export dialog (control case)', async () => {
+      mockAuthState.settings.pcEnabled = true
+      const wrapper = await mountView({ status: 'planned' })
+      await wrapper.vm.$nextTick()
+
+      const vm = wrapper.vm as unknown as { onExportToPC: () => Promise<void>; showExportDialog: boolean }
+      await vm.onExportToPC()
+      await wrapper.vm.$nextTick()
+
+      expect(vm.showExportDialog).toBe(true)
+    })
+  })
+
   // ★ 34-10 SURVIVES (named regression guard): this plan relocates the
   // buttons directly above this element in the template, and the save-status
   // bar's wrapper condition/chrome-only conditional (34-10/34-07) is
