@@ -43,6 +43,7 @@
           {{ isFetching ? 'Fetching...' : 'Fetch Passage' }}
         </button>
         <button
+          v-if="authStore.settings.aiEnabled"
           type="button"
           data-testid="ai-split-btn"
           :disabled="!canAiSplit || isSplitting"
@@ -151,6 +152,7 @@ import { splitPassage } from '@/utils/scriptureSplitter'
 import { splitCongregationalReading } from '@/utils/claudeApi'
 import { computeBoundaries, hasSplittableBoundaries } from '@/utils/scriptureBoundaries'
 import { useToasts } from '@/stores/toasts'
+import { useAuthStore } from '@/stores/auth'
 import type { CongregationalSection } from '@/types/slide'
 import type { ScriptureRef } from '@/types/service'
 
@@ -166,6 +168,7 @@ const emit = defineEmits<{
 }>()
 
 const toasts = useToasts()
+const authStore = useAuthStore()
 
 const referenceText = ref(props.reference ? formatScriptureReference(props.reference) : '')
 const isFetching = ref(false)

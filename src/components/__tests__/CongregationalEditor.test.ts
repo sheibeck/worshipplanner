@@ -3,6 +3,7 @@ import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import CongregationalEditor from '../CongregationalEditor.vue'
 import { useToasts } from '@/stores/toasts'
+import { useAuthStore } from '@/stores/auth'
 import type { ScriptureSlide, CongregationalSection } from '@/types/slide'
 import type { ScriptureRef } from '@/types/service'
 
@@ -547,6 +548,51 @@ describe('CongregationalEditor', () => {
       for (const id of testIds) {
         expect(knownPrefixes.some((prefix) => id === prefix || id.startsWith(prefix))).toBe(true)
       }
+    })
+  })
+
+  // ── 39-04: AI toggle — hide the AI split button, prove existing splits ────
+  // are never altered when AI is off. A real Pinia is already active
+  // (beforeEach above) and useAuthStore().settings is a plain writable ref
+  // defaulting to DEFAULT_ORG_SETTINGS (aiEnabled: true), so tests flip it
+  // directly rather than mocking the store.
+  describe('AI toggle (39-04)', () => {
+    it('renders the AI split button when AI is on', () => {
+      const wrapper = mountEditor()
+      expect(wrapper.find('[data-testid="ai-split-btn"]').exists()).toBe(true)
+    })
+
+    it('hides the AI split button when AI is off, while Fetch Passage and the reference input still render', () => {
+      useAuthStore().settings.aiEnabled = false
+      const wrapper = mountEditor()
+
+      expect(wrapper.find('[data-testid="ai-split-btn"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="fetch-btn"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="reference-input"]').exists()).toBe(true)
+    })
+
+    it('mounted over an existing AI-generated split with AI off: content is unaltered and a hand edit (speaker toggle) still applies', async () => {
+      useAuthStore().settings.aiEnabled = false
+      const wrapper = mountEditor({ reference: SAMPLE_REFERENCE, sections: SAMPLE_SECTIONS })
+
+      // Not cleared, not regenerated, not made read-only — every section
+      // renders exactly the content passed in.
+      expect(wrapper.find('[data-testid="preview-section-0"]').text()).toContain(SAMPLE_SECTIONS[0]!.text)
+      expect(wrapper.find('[data-testid="preview-section-1"]').text()).toContain(SAMPLE_SECTIONS[1]!.text)
+      expect(wrapper.find('[data-testid="speaker-toggle-0"]').text()).toBe('Leader')
+      expect(wrapper.find('[data-testid="speaker-toggle-1"]').text()).toBe('Congregation')
+      expect(mockSplitCongregationalReading).not.toHaveBeenCalled()
+
+      // Hand-dividing still works: a speaker toggle takes effect and is
+      // reported upward via update:sections, same as with AI on.
+      await wrapper.find('[data-testid="speaker-toggle-1"]').trigger('click')
+      expect(wrapper.find('[data-testid="speaker-toggle-1"]').text()).toBe('Leader')
+
+      const emits = wrapper.emitted('update:sections')
+      expect(emits).toHaveLength(1)
+      const emitted = emits![0]![0] as CongregationalSection[]
+      expect(emitted[0]).toEqual(SAMPLE_SECTIONS[0])
+      expect(emitted[1]).toEqual({ ...SAMPLE_SECTIONS[1], speaker: 'LEADER' })
     })
   })
 })

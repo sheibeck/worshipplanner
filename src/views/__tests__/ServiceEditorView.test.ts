@@ -355,6 +355,12 @@ const mockAuthState = reactive<{
   orgId: string | null
   hasPcCredentials: boolean
   pcCredentials: { appId: string; secret: string } | null
+  // 39-04: CongregationalEditor.vue (mounted as a child via the
+  // Congregational Reading modal) now reads authStore.settings.aiEnabled
+  // directly — without this, accessing `.aiEnabled` on an undefined
+  // `settings` throws at mount. Defaults to true so every pre-existing
+  // test in this file keeps its current behavior.
+  settings: { aiEnabled: boolean; pcEnabled: boolean; vwModeEnabled: boolean }
 }>({
   user: { uid: 'user-1' },
   isEditor: false,
@@ -363,6 +369,7 @@ const mockAuthState = reactive<{
   // "Copy for PC" branch it always took. Only the export tests flip these.
   hasPcCredentials: false,
   pcCredentials: null,
+  settings: { aiEnabled: true, pcEnabled: true, vwModeEnabled: true },
 })
 
 vi.mock('@/stores/auth', () => ({
