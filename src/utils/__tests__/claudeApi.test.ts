@@ -23,20 +23,32 @@ vi.mock('@/utils/appAuth', () => ({
 // toggle mid-suite without re-importing the module under test. Defaults to
 // true so every pre-existing test in this file keeps its current behavior.
 let mockAiEnabled = true
+// WR-03 (39-REVIEW) regression hook: when true, `useAuthStore()` itself
+// throws (simulating "no active Pinia"), so a test can prove the isAiEnabled
+// guard's own never-throw contract — the guard now runs INSIDE each gated
+// export's `try` block specifically so this throw resolves to `null` instead
+// of rejecting the returned promise.
+let mockAuthStoreThrows = false
 vi.mock('@/stores/auth', () => ({
-  useAuthStore: () => ({
-    settings: {
-      get aiEnabled() {
-        return mockAiEnabled
+  useAuthStore: () => {
+    if (mockAuthStoreThrows) {
+      throw new Error('no active Pinia')
+    }
+    return {
+      settings: {
+        get aiEnabled() {
+          return mockAiEnabled
+        },
       },
-    },
-  }),
+    }
+  },
 }))
 
 // Reset unconditionally after every test so a toggle-off case in one describe
 // block can never leak into an unrelated test regardless of run order.
 afterEach(() => {
   mockAiEnabled = true
+  mockAuthStoreThrows = false
 })
 
 // Mock the Anthropic SDK using the hoisted mockCreate/mockParse.
@@ -1008,5 +1020,62 @@ describe('pure helpers remain callable with AI off (aiEnabled)', () => {
         boundaries,
       ),
     ).toEqual([{ speaker: 'LEADER', startBoundary: 0, endBoundary: 2 }])
+  })
+})
+
+// ─── WR-03 (39-REVIEW): isAiEnabled() guard never throws ──────────────────────
+//
+// `isAiEnabled()` calls `useAuthStore()`, which throws if invoked with no
+// active Pinia instance. The module's documented contract (39-CONTEXT.md,
+// restated in this file's JSDoc) is "returns null on any error... never
+// throw from service/utility functions; let callers handle null." Before the
+// fix, the guard sat AHEAD of each export's `try` block, so this throw would
+// escape as a rejected promise instead of resolving to `null`. These tests
+// simulate that throw directly (rather than only exercising the toggle-off
+// path, which never reaches `useAuthStore()` throwing) to prove the
+// never-throw contract holds even when the guard itself fails.
+describe('WR-03: isAiEnabled() guard never throws out of a gated export', () => {
+  it('getSongSuggestions resolves to null, not a rejected promise, when useAuthStore() throws', async () => {
+    mockAuthStoreThrows = true
+
+    await expect(
+      getSongSuggestions({
+        sermonTopic: 'Grace',
+        sermonPassage: null,
+        slotVwType: 1,
+        alreadySelectedSongIds: [],
+        songLibrary: [{ id: 'song-1', title: 'Amazing Grace', ccliNumber: '1234567', vwTypes: [1], themes: [], lastUsedAt: null }],
+        recentServiceSongIds: [],
+      }),
+    ).resolves.toBeNull()
+    expect(mockCreate).not.toHaveBeenCalled()
+    expect(mockParse).not.toHaveBeenCalled()
+  })
+
+  it('getScriptureSuggestions resolves to null, not a rejected promise, when useAuthStore() throws', async () => {
+    mockAuthStoreThrows = true
+
+    await expect(
+      getScriptureSuggestions({
+        sermonTopic: 'Grace',
+        sermonPassage: null,
+        query: '',
+        recentScriptures: [],
+      }),
+    ).resolves.toBeNull()
+    expect(mockCreate).not.toHaveBeenCalled()
+    expect(mockParse).not.toHaveBeenCalled()
+  })
+
+  it('splitCongregationalReading resolves to null, not a rejected promise, when useAuthStore() throws', async () => {
+    mockAuthStoreThrows = true
+
+    // The guard short-circuits before `computeBoundaries` runs, so the exact
+    // text content is irrelevant here — unlike the "no failure path throws"
+    // test above (which needs real splittable boundaries), this one only
+    // needs to reach the guard.
+    await expect(splitCongregationalReading('Leader: Test line\nAll: Response line')).resolves.toBeNull()
+    expect(mockCreate).not.toHaveBeenCalled()
+    expect(mockParse).not.toHaveBeenCalled()
   })
 })

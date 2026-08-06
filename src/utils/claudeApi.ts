@@ -37,12 +37,12 @@ export interface AiScriptureSuggestion {
 /**
  * Single shared internal guard enforcing the org-level AI toggle
  * (`authStore.settings.aiEnabled`) at this module's entry point, rather than
- * only in the UI. Called as the FIRST statement of each of this file's three
- * network-calling exports (`getSongSuggestions`, `getScriptureSuggestions`,
- * `splitCongregationalReading`) so no entry point can forget it — a single
- * shared function is the only shape where a future missed call site is
- * impossible by construction, unlike threading an `aiEnabled` flag through
- * every call site as a parameter.
+ * only in the UI. Called as the FIRST statement inside the `try` block of
+ * each of this file's three network-calling exports (`getSongSuggestions`,
+ * `getScriptureSuggestions`, `splitCongregationalReading`) so no entry point
+ * can forget it — a single shared function is the only shape where a future
+ * missed call site is impossible by construction, unlike threading an
+ * `aiEnabled` flag through every call site as a parameter.
  *
  * Deliberately NOT applied to `safeParseJsonArray`, `validateSongSuggestions`,
  * `validateScriptureSuggestions` or `validateSplitResult` — those four make no
@@ -53,6 +53,15 @@ export interface AiScriptureSuggestion {
  * The auth store is read inside this function body, never at module
  * evaluation time — Pinia requires an active app instance that does not exist
  * when this module is first imported.
+ *
+ * WR-03 (39-REVIEW): the guard is called INSIDE each export's `try` block,
+ * not before it. `useAuthStore()` throws if invoked with no active Pinia
+ * instance — placing the guard ahead of the `try` would let that throw
+ * escape as a rejected promise, contradicting this module's documented
+ * never-throw contract ("returns null on any error... never throw from
+ * service/utility functions; let callers handle null"). Inside the `try`,
+ * that same throw is caught and mapped to the same `null` every other
+ * failure mode already returns.
  *
  * This is also the choke point named in 39-CONTEXT.md as the natural future
  * home for gating AI behind a paywall, should that ever become necessary.
@@ -186,8 +195,11 @@ export interface GetSongSuggestionsParams {
 export async function getSongSuggestions(
   params: GetSongSuggestionsParams,
 ): Promise<AiSongSuggestion[] | null> {
-  if (!isAiEnabled()) return null
   try {
+    // WR-03 (39-REVIEW): guard lives INSIDE the try so a throw from
+    // useAuthStore() (e.g. no active Pinia) resolves to null, matching this
+    // module's documented never-throw contract, instead of rejecting.
+    if (!isAiEnabled()) return null
     const {
       sermonTopic,
       sermonPassage,
@@ -307,8 +319,11 @@ export interface GetScriptureSuggestionsParams {
 export async function getScriptureSuggestions(
   params: GetScriptureSuggestionsParams,
 ): Promise<AiScriptureSuggestion[] | null> {
-  if (!isAiEnabled()) return null
   try {
+    // WR-03 (39-REVIEW): guard lives INSIDE the try so a throw from
+    // useAuthStore() (e.g. no active Pinia) resolves to null, matching this
+    // module's documented never-throw contract, instead of rejecting.
+    if (!isAiEnabled()) return null
     const { sermonTopic, sermonPassage, query, recentScriptures } = params
 
     const contextParts: string[] = []
@@ -534,8 +549,11 @@ Rules:
 export async function splitCongregationalReading(
   rawText: string,
 ): Promise<CongregationalSection[] | null> {
-  if (!isAiEnabled()) return null
   try {
+    // WR-03 (39-REVIEW): guard lives INSIDE the try so a throw from
+    // useAuthStore() (e.g. no active Pinia) resolves to null, matching this
+    // module's documented never-throw contract, instead of rejecting.
+    if (!isAiEnabled()) return null
     const boundaries = computeBoundaries(rawText)
     if (!hasSplittableBoundaries(boundaries)) return null
 
