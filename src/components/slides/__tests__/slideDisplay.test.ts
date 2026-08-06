@@ -506,7 +506,7 @@ describe('slideDisplay', () => {
     // 34-07 (owner UAT F1): the scripture route's label/tone changed — it now
     // opens an editor in place rather than routing away — but the key order
     // is unchanged, and no item may mention a lyrics route it does not offer.
-    it('34-07: the scripture route item is labelled "Edit scripture text" with a default (non-nav) tone, key order unchanged', () => {
+    it('34-07: the scripture route item is labelled "Set up congregational reading" with a default (non-nav) tone, key order unchanged', () => {
       for (const canMutate of [true, false]) {
         const entry = makeMenuEntry({ kind: 'scripture' })
         const items = slideActionMenuItems(entry, 'SCRIPTURE', canMutate)
@@ -514,8 +514,23 @@ describe('slideDisplay', () => {
           canMutate ? ['edit-details', 'edit-in-scripture', 'duplicate', 'delete'] : ['edit-details', 'edit-in-scripture'],
         )
         const routeItem = items.find((item) => item.key === 'edit-in-scripture')
-        expect(routeItem?.label).toBe('Edit scripture text')
+        expect(routeItem?.label).toBe('Set up congregational reading')
         expect(routeItem?.tone).toBe('default')
+      }
+    })
+
+    // Owner 2026-08-05: the destination has no free-text scripture override and
+    // never will (34-07 — the owner was shown the shadow-copy tension and
+    // declined it), so this item must not promise editing. Pinned as a negative
+    // because the failure mode is a plausible-sounding relabel drifting back
+    // toward "Edit …", which reads fine in a diff and is wrong in the product.
+    it('the scripture route item never promises text editing, for either canMutate value', () => {
+      for (const canMutate of [true, false]) {
+        const entry = makeMenuEntry({ kind: 'scripture' })
+        const items = slideActionMenuItems(entry, 'SCRIPTURE', canMutate)
+        const label = items.find((item) => item.key === 'edit-in-scripture')?.label ?? ''
+        expect(label.toLowerCase()).not.toContain('edit')
+        expect(label.toLowerCase()).toContain('congregational reading')
       }
     })
 

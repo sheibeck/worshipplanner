@@ -261,7 +261,23 @@ const MENU_ITEM_LABELS: Record<MenuItemKey, string> = {
   // editor in place (a modal over the Slides tab), not a navigation away
   // from it — 'edit-in-song' stays 'nav' below because IT still routes to
   // the song editor. The label is relabelled to name what actually opens.
-  'edit-in-scripture': 'Edit scripture text',
+  //
+  // Relabelled again 2026-08-05 (owner): "Edit scripture text" promised
+  // something the destination does not offer. What opens is the modal titled
+  // "Congregational Reading" — enter a reference, Fetch, AI-split, and toggle
+  // each section's speaker. There is deliberately NO free-text scripture
+  // override anywhere in it (34-07: the owner was shown the D-13/D-15
+  // shadow-copy tension and declined it), so a label promising text editing
+  // described a feature that does not and will not exist here. Named for the
+  // purpose instead — the owner's words were "it's simply a place to make it
+  // congregational reading".
+  //
+  // Kept as an action phrase because every sibling here is one ('Edit
+  // details', 'Duplicate', 'Delete Slide'). "Set up" reads slightly oddly when
+  // revisiting a reading that already exists — accepted, because the modal's
+  // own heading names the state correctly once open, and the previous label
+  // was actively wrong on every visit rather than mildly imprecise on some.
+  'edit-in-scripture': 'Set up congregational reading',
   duplicate: 'Duplicate',
   delete: 'Delete Slide',
 }

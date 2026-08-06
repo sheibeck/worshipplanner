@@ -1589,7 +1589,8 @@ const congregationalSlot = computed<ScriptureSlot | null>(() => {
 })
 
 /**
- * Handles the "Edit scripture text" / "Edit in scripture" request relayed up
+ * Handles the "Set up congregational reading" request (relabelled from "Edit
+ * scripture text" on 2026-08-05 — see slideDisplay.ts) relayed up
  * through SlidesTab's `navigate-to-scripture-editor` event (T-26-03-01: the
  * index is validated against the current plan item list and its kind before
  * touching any state, so an unhonourable request — out of range, or naming a

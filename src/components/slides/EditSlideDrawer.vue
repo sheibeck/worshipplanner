@@ -206,14 +206,25 @@
                      — opens the congregational-reading editor (ServiceEditorView's
                      modal, same relay the 3-dot menu's edit-in-scripture uses).
                      No free-text scripture override; canMutate-gated like the
-                     drawer's other mutation controls. -->
+                     drawer's other mutation controls.
+
+                     Relabelled 2026-08-05 (owner) in lockstep with the 3-dot
+                     menu's 'edit-in-scripture' label in slideDisplay.ts — the
+                     rationale lives there. These two controls fire the SAME
+                     relay and open the SAME modal, so they must never drift
+                     apart in wording; the owner reported only the menu, but a
+                     button one panel away still saying "Edit scripture text"
+                     would just relocate the confusion. The testid and the emit
+                     name still say `edit-scripture-text` deliberately — they
+                     are the wire contract SlidesTab and its tests bind to, and
+                     renaming them would be churn with no user-visible effect. -->
                 <button
                   v-if="canMutate"
                   type="button"
                   class="mt-2 px-2.5 py-1 rounded-md text-xs font-medium border border-gray-700 text-gray-300 hover:bg-gray-800 transition-colors"
                   data-testid="drawer-edit-scripture-text-btn"
                   @click="emit('edit-scripture-text')"
-                >Edit scripture text</button>
+                >Set up congregational reading</button>
               </template>
             </template>
 
