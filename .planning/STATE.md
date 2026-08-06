@@ -787,6 +787,21 @@ vitest run` passes 39/39 directly. Logged in the phase's `deferred-items.md`. Us
 
 ## Deferred Verification
 
+### v1.5 (current milestone)
+
+| Phase | State | Resume |
+|-------|-------|--------|
+| 39 | verification_deferred_human — **4/4 ROADMAP criteria verified automatically**; 5 UI-SPEC backstops outstanding, all recorded unchecked in `PENDING-VERIFICATION.md` § Phase 39 | /gsd-verify-work 39 |
+
+> Phase 39 is **code-complete and automatically verified**. Its code review found 1 Critical + 3
+> Warnings, all fixed and independently re-verified at iteration 2 (`39-REVIEW.md` status: clean).
+> What remains is only the owner's hands-on pass. The starred item is **39.03-1 — Planning Center
+> credential retention across a real off → reload → on cycle**: the one item in the phase that could
+> silently destroy user data if implemented wrongly. A unit test proves the handler never calls the
+> clear path; only a real reload proves the value survives.
+
+### v1.4 (historical — milestone shipped and archived 2026-08-05)
+
 | Phase | State | Resume |
 |-------|-------|--------|
 | 32 | verification_deferred_human | /gsd-verify-work 32 |

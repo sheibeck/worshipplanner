@@ -146,7 +146,7 @@ alone:
 Everything else keeps SUMMARY's phase boundaries and ordering rationale, renumbered to close the two
 merge gaps. Full reasoning recorded in `.planning/STATE.md` § "v1.5 ROADMAP.md phase breakdown."
 
-- [ ] **Phase 39: Org Settings Infrastructure & Feature Toggles** - Typed org settings plus AI/Planning Center toggles gated at the `claudeApi.ts` choke point
+- [x] **Phase 39: Org Settings Infrastructure & Feature Toggles** - Typed org settings plus AI/Planning Center toggles gated at the `claudeApi.ts` choke point
 - [ ] **Phase 40: Custom Auth Claim for Org Membership** - A testable, dual-read Storage-rules membership check (built, tested, undeployed — two owner deploys with a 1-hour soak between them)
 - [ ] **Phase 41: Sharing Correctness** - One permanent share link per service, auto-refreshed on every change
 - [ ] **Phase 42: PowerPoint Rendered-Image Display** - Client-side display of the already-deployed server-rendered PPTX images (carryover R062)
