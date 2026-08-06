@@ -94,7 +94,9 @@ describe('storage.rules — org membership', () => {
       await uploadBytes(ref(storage, 'orgs/orgA/pptx-imports/import1/source.pptx'), SMALL_BYTES)
     })
 
-    const context = testEnv.authenticatedContext('userB')
+    // userB carries a VALID but mismatched claim (orgB, not orgA) -- proves the claim
+    // arm rejects a real claim for the wrong org, not merely a claim-less token.
+    const context = testEnv.authenticatedContext('userB', { orgId: 'orgB', role: 'editor' })
     const storage = context.storage()
     const fileRef = ref(storage, 'orgs/orgA/pptx-imports/import1/source.pptx')
 
@@ -102,7 +104,9 @@ describe('storage.rules — org membership', () => {
   })
 
   it('denies a non-member from writing under an org path they do not belong to', async () => {
-    const context = testEnv.authenticatedContext('userB')
+    // userB carries a VALID but mismatched claim (orgB, not orgA) -- proves the claim
+    // arm rejects a real claim for the wrong org, not merely a claim-less token.
+    const context = testEnv.authenticatedContext('userB', { orgId: 'orgB', role: 'editor' })
     const storage = context.storage()
     const fileRef = ref(storage, 'orgs/orgA/pptx-imports/import2/source.pptx')
 
@@ -110,12 +114,33 @@ describe('storage.rules — org membership', () => {
   })
 
   it('denies a member write that exceeds the 25MB size cap', async () => {
-    await seedMembershipDoc('orgA', 'userA', 'editor')
-    const context = testEnv.authenticatedContext('userA')
+    // Valid claim, no members doc -- membership is satisfied via the claim arm, so
+    // the size conjunct is the SOLE reason for denial (not vacuous against a
+    // deny-everyone rule).
+    const context = testEnv.authenticatedContext('userA', { orgId: 'orgA', role: 'editor' })
     const storage = context.storage()
     const fileRef = ref(storage, 'orgs/orgA/pptx-imports/import3/source.pptx')
 
     await assertFails(uploadBytes(fileRef, OVER_CAP_BYTES))
+  })
+
+  it('denies a caller whose claim names a different organization', async () => {
+    // No members document anywhere -- both arms must independently deny.
+    const context = testEnv.authenticatedContext('userC', { orgId: 'orgB', role: 'editor' })
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgA/pptx-imports/import5/source.pptx')
+
+    await assertFails(uploadBytes(fileRef, SMALL_BYTES))
+  })
+
+  it('denies a caller whose claim carries an orgId but no role', async () => {
+    // Pins the non-null-role conjunct so it cannot be dropped silently: a claim with
+    // a matching orgId but no role key must still be denied.
+    const context = testEnv.authenticatedContext('userD', { orgId: 'orgA' })
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgA/pptx-imports/import6/source.pptx')
+
+    await assertFails(uploadBytes(fileRef, SMALL_BYTES))
   })
 })
 
@@ -131,8 +156,9 @@ describe('storage.rules — media path', () => {
   })
 
   it('denies a member media upload that exceeds the 50MB media cap', async () => {
-    await seedMembershipDoc('orgA', 'userA', 'editor')
-    const context = testEnv.authenticatedContext('userA')
+    // Valid claim, no members doc -- membership is satisfied via the claim arm, so
+    // the size conjunct is the SOLE reason for denial.
+    const context = testEnv.authenticatedContext('userA', { orgId: 'orgA', role: 'editor' })
     const storage = context.storage()
     const fileRef = ref(storage, 'orgs/orgA/media/m2/clip.mp4')
 
@@ -140,7 +166,8 @@ describe('storage.rules — media path', () => {
   })
 
   it('denies a non-member from writing to another org media path', async () => {
-    const context = testEnv.authenticatedContext('userB')
+    // userB carries a VALID but mismatched claim (orgB, not orgA).
+    const context = testEnv.authenticatedContext('userB', { orgId: 'orgB', role: 'editor' })
     const storage = context.storage()
     const fileRef = ref(storage, 'orgs/orgA/media/m3/clip.mp4')
 
@@ -148,11 +175,72 @@ describe('storage.rules — media path', () => {
   })
 
   it('regression: the media match does not loosen the non-media pptx-imports 25MB cap', async () => {
-    await seedMembershipDoc('orgA', 'userA', 'editor')
-    const context = testEnv.authenticatedContext('userA')
+    // Valid claim, no members doc -- membership is satisfied via the claim arm, so
+    // the size conjunct is the SOLE reason for denial.
+    const context = testEnv.authenticatedContext('userA', { orgId: 'orgA', role: 'editor' })
     const storage = context.storage()
     const fileRef = ref(storage, 'orgs/orgA/pptx-imports/import4/source.pptx')
 
     await assertFails(uploadBytes(fileRef, OVER_CAP_BYTES))
+  })
+
+  it('denies a caller with neither a claim nor a membership document on the media path', async () => {
+    // Both arms independently deny: bare authenticatedContext (no claim options)
+    // and no members document seeded anywhere.
+    const context = testEnv.authenticatedContext('userC')
+    const storage = context.storage()
+    const fileRef = ref(storage, 'orgs/orgA/media/m4/clip.mp4')
+
+    await assertFails(uploadBytes(fileRef, SMALL_BYTES))
+  })
+})
+
+describe('storage.rules — dual-read structure (R075 lockout guard)', () => {
+  // No emulator interaction needed -- this is a static assertion against the rules
+  // file's own text. It lives in this file because vitest.rules.config.ts already
+  // includes it and it is the file it guards.
+  //
+  // Automated guard against Pitfall 1 (40-RESEARCH.md): an AND instead of an OR, or a
+  // deleted Firestore-fallback predicate, locks out every member whose token predates
+  // the claim rollout. This test fails on either mistake.
+  //
+  // The Firestore-fallback arm's ALLOW behaviour cannot be proven in the Storage
+  // emulator (firebase-js-sdk#6803) -- see the comment on the org-membership
+  // describe block's allow-cases. This test proves the arm's continued STRUCTURAL
+  // presence instead, which is the honest substitute.
+  it('keeps the Firestore-membership fallback ORed, never ANDed, into the membership check', () => {
+    const raw = readFileSync('storage.rules', 'utf8')
+    // Collapse whitespace so formatting differences (line breaks, indentation) can't
+    // defeat the substring/regex checks below.
+    const normalized = raw.replace(/\s+/g, ' ')
+
+    // The production-proven fallback predicate was not deleted.
+    expect(normalized).toContain('firestore.exists(')
+
+    // The claim predicate is present and reads the exact two keys plan 40-02 writes.
+    expect(normalized).toContain('request.auth.token.orgId')
+    expect(normalized).toContain('request.auth.token.role')
+
+    // The two membership predicates must be combined disjunctively: the claim
+    // predicate (helper-function form `isOrgMemberByClaim(...)`, or an inlined claim
+    // expression) must be followed by `||` before the Firestore predicate
+    // (helper-function form `isOrgMemberByFirestore(...)`, or an inlined
+    // `firestore.exists(...)` expression). Written to accept either form per Task 1's
+    // documented fallback (inlining if the emulator rejects helper functions).
+    const claimFragment =
+      /(isOrgMemberByClaim\([^)]*\)|request\.auth\.token\.orgId == orgId[^|]*)/.source
+    const firestoreFragment =
+      /(isOrgMemberByFirestore\([^)]*\)|firestore\.exists\([^)]*\))/.source
+    const orJoinedRegex = new RegExp(`${claimFragment}\\s*\\|\\|\\s*${firestoreFragment}`)
+    expect(normalized).toMatch(orJoinedRegex)
+
+    // The conjunctive form of those same two predicates must NOT appear. Build the
+    // forbidden string at runtime (not as one literal) so a hand-written literal
+    // in this test can't accidentally drift out of sync with what it's guarding.
+    const claimCall = 'isOrgMemberByClaim(orgId)'
+    const firestoreCall = 'isOrgMemberByFirestore(orgId)'
+    const andSeparator = ['&', '&'].join('')
+    const forbiddenConjunction = [claimCall, andSeparator, firestoreCall].join(' ')
+    expect(normalized).not.toContain(forbiddenConjunction)
   })
 })
