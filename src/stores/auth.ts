@@ -8,6 +8,7 @@ import {
   sendPasswordResetEmail,
   signOut,
   onAuthStateChanged,
+  getIdTokenResult,
   type User,
 } from 'firebase/auth'
 import {
@@ -26,6 +27,17 @@ import type { OrgSettings } from '@/types/organization'
 import { DEFAULT_ORG_SETTINGS } from '@/types/organization'
 
 let memberUnsub: Unsubscribe | null = null
+
+// R075 / P-01 (Phase 40 Plan 03) — bounds on the just-joined-membership claim
+// retry in refreshOrgClaim below. Four attempts spaced 1.5s apart gives a
+// worst case of roughly 4.5s, comfortably inside the few-hundred-ms-to-a-few-
+// seconds band Cloud Functions triggers typically land in, and it is paid
+// only once: on the org-context load immediately following a membership
+// document being created (invite acceptance or auto-create-new-org).
+// Exported (module-scope, not store-scope) so tests can drive timing without
+// magic numbers.
+export const CLAIM_REFRESH_MAX_ATTEMPTS = 4
+export const CLAIM_REFRESH_DELAY_MS = 1500
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
@@ -89,7 +101,51 @@ export const useAuthStore = defineStore('auth', () => {
     })
   }
 
-  async function loadOrgContext(uid: string): Promise<void> {
+  // R075 (D-06/D-07) / P-01 — force the custom `orgId`/`role` claim (set by
+  // functions/src/orgMembershipClaims.ts's syncOrgMembershipClaim trigger)
+  // onto the active session's ID token so a member does not wait out a full
+  // 1-hour token lifetime for it to propagate. `getIdTokenResult` is used
+  // (rather than `getIdToken`) because it returns the decoded `claims`
+  // object, which is what lets the retry below know when to stop.
+  //
+  // `awaitClaim` scopes the retry (P-01) to the just-created-membership
+  // window only: false loops at most once with no delay (the ordinary,
+  // already-a-member path — latency must stay unchanged), true loops up to
+  // CLAIM_REFRESH_MAX_ATTEMPTS times spaced CLAIM_REFRESH_DELAY_MS apart,
+  // stopping the instant `claims.orgId` strictly equals `targetOrgId` (a
+  // claim naming a different org, e.g. a stale claim from a previous org,
+  // never satisfies the wait).
+  //
+  // Known limitation (D-01/D-04, documented not accidental): the claim only
+  // ever carries the user's PRIMARY org (orgIds[0]). For a multi-org user,
+  // a non-primary org load passes a targetOrgId the claim will never carry —
+  // that load is, and stays, served by the Firestore-membership arm of the
+  // dual-read alone. That is expected, not a bug in this retry.
+  //
+  // Never throws: a failed or exhausted refresh is not a failed sign-in —
+  // storage.rules' Firestore-membership arm still grants access while the
+  // claim is missing, so loadOrgContext must still resolve either way.
+  async function refreshOrgClaim(targetOrgId: string, awaitClaim: boolean): Promise<void> {
+    const currentUser = user.value
+    if (!currentUser) return
+
+    const maxAttempts = awaitClaim ? CLAIM_REFRESH_MAX_ATTEMPTS : 1
+    try {
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const result = await getIdTokenResult(currentUser, true)
+        if (result.claims.orgId === targetOrgId) {
+          return
+        }
+        if (attempt < maxAttempts) {
+          await new Promise<void>((resolve) => setTimeout(resolve, CLAIM_REFRESH_DELAY_MS))
+        }
+      }
+    } catch (err) {
+      console.error('[auth] refreshOrgClaim:', err)
+    }
+  }
+
+  async function loadOrgContext(uid: string, membershipJustCreated = false): Promise<void> {
     const userRef = doc(db, 'users', uid)
     const userSnap = await getDoc(userRef)
     const userData = userSnap.exists() ? userSnap.data() : null
@@ -108,6 +164,12 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     orgId.value = ids[0]!
+
+    // R075/P-01 — force the claim onto the token now that we know which org
+    // this session belongs to. Scoped retry only when membershipJustCreated
+    // is true (see refreshOrgClaim above and the onAuthStateChanged call
+    // site for why).
+    await refreshOrgClaim(ids[0]!, membershipJustCreated)
 
     const orgRef = doc(db, 'organizations', ids[0]!)
     const orgSnap = await getDoc(orgRef)
@@ -177,8 +239,15 @@ export const useAuthStore = defineStore('auth', () => {
   onAuthStateChanged(auth, async (firebaseUser) => {
     user.value = firebaseUser
     if (firebaseUser) {
-      await ensureUserDocument(firebaseUser)
-      await loadOrgContext(firebaseUser.uid)
+      // T-40-07 / P-01 — this is the invite-acceptance race window: the
+      // batch commit inside ensureUserDocument returns before the async
+      // syncOrgMembershipClaim Cloud Functions trigger has necessarily
+      // finished setting the claim, so a forced refresh fired on the very
+      // next line can complete before the claim exists. membershipCreated
+      // tells loadOrgContext to retry (bounded) instead of firing one
+      // refresh and giving up.
+      const { membershipCreated } = await ensureUserDocument(firebaseUser)
+      await loadOrgContext(firebaseUser.uid, membershipCreated)
     } else {
       orgId.value = null
       orgName.value = null
@@ -192,7 +261,7 @@ export const useAuthStore = defineStore('auth', () => {
     isReady.value = true
   })
 
-  async function ensureUserDocument(firebaseUser: User): Promise<void> {
+  async function ensureUserDocument(firebaseUser: User): Promise<{ membershipCreated: boolean }> {
     const userRef = doc(db, 'users', firebaseUser.uid)
     const userSnap = await getDoc(userRef)
 
@@ -244,7 +313,7 @@ export const useAuthStore = defineStore('auth', () => {
         batch.update(userRef, { orgIds: [inviteOrgId] })
 
         await batch.commit()
-        return
+        return { membershipCreated: true }
       }
     }
 
@@ -274,7 +343,10 @@ export const useAuthStore = defineStore('auth', () => {
       })
 
       await batch.commit()
+      return { membershipCreated: true }
     }
+
+    return { membershipCreated: false }
   }
 
   async function loginWithGoogle(): Promise<User | null> {

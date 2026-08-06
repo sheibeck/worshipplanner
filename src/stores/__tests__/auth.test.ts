@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { flushPromises } from '@vue/test-utils'
 
@@ -18,6 +18,10 @@ vi.mock('firebase/auth', () => {
     createUserWithEmailAndPassword: vi.fn(),
     sendPasswordResetEmail: vi.fn(),
     signOut: vi.fn(),
+    // 40-03 (R075/P-01) — the forced-refresh mechanism under test. Default
+    // resolves with no claims at all, matching a token that predates the
+    // rollout; individual tests override this to drive the retry.
+    getIdTokenResult: vi.fn(() => Promise.resolve({ claims: {} })),
     onAuthStateChanged: vi.fn((auth, callback) => {
       mockOnAuthStateChangedCallbacks.push(callback)
       // Store reference for tests to call
@@ -64,6 +68,7 @@ import {
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
   signOut,
+  getIdTokenResult,
 } from 'firebase/auth'
 import { doc, getDoc, updateDoc } from 'firebase/firestore'
 import { DEFAULT_ORG_SETTINGS } from '@/types/organization'
@@ -75,12 +80,21 @@ const mockUser = {
   photoURL: null,
 }
 
+// 40-03 (R075/P-01) discovered defect: the `firebase/auth` mock factory's
+// mockOnAuthStateChangedCallbacks array is created once per test FILE (the
+// vi.mock factory runs once), and every useAuthStore() call across every
+// test pushes a new callback into it -- clearAllMocks() resets call counts
+// but never shrinks this array. Only invoking the LATEST registration (this
+// test file's current store instance) keeps behavior identical for every
+// existing assertion while fixing a leak that would otherwise silently
+// re-invoke every prior test's callback and inflate call-count assertions
+// like getIdTokenResult's (see "org claim refresh (R075 / P-01)" below).
 async function triggerAuthStateChange(user: unknown) {
   const callbacks = (globalThis as Record<string, unknown>).__authCallbacks as
     | ((user: unknown) => void | Promise<void>)[]
     | undefined
-  if (callbacks) {
-    await Promise.all(callbacks.map((cb) => cb(user)))
+  if (callbacks && callbacks.length > 0) {
+    await callbacks[callbacks.length - 1]?.(user)
   }
 }
 
@@ -101,6 +115,40 @@ function mockOrgDocPath(orgData: Record<string, unknown> | null) {
       return Promise.resolve({
         exists: () => orgData !== null,
         data: () => orgData,
+      }) as never
+    }
+    return Promise.resolve({ exists: () => false, data: () => null }) as never
+  })
+}
+
+/**
+ * 40-03 (R075/P-01) — same shape as mockOrgDocPath, plus an invite waiting at
+ * inviteLookup/test@example.com for org-1. Drives ensureUserDocument's
+ * invite-acceptance path, which is what actually reports membershipCreated
+ * true and exercises the just-joined retry in loadOrgContext.
+ */
+function mockOrgDocPathWithInvite(orgData: Record<string, unknown> | null) {
+  vi.mocked(doc).mockImplementation(
+    (_db: unknown, ...segments: string[]) => ({ path: segments.join('/') }) as never,
+  )
+  vi.mocked(getDoc).mockImplementation((ref: unknown) => {
+    const path = (ref as { path?: string }).path
+    if (path === 'users/test-uid') {
+      return Promise.resolve({
+        exists: () => true,
+        data: () => ({ orgIds: ['org-1'] }),
+      }) as never
+    }
+    if (path === 'organizations/org-1') {
+      return Promise.resolve({
+        exists: () => orgData !== null,
+        data: () => orgData,
+      }) as never
+    }
+    if (path === 'inviteLookup/test@example.com') {
+      return Promise.resolve({
+        exists: () => true,
+        data: () => ({ orgId: 'org-1', role: 'editor' }),
       }) as never
     }
     return Promise.resolve({ exists: () => false, data: () => null }) as never
@@ -417,6 +465,169 @@ describe('useAuthStore', () => {
 
       await store.logout()
       expect(store.settings).toEqual(DEFAULT_ORG_SETTINGS)
+    })
+  })
+
+  // ── 40-03 (R075/P-01) ─────────────────────────────────────────────────────────
+  // Forced claim refresh on every org-context load, bounded retry scoped to the
+  // just-created-membership path only. Call-count assertions are the point: a
+  // naive unconditional retry would pass a test that only checked "a refresh
+  // happened", so every case below asserts exactly how many times
+  // getIdTokenResult fired.
+  describe('org claim refresh (R075 / P-01)', () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('performs the forced refresh exactly once on the ordinary (already-a-member) load, with no delay', async () => {
+      mockOrgDocPath({ name: 'Test Org' })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(getIdTokenResult).toHaveBeenCalledTimes(1)
+      expect(getIdTokenResult).toHaveBeenCalledWith(mockUser, true)
+      expect(store.orgId).toBe('org-1')
+    })
+
+    it('performs no forced refresh when the user belongs to no organization', async () => {
+      vi.mocked(doc).mockImplementation(
+        (_db: unknown, ...segments: string[]) => ({ path: segments.join('/') }) as never,
+      )
+      vi.mocked(getDoc).mockImplementation((ref: unknown) => {
+        const path = (ref as { path?: string }).path
+        if (path === 'users/test-uid') {
+          return Promise.resolve({
+            exists: () => true,
+            data: () => ({ orgIds: [] }),
+          }) as never
+        }
+        return Promise.resolve({ exists: () => false, data: () => null }) as never
+      })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(getIdTokenResult).not.toHaveBeenCalled()
+      expect(store.orgId).toBeNull()
+    })
+
+    it('just-joined, claim present on the first refresh: exactly one refresh, no delay', async () => {
+      mockOrgDocPathWithInvite({ name: 'Test Org' })
+      vi.mocked(getIdTokenResult).mockResolvedValueOnce({ claims: { orgId: 'org-1' } } as never)
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(getIdTokenResult).toHaveBeenCalledTimes(1)
+      expect(store.orgId).toBe('org-1')
+      expect(store.orgName).toBe('Test Org')
+    })
+
+    it('just-joined, claim absent then present on the third attempt: three refreshes, two delays, then stops', async () => {
+      mockOrgDocPathWithInvite({ name: 'Test Org' })
+      vi.mocked(getIdTokenResult)
+        .mockResolvedValueOnce({ claims: {} } as never)
+        .mockResolvedValueOnce({ claims: {} } as never)
+        .mockResolvedValueOnce({ claims: { orgId: 'org-1' } } as never)
+      const { useAuthStore, CLAIM_REFRESH_DELAY_MS } = await import('../auth')
+      const store = useAuthStore()
+
+      const authChangePromise = triggerAuthStateChange(mockUser)
+      await vi.advanceTimersByTimeAsync(CLAIM_REFRESH_DELAY_MS * 2)
+      await authChangePromise
+
+      expect(getIdTokenResult).toHaveBeenCalledTimes(3)
+      expect(store.orgId).toBe('org-1')
+    })
+
+    it('just-joined, claim never arrives: exactly CLAIM_REFRESH_MAX_ATTEMPTS refreshes, then gives up silently', async () => {
+      mockOrgDocPathWithInvite({ name: 'Test Org' })
+      vi.mocked(getIdTokenResult).mockResolvedValue({ claims: {} } as never)
+      const { useAuthStore, CLAIM_REFRESH_MAX_ATTEMPTS, CLAIM_REFRESH_DELAY_MS } =
+        await import('../auth')
+      const store = useAuthStore()
+
+      const authChangePromise = triggerAuthStateChange(mockUser)
+      await vi.advanceTimersByTimeAsync(CLAIM_REFRESH_DELAY_MS * (CLAIM_REFRESH_MAX_ATTEMPTS - 1))
+      await authChangePromise
+
+      expect(getIdTokenResult).toHaveBeenCalledTimes(CLAIM_REFRESH_MAX_ATTEMPTS)
+      expect(store.orgId).toBe('org-1')
+      expect(store.orgName).toBe('Test Org')
+    })
+
+    it('just-joined, claim present but for a different org: the retry continues rather than stopping', async () => {
+      mockOrgDocPathWithInvite({ name: 'Test Org' })
+      vi.mocked(getIdTokenResult).mockResolvedValue({ claims: { orgId: 'some-other-org' } } as never)
+      const { useAuthStore, CLAIM_REFRESH_MAX_ATTEMPTS, CLAIM_REFRESH_DELAY_MS } =
+        await import('../auth')
+      const store = useAuthStore()
+
+      const authChangePromise = triggerAuthStateChange(mockUser)
+      await vi.advanceTimersByTimeAsync(CLAIM_REFRESH_DELAY_MS * (CLAIM_REFRESH_MAX_ATTEMPTS - 1))
+      await authChangePromise
+
+      expect(getIdTokenResult).toHaveBeenCalledTimes(CLAIM_REFRESH_MAX_ATTEMPTS)
+      expect(store.orgId).toBe('org-1')
+    })
+
+    it('a throwing refresh is logged and swallowed: org context is still fully populated', async () => {
+      mockOrgDocPath({ name: 'Test Org' })
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      vi.mocked(getIdTokenResult).mockRejectedValueOnce(new Error('token refresh boom'))
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(consoleErrorSpy).toHaveBeenCalledWith('[auth] refreshOrgClaim:', expect.any(Error))
+      expect(store.orgId).toBe('org-1')
+      expect(store.orgName).toBe('Test Org')
+      consoleErrorSpy.mockRestore()
+    })
+  })
+
+  describe('ensureUserDocument membershipCreated reporting (P-01)', () => {
+    it('reports membershipCreated true on the invite-acceptance path', async () => {
+      vi.mocked(doc).mockImplementation(
+        (_db: unknown, ...segments: string[]) => ({ path: segments.join('/') }) as never,
+      )
+      vi.mocked(getDoc).mockImplementation((ref: unknown) => {
+        const path = (ref as { path?: string }).path
+        if (path === 'inviteLookup/test@example.com') {
+          return Promise.resolve({
+            exists: () => true,
+            data: () => ({ orgId: 'org-1', role: 'editor' }),
+          }) as never
+        }
+        return Promise.resolve({ exists: () => false, data: () => null }) as never
+      })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      const result = await store.ensureUserDocument(mockUser as never)
+      expect(result).toEqual({ membershipCreated: true })
+    })
+
+    it('reports membershipCreated true on the auto-create-new-org path', async () => {
+      vi.mocked(doc).mockImplementation(
+        (_db: unknown, ...segments: string[]) => ({ path: segments.join('/') }) as never,
+      )
+      vi.mocked(getDoc).mockImplementation(() => {
+        // No user doc, no invite -- hasOrg false, no invite found -> auto-create.
+        return Promise.resolve({ exists: () => false, data: () => null }) as never
+      })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      const result = await store.ensureUserDocument(mockUser as never)
+      expect(result).toEqual({ membershipCreated: true })
+    })
+
+    it('reports membershipCreated false on the already-a-member path', async () => {
+      mockOrgDocPath({ name: 'Test Org' })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      const result = await store.ensureUserDocument(mockUser as never)
+      expect(result).toEqual({ membershipCreated: false })
     })
   })
 
