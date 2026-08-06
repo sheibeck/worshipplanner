@@ -118,15 +118,36 @@
           <template v-if="isCongregational">
             <!--
               38-02: one slide carries exactly one section — the speaker sits
-              on its own line above the section's words, both at the same
-              body treatment the reference above them uses (no accent
-              colour, no size/weight step). There is nothing left to
-              distinguish visually between stacked sections, because there
-              is no longer a stack.
+              on its own line above the section's words, at the same SIZE and
+              WEIGHT as the reference above them and the passage below (no
+              size/weight step). There is nothing left to distinguish between
+              stacked sections, because there is no longer a stack.
+
+              Owner follow-up (2026-08-05): the speaker line gets COLOUR back,
+              and only colour — "make the Congregation and Leader text stand
+              out a bit with color. Nothing too crazy." This partially reverses
+              quick task 260805-kzd, which stripped the speaker tags' accent
+              entirely. Read the boundary carefully before changing it: kzd
+              removed THREE things — the accent colour, the size/weight step
+              (text-2xl font-semibold) and the shouty casing (uppercase
+              tracking-wider). Only the FIRST is restored. Size, weight and
+              casing stay exactly where kzd put them, which is what keeps this
+              "not too crazy" rather than a straight revert.
+
+              The two speakers get DIFFERENT colours rather than one shared
+              accent, because the label's whole job is answering "is this my
+              line?" for a congregation reading at a distance — a single
+              accent makes the tag visible but still requires reading it.
+              Sky/amber is a cool/warm pair with real luminance separation on
+              this dark background, and stays distinguishable under red-green
+              colour vision deficiency, where a blue/yellow split is the safe
+              axis. The passage text itself stays text-gray-100 — the words
+              are not colour-coded, only the speaker naming them.
             -->
             <p
               data-testid="presentation-speaker"
-              class="text-gray-100 text-5xl font-normal leading-[1.4] mb-2"
+              class="text-5xl font-normal leading-[1.4] mb-2"
+              :class="speakerColorClass"
             >
               {{ ((currentSlide.slide as ScriptureSlide).section as CongregationalSection).speaker === 'LEADER' ? 'Leader:' : 'Congregation:' }}
             </p>
@@ -496,6 +517,25 @@ const isCongregational = computed(() => {
   if (!slide || slide.contentKind !== 'scripture') return false
   const scripture = slide as ScriptureSlide
   return scripture.readingMode === 'congregational' && scripture.section !== undefined
+})
+
+/**
+ * The speaker line's colour, and ONLY its colour — see the template comment
+ * on `presentation-speaker` for why size/weight/casing deliberately stay put.
+ *
+ * Returned as a class rather than an inline style so the two values are real
+ * Tailwind literals the JIT compiler can see. A computed template string like
+ * `text-${hue}-300` would be scanned as one unmatched token and silently
+ * produce no CSS at all — the tags would render colourless in the built app
+ * while looking correct in the source and passing any test that asserts on
+ * `classes()`, which reads the class attribute rather than the applied style.
+ */
+const speakerColorClass = computed(() => {
+  const slide = currentSlide.value?.slide
+  if (!slide || slide.contentKind !== 'scripture') return 'text-gray-100'
+  const section = (slide as ScriptureSlide).section
+  if (!section) return 'text-gray-100'
+  return section.speaker === 'LEADER' ? 'text-sky-300' : 'text-amber-300'
 })
 
 // A live edit that shortens the show cannot leave currentIndex out of range.

@@ -550,7 +550,7 @@ describe('PresentationViewer', () => {
     expect(classes).not.toContain('tracking-wider')
   })
 
-  it('D1: a congregational ScriptureSlide renders its reference in the unified body treatment too, and its speaker tag carries no accent, in a LEADER section slide showing that section\'s words', async () => {
+  it('D1: a congregational ScriptureSlide renders its reference in the unified body treatment too, and its speaker tag is coloured but otherwise unaccented, in a LEADER section slide showing that section\'s words', async () => {
     const section = { speaker: 'LEADER' as const, text: 'Give thanks to the LORD, for he is good.' }
     mount(PresentationViewer, { props: { slides: [congregationalScriptureSlide('a', section)] } })
     await Promise.resolve()
@@ -568,12 +568,19 @@ describe('PresentationViewer', () => {
     expect(classes).not.toContain('uppercase')
     expect(classes).not.toContain('tracking-wider')
 
+    // Owner follow-up 2026-08-05: the speaker tag carries COLOUR again, and
+    // colour is the ONLY thing 260805-kzd removed that came back. The size,
+    // weight and casing negatives below are the load-bearing half of this
+    // assertion — they are what distinguishes "a bit of colour" from a revert
+    // to the old text-2xl font-semibold uppercase tracking-wider treatment.
     const leaderTag = body().find('[data-testid="presentation-speaker"]')
-    expect(leaderTag.classes()).toContain('text-gray-100')
+    expect(leaderTag.classes()).toContain('text-sky-300')
+    expect(leaderTag.classes()).not.toContain('text-gray-100')
     expect(leaderTag.classes()).toContain('text-5xl')
     expect(leaderTag.classes()).toContain('font-normal')
     expect(leaderTag.classes()).toContain('leading-[1.4]')
-    expect(leaderTag.classes()).not.toContain('text-indigo-300')
+    expect(leaderTag.classes()).not.toContain('text-2xl')
+    expect(leaderTag.classes()).not.toContain('font-semibold')
     expect(leaderTag.classes()).not.toContain('uppercase')
     expect(leaderTag.classes()).not.toContain('tracking-wider')
     expect(leaderTag.text()).toBe('Leader:')
@@ -616,6 +623,14 @@ describe('PresentationViewer', () => {
     expect(words1.text()).toBe(leaderSection.text)
     expect(slideText()).not.toContain(congregationSection.text)
 
+    // Snapshot the class lists NOW, before advancing. `speaker1`/`words1` hold
+    // live element references, and Vue patches this v-if branch's nodes in
+    // place across the slide change — so reading `.classes()` off them after
+    // the click would report slide 2's classes and make the comparison below
+    // pass against itself.
+    const speaker1Classes = speaker1.classes().slice().sort()
+    const words1Classes = words1.classes().slice().sort()
+
     // Document order: the speaker element precedes the section-text element.
     expect(speaker1.element.compareDocumentPosition(words1.element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 
@@ -631,9 +646,20 @@ describe('PresentationViewer', () => {
       speaker2.element.compareDocumentPosition(words2.element) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
 
-    // Both slides render the speaker/words at the same, unified class treatment.
-    expect(speaker1.classes().slice().sort()).toEqual(speaker2.classes().slice().sort())
-    expect(words1.classes().slice().sort()).toEqual(words2.classes().slice().sort())
+    // The PASSAGE text is treated identically on both slides — the words are
+    // never colour-coded by who says them.
+    expect(words1Classes).toEqual(words2.classes().slice().sort())
+
+    // The SPEAKER line is the one deliberate difference (owner follow-up
+    // 2026-08-05): Leader reads sky, Congregation reads amber, so a
+    // congregation can tell "is this my line?" without reading the label.
+    // Everything else about the two tags is identical — asserted by diffing
+    // the class lists and requiring the colour to be the ONLY delta.
+    const speaker2Classes = speaker2.classes().slice().sort()
+    expect(speaker1Classes).toContain('text-sky-300')
+    expect(speaker2Classes).toContain('text-amber-300')
+    expect(speaker1Classes.filter((c) => !speaker2Classes.includes(c))).toEqual(['text-sky-300'])
+    expect(speaker2Classes.filter((c) => !speaker1Classes.includes(c))).toEqual(['text-amber-300'])
   })
 
   it('readingMode congregational with no section falls back to normal-mode rendering', async () => {
