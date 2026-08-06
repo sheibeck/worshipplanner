@@ -25,7 +25,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 
 ### Settings Foundation
 
-- [ ] **R073**: Every church-level setting introduced in this milestone persists per organization and
+- [x] **R073**: Every church-level setting introduced in this milestone persists per organization and
       resolves to a sensible default when the field is absent, so an organization document created
       before a setting existed never errors or renders blank.
       <br>`[ARCH]` No `Organization` type exists today — org fields are read via `orgData.x as T` casts
@@ -137,7 +137,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
       entry points entirely rather than greying them out. Turning AI off must never alter slide content
       that AI already generated.
 
-- [ ] **R089**: A church can turn Planning Center integration off, hiding its features without altering
+- [x] **R089**: A church can turn Planning Center integration off, hiding its features without altering
       already-imported roster data or the status of services already exported.
 
 ### Bible Translation
@@ -257,7 +257,7 @@ Explicitly excluded. Documented to prevent scope creep.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R073 | Phase 39 | Pending |
+| R073 | Phase 39 | Complete |
 | R074 | Phase 40 | Pending |
 | R075 | Phase 40 | Pending |
 | R076 | Phase 41 | Pending |
@@ -273,7 +273,7 @@ Explicitly excluded. Documented to prevent scope creep.
 | R086 | Phase 44 | Pending |
 | R087 | Phase 44 | Pending |
 | R088 | Phase 39 | Pending |
-| R089 | Phase 39 | Pending |
+| R089 | Phase 39 | Complete |
 | R090 | Phase 45 | Pending |
 | R091 | Phase 45 | Pending |
 | R092 | Phase 45 | Pending |
@@ -290,6 +290,7 @@ Explicitly excluded. Documented to prevent scope creep.
 | R103 | Phase 48 | Pending |
 
 **Coverage:**
+
 - v1.5 requirements: 31 total
 - Mapped to phases: 31 (Phases 39-48)
 - Unmapped: 0

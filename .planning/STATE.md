@@ -5,15 +5,15 @@ milestone_name: Settings, Sharing, and Fidelity
 current_phase: 39
 current_phase_name: not yet planned
 status: planning
-stopped_at: Phase 39 UI-SPEC approved
-last_updated: "2026-08-06T18:22:30.699Z"
+stopped_at: Completed 39-02-PLAN.md
+last_updated: "2026-08-06T19:12:47.050Z"
 last_activity: 2026-08-06
 last_activity_desc: v1.5 ROADMAP.md created (Phases 39-48, 31/31 requirements mapped, 0 unmapped)
 progress:
   total_phases: 10
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 6
+  completed_plans: 2
   percent: 0
 ---
 
@@ -1265,6 +1265,8 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 38 P02 | 30min | 3 tasks | 6 files |
 | Phase 38 P03 | 30min | 3 tasks | 4 files |
 | Phase 38 P04 | 35min | 3 tasks | 3 files |
+| Phase 39 P02 | 10min | 3 tasks | 3 files |
+| Phase 39 P01 | 15min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -1526,6 +1528,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 38-04: tick() helper mirrors useSlideshowAssembly's apply shape exactly (writes slides AND freshly recomputed sourceSignature); its own fidelity is asserted against the written signature value, not just the changed flag, since carry-by-position idempotence can mask a broken helper
 - [Phase ?]: 38-04: comment audit found slideGroup.ts/slideshowAssembler.ts/scripture.ts already reconciled by 38-01/38-02; only slideGroupMaterializer.ts had 4 stale unqualified claims, all fixed with no behavioral change
 - [Phase ?]: 38-04: Task 3's owner-verification checkpoint deferred under the standing autonomy grant, recorded as PENDING-VERIFICATION.md items 38.1-38.7 — not run, not self-approved
+- [Phase ?]: Wave 0 harness auth-store mock: settings shape backed by per-key module-scope getters (SongTable.test.ts:39 precedent), not a single collapsed getter
+- [Phase ?]: findImportSongsButton typed as ReturnType<typeof mountSongsView> instead of VueWrapper<any> to satisfy eslint's no-explicit-any rule
 
 ### Roadmap Evolution
 
@@ -1837,9 +1841,9 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-06T18:22:30.658Z
-Stopped at: Phase 39 UI-SPEC approved
-Resume file: .planning/phases/39-org-settings-infrastructure-feature-toggles/39-UI-SPEC.md
+Last session: 2026-08-06T19:12:47.011Z
+Stopped at: Completed 39-02-PLAN.md
+Resume file: None
 
 ## Operator Next Steps
 

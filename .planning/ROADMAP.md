@@ -88,10 +88,8 @@ Full details: [milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md) · phase 
 <details>
 <summary>✅ v1.4 Service and Slides (Phases 29-38) — SHIPPED 2026-08-05</summary>
 
-
 **Milestone Goal:** Make the Service Order and Slides tabs trustworthy — ordering that holds, saves you
 can see, slides that always mirror the plan — and finish them against the Claude Design wireframes.
-
 
 - [x] **Phase 29: Order Structure — Stable Reordering & Post-Service** - Fix the drag-and-drop root cause and add the fifth Post-Service section (completed 2026-07-28)
 - [x] **Phase 30: Slides Mirror the Plan — Hard Lock & Reconciliation Removed** - Delete the reconcile/confirm flow; slide groups always mirror the service order (completed 2026-07-29)
@@ -139,6 +137,7 @@ alone:
   a Settings screen, so combining them gives the settings-infrastructure work real user-observable
   success criteria while still landing first, ahead of every later phase that depends on R073 (R086,
   R090, R093).
+
 - **Phase 48** merges SUMMARY's "Multi-Image Import Ordering" (R098 alone) with "Mobile & Layout
   Polish" (R099-R103) — SUMMARY's own rationale already called both "independent, low-risk... slot in
   wherever convenient," so combining them avoids two adjacent thin phases without changing what either
@@ -172,11 +171,12 @@ merge gaps. Full reasoning recorded in `.planning/STATE.md` § "v1.5 ROADMAP.md 
   3. In Settings, a church can turn Planning Center integration off; its features hide without altering already-imported roster data or the status of services already exported
   4. Turning AI off never alters slide content an AI split already generated
 
-**Plans**: 6 plans
+**Plans**: 2/6 plans executed
 
 Plans:
-- [ ] 39-01-PLAN.md — Wave 0: create the two missing test harnesses (`SettingsView.test.ts`, `SongsView.test.ts`)
-- [ ] 39-02-PLAN.md — `Organization`/`OrgSettings`/`DEFAULT_ORG_SETTINGS`, the single defaults-merge point in `loadOrgContext`, and the `vwModeEnabled` dual-read
+
+- [x] 39-01-PLAN.md — Wave 0: create the two missing test harnesses (`SettingsView.test.ts`, `SongsView.test.ts`)
+- [x] 39-02-PLAN.md — `Organization`/`OrgSettings`/`DEFAULT_ORG_SETTINGS`, the single defaults-merge point in `loadOrgContext`, and the `vwModeEnabled` dual-read
 - [ ] 39-03-PLAN.md — Settings screen: AI Features section, Planning Center enable toggle, dot-path writes, credentials block wrapped
 - [ ] 39-04-PLAN.md — AI guard at `claudeApi.ts`'s module entry point (3 of 7 exports) plus the three AI entry-point hides
 - [ ] 39-05-PLAN.md — the five remaining Planning Center entry points gated
@@ -349,7 +349,7 @@ Plans:
 | 18-23 | v1.2 | all | Complete (archived) | 2026-07-28 |
 | 24-28 | v1.3 | 33/33 | Complete (archived) | 2026-07-28 |
 | 29-38 | v1.4 | 61/61 | Complete (archived) | 2026-08-05 |
-| 39. Org Settings Infrastructure & Feature Toggles | v1.5 | 0/? | Not started | - |
+| 39. Org Settings Infrastructure & Feature Toggles | v1.5 | 2/6 | In Progress|  |
 | 40. Custom Auth Claim for Org Membership | v1.5 | 0/? | Not started | - |
 | 41. Sharing Correctness | v1.5 | 0/? | Not started | - |
 | 42. PowerPoint Rendered-Image Display | v1.5 | 0/? | Not started | - |
