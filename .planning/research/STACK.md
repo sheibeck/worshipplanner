@@ -1,236 +1,152 @@
 # Stack Research
 
-**Domain:** Brownfield additions to a shipped Vue 3 + Firebase worship-planning app (v1.4 "Service and Slides")
-**Researched:** 2026-07-28
-**Confidence:** HIGH for versions (verified via npm registry and Context7/skill-cached docs, 2026-07-28); MEDIUM for PPTX-rendering cost/latency figures (grounded in vendor docs and well-established LibreOffice/Cloud Run operating characteristics, not independently benchmarked against this app's actual deck corpus)
+**Domain:** v1.5 "Settings, Sharing, and Fidelity" — additions to an existing shipped Vue 3 + Firebase app
+**Researched:** 2026-08-06
+**Confidence:** MEDIUM (mixed — HIGH on npm package facts verified against the live registry, MEDIUM on Context7/official-doc claims, LOW on web-search-only claims such as NLT's terms of use and font metric comparisons; each finding below is tagged)
 
-This file covers **only the five new v1.4 capabilities**. It does not re-litigate the existing stack (Vue 3, Pinia+`onSnapshot`, Tailwind v4, Firebase Gen-2 Functions, SortableJS, Claude Haiku) — see PROJECT.md's Key Decisions table for that. Every recommendation below integrates into that existing stack rather than proposing to replace any part of it.
+## Summary Up Front
 
----
+Four of the five questions need **zero or near-zero new runtime dependencies**. This milestone is overwhelmingly about *wiring the existing stack differently* (a new proxy target, a new rules-testing pattern, new CSS `@font-face` assets, a native `Intl` API) rather than adding libraries. The one place a real new dependency earns its place is font tooling, and even there the recommended path (`@fontsource/*`) needs **no build step at all** — it is pre-built static assets shipped as npm packages.
 
-## 1. Server-side PowerPoint → image rendering
+## Recommended Stack
 
-### Recommended approach: self-hosted headless LibreOffice + Poppler, on a **dedicated Cloud Run service**, invoked **asynchronously** from the existing Cloud Function
+### Core Technologies — No Changes
 
-| Technology | Version | Purpose | Why Recommended |
-|------------|---------|---------|------------------|
-| LibreOffice (`libreoffice-impress` + core) | Debian `bookworm`/`trixie` package, any current 24.x/25.x build | PPTX → PDF conversion, one PDF page per slide | The only tool that reads real PPTX layout (masters, themes, embedded charts, effects) with fidelity close to PowerPoint itself — Aspose/CloudConvert/Gotenberg all use it (or an equivalent) under the hood anyway. **MPL 2.0** — free for commercial SaaS use, no per-seat or per-conversion fee, no vendor account |
-| Poppler `pdftoppm` (`poppler-utils`) | Debian package, current stable | Rasterizes each PDF page to a PNG at chosen DPI | LibreOffice's own `--convert-to png` only exports slide 1 — you need PDF as the intermediate format, then split it into one PNG per page. `pdftoppm` is the standard, fast, MIT/GPL-licensed tool for this and is already used for large-scale document pipelines |
-| `fonts-crosextra-carlito`, `fonts-crosextra-caladea` | Debian packages | Metric-compatible substitutes for Calibri/Cambria | **Do not install `ttf-mscorefonts-installer` or copy real Microsoft fonts into the image** — those are proprietary and not licensed for redistribution inside a hosted SaaS container. Carlito/Caladea (Google/Red Hat, SIL Open Font License) match Calibri/Cambria's character widths line-for-line, so wrapping and slide layout stay correct even though glyph shapes differ slightly |
-| `fonts-liberation` | Debian package | Metric-compatible Arial/Times New Roman/Courier New substitutes | Same licensing rationale as above — covers the other common Office defaults |
-| Cloud Run (Gen 2) — a **standalone service**, not a Firebase Function | — | Hosts the LibreOffice + Poppler container | See "Custom container vs. Firebase Functions Gen 2" below — this is the one piece that cannot be a normal `firebase deploy --only functions` deployment |
+| Technology | Version (current) | Purpose | Why Recommended |
+|------------|---------|---------|-----------------|
+| Vue 3 / Vite / Pinia / Tailwind v4 / Firebase 12 | unchanged (`^3.5.29` / `^7.3.1` / `^3.0.4` / `^4.0.0` / `^12.0.0`) | app runtime | Every v1.5 feature fits inside the existing architecture; nothing here forces a version bump |
 
-### What NOT to add
+### New Integration Points (no new npm packages)
 
-| Avoid | Why | Use Instead |
-|-------|-----|--------------|
-| **Gotenberg** (Docker image, MIT) | A legitimate, well-maintained option (65M+ pulls, wraps the same LibreOffice under the hood) — but it converts office docs *to PDF only*. You'd still need a second hop (Poppler) to get per-slide PNGs, and now you're operating two services (Gotenberg + your rasterizer) instead of one. For a single-format (PPTX-only) need, a single custom container running `soffice` + `pdftoppm` directly is less operational surface for the same result. Reconsider Gotenberg only if a future milestone needs to convert other office formats (DOCX, XLSX) too — its broader format coverage would then start paying for itself | One custom Cloud Run container with `soffice` + `pdftoppm` |
-| **unoconv** | A thin Python wrapper around the same LibreOffice UNO API — unmaintained for years, no meaningful advantage over calling `soffice --headless` directly, and it's one more moving part with its own dependency/version drift risk | Shell out to `soffice`/`pdftoppm` directly, or Gotenberg if format coverage grows |
-| **CloudConvert** | A real, working per-conversion cloud API (~$0.008/conversion-minute, ~$8/mo minimum plan) — but it means church slide decks (which may contain copyrighted worship graphics/photos of congregants) leave your infrastructure to a third-party vendor, plus API-key management alongside the ESV/Claude/Planning Center keys already in `.env.local`, plus a recurring bill for a workload that's essentially free to self-host at this volume | Self-hosted LibreOffice on Cloud Run — near-$0 at "a few dozen decks a month" (see Pricing below) |
-| **Aspose.Slides Cloud** | Best-in-class fidelity and a real PNG-per-slide export in one call, and its pay-per-call pricing (~$0.007–0.02/call, free tier of 150 calls/mo) is genuinely cheap at this volume — but it's a commercial SaaS dependency with its own account/API-key/rate-limit surface, and its on-prem SDK licenses run $1,000–3,000+/yr if ever needed off the cloud tier. Not wrong, just an unnecessary vendor relationship for a self-hostable, free alternative that already fits this app's existing Cloud Functions architecture | Same — self-hosted LibreOffice |
-| **Syncfusion** | Cloud pricing is opaque/hard to quote from public sources, and its primary offering is an on-prem .NET/JS SDK ($450–1,400+/yr per Vendr data) — a licensing model and language ecosystem (.NET-centric tooling) that doesn't fit this Node.js Cloud Functions codebase | Same — self-hosted LibreOffice |
-| **A pure-Node PPTX renderer** (e.g. building slide layout from the PPTX XML by hand) | No pure-Node library renders arbitrary PPTX with real fidelity — backgrounds, WordArt, SmartArt, embedded charts, and font metrics require an actual layout engine. Anything claiming to do this in pure JS is doing text/shape extraction (which is what `pptxParser.ts` already does), not rendering | LibreOffice (above) |
+| Addition | Purpose | Why Recommended |
+|----------|---------|-----------------|
+| `NLT_API_KEY` secret + `nlt: "https://api.nlt.to"` entry in `functions/src/index.ts`'s `PROXY_TARGETS` | Proxy the NLT API through the existing Cloud Function, mirroring `esv` | Reuses the proven proxy pattern exactly — no new server dependency, no new deploy step beyond `firebase functions:secrets:set NLT_API_KEY` |
+| Custom-claim mirror on `organizations/{orgId}/members/{uid}` writes, using `firebase-admin`'s `getAuth().setCustomUserClaims()` (already a transitive capability of the installed `firebase-admin@^13.10.0`) | Carry org membership onto the ID token so `storage.rules` can read it without a cross-service Firestore call | `setCustomUserClaims` is a stable Admin SDK method already available through the installed `firebase-admin` version — no version bump needed |
+| `Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })` applied to `classifyFiles`'s `images` bucket in `src/components/slides/dropRouting.ts` | Deterministic natural-sort ordering for multi-image drops (`img2.jpg` before `img10.jpg`) | Native to every JS engine Vite targets — zero bytes added to the bundle, no library to evaluate or maintain |
 
-### Custom container vs. Firebase Functions Gen 2 — confirmed answer
+### Supporting Libraries — Font Self-Hosting (the one real addition)
 
-**Yes, a custom container is required, and it changes the deployment path.** Firebase Cloud Functions Gen 2 does run on Cloud Run under the hood, but `firebase deploy --only functions` builds your function via **Google Cloud buildpacks**, not an arbitrary `Dockerfile` — buildpacks auto-detect a Node/Python source tree and produce a container for you; there is no supported way to `apt-get install libreoffice-impress poppler-utils` into that build. This means:
+| Library | Version | Purpose | When to Use |
+|---------|---------|---------|-------------|
+| `@fontsource/inter` | `5.3.0` | Self-hosted Inter (the Helvetica Neue stand-in — already the milestone decision in PROJECT.md) as static woff2 + CSS, shipped as an npm package | Import once; ship `@fontsource/inter/300.css`, `/400.css`, `/700.css` for Light/Regular/Bold |
+| `@fontsource/roboto`, `@fontsource/open-sans`, `@fontsource/montserrat`, `@fontsource/poppins`, `@fontsource/lato`, `@fontsource/merriweather`, `@fontsource/oswald` | `5.3.0` each (verified present on npm registry 2026-08-06) | The remaining curated font families for the settings font picker | Same import pattern — one `@fontsource/<family>/<weight>.css` per weight actually offered in the picker |
 
-1. **The LibreOffice/Poppler service must be deployed as a separate, plain Cloud Run service** (`gcloud run deploy --source .` with your own `Dockerfile`, or Cloud Build → Artifact Registry → `gcloud run deploy --image`), living in the same GCP project as the Firebase project (Firebase projects *are* GCP projects, so this is one project, two deployment surfaces — not a new project or a new vendor).
-2. **Keep the existing `parsePptx` Cloud Function as the auth/gatekeeper**, exactly as it already is (`request.auth` + independent `organizations/{orgId}/members/{uid}` check, storage-path gating on `orgs/{orgId}/pptx-imports/`). Add a **second Cloud Function** (still a normal buildpacks-built Gen-2 function, no container needed there) that, after `parsePptx` finishes text extraction, does a **service-to-service authenticated call** to the Cloud Run render service (Google-signed ID token via the Cloud Run Invoker IAM role — not a public endpoint) to kick off rendering. This reuses the exact auth pattern already proven in this codebase rather than inventing a new one.
-3. Do not expose the Cloud Run render service publicly or call it directly from the browser — keep it as an internal, IAM-gated service the Function talks to, matching every other write path in this app going through Firestore/Storage security rules or Function-level auth checks.
+**Why `@fontsource` over manually running a subsetting tool:** each `@fontsource/*` package already ships pre-built, pre-subsetted (per-charset, per-weight) `.woff2` files as static files inside `node_modules`, which Vite bundles/copies like any other asset. This satisfies "self-hosted, NOT the runtime Google Fonts API" (the explicit v1.5 decision — a projector with no internet at service time must never make a network request for a font) with **zero build tooling**, because there is nothing to build: importing the CSS is the entire integration. This is the standard, actively-maintained (>2000 packages, one per Google/OFL font family, `deps: none` on the core packages) way to self-host Google/OFL fonts in a Vite/npm project.
 
-### Container image, cold start, memory/CPU
+### Font Subsetting — Deliberately NOT Needed for the Common Case
 
-- **Base image:** `node:22-slim` or `node:22-bookworm-slim` (matches the existing Functions runtime pin, `functions/package.json` → `engines.node: "22"`), with `apt-get install -y libreoffice-impress poppler-utils fonts-crosextra-carlito fonts-crosextra-caladea fonts-liberation` layered on top. Expect a **~700MB–1.2GB image** — LibreOffice is not small, and this is the correct tradeoff for fidelity.
-- **Cold start:** LibreOffice's own process startup (loading its profile, fonts, filters) typically adds **several seconds on top of** Cloud Run's own cold-start latency — this is real and is the primary reason to run this asynchronously rather than have a user wait on it inline (see Sync vs. Async below).
-- **Memory/CPU:** Start at **2 GiB RAM / 1–2 vCPU**, `concurrency: 1` per instance. The `concurrency: 1` setting isn't just a safety margin — headless LibreOffice's per-user-profile lock (`-env:UserInstallation=file:///tmp/lo-<uuid>`) makes concurrent conversions on a *shared* instance a documented source of corruption/deadlock; one conversion per instance avoids that class of bug entirely rather than requiring careful profile-directory isolation code.
-- **`minInstances: 0`** is the right call at this volume (see Pricing) — the near-zero traffic doesn't justify paying to keep an instance warm.
+| Library | Version | Purpose | When to Use |
+|---------|---------|---------|-------------|
+| `subset-font` | `2.5.0` (verified on npm 2026-08-06) | WASM (harfbuzz/hb-subset) font subsetter, pure Node — no Python required | ONLY if the owner wants a font that has no `@fontsource` package (e.g., a purchased/custom family not on Google Fonts). Not needed for the curated OFL list above |
 
-### Per-conversion latency for a ~30-slide deck
-
-Expect **on the order of tens of seconds to low minutes** for a real 30-slide deck with images/charts on a cold instance (LibreOffice startup + PDF conversion + 30 `pdftoppm` rasterization passes + 30 Storage uploads), settling to well under that on a warm instance. This is squarely in "background job," not "synchronous request-response," territory — see below.
-
-### Pricing at low volume (a few dozen decks/month)
-
-Cloud Run's free tier (per project, per month) is **180,000 vCPU-seconds, 360,000 GiB-seconds, and 2,000,000 requests**. Even a generous estimate — 30 decks/month × 60 seconds of 2-vCPU compute each — is ~3,600 vCPU-seconds, under 2% of the free tier. **This workload is effectively free to self-host.** That's the strongest practical argument for self-hosting over any of the per-call/per-minute vendor APIs above, none of which can go below their subscription floor even at near-zero usage.
-
-### Licensing recap (the three things that kill this in practice)
-
-1. **LibreOffice itself:** MPL 2.0 — unrestricted commercial SaaS use, no fee, no attribution requirement beyond what MPL already requires for the (unmodified) binary you're shipping.
-2. **Fonts:** never bundle real Microsoft fonts (`ttf-mscorefonts-installer` fetches genuine MS font files under an EULA not written for redistribution in a hosted product) — use Carlito/Caladea/Liberation, which are open-licensed and metric-compatible.
-3. **Cold-start/fidelity risk, not a legal risk, but the practical failure mode:** font *substitution* happens silently — LibreOffice swaps a missing font with no error. Surface which fonts a deck used that weren't available server-side (already flagged in PITFALLS.md Pitfall 6) so "renders like the original" carries an honest caveat rather than a silent visual drift.
-
-### Synchronous-with-long-timeout vs. async background job — **recommendation: async**
-
-ARCHITECTURE.md flagged this as undecided. Given the cold-start and per-deck latency figures above (tens of seconds to low minutes, on an intermittently-cold service), **treat this as a background job, not a synchronous request the user's browser waits on**:
-
-- Trigger the render Function on the **Storage `onObjectFinalized` event** for the uploaded `.pptx` (or immediately after `parsePptx`'s text extraction completes, whichever the phase plan prefers) rather than from a client-awaited `onCall`.
-- Track progress on the `ImportedDeck` Firestore document with a status field (`pending` → `rendering` → `ready`/`failed`), only flipping to `ready` once **every expected slide image is confirmed uploaded** (a completeness check, not just "the function returned 200") — this directly addresses the orphaned-partial-render failure mode PITFALLS.md Pitfall 6 calls out.
-- The client subscribes to that status via the **same `onSnapshot` pattern already used everywhere else in this app** (Pinia stores + Firestore listeners) — no new client-side data-fetching pattern needed, just a new field to watch.
-- This also sidesteps Cloud Functions Gen-2's default timeout entirely — no need to raise it to its maximum (up to 60 minutes) and have a user's browser tab sit on a spinner that long; the UI can show "Rendering…" and move on.
-
----
-
-## 2. LLM-assisted congregational reading splits
-
-| Technology | Version | Purpose | Why Recommended |
-|------------|---------|---------|------------------|
-| `@anthropic-ai/sdk` | **upgrade from the currently-pinned `^0.78.0` to current (`^0.115.x` as of this research; re-check `npm view @anthropic-ai/sdk version` at implementation time)** | Anthropic API client | The pinned version is ~18 months behind. Structured-outputs support (`output_config.format`, `client.messages.parse()`) — the feature this task needs for a deterministic, schema-shaped response — was added well after 0.78.0. Upgrading is a prerequisite, not optional, for this feature |
-| `claude-haiku-4-5` (model ID) | current | Splits a scripture passage into leader/congregation reading parts | Matches this app's own existing, stated decision ("cost-efficient haiku model" — PROJECT.md Key Decisions) and PITFALLS.md's own analysis: this is a bounded structural-labeling task (assign each clause/verse to a speaker), not open-ended generation, which is exactly Haiku's strong suit. **Do not default to Opus/Sonnet for this** — reserve a bigger model only if Haiku's split quality proves inadequate on real passages during evaluation |
-| `output_config: { format: { type: "json_schema", schema: {...} } }` (Messages API structured outputs) | GA, no beta header, supported on Haiku 4.5 | Constrains the model's response to a fixed schema | This is the mechanism that makes the split deterministic and *safe*: the schema should describe **verse/clause indices and a speaker label only** (`{ verse: number, clauseStart: number, clauseEnd: number, speaker: "leader" | "congregation" }[]`) — never a `text` field the model fills in. The app then slices the **already-fetched, known-correct ESV passage string** using those indices to build the displayed slides. This makes hallucinated/reworded scripture text **structurally impossible** — the model can mis-assign a speaker, but it literally cannot alter a character of what's displayed, because the displayed text never originates from model output |
-
-### Integration point
-
-Route through the **existing single Cloud Function proxy** (`/api/anthropic`, already used by `src/utils/claudeApi.ts` for song/scripture suggestions) rather than adding a second proxy path. Add a new exported function alongside `getSongSuggestions`/`getScriptureSuggestions` in `claudeApi.ts` — same lazy-singleton client, same try/catch-and-fall-back-to-null pattern already established there, so the "AI is additive, never blocking" principle (an existing Key Decision) is inherited for free rather than re-implemented.
-
-### What NOT to do
-
-| Avoid | Why | Use Instead |
-|-------|-----|--------------|
-| Prompt-engineered "respond ONLY with valid JSON" + regex/`safeParseJsonArray` extraction (the pattern the existing `getSongSuggestions`/`getScriptureSuggestions` use today) | Works for suggestions where an occasional malformed response just means "no suggestion shown" — unacceptable here, where correctness of *displayed scripture text* is the whole point. Free-text JSON is not schema-validated, so a subtly malformed or creatively-reworded response could slip through `safeParseJsonArray`'s regex extraction undetected | `output_config.format` (structured outputs) with strict schema validation — reject and fall back on any validation failure, never attempt a "close enough" parse for this feature specifically |
-| Letting the model re-type or "repeat" the passage text in its response, even inside a JSON field | This is the single highest-risk mistake for this feature — translation drift, mis-transcription, or the model "smoothing" phrasing are all indistinguishable from success until someone reads it against the source ESV text live in front of a congregation | Model output is *indices/spans into the original string only*; the app slices the original |
-| A bigger/more expensive model "to be safe" | This is a structural-labeling task with a small, well-scoped output (assign N verses to two speakers) — added model size buys nothing here and contradicts the app's own stated cost-efficiency principle | `claude-haiku-4-5`, escalate only if evaluation shows real quality gaps |
-| Regenerating the split on every view | Same passage + same split algorithm version should produce a stable result — cache the split per passage (e.g. on the `ScriptureSlideEditor`'s associated Firestore doc) and only re-call the API on an explicit user "re-split" action, consistent with the deterministic, non-churning UX this task needs |
-
----
-
-## 3. Background images on slides
-
-**No new libraries needed.** This is additive to infrastructure that already exists — the gap is data-model fields and a resolution/upload flow, not new tooling.
-
-| Technology | Version | Purpose | Why / When to Use |
-|------------|---------|---------|---------------------|
-| Existing Firebase Storage + existing media-attachment upload flow | already in place | Storing background images | Same upload path already used for slide media/audio (`src/components/slides/**`) — add a `backgroundImageUrl?: string` field at three levels (`SongLyrics`, `SlideGroup`, `GroupSlideEntry`) per ARCHITECTURE.md §7's already-worked-out precedence model (slide overrides group overrides song) — no new upload UI pattern to invent |
-| **Firebase Extension: `storage-resize-images`** (official, `firebase/extensions`) | latest published version at install time (`firebase ext:install storage-resize-images`) | Auto-generates a resized/optimized copy on upload | The right tool for "optimize/resize at upload" — install-and-configure, zero custom Cloud Function code, supports JPEG/PNG/WebP/AVIF output, preserves `Cache-Control`/content metadata automatically, and (critically) writes the resized copy into the **same bucket** so it inherits this app's existing Storage-lifecycle patterns rather than needing a new one. Configure it to target a size matched to presentation resolution (e.g. 1920×1080, or a couple of tiers for different device pixel ratios) so slides don't ship multi-megabyte originals to a projector browser tab |
-| Plain CSS (`background-image` + `object-fit: cover`, or an `<img>` behind a positioned text layer) | — | Rendering the background behind slide text at presentation resolution | No library warranted — this is exactly what CSS backgrounds are for. The only real design work is a **text-contrast safeguard**: apply a semi-transparent scrim (a `background: rgba(0,0,0,0.35–0.5)` overlay, or a `text-shadow`/backdrop-blur band behind the text block) between the background image and the text layer so arbitrary user-uploaded photos never make copy illegible — this is a UI-SPEC/design concern for the relevant phase, not a stack concern, but flag it now so it isn't dropped |
-
-### What NOT to add
-
-| Avoid | Why | Use Instead |
-|-------|-----|--------------|
-| A client-side image-resizing library (e.g. `browser-image-compression`, `pica`) | Adds a bundle-size cost and a second place resizing logic can drift from the server-side extension's behavior | `storage-resize-images` extension — resize server-side, once, consistently |
-| A custom Cloud Function reimplementing what the extension already does | Firebase's own extension is maintained, handles metadata copying and multiple output sizes/formats declaratively, and needs zero custom code to install | The extension |
-
----
-
-## 4. Toast / save-status system
-
-### Recommendation: **hand-roll both**, on top of the Pinia `useSaveStatus` aggregator ARCHITECTURE.md §6 already specifies — no toast library
-
-| What | Why a library is *not* warranted here |
-|------|------------------------------------------|
-| Persistent inline "Saving… / Saved HH:MM" indicator | This is not a toast at all — it's a small, permanently-mounted status chip anchored to content, reading a Pinia store. No toast/notification library models this UX pattern (they're all built around transient, stacked, auto-dismissing popups) — it's a ~30-line Vue component (a `<span>`/`<div>` with a computed label + Tailwind classes matching the existing dark theme), not a library-shaped problem |
-| Failure-only toast | A single notification *kind*, triggered from one place (the same save-status aggregator, on a `status: 'error'` transition) — this is a handful of lines: a `<Teleport to="body">`'d fixed-position container, a small array of active toasts in the aggregator/store, a 4–6s auto-dismiss timer, and a dismiss button. Reaching for a library to solve "show one dismissable box occasionally" adds a dependency, its own theming override work (fighting the library's default look to match this app's gray-950/900 dark palette and the Claude Design wireframes already governing this milestone's visual language), and API surface (stacking rules, positioning config, animation config) this app will never use |
-
-### Library survey (for the record — why each was passed over)
-
-| Library | Version | Verdict |
-|---------|---------|---------|
-| `vue-toastification` | 1.7.14 (npm) | **Do not use.** Last published **2022-05-23** — over 3.5 years stale as of this research, no evidence of Vue 3.5+/Tailwind v4-era maintenance. Adopting an unmaintained UI dependency for a one-shot need is a worse long-term bet than 30 lines of owned code |
-| `vue-sonner` | 2.0.9 (npm) | Actively maintained (last publish 2025-10), small, Vue-3-native, and would work fine — genuinely the best *library* option if one were needed. Still not warranted: it's built for multi-toast stacking/promise-chaining/rich variants this app doesn't need, and its default visual style would need full override work to match the existing dark theme and the Claude Design wireframes, which is roughly the same amount of work as writing the component directly against Tailwind v4 utility classes already in use everywhere else in this codebase |
-| `reka-ui` (Toast primitive) | 2.10.1 (npm) | Very actively maintained (last publish within the last month), and its Toast primitive is genuinely accessible (Radix-derived, full keyboard/AT support) — but it's a large general-purpose headless-component library. Pulling in a whole new UI-primitives dependency for one component when this app has no other reka-ui usage is disproportionate. Worth reconsidering **only if** a later phase in this milestone or a future one needs several more accessible primitives (dialogs, popovers, comboboxes) at once — evaluate as a batch, not per-component |
-
-### Accessibility requirements (apply regardless of hand-rolled vs. library)
-
-- The persistent save-status text must live in an `aria-live="polite"` region so a screen-reader user hears "Saved 2:41" without it interrupting whatever they're doing — `polite`, not `assertive`, since this is routine status, not an alert.
-- The failure toast is the one case that warrants `aria-live="assertive"` (or `role="alert"`, which implies assertive) — a save failure is exactly the kind of interruption-worthy event `assertive` exists for.
-- Both regions should exist in the DOM at all times (not conditionally rendered in/out), with only their *text content* changing — conditionally mounting/unmounting an `aria-live` region is a common bug that causes some screen readers to miss the first announcement after mount.
-
----
-
-## 5. Drag-and-drop — stay on SortableJS
-
-Per the milestone constraint, this section answers narrowly: current-ness of the pin, whether a wrapper library is worth adopting, and the best additive keyboard-accessible layer. **No migration is proposed or implied anywhere below.**
-
-| Question | Answer |
-|----------|--------|
-| Is `sortablejs@1.15.7` current? | **Yes.** `npm view sortablejs version` returns `1.15.7` as of this research (last published 2026-02-11) — the app's existing pin is already the latest release. No action needed on the SortableJS version itself; ARCHITECTURE.md §1 already identified the real defects as three specific bugs in how `ServiceEditorView.vue`'s `onEnd` handler uses the library, not a version or library problem |
-| Is `vuedraggable`/`vue-draggable-plus` in use or worth adopting over raw SortableJS? | **Not in use today, and not worth adopting here.** See below |
-| Best keyboard-accessible reordering option, as an additive layer | **Hand-rolled up/down move buttons + a single `aria-live="polite"` announcement region — no new dependency** |
-
-### Why not `vuedraggable` / `vue-draggable-plus`
-
-| Library | Version | Why not |
-|---------|---------|---------|
-| `vuedraggable` | 4.1.0 (npm, Vue-3-only rewrite — confirmed `peerDependencies: {"vue": "^3.0.1"}`) | It wraps SortableJS internally, and its bundled internal version is **`sortablejs@1.14.0`** (per its own `package.json` dependency) — older than the app's own direct `1.15.7` pin. Adopting it would either (a) let npm dedupe to a single SortableJS version and hope the two call sites' assumptions about `evt.oldIndex`/`oldDraggableIndex` semantics don't drift across that gap, or (b) end up with two SortableJS copies in the bundle. Neither is an improvement over the raw library this codebase already understands deeply (ARCHITECTURE.md's bug analysis reads SortableJS's actual source, line-referenced) |
-| `vue-draggable-plus` | 0.6.1 (npm) | A newer, framework-agnostic-flavored wrapper with its own API surface to learn — but it does not solve anything ARCHITECTURE.md's root-cause analysis didn't already solve: the bugs are in *this app's* `onEnd` handler (wrong index fields, an incomplete DOM revert, an unstable `v-for` key), not in SortableJS's API surface. A wrapper library changes how you *call* SortableJS; it does not change whether your reorder logic reads `oldIndex` vs `oldDraggableIndex` correctly. Since the fix is already fully scoped against the raw library (ARCHITECTURE.md §1, points 1–6), swapping libraries mid-fix would mean re-deriving that same analysis against a new API for zero behavioral gain |
-
-**Net:** the correct action here is applying ARCHITECTURE.md's already-completed root-cause fix (`evt.oldDraggableIndex`/`newDraggableIndex`, per-section `Sortable.create()` containers, `slot.id` as the `v-for` key, `onMove` returning `false` across section boundaries) to the existing `sortablejs@1.15.7` pin — not a library swap.
-
-### Keyboard-accessible reordering — the additive layer
-
-SortableJS is pointer/touch-only by design; it has no keyboard interaction model. The milestone correctly scopes this as *additive*, not a SortableJS replacement, and the well-established pattern for exactly this gap (see e.g. the "Dragon Drop" pattern documented by Smashing Magazine, and the same up/down-button approach independently adopted by numerous accessible sortable-list implementations) is:
-
-1. **Add "Move up" / "Move down" buttons** to each reorderable row (Service Order slots, Slide Grid cards) — rendered alongside the existing drag handle, not replacing it. These buttons call the **exact same reorder function** the drag handler calls (the pure `reindexSlots`/array-splice logic ARCHITECTURE.md and PITFALLS.md both flag as already unit-testable in isolation from the DOM) — so there is no second, divergent reorder code path to maintain.
-2. **Disable/hide the "up" control on the first item and the "down" control on the last item** *within its section* (CSS/`:disabled`, not full removal — removal shifts other elements' tab order unpredictably).
-3. **Announce every move via a shared `aria-live="polite"` region** (the same one from §4 can plausibly be reused, or a sibling one scoped to the list) — e.g. "Call to Worship song moved to position 2 of 4 in Worship section." This is the piece a visible-only up/down button pair does *not* solve on its own — a sighted mouse user sees the list reorder; a screen-reader user needs the equivalent told to them.
-4. **No new dependency.** This is achievable entirely with the existing Vue 3 + Tailwind v4 stack and the reorder logic ARCHITECTURE.md already identified as the correct fix target. A framework-agnostic accessible-DnD library (e.g. Atlassian's `@atlaskit/pragmatic-drag-and-drop`, actively maintained, real keyboard+AT support) exists and was evaluated, but running it **alongside** SortableJS for the same lists means two independent reorder engines that must agree on final order and both write through the same Firestore document — a coordination problem with no upside over the buttons-plus-announcements pattern above, which reuses the single already-correct reorder function from either trigger source.
-
----
+**Do NOT reach for `fonttools`/`pyftsubset`.** It is the traditional way to subset fonts, but it is a **Python** CLI tool — this project has no Python toolchain anywhere in its build (`package.json`, `functions/package.json`, `render-service/` are all Node), so adding it would introduce an entirely new language runtime to CI/dev machines for a job `@fontsource` already does. If custom subsetting is ever needed, `subset-font` (Node/WASM) stays inside the existing toolchain.
 
 ## Installation
 
 ```bash
-# Frontend — Claude API SDK upgrade (capability 2)
-npm install @anthropic-ai/sdk@latest
+# Fonts — pick from the curated list; each ships Light(300)/Regular(400)/Bold(700) at minimum
+npm install @fontsource/inter @fontsource/roboto @fontsource/open-sans \
+  @fontsource/montserrat @fontsource/poppins @fontsource/lato \
+  @fontsource/merriweather @fontsource/oswald
 
-# No other new frontend dependencies for v1.4's new capabilities.
-# (Backgrounds, toast/save-status, and keyboard-accessible reordering are
-#  built on the existing stack — see "What NOT to add" in each section.)
-
-# Firebase Extension (capability 3) — installed via the Firebase CLI, not npm
-firebase ext:install storage-resize-images
-
-# functions/ — no new production dependencies for PPTX rendering (capability 1):
-# LibreOffice + Poppler are OS packages baked into a custom Cloud Run container
-# image (Dockerfile), not npm packages. If you choose to write the Cloud Run
-# service in Node, it needs no new npm packages beyond what functions/
-# already has (fs, child_process, @google-cloud/storage are already available
-# in this ecosystem) — the render logic is a thin wrapper shelling out to
-# `soffice` and `pdftoppm`.
+# Only if a non-Google/OFL custom font is ever needed later
+npm install -D subset-font
 ```
 
----
+No `npm install` is needed for the NLT proxy, custom claims, or deterministic ordering work — those are wiring changes inside `functions/src/index.ts`, `storage.rules`/`firestore.rules`, and `dropRouting.ts` respectively.
+
+## Detailed Findings by Question
+
+### 1. NLT Bible API (api.nlt.to) — differs from ESV in a load-bearing way
+
+**Confidence: LOW-MEDIUM** (web search + direct `WebFetch` of the live endpoint, not an official SDK/Context7 doc — verify against the owner's actual key + `/Documentation` page before building)
+
+Verified by fetching `https://api.nlt.to/api/passages?ref=John.1.1&key=TEST&version=NLT` directly:
+
+| Aspect | ESV API v3 (already integrated) | NLT API (api.nlt.to) |
+|---|---|---|
+| Auth | `Authorization: Token <key>` HTTP header | `key` **query string parameter** (`?key=...`) — cannot be injected as a header |
+| Endpoint | `GET /v3/passage/text/?q=<ref>` | `GET /api/passages?ref=<ref>&key=<key>&version=NLT` |
+| Response format | **JSON**: `{ passages: string[] }`, already clean plain text | **HTML** always — confirmed live: an `<h2>` heading plus body markup with verse numbers embedded inline. There is no documented parameter to request JSON or plain text, and no toggle for verse-numbers/headings/footnotes the way ESV has `include-verse-numbers`, `include-footnotes`, etc. |
+| Rate limits | (existing, unaffected) | Anonymous/no-key: 50 verses/request, 500 requests/day, non-commercial only. Keyed: **up to 500 verses/request** (matches NLT's own copyright-statement cap), 5,000 requests/day. The owner already has a key. |
+| Terms of use | (existing) | Quotations in "nonsalable media" — church bulletins, orders of service, and by direct analogy projected slides — only need the initials **"NLT"** appended, not a full copyright block. Quotations over 500 verses or 25% of a book need written approval from Tyndale House Publishers. This is a materially lighter attribution requirement than the app's existing CCLI song-copyright handling, but it still needs a visible "NLT" marker somewhere on scripture slides pulled from this source — mirror the existing copyright-on-first/last-slide pattern used for songs. |
+
+**Integration consequences for the roadmap:**
+- The Cloud Function proxy's `SECRET_INJECTED` header-injection pattern (`headers["authorization"] = ...`) does not work as-is for NLT, because the secret is a query parameter, not a header. The `nlt` proxy branch needs to append `?key=<NLT_API_KEY.value()>` to the **upstream URL**, not the headers object — a small, deliberate divergence from the `esv`/`anthropic` branches, not a bug to "fix" into consistency.
+- `src/utils/scripture.ts` / a new `nltApi.ts` needs an HTML→plain-text extraction step that `esvApi.ts` never needed. Use the browser-native `DOMParser` (`new DOMParser().parseFromString(html, 'text/html').body.textContent`) to strip markup — no HTML-parsing library needed — but note this alone will NOT cleanly separate verse numbers from verse text (NLT's markup interleaves them with no toggle to suppress), so a regex pass over the parsed DOM (stripping elements matching NLT's verse-number span class, discovered by inspecting a real response) will likely be needed for output parity with the ESV path's clean text. Flag this as a phase-level unknown to resolve against a real fetched sample, not a generic HTML-strip.
+- `version=NLT` is the query param default (also documented: `NLTUK`, `NTV`, `KJV` — the app should hardcode `NLT`).
+
+### 2. Firebase Auth Custom Claims — Storage emulator DOES honor them, via a different mechanism than the broken one
+
+**Confidence: MEDIUM** (Context7/official Firebase docs corroborate the size limit and refresh mechanics; the emulator-honoring claim is corroborated by the project's own installed `@firebase/rules-unit-testing@^5.0.0` API surface, verified against its own test file)
+
+- **Mechanism (production):** Admin SDK `getAuth().setCustomUserClaims(uid, claims)` — already reachable via the installed `firebase-admin@^13.10.0`, no version bump. Recommended trigger point: a Firestore `onDocumentWritten`/`onDocumentCreated` handler on `organizations/{orgId}/members/{uid}` (mirroring the existing `parsePptxHandler`/`requestPptxRenderHandler` pattern of exporting a handler function separately from its trigger wrapper for unit-testability) that mirrors membership into a claim shaped like `{ orgId, role }`.
+- **Size limit:** custom claims are capped at **1000 bytes total**. Exceeding it throws `auth/claims-too-large`. A single `{ orgId, role }` pair is nowhere near this limit — no design pressure here, but if the app ever needs multi-org membership, storing an array of org IDs would need to stay well under 1000 bytes (likely fine for the foreseeable org count).
+- **Client propagation:** claims only land on a client's ID token at the **next token mint** — a natural refresh happens roughly every hour, but a UI action right after claim-setting (e.g., accepting an org invite) needs an explicit `await user.getIdToken(true)` (or `getIdTokenResult(true)`) to force-refresh and pick up the new claim immediately. This is a concrete new call site the invite-acceptance flow in `src/stores/auth.ts` needs to add.
+- **Reading in Storage rules:** `request.auth.token.<claimName>` — e.g. `request.auth.token.orgId == orgId`. This is a **direct JWT-claim read**, structurally different from `firestore.exists(...)`, which is a cross-service call.
+- **The emulator question — this is the crux of the whole change.** `firestore.exists()` is confirmed permanently inert against the Storage emulator (`firebase-js-sdk#6803`, already documented in this project's CLAUDE.md and reproduced in `src/storage.rules.test.ts`). **Custom claims read via `request.auth.token` do NOT go through that broken cross-service path at all.** The project's own `@firebase/rules-unit-testing` dependency exposes `testEnv.authenticatedContext(uid, tokenOptions)`, where `tokenOptions` is exactly a bag of custom claims baked directly into the mock ID token the test context presents — no real Auth Emulator sign-in, no Admin SDK round-trip, no cross-service Firestore read. Changing `src/storage.rules.test.ts`'s currently-broken calls (`testEnv.authenticatedContext('userA')`, relying on `firestore.exists()`) to `testEnv.authenticatedContext('userA', { orgId: 'orgA' })` against a rule rewritten to check `request.auth.token.orgId == orgId` is the concrete fix that makes the 2 currently-failing allow-case tests pass locally — this is precisely the CLAUDE.md-documented goal ("moving org membership onto a custom auth claim makes the check work in both environments").
+- **One separate caveat found in research, not a blocker:** there is a known `firebase-tools-ui` issue where custom claims can fail to appear inside the **Cloud Functions emulator** when using the Auth emulator's own sign-in flow (`firebase/firebase-tools-ui#424`). This affects a different code path (Functions reading `request.auth` at runtime) than `rules-unit-testing`'s `authenticatedContext`, which mints its own test token independent of the Auth emulator's sign-in flow entirely. It's worth a phase-level smoke test, but it does not undermine the rules-unit-testing fix above.
+
+### 3 & 4. Self-Hosted Fonts and the Helvetica Neue Substitute
+
+**Confidence: MEDIUM** (npm registry facts are HIGH confidence — verified live 2026-08-06; licensing and metric-compatibility claims are web-search sourced, LOW-MEDIUM)
+
+- **Licensing:** Google Fonts are distributed under either **SIL OFL 1.1** (Montserrat, Poppins, Lato, Merriweather, Oswald, Nunito, Inter) or **Apache License 2.0** (Roboto, Open Sans). Both explicitly permit bundling/redistributing inside a commercial app; the only OFL restriction is that you cannot sell the raw font *files* as a standalone product, and if you modify-and-redistribute under OFL you must rename. Neither license requires visible in-app attribution, though keeping the license file alongside the font (which `@fontsource` packages already do) is the correct practice.
+- **Tooling — recommended:** `@fontsource/*` npm packages (see Recommended Stack above). Zero-build, per-weight, per-charset CSS+woff2 files, already the de facto standard way to self-host these exact fonts in a Vite project.
+- **Tooling — only if needed later:** `subset-font` (Node/WASM, no Python) for any font outside the `@fontsource` catalog. **Do not introduce `fonttools`/`pyftsubset`** — it requires Python, a toolchain this project does not otherwise have anywhere (confirmed: `package.json`, `functions/package.json` are both pure Node).
+- **Inter as the Helvetica Neue substitute (already decided in PROJECT.md):** confirmed as the standard open-source pick for this exact substitution — shares Helvetica's even color and closed apertures, ships Light(300)/Regular(400)/Bold(700) static weights plus a variable-font build via `@fontsource-variable/inter` if finer weight control is ever wanted. **Caveat surfaced by research and worth flagging to the roadmap:** Inter is explicitly *not metric-compatible* with Helvetica Neue (glyph widths differ) — the metric-compatible alternative is **Nimbus Sans L**, but that distinction matters for print reflow, not for on-screen/projected slide rendering, which is this app's actual use case. No action needed; Inter remains the right call for this milestone.
+- **Rounding out the curated 6–8 family list (Light/Regular/Bold all present in each):** Inter (Helvetica Neue stand-in), Roboto, Open Sans, Montserrat, Poppins, Lato, Merriweather (serif — useful for scripture legibility contrast against sans body/lyric text), Oswald (condensed, for display/impact use). All eight confirmed present as `@fontsource/*` packages at version `5.3.0` on the npm registry as of this research date. Final subset for the UI is explicitly deferred to the UI research phase per PROJECT.md — this list is candidates, not a mandate.
+
+### 5. Mobile Layout, Deterministic Ordering, Dismissible Panel — no new dependencies
+
+- **Mobile-responsive Slides tab / service edit screen:** Tailwind CSS v4 (already installed, `^4.0.0`) has full responsive-variant support (`sm:`/`md:`/`lg:` etc.) and is already the app's exclusive styling approach. No new CSS framework, no new breakpoint library. This is a layout/markup change, not a stack change.
+- **Deterministic multi-image ordering:** confirmed the actual gap by reading `src/components/slides/dropRouting.ts` — `classifyFiles` preserves whatever order the browser's `DataTransfer` API supplies, with no sort applied. The fix needs no library: `Array.prototype.sort()` with a comparator built from the **native** `Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })` produces correct natural-order sorting (`img2.jpg` before `img10.jpg`) directly from `file.name`, with zero bytes added to the bundle. Do not reach for `natural-orderby`, `natsort`, or similar npm packages — this is a solved problem in every modern JS engine via `Intl.Collator`.
+- **Dismissible dashboard "Getting Started" panel:** a boolean dismissed-flag persisted either to `localStorage` or a small field on the user/org doc, gated with a plain `v-if`. No new library — this is the same pattern class as the app's existing settings toggles (e.g. `vwModeEnabled`), just user-scoped instead of org-scoped, or org-scoped if the owner wants it shared across the team.
 
 ## Alternatives Considered
 
-| Category | Recommended | Alternative | When to Use Alternative |
-|----------|-------------|-------------|--------------------------|
-| PPTX → image rendering | Self-hosted LibreOffice + Poppler on a dedicated Cloud Run service | Aspose.Slides Cloud | If the team later wants zero self-hosted infra to maintain and is comfortable with a per-call vendor dependency + sending church slide content to a third party — the pricing works fine even then, it's a maintenance-tradeoff decision, not a cost one |
-| PPTX → image rendering | Same | Gotenberg | If a future milestone needs to convert additional office formats beyond PPTX (DOCX, XLSX) — Gotenberg's broader format coverage starts paying for the extra service-hop complexity at that point |
-| Scripture split model | `claude-haiku-4-5` | `claude-sonnet-5` | Only if real-passage evaluation during implementation shows Haiku's leader/congregation splits are unreliable on complex dialogue-heavy passages — escalate one tier, don't jump straight to Opus |
-| Save-status / toast | Hand-rolled component + `aria-live` regions | `vue-sonner` | If a later milestone needs richer toast behavior (stacked notifications, promise-based loading→success→error chains, swipe-to-dismiss) across many more call sites than just save-failure — at that point the library's feature set starts earning its dependency cost |
-| Keyboard-accessible reorder | Up/down buttons + `aria-live` announcements, reusing the existing reorder function | `@atlaskit/pragmatic-drag-and-drop` | If a future milestone wants to replace *all* of the app's drag interaction (not just add a keyboard path) with a more modern, actively-maintained, framework-agnostic engine — that's a real SortableJS migration decision this milestone explicitly rules out |
+| Recommended | Alternative | When to Use Alternative |
+|-------------|-------------|-------------------------|
+| `@fontsource/*` npm packages for self-hosted fonts | Google Fonts runtime `<link>`/API | **Rejected by the owner already** — a projector with no internet at service time cannot fetch a remote font; this is explicit in PROJECT.md and not up for reconsideration |
+| `@fontsource/*` npm packages | Manually downloading `.woff2` from `fonts.google.com` and hand-writing `@font-face` CSS | Only if a specific font is unavailable as an `@fontsource` package — otherwise this is pure maintenance burden (no version pinning, no easy weight/charset selection) for no benefit |
+| `subset-font` (Node/WASM) | `fonttools`/`pyftsubset` (Python) | Never for this project unless a Python toolchain is independently justified elsewhere — this app has none today |
+| `Intl.Collator` natural sort | `natural-orderby` / `natsort` npm packages | Only if the sort needs to go beyond filename comparison (e.g., locale-aware business rules a native Collator can't express) — not the case here |
+| Custom auth claim mirrored via Firestore trigger | Reading org membership fresh from Firestore inside `storage.rules` (status quo) | Never — this is precisely the broken, emulator-untestable pattern the milestone exists to replace |
+| Query-param key injection for NLT proxy branch | Reusing the ESV branch's header-injection code path unmodified | Never — NLT's auth is structurally a query param, not a header; forcing header injection would silently fail to authenticate every NLT request |
 
 ## What NOT to Use
 
 | Avoid | Why | Use Instead |
-|-------|-----|--------------|
-| `ttf-mscorefonts-installer` / bundled real Microsoft fonts in the render container | Not licensed for redistribution in a hosted commercial SaaS product | Carlito/Caladea/Liberation (open, metric-compatible substitutes) |
-| `unoconv` | Unmaintained wrapper adding a dependency layer with no functional benefit over calling `soffice` directly | Direct `soffice --headless --convert-to pdf` + `pdftoppm` |
-| Prompt-engineered free-text JSON parsing (`safeParseJsonArray`-style) for the scripture-split feature specifically | Not schema-validated; the one feature in this milestone where output correctness is non-negotiable | `output_config.format` structured outputs, indices/spans only, never re-typed text |
-| `vue-toastification` | Unmaintained since 2022 | Hand-rolled toast component (§4) |
-| `vuedraggable` / `vue-draggable-plus` as a wrapper over the existing SortableJS pin | Bundles an older/duplicate SortableJS and adds an API-translation layer over a library whose bugs are already root-caused against its raw API | Apply ARCHITECTURE.md's fix directly to `sortablejs@1.15.7` |
-| A second, parallel accessible-DnD library run alongside SortableJS for the same lists | Two reorder engines racing to write the same Firestore document is a new class of bug, not a fix | Up/down buttons calling the same reorder function (§5) |
-| A client-side image resize library for backgrounds | Duplicates what the `storage-resize-images` Firebase Extension already does server-side, consistently | The extension (§3) |
+|-------|-----|-------------|
+| `fonttools` / `pyftsubset` | Python-only tool; this project's entire build (`package.json`, `functions/package.json`, `render-service/`) is Node — adding Python is a new toolchain for zero net benefit | `@fontsource/*` (no subsetting needed) or `subset-font` (Node/WASM) if a custom font is ever needed |
+| Runtime Google Fonts API (`fonts.googleapis.com` `<link>` tags) | Already rejected by the owner in scoping — a projector offline at service time cannot fetch it | `@fontsource/*` self-hosted static assets |
+| A new HTML-parsing library (e.g. `cheerio`, `node-html-parser`) for the NLT response | The browser's native `DOMParser` already does this client-side, with zero bundle cost, and the proxy pattern keeps parsing out of the Cloud Function entirely | `new DOMParser().parseFromString(html, 'text/html')` in `src/utils/nltApi.ts` (new file, mirroring `esvApi.ts`) |
+| A natural-sort npm package for image ordering | `Intl.Collator({ numeric: true })` is native and already does exactly this | `Intl.Collator` comparator on `file.name` |
+| Reusing the ESV proxy branch's header-injection logic unmodified for NLT | NLT authenticates via a query parameter (`key=`), not an `Authorization` header — copying the ESV pattern verbatim would send an unauthenticated request upstream | A small NLT-specific branch in `functions/src/index.ts` that appends `key=<secret>` to the upstream URL |
 
 ## Version Compatibility
 
-| Package A | Compatible With | Notes |
+| Package | Compatible With | Notes |
 |-----------|-----------------|-------|
-| `@anthropic-ai/sdk@^0.115.x` | Node 22 (existing `functions/package.json` engines pin) | No known breaking runtime requirement beyond Node ≥18; re-verify `client.messages.parse()` / `output_config` are present in whatever exact version is current at implementation time via `npm view @anthropic-ai/sdk versions` |
-| `sortablejs@1.15.7` | Vue 3.x (existing app pin) | Unchanged from today — this research confirms the pin, it does not change it |
-| `storage-resize-images` extension | Firebase Storage (existing) | Writes resized copies into the **same bucket/paths convention** — verify its configured output prefix doesn't collide with `cleanupExpiredMedia`'s `orgs/{orgId}/media/` regex guard (PITFALLS.md's media-cleanup incident precedent) the same way the PPTX-render output must avoid it |
-| LibreOffice / Poppler container | Cloud Run Gen 2, same GCP project as the Firebase project | Not compatible with Firebase's `functions` buildpacks deploy path — must be deployed via `gcloud run deploy`, invoked from a normal Gen-2 Function via service-to-service auth |
+| `@fontsource/*@5.3.0` | Vite `^7.3.1` (installed) | Plain CSS + static asset imports — no Vite plugin required, works with the existing `@tailwindcss/vite` setup unmodified |
+| `subset-font@2.5.0` | Node `^20.19.0 \|\| >=22.12.0` (installed engines range) | Pure WASM/JS, no native bindings, no Python — safe in CI and every dev machine already targeted |
+| `firebase-admin@^13.10.0` (installed) | `setCustomUserClaims` | Already present — no bump needed for the custom-claims work |
+| `@firebase/rules-unit-testing@^5.0.0` (installed) | `authenticatedContext(uid, tokenOptions)` | Already present — no bump needed for the storage.rules test fix |
 
 ## Sources
 
-- `npm view <package> version` / `versions` / `time.modified` — live npm registry, run 2026-07-28 (`sortablejs`, `vuedraggable`, `vue-draggable-plus`, `vue-toastification`, `vue-sonner`, `reka-ui`, `@anthropic-ai/sdk`)
-- `claude-api` skill (bundled reference, this session, cached 2026-06-24 pricing table) — current model IDs/pricing (`claude-haiku-4-5`), structured-outputs (`output_config.format`) guidance, migration notes
-- WebSearch: Gotenberg (official docs + Docker Hub listing, MIT license, LibreOffice-backed), Firebase Cloud Functions Gen 2 / Cloud Run buildpacks-vs-custom-container behavior, LibreOffice headless Docker concurrency/profile-isolation guidance, CloudConvert/Aspose/Syncfusion public pricing pages, Firebase `storage-resize-images` extension documentation, accessible drag-and-drop patterns (Smashing Magazine "Dragon Drop," `@atlaskit/pragmatic-drag-and-drop`) — all fetched 2026-07-28, confidence MEDIUM (vendor/community docs, not independently load-tested against this app's own deck corpus or traffic)
-- Direct repository inspection: `C:\projects\worshipplanner\src\utils\claudeApi.ts` (existing Claude proxy pattern, current free-text JSON parsing this feature should NOT replicate), `functions/package.json` (Node 22 runtime pin), `package.json` (existing `@anthropic-ai/sdk@^0.78.0` pin) — confirms integration points against the real codebase, not assumed
-- `.planning/research/ARCHITECTURE.md`, `.planning/research/PITFALLS.md` (this session's sibling research) — cited directly wherever this file builds on their findings; no contradiction introduced
+- Direct `WebFetch` of `https://api.nlt.to/api/passages?ref=John.1.1&key=TEST&version=NLT` (live response, 2026-08-06) — confirmed HTML output, confidence LOW-MEDIUM (single manual sample, not the full documented spec)
+- `WebFetch`/`WebSearch` of `https://api.nlt.to/Documentation` and `https://api.nlt.to/` — endpoint shape, auth, rate limits, confidence LOW (web search summarization, not a primary-source read of full ToS text)
+- `WebSearch`: NLT copyright-statement terms via studylight.org mirror of Tyndale's copyright statement — confidence LOW, should be re-verified against Tyndale's actual current terms before shipping scripture display copy
+- `WebSearch`: Firebase custom claims size limit (1000 bytes) and `getIdToken(true)` refresh semantics, cross-referenced against `firebase.google.com/docs/auth/admin/custom-claims` — confidence MEDIUM
+- `WebSearch`: Firebase Storage rules `request.auth.token` claim access, `firebase.google.com/docs/storage/security/rules-conditions` — confidence MEDIUM
+- `WebSearch`: `@firebase/rules-unit-testing` `authenticatedContext(uid, tokenOptions)` API shape, cross-checked directly against this project's own `src/storage.rules.test.ts` (already imports `@firebase/rules-unit-testing`) — confidence MEDIUM-HIGH (own codebase confirms the API surface exists and is already in use, just without `tokenOptions` populated yet)
+- `WebSearch`: `firebase/firebase-js-sdk#6803` (already cited in this project's CLAUDE.md) and `firebase/firebase-tools-ui#424` — confidence MEDIUM (named GitHub issues, cross-checked against project's existing documented understanding)
+- npm registry, live `npm view` (2026-08-06): `subset-font@2.5.0`, `@fontsource/inter@5.3.0`, `@fontsource/{roboto,open-sans,montserrat,poppins,lato,merriweather,oswald}@5.3.0` — confidence HIGH (direct registry read)
+- `WebSearch`: Google Fonts / SIL OFL 1.1 vs Apache 2.0 licensing terms for self-hosting/redistribution — confidence LOW-MEDIUM (multiple secondary sources agree, no single primary legal source fetched)
+- `WebSearch`: Inter vs Helvetica Neue metric-compatibility comparison — confidence LOW (secondary comparison sites, not a font-metrics tool run directly)
+- Direct file reads: `functions/src/index.ts` (proxy pattern), `src/utils/esvApi.ts` (ESV integration point), `src/stores/auth.ts` (org context loading), `storage.rules`, `src/storage.rules.test.ts`, `src/components/slides/dropRouting.ts`, `package.json`, `functions/package.json` — confidence HIGH (primary source, this codebase)
 
 ---
-*Stack research for: WorshipPlanner v1.4 "Service and Slides" — new capabilities only*
-*Researched: 2026-07-28*
+*Stack research for: WorshipPlanner v1.5 "Settings, Sharing, and Fidelity"*
+*Researched: 2026-08-06*

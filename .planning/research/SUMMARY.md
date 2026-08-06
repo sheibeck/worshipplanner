@@ -1,169 +1,220 @@
 # Project Research Summary
 
-**Project:** WorshipPlanner
-**Domain:** Brownfield milestone on a shipped Vue 3 + Firebase worship-planning app (v1.4 "Service and Slides")
-**Researched:** 2026-07-28
+**Project:** WorshipPlanner — v1.5 "Settings, Sharing, and Fidelity"
+**Domain:** Church worship-planning / presentation SaaS (mature, shipped product — subsequent-milestone integration research, not 0-to-1)
+**Researched:** 2026-08-06
 **Confidence:** MEDIUM-HIGH
 
 ## Executive Summary
 
-v1.4 is a trust-repair milestone on a shipped app: 26 user-reported items reduce to about ten root causes. The drag-and-drop corruption reported in service ZTXcpNRcJTalEQp42fTx is caused by three compounding bugs in ServiceEditorView.vue's onEnd handler: using evt.oldIndex/newIndex (which count non-draggable section-header DOM siblings) instead of evt.oldDraggableIndex/newDraggableIndex, a DOM-revert that only undoes a single adjacent swap, and an unstable v-for key that changes on every reorder. The same pattern is copy-pasted into SlideGrid.vue. PITFALLS.md independently confirms the D-16 DOM-revert fix already exists and works correctly in both files -- the two researchers agree on the underlying SortableJS/Vue divergence mechanism, but the deeper trace found it is not sufficient on its own: the wrong-index-source and unstable-key bugs are separate, still-unfixed defects. No re-application of D-16 is needed; what is needed is fixing the index source and the v-for key, plus restructuring the five sections as independent per-section Sortable.create() containers.
+v1.5 is overwhelmingly a wiring milestone, not a new-library milestone: four of five stack questions need zero or near-zero new dependencies, and the one real addition (self-hosted fonts via `@fontsource/*`) needs no build step. The real difficulty is not "what to build" but reconciling the owner's locked decisions with code that already exists — the R036 draft-lock write guard, an inert cross-service Storage-rules check, an exhaustive-but-silently-forkable `SlotKind` switch pattern, and a share-token mint-fresh-every-time bug. Three subsystems that look like small settings features are actually schema/migration decisions in disguise: sharing, custom claims, and service-item types.
 
-The remaining work splits into two categories. Six items are structural fixes to production data (Service/ServiceSlot) that must preserve existing user documents: the ordering-model fix, adding Post-Service, hard-locking slide groups to service order (deleting reconciliation), draft-only editing with a genuine three-layer lock (Firestore rules -- currently absent -- plus store guard plus UI), the autosave race fix, and a save-status aggregator. Four items are net-new capability with infrastructure risk: server-side PPTX-to-image rendering (needs a standalone Cloud Run service with a custom Dockerfile since Firebase Functions buildpacks cannot install LibreOffice/Poppler), LLM-assisted scripture splitting (needs an Anthropic SDK upgrade from the stale pin for structured outputs), background images (low risk, additive), and a contextual-action-bar audit. PPTX rendering is the single highest-uncertainty item -- STACK.md's cost/latency figures are grounded estimates, not benchmarked against this app's real deck corpus, and PITFALLS.md flags cold starts, OOM, silent font substitution, and orphaned partial-render Storage objects as failure modes requiring async job architecture.
+The recommended approach: build shared settings infrastructure first (a typed `OrgSettings` sub-object — nothing like it exists today), do the custom-claims migration as its own long-soak infrastructure phase sequenced early, resolve the share-token storage location explicitly before writing code (it conflicts with R036 as literally decided), and treat the congregational-reading divider as the priority UI-research item since no comparable church product has solved it.
 
-The mitigation strategy threads through every phase: fix cheap/foundational things first (stable key, then ordering model) before anything that depends on trustworthy ordering; treat the autosave bug as MEDIUM-confidence and unreproduced -- write a failing repro test before fixing, since the evidenced mechanism (a self-echo updatedAt mismatch resetting an autosaveInitialized flag) is strongly argued but never run against the live app; and keep the AI feature narrowly scoped to structural labeling (indices into already-fetched ESV text, never model-regenerated text) so scripture correctness is structurally guaranteed.
+The dominant risk is rules-testing discipline: this project already shipped a deny-everyone Storage rule that passed its (deny-only) test suite for an entire milestone. Every rule change in v1.5 must ship with a passing allow-case test proven against the real emulator, written first. The second dominant risk is treating custom-claims rollout as a single deploy: it is structurally two deploys with a mandatory soak period, and deploying is the owner's action per the v1.5 autonomy grant, so that phase cannot fully close inside an autonomous run.
 
 ## Key Findings
 
 ### Recommended Stack
 
-Server-side PPTX rendering uses self-hosted headless LibreOffice + Poppler on a dedicated Cloud Run service, invoked asynchronously from the existing parsePptx Cloud Function via service-to-service IAM auth. LLM scripture splitting requires upgrading the Anthropic SDK from the old, stale pin (predates structured outputs) to current, using output_config.format to constrain output to verse/clause indices only on claude-haiku-4-5. Background images need no new libraries -- add backgroundImageUrl at three data-model levels and install the official storage-resize-images Firebase Extension. Save-status/toast should be hand-rolled on top of a new Pinia useSaveStatus aggregator (vue-toastification is stale since 2022; vue-sonner is fine but unnecessary here). Drag-and-drop stays on sortablejs 1.15.7 (confirmed current) -- the fix is in how onEnd calls it, not a library swap; keyboard-accessible reordering uses up/down buttons calling the same reorder function.
+Nearly the entire stack is unchanged (Vue 3 / Vite / Pinia / Tailwind v4 / Firebase 12). Additions: `@fontsource/*` packages for self-hosted curated fonts (Inter as the Helvetica Neue stand-in, plus 7 more OFL/Apache families); a `nlt` branch in the existing Cloud Function proxy — structurally different from ESV because NLT auth is a query parameter (not a header) and its response is HTML (not JSON), requiring `DOMParser`-based stripping; `firebase-admin`'s `setCustomUserClaims` (already available) for claims; native `Intl.Collator({ numeric: true })` for deterministic multi-image ordering.
 
 **Core technologies:**
-- LibreOffice + Poppler on Cloud Run (custom Dockerfile) -- real PPTX layout fidelity, MPL 2.0, near-zero cost, must be a separate deployment surface from firebase deploy --only functions
-- Anthropic SDK upgrade + structured outputs (output_config.format) -- the only way to make scripture-split output schema-validated rather than free-text-parsed
-- storage-resize-images Firebase Extension -- zero-code server-side image optimization
-- Hand-rolled save-status component + aria-live regions -- no toast library warranted
+- `@fontsource/inter` + 7 curated families (`5.3.0`) — self-hosted, offline-safe fonts — a projector without internet cannot fetch Google Fonts at service time (already decided, non-negotiable)
+- `NLT_API_KEY` + new proxy branch in `functions/src/index.ts` — reuses the proxy pattern but needs its own query-param-injection branch
+- Firestore `onDocumentWritten` trigger + `setCustomUserClaims` — mirrors the existing `requestPptxRender` trigger already shipped
+- `Intl.Collator` — native, zero-bytes, fixes the `slide2`-before-`slide10` ordering defect
 
 ### Expected Features
 
-**Must have:** Draft-only editability with state-scoped lock (an improvement over Planning Center's role-only permissions, not a copy); explicit Reopen-for-editing with export-aware warning; persistent inline Saving/Saved status with toast-on-failure-only; copyright/CCLI notice at least once per song group with correct content; group-level background with per-slide override; consistent contextual action bar per tab, primary actions always visible; Post-Service as a purely structural fifth section.
+**Must have (table stakes, all in the locked v1.5 list):** AI toggle (hide-on-off, not grey-out); Planning Center toggle; ESV/NLT selection with mandatory "(ESV)"/"(NLT)" attribution suffix (both publishers require initials-only for non-saleable media — no verse-count enforcement needed at this scale); stable share links (Planning Center's "Permalink" model validates persist-token + auto-refresh-content); Announcements/Miscellaneous as plain input boxes (Planning Center's generic "Item" type is the direct precedent); default service template at item-type+title granularity; congregational reading manual divider (priority — **no church-software precedent exists**; ProPresenter/EasyWorship/Proclaim all lack a documented leader/congregation split editor); global slide typography (family+weight+size); multi-image natural-sort ordering.
 
-**Should have:** Song-level background inherited from the canonical Song Lyrics editor; LLM-assisted responsive-reading split with role-tagged segments (only MediaShout has a manual comparable); compliance-margin CCLI placement (first AND last slide) explicitly documented as exceeding the legal once-per-song floor.
+**Should have / flag to owner:** text outline/shadow on slide typography — near-universal in comparable tools specifically as the standard legibility technique against background images (shipped v1.4) — not in the locked v1.5 list; recommend surfacing this gap explicitly.
 
-**Defer:** Live auto-advance/loop timer engine (belongs to the live-presentation layer this app does not own); full audit-log screen for reopen actions; approval workflow on reopening.
+**Defer (v2+):** per-item template durations; multiple named service templates; safe-area margin guides; free-range select-text-then-label divider mode (rejected — real responsive readings never break mid-sentence).
+
+**Anti-features rejected:** drag-handle dividers (breaks are discrete, not continuous — false precision, mobile accidental-drag risk); greyed-out (vs. hidden) AI controls when off; verse-count enforcement UI.
 
 ### Architecture Approach
 
-Service/ServiceSlot are the production data boundary (must preserve); SlideGroup/ImportedDeck/SongLyrics are greenfield (reshape freely). The core move is collapsing three overlapping concerns onto single sources of truth: per-section Sortable containers for ordering, one unconditional slide-group rebuild path (replacing reconciliation's three-branch logic with two), and one save-status aggregator above the existing useAutoSave composable (ServiceEditorView.vue still hand-rolls a duplicate ~150-line implementation predating that extraction).
+The org document has never had a typed shape — v1.5's ~8 new settings values must land as one typed `settings` sub-object with a single defaults-merge point in `auth.ts`, not eight more bare top-level fields. This is a hard prerequisite for every other settings feature.
 
 **Major components:**
-1. Per-section Sortable.create() containers -- makes oldIndex/newIndex trustworthy again, makes sections structurally non-draggable
-2. slideGroupMaterializer.ts reconcile functions stripped of confirm branches -- unconditional replace, no dismissedSignature, no ReconcileConfirmModal
-3. Three-layer draft lock (Firestore rules -- currently absent -- plus store guard plus UI) -- only rules are adversary-proof
-4. New Cloud Function plus Cloud Run render service for PPTX, writing under orgs/orgId/pptx-imports/importId/rendered/ (exempt from cleanupExpiredMedia by prefix)
-5. useSaveStatus Pinia aggregator above per-surface useAutoSave instances
+1. `src/types/organization.ts` + `DEFAULT_ORG_SETTINGS` — the org-settings foundation
+2. A Firestore `onDocumentWritten` trigger on `organizations/{orgId}/members/{uid}` — mirrors membership into a custom auth claim, matching the existing `requestPptxRender` trigger pattern
+3. A new (or repurposed) share-link document, resolving the R036 conflict (see below)
+4. A client-side render-status resolver for `pptxRenders`/`rendered/*.png` — genuinely new IMPORTED-branch logic, not a URL swap
+5. A CSS custom-property triplet + static font-registry module — greenfield; no font seam exists anywhere in this codebase today
 
 ### Critical Pitfalls
 
-1. **SortableJS/Vue DOM divergence** -- D-16 DOM-revert already works; still-open bugs are index source and unstable key. Fix both, do not reapply D-16.
-2. **Optimistic state racing its own Firestore echo** -- ServiceEditorView.vue already gates on autosaveStatus; Slides tab's separate slideGroupsStore subscription lacks this guard.
-3. **UI-only lock enforcement** -- firestore.rules has zero status-based write guard today; all three layers (rules, store, UI) must be built, rules first, plus any Cloud Function writing to a locked service (Admin SDK bypasses rules).
-4. **Headless PPTX rendering in serverless** -- cold starts, OOM, silent font substitution, orphaned partial-render objects. Must be async-job architecture; orphan-cleanup deletion must default to dry-run (this exact mismatch already caused a real incident in this codebase).
-5. **Deleting reconciliation leaves orphaned fields, dead imports, vacuous tests** -- dismissedSignature is a persisted Firestore field; trace via knowledge graph before deletion, record the leave-vs-backfill decision explicitly.
-6. **Post-Service touches production data with scattered section lists and non-exhaustive switches** -- convert switches to exhaustiveness-guarded patterns before adding the fifth section.
+1. **Custom claims can lock out or under-authorize users** — the 1000-byte ceiling is live (multi-org membership is real), claims stale up to 1 hour. Avoid via dual-read (`OR`) rules through one full soak, idempotent backfill, fallback removed only in a separate later deploy.
+2. **A rules change proves it denies the wrong thing, not that it allows the right thing** — this project already shipped a deny-everyone Storage rule that passed a deny-only test suite for a full milestone. Every rules change needs a passing allow-case test, written first, against the real emulator.
+3. **Share-link backfill can orphan already-circulated links** — must reuse the most recent existing token, not mint anew. Auto-refresh gated on "already shared"; must never write back to the document it watches (loop hazard).
+4. **Widening `SlotKind` is compiler-caught at 6+ exhaustive-switch sites but NOT at silent-fallthrough sites** — above all `addSlotAsItem`'s Planning Center export, which defaults unhandled kinds to "Message" with no guard.
+5. **A feature toggle that only hides UI leaves the code path callable** — AI/PC gates must live inside `claudeApi.ts`/the PC utility itself, not only in `v-if`s, and must never mutate already-generated content when flipped.
+
+## Contradictions/Refinements to PROJECT.md — Roadmapper Must Not Plan Against Superseded Decisions
+
+**1. Share token storage location conflicts with the R036 draft-lock guard.** PROJECT.md's locked decision — "persist the token on the service doc" — collides with the write guard shipped in Phase 31 (`services.ts:197-203` `assertWritable`, `firestore.rules:64-84`). A bare `{ shareToken }` write matches none of the three carve-out shapes and is REJECTED on `planned`/`exported` services — the common sharing case. Recommended fix (not yet a locked decision): a separate `serviceShareLinks/{serviceId}` document, never touching the service doc or R036's carve-out surface. The owner's intent — one never-rotating link, snapshot auto-refreshed — is unchanged; only the storage location moves. Separately, regardless of which option is chosen: `firestore.rules`' `shareTokens` collection has `allow update: if false` today, which blocks any snapshot refresh and must change (mirror `serviceShares`' existing update rule).
+
+**2. Custom claims scope: `storage.rules` ONLY, not `firestore.rules`.** `firestore.rules` reads Firestore from Firestore rules — a same-service call, unaffected by firebase-js-sdk#6803, already correctly synchronous. Moving `firestore.rules` to the claim too would trade one staleness class (real) for another (new and unnecessary). Scope this migration to `storage.rules`.
+
+**3. Custom claims rollout is structurally two deploys with a soak between, not one.** Rules must `OR` (never `AND`) the new claim against the existing check for at least one full max-token-lifetime (1 hour) before the fallback is removed in a separate deploy. Deploys are the owner's action per the standing v1.5 autonomy grant — this phase cannot fully close inside an autonomous run; it ships built-and-undeployed.
+
+**4. Multi-org membership is a live constraint.** `users/{uid}.orgIds` is already an array (`auth.ts:86-99` currently only uses `ids[0]`), so the 1000-byte claim-payload ceiling is real design pressure now. The claim shape must be designed before the Cloud Function is written.
+
+**5. Share-token backfill must ADOPT the most recent existing token, never mint fresh.** `createShareToken()` mints on every call, so some services already have several `shareTokens` docs. Minting anew orphans links already circulated to a congregation.
+
+**6. PPTX rendered-image display is not a URL swap — it's new branch logic in two files.** Rendered page count and parsed-slide count structurally disagree. The IMPORTED-kind derivation in both `slideGroupMaterializer.ts::deriveGroupEntries` and `slideshowAssembler.ts` needs a genuinely new code path for "ready render exists." `sourceSignature`'s IMPORTED case must fold in render status/count, or the existing rebuild-on-mismatch mechanism will never notice a `pending→ready` transition.
+
+**7. `addSlotAsItem`'s silent fallthrough is a real, already-demonstrated trap.** The Planning Center export if-chain defaults any unhandled `SlotKind` to a generic "Message" branch with no guard. `IMPORTED` already required an explicit skip-with-comment to avoid exactly this mislabeling, but only in the new-plan export path. `ANNOUNCEMENTS`/`MISCELLANEOUS` need the same deliberate treatment, and it will not be caught by the compiler.
+
+**8. NLT is not a drop-in ESV swap.** Auth is a `key` query parameter, not an `Authorization` header — the ESV branch's header-injection code cannot be reused verbatim. The response is HTML (not JSON), with no documented toggle to suppress verse numbers — needs a `DOMParser`-based strip step plus a follow-up regex pass, flagged as a phase-level unknown to resolve against a real fetched sample.
+
+## Additional Sequencing Constraints
+
+- **Do not parallelize phases that share a choke point.** The AI toggle and congregational-reading AI-split both gate through `claudeApi.ts`; custom claims and sharing rework both edit `firestore.rules`/`storage.rules`. Sequence these, don't run concurrently.
+- **Item 3 (default service template) depends on item 5 (finalized item-type palette).** The template editor needs the final `SlotKind` set settled first.
+- **Rules-testing discipline is mandatory on every phase touching `firestore.rules`/`storage.rules` this milestone.** Every such phase ships a positive (allow-case) test, written and run FIRST, against the real emulator — not a mental read of the `.rules` file. Any "environment limitation" claim must be proven inert by the strip-down method CLAUDE.md documents, not asserted.
+
+## Open Scope Questions for the Owner
+
+1. **Should global slide typography include text outline/shadow?** Near-universal in comparable tools, specifically as the legibility technique against background images (already shipped v1.4). Not in the locked v1.5 list — raise explicitly rather than silently including or dropping.
+2. **Does global typography extend to the printed Order of Service (`ServicePrintLayout.vue`), or is it slide-surfaces only?** Currently text-only, not slide-shaped — would be a fifth consumer surface if in scope. PROJECT.md does not resolve this.
 
 ## Implications for Roadmap
 
-The ~26 scoped items reduce to roughly 8-10 phases, sequenced by dependency:
+Suggested phase structure, continuing numbering from v1.4 (phases start at 39):
 
-### Phase 1: Stable v-for key + fixed ordering model
-**Rationale:** Cheapest fix plus foundational restructuring must land before anything depending on trustworthy order.
-**Delivers:** Correct drag-and-drop in ServiceEditorView.vue and SlideGrid.vue together (same root-cause fix).
-**Addresses:** Order structure; half of Slides interaction.
-**Avoids:** Pitfall 1 -- note DOM-revert is NOT broken, only index source and key are.
+### Phase 39: Org Settings Infrastructure
+**Rationale:** Every other settings feature writes into this shape — build first or every later phase re-touches `auth.ts`'s load/reset logic piecemeal.
+**Delivers:** `src/types/organization.ts` (`Organization`, `OrgSettings` — first of their kind), `DEFAULT_ORG_SETTINGS`, `auth.ts` merge-and-load logic, one nested `settings` field on the org doc.
+**Avoids:** The "eight duplicated `?? default` lines" pattern.
 
-### Phase 2: Post-Service section
-**Rationale:** Additive type change, only safe once ordering is trustworthy.
-**Delivers:** Fifth section with section-list inventory + exhaustiveness-guard conversion as prerequisite.
-**Addresses:** Post-Service milestone item; audit print/share/plan-rail/PC export.
-**Avoids:** Pitfall 9.
+### Phase 40: Custom Auth Claim for Org Membership
+**Rationale:** The riskiest item — needs the longest verification window. Independent of Phase 39; sequence early, not last.
+**Delivers:** `onDocumentWritten` trigger setting `{ orgId, role }` claims; dual-read `storage.rules` change; idempotent/resumable backfill; forced-refresh call sites in `auth.ts`.
+**Research flag:** Deploy-gated — the soak-and-fallback-removal step is the owner's action and cannot close autonomously.
+**Avoids:** Pitfall 1 (lockout/staleness), Pitfall 2 (unproven "environment limitation" claims).
 
-### Phase 3: Delete reconciliation, hard-lock slide groups
-**Rationale:** Depends on ordering being stable first; is one unit of work, not two phases.
-**Delivers:** Unconditional slide-group rebuild; removal of ReconcileConfirmModal, dismissedSignature, confirm branches.
-**Addresses:** Slides mirror the plan.
-**Avoids:** Pitfall 8 -- graph-trace consumers before deletion, delete (not skip) the test suite.
+### Phase 41: Sharing Correctness
+**Rationale:** Resolve the R036 conflict explicitly before writing code (recommend the separate `serviceShareLinks` document). Sequence after Phase 40 to avoid two concurrent rewrites of the same rules files.
+**Delivers:** Persisted, never-rotating share token (new document, not a service-doc field); `shareTokens`/`serviceShares` rules updated to permit snapshot overwrite; auto-refresh hooked to `services.ts`'s six write functions, gated on "already shared"; backfill that adopts existing tokens.
+**Avoids:** Pitfall 3 (orphaned links, write amplification, PII scope creep).
 
-### Phase 4: Draft-only editing + reopen (three-layer lock)
-**Rationale:** Independent, can build in parallel, but rules change must be sequenced against Phase 1's immediate-save path.
-**Delivers:** Firestore rules status check + store guard + centralized UI isEditable + dedicated reopenService action.
-**Addresses:** Service lifecycle.
-**Avoids:** Pitfall 5 -- extend firestore.rules.test.ts, not just UI tests.
+### Phase 42: PPTX Rendered-Image Display (carryover R062)
+**Rationale:** The largest, most structurally invasive item. Sequence after Phase 40/41 so Storage reads are claim-based for this brand-new code path.
+**Delivers:** Client-side render-status resolver; new IMPORTED branches in both materializer and assembler; `sourceSignature` folding in render status; full-bleed presenter branch; pending/failed fallback states.
+**Research flag:** Has slipped one milestone already — give it its own named phase with the stated acceptance criterion as explicit success condition.
 
-### Phase 5: Save-status aggregator + autosave bug fix
-**Rationale:** Root-cause fix must land before the global UI is wired to it.
-**Delivers:** useSaveStatus aggregator; persistent inline status; toast-on-failure-only; autosave bug fix.
-**Addresses:** Save reliability.
-**Avoids:** Pitfall 4 -- write the failing repro test FIRST; the root cause is MEDIUM confidence, not reproduced live.
+### Phase 43: Service Item Types (Announcements, Miscellaneous, Message simplification, Hymn palette removal)
+**Rationale:** Compiler-bounded at exhaustive-switch sites; real risk is silent-fallthrough sites. Independent of Phases 40-42; must land before or with Phase 44.
+**Delivers:** Widened `SlotKind` union; new `text` field shared by Message/Announcements/Miscellaneous (Prayer keeps its link-based shape); explicit guard in `addSlotAsItem`; Hymn removed from both palette locations only.
+**Avoids:** Pitfall 4 — verify `npm run type-check` (the `vue-tsc --build` form) is clean, and explicitly document which switch-group each new kind joins.
 
-### Phase 6: PPTX server-side rendering
-**Rationale:** Independent, can run in parallel; highest-uncertainty item in the milestone, should not sit adjacent to a tight deadline.
-**Delivers:** Standalone Cloud Run service (custom Dockerfile, LibreOffice + Poppler + Carlito/Caladea/Liberation fonts) + bridging Cloud Function; async job architecture with completeness checks.
-**Note on tension:** STACK.md frames async-Cloud-Run as the cost-driven recommendation; PITFALLS.md arrives at the same architecture from a risk-mitigation angle (cold starts/OOM/font substitution) -- convergence from two angles raises confidence, but neither source's latency/cost figures are benchmarked against real decks, so budget real test-deck validation time.
+### Phase 44: Default Service Template
+**Rationale:** Depends on Phase 39 and Phase 43. Otherwise small — one consumption site (`createService`).
+**Delivers:** `OrgSettings.defaultServiceTemplate: ServiceSlot[] | null`; `createService` reading `orgTemplate ?? buildSlots(progression)`; a Services slide-out editor reusing existing slot primitives; VW typing computed at creation time, never frozen into the stored template.
 
-### Phase 7: LLM-assisted scripture splitting
-**Rationale:** Enhances existing AI integration; SDK upgrade is a hard prerequisite since structured outputs postdate the current pin.
-**Delivers:** Upgraded SDK; new Cloud Function proxy path using output_config.format constrained to indices only.
-**Addresses:** Smarter content.
+### Phase 45: AI and Planning Center Settings Toggles
+**Rationale:** Low complexity, but the choke-point guard must be written and tested before the UI. Shares `claudeApi.ts` with Phase 48 — sequence, don't fully parallelize.
+**Delivers:** Two org-settings booleans; module-level guards; hide-not-grey UI treatment; explicit test proving a direct `claudeApi.ts` call with the toggle off makes no network request.
+**Avoids:** Pitfall 5.
 
-### Phase 8: Backgrounds + drawer split
-**Rationale:** Depends on Phase 3's unconditional rebuild being stable; drawer split sequenced after backgrounds exist as fields to display.
-**Delivers:** Three-tier background cascade (song > group > slide); EditSlideDrawer split into Edit details / Edit lyrics via 3-dot menu.
-**Addresses:** Backgrounds; part of Slides interaction.
+### Phase 46: ESV/NLT Bible Version Selection
+**Rationale:** Independent, low complexity, but the per-slide translation-source field is a schema decision that must be made now. Feeds Phase 48.
+**Delivers:** `NLT_API_KEY` + new proxy branch; settings picker; mandatory attribution suffix built once, shared by both scripture paths; per-slide translation-source field so a setting switch never retroactively alters existing slides.
+**Confidence flag:** NLT terms-of-use and exact API shape are LOW-MEDIUM confidence — verify against the owner's actual key before shipping.
 
-### Phase 9: Presentation correctness + CCLI placement + contextual action bars
-**Rationale:** Lower-complexity, trails the structural work; CCLI documentation-language fix belongs here.
-**Delivers:** No org labels when presenting; copyright first+last slide (documented as safety margin, not CCLI mandate); one action-bar pattern audited across every tab, after Service Order/Slides layouts finalize.
-**Addresses:** Presentation correctness; UI rework.
+### Phase 47: Global Slide Typography
+**Rationale:** Depends on Phase 39; needs the owner's answer on outline/shadow and print-surface scope before implementation. Greenfield infrastructure.
+**Delivers:** Curated font registry with recorded per-font licenses; CSS custom-property triplet consumed by grid, drawer preview, presenter (and print, if confirmed in scope); `document.fonts.ready`-gated first paint and pre-measurement gating.
+**Avoids:** Pitfall 6 (font flash/reflow on a live projection).
+**Research flag:** UI-research sub-step required per PROJECT.md's own decision text — bundle legibility research and font-loading-safety research together.
+
+### Phase 48: Congregational Reading Divider UX (priority feature)
+**Rationale:** The owner-mandated UI-research-heavy item. Depends on Phase 46, benefits from Phase 47. No church-software precedent exists — reference class is subtitle/caption editors (click-to-split) plus per-segment label chips, not drag-handle or free-range-selection (both evaluated and rejected).
+**Delivers:** Click-between-verses divider + per-segment Leader/Congregation/All chip control, seeded three ways (AI split, gated by Phase 45's toggle; one-click alternate-assignment; blank) into one editable `{ text, role }[]` structure; first slide shows the scripture reference, later slides show only the speaker label.
+**Uses:** Phase 45's AI toggle (gates but does not block), Phase 46's translation/attribution logic.
+
+### Phase 49: Multi-Image Import Ordering
+**Rationale:** Fully independent, low-risk, bug-fix-shaped — good candidate to build roadmap momentum early or slot in wherever convenient.
+**Delivers:** `Intl.Collator({ numeric: true, sensitivity: 'base' })` comparator applied to `classifyFiles`'s images bucket in `dropRouting.ts`.
+
+### Phase 50: Mobile & Layout Polish
+**Rationale:** Sequence last — benefits from Print/Share already having moved into the contextual action bar, and from no other phase still touching drag-and-drop order logic concurrently.
+**Delivers:** `QuarterView.vue`'s responsive button-stacking recipe applied to `ServiceEditorView.vue`'s header; Print/Share moved into `ContextualActionBar.vue`; Undo demoted to a link; dismissible Getting Started panel; mobile-friendly Slides tab (not independently audited yet).
+**Avoids:** Pitfall 8 (touch drag-and-drop reproducing the documented `ZTXcpNRcJTalEQp42fTx` index bug) — reuse the exact desktop SortableJS config with touch-only options added.
 
 ### Phase Ordering Rationale
 
-- Ordering must be trustworthy before Post-Service, the slide-group hard-lock, or draft-lock rules interacting with the immediate-save path
-- Reconciliation deletion and background data model are coupled -- sequence backgrounds after the unconditional rebuild lands
-- Claude SDK upgrade is a hard gate for the scripture-split feature
-- Draft-lock, autosave-fix, and PPTX rendering are mutually independent and can run in parallel once Phase 1 lands
-- Contextual action bar work is explicitly last -- building it before the two tab reworks finalize risks rework
+- Settings infrastructure (39) and custom claims (40) are prerequisite/independent infrastructure and belong first.
+- Sharing (41) is sequenced after claims (40) specifically to avoid two concurrent rewrites of the same rules files.
+- PPTX display (42) follows sharing so its brand-new Storage read path inherits claim-based correctness.
+- Service item types (43) is compiler-bounded and independent, but must precede the template (44).
+- AI/PC toggles (45) precede the divider (48) since both touch `claudeApi.ts`.
+- Bible version selection (46) precedes the divider (48) since the divider operates on already-fetched, already-attributed scripture text.
+- Typography (47) loosely precedes the divider (48) so the divider's slide preview reflects real settings.
+- Multi-image ordering (49) and mobile polish (50) are independent; mobile is last because it benefits from Print/Share already having moved and from no concurrent drag-and-drop work.
 
 ### Research Flags
 
-Needs deeper research during planning:
-- **Phase 4:** Firestore rules field-level diff logic for the reopen-transition special case
-- **Phase 6:** Highest-uncertainty item -- needs a real multi-font, multi-slide test deck and cost/latency validation
-- **Phase 7:** Re-verify SDK version and output_config.format call shape at implementation time; validate Haiku split determinism empirically
-- **Phase 3:** Needs a graph-trace pass to build the full reconciliation consumer inventory before deletion
+Phases likely needing deeper research during planning (`--research-phase`):
+- **Phase 40 (custom claims):** dual-read rollout, byte-budget claim shape, race-condition-at-invite-acceptance design.
+- **Phase 41 (sharing):** the R036 storage-location decision must be made explicitly in the plan.
+- **Phase 42 (PPTX display):** render-count-vs-parsed-count reconciliation across two files plus `sourceSignature`.
+- **Phase 46 (NLT):** the HTML-to-plain-text extraction step needs a spike/discovery step against a real sample.
+- **Phase 47 (typography):** owner must resolve outline/shadow and print-surface scope questions first.
+- **Phase 48 (congregational reading divider):** no direct precedent exists; treat the interaction-pattern analysis as required reading.
 
-Standard patterns (skip research-phase):
-- **Phase 1:** Root cause and fix already fully derived with line-level citations
-- **Phase 2:** Well-enumerated consumer checklist already exists
-- **Phase 5:** Fix shape well-evidenced, only needs repro-test-first discipline
-- **Phase 8:** Directly extends an existing precedent (audio's slide-beats-bed); no new libraries
+Phases with standard, well-documented patterns (safe to skip a dedicated research sub-step):
+- **Phase 39 (settings infrastructure):** direct generalization of the existing `vwModeEnabled` pattern.
+- **Phase 43 (service item types):** compiler-guided, existing well-understood architecture.
+- **Phase 44 (default template):** reuses existing slot primitives verbatim.
+- **Phase 45 (AI/PC toggles):** table-stakes SaaS pattern, existing choke point already designed for this.
+- **Phase 49 (multi-image ordering):** solved problem, native `Intl.Collator`.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH for versions (npm registry, 2026-07-28); MEDIUM for PPTX cost/latency (grounded estimates, not benchmarked) |
-| Features | MEDIUM -- websearch-only, cross-checked across 2+ sources per finding; CCLI section flags an unresolved primary source |
-| Architecture | HIGH -- cited to real file/line reads; autosave root cause explicitly flagged MEDIUM (strong hypothesis, not reproduced) |
-| Pitfalls | HIGH for codebase-specific findings; MEDIUM for general SortableJS/LibreOffice/LLM integration patterns |
+| Stack | MEDIUM | HIGH on npm-registry facts; LOW-MEDIUM on NLT API shape/terms and font licensing/metrics (web-search only) |
+| Features | MEDIUM | Official/primary for Planning Center and Crossway/Tyndale license pages; LOW-MEDIUM for congregational-reading UX specifically, since no church-software precedent exists |
+| Architecture | HIGH | Every claim traced to a specific file/line read in this codebase; no external research used |
+| Pitfalls | HIGH | Codebase-grounded, cross-checked against this project's own documented incident history; Firebase claims mechanics cross-checked directly against official docs |
 
-**Overall confidence:** MEDIUM-HIGH -- brownfield-specific findings are unusually well-grounded, all traced to actual code. External/competitive findings are solid but MEDIUM by design given limited authoritative documentation for this niche domain.
+**Overall confidence:** MEDIUM-HIGH — structural/architectural findings (where the real risk lives) are highly reliable; the two genuinely uncertain areas (NLT's exact terms/API shape, whether outline/shadow belongs in scope) are flagged as explicit open items.
 
 ### Gaps to Address
 
-- Autosave root cause is a hypothesis, not confirmed -- write a failing repro test before fixing.
-- CCLI's own binding license text was never directly retrieved (site returned marketing copy / 403) -- fix the internal justification language ("exceeds the legal minimum," not "CCLI requires this"), not the requirement itself.
-- PPTX rendering latency/cost are estimates -- budget real test-deck validation in Phase 6.
-- slideshowAssembler.ts and Planning Center export's exact section-count assumptions were flagged "likely automatic" but not fully confirmed -- verify at Phase 2 plan time.
-- Whether Haiku's scripture splits are reliably near-deterministic on real passages is asserted, not validated -- add an explicit evaluation step in Phase 7.
+- **NLT API terms of use and exact response shape:** verified only by a single manual fetch — confirm against the owner's actual key during Phase 46's planning.
+- **Font licensing for any curated family beyond Inter:** record and verify the license for each font actually added, don't assume by analogy.
+- **Whether schedule-only changes should trigger a share-snapshot refresh:** `resolveServiceRoleAssignments` reads the `quarters` store, which can change independent of any service-doc write — the client-side refresh hook does NOT cover a volunteer's schedule changing for someone not overridden on this specific service. Unresolved product question — resolve explicitly, don't let it slide.
+- **Slides tab mobile-blocking layout:** not independently audited line-by-line — Phase 50's plan needs the same targeted read-before-plan treatment given to `ServiceEditorView.vue`'s header.
+- **The two open scope questions for the owner** (typography outline/shadow; print-surface inclusion) — must be resolved before Phase 47's plan is finalized.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- Direct repository reads: ServiceEditorView.vue, SlideGrid.vue, slideGroupMaterializer.ts, useSlideshowAssembly.ts, slideGroups.ts, slideGroup.ts, service.ts, slotTypes.ts, useAutoSave.ts, services.ts, functions/src/index.ts, pptxParser.ts, firestore.rules, router/index.ts, sortablejs v1.15.7 source
-- npm registry version checks, run 2026-07-28
-- .planning/PROJECT.md, .planning/STATE.md
+- Direct codebase reads across all four research files: `.planning/PROJECT.md`, `CLAUDE.md`, `firestore.rules`, `storage.rules`, `src/stores/services.ts`, `src/stores/auth.ts`, `src/utils/slotTypes.ts`, `src/utils/slideGroupMaterializer.ts`, `src/utils/slideshowAssembler.ts`, `functions/src/index.ts`, `src/utils/esvApi.ts`, `src/components/slides/dropRouting.ts`, and ~15 more files enumerated in ARCHITECTURE.md's Sources section
+- npm registry live `npm view` (2026-08-06): `@fontsource/*@5.3.0` family, `subset-font@2.5.0`
+- [ESV Permissions - Crossway](https://www.crossway.org/permissions/)
+- [firebase.google.com/docs/auth/admin/custom-claims](https://firebase.google.com/docs/auth/admin/custom-claims)
 
 ### Secondary (MEDIUM confidence)
-- claude-api skill (cached 2026-06-24 pricing)
-- WebSearch: Gotenberg/LibreOffice/Cloud Run buildpacks, CloudConvert/Aspose/Syncfusion pricing, storage-resize-images docs, accessible drag-and-drop patterns
-- Planning Center Help, Google Docs/Notion/Linear/Primer save-feedback patterns, ProPresenter/EasyWorship/FreeShow/MediaShout docs, CCLI placement blogs, Adobe Spectrum/Mobbin toolbar patterns
+- [Set up plan templates - Planning Center](https://help.planningcenter.com/en/139469-set-up-plan-templates.html) and related PC help docs
+- [Guide to Using Themes in ProPresenter](https://support.renewedvision.com/hc/en-us/articles/34551484745875-Guide-to-Using-Themes-in-ProPresenter)
+- [NLT Bible Notices - thebible.org](https://thebible.org/gt/notices/nlt.html) / [StudyLight.org NLT copyright statement](https://www.studylight.org/site-resources/copyright-statements/eng/nlt.html)
+- [firebase-js-sdk#6803](https://github.com/firebase/firebase-js-sdk/issues/6803)
+- [Natural sort order - Wikipedia](https://en.wikipedia.org/wiki/Natural_sort_order); [Coding Horror - Sorting for Humans](https://blog.codinghorror.com/sorting-for-humans-natural-sort-order/)
 
-### Tertiary (LOW confidence)
-- Great Plains UMC CCLI blog post -- single-source, not cross-checked
-- CCLI's own site -- attempted fetch returned only marketing copy, flagged as unresolved primary source
+### Tertiary (LOW confidence, needs validation)
+- Direct `WebFetch` of `https://api.nlt.to/api/passages` (single manual sample, not full spec)
+- Google Fonts OFL/Apache licensing terms (multiple secondary sources)
+- Inter vs. Helvetica Neue metric-compatibility comparison (secondary comparison sites)
+- Congregational-reading UX precedent (subtitle-editor analogy - no direct church-software comparable found)
 
 ---
-*Research completed: 2026-07-28*
+*Research completed: 2026-08-06*
 *Ready for roadmap: yes*

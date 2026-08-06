@@ -1,635 +1,614 @@
-# Architecture Research — v1.4 "Service and Slides"
+# Architecture Research — v1.5 "Settings, Sharing, and Fidelity"
 
-**Domain:** Brownfield integration into a shipped Vue 3 + Firebase worship-planning app
-**Researched:** 2026-07-28
-**Confidence:** HIGH — every finding below is cited to a real file/line read in this session, not inferred from conventions. The one place confidence drops to MEDIUM (the autosave/song-change bug) is flagged explicitly with its reasoning chain.
+**Domain:** Subsequent-milestone integration research (Vue 3 + Firebase worship-planning app)
+**Researched:** 2026-08-06
+**Confidence:** HIGH — every claim below is grounded in a file/line read during this research pass, not
+inferred from PROJECT.md's prose alone. Where PROJECT.md's recorded milestone decision conflicts with
+what the code actually does, that conflict is called out explicitly rather than silently resolved.
 
-## System Overview (as it exists today)
+## Existing Architecture (confirmed by reading, not re-researched)
 
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│ ServiceEditorView.vue (2,717 lines)                                   │
-│  activeTab: 'service-order' | 'roles' | 'slides'                      │
-│  ┌─────────────────┐  ┌──────────────┐  ┌────────────────────────┐   │
-│  │ Service Order    │  │ Roles        │  │ Slides (SlidesTab.vue) │   │
-│  │ (this file,      │  │ (Phase 17)   │  │  SlidePlanRail         │   │
-│  │  inline template) │  │              │  │  SlideGrid             │   │
-│  │  - slot list      │  │              │  │  EditSlideDrawer       │   │
-│  │  - SortableJS #1  │  │              │  │  SortableJS #2         │   │
-│  └────────┬─────────┘  └──────────────┘  └───────────┬────────────┘   │
-│           │  localService: Ref<Service|null>          │                │
-│           │  (own hand-rolled autosave, ~150 lines)    │                │
-│           └───────────────┬────────────────────────────┘                │
-│                            │ useSlideshowAssembly(service, orgId)       │
-└────────────────────────────┼───────────────────────────────────────────┘
-                             ▼
-        ┌────────────────────────────────────────────┐
-        │ slideGroupMaterializer.ts (pure)             │
-        │  deriveGroupEntries / reconcileGroup /        │
-        │  reconcileSongGroup / reconcileUnstableIdGroup│
-        └───────────────────┬───────────────────────────┘
-                             ▼
-        ┌────────────────────────────────────────────┐
-        │ stores/slideGroups.ts (Firestore)            │
-        │  organizations/{orgId}/slideGroups/{slotId}  │
-        │  materializeGroupIfMissing / replaceGroupSlides│
-        │  dismissReconciliation / setGroupBedMedia     │
-        └────────────────────────────────────────────┘
+- Vue 3 SFCs + TypeScript, Pinia stores (`defineStore` with `ref`/`computed`, not the options API),
+  most stores hold a live Firestore `onSnapshot` subscription (`services.ts`, `auth.ts`'s member
+  listener, `importedSlides.ts`).
+- Firestore rooted at `organizations/{orgId}/...`. The org document itself (`organizations/{orgId}`)
+  carries loose, untyped fields today — `name`, `slug`, `pcAppId`, `pcSecret`, `vwModeEnabled` — read via
+  ad hoc `getDoc`/`orgData.<field> as <type>` casts in `src/stores/auth.ts:104-109`. **There is no
+  `Organization` TypeScript type anywhere in `src/types/`** (confirmed by glob — no match).
+- `organizations/{orgId}/services/{docId}` is the service document; **every write to it is confined to
+  `src/stores/services.ts`** — confirmed by grepping the whole `src/` tree for the org/services doc path:
+  the only non-test hit is `services.ts` itself (`src/rules.test.ts` is the only other hit, and it's a
+  rules test). No view, component, or other store ever calls `updateDoc`/`setDoc`/`addDoc` on a service
+  doc directly; every mutation goes through one of the store's exported functions.
+- Sharing: `shareTokens/{token}` (opaque, public-read) and `serviceShares/{slug}__service-{date}`
+  (memorable URL, public-read) both carry a frozen `serviceSnapshot` built once, at share time, in
+  `services.ts`'s `createShareToken` (`src/stores/services.ts:353-441`).
+- Firebase Storage under `orgs/{orgId}/...`, gated by `storage.rules`'s cross-service
+  `firestore.exists(.../members/$(uid))` check (both the `media/**` and generic `orgs/{orgId}/{allPaths=**}`
+  blocks — `storage.rules:17-44`).
+- Cloud Functions (`functions/src/index.ts`) proxy ESV and Anthropic through one `onRequest` handler
+  (`export const api`, lines 56-129), keyed by a `PROXY_TARGETS` map (`planningcenter`/`anthropic`/`esv`).
+- `pptx-render` (Cloud Run, `render-service/`) writes PNGs to Storage; `organizations/{orgId}/pptxRenders/{importId}`
+  tracks status (`pending`/`ready`/`failed`) — this collection is written server-side only
+  (`functions/src/index.ts:149-437`) and is invisible to `src/` (confirmed: `src/` has zero references
+  to `pptxRenders`; only `renderImportId` — a foreign key toward it — appears in `src/types/importedDeck.ts`).
+- Slide groups (`organizations/{orgId}/slideGroups/{slotId}`, doc id = the anchoring `ServiceSlot.id`)
+  are materialized from the service order by `src/utils/slideGroupMaterializer.ts` and consumed by
+  `src/utils/slideshowAssembler.ts` / `src/composables/useSlideshowAssembly.ts`.
+- `src/views/SettingsView.vue` mirror-writes single fields onto the org doc (`vwModeEnabled`, `pcAppId`,
+  `pcSecret`, `slug`, `name`) and then re-assigns the matching `authStore.<field>` ref directly —
+  **the org doc is not live-synced**; `loadOrgContext` (`auth.ts:82-139`) reads it once per session, and
+  every setting's "of record" value lives in `useAuthStore()`'s refs, kept in sync only by each save
+  handler's own mirror-write. This is a documented, deliberate pattern ("Pitfall 2" per in-code
+  comments at `SettingsView.vue:315` and `auth.ts:42-46`), not an oversight — v1.5 should extend it,
+  not replace it.
 
-        ┌────────────────────────────────────────────┐
-        │ Cloud Functions (functions/src/index.ts)     │
-        │  parsePptx (text) → orgs/{orgId}/pptx-imports/│
-        │                       {importId}/images/*.png │
-        │  cleanupExpiredMedia → orgs/{orgId}/media/*   │
-        │  ONLY (regex-guarded, never pptx-imports/)    │
-        └────────────────────────────────────────────┘
-```
+## 1. Org settings expansion
 
-`Service`/`ServiceSlot` (`src/types/service.ts`) are the PRODUCTION boundary — shipped v1.0, real
-user data, must be migrated carefully. Everything under `slideGroups`, `ImportedDeck`, `SongLyrics`,
-and `src/components/slides/**` is GREENFIELD per D-19 (STATE.md) — reshape freely, no migration.
+**Current pattern does not scale to ~8 settings as bare top-level fields — but the fix is additive, not
+a rewrite.** `vwModeEnabled` works today because it is one boolean with one obvious default (`true`).
+Eight settings (AI toggle, PC toggle, Bible version, default service template, font family/weight/size)
+span three shapes — booleans, an enum, and a structured object (a whole slot-array template) — and each
+needs its own "missing field on a legacy org doc" default. Continuing to add bare top-level fields would
+mean eight separate `(orgData.x as T) ?? default` lines duplicated across `auth.ts`'s two reset sites
+(`loadOrgContext`'s no-org branch, `logout`) plus every settings-page save handler.
 
----
+**Recommendation: a typed `settings` sub-object on the org document, with one defaults module.**
 
-## 1. Drag-and-drop root cause — service `ZTXcpNRcJTalEQp42fTx`
+- Add `src/types/organization.ts` — the first `Organization` type this codebase has ever had. Define an
+  `OrgSettings` interface (`aiEnabled: boolean`, `pcEnabled: boolean`, `bibleVersion: 'ESV' | 'NLT'`,
+  `defaultServiceTemplate: ServiceSlot[] | null`, `slideFont: { family: string; weight: number; size: number } | null`)
+  and export a single `DEFAULT_ORG_SETTINGS: OrgSettings` constant — mirroring `buildSlots`'s role as
+  "the one place a default service structure is defined" (`src/utils/slotTypes.ts:249-295`).
+- Store it as ONE nested field, `organizations/{orgId}.settings`, not eight top-level fields and not a
+  subcollection. A subcollection is unwarranted here: nothing about these values is queried
+  independently, unbounded in count, or written by a different actor than the org doc's other fields —
+  a subcollection would only buy an extra round trip. A single object also lets `updateDoc` use one
+  dot-path write per changed key (`{ 'settings.aiEnabled': false }`), matching the existing
+  `roleAssignmentOverrides.${roleId}` scoped-write precedent in `services.ts:332-335` that this
+  codebase already uses specifically to avoid concurrent-editor clobbering.
+- **Defaults live in code, read at every consumption site, never backfilled into Firestore.** This is
+  the existing `vwModeEnabled` convention (`?? true` in three places in `auth.ts`) generalized: merge
+  `DEFAULT_ORG_SETTINGS` under whatever `orgData.settings` returns (`{ ...DEFAULT_ORG_SETTINGS, ...(orgData.settings ?? {}) }`)
+  in `loadOrgContext`, so a legacy org doc with no `settings` key at all, or one missing just the newest
+  field (e.g. `slideFont` added in a later phase within this same milestone), is never an error and
+  never needs a migration script. Firestore's schemalessness is precisely what makes this safe — every
+  other field in this codebase already relies on it (`orgData.pcAppId as string ?? null`, etc).
+- **Where the merged value lives:** `useAuthStore()`, exactly like `vwModeEnabled` today — add
+  `orgSettings = ref<OrgSettings>(DEFAULT_ORG_SETTINGS)` beside the existing individual refs (do not
+  migrate `vwModeEnabled` itself; that field already ships and works, and folding it into `settings`
+  mid-milestone is pure churn with no functional benefit). Every new toggle follows `onToggleVwMode`'s
+  exact shape (`SettingsView.vue:474-494`): `updateDoc` the dot-path, then reassign the store's local
+  copy — never rely on a live subscription firing.
+- **Migration story:** none needed beyond the merge-with-defaults read above. No script, no Cloud
+  Function backfill, no `settings: {}` write-on-read. This is a direct consequence of Firestore's
+  document model plus the org doc's existing "read once per session, mirror-write on save" pattern —
+  the same reason `vwModeEnabled` never needed one.
+- **Build-order implication:** the `OrgSettings` type + defaults module + `auth.ts` merge-and-load logic
+  is a hard prerequisite for every other v1.5 settings feature (AI toggle, PC toggle, Bible version,
+  template, font). It should be the first phase of this milestone's settings work — every later phase
+  that adds a toggle is then a small, mechanical addition (new key in the interface, new default, new
+  Settings UI control, new consumption-site read), not infrastructure work.
 
-**Confidence: HIGH.** Found by reading `src/views/ServiceEditorView.vue` lines 519–537 (template) and
-1413–1467 (Sortable setup), cross-checked against `node_modules/sortablejs/modular/sortable.esm.js`
-(v1.15.7) lines 1200–1202 and 1897–1907.
+## 2. Share link rework
 
-### The three compounding bugs (all in the same `onEnd` handler)
+### The write-path enumeration (exhaustive, verified by grep)
 
-**Bug A — `evt.oldIndex`/`evt.newIndex` count section-header DOM nodes SortableJS never scoped them out of.**
+Grepping `src/` for the literal Firestore path `organizations/{orgId}/services` returns exactly two
+files: `src/stores/services.ts` (the implementation) and `src/rules.test.ts` (a rules test, not a write
+path). **No view or component writes to a service document directly.** Within `services.ts`, every
+function that issues a Firestore write to a service doc is:
 
-The template renders section headers and slot rows as *siblings in the same flat container*
-(`ServiceEditorView.vue:520-536`):
+1. `createService` — `addDoc` (services.ts:139-154)
+2. `updateService` — the generic `updateDoc`, called by `ServiceEditorView.vue` at three sites
+   (lines 1944, 3446, 3651 — slot/section reindex saves, the sermon-passage/notes autosave, and the
+   Planning Center export-status write) plus internally by `assignSongToSlot`/`clearSongFromSlot`
+   (services.ts:264-308)
+3. `markAsPlanned` — its own `updateDoc` (services.ts:226-234)
+4. `reopenService` — its own `updateDoc` (services.ts:247-253)
+5. `setRoleOverride` — its own scoped dot-path `updateDoc` (services.ts:316-336)
+6. `clearRoleOverride` — its own scoped dot-path `updateDoc` via `deleteField()` (services.ts:340-351)
+7. `deleteService` — `deleteDoc` (services.ts:259-262; irrelevant to snapshot staleness, only to token
+   cleanup — see below)
+
+This means a **client-side refresh hook is exhaustively achievable for every write to the service
+document itself**, by centralizing the refresh call at the tail of functions 1–6 (all defined in the
+same store closure, so this is a few call sites, not "every UI call site" — the earlier finding that all
+service-doc writes fund through six functions is what makes client-side refresh tractable, not merely
+convenient).
+
+**However, this does NOT cover every way "what the share link shows" can go stale.** The frozen
+snapshot's `roleAssignments` are resolved by `resolveServiceRoleAssignments(service, quarters, roles)`
+(`services.ts:381`), which reads the **`quarters` store** — a volunteer's schedule assignment can change
+via `src/stores/quarters.ts`'s own writes (e.g. `assignPerson`) **without touching the service document
+at all**. A pure "hook into `services.ts`'s six write functions" fix corrects exactly the root cause
+PROJECT.md names (a role *override*, which does live on the service doc via
+`roleAssignmentOverrides`), but does not generalize to a schedule change made from the Schedule/Quarter
+screen for a person who is NOT overridden on this specific service. **Flag this as a real, unresolved
+gap** — the milestone's decision text ("refresh the snapshot automatically whenever the service
+changes") is most naturally read as scoped to the service document, matching what's achievable
+client-side; whether schedule-only changes should also trigger a refresh is a product question the
+roadmapper should resolve explicitly rather than let slide by omission.
+
+### Client-side refresh vs. a Firestore `onWrite` trigger
+
+**Recommendation: client-side, not a Cloud Function trigger.** The trade-offs, concretely:
+
+- **Latency/cost:** a trigger fires on every write to every service doc, including services that were
+  never shared — it would need its own read of the doc to discover whether a `shareToken` is even
+  present before doing anything, on every save of every service in the org. A client-side hook already
+  has the answer in the reactive `Service` object it just wrote (`service.shareToken`), so it can skip
+  entirely when unshared, at zero extra read cost. A trigger also adds real latency (cold start plus a
+  round trip) before the refreshed link is live; client-side, the refresh completes before the save
+  operation's promise resolves.
+- **The `roleAssignments` re-resolution problem is the deciding factor.** `createShareToken` resolves
+  role assignments using `resolveServiceRoleAssignments` (`src/utils/serviceRoles.ts`), fed by the
+  **client's already-subscribed** `rosterStore`/`quartersStore` state (`services.ts:378-381`). A Cloud
+  Function trigger would have to re-implement or import this same algorithm server-side against
+  `functions/src/` — a **separate TypeScript project with no code-sharing mechanism to `src/`** (no
+  shared package, no path alias crossing the boundary — confirmed by directory structure). That is not
+  a small port: the algorithm folds in the roster's frequency tiers, must-serve-with pairing, and
+  per-role override precedence (per `PROJECT.md`'s Phase 15 requirement text). Maintaining two
+  implementations of this logic is exactly the kind of drift that reintroduces "stale role overrides,"
+  just at a new seam, and this codebase has explicit institutional memory of that failure class
+  (`STATE.md` T-13/T-17 precedents referenced in `services.ts`'s own comments). Client-side reuses the
+  **one** existing implementation.
+- **Deployment dependency:** the infra already exists (`requestPptxRender`'s `onDocumentCreated` trigger
+  is a working precedent for this codebase), so this is not a blocking cost — it's simply not needed
+  here given the algorithm-duplication problem above.
+
+**Concretely:** extract `createShareToken`'s snapshot-building block (`services.ts:359-399`) into a
+private `buildServiceSnapshot(service, orgId)` helper, call it both from the (renamed) "ensure share
+token" flow and from a new `refreshShareSnapshot(serviceId)` invoked at the tail of `updateService`,
+`markAsPlanned`, `reopenService`, `setRoleOverride`, and `clearRoleOverride` — guarded by "does this
+service have a persisted token" so the common unshared case costs nothing extra.
+
+### The "persist the token on the service doc" decision conflicts with the R036 draft-lock guard —flag loudly
+
+PROJECT.md's milestone decision reads: *"Persist the token on the service doc — minted once, never
+rotated."* Read literally, this means writing a `shareToken` field via `services.ts`'s existing
+`updateService`. **That collides directly with the R036 draft-only write guard already shipped in this
+codebase (Phase 31).** `updateService`'s `assertWritable` (`services.ts:197-203`) throws
+`ServiceLockedError` for any write to a non-draft service unless the payload matches exactly one of
+three enumerated shapes: ordinary draft editing, the Planning-Center export carve-out
+(`EXPORT_WRITE_KEYS`), or the reopen carve-out (`hasOnly(['status','updatedAt'])`). `firestore.rules`'
+`/services/{docId}` `allow update` block (`firestore.rules:64-84`) enforces the identical three-shape
+contract server-side. A bare `{ shareToken: token }` write matches **none** of the three — it would be
+silently rejected by the client guard (throwing `ServiceLockedError`) or, if that guard were bypassed,
+denied by Firestore itself. Since sharing a service is realistically most useful once it's `planned` (the
+"communicate this to the team" moment R036 exists to protect), this is not an edge case — **it is the
+common case**, and the milestone decision as literally written would not work for it.
+
+Two ways to resolve this, both requiring an explicit choice the phase planner must make (this research
+does not decide it):
+
+1. **Add a fourth named carve-out**, mirroring the R037 reopen pattern exactly: both `assertWritable`
+   and `firestore.rules`' `/services` block gain a `hasOnly(['shareToken','updatedAt'])` (or
+   `hasOnly(['shareToken','sharedAt','updatedAt'])`) branch, permitted at any stored status. This keeps
+   the token literally on the service doc as decided, at the cost of widening the lock's carve-out
+   surface — a security-sensitive file that this codebase treats with unusual care (see the extensive
+   comments throughout `services.ts` and `firestore.rules` warning against "helpfully" simplifying it).
+2. **Store the token in a separate, non-lock-gated document keyed by `serviceId`** — e.g.
+   `serviceShareLinks/{serviceId}: { token, orgId }` — analogous to how `slideGroups` and `shareTokens`/
+   `serviceShares` already live outside the service document entirely. `ensureShareToken` reads this
+   doc first; if present, reuses `.token`; otherwise mints and writes it. This never touches the service
+   document or R036 at all, and needs no rules change to the security-sensitive `/services` block —
+   only a new, simple rule for the new collection (public-read-by-token is unaffected; this new doc
+   would be editor-read/write-scoped like `shareTokens` create today).
+
+This research recommends option 2 as lower-risk (it doesn't touch the draft-lock's carve-out surface),
+but the roadmapper should treat PROJECT.md's decision text as **not yet reconciled with the codebase's
+existing lock semantics** and resolve it explicitly in the phase that implements this, rather than
+discovering the `ServiceLockedError` at implementation time.
+
+### `firestore.rules` on `shareTokens` must change regardless of which option above is chosen
+
+Confirmed by reading `firestore.rules:181-189`: `match /shareTokens/{token} { allow read: if true; allow
+create: if isSignedIn(); allow update: if false; ... }`. **`allow update: if false` blocks any snapshot
+refresh via the client SDK, full stop** — the rule as it stands today only ever supports "mint once,
+snapshot frozen forever," which is the opposite of what this milestone needs. This must change to permit
+an org editor to update `serviceSnapshot`/`updatedAt` while keeping `orgId`/`serviceId`/`token` immutable
+— directly mirroring the `serviceShares` collection's existing update rule two blocks below
+(`firestore.rules:225-233`), which **already** supports exactly this "overwritten in place, org-scoped"
+pattern for the memorable-URL share. `shareTokens` needs the same treatment `serviceShares` already has.
+
+### Confirmed: no PII leak from persisting the token on (or beside) the service doc
+
+`organizations/{orgId}/services/{docId}` reads are gated `allow read: if isOrgMember(orgId)`
+(`firestore.rules:61`) — not public. Storing `shareToken` as a field there (option 1 above) or in a
+new `serviceShareLinks/{serviceId}` doc scoped the same way as `shareTokens`' `create` rule (option 2)
+is safe: only org members — who can already mint/view share links themselves — could read the token
+value. Public/anonymous access is only ever through `shareTokens/{token}` (must already know the token)
+or `serviceShares/{slug}__service-{date}` (guessable but scoped per-org), both unchanged in this regard.
+
+## 3. Custom auth claim for org membership
+
+### Where memberships are created/mutated today — all four sites are client-side, none is a Cloud Function
+
+1. `src/stores/auth.ts::ensureUserDocument` — invite-acceptance branch: `batch.set(memberRef, { role, ... })`
+   (`auth.ts:199-205`).
+2. `src/stores/auth.ts::ensureUserDocument` — auto-create-org branch (no invite, no org): `batch.set(memberRef, { role: 'editor', ... })`
+   (`auth.ts:228-234`).
+3. `src/views/TeamView.vue::onToggleRole` — role change (`editor`↔`viewer`): plain `updateDoc`
+   (`TeamView.vue:319-341`).
+4. `src/views/TeamView.vue::onConfirmRemove` — member removal: presumably `deleteDoc` on the member doc
+   (confirmed pattern from the surrounding guard logic at `TeamView.vue:345-360`; the delete call itself
+   is just past the excerpt read but follows the file's established direct-client-write convention).
+
+**No Cloud Function touches `organizations/{orgId}/members/{uid}` today** — confirmed by grep (`setCustomUserClaims`/`customClaims`/`getIdToken` appear nowhere in `src/` or `functions/src/index.ts`; the
+only hits are the unrelated `render-service`/pptx research docs and `appAuth.ts`, which is the AI-proxy
+auth-header helper, not a claims mechanism). This is genuinely greenfield.
+
+### Recommended shape: a Firestore trigger, not a rewrite of the four write sites
+
+The client SDK **cannot** call `admin.auth().setCustomUserClaims` — that requires the Admin SDK, i.e. a
+Cloud Function. Rather than converting all four client write sites above into callable functions (a much
+larger, riskier change touching auth flow, org creation, and team management), add one
+`onDocumentWritten` trigger on `organizations/{orgId}/members/{uid}` that sets/clears the claim in
+response to create/update/delete — **directly the same pattern this codebase already ships** for
+`requestPptxRender` (`onDocumentCreated` on `organizations/{orgId}/pptxRenders/{importId}`,
+`functions/src/index.ts:429-437`). This requires zero changes to any of the four existing write sites;
+they keep writing Firestore exactly as they do today, and the trigger reacts. Claim shape:
+`{ orgId: string, role: 'editor' | 'viewer' }` — a single org, matching this codebase's existing
+single-org-per-user model (`auth.ts:99`, `ids[0]!` — only the first org id is ever used).
+
+### Backfill for existing members
+
+The trigger only fires on a **write**; existing member docs (created before this phase ships) will never
+trigger it on their own. A one-time backfill is required — an Admin SDK script (run once, analogous to
+how `render-service/DEPLOY.md` documents a one-time manual deploy step for this codebase) iterating the
+`members` collection group and calling `setCustomUserClaims` for each doc's `uid`. This is infrastructure
+work with no existing precedent in this repo to copy from directly, but the `cleanupOrphanRendersHandler`
+pattern (`functions/src/index.ts:614-623`, a dry-run-by-default admin-triggered maintenance job) is the
+closest structural analogue for "a script that touches every doc in a collection group once."
+
+### The stale-token problem — a real gap that needs an explicit forced refresh
+
+A signed-in user's ID token caches claims for up to an hour (Firebase Auth SDK default). Two concrete
+moments where a stale token will cause an incorrect Storage read/write, both needing an explicit
+`getIdTokenResult(true)` (or `user.getIdToken(true)`) call:
+
+1. **Existing users, at rollout of this feature.** After the backfill script runs, every already-signed-in
+   session still carries its old (claim-less, or default) token until it naturally refreshes or the app
+   forces one. Insert a forced refresh once during `auth.ts`'s `onAuthStateChanged` handler
+   (`auth.ts:142-157`), after `loadOrgContext` resolves — this is the natural "session just
+   established/confirmed" point.
+2. **A brand-new invite acceptance or org auto-creation.** `ensureUserDocument`'s two membership-writing
+   branches (`auth.ts:199-205`, `228-234`) write the member doc client-side; the trigger that sets the
+   claim runs **asynchronously, after** that write completes and the client has already moved on. Any
+   Storage operation attempted immediately after (e.g. uploading a background image in the same
+   session) can race the trigger and use a token that still has no claim. This needs either a forced
+   refresh with a short retry/backoff after the batch commit, or an explicit UI wait state — call this
+   out as a genuine, user-visible race the phase plan must design for, not an edge case to skip.
+
+### `firestore.rules` should NOT move to the claim
+
+`firestore.rules`' `isOrgMember`/`isOrgEditor` (`firestore.rules:11-18`) call `exists()`/`get()` on
+Firestore *from a Firestore rule* — a **same-service** read. The
+[firebase-js-sdk#6803](https://github.com/firebase/firebase-js-sdk/issues/6803) inert-in-emulator bug
+CLAUDE.md documents is specific to **Storage rules calling `firestore.exists()` cross-service** — it does
+not affect Firestore rules reading Firestore, which already works correctly in the emulator today (this
+is exactly why `firestore.rules.test.ts`-equivalent coverage for `/services` etc. is trustworthy while
+`storage.rules.test.ts` is not). Moving `firestore.rules` to the claim as well would introduce a **new**
+consistency risk with no offsetting benefit: a role change via `TeamView.vue::onToggleRole` takes effect
+immediately today (the rule's `get()` reads the fresh doc on every request); under a claim-based rule it
+would lag until the affected user's token refreshes — reintroducing a staleness class this migration is
+supposed to be eliminating, not adding elsewhere. **Scope the claim migration to `storage.rules` only.**
+
+### Rollback path
+
+If a claim is set incorrectly (wrong `orgId`, stale `role`), the safest rollback is at two independent
+levels: (a) redeploy the previous `storage.rules` revision via `firebase deploy --only storage:rules`
+(rules are versioned/instant — no data migration to undo), which restores the working
+`firestore.exists()` cross-service check as a stopgap; (b) re-run the backfill/correction script for the
+affected uid(s) and instruct/force a token refresh (`getIdToken(true)`) or a re-login, since a corrected
+claim in Firebase Auth does not retroactively fix an already-cached client token. Keep the trigger
+running in both cases — it is what keeps future writes correct once the claim values themselves are
+fixed.
+
+## 4. PPTX rendered-image display
+
+### What exists today, and the structural gap that makes this harder than "swap the image URL"
+
+- `PptxImportModal.vue` uploads the source `.pptx`, calls `parsePptx` (parses TEXT/IMAGE content),
+  and on confirm calls `importedSlidesStore.createDeck(...)` which writes an `ImportedDeck` doc
+  (`organizations/{orgId}/importedSlides/{id}`) with `slides: (TextSlide|ImageSlide)[]` — the **parsed**
+  content — plus, when the source was a real `.pptx` (not an image-only import), a `renderImportId`
+  field (`PptxImportModal.vue:304-307, 420-429`) that is the same id the server-side render pipeline
+  uses to key `organizations/{orgId}/pptxRenders/{renderImportId}`.
+- **Nothing in `src/` reads `pptxRenders` or lists the `orgs/{orgId}/pptx-imports/{importId}/rendered/`
+  Storage prefix** — confirmed by the earlier grep; `renderImportId` is currently a foreign key that
+  points nowhere from the client's perspective.
+- The IMPORTED slot kind's slides are derived from `deck.slides` (the parsed text/image content) in
+  **two independent places**, both of which must change: `slideGroupMaterializer.ts::deriveGroupEntries`'s
+  `case 'IMPORTED'` (line 119-129, mints one `GroupSlideEntry` per `deck.slides[]` item, `sourceRef: {
+  kind: 'imported', importId, innerSlideId }`) and `slideshowAssembler.ts`'s two IMPORTED paths — the
+  fallback derivation (line 469-479, for a slot with no materialized group yet) and
+  `resolveEntryContent`'s `case 'imported'` (line 186-193, which resolves a **stored** entry's
+  `sourceRef.innerSlideId` back to a `deck.slides` item for a materialized group).
+- **The rendered page count is structurally decoupled from `deck.slides.length`.** The `requestPptxRender`
+  trigger's own doc comment is explicit about this (`functions/src/index.ts:296-304`): the PPTX parser
+  (`mapAstToSlides`) skips slides with no substantial text/images and emits **one entry per image** on a
+  multi-image slide, so a 6-slide deck can parse to 4 `deck.slides` entries, or more than 6. The render
+  service, by contrast, produces one PNG per actual PowerPoint page (`renderedCount`, cross-checked
+  against a contiguous `page-0001.png..page-{n}.png` Storage listing). **These two counts will routinely
+  disagree.** Given the decision "the PNG is the slide, drawn — parsed text stays in the document but is
+  never drawn," the rendered slideshow's slide *count and order* must come from the render pages, not
+  from `deck.slides` — meaning the IMPORTED derivation logic needs a genuinely different code path when a
+  ready render exists, not a field-level substitution inside the existing per-`deck.slides`-item loop.
+
+### What must be built
+
+1. **A client-side render-status/URL resolver.** New store or extension of `useImportedSlides` that,
+   given an `ImportedDeck.renderImportId`, subscribes to (or fetches) `organizations/{orgId}/pptxRenders/{renderImportId}`
+   and, once `status === 'ready'`, resolves download URLs for the rendered pages. Firestore rules
+   already permit this read: `pptxRenders` is a single-segment subcollection under `organizations/{orgId}`,
+   so it falls through to the generic `match /{collection}/{docId} { allow read: if isOrgEditor(orgId); ... }`
+   catch-all (`firestore.rules:162-167`) — **no rules change needed for editors**, though note this is
+   `isOrgEditor`, not `isOrgMember`: a viewer cannot read it today, which matters if viewers are ever
+   expected to see rendered PPTX slides in-app. The Storage side of this (fetching the actual PNGs) is
+   currently gated by the same `firestore.exists()` cross-service check as everything else under
+   `orgs/{orgId}/**` — this is exactly the check Item 3 replaces, so this item benefits from Item 3
+   landing first (or at minimum, both remain subject to the same emulator-untestable blind spot until
+   then).
+2. **A client-side page-URL builder mirroring `renderedPrefixFor`/`RENDERED_OBJECT_NAME`.** `functions/src/`
+   and `src/` are separate TypeScript projects with no shared code — the 4-digit zero-padded
+   `page-XXXX.png` naming convention (`functions/src/index.ts:273-282`) must be re-implemented (or
+   discovered via a Storage `listAll` on the `rendered/` prefix, avoiding the padding-convention
+   duplication at the cost of an extra Storage list call). Flag the duplication risk either way — if a
+   future change to the render service's naming convention isn't mirrored client-side, rendered slides
+   silently stop resolving, with no compiler check catching it (two separate projects, no shared types).
+3. **A new/widened `AssemblyInputs` field** carrying render status+page URLs per deck (or per
+   `renderImportId`), threaded into both `deriveGroupEntries`'s and `slideshowAssembler.ts`'s IMPORTED
+   branches, so a ready render short-circuits the existing "one entry per `deck.slides[]` item" logic and
+   instead emits one `ImageSlide`-shaped entry per rendered page.
+4. **`sourceSignature`'s IMPORTED case must incorporate render status/count.** Today it's
+   `${deck.slides.length}:${joined text/urls}` (`slideshowAssembler.ts:192-197`) — this governs whether an
+   already-materialized `SlideGroup` gets rebuilt. Rendering is asynchronous: a user can confirm an
+   import and have its group materialize (from parsed text, render still `pending`) *before* the render
+   finishes. If the signature doesn't change when status flips `pending → ready`, **the existing
+   rebuild-on-signature-mismatch mechanism will never notice the render became available**, and the
+   group will keep showing stale parsed-text slides indefinitely. The signature must fold in render
+   status/`renderedCount` so the transition is detected and triggers a rebuild through the same mechanism
+   already used for every other kind.
+5. **Loading/failed states.** Per the decision, the PNG is drawn — while `status === 'pending'`, the
+   slide grid/presenter has nothing to draw yet (the render hasn't happened) and must fall back to
+   *something* visible (most consistent with existing patterns: the parsed `deck.slides` content as a
+   temporary placeholder, since it's already there and already rendered elsewhere in this codebase — or
+   an explicit "rendering…" state card, mirroring `PptxImportModal.vue`'s own `parsing`/`uploading` step
+   pattern). On `status === 'failed'`, the parsed text/image content is the only fallback that exists —
+   this is the graceful-degradation path the "keep parsed text in the document" half of the decision is
+   *for*.
+6. **The presenter draws full-bleed.** `PresentationViewer.vue`'s existing slide-kind branches
+   (`lyric`/`copyright`/`scripture`/... starting at line 72) are all centered text blocks with padding
+   (`px-16 py-12`, `PresentationViewer.vue:70`); an `imported`-as-rendered-PNG slide needs its own branch
+   that renders the image edge-to-edge (`object-contain` or `object-cover` filling the viewport, no text
+   padding) — structurally different from every existing branch, not a variant of one.
+7. **Not in scope for the public `ShareView.vue`.** Confirmed by reading `ShareView.vue` in full: it
+   renders only text (song title/key/BPM, scripture reference, notes, who's-serving) from the frozen
+   `serviceSnapshot` and has no slide/image rendering path at all today. This item is scoped to the
+   authenticated Slides tab grid, Edit Slide drawer preview, and presenter — no share-view work is
+   implied or needed.
+
+## 5. Service item types (`ANNOUNCEMENTS`, `MISCELLANEOUS`, `MESSAGE` simplification)
+
+### Compiler-caught (exhaustive `switch(slot.kind)`, no `default`) — TypeScript will refuse to compile until every new kind is handled
+
+| Site | File:line | What breaks without a new case |
+|---|---|---|
+| `slotLabel` | `src/utils/slotTypes.ts:37-52` | Human-readable label per kind |
+| `createSlot` | `src/utils/slotTypes.ts:58-98` | The factory — what fields a new slot gets |
+| `slotDisplayTitle` | `src/components/slides/slideDisplay.ts:61-81` | Slide-rail row title |
+| `slotLabel` (separate implementation) | `src/components/ServiceCard.vue:135-154` | Dashboard/service-list card label |
+| `deriveGroupEntries` | `src/utils/slideGroupMaterializer.ts:50-135` | What `GroupSlideEntry`/`sourceRef` a new slot kind produces |
+| fallback-derivation switch | `src/utils/slideshowAssembler.ts:394-501` | Slide content for a slot with no materialized group yet |
+| `sourceSignature` | `src/utils/slideshowAssembler.ts:147-204` | Change-detection signature per kind |
+
+Adding `ANNOUNCEMENTS`/`MISCELLANEOUS` to the `SlotKind` union (`src/types/service.ts:7`) will produce a
+compile error at every one of these sites until handled — this is real, load-bearing safety, and the
+natural place for both new kinds to land is alongside `PRAYER`/`MESSAGE`/`HYMN`'s existing shared
+`case 'PRAYER': case 'MESSAGE': case 'HYMN':` grouping in `deriveGroupEntries`/the assembler fallback
+switch (both already emit a generic `{ kind: 'text' }` `sourceRef`/`TextSlide` for that group — plain
+input boxes fit this exactly).
+
+### Silent fallthrough (if-chains, or a `default:` clause) — TypeScript will NOT catch these; each must be found and updated by hand
+
+| Site | File:line | Current behavior on an unhandled kind |
+|---|---|---|
+| `addSlotAsItem` (Planning Center export) | `src/utils/planningCenterApi.ts:884-1004` | **An unconditional if-chain ending in an un-guarded "MESSAGE" branch** (line ~995: no `if`, just falls through) — any kind not explicitly matched earlier is silently exported to Planning Center as a generic "Message" item. **This is not hypothetical** — `ServiceEditorView.vue:3401-3407` already has to special-case `IMPORTED` with an explicit `continue` and an inline comment naming exactly this trap ("skip export entirely rather than falling through addSlotAsItem's default MESSAGE-item branch and mislabeling it"), but that guard exists ONLY in the "new plan, no template" export path (line 3401). The "existing plan" export path (lines 3191-3305) never iterates non-song/non-scripture slots at all today, so it's incidentally safe — but it means **`ANNOUNCEMENTS`/`MISCELLANEOUS` need the same explicit skip-or-handle treatment `IMPORTED` already got**, and it is easy to miss because nothing forces it. |
+| `elementLabel` | `src/views/ServiceEditorView.vue:2692-2702` | Has a `default: return 'this element'` — compiles fine, silently generic for a new kind's delete-confirmation copy |
+| `isSlotPopulated` | `src/views/ServiceEditorView.vue:2651-2671` | If-chain, `return false` for an unhandled kind — a populated ANNOUNCEMENTS/MISCELLANEOUS slot would read as "empty" for whatever UI gates on this (e.g. delete-confirmation wording, completeness indicators) |
+| `slotPrefix`/`slotName`/`slotHasContent`/`slotUrl`/`slotTextClass` | `src/components/ServiceCard.vue:156-197` | Five separate if-chains, each silently no-ops (empty string/`false`/`null`) for an unhandled kind |
+| Slot row rendering | `src/views/ShareView.vue:29-75` | Vue template `v-else-if` chain — an unhandled kind renders **no row at all** on the public share page. No compiler exists to catch a template gap. |
+| Slot row rendering | `src/components/ServicePrintLayout.vue:16-84` | Same `v-else-if` chain pattern, same silent-gap risk, for the printed order of service |
+| Add-item palette | `src/views/ServiceEditorView.vue:803-807` (per-section inline chips) and `:1192-1196` (bottom palette) | Literal, hand-written `<button>` per kind — adding a kind requires a manual new button at BOTH locations; there is no list-driven rendering to extend once. Removing Hymn (per the milestone decision, "palette-only removal") means deleting exactly these two `Hymn` buttons and nothing else — `createSlot('HYMN')`, `slotLabel`, the assembler, and every switch above are explicitly NOT touched (matches PROJECT.md's decision verbatim). |
+
+### `MESSAGE` becoming a plain input box is a type-shape decision, not just a UI change
+
+`MESSAGE` currently shares `NonAssignableSlot` with `PRAYER` (`src/types/service.ts:73-79`): both carry
+optional `linkUrl`/`linkLabel`, and both are rendered in `ServiceEditorView.vue` with an identical
+link-editing UI (PRAYER at ~line 1010-1050, MESSAGE at ~line 1054-1097 — confirmed by reading both
+blocks). The decision only changes `MESSAGE` ("reduce Message to an input box with no URL link") —
+`PRAYER` is not mentioned and should keep its link capability. Since `ANNOUNCEMENTS`/`MISCELLANEOUS` are
+also specified as "plain input boxes," the natural shape is a **new field** (e.g. `text?: string`) shared
+by `MESSAGE`/`ANNOUNCEMENTS`/`MISCELLANEOUS`, while `PRAYER` stays on the existing link-based
+`NonAssignableSlot` shape unchanged. Whether this means splitting `NonAssignableSlot` into two
+interfaces, or widening it with both old (`linkUrl`/`linkLabel`, PRAYER-only going forward) and new
+(`text`, MESSAGE/ANNOUNCEMENTS/MISCELLANEOUS) fields, is a concrete type-design decision the phase plan
+must make explicitly — this research surfaces the fork, not the answer.
+
+## 6. Default service template
+
+`buildSlots(progression)` (`src/utils/slotTypes.ts:249-295`) is currently the **sole** source of a new
+service's structure — called once, from `createService` (`services.ts:139-154`), with no other call
+site in `src/` (confirmed by the earlier `SlotKind` grep — `createService` is the only non-test/non-type
+consumer). Per the milestone decision, an org-level template should become the primary source, with
+`buildSlots` demoted to "the fallback default template" when no org template is set.
+
+**Where the template lives:** the natural home is `OrgSettings.defaultServiceTemplate` (Item 1's new
+settings sub-object), typed as `ServiceSlot[] | null` — the same shape `buildSlots` already returns, so
+`createService` can do `const slots = orgSettings.defaultServiceTemplate ?? buildSlots(progression)`
+with no new type needed. This also means the "Services slide-out" settings UI (per PROJECT.md's target
+features) is, at its core, an editor for a `ServiceSlot[]` array — it can reuse the same `createSlot`/
+`reindexSlots`/`orderSlotsBySection` primitives `ServiceEditorView.vue` already uses for its own slot
+editing (`src/utils/slotTypes.ts`), rather than inventing a parallel slot-editing UI.
+
+**VW typing stays a layer on top, not baked into the stored template.** Per the decision, "when VW mode
+is on, the song slots in that template still receive required VW types from the chosen progression."
+This means the org template stores slot *structure* (kind, section, and for HYMN/etc. any fixed content)
+but a SONG slot's `requiredVwType` should **not** be frozen into the stored template — it must still be
+computed from `PROGRESSION_SLOT_TYPES[progression]` (`slotTypes.ts:16-31`) at service-creation time,
+keyed by the SONG slot's position within the template, exactly as `buildSlots` does today (`songSlot`
+helper, `slotTypes.ts:252-261`). This is a real design constraint on the template's shape/consumption
+logic, not a detail: a template with VW types "baked in" would desync the moment an org changes which
+progression they use, or turns VW mode off and back on.
+
+**Build-order implication:** this item depends on Item 1's settings infrastructure landing first (the
+template needs somewhere typed to live), and is otherwise self-contained — `createService` is the only
+consumption site to change.
+
+## 7. Global slide typography
+
+**There is currently zero font infrastructure to build on.** Confirmed by grepping the whole `src/` tree
+for `font-family`/`fontFamily`/`--font-`: the only hits are Tailwind's `font-sans` utility class on
+`ShareView.vue`/`QuarterShareView.vue`/the two print layouts — the Tailwind v4 default stack, applied
+nowhere else. `src/assets/main.css` (the entire global stylesheet) is 11 lines: a single `@import
+"tailwindcss"` plus a dark-mode background/color override — **no `@theme` block, no custom font tokens
+of any kind.** Every slide-rendering surface hardcodes its own Tailwind text-size/weight utility classes
+directly in the template with no shared variable:
+
+- `PresentationViewer.vue` (presenter): `text-5xl font-normal` for lyric/scripture body,
+  `text-6xl font-semibold` for copyright title, etc. — a different hardcoded class per slide-kind branch
+  (lines 76, 86, 90, 114 and onward).
+- `SlideCard.vue` (grid preview): `text-[13px] leading-normal` for the card body (line 45).
+- `EditSlideDrawer.vue` and the print layout presumably follow the same "hardcode Tailwind classes
+  per element" convention (not independently re-verified line-by-line here, but no font seam exists
+  anywhere in the codebase to contradict this).
+
+**So this is greenfield infrastructure, not "find the scattered seam and unify it" — there is no seam
+yet.** The one-setting-reaches-four-surfaces requirement (grid, drawer preview, presenter, print) is
+best served by **one CSS custom-property triplet** (`--slide-font-family`, `--slide-font-weight`,
+`--slide-font-size` or a base-size custom property that each surface's existing text-size utility scales
+from) set once at a shared ancestor and consumed via `style="font-family: var(--slide-font-family)"` (or
+a small Tailwind `@theme` mapping, given Tailwind v4's CSS-first config) on each of the surfaces above.
+Given "curated, self-hosted woff2 list" per the decision, the settings value is realistically a font
+*key* (not an arbitrary string) resolved against a small static font-registry module that also owns the
+`@font-face` declarations for the self-hosted files — this registry is itself new infrastructure this
+milestone must create (no equivalent exists today; nothing in this codebase currently ships any custom
+web font).
+
+**Print is a real fourth consumer, not an afterthought.** `ServicePrintLayout.vue` is Order-of-Service
+text (song/scripture/prayer/message rows), not currently slide-shaped — if "every slide" for typography
+purposes is meant to include the printed order of service, that's a fifth surface;if it's scoped to
+slide-shaped content only (grid/drawer/presenter), print is out of scope for this item specifically. This
+research did not find text in PROJECT.md resolving that ambiguity — flag it for the phase plan.
+
+## 8. Mobile responsiveness
+
+### The Schedule screen's existing pattern is real, working code — this is the class string to copy
+
+Despite its route being `/schedule` and its label "Schedule" in `AppSidebar.vue:119` (there is no
+`ScheduleView.vue` file — the page is `src/views/QuarterView.vue`), the owner's "Schedule screen" refers
+to `QuarterView.vue`. Its header button row (`QuarterView.vue:13`) is:
 
 ```html
-<div ref="slotContainerRef" class="space-y-1.5">
-  <template v-for="(slot, index) in localService.slots" :key="slot.kind + '-' + slot.position">
-    <div v-if="showsSectionHeaderAt(index)" class="section-header" ...>...</div>
-    <div class="slot-item" ...>...</div>
-  </template>
-</div>
+<div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-end gap-2 w-full sm:w-auto
+     [&>*]:w-full sm:[&>*]:w-auto [&>*]:justify-center sm:[&>*]:justify-start">
 ```
 
-`Sortable.create(el, { draggable: '.slot-item', ... })` is documented (and the code's own comment at
-line 1422-1426 claims) to "scope both drag eligibility AND index counting… to `.slot-item`." **That
-claim is false.** SortableJS's source (`sortable.esm.js:1201-1202`) computes two *separate* indices:
-
-```js
-oldIndex = index(target);                      // counts EVERY child of the container
-oldDraggableIndex = index(target, options.draggable);  // counts only .slot-item children
-```
-
-`onEnd` in `ServiceEditorView.vue:1430-1444` uses `evt.oldIndex`/`evt.newIndex` — the **all-children**
-index — as the splice indices into `localService.value.slots`, an array that has **no entries for
-section headers**:
-
-```js
-const slots = [...localService.value.slots]
-const moved = slots.splice(evt.oldIndex, 1)[0]   // evt.oldIndex includes header divs
-slots.splice(evt.newIndex, 0, moved)
-```
-
-Section headers appear *between every section transition* — precisely where a cross-section drag
-starts or lands. The number of headers preceding a given row varies with scroll position and drag
-distance, so every drag that crosses (or lands near) a section boundary splices the data array at an
-offset index. This is a **data-corruption** bug, not just a render glitch: it explains "the wrong item
-lands" (splice at wrong index), "sections duplicate or vanish" (an item removed from one section's
-range and inserted into another's), and "Sending renders mid-list" (an item physically relocated in
-the array despite its `section` field being untouched — `showsSectionHeaderAt` then sees a
-`prevSection !== slot.section` transition it didn't expect and renders another header for the same
-section further down). The fix is `evt.oldDraggableIndex`/`evt.newDraggableIndex`, which SortableJS
-already computes and exposes for exactly this situation — the code just never reads them.
-
-**Bug B — the "revert the DOM move" logic is not a revert; it's a partial, single-step nudge.**
-
-```js
-const parent = evt.item.parentNode
-if (parent) {
-  const ref = parent.children[evt.oldIndex]
-  parent.insertBefore(evt.item, evt.oldIndex < evt.newIndex ? ref?.nextSibling ?? null : ref ?? null)
-}
-```
-
-The comment (line 1433) says this exists so "Vue's reactive render is the single source of truth
-(prevents snap-back)" — i.e., undo SortableJS's physical DOM move before Vue re-renders from state, the
-classic SortableJS/Vue conflict the research question names directly. But walk it through for a
-multi-position drag, e.g. dragging index 0 to index 3 in `[A,B,C,D]`: after SortableJS's real move the
-DOM is `[B,C,D,A]`. `parent.children[evt.oldIndex=0]` is now `B` (SortableJS already moved things), and
-since `0 < 3`, the code inserts `A` before `B.nextSibling` (`C`), producing `[B,A,C,D]` — **not**
-`[A,B,C,D]`. It only ever undoes a single adjacent swap; anything that moves more than one slot leaves
-the DOM in a state that matches neither the pre-drag order nor the (correct) post-splice data order.
-Vue's subsequent patch then has to reconcile against DOM nodes that are already wrong, which is the
-second source of "wrong item visible" and why a hard remount (page refresh, which throws away this
-corrupted DOM/vnode tree and rebuilds fresh from `localService.value.slots`) is the only thing that
-reliably fixes it — exactly the reported symptom.
-
-**Bug C — the `v-for` key is unstable across every reorder, so Vue can't do a minimal patch even where Bug A/B don't apply.**
-
-```html
-:key="slot.kind + '-' + slot.position"
-```
-
-`reindexSlots()` (`src/utils/slotTypes.ts:97-99`) reassigns `position` to the array index on *every*
-add/remove/reorder: `slots.map((slot, index) => ({ ...slot, position: index }))`. That means **every
-slot's key downstream of a move changes on every single drag** (two SONG slots swapping index 2 and 5
-both get a new key, and so does everything between them). Vue's keyed diff then can't recognize "this
-is the same row, just relocated" for most of the list — it destroys and recreates vnodes instead of
-moving them — compounding the already-corrupted DOM from Bug B. The codebase already has the right
-stable identity sitting right there and uses it elsewhere for exactly this reason: `ServiceSlot.id`
-(`MediaAttachableSlot.id`, `src/types/service.ts:33-42`, minted by `createSlot()`/`buildSlots()`,
-explicitly documented as "never array index or `position`, both of which a drag-reorder rewrites" —
-this is the anchor `slideGroups/{slotId}` depends on). The Service Order tab's own `:key` violates the
-invariant the rest of the codebase was built around.
-
-**Confirmation this is a systemic pattern, not a one-off:** `SlideGrid.vue`'s own Sortable instance
-(`src/components/slides/SlideGrid.vue:657-717`) is explicitly documented as reusing "the exact
-SortableJS pattern already established in `ServiceEditorView.vue`'s slot list" (line 641-643) — same
-`evt.oldIndex`/`newIndex` splice, same single-step DOM "revert." It gets away with it for *within-group
-reorder* because its `:key="card.assembledSlide.slide.id"` (line 132) is stable (Bug C doesn't apply
-there), but it has its own instance of Bug A: `SlideDropTarget` (line 141) is rendered as a sibling in
-the same `cardsContainerRef` container, "deliberately NOT given the `.slide-card` class" — so it's
-excluded from `draggable` but still counted by `evt.oldIndex`/`newIndex`, always sitting one past the
-end. That is very likely the mechanism behind the separately reported "new slides landing
-second-to-last" defect (an append/drop index computed against the whole-children count lands one slot
-short of where the data array actually ends).
-
-### Recommended ordering model
-
-Make the five sections structurally immovable by not representing them as *inferred labels on a flat
-array* at all:
-
-1. **Keep `ServiceSlot.position` as a plain array-index integer** (no need for fractional ranks —
-   `reindexSlots()` already normalizes it correctly on every mutation; the bug was never the ordering
-   *representation*, it was the *DOM/index arithmetic* built on top of it).
-2. **Stop rendering section headers as siblings inside the Sortable-managed container.** Render each of
-   the five sections as its **own** `<div>` with its **own** `Sortable.create(...)` instance, scoped
-   with SortableJS's `group` option (e.g. `group: 'service-order'`) so items can still be dragged
-   *between* section containers. This makes `evt.oldIndex`/`evt.newIndex` trustworthy again — because
-   there is nothing else in a section's container to miscount — and it makes the five section headers
-   literally non-draggable (they're not `Sortable`-owned elements at all), directly satisfying "the five
-   sections... never reorderable."
-3. **On `onEnd`, splice/insert using `evt.oldDraggableIndex`/`evt.newDraggableIndex`** (already computed
-   by SortableJS) if a single flat array approach is kept instead of per-section instances — this alone
-   fixes Bug A without a bigger refactor, but per-section containers are the more robust fix because it
-   makes cross-section drags explicit (`onAdd`/`onRemove` events fire with a `toEl.dataset.section`) and
-   removes the need to infer section membership from array order at all.
-4. **Fix `onEnd`'s DOM-revert to a real revert or drop it.** Once (2) is done, `evt.item` never needs
-   the manual `insertBefore` dance — a per-section Sortable list only ever needs to worry about single
-   local moves, and Vue's own patch (keyed correctly per point 5) can safely re-render from state
-   without the hand-rolled DOM surgery. If a flat-array approach is kept instead, replace the current
-   single-step nudge with SortableJS's documented pattern: capture the full pre-drag `Array.from(parent.children)` order in `onStart`, and on `onEnd` restore that exact array order via a loop of
-   `insertBefore` calls (not one), *before* mutating `localService.value.slots`.
-5. **Key `v-for` on `slot.id`**, not `slot.kind + '-' + slot.position`. This is a one-line, always-safe
-   fix, independent of everything else above, and should land first — cheapest, and it's the same
-   invariant slide groups already depend on.
-6. **`SERVICE_SECTION` membership should be assignable only by drop target, never by direct field edit
-   racing a drag** — i.e., delete the free-standing `<select>` in `onSectionChange` (line 1381-1386;
-   currently the *only* way `slot.section` changes outside a drag) or keep it only as a fallback for
-   assistive-tech users, but route it through the same "always land in a valid position within that
-   section's container" logic a drop uses, so a select-driven section change can't produce a
-   non-contiguous section run either.
-
-This is the SAME underlying pattern for both known reorder defects (Service Order tab AND SlideGrid's
-"new slides landing second-to-last") — fixing the shared mechanism once (stable key + correct
-index source + real per-container scoping) closes both, and should be planned as one phase, not two.
-
----
-
-## 2. Adding a Post-Service section (production data)
-
-**Confidence: HIGH.**
-
-The four-section list is defined in exactly one place as the union type + const array
-(`src/types/service.ts:13-22`):
-
-```ts
-export type ServiceSection = 'pre-service' | 'worship' | 'message' | 'sending'
-export const SERVICE_SECTIONS: readonly ServiceSection[] = ['pre-service', 'worship', 'message', 'sending']
-export const SERVICE_SECTION_LABELS: Record<ServiceSection, string> = { ... }
-```
-
-Adding `'post-service'` to the union + both consts is safe and additive: `ServiceSlot.section` is
-already **optional** (`section?: ServiceSection` on every slot variant), and every consumer already
-handles the section-absent case as a distinct "legacy/ungrouped" bucket — meaning an *existing* v1.0
-service document with no `section` field on its slots, or with only the four existing values, needs
-**zero migration**. No script, no backfill. This is squarely inside D-19's "no migration needed"
-guidance even though it touches `ServiceSlot` (production), because the change is additive to an
-optional field's allowed value set, not a shape change to required data.
-
-**Places that consume `SERVICE_SECTIONS`/`SERVICE_SECTION_LABELS` and must be checked for hard-coding
-of "four":**
-
-| File | What it does | Post-Service impact |
-|------|---------------|----------------------|
-| `src/utils/slotTypes.ts:139-143` (`defaultSectionForPosition`) | Hard-codes `position===7→message`, `position===8→sending`, else `worship` for the **default 9-slot template** (`buildSlots`) | No change needed — the default template has no Post-Service slot; Post-Service starts empty and is populated by the user adding an item to it, same as today's Pre-Service (already documented as having "no default slot" in the same comment block, line 134-137) |
-| `src/composables/useSlideshowAssembly.ts:544-561` (`assembledSections`) | Iterates `SERVICE_SECTIONS` to build the grouped preview | Automatic — adding the 5th value to the const array is sufficient, no code change |
-| `ServiceEditorView.vue` — `showsSectionHeaderAt`, `onSectionChange`'s `<option v-for="s in SERVICE_SECTIONS">` (line 899) | Section-header rendering, section-assignment dropdown | Automatic once `SERVICE_SECTIONS` includes the 5th value — but this is also exactly the code path being rebuilt for the drag-drop fix (§1), so land that first |
-| **Assembler** (`src/utils/slideshowAssembler.ts`) — verify at plan time whether it reads `SERVICE_SECTIONS` directly or only reads `slot.section` per-slide (I did not find a hard 4-count check reading the surrounding code; grep this file specifically before landing) | Section label carried onto `AssembledSlide.section`/`AssembledSection` | Likely automatic |
-| **Plan rail** (`SlidePlanRail.vue`) | Mirrors service order sections in the Slides tab | Must be audited for any `SERVICE_SECTIONS.length` / index-4 assumption |
-| **Print** (`ServicePrintLayout.vue`) | Renders the printable order of service | Must be audited — printed layouts are a common place a hard-coded "last section" heading/footer assumption hides |
-| **Share** (`ShareView.vue`, `QuarterShareView.vue`) | Read-only public view | Same audit as print |
-| **Planning Center export** (`src/utils/planningCenterExport.ts`) | Builds PC plan items from slots | Sections aren't part of the PC item shape today (slots map 1:1 to PC items by kind/position) — verify it doesn't filter/label by section anywhere, but this is lower risk than print/share since PC export is kind-driven, not section-driven |
-
-**Recommended sequencing relative to §1:** land the fixed/immovable five-section ordering model FIRST
-(with only the existing four sections, proving the per-section-container Sortable approach works),
-THEN add `'post-service'` as the fifth container — adding a section to an already-correct structural
-model is a one-line type change plus a UI audit; adding it to the *current* flat-array-with-inferred-headers
-model would just be adding a fifth way for Bug A/B/C to manifest.
-
----
-
-## 3. Hard-locking slide groups to service order — deleting reconciliation
-
-**Confidence: HIGH** on the architecture recommendation and the full consumer enumeration (all found by
-direct grep + read of every hit).
-
-### Recommended architecture: keep groups persisted, but make every service-order write deterministically rebuild them — delete the "diverged, ask the user" branch entirely
-
-`SlideGroup` documents are useful to keep **persisted** (not derive-on-read) because they carry
-per-slide state that has no other home: `label`, `notes`, `audioUrl`/`audioScope`/`audioLoop` per slide,
-`bedAudioUrl`, and (new in v1.4) backgrounds. Deriving on every read would either lose that
-user-authored state or require re-deriving it from nothing, which is what reconciliation's
-`hasCustomization`/`isNonDerivableEntry` machinery exists to protect *today* — and that protection is
-precisely the mechanism the milestone wants removed. The replacement rule is simpler than reconciliation,
-not more complex: **the SONG/SCRIPTURE/IMPORTED slot's *structural* shape (section order, membership,
-count) is not something the user is allowed to diverge from anymore** (per "Song groups read-only in the
-Slides tab," already a v1.4 decision in STATE.md's Key Decisions table). Once slide *structure* can no
-longer diverge, there's nothing left to reconcile — only content-derived entries (`lyric`/`scripture`/
-`imported`/`copyright`) plus user-added ones (`video`, authored `text`) need to be re-merged
-deterministically on every write, always, with no confirm gate, because there is no longer a "the user
-customized structure and might lose it" case for the four content kinds — group-level backgrounds and
-per-slide backgrounds (§7) attach to `GroupSlideEntry`/`SlideGroup` by id, which `deriveGroupEntries`
-already preserves via `buildInitialGroup`'s "content changed, not identity" contract.
-
-Concretely: `reconcileSongGroup`'s **additive merge** logic (the by-`sectionId`, positional-consumption
-merge that already never confirm-gates — `slideGroupMaterializer.ts:238-392`) is close to what should
-remain, **minus the song-identity-swap confirm branch** (lines 250-267) — a song swap becomes an
-unconditional silent replace, matching "Swapping a song silently rewrites its slides" verbatim from
-PROJECT.md. `reconcileScriptureGroup`/`reconcileImportedGroup` (`reconcileUnstableIdGroup`,
-lines 437-458) collapse from a three-branch (unchanged / silent-replace / confirm-required) shape to
-two (unchanged / always-replace) — deleting only the `hasCustomization` branch.
-
-**When this rebuild should run:** the existing wiring in `useSlideshowAssembly.ts` already has the right
-shape — `reconciliationOutcomes` is a synchronous `computed` recalculated on every `service`/store change,
-and `applyReconciliationOutcomes` is the async effect that writes. Keep that plumbing; delete only the
-`needsConfirm` branch and everything that exists to serve it.
-
-### Every consumer of the reconciliation path that must be unwound
-
-| File | Symbol(s) | Disposition |
-|------|-----------|--------------|
-| `src/utils/slideGroupMaterializer.ts` | `hasCustomization`, `isNonDerivableEntry`, `computeLoss`, the `needsConfirm`/`songSwap` branches of `reconcileSongGroup` and `reconcileUnstableIdGroup`, `ReconcileResult.needsConfirm`/`.proposed`/`.loss`/`.songSwap` fields | Delete the confirm branches; keep the additive-merge / signature-diff *replace* logic, made unconditional |
-| `src/composables/useSlideshowAssembly.ts` | `pendingReconciliationsMap`, `PendingReconciliation` interface, `pendingReconciliations` return value, the `needsConfirm` branch inside `applyReconciliationOutcomes` (lines 454-496), `dismissedSignature` comparison (lines 464-478) | Delete entirely — `applyReconciliationOutcomes` becomes "always write the outcome," no map, no confirm state |
-| `src/types/slideGroup.ts` | `SlideGroup.dismissedSignature` field (lines 44-57) | Delete field |
-| `src/stores/slideGroups.ts` | `dismissReconciliation` function (lines 223-226) | Delete function; **keep** `replaceGroupSlides`'s `baseSlides`/`runTransaction` concurrency-merge (lines 278-330) — that's a generically useful concurrent-write guard unrelated to the confirm UX, still needed once writes become unconditional |
-| `src/components/slides/ReconcileConfirmModal.vue` | Whole component | Delete file |
-| `src/components/slides/SlideGrid.vue` | `reconciliationNotice` computed, `showReconcileModal`, `pendingForSelected`, `onApplyReconciliation`, `onDismissReconciliation`, the `<ReconcileConfirmModal>` template block (lines 81-90), the passive-banner block (lines 64-80), `pendingReconciliations` prop | Delete all; `pendingReconciliations` prop removed from the component's prop contract |
-| `src/components/slides/SlidesTab.vue` | `pendingReconciliations` prop passthrough (lines 45, 139) | Delete prop passthrough |
-| `src/components/slides/slideDisplay.ts` | `PendingReconciliation` interface (line 148), `EnsureGroupMaterializedResult` (unaffected — keep; it's the on-demand materializer contract, unrelated to reconciliation) | Delete `PendingReconciliation` |
-| `src/views/ServiceEditorView.vue` | `pendingReconciliations`/`ensureGroupMaterialized` destructured from `useSlideshowAssembly` and passed to `SlidesTab` (lines 1028, 1032, 1393-1394) | Delete `pendingReconciliations` wiring; **keep** `ensureGroupMaterialized` — unrelated (on-demand create, not reconcile) |
-| Tests | `slideGroupMaterializer.test.ts`, `useSlideshowAssembly.test.ts`, `SlideGrid.test.ts`, `SlidesTab.test.ts`, `ReconcileConfirmModal.test.ts`, `slideGroups.test.ts`, and any `EditSlideDrawer.test.ts` cases exercising the confirm path | Every confirm-path test case deleted; additive-merge / signature-diff test cases updated to assert unconditional replacement instead of a `needsConfirm: true` result |
-
-**Note on `EditSlideDrawer.vue`:** grep found it as a *file* referencing reconciliation types (via the
-composable's return shape passed through `SlidesTab`), but its own logic ("Edit in song"/"Edit in
-scripture" links, per-slide label/notes/audio/delete) is independent of the confirm flow — it should
-need no direct code change from this deletion beyond whatever prop-shape ripple `SlidesTab`/`SlideGrid`
-changes cause.
-
-**Build-order dependency (stated explicitly by the downstream-consumer prompt, confirmed by the code):**
-delete reconciliation-confirm *before* building the "hard mirror" unconditional-rebuild behavior — they
-are the same code path (`reconcileGroup`/`applyReconciliationOutcomes`), so this isn't really two
-sequential phases so much as one phase that both deletes the confirm branch and makes the remaining
-branch unconditional in the same change. Land it AFTER §1's ordering-model fix, because "hard-locked to
-service order" only means something once service order itself stops corrupting on drag.
-
----
-
-## 4. Draft-only editing — where the gate genuinely enforces vs. is cosmetic
-
-**Confidence: HIGH.**
-
-### Current state (verified, not assumed)
-
-- **Firestore rules** (`firestore.rules:51-53`): `match /services/{docId} { allow write: if isOrgEditor(orgId); }` — **role-only, zero status check.** Any org editor can write to a `planned` or `exported` service directly today; nothing in the security layer distinguishes status.
-- **Router** (`src/router/index.ts:60-63`): `/services/:id` has `meta: { requiresAuth: true }` **only** — no `requiresEditor`, confirmed by the file's own comment elsewhere ("`/services/:id` has no `requiresEditor` route guard... a non-editor viewer can land here"). The router is not a status-gate candidate at all today; it doesn't even gate role.
-- **Pinia store** (`src/stores/services.ts:84-90`): `updateService(id, data)` is a generic `updateDoc` wrapper with no status awareness — any caller (autosave, drag-drop, AI accept, role override) can write regardless of status.
-- **Component-level gating**: exactly one computed, `isExportedLocked = computed(() => localService.value?.status === 'exported')` (`ServiceEditorView.vue:1357-1359`), consumed by **~15+ separate `v-if`/`:disabled` template checks** scattered through the Service Order tab (song picker, scripture input, sermon passage editor, AI-suggest button, etc.) — each one hand-repeats `authStore.isEditor && !isExportedLocked`. **`planned` is currently NOT locked at all** — only `exported` is. This is both incomplete (doesn't cover the milestone's "leaving Draft locks... " requirement) and purely cosmetic (a network-level write, a stale tab, or a bypassed component still succeeds against Firestore).
-
-### Where the gate belongs — minimum genuinely-enforcing set
-
-1. **Firestore rules — the only layer that is actually enforcing.** Add a status check to the
-   `/services/{docId}` write rule: allow update only when `resource.data.status == 'draft'`, **OR** the
-   write is exactly the reopen-to-draft transition (`request.resource.data.status == 'draft' &&
-   resource.data.status != 'draft'`, i.e. the one mutation allowed to originate from a non-draft
-   document) **OR** the draft→planned/exported transition itself (status changing forward, which today's
-   `onSave()` already special-cases for `lastUsedAt` bumping — see §6). This needs field-level nuance
-   (Firestore rules can inspect `request.resource.data` vs `resource.data` diffs), not just a boolean —
-   plan this as its own rules-design task, not a one-line addition, and pair it with `test:rules`
-   coverage (the project already has a rules-emulator test harness per `storage.rules.test.ts`'s sibling
-   pattern).
-2. **Store-level guard as defense-in-depth, not the source of truth.** `serviceStore.updateService`
-   could early-return (or throw) when attempting to write slot/roleAssignment fields against a
-   non-draft, non-reopening service — this gives a clean error surface for accidental client bugs
-   (e.g., a stray autosave firing after a reopen race) without relying on the Firestore round-trip to
-   catch it. This is a real second layer, not cosmetic, because it runs on every call site (autosave,
-   drag-drop-immediate-save, AI accept, section change) without needing each one to remember to check.
-3. **Component-level disabling is UX, not enforcement — keep it, but centralize it.** Replace the
-   ~15-repetition pattern with a single computed (e.g. `isEditable = computed(() =>
-   authStore.isEditor && localService.value?.status === 'draft')`) consumed everywhere `isExportedLocked`
-   is today, extended to cover `planned` as well as `exported`. This is necessary for a good UI (don't
-   show pickers/inputs a save would reject) but must never be treated as the enforcement layer — it's
-   the layer that's easiest to bypass (devtools, a stale build, a second browser tab).
-4. **Router is not a natural fit** for a *status* gate (it already skips even *role* gating on this
-   route by design — viewers land here too, for read-only). Leave routing as-is; the tab-level
-   `isEditable` computed already accounts for both role and status uniformly.
-
-### The reopen-to-draft transition
-
-This is the one deliberate exception every layer above must special-case identically: `status:
-'planned'|'exported' → 'draft'` must be the *one* write a non-draft service still accepts, and (per
-PROJECT.md's decision table) it must warn when `pcExportedAt`/`pcPlanId` are already set (the service
-was actually exported to Planning Center) so the warning lives at the point of the status-changing
-action, not scattered through field-level disables. Firestore rules need an explicit allowance for
-this exact status transition (see point 1); the store action that performs it should be a dedicated
-`reopenService(id)` (mirroring `setRoleOverride`'s scoped-write precedent already in `services.ts`)
-rather than routing through the generic `updateService`, so the rules-side exception can be scoped
-tightly to that one write shape instead of accepting arbitrary field changes alongside a status flip.
-
----
-
-## 5. PPTX server-side image rendering — integration with the existing pipeline
-
-**Confidence: HIGH** on integration points; the rendering technology choice itself is out of scope for
-this architecture doc (a STACK.md concern).
-
-### Existing pipeline (verified in `functions/src/index.ts` and `pptxParser.ts`)
-
-- `parsePptx` (`onCall`, `functions/src/index.ts:199-202`) — text-only extraction. Auth-gated
-  (`request.auth` + independent `organizations/{orgId}/members/{uid}` re-check, never trusting the
-  client-declared `orgId` alone), storage-path-gated (`storagePath` must start with
-  `orgs/${orgId}/pptx-imports/`), and **never deletes the source object on any path** (explicit
-  invariant in the doc comment, line 148-150 — "this function never issues a delete call at all").
-- Extracted images already live at `orgs/{orgId}/pptx-imports/{importId}/images/{n}.{ext}`
-  (`pptxParser.ts:166, 210`), written via `bucket.file(path).save(imageBuffer, ...)`.
-- `cleanupExpiredMedia` (`onSchedule`, `index.ts:254-301`) is **structurally incapable** of touching
-  this path: `MEDIA_PATH_GUARD = /^orgs\/[^/]+\/media\//` (line 241) is checked *before* any delete
-  decision, and the comment states explicitly it "imports NO Firestore API at all" and only ever
-  lists/deletes objects under `orgs/{orgId}/media/`. `pptx-imports/` is outside that prefix by
-  construction — this is not a coincidence to preserve carefully, it's a structural guarantee already
-  in place.
-
-### Recommended integration for server-side rendering
-
-1. **New Cloud Function, not a modification of `parsePptx`.** Keep text extraction (`parsePptx`) and
-   image rendering as separate callables (or make rendering an optional second phase of the same
-   upload flow) — text parsing is fast/cheap and already ships; full-fidelity rendering (headless
-   LibreOffice/PowerPoint conversion or similar) is a heavier, slower, more failure-prone operation that
-   deserves its own timeout/memory profile (the existing `parsePptx` is already tuned tight at
-   `{ memory: "1GiB", timeoutSeconds: 120 }` — rendering will likely need more of both) and its own
-   error path that degrades gracefully to text-only rather than failing the whole import.
-2. **Rendered images belong under the SAME `pptx-imports/{importId}/` prefix**, e.g.
-   `orgs/{orgId}/pptx-imports/{importId}/rendered/{n}.png` — sibling to the existing `images/` folder,
-   not a new top-level namespace. This is what makes them automatically exempt from
-   `cleanupExpiredMedia` with **zero changes** to that function or its guard regex; putting rendered
-   images under `orgs/{orgId}/media/` instead would be a real, avoidable landmine (that path IS subject
-   to the 14-day retention delete, which is wrong for a permanently-referenced rendered slide).
-3. **Slide model reference point:** `ImportedDeck.slides: (TextSlide | ImageSlide)[]`
-   (`src/types/importedDeck.ts:16`) and `ImageSlide { contentKind: 'image'; imageUrl; altText? }`
-   (`src/types/slide.ts:86-90`) already exist and are exactly the right shape for "one slide, one
-   rendered image." The milestone's "retaining parsed text as a layer" requirement means widening
-   `ImageSlide` with an optional field (e.g. `parsedText?: string`) rather than keeping the parsed text
-   as a separate `TextSlide` sibling — a rendered PPTX slide should be **one** `ImageSlide` entry with
-   its extracted text attached as metadata (searchable/labelable, per the milestone), not two entries a
-   user could get out of sync. This is inside the greenfield boundary (`ImportedDeck`/`Slide` types,
-   Phase 21+, never shipped) — reshape freely, no migration.
-4. **`deriveGroupEntries`'s `'IMPORTED'` case** (`slideGroupMaterializer.ts:75-85`) already maps
-   `deck.slides` 1:1 into `GroupSlideEntry[]` by index — no change needed there once `ImageSlide` carries
-   the rendered URL; the materializer doesn't care whether the image came from text-extraction or
-   full-render, only that `ImportedDeck.slides[i]` resolves to something displayable.
-5. **`sourceSignature`'s `'IMPORTED'` branch** (`slideGroupMaterializer.ts:128-134`) currently signs on
-   `s.contentKind === 'image' ? s.imageUrl : s.body` — this keeps working unchanged if rendered slides
-   stay `contentKind: 'image'`, but must be revisited if `parsedText` is added as a field on `ImageSlide`
-   (decide whether a same-image-different-text edit should count as a signature change; likely yes,
-   since under §3's "always rebuild" model this only matters for *detecting* a genuine re-import, not
-   for gating a confirm).
-
----
-
-## 6. App-wide save-status store + fixing Service Order autosave
-
-**Confidence: HIGH** on the architectural placement question; **MEDIUM** on the specific autosave-bug
-root cause (strong, code-evidenced hypothesis below, not empirically reproduced by running the app in
-this session).
-
-### `useAutoSave` exists and is NOT used by `ServiceEditorView.vue`
-
-`src/composables/useAutoSave.ts` is a real, tested, reusable composable (`status`/`flush`/`cleanup`,
-800ms debounce, inflight guard, first-trigger suppression) — its own doc comment says it was "extracted
-from ServiceEditorView's pattern." It IS consumed by `SongLyricEditor.vue`, `ScriptureSlideEditor.vue`,
-and `CongregationalEditor.vue` (confirmed via grep). **`ServiceEditorView.vue` still hand-rolls its own
-~150-line duplicate** (`autosaveStatus`/`autosaveTimer`/`autosaveInitialized`/`autosaveSaving`/
-`previousService` module-level state, lines 1210-1215, plus the watcher at 1607-1657 and the
-drag-drop-immediate-save special case at 1445-1463) — it predates the extraction and was never migrated.
-This duplication is itself an architectural defect worth fixing regardless of the specific bug below:
-two independent implementations of the same debounce/inflight/status-lifecycle logic will keep drifting
-(the hand-rolled copy has already accumulated its own patch comments — "D-15", "D-16", "D-17" — each one
-a symptom-level fix layered onto growing complexity the shared composable doesn't have).
-
-### Where the global save-status store belongs
-
-A new `useSaveStatus` Pinia store (or a plain composable backed by one shared `ref`, consistent with
-how `authStore`/`songStore` etc. are structured) should sit **above** `useAutoSave`, not replace it:
-`useAutoSave` stays the per-editing-surface debounce/save mechanism (one instance per tab/composable
-consumer — Service Order, Roles, Slides, Song Lyrics, Scripture editor each keep their own save
-lifecycle since they write to different documents/fields on different schedules); the new store is a
-**thin aggregator** each `useAutoSave` instance reports its `status` into (e.g. via a small wrapper that
-calls `saveStatusStore.report(sourceId, status)` inside `useAutoSave`'s own status-setting points, or by
-having each consumer `watch()` its own `status` ref and forward it). The persistent inline "Saving… /
-Saved HH:MM" indicator the milestone wants is then a single global UI element reading the aggregator,
-while each individual editing surface still owns its own debounce timing and dirty-detection — this
-avoids collapsing five independently-timed save flows into one shared timer, which would either coarsen
-the debounce for surfaces that don't need it or create false "Saving…" flicker across unrelated tabs.
-**Toast-on-failure-only** should also route through this same aggregator (a `status: 'error'` value
-`useAutoSave` doesn't currently have — it needs a fifth status added to `AutoSaveStatus`, since today's
-type is `'idle'|'pending'|'saving'|'saved'` with no failure state at all; `flush()`/the debounced saver
-currently let a thrown `saveFn()` propagate as an **unhandled rejection with no status change**, which
-is itself worth fixing as part of this work regardless of the specific song-select bug below).
-
-### The song-change-never-autosaves bug — root-cause hypothesis
-
-Every direct mutation path for `songId` (`onSelectSong` at `ServiceEditorView.vue:1867-1878`,
-`onClearSong`'s no-confirm-needed branch at 1880-1896, `confirmSlotDelete`'s clear-song branch at
-1829-1837, `acceptAiSong` at 2078-2085, all funneling through `onSelectSong`) performs a textbook-correct
-Vue 3 reactive mutation: `localService.value.slots[index] = { ...slot, songId, songTitle, songKey }`.
-Under Vue 3's Proxy-based reactivity this **should** trigger the `deep: true` watcher on `localService`
-(`ServiceEditorView.vue:1607-1657`) exactly like any other field edit — there is no Vue-2-style
-"array index assignment isn't reactive" trap here. Having ruled that out, the strongest evidenced
-mechanism is a **flag-reset race between the two `localService`-adjacent watchers**, both declared in
-this same file:
-
-1. **`onSave()` (line 2658-2702) explicitly destructures `updatedAt` out of the write payload**:
-   `const { id, createdAt, updatedAt, ...data } = localService.value` — the client never locally tracks
-   the true post-save server timestamp.
-2. **`serviceStore.updateService()` (`src/stores/services.ts:84-90`) always writes
-   `updatedAt: serverTimestamp()` server-side**, regardless of what the client sent.
-3. Every save's resulting `onSnapshot` echo therefore lands in `serviceStore.services` carrying a
-   **new, server-resolved `updatedAt`** that the client's `originalService.value`/`localService.value`
-   never held — so `JSON.stringify` comparison in the "remote update" watcher
-   (`ServiceEditorView.vue:1546-1590`, specifically `remoteJson !== localJson` at line 1578) is
-   **virtually guaranteed to be true on every single save's own echo, not just on genuine remote
-   changes from another client.**
-4. That branch (entered because, right after a save completes, `autosaveStatus.value` is `'idle'`
-   or `'saved'` — exactly the condition it checks) reassigns `localService.value`/`originalService.value`
-   **and unconditionally resets `autosaveInitialized = false`** (line 1583) on every one of these
-   self-echoes — i.e., after every save, not just after a genuine concurrent edit from someone else.
-5. The autosave watcher's very next deep-watch trigger — **whatever mutation happens to cause it**,
-   with no way to distinguish "the mutation that reset this flag" from "an unrelated subsequent user
-   edit" — gets silently swallowed by the `if (!autosaveInitialized) { autosaveInitialized = true;
-   return }` guard (lines 1615-1618).
-6. Fields edited by **continuous input** (typing in the notes/sermon-topic textarea, retyping a
-   scripture reference) self-heal: even if one keystroke's trigger lands in the swallowed window, the
-   very next keystroke fires the watcher again with the flag now `true`. **A song pick is a single,
-   discrete, one-shot mutation** — if that one click happens to land in the (short, but real — every
-   save's Firestore round-trip echo, typically well under the 3-second "Saved" fade window) post-echo
-   reset window, it is dropped with **no error, no retry, and no visible symptom other than "it didn't
-   save."** This matches "changing a song currently never fired autosave" far more precisely than a
-   pervasive reactivity failure would (which would also break every other field, and it doesn't).
-
-**Recommended fix, in order of confidence:** (a) stop resetting `autosaveInitialized` on a
-self-echo — compare the incoming snapshot's `updatedAt` against a value the client DID capture from its
-own last successful save (have `onSave()`/the reorder-immediate-save path store the server-confirmed
-`updatedAt` it gets back, or simply compare everything *except* `updatedAt`/`createdAt` when deciding
-`remoteJson !== localJson`, since those two fields are the only ones the client never locally
-tracks accurately); (b) once that's fixed, migrate `ServiceEditorView.vue` off the hand-rolled autosave
-onto the shared `useAutoSave` composable (removing the duplicate `autosaveInitialized` boolean entirely
-in favor of the composable's own, better-isolated, single-purpose guard) rather than patching the
-hand-rolled version a fourth time (D-15/D-16/D-17 are already three prior patches to this same block).
-This should be verified empirically (a manual repro: pick a song immediately after a prior save's echo
-lands, confirm it silently doesn't persist) before committing to the exact fix shape — the mechanism
-above is strongly evidenced but not yet reproduced live.
-
----
-
-## 7. Backgrounds and the 3-dot menu / split drawers
-
-**Confidence: MEDIUM** — the model-shape recommendation is grounded in the existing `SlideGroup`/
-`GroupSlideEntry`/`Song` shapes actually read; the drawer split is a UI restructuring the milestone
-scopes explicitly, and this section describes the *data* implications, not the visual design (that's a
-UI-SPEC concern for the relevant phase).
-
-### Background image data model
-
-Three distinct scopes, matching three distinct existing anchors already in the codebase:
-
-- **Whole slide group** — `SlideGroup` already carries group-scoped media (`bedAudioUrl`,
-  `sourceSignature`) at `organizations/{orgId}/slideGroups/{slotId}` (`src/types/slideGroup.ts:34-61`).
-  A `backgroundImageUrl?: string` field belongs here, at the same level as `bedAudioUrl`, and should
-  follow `setGroupBedMedia`'s scoped-write pattern (`slideGroups.ts:173-204` — `updateDoc` touching only
-  the one field + `updatedAt`, with a skeleton-create fallback for a not-yet-materialized group) rather
-  than a full-document rewrite, for the same concurrency reasons documented there.
-- **Single slide** — `GroupSlideEntry` (`slideGroup.ts:68-80`) already carries per-slide overrides
-  (`label`, `notes`, `audioUrl`, `audioScope`, `audioLoop`). A `backgroundImageUrl?: string` field
-  belongs here too, alongside those, with the SAME "slide overrides group" precedence pattern the
-  existing audio fields already establish (`AudioPlayer`/`SlideBase.audioUrl`'s doc comment describes
-  "two-level precedence — the entry's OWN audio first, falling back to the group's `bedAudioUrl`" —
-  backgrounds should mirror this exactly: per-slide background wins, else group background, else none).
-- **Whole song (set from the Song Lyrics editor)** — this is the one scope with **no existing anchor in
-  the slide-group model at all**, because it needs to live on the canonical `Song`/`SongLyrics` record
-  (`src/types/song.ts`/`src/types/songLyrics.ts`), not on any per-service `SlideGroup` — a song's
-  background must be visible in *every* service that uses the song, matching D002's "single canonical
-  song lyric version… services reference live, not as copies" precedent already governing lyrics
-  themselves. Add `backgroundImageUrl?: string` to `SongLyrics` (greenfield, Phase 18+, no migration per
-  D-19), and have `deriveGroupEntries`'s `'SONG'` case (`slideGroupMaterializer.ts:30-57`) read it as the
-  bottom of the same three-level precedence chain (slide entry → group → song).
-
-**Precedence resolution point:** wherever `assembleSlideshow`/the presentation layer currently resolves
-`audioUrl` per slide (the "slide beats bed" logic referenced throughout `slideGroupMaterializer.ts`'s
-comments) is the natural place to add the equivalent `backgroundImageUrl` resolution — same shape,
-same file, extend rather than invent a parallel mechanism.
-
-### Splitting the Edit Slide drawer
-
-`EditSlideDrawer.vue` (1,050 lines) is currently a single scrimless floating panel
-(`src/components/slides/EditSlideDrawer.vue`, shipped Phase 26) that surfaces every editable concern in
-one scroll region per slide: label, notes, audio scope/loop, an inline-editable text body
-(`drawer-slide-text-editable`, D-13's "one editable exception"), delete, and the "Edit in song"/
-"Edit in scripture" cross-navigation links (`onEditInSong`, line 938-943, via `songEditLink.ts`). It has
-no internal tab component today — the milestone's "single multi-tab Edit Slide drawer" describes this
-one-panel-does-everything shape, not a literal `<Tabs>` widget, and the ask is to split it into two
-separate drawer instances reached via a 3-dot menu instead of the current click-to-select-opens-drawer
-flow:
-
-- **"Edit details"** — label, notes, audio (scope/loop), background (new), delete, and the cross-nav
-  links. This is metadata *about* the slide, independent of its content.
-- **"Edit lyrics"** — the inline-editable text body (today's `drawer-slide-text-editable` path), scoped
-  to the one case D-13 already carves out as editable in-place (a hand-authored text slide — song
-  lyrics themselves stay read-only here per the "song groups read-only in the Slides tab" v1.4 decision,
-  edited only from the Song Lyrics screen).
-
-Given the milestone's requirement that "song groups [are] read-only here," the "Edit lyrics" drawer is
-scoped narrowly — it applies to hand-authored text slides (PRAYER/MESSAGE/HYMN placeholder text, or a
-user-added blank slide) and NOT to SONG-group lyric entries, which route to "Edit in song" instead. This
-means the two-drawer split is less "two views of the same data" and more "two different affordances
-that happen to share the same trigger point (3-dot menu) and the same underlying `GroupSlideEntry`" —
-worth confirming against the Claude Design wireframes (`Slides Tab.dc.html`) at plan time, since the
-exact condition for which drawer a given slide's 3-dot menu opens (or whether both are always available,
-with "Edit lyrics" disabled for read-only content) is a UI decision this research doc can't settle from
-the code alone.
-
----
-
-## Recommended build order
-
-Ordered to respect the dependencies explicitly named in this research and in PROJECT.md's milestone
-scoping — later items build on structural guarantees earlier ones establish:
-
-1. **Fix the `v-for` key** (`slot.kind + '-' + slot.position` → `slot.id`) in `ServiceEditorView.vue` —
-   cheapest possible change, always-correct, unblocks nothing but itself, do first as a quick win that
-   also removes one of the three compounding drag-drop bugs immediately.
-2. **Fixed five-section ordering model** (§1) — per-section Sortable containers (or, at minimum,
-   `evt.oldDraggableIndex`/`newDraggableIndex` + a real multi-step DOM revert), applied to BOTH
-   `ServiceEditorView.vue`'s slot list and `SlideGrid.vue`'s card grid (same root pattern, same fix
-   shape, do together). This is the prerequisite for §2 (Post-Service) and for "slides mirror the plan"
-   meaning anything, so it must land before both.
-3. **Post-Service section** (§2) — additive type change once the ordering model is trustworthy; audit
-   print/share/plan-rail/PC-export for hard-coded four-section assumptions.
-4. **Delete reconciliation, make slide-group rebuild unconditional** (§3) — depends on #2/#3 only in
-   that "service order" must be a stable source of truth first; otherwise independent. Enumerated
-   consumer list above is the removal checklist.
-5. **Draft-only editing + reopen** (§4) — independent of #1-4; can be built in parallel, but sequence
-   its Firestore-rules change carefully against #1's drag-drop-immediate-save path (a reorder mid-flight
-   during a status transition needs the same rule to hold).
-6. **Save-status store + Service Order autosave fix** (§6) — the `autosaveInitialized`-reset race fix
-   should land before the global save-status UI is wired to it, so the UI doesn't faithfully surface a
-   still-broken "silently didn't save" state; migrating `ServiceEditorView` onto `useAutoSave` can follow
-   once the root cause is confirmed.
-7. **PPTX server-side rendering** (§5) — independent of the above; can proceed in parallel, gated only
-   on the `ImageSlide`/`ImportedDeck` type widening being greenfield-safe (it is).
-8. **Backgrounds + drawer split** (§7) — backgrounds' data model depends on §3's group/entry rebuild
-   being the stable, unconditional path (a background set on a `GroupSlideEntry` that reconciliation can
-   still silently discard would be a regression); the drawer split is a UI restructuring best sequenced
-   after backgrounds exist as fields to display, so both land last.
+This is a complete, working mobile-stacking recipe: `flex-col` (stacked, full-width buttons) below the
+`sm` breakpoint, `flex-row flex-wrap` (inline, auto-width, wrapping) at `sm`+, using Tailwind's arbitrary
+child-selector variants (`[&>*]:...`) to force every direct-child button to full-width-and-centered on
+mobile without touching each button's own class list. This is directly reusable verbatim on
+`ServiceEditorView.vue`'s equivalent button rows.
+
+### What's structurally in the way on `ServiceEditorView.vue` today
+
+- The header "Save area" (`ServiceEditorView.vue:96-97`, `<div class="flex items-center gap-3">`) holds
+  Undo, Mark as Planned, and (via `ContextualActionBar.vue`) Save/Suggest/Export — a plain `flex` row
+  with **no responsive stacking at all**, unlike `QuarterView.vue`'s header. On a narrow viewport this
+  row will overflow or wrap awkwardly rather than stack.
+- **Print and Share are still at the page bottom**, not in the top contextual action bar — confirmed:
+  `ServiceEditorView.vue:1315-1364`, a separate `<div class="mt-6 pt-4 ... flex flex-wrap items-center
+  gap-2">` block below the tab content, entirely disconnected from `ContextualActionBar.vue`
+  (`src/components/ContextualActionBar.vue`) which Phase 36 built specifically as "the one shared action
+  bar" (per that file's own doc comment) but which today only carries Save/Suggest/Export/Mark-as-Planned
+  — Print/Share were never migrated into it. Moving them requires: (a) adding `print`/`share`
+  `ActionBarItem`s to `src/views/serviceEditorActionBar.ts` (the `buildActionBarItems` module
+  `ContextualActionBar.vue` already consumes declaratively), and (b) deleting the bottom action block
+  (lines 1315-1364) — Delete stays, per PROJECT.md's target features (only Print/Share move; Undo is
+  demoted to a link, not moved into this bar).
+- **Undo is a full button, not a link**, in the header's Save area (`ServiceEditorView.vue:101-112`) —
+  demoting it per the milestone's target feature is a template/class change at this one site, not a
+  structural one.
+- **The Slides tab** (`SlidesTab.vue`, `SlideGrid.vue`, `SlidePlanRail.vue`) was not independently
+  audited line-by-line for mobile-blocking layout in this pass (out of the explicit `files_to_read`
+  list and beyond this research's time budget) — flag this as an open item for the phase that actually
+  implements mobile support: it should get the same targeted read-before-plan treatment this document
+  gave `ServiceEditorView.vue`'s header/action rows, since "make the Slides tab mobile friendly" is
+  listed as a distinct target feature from the service-edit-screen button stacking.
+
+### Dashboard "Getting Started" panel — confirmed net-new
+
+Grepped `DashboardView.vue` for any existing "Getting Started" content — no match. This is a new,
+self-contained panel (dismissible, presumably via a `localStorage` flag consistent with this
+codebase's client-only-preference conventions — no existing per-user dismissal-flag precedent was found
+in Firestore, and inventing one there would be disproportionate for a UI nicety). Low architectural risk;
+does not depend on any other v1.5 item.
+
+## Suggested build order (dependency-driven, not thematic)
+
+1. **`OrgSettings` type + defaults module + `auth.ts` merge-and-load** (Item 1). Every other settings
+   toggle (AI, PC, Bible version, template, font) writes into this shape — build it first or every later
+   phase re-touches `auth.ts`'s load/reset logic piecemeal.
+2. **Org membership → custom claim** (Item 3), independently of Item 1. This is infrastructure
+   (`storage.rules` + one new trigger + a backfill script) with no dependency on settings and no UI
+   surface of its own — safe to parallelize with Item 1, and worth doing early since Item 4's Storage
+   reads inherit its correctness.
+3. **Share link rework** (Item 2) — resolve the R036 conflict explicitly (this research recommends the
+   separate-document option) before writing code; this is a design decision, not just an implementation
+   task, and blocks nothing else in this milestone.
+4. **PPTX rendered-image display** (Item 4) — the single largest, most structurally invasive item
+   (touches `AssemblyInputs`, both `deriveGroupEntries` and `slideshowAssembler.ts`'s IMPORTED
+   branches, `sourceSignature`, and adds a new client-side render-status resolver). Sequence after
+   Item 3 so Storage reads are claim-based rather than inheriting the emulator-blind cross-service check
+   for a brand-new code path.
+5. **Service item types** (Item 5) — mechanically bounded by the compiler for the exhaustive-switch
+   sites; the risk is entirely in the silent-fallthrough sites enumerated above (Planning Center export
+   above all). Independent of Items 1–4; can run in parallel with them.
+6. **Default service template** (Item 6) — depends on Item 1 (needs `OrgSettings` to exist) but is
+   otherwise small and self-contained (one consumption site, `createService`).
+7. **Global slide typography** (Item 7) — depends on Item 1 for where the setting lives; the CSS
+   custom-property seam itself is greenfield and can be built in parallel with most other items once the
+   setting exists to read.
+8. **Congregational reading divider UX, deterministic multi-image ordering, mobile/layout polish**
+   (remaining target features, not deep-dived here per the `files_to_read` scope) — layer in after the
+   structural items above; mobile/layout work in particular benefits from Print/Share already having
+   moved into the contextual action bar (Item 8's own finding) before restyling that bar for small
+   screens.
 
 ## Sources
 
-- `src/types/service.ts`, `src/utils/slotTypes.ts`, `src/views/ServiceEditorView.vue` — read in full for
-  ordering model, autosave, and section logic.
-- `src/components/slides/SlideGrid.vue`, `EditSlideDrawer.vue`, `SlidesTab.vue`, `slideDisplay.ts` — read
-  for the Slides tab's parallel Sortable instance and reconciliation consumers.
-- `src/utils/slideGroupMaterializer.ts`, `src/composables/useSlideshowAssembly.ts`,
-  `src/stores/slideGroups.ts`, `src/types/slideGroup.ts` — read in full for reconciliation architecture.
-- `src/composables/useAutoSave.ts`, `src/stores/services.ts` — read for save-status architecture.
-- `functions/src/index.ts`, `functions/src/pptxParser.ts` — read for the PPTX/media-cleanup Cloud
-  Function boundary.
-- `firestore.rules`, `src/router/index.ts` — read for RBAC/status-gate enforcement layers.
-- `node_modules/sortablejs/modular/sortable.esm.js` (v1.15.7) — read to confirm `oldIndex`/`newIndex`
-  vs `oldDraggableIndex`/`newDraggableIndex` semantics, the load-bearing evidence for §1.
-- `.planning/PROJECT.md`, `.planning/STATE.md` — milestone scope, D-18/D-19 greenfield/production
-  boundary, v1.3 standing decisions.
+Every file below was read in full or in the cited line ranges during this research pass:
+
+`.planning/PROJECT.md` · `src/stores/services.ts` · `src/types/service.ts` · `src/utils/slotTypes.ts` ·
+`src/views/SettingsView.vue` · `src/components/slides/slideDisplay.ts` · `firestore.rules` ·
+`storage.rules` · `CLAUDE.md` · `src/stores/auth.ts` · `src/types/importedDeck.ts` · `src/types/slide.ts` ·
+`src/types/slideGroup.ts` (partial) · `functions/src/index.ts` (lines 1-130, 130-460, 550-630) ·
+`src/utils/claudeApi.ts` · `src/components/PptxImportModal.vue` · `src/utils/slideGroupMaterializer.ts` ·
+`src/utils/slideshowAssembler.ts` · `src/composables/useSlideshowAssembly.ts` (grep + partial) ·
+`src/stores/importedSlides.ts` · `src/views/ShareView.vue` · `src/components/ServicePrintLayout.vue` ·
+`src/components/ServiceCard.vue` (lines 120-220) · `src/utils/planningCenterApi.ts` (lines 875-1005) ·
+`src/views/ServiceEditorView.vue` (lines 1-140, 800-810, 1190-1200, 1300-1420, 2600-2760, 3160-3420) ·
+`src/views/TeamView.vue` (lines 200-360) · `src/views/QuarterView.vue` (lines 1-35) ·
+`src/components/AppSidebar.vue` (lines 95-135) · `src/components/ContextualActionBar.vue` ·
+`src/components/slides/SlideCard.vue` (lines 1-80) · `src/components/PresentationViewer.vue` (lines 1-120) ·
+`src/assets/main.css` · `src/views/DashboardView.vue` (grep only, no match for existing Getting Started panel)
+
+No web/external research was used for this document — this is a codebase-integration research pass, and
+every claim is traceable to the source files above rather than to general Vue/Firebase ecosystem
+knowledge.
 
 ---
-*Architecture research for: WorshipPlanner v1.4 "Service and Slides"*
-*Researched: 2026-07-28*
+*Architecture research for: WorshipPlanner v1.5 "Settings, Sharing, and Fidelity"*
+*Researched: 2026-08-06*

@@ -1,259 +1,605 @@
-# Pitfalls Research — v1.4 "Service and Slides"
+# Pitfalls Research: v1.5 Settings, Sharing, and Fidelity
 
-**Domain:** Adding drag-and-drop ordering, autosave reliability, a service-lifecycle lock, server-side PPTX rendering, and LLM-assisted content to an existing Vue 3 + Pinia + Firestore worship-planning app
-**Researched:** 2026-07-28
-**Confidence:** HIGH for codebase-specific findings (read directly from `src/` and `functions/src/`); MEDIUM for general SortableJS/Vue-reactivity, headless-LibreOffice, and LLM-integration patterns (established practice, not fetched from a dated source this session — treat as a strong prior, not a citation)
+**Domain:** Adding settings/sharing/fidelity features to a shipped Vue 3 + Firebase church-planning
+app with real production data and a live congregation-facing share surface.
+**Researched:** 2026-08-06
+**Confidence:** HIGH for codebase-grounded findings (read directly from `src/`, `functions/src/`,
+`firestore.rules`, `storage.rules`, `.planning/PROJECT.md`, `.planning/STATE.md`); HIGH for Firebase
+custom-claims mechanics (cross-checked against `firebase.google.com/docs/auth/admin/custom-claims`
+directly, two independent passes).
 
-This file is scoped to the milestone described in `.planning/PROJECT.md` §"Current Milestone: v1.4" and grounded in the actual code paths in this repo (`ServiceEditorView.vue`, `SlideGrid.vue`, `useAutoSave.ts`, `firestore.rules`, `functions/src/index.ts`, `.planning/STATE.md`'s defect history). Every pitfall below is either something this codebase has already done wrong once, a pattern the current code has already half-solved and could regress, or new infrastructure v1.4 introduces with no prior art in this repo.
+This milestone's own scoping record already contains one production incident (`storage.rules`
+deny-everyone, fixed by IAM grant 2026-08-06) and one previously-mislabelled test (see CLAUDE.md).
+Every pitfall below is written against that backdrop — not generic security/mobile advice.
+
+---
 
 ## Critical Pitfalls
 
-### Pitfall 1: SortableJS physically moves DOM nodes Vue owns from state — the canonical reorder-corruption bug
+### Pitfall 1: Custom auth claims lock out signed-in users, or silently under-authorize them
 
 **What goes wrong:**
-SortableJS is a vanilla-JS library: on drag it *mutates the real DOM directly* — it detaches the dragged `<li>`/`<div>` and reinserts it at the drop position, using low-level `insertBefore`/`appendChild`. Vue's renderer, meanwhile, believes it owns that same DOM subtree and computes future patches from its **virtual DOM diff**, which still reflects the *pre-drag* order. The instant SortableJS's real-DOM mutation and Vue's vdom model diverge, every subsequent operation compounds the error: the next reactive update patches the *wrong* physical nodes (because Vue matches by position/vnode, not by what SortableJS actually moved), so drop N lands on the visually-adjacent-but-wrong item, a section can appear to duplicate (Vue re-inserts a node SortableJS already moved, so the same logical item now has two DOM representations) or vanish (Vue removes what it thinks is the stale node, but that node is now hosting different content after SortableJS's move), and the state only re-syncs to reality on full remount — i.e. a page refresh. This is *exactly* the reported v1.3/v1.4 defect: `service ZTXcpNRcJTalEQp42fTx` — Sending mid-list, Message last, Worship twice, correct only after refresh.
-The root cause is never "the reorder handler computed the wrong index" in isolation — it's that **by the time `onEnd` fires, the DOM Vue will diff against next render is already lying to it**, so even a mathematically correct index computation renders against corrupted DOM state.
+Moving org membership onto a Firebase custom claim (`request.auth.token.orgId` /
+`request.auth.token.role` in rules, in place of `firestore.exists()`/`get()`) touches every
+existing session at once. The specific ways this fails in production, all confirmed against
+Firebase's documented behavior:
+
+- **1000-byte payload ceiling.** `setCustomUserClaims()` throws if the JSON-serialized claims
+  object exceeds 1000 bytes. This app's own `users/{uid}.orgIds` field is already an **array** —
+  `auth.ts:86` reads `userData?.orgIds ?? []` and `loadOrgContext` picks `ids[0]` — so a user who
+  belongs to more than one org (the schema already allows it; only the UI never exercises it) needs
+  more than a single `{orgId, role}` pair encoded. A naive `{ orgs: { <20-char-orgId>: 'editor', ... } }`
+  map hits the ceiling at a handful of orgs. Design the claim shape (short org keys, or a capped
+  list, or a single "active org" claim with per-org checks staying in Firestore for anyone in >1
+  org) *before* writing the Cloud Function, not after the first `auth/claims-too-large` error in
+  production.
+- **Claims are stale until the ID token refreshes** — normally up to one hour, and the Firebase SDK
+  does not proactively refresh just because Firestore data changed. A member added to an org (or
+  promoted editor→admin, or removed) will not see the new claim take effect until: (a) their token
+  naturally refreshes, (b) they sign out/in, or (c) the client explicitly calls
+  `getIdToken(true)`/`getIdTokenResult(true)`. **Every existing signed-in tab, right now, has zero
+  claim.** If a rule is written as `isOrgMember(orgId)` → "has the claim," every currently-open
+  session fails every check the instant that rule deploys, until each tab force-refreshes.
+- **The backfill can miss users.** A one-time Cloud Function that iterates `organizations/*/members/*`
+  and calls `setCustomUserClaims` per uid is a full collection-group scan with pagination, retry, and
+  idempotency concerns of its own — an interrupted run silently leaves a subset of users claim-less.
+  There is no current collection-group query anywhere in `src/` to reuse (grep confirmed no
+  `collectionGroup('members')` usage today) — this is new code, unexercised by any existing pattern.
+- **A client can read but never trust its own claims.** `request.auth.token.role` inside
+  `firestore.rules`/`storage.rules` is authoritative because only the Admin SDK can set it; but
+  `getIdTokenResult()` output in the browser is just as trustable as any other server-issued value —
+  the *bug* to avoid is writing app logic that trusts *Firestore-stored* role fields (which the
+  client itself can write, per the existing `isOrgEditor` `write` grant on the `members/{uid}` doc)
+  as if they were the claim. The two must not silently diverge: a member's Firestore `role` field
+  and their claim's `role` need one write path, not two.
+- **Membership changes need a claims refresh path, not a fire-and-forget `setCustomUserClaims` call.**
+  If `setCustomUserClaims` runs but nothing tells the client to refresh, the client's *current*
+  claim (from up to an hour ago) can be more permissive than intended — e.g. a removed member keeps
+  write access to Storage for up to an hour after removal, or (worse for this app) a demoted editor
+  keeps editor-level Firestore rule access even though the UI now hides editor controls.
 
 **Why it happens:**
-SortableJs was built framework-agnostically, before Vue 3's fine-grained reactivity/vdom model existed. Its entire drag mechanic depends on doing what the browser's native drag-and-drop *would* do — move the actual node — and it has no concept of "ask the framework to move this instead." Teams new to the combination assume "since I read the new order in `onEnd` and update the array, everything will resync" — but that assumes Vue's next patch starts from a DOM state matching its vdom snapshot, which is false the moment SortableJS has moved a node.
+Custom claims look like a drop-in replacement for a Firestore membership check, but they are a
+*second, independently-cached* copy of the same fact with its own propagation delay. Teams that have
+only ever used Firestore rules (synchronous, always current as of the write) underestimate the
+staleness window because nothing in local dev (where tokens are freshly minted every session) ever
+exposes it.
 
-**How to avoid:**
-This codebase has **already found and applied the correct fix in two places** (`src/views/ServiceEditorView.vue:1430-1438`, tagged `D-16`, and `src/components/slides/SlideGrid.vue:669-679`) — study and preserve this pattern rather than reinventing it:
-1. In `onEnd`, **before mutating any Vue state**, manually revert SortableJS's DOM move: read `evt.oldIndex`/`evt.newIndex`, find the sibling that occupied `oldIndex` before the move, and `insertBefore`/`insertBefore(...).nextSibling` the dragged `evt.item` back to where it was. This makes the real DOM match what Vue's vdom still believes, so Vue's own reactive re-render — driven purely by the array mutation you make next — is the **single source of truth** and produces the only DOM move that ever happens.
-2. Only *after* the DOM is reverted, splice the underlying array (`slots.splice(oldIndex,1)[0]` then `.splice(newIndex,0,moved)`) and reassign a **new array reference** (`localService.value.slots = reindexed`), not an in-place mutation, so Vue's `key`-based reconciliation regenerates a clean subtree.
-3. **Stable, content-derived keys** — never array index. This codebase already does this correctly (`:key="slot.kind + '-' + slot.position"` in the Service Order list, `:key="card.assembledSlide.slide.id"` in the slide grid). If a future contributor "simplifies" a `v-for` to `:key="index"`, Vue will reuse DOM nodes across a reorder by position rather than identity, silently reintroducing this exact failure class even with the DOM-revert fix in place — flag any `:key="index"` in review as a regression.
-4. `draggable` (the CSS-selector option, not the item type) must scope precisely to reorderable rows and exclude structural siblings (section headers, drop-target placeholders) — this repo's comment at `ServiceEditorView.vue:1422-1427` documents exactly this: `oldIndex`/`newIndex` counting is bound to `.slot-item`, and mixing in non-draggable siblings would shift the index math by however many headers precede the drop point. When Post-Service is added (target feature), audit that its section header is excluded from the `.slot-item` selector the same way the other four are.
-5. For the "five sections permanently ordered, never reorderable" requirement: use SortableJS's `onMove` callback to return `false` for any move that would cross a section boundary or reorder a header, rather than trying to correct it after the fact in `onEnd` — rejecting the move up front avoids ever having to revert a cross-section drop, and avoids a UI flash where the illegal drop briefly "succeeds" visually.
-6. Clone vs move: SortableJS defaults to moving the source node. If a future feature needs "copy this slide into another group" behavior (not currently in scope), that requires `group: { pull: 'clone', put: true }` and is a materially different code path from in-list reorder — don't reuse the reorder `onEnd` handler for it.
+**How to avoid — the safe rollout order:**
+1. **Design the claim shape against the 1000-byte ceiling first**, explicitly handling the
+   multi-org case the schema already permits (`orgIds` array). Prefer a *minimal* claim — e.g. just
+   `{ o: [orgId, ...], r: { [orgId]: 'e'|'a' } }` with short keys — over embedding anything that
+   isn't needed by a rule. If the true byte math is still tight, fall back to "claims cover the
+   *first N* orgs, `firestore.exists()`/Firestore reads cover the rest" rather than erroring.
+2. **Dual-read rules before cutover.** Change `isOrgMember(orgId)`/`isOrgEditor(orgId)` in BOTH
+   `firestore.rules` and `storage.rules` to `OR` the claim and the existing `exists()`/`get()` check
+   — never AND, never claim-only — for at least one full deploy cycle:
+   ```
+   function isOrgMember(orgId) {
+     return isSignedIn() && (
+       orgId in request.auth.token.get('orgIds', []) ||
+       exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid))
+     );
+   }
+   ```
+   This is the only rollout order that cannot lock anyone out: a stale/absent claim simply falls
+   through to the check that has worked in production since v1.0.
+3. **Backfill via a Cloud Function, idempotent and resumable** (checkpoint the last processed uid;
+   safe to re-run). Verify completion by comparing count of claims-set users against count of
+   distinct `organizations/*/members/*` docs — not by "the function returned 200."
+2. **Write path unification.** Every place that changes a member's role or removes a member
+   (`isOrgEditor` writes to `members/{uid}`) must, in the same transaction/trigger, call
+   `setCustomUserClaims` — via a Firestore-triggered Cloud Function (`onDocumentWritten` on
+   `organizations/{orgId}/members/{uid}`), not a client-invoked callable, so a client can never skip
+   the claim update.
+3. **Force-refresh on the client after a relevant write.** Mirror the pattern Firebase's own docs
+   recommend: the member doc write already triggers `onSnapshot` listeners in this app
+   (`auth.ts` subscribes to the member doc) — on a role/removal change observed via that listener,
+   call `getIdToken(true)` proactively so the *acting* user's own session (if they changed their own
+   membership, e.g. leaving an org) doesn't run on a stale token for up to an hour. This does not
+   fix *other* affected users' open tabs (they legitimately wait for natural refresh or their own
+   next sign-in) — that gap is exactly why dual-read must stay in place through the token's max
+   lifetime (1 hour) after cutover, not just through deploy.
+4. **Verify before it can lock anyone out.** Before removing the dual-read fallback: (a) run the
+   emulator rules suite with the claim present, claim absent, and claim stale-but-Firestore-current,
+   proving all three pass; (b) in a real (non-prod) project, sign in as an existing pre-migration
+   user, confirm they are NOT locked out with zero claim; (c) only after 1+ hour (max token lifetime)
+   with dual-read live and no error-rate spike, remove the `exists()`/`get()` fallback in a *separate*
+   deploy from the one that added the claim.
+5. **Rollback plan once tokens carry the claim.** Rolling back `firestore.rules`/`storage.rules` to
+   the pre-claim version is safe and instant (rules deploys are independent of token state — an
+   old-shape rule simply ignores whatever claim is present). The one-way door is the claim *data*
+   itself: once claims are backfilled, leaving them in place while reverting rules is harmless (an
+   unused claim in the token costs nothing). Never remove the dual-read `OR` branch until the team is
+   certain no rollback is coming.
 
 **Warning signs:**
-- Any new `Sortable.create(...)` call in a diff that does **not** contain a DOM-revert block before the state mutation in `onEnd`.
-- A reorder that "looks right immediately but is wrong after the parent re-renders for an unrelated reason" (e.g. an autosave echo lands right after a drag) — this is the divergence compounding.
-- Bug reports phrased as "only wrong after doing it twice" or "only correct after refresh" — this phrasing is the diagnostic signature of vdom/real-DOM divergence, not a logic bug in the reindex function.
-- `v-for` using `:key="idx"` anywhere in a Sortable-managed list.
+- Any `firestore.rules`/`storage.rules` diff that replaces (rather than adds an `OR` to) an
+  `exists()`/`get()` check with a claim check in the same deploy.
+- A backfill Cloud Function with no resumability/idempotency and no post-run count verification.
+- `setCustomUserClaims` called from anywhere reachable by client-supplied input without server-side
+  membership verification first (claims are as dangerous to set wrongly as they are trustworthy once
+  set correctly).
+- No test exercising a user who belongs to 2+ orgs against the real claim-shape byte count.
 
-**How to test reordering deterministically in jsdom (no real drag events exist):**
-jsdom cannot fire real `dragstart`/`dragover`/`drop`/pointer-capture sequences, so integration tests must bypass SortableJS's DOM layer and exercise the pure logic:
-- Unit-test the **pure reorder function** (`reindexSlots`, the `replaceGroupSlides` slide-array splice) directly with plain arrays — no DOM, no component mount. This is exactly what `src/utils/songSectionOrder.ts`'s pure pool+order model already does for the Song Lyrics editor, and it's the right pattern to replicate for Service Order / Slide Grid reorder logic.
-- For the DOM-revert half specifically, either (a) call the component's `onEnd` handler directly with a synthetic `evt` object (`{ oldIndex, newIndex, item: <a real element pulled from the mounted tree> }`) and assert both the DOM order and the store-write payload, or (b) skip DOM assertions entirely for the drag mechanic and instead assert, end-to-end, that **after N sequential simulated reorders (calling the handler N times with fresh indices, not real drags), the final array state matches direct manual computation** — this is what catches the 2→4→8 compounding class of bug, because it forces the same handler to run against its own prior output repeatedly, the same way real rapid drags do.
-- Real OS drag-and-drop remains manual/human-verify only — the existing `25-07-SUMMARY.md` `<human-check>` precedent (real file drop can't be tested in jsdom either) is the template: document it as a manual verification step in the phase plan rather than silently skipping coverage.
-
-**Phase to address:** The phase implementing "fix service-item drag-and-drop so drop lands the dragged item without a refresh to correct the view" (Order structure) and the phase implementing "fix drag-reorder reverting" (Slides interaction). Both touch a `Sortable.create` call site — require the DOM-revert-before-mutate pattern and a same-key-stability check in both.
+**Phase to address:**
+The "move org membership onto a custom auth claim" phase (carried-forward v1.4 item, R062-adjacent).
+This should be its own phase, sequenced *early* in the milestone but not first — it should land
+*after* the sharing rework's Firestore/Storage-rules changes are stable, so this phase isn't
+debugging two rules rewrites in the same window. It must not be bundled with any UI-facing settings
+work; it is pure infrastructure risk and deserves an isolated blast radius.
 
 ---
 
-### Pitfall 2: Optimistic local state races the Firestore `onSnapshot` echo of its own write
+### Pitfall 2: A security-rules change proves it denies the wrong thing, not that it allows the right thing
 
 **What goes wrong:**
-Every local edit (reorder, song swap, slide edit) writes to Firestore; that write triggers `onSnapshot` to fire again with the server's copy, which arrives back at the client asynchronously — sometimes *after* the user has already made a second, newer local edit. If the store or component naively does `localState = snapshotData` whenever a snapshot arrives, a slow echo of edit #1 can overwrite the in-flight edit #2, and the user's second change silently reverts — invisible until they navigate away and back (i.e. "it's fine after refresh," because by then the store has settled to whatever was actually persisted, which may or may not include the lost edit, but a *fresh mount* is where users happen to notice: they open the page again and it's finally right, so it "looks like a page-load bug" when it's actually a race). This is the same failure class as the two-order-fields precedence bug (28-02): two sources of truth (local optimistic state vs. remote snapshot) racing without a documented winner.
+This project has already shipped a rule that denied every legitimate user while the emulator test
+suite reported green, because — per CLAUDE.md — **`firestore.exists()` is permanently inert in the
+Storage emulator** (firebase-js-sdk#6803): a rule reduced to nothing but that cross-service clause
+denies identically whether the membership doc exists or not. All the *deny* test cases passed
+(correctly denying non-members) while both *allow* cases failed (incorrectly denying members) — and
+the failures were mislabelled "needs the Storage emulator" instead of investigated, for an entire
+milestone, until a real PPTX import hit `storage/unauthorized` in production.
 
-**Why it happens:**
-`onSnapshot` fires on *every* write to the document, including the client's own — Firestore doesn't suppress self-echo by default. A naive subscription handler treats every snapshot as authoritative and clobbers local state unconditionally. Debouncing the *write* (so rapid local edits coalesce into fewer network calls) doesn't fix this — it can make it worse, because a debounced burst of edits now produces one delayed write, and if the user makes yet another edit during that debounce window, the eventual echo can race an even newer local change with a wider timing gap.
+**Why it happens:** Deny-path tests are trivially easy to write and pass even when a rule is
+completely broken (an unconditional `allow: if false` also passes every deny test). Allow-path tests
+against a rule with an inert clause fail in a way that *looks* like an environment limitation rather
+than a rule bug, especially when a prior comment in the codebase already says "emulator can't do
+this" for something else.
 
-**How to avoid:**
-- This codebase's `ServiceEditorView.vue` **already implements the correct guard** (lines 1546-1590): the `serviceStore.services` watcher only overwrites `localService`/`originalService` from a remote snapshot when `autosaveStatus.value === 'idle' || autosaveStatus.value === 'saved'` — i.e. never while the user is actively mid-edit (`'pending'`/`'saving'`). This is the pattern to replicate everywhere state is optimistically edited (Slide Grid, Slide edit drawers): **gate remote-snapshot application on a local "dirty/in-flight" flag**, never apply unconditionally.
-- Use Firestore's `metadata.hasPendingWrites` on the snapshot as a second signal, complementary to (not a replacement for) the app-level dirty flag: `hasPendingWrites: true` tells you *this specific snapshot* is the client's own optimistic echo, not a genuinely new remote change — useful for deciding whether to even run the diff/merge logic at all, since these snapshots by definition can't carry someone else's newer edit.
-- **Write coalescing**: a single in-flight-write guard (this repo's `autosaveSaving`/`saving` boolean, already present in both `ServiceEditorView.vue`'s inline autosave and the extracted `useAutoSave.ts` composable) that reschedules rather than double-fires is necessary but not sufficient — it prevents two overlapping writes to the *same* document, but does nothing about a same-document write racing a *different* immediate write (e.g. the drag-and-drop immediate-persist path at `ServiceEditorView.vue:1446-1461`, which bypasses the debounce entirely per decision D-15). Any code path that writes outside the main debounced autosave watcher (immediate-on-reorder is one; a future immediate-on-lock-toggle would be another) must also update `originalService`/clear the debounce timer the same way the reorder handler does, or the two write paths can race each other's "was this dirty" comparison.
-- **Debounce interacting badly with rapid successive drags**: if a user drags three times in under 800ms (the app's default debounce), and each drag also triggers an *immediate* persist (per D-15, reorder bypasses debounce), three immediate writes fire in quick succession — the store must serialize these (queue, not fire-and-forget) or the middle write's slower round-trip can land after the last write's echo and stomp it back. Verify `serviceStore.updateService` either awaits or the calling code awaits before allowing the next reorder to fire a second immediate write.
-- **The diagnostic signature to explicitly test for**: "wrong immediately after a rapid double-edit, but correct after a full page reload" is not a rendering bug — it means the store settled to server-truth on the fresh subscribe, which tells you the bug is a *client-side race*, not a *persistence* bug. Write a repro test that does: edit A → (before A's write completes) edit B → assert final Firestore document reflects B, not a merge or A-wins.
+**How to avoid — the concrete testing discipline for this milestone's rules changes** (custom
+claims, sharing rework, settings docs, service-item type additions all touch `firestore.rules`
+and/or `storage.rules`):
+1. **Every rules change ships with both a positive and negative test, and the positive test is
+   written and run FIRST.** A rule that only has deny tests is not tested — treat "I added deny
+   tests" as incomplete work, not as a checkpoint.
+2. **Any test failure attributed to "environment limitation" must be proven, not asserted.** The
+   proof pattern this project already established (CLAUDE.md, 2026-08-06): strip the rule down to
+   *only* the suspect clause, observe identical pass/fail with the underlying condition proven true
+   by an out-of-band admin read AND proven false — if the rule behaves identically either way, it's
+   provably inert, not merely "probably an emulator quirk." Do this proof before writing the words
+   "known limitation" into any test file or plan.
+3. **When a rule depends on a cross-service read (Storage rule reading Firestore, as `storage.rules`
+   currently does and as any interim dual-read claim rule will also do during Pitfall 1's rollout),
+   assume the emulator cannot validate it until proven otherwise for that specific service pair.**
+   `firestore.exists()` from Storage rules is confirmed inert; do not assume the reverse (Firestore
+   rules reading `request.auth.token`, which is native and always evaluable) has the same problem —
+   custom-claims-based rules are, in fact, the fix for this exact blind spot, which is the whole
+   rationale for Pitfall 1's phase.
+4. **`npm run test:rules` (the real emulator-backed suite) is the gate, not a mental read of the
+   `.rules` file.** Any rules change lands with an actual run of that suite (or
+   `npx vitest run --config vitest.rules.config.ts` against an already-running emulator, per
+   CLAUDE.md) attached as evidence, not "the logic looks right."
+5. **New collections added this milestone (settings doc, org font/template config) need read AND
+   write, allow AND deny tests from the day the rule is written** — not retrofitted later. The
+   `serviceShares`/`quarterShares` rules already in this file are the right model to copy: paired
+   comments explaining *why* each clause exists (e.g. the CR-01 slug-squatting fix), not just what it
+   does.
 
 **Warning signs:**
-- Any `onSnapshot` callback (in a Pinia store or component) that assigns `localX.value = snapshotData` without checking a dirty/in-progress flag first.
-- A save-status indicator that flickers from "Saved" back to "Saving…" or "Unsaved changes" immediately after showing "Saved," with no user action in between — that's the store having just re-applied a stale echo.
-- Any place a write is issued outside the single debounced autosave watcher (immediate-on-reorder is the known existing case) without an equivalent guard against the watcher's next tick re-treating the same change as newly dirty.
+- A rules test file where every test name starts with "denies" / "rejects" / "blocks" and none start
+  with "allows".
+- A code comment or commit message containing "known limitation" or "emulator can't" attached to a
+  test that has never been isolated and proven inert by the strip-down method above.
+- A rules change reviewed only by reading the `.rules` file, with no emulator run cited as evidence.
 
-**Phase to address:** The "Save reliability" phase (repair Service Order autosave, one persistent save indicator) owns the guard pattern generally; the "Order structure" and "Slides interaction" phases (which each add or touch an immediate-write reorder path) must apply the same dirty-flag gate to their own snapshot watchers rather than assuming the Service Order tab's existing guard covers them — Slides tab state is a separate store (`slideGroupsStore`) with its own subscription, not automatically covered by `ServiceEditorView.vue`'s fix.
+**Phase to address:** Every phase that touches `firestore.rules` or `storage.rules` this milestone —
+custom claims, sharing (new `serviceShares`-adjacent fields/collections), settings (new org-scoped
+settings doc), and the Announcements/Miscellaneous item additions if they need new field-level
+validation. This is a *discipline*, not a single phase's deliverable — call it out explicitly in
+every such phase's plan verification checklist.
 
 ---
 
-### Pitfall 3: Integer-position reindexing on every reorder is a full-array rewrite that breaks under concurrent edits
+### Pitfall 3: Persisted-token share-link migration breaks links already in the congregation's hands, or amplifies writes into a cost/loop problem
 
 **What goes wrong:**
-Both current reorder implementations in this codebase — `reindexSlots` (Service Order slots) and the `SlideGrid.vue` `onEnd` handler (`sorted.map((entry, i) => ({ ...entry, order: i }))`) — use **dense integer positions**: every item in the list is renumbered 0..N-1 on every reorder, and the write replaces the *entire* array/collection. This is simple and (with the DOM-revert fix from Pitfall 1) currently correct for the single-editor case this app targets, but it has two structural costs worth flagging even though the team's 2-3 planner scale makes them low-probability today: (a) it means **every reorder write touches every item**, so two people reordering "different" items at nearly the same time (e.g. one drags item 3, another drags item 7) produce two full-array writes that fully overwrite each other rather than merging — the loser's entire reorder is lost, not just the conflicting part; (b) the existing `sourceSignature`/`currentGroup.slides` optimistic-concurrency check in `SlideGroup.replaceGroupSlides` (CR-02, already implemented) detects *that* a conflict happened but the resolution is still "the whole array from whichever write lands last wins" — there's no positional merge.
+Today, `createShareToken()` (`src/stores/services.ts:353`) mints a brand-new random 36-char token and
+a frozen `serviceSnapshot` **every time it's called**, and separately overwrites the memorable
+`serviceShares/{slug}__service-{date}` doc in place. v1.5's fix is to persist one token on the
+service doc (minted once, never rotated) and auto-refresh the snapshot on every service change. Four
+concrete hazards in that migration:
 
-**Why it happens:**
-Dense integer indices are the obvious data model and they're genuinely fine for a single active editor — the real cost only appears under concurrent edits, which is exactly the scenario a full-array-rewrite index can't express incrementally: you cannot describe "item X moved between Y and Z" without touching every index between the old and new position, which is indistinguishable, from a Firestore write standpoint, from "the whole list changed." Teams often reach for dense integers first because it's what an in-memory JS array naturally is, and only notice the write-amplification/conflict cost once multiple editors show up.
+- **Backfilling a token onto existing service documents.** Services that already have a `shareTokens`
+  doc from a prior `createShareToken()` call have a token *already circulated* to the congregation
+  (e.g. printed in a bulletin, texted to a volunteer). If the backfill mints a *second, different*
+  token and only the new one gets persisted on the service doc, the old link (still resolvable
+  because its `shareTokens/{token}` doc is never deleted, per the rules' `allow read: if true`)
+  becomes a permanent stale fork — it will silently stop tracking the service once the new one takes
+  over autosave-refresh, showing whatever plan existed at the moment of the last manual share
+  forever. The correct backfill re-uses the **most recently created** existing token for that service
+  (if one exists) as the persisted token, rather than minting fresh — this preserves every link
+  already in someone's hands.
+- **Auto-refresh on every service write is a second write, and it must not become a trigger loop.**
+  If the refresh is implemented as a Cloud Function trigger (`onDocumentWritten` on
+  `organizations/{orgId}/services/{docId}`) that writes the refreshed snapshot to
+  `shareTokens/{token}` and/or `serviceShares/{slug}__service-{date}`, that is safe *only* as long as
+  neither of those writes touches the `services/{docId}` document itself. If, instead, refresh is
+  implemented as an extra client-side write appended to every service save that happens to touch
+  `services/{docId}` (e.g. caching "last refreshed" on the service doc), a Firestore-triggered
+  function watching `services/{docId}` for exactly that purpose will re-fire on its own write —
+  classic infinite trigger loop. **Design constraint: the refresh write's target must never be a
+  document the refresh trigger itself watches.**
+- **Cost/write amplification.** Every keystroke-debounced service autosave (this app already
+  debounces autosave, per PROJECT.md's save-reliability history) would, under a naive "refresh
+  snapshot on every write" design, also re-run the roster/quarter resolution
+  (`resolveServiceRoleAssignments`, a cross-collection read) and write two more documents
+  (`shareTokens` + `serviceShares`) per save. At current scale (2-3 planners, one org) this is
+  immaterial; the actual risk is *unshared* services (never presented to anyone, no `shareTokens`
+  doc yet) paying this cost on every autosave for no reader. **Only refresh a service that has
+  already been shared at least once** (i.e., a `shareTokens` doc already exists) — do not eagerly
+  create share docs for services nobody has shared.
+- **PII scope creep on refresh.** `createShareToken()`'s `serviceSnapshot` deliberately carries
+  `personNames` only (D-04/D-24 guard — resolved via a `Map<id, name>`, never the raw `Person`
+  object with email/phone/`pcPersonId`). A refresh path implemented as "just re-run the same
+  snapshot-building code on write" is safe *only if it reuses the exact same resolution function*.
+  The hazard is a future edit to that resolver (e.g. someone adding a phone number for a "text the
+  team" feature) that widens what a **public, unauthenticated** read (`allow read: if true` on both
+  `shareTokens` and `serviceShares`) exposes — and because refresh now runs automatically on every
+  save instead of only at explicit "Share" click time, a PII leak introduced this way would appear
+  on *every* service silently and immediately, not just on the next manual share.
 
 **How to avoid:**
-- **Given this app's real scale (2-3 active planners, and the milestone's explicit design decision that a service locks to a single editor outside Draft)**, a full fractional-rank or sparse-index rewrite is very likely **not worth doing for v1.4** — the existing dense-integer + optimistic-concurrency-check pattern is a reasonable, already-proven-in-this-codebase choice, and introducing fractional ranking now would add a new class of bug (see below) to solve a race condition that Draft-only-editing already substantially mitigates. **Recommendation: keep dense integers, but make the "reindex on every reorder" behavior deliberate and tested**, not accidental.
-- If fractional/lexicographic ranking is later adopted (e.g. if Draft-locking doesn't fully eliminate concurrent-editor races, or a future milestone adds real-time co-editing) — its own pitfalls to design against up front: **precision exhaustion** (repeatedly inserting between the same two neighbors, e.g. always dragging into the exact middle, eventually produces ranks that differ only in a trailing digit beyond float/string precision, at which point the two items compare equal and sort order becomes undefined — mitigate with periodic full-list renumbering, or string-based lexicographic ranks with unbounded-length insertion instead of floats) and **ties** (two concurrent inserts choosing the same gap independently produce identical or adjacent-but-unstable ranks — needs a tie-break, typically item ID, baked into the comparator from day one, not bolted on later).
-- **What v1.4 should actually harden**: the *conflict-detection* half (`sourceSignature` comparison) that already exists for slide groups — verify the same pattern is applied to the Service Order slots array once Post-Service is added and once autosave reliability work touches this code path, since a merge-on-conflict for slots does not currently appear to exist (the immediate-write reorder path at `ServiceEditorView.vue:1446` writes `{ slots: reindexed }` directly via `updateService`, with no base-snapshot comparison visible in the excerpt reviewed) — add the same "pass the pre-write snapshot so a concurrent append is detected" discipline `replaceGroupSlides` already has, rather than a bare `updateDoc`.
+- Backfill script: for each service with an existing `shareTokens` doc, reuse its token (most recent
+  by `createdAt` if multiple) rather than minting new.
+- Implement the refresh as a Cloud Functions Firestore trigger on `services/{docId}` writing *only*
+  to `shareTokens/{token}` and `serviceShares/{shareId}` — never back to `services/{docId}` — and add
+  a test asserting the trigger does not re-fire itself.
+- Gate the refresh on "a share already exists for this service" to avoid amplifying every autosave.
+- Add an explicit test (unit or rules) pinning the snapshot shape to `{name, roleId, roleName,
+  group, personNames}` — no email/phone/id fields — so a future PII widening fails CI, not just code
+  review.
 
 **Warning signs:**
-- A reorder write payload that always contains the *entire* ordered collection, with no way to tell from the payload alone what actually moved — makes conflict auditing and rollback harder than it needs to be.
-- Two editors (even accidentally — e.g. one browser tab left open, plus a second tab) each reordering: whichever writes last wins outright, with no warning to the loser that their change was discarded.
+- A backfill script that calls `crypto.getRandomValues` / mints a new token instead of reading
+  existing `shareTokens` docs for the service first.
+- A refresh implementation where the Cloud Function trigger's watch path and write path overlap.
+- Firestore write-count graphs (or local emulator debug logs) showing N writes per single service
+  save where N was previously 1.
+- Any new field on `serviceSnapshot.roleAssignments` beyond `roleId/roleName/group/personNames`.
 
-**Phase to address:** "Order structure" (Post-Service addition touches the slots reindex path) and "Slides interaction" (already has the conflict-detection half — extend the same discipline to slots). Not a phase to introduce fractional ranking in — flag it explicitly as **out of scope for v1.4**, revisit only if real concurrent-editing becomes a requirement.
+**Phase to address:** The "sharing correctness" phase (persisted token, auto-refresh). Backfill
+should be a discrete, reviewable step within that phase — not folded silently into the schema
+migration — precisely because it's the one step that can strand already-circulated links.
 
 ---
 
-### Pitfall 4: A "changing a song never fires autosave" bug is a watch-semantics trap, not a missing feature
+### Pitfall 4: Widening `SlotKind` breaks in the gap between "old data, new code" and "new data, old code"
 
 **What goes wrong:**
-The reported v1.4 defect — "song changes never fired autosave and saves were invisible above the fold" — is the textbook signature of one of a small set of Vue watch-semantics traps, and worth enumerating precisely because this codebase's *current* autosave watcher (`ServiceEditorView.vue:1607-1657`, `deep: true` on the whole `localService` ref) looks correct on its face, which means the bug is either (a) already fixed in this exact spot and the requirement is stale, (b) present in a *different* mutation path that doesn't route through this watcher, or (c) a save-status-visibility bug being misreported as a "save didn't happen" bug. All three are worth guarding against explicitly:
-- **Non-deep watch on an object/array**: `watch(source, cb)` without `{ deep: true }` only fires when the *reference* changes, not when a nested property mutates in place. `useAutoSave.ts` (the extracted composable) does pass `{ deep: true }` — correct — but any *new* call site that adopts the composable and passes, say, a `computed(() => localService.value?.someField)` instead of the whole reactive object trades "watch everything" for "watch one path," and a change to `songId` on a different field than the one being watched would then silently not fire.
-- **Replacing vs. mutating a nested field**: `onSelectSong` (line 1875) does `localService.value.slots[index] = { ...slot, songId: ... }` — a whole-object replacement at an array index. This *does* trigger Vue 3's Proxy-based deep-watch reactivity (array-index assignment is tracked in Vue 3, unlike Vue 2) — but if a future refactor instead does `slot.songId = song.id` (in-place mutation) on an object that was cloned via `JSON.parse(JSON.stringify(...))` at some earlier point and is no longer the *reactive* instance Vue is tracking (a plain clone, not a `reactive()`/`ref()`-wrapped value), the mutation would be invisible to any watcher entirely. Verify any code that touches `SongSlot.songId` continues to mutate the live reactive tree, not a detached clone.
-- **Watching a computed that doesn't track the mutated path**: a computed's dependency tracking is exactly the properties it reads during evaluation. A computed like `hasSermonContext` correctly tracks `sermonTopic`/`sermonPassage` because it reads them — but a *different* computed used as a watch source that happens not to dereference `songId` on its read path (e.g. one that maps slots to `{ kind, position }` only, dropping `songId`) would never re-fire when only `songId` changes, even though the underlying object did change.
-- **Save-status invisibility masquerading as a missing save**: the "Saving soon…"/"Saving…"/"Saved" indicator currently renders inline near the header (`ServiceEditorView.vue:82-104`) and is explicitly called out in PROJECT.md as needing to become "one persistent inline ... indicator anchored to the content being edited," implying the *current* placement is easy to miss when editing a song deep in a long slot list — a save that *did* fire but whose status the user never saw scrolls past unnoticed, and gets reported identically to "it never saved."
+`SlotKind` (`src/types/service.ts:7`) is a closed union:
+`'SONG' | 'SCRIPTURE' | 'PRAYER' | 'MESSAGE' | 'HYMN' | 'IMPORTED'`. Adding `'ANNOUNCEMENT'` and
+`'MISC'` this milestone touches at least six confirmed exhaustive `switch (slot.kind)` sites across
+`slotTypes.ts`, `slideGroupMaterializer.ts` (multiple switches), and others — all currently written
+**without a `default:` clause**, which means TypeScript's exhaustiveness checking will hard-fail the
+build at every site that isn't updated. That is the *good* half of the news: `npm run type-check`
+(the `vue-tsc --build` gate CLAUDE.md insists on, not the narrower `-p tsconfig.app.json` form) will
+catch every missed switch at compile time for code that ships in the same deploy.
 
-**Why it happens:**
-Deep-watch correctness is easy to get right once and silently break later — the failure mode isn't "the watcher is obviously wrong," it's "a refactor six months later swaps a whole-object watch for a narrower computed, or swaps an in-place mutation for a clone-and-replace (or vice versa), and nothing in the type system catches it." This class of bug is invisible in code review unless the reviewer traces reactivity, not just logic.
+The real hazard is runtime, not compile-time, and has two directions:
+- **Old documents, new code:** already-created services will never contain `ANNOUNCEMENT`/`MISC`
+  slots — no migration needed, nothing to backfill. Low risk.
+- **New documents, old code — the actual danger.** Once `ANNOUNCEMENT`/`MISC` slots exist in
+  Firestore, any client still running a **previously-cached JS bundle** (a browser tab left open
+  since before deploy, or a service worker/CDN edge cache serving a stale asset) receives those slots
+  over `onSnapshot` and runs them through *its* compiled switch — which, being the old bundle, has no
+  case for the new kind. Because these are exhaustive switches with **no `default:`**, the *old*
+  bundle's JS (TypeScript exhaustiveness is erased at build time — it produces ordinary
+  fall-through-to-nothing JS, not a runtime guard) returns `undefined` from `slotLabel`, and the
+  grouped-switch sites in `slideGroupMaterializer.ts`/`useSlideshowAssembly.ts` likely fall through to
+  whatever their nearest matched case's behavior is *not* — i.e., silently produce no slide content,
+  no label, or (worse) misroute the slot into the PRAYER/MESSAGE/HYMN "no slide" bucket, making a
+  real Announcement silently vanish from an old tab's rendered service order or presenter view with
+  no error.
+- **The Slides tab / presenter view** is the sharpest edge: a slide-group materializer that doesn't
+  recognize the kind may produce zero slides for it, and a presenter mid-service on a stale tab could
+  simply skip an Announcement or Miscellaneous item with no visible failure.
 
 **How to avoid:**
-- Root-cause the *actual* current defect before assuming a rewrite is needed — write a failing test first: mount `ServiceEditorView`, call `onSelectSong`, advance fake timers past the debounce, assert `serviceStore.updateService` was called. If it already passes, the bug is either already fixed, or lives in a code path this test doesn't exercise (e.g. it only reproduces via the actual `SongSlotPicker` component's emit path, not a direct `onSelectSong` call) — narrow from there rather than guessing.
-- Standardize on **one** autosave mechanism. This codebase currently has *two* independent autosave implementations doing overlapping work: the inline watcher in `ServiceEditorView.vue` (1546-1657) and the extracted `useAutoSave.ts` composable — if v1.4's "Save reliability" phase migrates `ServiceEditorView` onto the composable (a reasonable move, since the composable is cleaner and already has its own test suite), audit every mutation path (song select/clear, sermon context edits, drag reorder's immediate-write bypass) to confirm the new watch source still deep-observes everything the old inline watcher did — this migration is exactly where a "watching a narrower source" regression would be introduced.
-- Prefer `structuredClone` or an explicit deep-merge over `JSON.parse(JSON.stringify(...))` for snapshotting (`originalService`, `previousService` for undo) — functionally equivalent for this data shape, but flag any place a *new* feature introduces a snapshot that then gets edited directly (rather than the live reactive tree) as a reactivity dead-end.
-- **Debounce dropping the final change**: verify the debounce timer is *reset*, not *ignored*, on each new change while pending — this codebase's watcher does `clearDebounceTimer(); scheduleSave()` on every trigger (correct — resets the window rather than saving on a fixed cadence), so the last edit within any burst is what eventually saves. Confirm this survives a migration to the composable, and add a test: rapid-fire three changes within the debounce window, advance timers once, assert exactly one save fired with the *third* change's payload.
-- **Unmount before flush**: `useAutoSave.ts` calls `flush()` in `onUnmounted` only if `status.value === 'pending'` — but `flush()` is itself `async`, and `onUnmounted` does not await async cleanup; if the user navigates away fast enough, the component can unmount and the async `saveFn()` can still be resolving against state that's already torn down (e.g. if `saveFn` closes over `localService.value` and that ref's owning component is gone). Verify `saveFn` doesn't depend on anything that becomes invalid post-unmount, or capture what it needs by value before the async boundary.
-- **Navigating away mid-save**: Vue Router doesn't block navigation by default. If a save is `'pending'` or `'saving'` when the user clicks a nav link, either (a) block navigation with a router guard until flush completes (best UX, most work) or (b) fire-and-forget the flush and accept the small window where the destination page shows stale data until the write completes and `onSnapshot` catches up (acceptable given Firestore's near-real-time sync, but must be a deliberate choice, not an accident) — decide and document which, don't leave it implicit.
-- **Last-write-wins clobbering**: covered in depth under Pitfall 2 — the same dirty-flag gate applies here.
+- Before adding the new kinds, grep every `switch (…kind)` / `switch (…\.kind)` site (six-plus
+  confirmed) and add the new cases in the **same commit**, relying on the compiler to enumerate every
+  site — do not trust memory.
+- **Explicitly decide and document** whether `ANNOUNCEMENT`/`MISC` join the "no slide generated"
+  group (with `PRAYER`/`MESSAGE`/`HYMN`) or the "generates a slide" group (with `SONG`/`SCRIPTURE`/
+  `IMPORTED`) at each of the six sites — PROJECT.md describes both as "plain input boxes," which
+  argues for the no-slide-generated group, matching `MESSAGE`'s current treatment (v1.5 also reduces
+  MESSAGE itself to a plain input box, so precedent already exists in this same milestone).
+- **Mitigate the stale-client window deliberately**, since it cannot be eliminated by server-side
+  code alone: ship a version banner / forced-reload prompt on new deploy (if the app has one) or
+  accept the window and scope it — a service with no Announcement/Misc items visible to a stale tab
+  degrades to "item invisible," not "app crashes," as long as every switch defaults to the no-op
+  branch rather than throwing.
+- Add a unit test per switch site asserting a not-yet-existing hypothetical kind is unreachable
+  (TypeScript will already enforce this, but an explicit "every SlotKind member is handled" test
+  documents the invariant for the next person adding a kind).
 
 **Warning signs:**
-- Editing a field and never seeing the save-status indicator change state at all (not even a same-tab flicker) — strongest signal of a genuinely broken watch, as opposed to an indicator that fired but was easy to miss.
-- A `watch` call site with a `computed` or narrow accessor as its source, added without `{ deep: true }` and without confirming the computed's read-path actually touches the field being edited.
-- Two different autosave code paths (composable + inline watcher) live in the codebase simultaneously past this milestone — a maintenance hazard even if both currently work, because a future fix applied to one silently doesn't apply to the other.
+- Any `switch (slot.kind)` gaining a `default:` clause "to be safe" — this silently defeats the
+  compiler's exhaustiveness check for every *future* kind addition, trading a build-time guarantee
+  for a runtime guess.
+- `npm run type-check` passing while `npx vue-tsc --noEmit -p tsconfig.app.json` also passes — the
+  narrower form should never be treated as sufficient per CLAUDE.md; confirm the wide gate ran.
+- QA that only tests against a freshly-loaded tab — the stale-client failure mode requires
+  deliberately testing with an old bundle against new data (e.g. open the app, deploy, then interact
+  with the already-open tab).
 
-**Phase to address:** "Save reliability" phase, explicitly — this is the phase's stated purpose. Write the repro test *first* (red), then fix, so the fix is provably targeted rather than a speculative rewrite.
+**Phase to address:** The "service items — Announcements/Miscellaneous/Message-as-input-box" phase.
+Do this widening in isolation from the sharing/claims work so a `type-check` failure has one obvious
+cause, and pair it with the "org service template replaces `buildSlots()`" work only if the template
+also needs to reference the new kinds (likely, since a template author would want to include them).
 
 ---
 
-### Pitfall 5: UI-only lock enforcement — store and security rules still accept writes
+### Pitfall 5: A feature toggle hides UI but leaves the code path callable, corrupting data or stranding mid-workflow state
 
 **What goes wrong:**
-The classic mistake: disable/hide the edit controls in the Vue component when `service.status !== 'draft'`, and consider the lock "done." Two other layers can still accept a write to a non-Draft service and neither currently enforces status in this codebase (confirmed by inspection — `firestore.rules` has no `status`-based write guard, and `serviceStore`'s update actions accept whatever payload they're given): (1) the Pinia store's `updateService`/equivalent action has no status check, so any code path that calls it directly — a stale component instance that hasn't re-rendered after a status flip, a background job, a future bulk-operation feature — writes through; (2) Firestore Security Rules are the only enforcement point that's actually adversary-proof (a modified client, a direct REST call, a compromised browser extension can all bypass the Vue layer and the store layer entirely, but cannot bypass rules). Locking only in the UI means the lock is cosmetic, not real — and this specific gap (UI check without a matching store/rules check) is the same *shape* of bug as the reconciliation compounding bug and the two-competing-order-fields bug already found in this codebase: **a rule enforced in exactly one of several places that touch the same data.**
-
-**Why it happens:**
-The UI layer is where "lock" is most *visible*, so it's natural to implement it there first and treat it as done once the buttons are disabled — the store and rules layers require separately remembering that the same invariant needs re-asserting in a different language (Firestore Rules' own DSL) and a different location in the codebase, with no compiler link between the two.
+Both the AI toggle and the Planning Center toggle interact with state that outlives the toggle
+flip:
+- **AI toggle.** `src/utils/claudeApi.ts` is confirmed as the single choke point for all three AI
+  surfaces (song suggestions, scripture discovery, congregational split) — per PROJECT.md's own
+  Key Decisions table, this was chosen specifically because it "doubles as the future paywall seam."
+  The anti-pattern to avoid: gating only the *UI* (hide the "Suggest with AI" button) while
+  `claudeApi.ts`'s functions remain callable from anywhere that still imports them — a component that
+  wasn't updated, a stale cached bundle (same class of problem as Pitfall 4), or a direct
+  store-action call from dev tools would still spend the org's Claude quota/budget after the org
+  believed AI was off. The gate must live *inside* `claudeApi.ts` itself (throw/no-op before any
+  network call), not only in the components that call it — matching the "choke point" framing
+  PROJECT.md already committed to.
+  A second, subtler hazard: **services that already used an AI feature** (an AI-generated
+  congregational split already saved into a scripture slot's leader/congregation text) must not be
+  mutated or blanked when AI is switched off later — the toggle governs *future* AI invocation, not
+  *past* AI-derived content. Turning AI off must never cascade into "delete AI-authored slide text,"
+  which would silently corrupt an already-planned service.
+- **Planning Center toggle.** `pcAppId`/`pcSecret` live on the `organizations/{orgId}` doc
+  (`auth.ts:107-108`) and `hasPcCredentials` gates whether PC calls are attempted. Switching PC off
+  should not delete these credentials — a church "porting off" PC (PROJECT.md: "once they have fully
+  ported off it") may reconsider, and re-entering an API secret is real friction. But the toggle
+  needs to gate every PC-touching code path consistently: CSV import already exists independent of
+  the API path (PROJECT.md: "Complement Planning Center... no API integration, data flows via CSV
+  import" was the *original* constraint, though the export write path
+  `keys().hasOnly(['status','pcExportedAt','pcPlanId','updatedAt'])` in `firestore.rules` shows a
+  real, rules-enforced PC-export status transition exists in production today). **A service already
+  `exported` to Planning Center (status `exported`, carrying `pcExportedAt`/`pcPlanId`) must not be
+  treated as "needs export" or have its exported status silently reverted** when the org turns PC
+  off — that status is historical fact about what already happened, not a live PC connection
+  indicator.
 
 **How to avoid:**
-- Enforce in **three places, deliberately, in this order**: Firestore Security Rules (non-negotiable — the only layer that can't be bypassed by a modified client), the Pinia store action (defense-in-depth, gives a fast client-side error instead of waiting on a rules rejection round-trip), and the UI (disabled controls — purely UX, prevents the user from even trying).
-- Rules pattern: a service-locked-except-draft rule needs to read the *existing* document's `status` field on `update` (`resource.data.status`), not the incoming write's status (`request.resource.data.status`) — the common mistake is checking the new value, which lets a malicious/buggy write flip status *and* mutate other fields in the same request. Also must special-case the **status-transition write itself** ("Reopen for editing" — draft → planned/exported → draft) so the rule doesn't lock out the one write that's supposed to be allowed from a locked state; a clean pattern is: allow the write if `resource.data.status == 'draft'`, OR if the only fields changing are the status field and status-transition metadata (`request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reopenedAt', ...])`).
-- **Slides, ServiceSlot children, and any subcollection/denormalized copy must inherit the same lock** — the milestone explicitly says "Service Order, Slides and Roles all lock" together; if Slides live in a separate Firestore collection (`slideGroups`, per the existing model) keyed by `serviceId`, that collection's rules need their *own* read of the parent service's status (a `get()` call in rules, which has a cost and a recursion-limit consideration — cache it if the same lookup happens for multiple documents in one rules evaluation) rather than assuming the top-level service lock covers them by association.
-- **Locking so hard that legitimate correction becomes impossible**: the milestone's own answer to this is the explicit "Reopen for editing" escape hatch with an export-aware warning — make sure that escape hatch is itself testable and that the warning text actually differentiates "never exported" from "already exported to Planning Center" (PROJECT.md's decision table specifically calls out warning only when *already exported*), so a planner fixing a typo in a never-exported Planned service doesn't get a scarier warning than the situation warrants.
-- **A locked entity is still reachable via deep links, share links, and background jobs** — the read-only share link (existing v1.0 feature) must continue to work read-only regardless of lock status (locking is about *writes*, not reads — don't accidentally gate the share view on `status === 'draft'`), and any Cloud Function that mutates a service (Planning Center export writer, a future scheduled job) must apply the same status check server-side that the rules apply to client writes — a Cloud Function running with elevated/admin credentials **bypasses Firestore Rules entirely**, so if the export function or any other backend job writes to `services/{id}` without its own explicit status check, it is a second, silent bypass of the lock that rules alone cannot catch.
+- Gate `claudeApi.ts` at its own entry points (every exported function checks the toggle and
+  fails soft/no-ops before any network call), not only at call sites.
+- Never write a migration or toggle-flip handler that mutates already-saved AI-derived slide content
+  or already-exported PC status fields. The toggle changes future behavior only.
+- Write an explicit test: "toggle AI off, call a `claudeApi.ts` function directly (bypassing UI),
+  assert it does not make a network request" — this is the only test that actually proves the choke
+  point, as opposed to testing that a button is hidden.
+- Keep `pcAppId`/`pcSecret` on the org doc even when the toggle is off; only gate their *use*.
 
 **Warning signs:**
-- A `firestore.rules` diff that adds a `status`-based `allow update` condition to `services/{id}` but no corresponding condition on `slideGroups/{id}` or wherever Slides/Roles data actually lives.
-- Any Cloud Function that writes to a locked collection without itself checking `status` — Cloud Functions Admin SDK writes bypass Rules, so this is a real, not theoretical, escape hatch for the lock.
-- A store action (`updateService`, `updateSlideGroup`, etc.) with no client-side status guard — relying on rules alone to produce a *permission-denied* Firestore error is functionally correct but produces a worse error UX (an unhandled promise rejection or a generic toast) than a store-level early return with a specific message.
+- A toggle implementation that lives only in `v-if`s in `.vue` files, with no corresponding guard in
+  `claudeApi.ts` or the PC API utility.
+- Any code path (migration, toggle handler, "reset" button) that writes to a scripture slot's
+  congregational-split fields or to a service's `pcExportedAt`/`pcPlanId`/`status` in response to a
+  *settings* change rather than a direct user edit of that service.
 
-**Phase to address:** The "Service lifecycle" phase (Draft-only editing, Reopen-for-editing). This phase should be planned to touch `firestore.rules`, `firestore.rules.test.ts` (which already exists in this repo per `STATE.md`'s test-baseline notes — extend it, don't just add UI tests), the relevant store actions, and any Cloud Function that writes to a locked collection, as one unit — not as a UI-only task with rules deferred to "later."
+**Phase to address:** The "Settings — AI/Planning Center toggles" phase. Write the choke-point test
+before building the UI toggle, not after — it is cheap now and expensive to retrofit once multiple
+call sites exist.
 
 ---
 
-### Pitfall 6: Headless PPTX-to-image rendering in Cloud Functions — cold starts, OOM, missing fonts, and re-render cost
+### Pitfall 6: Self-hosted fonts render the projector or the print layout with the wrong font mid-service
 
 **What goes wrong:**
-v1.4 adds server-side rendering of imported PowerPoint decks to images for true visual fidelity (backgrounds, fonts, charts, effects) — genuinely new infrastructure for this codebase (the existing `functions/src/pptxParser.ts` only extracts text; there is no rendering pipeline today). Headless LibreOffice (the standard approach for server-side PPTX→image conversion, since Microsoft's own renderer isn't available server-side) inside a serverless Cloud Function carries several well-known failure modes that will surface here specifically because this app's decks are church-service slide decks — often reused week to week with images, video-thumbnail frames, and custom fonts, which are exactly the inputs that stress this pipeline hardest:
-- **Cold starts**: LibreOffice is a heavyweight process (hundreds of MB, seconds-long startup) — a cold Cloud Function instance paying that startup cost on top of Cloud Functions' own cold-start latency can push a single import well past a synchronous request's reasonable timeout, and doing this per-invocation (rather than keeping a warm instance/profile) multiplies the cost.
-- **Memory limits / OOM on large decks**: a deck with many high-resolution background images or embedded video-thumbnail frames can exceed a Cloud Function's memory allocation during LibreOffice's rendering pass, producing a hard OOM kill with no partial output and (if not handled) no useful error surfaced to the user — just "import failed."
-- **Missing Microsoft fonts causing silent layout substitution**: PowerPoint decks routinely use fonts (Calibri, Segoe UI variants, or a church's own brand font) that are not open-source and not installed in a stock Linux container. LibreOffice substitutes a fallback font *without erroring* — the render "succeeds" but text overflows its box, wraps differently, or shifts position relative to the original, which is a **correctness** failure indistinguishable from success unless someone visually compares against the source deck. This is the single highest-risk failure mode for this specific feature, because it fails silently and the whole point of the feature is "look like the original PowerPoint."
-- **Concurrency and temp-file cleanup**: LibreOffice's headless mode uses a user profile directory and lock files: running multiple conversions concurrently against a shared profile directory can corrupt or deadlock the conversion (a well-documented LibreOffice headless issue) — each concurrent invocation needs its own isolated profile/temp directory (`-env:UserInstallation=file:///tmp/lo-<uuid>`), and that directory must be reliably cleaned up on both success and failure paths, including a function timeout mid-render, or Cloud Functions' ephemeral `/tmp` (limited size, shared across warm-instance reuse) fills up across invocations on the same warm instance.
-- **Function timeout on long decks**: a deck with many slides each needing a render pass can exceed a function's max execution time; the fix is either raising the timeout (with a cost/latency tradeoff) or converting the import into an async job (write "processing" status, render in the background — possibly via a longer-timeout 2nd-gen function or a Cloud Run job — then update status and notify), which is a materially different architecture than a synchronous request/response import.
-- **Orphaned images in Storage when a job fails midway**: if the render pipeline uploads each rendered slide image to Storage as it completes (rather than atomically at the end), a failure partway through (OOM, timeout, LibreOffice crash) leaves a partial set of slide images in Storage with no owning, complete deck record — orphaned blobs that a naive cleanup job might not even find (they don't match the expected "N images for deck of N slides" invariant, so a completeness check could catch them, but a simple "does this file have an owner reference" check would not, since the reference *was* being written, just for slides 1-5 of 12). This is the same *class* of bug as the media-cleanup dry-run default incident (STATE.md) — a partial-failure path that leaves orphaned Storage objects, discovered only when a cleanup/audit process runs and either falsely deletes something live or (worse, per that incident's actual root cause) defaults to deleting more than intended. **Any deletion path this new orphan-cleanup need creates must default to dry-run/report-only, exactly like the fix already applied to `cleanupExpiredMedia`, and its doc comment must be verified against its actual code default before shipping** — that mismatch is precisely what caused the prior incident.
-- **The cost trap of re-rendering on every read**: if rendered slide images aren't cached/persisted and instead regenerated whenever the Slides tab or Present view is opened, cost scales with *views* rather than *imports* — for a deck referenced across a rehearsal night and Sunday morning by every team member with app access, this can multiply invocations dramatically for zero benefit (the rendered output doesn't change between views). Render once at import time, persist the images to Storage, and store the resulting URLs on the slide/deck record — treat re-render as an explicit user action (re-import), never an implicit side effect of viewing.
-
-**Why it happens:**
-LibreOffice-in-serverless is a well-trodden but consistently under-scoped integration: it "works in local testing with one small deck" and the failure modes above only appear at production scale (concurrent users, larger real decks, fonts the test deck happened not to use) — which is exactly the gap between a demo and a shipped feature.
+The milestone decision already commits to curated self-hosted `woff2` files specifically because "a
+projector without internet at service time cannot fetch a remote font" (PROJECT.md). The specific
+failure modes this must guard against:
+- **FOIT/FOUT on the presenter view.** If the font isn't loaded before the presenter view first
+  paints a slide, the browser either shows invisible text until the font loads (FOIT, with the
+  default `font-display` behavior in many browsers) or shows a fallback-font flash that then reflows
+  (FOUT) — either is visible to the congregation on a live projector, which is a materially worse
+  failure than a slow page load anywhere else in the app.
+- **A font must be loaded before a slide is *measured*, not just before it's painted.** Any slide
+  layout logic that measures text (auto-sizing lyrics to fit a slide, wrapping congregational-reading
+  text) that runs against a fallback font's metrics before the real font swaps in will compute wrong
+  wrap points/sizes, then visibly reflow once the real font arrives — or, if the measurement result is
+  cached/persisted rather than recomputed live, could bake in a wrong layout that only self-corrects
+  on next edit.
+- **Print has the same measurement hazard** without even the FOUT/FOIT recovery — a print job that
+  starts before the font is loaded may rasterize with the fallback font permanently (no repaint on a
+  printed page).
+- **Licensing/attribution.** Self-hosted `woff2` files carry redistribution terms independent of
+  where they're served from — bundling a font that is not licensed for embedding/redistribution (as
+  opposed to just "free to view on a webpage via a hosted service") is a real legal exposure distinct
+  from the runtime font-loading problem. `Inter` (named as the Helvetica Neue stand-in) is
+  SIL-licensed and safe to bundle, but any additional font added to the "curated list" needs the same
+  check before being added, not assumed by analogy.
 
 **How to avoid:**
-- Treat this as background-job architecture from the start, not a synchronous Cloud Function call: import triggers a job, the job renders and uploads images with a completeness marker (only flip the deck's status to "ready" after every expected image is confirmed uploaded), the client polls or subscribes to that status via the existing `onSnapshot` pattern this app already uses everywhere else.
-- Pin a specific font set inside the function's container image (install common Microsoft-compatible open alternatives — e.g. `fonts-crosextra-carlito`/`fonts-crosextra-caladea` as Calibri/Cambria metric-compatible substitutes — explicitly, don't rely on whatever base image ships) and, critically, **surface font substitution to the user** rather than silently accepting it: if feasible, have the render step report which fonts in the source deck weren't available server-side, so "looks like the original PowerPoint" has an honest caveat when it can't be guaranteed rather than a silent visual drift.
-- One isolated temp/profile directory per invocation, deleted in a `finally`, with a startup sweep of `/tmp` for orphaned directories from a prior invocation that crashed before cleanup ran (warm-instance reuse means `/tmp` state can persist across invocations on the same instance).
-- Size/slide-count guard before attempting the render (reject or route to async-with-progress above a threshold) rather than discovering the limit via a production OOM.
-- Retained text layer (already a stated v1.4 decision — "keep parsed text as a searchable/label layer") must be derived from the *existing* `pptxParser.ts` text-extraction path, not re-parsed from the rendered images (OCR) — keep these as two independent, already-proven-separately pipelines rather than making the text layer depend on the new, riskier rendering pipeline succeeding.
+- Use the CSS Font Loading API (`document.fonts.load(...)`/`document.fonts.ready`) to gate the
+  presenter view's *first paint* — do not rely on `@font-face` + `font-display: swap` alone, since
+  swap is exactly the FOUT behavior to avoid on a projector.
+- Any measurement-then-persist logic (auto-fit sizing) must await `document.fonts.ready` before
+  measuring, every time it measures — not just once at app boot, since the presenter/print views can
+  be the first place in a session that font is needed.
+- Preload the org's configured font (`<link rel="preload" as="font">` or equivalent) as soon as the
+  org's font setting is known — on app boot from the settings store, not lazily at first slide
+  render.
+- Record the license for every font added to the curated list in the codebase (a comment or a data
+  file next to the font list), and verify embedding/redistribution rights before adding — don't
+  assume "free download" implies "free to bundle."
 
 **Warning signs:**
-- Any Cloud Function invoking `soffice --headless` without an explicit `-env:UserInstallation=file:///tmp/<unique>` argument.
-- A deck-import success path that doesn't verify slide-image count against expected slide count before marking the deck "ready."
-- Any new Storage-deletion code (orphan cleanup for failed renders) that doesn't default to dry-run — cross-check its doc comment against its actual code default line-by-line before merge, given this exact mismatch already shipped once in this codebase.
-- No visible cost/invocation-count monitoring plan for the render function once shipped — this is the kind of feature that can produce a surprise Cloud Functions bill if re-render-on-view sneaks in.
+- A presenter view or print layout with no `document.fonts.ready`/font-loading gate before first
+  render.
+- Visible text reflow in manual testing of the presenter view on a fresh page load (throttle network
+  to reproduce reliably).
+- Any curated font added without a recorded license check.
 
-**Phase to address:** The phase implementing "PowerPoint import renders slides server-side to images" (Smarter content / Presentation correctness area). This phase should explicitly budget time for a real multi-font, multi-slide test deck (not a 2-slide test fixture) and should not be scheduled adjacent to a tight deadline — it's the highest-uncertainty item in the milestone and the prompt's own quality gate agrees ("what phases need deeper research flags").
+**Phase to address:** The "Slides slide-out — global font family/weight/size" phase, specifically its
+UI-research sub-step (PROJECT.md: "Final list settled by the UI research phase against projection
+legibility") — legibility research and font-loading-safety research belong together, not split
+across phases, since both gate the same curated list.
 
 ---
 
-### Pitfall 7: LLM-generated content — determinism, injection, cost, latency, verbatim-scripture correctness, and graceful degradation
+### Pitfall 7: A second Bible translation creates copyright exposure on cached/persisted text and stale slides when a church switches translations
 
 **What goes wrong:**
-v1.4 adds LLM-assisted congregational reading splits (leader/congregation) for scripture, and this domain has a sharper version of the usual LLM pitfalls because the input text (scripture) has a **correctness requirement stronger than typical LLM use cases**: the passage displayed to a congregation must be verbatim to the source translation — an LLM that paraphrases, "improves," or subtly mis-transcribes even a word while splitting a passage into reading parts is not a UX nitpick, it's a doctrinal/trust problem for a worship-planning tool used in front of a live congregation. Specific failure modes:
-- **Non-determinism where users expect stable output**: re-running the same split on the same passage can (with any temperature > 0) produce a different leader/congregation partition each time. For an *editorial* UI where a planner reviews and might re-generate, unpredictable churn on identical input erodes trust ("why did it change the split when I didn't change anything") even when both outputs are individually valid.
-- **Prompt injection from scripture/user text**: scripture text itself is low-risk (a fixed, curated corpus via the ESV API), but any user-editable text that flows into the same prompt (a sermon topic field, free-text passage search, a slide's manually-added notes) is untrusted input and could contain text crafted to override the system prompt's instructions. Given this app already proxies Claude API calls through a Cloud Function (confirmed in `functions/src/index.ts`), the injection surface is whatever user-controllable strings get concatenated into that request — treat every user-editable field feeding an AI-assist prompt as adversarial, not just as "probably fine because our users are trusted church staff."
-- **Cost per call**: this codebase already uses `claude-haiku-4-5` for existing AI features (song/scripture suggestions, per `src/utils/claudeApi.ts`), consistent with the project's stated "cost-efficient haiku model" decision — the scripture-splitting feature is a good fit for the same tier: it's a well-scoped, bounded-output classification-adjacent task (assign each verse/clause to leader or congregation), not open-ended generation, and per the `claude-api` skill's current model guidance, Haiku 4.5 ($1/$5 per MTok) is the right cost tier for this shape of task versus Sonnet 5 ($3/$15, intro $2/$10 through 2026-08-31) — reserve Sonnet-tier only if Haiku's split quality proves inadequate on real passages during evaluation, don't default to a bigger model preemptively.
-- **Latency in an interactive editor**: a synchronous "click → wait → see split" flow blocks the planner's editing flow; even a fast Haiku call has real network + inference latency (typically low hundreds of ms to a couple seconds) — the UI must show a clear loading state and must not lock the rest of the editor while waiting, consistent with this app's existing "AI is additive, never blocking" principle (already a Key Decision in PROJECT.md for the song/scripture suggestion features).
-- **Hallucinated or altered scripture text**: the two ways this can go wrong are subtly different and need different mitigations — (a) the LLM *reproduces* the passage text itself from its training data rather than the text you gave it, which can introduce translation drift (a different Bible translation's wording) or outright misremembering; (b) the LLM's assigned split introduces formatting artifacts that look like altered text (e.g. paraphrasing a verse into the "leader" line while quoting it differently in the "congregation" line, if the model is asked to *repeat* the text rather than just *label* it).
-- **Graceful degradation**: consistent with this app's existing "AI is additive, never blocking" principle, the congregational-reading-split feature must never be a hard dependency for using a scripture slide — if the Claude API call fails, times out, or the proxy Cloud Function errors, the scripture slide must still render and be usable (presumably falling back to no split / single-block reading, or the last manually-edited split), not block the editor or the presentation.
-
-**Why it happens:**
-LLM features get designed around the "generate content" mental model even when the actual task is closer to "structure/label content I already have" — and the distinction matters enormously for correctness risk. Teams default to letting the model regenerate text because that's the most common LLM UX pattern, without noticing their specific task doesn't need generation at all.
+`src/utils/esvApi.ts` fetches passage text fresh via `/api/esv/...` on every call (no client-side
+cache observed) — but once fetched, that text is **persisted** into scripture slots and slide-group
+documents (confirmed: scripture text flows into slides via `slideGroupMaterializer.ts`/
+`useSlideshowAssembly.ts`, which are the exhaustive-switch sites from Pitfall 4). ESV and NLT are
+separate copyright holders (Crossway vs. Tyndale House) with independently-negotiated API terms —
+common real-world restrictions include a maximum verse/word count per single display and a required
+attribution/copyright notice on each display. Two concrete hazards specific to *adding* NLT to an
+app that already persists ESV text:
+- **Persisting fetched text beyond what each license permits** is a real risk distinct from simply
+  *displaying* it: this app already writes passage text into Firestore documents (slide groups),
+  which is storage, not just transient display — the NLT API terms (and, on renewal, the ESV terms)
+  need to be checked for whether *storage* (as opposed to real-time API display) requires different
+  handling, since `NLT_API_KEY` joining `.env.local` (already decided, per PROJECT.md) only covers
+  fetching, not the storage question.
+- **Switching a church's translation setting does not retroactively touch already-generated slides.**
+  A scripture slide generated from an ESV passage, viewed after the org's setting flips to NLT,
+  should keep showing its already-persisted ESV text (with ESV's attribution) — not silently
+  re-fetch/re-render as NLT (which would violate the *original* passage's boundaries, e.g. exact
+  verse start/end, that were chosen against ESV's text) and not show mismatched attribution (ESV text
+  with an NLT copyright notice, or vice versa). Each already-generated slide needs to remember which
+  translation it came from, independent of the org's *current* setting, and render the correct
+  attribution regardless of which translation is currently selected in Settings.
+- **Re-generating** an existing scripture slide after a translation switch (a normal user action —
+  editing a scripture item) should re-fetch from the newly-selected translation and require the same
+  6-10-verse-range validation this app already applies to ESV, not silently reuse cached ESV text
+  under an NLT label.
 
 **How to avoid:**
-- **Never let the model regenerate the scripture text.** Send the verbatim passage text (already fetched from the ESV API, per this app's existing scripture-selection flow) as input, and constrain the model's *output* to structural metadata only — e.g. an array of `{ text_span_start, text_span_end, speaker: "leader"|"congregation" }` offsets, or verse/clause **indices** into the source text, never free-form re-typed text. Then the app code slices the *original, known-correct* string using those indices/offsets to build the displayed slides. This makes hallucinated wording structurally impossible — the model can mis-assign a speaker, but it cannot alter a single character of what's displayed, because displayed text never comes from model output. **Use structured outputs / `output_config.format` (or strict tool use) to enforce this schema** — reject or retry outputs that don't validate, don't trust free-text JSON-in-a-string parsing for something this correctness-sensitive. If offset-matching against the model's output ever fails to validate against the source text (e.g. an index out of range, or a reconstructed slice that doesn't byte-match the original passage), treat it as a hard validation failure and fall back — never silently accept a near-match.
-- **Determinism**: use `temperature`/sampling controls consistent with what this task needs — for the leader/congregation split, prefer the lowest reasonable `effort`/no-sampling-randomness setting available on the deployed model, and cache the result per passage (same passage + same split algorithm version → same cached split) so re-opening the same scripture slide doesn't silently re-roll a different partition; only regenerate on an explicit user "re-split" action, and even then a structural task like this should be stable across calls if driven mostly by the passage's own grammatical structure (dialogue markers, punctuation) rather than creative judgment — validate this empirically against real passages during implementation, don't assume it.
-- **Prompt injection**: keep the scripture text and any user-editable text (sermon topic, notes) in clearly delimited, separate positions in the prompt from the system instructions, and do not let user text alter the *output schema* the app expects — validate the model's response against the structured schema regardless of what the input contained, so even a successful injection attempt can't produce output the app will render as if it were scripture. Given the existing Cloud Function proxy already centralizes all Claude calls, add this validation at that single choke point rather than per-caller.
-- **Cost**: Haiku-tier per the existing app-wide precedent; batch nothing here (this is inherently a small, single-passage, interactive call, not a batch-processing shape) — the Batches API and cost-saving async patterns discussed generally for LLM integrations don't apply to this specific feature.
-- **Latency UX**: show a distinct loading state on the specific slide/section being split, not a full-page spinner; disable only the "generate split" action while in flight, leave the rest of the editor interactive (consistent with the "AI is additive, never blocking" principle already established in this codebase).
-- **Graceful degradation**: wrap the Claude API call (through the existing proxy) in the same try/catch-and-fall-back pattern this app already uses for AI song suggestions — on any failure, leave the scripture slide in its prior state (single block or last saved split) and surface a non-blocking error (a toast or inline note), never an exception that breaks the editor.
+- Store the source translation code (`'ESV'`/`'NLT'`) alongside any persisted scripture text, at the
+  slide/slot level, not only at the org-settings level — this is the field that resolves the
+  "does switching invalidate existing slides" question without ambiguity.
+- Render the copyright/attribution notice from the *persisted* translation code on each slide, never
+  from the org's current setting.
+- Confirm with both API terms (ESV already integrated; NLT is new) whether Firestore persistence of
+  fetched text is within the redistribution/display license, not just within a "per API response"
+  read limit — this is a "verify before shipping," not an assumption, since NLT's terms may differ
+  from ESV's even though both are proxied through the identical Cloud Function pattern.
 
 **Warning signs:**
-- Any prompt that asks the model to "repeat the passage split into parts" rather than "return indices/spans into the following exact text" — the former re-types scripture through the model, the latter never does.
-- A scripture-split call site with no timeout/error handling that would leave the editor in a stuck loading state on API failure.
-- Regenerating the same passage's split producing visibly different results between two consecutive clicks with no input change — signals under-constrained sampling for a task that should be near-deterministic.
+- A scripture slide document with no field recording which translation its text came from.
+- A translation switch that causes previously-generated slides to change on the next page load with
+  no user action.
+- Any UI surface displaying scripture text with no visible copyright/attribution string.
 
-**Phase to address:** The "Smarter content" phase (LLM-assisted congregational reading splits). Consult the `claude-api` skill again at implementation time for the exact current SDK call shape (model ID, `output_config.format` syntax) since API details in this reference file may drift before that phase is planned.
+**Phase to address:** The "ESV/NLT Bible version selection" phase. The per-slide translation-source
+field is a schema decision that should be made in this phase, not deferred, since retrofitting it
+onto slides already created during this same milestone (with only ESV available) is exactly the
+kind of migration Pitfall 4's "old documents, new code" pattern warns about.
 
 ---
 
-### Pitfall 8: Deleting the reconciliation/confirm flow can leave orphaned fields, dead imports, vacuous tests, and dangling UI entry points
+### Pitfall 8: Mobile/touch retrofit of SortableJS-based drag-and-drop reproduces this app's own documented index bugs
 
 **What goes wrong:**
-v1.4 explicitly removes the entire reconcile/confirm review flow (`ReconcileConfirmModal.vue`, `SlideGroup.dismissedSignature`, `dismissReconciliation`, `ReconcileResult.songSwap`, the `reconcileSongGroup` function itself, and the whole "diverged group shows a passive banner" UX) in favor of hard-locking slide order/membership to the service order with no review step. This is exactly the shape of removal that's already bitten this codebase once: **Phase 27's Service Order rename/strip-slide-editing work correctly anticipated dangling references** (it explicitly deleted `ImportedSlideEditor`, `SlotMediaAttachment`, and `SlideshowPreview` *with their tests*, and caught two false ROADMAP premises before they caused breakage — see STATE.md's Phase 27 entry). Apply the same discipline here, because the reconciliation flow is more deeply threaded through the data model than the Phase 27 removals were: `SlideGroup.dismissedSignature` and `ReconcileResult.songSwap` are **persisted Firestore fields**, not just in-memory component state, so removing the code without a plan for the field leaves it sitting in every existing `SlideGroup` document in production — orphaned data that a future developer will eventually wonder about, and that a naive "does this field still get written" grep will miss once the writer is deleted (the field just silently stops being touched, not obviously "dead" from a document inspection).
-Concretely, the risks: (a) **orphaned Firestore fields** — `dismissedSignature` and any related persisted reconciliation state remain on documents forever unless explicitly backfilled/cleared, which under this repo's D-19 "no legacy compatibility, no migration for greenfield slide-area data" standing decision is arguably *fine to leave* (the field is simply never read again) but must be a **deliberate choice recorded as a decision**, not an oversight — silently-unused-but-present fields are exactly the kind of thing that causes confusion 6 months later ("why does this document have a `dismissedSignature` field, is something still writing it?"); (b) **dead imports** — any file that still imports `ReconcileConfirmModal`, `reconcileSongGroup`, or related types after the primary call sites are removed, caught by `vue-tsc --build` for type-level dead references but *not* for a leftover dynamic import or a lazy-loaded route that still references the deleted component path; (c) **stale tests that still pass vacuously** — the existing reconciliation test suite (built up across Phases 24-26, including the two previously-fixed latent defects — the compounding-2→4→8→16 bug and the duplicate-lyric-entry-drop bug, both specifically *in* `reconcileSongGroup`) must be **deleted, not left passing against dead code** — a test file that still imports and exercises `reconcileSongGroup` after the function is deleted from the production call path either fails to compile (good, forces the cleanup) or, worse, if the function itself is *kept* as dead code "just in case" while its call sites are removed, the tests keep passing and give false confidence that reconciliation logic is still exercised in the live app; (d) **dangling UI entry points** — the "Edit in song" / "Edit in scripture" relay links, the reconciliation banner, and any menu/button that used to open `ReconcileConfirmModal` need every trigger removed, not just the modal component — a leftover button that opens nothing (because its handler was gutted but the button wasn't) is a worse UX regression than the feature it replaced.
-
-**Why it happens:**
-Deleting a shipped subsystem is naturally biased toward "delete the obviously-central file and see what breaks" — which `vue-tsc`/the type checker catches well for compile-time references but not for persisted-data fields, dynamically-imported components, or UI affordances whose *handler* silently became a no-op rather than a type error.
+SortableJS drives drag-and-drop in at least three places already (`ServiceEditorView.vue`,
+`SlideGrid.vue`, `SongLyricEditor.vue`), and this app has a **documented, reproducible index bug** —
+PROJECT.md's own "Reproduction case for the drag-and-drop defect" (service `ZTXcpNRcJTalEQp42fTx`:
+sections rendered out of order after repeated reordering, correct again only after a page refresh).
+That class of bug — the DOM's post-drag order and the underlying array/Firestore order silently
+diverging — is exactly what a touch-target/viewport retrofit is likely to reintroduce or worsen,
+because:
+- **Touch drag needs different SortableJS options** (`delay`, `touchStartThreshold`, `forceFallback`)
+  than mouse drag, and mismatched settings commonly cause a drag to register as a tap-scroll instead
+  (the item doesn't move) or, worse, register a drop at the wrong index because touch move events fire
+  at a different granularity than mouse move events feeding the same reorder handler.
+- **Small touch targets on a narrow viewport** (the Slides tab's slide-group cards, the service-order
+  drag handles) are the most likely place a retrofit either shrinks hit areas below usable size or
+  overlaps a drag handle with a tap-to-edit affordance, producing accidental drags/accidental edits.
+- **The existing fixed-section constraint** (five sections — Pre-Service through Post-Service — that
+  "are fixed, always visible, and never reorderable," per v1.4's completed work) must survive the
+  mobile retrofit unchanged; a naive mobile reorder implementation that treats the whole list as one
+  flat sortable group (rather than per-section, matching the desktop implementation) would silently
+  reintroduce cross-section reordering on mobile only.
 
 **How to avoid:**
-- Trace every consumer of `SlideGroup.dismissedSignature`, `ReconcileResult`, `reconcileSongGroup`, and `ReconcileConfirmModal` via the project's knowledge graph (`gsd-core graphify query`, per this repo's `CLAUDE.md` — query before grepping) to get the full call-site set before deleting anything, the same way Phase 27's review "traced all load-bearing paths end to end" (explicitly praised in `27-REVIEW.md` per STATE.md).
-- Decide explicitly, as a recorded decision, what happens to `dismissedSignature` on existing documents: leave-and-ignore (consistent with D-19's "no migration for greenfield slide data" precedent, since this field was never seen by real users per that same standing decision) is likely the right, low-risk call — but write it down as a decision, don't let it be silent.
-- Delete the reconciliation test files **entirely**, don't leave them skipped or commented out — a `describe.skip` block for deleted functionality is worse than deletion, because it still shows up in test-file listings implying coverage exists.
-- Grep specifically for **dynamic/lazy imports** (`() => import('...ReconcileConfirmModal...')`, route-level lazy component definitions) in addition to static imports — `vue-tsc` type-checks static imports well but a string-based dynamic import path to a deleted file is a runtime 404, not a compile error.
-- Audit every button/menu entry/link that used to trigger the reconcile flow and confirm each is either removed or repointed — not left present-but-inert.
-- After removal, run the full existing test suite and confirm the **failing-file-set count doesn't grow** relative to the documented pre-existing baseline (STATE.md tracks this exact baseline — currently 10 known pre-existing failures) — any *new* failure post-removal is a real regression from this deletion, not noise.
+- Do not write new reorder logic for mobile — reuse the exact same SortableJS instance/config used on
+  desktop, adding only touch-specific *options* (`delay`, `touchStartThreshold`), so the
+  index-computation code path stays identical between input methods and any regression is
+  immediately visible on desktop too (rather than mobile-only, and easy to miss in review).
+- Add a regression test/manual repro step specifically mirroring the documented
+  `ZTXcpNRcJTalEQp42fTx` case, run under touch-simulated interaction (Playwright/Cypress touch
+  events or manual device testing), before considering the mobile retrofit done.
+- Keep drag handles visually and functionally distinct from tap targets (a dedicated handle icon,
+  not "drag the whole card"), sized to touch-target minimums (commonly cited as ~44x44px) — this is
+  as much an index-bug-prevention measure as it is accessibility, since ambiguous touch input is what
+  produces wrong-index drops.
 
 **Warning signs:**
-- `vue-tsc --build` passing clean while a manual click-through still shows a reconciliation banner or "Edit in song" link that goes nowhere.
-- A Firestore document inspection (any real service's `slideGroups` records) showing `dismissedSignature` still present post-removal with no decision recorded about whether that's intentional.
-- Test files under `src/**/__tests__/*reconcil*` still present and passing after the production reconciliation code is deleted.
+- A drop that "looks right" immediately but reverts or duplicates after the next autosave/refresh —
+  the exact signature of the documented bug.
+- Reorder logic branching on `window.innerWidth`/a mobile flag to use different array-splice logic
+  for touch vs. mouse, rather than one shared handler.
+- Manual testing performed only via browser devtools' responsive-mode mouse emulation, which does not
+  exercise real touch event timing/granularity.
 
-**Phase to address:** The "Slides mirror the plan" phase (removes reconcile/confirm entirely, hard-locks slide order to service order). Should explicitly list "graph-trace all consumers before deletion" and "delete (not skip) the reconciliation test suite" as plan tasks, not assume they fall out naturally from removing the main component.
+**Phase to address:** The "mobile & layout" phase (mobile-friendly Slides tab, stacked buttons). This
+should be sequenced *after* any other phase that touches drag-and-drop order logic this milestone
+(none currently planned, but if scope shifts), so the mobile retrofit isn't chasing a moving target.
 
 ---
 
-### Pitfall 9: Adding Post-Service to the production `Service`/`ServiceSlot` model — scattered section lists, exhaustive switches, and silently-accepting unions
+### Pitfall 9: A 22-cluster milestone overruns by under-sequencing independent-looking work that shares hidden dependencies
 
 **What goes wrong:**
-Unlike the Slides-area data model (explicitly greenfield per D-19, "never deployed, never seen by a user"), `Service`/`ServiceSlot` are **production data** — shipped in v1.0, human-verified against a real Planning Center account, with real user documents in Firestore (per STATE.md's explicit GREENFIELD-vs-PRODUCTION boundary table, which puts `Service`/`ServiceSlot` firmly on the "must preserve" side). Adding a fifth section (Post-Service) to a four-section model (Pre-Service, Worship, Message, Sending — D005 from the v1.2 decisions) that's been live since v1.0 risks the exact class of bug this codebase has already been bitten by with `performanceOrder` (28-02): **a section-list value that's hard-coded or enumerated in more than one place, where one consumer is updated and another silently isn't.** Concretely:
-- **Hard-coded section lists scattered across assembler/print/share/export**: the four-section order (D005) almost certainly appears as a literal array or object-key sequence in multiple independent places — the slideshow assembler (which groups slides by section), the print/PDF order-of-service renderer, the read-only share-link view, and the Planning Center CSV/text export. Each of these needs Post-Service added *individually* — there is no single source-of-truth constant guaranteed to already exist (and even if one does, e.g. `SECTION_ORDER = [...]`, any consumer that destructures or hard-codes `[pre, worship, message, sending]` positionally rather than iterating the constant will not pick up a fifth entry just because the constant changed).
-- **Exhaustive `switch` statements**: any `switch (slot.section)` or `switch (item.sectionKind)` written *before* v1.4 was scoped to four cases: adding a fifth case (`Post-Service`) to the section enum without a compile-time exhaustiveness check (TypeScript's `never`-typed `default` branch pattern) means an *old* switch statement with only four `case`s and a silent fallback (`default: return null` / `default: break`) will **compile cleanly, run without error, and simply drop Post-Service items** wherever that switch lives — no crash, no type error, just missing data at runtime. This is the union-type sibling of the section-list problem: the type system caught nothing because the switch was never asked to be exhaustive in the first place.
-- **Union types that silently accept a new member without any compile error at the call sites that matter**: if the section type is a string literal union (`'pre-service' | 'worship' | 'message' | 'sending'`) and it's widened to include `'post-service'`, TypeScript will happily accept the new value everywhere a bare `SectionKind` is used — the type system only flags a problem at call sites that explicitly narrow with an exhaustiveness guard (`assertNever` in a `default` case, or a `Record<SectionKind, X>` object literal that TypeScript *will* flag as missing a key). A plain `switch`/`if-else` chain without that guard, or an object literal built with `Object.fromEntries`/spread rather than a literal `{ ...}` with all keys present, will accept the new union member into the type system without ever surfacing a "you forgot to handle this" signal — meaning the bug is discoverable only by manual audit or runtime testing, not by `vue-tsc --build`.
-
-**Why it happens:**
-Section lists and section-kind switches accumulate organically across features built at different times (v1.0's initial service model, v1.2's slide sections, v1.3's Service Order rename) — by the time a fifth section is added, there's no single inventory of "everywhere the four-section assumption is baked in," and the type system only protects call sites that were *written defensively* (with exhaustiveness checks) from the start, which not every consumer necessarily was.
+v1.5's target-feature list spans at least nine independent-sounding areas (custom claims, PPTX
+display, sharing, four settings toggles/pickers, five service-item changes, congregational-reading
+UX, image-order determinism, and five mobile/layout items) plus four carried-forward items. Broad
+milestones like this typically fail in one of these specific ways, each with a specific tell in
+*this* codebase:
+- **The riskiest item (custom claims) gets scheduled last "because it's infrastructure," and then
+  rushed** when everything else runs over — exactly backwards, since Pitfall 1 shows it needs the
+  longest verification window (the dual-read soak period) and the most room to roll back cleanly.
+  It should be sequenced early precisely because a slow, careful rollout with time to observe is safe
+  and a rushed one is not.
+- **Items that look independent but share a choke point collide.** The AI toggle (Pitfall 5) and the
+  congregational-reading UX both touch `claudeApi.ts` and scripture-slide generation; the sharing
+  rework (Pitfall 3) and the custom-claims work (Pitfall 1) both touch `firestore.rules`/
+  `storage.rules` in the same file. Planning these as fully parallel phases risks two phases editing
+  the same rules file or the same choke-point module in overlapping windows, producing merge/rules
+  conflicts that don't show up until integration.
+- **The carried-forward PPTX display item (R062) is scoped as "half done" and has "never had a home
+  in the roadmap"** per PROJECT.md's own language — the exact phrasing that predicts it slipping
+  again unless it's given an explicit, named phase with its own acceptance criteria (client reads
+  `pptxRenders`/`rendered/*.png`, draws the PNG in grid and presenter, per the milestone decision
+  table) rather than being folded as a sub-task into a larger fidelity phase.
+- **Settings items that look like simple toggles (font, template, translation) are each schema
+  decisions** (Pitfalls 6, 7, and the org-template-replaces-`buildSlots()` decision) that, if
+  under-scoped as "just add a settings field," skip the migration/backward-compatibility questions
+  each one actually raises (old services with no font setting; slides generated before a template
+  existed; slides generated under the previous sole translation).
 
 **How to avoid:**
-- Before writing any Post-Service code, **grep + graph-query for every reference to the existing four section names/kinds** (`'Pre-Service'`, `'Worship'`, `'Message'`, `'Sending'` and their code-identifier equivalents) across `src/` and `functions/src/` — this produces the actual inventory of touch points rather than guessing. Use `/gsd:graphify query "section"` per this repo's `CLAUDE.md` convention as the first pass, then grep to confirm completeness.
-- **Introduce (or locate and consolidate onto) a single canonical ordered list/constant for the five sections**, and audit every consumer to iterate that constant rather than hard-code a positional literal — the assembler, print view, share view, and PC export should all derive their section ordering from one place.
-- **Convert every `switch`/`if-else` over the section-kind union to use a TypeScript exhaustiveness guard** (a `default: return assertNever(x)` pattern, or model the per-section behavior as a `Record<SectionKind, Handler>` object literal, which TypeScript *does* flag as incomplete if a key is missing) — this is the concrete, actionable prevention: it converts "adding Post-Service silently breaks N places" into "adding Post-Service produces N compile errors, each pointing exactly at what needs updating." Do this conversion *before* adding the fifth member to the union, so the audit of existing incompleteness happens on the *current*, already-shipped four-section code, isolated from the new-section work.
-- **Test the empty-Post-Service case explicitly**: this repo's own "Deferred UI Follow-up" notes flag that empty sections (Pre-Service with no elements) don't render because of a pre-existing gap — the same gap will apply to a freshly-added, likely-usually-empty Post-Service section, and the milestone's "sections are fixed, always visible" requirement means this is now a *must-fix*, not a follow-up: verify Post-Service (and every other section) renders its header/placeholder even with zero items, across Service Order, Slides tab, print, and share views.
-- **Migration is real here, unlike the Slides area**: since `Service`/`ServiceSlot` documents already exist in production, adding Post-Service must not require a backfill for the feature to work (existing services simply have zero Post-Service items until a user adds one — no migration needed for that), but any code that assumes "exactly N slots across exactly 4 known sections" (e.g. a fixed-length array, a positional index into a 4-element structure) rather than "N slots grouped by section" will break on existing documents the moment Post-Service is introduced as a valid `sectionKind`, even without any Post-Service *data* yet — audit for positional/index-based section assumptions specifically, not just enum-exhaustiveness.
+- Sequence Pitfall-1 (custom claims) early, with the dual-read soak period budgeted as real elapsed
+  time in the schedule, not "as long as it takes between two adjacent phases."
+- Group phases by *shared file/choke-point*, not by feature-area label — e.g. don't split "AI
+  toggle" and "congregational reading AI-split" into fully independent, parallel phases if both edit
+  `claudeApi.ts`'s gating logic; sequence or merge them.
+- Give the PPTX-display carryover its own phase with the milestone decision table's stated
+  acceptance criterion ("the rendered PNG *is* the slide... drawn in the grid and in the presenter")
+  as its explicit success condition, since it has already slipped one milestone.
+- Treat each settings picker (font, template, translation) as carrying a migration question for
+  already-existing data, and require that question answered in the phase's plan before implementation
+  starts — not discovered during execution.
 
 **Warning signs:**
-- A grep for the four existing section name strings turning up more than 2-3 call sites (assembler, one renderer) — every additional site is a place Post-Service must also be explicitly added.
-- Any `switch (section)` in the codebase with a bare `default:` that doesn't call an `assertNever`/exhaustiveness helper.
-- A print/export/share view that visually still shows only four sections after the data-model and Service Order/Slides tab work is "done" — the strongest sign the section list was hard-coded independently in that renderer and missed.
+- A roadmap where the custom-claims phase is scheduled after most other phases "so it doesn't block
+  anything."
+- Two phases with overlapping edits to `firestore.rules`, `storage.rules`, or `claudeApi.ts` planned
+  to run in parallel.
+- A settings-picker phase plan with no line addressing what happens to data created before the
+  setting existed.
 
-**Phase to address:** The "Order structure" phase (add Post-Service section). This phase's plan should explicitly include a "section-list inventory + exhaustiveness-guard conversion" task as a prerequisite step before the section itself is added, and should require a print/share/export view check in its acceptance criteria, not just Service Order + Slides tab.
+**Phase to address:** This is a roadmap-structure concern, not a single phase's — it should shape
+phase *ordering* directly (see Sources/roadmap-implications note below).
 
 ---
 
@@ -261,86 +607,100 @@ Section lists and section-kind switches accumulate organically across features b
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|-----------------|------------------|
-| Keep dense-integer reindex (no fractional ranking) for reorder | Simple, already proven correct in this codebase with the DOM-revert fix | Full-array-rewrite conflict cost under real concurrent editing | Acceptable for v1.4 — Draft-only locking already limits concurrent-editor exposure; revisit only if real-time co-editing becomes a future requirement |
-| Two autosave implementations (inline watcher + `useAutoSave.ts` composable) coexisting past v1.4 | Avoids a risky mid-milestone migration | A future fix applied to one doesn't apply to the other; doubles the surface for the Pitfall 4 watch-semantics class of bug | Never acceptable past this milestone — consolidate onto one during the "Save reliability" phase |
-| Leaving `dismissedSignature` on existing `SlideGroup` docs unbackfilled after reconciliation removal | Zero migration work, consistent with D-19 | A field with no writer and no reader confuses future debugging ("is something still using this?") | Acceptable only if explicitly recorded as a decision, per D-19's own precedent — never acceptable silently |
-| Synchronous PPTX render inside the import request (no async job) | Simpler initial implementation | Function timeout on real-sized decks, no progress UX, harder to add font-substitution warnings later | Only acceptable for a first internal prototype/spike — not for the shipped feature given the milestone explicitly wants server-side fidelity for real decks |
+| Rules dual-read `OR` left in place indefinitely instead of removed after cutover | Zero extra work, never locks anyone out | Every future rules change must remember to preserve both branches; masks whether the claim path actually works if the Firestore fallback is silently doing all the work | Acceptable to leave for one milestone as a safety net, but track removal as a follow-up item — don't let it become permanent by default |
+| Gate a toggle only in the UI, defer the `claudeApi.ts`/PC choke-point guard | Ships the visible feature faster | Silent quota spend / stray PC calls from any code path that bypasses the UI gate (dev tools, stale bundle, missed call site) | Never acceptable for AI (real API cost) or PC (real external write risk) — do the choke-point guard first |
+| Skip the per-slide translation-source field, key attribution off the org's current setting | Simpler schema, less migration work | Breaks the moment a church switches translations mid-use; wrong attribution is a licensing violation, not just a bug | Never acceptable given both translations are actively supported and switchable |
+| Backfill custom claims without idempotency/resume support | Faster to write | An interrupted run leaves an unknown subset of users un-migrated with no easy way to find them | Never acceptable — this directly risks the lockout Pitfall 1 exists to prevent |
 
 ## Integration Gotchas
 
 | Integration | Common Mistake | Correct Approach |
-|-------------|-----------------|-------------------|
-| SortableJS + Vue 3 | Mutating state directly in `onEnd` without reverting SortableJS's DOM move first | Revert the DOM move, then mutate a fresh array reference — this codebase's own `D-16` pattern in `ServiceEditorView.vue`/`SlideGrid.vue` |
-| Firestore `onSnapshot` + optimistic local state | Applying every incoming snapshot unconditionally | Gate remote-snapshot application on a local dirty/in-flight flag (`autosaveStatus !== 'idle'/'saved'`), as this codebase's store-watcher already does for Service Order — replicate for every store with optimistic local edits |
-| Firestore Security Rules + status lock | Enforcing lock only in Vue components | Enforce in rules first (adversary-proof), store second (fast client error), UI third (affordance only) — and check every Cloud Function that writes to the locked collections, since Admin SDK writes bypass rules entirely |
-| Headless LibreOffice in Cloud Functions | Sharing one profile/temp dir across concurrent invocations | Unique `-env:UserInstallation` per invocation, cleaned up in `finally`, with a startup sweep for orphans from a crashed prior invocation on the same warm instance |
-| Claude API for scripture content | Letting the model regenerate/re-type the passage text | Send passage text as input, constrain model output to structural indices/spans only via `output_config.format`, and slice the *original* known-correct string for display — never render model-authored text as scripture |
+|-------------|-----------------|--------------------|
+| Firebase custom claims | Treating `setCustomUserClaims` as synchronous with client state | Dual-read rules through at least one full max-token-lifetime (1 hour) after every claims-affecting deploy |
+| Storage emulator + Firestore rules | Assuming any cross-service check is testable locally just because *some* emulator tests pass | Isolate the suspect clause and prove pass/fail is identical regardless of the underlying condition before calling it an environment limitation |
+| ESV/NLT proxy (`functions/src/index.ts`) | Assuming both APIs share identical storage/redistribution terms because they're proxied through the same Cloud Function pattern | Check each API's terms independently for the storage (not just display) question before persisting fetched text |
+| SortableJS (multi-instance: ServiceEditorView, SlideGrid, SongLyricEditor) | Writing separate touch-specific reorder logic per surface | Reuse one shared config/handler, add touch-only *options*, keep index-computation code identical across input methods |
 
 ## Performance Traps
 
 | Trap | Symptoms | Prevention | When It Breaks |
-|------|----------|------------|------------------|
-| Full-array reorder rewrite on every drag | Every reorder write touches the entire slot/slide collection regardless of what moved | Acceptable at this app's scale (2-3 planners, Draft-lock limits concurrency); add fractional ranking only if concurrent editing becomes real | Would surface as lost-reorder conflicts if simultaneous multi-editor use grows well beyond current team size |
-| Re-rendering PPTX-to-image on every Slides-tab/Present view open | Cloud Functions invocation count and LibreOffice cost scale with *views*, not imports | Render once at import, persist images + URLs, treat re-render as an explicit user action | Immediately, the first time a deck is viewed more than once — budget for this from day one of the rendering phase, not as an optimization pass later |
-| Deep-cloning (`JSON.parse(JSON.stringify)`) the whole service on every remote snapshot merge | Works fine at this document's size today | Could become a per-keystroke cost if the service document grows much larger (many slots, deeply nested slide data inlined) | Not currently a concern at this app's document sizes — flag only if service documents grow substantially larger in a future milestone |
+|------|----------|------------|-----------------|
+| Share-snapshot refresh on every service write, including unshared services | Firestore write-count spike disproportionate to actual sharing usage; unnecessary roster/quarter cross-reads on every autosave | Gate refresh on "a `shareTokens` doc already exists for this service" | Immaterial at current scale (2-3 planners) but wastes writes/reads from day one — cheap to prevent now |
+| Claims-backfill as an unbounded single-invocation function | Cloud Function timeout on orgs with many members; partial backfill | Paginate + checkpoint + resumable | Breaks once member count exceeds what fits in one function invocation's time budget |
 
 ## Security Mistakes
 
 | Mistake | Risk | Prevention |
 |---------|------|------------|
-| Status lock enforced only client-side | A modified client, direct REST call, or a Cloud Function without its own check can write to a "locked" service | Firestore Rules as the primary enforcement layer; explicit status checks in every Cloud Function that writes to `services`/`slideGroups` |
-| Untrusted free-text (sermon topic, notes) concatenated into an LLM prompt without delimiting from instructions | Prompt injection could attempt to alter the model's output schema or behavior | Delimit user text clearly from system instructions; validate model output against a strict schema regardless of prompt content, at the existing single Cloud Function proxy choke point |
-| A Storage-object cleanup job (for orphaned PPTX render images, or any new cleanup need this feature introduces) defaulting to live-delete | Repeats the exact incident already found and fixed for `cleanupExpiredMedia` (doc comment claimed dry-run default; code defaulted to live delete on a daily schedule) | Default every new deletion path to dry-run/report-only; verify the doc comment matches the actual code default before merge, not after |
+| Trusting a client-writable Firestore `role` field as equivalent to the auth-claim `role` | The two can diverge (client can write its own Firestore role field per today's `isOrgEditor` write grant on `members/{uid}`, but cannot write its own claim) — code that reads the wrong one for an authorization decision can be tricked | Rules use the claim (server-set only); app UI can read either for *display*, but any access decision must go through the claim or the existing Firestore check, never a client-writable field |
+| Widening the public `shareTokens`/`serviceShares` snapshot fields without a pinned-shape test | A future edit anywhere in the snapshot-building path silently exposes new PII to an unauthenticated `allow read: if true` reader | A test asserting the exact field set of `serviceSnapshot.roleAssignments`, failing CI on any addition |
+| Removing the `exists()`/`get()` fallback in the same deploy that adds the claim check | Any user without the claim yet (not-yet-refreshed token, backfill miss) is locked out instantly | Two separate deploys: add-with-dual-read, then (after the soak period) remove-fallback |
 
 ## UX Pitfalls
 
 | Pitfall | User Impact | Better Approach |
-|---------|--------------|-------------------|
-| Save-status indicator placed where it scrolls out of view during a long edit session | User can't tell whether a change saved, reports "it didn't save" for what was actually a visibility problem | Persistent inline indicator anchored to the content being edited, per the milestone's own explicit decision — verify it stays visible across the full scroll range of the Service Order and Song Lyrics editors |
-| A silently font-substituted PPTX render that "looks like the original" only approximately | Users trust "server-side rendering for true fidelity" and don't notice subtle text-overflow/wrap differences until presenting live | Surface a substitution warning when detectable, rather than presenting every render as equally faithful |
-| Locking so completely that a typo fix requires the full "Reopen for editing" flow with an export warning even for a never-exported service | Friction disproportionate to the risk for the common case (Planned but never exported) | Differentiate the warning text by whether the service was actually exported, per the milestone's own decision table |
+|---------|-------------|-------------------|
+| Presenter view painting before the org's configured font loads | Visible font flash/reflow on a live projection in front of the congregation | Gate first paint on `document.fonts.ready` for the specific configured font |
+| Toggling a feature off with no indication of what happens to data that already used it | A planner turning off AI worries their already-split congregational reading will vanish or was never real | Explicit copy: "Existing AI-assisted content is unaffected; this only disables future AI suggestions" |
+| Auto-refreshing share snapshot silently changing role names shown on a link already sent out | A volunteer clicks a link they were sent last week and sees names that don't match what they were told verbally, with no explanation | This is by design (v1.5's whole point — role overrides publish without re-sharing), but the share view itself should show a "last updated" timestamp so recipients can tell it's current, not stale |
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **Drag-and-drop reorder:** Often missing the DOM-revert-before-mutate step — verify by dragging the *same* item twice in a row without a re-render in between (the compounding-error trigger), not just once.
-- [ ] **Autosave:** Often "fixed" by adding more watchers rather than fixing the one watcher's source/reactivity path — verify with a test that edits a field, advances fake timers, and asserts the store-write payload, not just that *some* save fired.
-- [ ] **Service lock:** Often enforced in the UI only — verify by attempting a direct store-action call or a Firestore Rules unit test against a locked document, not just by checking that buttons are disabled.
-- [ ] **PPTX server-side render:** Often tested against one small, font-standard sample deck — verify against a deck using non-standard fonts, many slides, and at least one large embedded image before considering it done.
-- [ ] **LLM scripture split:** Often tested by eyeballing one passage's output — verify the displayed text is byte-identical to the source ESV text for several different passages, not just that the split "looks reasonable."
-- [ ] **Reconciliation removal:** Often "done" once the main modal component is deleted — verify no dangling menu entries, no orphaned dynamic imports, and no stale-but-passing test files remain.
-- [ ] **Post-Service section:** Often added to the Service Order tab and Slides tab only — verify it also appears correctly in print, share-link, and Planning Center export views, and that it renders even with zero items.
+- [ ] **Custom claims rollout:** Often missing the dual-read window — verify `firestore.rules`/
+      `storage.rules` still contain the `exists()`/`get()` fallback branch, not just the claim check,
+      immediately after the phase that adds claims.
+- [ ] **Rules changes:** Often missing a passing *allow* test — verify at least one allow-case test
+      exists and is run against the real emulator (`npm run test:rules` or the direct
+      `vitest.rules.config.ts` invocation), not just deny-case tests.
+- [ ] **Share-link migration:** Often missing the backfill-reuses-existing-token step — verify a
+      service that already had a `shareTokens` doc before this migration keeps resolving through its
+      original token afterward.
+- [ ] **SlotKind widening:** Often missing one of the six-plus exhaustive switch sites — verify
+      `npm run type-check` (the `vue-tsc --build` form, not `-p tsconfig.app.json`) passes clean after
+      adding `ANNOUNCEMENT`/`MISC`.
+- [ ] **AI/PC toggles:** Often missing the module-level guard — verify calling a `claudeApi.ts`
+      function directly (bypassing the UI) with the toggle off does not issue a network request.
+- [ ] **Font settings:** Often missing the pre-measurement font-load gate — verify presenter/print
+      views await `document.fonts.ready` before rendering, not just before showing a loading spinner.
+- [ ] **Second Bible translation:** Often missing a per-slide translation-source field — verify a
+      slide created under ESV still shows ESV's attribution after the org's setting switches to NLT.
+- [ ] **Mobile drag-and-drop:** Often missing a repro of the documented index bug under touch —
+      verify the `ZTXcpNRcJTalEQp42fTx`-style reorder-then-refresh case is retested on a touch input
+      path, not just visually spot-checked in devtools responsive mode.
 
 ## Recovery Strategies
 
 | Pitfall | Recovery Cost | Recovery Steps |
-|---------|----------------|------------------|
-| SortableJS/Vue divergence shipped without the DOM-revert fix | LOW | Apply the exact pattern already proven in `ServiceEditorView.vue`/`SlideGrid.vue` to the new call site — this is a known, already-solved problem in this codebase, not a research task |
-| A dirty-flag gate missing on a new store's snapshot watcher, causing lost edits | MEDIUM | Add the gate retroactively; requires auditing every write path in that store to confirm they all update the dirty flag consistently, not just the primary one |
-| A status lock shipped UI-only, discovered post-release | MEDIUM-HIGH | Requires a Firestore Rules change (safe, additive) plus an audit of every existing Cloud Function/store action for a missed status check — higher cost the more write paths accumulated before the gap was caught |
-| PPTX render silently mis-rendering fonts in production | HIGH | Requires re-rendering affected decks after adding the missing font packages, plus a way to detect which existing rendered decks were affected — expensive if not caught before many decks are imported |
-| Orphaned Firestore fields from reconciliation removal | LOW | Given D-19's precedent, likely just a documentation fix (record the decision) — no runtime cost since nothing reads the field |
+|---------|-----------------|------------------|
+| Custom claims lock out users despite dual-read (bug in the `OR` logic itself) | LOW | Revert the rules deploy only (instant, independent of token state) — claim data already backfilled is harmless to leave in place |
+| Share-link backfill mints new tokens instead of reusing existing ones, orphaning circulated links | MEDIUM | Re-run backfill with corrected reuse logic; old orphaned `shareTokens` docs can be identified by comparing `createdAt` timestamps against the persisted-token migration's run time, then manually re-pointed if the original link is still needed |
+| SlotKind widening ships with a missed switch site (compile passed via the narrow tsconfig form) | LOW | Add the missing case, redeploy — no data migration needed since this is a pure code defect, not a data-shape problem |
+| AI toggle only gates UI, quota spent via a bypassed path | MEDIUM | Add the choke-point guard retroactively in `claudeApi.ts`; audit Claude API usage logs for the affected window to confirm no further leakage, no data corruption to undo since AI output was already treated as additive/non-blocking |
 
 ## Pitfall-to-Phase Mapping
 
 | Pitfall | Prevention Phase | Verification |
-|---------|--------------------|----------------|
-| 1. SortableJS/Vue DOM divergence | Order structure (Service Order reorder) + Slides interaction (Slide Grid reorder) | Reorder the same item twice without an intervening remount; assert final order matches manual computation, not just "looks right once" |
-| 2. Optimistic-state/`onSnapshot` race | Save reliability (primary) + Order structure/Slides interaction (any new write path) | Edit A, then edit B before A's write completes; assert final persisted document reflects B |
-| 3. Integer reindex under concurrency | Order structure (Post-Service touches slot reindex) | Confirm slot writes carry the same optimistic-concurrency base-snapshot check the slide-group writer already has |
-| 4. Autosave watch-semantics gap | Save reliability | Failing-test-first repro: change a song, advance fake timers, assert store-write payload |
-| 5. UI-only lock enforcement | Service lifecycle | `firestore.rules.test.ts` case asserting a direct write to a non-Draft service is rejected, independent of any UI test |
-| 6. Headless PPTX render pitfalls | PowerPoint server-side rendering (Smarter content / Presentation correctness) | Render a real multi-font, multi-slide test deck, not a 2-slide fixture; verify orphan-cleanup defaults to dry-run |
-| 7. LLM scripture-split correctness | Smarter content | Byte-compare displayed scripture text against ESV source across multiple passages; verify graceful fallback on a forced API failure |
-| 8. Reconciliation-flow removal debris | Slides mirror the plan | Graph-trace all consumers before deletion; confirm no growth in the documented pre-existing test-failure baseline after removal |
-| 9. Post-Service section-list gaps | Order structure | Grep/graph-query every existing four-section reference before adding the fifth; convert relevant switches to exhaustiveness-guarded form first |
+|---------|-------------------|----------------|
+| Custom claims lockout / staleness / size limit | Custom auth claims phase (sequence early; own phase, not bundled) | Emulator rules suite passes with claim present/absent/stale; real (non-prod) sign-in test with a pre-migration user shows no lockout; 1-hour soak with dual-read before fallback removal |
+| Rules "denies everyone" repeat | Every phase touching `firestore.rules`/`storage.rules` | At least one passing allow-case test per rule change, run against the real emulator, cited as evidence in the phase's verification |
+| Share-link backfill / write amplification / PII widening | Sharing correctness phase | Backfill reuses existing tokens (test against a pre-migration service); refresh trigger's write target excludes its own watch path; snapshot field-shape test pinned |
+| SlotKind widening breaks old bundles / silent fallthrough | Service items (Announcements/Misc/Message) phase | `npm run type-check` clean; explicit decision recorded for which switch-group (slide-generating vs. not) each new kind joins |
+| Feature toggle leaves code path callable | Settings — AI/PC toggles phase | Direct call to `claudeApi.ts`/PC utility with toggle off makes no network request; already-exported PC status and already-AI-generated slide content untouched by the toggle flip |
+| Font FOUT/FOIT on presenter/print | Slides slide-out — font phase (with its UI-research sub-step) | Manual throttled-network test shows no visible reflow on presenter first paint; license recorded for every curated font |
+| Second translation copyright/staleness | ESV/NLT Bible version phase | Per-slide translation-source field present and tested; translation switch doesn't retroactively alter existing slides |
+| Mobile drag-and-drop index bugs | Mobile & layout phase | Documented `ZTXcpNRcJTalEQp42fTx`-style repro retested under touch input, not just devtools mouse emulation |
+| Broad-milestone scope overrun | Roadmap phase ordering itself | Custom claims sequenced early with soak time budgeted; choke-point-sharing phases (AI toggle + congregational-AI-split; sharing + claims on rules files) sequenced, not parallelized; PPTX display given its own named phase with the stated acceptance criterion |
 
 ## Sources
 
-- Direct inspection of this repository: `src/views/ServiceEditorView.vue`, `src/components/slides/SlideGrid.vue`, `src/composables/useAutoSave.ts`, `src/utils/claudeApi.ts`, `firestore.rules`, `functions/src/index.ts`, `functions/src/pptxParser.ts` — read 2026-07-28. HIGH confidence: verified against actual code, not inferred.
-- `.planning/PROJECT.md` and `.planning/STATE.md` — this project's own recorded defect history (compounding reconciliation bug, competing `performanceOrder` fields, media-cleanup dry-run default incident, the `.env.local` worktree build incident) and milestone decisions. HIGH confidence: primary source for this project.
-- SortableJS + Vue 3 reactivity failure mode, fractional/lexicographic ranking tradeoffs, headless LibreOffice serverless pitfalls (cold start, OOM, font substitution, profile-directory concurrency), and general LLM-integration pitfalls (determinism, injection, graceful degradation) — established, widely-documented community practice as of this session's training/knowledge; not independently re-verified via a fetched external source this run. MEDIUM confidence: treat as a strong, broadly-corroborated prior rather than a citation, and re-validate against current SortableJS/LibreOffice release notes if a specific version-dependent detail becomes load-bearing during implementation.
-- `claude-api` skill (bundled reference, this session) — current Claude model catalog, pricing, `output_config.format` structured-outputs guidance, and graceful-degradation/cost patterns used to ground Pitfall 7. HIGH confidence: skill's own cached reference, dated 2026-06-24 pricing table.
+- Direct codebase reads (HIGH confidence, primary source): `.planning/PROJECT.md`, `CLAUDE.md`,
+  `firestore.rules`, `storage.rules`, `src/stores/services.ts` (`createShareToken`),
+  `src/stores/auth.ts` (`loadOrgContext`, `orgIds`), `src/utils/slotTypes.ts`,
+  `src/utils/slideGroupMaterializer.ts`, `src/utils/esvApi.ts`, `functions/src/index.ts`,
+  `.planning/codebase/CONCERNS.md`, `.planning/STATE.md` (storage.rules incident record).
+- [Control Access with Custom Claims and Security Rules | Firebase Authentication](https://firebase.google.com/docs/auth/admin/custom-claims) — 1000-byte payload limit, token-refresh propagation, `getIdToken(true)` force-refresh pattern (HIGH confidence, official documentation, fetched and cross-checked directly).
+- [firebase-js-sdk#6803](https://github.com/firebase/firebase-js-sdk/issues/6803) — cited in CLAUDE.md as the root cause of `firestore.exists()` being inert in the Storage emulator; not independently re-verified in this pass, taken as established project fact per CLAUDE.md's own investigation record.
 
 ---
-*Pitfalls research for: v1.4 "Service and Slides" milestone — worshipplanner (Vue 3 + Firebase)*
-*Researched: 2026-07-28*
+*Pitfalls research for: WorshipPlanner v1.5 Settings, Sharing, and Fidelity*
+*Researched: 2026-08-06*
