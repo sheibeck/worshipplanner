@@ -45,11 +45,28 @@ export function buildOrgMembershipClaim(orgId: string, role: string): OrgMembers
 export interface DecideMembershipClaimParams {
   uid: string;
   orgId: string;
-  /** undefined => this write was a delete of the member document. */
+  /**
+   * Whether the member document exists AFTER this write. false only for a
+   * genuine delete -- this is the real create/update/delete signal, threaded
+   * explicitly rather than inferred from `role` (WR-01: `role === undefined`
+   * alone is ambiguous between "document deleted" and "document exists but
+   * has no role field").
+   */
+  documentExists: boolean;
+  /**
+   * The document's `role` field. Only meaningful when `documentExists` is
+   * true -- when `documentExists` is false this is always undefined too
+   * (a deleted document has no fields), but callers must not rely on
+   * `role === undefined` alone to mean "deleted".
+   */
   role: string | undefined;
 }
 
-export type MembershipClaimSkipReason = "not-primary-org" | "no-user-doc" | "already-current";
+export type MembershipClaimSkipReason =
+  | "not-primary-org"
+  | "no-user-doc"
+  | "already-current"
+  | "missing-role";
 
 export type MembershipClaimDecision =
   | { action: "set"; claims: OrgMembershipClaim }
@@ -72,7 +89,7 @@ export type MembershipClaimDecision =
 export async function decideMembershipClaim(
   params: DecideMembershipClaimParams,
 ): Promise<MembershipClaimDecision> {
-  const { uid, orgId, role } = params;
+  const { uid, orgId, documentExists, role } = params;
 
   // Step 1: independently re-derive the primary org from Firestore. Never
   // fall back to trusting the event's orgId param alone -- this mirrors
@@ -94,13 +111,24 @@ export async function decideMembershipClaim(
     return { action: "skip", reason: "not-primary-org" };
   }
 
-  // Step 3: a delete of the PRIMARY membership clears rather than
-  // recomputes a new primary. TeamView.vue's client-side deleteDoc does not
-  // update users/{uid}.orgIds, so orgIds[0] is itself stale at this moment
-  // -- recomputing from it would produce a claim for an org the user just
-  // left.
-  if (role === undefined) {
+  // Step 3: a delete (documentExists === false) of the PRIMARY membership
+  // clears rather than recomputes a new primary. TeamView.vue's client-side
+  // deleteDoc does not update users/{uid}.orgIds, so orgIds[0] is itself
+  // stale at this moment -- recomputing from it would produce a claim for an
+  // org the user just left.
+  if (!documentExists) {
     return { action: "clear" };
+  }
+
+  // Step 3b (WR-01): the document exists but has no `role` field -- e.g. a
+  // manual Firestore Console edit, or a future write path that creates a
+  // members/{uid} doc without setting role. This is NOT a delete, so it must
+  // never take the clear branch above: clearing here would silently revoke a
+  // still-valid membership's claim on ambiguous input. Skip defensively
+  // instead -- a stale claim is the lesser harm; the delete path above
+  // already handles genuine revocation explicitly.
+  if (role === undefined) {
+    return { action: "skip", reason: "missing-role" };
   }
 
   // Step 4: idempotency -- skip a redundant write if the claim already
@@ -148,7 +176,12 @@ export async function syncOrgMembershipClaimHandler(
   const { orgId, uid, after } = params;
 
   try {
-    const decision = await decideMembershipClaim({ uid, orgId, role: after?.role });
+    const decision = await decideMembershipClaim({
+      uid,
+      orgId,
+      documentExists: after !== undefined,
+      role: after?.role,
+    });
 
     switch (decision.action) {
       case "set":

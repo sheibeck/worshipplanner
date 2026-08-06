@@ -273,12 +273,13 @@ describe("backfillOrgMembershipClaims", () => {
     expect(summary.failed[0]).toEqual({ uid: "bad", orgId: ORG_A, error: expect.any(String) });
   });
 
-  it("a live members document whose role is undefined (defensive 'clear' path) is counted as skipped, not acted on", async () => {
-    // decideMembershipClaim only returns 'clear' when role is undefined, which in
-    // the trigger's case means a delete. A live members document read via
-    // collectionGroup always exists and (in this codebase) always carries a role,
-    // so this path is not reachable in practice -- this test proves the defensive
-    // handling doesn't throw or write a claim if it were ever hit.
+  it("a live members document whose role is undefined (missing-role, WR-01) is counted as skipped, not acted on", async () => {
+    // decideMembershipClaim (post-WR-01) returns skip/missing-role -- never clear --
+    // whenever documentExists is true and role is undefined. This loop always passes
+    // documentExists: true (a query result document by definition exists), so a live
+    // members document with no role field can never trigger a claim clear here; it is
+    // skipped defensively instead. This test proves that doesn't throw or write a
+    // claim.
     const noRole = fakeMemberDoc({ uid: "u1", orgId: ORG_A });
     mockFirestore([noRole], { u1: fakeUserDoc(true, [ORG_A]) });
     const { setCustomUserClaims } = statefulAuth();

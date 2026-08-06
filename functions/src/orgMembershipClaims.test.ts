@@ -81,7 +81,12 @@ describe("decideMembershipClaim", () => {
     mockUsersFirestore(fakeUserDoc(false));
     mockAuth();
 
-    const decision = await decideMembershipClaim({ uid: UID, orgId: ORG_A, role: "editor" });
+    const decision = await decideMembershipClaim({
+      uid: UID,
+      orgId: ORG_A,
+      documentExists: true,
+      role: "editor",
+    });
 
     expect(decision).toEqual({ action: "skip", reason: "no-user-doc" });
   });
@@ -90,7 +95,12 @@ describe("decideMembershipClaim", () => {
     mockUsersFirestore(fakeUserDoc(true, []));
     mockAuth();
 
-    const decision = await decideMembershipClaim({ uid: UID, orgId: ORG_A, role: "editor" });
+    const decision = await decideMembershipClaim({
+      uid: UID,
+      orgId: ORG_A,
+      documentExists: true,
+      role: "editor",
+    });
 
     expect(decision).toEqual({ action: "skip", reason: "no-user-doc" });
   });
@@ -99,16 +109,26 @@ describe("decideMembershipClaim", () => {
     mockUsersFirestore(fakeUserDoc(true, [ORG_A]));
     mockAuth();
 
-    const decision = await decideMembershipClaim({ uid: UID, orgId: ORG_B, role: "editor" });
+    const decision = await decideMembershipClaim({
+      uid: UID,
+      orgId: ORG_B,
+      documentExists: true,
+      role: "editor",
+    });
 
     expect(decision).toEqual({ action: "skip", reason: "not-primary-org" });
   });
 
-  it("returns clear for a delete (role undefined) of the primary org", async () => {
+  it("returns clear for a delete (documentExists false) of the primary org", async () => {
     mockUsersFirestore(fakeUserDoc(true, [ORG_A]));
     mockAuth();
 
-    const decision = await decideMembershipClaim({ uid: UID, orgId: ORG_A, role: undefined });
+    const decision = await decideMembershipClaim({
+      uid: UID,
+      orgId: ORG_A,
+      documentExists: false,
+      role: undefined,
+    });
 
     expect(decision).toEqual({ action: "clear" });
   });
@@ -117,16 +137,41 @@ describe("decideMembershipClaim", () => {
     mockUsersFirestore(fakeUserDoc(true, [ORG_A]));
     mockAuth();
 
-    const decision = await decideMembershipClaim({ uid: UID, orgId: ORG_B, role: undefined });
+    const decision = await decideMembershipClaim({
+      uid: UID,
+      orgId: ORG_B,
+      documentExists: false,
+      role: undefined,
+    });
 
     expect(decision).toEqual({ action: "skip", reason: "not-primary-org" });
+  });
+
+  it("returns skip/missing-role when the document exists but has no role field -- ambiguous input must NOT clear a valid claim (WR-01)", async () => {
+    mockUsersFirestore(fakeUserDoc(true, [ORG_A]));
+    const { setCustomUserClaims } = mockAuth({ existingClaims: { orgId: ORG_A, role: "editor" } });
+
+    const decision = await decideMembershipClaim({
+      uid: UID,
+      orgId: ORG_A,
+      documentExists: true,
+      role: undefined,
+    });
+
+    expect(decision).toEqual({ action: "skip", reason: "missing-role" });
+    expect(setCustomUserClaims).not.toHaveBeenCalled();
   });
 
   it("returns set with the fresh claim when no existing claim matches", async () => {
     mockUsersFirestore(fakeUserDoc(true, [ORG_A]));
     mockAuth({ existingClaims: undefined });
 
-    const decision = await decideMembershipClaim({ uid: UID, orgId: ORG_A, role: "editor" });
+    const decision = await decideMembershipClaim({
+      uid: UID,
+      orgId: ORG_A,
+      documentExists: true,
+      role: "editor",
+    });
 
     expect(decision).toEqual({ action: "set", claims: { orgId: ORG_A, role: "editor" } });
   });
@@ -135,7 +180,12 @@ describe("decideMembershipClaim", () => {
     mockUsersFirestore(fakeUserDoc(true, [ORG_A]));
     mockAuth({ existingClaims: { orgId: ORG_A, role: "editor" } });
 
-    const decision = await decideMembershipClaim({ uid: UID, orgId: ORG_A, role: "editor" });
+    const decision = await decideMembershipClaim({
+      uid: UID,
+      orgId: ORG_A,
+      documentExists: true,
+      role: "editor",
+    });
 
     expect(decision).toEqual({ action: "skip", reason: "already-current" });
   });
@@ -144,7 +194,7 @@ describe("decideMembershipClaim", () => {
     const { usersCollection } = mockUsersFirestore(fakeUserDoc(true, [ORG_A]));
     mockAuth();
 
-    await decideMembershipClaim({ uid: UID, orgId: ORG_A, role: "editor" });
+    await decideMembershipClaim({ uid: UID, orgId: ORG_A, documentExists: true, role: "editor" });
 
     expect(usersCollection.doc).toHaveBeenCalledWith(UID);
   });
@@ -279,6 +329,24 @@ describe("syncOrgMembershipClaimHandler", () => {
 
     expect(setCustomUserClaims).not.toHaveBeenCalled();
     expect(outcome).toEqual({ action: "skip", reason: "already-current" });
+  });
+
+  it("malformed create/update (document exists, no role field): does NOT clear a still-valid claim -- previously-ambiguous case (WR-01)", async () => {
+    mockUsersFirestore(fakeUserDoc(true, [ORG_A]));
+    const { setCustomUserClaims } = mockAuth({ existingClaims: { orgId: ORG_A, role: "editor" } });
+
+    // `after` exists (this is a create/update, not a delete) but has no `role`
+    // key -- e.g. a manual Firestore Console edit. Before WR-01 this was
+    // indistinguishable from a delete and would have wiped a valid claim via
+    // setCustomUserClaims(uid, null).
+    const outcome = await syncOrgMembershipClaimHandler({
+      orgId: ORG_A,
+      uid: UID,
+      after: {},
+    });
+
+    expect(setCustomUserClaims).not.toHaveBeenCalled();
+    expect(outcome).toEqual({ action: "skip", reason: "missing-role" });
   });
 
   it("auth lookup failure: getUser rejecting resolves with a failure outcome, does not throw out of the handler", async () => {

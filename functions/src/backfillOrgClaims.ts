@@ -108,7 +108,7 @@ export async function backfillOrgMembershipClaims(
     const role = (memberDoc.data() as { role?: string } | undefined)?.role;
 
     try {
-      const decision = await decideMembershipClaim({ uid, orgId, role });
+      const decision = await decideMembershipClaim({ uid, orgId, documentExists: true, role });
 
       switch (decision.action) {
         case "set":
@@ -123,11 +123,11 @@ export async function backfillOrgMembershipClaims(
           console.log(`[backfillOrgClaims] ${uid} (${orgId}): skip (${decision.reason})`);
           break;
         case "clear":
-          // Not reachable from a live members document -- a member doc that exists
-          // always carries a role, so decideMembershipClaim never returns 'clear'
-          // from this call site (role is only ever undefined on a delete, and a
-          // deleted document is never returned by this query). Treated defensively
-          // as skipped rather than assumed unreachable.
+          // Not reachable from this call site: decideMembershipClaim only ever
+          // returns 'clear' when documentExists is false (WR-01), and this loop
+          // always passes documentExists: true -- a query result is by definition
+          // a document that exists. Treated defensively as skipped rather than
+          // assumed unreachable.
           skipped++;
           console.log(`[backfillOrgClaims] ${uid} (${orgId}): skip (clear-not-reachable)`);
           break;
