@@ -5,16 +5,16 @@ milestone_name: Settings, Sharing, and Fidelity
 current_phase: 39
 current_phase_name: org-settings-infrastructure-feature-toggles
 status: in_progress
-stopped_at: Completed 40-03-PLAN.md
-last_updated: "2026-08-06T23:11:00.563Z"
+stopped_at: Completed 40-04-PLAN.md
+last_updated: "2026-08-06T23:21:25.335Z"
 last_activity: 2026-08-06
 last_activity_desc: "Phase 39 Plan 02 executed: OrgSettings/DEFAULT_ORG_SETTINGS type"
 progress:
   total_phases: 10
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 10
-  completed_plans: 9
-  percent: 10
+  completed_plans: 10
+  percent: 20
 ---
 
 # Project State
@@ -1291,6 +1291,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 40 P01 | 10min | 3 tasks | 2 files |
 | Phase 40 P02 | 8min | 2 tasks | 4 files |
 | Phase 40 P03 | 35min | 2 tasks | 2 files |
+| Phase 40 P04 | 15min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -1566,6 +1567,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 40-02: syncOrgMembershipClaim (functions/src/orgMembershipClaims.ts) built and unit-tested, never deployed -- shares decideMembershipClaim with plan 40-04's backfill so the two claim-setting code paths cannot drift.
 - [Phase ?]: Phase 40 Plan 03: refreshOrgClaim called sequentially before the org-doc read (not concurrently) to keep the ordinary-path exactly-one-refresh-no-delay assertion simple
 - [Phase ?]: Phase 40 Plan 03: fixed a pre-existing auth.test.ts mock leak (onAuthStateChanged callbacks accumulated across tests) that was inflating getIdTokenResult call counts once exact-count assertions were added
+- [Phase ?]: 40-04: None - plan executed exactly as written
+- [Phase ?]: 40-04: Backfill and runbook both confirmed against real artifacts: firebase.json deploy targets, plan 40-01's exact guard test title, and plan 40-03's exact CLAIM_REFRESH constants -- nothing invented or stale.
 
 ### Roadmap Evolution
 
@@ -1877,8 +1880,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-06T23:11:00.525Z
-Stopped at: Completed 40-03-PLAN.md
+Last session: 2026-08-06T23:21:25.290Z
+Stopped at: Completed 40-04-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
