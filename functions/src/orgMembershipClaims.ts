@@ -123,8 +123,6 @@ export interface MemberDocData {
 export interface SyncOrgMembershipClaimParams {
   orgId: string;
   uid: string;
-  /** Member document data before the write, or undefined for a create. */
-  before: MemberDocData | undefined;
   /** Member document data after the write, or undefined for a delete. */
   after: MemberDocData | undefined;
 }
@@ -174,9 +172,6 @@ export const syncOrgMembershipClaim = onDocumentWritten(
     await syncOrgMembershipClaimHandler({
       orgId: event.params.orgId,
       uid: event.params.uid,
-      before: event.data?.before.exists
-        ? (event.data.before.data() as MemberDocData)
-        : undefined,
       after: event.data?.after.exists
         ? (event.data.after.data() as MemberDocData)
         : undefined,

@@ -158,7 +158,6 @@ describe("syncOrgMembershipClaimHandler", () => {
     const outcome = await syncOrgMembershipClaimHandler({
       orgId: ORG_A,
       uid: UID,
-      before: undefined,
       after: { role: "editor" },
     });
 
@@ -174,7 +173,6 @@ describe("syncOrgMembershipClaimHandler", () => {
     const outcome = await syncOrgMembershipClaimHandler({
       orgId: ORG_A,
       uid: UID,
-      before: { role: "editor" },
       after: { role: "viewer" },
     });
 
@@ -189,7 +187,6 @@ describe("syncOrgMembershipClaimHandler", () => {
     await syncOrgMembershipClaimHandler({
       orgId: ORG_A,
       uid: UID,
-      before: undefined,
       after: { role: "admin" },
     });
 
@@ -203,7 +200,6 @@ describe("syncOrgMembershipClaimHandler", () => {
     const outcome = await syncOrgMembershipClaimHandler({
       orgId: ORG_A,
       uid: UID,
-      before: { role: "editor" },
       after: undefined,
     });
 
@@ -219,7 +215,6 @@ describe("syncOrgMembershipClaimHandler", () => {
     const outcome = await syncOrgMembershipClaimHandler({
       orgId: ORG_B,
       uid: UID,
-      before: undefined,
       after: { role: "editor" },
     });
 
@@ -234,7 +229,6 @@ describe("syncOrgMembershipClaimHandler", () => {
     const outcome = await syncOrgMembershipClaimHandler({
       orgId: ORG_B,
       uid: UID,
-      before: { role: "editor" },
       after: undefined,
     });
 
@@ -250,8 +244,7 @@ describe("syncOrgMembershipClaimHandler", () => {
       syncOrgMembershipClaimHandler({
         orgId: ORG_A,
         uid: UID,
-        before: undefined,
-        after: { role: "editor" },
+          after: { role: "editor" },
       }),
     ).resolves.toEqual({ action: "skip", reason: "no-user-doc" });
 
@@ -267,8 +260,7 @@ describe("syncOrgMembershipClaimHandler", () => {
       syncOrgMembershipClaimHandler({
         orgId: ORG_A,
         uid: UID,
-        before: undefined,
-        after: { role: "editor" },
+          after: { role: "editor" },
       }),
     ).resolves.toEqual({ action: "skip", reason: "no-user-doc" });
 
@@ -282,7 +274,6 @@ describe("syncOrgMembershipClaimHandler", () => {
     const outcome = await syncOrgMembershipClaimHandler({
       orgId: ORG_A,
       uid: UID,
-      before: { role: "editor" },
       after: { role: "editor" },
     });
 
@@ -302,7 +293,6 @@ describe("syncOrgMembershipClaimHandler", () => {
     const outcome = await syncOrgMembershipClaimHandler({
       orgId: ORG_A,
       uid: UID,
-      before: undefined,
       after: { role: "editor" },
     });
 
