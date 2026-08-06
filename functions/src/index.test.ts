@@ -46,6 +46,11 @@ vi.mock("firebase-functions/params", () => ({
 }));
 vi.mock("firebase-functions/v2/firestore", () => ({
   onDocumentCreated: vi.fn((_path: string, handler: unknown) => handler),
+  // ./orgMembershipClaims (imported transitively via ./index) also calls
+  // onDocumentWritten at module scope -- this suite doesn't exercise that
+  // trigger's behavior (see orgMembershipClaims.test.ts), it just needs the
+  // module-scope call itself neutralized so importing ./index doesn't throw.
+  onDocumentWritten: vi.fn((_path: string, handler: unknown) => handler),
 }));
 vi.mock("./pptxParser", () => ({
   parsePptxBuffer: vi.fn(),

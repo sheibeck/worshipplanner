@@ -8,6 +8,7 @@ import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { parsePptxBuffer, type MappedSlide } from "./pptxParser";
 import { invokeRenderService } from "./renderInvoker";
+import { syncOrgMembershipClaim } from "./orgMembershipClaims";
 
 // Server-held secrets (Google Secret Manager). Set once with:
 //   firebase functions:secrets:set CLAUDE_API_KEY
@@ -697,3 +698,20 @@ export const cleanupOrphanRenders = onSchedule(
     await cleanupOrphanRendersHandler();
   },
 );
+
+// --- syncOrgMembershipClaim (R074/R075: the claim storage.rules reads) --
+//
+// Sets the { orgId, role } custom auth claim that storage.rules' dual-read
+// isOrgMemberByClaim(orgId) arm reads as request.auth.token.orgId /
+// request.auth.token.role (plan 40-01). One onDocumentWritten trigger on
+// organizations/{orgId}/members/{uid} covers create, role change and delete.
+// Invite acceptance (ensureUserDocument's batch .set() on this same
+// document) flows through this trigger too, so no separate invite-specific
+// code path is needed. Implementation lives in ./orgMembershipClaims so its
+// shared decision logic (decideMembershipClaim) can be imported by plan
+// 40-04's backfill script without duplicating it. Only the deployed trigger
+// is re-exported here -- decideMembershipClaim, buildOrgMembershipClaim and
+// syncOrgMembershipClaimHandler are intentionally NOT part of this module's
+// exports, mirroring how requestPptxRenderHandler is reachable only via a
+// direct module import in tests.
+export { syncOrgMembershipClaim };
