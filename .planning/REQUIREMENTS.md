@@ -129,7 +129,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 
 ### Feature Toggles
 
-- [ ] **R088**: A church can turn AI features off, and with them off the app makes no AI request from
+- [x] **R088**: A church can turn AI features off, and with them off the app makes no AI request from
       anywhere.
       <br>`[PITFALL]` The guard must live at the `claudeApi.ts` module entry point, **not** in the `.vue`
       files — hiding UI while leaving the code path callable is the anti-pattern. Requires a test proving
@@ -272,7 +272,7 @@ Explicitly excluded. Documented to prevent scope creep.
 | R085 | Phase 43 | Pending |
 | R086 | Phase 44 | Pending |
 | R087 | Phase 44 | Pending |
-| R088 | Phase 39 | Pending |
+| R088 | Phase 39 | Complete |
 | R089 | Phase 39 | Complete |
 | R090 | Phase 45 | Pending |
 | R091 | Phase 45 | Pending |

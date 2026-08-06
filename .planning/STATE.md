@@ -5,15 +5,15 @@ milestone_name: Settings, Sharing, and Fidelity
 current_phase: 39
 current_phase_name: org-settings-infrastructure-feature-toggles
 status: in_progress
-stopped_at: Completed 39-02-PLAN.md
-last_updated: "2026-08-06T19:14:25.617Z"
+stopped_at: Completed 39-03-PLAN.md
+last_updated: "2026-08-06T19:41:36.842Z"
 last_activity: 2026-08-06
 last_activity_desc: "Phase 39 Plan 02 executed: OrgSettings/DEFAULT_ORG_SETTINGS type"
 progress:
   total_phases: 10
   completed_phases: 0
   total_plans: 6
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -113,7 +113,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 39 of 48 (Org Settings Infrastructure & Feature Toggles)
-Plan: 2 of 6 in current phase (39-03 next)
+Plan: 3 of 6 in current phase (39-03 next)
 Status: Plan 02 (org settings infrastructure) complete — settings shape and dual-read merged
 Last activity: 2026-08-06 — Phase 39 Plan 02 executed: OrgSettings/DEFAULT_ORG_SETTINGS type
 module, authStore.settings merged once in loadOrgContext, vwModeEnabled dual-read, R073 test
@@ -1269,6 +1269,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 38 P04 | 35min | 3 tasks | 3 files |
 | Phase 39 P02 | 10min | 3 tasks | 3 files |
 | Phase 39 P01 | 15min | 2 tasks | 2 files |
+| Phase 39 P03 | 20min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -1534,6 +1535,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: findImportSongsButton typed as ReturnType<typeof mountSongsView> instead of VueWrapper<any> to satisfy eslint's no-explicit-any rule
 - [Phase ?]: 39-02: OrgSettings members are required, not optional — the auth.ts::loadOrgContext merge point is the single place any consumer coalesces to a default
 - [Phase ?]: 39-02: vwModeEnabled dual-read (settings.vwModeEnabled ?? orgData.vwModeEnabled ?? true) implemented once in loadOrgContext; backfill is write-triggered (39-03), never a bulk migration script
+- [Phase ?]: onToggleVwMode's write target moved to the nested settings.vwModeEnabled dot-path (39-03) — completes the lazy backfill; authStore.vwModeEnabled store API unchanged
+- [Phase ?]: T-39-01 threat verified against real firestore.rules: organizations/{orgId}'s allow write: if isOrgEditor(orgId) is document-level (no field restriction), so it already covers new nested settings.* writes with no rule change needed
 
 ### Roadmap Evolution
 
@@ -1845,8 +1848,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-06T19:12:47.011Z
-Stopped at: Completed 39-02-PLAN.md
+Last session: 2026-08-06T19:41:36.801Z
+Stopped at: Completed 39-03-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

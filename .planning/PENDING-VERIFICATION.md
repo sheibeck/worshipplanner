@@ -631,6 +631,43 @@ below — it was never run, and nothing in this item was self-approved.**
 
 ---
 
+## Phase 39 — Org Settings Infrastructure & Feature Toggles (v1.5)
+
+Deferred under the v1.5 standing autonomy grant (STATE.md, 2026-08-06). All automated gates
+(`npm run type-check`, `npx vitest run src/views/__tests__/SettingsView.test.ts`, the full app
+suite) are green; the items below need a human because jsdom cannot prove a real Firestore
+round-trip or judge visual wrapping.
+
+- ☐ **39.03-1 Credential retention across a real off → reload → on cycle.** In Settings, enter
+  Planning Center credentials, toggle the integration off, RELOAD THE PAGE, toggle it back on, and
+  confirm the masked credential display is present and unchanged. `SettingsView.test.ts`'s
+  `never clears Planning Center credentials when the integration is turned off` test proves the
+  handler issues no clear-credentials call and no `updateDoc` payload names `pcAppId`/`pcSecret` —
+  only a real Firestore round-trip plus reload proves the value actually survives. This is the one
+  state in this phase that could silently destroy user data if implemented wrongly (R089).
+
+- ☐ **39.03-2 AI feature list does not wrap past 2 lines.** At a standard desktop viewport, open
+  Settings and confirm no item in the AI Features list wraps beyond two lines. The three
+  descriptions are authored under 80 characters by design to hold each item to one line at
+  `max-w-4xl`.
+
+- ☐ **39.03-3 / 39-02 D7 — Defaults on a genuinely pre-v1.5 organization document.** Open the
+  Settings screen against a REAL organization document created before v1.5 (not a fixture). Confirm
+  both the "Enable AI features" and "Enable Planning Center integration" checkboxes render
+  **checked**, and that both feature sets render visible — never a blank or indeterminate checkbox.
+  Carried forward from `39-02-SUMMARY.md`'s D7: the Settings screen the defaults-merge point feeds
+  did not exist until this plan shipped.
+
+- ☐ **39.03-4 `vwModeEnabled` migration does not silently re-enable a deliberately-off church.**
+  Against a real organization document with a flat `vwModeEnabled: false` and no `settings` key,
+  confirm the Vertical Worship toggle renders **unchecked** on first load, then confirm saving ANY
+  toggle on the Settings screen backfills a nested `settings.vwModeEnabled: false` (not `true`) onto
+  that document. A naive `settings.vwModeEnabled ?? true` read would silently flip a real church's
+  deliberate opt-out back on — `auth.test.ts`'s fixture-based regression test proves the merge
+  function; only a real document proves the deployed read+write path.
+
+---
+
 ## Notes and failures
 
 _(Record anything that failed here, with what you saw versus what was expected.)_
