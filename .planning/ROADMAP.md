@@ -171,14 +171,14 @@ merge gaps. Full reasoning recorded in `.planning/STATE.md` § "v1.5 ROADMAP.md 
   3. In Settings, a church can turn Planning Center integration off; its features hide without altering already-imported roster data or the status of services already exported
   4. Turning AI off never alters slide content an AI split already generated
 
-**Plans**: 3/6 plans executed
+**Plans**: 4/6 plans executed
 
 Plans:
 
 - [x] 39-01-PLAN.md — Wave 0: create the two missing test harnesses (`SettingsView.test.ts`, `SongsView.test.ts`)
 - [x] 39-02-PLAN.md — `Organization`/`OrgSettings`/`DEFAULT_ORG_SETTINGS`, the single defaults-merge point in `loadOrgContext`, and the `vwModeEnabled` dual-read
 - [x] 39-03-PLAN.md — Settings screen: AI Features section, Planning Center enable toggle, dot-path writes, credentials block wrapped
-- [ ] 39-04-PLAN.md — AI guard at `claudeApi.ts`'s module entry point (3 of 7 exports) plus the three AI entry-point hides
+- [x] 39-04-PLAN.md — AI guard at `claudeApi.ts`'s module entry point (3 of 7 exports) plus the three AI entry-point hides
 - [ ] 39-05-PLAN.md — the five remaining Planning Center entry points gated
 - [ ] 39-06-PLAN.md — phase gate (`npm run type-check`, suite baseline, requirement traceability) and the five manual backstops
 
@@ -349,7 +349,7 @@ Plans:
 | 18-23 | v1.2 | all | Complete (archived) | 2026-07-28 |
 | 24-28 | v1.3 | 33/33 | Complete (archived) | 2026-07-28 |
 | 29-38 | v1.4 | 61/61 | Complete (archived) | 2026-08-05 |
-| 39. Org Settings Infrastructure & Feature Toggles | v1.5 | 3/6 | In Progress|  |
+| 39. Org Settings Infrastructure & Feature Toggles | v1.5 | 4/6 | In Progress|  |
 | 40. Custom Auth Claim for Org Membership | v1.5 | 0/? | Not started | - |
 | 41. Sharing Correctness | v1.5 | 0/? | Not started | - |
 | 42. PowerPoint Rendered-Image Display | v1.5 | 0/? | Not started | - |
