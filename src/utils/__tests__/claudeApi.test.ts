@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // Use vi.hoisted to ensure mockCreate/mockParse are available at mock factory
 // hoisting time. `messages.parse()` is a distinct SDK method from
@@ -17,6 +17,27 @@ const { mockCreate, mockParse } = vi.hoisted(() => {
 vi.mock('@/utils/appAuth', () => ({
   getAppAuthHeaders: vi.fn().mockResolvedValue({ 'X-App-Auth': 'test-token' }),
 }))
+
+// Getter-mock precedent: src/components/__tests__/SongTable.test.ts:39. A
+// module-scope mutable variable read through a getter lets a test flip the
+// toggle mid-suite without re-importing the module under test. Defaults to
+// true so every pre-existing test in this file keeps its current behavior.
+let mockAiEnabled = true
+vi.mock('@/stores/auth', () => ({
+  useAuthStore: () => ({
+    settings: {
+      get aiEnabled() {
+        return mockAiEnabled
+      },
+    },
+  }),
+}))
+
+// Reset unconditionally after every test so a toggle-off case in one describe
+// block can never leak into an unrelated test regardless of run order.
+afterEach(() => {
+  mockAiEnabled = true
+})
 
 // Mock the Anthropic SDK using the hoisted mockCreate/mockParse.
 vi.mock('@anthropic-ai/sdk', () => {
@@ -293,6 +314,23 @@ describe('getSongSuggestions', () => {
 
     expect(result).toBeNull()
   })
+
+  it('aiEnabled: returns null and never invokes the SDK when the AI toggle is off', async () => {
+    mockAiEnabled = false
+
+    const result = await getSongSuggestions({
+      sermonTopic: 'Grace',
+      sermonPassage: null,
+      slotVwType: 1,
+      alreadySelectedSongIds: [],
+      songLibrary: [{ id: 'song-1', title: 'Amazing Grace', ccliNumber: '1234567', vwTypes: [1], themes: [], lastUsedAt: null }],
+      recentServiceSongIds: [],
+    })
+
+    expect(result).toBeNull()
+    expect(mockCreate).not.toHaveBeenCalled()
+    expect(mockParse).not.toHaveBeenCalled()
+  })
 })
 
 describe('getScriptureSuggestions', () => {
@@ -374,6 +412,21 @@ describe('getScriptureSuggestions', () => {
     })
 
     expect(result).toBeNull()
+  })
+
+  it('aiEnabled: returns null and never invokes the SDK when the AI toggle is off', async () => {
+    mockAiEnabled = false
+
+    const result = await getScriptureSuggestions({
+      sermonTopic: 'Forgiveness',
+      sermonPassage: null,
+      query: 'passages about forgiveness',
+      recentScriptures: [],
+    })
+
+    expect(result).toBeNull()
+    expect(mockCreate).not.toHaveBeenCalled()
+    expect(mockParse).not.toHaveBeenCalled()
   })
 })
 
@@ -901,5 +954,59 @@ describe('splitCongregationalReading', () => {
     mockParse.mockResolvedValueOnce({ parsed_output: { sections: 'not-an-array' } })
 
     await expect(splitCongregationalReading(RAW_TEXT)).resolves.toBeNull()
+  })
+
+  it('aiEnabled: returns null and never invokes the SDK when the AI toggle is off', async () => {
+    mockAiEnabled = false
+
+    const result = await splitCongregationalReading(RAW_TEXT)
+
+    expect(result).toBeNull()
+    expect(mockCreate).not.toHaveBeenCalled()
+    expect(mockParse).not.toHaveBeenCalled()
+  })
+})
+
+// ─── AI toggle: pure helpers stay ungated (39-04) ─────────────────────────────
+//
+// The guard is applied to exactly the three network-calling exports above.
+// These four exports make no network call and must keep working identically
+// with AI off — gating them would be a functional regression, since existing
+// AI-generated content (e.g. an already-split congregational reading) must
+// remain parseable and editable even when the toggle is off.
+describe('pure helpers remain callable with AI off (aiEnabled)', () => {
+  it('safeParseJsonArray, validateSongSuggestions, validateScriptureSuggestions and validateSplitResult all return their normal results with the AI toggle off', () => {
+    mockAiEnabled = false
+
+    expect(safeParseJsonArray('[{"a":1}]')).toEqual([{ a: 1 }])
+
+    expect(
+      validateSongSuggestions(
+        [{ songId: 'song-1', reason: 'fits' }],
+        [{ id: 'song-1' }],
+      ),
+    ).toEqual([{ songId: 'song-1', reason: 'fits' }])
+
+    expect(
+      validateScriptureSuggestions([
+        {
+          book: 'Psalms',
+          chapter: 103,
+          verseStart: 1,
+          verseEnd: 12,
+          reason: 'fits',
+          recentlyUsed: false,
+          weeksAgoUsed: null,
+        },
+      ]),
+    ).toHaveLength(1)
+
+    const boundaries = [0, 1, 2]
+    expect(
+      validateSplitResult(
+        { sections: [{ speaker: 'LEADER', startBoundary: 0, endBoundary: 2 }] },
+        boundaries,
+      ),
+    ).toEqual([{ speaker: 'LEADER', startBoundary: 0, endBoundary: 2 }])
   })
 })

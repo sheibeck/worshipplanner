@@ -13,6 +13,7 @@ import {
   stripVerseMarkers,
   verseRangeForSlice,
 } from '@/utils/scriptureBoundaries'
+import { useAuthStore } from '@/stores/auth'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -29,6 +30,35 @@ export interface AiScriptureSuggestion {
   reason: string
   recentlyUsed: boolean
   weeksAgoUsed: number | null
+}
+
+// ─── AI Toggle Guard ─────────────────────────────────────────────────────────
+
+/**
+ * Single shared internal guard enforcing the org-level AI toggle
+ * (`authStore.settings.aiEnabled`) at this module's entry point, rather than
+ * only in the UI. Called as the FIRST statement of each of this file's three
+ * network-calling exports (`getSongSuggestions`, `getScriptureSuggestions`,
+ * `splitCongregationalReading`) so no entry point can forget it — a single
+ * shared function is the only shape where a future missed call site is
+ * impossible by construction, unlike threading an `aiEnabled` flag through
+ * every call site as a parameter.
+ *
+ * Deliberately NOT applied to `safeParseJsonArray`, `validateSongSuggestions`,
+ * `validateScriptureSuggestions` or `validateSplitResult` — those four make no
+ * network call and gating them would be a functional regression: existing
+ * AI-generated content (e.g. an already-split congregational reading) must
+ * remain parseable and editable even with AI off.
+ *
+ * The auth store is read inside this function body, never at module
+ * evaluation time — Pinia requires an active app instance that does not exist
+ * when this module is first imported.
+ *
+ * This is also the choke point named in 39-CONTEXT.md as the natural future
+ * home for gating AI behind a paywall, should that ever become necessary.
+ */
+function isAiEnabled(): boolean {
+  return useAuthStore().settings.aiEnabled
 }
 
 // ─── System Prompts ──────────────────────────────────────────────────────────
@@ -156,6 +186,7 @@ export interface GetSongSuggestionsParams {
 export async function getSongSuggestions(
   params: GetSongSuggestionsParams,
 ): Promise<AiSongSuggestion[] | null> {
+  if (!isAiEnabled()) return null
   try {
     const {
       sermonTopic,
@@ -276,6 +307,7 @@ export interface GetScriptureSuggestionsParams {
 export async function getScriptureSuggestions(
   params: GetScriptureSuggestionsParams,
 ): Promise<AiScriptureSuggestion[] | null> {
+  if (!isAiEnabled()) return null
   try {
     const { sermonTopic, sermonPassage, query, recentScriptures } = params
 
@@ -502,6 +534,7 @@ Rules:
 export async function splitCongregationalReading(
   rawText: string,
 ): Promise<CongregationalSection[] | null> {
+  if (!isAiEnabled()) return null
   try {
     const boundaries = computeBoundaries(rawText)
     if (!hasSplittableBoundaries(boundaries)) return null
