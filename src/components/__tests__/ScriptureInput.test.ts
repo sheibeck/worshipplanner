@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { nextTick } from 'vue'
 import { mount, flushPromises } from '@vue/test-utils'
 import ScriptureInput from '../ScriptureInput.vue'
@@ -97,6 +97,25 @@ vi.mock('@/utils/esvApi', () => ({
 vi.mock('@/utils/claudeApi', () => ({
   getScriptureSuggestions: vi.fn(() => Promise.resolve(null)),
 }))
+
+// This component did not use the auth store before 39-04. Getter-mock
+// precedent: src/components/__tests__/SongTable.test.ts:39. Defaults to
+// `true` so every pre-existing test in this file keeps its current
+// behavior — none of them mounted with showAiSuggest before this phase.
+let mockAiEnabled = true
+vi.mock('@/stores/auth', () => ({
+  useAuthStore: () => ({
+    settings: {
+      get aiEnabled() {
+        return mockAiEnabled
+      },
+    },
+  }),
+}))
+
+afterEach(() => {
+  mockAiEnabled = true
+})
 
 describe('ScriptureInput', () => {
   const defaultProps = {
@@ -418,5 +437,32 @@ describe('ScriptureInput', () => {
       const input = wrapper.find('input[type="text"]')
       expect((input.element as HTMLInputElement).value).toBe('')
     })
+  })
+})
+
+// 39-04: the AI scripture discovery block is AND-composed with the existing
+// showAiSuggest prop, not replaced by it — showAiSuggest already scopes this
+// block to reading slots only.
+describe('AI toggle (39-04)', () => {
+  const readingSlotProps = {
+    modelValue: null,
+    sermonPassage: null,
+    showOverlapWarning: true,
+    showAiSuggest: true,
+    label: 'Scripture Reading',
+  }
+
+  it('renders the AI block for a reading slot when the AI toggle is on', () => {
+    mockAiEnabled = true
+    const wrapper = mount(ScriptureInput, { props: readingSlotProps })
+    expect(wrapper.find('input[placeholder^="Search passages"]').exists()).toBe(true)
+  })
+
+  it('hides the AI block for a reading slot when the AI toggle is off, and the freeform text input is the first rendered element', () => {
+    mockAiEnabled = false
+    const wrapper = mount(ScriptureInput, { props: readingSlotProps })
+    expect(wrapper.find('input[placeholder^="Search passages"]').exists()).toBe(false)
+    const firstInput = wrapper.find('input')
+    expect(firstInput.attributes('placeholder')).not.toMatch(/^Search passages/)
   })
 })

@@ -61,7 +61,7 @@
         <div v-if="!searchQuery">
 
           <!-- AI Picks section -->
-          <div v-if="hasSermonContext !== false">
+          <div v-if="authStore.settings.aiEnabled && hasSermonContext !== false">
             <!-- Loading shimmer -->
             <div v-if="aiLoading" class="px-3 py-2">
               <p class="px-0 pt-1 pb-1 text-xs font-semibold text-indigo-400 uppercase tracking-wider">AI Picks</p>

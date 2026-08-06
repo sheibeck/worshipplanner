@@ -1,7 +1,7 @@
 <template>
   <div class="space-y-2">
     <!-- AI Scripture Search (only for reading slots) -->
-    <div v-if="showAiSuggest" class="space-y-2">
+    <div v-if="showAiSuggest && authStore.settings.aiEnabled" class="space-y-2">
       <div class="flex gap-2">
         <input
           v-model="aiQuery"
@@ -199,7 +199,10 @@ import { ref, computed, watch } from 'vue'
 import { esvLink, scripturesOverlap, parseScriptureInput, formatScriptureReference } from '@/utils/scripture'
 import { fetchPassageText } from '@/utils/esvApi'
 import { getScriptureSuggestions, type AiScriptureSuggestion } from '@/utils/claudeApi'
+import { useAuthStore } from '@/stores/auth'
 import type { ScriptureRef } from '@/types/service'
+
+const authStore = useAuthStore()
 
 const props = defineProps<{
   modelValue: ScriptureRef | null
