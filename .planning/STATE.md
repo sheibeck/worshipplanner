@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Service and Slides
-current_phase: 38
-current_phase_name: Congregational Readings Become Real Slides
-status: planning
+status: Awaiting next milestone
 stopped_at: Completed 38-04-PLAN.md (Phase 38 code-complete; owner checkpoint deferred, PENDING-VERIFICATION.md 38.1-38.7)
-last_updated: "2026-08-06T03:01:03.073Z"
+last_updated: "2026-08-06T03:03:54.174Z"
 last_activity: 2026-08-05
-last_activity_desc: Phase 37 complete, transitioned to Phase 38
+last_activity_desc: Milestone v1.4 completed and archived
 progress:
   total_phases: 10
   completed_phases: 10
   total_plans: 61
   completed_plans: 61
   percent: 100
+current_phase: 38
+current_phase_name: Congregational Readings Become Real Slides
 ---
 
 # Project State
@@ -75,15 +75,10 @@ See: .planning/PROJECT.md (updated 2026-07-28)
 
 ## Current Position
 
-Phase: 38 — Congregational Readings Become Real Slides
-Plan: Not started
-Status: Ready to plan
-        executed 2026-08-04). `36-VERIFICATION.md` is `gaps_found` at 4/5 criteria.
-Last activity: 2026-08-05 — Phase 37 complete, transitioned to Phase 38
-
-> Two lines of garbage were removed from this block on 2026-08-05 — orphaned fragments of the
-> previous phase's multi-line Status/Last-activity entries that `phase.complete` left behind when
-> it rewrote the single-line fields around them. Keep these four fields to ONE line each.
+Phase: Milestone v1.4 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-08-05 — Milestone v1.4 completed and archived
 
 ## ★ Phase 36's remaining gap is a DECISION, not missing code — read before planning it
 
@@ -1472,9 +1467,59 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - 22-04: media/autoplay e2e human-verify checkpoint (Task 3) pending before this plan is fully signed off
 - 28-06: this phase's human-verify batch (queued in 28-06-SUMMARY.md) is outstanding, alongside Phases 20-23/25-27 — deferred to /gsd-audit-milestone per the documented v1.3 convention.
 
+## Deferred Items
+
+Acknowledged and deferred at milestone close on 2026-08-05. The owner's instruction was to close v1.4
+and route anything found later into the next batch of changes, so these were accepted rather than
+resolved.
+
+**Closeout type: `override_closeout`** — not `verified_closeout`. Two reasons, both recorded rather
+than smoothed over:
+
+1. **`/gsd-audit-milestone` was never run.** No `.planning/v1.4-MILESTONE-AUDIT.md` exists, so
+   requirements coverage, cross-phase integration and E2E flows were never independently audited at
+   the milestone level.
+
+2. **Every phase's verification is `status_source: owner-attributed`.** Phases 32–38 were accepted,
+   not executed. See `PENDING-VERIFICATION.md`'s CLOSED UNRUN header.
+
+### Quick tasks with missing/unknown completion markers (14)
+
+These predate v1.4 — v1.0-to-v1.3-era task directories whose completion markers are absent or
+unreadable. They are bookkeeping debris, not open work: several are demonstrably shipped (task 9's
+and task 10's commits are listed in this file's own Quick Tasks table). Deferred as-is.
+
+| Category | Item | Status |
+|----------|------|--------|
+| quick_task | 1-refactor-pc-export-dialog-with-service-t | missing |
+| quick_task | 2-use-song-item-type-and-link-pc-songs-by- | unknown |
+| quick_task | 3-auto-populate-pc-item-assignments-person | unknown |
+| quick_task | 4-dismissing-the-import-dialog-should-expl | unknown |
+| quick_task | 5-support-multiple-types-per-song-and-show | unknown |
+| quick_task | 6-fix-service-edit-screen-autosave-inconsi | unknown |
+| quick_task | 7-remove-key-x-suffix-from-song-titles-whe | unknown |
+| quick_task | 8-replace-separate-book-chapter-verse-scri | unknown |
+| quick_task | 9-subscribe-to-updates-so-that-if-2-or-mor | unknown |
+| quick_task | 10-allow-closing-the-scripture-preview-in-e | unknown |
+| quick_task | 260416-dd1-song-picker-improvements-expand-scrollab | unknown |
+| quick_task | 260416-dlb-auto-select-default-teams-in-pc-export-d | missing |
+| quick_task | 260711-dto-menu-page-route-naming-cleanup-drawer-ed | unknown |
+| quick_task | 260713-d60-volunteers-merge-active-inactive | missing |
+
+### Resolved during close, not deferred
+
+- **Phase 34's UAT** was flagged `gaps_found` by the pre-close audit. That status was **stale, not an
+  open defect** — owner findings F1–F5 were closed by gap-closure plans 34-05…34-12 (eight plans, all
+  with SUMMARYs) and `34-VERIFICATION.md` reads 12/12 must-haves verified. The file recorded the
+  findings but was never re-statused. Corrected to `resolved` at close.
+
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
 Last session: 2026-08-05T22:07:43.224Z
 Stopped at: Completed 38-04-PLAN.md (Phase 38 code-complete; owner checkpoint deferred, PENDING-VERIFICATION.md 38.1-38.7)
 Resume file: None
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone

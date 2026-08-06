@@ -6,7 +6,7 @@
 - ✅ **v1.1** — Phases 8-17 (Planning Center, song catalog, volunteer scheduling)
 - ✅ **v1.2 — Worship Service Slide Management** — Phases 18-23 (shipped 2026-07-28; owner acceptance, checkpoints waived)
 - ✅ **v1.3 — Slides Tab Rework** — Phases 24-28 (shipped 2026-07-28; verified by owner)
-- 🔄 **v1.4 — Service and Slides** — Phases 29-37 (in progress; ordering fixes, slide-mirror hard lock, draft lock, save reliability, backgrounds, LLM scripture split, presentation correctness, UI rework, PPTX rendering)
+- ✅ **v1.4 — Service and Slides** — Phases 29-38 (shipped 2026-08-05; owner acceptance, verification unrun)
 
 <details>
 <summary>✅ v1.2 Worship Service Slide Management (Phases 18-23) — ARCHIVED 2026-07-28</summary>
@@ -84,12 +84,13 @@ Full details: [milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md) · phase 
 
 </details>
 
-### 🔄 v1.4 Service and Slides (In Progress)
+<details>
+<summary>✅ v1.4 Service and Slides (Phases 29-38) — SHIPPED 2026-08-05</summary>
+
 
 **Milestone Goal:** Make the Service Order and Slides tabs trustworthy — ordering that holds, saves you
 can see, slides that always mirror the plan — and finish them against the Claude Design wireframes.
 
-**Requirements:** `.planning/REQUIREMENTS.md` (R036–R069, 34 total)
 
 - [x] **Phase 29: Order Structure — Stable Reordering & Post-Service** - Fix the drag-and-drop root cause and add the fifth Post-Service section (completed 2026-07-28)
 - [x] **Phase 30: Slides Mirror the Plan — Hard Lock & Reconciliation Removed** - Delete the reconcile/confirm flow; slide groups always mirror the service order (completed 2026-07-29)
@@ -102,308 +103,22 @@ can see, slides that always mirror the plan — and finish them against the Clau
 - [x] **Phase 37: PowerPoint Server-Side Rendering** - Render imported PowerPoint decks server-side to true-fidelity images (completed 2026-08-05)
 - [x] **Phase 38: Congregational Readings Become Real Slides** - Each Leader/Congregation section becomes its own slide, individually editable and deletable (completed 2026-08-05)
 
-## Phase Details
-
-### Phase 29: Order Structure — Stable Reordering & Post-Service
-
-**Goal:** Service items and slides reorder reliably and land exactly where dropped, and a fifth Post-Service section exists for content that runs as people exit.
-**Depends on**: Nothing (first phase of v1.4)
-**Requirements**: R042, R043, R044, R049, R050
-**Success Criteria** (what must be TRUE):
-
-  1. Dragging a service item to a new position lands it exactly there immediately, with no page refresh needed to see the correct order
-  2. The five service sections (Pre-Service, Worship, Message, Sending, Post-Service) always render in that fixed order, are never themselves draggable, and stay visible even when empty
-  3. Dragging a slide within the Slides tab persists its new position without reverting
-  4. Adding a new slide appends it to the true end of its group, not before the last slide
-
-**Plans**: 5/5 plans executed
-Plans:
-
-- [x] 29-01-PLAN.md — Failing repro FIRST: header-inclusive fixtures, DOM-derived drag helper, identity-based assertions (wave 1)
-- [x] 29-02-PLAN.md — Pure section-ordering helpers in slotTypes.ts + defaultSectionForPosition audit (wave 1)
-- [x] 29-03-PLAN.md — ServiceEditorView: per-section containers, stable slot.id key, correct onEnd, save-failure revert (wave 2)
-- [x] 29-04-PLAN.md — SlideGrid: draggable-scoped indices, one append contract, visible reorder failure (wave 2)
-- [x] 29-05-PLAN.md — Add the fifth Post-Service section, audit four consumers, human-verify a real drag (wave 3)
-
-**UI hint**: yes
-**Research flag**: standard pattern — root cause and fix already fully derived with line-level citations (SUMMARY.md/ARCHITECTURE.md §1); no dedicated research pass needed.
-**Notes**: The existing D-16 DOM-revert fix (`ServiceEditorView.vue:1430`, `SlideGrid.vue:669`) already works and must NOT be re-applied or "re-fixed" — the two open defects are (a) `evt.oldIndex`/`evt.newIndex` used where `oldDraggableIndex`/`newDraggableIndex` are required (section-header DOM nodes are still counted despite the `draggable: '.slot-item'` selector), and (b) the `v-for` key (`slot.kind + '-' + slot.position`) being unstable across every reorder since `reindexSlots()` rewrites `position` on every mutation — re-key on `slot.id`. Land the index-source/per-section fix against the existing four sections first, THEN add `'post-service'` as the fifth section — proving the mechanism before widening it. The same root-cause fix explains both `ServiceEditorView.vue`'s reorder bug and `SlideGrid.vue`'s "new slide lands second-to-last" bug (R049/R050) — one fix, two files. Audit print/share/plan-rail/Planning-Center-export for hard-coded four-section assumptions when Post-Service is added (Pitfall 9).
-
-### Phase 30: Slides Mirror the Plan — Hard Lock & Reconciliation Removed
-
-**Goal:** Slide-group order and membership are hard-locked to the service order, with the reconcile/confirm review flow deleted entirely.
-**Depends on**: Phase 29
-**Requirements**: R045, R046, R047, R048, R054
-**Success Criteria** (what must be TRUE):
-
-  1. Reordering a service item automatically reorders its slide group in the Slides tab — no second manual step
-  2. Swapping a song on a service item silently rewrites that group's slides to the new song, with no confirmation prompt
-  3. Changing a scripture passage updates its scripture slide automatically, defaulting to one slide carrying the passage
-  4. No reconcile/confirm modal or banner ever appears in the Slides tab — every change rebuilds unconditionally
-  5. Song groups in the Slides tab are read-only — a planner cannot create, edit, delete, or reorder a song's slides there
-
-**Plans**: 4/4 plans executed
-Plans:
-
-- [x] 30-01-PLAN.md — Strip the confirm surface: prop chain, banner, modal, decline store action (wave 1)
-- [x] 30-02-PLAN.md — Unconditional idempotent rebuild; survival generalized to all kinds; scripture reference-only (wave 2)
-- [x] 30-03-PLAN.md — Song groups read-only in drawer and grid, after repointing the SONG test fixture (wave 3)
-- [x] 30-04-PLAN.md — Permutation property test for the order lock, membership lock, removal gate, human-verify (wave 4)
-
-**UI hint**: no
-**Research flag**: needs research — graph-trace the full reconciliation consumer inventory (`SlideGroup.dismissedSignature`, `ReconcileResult`, `reconcileSongGroup`, `ReconcileConfirmModal`, and every static AND dynamic import of them) before deleting anything; spans 9 files plus tests.
-**Notes**: `dismissedSignature` is a persisted Firestore field on existing `SlideGroup` documents — record explicitly whether it's left-and-ignored (consistent with D-19, since it was never seen in production) or backfilled; don't let the decision happen by omission. Keep the concurrent-write transaction merge in `replaceGroupSlides` — that generic conflict guard is unrelated to the confirm UX and is still needed once writes become unconditional. Delete the reconciliation test suite entirely (not `describe.skip`); confirm the post-removal failing-file-set doesn't grow past the documented 10-file baseline.
-
-### Phase 31: Service Lifecycle — Draft Lock & Reopen
-
-**Goal:** A service is editable only in Draft; Service Order, Slides and Roles all lock at planned/exported, with an explicit "Reopen for editing" path back.
-**Depends on**: Phase 29
-**Requirements**: R036, R037, R038
-**Success Criteria** (what must be TRUE):
-
-  1. A service can only be edited (Service Order, Slides, and Roles) while its status is Draft; a direct write attempt against a non-draft service — bypassing the UI — is rejected
-  2. An editor can explicitly "Reopen for editing" a Planned or Exported service, returning it to Draft
-  3. Reopening a service that was already exported to Planning Center shows a warning that Planning Center still holds the previously exported version; reopening a never-exported service does not show that warning
-  4. Creating a new service defaults its date to the nearest Sunday that doesn't already have a service plan
-
-**Plans**: 5/6 plans executed
-
-- [x] 31-01-PLAN.md
-- [x] 31-02-PLAN.md
-- [x] 31-03-PLAN.md
-- [x] 31-04-PLAN.md
-- [x] 31-05-PLAN.md
-- [x] 31-06-PLAN.md
-
-**UI hint**: yes
-**Research flag**: needs research — Firestore rules field-level diff logic for the reopen-transition special case (the rule must read `resource.data.status`, not `request.resource.data.status`, and must carve out an explicit allowance for the one status-reverting write).
-**Notes**: `firestore.rules` has ZERO status-based write guard today (role-only) — this is the only genuinely adversary-proof layer, so build it first, then the Pinia store guard (defense-in-depth), then centralize the ~15-repetition UI-only `isExportedLocked` pattern into one `isEditable` computed. Any Cloud Function that writes to `services`/`slideGroups` needs its own explicit status check — the Admin SDK bypasses Firestore rules entirely. Extend `firestore.rules.test.ts`, don't just add UI tests. Sequence the rules change carefully against Phase 29's drag-drop-immediate-save path — a reorder mid-flight during a status transition needs the same rule to hold.
-
-### Phase 32: Save Reliability — Autosave Fix & Persistent Status
-
-**Goal:** Every mutation on the Service Order reliably fires autosave, and the whole app has one persistent inline save-status indicator.
-**Depends on**: Phase 29
-**Requirements**: R039, R040, R041
-**Success Criteria** (what must be TRUE):
-
-  1. Changing a song on a service item reliably triggers a save, including immediately after a prior save's own echo lands
-  2. Every surface with autosave shows a persistent inline "Saving… / Saved HH:MM" status anchored to the content being edited, visible without scrolling
-  3. A save failure raises a toast; a save success does not
-
-**Plans**: 6/6 plans executed
-
-- [x] 32-01-PLAN.md — R039 repro test (red first), store-layer own-echo classifier, view guard
-- [x] 32-02-PLAN.md — `useAutoSave` gains `'error'` and loses the 3s fade
-- [x] 32-03-PLAN.md — `useSaveStatus` and `useToasts` stores, with the error-edge toast trigger
-- [x] 32-04-PLAN.md — `SaveStatusIndicator.vue`, `ToastHost.vue`, mounted in `AppShell.vue`
-- [x] 32-05-PLAN.md — `ServiceEditorView` migrates onto `useAutoSave`; sticky status bar
-- [x] 32-06-PLAN.md — the three editors adopt the shared indicator; per-status testids retired
-
-**UI hint**: yes
-**Research flag**: standard pattern — fix shape is well-evidenced; only needs repro-test-first discipline.
-**Notes**: Write the failing repro test FIRST. The root cause (a save's own Firestore echo carrying a server `updatedAt` the client never tracked, resetting the `autosaveInitialized` guard and swallowing the next discrete mutation) is MEDIUM confidence and has never been reproduced against the live app — do not rewrite blind. Build one `useSaveStatus` Pinia aggregator sitting ABOVE the existing, already-tested `useAutoSave` composable (not replacing it); migrate `ServiceEditorView.vue` off its hand-duplicated ~150-line inline autosave onto `useAutoSave` once the root cause is confirmed. `AutoSaveStatus` needs a fifth `'error'` state — today's type has no failure state at all.
-
-### Phase 33: Backgrounds & Slide Editing
-
-**Goal:** Background images can be set at group, slide, and song level, and slide editing moves to an explicit 3-dot menu with type-appropriate options.
-**Depends on**: Phase 30
-**Requirements**: R055, R056, R057, R058, R051, R052, R063
-**Success Criteria** (what must be TRUE):
-
-  1. A background image can be set for an entire slide group, for one individual slide (overriding the group's), or for a song from the Song Lyrics editor — **most specific wins**: a slide's own background beats its group's, which beats the song's, mirroring the existing slide-beats-bed audio precedence
-  2. Per-slide audio no longer offers a "whole group" scope option; group-wide audio is set only at the group level
-  3. A slide only enters edit mode via an explicit 3-dot menu action, never by clicking the slide itself
-  4. The 3-dot menu opens separate "Edit details" and "Edit lyrics" drawers instead of one multi-tab drawer
-  5. The editing options offered for a slide vary by the service-item type it belongs to — a scripture item offers options a song item does not
-
-**Plans**: 9/9 plans executed
-Plans:
-
-- [x] 33-01-PLAN.md — Three background fields + the slide/group/song cascade in `resolveEntryMedia` (wave 1)
-- [x] 33-02-PLAN.md — `slideActionMenuItems` pure per-kind helper + `SlideActionMenu.vue`, the codebase's first ARIA menu (wave 1)
-- [x] 33-03-PLAN.md — `useBackgroundUpload` composable + shared `BackgroundControl.vue` (wave 2)
-- [x] 33-04-PLAN.md — R058: delete the per-slide audio scope option, its field, and its test block (wave 2)
-- [x] 33-05-PLAN.md — `SlideCard`: root element swap for legal menu nesting + background provenance chip (wave 2)
-- [x] 33-06-PLAN.md — Song-level background in the Song Lyrics editor + `setSongBackground` (wave 3)
-- [x] 33-07-PLAN.md — Drawer `mode` split, Slide Background section, pending-action seam (wave 3)
-- [x] 33-08-PLAN.md — `SlideGrid`: group background control + one-menu-open-at-a-time ownership (wave 3)
-- [x] 33-09-PLAN.md — `SlidesTab`: R051 decoupling + the single menu dispatcher (wave 4)
-
-**UI hint**: yes
-**Research flag**: standard pattern — directly extends an existing precedent (audio's slide-beats-bed cascade); no new libraries.
-**★ Plan-time premise correction (2026-08-02):** the Notes line below ends by saying "Confirm against the Claude Design wireframes at plan time which drawer a given slide's 3-dot menu opens." **That is a false premise.** `docs/design/slides-tab.dc.html` was pulled 2026-07-25 and contains no 3-dot menu, no "Edit details"/"Edit lyrics", and no background feature — verified, all 106 `background` matches are CSS declarations. Every new affordance in this phase is **original design work**, settled and reviewed in `33-UI-SPEC.md`. Same class of finding as Phase 27's two false ROADMAP premises. See `.planning/STATE.md` § "⚠ OPEN ITEM FOR THE OWNER — the design wireframes are stale", which also flags that **Phase 36 depends on wireframes that do not exist**.
-**Notes**: Add `backgroundImageUrl?: string` at three levels — `GroupSlideEntry` (per-slide), `SlideGroup` (group), `SongLyrics` (song, greenfield, no migration) — resolved wherever `assembleSlideshow` already resolves `audioUrl` per slide. The "Edit lyrics" drawer applies only to hand-authored text slides (PRAYER/MESSAGE/blank), never SONG-group lyric entries, which stay read-only here and route to "Edit in song" (R054, Phase 30). Confirm against the Claude Design wireframes at plan time which drawer a given slide's 3-dot menu opens.
-
-### Phase 34: Smarter Content — LLM Scripture Split
-
-**Goal:** A scripture item can be split into a leader/congregation congregational reading, with scripture correctness structurally guaranteed.
-**Depends on**: Nothing new (independent within v1.4)
-**Requirements**: R064, R070, R071
-**Success Criteria** (what must be TRUE):
-
-  1. A scripture item can be split into a leader/congregation congregational reading
-  2. Displayed scripture text is always byte-identical to the already-fetched ESV source — the model returns only indices/speaker labels, never regenerated words
-  3. Splits fall only on clause/verse boundaries, never mid-sentence
-  4. If the split call fails, the scripture slide still renders and remains usable — the feature never blocks editing
-
-**Plans**: 12/12 plans executed
-
-Plans:
-
-- [x] 34-01-PLAN.md — Boundary computation, marker embedding, and byte-exact slicing (pure functions)
-- [x] 34-02-PLAN.md — SPLIT_SCHEMA and validateSplitResult() tested against every individual failure mode
-- [x] 34-03-PLAN.md — splitCongregationalReading(): call shape, slicing, and every failure path
-- [x] 34-04-PLAN.md — Opt-in "Split with AI" affordance, failure toast, manual-path regression
-- [x] 34-05-PLAN.md — ScriptureSlot.congregationalSections, the two scripture helpers, and BOTH assembler call sites (wave 1, gap closure)
-- [x] 34-06-PLAN.md — CongregationalEditor persistence rewrite: off the rejected reading document, onto a prop/emit contract (wave 1, gap closure)
-- [x] 34-07-PLAN.md — Mount it on the SLIDE: action-menu and drawer routes to one keyed editor, plus the WR-04 swap test (wave 2, gap closure)
-- [x] 34-08-PLAN.md — Composed slot→group→slide pipeline proof, validation/PENDING/R064+R070+R071 records, phase gate (wave 4, gap closure)
-- [x] 34-09-PLAN.md — UAT F3: render the resolved background on the Present screen; propose and write R070 (wave 1, UAT)
-- [x] 34-10-PLAN.md — UAT F4: gate the sticky save-status wrapper so no empty bordered box renders (wave 1, UAT)
-- [x] 34-11-PLAN.md — UAT F2: merge group music and group background into one panel, layout only (wave 1, UAT)
-- [x] 34-12-PLAN.md — UAT F5: diagnose the Export to PC gate, then explain the no-credentials state; propose and write R071 (wave 3, UAT)
-
-**UI hint**: no
-**Research flag**: needs research — re-verify the current `@anthropic-ai/sdk` version and `output_config.format` call shape at implementation time (consult the `claude-api` skill again, details may have drifted); validate Haiku split determinism empirically against real passages.
-**Notes**: Upgrading `@anthropic-ai/sdk` from the current `^0.78.0` pin is a hard prerequisite — it predates the structured-outputs support this feature depends on; schedule the upgrade as the first task in this phase. Never let the model regenerate or re-type scripture text — constrain output to structural indices/spans only, validated against a strict schema at the existing single Cloud Function proxy choke point, and treat any offset that fails to byte-match the source as a hard validation failure with fallback, never a silent near-match. Haiku-tier, consistent with the app's existing cost-efficient-model precedent; AI remains additive and never blocking.
-**Planning corrections (2026-08-03)**: three premises above are false and the plans do NOT follow them. (a) The SDK upgrade is **not** a prerequisite — structured outputs went GA in SDK `0.72.0` and the installed `0.78.0` already ships `output_config.format`, `messages.parse()` and `jsonSchemaOutputFormat`; no package is installed or upgraded in this phase. (b) Validation **cannot** live at the Cloud Function proxy — it is a byte-blind pass-through that never sees the ESV source text, so validation is client-side in `src/utils/claudeApi.ts`; no file under `functions/` is touched. (c) `CongregationalEditor.vue` is **mounted nowhere in production**, so success criterion 1 is not true for a user today; mounting it is blocked on an owner decision recorded in `.planning/PENDING-VERIFICATION.md`. The design also exceeds the requirement: boundary **indices** into a pre-computed array of legal split positions, rather than raw character offsets, make a mid-sentence split structurally unrepresentable. (d) Owner UAT finding F3 (2026-08-03 hands-on session) exposed a requirements gap: a media cascade (R055/R056/R057) built through authoring, with no requirement covering the presentation surface that was the point of it — now carried by **R070**. (e) Owner UAT finding F5 was a misdiagnosis — Export to PC was never removed, it is credential-gated (`authStore.hasPcCredentials`), and 34-12's diagnosis found the gate itself behaving correctly; the real defect, the unexplained silent substitution to Copy for PC with no reason given, is now carried by **R071**. **Closing note (34-08 phase gate):** correction (c) is closed by plans 34-05..34-08 via slot-as-source-of-truth — the *direction* was never actually an open owner question (R047 had already decided it, and R064's own text records the rejected alternative); the remaining open question, WHERE the editor mounts, was answered by the owner on 2026-08-03 in favour of the scripture slide's own edit route (UAT F1), with no free-text scripture override added. Plans 34-09..34-12 close owner UAT findings F2..F5 and are **not** R064 scope — two of them (F3, F5) required requirements that had never been written at all, now R070 and R071.
-
-### Phase 35: Presentation Correctness & Lyric Editor
-
-**Goal:** Presented slideshows never leak organizational labels and always carry copyright where required, and lyric paste gets a copyright warning and an inline treatment.
-**Depends on**: Phase 30
-**Requirements**: R059, R060, R061, R065, R066
-**Success Criteria** (what must be TRUE):
-
-  1. Organizational labels never appear when presenting or previewing a slideshow
-  2. Copyright/CCLI information is visible on both the first and last slide of every song group
-  3. Starting the presentation begins at the highlighted group and slide, or that group's first slide when none is highlighted
-  4. Pasting lyrics warns when copyright information is missing rather than accepting silently
-  5. Pasting lyrics happens inline in the editor, not in a modal
-
-**Plans**: 4/4 plans executed
-Plans:
-
-- [x] 35-01-PLAN.md — R059 render fix (delete the leaked `sectionLabel`) + R061 present-start threading through `SlidesTab` → `ServiceEditorView` → `PresentationViewer` (wave 1)
-- [x] 35-02-PLAN.md — R060 regression tests on all three copyright-bracket paths. **Test-only: no emission code — research proved all three paths already bracket, so adding emission would triple-emit** (wave 1)
-- [x] 35-03-PLAN.md — R065/R066: new `LyricPasteRegion.vue` inline surface with the copyright block + always-available override, plus the migrated `LyricPasteDialog` test coverage (wave 1)
-- [x] 35-04-PLAN.md — R066: host the region in `SongLyricEditor.vue`, delete `LyricPasteDialog.vue` and its test file, cover the host-driven open/close/reset mechanisms (wave 2)
-
-**UI hint**: yes
-**Research flag**: standard pattern for R059/R061 (presentation-layer read of already-assembled data); see Notes for R060's documentation-language caveat.
-**Design source**: Claude Design project "Worship Planner Slideshow Design" (`e8e6c287-3e88-402f-88e1-7ad6d5101fa2`), read via DesignSync (`/design-login` if unauthorized) — R066's inline paste-lyrics treatment is specified in the wireframes referenced from `Slides Tab.dc.html`/`support.js`.
-**Notes**: R060 exceeds the documented legal minimum (the real-world convention is at least once per song, typically the last slide) — first-AND-last is a deliberate safety margin for mid-deck starts and songs cut short. Do NOT justify it as "CCLI requires this" in any UI copy or code comment; CCLI's own primary license text was never successfully retrieved this research pass (the site returned marketing copy) and should be pulled before treating this as legally final language.
-
-### Phase 36: UI Rework — Service Order & Contextual Action Bars
-
-**Goal:** The Service Order tab is rebuilt against the Claude Design wireframes, and one contextual action-bar pattern is applied across every tabbed screen.
-**Depends on**: Phase 31, Phase 33
-**Requirements**: R067, R068, R069, R053
-**Success Criteria** (what must be TRUE):
-
-  1. The Service Order tab matches the Claude Design "Turn 3 — Service Order tab" wireframes
-  2. Every tabbed screen (Service Order, Slides, Roles) shows only the actions relevant to that tab through one shared contextual action-bar pattern — "Suggest All Songs"/"Copy to PC" no longer appear on the Slides or Roles tabs
-  3. The Present button appears in the position specified by design "1a Plan rail · slide grid · Edit Slide drawer — two states"
-  4. "Add slide" lives in the contextual action bar, and a group's own drag-and-drop zone doubles as the import affordance — the separate "Import into this Group" button is gone. *(Corrected 2026-08-03 by 36-UI-SPEC: the "Add music to this group" clause is **superseded**. Design "1a" shows group music as its own inline panel, never in a bar, and owner UAT finding F2 — landed as `34-11` — explicitly asked for group music and background to sit together in one panel. R053 corrected in REQUIREMENTS.md with the same evidence.)*
-     **⚠ OPEN OWNER DECISION (2026-08-04):** the remaining `＋ Add slide` clause is **also not literally
-     met.** Phase 36 kept the button in `SlideGrid.vue`'s own header — a wireframe-backed UI-SPEC
-     discretionary call, disclosed in `36-UI-SPEC.md` § Finding 2, three plans' frontmatter and one
-     SUMMARY. `36-VERIFICATION.md` records this as a **gap, not a pass**: the reasoning is sound but,
-     unlike the "Add music" clause, it never received an owner-approved correction. Either accept the
-     override recorded in `36-VERIFICATION.md`'s frontmatter, or commission the full relocation — which
-     is materially more expensive and which the UI-SPEC recommends against rather than forbids.
-
-  5. The Roles tab is last in the tab order
-
-**Plans**: 5/5 plans executed
-Plans:
-
-- [x] 36-01-PLAN.md — R053: the group drop zone becomes the click-to-import affordance; the separate Import button is deleted (wave 1)
-- [x] 36-02-PLAN.md — R068a: the shared ContextualActionBar component and the PURE per-tab item builder that makes R068's acceptance test data-level (wave 1)
-- [x] 36-03-PLAN.md — R068b + R069: the bar wired into the page header, Present relocated per design 1a, tabs reordered to Service Order · Slides · Roles (wave 2)
-- [x] 36-04-PLAN.md — R067a: per-band section headers with slide counts and per-band ＋ Add item; addSlot gains an additive targetSection (wave 3)
-- [x] 36-05-PLAN.md — R067b: the dashed ＋ Add to the service palette replaces the Add Element dropdown, plus the Service Order preservation sweep and the phase gate (wave 4)
-
-**UI hint**: yes
-**Research flag**: standard/UI-heavy — no deep technical uncertainty, but real sequencing risk: this phase must land LAST among UI work, after Phase 31's Service Order layout and Phase 33's Slides layout both finalize, or the action bar needs rework.
-**Planning note (2026-08-03):** planned with `--skip-research`, so there is **no `36-RESEARCH.md`, no `36-VALIDATION.md` and no `36-PATTERNS.md`** — a recorded choice, not a gap. The approved `36-UI-SPEC.md` supplies the design contract and `36-CONTEXT.md`'s verified file:line table supplies the pattern inventory; validation criteria are authored inline as per-task `<automated>` commands. Five plans rather than `coarse` granularity's usual 1-3 because `ServiceEditorView.vue` (3,690 lines) is the center of gravity for R067, R068 and R069 — those three cannot parallelize, so fewer plans would mean 5-6 task plans in the project's largest file. Waves are 1, 1, 2, 3, 4; only 36-01 and 36-02 run in parallel, and they share no files.
-**Design source**: Claude Design project "Worship Planner Slideshow Design" (`e8e6c287-3e88-402f-88e1-7ad6d5101fa2`), read via DesignSync (`/design-login` if unauthorized) — the Service Order rebuild is "Turn 3 — Service Order tab"; the Present button placement is "1a Plan rail · slide grid · Edit Slide drawer — two states."
-**Notes**: This phase is explicitly sequenced last among the milestone's UI work — R068 depends on R067 and the Slides tab layout (Phase 33) both being final, and R053's "move Add slide/Add music into the contextual action bar" only makes sense once that action bar exists, which is why R053 is grouped here rather than with the rest of Slides interaction (Phase 29/33). This is a deliberate departure from a literal reading of the "Slides Interaction" requirement category — R053's own text names R068 as its target.
-
-### Phase 37: PowerPoint Server-Side Rendering
-
-**Goal:** Imported PowerPoint decks render server-side to true-fidelity images, retaining parsed text as a searchable layer.
-**Depends on**: Nothing (independent — deliberately scheduled last per user decision, so an overrun or cut cannot disturb the other 33 requirements)
-**Requirements**: R062
-**Success Criteria** (what must be TRUE):
-
-  1. An imported PowerPoint deck displays as a true visual rendering of each slide — backgrounds, fonts, layout, effects — not text alone
-  2. Extracted text remains available as a searchable/label layer alongside the rendered image
-  3. Only metric-compatible open fonts (Carlito/Caladea/Liberation) are used server-side; no Microsoft fonts are bundled
-  4. Orphan cleanup for failed renders defaults to dry-run/report-only
-
-**Plans**: 6/6 plans executed
-Plans:
-
-- [x] 37-01-PLAN.md — Scaffold the standalone render-service/ project, its Dockerfile, and the font-policy gate as a text test (wave 1)
-- [x] 37-02-PLAN.md — The render service: soffice/pdftoppm orchestration, zero-padded page ordering, POST /render (wave 2)
-- [x] 37-03-PLAN.md — Bridging foundation: the ID-token invoker seam and the additive pptxRenders queue write (wave 1)
-- [x] 37-04-PLAN.md — The completeness check: independent Storage recount gates the ready flip (wave 2)
-- [x] 37-05-PLAN.md — Orphan-render cleanup (dry-run by default) and the deck↔render renderImportId bridge (wave 3)
-- [x] 37-06-PLAN.md — The gcloud run deploy handoff, the Phase 37 pending-verification section, and the three-suite gate (wave 4)
-
-**UI hint**: no
-**Research flag**: needs research — highest-uncertainty item in the milestone; needs a real multi-font, multi-slide test deck and cost/latency validation, not a 2-slide fixture.
-**Planning note (2026-08-03):** planned under **BUILD BUT DO NOT DEPLOY** (STATE.md v1.4 standing decisions). No plan runs `gcloud`, `firebase deploy`, `docker build`/`push`, or creates any GCP resource. The exact deploy command is handed over in `render-service/DEPLOY.md` for the owner to run. Six plans rather than the `coarse` granularity's usual 1-3 because the phase spans three separate test suites — `render-service/` (new), `functions/`, and the app's `src/` — and a 3-plan shape would need six tasks per plan.
-**Notes**: Standalone Cloud Run service (custom Dockerfile, LibreOffice + Poppler) — Firebase Functions buildpacks cannot install these; a new Cloud Function bridges via service-to-service IAM auth, invoked asynchronously with a completeness check (only flip the deck to "ready" once every expected image is confirmed uploaded). Rendered images land under the existing `orgs/{orgId}/pptx-imports/{importId}/rendered/` prefix — sibling to `images/`, structurally exempt from `cleanupExpiredMedia`'s regex guard with zero changes to that function. Any new deletion path this introduces must default to dry-run — the inverse default already caused a real incident in this codebase (`cleanupExpiredMedia`'s doc-comment-vs-code-default mismatch, fixed 2026-07-28). **User decision:** kept in v1.4 but scheduled deliberately last so an overrun or cut disturbs nothing else.
-
-### Phase 38: Congregational Readings Become Real Slides
-
-**Goal:** A congregational scripture reading produces one slide per section — speaker on top, passage below — and each of those slides can be edited or deleted on its own.
-**Depends on**: Phase 34 (which produced `ServiceSlot.congregationalSections`) and Phase 30 (whose hard lock governs group membership)
-**Requirements**: R072 (assigned during planning 2026-08-05, from the owner request of the same day)
-**Success Criteria** (what must be TRUE):
-
-  1. Turning a scripture item into a congregational reading yields N slides in the slide grid, one per section — not one slide carrying N sections
-  2. Each section slide shows its speaker (Leader / Congregation) above that section's passage text
-  3. A section slide can be edited on its own without altering its siblings
-  4. A section slide can be deleted on its own, and stays deleted — it must not reappear when the group is next derived
-  5. Existing services with a stored congregational reading keep working; nothing that reads today's shape breaks
-
-**Plans**: 4/4 plans executed
-Plans:
-
-- [x] 38-01-PLAN.md — The two states in the pure layer: section payload on SourceRef, N-entry derivation, sections-aware signature, detach/convert/destroy rebuild (wave 1)
-- [x] 38-02-PLAN.md — One section per slide in the type system and on the projector: singular field, speaker above the passage (wave 2)
-- [x] 38-03-PLAN.md — Edit and delete a section slide: drawer passage field, speaker control, speaker-named cards (wave 3)
-- [x] 38-04-PLAN.md — Composed multi-tick durability and migration contract, comment reconciliation, owner verification (wave 4)
-
-**UI hint**: yes — touches the slide grid, the 3-dot menu, and the projected slide
-**Research flag**: no external research needed; the uncertainty is internal design, resolved by discussion
-
-**Scoping notes (scouted 2026-08-05, verify before planning — these are the facts that make this a phase and not a quick task):**
-
-- Sections are **slot-owned, not slide-owned**: `ServiceSlot.congregationalSections` (`src/types/service.ts:69`).
-- A SCRIPTURE slot materializes **exactly one** entry with no payload:
-  `[{ order: 0, sourceRef: { kind: 'scripture' } }]` (`src/utils/slideGroupMaterializer.ts:84`).
-
-- `congregationalSlideFieldsFromSlot` (`src/utils/scripture.ts:218-225`) copies **all** sections onto
-  that single slide at assembly time, which is why `PresentationViewer` renders them stacked.
-
-- **The precedent to follow already exists**: an `IMPORTED` slot emits one entry per inner slide
-  (`slideGroupMaterializer.ts:92-96`), discriminated by `innerSlideId`. Multi-entry groups from one
-  slot are established, not novel. The `slideGroup.ts` `SourceRef` doc comment already anticipates
-  this exact widening for congregational splits.
-
-- **The hard problem is criterion 4.** Group membership is re-derived from the slot, so a deleted
-  section slide will come back unless deletion changes the slot's sections or something records the
-  deletion. The re-derivation trigger is a structural signature that, for scripture, is just the
-  formatted reference (`slideGroupMaterializer.ts:133-137`) — so today a sections change does **not**
-  re-derive. Both halves of that need deciding together: what re-derives, and what a delete means.
-
-- **Related correctness rule not to break**: changing a slot's reference clears its stored sections
-  on purpose (`scripture.ts:227-238`) — projecting one passage's words under another reference is a
-  failure the assembler cannot detect.
+**Requirements:** [milestones/v1.4-REQUIREMENTS.md](milestones/v1.4-REQUIREMENTS.md) (R036–R072)
+
+Full details: [milestones/v1.4-ROADMAP.md](milestones/v1.4-ROADMAP.md) · phase artifacts moved to `milestones/v1.4-phases/`
+
+> **Closed on owner acceptance 2026-08-05, not on a passing verification gate.** Phases 29-31 were
+> genuinely verified. Phases 32-38 are `status_source: owner-attributed` — the owner accepted their
+> outstanding human verification without running it ("Any issues I find from here on out will go in
+> the next set of changes I'm going to post"). `/gsd-audit-milestone` was never run. The unrun
+> checks are preserved in `.planning/PENDING-VERIFICATION.md` under a CLOSED UNRUN header rather
+> than deleted, so anything that surfaces later can be traced to the check that would have caught it.
+>
+> **Phase 37 shipped BUILT BUT UNDEPLOYED by the owner's own instruction** — R062 is `[~]` partial,
+> the Cloud Run render service was never deployed, and no UI consumes its output. See
+> `milestones/v1.4-phases/37-*/37-VERIFICATION.md` and `render-service/DEPLOY.md`.
+
+</details>
 
 ## Progress
 
@@ -413,16 +128,7 @@ Plans:
 | 8-17, 16.1 | v1.1 | all | Complete (archived) | 2026-07-24 |
 | 18-23 | v1.2 | all | Complete (archived) | 2026-07-28 |
 | 24-28 | v1.3 | 33/33 | Complete (archived) | 2026-07-28 |
-| 29. Order Structure — Stable Reordering & Post-Service | v1.4 | 5/5 | Complete    | 2026-07-28 |
-| 30. Slides Mirror the Plan — Hard Lock & Reconciliation Removed | v1.4 | 4/4 | Complete    | 2026-07-29 |
-| 31. Service Lifecycle — Draft Lock & Reopen | v1.4 | 6/6 | Complete    | 2026-07-30 |
-| 32. Save Reliability — Autosave Fix & Persistent Status | v1.4 | 6/6 | Complete    | 2026-08-05 |
-| 33. Backgrounds & Slide Editing | v1.4 | 9/9 | Complete    | 2026-08-05 |
-| 34. Smarter Content — LLM Scripture Split | v1.4 | 12/12 | Complete    | 2026-08-05 |
-| 35. Presentation Correctness & Lyric Editor | v1.4 | 4/4 | Complete    | 2026-08-05 |
-| 36. UI Rework — Service Order & Contextual Action Bars | v1.4 | 5/5 | Complete    | 2026-08-05 |
-| 37. PowerPoint Server-Side Rendering | v1.4 | 6/6 | Complete    | 2026-08-05 |
-| 38. Congregational Readings Become Real Slides | v1.4 | 4/4 | Complete    | 2026-08-05 |
+| 29-38 | v1.4 | 61/61 | Complete (archived) | 2026-08-05 |
 
 ## Backlog
 

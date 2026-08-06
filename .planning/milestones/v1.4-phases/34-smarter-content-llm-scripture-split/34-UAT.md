@@ -2,7 +2,8 @@
 phase: "34"
 name: "smarter-content-llm-scripture-split"
 created: 2026-08-03
-status: gaps_found
+status: resolved
+status_corrected: "2026-08-05 — was stale at gaps_found; findings F1-F5 were closed by plans 34-05..34-12 (8 gap-closure plans, all with SUMMARYs) and 34-VERIFICATION.md reads 12/12 must-haves verified. The file recorded the findings but was never re-statused after they were fixed."
 source: owner hands-on session, 2026-08-03
 scope_note: >
   These are OWNER findings from real use of the running app. Only F1 belongs to R064.

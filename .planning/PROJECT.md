@@ -11,9 +11,25 @@ Smart weekly service planning that follows the Vertical Worship methodology (1�
 ## Current State
 
 **Shipped:** v1.0 MVP (Phases 1–4, 6–7) · v1.1 (Phases 8–17) · v1.2 Worship Service Slide Management
-(Phases 18–23) · **v1.3 Slides Tab Rework (Phases 24–28)** — all archived as of 2026-07-28.
+(Phases 18–23) · v1.3 Slides Tab Rework (Phases 24–28) · **v1.4 Service and Slides (Phases 29–38,
+shipped 2026-08-05)** — all archived.
 
-**Open:** v1.4 Service and Slides (Phases 29+), started 2026-07-28.
+**Open:** nothing. v1.5 has not been scoped — run `/gsd-new-milestone`.
+
+### v1.4 shipped on owner acceptance, with two things left genuinely unfinished
+
+Phases 29–31 were verified normally. **Phases 32–38 were accepted, not verified** — their
+`*-VERIFICATION.md` files carry `status_source: owner-attributed`, `/gsd-audit-milestone` was never
+run, and the unrun checks are preserved in `.planning/PENDING-VERIFICATION.md` under a CLOSED UNRUN
+header. The owner's call, made explicitly: *"Any issues I find from here on out will go in the next set
+of changes I'm going to post."*
+
+Two items are not merely unverified but **incomplete**, and are carried into Active below:
+
+1. **PPTX server-side rendering is built but undeployed** (Phase 37, R062 `[~]`). Nothing was
+   containerized or provisioned; `render-service/DEPLOY.md` is the handoff.
+2. **`firestore.rules` is not deployed** (backlog 999.3). Phase 31's draft lock is a three-layer
+   control whose third layer ships separately from the bundle and is currently not live.
 
 v1.2 gave the app slide management (lyrics, scripture, PPTX import, media, presentation preview). v1.3
 then reworked it around a **persisted slide-group model**: a dedicated **Slides** tab where all slide
@@ -29,7 +45,11 @@ per-phase verification.
 **Dropped 2026-07-28:** Collaboration / Tasks & Events (planned as Phase 5, never started) —
 `TASK-01..03`, `EVNT-01..04`. Still in backlog: **999.1**, extract a shared song-browse component.
 
-## Current Milestone: v1.4 Service and Slides
+## Previous Milestone: v1.4 Service and Slides (SHIPPED 2026-08-05)
+
+> Archived. Full record: [milestones/v1.4-ROADMAP.md](milestones/v1.4-ROADMAP.md) ·
+> [milestones/v1.4-REQUIREMENTS.md](milestones/v1.4-REQUIREMENTS.md). Retained below for context until
+> v1.5 is scoped.
 
 **Goal:** Make the Service Order and Slides tabs trustworthy — ordering that holds, saves you can see,
 slides that always mirror the plan — and finish them against the Claude Design wireframes.
@@ -114,23 +134,33 @@ only after a page refresh.
 - ✓ Selective Planning Center roster import: scope by worship team + individually-scheduled positions with per-position Role mapping (choir/orchestra excluded), importing name, email, and roles — v1.0 (Validated in Phase 14)
 - ✓ Per-(person, role) serve frequency (independent cadence per role a person holds) plus role-category co-occurrence rules — TECH exclusive; BAND/VOCALS/OTHER combine, capped at one BAND instrument per person per service — with the per-quarter tier (regular/fill-in/out) reconciled per-role consistently across scheduler, availability drawer, manual grid quick-assign, and admin roster status/filter — v1.0 (Validated in Phase 15)
 
+- ✓ A service is editable only while in Draft; leaving Draft locks Service Order, Slides and Roles, with an explicit Reopen-for-editing path back — v1.4 (Phase 31)
+- ✓ Autosave on the Service Order is reliable, and every save in the app is visible without scrolling — v1.4 (Phase 32)
+- ✓ Post-Service section exists in both the service plan and the slides — v1.4 (Phase 29)
+- ✓ Service items reorder correctly by drag-and-drop, with the five sections permanently ordered — v1.4 (Phase 29)
+- ✓ Slide groups always mirror the service order — no review step, no manual re-sync — v1.4 (Phase 30)
+- ✓ Slides can be reordered, added, and edited without accidental edit-mode or lost changes — v1.4 (Phases 30, 33)
+- ✓ Background images can be set per group, per slide, and per song — v1.4 (Phase 33; rendering at presentation added as R070)
+- ✓ Presented slides show copyright where required and never show organizational labels — v1.4 (Phase 35)
+- ✓ Scripture slides can be generated as congregational readings with LLM-assisted splitting — v1.4 (Phase 34), and each section is now its own editable slide — v1.4 (Phase 38)
+- ✓ Lyric paste warns when copyright information is missing, and happens inline — v1.4 (Phase 35)
+- ✓ Every tabbed screen shows only the actions relevant to the open tab — v1.4 (Phase 36)
+
 ### Active
 
-<!-- v1.4 Service and Slides — see .planning/REQUIREMENTS.md for the REQ-ID breakdown -->
+<!-- v1.5 has not been scoped. Run /gsd-new-milestone to define it. -->
 
-- [ ] A service is editable only while in Draft; leaving Draft locks Service Order, Slides and Roles,
-      with an explicit Reopen-for-editing path back
-- [ ] Autosave on the Service Order is reliable, and every save in the app is visible without scrolling
-- [ ] Post-Service section exists in both the service plan and the slides
-- [ ] Service items reorder correctly by drag-and-drop, with the five sections permanently ordered
-- [ ] Slide groups always mirror the service order — no review step, no manual re-sync
-- [ ] Slides can be reordered, added, and edited without accidental edit-mode or lost changes
-- [ ] Background images can be set per group, per slide, and per song
-- [ ] Presented slides show copyright where required and never show organizational labels
-- [ ] PowerPoint imports look like the original PowerPoint
-- [ ] Scripture slides can be generated as congregational readings with LLM-assisted splitting
-- [ ] Lyric paste warns when copyright information is missing, and happens inline
-- [ ] Every tabbed screen shows only the actions relevant to the open tab
+- [ ] **PowerPoint imports look like the original PowerPoint** — carried forward from v1.4 as
+      **incomplete**. Phase 37 built the whole server-side render pipeline (Cloud Run service,
+      Dockerfile, bridging Cloud Function, cleanup job, 39 tests) but it was **never deployed**, by the
+      owner's own instruction, and **no UI consumes the rendered images**. R062 is `[~]` partial.
+      Finishing it means deploying per `render-service/DEPLOY.md` and building a client-side display.
+- [ ] **Deploy `firestore.rules` to production** (backlog Phase 999.3) — Phase 31's draft lock has
+      three layers; the UI gate and store guard ship in the bundle, the rules layer does not. Until it
+      is deployed, the browser console can still write to a locked service.
+- [ ] Clearing a song should clear its slides, even when the song is reprised (backlog Phase 999.2)
+- [ ] Extract a shared song-browse component used by both the Songs page and the service-plan picker
+      (backlog Phase 999.1)
 
 ### Out of Scope
 
@@ -242,4 +272,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-28 after opening milestone v1.4 (Service and Slides)*
+*Last updated: 2026-08-05 after shipping milestone v1.4 (Service and Slides)*
