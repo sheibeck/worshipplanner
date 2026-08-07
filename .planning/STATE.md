@@ -4,17 +4,17 @@ milestone: v1.5
 milestone_name: Settings, Sharing, and Fidelity
 current_phase: 42
 current_phase_name: PowerPoint Rendered-Image Display
-status: executing
-stopped_at: Completed 42-07-PLAN.md
-last_updated: "2026-08-07T11:30:00.524Z"
+status: verifying
+stopped_at: Completed 42-08-PLAN.md (Phase 42 code-complete, ready for verification)
+last_updated: "2026-08-07T12:04:13.276Z"
 last_activity: 2026-08-07
 last_activity_desc: Phase 42 execution started
 progress:
   total_phases: 11
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 23
-  completed_plans: 22
-  percent: 36
+  completed_plans: 23
+  percent: 45
 ---
 
 # Project State
@@ -114,7 +114,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 42 (PowerPoint Rendered-Image Display) — EXECUTING
 Plan: 8 of 8
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-08-07 — Phase 42 execution started
 module, authStore.settings merged once in loadOrgContext, vwModeEnabled dual-read, R073 test
 coverage (src/stores/__tests__/auth.test.ts)
@@ -1304,6 +1304,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 42 P05 | 15min | 2 tasks | 2 files |
 | Phase 42 P06 | 55min | 2 tasks | 4 files |
 | Phase 42 P07 | 40min | 2 tasks | 2 files |
+| Phase 42 P08 | 24min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -1602,6 +1603,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 42-05: slideshowAssembler.ts's two IMPORTED paths now route through the shared importedRenderReconciler (resolveImportedRender/importedEntryIdentities/importedEntryContent), keyed on deck.renderImportId — matching 42-04's materializer wiring so the grid and presenter provably agree
 - [Phase ?]: 42-06: renderFailureSentence lookup deliberately leaves incomplete-render unmapped per UI-SPEC's contract; routes through generic fallback
 - [Phase ?]: PresentationViewer's failed-render icon uses h-8 w-8 amber-300 (smaller than the pending spinner) per UI-SPEC wording; the never-louder guarantee is enforced at the heading level (identical text-4xl font-semibold on both states).
+- [Phase ?]: Switched useSlideshowAssembly's lifecycle hook from onUnmounted to onScopeDispose so render-listener teardown is testable outside a mounted component and works identically inside one
+- [Phase ?]: distinctRenderImportIds/renderReadySignal follow the existing synchronous-computed-decides-WHAT / async-watch-does-the-work split; renderedUrlCache is keyed renderImportId:renderedCount so a re-render's page-count change cannot serve a stale URL array
 
 ### Roadmap Evolution
 
@@ -1913,8 +1916,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-07T11:30:00.481Z
-Stopped at: Completed 42-07-PLAN.md
+Last session: 2026-08-07T12:04:13.231Z
+Stopped at: Completed 42-08-PLAN.md (Phase 42 code-complete, ready for verification)
 Resume file: None
 
 ## Operator Next Steps

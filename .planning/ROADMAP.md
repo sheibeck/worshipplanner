@@ -273,7 +273,7 @@ Plans:
   3. New `IMPORTED`-branch logic in both `slideGroupMaterializer.ts` and `slideshowAssembler.ts` reconciles the render count against the parsed-slide count rather than assuming they agree — proven by a test covering the documented count-disagreement case
   4. `sourceSignature` for an IMPORTED group folds in render status, so the existing rebuild-on-mismatch mechanism fires exactly once when a render transitions pending → ready
 
-**Plans**: 7/8 plans executed
+**Plans**: 8/8 plans executed
 
 Plans:
 
@@ -284,7 +284,7 @@ Plans:
 - [x] 42-05-PLAN.md — assembler IMPORTED paths: stored-group and no-group fallback, 1-based page resolution, parsed text never drawn
 - [x] 42-06-PLAN.md — grid: `failureReason` sentence map and `SlideCard` pending/failed states
 - [x] 42-07-PLAN.md — presenter: `PresentationViewer` pending/failed states and the never-skip guarantee
-- [ ] 42-08-PLAN.md — composable wiring: render subscription, URL cache, all four `AssemblyInputs` sites, deferred manual checks
+- [x] 42-08-PLAN.md — composable wiring: render subscription, URL cache, all four `AssemblyInputs` sites, deferred manual checks
 
 **UI hint**: yes
 **Research flag**: needs research — render-count-vs-parsed-count reconciliation across two files plus `sourceSignature`; this item has already slipped one full milestone (v1.4 Phase 37 shipped the backend only), so treat the stated success criteria as the explicit definition of done.
@@ -404,7 +404,7 @@ Plans:
 | 39. Org Settings Infrastructure & Feature Toggles | v1.5 | 6/6 | In Progress|  |
 | 40. Custom Auth Claim for Org Membership | v1.5 | 4/4 | In Progress|  |
 | 41. Sharing Correctness | v1.5 | 4/4 | Complete    | 2026-08-07 |
-| 42. PowerPoint Rendered-Image Display | v1.5 | 7/8 | In Progress|  |
+| 42. PowerPoint Rendered-Image Display | v1.5 | 8/8 | In Progress|  |
 | 43. Service Item Types | v1.5 | 0/? | Not started | - |
 | 44. Default Service Template | v1.5 | 0/? | Not started | - |
 | 45. ESV/NLT Bible Version Selection | v1.5 | 0/? | Not started | - |
