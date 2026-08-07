@@ -91,12 +91,14 @@ describe('pickAdoptableToken', () => {
   })
 
   it('5. breaks a byte-identical createdAt tie via lexicographically greatest id', () => {
-    // Array order (tok-b, tok-a) is the opposite of alphabetical order, so a no-op
-    // comparator (one that never reaches the tiebreak) cannot pass this case.
+    // WR-01 (41-REVIEW): array order (tok-a, tok-b) MATCHES alphabetical order, i.e. the
+    // order a stable sort with a no-op/absent tiebreak would already produce unchanged.
+    // Only the real tiebreak (b.id.localeCompare(a.id), which sorts the greatest id first)
+    // reorders this to 'tok-b' — a no-op comparator would leave 'tok-a' first and fail here.
     const createdAt = { seconds: 500, nanoseconds: 0 }
     const candidates: ShareTokenCandidate[] = [
-      { id: 'tok-b', orgId: 'org-1', createdAt },
       { id: 'tok-a', orgId: 'org-1', createdAt },
+      { id: 'tok-b', orgId: 'org-1', createdAt },
     ]
     expect(pickAdoptableToken(candidates, 'org-1')).toBe('tok-b')
   })
@@ -111,9 +113,12 @@ describe('pickAdoptableToken', () => {
   })
 
   it('7. two null createdAt values still resolve deterministically via the id tiebreak', () => {
+    // WR-01 (41-REVIEW): array order (tok-a, tok-b) MATCHES alphabetical order — see test 5's
+    // comment for why the input order must oppose the expected output to actually exercise the
+    // tiebreak rather than just observing stable-sort's order preservation.
     const candidates: ShareTokenCandidate[] = [
-      { id: 'tok-b', orgId: 'org-1', createdAt: null },
       { id: 'tok-a', orgId: 'org-1', createdAt: null },
+      { id: 'tok-b', orgId: 'org-1', createdAt: null },
     ]
     expect(pickAdoptableToken(candidates, 'org-1')).toBe('tok-b')
   })
