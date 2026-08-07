@@ -69,8 +69,52 @@
         data-testid="presentation-slide"
         class="w-full h-full flex flex-col items-center justify-center px-16 py-12 text-center"
       >
+        <!-- Render-pending — the FIRST branch of this chain (R080/D-15).
+             Occupies the slide's normal position; never filters it out of
+             props.slides, hasSlides, atFirst, atLast or progressLabel. -->
+        <div
+          v-if="currentRenderState === 'pending'"
+          data-testid="presentation-render-pending"
+          class="flex flex-col items-center gap-4"
+        >
+          <svg
+            class="h-10 w-10 animate-spin text-indigo-400"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
+          <h2 class="text-4xl font-semibold text-gray-100">This slide is still rendering.</h2>
+        </div>
+
+        <!-- Render-failed — amber, never red (discretionary decision,
+             42-UI-SPEC.md § Color): a congregation-facing pause, not an error
+             page. Same layout family and same heading size/weight as pending
+             above — never visually louder. -->
+        <div
+          v-else-if="currentRenderState === 'failed'"
+          data-testid="presentation-render-failed"
+          class="flex flex-col items-center gap-4"
+        >
+          <svg
+            class="h-8 w-8 text-amber-300"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            aria-hidden="true"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+          </svg>
+          <h2 class="text-4xl font-semibold text-gray-100">This slide couldn't be rendered.</h2>
+          <p class="text-[13px] leading-normal text-gray-400">{{ currentRenderFailureSentence }}</p>
+        </div>
+
         <!-- lyric -->
-        <template v-if="slideKind === 'lyric'">
+        <template v-else-if="slideKind === 'lyric'">
           <p
             data-testid="presentation-body"
             class="text-gray-100 whitespace-pre-line text-5xl font-normal leading-[1.4]"
@@ -341,6 +385,7 @@ import type {
   VideoSlide,
 } from '@/types/slide'
 import { SERVICE_SECTION_LABELS } from '@/types/service'
+import { renderFailureSentence } from './slides/slideDisplay'
 import AudioPlayer from './AudioPlayer.vue'
 import VideoPlayer from './VideoPlayer.vue'
 
@@ -406,6 +451,20 @@ const exitVisible = computed(() => chromeVisible.value || isLoadingState.value |
 const currentSlide = computed<AssembledSlide | null>(() => props.slides[currentIndex.value] ?? null)
 const atFirst = computed(() => currentIndex.value <= 0)
 const atLast = computed(() => currentIndex.value >= props.slides.length - 1)
+
+/** R080/D-15 — `'pending' | 'failed' | null` for whichever slide is currently
+ * on screen. This branch precedes the entire per-kind chain below (ordering
+ * is the mechanism, not a filter) so a render-state slide never falls
+ * through to a broken image element or stale parsed text. */
+const currentRenderState = computed<'pending' | 'failed' | null>(
+  () => currentSlide.value?.slide.renderState ?? null,
+)
+
+/** Routed through `renderFailureSentence` — the ONE sanctioned path from the
+ * raw `renderFailureReason` slug to the DOM (T-42-04), same as SlideCard.vue. */
+const currentRenderFailureSentence = computed(() =>
+  renderFailureSentence(currentSlide.value?.slide.renderFailureReason),
+)
 
 const currentAudioUrl = computed<string | null>(() => currentSlide.value?.slide.audioUrl ?? null)
 /**

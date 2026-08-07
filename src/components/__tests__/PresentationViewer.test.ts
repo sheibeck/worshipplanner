@@ -159,6 +159,27 @@ function imageSlide(id: string): AssembledSlide {
 }
 
 /**
+ * Attaches `renderState`/`renderFailureReason` to an existing fixture's
+ * `slide` rather than writing new render-state-only fixtures from scratch —
+ * `SlideBase.renderState` sits alongside `contentKind`, so any fixture can
+ * carry it (R080/D-15, 42-03).
+ */
+function withRenderState(
+  assembled: AssembledSlide,
+  renderState: 'pending' | 'failed',
+  renderFailureReason?: string,
+): AssembledSlide {
+  return {
+    ...assembled,
+    slide: {
+      ...assembled.slide,
+      renderState,
+      ...(renderFailureReason !== undefined && { renderFailureReason }),
+    },
+  }
+}
+
+/**
  * Attaches a resolved `backgroundImageUrl` (+ its provenance tier) to an
  * existing fixture rather than writing a new slide fixture from scratch —
  * the viewer only ever reads these two fields off `slide`, so any fixture
@@ -753,6 +774,75 @@ describe('PresentationViewer', () => {
     expect(slideContainer.find('i').exists()).toBe(false)
     expect(slideContainer.text()).toContain('<script>alert(1)</script>')
     expect(slideContainer.text()).toContain('<b>bold</b>')
+  })
+
+  // ── 42-07 Task 1: the presenter's pending/failed canvas states (R080/D-15) ──
+
+  describe('render-pending and render-failed canvas states (R080/D-15)', () => {
+    it('a pending current slide renders presentation-render-pending with the rendering heading, and neither presentation-image nor presentation-body', async () => {
+      mount(PresentationViewer, { props: { slides: [withRenderState(imageSlide('a'), 'pending')] } })
+      await Promise.resolve()
+
+      const pending = body().find('[data-testid="presentation-render-pending"]')
+      expect(pending.exists()).toBe(true)
+      expect(pending.text()).toContain('This slide is still rendering.')
+      expect(body().find('[data-testid="presentation-image"]').exists()).toBe(false)
+      expect(body().find('[data-testid="presentation-body"]').exists()).toBe(false)
+    })
+
+    it('a failed current slide renders presentation-render-failed with the failed heading and mapped caption, and neither presentation-image nor presentation-body', async () => {
+      mount(PresentationViewer, {
+        props: { slides: [withRenderState(imageSlide('a'), 'failed', 'missing-render-doc')] },
+      })
+      await Promise.resolve()
+
+      const failed = body().find('[data-testid="presentation-render-failed"]')
+      expect(failed.exists()).toBe(true)
+      expect(failed.text()).toContain("This slide couldn't be rendered.")
+      expect(failed.text()).toContain("This deck's render record is missing.")
+      expect(body().find('[data-testid="presentation-image"]').exists()).toBe(false)
+      expect(body().find('[data-testid="presentation-body"]').exists()).toBe(false)
+    })
+
+    it('a failed slide with an unmapped renderFailureReason shows the generic fallback and never the raw slug', async () => {
+      mount(PresentationViewer, {
+        props: { slides: [withRenderState(imageSlide('a'), 'failed', 'some-unmapped-future-reason')] },
+      })
+      await Promise.resolve()
+
+      const html = document.body.innerHTML
+      expect(html).not.toContain('some-unmapped-future-reason')
+      expect(body().find('[data-testid="presentation-render-failed"]').text()).toContain(
+        "This slide couldn't be rendered.",
+      )
+    })
+
+    it('the pending and failed headings share the same text-4xl font-semibold size and weight — failed is never louder', async () => {
+      let wrapper = mount(PresentationViewer, { props: { slides: [withRenderState(imageSlide('a'), 'pending')] } })
+      await Promise.resolve()
+      const pendingHeading = body().find('[data-testid="presentation-render-pending"] h2')
+      expect(pendingHeading.classes()).toContain('text-4xl')
+      expect(pendingHeading.classes()).toContain('font-semibold')
+      wrapper.unmount()
+
+      wrapper = mount(PresentationViewer, { props: { slides: [withRenderState(imageSlide('a'), 'failed')] } })
+      await Promise.resolve()
+      const failedHeading = body().find('[data-testid="presentation-render-failed"] h2')
+      expect(failedHeading.classes()).toContain('text-4xl')
+      expect(failedHeading.classes()).toContain('font-semibold')
+    })
+
+    it('a slide with no renderState and contentKind image still renders presentation-image byte-identically', async () => {
+      mount(PresentationViewer, { props: { slides: [imageSlide('a')] } })
+      await Promise.resolve()
+
+      const img = body().find('[data-testid="presentation-image"]')
+      expect(img.exists()).toBe(true)
+      expect(img.classes()).toContain('object-contain')
+      expect(img.classes()).toContain('max-h-[80vh]')
+      expect(body().find('[data-testid="presentation-render-pending"]').exists()).toBe(false)
+      expect(body().find('[data-testid="presentation-render-failed"]').exists()).toBe(false)
+    })
   })
 
   // ── Task 1: mount the chromeless players and drive play/pause across transitions ──
