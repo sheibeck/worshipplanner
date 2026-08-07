@@ -2,9 +2,9 @@
 phase: 42
 slug: powerpoint-rendered-image-display
 # status lifecycle: draft (seeded by plan-phase) → validated (set by validate-phase §6)
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: validated
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-08-07
 ---
 
@@ -105,17 +105,58 @@ fill in concrete task IDs.
 
 ---
 
+## Validation Audit 2026-08-07
+
+| Metric | Count |
+|--------|-------|
+| Requirements in scope | 2 (R079, R080) |
+| Gaps found | 0 |
+| Resolved | 0 (none needed) |
+| Escalated to manual-only | 4 (all inherently manual — see above) |
+| Probe edges covered | 4 truths + 1 flagged assumption (the `unclassified` R080 row, correctly not backstopped) |
+| UI-SPEC considerations lifted | 7 covered + 1 flat-scalar backstop |
+
+**Test surface, counted on the final tree:**
+
+| Suite | Tests |
+|---|---|
+| `src/utils/__tests__/importedRenderReconciler.test.ts` | 33 |
+| `src/utils/__tests__/renderedPagePaths.test.ts` | 9 |
+| `src/stores/__tests__/pptxRenders.test.ts` | 11 |
+| `src/components/slides/__tests__/slideDisplay.test.ts` | 67 |
+| `src/components/slides/__tests__/SlideCard.test.ts` | 37 |
+| `src/components/__tests__/PresentationViewer.test.ts` | 86 |
+| `src/composables/__tests__/useSlideshowAssembly.test.ts` | 49 |
+| `src/rules.test.ts` — `pptxRenders` references | 21 (7 emulator cases) |
+
+**Wave 0 items — all closed:**
+- The rules probe ran and **confirmed** the premise (write succeeded pre-fix) rather than falsifying it.
+- The `usePptxRenders` / `resolveImageUrl` mocks were added to `useSlideshowAssembly.test.ts`.
+- The `getDownloadURL` mock question resolved — handled inside the composable's own loader.
+
+**Evidence re-run independently:**
+- `npm run type-check` → 0 errors
+- `npx vitest run` → **2842 passed**, 13 failed across the 3 documented baseline files
+  (`src/storage.rules.test.ts`, `src/views/__tests__/RosterView.test.ts`, `render-service/src/render.test.ts`)
+- `npx vitest run --config vitest.rules.config.ts` → **140/140**
+
+---
+
 ## Validation Sign-Off
 
-- [ ] All tasks have automated verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references (the rules probe and both test-mock gaps)
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 180s
-- [ ] The `firestore.rules` change ships with a **passing ALLOW case that actually executed** against
-      the emulator, plus the DENY case that proves the T-37-15 write hole is closed
-- [ ] No test asserts a *presence* where the requirement is an *absence* (parsed text NOT drawn; the
-      presenter NOT skipping; the raw `failureReason` slug NOT in the DOM)
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have automated verify or a documented manual-only entry
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references (the rules probe and both test-mock gaps — all closed)
+- [x] No watch-mode flags
+- [x] Feedback latency < 180s
+- [x] The `firestore.rules` change ships with a **passing ALLOW case that actually executed** against
+      the emulator, plus the DENY case that proves the T-37-15 write hole is closed — and the DENY
+      case was RED before the fix, which is the strongest form of this evidence
+- [x] No test asserts a *presence* where the requirement is an *absence* — parsed text NOT drawn, the
+      presenter NOT skipping, the raw `failureReason` slug NOT in the DOM; all three are absence
+      assertions
+- [x] The `pending → ready` idempotence test pins **entry-id continuity**, closing the asymmetry that
+      let code-review finding CR-01 verify green
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** validated 2026-08-07
