@@ -845,6 +845,77 @@ describe('PresentationViewer', () => {
     })
   })
 
+  // ── 42-07 Task 2: the presenter never skips a pending or failed slide (R080/D-15) ──
+
+  describe('never skips a pending or failed slide (R080/D-15)', () => {
+    it('a pending slide in the middle position is counted, reached by next (not jumped over), and re-reached by prev', async () => {
+      const slides: AssembledSlide[] = [
+        withoutSection(imageSlide('a')),
+        withRenderState(withoutSection(imageSlide('b')), 'pending'),
+        withoutSection(imageSlide('c')),
+      ]
+      mount(PresentationViewer, { props: { slides } })
+      await Promise.resolve()
+
+      // Mounted at slide 1: the pending slide is counted in the denominator.
+      expect(body().find('[data-testid="presentation-progress"]').text()).toBe('1 / 3')
+      expect(body().find('[data-testid="presentation-prev"]').attributes('disabled')).toBeDefined()
+      expect(body().find('[data-testid="presentation-next"]').attributes('disabled')).toBeUndefined()
+
+      // Advancing once lands ON the pending slide, not past it.
+      await body().find('[data-testid="presentation-next"]').trigger('click')
+      expect(body().find('[data-testid="presentation-render-pending"]').exists()).toBe(true)
+      expect(body().find('[data-testid="presentation-progress"]').text()).toBe('2 / 3')
+
+      // Advancing again lands on slide 3.
+      await body().find('[data-testid="presentation-next"]').trigger('click')
+      expect(body().find('[data-testid="presentation-progress"]').text()).toBe('3 / 3')
+      expect(body().find('[data-testid="presentation-next"]').attributes('disabled')).toBeDefined()
+
+      // Going back from slide 3 lands on the pending slide again — prev does not skip it either.
+      await body().find('[data-testid="presentation-prev"]').trigger('click')
+      expect(body().find('[data-testid="presentation-render-pending"]').exists()).toBe(true)
+      expect(body().find('[data-testid="presentation-progress"]').text()).toBe('2 / 3')
+    })
+
+    it('a failed slide in the same middle position is counted, reached by next, and re-reached by prev', async () => {
+      const slides: AssembledSlide[] = [
+        withoutSection(imageSlide('a')),
+        withRenderState(withoutSection(imageSlide('b')), 'failed'),
+        withoutSection(imageSlide('c')),
+      ]
+      mount(PresentationViewer, { props: { slides } })
+      await Promise.resolve()
+
+      expect(body().find('[data-testid="presentation-progress"]').text()).toBe('1 / 3')
+
+      await body().find('[data-testid="presentation-next"]').trigger('click')
+      expect(body().find('[data-testid="presentation-render-failed"]').exists()).toBe(true)
+      expect(body().find('[data-testid="presentation-progress"]').text()).toBe('2 / 3')
+
+      await body().find('[data-testid="presentation-next"]').trigger('click')
+      expect(body().find('[data-testid="presentation-progress"]').text()).toBe('3 / 3')
+
+      await body().find('[data-testid="presentation-prev"]').trigger('click')
+      expect(body().find('[data-testid="presentation-render-failed"]').exists()).toBe(true)
+      expect(body().find('[data-testid="presentation-progress"]').text()).toBe('2 / 3')
+    })
+
+    it('an all-pending three-slide deck shows the pending block, reads "1 / 3", and is never the empty state', async () => {
+      const slides: AssembledSlide[] = [
+        withRenderState(withoutSection(imageSlide('a')), 'pending'),
+        withRenderState(withoutSection(imageSlide('b')), 'pending'),
+        withRenderState(withoutSection(imageSlide('c')), 'pending'),
+      ]
+      mount(PresentationViewer, { props: { slides } })
+      await Promise.resolve()
+
+      expect(body().find('[data-testid="presentation-progress"]').text()).toBe('1 / 3')
+      expect(body().find('[data-testid="presentation-render-pending"]').exists()).toBe(true)
+      expect(body().find('[data-testid="presentation-empty-state"]').exists()).toBe(false)
+    })
+  })
+
   // ── Task 1: mount the chromeless players and drive play/pause across transitions ──
 
   /**
