@@ -61,6 +61,25 @@
             <span class="text-gray-500"> -- </span>
             <span class="text-gray-900">{{ formatScriptureRef(props.service.sermonPassage) }}</span>
           </template>
+          <template v-if="slot.body?.trim()">
+            <p class="whitespace-pre-wrap text-gray-700 mt-1">{{ slot.body }}</p>
+          </template>
+        </template>
+
+        <!-- ANNOUNCEMENTS slot -->
+        <template v-else-if="slot.kind === 'ANNOUNCEMENTS'">
+          <span class="font-semibold text-gray-700">Announcements</span>
+          <template v-if="slot.body?.trim()">
+            <p class="whitespace-pre-wrap text-gray-700 mt-1">{{ slot.body }}</p>
+          </template>
+        </template>
+
+        <!-- MISC slot -->
+        <template v-else-if="slot.kind === 'MISC'">
+          <span class="font-semibold text-gray-700">Miscellaneous</span>
+          <template v-if="slot.body?.trim()">
+            <p class="whitespace-pre-wrap text-gray-700 mt-1">{{ slot.body }}</p>
+          </template>
         </template>
 
         <!-- HYMN slot -->

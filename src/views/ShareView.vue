@@ -61,6 +61,19 @@
             <p v-if="serviceSnapshot.sermonPassage" class="text-base text-gray-900">
               {{ formatScriptureRef(serviceSnapshot.sermonPassage) }}
             </p>
+            <p v-if="slot.body?.trim()" class="whitespace-pre-wrap text-sm text-gray-700 mt-1">{{ slot.body }}</p>
+          </template>
+
+          <!-- ANNOUNCEMENTS slot -->
+          <template v-else-if="slot.kind === 'ANNOUNCEMENTS'">
+            <p class="text-xs text-gray-500 uppercase tracking-wider mb-0.5">Announcements</p>
+            <p v-if="slot.body?.trim()" class="whitespace-pre-wrap text-sm text-gray-700 mt-1">{{ slot.body }}</p>
+          </template>
+
+          <!-- MISC slot -->
+          <template v-else-if="slot.kind === 'MISC'">
+            <p class="text-xs text-gray-500 uppercase tracking-wider mb-0.5">Miscellaneous</p>
+            <p v-if="slot.body?.trim()" class="whitespace-pre-wrap text-sm text-gray-700 mt-1">{{ slot.body }}</p>
           </template>
 
           <!-- HYMN slot -->
