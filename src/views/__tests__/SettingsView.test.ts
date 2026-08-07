@@ -8,9 +8,21 @@
  * does NOT have yet — it is seeded here on purpose so Waves 2 and 3 can extend this
  * file with real assertions instead of first having to invent the mock shape.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { mount, flushPromises, DOMWrapper, enableAutoUnmount } from '@vue/test-utils'
 import SettingsView from '../SettingsView.vue'
+import type { ServiceTemplateEntry } from '@/types/organization'
+
+// 44-02: ServiceTemplateEditor.vue's own panel markup lives inside a
+// `<Teleport to="body">` (EditSlideDrawer.vue's structural precedent), so
+// once the Services card opens it, its content is NOT inside `wrapper`'s own
+// vnode tree — read it through `document.body` instead, mirroring
+// EditSlideDrawer.test.ts's own `body()` helper. Auto-unmount keeps a test's
+// teleported panel from leaking into the next test's `document.body`.
+enableAutoUnmount(afterEach)
+function body(): DOMWrapper<HTMLElement> {
+  return new DOMWrapper(document.body)
+}
 
 // ── firebase/firestore mock (copied verbatim in shape from
 //    src/stores/__tests__/auth.test.ts:31-49). `mockUpdateDoc`/`mockGetDoc` are
@@ -79,6 +91,9 @@ let mockVwModeEnabled = true
 let mockAiEnabled = true
 let mockPcEnabled = true
 let mockSettingsVwModeEnabled = true
+// 44-02: R086 Services card summary + ServiceTemplateEditor.vue (mounted as a
+// child, which also calls useAuthStore() directly) both read this field.
+let mockDefaultServiceTemplate: ServiceTemplateEntry[] = []
 
 const mockSetPcCredentials = vi.fn()
 
@@ -139,6 +154,15 @@ vi.mock('@/stores/auth', () => ({
       set vwModeEnabled(v: boolean) {
         mockSettingsVwModeEnabled = v
       },
+      // 44-02: setter required for ServiceTemplateEditor.vue's onSave mirror-write
+      // (`authStore.settings.defaultServiceTemplate = payload`), mirroring every
+      // other settings.* setter above.
+      get defaultServiceTemplate() {
+        return mockDefaultServiceTemplate
+      },
+      set defaultServiceTemplate(v: ServiceTemplateEntry[]) {
+        mockDefaultServiceTemplate = v
+      },
     },
   }),
 }))
@@ -166,6 +190,7 @@ describe('SettingsView (Wave 0 harness — Phase 39)', () => {
     mockAiEnabled = true
     mockPcEnabled = true
     mockSettingsVwModeEnabled = true
+    mockDefaultServiceTemplate = []
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
     mockSetPcCredentials.mockClear()
@@ -207,6 +232,7 @@ describe('SettingsView dot-path writes (R073) — Wave 2 (39-03)', () => {
     mockAiEnabled = true
     mockPcEnabled = true
     mockSettingsVwModeEnabled = true
+    mockDefaultServiceTemplate = []
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
     mockSetPcCredentials.mockClear()
@@ -306,6 +332,7 @@ describe('SettingsView Planning Center credential retention (R089) — Wave 2 (3
     mockAiEnabled = true
     mockPcEnabled = true
     mockSettingsVwModeEnabled = true
+    mockDefaultServiceTemplate = []
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
     mockSetPcCredentials.mockClear()
@@ -356,5 +383,86 @@ describe('SettingsView Planning Center credential retention (R089) — Wave 2 (3
     // authStore.hasPcCredentials (and therefore the stored credentials
     // themselves) were never touched by the off state.
     expect(wrapper.text()).toContain('Edit Credentials')
+  })
+})
+
+describe('SettingsView Services card (R086) — Wave 2 (44-02)', () => {
+  beforeEach(() => {
+    mockOrgId = 'org-1'
+    mockOrgName = 'Test Church'
+    mockOrgSlug = 'test-church'
+    mockIsEditor = true
+    mockHasPcCredentials = false
+    mockPcAppId = null
+    mockPcSecret = null
+    mockVwModeEnabled = true
+    mockAiEnabled = true
+    mockPcEnabled = true
+    mockSettingsVwModeEnabled = true
+    mockDefaultServiceTemplate = []
+    mockUpdateDoc.mockClear()
+    mockGetDoc.mockClear()
+    mockSetPcCredentials.mockClear()
+  })
+
+  it('renders the Services heading and card', () => {
+    const wrapper = mountSettingsView()
+    expect(wrapper.text()).toContain('Services')
+    expect(wrapper.find('[data-testid="open-template-editor"]').exists()).toBe(true)
+  })
+
+  it('shows the exact empty-template copy when no template is configured', () => {
+    mockDefaultServiceTemplate = []
+    const wrapper = mountSettingsView()
+    expect(wrapper.get('[data-testid="template-summary"]').text()).toBe(
+      'No default template set — new services start empty until you add items here.',
+    )
+  })
+
+  it('shows "{N} items across {M} sections" for a configured template', () => {
+    mockDefaultServiceTemplate = [
+      { id: 's1', kind: 'SONG', section: 'worship' },
+      { id: 's2', kind: 'SCRIPTURE', section: 'worship' },
+      { id: 's3', kind: 'MESSAGE', section: 'message' },
+    ]
+    const wrapper = mountSettingsView()
+    expect(wrapper.get('[data-testid="template-summary"]').text()).toBe('3 items across 2 sections')
+  })
+
+  it('does not count section-less entries toward the section total', () => {
+    mockDefaultServiceTemplate = [
+      { id: 's1', kind: 'SONG' },
+      { id: 's2', kind: 'PRAYER', section: 'sending' },
+    ]
+    const wrapper = mountSettingsView()
+    expect(wrapper.get('[data-testid="template-summary"]').text()).toBe('2 items across 1 sections')
+  })
+
+  it('clicking "Edit Default Template" opens the ServiceTemplateEditor slide-out', async () => {
+    const wrapper = mountSettingsView()
+    expect(body().find('[data-testid="service-template-editor"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="open-template-editor"]').trigger('click')
+    await flushPromises()
+
+    expect(body().find('[data-testid="service-template-editor"]').exists()).toBe(true)
+  })
+
+  it('closing the editor closes the slide-out', async () => {
+    const wrapper = mountSettingsView()
+    await wrapper.get('[data-testid="open-template-editor"]').trigger('click')
+    await flushPromises()
+    expect(body().find('[data-testid="service-template-editor"]').exists()).toBe(true)
+
+    await body().get('[data-testid="service-template-editor-close"]').trigger('click')
+    await flushPromises()
+
+    expect(body().find('[data-testid="service-template-editor"]').exists()).toBe(false)
+  })
+
+  it('disables the "Edit Default Template" button for a non-editor (viewer)', () => {
+    mockIsEditor = false
+    const wrapper = mountSettingsView()
+    expect(wrapper.get('[data-testid="open-template-editor"]').attributes('disabled')).toBeDefined()
   })
 })
