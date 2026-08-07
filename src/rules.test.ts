@@ -1484,3 +1484,29 @@ describe('Slide group lock (R036)', () => {
     })
   })
 })
+
+// T-42-01 / D-01 — pptxRenders is a single-segment nested collection under
+// /organizations/{orgId}, so it is matched by the generic wildcard at
+// firestore.rules:198-203 before any dedicated block exists. Task 1 proves
+// this contested premise (functions/src/index.ts:144-148 and 42-CONTEXT.md's
+// first draft both asserted the opposite) with a real emulator write, BEFORE
+// any rules edit lands. See src/rules.test.ts's own git history for the
+// Task 2 commit that flips this same assertion from assertSucceeds to
+// assertFails once the wildcard's write-exclusion clause is added.
+describe('pptxRenders — org-member read, no client write', () => {
+  it('PROBE (pre-fix) — an org editor CAN currently write a pptxRenders doc via the generic wildcard', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('organizations/orgA/pptxRenders/import-1', {
+      status: 'pending',
+      storagePath: 'orgs/orgA/pptx-imports/import-1/source.pptx',
+    })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertSucceeds(
+      updateDoc(doc(db, 'organizations', 'orgA', 'pptxRenders', 'import-1'), {
+        status: 'ready',
+        renderedCount: 99,
+      }),
+    )
+  })
+})
