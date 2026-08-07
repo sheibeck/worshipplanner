@@ -172,14 +172,15 @@
           <div v-else class="flex items-center gap-3">
             <button
               type="button"
-              class="bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-md px-4 py-2 text-sm font-medium transition-colors"
+              class="bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-md px-4 py-2 text-sm font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              :disabled="!authStore.isEditor"
               data-testid="template-reset"
               @click="onResetClick"
             >Reset to 1-2-3 default</button>
             <button
               type="button"
               class="inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white rounded-md px-4 py-2 text-sm font-medium transition-colors"
-              :disabled="isSaving"
+              :disabled="isSaving || !authStore.isEditor"
               data-testid="template-save"
               @click="onSave"
             >{{ isSaving ? 'Saving...' : savedFeedback ? 'Saved!' : 'Save Template' }}</button>
@@ -403,6 +404,7 @@ onUnmounted(() => {
 // Area 1 override) — never an automatic fallback for an unset template.
 
 function onResetClick(): void {
+  if (!authStore.isEditor) return
   if (draft.value.length === 0) {
     applyReset()
   } else {
@@ -411,6 +413,7 @@ function onResetClick(): void {
 }
 
 function applyReset(): void {
+  if (!authStore.isEditor) return
   draft.value = buildSlots('1-2-2-3').map((slot) => ({
     id: crypto.randomUUID(),
     kind: slot.kind,
