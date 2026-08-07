@@ -6,7 +6,7 @@ import {
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing'
 import { readFileSync } from 'fs'
-import { doc, getDoc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore'
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore'
 
 let testEnv: RulesTestEnvironment
 
@@ -141,6 +141,109 @@ describe('Editor vs viewer write permissions', () => {
         updatedAt: new Date(),
       }),
     )
+  })
+})
+
+// -- R104 -- close the self-service membership hole --------------------------
+//
+// firestore.rules' `allow create` on organizations/{orgId}/members/{uid} used to
+// read only `isSignedIn() && request.auth.uid == uid` -- no relationship to the
+// target org at all. These four tests prove the two legitimate creation flows
+// (org creation, invite acceptance) survive a tightened predicate while an
+// uninvited self-join and a role-escalated invite acceptance are both denied.
+//
+// Tests B and C build a REAL writeBatch mirroring ensureUserDocument's exact
+// operation order (src/stores/auth.ts:294-347) -- NOT seedDoc, which bypasses
+// rules entirely and would prove nothing about the predicate under test.
+describe('Members create — R104 self-service membership hole', () => {
+  it('DENIES a signed-in user with no invite from self-creating a membership in an arbitrary org', async () => {
+    // Test A — criterion 1. Org exists, owned by someone else; no invite seeded.
+    await seedDoc('organizations/orgA', { name: "Someone Else's Church", createdBy: 'someoneElse' })
+    const context = testEnv.authenticatedContext('attacker', { email: 'attacker@example.com' })
+    const db = context.firestore()
+    await assertFails(
+      setDoc(doc(db, 'organizations', 'orgA', 'members', 'attacker'), {
+        role: 'editor',
+        joinedAt: new Date(),
+      }),
+    )
+  })
+
+  it('ALLOWS a user accepting a genuine outstanding invite, via a real writeBatch matching ensureUserDocument', async () => {
+    // Test B — criterion 2. Real invite exists; batch deletes it in the SAME
+    // operation order as auth.ts:294-315 before creating the member doc -- the
+    // invite delete is what makes get() (pre-batch state) vs getAfter()
+    // (post-batch state) observable.
+    await seedDoc('organizations/orgA', { name: "Someone Else's Church", createdBy: 'someoneElse' })
+    await seedDoc('organizations/orgA/invites/member@example.com', {
+      role: 'viewer',
+      status: 'pending',
+      email: 'member@example.com',
+    })
+    await seedDoc('inviteLookup/member@example.com', { orgId: 'orgA', role: 'viewer' })
+
+    const context = testEnv.authenticatedContext('userInvited', { email: 'member@example.com' })
+    const db = context.firestore()
+    const batch = writeBatch(db)
+    batch.delete(doc(db, 'inviteLookup', 'member@example.com'))
+    batch.delete(doc(db, 'organizations', 'orgA', 'invites', 'member@example.com'))
+    batch.set(doc(db, 'organizations', 'orgA', 'members', 'userInvited'), {
+      role: 'viewer',
+      joinedAt: new Date(),
+      displayName: 'Invited User',
+      email: 'member@example.com',
+    })
+    await assertSucceeds(batch.commit())
+  })
+
+  it('ALLOWS the founder of a brand-new org to create their own first membership, via a real writeBatch matching ensureUserDocument', async () => {
+    // Test C — criterion 3, THE TRAP. Nothing seeded. The org doc and the
+    // member doc are created in the SAME batch, matching auth.ts:322-345
+    // exactly -- proving the org-creation branch's getAfter()/get() choice
+    // against the emulator, not documentation.
+    const context = testEnv.authenticatedContext('founder', { email: 'founder@example.com' })
+    const db = context.firestore()
+    const batch = writeBatch(db)
+    batch.set(doc(db, 'organizations', 'newOrg'), {
+      name: "Founder's Church",
+      createdAt: new Date(),
+      createdBy: 'founder',
+    })
+    batch.set(doc(db, 'organizations', 'newOrg', 'members', 'founder'), {
+      role: 'editor',
+      joinedAt: new Date(),
+      displayName: 'Founder',
+      email: 'founder@example.com',
+    })
+    await assertSucceeds(batch.commit())
+  })
+
+  it('DENIES a user with a genuine viewer invite from escalating their role to editor on accept', async () => {
+    // Test D — criterion 4. Identical seeding/batch shape to Test B; the ONLY
+    // difference is the submitted role. This is a distinct failure mode from
+    // Test A: Test A proves the branch is false with no invite at all, Test D
+    // proves it is false when an invite exists but the submitted role does
+    // not match it.
+    await seedDoc('organizations/orgA', { name: "Someone Else's Church", createdBy: 'someoneElse' })
+    await seedDoc('organizations/orgA/invites/member@example.com', {
+      role: 'viewer',
+      status: 'pending',
+      email: 'member@example.com',
+    })
+    await seedDoc('inviteLookup/member@example.com', { orgId: 'orgA', role: 'viewer' })
+
+    const context = testEnv.authenticatedContext('userInvited', { email: 'member@example.com' })
+    const db = context.firestore()
+    const batch = writeBatch(db)
+    batch.delete(doc(db, 'inviteLookup', 'member@example.com'))
+    batch.delete(doc(db, 'organizations', 'orgA', 'invites', 'member@example.com'))
+    batch.set(doc(db, 'organizations', 'orgA', 'members', 'userInvited'), {
+      role: 'editor', // escalated — the invite only granted 'viewer'
+      joinedAt: new Date(),
+      displayName: 'Invited User',
+      email: 'member@example.com',
+    })
+    await assertFails(batch.commit())
   })
 })
 
