@@ -95,6 +95,57 @@ vi.mock('@/stores/slideGroups', () => ({
     }),
 }))
 
+// --- Stubbed pptxRenders store (Phase 42, 42-02 Task 3 — Wave 0 scaffolding) ---
+//
+// Both mocks in this block are INERT right now: nothing in useSlideshowAssembly.ts
+// imports either `@/stores/pptxRenders` or `@/utils/pptxUpload` yet (that wiring is a
+// later plan in this phase). They exist here so every IMPORTED-with-render test a later
+// plan writes can fail only for the right reason, rather than for a missing mock — the
+// Phase-41 precedent this task exists to avoid repeating: `services.test.ts`'s
+// firestore mock lacked `where`/`getDocs`, discovered late, and it blocked every
+// adoption test (42-RESEARCH.md § Wave 0 Gaps).
+//
+// `rendersByImportId` is a real `reactive(new Map())` a test can write into directly —
+// mirroring the hand-rolled reactive-stub style of every other store mock in this file
+// — and `syncSubscriptions`/`unsubscribeAll` are `vi.fn()` spies so a later plan can
+// assert subscription and teardown wiring by call.
+const pptxRendersState = reactive({ rendersByImportId: new Map<string, unknown>() })
+const mockSyncPptxRenderSubscriptions = vi.fn()
+const mockUnsubscribeAllPptxRenders = vi.fn()
+
+vi.mock('@/stores/pptxRenders', () => ({
+  usePptxRenders: () =>
+    reactive({
+      rendersByImportId: pptxRendersState.rendersByImportId,
+      syncSubscriptions: mockSyncPptxRenderSubscriptions,
+      unsubscribeAll: mockUnsubscribeAllPptxRenders,
+    }),
+}))
+
+// --- Stubbed pptxUpload's resolveImageUrl (Phase 42, 42-02 Task 3) ---
+//
+// `resolveImageUrl` resolves a deterministic fake URL derived from its path argument, so
+// a later test can assert WHICH path was resolved, not merely that something was.
+// `importActual` preserves every other export (generateImportId, uploadPptx,
+// uploadImage, PPTX_MAX_BYTES, PptxFileTooLargeError, isPptxFileTooLarge,
+// validatePptxSize) in case a later addition to this suite relies on them.
+//
+// Component-suite finding recorded per this task's instructions (see SUMMARY):
+// `SlideCard.vue` (imageSrc, line 150) and `PresentationViewer.vue` (image branch, line
+// 184) both consume an already-resolved `imageUrl` off the assembled slide and neither
+// calls Storage — so `SlideCard.test.ts`/`PresentationViewer.test.ts` need NO
+// `resolveImageUrl`/`getDownloadURL` mock. URL resolution is this composable's job
+// alone.
+const mockResolveImageUrl = vi.fn((path: string) => Promise.resolve(`https://fake-storage.test/${path}`))
+
+vi.mock('@/utils/pptxUpload', async (importActual) => {
+  const actual = await importActual<typeof import('@/utils/pptxUpload')>()
+  return {
+    ...actual,
+    resolveImageUrl: mockResolveImageUrl,
+  }
+})
+
 // Every call site below invokes the composable directly (not through a
 // mounted component), so `onUnmounted(cleanup)` inside it never actually
 // registers (Vue warns "no active component instance") and its internal
