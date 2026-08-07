@@ -1260,6 +1260,23 @@ describe('addSlotAsItem', () => {
       expect(result).toBe('')
       expect(vi.mocked(fetch)).not.toHaveBeenCalled()
     })
+
+    // 43-04 Task 3 Part B: the exhaustiveness backstop's compile-time guard
+    // (proven separately, see 43-04-SUMMARY.md's captured Part A evidence)
+    // only protects against a SlotKind this build was compiled with. Data
+    // read from Firestore is untyped at the wire and could carry a kind this
+    // build has never heard of — this test proves the backstop's throw arm
+    // is reachable and informative at RUNTIME for exactly that case, rather
+    // than silently exporting the unknown kind under a borrowed title.
+    it('an out-of-union kind value (as could arrive from untyped Firestore data) rejects with an error naming that kind, and issues no POST', async () => {
+      const slot = { kind: 'BULLETIN_INSERT', id: 'slot-unknown-16', position: 16 } as unknown as ServiceSlot
+
+      await expect(
+        addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 16, []),
+      ).rejects.toThrow(/BULLETIN_INSERT/)
+
+      expect(vi.mocked(fetch)).not.toHaveBeenCalled()
+    })
   })
 
 })
