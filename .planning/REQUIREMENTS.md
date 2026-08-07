@@ -142,8 +142,13 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
       is on the song slots in that template still receive their required VW types from the chosen
       progression.
       <br>`[ARCH]` VW typing is computed at creation time and **never frozen into the stored template**,
-      so toggling VW mode later does not leave stale types behind. `buildSlots()` becomes the fallback
-      when no template is set. Depends on R081–R085 — the template editor needs the final `SlotKind` set.
+      so toggling VW mode later does not leave stale types behind.
+      <br>**CORRECTION (owner decision, 2026-08-07, Phase 44 discuss):** when no template is set a new
+      blank service defaults to **EMPTY**, not `buildSlots()`. The prior "`buildSlots()` becomes the
+      fallback" wording is superseded. `buildSlots()`' 1-2-3 shape is instead exposed as a **"Reset to
+      1-2-3 default"** preset in the Settings template editor. Accepted implication: existing churches
+      (no template configured yet) get an empty new service on ship until they configure one or load the
+      preset. Depends on R081–R085 — the template editor needs the final `SlotKind` set.
 
 ### Feature Toggles
 

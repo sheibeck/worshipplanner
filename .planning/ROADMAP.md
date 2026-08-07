@@ -324,7 +324,7 @@ Plans:
 **Success Criteria** (what must be TRUE):
 
   1. In Settings, a church can define the default set and order of items — using the full item-type palette Phase 43 finalized — that make up a new blank service, via a Services slide-out editor reusing existing slot primitives
-  2. Creating a new blank service builds it from the church's template; `buildSlots()` becomes the fallback only when no template is set
+  2. Creating a new blank service builds it from the church's template; when no template is set the new service defaults to **EMPTY** (owner correction 2026-08-07 — supersedes the prior "`buildSlots()` becomes the fallback" wording; `buildSlots()`' 1-2-3 shape is exposed as a "Reset to 1-2-3 default" preset in the editor instead)
   3. When Vertical Worship mode is on, the song slots in that template receive their required VW types from the chosen progression at creation time — VW typing is computed then, never frozen into the stored template, so toggling VW mode later never leaves stale types behind on an already-created service
 
 **Plans**: TBD
