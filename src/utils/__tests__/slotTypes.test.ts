@@ -9,8 +9,11 @@ import {
   groupBySection,
   flattenBySection,
   orderSlotsBySection,
+  progressionVwTypeSequence,
+  buildSlotsFromTemplate,
 } from '@/utils/slotTypes'
 import { SERVICE_SECTIONS, type SongSlot, type ScriptureSlot, type NonAssignableSlot, type HymnSlot, type ImportedSlot, type Service, type ServiceSlot } from '@/types/service'
+import type { ServiceTemplateEntry } from '@/types/organization'
 
 describe('PROGRESSION_SLOT_TYPES', () => {
   it('maps 1-2-2-3 progression correctly', () => {
@@ -774,5 +777,84 @@ describe('ANNOUNCEMENTS and MISC (43-01)', () => {
     expect(reindexed[0]!.id).toBe('ord-c')
     expect(reindexed[1]!.position).toBe(1)
     expect(reindexed[1]!.id).toBe('ord-d')
+  })
+})
+
+describe('progressionVwTypeSequence (44-01)', () => {
+  it("'1-2-2-3' reads PROGRESSION_SLOT_TYPES position-sorted as an ordered sequence: [1, 2, 2, 3, 3]", () => {
+    expect(progressionVwTypeSequence('1-2-2-3')).toEqual([1, 2, 2, 3, 3])
+  })
+
+  it("'1-2-3-3' reads PROGRESSION_SLOT_TYPES position-sorted as an ordered sequence: [1, 2, 3, 3, 3]", () => {
+    expect(progressionVwTypeSequence('1-2-3-3')).toEqual([1, 2, 3, 3, 3])
+  })
+})
+
+describe('buildSlotsFromTemplate (44-01)', () => {
+  function entry(kind: ServiceTemplateEntry['kind'], section?: ServiceTemplateEntry['section']): ServiceTemplateEntry {
+    return { id: crypto.randomUUID?.() ?? Math.random().toString(36), kind, ...(section ? { section } : {}) }
+  }
+
+  it('empty template → zero slots', () => {
+    expect(buildSlotsFromTemplate([], true)).toEqual([])
+  })
+
+  it('3 SONG entries with VW on → requiredVwType follows the ORDINAL sequence [1, 2, 2], not array-position lookup', () => {
+    const template: ServiceTemplateEntry[] = [entry('SONG'), entry('SONG'), entry('SONG')]
+    const slots = buildSlotsFromTemplate(template, true) as SongSlot[]
+    expect(slots).toHaveLength(3)
+    expect(slots.every((s) => s.kind === 'SONG')).toBe(true)
+    expect(slots[0]!.requiredVwType).toBe(1)
+    expect(slots[1]!.requiredVwType).toBe(2)
+    expect(slots[2]!.requiredVwType).toBe(2)
+  })
+
+  it('mixed template (SONG, SCRIPTURE, SONG, PRAYER, SONG) with VW on → only SONG slots consume the sequence, in order; other kinds interleaved at their array positions', () => {
+    const template: ServiceTemplateEntry[] = [
+      entry('SONG', 'worship'),
+      entry('SCRIPTURE', 'worship'),
+      entry('SONG', 'worship'),
+      entry('PRAYER', 'worship'),
+      entry('SONG', 'sending'),
+    ]
+    const slots = buildSlotsFromTemplate(template, true)
+    expect(slots.map((s) => s.kind)).toEqual(['SONG', 'SCRIPTURE', 'SONG', 'PRAYER', 'SONG'])
+    const songSlots = slots.filter((s) => s.kind === 'SONG') as SongSlot[]
+    expect(songSlots.map((s) => s.requiredVwType)).toEqual([1, 2, 2])
+    expect(slots[4]!.section).toBe('sending')
+  })
+
+  it('7 SONG entries with VW on → songs 6 and 7 cycle via modulo (sequence[5 % 5]=1, sequence[6 % 5]=2)', () => {
+    const template: ServiceTemplateEntry[] = Array.from({ length: 7 }, () => entry('SONG'))
+    const slots = buildSlotsFromTemplate(template, true) as SongSlot[]
+    expect(slots.map((s) => s.requiredVwType)).toEqual([1, 2, 2, 3, 3, 1, 2])
+  })
+
+  it('VW OFF → SONG slots carry createSlot default requiredVwType (2), the ordinal sequence is never consulted', () => {
+    const template: ServiceTemplateEntry[] = [entry('SONG'), entry('SONG'), entry('SONG')]
+    const slots = buildSlotsFromTemplate(template, false) as SongSlot[]
+    expect(slots.every((s) => s.requiredVwType === 2)).toBe(true)
+  })
+
+  it('output slots have contiguous positions 0..n-1 (reindexSlots applied), and kind/section preserved', () => {
+    const template: ServiceTemplateEntry[] = [entry('PRAYER', 'worship'), entry('MESSAGE', 'message'), entry('SONG', 'sending')]
+    const slots = buildSlotsFromTemplate(template, true)
+    expect(slots.map((s) => s.position)).toEqual([0, 1, 2])
+    expect(slots.map((s) => s.kind)).toEqual(['PRAYER', 'MESSAGE', 'SONG'])
+    expect(slots[0]!.section).toBe('worship')
+    expect(slots[1]!.section).toBe('message')
+    expect(slots[2]!.section).toBe('sending')
+  })
+
+  it('an entry whose kind is not a recognized SlotKind is skipped rather than producing an undefined-kind slot (T-44-03)', () => {
+    const template = [
+      entry('SONG'),
+      { id: 'bad-1', kind: 'NOT_A_REAL_KIND' } as unknown as ServiceTemplateEntry,
+      entry('PRAYER'),
+    ]
+    const slots = buildSlotsFromTemplate(template, true)
+    expect(slots).toHaveLength(2)
+    expect(slots.map((s) => s.kind)).toEqual(['SONG', 'PRAYER'])
+    expect(slots.map((s) => s.position)).toEqual([0, 1])
   })
 })
