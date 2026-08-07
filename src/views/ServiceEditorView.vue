@@ -1058,51 +1058,28 @@
                 </div>
               </template>
 
-              <!-- MESSAGE slot -->
-              <template v-else-if="slot.kind === 'MESSAGE'">
+              <!-- MESSAGE / ANNOUNCEMENTS / MISC slot: one shared free-text body editor
+                   (43-03, R081/R082/R083). The Message URL/link fields are removed from
+                   the UI only — linkUrl/linkLabel stay in NonAssignableSlot and in
+                   Firestore, untouched by this branch. -->
+              <template v-else-if="slot.kind === 'MESSAGE' || slot.kind === 'ANNOUNCEMENTS' || slot.kind === 'MISC'">
                 <div class="flex items-center gap-2 mb-1">
-                  <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Message</p>
+                  <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">{{ slotLabel(slot, index) }}</p>
                   <span class="text-xs text-gray-600 italic">No assignment needed</span>
                 </div>
-                <!-- Editor: editable link fields. CLASS A. -->
-                <div v-if="canEditService" class="flex items-center gap-2 mt-1">
-                  <input
-                    :value="(slot as NonAssignableSlot).linkLabel"
-                    @input="(slot as NonAssignableSlot).linkLabel = ($event.target as HTMLInputElement).value"
-                    type="text"
-                    placeholder="Link label (optional)"
-                    class="rounded-md bg-gray-800 border border-gray-700 text-gray-200 text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500 w-36"
-                  />
-                  <input
-                    :value="(slot as NonAssignableSlot).linkUrl"
-                    @input="(slot as NonAssignableSlot).linkUrl = ($event.target as HTMLInputElement).value"
-                    type="url"
-                    placeholder="https://..."
-                    class="rounded-md bg-gray-800 border border-gray-700 text-gray-200 text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500 flex-1"
-                  />
-                  <a
-                    v-if="(slot as NonAssignableSlot).linkUrl"
-                    :href="(slot as NonAssignableSlot).linkUrl"
-                    target="_blank"
-                    rel="noopener"
-                    class="text-indigo-400 hover:text-indigo-300 transition-colors flex-shrink-0"
-                    title="Open link"
-                    @click.stop
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
-                  </a>
-                </div>
-                <!-- Viewer: read-only link -->
-                <div v-else-if="(slot as NonAssignableSlot).linkUrl" class="flex items-center gap-2 mt-1">
-                  <a
-                    :href="(slot as NonAssignableSlot).linkUrl"
-                    target="_blank"
-                    rel="noopener"
-                    class="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
-                  >{{ (slot as NonAssignableSlot).linkLabel || (slot as NonAssignableSlot).linkUrl }}</a>
-                </div>
+                <!-- Editor: shared free-text body. CLASS A. -->
+                <textarea
+                  v-if="canEditService"
+                  :value="(slot as NonAssignableSlot).body"
+                  @input="(slot as NonAssignableSlot).body = ($event.target as HTMLTextAreaElement).value"
+                  rows="3"
+                  :placeholder="bodyPlaceholder(slot.kind as 'MESSAGE' | 'ANNOUNCEMENTS' | 'MISC')"
+                  data-testid="slot-body-input"
+                  class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-200 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500 resize-y mt-1"
+                ></textarea>
+                <!-- Viewer / locked: read-only, preserves line breaks -->
+                <p v-else-if="(slot as NonAssignableSlot).body?.trim()" data-testid="slot-body-text" class="text-sm text-gray-200 whitespace-pre-wrap mt-1">{{ (slot as NonAssignableSlot).body }}</p>
+                <p v-else data-testid="slot-body-empty" class="text-sm text-gray-400 italic mt-1">{{ slotLabel(slot, index) }} — Empty</p>
               </template>
 
               <!-- HYMN slot -->
@@ -2656,7 +2633,24 @@ function addSlot(kind: SlotKind, vwType?: VWType, targetSection?: ServiceSection
   localService.value.slots = reindexSlots(orderSlotsBySection(localService.value.slots))
 }
 
+// ── Body editor placeholder lookup (43-03) ──────────────────────────────────────
+// Static three-key lookup for the shared MESSAGE/ANNOUNCEMENTS/MISC body textarea.
+// Parameter typed to only those three kinds, not the whole SlotKind union, so a
+// caller passing an unrelated kind is a compile error.
+function bodyPlaceholder(kind: 'MESSAGE' | 'ANNOUNCEMENTS' | 'MISC'): string {
+  const placeholders: Record<'MESSAGE' | 'ANNOUNCEMENTS' | 'MISC', string> = {
+    MESSAGE: 'Message notes or outline…',
+    ANNOUNCEMENTS: 'Announcement details…',
+    MISC: 'Details…',
+  }
+  return placeholders[kind]
+}
+
 // ── Slot populated check (D-14) ────────────────────────────────────────────────
+// NOTE: isSlotPopulated is known dead code — declared and never called since
+// Phase 12-05 (flagged as IN-01 in 27-REVIEW.md). Kept internally consistent with
+// the 43-03 UI change (MESSAGE moves from a link-based check to a body-based
+// check) rather than revived or wired to anything new.
 
 function isSlotPopulated(slot: ServiceSlot): boolean {
   if (slot.kind === 'SONG') {
@@ -2666,9 +2660,13 @@ function isSlotPopulated(slot: ServiceSlot): boolean {
     const s = slot as ScriptureSlot
     return !!(s.book || s.chapter || s.verseStart || s.verseEnd)
   }
-  if (slot.kind === 'MESSAGE' || slot.kind === 'PRAYER') {
+  if (slot.kind === 'PRAYER') {
     const s = slot as NonAssignableSlot
     return !!(s.linkUrl?.trim() || s.linkLabel?.trim())
+  }
+  if (slot.kind === 'MESSAGE' || slot.kind === 'ANNOUNCEMENTS' || slot.kind === 'MISC') {
+    const s = slot as NonAssignableSlot
+    return !!s.body?.trim()
   }
   if (slot.kind === 'HYMN') {
     const s = slot as HymnSlot
@@ -2706,6 +2704,8 @@ function elementLabel(kind: SlotKind): string {
     case 'HYMN': return 'this hymn'
     case 'MESSAGE': return 'this message'
     case 'PRAYER': return 'this prayer'
+    case 'ANNOUNCEMENTS': return 'this announcement'
+    case 'MISC': return 'this miscellaneous item'
     case 'IMPORTED': return 'this imported deck'
     default: return 'this element'
   }
