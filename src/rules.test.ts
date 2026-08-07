@@ -1556,4 +1556,37 @@ describe('pptxRenders — org-member read, no client write', () => {
       }),
     )
   })
+
+  // WR-03 (42-REVIEW.md): the block above proved the UPDATE half of "write"
+  // (T-42-01, forging a ready flip) and a VIEWER's create denial — but not an
+  // EDITOR's create/delete denial, which every other collection in this file
+  // covers explicitly (see `serviceShareLinks`'s CREATE/UPDATE/DELETE-each
+  // structure above). The rule's `allow write` predicate
+  // (firestore.rules:234-237) is one unified condition covering create/
+  // update/delete, so these are expected to pass by construction — proving
+  // it closes the completeness gap the reviewer flagged rather than leaving
+  // it to code inspection.
+  it('DENY (WR-03) — an org editor cannot create a new pptxRenders doc via the generic wildcard', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertFails(
+      setDoc(doc(db, 'organizations', 'orgA', 'pptxRenders', 'import-3'), {
+        status: 'pending',
+        storagePath: 'orgs/orgA/pptx-imports/import-3/source.pptx',
+      }),
+    )
+  })
+
+  it('DENY (WR-03) — an org editor cannot delete an existing pptxRenders doc via the generic wildcard', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('organizations/orgA/pptxRenders/import-1', {
+      status: 'ready',
+      storagePath: 'orgs/orgA/pptx-imports/import-1/source.pptx',
+      renderedCount: 5,
+    })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertFails(deleteDoc(doc(db, 'organizations', 'orgA', 'pptxRenders', 'import-1')))
+  })
 })
