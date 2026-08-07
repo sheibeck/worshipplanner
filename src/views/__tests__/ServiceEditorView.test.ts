@@ -1624,13 +1624,13 @@ describe('ServiceEditorView - section-band slide count and per-band add (36-04, 
     expect(placeholder.text()).toContain('Drag an item here, or set its Section to Pre-Service.')
   })
 
-  it('clicking a band add-item link opens exactly 5 chips; clicking it again closes it; opening another band closes the first', async () => {
+  it('clicking a band add-item link opens exactly 6 chips (43-03: Hymn retired, Announcements/Misc added); clicking it again closes it; opening another band closes the first', async () => {
     const wrapper = await mountView()
 
     await openBand(wrapper, 'worship')
     const menu = wrapper.find('[data-testid="section-add-menu-worship"]')
     expect(menu.exists()).toBe(true)
-    expect(menu.findAll('button')).toHaveLength(5)
+    expect(menu.findAll('button')).toHaveLength(6)
 
     await openBand(wrapper, 'worship') // toggle closed
     expect(wrapper.find('[data-testid="section-add-menu-worship"]').exists()).toBe(false)
@@ -1679,7 +1679,7 @@ describe('ServiceEditorView - section-band slide count and per-band add (36-04, 
     await openBand(wrapper, 'worship')
     await clickChip(wrapper, 'worship', 'scripture')
     await openBand(wrapper, 'sending')
-    await clickChip(wrapper, 'sending', 'hymn')
+    await clickChip(wrapper, 'sending', 'misc')
 
     expect(wrapper.find('[data-testid="section-list-worship"]').findAll('.slot-item')).toHaveLength(3)
     expect(wrapper.find('[data-testid="section-list-sending"]').findAll('.slot-item')).toHaveLength(2)
@@ -1776,21 +1776,26 @@ describe('ServiceEditorView - add-to-service palette (36-05, R067)', () => {
     mockServicesList = [buildSectionedService()]
   })
 
-  it('renders exactly five chips in order, with the five palette-add-* testids and the labels Song/Scripture/Prayer/Message/Hymn', async () => {
+  it('renders exactly six chips in order, with the six palette-add-* testids and the labels Song/Scripture/Prayer/Message/Announcements/Miscellaneous, and NO Hymn chip (43-03, R084 easy half)', async () => {
     const wrapper = await mountView()
 
     const palette = wrapper.find('[data-testid="add-to-service-palette"]')
     expect(palette.exists()).toBe(true)
     const buttons = palette.findAll('button')
-    expect(buttons).toHaveLength(5)
-    expect(buttons.map((b) => b.attributes('data-testid'))).toEqual([
+    expect(buttons).toHaveLength(6)
+    const testids = buttons.map((b) => b.attributes('data-testid'))
+    expect(testids).toEqual([
       'palette-add-song',
       'palette-add-scripture',
       'palette-add-prayer',
       'palette-add-message',
-      'palette-add-hymn',
+      'palette-add-announcements',
+      'palette-add-misc',
     ])
-    expect(buttons.map((b) => b.text())).toEqual(['Song', 'Scripture', 'Prayer', 'Message', 'Hymn'])
+    expect(buttons.map((b) => b.text())).toEqual(['Song', 'Scripture', 'Prayer', 'Message', 'Announcements', 'Miscellaneous'])
+    // Explicit negative: the Hymn palette testid is not among the six — a chip
+    // count alone does not prove R084's palette-retirement half.
+    expect(testids).not.toContain('palette-add-hymn')
   })
 
   it('no button anywhere in the view has the old "Add Element" label, and there is no click-away backdrop or floating panel', async () => {
@@ -1844,7 +1849,8 @@ describe('ServiceEditorView - add-to-service palette (36-05, R067)', () => {
     ['palette-add-scripture', 'SCRIPTURE'],
     ['palette-add-prayer', 'PRAYER'],
     ['palette-add-message', 'MESSAGE'],
-    ['palette-add-hymn', 'HYMN'],
+    ['palette-add-announcements', 'ANNOUNCEMENTS'],
+    ['palette-add-misc', 'MISC'],
   ])('clicking %s appends a slot of kind %s', async (testid, kind) => {
     const wrapper = await mountView()
     const before = (wrapper.vm as unknown as SlotsVm).localService.slots.length
@@ -1891,6 +1897,324 @@ describe('ServiceEditorView - add-to-service palette (36-05, R067)', () => {
     const wrapper = await mountView()
 
     expect(wrapper.find('[data-testid="add-to-service-palette"]').exists()).toBe(false)
+  })
+})
+
+// ── Shared body editor: Message/Announcements/Misc, Hymn palette retirement (43-03) ──
+// Probe edges owned by this plan: E-02, E-06, E-09, E-11, E-12, E-16 (43-03-PLAN.md
+// § Probe Edge Coverage). UI-SPEC covered considerations: empty, populated, palette
+// exclusivity, data-retention, zero-one-many, and the lifted UI-06 (elementLabel copy).
+
+describe('ServiceEditorView - shared body editor: Message/Announcements/Misc, Hymn palette retirement (43-03)', () => {
+  interface SlotsVm {
+    localService: { slots: Array<Record<string, unknown>> }
+  }
+
+  async function mountView() {
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          ContextualActionBar: false,
+          RouterLink: { template: '<a><slot /></a>' },
+          SaveStatusIndicator: false,
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+          PresentationViewer: true,
+          // D-14's slot-delete confirmation renders via <Teleport to="body"> —
+          // opt it out of shallowMount's default auto-stub so UI-06's test can
+          // read the confirm dialog's body text from document.body.
+          teleport: false,
+        },
+      },
+    })
+  }
+
+  function body() {
+    return new DOMWrapper(document.body)
+  }
+
+  async function openBand(wrapper: Awaited<ReturnType<typeof mountView>>, key: string) {
+    await wrapper.find(`[data-testid="section-add-item-${key}"]`).trigger('click')
+    await wrapper.vm.$nextTick()
+  }
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockServicesList = [buildSectionedService()]
+  })
+
+  // ── Palette membership (R084 easy half, UI-03) ──────────────────────────────
+
+  it('the per-section inline chip row renders Announcements and Misc, and no Hymn chip', async () => {
+    const wrapper = await mountView()
+    await openBand(wrapper, 'worship')
+
+    const menu = wrapper.find('[data-testid="section-add-menu-worship"]')
+    expect(menu.find('[data-testid="section-add-announcements-worship"]').exists()).toBe(true)
+    expect(menu.find('[data-testid="section-add-misc-worship"]').exists()).toBe(true)
+    expect(menu.find('[data-testid="section-add-hymn-worship"]').exists()).toBe(false)
+  })
+
+  // ── UI-05: zero-one-many, no new quantity constraint ────────────────────────
+
+  it('UI-05: clicking Announcements twice appends two distinct slots; the same for Miscellaneous', async () => {
+    const wrapper = await mountView()
+    const before = (wrapper.vm as unknown as SlotsVm).localService.slots.length
+
+    await wrapper.find('[data-testid="palette-add-announcements"]').trigger('click')
+    await wrapper.vm.$nextTick()
+    await wrapper.find('[data-testid="palette-add-announcements"]').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    let slots = (wrapper.vm as unknown as SlotsVm).localService.slots
+    expect(slots).toHaveLength(before + 2)
+    const firstTwoNew = slots.slice(-2)
+    expect(firstTwoNew.every((s) => s.kind === 'ANNOUNCEMENTS')).toBe(true)
+    expect(firstTwoNew[0]!.id).not.toBe(firstTwoNew[1]!.id)
+
+    await wrapper.find('[data-testid="palette-add-misc"]').trigger('click')
+    await wrapper.vm.$nextTick()
+    await wrapper.find('[data-testid="palette-add-misc"]').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    slots = (wrapper.vm as unknown as SlotsVm).localService.slots
+    expect(slots).toHaveLength(before + 4)
+    const lastTwoNew = slots.slice(-2)
+    expect(lastTwoNew.every((s) => s.kind === 'MISC')).toBe(true)
+    expect(lastTwoNew[0]!.id).not.toBe(lastTwoNew[1]!.id)
+  })
+
+  // ── E-02 / UI-01: empty body is a valid state, ANNOUNCEMENTS ────────────────
+
+  it('E-02: an ANNOUNCEMENTS slot with no body renders the empty textarea + placeholder in the editor, and a whitespace-only body renders the italic empty state in the viewer, with no error styling', async () => {
+    mockServicesList = [{
+      ...buildSectionedService(),
+      slots: [{ kind: 'ANNOUNCEMENTS', id: 'a1', position: 0, body: '   ' }],
+    }]
+    mockAuthState.isEditor = false
+    const viewerWrapper = await mountView()
+
+    const empty = viewerWrapper.find('[data-testid="slot-body-empty"]')
+    expect(empty.exists()).toBe(true)
+    expect(empty.text()).toBe('Announcements — Empty')
+    expect(viewerWrapper.find('[data-testid="slot-body-text"]').exists()).toBe(false)
+    expect(viewerWrapper.findAll('.text-red-400').length + viewerWrapper.findAll('.text-red-500').length).toBe(0)
+
+    mockServicesList = [{
+      ...buildSectionedService(),
+      slots: [{ kind: 'ANNOUNCEMENTS', id: 'a2', position: 0 }],
+    }]
+    mockAuthState.isEditor = true
+    const editorWrapper = await mountView()
+    const textarea = editorWrapper.find('[data-testid="slot-body-input"]')
+    expect(textarea.exists()).toBe(true)
+    expect((textarea.element as HTMLTextAreaElement).value).toBe('')
+    expect(textarea.attributes('placeholder')).toBe('Announcement details…')
+  })
+
+  // ── E-06: the same predicate, independently, for MISC ───────────────────────
+
+  it('E-06: a MISC slot with no body renders the empty textarea + placeholder in the editor, and a whitespace-only body renders the italic empty state in the viewer, with no error styling', async () => {
+    mockServicesList = [{
+      ...buildSectionedService(),
+      slots: [{ kind: 'MISC', id: 'x1', position: 0, body: '  \n ' }],
+    }]
+    mockAuthState.isEditor = false
+    const viewerWrapper = await mountView()
+
+    const empty = viewerWrapper.find('[data-testid="slot-body-empty"]')
+    expect(empty.exists()).toBe(true)
+    expect(empty.text()).toBe('Miscellaneous — Empty')
+    expect(viewerWrapper.find('[data-testid="slot-body-text"]').exists()).toBe(false)
+    expect(viewerWrapper.findAll('.text-red-400').length + viewerWrapper.findAll('.text-red-500').length).toBe(0)
+
+    mockServicesList = [{
+      ...buildSectionedService(),
+      slots: [{ kind: 'MISC', id: 'x2', position: 0 }],
+    }]
+    mockAuthState.isEditor = true
+    const editorWrapper = await mountView()
+    const textarea = editorWrapper.find('[data-testid="slot-body-input"]')
+    expect(textarea.exists()).toBe(true)
+    expect((textarea.element as HTMLTextAreaElement).value).toBe('')
+    expect(textarea.attributes('placeholder')).toBe('Details…')
+  })
+
+  // ── UI-02: populated body round-trips into the read-only viewer ─────────────
+
+  it('a populated MESSAGE body renders read-only with preserved line breaks in the viewer, matching what the editor textarea holds', async () => {
+    const populatedBody = 'Line one\nLine two'
+    mockServicesList = [{
+      ...buildSectionedService(),
+      slots: [{ kind: 'MESSAGE', id: 'm1', position: 0, body: populatedBody }],
+    }]
+    mockAuthState.isEditor = false
+    const wrapper = await mountView()
+
+    const text = wrapper.find('[data-testid="slot-body-text"]')
+    expect(text.exists()).toBe(true)
+    // .text() collapses whitespace (including the embedded newline) per VTU's
+    // normalization — assert the exact preserved-newline content via textContent.
+    expect(text.element.textContent).toBe(populatedBody)
+    expect(wrapper.find('[data-testid="slot-body-empty"]').exists()).toBe(false)
+  })
+
+  // ── E-09: adjacency — two MESSAGE slots stay independent ────────────────────
+
+  it('E-09: two adjacent MESSAGE slots each render their own textarea, and editing one leaves the other\'s body untouched', async () => {
+    mockServicesList = [{
+      ...buildSectionedService(),
+      slots: [
+        { kind: 'MESSAGE', id: 'm1', position: 0, body: 'First message' },
+        { kind: 'MESSAGE', id: 'm2', position: 1, body: 'Second message' },
+      ],
+    }]
+    const wrapper = await mountView()
+
+    const textareas = wrapper.findAll('[data-testid="slot-body-input"]')
+    expect(textareas).toHaveLength(2)
+    expect((textareas[0]!.element as HTMLTextAreaElement).value).toBe('First message')
+    expect((textareas[1]!.element as HTMLTextAreaElement).value).toBe('Second message')
+
+    await textareas[0]!.setValue('Changed first')
+    await wrapper.vm.$nextTick()
+
+    const slots = (wrapper.vm as unknown as SlotsVm).localService.slots
+    expect(slots[0]!.body).toBe('Changed first')
+    expect(slots[1]!.body).toBe('Second message')
+  })
+
+  // ── E-11: verbatim encoding round-trip AND stored linkUrl survival ──────────
+
+  it('E-11: a typed body round-trips verbatim through the binding, and a stored linkUrl/linkLabel on the same MESSAGE slot is neither read into body nor destroyed', async () => {
+    mockServicesList = [{
+      ...buildSectionedService(),
+      slots: [{ kind: 'MESSAGE', id: 'm1', position: 0, linkUrl: 'https://example.com/notes', linkLabel: 'Sermon notes' }],
+    }]
+    const wrapper = await mountView()
+
+    // Half 1: body is NOT populated from linkUrl, and linkUrl/linkLabel survive mount.
+    const slotsBefore = (wrapper.vm as unknown as SlotsVm).localService.slots
+    expect(slotsBefore[0]!.body).toBeUndefined()
+    expect(slotsBefore[0]!.linkUrl).toBe('https://example.com/notes')
+    expect(slotsBefore[0]!.linkLabel).toBe('Sermon notes')
+
+    // Half 2: typed text (leading/trailing space, newline, multi-byte, emoji)
+    // round-trips verbatim, AND linkUrl/linkLabel are untouched by the edit.
+    const encoded = ' leading and trailing space \nnewline · café · 🎵 '
+    const textarea = wrapper.find('[data-testid="slot-body-input"]')
+    await textarea.setValue(encoded)
+    await wrapper.vm.$nextTick()
+
+    const slotsAfter = (wrapper.vm as unknown as SlotsVm).localService.slots
+    expect(slotsAfter[0]!.body).toBe(encoded)
+    expect(slotsAfter[0]!.linkUrl).toBe('https://example.com/notes')
+    expect(slotsAfter[0]!.linkLabel).toBe('Sermon notes')
+  })
+
+  // ── E-12: removing the URL control renumbers nothing ─────────────────────────
+
+  it('E-12: mounting a service with a MESSAGE slot carrying a stored linkUrl leaves every slot\'s id, position and array index identical to before', async () => {
+    const fixture: Service = {
+      ...buildSectionedService(),
+      slots: [
+        ...buildSectionedService().slots,
+        { kind: 'MESSAGE', id: 'm-with-link', position: 4, linkUrl: 'https://example.com', linkLabel: 'Link', section: 'sending' },
+      ],
+    }
+    const before = fixture.slots.map((s, i) => ({ id: s.id, position: s.position, index: i }))
+    mockServicesList = [fixture]
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const after = (wrapper.vm as unknown as SlotsVm).localService.slots.map((s, i) => ({ id: s.id, position: s.position, index: i }))
+    expect(after).toEqual(before)
+  })
+
+  // ── E-16: a saved HYMN slot renders and reorders nothing (R084 ordering half) ─
+
+  it('E-16: mounting a saved service containing a HYMN slot leaves slot count, ids, order and positions unchanged, and the HYMN slot still renders its own content row', async () => {
+    const fixture: Service = {
+      ...buildSectionedService(),
+      slots: [
+        ...buildSectionedService().slots,
+        { kind: 'HYMN', id: 'h1', position: 4, hymnName: 'Great Is Thy Faithfulness', hymnNumber: '10', verses: '', section: 'sending' },
+      ],
+    }
+    const before = fixture.slots.map((s) => ({ id: s.id, position: s.position }))
+    mockServicesList = [fixture]
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const slots = (wrapper.vm as unknown as SlotsVm).localService.slots
+    expect(slots).toHaveLength(fixture.slots.length)
+    expect(slots.map((s) => ({ id: s.id, position: s.position }))).toEqual(before)
+    // canEditService is true in this describe block's default fixture, so the
+    // HYMN branch renders its editor arm (an <input>, not text content) — read
+    // the input's bound value rather than wrapper.text().
+    const hymnNameInput = wrapper.find('input[placeholder="Hymn Name"]')
+    expect(hymnNameInput.exists()).toBe(true)
+    expect((hymnNameInput.element as HTMLInputElement).value).toBe('Great Is Thy Faithfulness')
+  })
+
+  // ── R083: the URL control is scoped to Message, not global (paired w/ Prayer) ─
+
+  it('a MESSAGE row renders no url-typed input and no link anchor; a PRAYER row in the same service still has both, proving the removal is scoped to Message', async () => {
+    mockServicesList = [{
+      ...buildSectionedService(),
+      slots: [
+        { kind: 'MESSAGE', id: 'm1', position: 0, linkUrl: 'https://example.com/message' },
+        { kind: 'PRAYER', id: 'p1', position: 1, linkUrl: 'https://example.com/prayer' },
+      ],
+    }]
+    const wrapper = await mountView()
+
+    const rows = wrapper.findAll('.slot-item')
+    const messageRow = rows.find((r) => r.text().includes('Message'))
+    const prayerRow = rows.find((r) => r.text().includes('Prayer'))
+    expect(messageRow).toBeDefined()
+    expect(prayerRow).toBeDefined()
+
+    expect(messageRow!.find('input[type="url"]').exists()).toBe(false)
+    expect(messageRow!.find('a').exists()).toBe(false)
+
+    expect(prayerRow!.find('input[type="url"]').exists()).toBe(true)
+    expect(prayerRow!.find('a').exists()).toBe(true)
+  })
+
+  // ── UI-06: elementLabel copy for the remove-element confirmation ────────────
+
+  it('UI-06: the remove-element confirmation names "this announcement" and "this miscellaneous item" instead of falling to the generic default', async () => {
+    mockServicesList = [{
+      ...buildSectionedService(),
+      slots: [
+        { kind: 'ANNOUNCEMENTS', id: 'a1', position: 0 },
+        { kind: 'MISC', id: 'x1', position: 1 },
+      ],
+    }]
+    const wrapper = await mountView()
+
+    const removeButtons = wrapper.findAll('button[title="Remove element"]')
+    expect(removeButtons.length).toBeGreaterThanOrEqual(2)
+
+    await removeButtons[0]!.trigger('click')
+    await wrapper.vm.$nextTick()
+    expect(body().text()).toContain('this announcement')
+    const cancelBtn1 = body().findAll('button').find((b) => b.text() === 'Cancel')
+    await cancelBtn1!.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    await removeButtons[1]!.trigger('click')
+    await wrapper.vm.$nextTick()
+    expect(body().text()).toContain('this miscellaneous item')
+    const cancelBtn2 = body().findAll('button').find((b) => b.text() === 'Cancel')
+    await cancelBtn2!.trigger('click')
+    await wrapper.vm.$nextTick()
   })
 })
 
@@ -3512,14 +3836,14 @@ describe('ServiceEditorView - no deck editing or deck import on the Service Orde
     expect(wrapper.text()).not.toContain('Import PowerPoint')
   })
 
-  it('still offers the five non-import palette chips', async () => {
+  it('still offers the six non-import palette chips (43-03: Hymn retired, Announcements/Misc added)', async () => {
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
 
     const palette = wrapper.find('[data-testid="add-to-service-palette"]')
     expect(palette.exists()).toBe(true)
     const chipLabels = palette.findAll('button').map((b) => b.text())
-    expect(chipLabels).toEqual(expect.arrayContaining(['Song', 'Scripture', 'Prayer', 'Message', 'Hymn']))
+    expect(chipLabels).toEqual(expect.arrayContaining(['Song', 'Scripture', 'Prayer', 'Message', 'Announcements', 'Miscellaneous']))
   })
 
   it('an existing imported plan item with a deck still renders its heading', async () => {
