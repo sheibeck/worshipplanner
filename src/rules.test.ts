@@ -587,7 +587,7 @@ describe('serviceShares — public read, org-editor-scoped create/update', () =>
   })
 })
 
-describe('shareTokens — public read, signed-in create, editor-scoped delete (revoke on quarter delete)', () => {
+describe('shareTokens — public read, signed-in create, editor-scoped in-place update, editor-scoped delete', () => {
   it('allows unauthenticated read of a shareTokens doc (public share link)', async () => {
     await seedDoc('shareTokens/tok-abc', { orgId: 'orgA', quarterId: 'q1' })
     const context = testEnv.unauthenticatedContext()
@@ -618,13 +618,90 @@ describe('shareTokens — public read, signed-in create, editor-scoped delete (r
     await assertFails(deleteDoc(doc(db, 'shareTokens', 'tok-abc')))
   })
 
-  it('denies updating a shareTokens doc (frozen snapshot — update stays false)', async () => {
+  // R077 — the in-place refresh path this phase exists to prove. Replaces the
+  // prior stale assertion that `shareTokens` update stayed `if false` forever;
+  // R077 deliberately reverses that invariant. Six cases: one ALLOW (ROADMAP
+  // criterion 3 — the genuine allow case that must actually execute) plus five
+  // DENY covering cross-org overwrite, no-membership, orgId reassignment,
+  // unauthenticated, and viewer-role.
+  it('ALLOW (ROADMAP criterion 3) — an editor of the owning org can refresh a shareTokens doc in place', async () => {
     await seedMembershipDoc('orgA', 'userA', 'editor')
-    await seedDoc('shareTokens/tok-abc', { orgId: 'orgA', quarterId: 'q1' })
+    await seedDoc('shareTokens/tok-abc', { orgId: 'orgA', serviceId: 'service-1' })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertSucceeds(
+      updateDoc(doc(db, 'shareTokens', 'tok-abc'), {
+        orgId: 'orgA',
+        serviceId: 'service-1',
+        serviceSnapshot: { name: 'Refreshed Service', updatedAt: 'now' },
+      }),
+    )
+  })
+
+  it('DENY (T-41-04) — an editor of a DIFFERENT org cannot update orgA\'s shareTokens doc (cross-org overwrite)', async () => {
+    await seedMembershipDoc('orgB', 'userB', 'editor')
+    await seedDoc('shareTokens/tok-abc', { orgId: 'orgA', serviceId: 'service-1' })
+    const context = testEnv.authenticatedContext('userB')
+    const db = context.firestore()
+    await assertFails(
+      updateDoc(doc(db, 'shareTokens', 'tok-abc'), {
+        orgId: 'orgA',
+        serviceId: 'service-1',
+        serviceSnapshot: { name: 'Tampered' },
+      }),
+    )
+  })
+
+  it('DENY (T-41-04) — a signed-in user with no org membership anywhere cannot update a shareTokens doc', async () => {
+    await seedDoc('shareTokens/tok-abc', { orgId: 'orgA', serviceId: 'service-1' })
+    const context = testEnv.authenticatedContext('userC')
+    const db = context.firestore()
+    await assertFails(
+      updateDoc(doc(db, 'shareTokens', 'tok-abc'), {
+        orgId: 'orgA',
+        serviceId: 'service-1',
+        serviceSnapshot: { name: 'Tampered' },
+      }),
+    )
+  })
+
+  it('DENY (T-41-05) — an editor of the owning org cannot reassign a shareTokens doc to a different orgId', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('shareTokens/tok-abc', { orgId: 'orgA', serviceId: 'service-1' })
     const context = testEnv.authenticatedContext('userA')
     const db = context.firestore()
     await assertFails(
-      setDoc(doc(db, 'shareTokens', 'tok-abc'), { orgId: 'orgA', quarterId: 'q1', tampered: true }),
+      updateDoc(doc(db, 'shareTokens', 'tok-abc'), {
+        orgId: 'orgB',
+        serviceId: 'service-1',
+      }),
+    )
+  })
+
+  it('DENY (T-41-04) — an unauthenticated caller cannot update a shareTokens doc', async () => {
+    await seedDoc('shareTokens/tok-abc', { orgId: 'orgA', serviceId: 'service-1' })
+    const context = testEnv.unauthenticatedContext()
+    const db = context.firestore()
+    await assertFails(
+      updateDoc(doc(db, 'shareTokens', 'tok-abc'), {
+        orgId: 'orgA',
+        serviceId: 'service-1',
+        serviceSnapshot: { name: 'Tampered' },
+      }),
+    )
+  })
+
+  it('DENY (T-41-08) — a viewer-role member of the owning org cannot update a shareTokens doc', async () => {
+    await seedMembershipDoc('orgA', 'userV', 'viewer')
+    await seedDoc('shareTokens/tok-abc', { orgId: 'orgA', serviceId: 'service-1' })
+    const context = testEnv.authenticatedContext('userV')
+    const db = context.firestore()
+    await assertFails(
+      updateDoc(doc(db, 'shareTokens', 'tok-abc'), {
+        orgId: 'orgA',
+        serviceId: 'service-1',
+        serviceSnapshot: { name: 'Tampered' },
+      }),
     )
   })
 })
