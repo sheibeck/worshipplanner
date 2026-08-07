@@ -114,13 +114,13 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 
 ### Service Items
 
-- [ ] **R081**: A planner can add an **Announcements** item to a service and type free text into it.
+- [x] **R081**: A planner can add an **Announcements** item to a service and type free text into it.
 
-- [ ] **R082**: A planner can add a **Miscellaneous** item to a service and type free text into it.
+- [x] **R082**: A planner can add a **Miscellaneous** item to a service and type free text into it.
 
 - [ ] **R083**: The **Message** item is a plain free-text box with no URL link field.
 
-- [ ] **R084**: **Hymn** is no longer offered when adding an item, and every existing Hymn item in a
+- [x] **R084**: **Hymn** is no longer offered when adding an item, and every existing Hymn item in a
       saved service keeps rendering, printing and presenting exactly as before.
       <br>Palette-only removal by owner decision — no migration. `HYMN` carries free-text
       `hymnName`/`hymnNumber`/`verses` that `SONG` (which requires a catalog `songId`) cannot represent
@@ -283,10 +283,10 @@ Explicitly excluded. Documented to prevent scope creep.
 | R078 | Phase 41 | Complete |
 | R079 | Phase 42 | Complete |
 | R080 | Phase 42 | Complete |
-| R081 | Phase 43 | Pending |
-| R082 | Phase 43 | Pending |
+| R081 | Phase 43 | Complete |
+| R082 | Phase 43 | Complete |
 | R083 | Phase 43 | Pending |
-| R084 | Phase 43 | Pending |
+| R084 | Phase 43 | Complete |
 | R085 | Phase 43 | Pending |
 | R086 | Phase 44 | Pending |
 | R087 | Phase 44 | Pending |

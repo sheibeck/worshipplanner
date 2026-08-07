@@ -929,6 +929,31 @@ that durable record.
 
 ---
 
+## Phase 43 — Service Item Types (R081-R085)
+
+### Plan 43-01 — projected ANNOUNCEMENTS/MISC slides show the kind label, not the planner's body
+
+**Recorded decision, not a defect.** `slideGroupMaterializer.ts` and `slideshowAssembler.ts` both emit
+`slotLabel(slot)` — `"Announcements"` / `"Miscellaneous"` — as BOTH the title and body of the
+congregation-facing PROJECTED slide for an ANNOUNCEMENTS or MISC slot, never `slot.body`.
+
+**Two reasons, both from 43-01-PLAN.md's Task 2:**
+
+1. Projecting a planner's raw free-text notes to a congregation is a content decision no requirement
+   in Phase 43 authorizes.
+2. `sourceSignature()` in `slideGroupMaterializer.ts` returns `undefined` for every text-backed kind
+   (PRAYER/MESSAGE/ANNOUNCEMENTS/MISC/HYMN). A projected slide derived from `body` would have no
+   change-detection signal, so a `body` edit would leave a stale materialized group behind with no way
+   to detect it needs rebuilding.
+
+**Team-facing surfaces (print and share, plan 04) DO render `body`.** Only the congregation-facing
+projection withholds it.
+
+- [ ] **Owner confirms this is the wanted behaviour**, or asks for `body` to project instead (which
+      would require also solving the `sourceSignature` staleness problem above — not a one-line change).
+
+---
+
 ## Notes and failures
 
 _(Record anything that failed here, with what you saw versus what was expected.)_

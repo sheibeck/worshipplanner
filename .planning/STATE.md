@@ -4,16 +4,16 @@ milestone: v1.5
 milestone_name: Settings, Sharing, and Fidelity
 current_phase: 43
 current_phase_name: Service Item Types
-status: planning
-stopped_at: Completed 42-08-PLAN.md (Phase 42 code-complete, ready for verification)
-last_updated: "2026-08-07T13:32:32.207Z"
+status: executing
+stopped_at: Completed 43-01-PLAN.md
+last_updated: "2026-08-07T18:03:16.761Z"
 last_activity: 2026-08-07
-last_activity_desc: Phase 42 complete, transitioned to Phase 43
+last_activity_desc: Phase 43 execution started
 progress:
   total_phases: 11
   completed_phases: 5
-  total_plans: 23
-  completed_plans: 23
+  total_plans: 27
+  completed_plans: 24
   percent: 45
 ---
 
@@ -140,7 +140,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 42 — PowerPoint Rendered-Image Display
+**Current focus:** Phase 43 — Service Item Types
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -150,10 +150,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 43 — Service Item Types
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-08-07 — Phase 42 complete, transitioned to Phase 43
+Phase: 43 (Service Item Types) — EXECUTING
+Plan: 2 of 4
+Status: Ready to execute
+Last activity: 2026-08-07 — Phase 43 execution started
 module, authStore.settings merged once in loadOrgContext, vwModeEnabled dual-read, R073 test
 coverage (src/stores/__tests__/auth.test.ts)
 
@@ -1343,6 +1343,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 42 P06 | 55min | 2 tasks | 4 files |
 | Phase 42 P07 | 40min | 2 tasks | 2 files |
 | Phase 42 P08 | 24min | 3 tasks | 3 files |
+| Phase 43 P01 | 9min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -1643,6 +1644,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: PresentationViewer's failed-render icon uses h-8 w-8 amber-300 (smaller than the pending spinner) per UI-SPEC wording; the never-louder guarantee is enforced at the heading level (identical text-4xl font-semibold on both states).
 - [Phase ?]: Switched useSlideshowAssembly's lifecycle hook from onUnmounted to onScopeDispose so render-listener teardown is testable outside a mounted component and works identically inside one
 - [Phase ?]: distinctRenderImportIds/renderReadySignal follow the existing synchronous-computed-decides-WHAT / async-watch-does-the-work split; renderedUrlCache is keyed renderImportId:renderedCount so a re-render's page-count change cannot serve a stale URL array
+- [Phase ?]: 43-01: One shared NonAssignableSlot.body?: string (not per-kind fields) for MESSAGE/ANNOUNCEMENTS/MISC; ANNOUNCEMENTS/MISC reuse PRAYER's neutral badge colour; projected slide shows kind label not body (deferred owner check in PENDING-VERIFICATION.md)
 
 ### Roadmap Evolution
 
@@ -1954,8 +1956,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-07T12:04:13.231Z
-Stopped at: Completed 42-08-PLAN.md (Phase 42 code-complete, ready for verification)
+Last session: 2026-08-07T18:03:16.722Z
+Stopped at: Completed 43-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
