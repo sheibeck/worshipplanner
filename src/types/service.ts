@@ -4,7 +4,7 @@ import type { CongregationalSection } from './slide'
 
 export type Progression = '1-2-2-3' | '1-2-3-3'
 export type ServiceStatus = 'draft' | 'planned' | 'exported'
-export type SlotKind = 'SONG' | 'SCRIPTURE' | 'PRAYER' | 'MESSAGE' | 'HYMN' | 'IMPORTED'
+export type SlotKind = 'SONG' | 'SCRIPTURE' | 'PRAYER' | 'MESSAGE' | 'ANNOUNCEMENTS' | 'MISC' | 'HYMN' | 'IMPORTED'
 
 /**
  * Formalized service sections (D005). Exactly these five members — no others.
@@ -71,8 +71,17 @@ export interface ScriptureSlot extends MediaAttachableSlot {
 }
 
 export interface NonAssignableSlot extends MediaAttachableSlot {
-  kind: 'PRAYER' | 'MESSAGE'
+  kind: 'PRAYER' | 'MESSAGE' | 'ANNOUNCEMENTS' | 'MISC'
   position: number
+  /**
+   * The single free-text field shared by MESSAGE, ANNOUNCEMENTS and MISC
+   * (R081/R082/R083). Named `body` to match the existing `TextSlide.body`
+   * in `src/types/slide.ts` — same concept, same word. OPTIONAL because
+   * every PRAYER and MESSAGE slot already in production lacks it; a
+   * required field would break every stored service and force a migration
+   * this phase is not authorized to write.
+   */
+  body?: string
   linkUrl?: string
   linkLabel?: string
   section?: ServiceSection
