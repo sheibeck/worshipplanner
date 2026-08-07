@@ -856,6 +856,231 @@ describe('useServiceStore', () => {
     })
   })
 
+  // ── R076/R078 — ensureShareLink stability, adoption and convergence ─────────
+  //
+  // getDoc responses are queued in CALL ORDER: ensureShareLink's link-document
+  // read is always first; writeSharePayload's memorable-URL org read is
+  // second (and defaults to the mock's shared exists:true/grace-church value
+  // unless a case overrides it). No local beforeEach here (unlike the
+  // sibling createShareToken describe above) — full control per case.
+  describe('ensureShareLink', () => {
+    it('first share on a virgin service mints exactly one token and records it once', async () => {
+      const { getDoc, getDocs, setDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      const service = makeService() as unknown as Service
+
+      vi.mocked(getDoc).mockResolvedValueOnce({ exists: () => false, data: () => ({}) } as never)
+      // getDocs default (empty result) applies — no pre-existing tokens.
+
+      const token = await store.ensureShareLink(service, 'org-1')
+
+      expect(token).toHaveLength(36)
+      expect(token).toMatch(/^[0-9a-f]{36}$/)
+      expect(mockTxSet).toHaveBeenCalledTimes(1)
+      const [, txSetPayload] = mockTxSet.mock.calls[0]!
+      const payload = txSetPayload as Record<string, unknown>
+      expect(payload.token).toBe(token)
+      expect(payload.orgId).toBe('org-1')
+      expect(payload.serviceId).toBe('service-1')
+      expect(setDoc).toHaveBeenCalledTimes(2) // shareTokens payload, then serviceShares memorable-URL
+      expect(getDocs).toHaveBeenCalledTimes(1)
+    })
+
+    it('repeat share returns the same token and mints nothing (R076 idempotency edge)', async () => {
+      const { getDoc, getDocs } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      const service = makeService() as unknown as Service
+
+      vi.mocked(getDoc).mockResolvedValueOnce({ exists: () => false, data: () => ({}) } as never)
+      const token1 = await store.ensureShareLink(service, 'org-1')
+
+      // Do NOT prove stability by comparing two returned strings alone — the
+      // suite's deterministic crypto.getRandomValues stub means every mint
+      // returns the identical string, so a naive equality assertion would
+      // pass even when a fresh mint occurred. The load-bearing assertions
+      // are the call counts below.
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => true,
+        data: () => ({ token: token1, orgId: 'org-1', serviceId: 'service-1' }),
+      } as never)
+      const token2 = await store.ensureShareLink(service, 'org-1')
+
+      expect(token2).toBe(token1)
+      expect(mockTxSet).toHaveBeenCalledTimes(1) // still 1 across both calls
+      expect(getDocs).toHaveBeenCalledTimes(1) // no re-adoption scan on the second call
+    })
+
+    it('adoption picks the most recent of three pre-existing tokens and mints none (R078)', async () => {
+      const { getDoc, getDocs, setDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      const service = makeService() as unknown as Service
+
+      vi.mocked(getDoc).mockResolvedValueOnce({ exists: () => false, data: () => ({}) } as never)
+      // Newest candidate ('token-newest') is deliberately neither first nor last.
+      vi.mocked(getDocs).mockResolvedValueOnce({
+        empty: false,
+        docs: [
+          { id: 'token-mid', data: () => ({ serviceId: 'service-1', orgId: 'org-1', createdAt: { seconds: 500 } }) },
+          { id: 'token-newest', data: () => ({ serviceId: 'service-1', orgId: 'org-1', createdAt: { seconds: 900 } }) },
+          { id: 'token-oldest', data: () => ({ serviceId: 'service-1', orgId: 'org-1', createdAt: { seconds: 100 } }) },
+        ],
+      } as never)
+
+      const token = await store.ensureShareLink(service, 'org-1')
+
+      expect(token).toBe('token-newest')
+      const [firstSetDocRef] = vi.mocked(setDoc).mock.calls[0]!
+      expect((firstSetDocRef as { id: string }).id).toBe('token-newest')
+      const [, txSetPayload] = mockTxSet.mock.calls[0]!
+      expect((txSetPayload as Record<string, unknown>).token).toBe('token-newest')
+    })
+
+    it('adoption over exactly one candidate adopts it and mints none; over zero candidates mints exactly one (R078 empty edge)', async () => {
+      const { getDoc, getDocs } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+
+      // Zero candidates: mints exactly one.
+      const virginService = makeService({ id: 'service-1' }) as unknown as Service
+      vi.mocked(getDoc).mockResolvedValueOnce({ exists: () => false, data: () => ({}) } as never)
+      // getDocs default (empty) applies.
+      const mintedToken = await store.ensureShareLink(virginService, 'org-1')
+      expect(mintedToken).toHaveLength(36)
+      expect(mintedToken).toMatch(/^[0-9a-f]{36}$/)
+
+      // Exactly one candidate: adopts it, mints none. Captured mintedToken
+      // above is the value the deterministic mint stub would produce — the
+      // meaningful comparison below proves this path did NOT mint.
+      const otherService = makeService({ id: 'service-2' }) as unknown as Service
+      vi.mocked(getDoc).mockResolvedValueOnce({ exists: () => false, data: () => ({}) } as never)
+      vi.mocked(getDocs).mockResolvedValueOnce({
+        empty: false,
+        docs: [
+          { id: 'the-only-candidate', data: () => ({ serviceId: 'service-2', orgId: 'org-1', createdAt: { seconds: 1 } }) },
+        ],
+      } as never)
+      const adoptedToken = await store.ensureShareLink(otherService, 'org-1')
+
+      expect(adoptedToken).toBe('the-only-candidate')
+      expect(adoptedToken).not.toBe(mintedToken)
+    })
+
+    it('an adopted token is used verbatim as the document id (R077 encoding edge)', async () => {
+      const { getDoc, getDocs, setDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      const service = makeService() as unknown as Service
+
+      const mixedCaseId = 'AbC-123_XyZ.legacyToken'
+      vi.mocked(getDoc).mockResolvedValueOnce({ exists: () => false, data: () => ({}) } as never)
+      vi.mocked(getDocs).mockResolvedValueOnce({
+        empty: false,
+        docs: [{ id: mixedCaseId, data: () => ({ serviceId: 'service-1', orgId: 'org-1', createdAt: { seconds: 1 } }) }],
+      } as never)
+
+      const token = await store.ensureShareLink(service, 'org-1')
+
+      // Any case-folding, trimming or normalization on the write path shows
+      // up here as an inequality — and would break ShareView's read path,
+      // which uses the route parameter verbatim.
+      expect(token).toBe(mixedCaseId)
+      const [docRef] = vi.mocked(setDoc).mock.calls[0]!
+      expect((docRef as { id: string }).id).toBe(mixedCaseId)
+    })
+
+    it('the adoption query is equality-only (no composite index)', async () => {
+      const { getDoc, where, orderBy, limit } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1') // legitimately calls orderBy once for the services listener
+      vi.mocked(orderBy).mockClear()
+
+      const service = makeService() as unknown as Service
+      vi.mocked(getDoc).mockResolvedValueOnce({ exists: () => false, data: () => ({}) } as never)
+      // getDocs default (empty) applies.
+
+      await store.ensureShareLink(service, 'org-1')
+
+      expect(where).toHaveBeenCalledWith('serviceId', '==', 'service-1')
+      expect(orderBy).not.toHaveBeenCalled()
+      expect(limit).not.toHaveBeenCalled()
+    })
+
+    it('no write is ever issued against the service document (T-41-01)', async () => {
+      const { getDoc, updateDoc, setDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      const service = makeService() as unknown as Service
+      vi.mocked(getDoc).mockResolvedValueOnce({ exists: () => false, data: () => ({}) } as never)
+
+      await store.ensureShareLink(service, 'org-1')
+
+      // Assert the ABSENCE, not merely the presence of the two forward
+      // writes — a write-back that also performed the forward writes would
+      // pass a presence-only assertion.
+      for (const [ref] of vi.mocked(updateDoc).mock.calls) {
+        expect((ref as { path?: string }).path ?? '').not.toContain('services')
+      }
+      for (const [ref] of vi.mocked(setDoc).mock.calls) {
+        expect((ref as { path?: string }).path ?? '').not.toContain('services')
+      }
+    })
+
+    it('the PII guard holds on the create path (T-41-03, ROADMAP criterion 5)', async () => {
+      const { getDoc, setDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      const service = makeService() as unknown as Service
+      vi.mocked(getDoc).mockResolvedValueOnce({ exists: () => false, data: () => ({}) } as never)
+
+      await store.ensureShareLink(service, 'org-1')
+
+      // The roster mock deliberately carries email and phone on both people,
+      // so this fails loudly if buildServiceSnapshot ever starts embedding a
+      // raw Person.
+      const [, data] = vi.mocked(setDoc).mock.calls[0]!
+      const serialized = JSON.stringify(data)
+      expect(serialized).not.toMatch(/email/i)
+      expect(serialized).not.toMatch(/phone/i)
+      expect(serialized).not.toMatch(/pcPersonId/i)
+    })
+
+    it('concurrent first-share convergence: a link created mid-flight wins over the local mint (backstop)', async () => {
+      const { getDoc, setDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      const service = makeService() as unknown as Service
+
+      vi.mocked(getDoc).mockResolvedValueOnce({ exists: () => false, data: () => ({}) } as never)
+      // getDocs default (empty) applies — the local mint happens before the
+      // transaction runs. The other client's write landing between the outer
+      // read and the transaction is simulated by overriding the
+      // transaction's OWN get spy, not the outer getDoc.
+      mockTxGet.mockResolvedValueOnce({
+        exists: () => true,
+        data: () => ({ token: 'winner-token', orgId: 'org-1', serviceId: 'service-1' }),
+      } as never)
+
+      const token = await store.ensureShareLink(service, 'org-1')
+
+      expect(token).toBe('winner-token')
+      expect(mockTxSet).not.toHaveBeenCalled()
+      const [docRef] = vi.mocked(setDoc).mock.calls[0]!
+      expect((docRef as { id: string }).id).toBe('winner-token')
+    })
+  })
+
   // ── R036 / R037 — the store's draft-only write guard + status transitions ────
   //
   // Layer 2 of 3. These assertions deliberately mirror the `/services`
