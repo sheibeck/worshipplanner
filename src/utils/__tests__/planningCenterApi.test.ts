@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { Service, ServiceSlot, SongSlot, ScriptureSlot, NonAssignableSlot, HymnSlot, ScriptureRef } from '@/types/service'
+import type { Service, ServiceSlot, SongSlot, ScriptureSlot, NonAssignableSlot, HymnSlot, ImportedSlot, ScriptureRef } from '@/types/service'
 import type { Timestamp } from 'firebase/firestore'
 import type { VWType } from '@/types/song'
 
@@ -1086,6 +1086,180 @@ describe('addSlotAsItem', () => {
     // Should not throw despite note POST failing
     const result = await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 0, songs)
     expect(result).toBe('item-99')
+  })
+
+  // R085 (Phase 43 Plan 02): addSlotAsItem's dispatch was an unguarded if-chain
+  // whose final block was an implicit else returning a "Message" item for any
+  // unhandled SlotKind. These tests prove every widened kind exports as itself
+  // — never silently as Message — and that the exhaustiveness backstop leaves
+  // SONG/HYMN/SCRIPTURE/PRAYER (asserted unmodified above) untouched.
+  describe('R085 — every SlotKind branch is explicit (Phase 43 Plan 02)', () => {
+    it('E-17: two adjacent new-kind slots produce two distinct titles at their own sequence values', async () => {
+      // Two calls to addSlotAsItem in one test each read a fetch Response body
+      // once (Response.json() is single-use), so this needs two independent
+      // mock responses rather than defaultFetchResponse()'s single shared one.
+      vi.mocked(fetch)
+        .mockResolvedValueOnce(new Response(JSON.stringify({ data: { id: 'item-ann' } }), { status: 201 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({ data: { id: 'item-misc' } }), { status: 201 }))
+      const announcements: NonAssignableSlot = { kind: 'ANNOUNCEMENTS', id: 'slot-ann-0', position: 0 }
+      const misc: NonAssignableSlot = { kind: 'MISC', id: 'slot-misc-1', position: 1 }
+
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', announcements, 2, [])
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', misc, 3, [])
+
+      const [, opts0] = vi.mocked(fetch).mock.calls[0]!
+      const [, opts1] = vi.mocked(fetch).mock.calls[1]!
+      const body0 = JSON.parse(opts0?.body as string)
+      const body1 = JSON.parse(opts1?.body as string)
+
+      expect(body0.data.attributes.title).toBe('Announcements')
+      expect(body0.data.attributes.sequence).toBe(2)
+      expect(body1.data.attributes.title).toBe('Miscellaneous')
+      expect(body1.data.attributes.sequence).toBe(3)
+      expect(body0.data.attributes.title).not.toBe(body1.data.attributes.title)
+    })
+
+    it('maps ANNOUNCEMENTS slot to a regular item titled "Announcements", never "Message"', async () => {
+      defaultFetchResponse()
+      const slot: NonAssignableSlot = { kind: 'ANNOUNCEMENTS', id: 'slot-ann-5', position: 5 }
+
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 5, [])
+
+      const [, options] = vi.mocked(fetch).mock.calls[0]!
+      const body = JSON.parse(options?.body as string)
+      expect(body.data.attributes.item_type).toBe('regular')
+      expect(body.data.attributes.title).toBe('Announcements')
+      expect(body.data.attributes.title).not.toBe('Message')
+    })
+
+    it('maps MISC slot to a regular item titled "Miscellaneous", never "Message"', async () => {
+      defaultFetchResponse()
+      const slot: NonAssignableSlot = { kind: 'MISC', id: 'slot-misc-6', position: 6 }
+
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 6, [])
+
+      const [, options] = vi.mocked(fetch).mock.calls[0]!
+      const body = JSON.parse(options?.body as string)
+      expect(body.data.attributes.item_type).toBe('regular')
+      expect(body.data.attributes.title).toBe('Miscellaneous')
+      expect(body.data.attributes.title).not.toBe('Message')
+    })
+
+    it('E-18: an ANNOUNCEMENTS slot with a whitespace-only body exports as itself with no description', async () => {
+      defaultFetchResponse()
+      const slot: NonAssignableSlot = { kind: 'ANNOUNCEMENTS', id: 'slot-ann-7', position: 7, body: '   \n\t  ' }
+
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 7, [])
+
+      const [, options] = vi.mocked(fetch).mock.calls[0]!
+      const body = JSON.parse(options?.body as string)
+      expect(body.data.attributes.title).toBe('Announcements')
+      expect(body.data.attributes.title).not.toBe('Message')
+      expect(body.data.attributes.html_details).toBeUndefined()
+    })
+
+    it('E-18: a MISC slot with a whitespace-only body exports as itself with no description', async () => {
+      defaultFetchResponse()
+      const slot: NonAssignableSlot = { kind: 'MISC', id: 'slot-misc-8', position: 8, body: '  ' }
+
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 8, [])
+
+      const [, options] = vi.mocked(fetch).mock.calls[0]!
+      const body = JSON.parse(options?.body as string)
+      expect(body.data.attributes.title).toBe('Miscellaneous')
+      expect(body.data.attributes.title).not.toBe('Message')
+      expect(body.data.attributes.html_details).toBeUndefined()
+    })
+
+    it('E-19: an ANNOUNCEMENTS slot body reaches html_details verbatim — leading/trailing space, newline, multi-byte char, emoji', async () => {
+      defaultFetchResponse()
+      const rawBody = ' Line one\ncafé opens at 9am 🎉 '
+      const slot: NonAssignableSlot = { kind: 'ANNOUNCEMENTS', id: 'slot-ann-9', position: 9, body: rawBody }
+
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 9, [])
+
+      const [, options] = vi.mocked(fetch).mock.calls[0]!
+      const body = JSON.parse(options?.body as string)
+      expect(body.data.attributes.html_details).toBe(rawBody)
+    })
+
+    it('E-20: sequence passes through the ANNOUNCEMENTS and MISC branches unchanged at a non-zero value', async () => {
+      // See the E-17 test above: two addSlotAsItem calls need two independent
+      // mock responses since Response.json() can only be read once per call.
+      vi.mocked(fetch)
+        .mockResolvedValueOnce(new Response(JSON.stringify({ data: { id: 'item-ann' } }), { status: 201 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({ data: { id: 'item-misc' } }), { status: 201 }))
+      const announcements: NonAssignableSlot = { kind: 'ANNOUNCEMENTS', id: 'slot-ann-10', position: 10 }
+      const misc: NonAssignableSlot = { kind: 'MISC', id: 'slot-misc-11', position: 11 }
+
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', announcements, 42, [])
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', misc, 43, [])
+
+      const [, opts0] = vi.mocked(fetch).mock.calls[0]!
+      const [, opts1] = vi.mocked(fetch).mock.calls[1]!
+      expect(JSON.parse(opts0?.body as string).data.attributes.sequence).toBe(42)
+      expect(JSON.parse(opts1?.body as string).data.attributes.sequence).toBe(43)
+    })
+
+    it('E-10: a MESSAGE slot with neither body nor sermonPassage resolves without throwing and has no description', async () => {
+      defaultFetchResponse()
+      const slot: NonAssignableSlot = { kind: 'MESSAGE', id: 'slot-msg-12', position: 12 }
+
+      await expect(
+        addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 12, [], null),
+      ).resolves.not.toThrow()
+
+      const [, options] = vi.mocked(fetch).mock.calls[0]!
+      const body = JSON.parse(options?.body as string)
+      expect(body.data.attributes.title).toBe('Message')
+      expect(body.data.attributes.html_details).toBeUndefined()
+    })
+
+    it('a MESSAGE slot with both body and sermonPassage prefers body', async () => {
+      defaultFetchResponse()
+      const sermonPassage: ScriptureRef = { book: 'Romans', chapter: 8, verseStart: 1, verseEnd: 11 }
+      const slot: NonAssignableSlot = {
+        kind: 'MESSAGE',
+        id: 'slot-msg-13',
+        position: 13,
+        body: 'Series: Hope, week 3',
+      }
+
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 13, [], sermonPassage)
+
+      const [, options] = vi.mocked(fetch).mock.calls[0]!
+      const body = JSON.parse(options?.body as string)
+      expect(body.data.attributes.html_details).toBe('Series: Hope, week 3')
+    })
+
+    it('E-14: a HYMN slot with empty hymnNumber and empty verses exports the bare title with no # and no (vv. )', async () => {
+      defaultFetchResponse()
+      const slot: HymnSlot = {
+        kind: 'HYMN',
+        id: 'slot-hymn-14',
+        position: 14,
+        hymnName: 'Holy Holy Holy',
+        hymnNumber: '',
+        verses: '',
+      }
+
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 14, [])
+
+      const [, options] = vi.mocked(fetch).mock.calls[0]!
+      const body = JSON.parse(options?.body as string)
+      expect(body.data.attributes.title).toBe('Worship Song - Holy Holy Holy')
+      expect(body.data.attributes.title).not.toContain('#')
+      expect(body.data.attributes.title).not.toContain('(vv. ')
+    })
+
+    it('an IMPORTED slot returns the empty string and issues no POST', async () => {
+      const slot: ImportedSlot = { kind: 'IMPORTED', id: 'slot-imp-15', position: 15, importId: 'import-1' }
+
+      const result = await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 15, [])
+
+      expect(result).toBe('')
+      expect(vi.mocked(fetch)).not.toHaveBeenCalled()
+    })
   })
 
 })
