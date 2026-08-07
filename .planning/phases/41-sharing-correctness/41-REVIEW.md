@@ -1,6 +1,6 @@
 ---
 phase: 41-sharing-correctness
-reviewed: 2026-08-07T00:00:00Z
+reviewed: 2026-08-07T04:35:00Z
 depth: standard
 files_reviewed: 6
 files_reviewed_list:
@@ -11,10 +11,10 @@ files_reviewed_list:
   - src/utils/__tests__/shareTokens.test.ts
   - src/utils/shareTokens.ts
 findings:
-  critical: 1
-  warning: 6
+  critical: 0
+  warning: 1
   info: 1
-  total: 8
+  total: 2
 status: issues_found
 ---
 
@@ -27,245 +27,112 @@ status: issues_found
 
 ## Summary
 
-The core of this phase — `orgId` immutability on both `shareTokens` and `serviceShareLinks`, the
-null-`resource` read guard, `pickAdoptableToken`'s org-filter-before-sort ordering, the
-equality-only adoption query, `buildServiceSnapshot`'s PII scrub, and `maybeRefreshShareLink`'s
-structural inability to write back to `services/{docId}` — is implemented correctly and is backed
-by tests that genuinely exercise the behavior (the "assert absence, not just presence" discipline
-called out in the plan is followed in practice, e.g. the T-41-01/T-41-02 tests iterate every
-`updateDoc`/`setDoc` call rather than just counting them).
+This is iteration 2, re-reviewing after a fixer pass (`b2a2e5c`, `808f181`, `0a26bf0`, `566e4d8`,
+`e6891cd`, `80f9a96`) that claimed to resolve CR-01 and WR-01/02/03/05/06 from the prior review, and
+to deliberately skip WR-04. Each claimed fix was independently re-derived from the current source and
+verified against the actual code and tests, not taken on the fixer's report alone.
 
-The null-`resource` read clause on `serviceShareLinks` (focus area 3) was reviewed specifically for
-whether it leaks anything beyond existence: it does not — a denied read carries no data, and the
-`resource == null` branch only ever fires on a genuinely nonexistent document. The stated low-severity
-acceptance (existence oracle only) is sound as implemented.
+**CR-01 (was Critical) — confirmed genuinely closed, and confirmed it does not break any legitimate
+flow.** `firestore.rules:231` now reads `allow create: if isOrgEditor(request.resource.data.orgId);`
+for `shareTokens`, matching the idiom already used by `serviceShareLinks`/`quarterShares`/
+`serviceShares`. Traced every legitimate create path: `writeSharePayload`'s `setDoc(doc(db,
+'shareTokens', token), ...)` (`src/stores/services.ts:496`) is reachable only through
+`ensureShareLink`/`maybeRefreshShareLink`, both of which are called only from editor-gated UI actions
+(`createShareToken`, `updateService`, `setRoleOverride`, `clearRoleOverride`), and the write always
+carries the caller's real `orgId` (`orgIdValue`/`orgId.value`, never attacker input) — so the tightened
+rule cannot break a sanctioned share. Confirmed the adoption logic in `pickAdoptableToken` (org-filter
+before sort) means an attacker who is only editor of their *own* org can never plant a document that
+gets adopted for a *different* org's service, because the filter requires `candidate.orgId === orgId`
+of the actual target org, and the create rule now requires the creator to actually be an editor of
+whatever `orgId` they write. Four new rules-suite create-authorization tests
+(`src/rules.test.ts:606-667`) exercise ALLOW (genuine editor), and DENY for a different-org editor,
+a no-membership user, a same-org viewer, and unauthenticated — all against the live rule, not a stub.
+This also resolves WR-05, whose gap (zero create coverage) is exactly what these four tests fill; the
+`describe` block title was correctly updated to "editor-scoped create" to match.
 
-One finding is a genuine BLOCKER: the phase's new adoption logic (`pickAdoptableToken` /
-`ensureShareLink`) reads and *trusts* the `orgId` and `createdAt` fields of arbitrary pre-existing
-`shareTokens` documents to decide which token becomes "the" official, permanently-recorded share link
-for a service — but `shareTokens`' `create` rule was left at `isSignedIn()`, with no org-membership
-check at all, unlike every sibling collection this phase touches (`serviceShareLinks`, `quarterShares`,
-`serviceShares` all require `isOrgEditor`). That gap predates this phase, but this phase is what turns
-it into an exploitable trust-boundary violation: before this phase nothing ever *read back and acted
-on* another party's `shareTokens` document, so the loose create rule was inert. Now it is not. See
-CR-01.
+**WR-01 — confirmed genuinely non-vacuous now.** Tests 5 and 7 in
+`src/utils/__tests__/shareTokens.test.ts` now supply `[tok-a, tok-b]` (alphabetical order, which is
+also what a no-op/absent tiebreak's stable sort would preserve unchanged) and assert the result is
+`'tok-b'`. Reasoning it through independently: with the real tiebreak
+(`b.id.localeCompare(a.id)`) removed and replaced by `return 0`, a stable sort leaves `[tok-a, tok-b]`
+untouched, so `sorted[0].id` would be `'tok-a'` — the assertion `toBe('tok-b')` would fail. The fixer's
+report additionally claims they mechanically verified this by temporarily zeroing the comparator,
+confirming both tests failed, and restoring it with an empty `git diff`; the current diff and test
+content are consistent with that having been done correctly.
 
-The remaining findings are warnings: two vacuous test assertions in the tiebreak-coverage of
-`pickAdoptableToken`, a permanent-for-session soft-fail with no user-facing signal, a cache that is
-never invalidated on org switch or service delete, a pre-existing (but now more easily triggered)
-orphaning of the memorable-URL doc on a post-share date edit, and a rules-test coverage gap.
+**WR-02 — confirmed the classification logic and confirmed it cannot misclassify in a way that
+regresses.** `maybeRefreshShareLink`'s catch (`src/stores/services.ts:685-710`) now reads
+`(err as { code?: string } | undefined)?.code` and only treats `code === 'permission-denied'` as
+permanent, mirroring the identical pattern already established in `src/utils/slug.ts:58`. Any other
+error (including a plain code-less `Error`, the transient-network stand-in) leaves the cache untouched
+so the next edit retries. Two new tests (`services.test.ts:1421`, `:1454`) exercise both branches by
+inspecting whether a *second* `updateService` call reaches `setDoc`/`getDoc` — a behavioral assertion,
+not a call-count-only one. Ran the full `services.test.ts` suite (81 tests) and it passes.
 
-## Critical Issues
+**WR-03 — confirmed the cache is cleared on both `unsubscribeAll()` and `deleteService()`
+(`services.ts:211`, `:355`), and confirmed by tracing that this is the complete set of state-resetting
+entry points** — `unsubscribeAll()` is the only path that changes `orgId.value` (org switch always
+tears down the old subscription first, per `subscribe()`'s `if (unsubscribeFn) unsubscribeFn()` call
+before re-assigning `orgId.value`), so there is no route to a live `orgId` change that bypasses the
+clear. Two new behavioral tests prove a same-id refresh after each event re-reads via `getDoc` instead
+of reusing the stale cached token.
 
-### CR-01: `shareTokens`' create rule has no org-membership check, and the new adoption logic trusts its data — enabling a non-editor (or non-member, given a known serviceId) to hijack a service's first share
+**WR-06 — confirmed added** (`src/rules.test.ts:825-831`): a viewer-role member of the owning org is
+asserted to get `assertFails(getDoc(...))` on an existing `serviceShareLinks` doc, filling the one gap
+in that collection's otherwise-thorough role-matrix coverage.
 
-**File:** `firestore.rules:220` (rule), `src/stores/services.ts:558-598` (trust boundary), `src/utils/shareTokens.ts:108-119` (`pickAdoptableToken`)
+**WR-04 (skipped) — the skip rationale is sound and is carried forward as a known limitation, not
+re-raised as new.** The two remedies the original review proposed are, as the fix report argues,
+materially larger than an atomic fix: keying `serviceShares` docs by anything other than
+`${slug}__service-${date}` would 404 every already-published memorable link (`ShareView.vue`
+reconstructs that exact id from the route params), and tracking-and-deleting the previous date-keyed
+doc requires a new persisted field plus migration handling for every service shared before the field
+existed. Both are genuine schema/migration decisions, not a rules or store one-liner. Verified this
+finding is still present and unchanged in the current code — `writeSharePayload`
+(`services.ts:522`) still keys on the live `service.date`, and `maybeRefreshShareLink` still triggers
+that write on ordinary edits — so it remains open at its original Warning severity, tracked as a
+follow-up rather than fixed here.
 
-**Issue:**
+No new bugs were introduced by the fix commits: all six diffs are scoped tightly to their claimed
+finding (confirmed via `git show --stat` on each commit), `npm run type-check` (`vue-tsc --build`,
+per this project's typechecking convention) is clean, and the full `services.test.ts` (81 tests) and
+`shareTokens.test.ts` (20 tests) suites pass.
 
-`firestore.rules:220`:
-```
-allow create: if isSignedIn();
-```
-
-This is the only CRUD rule anywhere in this phase's authorization surface — `serviceShareLinks`
-create/update/delete, `quarterShares` create/update, `serviceShares` create/update — that does **not**
-require `isOrgEditor(request.resource.data.orgId)`. It requires only that the caller be signed in to
-*any* account; `orgId`, `serviceId`, and `serviceSnapshot` are entirely caller-controlled.
-
-Before this phase, that looseness was inert: `createShareToken` always minted a brand-new random
-token and never read anyone else's `shareTokens` document. This phase adds `ensureShareLink`'s
-adopt-or-create path (`src/stores/services.ts:550-565`), which — the *first* time a service is
-shared (no `serviceShareLinks/{serviceId}` doc yet) — queries `shareTokens` for
-`where('serviceId','==', service.id)` and calls `pickAdoptableToken(candidates, orgIdValue)`, which
-adopts whichever candidate's **attacker-suppliable** `orgId` field string-equals the real org id
-(picking the newest `createdAt` if several match). The winning candidate's document id is then
-persisted permanently as the service's official token via `runTransaction` at
-`services.ts:576-589`, and payload content is subsequently overwritten with legitimate data — but
-only *after* the malicious document has already been selected and its id locked in.
-
-Concretely: any signed-in user of the app who knows a target `(orgId, serviceId)` pair — trivially
-true for any **viewer**-role member of that org (`isOrgMember` grants read on
-`organizations/{orgId}/services`, so a viewer can enumerate real `serviceId`s the same way an
-editor can; `orgId` itself is public via `orgSlugs/{slug}` reads, `allow read: if true`) — can, with
-a bare `setDoc`, create:
-
-```js
-setDoc(doc(db, 'shareTokens', 'attacker-chosen-token'), {
-  serviceId: '<real, not-yet-shared serviceId>',
-  orgId: '<real orgId>',
-  serviceSnapshot: { /* attacker-controlled */ },
-  createdAt: serverTimestamp(),
-})
-```
-
-This passes `create` today (`isSignedIn()` only). Two consequences:
-
-1. **Unsanctioned publication.** Until an editor first presses "Share" for that service, the
-   attacker's `serviceSnapshot` is publicly readable (`shareTokens` read is `if true`) at a URL an
-   editor never approved — for a service that may never be intended to be shared at all. This
-   directly undermines the editor-gating this phase otherwise builds carefully (viewers cannot
-   create/update/delete `serviceShareLinks`; only editors can).
-2. **Token hijack.** When an editor genuinely does share the service for the first time, adoption
-   picks the attacker's document (it is the only/newest candidate whose `orgId` matches), so the
-   permanently-recorded official token is the attacker-chosen string, not a server-random one. The
-   payload content self-heals on the very next `writeSharePayload` call, but the token identity does
-   not.
-
-This is exactly the class of bug the `T-41-04`/`T-41-05`/CR-01 cross-org-overwrite fixes elsewhere in
-this same rules file were written to close — a client-controlled document that a later authorization
-decision trusts without an org-membership check — just on the `create` verb instead of `update`.
-
-**Fix:** align `shareTokens`' create rule with every sibling collection in this phase:
-
-```
-match /shareTokens/{token} {
-  allow read: if true;
-  allow create: if isOrgEditor(request.resource.data.orgId);
-  allow update: if isOrgEditor(resource.data.orgId)
-                   && request.resource.data.orgId == resource.data.orgId;
-  allow delete: if isOrgEditor(resource.data.orgId);
-}
-```
-
-Verified this does not break the legitimate paths: every `setDoc` against `shareTokens` in
-`writeSharePayload` runs only from `ensureShareLink`/`maybeRefreshShareLink`, both reachable only
-through UI actions gated to editors, and the write always carries the real `orgId`, so
-`isOrgEditor(request.resource.data.orgId)` is satisfied. The self-heal overwrite path (adopted
-doc already exists) is unaffected since it is governed by the (already-correct) `update` rule, not
-`create`.
+The only items still open are the two carried forward from the prior review at unchanged severity:
+WR-04 (deliberately skipped, rationale accepted) and IN-01 (out of scope for the fix pass). No new
+findings were surfaced by this re-review.
 
 ## Warnings
 
-### WR-01: `pickAdoptableToken`'s createdAt-tie tests are vacuous — they would pass even with no tiebreak at all
+### WR-04 (carried forward, unchanged severity): a post-share date edit still orphans the old memorable-URL (`serviceShares`) document
 
-**File:** `src/utils/__tests__/shareTokens.test.ts:93-119`
-
-**Issue:** Tests 5 and 7 both construct `candidates` in the array order `[tok-b, tok-a]` (or
-`[tok-b(null), tok-a(null)]`) and assert the result is `'tok-b'`. `Array.prototype.sort` is a
-**stable** sort per the ECMAScript spec — elements that compare equal keep their original relative
-order. Since both candidates share an identical `createdAt`, `shareTokenCreatedAtMillis(b) -
-shareTokenCreatedAtMillis(a)` is always `0` in these two cases, so if the comparator's tiebreak line
-(`return b.id.localeCompare(a.id)`) were deleted entirely — i.e. `pickAdoptableToken` had **no**
-tiebreak logic at all and just returned `0` for every equal-createdAt pair — the input order
-`[tok-b, tok-a]` would be preserved unchanged by the stable sort, and `sorted[0].id` would still be
-`'tok-b'`. Both tests would still pass. The in-file comment ("Array order ... is the opposite of
-alphabetical order, so a no-op comparator ... cannot pass this case") is incorrect: alphabetical
-order of the *ids* is `tok-a < tok-b`, but the *array* is already ordered `[tok-b, tok-a]`, which is
-exactly the output a no-op/absent tiebreak would produce.
-
-**Fix:** flip the input order so the array's natural (stable, pre-sort) order disagrees with the
-expected output, forcing the tiebreak to actually run:
-
-```js
-it('5. breaks a byte-identical createdAt tie via lexicographically greatest id', () => {
-  const createdAt = { seconds: 500, nanoseconds: 0 }
-  const candidates: ShareTokenCandidate[] = [
-    { id: 'tok-a', orgId: 'org-1', createdAt }, // array order now MATCHES alphabetical order
-    { id: 'tok-b', orgId: 'org-1', createdAt },
-  ]
-  expect(pickAdoptableToken(candidates, 'org-1')).toBe('tok-b') // only the real tiebreak reaches this
-})
-```
-
-Apply the same fix to test 7 (two `null` `createdAt` values).
-
-### WR-02: A single write failure permanently disables share-refresh for a service for the rest of the session, with no user-facing signal
-
-**File:** `src/stores/services.ts:674-684`
-
-**Issue:** `maybeRefreshShareLink`'s catch block sets `shareLinkCache.set(id, false)` on *any*
-error — a transient network blip, a brief rules-propagation delay, or a genuine permission problem
-are all treated identically. Once cached `false`, every future call short-circuits before attempting
-another write (`services.ts:645-646`), for the remainder of the Pinia store's lifetime (effectively
-the session). The only signal is `console.error`, which no end user will ever see. A real,
-already-public, already-shared service can silently drift out of sync with what viewers see at its
-public URL, with the editor having no indication anything is wrong.
-
-**Fix:** distinguish transient failures from permanent ones (e.g. retry with backoff, or only cache
-`false` on a permission-denied-style error), and/or surface a visible (even if dismissible) warning
-in the editor UI when a refresh has failed, rather than relying solely on a console log.
-
-### WR-03: `shareLinkCache` is never invalidated on org switch or service deletion
-
-**File:** `src/stores/services.ts:460`, `342-345`, `199-207`
-
-**Issue:** `shareLinkCache` is a plain `Map` scoped to the store instance's closure, populated by
-`ensureShareLink`/`maybeRefreshShareLink` keyed by `serviceId`. `unsubscribeAll()` (called on org
-switch) resets `services`, `isLoading`, `ownWriteEchoIds`, and `pendingWriteIds` — every other piece
-of subscription-scoped state — but not `shareLinkCache`. `deleteService()` does not remove that
-service's entry either. In practice this is low-risk (Firestore's 20-character random document ids
-make a same-session, cross-org `serviceId` collision astronomically unlikely), but it is a real gap
-relative to the store's otherwise careful full-reset discipline on org switch, and an unbounded (if
-practically small) accumulation of dead entries for services that no longer exist.
-
-**Fix:** clear `shareLinkCache` in `unsubscribeAll()`, and delete the entry for `id` in
-`deleteService()`.
-
-### WR-04: A post-share date edit orphans the old memorable-URL (`serviceShares`) document, and auto-refresh now triggers this more readily
-
-**File:** `src/stores/services.ts:511`, `639-673`
-
-**Issue:** `writeSharePayload` keys the memorable-URL document as
-`` `${slug}__service-${service.date}` ``, computed from the **current** `service.date` at write time.
-If a shared service's date is edited after its first share, the next write (whether an explicit
-re-share or, as of this phase, *any* auto-triggered refresh via `maybeRefreshShareLink` on
-`updateService`/`setRoleOverride`/`clearRoleOverride`) creates a **new** document at the new
-date-keyed id and leaves the **old** one frozen with stale content at its old public URL — with no
-revocation path. This pattern predates this phase (`quarters.ts::finalizeAndShare` shares it), but
-before this phase it could only be produced by an explicit second "Share" button press after a date
-change; now any ordinary edit after a date change reaches the same outcome silently, since refresh
-is hooked into the normal edit path.
-
-**Fix:** key the memorable-URL document by a stable identifier (e.g. `service.id` or the
-`serviceShareLinks` doc's token) instead of the mutable `service.date`, or explicitly delete/mark
-the previous date-keyed document when a date change is detected during refresh.
-
-### WR-05: `shareTokens`' `create` rule has zero test coverage in `src/rules.test.ts`
-
-**File:** `src/rules.test.ts:590-707`
-
-**Issue:** The `describe` block at line 590 is titled `'shareTokens — public read, signed-in create,
-editor-scoped in-place update, editor-scoped delete'`, but contains no test that exercises `create`
-at all — only `read`, `delete`, and the R077 `update` cases. This is precisely the gap that let CR-01
-ship undetected: every sibling collection this phase touches (`serviceShareLinks`, `quarterShares`,
-`serviceShares`) has explicit create-authorization tests (member-of-different-org denied,
-no-membership denied, unauthenticated denied); `shareTokens` has none.
-
-**Fix:** add the missing create cases, mirroring the `serviceShareLinks` create block
-(`rules.test.ts:750-800`) — at minimum: signed-in editor of the target org succeeds, signed-in user
-with no membership in the target org is denied, member of a different org is denied, unauthenticated
-is denied. These tests should fail against the current rule (until CR-01 is fixed) and pass after.
-
-### WR-06: No rules test asserts a viewer (non-editor) of the *owning* org is denied read on an existing `serviceShareLinks` doc
-
-**File:** `src/rules.test.ts:709-748`
-
-**Issue:** The `serviceShareLinks` read block tests an org editor (ALLOW), an unauthenticated caller
-(DENY), and an editor of a *different* org (DENY) — but not a viewer-role member of the *same* org
-reading an *existing* doc. `isOrgEditor` does gate viewers out, and the create/delete blocks for this
-same collection do test the viewer case explicitly (`T-41-08` at lines 777 and, implicitly, delete),
-so this read case is the one gap in an otherwise-thorough set, on the specific rule this phase
-singles out as security-sensitive (the null-`resource` clause).
-
-**Fix:** add `'DENY — a viewer-role member of the owning org cannot read an existing
-serviceShareLinks doc'`, seeding a viewer membership and asserting `assertFails(getDoc(...))`.
+**File:** `src/stores/services.ts:511-528` (key construction), `:650-711` (auto-refresh trigger)
+**Issue:** `writeSharePayload` still keys the memorable-URL document as
+`` `${slug}__service-${service.date}` ``, computed from the *current* `service.date` at write time. If
+a shared service's date is edited after its first share, the next write — whether an explicit re-share
+or any auto-triggered refresh via `maybeRefreshShareLink` on `updateService`/`setRoleOverride`/
+`clearRoleOverride` — creates a *new* document at the new date-keyed id and leaves the *old* one frozen
+with stale content at its old public URL, with no revocation path. This is unchanged from the prior
+review; the fixer deliberately skipped it (see Summary above) with a rationale this review agrees is
+sound for an atomic fix pass. Recorded here so it is not lost, not because it is a new defect.
+**Fix:** deferred — needs a dedicated plan that either keys the doc by a stable identifier with a
+migration path for already-shared services, or persists the previously-written date so a refresh can
+explicitly clean it up. Do not attempt either mechanically inside a review-fix pass.
 
 ## Info
 
-### IN-01: `serviceShareLinks` create/update do not verify the `serviceId` field matches the document's own path key
+### IN-01 (carried forward, unaddressed): `serviceShareLinks` create/update do not verify the `serviceId` field matches the document's own path key
 
-**File:** `firestore.rules:256-259`
-
-**Issue:** `allow create: if isOrgEditor(request.resource.data.orgId);` and the corresponding
-`update` rule never check that `request.resource.data.serviceId` equals the wildcard `{serviceId}`
-segment of the document path. An org editor could in principle write a `serviceShareLinks/{X}` doc
-whose `serviceId` field says `Y`. Nothing in the current app reads this field for a lookup (the store
-always addresses these docs directly by `service.id` as the path, never queries by the field), so
-this is not currently exploitable, and it matches the general convention elsewhere in this rules file
-(e.g. `shareTokens.serviceId` is similarly unverified against anything). Worth a comment or a
-`request.resource.data.serviceId == serviceId` guard if this field is ever relied upon for a query in
-the future.
+**File:** `firestore.rules:267-270`
+**Issue:** Unchanged from the prior review. `allow create: if isOrgEditor(request.resource.data.orgId);`
+and the corresponding `update` rule never check that `request.resource.data.serviceId` equals the
+wildcard `{serviceId}` segment of the document path. Not currently exploitable (nothing in the app
+queries by this field; the store always addresses these docs directly by `service.id` as the path), and
+matches the general convention elsewhere in this rules file (`shareTokens.serviceId` is similarly
+unverified). This was explicitly out of scope for the fix pass (`fix_scope: critical_warning`
+excludes Info items) and remains open.
+**Fix:** add `&& request.resource.data.serviceId == serviceId` to both the `create` and `update`
+clauses if this field is ever relied upon for a query in the future; not urgent today.
 
 ---
 
