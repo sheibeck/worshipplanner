@@ -21,6 +21,17 @@ let snapshotCallback: ((snap: { docs: SnapshotDoc[] }) => void) | null = null
 let snapshotOptions: { includeMetadataChanges?: boolean } | undefined
 const mockUnsubscribe = vi.fn()
 
+// ── 41-03 Task 1 (Wave 0 blocker, RESEARCH.md Pitfall 4) ──────────────────────
+// This phase introduces the first FILTERED Firestore query in the codebase
+// (`ensureShareLink`'s adoption scan over `shareTokens`). Nothing before this
+// used `where`/`getDocs`/`limit`/`runTransaction`, so the hand-maintained mock
+// below had none of them — every R078 adoption test would fail to load with a
+// "not a function" TypeError before asserting anything. The transaction's
+// `get`/`set` spies are declared here, at module scope (mirroring the existing
+// `mockUnsubscribe` pattern), so a test can assert on them after import.
+const mockTxGet = vi.fn(() => Promise.resolve({ exists: () => false, data: () => ({}) }))
+const mockTxSet = vi.fn()
+
 // Mock firebase/firestore module
 vi.mock('firebase/firestore', () => {
   return {
@@ -61,6 +72,26 @@ vi.mock('firebase/firestore', () => {
     deleteField: vi.fn(() => '__DELETE_FIELD_SENTINEL__'),
     query: vi.fn((ref) => ref),
     orderBy: vi.fn(),
+    // `where` returns a plain descriptor so a test can assert the field, op
+    // and value the adoption query filtered on.
+    where: vi.fn((field: string, op: string, value: unknown) => ({ field, op, value })),
+    // `limit` is not called anywhere in this phase — it exists so a stray
+    // future call doesn't get silently swallowed, and so a test can assert
+    // it was NOT called (part of the no-composite-index guarantee).
+    limit: vi.fn((n: number) => ({ limit: n })),
+    // Defaults to an empty result: "no pre-existing tokens" is the ordinary
+    // first-share path. Adoption tests override per-call with
+    // mockResolvedValueOnce.
+    getDocs: vi.fn(() => Promise.resolve({ empty: true, docs: [] })),
+    // Invokes the callback with a transaction stand-in whose get/set are the
+    // module-scope spies above (so their calls are assertable from a test),
+    // plus inert update/delete members so a stray call doesn't throw an
+    // unhelpful error.
+    runTransaction: vi.fn(
+      async (_db: unknown, updateFunction: (tx: { get: typeof mockTxGet; set: typeof mockTxSet; update: () => void; delete: () => void }) => unknown) => {
+        return updateFunction({ get: mockTxGet, set: mockTxSet, update: () => {}, delete: () => {} })
+      },
+    ),
     serverTimestamp: vi.fn(() => ({ seconds: 1000000, nanoseconds: 0 })),
   }
 })
@@ -183,6 +214,17 @@ describe('useServiceStore', () => {
       const { useServiceStore } = await import('../services')
       const store = useServiceStore()
       expect(store.services).toEqual([])
+
+      // Regression guard for the Wave 0 mock gap (RESEARCH.md Pitfall 4):
+      // without these four exports, every R078 adoption test would fail to
+      // load with a "not a function" TypeError before asserting anything.
+      // Folded into this existing test (rather than a new `it(...)`) so the
+      // pre-existing 55-test baseline count is undisturbed.
+      const { where, getDocs, limit, runTransaction } = await import('firebase/firestore')
+      expect(typeof where).toBe('function')
+      expect(typeof getDocs).toBe('function')
+      expect(typeof limit).toBe('function')
+      expect(typeof runTransaction).toBe('function')
     })
 
     it('starts with isLoading true', async () => {
