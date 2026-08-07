@@ -110,6 +110,7 @@
                     :value="entry.section ?? ''"
                     class="rounded-md bg-gray-800 border border-gray-700 text-gray-300 text-xs px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 flex-shrink-0 mt-0.5"
                     title="Section"
+                    aria-label="Section"
                     @change="onSectionChange(entry.id, ($event.target as HTMLSelectElement).value)"
                   >
                     <option value="">No section</option>
