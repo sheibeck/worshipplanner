@@ -1494,7 +1494,7 @@ describe('Slide group lock (R036)', () => {
 // Task 2 commit that flips this same assertion from assertSucceeds to
 // assertFails once the wildcard's write-exclusion clause is added.
 describe('pptxRenders — org-member read, no client write', () => {
-  it('PROBE (pre-fix) — an org editor CAN currently write a pptxRenders doc via the generic wildcard', async () => {
+  it('DENY (T-42-01, was PROBE pre-fix) — an org editor cannot write a pptxRenders doc via the generic wildcard', async () => {
     await seedMembershipDoc('orgA', 'userA', 'editor')
     await seedDoc('organizations/orgA/pptxRenders/import-1', {
       status: 'pending',
@@ -1502,10 +1502,57 @@ describe('pptxRenders — org-member read, no client write', () => {
     })
     const context = testEnv.authenticatedContext('userA')
     const db = context.firestore()
-    await assertSucceeds(
+    await assertFails(
       updateDoc(doc(db, 'organizations', 'orgA', 'pptxRenders', 'import-1'), {
         status: 'ready',
         renderedCount: 99,
+      }),
+    )
+  })
+
+  it('ALLOW (D-02) — a viewer-role member of orgA reads a pptxRenders doc — the grant is member-tier, not editor-tier', async () => {
+    await seedMembershipDoc('orgA', 'userV', 'viewer')
+    await seedDoc('organizations/orgA/pptxRenders/import-1', {
+      status: 'ready',
+      storagePath: 'orgs/orgA/pptx-imports/import-1/source.pptx',
+      renderedCount: 5,
+    })
+    const context = testEnv.authenticatedContext('userV')
+    const db = context.firestore()
+    await assertSucceeds(getDoc(doc(db, 'organizations', 'orgA', 'pptxRenders', 'import-1')))
+  })
+
+  it('DENY (T-42-03) — an editor of a DIFFERENT org cannot read orgA\'s pptxRenders doc', async () => {
+    await seedMembershipDoc('orgB', 'userB', 'editor')
+    await seedDoc('organizations/orgA/pptxRenders/import-1', {
+      status: 'ready',
+      storagePath: 'orgs/orgA/pptx-imports/import-1/source.pptx',
+      renderedCount: 5,
+    })
+    const context = testEnv.authenticatedContext('userB')
+    const db = context.firestore()
+    await assertFails(getDoc(doc(db, 'organizations', 'orgA', 'pptxRenders', 'import-1')))
+  })
+
+  it('DENY (T-42-03) — an unauthenticated caller cannot read orgA\'s pptxRenders doc', async () => {
+    await seedDoc('organizations/orgA/pptxRenders/import-1', {
+      status: 'ready',
+      storagePath: 'orgs/orgA/pptx-imports/import-1/source.pptx',
+      renderedCount: 5,
+    })
+    const context = testEnv.unauthenticatedContext()
+    const db = context.firestore()
+    await assertFails(getDoc(doc(db, 'organizations', 'orgA', 'pptxRenders', 'import-1')))
+  })
+
+  it('DENY (D-02) — a viewer-role member of orgA cannot create a new pptxRenders doc', async () => {
+    await seedMembershipDoc('orgA', 'userV', 'viewer')
+    const context = testEnv.authenticatedContext('userV')
+    const db = context.firestore()
+    await assertFails(
+      setDoc(doc(db, 'organizations', 'orgA', 'pptxRenders', 'import-2'), {
+        status: 'pending',
+        storagePath: 'orgs/orgA/pptx-imports/import-2/source.pptx',
       }),
     )
   })

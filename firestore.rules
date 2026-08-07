@@ -170,10 +170,28 @@ service cloud.firestore {
         }
       }
 
+      // pptxRenders — render-status doc for an imported PowerPoint deck
+      // (R062, Phase 42). READ ONLY — member tier, not editor tier: a viewer
+      // already reads the deck's full parsed content and structure through
+      // importedSlides/slideGroups, so render status (`status`,
+      // `renderedCount`, `failureReason`) carries no additional sensitivity
+      // (T-42-02, accepted risk). Nothing client-side writes this document —
+      // the render service (Admin SDK, functions/src/index.ts) is the sole
+      // writer, bypassing rules entirely — so no create/update/delete is
+      // granted here. See the generic wildcard's `collection !=
+      // 'pptxRenders'` exclusion immediately below: without it, Firestore's
+      // OR-evaluation means this block's read-only intent is a complete
+      // no-op for writes, and an org editor can forge a `ready` flip
+      // (T-42-01, inheriting T-37-15).
+      match /pptxRenders/{importId} {
+        allow read: if isOrgMember(orgId);
+      }
+
       // All other nested collections — editors only.
       //
-      // ★ `collection != 'services'` and `collection != 'slideGroups'` are both
-      // LOAD-BEARING. Do not remove either.
+      // ★ `collection != 'services'`, `collection != 'slideGroups'` AND
+      // `collection != 'pptxRenders'` are all LOAD-BEARING. Do not remove any
+      // of the three.
       // `{collection}` is a single-segment wildcard, so this rule also matches
       // /organizations/{orgId}/services/{docId}, and Firestore rules are
       // OR-evaluated: a broader rule that grants access wins over a narrower one
@@ -186,9 +204,25 @@ service cloud.firestore {
       // Because the exclusion removes the backstop, the /services block must
       // itself grant read, create, update AND delete — it does.
       //
-      // NOTE: only `write` is excluded. `read` still falls through here
-      // harmlessly; both blocks grant read to any org member, which is strictly
-      // broader than isOrgEditor.
+      // The pptxRenders exclusion (Phase 42, T-42-01) is the same mechanism a
+      // third time: without it, the read-only `match /pptxRenders/{importId}`
+      // block above grants no protection at all against writes, because THIS
+      // wildcard — 20 lines below it — independently grants write to any
+      // org editor on any single-segment nested collection, pptxRenders
+      // included. An org editor could otherwise forge `status: 'ready'` and
+      // an arbitrary `renderedCount`, which is exactly threat T-37-15 —
+      // `functions/src/index.ts:342` names it the one outcome the render
+      // service "must never be able to produce." Proven RED (write
+      // succeeding) then GREEN (write denied) against the real emulator in
+      // src/rules.test.ts's `pptxRenders` describe block.
+      //
+      // NOTE: only `write` is excluded for services/slideGroups. `read` still
+      // falls through here harmlessly for those two; both blocks grant read
+      // to any org member, which is strictly broader than isOrgEditor. The
+      // pptxRenders block above is the one exception — its read is also
+      // handled by its own dedicated block (member tier, not editor tier),
+      // so this wildcard's editor-tier read is redundant but harmless for it
+      // too.
       //
       // The slideGroups exclusion had to land in the SAME commit as the
       // /slideGroups block above: before that block existed, THIS wildcard was
@@ -199,7 +233,8 @@ service cloud.firestore {
         allow read: if isOrgEditor(orgId);
         allow write: if isOrgEditor(orgId)
           && collection != 'services'
-          && collection != 'slideGroups';
+          && collection != 'slideGroups'
+          && collection != 'pptxRenders';
       }
     }
 
