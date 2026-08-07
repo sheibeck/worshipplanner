@@ -30,24 +30,61 @@ imported.
 ### ⚠ CORRECTION TO THE ROADMAP — this phase is NOT deploy-free
 
 The ROADMAP's Phase 42 notes state: *"this phase is pure client-side consumption, with nothing new to
-deploy."* **That premise is false, and planning against it would produce an unimplementable phase.**
+deploy."* **That premise is false.** A `firestore.rules` change is required — but not the one this
+section originally claimed. See the superseding correction immediately below.
 
-Verified 2026-08-07 against the live files:
-
-- The render record lives at `organizations/{orgId}/pptxRenders/{importId}`
-  (`functions/src/index.ts:159-165`).
-- `firestore.rules` has **no match block for it**. It falls through to
-  `match /{document=**} { allow read, write: if false; }` (`firestore.rules:317-320`).
-- `functions/src/index.ts:144-148` says so explicitly, and defers rules deployment to "backlog 999.3":
-  the Admin SDK bypasses rules, so the Functions never noticed.
-
-**The client therefore cannot read `status`, `renderedCount`, or `failureReason` at all today.**
-ROADMAP criterion 2 — distinguishing *pending* from *failed* — is unimplementable without it.
-
-**Resolution:** add a read-only rule for that path. **This costs the owner nothing extra:** Phase 41
-already queued `firebase deploy --only firestore:rules`, and this change lands in the same file, so
-one deploy covers both. Record it in `.planning/PENDING-VERIFICATION.md` alongside Phase 41's entry
-rather than as a second handoff.
+> #### ⚠⚠ SUPERSEDED — corrected 2026-08-07 during phase research
+>
+> **This section first said the client "cannot read `pptxRenders` at all" because the path falls
+> through to the catch-all deny at `firestore.rules:317-320`. That was WRONG**, and it inverted the
+> required work. Recorded rather than silently rewritten, because the mistake is instructive and
+> exactly the class of error the codebase has been bitten by before.
+>
+> `organizations/{orgId}/pptxRenders/{importId}` **never reaches the catch-all.** It is matched first
+> by the generic single-segment wildcard at `firestore.rules:198-203`:
+>
+> ```
+> match /{collection}/{docId} {
+>   allow read:  if isOrgEditor(orgId);
+>   allow write: if isOrgEditor(orgId)
+>     && collection != 'services'
+>     && collection != 'slideGroups';
+> }
+> ```
+>
+> **Firestore rules are OR-evaluated — a broader rule that grants access wins over a narrower one that
+> denies.** The rules file documents this itself at lines 177-184, emulator-verified in
+> 31-RESEARCH.md probes A1/A2, and calls the two existing exclusions "LOAD-BEARING."
+>
+> **Two consequences, both material:**
+>
+> 1. **Read already works.** An org editor can read `status`, `renderedCount`, and `failureReason`
+>    today. Criterion 2 is *not* blocked, and **no read rule needs adding.**
+>
+> 2. **Write also works, and should not.** `'pptxRenders'` is absent from the write-exclusion list, so
+>    an org editor can currently **write** the render document — i.e. fake a `ready` flip. That is
+>    precisely threat **T-37-15**, which `functions/src/index.ts:342` says "the service must never be
+>    able to produce." These wildcard lines are pre-existing and **deployed**, so this is live in
+>    production now. Scope is bounded — an editor can only affect their *own* org, and the worst
+>    outcome is their own deck showing a wrong state — but it is free to close.
+>
+> `functions/src/index.ts:144-148`'s claim that the catch-all denies client access to this collection
+> is wrong for the same reason, and should be corrected in the same pass.
+>
+> **The actual required change is therefore the INVERSE of what was first written here:** add
+> `&& collection != 'pptxRenders'` to the wildcard's **write** clause, and add an explicit
+> `pptxRenders` block granting **read** to org members (so read access is intentional and stated
+> rather than an accident of wildcard fallthrough). Prove both with emulator ALLOW **and** DENY cases.
+>
+> **Still costs the owner nothing extra:** Phase 41 already queued
+> `firebase deploy --only firestore:rules`, and this lands in the same file, so one deploy covers
+> both. Amend Phase 41's entry in `.planning/PENDING-VERIFICATION.md` rather than adding a second
+> handoff.
+>
+> **The lesson, which is the same one CLAUDE.md already records in a different costume:** a catch-all
+> deny at the bottom of a rules file proves nothing on its own. Under OR-evaluation, *any* broader
+> matching rule above it wins. Reading only the specific block and the catch-all — as this section
+> originally did — is not a rules audit.
 
 **Storage needs no change** — rendered images live under `orgs/{orgId}/pptx-imports/{importId}/…`,
 already covered by `match /orgs/{orgId}/{allPaths=**} { allow read: if isOrgMember(orgId); }` in
