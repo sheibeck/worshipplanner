@@ -136,7 +136,16 @@ vi.mock('@/stores/pptxRenders', () => ({
 // calls Storage — so `SlideCard.test.ts`/`PresentationViewer.test.ts` need NO
 // `resolveImageUrl`/`getDownloadURL` mock. URL resolution is this composable's job
 // alone.
-const mockResolveImageUrl = vi.fn((path: string) => Promise.resolve(`https://fake-storage.test/${path}`))
+// `vi.hoisted` (not a bare `const mockXxx = vi.fn(...)`) — Phase 42 finding: this
+// mock's factory was INERT (never executed) until this plan wired `resolveImageUrl`
+// into `useSlideshowAssembly.ts`'s own import graph. Once it actually runs, the
+// factory below is invoked while the module graph resolves — BEFORE this file's own
+// top-level `const` statements have executed — so a plain `const mockResolveImageUrl
+// = vi.fn(...)` throws "Cannot access 'mockResolveImageUrl' before initialization".
+// `vi.hoisted` guarantees the value exists before any `vi.mock` factory can run.
+const mockResolveImageUrl = vi.hoisted(() =>
+  vi.fn((path: string) => Promise.resolve(`https://fake-storage.test/${path}`)),
+)
 
 vi.mock('@/utils/pptxUpload', async (importActual) => {
   const actual = await importActual<typeof import('@/utils/pptxUpload')>()
@@ -147,16 +156,21 @@ vi.mock('@/utils/pptxUpload', async (importActual) => {
 })
 
 // Every call site below invokes the composable directly (not through a
-// mounted component), so `onUnmounted(cleanup)` inside it never actually
-// registers (Vue warns "no active component instance") and its internal
-// `watch()`es would otherwise keep running for the rest of the test file,
-// recomputing against the module-level mock state (`slideGroupsState`,
-// `scriptureState`, `importedState`) that later tests' `beforeEach` mutates.
-// Task 2's materialization writes are the first thing in this suite whose
+// mounted component), so a lifecycle hook that only registers against a live
+// component instance (`onUnmounted`) would be a silent no-op here (Vue warns
+// "no active component instance") and its internal `watch()`es would
+// otherwise keep running for the rest of the test file, recomputing against
+// the module-level mock state (`slideGroupsState`, `scriptureState`,
+// `importedState`) that later tests' `beforeEach` mutates. Task 2's
+// materialization writes are the first thing in this suite whose
 // re-triggering is actually OBSERVABLE (a call count), so that latent leak
-// needs fixing here: wrap every invocation in its own `effectScope`, whose
-// `.stop()` disposes every `watch`/`computed` created inside — independent
-// of `onUnmounted` — and tear every scope down after each test.
+// needed fixing here: wrap every invocation in its own `effectScope`, whose
+// `.stop()` disposes every `watch`/`computed` created inside AND triggers the
+// composable's own `onScopeDispose(cleanup)` (Phase 42 Task 1 — switched from
+// `onUnmounted` for exactly this reason: `onScopeDispose` fires on ANY active
+// scope's disposal, component-mounted or manually created, so the render
+// listener teardown this phase adds is testable without a full component
+// mount). Every scope is torn down after each test below.
 const activeScopes: EffectScope[] = []
 
 function useSlideshowAssembly(
@@ -256,6 +270,10 @@ describe('useSlideshowAssembly', () => {
     importedState.decks = []
     songsState.songs = []
     slideGroupsState.groups = []
+    // Phase 42: the pptxRenders store's map is not a vi.fn() mock, so
+    // `vi.clearAllMocks()` above never touches it — reset it explicitly, or a
+    // render document set by one test would leak into the next.
+    pptxRendersState.rendersByImportId.clear()
   })
 
   it('reorders assembledSlideshow when service slots are reordered (R006)', async () => {
@@ -1489,6 +1507,65 @@ describe('useSlideshowAssembly', () => {
       ])
       expect(mockMaterializeGroupIfMissing).toHaveBeenCalledTimes(1)
       expect(resultA?.entries).toEqual(resultB?.entries)
+    })
+  })
+
+  // --- Phase 42 (R079/R080): render-status subscription lifecycle (42-08 Task 1) ---
+  describe('PPTX render subscription lifecycle (Task 1)', () => {
+    function importedSlot(id: string, importId: string, position = 0): ServiceSlot {
+      return { kind: 'IMPORTED', id, position, importId, section: 'pre-service' }
+    }
+
+    function deckWithRender(id: string, renderImportId?: string): ImportedDeck {
+      return {
+        id,
+        sourceFileName: `${id}.pptx`,
+        section: 'pre-service',
+        slides: [{ id: `${id}-inner-1`, position: 0, contentKind: 'text', title: 'T', body: 'B' }],
+        ...(renderImportId !== undefined ? { renderImportId } : {}),
+        createdAt: {} as never,
+        updatedAt: {} as never,
+      }
+    }
+
+    it('calls syncSubscriptions with the org id and exactly the renderImportIds of IMPORTED decks that have one', async () => {
+      importedState.decks = [
+        deckWithRender('deck-1', 'render-1'),
+        deckWithRender('deck-2'), // no renderImportId — contributes nothing
+      ]
+      const service = ref<Service | null>(
+        makeService([importedSlot('slot-imported-1', 'deck-1', 0), importedSlot('slot-imported-2', 'deck-2', 1)]),
+      )
+      useSlideshowAssembly(service, 'org-1')
+      await nextTick()
+
+      expect(mockSyncPptxRenderSubscriptions).toHaveBeenCalledWith('org-1', ['render-1'])
+    })
+
+    it('re-calls syncSubscriptions with the reduced set when an IMPORTED slot referencing a rendered deck is removed', async () => {
+      importedState.decks = [deckWithRender('deck-1', 'render-1'), deckWithRender('deck-2', 'render-2')]
+      const service = ref<Service | null>(
+        makeService([importedSlot('slot-imported-1', 'deck-1', 0), importedSlot('slot-imported-2', 'deck-2', 1)]),
+      )
+      useSlideshowAssembly(service, 'org-1')
+      await nextTick()
+      const calls = mockSyncPptxRenderSubscriptions.mock.calls
+      const lastCallIds = calls[calls.length - 1]![1] as string[]
+      expect([...lastCallIds].sort()).toEqual(['render-1', 'render-2'])
+
+      service.value = makeService([importedSlot('slot-imported-1', 'deck-1', 0)])
+      await nextTick()
+      expect(mockSyncPptxRenderSubscriptions).toHaveBeenLastCalledWith('org-1', ['render-1'])
+    })
+
+    it("calls unsubscribeAll exactly once when the composable's effect scope is stopped", async () => {
+      const service = ref<Service | null>(makeService([hymnSlot({ position: 0 })]))
+      useSlideshowAssembly(service, 'org-1')
+      await nextTick()
+      expect(mockUnsubscribeAllPptxRenders).not.toHaveBeenCalled()
+
+      activeScopes.splice(0).forEach((scope) => scope.stop())
+      expect(mockUnsubscribeAllPptxRenders).toHaveBeenCalledTimes(1)
     })
   })
 })

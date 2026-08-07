@@ -12,12 +12,13 @@
  * read from that lyrics document's `performanceOrder` field alone (R035/D-03)
  * — there is no second order source and no precedence chain.
  */
-import { ref, reactive, computed, watch, onUnmounted, type Ref, type ComputedRef } from 'vue'
+import { ref, reactive, computed, watch, onScopeDispose, type Ref, type ComputedRef } from 'vue'
 import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore'
 import { db } from '@/firebase'
 import { useScriptureSlides } from '@/stores/scriptureSlides'
 import { useImportedSlides } from '@/stores/importedSlides'
 import { useSlideGroups } from '@/stores/slideGroups'
+import { usePptxRenders } from '@/stores/pptxRenders'
 import { assembleSlideshow, type AssemblyInputs } from '@/utils/slideshowAssembler'
 import { buildInitialGroup, rebuildGroup, sourceSignature, type RebuildResult } from '@/utils/slideGroupMaterializer'
 import { SERVICE_SECTIONS, SERVICE_SECTION_LABELS, type Service } from '@/types/service'
@@ -145,6 +146,7 @@ export function useSlideshowAssembly(
   const scriptureStore = useScriptureSlides()
   const importedStore = useImportedSlides()
   const slideGroupsStore = useSlideGroups()
+  const pptxRendersStore = usePptxRenders()
   const loadLyrics = options?.lyricsLoader ?? defaultLyricsLoader
 
   const canWrite = computed<boolean>(() => {
@@ -187,6 +189,42 @@ export function useSlideshowAssembly(
     }
     return map
   })
+
+  // --- Phase 42 (R079/R080): render-status subscription, driven by the service's IMPORTED slots ---
+  //
+  // `distinctRenderImportIds` is fully SYNCHRONOUS (mirrors `distinctSongIds` below) — it
+  // decides WHAT to subscribe and nothing else. Two identifier hops, both load-bearing: a
+  // slot's `importId` is the deck's Firestore doc id (`ImportedDeck.id`), used to look the
+  // deck up in `importedDecksById`; the value actually collected is that deck's Storage-side
+  // `renderImportId` (`ImportedDeck.renderImportId`), which is what `pptxRendersStore` and
+  // `renderedPagePath` are keyed by. Conflating the two would subscribe (or resolve URLs
+  // against) the wrong document.
+  const distinctRenderImportIds = computed<string[]>(() => {
+    const svc = service.value
+    if (!svc) return []
+    const ids = new Set<string>()
+    for (const slot of svc.slots) {
+      if (slot.kind !== 'IMPORTED' || !slot.importId) continue
+      const deck = importedDecksById.value.get(slot.importId)
+      if (deck?.renderImportId) ids.add(deck.renderImportId)
+    }
+    return Array.from(ids)
+  })
+
+  // Deliberately NOT folded into the `stopOrgWatch` org watch above: that watch subscribes
+  // once per org (guarded by `subscribedOrgId`) and is inert on a repeat call with the same
+  // org, whereas this watch must re-run every time the id SET changes within the same org
+  // (a deck added/removed from the service). Merging them would either drop the org guard
+  // (re-subscribing scripture/imported/groups on every deck change) or lose render-id
+  // reactivity (no re-sync when a deck is added/removed without an org change) — do not
+  // "tidy" these into one watch.
+  const stopRenderSubscriptionWatch = watch(
+    [distinctRenderImportIds, resolvedOrgId],
+    ([ids, org]) => {
+      pptxRendersStore.syncSubscriptions(org, ids)
+    },
+    { immediate: true },
+  )
 
   // --- per-song current lyrics: songLyrics store is single-song, so gather here ---
   const songLyricsById = reactive(new Map<string, SongLyrics>())
@@ -560,9 +598,19 @@ export function useSlideshowAssembly(
     stopLyricsWatch()
     stopMaterializeWatch()
     stopRebuildWatch()
+    stopRenderSubscriptionWatch()
+    pptxRendersStore.unsubscribeAll()
   }
 
-  onUnmounted(cleanup)
+  // `onScopeDispose` rather than `onUnmounted`: it fires on ANY active effect
+  // scope's disposal — a real component's unmount (Vue runs `setup()` inside the
+  // component's own detached scope, so this is byte-identical to `onUnmounted`
+  // there) as well as an explicitly-created `effectScope().stop()`, which is how
+  // this composable is exercised outside a mounted component (this file's own
+  // test suite). `onUnmounted` alone only registers against a live component
+  // instance and is a silent no-op otherwise, which would make the render
+  // listeners' teardown (T-42-06) untestable without a full component mount.
+  onScopeDispose(cleanup)
 
   return {
     assembledSlideshow,
