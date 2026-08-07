@@ -878,8 +878,24 @@ export function buildPlanTitle(service: Pick<Service, 'sermonPassage' | 'name' |
 }
 
 /**
+ * Whitespace-aware description derivation for the MESSAGE/ANNOUNCEMENTS/MISC
+ * text kinds (R085). Uses a trimmed-length check to decide whether a
+ * description is present at all — an empty or whitespace-only `body` must
+ * produce no `html_details` attribute (E-18) — but returns the ORIGINAL,
+ * untrimmed string when it is present, so a non-empty `body` reaches
+ * Planning Center byte-for-byte unchanged (E-19). Never trims, collapses
+ * whitespace, converts newlines to markup, escapes, or truncates.
+ */
+function bodyDescription(body?: string): string | undefined {
+  return body && body.trim().length > 0 ? body : undefined
+}
+
+/**
  * Add a service slot as a Planning Center item.
- * Maps each SlotKind to the appropriate item type and attributes.
+ * Dispatch is exhaustive and compiler-guarded (R085): every `SlotKind` member
+ * has its own explicit branch below, and the `never`-typed backstop after the
+ * chain turns a future unhandled kind into a compile error here rather than a
+ * silent relabel as "Message".
  */
 export async function addSlotAsItem(
   appId: string,
@@ -992,16 +1008,66 @@ export async function addSlotAsItem(
     })
   }
 
-  // MESSAGE
-  const description =
-    sermonPassage ? formatScriptureRef(sermonPassage) : undefined
+  if (slot.kind === 'ANNOUNCEMENTS') {
+    return createItem(appId, secret, serviceTypeId, planId, {
+      title: 'Announcements',
+      itemType: 'regular',
+      description: bodyDescription(slot.body),
+      sequence,
+      length,
+    })
+  }
 
-  return createItem(appId, secret, serviceTypeId, planId, {
-    title: 'Message',
-    itemType: 'regular',
-    description,
-    sequence,
-  })
+  if (slot.kind === 'MISC') {
+    return createItem(appId, secret, serviceTypeId, planId, {
+      title: 'Miscellaneous',
+      itemType: 'regular',
+      description: bodyDescription(slot.body),
+      sequence,
+      length,
+    })
+  }
+
+  if (slot.kind === 'MESSAGE') {
+    // `body` wins when present (R085); the pre-existing `sermonPassage`
+    // fallback is preserved, not replaced, so a Message slot with no body
+    // still gets the formatted sermon passage as its description.
+    const description =
+      bodyDescription(slot.body) ?? (sermonPassage ? formatScriptureRef(sermonPassage) : undefined)
+
+    return createItem(appId, secret, serviceTypeId, planId, {
+      title: 'Message',
+      itemType: 'regular',
+      description,
+      sequence,
+    })
+  }
+
+  if (slot.kind === 'IMPORTED') {
+    // IMPORTED slots reference PPTX/image decks with no analogous Planning
+    // Center item type. ServiceEditorView.vue already `continue`s past these
+    // slots before ever calling addSlotAsItem, so in practice this branch is
+    // defensive — but it must exist anyway: the caller's `continue` does not
+    // narrow this function's `slot` parameter type, and the exhaustiveness
+    // backstop below cannot compile without an explicit IMPORTED case here.
+    // Matches the SONG branch's empty-songId early return: empty string
+    // means "no item was created".
+    return ''
+  }
+
+  // Exhaustiveness backstop (R085). Binds on `slot.kind` rather than `slot`
+  // itself: PRAYER/ANNOUNCEMENTS/MISC/MESSAGE all share the single
+  // `NonAssignableSlot` interface (one object type, a 4-literal `kind`
+  // union), and TypeScript's control-flow narrowing does not collapse a
+  // shared object type to `never` from sequential `if`-return checks on one
+  // of its properties — only the discriminant's own literal-union type
+  // narrows to `never` that way. If a future `SlotKind` member is ever added
+  // without a branch above, `slot.kind` stops being assignable to `never`
+  // and `npm run type-check` fails AT THIS LINE — a compile error here, not
+  // a silent relabel of the new kind as "Message". This is the one dispatch
+  // site in the codebase where that protection has to be written by hand.
+  const unhandledKind: never = slot.kind
+  throw new Error(`addSlotAsItem: unhandled SlotKind "${unhandledKind}"`)
 }
 
 /**
