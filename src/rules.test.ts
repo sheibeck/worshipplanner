@@ -706,6 +706,167 @@ describe('shareTokens — public read, signed-in create, editor-scoped in-place 
   })
 })
 
+describe('serviceShareLinks — org-editor-scoped, no public read', () => {
+  // READ (4)
+  it('ALLOW — an org editor of orgA reads an existing serviceShareLinks doc', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('serviceShareLinks/service-1', { token: 'tok-abc', orgId: 'orgA', serviceId: 'service-1' })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertSucceeds(getDoc(doc(db, 'serviceShareLinks', 'service-1')))
+  })
+
+  // T-41-09 — load-bearing. ensureShareLink's very first Firestore operation is
+  // exactly this read: a get() against a serviceShareLinks doc that has never
+  // been created. `resource` is null for a nonexistent document; a bare
+  // `isOrgEditor(resource.data.orgId)` clause would dereference that null and
+  // ERROR, and an erroring rule DENIES — so the caller would see
+  // PERMISSION_DENIED instead of a clean not-found snapshot, and the entire
+  // adopt-or-create flow in Plans 03/04 would be unreachable on its first call.
+  // If this test fails, the fix is the rule's null-resource branch, not the test.
+  it('ALLOW, load-bearing (T-41-09) — an org editor reads a serviceShareLinks doc that was NEVER seeded, and gets a clean not-found snapshot rather than PERMISSION_DENIED', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    const snap = await assertSucceeds(getDoc(doc(db, 'serviceShareLinks', 'service-999')))
+    expect(snap.exists()).toBe(false)
+  })
+
+  it('DENY (T-41-06) — an unauthenticated caller cannot read an existing serviceShareLinks doc', async () => {
+    await seedDoc('serviceShareLinks/service-1', { token: 'tok-abc', orgId: 'orgA', serviceId: 'service-1' })
+    const context = testEnv.unauthenticatedContext()
+    const db = context.firestore()
+    await assertFails(getDoc(doc(db, 'serviceShareLinks', 'service-1')))
+  })
+
+  it('DENY (T-41-06) — an editor of a DIFFERENT org cannot read orgA\'s serviceShareLinks doc', async () => {
+    await seedMembershipDoc('orgB', 'userB', 'editor')
+    await seedDoc('serviceShareLinks/service-1', { token: 'tok-abc', orgId: 'orgA', serviceId: 'service-1' })
+    const context = testEnv.authenticatedContext('userB')
+    const db = context.firestore()
+    await assertFails(getDoc(doc(db, 'serviceShareLinks', 'service-1')))
+  })
+
+  // CREATE (4)
+  it('ALLOW — an editor of orgA creates a serviceShareLinks doc for orgA', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertSucceeds(
+      setDoc(doc(db, 'serviceShareLinks', 'service-2'), {
+        token: 'tok-def',
+        orgId: 'orgA',
+        serviceId: 'service-2',
+      }),
+    )
+  })
+
+  it('DENY (T-41-06) — an editor of a DIFFERENT org cannot create a serviceShareLinks doc carrying orgId orgA (cross-tenant)', async () => {
+    await seedMembershipDoc('orgB', 'userB', 'editor')
+    const context = testEnv.authenticatedContext('userB')
+    const db = context.firestore()
+    await assertFails(
+      setDoc(doc(db, 'serviceShareLinks', 'service-2'), {
+        token: 'tok-def',
+        orgId: 'orgA',
+        serviceId: 'service-2',
+      }),
+    )
+  })
+
+  it('DENY (T-41-08) — a viewer-role member of orgA cannot create a serviceShareLinks doc for orgA', async () => {
+    await seedMembershipDoc('orgA', 'userV', 'viewer')
+    const context = testEnv.authenticatedContext('userV')
+    const db = context.firestore()
+    await assertFails(
+      setDoc(doc(db, 'serviceShareLinks', 'service-2'), {
+        token: 'tok-def',
+        orgId: 'orgA',
+        serviceId: 'service-2',
+      }),
+    )
+  })
+
+  it('DENY — an unauthenticated caller cannot create a serviceShareLinks doc', async () => {
+    const context = testEnv.unauthenticatedContext()
+    const db = context.firestore()
+    await assertFails(
+      setDoc(doc(db, 'serviceShareLinks', 'service-2'), {
+        token: 'tok-def',
+        orgId: 'orgA',
+        serviceId: 'service-2',
+      }),
+    )
+  })
+
+  // UPDATE (3)
+  it('ALLOW — an editor of orgA overwrites the seeded serviceShareLinks doc with orgId unchanged', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('serviceShareLinks/service-1', { token: 'tok-abc', orgId: 'orgA', serviceId: 'service-1' })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertSucceeds(
+      updateDoc(doc(db, 'serviceShareLinks', 'service-1'), {
+        token: 'tok-abc-refreshed',
+        orgId: 'orgA',
+        serviceId: 'service-1',
+      }),
+    )
+  })
+
+  it('DENY (T-41-04) — an editor of a DIFFERENT org cannot overwrite orgA\'s serviceShareLinks doc', async () => {
+    await seedMembershipDoc('orgB', 'userB', 'editor')
+    await seedDoc('serviceShareLinks/service-1', { token: 'tok-abc', orgId: 'orgA', serviceId: 'service-1' })
+    const context = testEnv.authenticatedContext('userB')
+    const db = context.firestore()
+    await assertFails(
+      updateDoc(doc(db, 'serviceShareLinks', 'service-1'), {
+        token: 'tok-abc-tampered',
+        orgId: 'orgA',
+        serviceId: 'service-1',
+      }),
+    )
+  })
+
+  it('DENY (T-41-05) — an editor of orgA cannot reassign a serviceShareLinks doc to a different orgId', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('serviceShareLinks/service-1', { token: 'tok-abc', orgId: 'orgA', serviceId: 'service-1' })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertFails(
+      updateDoc(doc(db, 'serviceShareLinks', 'service-1'), {
+        token: 'tok-abc',
+        orgId: 'orgB',
+        serviceId: 'service-1',
+      }),
+    )
+  })
+
+  // DELETE (3)
+  it('ALLOW — an editor of orgA deletes the seeded serviceShareLinks doc', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('serviceShareLinks/service-1', { token: 'tok-abc', orgId: 'orgA', serviceId: 'service-1' })
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertSucceeds(deleteDoc(doc(db, 'serviceShareLinks', 'service-1')))
+  })
+
+  it('DENY — an editor of a DIFFERENT org cannot delete orgA\'s serviceShareLinks doc', async () => {
+    await seedMembershipDoc('orgB', 'userB', 'editor')
+    await seedDoc('serviceShareLinks/service-1', { token: 'tok-abc', orgId: 'orgA', serviceId: 'service-1' })
+    const context = testEnv.authenticatedContext('userB')
+    const db = context.firestore()
+    await assertFails(deleteDoc(doc(db, 'serviceShareLinks', 'service-1')))
+  })
+
+  it('DENY — an unauthenticated caller cannot delete a serviceShareLinks doc', async () => {
+    await seedDoc('serviceShareLinks/service-1', { token: 'tok-abc', orgId: 'orgA', serviceId: 'service-1' })
+    const context = testEnv.unauthenticatedContext()
+    const db = context.firestore()
+    await assertFails(deleteDoc(doc(db, 'serviceShareLinks', 'service-1')))
+  })
+})
+
 describe('Editor/Viewer RBAC', () => {
   it('editor can write to songs collection', async () => {
     await seedMembershipDoc('orgA', 'userA', 'editor')
