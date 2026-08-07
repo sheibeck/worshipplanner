@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { reactive } from 'vue'
 import { setActivePinia, createPinia } from 'pinia'
 import type { Service } from '@/types/service'
+import type { ServiceTemplateEntry } from '@/types/organization'
 
 // Mock crypto.getRandomValues for deterministic token generation, and
 // crypto.randomUUID (Phase 24, D-01) so createSlot()/buildSlots()'s slot-id
@@ -153,6 +155,22 @@ vi.mock('@/stores/quarters', () => ({
   })),
 }))
 
+// 44-01 (Pitfall #1, 44-RESEARCH.md) — createService now reads
+// authStore.settings.defaultServiceTemplate/vwModeEnabled. No prior art in
+// this file; mockAuthState.settings shape copies ServiceEditorView.test.ts's
+// established `vi.mock('@/stores/auth', ...)` pattern (lines 352-377 there).
+// A `reactive()` object so a test can mutate `mockAuthState.settings...`
+// between calls without re-mocking.
+const mockAuthState = reactive<{
+  settings: { aiEnabled: boolean; pcEnabled: boolean; vwModeEnabled: boolean; defaultServiceTemplate: ServiceTemplateEntry[] }
+}>({
+  settings: { aiEnabled: true, pcEnabled: true, vwModeEnabled: true, defaultServiceTemplate: [] },
+})
+
+vi.mock('@/stores/auth', () => ({
+  useAuthStore: () => mockAuthState,
+}))
+
 function makeService(overrides: Partial<{
   id: string
   date: string
@@ -207,6 +225,12 @@ describe('useServiceStore', () => {
     vi.clearAllMocks()
     snapshotCallback = null
     snapshotOptions = undefined
+    // Reset the mutable authStore mock between tests — otherwise a
+    // createService test that sets a template would leak into the next test.
+    mockAuthState.settings.aiEnabled = true
+    mockAuthState.settings.pcEnabled = true
+    mockAuthState.settings.vwModeEnabled = true
+    mockAuthState.settings.defaultServiceTemplate = []
   })
 
   describe('initial state', () => {
@@ -438,8 +462,8 @@ describe('useServiceStore', () => {
     })
   })
 
-  describe('createService', () => {
-    it('calls addDoc with correct shape including serverTimestamp', async () => {
+  describe('createService (44-01 — template-driven, empty-by-default)', () => {
+    it('calls addDoc with correct shape including serverTimestamp, progression, and status draft', async () => {
       const { addDoc, serverTimestamp } = await import('firebase/firestore')
       const { useServiceStore } = await import('../services')
       const store = useServiceStore()
@@ -456,17 +480,19 @@ describe('useServiceStore', () => {
       const data = callArgs[1] as Record<string, unknown>
       expect(data.date).toBe('2026-03-08')
       expect(data.progression).toBe('1-2-2-3')
+      expect(data.status).toBe('draft')
       expect(data.createdAt).toBeDefined()
       expect(data.updatedAt).toBeDefined()
       expect(serverTimestamp).toHaveBeenCalled()
     })
 
-    it('createService builds a 9-slot template from progression', async () => {
+    it('an empty/unset defaultServiceTemplate produces a new service with 0 slots (owner override 2026-08-07 — EMPTY, never buildSlots)', async () => {
       const { addDoc } = await import('firebase/firestore')
       const { useServiceStore } = await import('../services')
       const store = useServiceStore()
       store.subscribe('org-1')
 
+      // mockAuthState.settings.defaultServiceTemplate defaults to [] (beforeEach)
       await store.createService({
         date: '2026-03-08',
         name: '',
@@ -475,15 +501,23 @@ describe('useServiceStore', () => {
 
       const callArgs = vi.mocked(addDoc).mock.calls[0]!
       const data = callArgs[1] as Record<string, unknown>
-      const slots = data.slots as Array<{ kind: string; position: number }>
-      expect(slots).toHaveLength(9)
+      const slots = data.slots as unknown[]
+      expect(slots).toHaveLength(0)
     })
 
-    it('createService 1-2-2-3: song slots get correct VW types', async () => {
+    it('a non-empty template produces slots matching kind/section/order exactly', async () => {
       const { addDoc } = await import('firebase/firestore')
       const { useServiceStore } = await import('../services')
       const store = useServiceStore()
       store.subscribe('org-1')
+
+      mockAuthState.settings.defaultServiceTemplate = [
+        { id: 't-1', kind: 'SONG', section: 'worship' },
+        { id: 't-2', kind: 'SCRIPTURE', section: 'worship' },
+        { id: 't-3', kind: 'SONG', section: 'sending' },
+        { id: 't-4', kind: 'MESSAGE', section: 'message' },
+      ]
+      mockAuthState.settings.vwModeEnabled = false
 
       await store.createService({
         date: '2026-03-08',
@@ -493,46 +527,50 @@ describe('useServiceStore', () => {
 
       const callArgs = vi.mocked(addDoc).mock.calls[0]!
       const data = callArgs[1] as Record<string, unknown>
-      const slots = data.slots as Array<{ kind: string; position: number; requiredVwType?: number }>
+      const slots = data.slots as Array<{ kind: string; section?: string; position: number }>
+      expect(slots.map((s) => s.kind)).toEqual(['SONG', 'SCRIPTURE', 'SONG', 'MESSAGE'])
+      expect(slots.map((s) => s.section)).toEqual(['worship', 'worship', 'sending', 'message'])
+      expect(slots.map((s) => s.position)).toEqual([0, 1, 2, 3])
+    })
 
+    it('VW mode ON: SONG entries in the template receive requiredVwType from the ordinal 1-2-2-3 sequence', async () => {
+      const { addDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+
+      mockAuthState.settings.defaultServiceTemplate = [
+        { id: 't-1', kind: 'SONG' },
+        { id: 't-2', kind: 'PRAYER' },
+        { id: 't-3', kind: 'SONG' },
+        { id: 't-4', kind: 'SONG' },
+      ]
+      mockAuthState.settings.vwModeEnabled = true
+
+      await store.createService({
+        date: '2026-03-08',
+        name: '',
+        teams: [],
+      })
+
+      const callArgs = vi.mocked(addDoc).mock.calls[0]!
+      const data = callArgs[1] as Record<string, unknown>
+      const slots = data.slots as Array<{ kind: string; requiredVwType?: number }>
       const songSlots = slots.filter((s) => s.kind === 'SONG')
-      expect(songSlots).toHaveLength(5)
-      expect(songSlots[0]!.requiredVwType).toBe(1) // position 0
-      expect(songSlots[1]!.requiredVwType).toBe(2) // position 2
-      expect(songSlots[2]!.requiredVwType).toBe(2) // position 5
-      expect(songSlots[3]!.requiredVwType).toBe(3) // position 6
-      expect(songSlots[4]!.requiredVwType).toBe(3) // position 8
+      expect(songSlots.map((s) => s.requiredVwType)).toEqual([1, 2, 2])
     })
 
-    it('createService 1-2-3-3: song slots get correct VW types', async () => {
+    it('VW mode OFF: SONG slots are present, carrying createSlot default requiredVwType, not an ordinal-derived value', async () => {
       const { addDoc } = await import('firebase/firestore')
       const { useServiceStore } = await import('../services')
       const store = useServiceStore()
       store.subscribe('org-1')
 
-      await store.createService({
-        date: '2026-03-15',
-        name: '',
-        teams: [],
-      })
-
-      const callArgs = vi.mocked(addDoc).mock.calls[0]!
-      const data = callArgs[1] as Record<string, unknown>
-      const slots = data.slots as Array<{ kind: string; position: number; requiredVwType?: number }>
-
-      const songSlots = slots.filter((s) => s.kind === 'SONG')
-      expect(songSlots[0]!.requiredVwType).toBe(1)
-      expect(songSlots[1]!.requiredVwType).toBe(2)
-      expect(songSlots[2]!.requiredVwType).toBe(2)
-      expect(songSlots[3]!.requiredVwType).toBe(3)
-      expect(songSlots[4]!.requiredVwType).toBe(3)
-    })
-
-    it('createService sets status to draft', async () => {
-      const { addDoc } = await import('firebase/firestore')
-      const { useServiceStore } = await import('../services')
-      const store = useServiceStore()
-      store.subscribe('org-1')
+      mockAuthState.settings.defaultServiceTemplate = [
+        { id: 't-1', kind: 'SONG' },
+        { id: 't-2', kind: 'SONG' },
+      ]
+      mockAuthState.settings.vwModeEnabled = false
 
       await store.createService({
         date: '2026-03-08',
@@ -542,7 +580,10 @@ describe('useServiceStore', () => {
 
       const callArgs = vi.mocked(addDoc).mock.calls[0]!
       const data = callArgs[1] as Record<string, unknown>
-      expect(data.status).toBe('draft')
+      const slots = data.slots as Array<{ kind: string; requiredVwType?: number }>
+      const songSlots = slots.filter((s) => s.kind === 'SONG')
+      expect(songSlots).toHaveLength(2)
+      expect(songSlots.every((s) => s.requiredVwType === 2)).toBe(true)
     })
 
     it('createService returns the new document id', async () => {
