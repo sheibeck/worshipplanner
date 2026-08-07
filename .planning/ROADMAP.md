@@ -273,10 +273,11 @@ Plans:
   3. New `IMPORTED`-branch logic in both `slideGroupMaterializer.ts` and `slideshowAssembler.ts` reconciles the render count against the parsed-slide count rather than assuming they agree — proven by a test covering the documented count-disagreement case
   4. `sourceSignature` for an IMPORTED group folds in render status, so the existing rebuild-on-mismatch mechanism fires exactly once when a render transitions pending → ready
 
-**Plans**: 8 plans
+**Plans**: 1/8 plans executed
 
 Plans:
-- [ ] 42-01-PLAN.md — Wave 0 rules probe, close the `pptxRenders` wildcard write hole, member-tier read grant, amend Phase 41's deploy handoff
+
+- [x] 42-01-PLAN.md — Wave 0 rules probe, close the `pptxRenders` wildcard write hole, member-tier read grant, amend Phase 41's deploy handoff
 - [ ] 42-02-PLAN.md — client render-document type, rendered-page path convention, live per-importId `pptxRenders` store, Wave 0 test mocks
 - [ ] 42-03-PLAN.md — render-state slide fields, `AssemblyInputs` render maps, and the one shared pure reconciler
 - [ ] 42-04-PLAN.md — materializer IMPORTED branch: entries, `sourceSignature` folding, transition idempotence, user-slide survival
@@ -403,7 +404,7 @@ Plans:
 | 39. Org Settings Infrastructure & Feature Toggles | v1.5 | 6/6 | In Progress|  |
 | 40. Custom Auth Claim for Org Membership | v1.5 | 4/4 | In Progress|  |
 | 41. Sharing Correctness | v1.5 | 4/4 | Complete    | 2026-08-07 |
-| 42. PowerPoint Rendered-Image Display | v1.5 | 0/? | Not started | - |
+| 42. PowerPoint Rendered-Image Display | v1.5 | 1/8 | In Progress|  |
 | 43. Service Item Types | v1.5 | 0/? | Not started | - |
 | 44. Default Service Template | v1.5 | 0/? | Not started | - |
 | 45. ESV/NLT Bible Version Selection | v1.5 | 0/? | Not started | - |

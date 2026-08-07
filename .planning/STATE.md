@@ -4,16 +4,16 @@ milestone: v1.5
 milestone_name: Settings, Sharing, and Fidelity
 current_phase: 42
 current_phase_name: PowerPoint Rendered-Image Display
-status: planning
-stopped_at: Completed 41-04-PLAN.md — Phase 41 (Sharing Correctness) code-complete, all 4 plans done, ready for verification
-last_updated: "2026-08-07T08:39:34.996Z"
+status: executing
+stopped_at: Completed 42-01-PLAN.md — pptxRenders write hole closed, member-tier read granted, Phase 41 deploy handoff amended
+last_updated: "2026-08-07T09:57:49.903Z"
 last_activity: 2026-08-07
-last_activity_desc: Phase 41 complete, transitioned to Phase 42
+last_activity_desc: Phase 42 execution started
 progress:
   total_phases: 11
   completed_phases: 4
-  total_plans: 15
-  completed_plans: 15
+  total_plans: 23
+  completed_plans: 16
   percent: 36
 ---
 
@@ -102,7 +102,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 41 — Sharing Correctness
+**Current focus:** Phase 42 — PowerPoint Rendered-Image Display
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -112,10 +112,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 42 — PowerPoint Rendered-Image Display
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-08-07 — Phase 41 complete, transitioned to Phase 42
+Phase: 42 (PowerPoint Rendered-Image Display) — EXECUTING
+Plan: 2 of 8
+Status: Ready to execute
+Last activity: 2026-08-07 — Phase 42 execution started
 module, authStore.settings merged once in loadOrgContext, vwModeEnabled dual-read, R073 test
 coverage (src/stores/__tests__/auth.test.ts)
 
@@ -1297,6 +1297,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 41 P02 | 20min | 2 tasks | 2 files |
 | Phase 41 P03 | 35min | 3 tasks | 2 files |
 | Phase 41 P04 | 20min | 2 tasks | 2 files |
+| Phase 42 P01 | 8min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -1583,6 +1584,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Token stability proven by call-count (transaction set, getDocs), never by string equality, because the suite's deterministic crypto.getRandomValues stub makes every mint produce the identical string
 - [Phase ?]: R077 auto-refresh hook calls writeSharePayload only (never ensureShareLink), hooked into exactly updateService/setRoleOverride/clearRoleOverride, with a per-session negative cache and WR-06 soft-fail
 - [Phase ?]: WR-06 soft-fail must be tested with two independent Pinia instances — after a refresh failure, shareLinkCache caches false for that service, so a shared-store test of a second action's resolution would short-circuit silently
+- [Phase ?]: 42-01: proved D-01/D-02 write-hole premise via emulator PROBE before fixing; kept pptxRenders read at member tier (isOrgMember), not editor tier, per D-02
+- [Phase ?]: 42-01: amended Phase 41's existing PENDING-VERIFICATION.md deploy checkbox rather than adding a second handoff, per D-18 — one firebase deploy --only firestore:rules now covers both phases
 
 ### Roadmap Evolution
 
@@ -1894,8 +1897,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-07T07:18:45.488Z
-Stopped at: Completed 41-04-PLAN.md — Phase 41 (Sharing Correctness) code-complete, all 4 plans done, ready for verification
+Last session: 2026-08-07T09:57:49.865Z
+Stopped at: Completed 42-01-PLAN.md — pptxRenders write hole closed, member-tier read granted, Phase 41 deploy handoff amended
 Resume file: None
 
 ## Operator Next Steps

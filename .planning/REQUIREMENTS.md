@@ -109,7 +109,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
       `sourceSignature` so the existing rebuild-on-mismatch mechanism ever notices a `pending → ready`
       transition. Parsed text is retained in the document for search and labels but is never drawn.
 
-- [ ] **R080**: A slide whose render is still pending or has failed shows an explicit state rather than
+- [x] **R080**: A slide whose render is still pending or has failed shows an explicit state rather than
       a blank, broken, or misleadingly-stale slide.
 
 ### Service Items
@@ -282,7 +282,7 @@ Explicitly excluded. Documented to prevent scope creep.
 | R077 | Phase 41 | Complete |
 | R078 | Phase 41 | Complete |
 | R079 | Phase 42 | Pending |
-| R080 | Phase 42 | Pending |
+| R080 | Phase 42 | Complete |
 | R081 | Phase 43 | Pending |
 | R082 | Phase 43 | Pending |
 | R083 | Phase 43 | Pending |
