@@ -1036,6 +1036,34 @@ automatic 1-2-3 default. This is live-visible the moment this plan's code reache
       "Reset to 1-2-3 default") and confirms a subsequent new service's slots match the configured
       template's kind/section/order, with correct Vertical Worship types when VW mode is on.
 
+### Plan 44-02 — the Settings "Services" template editor UI (`ServiceTemplateEditor.vue`)
+
+**Unit-level proof only.** `src/components/settings/__tests__/ServiceTemplateEditor.test.ts` (20
+tests) and `src/views/__tests__/SettingsView.test.ts`'s "Services card" block (7 tests) prove the
+closed six-chip palette, add/reorder/section-change/remove against a mocked `sortablejs` capture
+harness, Reset-to-1-2-3 (with confirm on a non-empty draft), the dot-path/`stripUndefined` Save
+payload, empty-save-enabled, aria-labels, draft cloning (Pitfall #3), and the Services card's live
+summary — all against jsdom and a mocked Firestore/`sortablejs`, not a real browser or a real
+pointer drag.
+
+- [ ] **Real drag-and-drop reorder feel.** Open Settings → Services → Edit Default Template, add a
+      few items across different sections, and drag one by its handle — within its own section, and
+      across a section boundary into a different one. Confirm the drop lands where expected and the
+      drag-over section tints as it crosses each boundary. The automated suite calls `onEnd` directly
+      against the exact options SortableJS was configured with; it does not prove a real pointer drag
+      feels right.
+- [ ] **The slide-out has no scrim and no reflow underneath.** With the editor open, confirm the
+      Settings page behind it is still fully visible and clickable (no dimming overlay), matching
+      `EditSlideDrawer.vue`'s existing precedent this component structurally ports.
+- [ ] **The Services card summary reads naturally.** With no template configured, confirm the card
+      reads "No default template set — new services start empty until you add items here." After
+      building a template (e.g. via Reset to 1-2-3 default) and saving, confirm the summary updates
+      to "{N} items across {M} sections" with numbers that match what was actually saved.
+- [ ] **The drawer opens and closes cleanly in the running app.** Click "Edit Default Template",
+      confirm the panel slides in from the right without layout jank, make an edit, click the close
+      (×) button, and confirm it slides back out and the Services card's summary reflects whatever
+      was actually saved (not what was left in the draft if Save was never clicked).
+
 ---
 
 ## Notes and failures

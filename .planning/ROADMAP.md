@@ -327,10 +327,10 @@ Plans:
   2. Creating a new blank service builds it from the church's template; when no template is set the new service defaults to **EMPTY** (owner correction 2026-08-07 — supersedes the prior "`buildSlots()` becomes the fallback" wording; `buildSlots()`' 1-2-3 shape is exposed as a "Reset to 1-2-3 default" preset in the editor instead)
   3. When Vertical Worship mode is on, the song slots in that template receive their required VW types from the chosen progression at creation time — VW typing is computed then, never frozen into the stored template, so toggling VW mode later never leaves stale types behind on an already-created service
 
-**Plans**: 1/2 plans executed
+**Plans**: 2/2 plans executed
 
 - [x] 44-01-PLAN.md — data model + creation logic: `ServiceTemplateEntry` type + `OrgSettings.defaultServiceTemplate`, `buildSlotsFromTemplate()` with ordinal VW-type mapping, `createService` rerouted to the template (empty → EMPTY service), test suite rewritten (wave 1)
-- [ ] 44-02-PLAN.md — Settings template editor: `ServiceTemplateEditor.vue` slide-out (Phase 43 palette + per-section SortableJS reorder + section select + remove + "Reset to 1-2-3 default" + Save) and the new Services card in `SettingsView.vue` (wave 2)
+- [x] 44-02-PLAN.md — Settings template editor: `ServiceTemplateEditor.vue` slide-out (Phase 43 palette + per-section SortableJS reorder + section select + remove + "Reset to 1-2-3 default" + Save) and the new Services card in `SettingsView.vue` (wave 2)
 
 **UI hint**: yes
 **Research flag**: skip — reuses existing slot primitives verbatim; the one consumption site is `createService`.
@@ -418,7 +418,7 @@ Plans:
 | 41. Sharing Correctness | v1.5 | 4/4 | Complete    | 2026-08-07 |
 | 42. PowerPoint Rendered-Image Display | v1.5 | 8/8 | Complete    | 2026-08-07 |
 | 43. Service Item Types | v1.5 | 4/4 | In Progress|  |
-| 44. Default Service Template | v1.5 | 1/2 | In Progress|  |
+| 44. Default Service Template | v1.5 | 2/2 | In Progress|  |
 | 45. ESV/NLT Bible Version Selection | v1.5 | 0/? | Not started | - |
 | 46. Global Slide Typography | v1.5 | 0/? | Not started | - |
 | 47. Congregational Reading Divider UX | v1.5 | 0/? | Not started | - |

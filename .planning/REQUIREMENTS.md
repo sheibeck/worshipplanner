@@ -135,11 +135,11 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 
 ### Default Service Template
 
-- [ ] **R086**: A church can define, in Settings, the default set and order of items that make up a new
+- [x] **R086**: A church can define, in Settings, the default set and order of items that make up a new
       blank service.
-      <br>`[44-01]` The storage contract (`OrgSettings.defaultServiceTemplate`) and default resolution
-      are complete; the Settings "Services" template editor UI that lets a church actually define the
-      template lands in Plan 44-02 — checked off there, not here.
+      <br>`[44-01]` The storage contract (`OrgSettings.defaultServiceTemplate`) and default resolution.
+      `[44-02]` The Settings "Services" template editor UI (`ServiceTemplateEditor.vue`) that lets a
+      church actually define the template — both plans complete, requirement satisfied end to end.
 
 - [x] **R087**: A new blank service is built from the church's template, and when Vertical Worship mode
       is on the song slots in that template still receive their required VW types from the chosen
@@ -296,7 +296,7 @@ Explicitly excluded. Documented to prevent scope creep.
 | R083 | Phase 43 | Complete |
 | R084 | Phase 43 | Complete |
 | R085 | Phase 43 | Complete |
-| R086 | Phase 44 | In Progress (44-01 storage/engine done; 44-02 editor UI pending) |
+| R086 | Phase 44 | Complete |
 | R087 | Phase 44 | Complete |
 | R088 | Phase 39 | Complete |
 | R089 | Phase 39 | Complete |

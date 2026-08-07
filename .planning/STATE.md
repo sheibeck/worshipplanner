@@ -5,16 +5,16 @@ milestone_name: Settings, Sharing, and Fidelity
 current_phase: 44
 current_phase_name: Default Service Template
 status: executing
-stopped_at: Completed 44-01-PLAN.md
-last_updated: "2026-08-07T22:10:55.337Z"
+stopped_at: Completed 44-02-PLAN.md
+last_updated: "2026-08-07T22:39:38.396Z"
 last_activity: 2026-08-07
 last_activity_desc: Phase 43 (4/4 plans) complete, verification deferred per the standing
 progress:
   total_phases: 11
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 29
-  completed_plans: 28
-  percent: 55
+  completed_plans: 29
+  percent: 64
 ---
 
 # Project State
@@ -150,12 +150,18 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 44 (Default Service Template) — EXECUTING
-Plan: 1 of 2
-Status: 44-01 complete (engine: ServiceTemplateEntry type, buildSlotsFromTemplate, rerouted
-createService, empty-by-default owner override). 44-02 (Settings template editor UI) remains.
-Last activity: 2026-08-07 — Phase 43 (4/4 plans) complete, verification deferred per the standing
-v1.5 autonomy grant; Phase 44 plan 01 executed.
+Phase: 44 (Default Service Template) — CODE-COMPLETE, verification not yet run
+Plan: 2 of 2 — both plans executed
+Status: 44-01 (engine: ServiceTemplateEntry type, buildSlotsFromTemplate, rerouted createService,
+empty-by-default owner override) and 44-02 (Settings "Services" template editor UI —
+ServiceTemplateEditor.vue + the Services card in SettingsView.vue) are both complete. R086/R087
+fully delivered end to end. `npm run type-check` clean; app suite failing-file-set unchanged from
+the documented 2-file baseline (`src/storage.rules.test.ts`, `RosterView.test.ts`). Human-verify
+items for both plans recorded in `.planning/PENDING-VERIFICATION.md` § Phase 44, deferred per the
+standing v1.5 autonomy grant — not yet run, not self-approved. `/gsd-verify-work 44` is the next
+step for this phase; no further plans are scoped here.
+Last activity: 2026-08-07 — Phase 44 (2/2 plans) complete, verification deferred per the standing
+v1.5 autonomy grant.
 
 ## ⏸ RESUME HERE (2026-08-06 — v1.5 ROADMAP.md created, ready to plan Phase 39)
 
@@ -1348,6 +1354,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 43 P02 | 22min | 2 tasks | 2 files |
 | Phase 43 P04 | 35min | 3 tasks | 6 files |
 | Phase 44 P01 | 45min | 3 tasks | 5 files |
+| Phase 44 P02 | 30min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -1656,6 +1663,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 43-04: T-43-03 (body visible in published share snapshot) accepted not mitigated — buildServiceSnapshot already copied slots wholesale since plan 01, and notes has published under the same share token since v1.0; recorded in PENDING-VERIFICATION.md for owner confirmation
 - [Phase ?]: Empty/unset defaultServiceTemplate produces an EMPTY new service (owner's 2026-08-07 override) — buildSlots() is never called from createService
 - [Phase ?]: VW-type ordinal mapping cycles via modulo for templates with more than 5 SONG entries (44-RESEARCH.md Assumption A1)
+- [Phase ?]: Row aria-labels/kind labels reuse slotLabel(createSlot(kind)) instead of a second hand-written switch
+- [Phase ?]: Per-item remove fires immediately with no confirm (template entries carry no user content, unlike live ServiceEditorView slots)
+- [Phase ?]: All five SERVICE_SECTIONS containers render as live Sortable drop targets whenever the draft is non-empty, even when currently empty
 
 ### Roadmap Evolution
 
@@ -1967,8 +1977,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-07T22:10:55.292Z
-Stopped at: Completed 44-01-PLAN.md
+Last session: 2026-08-07T22:39:38.354Z
+Stopped at: Completed 44-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
