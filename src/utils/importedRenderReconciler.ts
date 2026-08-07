@@ -112,17 +112,33 @@ export function resolveImportedRender(
     }
   }
 
-  // render.status === 'ready'
-  if (render.renderedCount !== undefined && render.renderedCount >= 1) {
-    // Fact 3: renderedCount wins outright — no comparison against
-    // deck.slides.length, no clamping, no pairing. Under, at, or over parsed
-    // count are all just "N ready entries."
-    return { mode: 'ready', entryCount: render.renderedCount }
+  // WR-04 (42-REVIEW.md): an EXPLICIT `render.status === 'ready'` check, not
+  // an implicit fall-through by elimination. `PptxRenderDoc` is cast from
+  // `snap.data()` with no runtime validation (`pptxRenders.ts`), so a future
+  // status value the client hasn't deployed for yet (`functions/src/index.ts`
+  // can add one without a client deploy — the sibling `failureReason` slug
+  // space already works this way) or a malformed document must degrade
+  // safely to `failed`, never be silently treated as `ready` merely because
+  // it fell through the `pending`/`failed` checks above and happened to
+  // carry a truthy `renderedCount`.
+  if (render.status === 'ready') {
+    if (render.renderedCount !== undefined && render.renderedCount >= 1) {
+      // Fact 3: renderedCount wins outright — no comparison against
+      // deck.slides.length, no clamping, no pairing. Under, at, or over parsed
+      // count are all just "N ready entries."
+      return { mode: 'ready', entryCount: render.renderedCount }
+    }
+    // Fact 3's named carve-out: a self-contradictory ready document (the
+    // server's own gate requires actualCount > 0 to ever write 'ready') falls
+    // back to failed with the deck's parsed length, not to zero entries.
+    return { mode: 'failed', entryCount: deck.slides.length }
   }
 
-  // Fact 3's named carve-out: a self-contradictory ready document (the
-  // server's own gate requires actualCount > 0 to ever write 'ready') falls
-  // back to failed with the deck's parsed length, not to zero entries.
+  // Safe fallback for any status value outside the closed union this module
+  // type-checks against (a future server-added status, or a corrupted/
+  // malformed document) — degrade to `failed` with no `failureReason`, so
+  // the generic fallback sentence (42-06) applies, rather than crash or
+  // masquerade as `ready`.
   return { mode: 'failed', entryCount: deck.slides.length }
 }
 
