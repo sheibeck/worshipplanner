@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Settings, Sharing, and Fidelity
-current_phase: 43
+current_phase: 44
 current_phase_name: Default Service Template
 status: executing
-stopped_at: Phase 44 UI-SPEC approved; ready to plan
-last_updated: "2026-08-07T21:30:21.014Z"
+stopped_at: Completed 44-01-PLAN.md
+last_updated: "2026-08-07T22:10:55.337Z"
 last_activity: 2026-08-07
-last_activity_desc: Phase 43 execution started
+last_activity_desc: Phase 43 (4/4 plans) complete, verification deferred per the standing
 progress:
   total_phases: 11
   completed_phases: 6
-  total_plans: 27
-  completed_plans: 27
+  total_plans: 29
+  completed_plans: 28
   percent: 55
 ---
 
@@ -150,12 +150,12 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 43 (Service Item Types) — EXECUTING
-Plan: 4 of 4
-Status: Ready to execute
-Last activity: 2026-08-07 — Phase 43 execution started
-module, authStore.settings merged once in loadOrgContext, vwModeEnabled dual-read, R073 test
-coverage (src/stores/__tests__/auth.test.ts)
+Phase: 44 (Default Service Template) — EXECUTING
+Plan: 1 of 2
+Status: 44-01 complete (engine: ServiceTemplateEntry type, buildSlotsFromTemplate, rerouted
+createService, empty-by-default owner override). 44-02 (Settings template editor UI) remains.
+Last activity: 2026-08-07 — Phase 43 (4/4 plans) complete, verification deferred per the standing
+v1.5 autonomy grant; Phase 44 plan 01 executed.
 
 ## ⏸ RESUME HERE (2026-08-06 — v1.5 ROADMAP.md created, ready to plan Phase 39)
 
@@ -1347,6 +1347,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 43 P01 | 9min | 3 tasks | 8 files |
 | Phase 43 P02 | 22min | 2 tasks | 2 files |
 | Phase 43 P04 | 35min | 3 tasks | 6 files |
+| Phase 44 P01 | 45min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -1653,6 +1654,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 43-04: SlotKind is a parallel, non-structural type — widening it alone does not reach addSlotAsItem's exhaustiveness backstop; the probe must widen NonAssignableSlot['kind'] to actually prove the backstop fires
 - [Phase ?]: 43-04: body renders on ServicePrintLayout.vue/ShareView.vue via each surface's own free-text vocabulary (whitespace-pre-wrap notes precedent), text interpolation only, absent body renders label-only like PRAYER — no shared component, no v-html
 - [Phase ?]: 43-04: T-43-03 (body visible in published share snapshot) accepted not mitigated — buildServiceSnapshot already copied slots wholesale since plan 01, and notes has published under the same share token since v1.0; recorded in PENDING-VERIFICATION.md for owner confirmation
+- [Phase ?]: Empty/unset defaultServiceTemplate produces an EMPTY new service (owner's 2026-08-07 override) — buildSlots() is never called from createService
+- [Phase ?]: VW-type ordinal mapping cycles via modulo for templates with more than 5 SONG entries (44-RESEARCH.md Assumption A1)
 
 ### Roadmap Evolution
 
@@ -1964,9 +1967,9 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-07T21:30:20.970Z
-Stopped at: Phase 44 UI-SPEC approved; ready to plan
-Resume file: .planning/phases/44-default-service-template/44-UI-SPEC.md
+Last session: 2026-08-07T22:10:55.292Z
+Stopped at: Completed 44-01-PLAN.md
+Resume file: None
 
 ## Operator Next Steps
 

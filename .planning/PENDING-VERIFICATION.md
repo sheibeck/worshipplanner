@@ -1014,6 +1014,30 @@ real-world counterpart: confirm the exported Hymn item's title is unaffected by 
 
 ---
 
+## Phase 44 — Default Service Template (R086, R087)
+
+### Plan 44-01 — the empty-by-default engine (`buildSlotsFromTemplate` + rerouted `createService`)
+
+**Unit-level proof only.** `src/utils/__tests__/slotTypes.test.ts` and
+`src/stores/__tests__/services.test.ts` prove the ordinal (not positional) VW-type mapping, the
+modulo cycle for templates with more than 5 `SONG` entries, the unknown-kind defensive skip, and
+`createService`'s empty-template → 0-slots contract against mocked Firestore/`authStore` — not that
+creating a real blank service in the live app produces the expected result.
+
+**Disclosed behavior change, owner already accepted the tradeoff (44-CONTEXT.md, 2026-08-07
+override):** every church without a configured template (which is every church today — the
+template editor UI ships in Plan 44-02) now gets a genuinely EMPTY new service, not the previous
+automatic 1-2-3 default. This is live-visible the moment this plan's code reaches production.
+
+- [ ] **Owner creates a new blank service with no default template configured** and confirms it has
+      **zero slots** (not the previous automatic 1-2-3 shape) — the intended, deliberate behavior
+      per the 2026-08-07 override, not a regression.
+- [ ] Once Plan 44-02's Settings template editor ships, **owner configures a template** (e.g. via
+      "Reset to 1-2-3 default") and confirms a subsequent new service's slots match the configured
+      template's kind/section/order, with correct Vertical Worship types when VW mode is on.
+
+---
+
 ## Notes and failures
 
 _(Record anything that failed here, with what you saw versus what was expected.)_
