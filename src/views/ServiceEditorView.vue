@@ -810,7 +810,8 @@
               <button type="button" class="rounded-md border border-gray-700 px-2 py-1 text-[11px] font-medium text-gray-300 hover:bg-gray-800 transition-colors" :data-testid="`section-add-scripture-${group.key}`" @click="addSlot('SCRIPTURE', undefined, group.key as ServiceSection); openSectionAddKey = null">Scripture</button>
               <button type="button" class="rounded-md border border-gray-700 px-2 py-1 text-[11px] font-medium text-gray-300 hover:bg-gray-800 transition-colors" :data-testid="`section-add-prayer-${group.key}`" @click="addSlot('PRAYER', undefined, group.key as ServiceSection); openSectionAddKey = null">Prayer</button>
               <button type="button" class="rounded-md border border-gray-700 px-2 py-1 text-[11px] font-medium text-gray-300 hover:bg-gray-800 transition-colors" :data-testid="`section-add-message-${group.key}`" @click="addSlot('MESSAGE', undefined, group.key as ServiceSection); openSectionAddKey = null">Message</button>
-              <button type="button" class="rounded-md border border-gray-700 px-2 py-1 text-[11px] font-medium text-gray-300 hover:bg-gray-800 transition-colors" :data-testid="`section-add-hymn-${group.key}`" @click="addSlot('HYMN', undefined, group.key as ServiceSection); openSectionAddKey = null">Hymn</button>
+              <button type="button" class="rounded-md border border-gray-700 px-2 py-1 text-[11px] font-medium text-gray-300 hover:bg-gray-800 transition-colors" :data-testid="`section-add-announcements-${group.key}`" @click="addSlot('ANNOUNCEMENTS', undefined, group.key as ServiceSection); openSectionAddKey = null">Announcements</button>
+              <button type="button" class="rounded-md border border-gray-700 px-2 py-1 text-[11px] font-medium text-gray-300 hover:bg-gray-800 transition-colors" :data-testid="`section-add-misc-${group.key}`" @click="addSlot('MISC', undefined, group.key as ServiceSection); openSectionAddKey = null">Miscellaneous</button>
             </div>
 
             <!-- Section list container: always rendered — populated or not — so it is always a live
@@ -1199,7 +1200,8 @@
           <button type="button" class="rounded-md border border-gray-700 px-2 py-1 text-[11px] font-medium text-gray-300 hover:bg-gray-800 transition-colors" data-testid="palette-add-scripture" @click="addSlot('SCRIPTURE')">Scripture</button>
           <button type="button" class="rounded-md border border-gray-700 px-2 py-1 text-[11px] font-medium text-gray-300 hover:bg-gray-800 transition-colors" data-testid="palette-add-prayer" @click="addSlot('PRAYER')">Prayer</button>
           <button type="button" class="rounded-md border border-gray-700 px-2 py-1 text-[11px] font-medium text-gray-300 hover:bg-gray-800 transition-colors" data-testid="palette-add-message" @click="addSlot('MESSAGE')">Message</button>
-          <button type="button" class="rounded-md border border-gray-700 px-2 py-1 text-[11px] font-medium text-gray-300 hover:bg-gray-800 transition-colors" data-testid="palette-add-hymn" @click="addSlot('HYMN')">Hymn</button>
+          <button type="button" class="rounded-md border border-gray-700 px-2 py-1 text-[11px] font-medium text-gray-300 hover:bg-gray-800 transition-colors" data-testid="palette-add-announcements" @click="addSlot('ANNOUNCEMENTS')">Announcements</button>
+          <button type="button" class="rounded-md border border-gray-700 px-2 py-1 text-[11px] font-medium text-gray-300 hover:bg-gray-800 transition-colors" data-testid="palette-add-misc" @click="addSlot('MISC')">Miscellaneous</button>
         </div>
 
         </div>
