@@ -818,6 +818,18 @@ describe('serviceShareLinks — org-editor-scoped, no public read', () => {
     await assertFails(getDoc(doc(db, 'serviceShareLinks', 'service-1')))
   })
 
+  // WR-06 (41-REVIEW): the one gap in an otherwise-thorough set for this
+  // security-sensitive rule — isOrgEditor gates viewers out, and the
+  // create/delete blocks for this collection already test the viewer case
+  // explicitly, but the read block never did.
+  it('DENY (WR-06) — a viewer-role member of the owning org cannot read an existing serviceShareLinks doc', async () => {
+    await seedMembershipDoc('orgA', 'userV', 'viewer')
+    await seedDoc('serviceShareLinks/service-1', { token: 'tok-abc', orgId: 'orgA', serviceId: 'service-1' })
+    const context = testEnv.authenticatedContext('userV')
+    const db = context.firestore()
+    await assertFails(getDoc(doc(db, 'serviceShareLinks', 'service-1')))
+  })
+
   // CREATE (4)
   it('ALLOW — an editor of orgA creates a serviceShareLinks doc for orgA', async () => {
     await seedMembershipDoc('orgA', 'userA', 'editor')
