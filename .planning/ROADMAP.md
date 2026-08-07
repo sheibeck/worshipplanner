@@ -149,7 +149,7 @@ merge gaps. Full reasoning recorded in `.planning/STATE.md` § "v1.5 ROADMAP.md 
 - [x] **Phase 39: Org Settings Infrastructure & Feature Toggles** - Typed org settings plus AI/Planning Center toggles gated at the `claudeApi.ts` choke point
 - [x] **Phase 40: Custom Auth Claim for Org Membership** - A testable, dual-read Storage-rules membership check (built, tested, undeployed — two owner deploys with a 1-hour soak between them)
 - [x] **Phase 40.1: Close the Self-Service Membership Hole** (INSERTED 2026-08-06) - Only an invite-holder or an org's creator can create a membership document
-- [ ] **Phase 41: Sharing Correctness** - One permanent share link per service, auto-refreshed on every change
+- [x] **Phase 41: Sharing Correctness** - One permanent share link per service, auto-refreshed on every change (completed 2026-08-07)
 - [ ] **Phase 42: PowerPoint Rendered-Image Display** - Client-side display of the already-deployed server-rendered PPTX images (carryover R062)
 - [ ] **Phase 43: Service Item Types** - Announcements, Miscellaneous, a plain-text Message, and Hymn retired from the add-item palette
 - [ ] **Phase 44: Default Service Template** - A church-defined default item set for new blank services
@@ -391,7 +391,7 @@ Plans:
 | 29-38 | v1.4 | 61/61 | Complete (archived) | 2026-08-05 |
 | 39. Org Settings Infrastructure & Feature Toggles | v1.5 | 6/6 | In Progress|  |
 | 40. Custom Auth Claim for Org Membership | v1.5 | 4/4 | In Progress|  |
-| 41. Sharing Correctness | v1.5 | 4/4 | In Progress|  |
+| 41. Sharing Correctness | v1.5 | 4/4 | Complete    | 2026-08-07 |
 | 42. PowerPoint Rendered-Image Display | v1.5 | 0/? | Not started | - |
 | 43. Service Item Types | v1.5 | 0/? | Not started | - |
 | 44. Default Service Template | v1.5 | 0/? | Not started | - |

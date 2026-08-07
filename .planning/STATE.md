@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Settings, Sharing, and Fidelity
-current_phase: 41
-current_phase_name: Sharing Correctness
-status: verifying
+current_phase: 42
+current_phase_name: PowerPoint Rendered-Image Display
+status: planning
 stopped_at: Completed 41-04-PLAN.md — Phase 41 (Sharing Correctness) code-complete, all 4 plans done, ready for verification
-last_updated: "2026-08-07T07:18:45.525Z"
+last_updated: "2026-08-07T08:39:34.996Z"
 last_activity: 2026-08-07
-last_activity_desc: Phase 41 execution started
+last_activity_desc: Phase 41 complete, transitioned to Phase 42
 progress:
   total_phases: 11
   completed_phases: 4
@@ -112,10 +112,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 41 (Sharing Correctness) — EXECUTING
-Plan: 4 of 4
-Status: Phase complete — ready for verification
-Last activity: 2026-08-07 — Phase 41 execution started
+Phase: 42 — PowerPoint Rendered-Image Display
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-08-07 — Phase 41 complete, transitioned to Phase 42
 module, authStore.settings merged once in loadOrgContext, vwModeEnabled dual-read, R073 test
 coverage (src/stores/__tests__/auth.test.ts)
 
