@@ -804,7 +804,31 @@ and **no public read** — proven against the real Firestore emulator in `src/ru
 > — see `41-REVIEW-FIX.md`). **This clause must ship in the same `firestore.rules` deploy as the rest
 > of this phase's changes below — it is not a separate deploy.**
 
-- [ ] **Deploy the updated `firestore.rules`** — `firebase deploy --only firestore:rules`.
+> **UPDATE (Phase 42-01, 2026-08-07): the pending rules diff grew again — two more clauses, unrelated
+> collection, same file, same deploy.** Phase 42 (PowerPoint Rendered-Image Display) found and closed a
+> **pre-existing, currently-LIVE-in-production** write hole while researching how to read PPTX render
+> status: `organizations/{orgId}/pptxRenders/{importId}` was never given its own rules block, so it fell
+> through to the generic single-segment wildcard (`firestore.rules:198-203`), which grants any org
+> **editor** both read AND write on it today. Write was never supposed to be possible — the render
+> document is meant to be Admin-SDK-only (`functions/src/index.ts:342` names a client-forged `ready`
+> flip as the one outcome the render service "must never be able to produce," T-37-15/T-42-01). **Until
+> this deploy runs, an org editor can forge their own org's render document to `ready` with a fake
+> `renderedCount` via a plain client-SDK `updateDoc` — verified via an emulator probe that PASSED
+> against the undeployed rules file before the fix (`42-01-SUMMARY.md`).** Two clauses added, both
+> inside `match /organizations/{orgId}`, nothing else: (a) a dedicated
+> `match /pptxRenders/{importId} { allow read: if isOrgMember(orgId); }` block — read only, member tier
+> (not editor tier), since a viewer already sees the deck's full parsed content; (b) `collection !=
+> 'pptxRenders'` appended to the generic wildcard's `allow write` clause, alongside the existing
+> `services`/`slideGroups` exclusions, closing the hole. Proven against the real Firestore emulator:
+> `npx vitest run --config vitest.rules.config.ts` reports **138/138 passing**, including the flipped
+> write-DENY case (PASSED pre-fix, now fails post-fix) and an ALLOW case for a viewer-role read (see
+> `42-01-SUMMARY.md` for exact before/after counts). `storage.rules` is untouched — rendered pages
+> already fall under the existing `orgs/{orgId}/{allPaths=**}` org-member read grant. **This too ships
+> in the same `firestore.rules` deploy below — still one deploy, now carrying three phases' clauses.**
+
+- [ ] **Deploy the updated `firestore.rules`** — `firebase deploy --only firestore:rules`. Carries
+      Phase 41's sharing-correctness clauses (including the CR-01 `shareTokens` create-rule tightening)
+      **and** Phase 42's `pptxRenders` read/write clauses (above) — still exactly one deploy.
       **Ordering constraint, load-bearing:** deploy this **before, or in the same session as**, any
       hosting deploy carrying Phase 41's app code (Plans 02-04). `ensureShareLink` reads
       `serviceShareLinks/{serviceId}`, which the catch-all rule currently denies outright — if the app
@@ -812,9 +836,13 @@ and **no public read** — proven against the real Firestore emulator in `src/ru
       user and every service. There is deliberately no client-side fallback to the old
       mint-fresh-every-time behaviour: a fallback would silently defeat R076 (link stability) and hide
       a missed deploy behind working-looking UI, whereas a loud failure surfaces the ordering mistake
-      immediately. **Includes the CR-01 `shareTokens` create-rule tightening noted above — verify it
-      landed by confirming `firestore.rules`'s `shareTokens` block reads `allow create: if
-      isOrgEditor(request.resource.data.orgId)`, not `if isSignedIn()`.**
+      immediately.
+      **After deploying, verify all of:**
+      - `shareTokens` block reads `allow create: if isOrgEditor(request.resource.data.orgId)`, not
+        `if isSignedIn()` (CR-01).
+      - `firestore.rules` in the console shows a `match /pptxRenders/{importId}` read block AND
+        `collection != 'pptxRenders'` on the generic wildcard's write clause (Phase 42) — until this
+        lands, the write hole described above remains live.
 
 **`deleteService` share revocation — resolved as OUT OF SCOPE, not fixed this phase.**
 `41-RESEARCH.md` § Open Questions flags that `src/stores/services.ts::deleteService` (line 259) does
