@@ -248,7 +248,14 @@ Plans:
   4. Running the backfill against a service that already has several `shareTokens` documents (from the old mint-fresh-every-time behavior) adopts the most recent existing token rather than minting a new one, so links already circulated to a congregation keep working — proven by test
   5. The snapshot's existing PII guard (names only, never the raw Person object) is proven intact after the rework; deploying the updated `firestore.rules` remains the owner's step, with the exact command handed off in this phase's notes
 
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 41-01-PLAN.md — Wave 1: loosen the `shareTokens` update rule, add the `serviceShareLinks` rules block with an absence-tolerant read, prove both against the emulator (20 tests), record the owner deploy handoff and the `deleteService` scope decision
+- [ ] 41-02-PLAN.md — Wave 1: `src/utils/shareTokens.ts` — dependency-free `mintShareToken` / `shareTokenCreatedAtMillis` / `pickAdoptableToken`, with the R078 adoption ordering (org filter, `createdAt` desc, doc-id tiebreak, null-safe) proven without a Firestore mock
+- [ ] 41-03-PLAN.md — Wave 2: Wave 0 mock extension (`where`/`getDocs`/`limit`/`runTransaction`), extract `buildServiceSnapshot`, implement `ensureShareLink` (adopt-or-create via transaction, then write payload in place), retain `createShareToken` as a delegating wrapper
+- [ ] 41-04-PLAN.md — Wave 3: `maybeRefreshShareLink` hooked into `updateService` / `setRoleOverride` / `clearRoleOverride` behind the session cache and WR-06 soft-fail; prove no write-back and the PII guard on the refresh path
+
 **UI hint**: no
 **Research flag**: needs research — the storage-location decision (a separate `serviceShareLinks` document, not the service doc) must be made explicit in the plan against R036's actual carve-out shapes, not assumed from PROJECT.md's original wording.
 **Notes**: PROJECT.md's original decision — "persist the token on the service doc" — is superseded by REQUIREMENTS.md's R076 correction; do not plan against the old wording. One root cause explains both "the link changed" and "my role overrides aren't showing": `createShareToken()` minted a fresh token on every call and froze the snapshot at share time.
