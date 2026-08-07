@@ -108,6 +108,33 @@ describe('usePptxRenders', () => {
       store.syncSubscriptions('orgA', [])
       expect(store.rendersByImportId.has('a')).toBe(false)
     })
+
+    it('WR-05: an id removed then re-added in a later call opens a FRESH listener rather than being suppressed by a stale entry', async () => {
+      const { onSnapshot } = await import('firebase/firestore')
+      const { usePptxRenders } = await import('../pptxRenders')
+      const store = usePptxRenders()
+
+      store.syncSubscriptions('orgA', ['a'])
+      expect(onSnapshot).toHaveBeenCalledTimes(1)
+      const firstUnsubA = unsubscribeSpies.get('a')!
+
+      store.syncSubscriptions('orgA', [])
+      expect(firstUnsubA).toHaveBeenCalledOnce()
+      expect(store.rendersByImportId.has('a')).toBe(false)
+
+      store.syncSubscriptions('orgA', ['a'])
+
+      // Two `onSnapshot` calls total (once per open) — a stale `listeners` entry
+      // suppressing re-subscription, or a double-`onSnapshot` call, would show up
+      // as a count other than 2 here.
+      expect(onSnapshot).toHaveBeenCalledTimes(2)
+
+      // The second open's data flows through `rendersByImportId` correctly —
+      // proves the fresh listener's callback is wired up, not just that
+      // `onSnapshot` was invoked again.
+      triggerSnapshot('a', { status: 'ready', renderedCount: 2 })
+      expect(store.rendersByImportId.get('a')).toEqual({ status: 'ready', renderedCount: 2 })
+    })
   })
 
   describe('snapshot callback — presence vs absence', () => {
