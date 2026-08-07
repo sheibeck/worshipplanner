@@ -966,6 +966,20 @@ Planning Center actually creates three distinctly-titled items when given that s
       Planning Center plan that all three items appear with their own titles — `Announcements`,
       `Miscellaneous`, `Message` — and that none of them is mislabeled `Message`.
 
+### Plan 43-03 — hands-on feel of the new palette and shared body editor (R081-R084 easy half)
+
+**Unit-level proof only.** Both palette rows now offer Announcements and Miscellaneous and no longer
+offer Hymn; one shared `<textarea>` (`slot-body-input`) serves Message/Announcements/Miscellaneous and
+the Message URL control is gone from the markup (`linkUrl`/`linkLabel` remain in the type and in
+Firestore). Palette membership, body round-trip, URL absence (proven scoped by a paired Prayer
+assertion), stored-link survival and ordering stability are all proven against a mounted component in
+`src/views/__tests__/ServiceEditorView.test.ts` — not that the editor feels right in a real browser.
+
+- [ ] **Owner adds an Announcements item and a Miscellaneous item** to a real service, types into each,
+      and confirms they save and reload correctly; confirms the **Message** item is now a plain text
+      box with **no URL control**; and confirms long pasted body text **wraps and grows downward**
+      rather than scrolling the row sideways.
+
 ---
 
 ## Notes and failures
