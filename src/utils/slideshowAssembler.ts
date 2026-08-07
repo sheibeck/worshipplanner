@@ -40,6 +40,7 @@ import {
   congregationalSectionsFromSlot,
   congregationalSectionFromRef,
 } from './scripture'
+import { resolveImportedRender, importedEntryIdentities, importedEntryContent } from './importedRenderReconciler'
 
 /** Content maps the assembly engine resolves slots against. Pre-loaded by the caller. */
 export interface AssemblyInputs {
@@ -210,10 +211,19 @@ function resolveEntryContent(
     case 'imported': {
       const deck = inputs.importedDecksById.get(ref.importId)
       if (!deck) return undefined
-      const innerSlide = deck.slides.find((s) => s.id === ref.innerSlideId)
-      if (!innerSlide) return undefined
-      const { id: _id, position: _position, ...rest } = innerSlide
-      return rest
+      // Phase 42 (R079/R080): route through the ONE shared reconciler both
+      // this stored-group path and the no-group fallback below call into —
+      // the grid (slideGroupMaterializer.ts, 42-04) and the presenter must
+      // never independently derive render state. LOAD-BEARING: for a
+      // pending/failed render, `importedEntryContent` returns a DEFINED,
+      // non-drawable object (never `undefined`), so the `if (!content)
+      // continue` guard below can never omit it — omitting it would shorten
+      // a live slideshow mid-service (42-UI-SPEC.md). Do not "tidy" that
+      // guard into skipping render-state slides.
+      const render = deck.renderImportId ? inputs.pptxRendersByImportId?.get(deck.renderImportId) : undefined
+      const resolution = resolveImportedRender(deck, render)
+      const urls = deck.renderImportId ? inputs.renderedImageUrlsByImportId?.get(deck.renderImportId) : undefined
+      return importedEntryContent(deck, resolution, ref.innerSlideId, urls)
     }
 
     case 'text': {
@@ -495,9 +505,21 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
         const deck: ImportedDeck | undefined = inputs.importedDecksById.get(slot.importId)
         if (!deck) break
 
-        deck.slides.forEach((innerSlide, localSeq) => {
-          const { id: _id, position: _position, ...rest } = innerSlide
-          emitFallback(slot, index, rest, slot.importId!, localSeq)
+        // Phase 42 (R079/R080): the fallback path must agree slide-for-slide
+        // with the stored-group path above — same reconciler, same identity
+        // list, same content resolution — exactly as the SCRIPTURE fallback's
+        // own comment already requires for its kind. Skip an identity ONLY
+        // when the helper returns `undefined`, which can happen only in
+        // `parsed` mode (a re-import that dropped an inner slide id).
+        const render = deck.renderImportId ? inputs.pptxRendersByImportId?.get(deck.renderImportId) : undefined
+        const resolution = resolveImportedRender(deck, render)
+        const urls = deck.renderImportId ? inputs.renderedImageUrlsByImportId?.get(deck.renderImportId) : undefined
+        const identities = importedEntryIdentities(deck, resolution)
+
+        identities.forEach((innerSlideId, localSeq) => {
+          const content = importedEntryContent(deck, resolution, innerSlideId, urls)
+          if (!content) return
+          emitFallback(slot, index, content, slot.importId!, localSeq)
         })
         break
       }
