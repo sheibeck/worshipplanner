@@ -124,6 +124,147 @@ describe('SlideCard', () => {
     expect(wrapper.find('[data-testid="slide-card-body"]').exists()).toBe(false)
   })
 
+  describe('render-pending state (R080)', () => {
+    it('renders the pending tile and neither the image nor the body branch', () => {
+      const assembled = makeAssembled({
+        slotKind: 'IMPORTED',
+        slide: {
+          id: 'pending-1',
+          position: 0,
+          contentKind: 'image',
+          imageUrl: '',
+          renderState: 'pending',
+        },
+      })
+      const wrapper = mountCard({ assembledSlide: assembled })
+      expect(wrapper.get('[data-testid="slide-card-render-pending"]').text()).toContain('Rendering…')
+      expect(wrapper.find('[data-testid="slide-card-image"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="slide-card-body"]').exists()).toBe(false)
+    })
+
+    it('keeps the content-label and slide-number overlay badges visible', () => {
+      const assembled = makeAssembled({
+        slotKind: 'IMPORTED',
+        slide: {
+          id: 'pending-2',
+          position: 0,
+          contentKind: 'image',
+          imageUrl: '',
+          renderState: 'pending',
+        },
+      })
+      const wrapper = mountCard({ assembledSlide: assembled, number: 3 })
+      expect(wrapper.find('[data-testid="slide-card-content-label"]').exists()).toBe(true)
+      expect(wrapper.get('[data-testid="slide-card-number"]').text()).toBe('3')
+    })
+  })
+
+  describe('render-failed state (R080)', () => {
+    it('renders the failed tile with a mapped sentence, and neither the image nor the body branch', () => {
+      const assembled = makeAssembled({
+        slotKind: 'IMPORTED',
+        slide: {
+          id: 'failed-1',
+          position: 0,
+          contentKind: 'image',
+          imageUrl: '',
+          renderState: 'failed',
+          renderFailureReason: 'missing-render-doc',
+        },
+      })
+      const wrapper = mountCard({ assembledSlide: assembled })
+      const failedTile = wrapper.get('[data-testid="slide-card-render-failed"]')
+      expect(failedTile.text()).toContain('Render failed')
+      expect(failedTile.text()).toContain("This deck's render record is missing.")
+      expect(wrapper.find('[data-testid="slide-card-image"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="slide-card-body"]').exists()).toBe(false)
+    })
+
+    it('shows the generic fallback sentence for an unmapped failure reason, and never renders the raw slug', () => {
+      const assembled = makeAssembled({
+        slotKind: 'IMPORTED',
+        slide: {
+          id: 'failed-2',
+          position: 0,
+          contentKind: 'image',
+          imageUrl: '',
+          renderState: 'failed',
+          renderFailureReason: 'incomplete-render',
+        },
+      })
+      const wrapper = mountCard({ assembledSlide: assembled })
+      expect(wrapper.html()).not.toContain('incomplete-render')
+      expect(wrapper.html()).toContain("This slide couldn't be rendered.")
+    })
+
+    it('shows the generic fallback sentence when renderFailureReason is entirely absent', () => {
+      const assembled = makeAssembled({
+        slotKind: 'IMPORTED',
+        slide: {
+          id: 'failed-3',
+          position: 0,
+          contentKind: 'image',
+          imageUrl: '',
+          renderState: 'failed',
+        },
+      })
+      const wrapper = mountCard({ assembledSlide: assembled })
+      expect(wrapper.html()).toContain("This slide couldn't be rendered.")
+    })
+
+    it('keeps the content-label and slide-number overlay badges visible', () => {
+      const assembled = makeAssembled({
+        slotKind: 'IMPORTED',
+        slide: {
+          id: 'failed-4',
+          position: 0,
+          contentKind: 'image',
+          imageUrl: '',
+          renderState: 'failed',
+          renderFailureReason: 'missing-storage-path',
+        },
+      })
+      const wrapper = mountCard({ assembledSlide: assembled, number: 5 })
+      expect(wrapper.find('[data-testid="slide-card-content-label"]').exists()).toBe(true)
+      expect(wrapper.get('[data-testid="slide-card-number"]').text()).toBe('5')
+    })
+
+    it("does not bleed the red tint into the card's outer border classes", () => {
+      const assembled = makeAssembled({
+        slotKind: 'IMPORTED',
+        slide: {
+          id: 'failed-5',
+          position: 0,
+          contentKind: 'image',
+          imageUrl: '',
+          renderState: 'failed',
+        },
+      })
+      const wrapper = mountCard({ assembledSlide: assembled })
+      const card = wrapper.get('.slide-card')
+      expect(card.classes()).not.toContain('border-red-900/40')
+      expect(card.classes().join(' ')).toMatch(/border-gray-800|border-indigo-500/)
+    })
+  })
+
+  it("renders no render-state tile for a slide with no renderState, keeping today's image branch byte-identical", () => {
+    const assembled = makeAssembled({
+      slotKind: 'IMPORTED',
+      slide: {
+        id: 'no-render-state',
+        position: 0,
+        contentKind: 'image',
+        imageUrl: 'https://example.com/ready.png',
+      },
+    })
+    const wrapper = mountCard({ assembledSlide: assembled })
+    expect(wrapper.find('[data-testid="slide-card-render-pending"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="slide-card-render-failed"]').exists()).toBe(false)
+    const img = wrapper.get('[data-testid="slide-card-image"]')
+    expect(img.classes()).toContain('object-contain')
+    expect(img.classes()).not.toContain('object-cover')
+  })
+
   it('renders a video slide, identifying it as video and naming its file when it has one', () => {
     const assembled = makeAssembled({
       slotKind: 'IMPORTED',

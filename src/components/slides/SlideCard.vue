@@ -33,8 +33,43 @@
         data-testid="slide-card-number"
       >{{ number }}</span>
 
+      <div
+        v-if="renderPending"
+        class="flex h-full w-full flex-col items-center justify-center gap-2"
+        data-testid="slide-card-render-pending"
+      >
+        <svg
+          class="h-4 w-4 animate-spin text-indigo-400"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+        </svg>
+        <span class="text-[11px] text-gray-300">Rendering&hellip;</span>
+      </div>
+      <div
+        v-else-if="renderFailed"
+        class="flex h-full w-full flex-col items-center justify-center gap-2 border border-red-900/40 bg-red-950/20 px-3 text-center"
+        data-testid="slide-card-render-failed"
+      >
+        <svg
+          class="h-4 w-4 text-red-400"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          aria-hidden="true"
+        >
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+        </svg>
+        <span class="text-[11px] text-red-300">Render failed</span>
+        <span class="text-[13px] leading-normal text-red-400/80">{{ renderFailureCopy }}</span>
+      </div>
       <img
-        v-if="isImage"
+        v-else-if="isImage"
         :src="imageSrc"
         :alt="imageAlt"
         class="h-full w-full object-contain"
@@ -121,7 +156,13 @@
  */
 import { computed } from 'vue'
 import type { AssembledSlide, ImageSlide } from '@/types/slide'
-import { KIND_BADGE_CLASSES, slideContentLabel, slideBodyText, slideFooterLabel } from './slideDisplay'
+import {
+  KIND_BADGE_CLASSES,
+  slideContentLabel,
+  slideBodyText,
+  slideFooterLabel,
+  renderFailureSentence,
+} from './slideDisplay'
 import type { MenuItem, MenuItemKey } from './slideDisplay'
 import SlideActionMenu from './SlideActionMenu.vue'
 
@@ -149,6 +190,19 @@ const emit = defineEmits<{
 const isImage = computed(() => props.assembledSlide.slide.contentKind === 'image')
 const imageSrc = computed(() => (props.assembledSlide.slide as ImageSlide).imageUrl)
 const imageAlt = computed(() => (props.assembledSlide.slide as ImageSlide).altText ?? '')
+
+/**
+ * Phase 42 (R079/R080) render-state discriminator, read straight off the
+ * assembled slide's `SlideBase.renderState` field. Its PRESENCE gates the
+ * preview box's branch chain ahead of `isImage`/body-text — a slide carrying
+ * `renderState` never carries drawable content (`SlideBase`'s own doc
+ * comment).
+ */
+const renderState = computed(() => props.assembledSlide.slide.renderState)
+const renderPending = computed(() => renderState.value === 'pending')
+const renderFailed = computed(() => renderState.value === 'failed')
+/** Routed through `renderFailureSentence` — the ONE sanctioned path from the raw `renderFailureReason` slug to the DOM (T-42-04). */
+const renderFailureCopy = computed(() => renderFailureSentence(props.assembledSlide.slide.renderFailureReason))
 
 const contentLabel = computed(() => slideContentLabel(props.assembledSlide.slide))
 const bodyText = computed(() => slideBodyText(props.assembledSlide.slide))
