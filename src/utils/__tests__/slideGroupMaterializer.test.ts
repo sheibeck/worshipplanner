@@ -14,9 +14,11 @@ import type { SongSlot, ScriptureSlot, NonAssignableSlot, HymnSlot, ImportedSlot
 import type { SongLyrics } from '@/types/songLyrics'
 import type { ScriptureReading } from '@/types/scriptureReading'
 import type { ImportedDeck } from '@/types/importedDeck'
+import type { PptxRenderDoc } from '@/types/pptxRender'
 import type { ScriptureSlide, TextSlide, ImageSlide, CongregationalSection } from '@/types/slide'
 import type { SlideGroup } from '@/types/slideGroup'
 import type { Timestamp } from 'firebase/firestore'
+import { RENDERED_PAGE_IDENTITY_PREFIX } from '@/utils/importedRenderReconciler'
 
 const mockTimestamp = { toDate: () => new Date('2026-01-01') } as unknown as Timestamp
 
@@ -2376,5 +2378,329 @@ describe('R060 — copyright bracket (materialized paths)', () => {
         expect(result.slides.map((e) => e.order)).toEqual(result.slides.map((_, i) => i))
       }
     })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Phase 42 (42-04): IMPORTED render-reconciliation fixtures, local to the four
+// describe blocks below. Deliberately NOT folded into the shared fixtures
+// above `deriveGroupEntries — IMPORTED` — every existing IMPORTED fixture in
+// this file has no `renderImportId` on purpose, so the pre-existing 108 tests
+// prove the byte-identical parsed-mode fallthrough (D-16) untouched by any of
+// this.
+// ---------------------------------------------------------------------------
+
+/** A 5-parsed-slide deck carrying a `renderImportId`, so it resolves through
+ * every mode `resolveImportedRender` can produce rather than always `parsed`. */
+function makeRenderedImportedDeck(overrides: Partial<ImportedDeck> = {}): ImportedDeck {
+  return makeImportedDeck({
+    renderImportId: 'render-1',
+    slides: [
+      { id: 'is-1', position: 0, contentKind: 'text', title: 'Slide 1', body: 'Body 1' } as TextSlide,
+      { id: 'is-2', position: 1, contentKind: 'text', title: 'Slide 2', body: 'Body 2' } as TextSlide,
+      { id: 'is-3', position: 2, contentKind: 'text', title: 'Slide 3', body: 'Body 3' } as TextSlide,
+      { id: 'is-4', position: 3, contentKind: 'text', title: 'Slide 4', body: 'Body 4' } as TextSlide,
+      { id: 'is-5', position: 4, contentKind: 'text', title: 'Slide 5', body: 'Body 5' } as TextSlide,
+    ],
+    ...overrides,
+  })
+}
+
+function makeRenderDoc(overrides: Partial<PptxRenderDoc> = {}): PptxRenderDoc {
+  return { status: 'pending', ...overrides }
+}
+
+/** Builds `AssemblyInputs` with `deck` registered under `deck.id` and, when
+ * `render` is provided, that render document registered under the deck's OWN
+ * `renderImportId` (never under `deck.id` — T-42-07's two-identifier design). */
+function makeRenderInputs(
+  deck: ImportedDeck,
+  render: PptxRenderDoc | undefined,
+  overrides: Partial<AssemblyInputs> = {},
+): AssemblyInputs {
+  const pptxRendersByImportId = new Map<string, PptxRenderDoc>()
+  if (render && deck.renderImportId) pptxRendersByImportId.set(deck.renderImportId, render)
+  return makeInputs({
+    importedDecksById: new Map([[deck.id, deck]]),
+    pptxRendersByImportId,
+    ...overrides,
+  })
+}
+
+describe('deriveGroupEntries — IMPORTED with a render', () => {
+  it('T-42-07: a deck with no renderImportId derives its parsed entries unchanged even when a render document for another id is present in the map', () => {
+    const slot = importedSlot({ importId: 'deck-1' })
+    const deck = makeImportedDeck() // no renderImportId — the wrong-deck guard case
+    const inputs = makeInputs({
+      importedDecksById: new Map([['deck-1', deck]]),
+      pptxRendersByImportId: new Map([['some-other-render-id', makeRenderDoc({ status: 'ready', renderedCount: 99 })]]),
+    })
+
+    const entries = deriveGroupEntries(slot, inputs)
+
+    expect(entries).toHaveLength(2)
+    expect(entries.map((e) => e.sourceRef)).toEqual([
+      { kind: 'imported', importId: 'deck-1', innerSlideId: 'is-1' },
+      { kind: 'imported', importId: 'deck-1', innerSlideId: 'is-2' },
+    ])
+  })
+
+  it('a pending render derives entries equal to the parsed count, every innerSlideId a parsed inner slide id', () => {
+    const slot = importedSlot({ importId: 'deck-1' })
+    const deck = makeRenderedImportedDeck()
+    const inputs = makeRenderInputs(deck, makeRenderDoc({ status: 'pending' }))
+
+    const entries = deriveGroupEntries(slot, inputs)
+
+    expect(entries).toHaveLength(5)
+    expect(entries.map((e) => (e.sourceRef as { innerSlideId: string }).innerSlideId)).toEqual([
+      'is-1',
+      'is-2',
+      'is-3',
+      'is-4',
+      'is-5',
+    ])
+  })
+
+  it('a failed render derives entries equal to the parsed count, every innerSlideId a parsed inner slide id', () => {
+    const slot = importedSlot({ importId: 'deck-1' })
+    const deck = makeRenderedImportedDeck()
+    const inputs = makeRenderInputs(deck, makeRenderDoc({ status: 'failed', failureReason: 'render-timeout' }))
+
+    const entries = deriveGroupEntries(slot, inputs)
+
+    expect(entries).toHaveLength(5)
+    expect(
+      entries.every(
+        (e) => e.sourceRef.kind === 'imported' && !e.sourceRef.innerSlideId.startsWith(RENDERED_PAGE_IDENTITY_PREFIX),
+      ),
+    ).toBe(true)
+  })
+
+  it.each([
+    { renderedCount: 3 },
+    { renderedCount: 5 },
+    { renderedCount: 8 },
+  ])(
+    'ROADMAP criterion 3 / D-05: a ready render with renderedCount=$renderedCount derives exactly $renderedCount synthetic rendered-page entries, unconditional on the parsed count of 5',
+    ({ renderedCount }) => {
+      const slot = importedSlot({ importId: 'deck-1' })
+      const deck = makeRenderedImportedDeck()
+      const inputs = makeRenderInputs(deck, makeRenderDoc({ status: 'ready', renderedCount }))
+
+      const entries = deriveGroupEntries(slot, inputs)
+
+      expect(entries).toHaveLength(renderedCount)
+      expect(
+        entries.every(
+          (e, i) =>
+            e.sourceRef.kind === 'imported' && e.sourceRef.innerSlideId === `${RENDERED_PAGE_IDENTITY_PREFIX}${i + 1}`,
+        ),
+      ).toBe(true)
+      // None of these synthetic identities is a parsed inner slide id.
+      const parsedIds = new Set(deck.slides.map((s) => s.id))
+      expect(
+        entries.every((e) => e.sourceRef.kind === 'imported' && !parsedIds.has(e.sourceRef.innerSlideId)),
+      ).toBe(true)
+    },
+  )
+
+  it('D-05 named carve-out: a self-contradictory ready render with renderedCount=0 resolves to failed and derives the parsed count with parsed inner slide ids, not zero entries', () => {
+    const slot = importedSlot({ importId: 'deck-1' })
+    const deck = makeRenderedImportedDeck()
+    const inputs = makeRenderInputs(deck, makeRenderDoc({ status: 'ready', renderedCount: 0 }))
+
+    const entries = deriveGroupEntries(slot, inputs)
+
+    expect(entries).toHaveLength(5)
+    expect(
+      entries.every(
+        (e) => e.sourceRef.kind === 'imported' && !e.sourceRef.innerSlideId.startsWith(RENDERED_PAGE_IDENTITY_PREFIX),
+      ),
+    ).toBe(true)
+  })
+})
+
+describe('sourceSignature — IMPORTED render folding', () => {
+  it('R079/D-09: pending, failed, ready/3 and ready/4 all produce distinct signatures for the same deck', () => {
+    const slot = importedSlot({ importId: 'deck-1' })
+    const deck = makeRenderedImportedDeck()
+
+    const pending = sourceSignature(slot, makeRenderInputs(deck, makeRenderDoc({ status: 'pending' })))
+    const failed = sourceSignature(slot, makeRenderInputs(deck, makeRenderDoc({ status: 'failed' })))
+    const ready3 = sourceSignature(slot, makeRenderInputs(deck, makeRenderDoc({ status: 'ready', renderedCount: 3 })))
+    const ready4 = sourceSignature(slot, makeRenderInputs(deck, makeRenderDoc({ status: 'ready', renderedCount: 4 })))
+
+    expect(new Set([pending, failed, ready3, ready4]).size).toBe(4)
+  })
+
+  it('D-09: the absent-render-document case signs identically to the explicit pending case, since both resolve to the same mode', () => {
+    const slot = importedSlot({ importId: 'deck-1' })
+    const deck = makeRenderedImportedDeck()
+
+    const explicitPending = sourceSignature(slot, makeRenderInputs(deck, makeRenderDoc({ status: 'pending' })))
+    const absentRenderDoc = sourceSignature(slot, makeRenderInputs(deck, undefined))
+
+    expect(explicitPending).toBe(absentRenderDoc)
+  })
+
+  it("T-42-10: two decks whose parsed text differs only by where a literal pipe falls do not collide — the old `${count}:${texts.join('|')}` form would have", () => {
+    const slotA = importedSlot({ importId: 'deck-a' })
+    const deckA = makeImportedDeck({
+      id: 'deck-a',
+      slides: [
+        { id: 'a-1', position: 0, contentKind: 'text', body: 'x|y' } as TextSlide,
+        { id: 'a-2', position: 1, contentKind: 'text', body: 'z' } as TextSlide,
+      ],
+    })
+    const inputsA = makeInputs({ importedDecksById: new Map([['deck-a', deckA]]) })
+
+    const slotB = importedSlot({ importId: 'deck-b' })
+    const deckB = makeImportedDeck({
+      id: 'deck-b',
+      slides: [
+        { id: 'b-1', position: 0, contentKind: 'text', body: 'x' } as TextSlide,
+        { id: 'b-2', position: 1, contentKind: 'text', body: 'y|z' } as TextSlide,
+      ],
+    })
+    const inputsB = makeInputs({ importedDecksById: new Map([['deck-b', deckB]]) })
+
+    // Sanity: both decks DO collide under the pre-Phase-42 encoding this test
+    // guards against, so the assertion below is meaningful rather than
+    // vacuous.
+    const oldEncoding = (deck: ImportedDeck) => {
+      const texts = deck.slides.map((s) => (s.contentKind === 'image' ? s.imageUrl : s.body))
+      return `${texts.length}:${texts.join('|')}`
+    }
+    expect(oldEncoding(deckA)).toBe(oldEncoding(deckB))
+
+    expect(sourceSignature(slotA, inputsA)).not.toBe(sourceSignature(slotB, inputsB))
+  })
+})
+
+describe('rebuildImportedGroup — render transitions', () => {
+  it("D-10: a pending -> ready transition rebuilds exactly once, then rebuilding again against the SAME render document is changed: false", () => {
+    const slot = importedSlot({ importId: 'deck-1' })
+    const deck = makeRenderedImportedDeck()
+    const pendingInputs = makeRenderInputs(deck, makeRenderDoc({ status: 'pending' }))
+
+    const initial = buildInitialGroup(slot, 'svc-1', pendingInputs)
+    const storedGroup: SlideGroup = makeGroup({ ...initial })
+    expect(storedGroup.slides).toHaveLength(5)
+
+    const readyInputs = makeRenderInputs(deck, makeRenderDoc({ status: 'ready', renderedCount: 5 }))
+    const firstRebuild = rebuildImportedGroup(storedGroup, slot, readyInputs)
+
+    expect(firstRebuild.changed).toBe(true)
+    expect(firstRebuild.slides).toHaveLength(5)
+    expect(
+      firstRebuild.slides.every(
+        (e, i) =>
+          e.sourceRef.kind === 'imported' && e.sourceRef.innerSlideId === `${RENDERED_PAGE_IDENTITY_PREFIX}${i + 1}`,
+      ),
+    ).toBe(true)
+
+    const rebuiltGroup: SlideGroup = { ...storedGroup, slides: firstRebuild.slides }
+    const secondRebuild = rebuildImportedGroup(rebuiltGroup, slot, readyInputs)
+
+    expect(secondRebuild.changed).toBe(false)
+    expect(secondRebuild.slides).toEqual(firstRebuild.slides)
+  })
+
+  it('D-12: a failed -> ready transition is entry-for-entry identical (sourceRef, order, changed) to the pending -> ready transition', () => {
+    const slot = importedSlot({ importId: 'deck-1' })
+    const deck = makeRenderedImportedDeck()
+    const readyInputs = makeRenderInputs(deck, makeRenderDoc({ status: 'ready', renderedCount: 5 }))
+
+    const pendingInitial = buildInitialGroup(slot, 'svc-1', makeRenderInputs(deck, makeRenderDoc({ status: 'pending' })))
+    const pendingStoredGroup: SlideGroup = makeGroup({ ...pendingInitial })
+    const pendingToReady = rebuildImportedGroup(pendingStoredGroup, slot, readyInputs)
+
+    const failedInitial = buildInitialGroup(
+      slot,
+      'svc-1',
+      makeRenderInputs(deck, makeRenderDoc({ status: 'failed', failureReason: 'render-timeout' })),
+    )
+    const failedStoredGroup: SlideGroup = makeGroup({ ...failedInitial })
+    const failedToReady = rebuildImportedGroup(failedStoredGroup, slot, readyInputs)
+
+    expect(failedToReady.changed).toBe(pendingToReady.changed)
+    expect(failedToReady.slides.map((e) => e.sourceRef)).toEqual(pendingToReady.slides.map((e) => e.sourceRef))
+    expect(failedToReady.slides.map((e) => e.order)).toEqual(pendingToReady.slides.map((e) => e.order))
+  })
+
+  it('Assumption A1: the rendered-page-N identity is stable enough to carry a per-slide label/audio across a rebuild that leaves renderedCount unchanged', () => {
+    const slot = importedSlot({ importId: 'deck-1' })
+    const deck = makeRenderedImportedDeck()
+    const readyInputs = makeRenderInputs(deck, makeRenderDoc({ status: 'ready', renderedCount: 5 }))
+
+    const initial = buildInitialGroup(slot, 'svc-1', readyInputs)
+    const storedGroup: SlideGroup = makeGroup({ ...initial })
+    const labeledGroup: SlideGroup = {
+      ...storedGroup,
+      slides: storedGroup.slides.map((e, i) =>
+        i === 2 ? { ...e, label: 'Custom label', audioUrl: 'https://example.com/a.mp3' } : e,
+      ),
+    }
+
+    // Deriving twice from the SAME (deck, render) produces identical
+    // synthetic identities both times — this is Assumption A1 itself.
+    const firstDerivation = deriveGroupEntries(slot, readyInputs)
+    const secondDerivation = deriveGroupEntries(slot, readyInputs)
+    expect(firstDerivation.map((e) => e.sourceRef)).toEqual(secondDerivation.map((e) => e.sourceRef))
+
+    const result = rebuildImportedGroup(labeledGroup, slot, readyInputs)
+
+    expect(result.changed).toBe(false)
+    const carried = result.slides[2]!
+    expect(carried.id).toBe(labeledGroup.slides[2]!.id)
+    expect(carried.label).toBe('Custom label')
+    expect(carried.audioUrl).toBe('https://example.com/a.mp3')
+  })
+})
+
+describe('rebuildImportedGroup — user work survives a render transition', () => {
+  it('D-11 / Phase 24 D-02: an authored text entry and a video entry both survive a pending -> ready transition with unchanged ids, audioUrl and notes', () => {
+    const slot = importedSlot({ importId: 'deck-1' })
+    const deck = makeRenderedImportedDeck()
+    const pendingInputs = makeRenderInputs(deck, makeRenderDoc({ status: 'pending' }))
+    const pendingEntries = deriveGroupEntries(slot, pendingInputs)
+
+    const storedGroup: SlideGroup = makeGroup({
+      slides: [
+        ...pendingEntries,
+        {
+          id: 'e-authored',
+          order: pendingEntries.length,
+          sourceRef: { kind: 'text', title: 'My Slide', body: 'My words' },
+          audioUrl: 'https://example.com/a.mp3',
+          notes: 'Read slowly',
+        },
+        {
+          id: 'e-video',
+          order: pendingEntries.length + 1,
+          sourceRef: { kind: 'video', videoSrc: 'https://example.com/dropped.mp4' },
+        },
+      ],
+    })
+
+    const readyInputs = makeRenderInputs(deck, makeRenderDoc({ status: 'ready', renderedCount: 5 }))
+    const result = rebuildImportedGroup(storedGroup, slot, readyInputs)
+
+    // Unconditional path — there is no confirm gate left to stall this
+    // (Phase 30 deleted it): the result is a full rebuilt slide list, not the
+    // untouched stored slides.
+    expect(result.changed).toBe(true)
+    expect(result.slides).toHaveLength(storedGroup.slides.length)
+
+    const authored = result.slides.find((e) => e.id === 'e-authored')
+    expect(authored).toBeDefined()
+    expect(authored?.sourceRef).toEqual({ kind: 'text', title: 'My Slide', body: 'My words' })
+    expect(authored?.audioUrl).toBe('https://example.com/a.mp3')
+    expect(authored?.notes).toBe('Read slowly')
+
+    const video = result.slides.find((e) => e.id === 'e-video')
+    expect(video).toBeDefined()
+    expect(video?.sourceRef).toEqual({ kind: 'video', videoSrc: 'https://example.com/dropped.mp4' })
   })
 })
