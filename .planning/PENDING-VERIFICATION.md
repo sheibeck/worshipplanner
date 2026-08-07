@@ -863,6 +863,37 @@ Candidate for a future phase; not blocking v1.5.
 
 ---
 
+## Phase 42 — PowerPoint Rendered-Image Display (R079, R080)
+
+**The phase's automated evidence is complete — every unit/component/materializer/assembler suite and
+the rules suite (emulator) are green, `npm run type-check` reports 0 errors, and no deploy command has
+been run.** The four items below are the ONLY outstanding checks for this phase. **None of them is
+recorded as passed** — they require either real visual judgment (jsdom cannot render) or a live round
+trip against the deployed Cloud Run render service, neither of which a unit test can substitute for.
+
+- [ ] **A real PPTX renders and looks like it did in PowerPoint.** jsdom has no rendering, so visual
+      fidelity is unassertable by any automated test — this is the phase's actual goal.
+      `docs/example.pptx` is in the tree as a fixture. Import it, open the Slides tab, confirm the
+      slides look like the source deck; then present and confirm the same.
+- [ ] **The `pending → ready` transition observed live.** Requires a real render round-trip against
+      the deployed Cloud Run service — nothing in the unit suite can simulate the service actually
+      finishing a render. Import a deck and watch the grid while the render completes; the tiles
+      should flip from the pending placeholder to the rendered image with no reload (ROADMAP
+      criterion 4, closed structurally in `42-08` — `renderReadySignal`/`onSnapshot` — but only a live
+      round trip proves it end to end).
+- [ ] **Overlay-badge legibility across all three states.** `42-UI-SPEC.md`'s one `backstop`
+      consideration — an asserted intent needing a held-out visual check, not a unit-testable
+      contrast ratio. Eyeball the content-label and slide-number badges against a light rendered
+      slide, a dark one, and both placeholder states (pending/failed).
+- [ ] **`firestore.rules` deploy.** Already recorded under Phase 41's entry above, as its own single
+      checkbox — Phase 42's `pptxRenders` read/write clauses (T-42-01) ship in that SAME deploy, not a
+      second one. See the Phase 41 section's "UPDATE (Phase 42-01, ...)" note for the exact clauses;
+      the deploy command itself is given once, in that section's checkbox, and is deliberately not
+      repeated here. Until that deploy runs, the T-37-15/T-42-01 write hole (an org editor can forge
+      their own org's render document to `ready`) stays open in production.
+
+---
+
 ## Notes and failures
 
 _(Record anything that failed here, with what you saw versus what was expected.)_
