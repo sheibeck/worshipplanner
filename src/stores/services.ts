@@ -22,9 +22,10 @@ import { db } from '@/firebase'
 import { useSongStore } from '@/stores/songs'
 import { useRosterStore } from '@/stores/roster'
 import { useQuartersStore } from '@/stores/quarters'
+import { useAuthStore } from '@/stores/auth'
 import { deriveSlug, claimSlug } from '@/utils/slug'
 import { resolveServiceRoleAssignments } from '@/utils/serviceRoles'
-import { buildSlots } from '@/utils/slotTypes'
+import { buildSlotsFromTemplate } from '@/utils/slotTypes'
 import { mintShareToken, pickAdoptableToken, type ShareTokenCandidate } from '@/utils/shareTokens'
 import type { Service, ServiceStatus, Progression, ScriptureRef, ServiceSlot } from '@/types/service'
 import type { SongSlot } from '@/types/service'
@@ -222,7 +223,16 @@ export const useServiceStore = defineStore('services', () => {
 
   async function createService(data: CreateServiceInput): Promise<string> {
     if (!orgId.value) throw new Error('No orgId set — call subscribe() first')
-    const slots = buildSlots('1-2-2-3')
+    // 44-01/R087: slots come from the church's default service template —
+    // or an EMPTY service when the template is unset (owner override
+    // 2026-08-07). buildSlots() is NEVER reinstated as a fallback here; it
+    // remains available only as the template editor's "Reset to 1-2-3
+    // default" preset source (44-02).
+    const authStore = useAuthStore()
+    const slots = buildSlotsFromTemplate(
+      authStore.settings.defaultServiceTemplate,
+      authStore.settings.vwModeEnabled,
+    )
     const ref = await addDoc(collection(db, 'organizations', orgId.value, 'services'), {
       ...data,
       progression: '1-2-2-3',
