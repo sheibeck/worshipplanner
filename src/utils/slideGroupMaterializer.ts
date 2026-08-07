@@ -151,6 +151,8 @@ export function deriveGroupEntries(slot: ServiceSlot, inputs: AssemblyInputs): G
 
     case 'PRAYER':
     case 'MESSAGE':
+    case 'ANNOUNCEMENTS':
+    case 'MISC':
     case 'HYMN':
       return [{ id: crypto.randomUUID(), order: 0, sourceRef: { kind: 'text' } }]
   }
@@ -234,6 +236,8 @@ export function sourceSignature(slot: ServiceSlot, inputs: AssemblyInputs): stri
 
     case 'PRAYER':
     case 'MESSAGE':
+    case 'ANNOUNCEMENTS':
+    case 'MISC':
     case 'HYMN':
       return undefined
   }
@@ -292,6 +296,8 @@ function isSlotDerivableRef(slot: ServiceSlot, ref: SourceRef): boolean {
       return ref.kind === 'imported' && ref.importId === slot.importId
     case 'PRAYER':
     case 'MESSAGE':
+    case 'ANNOUNCEMENTS':
+    case 'MISC':
     case 'HYMN':
       return ref.kind === 'text' && ref.title === undefined && ref.body === undefined
   }
@@ -926,6 +932,8 @@ export function rebuildGroup(group: SlideGroup, slot: ServiceSlot, inputs: Assem
       return rebuildImportedGroup(group, slot, inputs)
     case 'PRAYER':
     case 'MESSAGE':
+    case 'ANNOUNCEMENTS':
+    case 'MISC':
     case 'HYMN':
       return { changed: false, slides: group.slides }
   }

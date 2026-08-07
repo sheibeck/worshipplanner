@@ -44,6 +44,10 @@ export function slotLabel(slot: ServiceSlot, _index?: number | string): string {
       return 'Prayer'
     case 'MESSAGE':
       return 'Message'
+    case 'ANNOUNCEMENTS':
+      return 'Announcements'
+    case 'MISC':
+      return 'Miscellaneous'
     case 'HYMN':
       return 'Hymn'
     case 'IMPORTED':
@@ -90,6 +94,10 @@ export function createSlot(kind: SlotKind, vwType?: VWType, section?: ServiceSec
       return { kind: 'PRAYER', id, position: 0, ...sectionFields } as NonAssignableSlot
     case 'MESSAGE':
       return { kind: 'MESSAGE', id, position: 0, ...sectionFields } as NonAssignableSlot
+    case 'ANNOUNCEMENTS':
+      return { kind: 'ANNOUNCEMENTS', id, position: 0, ...sectionFields } as NonAssignableSlot
+    case 'MISC':
+      return { kind: 'MISC', id, position: 0, ...sectionFields } as NonAssignableSlot
     case 'HYMN':
       return { kind: 'HYMN', id, position: 0, hymnName: '', hymnNumber: '', verses: '', ...sectionFields } as HymnSlot
     case 'IMPORTED':

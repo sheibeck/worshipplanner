@@ -47,6 +47,10 @@ export const KIND_BADGE_CLASSES: Record<SlotKind, string> = {
   PRAYER: 'bg-gray-800 text-gray-400 border-gray-700',
   // Reuses TeamTagPill's `user` variant exactly.
   MESSAGE: 'bg-pink-900/50 text-pink-300 border-pink-800',
+  // ANNOUNCEMENTS and MISC reuse PRAYER's neutral family — no new colour
+  // token introduced for this phase.
+  ANNOUNCEMENTS: 'bg-gray-800 text-gray-400 border-gray-700',
+  MISC: 'bg-gray-800 text-gray-400 border-gray-700',
   // Reuses SongBadge's Type-3 amber exactly.
   IMPORTED: 'bg-amber-900/50 text-amber-300 border-amber-800',
 }
@@ -114,6 +118,8 @@ export function slotDisplayTitle(slot: ServiceSlot): string {
       return slot.hymnName && slot.hymnName.trim() ? slot.hymnName : slotLabel(slot)
     case 'PRAYER':
     case 'MESSAGE':
+    case 'ANNOUNCEMENTS':
+    case 'MISC':
     case 'IMPORTED':
       return slotLabel(slot)
   }

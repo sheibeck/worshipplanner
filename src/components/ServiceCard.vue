@@ -145,6 +145,12 @@ function slotLabel(slot: ServiceSlot): string {
       return '--- Prayer ---'
     case 'MESSAGE':
       return 'Message'
+    case 'ANNOUNCEMENTS':
+      // Matches the canonical label used by utils/slotTypes.ts's slotLabel().
+      return 'Announcements'
+    case 'MISC':
+      // Matches the canonical label used by utils/slotTypes.ts's slotLabel().
+      return 'Miscellaneous'
     case 'HYMN':
       return slot.hymnName ? `Hymn — ${slot.hymnName}${slot.hymnNumber ? ` #${slot.hymnNumber}` : ''}` : 'Hymn — Empty'
     case 'IMPORTED':

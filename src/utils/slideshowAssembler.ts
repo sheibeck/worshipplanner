@@ -100,6 +100,14 @@ function buildTextContentForSlot(slot: ServiceSlot): Omit<TextSlide, 'id' | 'pos
   switch (slot.kind) {
     case 'PRAYER':
     case 'MESSAGE':
+    case 'ANNOUNCEMENTS':
+    case 'MISC':
+      // The congregation-facing projected slide shows the kind label, NOT the
+      // planner's `body` text (43-01 recorded decision, see 43-01-SUMMARY.md).
+      // `sourceSignature` returns `undefined` for every text-backed kind, so a
+      // projected slide derived from `body` would have no change-detection
+      // signal and a `body` edit would leave a stale materialized group
+      // behind. Team-facing print/share surfaces (plan 04) DO render `body`.
       return { contentKind: 'text', title: slotLabel(slot), body: slotLabel(slot) }
     case 'HYMN': {
       const body = slot.verses ? `${slot.hymnName}\n\n${slot.verses}` : slot.hymnName
@@ -525,7 +533,9 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
       }
 
       case 'PRAYER':
-      case 'MESSAGE': {
+      case 'MESSAGE':
+      case 'ANNOUNCEMENTS':
+      case 'MISC': {
         const content: Omit<TextSlide, 'id' | 'position'> = {
           contentKind: 'text',
           title: slotLabel(slot),
