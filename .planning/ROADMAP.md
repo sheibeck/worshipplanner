@@ -273,10 +273,21 @@ Plans:
   3. New `IMPORTED`-branch logic in both `slideGroupMaterializer.ts` and `slideshowAssembler.ts` reconciles the render count against the parsed-slide count rather than assuming they agree — proven by a test covering the documented count-disagreement case
   4. `sourceSignature` for an IMPORTED group folds in render status, so the existing rebuild-on-mismatch mechanism fires exactly once when a render transitions pending → ready
 
-**Plans**: TBD
+**Plans**: 8 plans
+
+Plans:
+- [ ] 42-01-PLAN.md — Wave 0 rules probe, close the `pptxRenders` wildcard write hole, member-tier read grant, amend Phase 41's deploy handoff
+- [ ] 42-02-PLAN.md — client render-document type, rendered-page path convention, live per-importId `pptxRenders` store, Wave 0 test mocks
+- [ ] 42-03-PLAN.md — render-state slide fields, `AssemblyInputs` render maps, and the one shared pure reconciler
+- [ ] 42-04-PLAN.md — materializer IMPORTED branch: entries, `sourceSignature` folding, transition idempotence, user-slide survival
+- [ ] 42-05-PLAN.md — assembler IMPORTED paths: stored-group and no-group fallback, 1-based page resolution, parsed text never drawn
+- [ ] 42-06-PLAN.md — grid: `failureReason` sentence map and `SlideCard` pending/failed states
+- [ ] 42-07-PLAN.md — presenter: `PresentationViewer` pending/failed states and the never-skip guarantee
+- [ ] 42-08-PLAN.md — composable wiring: render subscription, URL cache, all four `AssemblyInputs` sites, deferred manual checks
+
 **UI hint**: yes
 **Research flag**: needs research — render-count-vs-parsed-count reconciliation across two files plus `sourceSignature`; this item has already slipped one full milestone (v1.4 Phase 37 shipped the backend only), so treat the stated success criteria as the explicit definition of done.
-**Notes**: Not a URL swap. The rendered PNG IS the slide, drawn in the grid and the presenter; parsed text stays in the document for search and labels but is never drawn — per the owner's framing, "import the powerpoint so that the slides look like they natively looked in the powerpoint presentation." The Cloud Run render service itself is already deployed (v1.4 Phase 37, confirmed working against production 2026-08-06) — this phase is pure client-side consumption, with nothing new to deploy.
+**Notes**: Not a URL swap. The rendered PNG IS the slide, drawn in the grid and the presenter; parsed text stays in the document for search and labels but is never drawn — per the owner's framing, "import the powerpoint so that the slides look like they natively looked in the powerpoint presentation." The Cloud Run render service itself is already deployed (v1.4 Phase 37, confirmed working against production 2026-08-06) — do not rebuild, redeploy or modify it. ⚠ **CORRECTION (2026-08-07, planning):** the note formerly said "pure client-side consumption, with nothing new to deploy." That is FALSE. A `firestore.rules` change IS required — not to grant read (which already works by accident through the generic single-segment wildcard at `firestore.rules:198-203`) but to REVOKE write: `'pptxRenders'` is absent from that wildcard's write-exclusion list, so an org editor can forge a render `ready` flip today, live in production (threat T-37-15 / T-42-01). Phase 42-01 closes it, proving the hole with an emulator write that succeeds pre-fix. It ships built, tested and UNDEPLOYED, folded into Phase 41's already-pending single `firebase deploy --only firestore:rules` — one deploy covers both phases.
 
 ### Phase 43: Service Item Types
 
