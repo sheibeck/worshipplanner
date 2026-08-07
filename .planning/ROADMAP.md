@@ -225,11 +225,11 @@ Plans:
   4. A user cannot choose their own `role` on create — a self-created membership carrying `role: 'editor'` is denied, or the role is forced server-side regardless of the submitted body
   5. `firestore.rules` is modified but **NOT deployed** — the change is handed to the owner to ship alongside Phase 40's deploy 2
 
-**Plans**: 1 plan
+**Plans**: 1/1 plans executed
 
 Plans:
 
-- [ ] 40.1-01-PLAN.md — the four emulator tests run against the UNFIXED rule first (both DENY cases observed failing), then the two-branch `allow create` predicate (`getAfter()` for org creation, `get()`/`exists()` for invite acceptance), then the phase gate and the owner deploy handoff [wave 1]
+- [x] 40.1-01-PLAN.md — the four emulator tests run against the UNFIXED rule first (both DENY cases observed failing), then the two-branch `allow create` predicate (`getAfter()` for org creation, `get()`/`exists()` for invite acceptance), then the phase gate and the owner deploy handoff [wave 1]
 
 **UI hint**: no
 **Research flag**: needs research — trace both legitimate creation flows (org creation and invite acceptance) in real source before touching the rule. The current rule is loose *on purpose*; a fix that only considers the invite path will silently break org creation, and a fix that only considers org creation leaves the hole open.

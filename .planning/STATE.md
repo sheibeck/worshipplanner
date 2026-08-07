@@ -5,16 +5,16 @@ milestone_name: Settings, Sharing, and Fidelity
 current_phase: 39
 current_phase_name: org-settings-infrastructure-feature-toggles
 status: in_progress
-stopped_at: Completed 40-04-PLAN.md
-last_updated: "2026-08-06T23:21:25.335Z"
+stopped_at: Completed 40.1-01-PLAN.md
+last_updated: "2026-08-07T01:59:30.131Z"
 last_activity: 2026-08-06
 last_activity_desc: "Phase 39 Plan 02 executed: OrgSettings/DEFAULT_ORG_SETTINGS type"
 progress:
-  total_phases: 10
-  completed_phases: 2
-  total_plans: 10
-  completed_plans: 10
-  percent: 20
+  total_phases: 11
+  completed_phases: 3
+  total_plans: 11
+  completed_plans: 11
+  percent: 27
 ---
 
 # Project State
@@ -1292,6 +1292,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 40 P02 | 8min | 2 tasks | 4 files |
 | Phase 40 P03 | 35min | 2 tasks | 2 files |
 | Phase 40 P04 | 15min | 2 tasks | 3 files |
+| Phase 40.1 P01 | 4min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -1569,6 +1570,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Phase 40 Plan 03: fixed a pre-existing auth.test.ts mock leak (onAuthStateChanged callbacks accumulated across tests) that was inflating getIdTokenResult call counts once exact-count assertions were added
 - [Phase ?]: 40-04: None - plan executed exactly as written
 - [Phase ?]: 40-04: Backfill and runbook both confirmed against real artifacts: firebase.json deploy targets, plan 40-01's exact guard test title, and plan 40-03's exact CLAIM_REFRESH constants -- nothing invented or stale.
+- [Phase ?]: R104 fix: getAfter() for org-creation branch, get()/exists() for invite-acceptance branch — recommended arrangement worked on first emulator run, no swap needed
 
 ### Roadmap Evolution
 
@@ -1880,8 +1882,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-06T23:21:25.290Z
-Stopped at: Completed 40-04-PLAN.md
+Last session: 2026-08-07T01:59:30.063Z
+Stopped at: Completed 40.1-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

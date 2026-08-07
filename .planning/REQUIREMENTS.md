@@ -59,7 +59,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 
 ### Membership Integrity
 
-- [ ] **R104**: Only a user holding a valid invite — or the creator of a brand-new organization — can
+- [x] **R104**: Only a user holding a valid invite — or the creator of a brand-new organization — can
       create a membership document. A signed-in user cannot self-join an arbitrary organization, and
       cannot choose their own role on create.
       <br>**Added 2026-08-06** after Phase 40's code review (WR-03). **Pre-existing vulnerability, not
@@ -306,7 +306,7 @@ Explicitly excluded. Documented to prevent scope creep.
 | R101 | Phase 48 | Pending |
 | R102 | Phase 48 | Pending |
 | R103 | Phase 48 | Pending |
-| R104 | Phase 40.1 | Pending |
+| R104 | Phase 40.1 | Complete |
 
 **Coverage:**
 
