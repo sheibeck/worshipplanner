@@ -701,6 +701,22 @@ describe('useServiceStore', () => {
   })
 
   describe('createShareToken', () => {
+    // ensureShareLink's FIRST getDoc call (41-03) is the serviceShareLinks/{id}
+    // read, which precedes the org-document read these tests were originally
+    // written against. Runs AFTER the outer beforeEach's vi.clearAllMocks(),
+    // so it survives that reset. Without this, the mock's shared default
+    // (exists: () => true, data: () => ({ name: 'Grace Church', slug:
+    // 'grace-church' })) would make ensureShareLink think a link document
+    // already exists and try to read a nonexistent `.token` off org data,
+    // resolving to `undefined` for every token below.
+    beforeEach(async () => {
+      const { getDoc } = await import('firebase/firestore')
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => false,
+        data: () => ({}),
+      } as never)
+    })
+
     it('createShareToken returns a 36-character hex string', async () => {
       const { useServiceStore } = await import('../services')
       const store = useServiceStore()

@@ -9,10 +9,13 @@ import {
   deleteField,
   doc,
   getDoc,
+  getDocs,
   setDoc,
   serverTimestamp,
   query,
   orderBy,
+  where,
+  runTransaction,
   type Unsubscribe,
 } from 'firebase/firestore'
 import { db } from '@/firebase'
@@ -22,8 +25,10 @@ import { useQuartersStore } from '@/stores/quarters'
 import { deriveSlug, claimSlug } from '@/utils/slug'
 import { resolveServiceRoleAssignments } from '@/utils/serviceRoles'
 import { buildSlots } from '@/utils/slotTypes'
-import type { Service, ServiceStatus } from '@/types/service'
+import { mintShareToken, pickAdoptableToken, type ShareTokenCandidate } from '@/utils/shareTokens'
+import type { Service, ServiceStatus, Progression, ScriptureRef, ServiceSlot } from '@/types/service'
 import type { SongSlot } from '@/types/service'
+import type { RoleGroup } from '@/types/roster'
 
 type CreateServiceInput = {
   date: string
@@ -61,6 +66,80 @@ export class ServiceLockedError extends Error {
     this.name = 'ServiceLockedError'
     this.serviceId = serviceId
     this.storedStatus = storedStatus
+  }
+}
+
+/**
+ * The public payload shape `shareTokens/{token}` and `serviceShares/{slug}...`
+ * both carry as their `serviceSnapshot` field. Everything in here is published
+ * to anyone holding the URL — see the D-04/D-24 PII guard on `roleAssignments`
+ * below.
+ */
+export interface ServiceSnapshot {
+  date: string
+  name: string
+  progression: Progression
+  teams: string[]
+  slots: ServiceSlot[]
+  sermonPassage: ScriptureRef | null
+  notes: string
+  status: ServiceStatus
+  roleAssignments: {
+    roleId: string
+    roleName: string
+    group: RoleGroup
+    personNames: string[]
+  }[]
+}
+
+/**
+ * Extracted from the old inline `createShareToken` body (41-03) so the create
+ * path and Plan 04's refresh path share exactly ONE snapshot builder — two
+ * copies would drift, and one of them would be the one that leaks a raw
+ * `Person`. Runs inside a store action with an active Pinia, exactly as the
+ * inline code did before extraction.
+ */
+export function buildServiceSnapshot(service: Service): ServiceSnapshot {
+  // Resolve BPM for each song slot from song store
+  const songStore = useSongStore()
+  const slotsWithBpm = service.slots.map((slot) => {
+    if (slot.kind === 'SONG' && (slot as SongSlot).songId) {
+      const songSlot = slot as SongSlot
+      const song = songStore.songs.find((s) => s.id === songSlot.songId)
+      let bpm: number | null = null
+      if (song) {
+        const matchingArr = song.arrangements.find((a) => a.key === songSlot.songKey)
+        bpm = matchingArr?.bpm ?? song.arrangements[0]?.bpm ?? null
+      }
+      return { ...slot, bpm }
+    }
+    return slot
+  }) as ServiceSlot[]
+
+  // Who's-serving snapshot (D-04/D-24 PII guard): resolve personId -> name via a
+  // Map ONLY — never embed the raw Person object (no email/phone/pcPersonId).
+  // Mirrors quarters.ts::finalizeAndShare's nameById pattern exactly.
+  const rosterStore = useRosterStore()
+  const quartersStore = useQuartersStore()
+  const nameById = new Map(rosterStore.people.map((p) => [p.id, p.name]))
+  const resolved = resolveServiceRoleAssignments(service, quartersStore.quarters, rosterStore.roles)
+  const roleAssignments = resolved.map((r) => ({
+    roleId: r.roleId,
+    roleName: r.roleName,
+    group: r.group,
+    personNames: r.effectivePersonIds.map((id) => nameById.get(id) ?? id),
+  }))
+
+  return {
+    date: service.date,
+    name: service.name,
+    progression: service.progression,
+    teams: service.teams,
+    slots: slotsWithBpm,
+    sermonPassage: service.sermonPassage,
+    notes: service.notes,
+    status: service.status,
+    roleAssignments,
   }
 }
 
@@ -350,59 +429,44 @@ export const useServiceStore = defineStore('services', () => {
     })
   }
 
-  async function createShareToken(service: Service, orgIdValue: string): Promise<string> {
-    // Generate cryptographically random 36-char hex token
-    const array = new Uint8Array(18)
-    crypto.getRandomValues(array)
-    const token = Array.from(array, (b) => b.toString(16).padStart(2, '0')).join('')
+  // R076/R078 (41-03) — resolved once per Pinia instance, so a fresh store
+  // (and so each test) gets a fresh cache. A stored string is the resolved
+  // token for that service; `false` means "known to have no share link this
+  // session" — Plan 04's refresh hook reads this to skip both the write and
+  // the read for a never-shared service, so an ordinary autosave costs
+  // nothing after the first lookup. Declared here (not module scope) so it
+  // cannot leak across Pinia instances/tests.
+  const shareLinkCache = new Map<string, string | false>()
 
-    // Resolve BPM for each song slot from song store
-    const songStore = useSongStore()
-    const slotsWithBpm = service.slots.map((slot) => {
-      if (slot.kind === 'SONG' && (slot as SongSlot).songId) {
-        const songSlot = slot as SongSlot
-        const song = songStore.songs.find((s) => s.id === songSlot.songId)
-        let bpm: number | null = null
-        if (song) {
-          const matchingArr = song.arrangements.find((a) => a.key === songSlot.songKey)
-          bpm = matchingArr?.bpm ?? song.arrangements[0]?.bpm ?? null
-        }
-        return { ...slot, bpm }
-      }
-      return slot
-    })
-
-    // Who's-serving snapshot (D-04/D-24 PII guard): resolve personId -> name via a
-    // Map ONLY — never embed the raw Person object (no email/phone/pcPersonId).
-    // Mirrors quarters.ts::finalizeAndShare's nameById pattern exactly.
-    const rosterStore = useRosterStore()
-    const quartersStore = useQuartersStore()
-    const nameById = new Map(rosterStore.people.map((p) => [p.id, p.name]))
-    const resolved = resolveServiceRoleAssignments(service, quartersStore.quarters, rosterStore.roles)
-    const roleAssignments = resolved.map((r) => ({
-      roleId: r.roleId,
-      roleName: r.roleName,
-      group: r.group,
-      personNames: r.effectivePersonIds.map((id) => nameById.get(id) ?? id),
-    }))
-
-    const serviceSnapshot = {
-      date: service.date,
-      name: service.name,
-      progression: service.progression,
-      teams: service.teams,
-      slots: slotsWithBpm,
-      sermonPassage: service.sermonPassage,
-      notes: service.notes,
-      status: service.status,
-      roleAssignments,
-    }
+  /**
+   * The `shareTokens/{token}` payload write plus the soft-fail memorable-URL
+   * `serviceShares/{slug}__service-{date}` write. Runs on EVERY
+   * `ensureShareLink` path, including adoption, so a link already emailed to
+   * a congregation starts showing current data immediately rather than
+   * waiting for the next edit.
+   *
+   * This is an unconditional full-document `setDoc`, not a partial update —
+   * deliberately. That makes the write idempotent and self-healing (a token
+   * document that was deleted is recreated rather than silently failing).
+   * `shareTokens` is a payload surface, not the authoritative creation
+   * record — that lives on `serviceShareLinks/{serviceId}` — so re-stamping
+   * `createdAt` here is harmless and keeps the live token sorting first if
+   * adoption ever runs again.
+   *
+   * The token is used VERBATIM as the document id: no case-folding, no
+   * whitespace trimming, no Unicode normalization. `ShareView.vue` resolves
+   * `/share/:token` by using the route parameter verbatim as the document
+   * id, and any asymmetry here breaks every adopted mixed-case legacy token.
+   */
+  async function writeSharePayload(service: Service, orgIdValue: string, token: string): Promise<void> {
+    const serviceSnapshot = buildServiceSnapshot(service)
 
     await setDoc(doc(db, 'shareTokens', token), {
       serviceId: service.id,
       orgId: orgIdValue,
       serviceSnapshot,
       createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
     })
 
     // R-02/D-18: memorable-URL secondary write, mirroring
@@ -432,12 +496,96 @@ export const useServiceStore = defineStore('services', () => {
       })
     } catch (err) {
       console.error(
-        'createShareToken: memorable-URL slug/serviceShares write failed — the opaque share link above already succeeded',
+        'writeSharePayload: memorable-URL slug/serviceShares write failed — the opaque share link above already succeeded',
         err,
       )
     }
+  }
 
+  /**
+   * R076/R078 — resolves THE one stable token for a service: reading the
+   * `serviceShareLinks/{serviceId}` identity doc if it exists, else adopting
+   * the most recent compatible already-circulated `shareTokens` document, else
+   * minting a fresh one — then always writing the current payload in place.
+   *
+   * `createShareToken` is a thin wrapper around this; both are exposed on the
+   * store so a future caller can distinguish "resolve the link" from "share
+   * and get the token", though today they're the same operation.
+   */
+  async function ensureShareLink(service: Service, orgIdValue: string): Promise<string> {
+    const linkRef = doc(db, 'serviceShareLinks', service.id)
+
+    // 1. Steady-state path: the link already exists. This is why repeat
+    //    shares return the same string, and it is the ordinary case after
+    //    the first share.
+    const existingLinkSnap = await getDoc(linkRef)
+    if (existingLinkSnap.exists()) {
+      const token = existingLinkSnap.data().token as string
+      await writeSharePayload(service, orgIdValue, token)
+      shareLinkCache.set(service.id, token)
+      return token
+    }
+
+    // 2. No link doc yet — adopt an already-circulated token if one exists
+    //    for this service, else mint a fresh one. Equality filter ONLY: no
+    //    orderBy, no limit. Ordering is pickAdoptableToken's job (client-side)
+    //    and a server-side sort here would need a composite index this
+    //    project's firestore.indexes.json does not declare, and the emulator
+    //    would not catch the gap — it would only surface in production, on
+    //    exactly the multi-token services this adoption path exists to
+    //    rescue.
+    const adoptionQuery = query(collection(db, 'shareTokens'), where('serviceId', '==', service.id))
+    const candidatesSnap = await getDocs(adoptionQuery)
+    const candidates: ShareTokenCandidate[] = candidatesSnap.docs.map((d) => ({
+      id: d.id,
+      orgId: d.data().orgId,
+      createdAt: d.data().createdAt,
+    }))
+    const adopted = pickAdoptableToken(candidates, orgIdValue)
+    const candidateToken = adopted ?? mintShareToken()
+
+    // 3. Persist the link through a transaction, not a bare setDoc. Re-read
+    //    the link ref INSIDE the transaction: if another client's first-share
+    //    of the same never-shared service landed between step 1's read and
+    //    this transaction, the loser here adopts the winner's already-recorded
+    //    token and never writes its own locally-minted/adopted value to the
+    //    index at all — that's what makes two concurrent first-shares of the
+    //    same service converge on one token instead of racing to overwrite
+    //    each other's index entry.
+    const token = await runTransaction(db, async (tx) => {
+      const txLinkSnap = await tx.get(linkRef)
+      if (txLinkSnap.exists()) {
+        return txLinkSnap.data().token as string
+      }
+      tx.set(linkRef, {
+        token: candidateToken,
+        orgId: orgIdValue,
+        serviceId: service.id,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      })
+      return candidateToken
+    })
+
+    // 4. Write the current payload in place on EVERY path, including
+    //    adoption, so an already-circulated link starts showing current data
+    //    immediately.
+    await writeSharePayload(service, orgIdValue, token)
+
+    // 5. Cache and return.
+    shareLinkCache.set(service.id, token)
     return token
+  }
+
+  /**
+   * Thin delegating wrapper. The name and the two-argument signature are
+   * preserved verbatim because `ServiceEditorView.vue:3509` and
+   * `ServiceCard.vue:209` call `createShareToken(service, orgId)` and must
+   * not change — if a caller ever needed to change, the wrapper signature
+   * would be wrong, not the caller.
+   */
+  async function createShareToken(service: Service, orgIdValue: string): Promise<string> {
+    return ensureShareLink(service, orgIdValue)
   }
 
   return {
@@ -458,5 +606,6 @@ export const useServiceStore = defineStore('services', () => {
     setRoleOverride,
     clearRoleOverride,
     createShareToken,
+    ensureShareLink,
   }
 })
