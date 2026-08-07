@@ -228,4 +228,85 @@ describe('ShareView', () => {
 
     expect(wrapper.text()).not.toContain("Who's Serving")
   })
+
+  // ── 43-04: ANNOUNCEMENTS/MISC branches and body rendering ───────────────────
+  // T-43-12 — before this plan, the v-else-if chain had no trailing arm, so
+  // these two kinds rendered as nothing at all.
+
+  it('renders an ANNOUNCEMENTS slot as its own labelled line, with its body (43-04)', async () => {
+    mockGetDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({
+        serviceSnapshot: {
+          ...mockSnapshot,
+          notes: '',
+          slots: [{ kind: 'ANNOUNCEMENTS', position: 0, body: 'Potluck this Sunday after service' }],
+        },
+      }),
+    })
+    const wrapper = await mountShareView()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Announcements')
+    expect(wrapper.text()).toContain('Potluck this Sunday after service')
+  })
+
+  it('renders a MISC slot as its own labelled line, with its body (43-04)', async () => {
+    mockGetDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({
+        serviceSnapshot: {
+          ...mockSnapshot,
+          notes: '',
+          slots: [{ kind: 'MISC', position: 0, body: 'Building closes early Monday' }],
+        },
+      }),
+    })
+    const wrapper = await mountShareView()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Miscellaneous')
+    expect(wrapper.text()).toContain('Building closes early Monday')
+  })
+
+  it('preserves an embedded newline in a MESSAGE body (43-04)', async () => {
+    mockGetDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({
+        serviceSnapshot: {
+          ...mockSnapshot,
+          notes: '',
+          slots: [{ kind: 'MESSAGE', position: 0, body: 'Line one\nLine two' }],
+        },
+      }),
+    })
+    const wrapper = await mountShareView()
+    await flushPromises()
+
+    // notes is blanked above so this is the only whitespace-pre-wrap paragraph
+    // in the DOM — .text() collapses the embedded newline, so read textContent
+    // directly to prove the line break survives.
+    const bodyEl = wrapper.find('p.whitespace-pre-wrap')
+    expect(bodyEl.exists()).toBe(true)
+    expect(bodyEl.element.textContent).toBe('Line one\nLine two')
+  })
+
+  it('renders a MISC slot with no body as a label-only line, with no not-assigned placeholder (43-04)', async () => {
+    mockGetDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({
+        serviceSnapshot: {
+          ...mockSnapshot,
+          notes: '',
+          slots: [{ kind: 'MISC', position: 0 }],
+        },
+      }),
+    })
+    const wrapper = await mountShareView()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Miscellaneous')
+    expect(wrapper.text()).not.toContain('[not assigned]')
+    expect(wrapper.find('p.whitespace-pre-wrap').exists()).toBe(false)
+  })
 })

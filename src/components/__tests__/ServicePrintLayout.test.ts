@@ -195,4 +195,55 @@ describe('ServicePrintLayout', () => {
     expect(slotRows).toHaveLength(4)
     expect(slotRows[slotRows.length - 1]!.text()).toContain('Prayer')
   })
+
+  // ── 43-04: ANNOUNCEMENTS/MISC branches and body rendering ───────────────────
+  // T-43-12 — before this plan, the v-else-if chain had no trailing arm, so
+  // these two kinds rendered as nothing at all.
+
+  it('renders an ANNOUNCEMENTS slot as its own labelled line, with its body (43-04)', () => {
+    const service: Service = {
+      ...mockService,
+      slots: [{ kind: 'ANNOUNCEMENTS', id: 'ann-1', position: 0, body: 'Potluck this Sunday after service' }],
+    }
+    const wrapper = mount(ServicePrintLayout, { props: { service, songs: mockSongs } })
+    expect(wrapper.text()).toContain('Announcements')
+    expect(wrapper.text()).toContain('Potluck this Sunday after service')
+  })
+
+  it('renders a MISC slot as its own labelled line, with its body (43-04)', () => {
+    const service: Service = {
+      ...mockService,
+      slots: [{ kind: 'MISC', id: 'misc-1', position: 0, body: 'Building closes early Monday' }],
+    }
+    const wrapper = mount(ServicePrintLayout, { props: { service, songs: mockSongs } })
+    expect(wrapper.text()).toContain('Miscellaneous')
+    expect(wrapper.text()).toContain('Building closes early Monday')
+  })
+
+  it('preserves an embedded newline in a MESSAGE body (43-04)', () => {
+    const service: Service = {
+      ...mockService,
+      slots: [{ kind: 'MESSAGE', id: 'msg-body-1', position: 0, body: 'Line one\nLine two' }],
+    }
+    const wrapper = mount(ServicePrintLayout, { props: { service, songs: mockSongs } })
+    const row = wrapper.findAll('[data-slot-row]')[0]!
+    const bodyEl = row.find('p.whitespace-pre-wrap')
+    expect(bodyEl.exists()).toBe(true)
+    // .text() collapses whitespace including the embedded newline — read
+    // textContent directly to prove the line break survives (mirrors the
+    // precedent in ServiceEditorView.test.ts for the same reason).
+    expect(bodyEl.element.textContent).toBe('Line one\nLine two')
+  })
+
+  it('renders an ANNOUNCEMENTS slot with no body as a label-only line, with no not-assigned placeholder (43-04)', () => {
+    const service: Service = {
+      ...mockService,
+      slots: [{ kind: 'ANNOUNCEMENTS', id: 'ann-2', position: 0 }],
+    }
+    const wrapper = mount(ServicePrintLayout, { props: { service, songs: mockSongs } })
+    expect(wrapper.text()).toContain('Announcements')
+    expect(wrapper.text()).not.toContain('[not assigned]')
+    const row = wrapper.findAll('[data-slot-row]')[0]!
+    expect(row.find('p.whitespace-pre-wrap').exists()).toBe(false)
+  })
 })
