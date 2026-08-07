@@ -789,6 +789,21 @@ clause loosened from an unconditional `if false` to the org-scoped `serviceShare
 and **no public read** — proven against the real Firestore emulator in `src/rules.test.ts` (see
 `41-01-SUMMARY.md` for before/after counts). Nothing was deployed.
 
+> **UPDATE (41-REVIEW-FIX, 2026-08-07): the pending rules diff grew by one more clause — CR-01.**
+> `shareTokens`' `allow create` was left at bare `isSignedIn()` (no org-membership check at all),
+> unlike every sibling collection this phase touches. This phase's new adoption logic
+> (`pickAdoptableToken`/`ensureShareLink` in `src/stores/services.ts`) reads and *trusts* the `orgId`
+> of arbitrary pre-existing `shareTokens` documents to decide a service's permanent public link — so
+> the loose `create` rule turned from inert into an exploitable trust-boundary violation (a signed-in
+> non-editor, or even a non-member given a known `serviceId`, could plant a document that gets
+> adopted as the official token). Fixed to `allow create: if isOrgEditor(request.resource.data.orgId)`,
+> matching `serviceShareLinks`/`quarterShares`/`serviceShares`. Proven against the real Firestore
+> emulator: `npx vitest run --config vitest.rules.config.ts` reports **133/133 passing**, including
+> four new create-authorization cases that were confirmed to pass against the FIXED rule (the ALLOW
+> case for a genuine org editor, and three DENY cases — cross-org editor, no-membership, unauthenticated
+> — see `41-REVIEW-FIX.md`). **This clause must ship in the same `firestore.rules` deploy as the rest
+> of this phase's changes below — it is not a separate deploy.**
+
 - [ ] **Deploy the updated `firestore.rules`** — `firebase deploy --only firestore:rules`.
       **Ordering constraint, load-bearing:** deploy this **before, or in the same session as**, any
       hosting deploy carrying Phase 41's app code (Plans 02-04). `ensureShareLink` reads
@@ -797,7 +812,9 @@ and **no public read** — proven against the real Firestore emulator in `src/ru
       user and every service. There is deliberately no client-side fallback to the old
       mint-fresh-every-time behaviour: a fallback would silently defeat R076 (link stability) and hide
       a missed deploy behind working-looking UI, whereas a loud failure surfaces the ordering mistake
-      immediately.
+      immediately. **Includes the CR-01 `shareTokens` create-rule tightening noted above — verify it
+      landed by confirming `firestore.rules`'s `shareTokens` block reads `allow create: if
+      isOrgEditor(request.resource.data.orgId)`, not `if isSignedIn()`.**
 
 **`deleteService` share revocation — resolved as OUT OF SCOPE, not fixed this phase.**
 `41-RESEARCH.md` § Open Questions flags that `src/stores/services.ts::deleteService` (line 259) does
