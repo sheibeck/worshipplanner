@@ -330,6 +330,43 @@ describe('useServiceStore', () => {
       expect(store.isOwnWriteEcho('service-1')).toBe(false)
     })
 
+    // WR-03 (41-REVIEW): shareLinkCache is private closure state, asserted
+    // behaviorally — see the deleteService WR-03 test above for the same
+    // technique. Without the fix, unsubscribeAll left the previous org's
+    // cached token in place, so a same-session, same-id refresh after
+    // switching orgs would reuse a token that belongs to the WRONG org
+    // (harmless only because Firestore ids don't collide across orgs in
+    // practice, but a real gap in the store's otherwise-full reset).
+    it('WR-03: unsubscribeAll drops the shareLinkCache entry — a same-id refresh after re-subscribing re-reads instead of reusing the stale cached token', async () => {
+      const { getDoc, setDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService()])
+
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => true,
+        data: () => ({ token: 'tok-old', orgId: 'org-1', serviceId: 'service-1' }),
+      } as never)
+      await store.updateService('service-1', { notes: 'first edit' })
+      const firstDocRef = vi.mocked(setDoc).mock.calls[0]![0] as { id: string }
+      expect(firstDocRef.id).toBe('tok-old')
+
+      store.unsubscribeAll()
+      store.subscribe('org-2')
+      triggerSnapshot([makeService()])
+
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => true,
+        data: () => ({ token: 'tok-new', orgId: 'org-2', serviceId: 'service-1' }),
+      } as never)
+      vi.mocked(setDoc).mockClear()
+      await store.updateService('service-1', { notes: 'second edit' })
+
+      const secondDocRef = vi.mocked(setDoc).mock.calls[0]![0] as { id: string }
+      expect(secondDocRef.id).toBe('tok-new')
+    })
+
     it('unsubscribeAll empties ownWriteEchoIds', async () => {
       const { useServiceStore } = await import('../services')
       const store = useServiceStore()
@@ -551,6 +588,45 @@ describe('useServiceStore', () => {
       await store.deleteService('service-1')
 
       expect(deleteDoc).toHaveBeenCalledOnce()
+    })
+
+    // WR-03 (41-REVIEW): shareLinkCache is private closure state, so this is
+    // asserted behaviorally rather than by inspecting the Map directly. A
+    // fresh getDoc-backed lookup (not the stale cached token) after delete
+    // is exactly what proves the entry was actually removed, not merely that
+    // deleteDoc was called.
+    it('WR-03: deleting a service drops its shareLinkCache entry — a later same-id refresh re-reads instead of reusing the stale cached token', async () => {
+      const { getDoc, setDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService()])
+
+      // Populate the cache for service-1 with tok-old via an ordinary refresh.
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => true,
+        data: () => ({ token: 'tok-old', orgId: 'org-1', serviceId: 'service-1' }),
+      } as never)
+      await store.updateService('service-1', { notes: 'first edit' })
+      const firstDocRef = vi.mocked(setDoc).mock.calls[0]![0] as { id: string }
+      expect(firstDocRef.id).toBe('tok-old')
+
+      await store.deleteService('service-1')
+
+      // Simulate the id being reused (or simply re-verify against a fresh
+      // lookup): a DIFFERENT link doc is queued. If the cache entry survived
+      // delete, maybeRefreshShareLink would short-circuit on the stale
+      // 'tok-old' string and never call getDoc again — this proves it did.
+      vi.mocked(getDoc).mockResolvedValueOnce({
+        exists: () => true,
+        data: () => ({ token: 'tok-new', orgId: 'org-1', serviceId: 'service-1' }),
+      } as never)
+      vi.mocked(setDoc).mockClear()
+      triggerSnapshot([makeService()])
+      await store.updateService('service-1', { notes: 'second edit' })
+
+      const secondDocRef = vi.mocked(setDoc).mock.calls[0]![0] as { id: string }
+      expect(secondDocRef.id).toBe('tok-new')
     })
   })
 

@@ -204,6 +204,11 @@ export const useServiceStore = defineStore('services', () => {
     isLoading.value = true
     ownWriteEchoIds.value = []
     pendingWriteIds = []
+    // WR-03 (41-REVIEW): shareLinkCache is subscription-scoped state exactly
+    // like everything else reset above, but was missed — clear it on org
+    // switch too, so a cached token/false from the previous org's services
+    // can never leak into the newly-subscribed org's resolution.
+    shareLinkCache.clear()
   }
 
   /** R039 — true when `serviceId`'s most recent snapshot is this client's
@@ -342,6 +347,12 @@ export const useServiceStore = defineStore('services', () => {
   async function deleteService(id: string) {
     if (!orgId.value) return
     await deleteDoc(doc(db, 'organizations', orgId.value, 'services', id))
+    // WR-03 (41-REVIEW): drop the deleted service's shareLinkCache entry so
+    // it cannot accumulate as a dead entry, and so a same-session, same-org
+    // serviceId reuse (however unlikely with Firestore's random doc ids)
+    // never resolves against a stale cached token/false for a service that
+    // no longer exists.
+    shareLinkCache.delete(id)
   }
 
   async function assignSongToSlot(
