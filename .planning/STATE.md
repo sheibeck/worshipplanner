@@ -4,17 +4,17 @@ milestone: v1.5
 milestone_name: Settings, Sharing, and Fidelity
 current_phase: 41
 current_phase_name: Sharing Correctness
-status: executing
-stopped_at: Completed 41-03-PLAN.md
-last_updated: "2026-08-07T06:57:53.827Z"
+status: verifying
+stopped_at: Completed 41-04-PLAN.md — Phase 41 (Sharing Correctness) code-complete, all 4 plans done, ready for verification
+last_updated: "2026-08-07T07:18:45.525Z"
 last_activity: 2026-08-07
 last_activity_desc: Phase 41 execution started
 progress:
   total_phases: 11
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 15
-  completed_plans: 14
-  percent: 27
+  completed_plans: 15
+  percent: 36
 ---
 
 # Project State
@@ -114,7 +114,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 41 (Sharing Correctness) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-08-07 — Phase 41 execution started
 module, authStore.settings merged once in loadOrgContext, vwModeEnabled dual-read, R073 test
 coverage (src/stores/__tests__/auth.test.ts)
@@ -1296,6 +1296,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 41 P01 | 11min | 3 tasks | 3 files |
 | Phase 41 P02 | 20min | 2 tasks | 2 files |
 | Phase 41 P03 | 35min | 3 tasks | 2 files |
+| Phase 41 P04 | 20min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -1580,6 +1581,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: pickAdoptableToken filters candidates by orgId strictly BEFORE sorting, proven by a foreign-org-candidate-is-newer test case (T-41-07)
 - [Phase ?]: ensureShareLink's steady-state branch skips the transaction entirely, returning early after writeSharePayload when serviceShareLinks/{serviceId} already exists
 - [Phase ?]: Token stability proven by call-count (transaction set, getDocs), never by string equality, because the suite's deterministic crypto.getRandomValues stub makes every mint produce the identical string
+- [Phase ?]: R077 auto-refresh hook calls writeSharePayload only (never ensureShareLink), hooked into exactly updateService/setRoleOverride/clearRoleOverride, with a per-session negative cache and WR-06 soft-fail
+- [Phase ?]: WR-06 soft-fail must be tested with two independent Pinia instances — after a refresh failure, shareLinkCache caches false for that service, so a shared-store test of a second action's resolution would short-circuit silently
 
 ### Roadmap Evolution
 
@@ -1891,8 +1894,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-07T06:57:53.787Z
-Stopped at: Completed 41-03-PLAN.md
+Last session: 2026-08-07T07:18:45.488Z
+Stopped at: Completed 41-04-PLAN.md — Phase 41 (Sharing Correctness) code-complete, all 4 plans done, ready for verification
 Resume file: None
 
 ## Operator Next Steps
