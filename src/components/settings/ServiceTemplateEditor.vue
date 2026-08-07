@@ -350,6 +350,8 @@ function onTemplateSortEnd(evt: Sortable.SortableEvent): void {
   if (!moved) return
   if (toKey !== 'ungrouped') {
     moved.section = toKey
+  } else {
+    moved.section = undefined
   }
   const toBucket = bucketForKey(grouped, toKey)
   toBucket.splice(newDraggableIndex, 0, moved)
