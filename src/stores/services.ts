@@ -288,6 +288,10 @@ export const useServiceStore = defineStore('services', () => {
       ...data,
       updatedAt: serverTimestamp(),
     })
+    // R077 (41-04) — keep a previously-shared service's public payload
+    // current without a second Share press. The refresh hook is defined
+    // further down this file, below ensureShareLink.
+    await maybeRefreshShareLink(id, data as Partial<Service>)
   }
 
   // ── R037 status transitions ──────────────────────────────────────────────────
@@ -412,6 +416,14 @@ export const useServiceStore = defineStore('services', () => {
       [`roleAssignmentOverrides.${roleId}`]: personIds,
       updatedAt: serverTimestamp(),
     })
+    // R077 (41-04) — the Roles tab bypasses updateService's funnel entirely,
+    // so it carries its own refresh hook. The next override map is built
+    // locally (mirroring the scoped dot-path write above) because the
+    // refresh hook's overrides argument must be a real JS object, not a
+    // Firestore dot-path key.
+    const service = services.value.find((s) => s.id === serviceId)
+    const nextOverrides = { ...(service?.roleAssignmentOverrides ?? {}), [roleId]: personIds }
+    await maybeRefreshShareLink(serviceId, { roleAssignmentOverrides: nextOverrides })
   }
 
   // Clears a single role's override via deleteField() on its scoped dot-path key,
@@ -427,6 +439,15 @@ export const useServiceStore = defineStore('services', () => {
       [`roleAssignmentOverrides.${roleId}`]: deleteField(),
       updatedAt: serverTimestamp(),
     })
+    // R077 (41-04) — same reasoning as setRoleOverride above. `deleteField()`
+    // is a Firestore wire sentinel, not a JS deletion: the key must be
+    // GENUINELY removed from the merged map here, or
+    // resolveServiceRoleAssignments would treat the sentinel string as a
+    // present override instead of falling back to the schedule.
+    const service = services.value.find((s) => s.id === serviceId)
+    const nextOverrides = { ...(service?.roleAssignmentOverrides ?? {}) }
+    delete nextOverrides[roleId]
+    await maybeRefreshShareLink(serviceId, { roleAssignmentOverrides: nextOverrides })
   }
 
   // R076/R078 (41-03) — resolved once per Pinia instance, so a fresh store
@@ -586,6 +607,81 @@ export const useServiceStore = defineStore('services', () => {
    */
   async function createShareToken(service: Service, orgIdValue: string): Promise<string> {
     return ensureShareLink(service, orgIdValue)
+  }
+
+  /**
+   * R077 (41-04) — keeps a previously-shared service's public payload
+   * current after ANY of the three write paths below, without a second
+   * Share press. Hooked into exactly three write paths and no others:
+   *
+   *   - `updateService` (also covers `assignSongToSlot`, `clearSongFromSlot`,
+   *     the editor's autosave and slot reorder — all route through it)
+   *   - `setRoleOverride`
+   *   - `clearRoleOverride`
+   *
+   * Deliberately NOT hooked: `markAsPlanned` and `reopenService` are
+   * status-only writes and `ShareView.vue` never renders `status`;
+   * `deleteService` uses `deleteDoc` and is not a refresh trigger;
+   * `createService` has nothing yet to refresh.
+   *
+   * Loop safety (T-41-02): the store's only `onSnapshot` subscribes to
+   * `organizations/{orgId}/services` (see `subscribe()` above). Nothing
+   * subscribes to `shareTokens` or `serviceShareLinks`, so a write to either
+   * has no path back into the editor's remote-merge watcher or autosave —
+   * PROVIDED this function itself never writes to `services/{docId}`, which
+   * it does not: it calls `writeSharePayload` only, never `updateDoc`/`setDoc`
+   * against a services path.
+   *
+   * Never rejects — the whole body is one try/catch (WR-06 soft-fail,
+   * mirroring `writeSharePayload`'s memorable-URL catch above). A share
+   * problem must never fail the user's save.
+   */
+  async function maybeRefreshShareLink(id: string, overrides: Partial<Service> = {}): Promise<void> {
+    try {
+      if (!orgId.value) return
+      const localService = services.value.find((s) => s.id === id)
+      if (!localService) return
+
+      const cached = shareLinkCache.get(id)
+      if (cached === false) return // known unshared this session — skip both the write and the read
+
+      let token: string
+      if (typeof cached === 'string' && cached.length > 0) {
+        token = cached
+      } else {
+        const linkSnap = await getDoc(doc(db, 'serviceShareLinks', id))
+        const linkToken = linkSnap.exists() ? (linkSnap.data().token as string | undefined) : undefined
+        if (!linkSnap.exists() || !linkToken) {
+          shareLinkCache.set(id, false)
+          return
+        }
+        token = linkToken
+        shareLinkCache.set(id, token)
+      }
+
+      // `overrides` merged over the LOCAL pre-write state: at the moment this
+      // hook runs, `services.value` still holds the pre-write snapshot.
+      // Firestore's latency compensation usually closes that window in
+      // production, but the unit suite's mocked `firebase/firestore` never
+      // fires `onSnapshot` at all — without this explicit merge, every
+      // "the payload reflects the new value" assertion would read stale
+      // state and pass even if the refresh had done nothing.
+      const effectiveService: Service = { ...localService, ...overrides }
+      // Call writeSharePayload, NEVER ensureShareLink — the refresh path
+      // must be structurally incapable of taking the adopt-or-create branch,
+      // or an ordinary edit to a never-shared service would publish it.
+      await writeSharePayload(effectiveService, orgId.value, token)
+    } catch (err) {
+      // Disabling refresh for this service for the remainder of the session
+      // is deliberate: before the owner deploys Plan 01's rules, every
+      // attempt is denied, and retrying on every keystroke would flood the
+      // console for no benefit. A page reload clears the cache and retries.
+      console.error(
+        `services.ts share-link auto-refresh: failed for service ${id} — the user's own save already succeeded; disabling share refresh for this service for the remainder of the session`,
+        err,
+      )
+      shareLinkCache.set(id, false)
+    }
   }
 
   return {
