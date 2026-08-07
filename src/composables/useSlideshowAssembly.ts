@@ -276,7 +276,16 @@ export function useSlideshowAssembly(
           const urls = await Promise.all(
             Array.from({ length: count }, (_, i) => resolveImageUrl(renderedPagePath(org, id, i + 1))),
           )
-          renderedUrlCache.set(renderedUrlCacheKey(id, count), urls)
+          const freshKey = renderedUrlCacheKey(id, count)
+          // WR-01 (42-REVIEW.md): only the CURRENT count's entry is ever read again
+          // (`renderedImageUrlsByImportId` above looks up exactly one key per id), so
+          // every other `(id, count)` pair for this SAME id is now unreachable — evict
+          // it rather than let it stay resident forever across re-renders/retries
+          // within one composable instance's lifetime.
+          for (const key of renderedUrlCache.keys()) {
+            if (key !== freshKey && key.startsWith(`${id}:`)) renderedUrlCache.delete(key)
+          }
+          renderedUrlCache.set(freshKey, urls)
         } catch (err) {
           // Same containment posture as `materializeCandidates`/`applyRebuildOutcomes`
           // (HI-01): one unreadable page must not abort resolution for other decks in
