@@ -118,7 +118,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 
 - [x] **R082**: A planner can add a **Miscellaneous** item to a service and type free text into it.
 
-- [ ] **R083**: The **Message** item is a plain free-text box with no URL link field.
+- [x] **R083**: The **Message** item is a plain free-text box with no URL link field.
 
 - [x] **R084**: **Hymn** is no longer offered when adding an item, and every existing Hymn item in a
       saved service keeps rendering, printing and presenting exactly as before.
@@ -285,7 +285,7 @@ Explicitly excluded. Documented to prevent scope creep.
 | R080 | Phase 42 | Complete |
 | R081 | Phase 43 | Complete |
 | R082 | Phase 43 | Complete |
-| R083 | Phase 43 | Pending |
+| R083 | Phase 43 | Complete |
 | R084 | Phase 43 | Complete |
 | R085 | Phase 43 | Complete |
 | R086 | Phase 44 | Pending |
