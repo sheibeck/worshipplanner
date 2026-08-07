@@ -94,7 +94,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
       **never back to `services/{docId}`**, or it forms a trigger loop. The snapshot's existing PII guard
       (names only, never the raw Person object) must survive the rework.
 
-- [ ] **R078**: Share links already circulated to a congregation before this change keep working.
+- [x] **R078**: Share links already circulated to a congregation before this change keep working.
       <br>`[PITFALL]` `createShareToken()` mints fresh on every call, so a service may already have
       several `shareTokens` documents. The backfill must **adopt the most recent existing token**, not
       mint a new one — minting would silently orphan a link someone already emailed out.
@@ -280,7 +280,7 @@ Explicitly excluded. Documented to prevent scope creep.
 | R075 | Phase 40 | Complete |
 | R076 | Phase 41 | Complete |
 | R077 | Phase 41 | Complete |
-| R078 | Phase 41 | Pending |
+| R078 | Phase 41 | Complete |
 | R079 | Phase 42 | Pending |
 | R080 | Phase 42 | Pending |
 | R081 | Phase 43 | Pending |
