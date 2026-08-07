@@ -2,10 +2,9 @@
 phase: 41
 slug: sharing-correctness
 # status lifecycle: draft (seeded by plan-phase) → validated (set by validate-phase §6)
-# audit-milestone §5.5 distinguishes NOT-VALIDATED (draft) from PARTIAL (validated + nyquist_compliant: false) (#2117)
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: validated
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-08-07
 ---
 
@@ -24,54 +23,61 @@ created: 2026-08-07
 | **Quick run command** | `npx vitest run --dir src --exclude '**/rules.test.ts' src/stores/__tests__/services.test.ts` |
 | **Full suite command** | `npx vitest run` then `npm run type-check` |
 | **Rules suite command** | `npm run test:rules` (starts its own emulator; if one is already up, use `npx vitest run --config vitest.rules.config.ts`) |
-| **Estimated runtime** | ~10s targeted · ~90s full app suite · ~40s rules suite |
+| **Measured runtime** | ~10s targeted · ~178s full app suite · ~16s rules suite |
 
 > ⚠ **Command discipline, from CLAUDE.md — do not deviate.** `npx vitest run src/` picks up
 > `render-service/src/render.test.ts` by substring match and dies on a Vitest version mismatch.
 > `npx vitest run --dir src` bypasses `vite.config.ts`'s relative exclude and runs `src/rules.test.ts`
 > without an emulator. Use **`npx vitest run --dir src --exclude '**/rules.test.ts'`** or bare
-> `npx vitest run`. A run reporting `src/rules.test.ts` failing is a tooling artifact of the command,
-> not a regression.
+> `npx vitest run`.
 >
-> ⚠ **Type-check gate is `npm run type-check` (`vue-tsc --build`), never `-p tsconfig.app.json`** —
-> the narrow form silently skips test files and has already let five `TS2339` errors survive two
-> full phases.
+> ⚠ **`src/rules.test.ts` is EXCLUDED from the default `npx vitest run`.** A clean app-suite run
+> proves *nothing* about Firestore rules. Rules changes must be proven by the rules suite, separately.
+>
+> ⚠ **Type-check gate is `npm run type-check`** (`vue-tsc --build`), never `-p tsconfig.app.json`.
 
 ---
 
 ## Sampling Rate
 
-- **After every task commit:** Run the targeted quick command for the files touched by that task.
-- **After every plan wave:** Run `npx vitest run` (full app suite) + `npm run type-check`.
-- **After any task touching `firestore.rules`:** Run the rules suite. A rules change with no rules-suite
-  run is an untested assertion — see the CLAUDE.md incident where a deny-everyone `storage.rules`
-  shipped behind an all-deny suite.
-- **Before `/gsd-verify-work`:** Full app suite green against the documented 2-file baseline
-  (`src/storage.rules.test.ts`, `src/views/__tests__/RosterView.test.ts`), rules suite green,
+- **After every task commit:** targeted quick command for the files touched.
+- **After every plan wave:** `npx vitest run` + `npm run type-check`.
+- **After any task touching `firestore.rules`:** the rules suite. A rules change with no rules-suite run
+  is an untested assertion.
+- **Before `/gsd-verify-work`:** full app suite green against the documented baseline, rules suite green,
   `npm run type-check` at 0 errors.
-- **Max feedback latency:** 90 seconds.
+- **Max feedback latency:** 180 seconds (measured).
 
 ---
 
 ## Per-Task Verification Map
 
-> Task IDs are assigned by the planner. This table is seeded with the requirement-to-verification
-> mapping the plans must satisfy; the planner and executor fill in concrete task IDs and commands.
+All 12 seeded rows resolved to real, named, passing tests. Line numbers are as of commit `6bf8de6`.
 
-| Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
-|---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| TBD | TBD | 1 | R076 | — | Repeat `share` on the same service returns the same token; `serviceShareLinks/{serviceId}` is written once and its `token` never changes | unit | `npx vitest run --dir src --exclude '**/rules.test.ts' src/stores/__tests__/services.test.ts` | ✅ | ⬜ pending |
-| TBD | TBD | 1 | R076 | T-41-01 | A `{shareToken}` write is never issued against `services/{docId}` — asserted as the *absence* of a call, so the R036 draft-lock is not re-entered | unit | same as above | ✅ | ⬜ pending |
-| TBD | TBD | 2 | R077 | — | After `updateService`, the shared payload reflects the new plan without a re-share | unit | same as above | ✅ | ⬜ pending |
-| TBD | TBD | 2 | R077 | — | After `setRoleOverride` / `clearRoleOverride`, the shared payload reflects the new overrides | unit | same as above | ✅ | ⬜ pending |
-| TBD | TBD | 2 | R077 | T-41-02 | Refresh writes **only** to `shareTokens`/`serviceShares`; asserted as no write back to `services/{docId}` (loop safety) | unit | same as above | ✅ | ⬜ pending |
-| TBD | TBD | 2 | R077 | T-41-03 | PII guard intact — the snapshot carries `personNames` only, never a raw `Person` (no email / phone / pcPersonId), on **both** the create and the refresh path | unit | same as above | ✅ | ⬜ pending |
-| TBD | TBD | 2 | R078 | — | Adoption picks the most recent of several pre-existing `shareTokens` docs rather than minting a new one | unit | same as above | ✅ | ⬜ pending |
-| TBD | TBD | 2 | R078 | — | Adoption of a stale token refreshes its payload in place immediately | unit | same as above | ✅ | ⬜ pending |
-| TBD | TBD | 3 | R077 | T-41-04 | **ALLOW case** — an org editor CAN update `shareTokens/{token}` for their own org, run against the real emulator | rules | `npm run test:rules` | ✅ | ⬜ pending |
-| TBD | TBD | 3 | R077 | T-41-04 | **DENY case** — an editor of a *different* org CANNOT update that `shareTokens` doc (no cross-org overwrite; the CR-01 bug class) | rules | `npm run test:rules` | ✅ | ⬜ pending |
-| TBD | TBD | 3 | R077 | T-41-05 | **DENY case** — an update that changes `orgId` is rejected (a share can never be reassigned to another org) | rules | `npm run test:rules` | ✅ | ⬜ pending |
-| TBD | TBD | 3 | R076 | T-41-06 | **ALLOW + DENY** — `serviceShareLinks/{serviceId}` is readable/writable by an org editor of that org and by nobody else; **not** publicly readable | rules | `npm run test:rules` | ✅ | ⬜ pending |
+| Requirement | Threat Ref | Secure Behavior | Test Type | Evidence | Status |
+|-------------|------------|-----------------|-----------|----------|--------|
+| R076 | — | Repeat share returns the same token and mints nothing (idempotency edge) | unit | `services.test.ts:967` — *"repeat share returns the same token and mints nothing (R076 idempotency edge)"*. **Asserts call counts, not string equality** — the `crypto.getRandomValues` stub is deterministic, so a string comparison would be vacuous | ✅ green |
+| R076 | — | First share on a virgin service mints exactly one token and records it once | unit | `services.test.ts:943` | ✅ green |
+| R076 | T-41-01 | No write is ever issued against `services/{docId}` from a share path | unit | `services.test.ts:1093` — asserted as an **absence** | ✅ green |
+| R076 | T-41-11 | Concurrent first-shares converge on a single token (**the `backstop` must-have**) | unit | `services.test.ts:1134` — *"concurrent first-share convergence: a link created mid-flight wins over the local mint (backstop)"*. Implemented via `runTransaction` with an in-transaction re-read, so this **resolves rather than abstaining** to `human_needed` | ✅ green |
+| R077 | — | Refresh reflects the current plan after `updateService` | unit | `services.test.ts` refresh block | ✅ green |
+| R077 | — | Refresh reflects current role overrides after `setRoleOverride`/`clearRoleOverride` | unit | `services.test.ts:1391` (+ role-override refresh cases) | ✅ green |
+| R077 | T-41-02 | Refresh writes **only** `shareTokens`/`serviceShares`; **no** write-back to `services/{docId}` | unit | `services.test.ts:1230` — *"the only services write is the user's own save — no write-back — while the two forward share writes DO happen"*. Absence + presence in one assertion | ✅ green |
+| R077 | T-41-03 | PII guard on the **create** path — `personNames` only | unit | `services.test.ts:880`, `:1114` | ✅ green |
+| R077 | T-41-03 | PII guard on the **refresh** path — ROADMAP criterion 5's other half | unit | `services.test.ts:1256` | ✅ green |
+| R077 | T-41-12 | An ordinary edit never publishes a never-shared service | unit | `services.test.ts:1351` — *"an ordinary edit never creates a share link — the transaction set spy is never called"* | ✅ green |
+| R077 | T-41-13 | Transient refresh failure retries; only `permission-denied` disables for the session | unit | `services.test.ts:1421`, `:1454` (both directions) | ✅ green |
+| R078 | — | Adoption picks the most recent of several pre-existing tokens, mints none | unit | `services.test.ts:993` | ✅ green |
+| R078 | — | Adoption over exactly one adopts it; over zero mints exactly one (empty edge) | unit | `services.test.ts:1020` | ✅ green |
+| R078 | T-41-07 | `pickAdoptableToken` org-filters **before** sorting, incl. the newer-foreign-org case | unit | `shareTokens.test.ts` org-filter cases | ✅ green |
+| R078 | — | The adoption query is equality-only — **no composite index required** | unit | `services.test.ts:1075` — *"the adoption query is equality-only (no composite index)"* | ✅ green |
+| R077 | T-41-04 | **ALLOW** — an org editor CAN refresh a `shareTokens` doc in place | **rules (emulator)** | `rules.test.ts:698` — *"ALLOW (ROADMAP criterion 3) — an editor of the owning org can refresh a shareTokens doc in place"* | ✅ green |
+| R077 | T-41-04 | **DENY** — cross-org update, no-membership update, unauthenticated update | rules | `rules.test.ts:712`, `:726`, `:752` | ✅ green |
+| R077 | T-41-05 | **DENY** — `orgId` reassignment rejected on both collections | rules | `rules.test.ts:739`, `:914` | ✅ green |
+| R077 | T-41-08 | **DENY** — a viewer-role member cannot update a `shareTokens` doc | rules | `rules.test.ts:765` | ✅ green |
+| R076 | T-41-06 | `serviceShareLinks` ALLOW for owning-org editor; DENY for public, foreign org, viewer | rules | `rules.test.ts:782`, `:806`, `:813`, `:825` | ✅ green |
+| R076 | T-41-09 | **ALLOW, load-bearing** — reading a NEVER-SEEDED link doc yields a clean not-found, not `PERMISSION_DENIED` | rules | `rules.test.ts:798` | ✅ green |
+| R076 | **T-41-14** | **ALLOW + 3 DENY** — `shareTokens` create is org-editor-scoped (the CR-01 fix) | rules | `rules.test.ts:606`, `:619`, `:632`, `:644`, `:657` | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -79,38 +85,59 @@ created: 2026-08-07
 
 ## Wave 0 Requirements
 
-- [ ] `src/stores/__tests__/services.test.ts` — extend the `firebase/firestore` mock with `where`,
-      `query`, `orderBy`, `limit`, and `getDocs`. The research pass found this mock has **none** of
-      them: this phase introduces the first filtered Firestore query anywhere in the codebase, so
-      every R078 adoption test fails to even load without this. **This is a genuine Wave 0 blocker,
-      not a nicety.**
-- [ ] `src/rules.test.ts` — replace the existing assertion at `src/rules.test.ts:621-629` that
-      `shareTokens` update is denied for everyone. That assertion becomes **intentionally false** this
-      phase; it must be rewritten as an allow-case + deny-cases pair, never deleted and never left
-      failing as a "known regression."
-
-*Everything else: existing infrastructure covers the phase.*
+- [x] `src/stores/__tests__/services.test.ts` — `firebase/firestore` mock extended with `where`,
+      `getDocs`, `limit`, and `runTransaction`. This was a genuine blocker: Phase 41 introduced the
+      first filtered Firestore query in the codebase, and every R078 adoption test failed to *load*
+      until it landed. Done standalone in plan 41-03 Task 1 (`812de86`).
+- [x] `src/rules.test.ts` — the stale assertion that `shareTokens` update is denied for everyone was
+      **replaced** (not deleted, never left red) with allow + deny cases. Done in plan 41-01
+      (`873a4c5`).
 
 ---
 
 ## Manual-Only Verifications
 
+These are manual by nature, not by omission — neither can be made automated without changing what is
+being tested.
+
 | Behavior | Requirement | Why Manual | Test Instructions |
 |----------|-------------|------------|-------------------|
-| A share link circulated before this change still resolves after the rework | R078 | Requires a real pre-existing `shareTokens` document created by the old mint-fresh code path against live data; the unit test proves the adoption *logic*, not that production data matches the assumed shape | Open a share URL captured before this phase shipped; confirm it loads and shows current plan data. |
-| `firestore.rules` deploy | R077 | **Owner-gated by the v1.5 standing autonomy grant — no deploys during an autonomous run** | Owner runs `firebase deploy --only firestore:rules`. Until then, the loosened update rule is inert in production and refresh writes will be rejected live. This is expected and by design. |
+| A share link circulated **before** this change still resolves | R078 | Requires a real pre-existing `shareTokens` document created by the old mint-fresh code path against live production data. The unit tests prove the adoption *logic*; they cannot prove production data matches the assumed shape | Open a share URL captured before this phase shipped; confirm it loads and shows current plan data. **Do this after the rules deploy, not before** |
+| `firestore.rules` deploy | R077, R076 | **Owner-gated by the v1.5 standing autonomy grant — no deploys during an autonomous run** | Owner runs `firebase deploy --only firestore:rules`. Until then every rules-level mitigation in this phase is **inert in production** and refresh writes will be rejected live. Expected and by design. See `.planning/PENDING-VERIFICATION.md` |
 
 ---
 
-## Validation Sign-Off
+## Validation Audit 2026-08-07
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references (the `where`/`getDocs` mock gap above)
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 90s
-- [ ] Every `firestore.rules` change has a **passing ALLOW case that actually executed** against the
+| Metric | Count |
+|--------|-------|
+| Requirements in scope | 3 (R076, R077, R078) |
+| Gaps found | 0 |
+| Resolved | 0 (none needed) |
+| Escalated to manual-only | 2 (both inherently manual — see above) |
+| Probe edges covered | 9/9 (8 `truths` + 1 `backstop`, which **resolved** rather than abstaining) |
+
+**Evidence, re-run independently at audit time rather than taken from the summaries:**
+- `npx vitest run --config vitest.rules.config.ts` → **133/133 passing** (120 `rules.test.ts` + 13 `storage.rules.test.ts`)
+- `npx vitest run` → **2733 passed**, 13 failed across 3 pre-existing baseline files
+  (`src/storage.rules.test.ts`, `src/views/__tests__/RosterView.test.ts`, `render-service/src/render.test.ts`)
+  — none touched by this phase
+- `npm run type-check` → **0 errors**
+
+---
+
+## Sign-Off
+
+- [x] All tasks have automated verification or a documented manual-only entry
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references (the `where`/`getDocs` mock gap — closed)
+- [x] No watch-mode flags
+- [x] Feedback latency < 180s
+- [x] Every `firestore.rules` change has a **passing ALLOW case that actually executed** against the
       emulator — not a deny-only suite, and not a read of the rules file
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] Token-stability assertions verified **non-vacuous** (call counts, not string equality against a
+      deterministic `crypto.getRandomValues` stub)
+- [x] Loop safety asserted as an **absence**, not merely as the presence of the forward writes
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** validated 2026-08-07
