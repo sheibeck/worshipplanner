@@ -19,7 +19,7 @@ import type { ServiceSlot, SlotKind } from '@/types/service'
 import type { Slide } from '@/types/slide'
 import type { GroupSlideEntry, SourceRef } from '@/types/slideGroup'
 
-const ALL_KINDS: SlotKind[] = ['SONG', 'SCRIPTURE', 'PRAYER', 'MESSAGE', 'HYMN', 'IMPORTED']
+const ALL_KINDS: SlotKind[] = ['SONG', 'SCRIPTURE', 'PRAYER', 'MESSAGE', 'ANNOUNCEMENTS', 'MISC', 'HYMN', 'IMPORTED']
 
 describe('slideDisplay', () => {
   describe('KIND_BADGE_CLASSES', () => {
@@ -225,6 +225,13 @@ describe('slideDisplay', () => {
       expect(slotDisplayTitle(prayer)).toBe('Prayer')
       expect(slotDisplayTitle(message)).toBe('Message')
       expect(slotDisplayTitle(imported)).toBe('Imported Slides')
+    })
+
+    it('returns the canonical label for ANNOUNCEMENTS and MISC slots (43-01)', () => {
+      const announcements: ServiceSlot = { kind: 'ANNOUNCEMENTS', id: 'slot-announcements', position: 6 }
+      const misc: ServiceSlot = { kind: 'MISC', id: 'slot-misc', position: 7 }
+      expect(slotDisplayTitle(announcements)).toBe('Announcements')
+      expect(slotDisplayTitle(misc)).toBe('Miscellaneous')
     })
   })
 

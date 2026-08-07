@@ -635,3 +635,144 @@ describe('orderSlotsBySection', () => {
     expect(result[4]).toBe(slotLegacy) // legacy, trailing
   })
 })
+
+describe('ANNOUNCEMENTS and MISC (43-01)', () => {
+  it('createSlot(ANNOUNCEMENTS) returns kind, a non-empty id, position 0, and omits body entirely', () => {
+    const slot = createSlot('ANNOUNCEMENTS') as NonAssignableSlot
+    expect(slot.kind).toBe('ANNOUNCEMENTS')
+    expect(typeof slot.id).toBe('string')
+    expect(slot.id.length).toBeGreaterThan(0)
+    expect(slot.position).toBe(0)
+    // Absent-key assertion, not toBeUndefined() — a key set to undefined and
+    // an absent key are indistinguishable to toBeUndefined(), but the whole
+    // point of the optional field is that a brand-new slot has the same
+    // absent-body shape as every stored legacy PRAYER/MESSAGE slot.
+    expect('body' in slot).toBe(false)
+  })
+
+  it('createSlot(MISC) returns kind, a non-empty id, position 0, and omits body entirely', () => {
+    const slot = createSlot('MISC') as NonAssignableSlot
+    expect(slot.kind).toBe('MISC')
+    expect(typeof slot.id).toBe('string')
+    expect(slot.id.length).toBeGreaterThan(0)
+    expect(slot.position).toBe(0)
+    expect('body' in slot).toBe(false)
+  })
+
+  it('two successive createSlot(ANNOUNCEMENTS) calls return different ids', () => {
+    const a = createSlot('ANNOUNCEMENTS')
+    const b = createSlot('ANNOUNCEMENTS')
+    expect(a.id).not.toBe(b.id)
+  })
+
+  it('slotLabel returns "Announcements" for ANNOUNCEMENTS and "Miscellaneous" for MISC', () => {
+    const announcements: NonAssignableSlot = { kind: 'ANNOUNCEMENTS', id: 's-7', position: 0 }
+    const misc: NonAssignableSlot = { kind: 'MISC', id: 's-8', position: 0 }
+    expect(slotLabel(announcements)).toBe('Announcements')
+    expect(slotLabel(misc)).toBe('Miscellaneous')
+  })
+
+  it('the six pre-existing slotLabel values are unchanged', () => {
+    const song: SongSlot = { kind: 'SONG', id: 's-1', position: 0, requiredVwType: 1, songId: null, songTitle: null, songKey: null }
+    const scripture: ScriptureSlot = { kind: 'SCRIPTURE', id: 's-2', position: 1, book: null, chapter: null, verseStart: null, verseEnd: null }
+    const prayer: NonAssignableSlot = { kind: 'PRAYER', id: 's-3', position: 3 }
+    const message: NonAssignableSlot = { kind: 'MESSAGE', id: 's-4', position: 7 }
+    const hymn: HymnSlot = { kind: 'HYMN', id: 's-5', position: 4, hymnName: '', hymnNumber: '', verses: '' }
+    const imported: ImportedSlot = { kind: 'IMPORTED', id: 's-6', position: 0, importId: null }
+    expect(slotLabel(song)).toBe('Song')
+    expect(slotLabel(scripture)).toBe('Scripture Reading')
+    expect(slotLabel(prayer)).toBe('Prayer')
+    expect(slotLabel(message)).toBe('Message')
+    expect(slotLabel(hymn)).toBe('Hymn')
+    expect(slotLabel(imported)).toBe('Imported Slides')
+  })
+
+  it('HYMN survives at the type layer: createSlot(HYMN) is unchanged and slotLabel still returns "Hymn" (R084 is palette-only, not a type change)', () => {
+    const slot = createSlot('HYMN') as HymnSlot
+    expect(slot.kind).toBe('HYMN')
+    expect(slot.hymnName).toBe('')
+    expect(slot.hymnNumber).toBe('')
+    expect(slot.verses).toBe('')
+    expect(slotLabel(slot)).toBe('Hymn')
+  })
+
+  // E-01/E-05 (adjacency): two adjacent slots of the same new kind, with
+  // distinct body values, remain two distinct array entries — nothing merges
+  // or dedupes equal-kind neighbours.
+  it('E-01: two adjacent ANNOUNCEMENTS slots remain two distinct entries with distinct ids and independent body values after reindexSlots', () => {
+    const a: NonAssignableSlot = { kind: 'ANNOUNCEMENTS', id: 'ann-a', position: 0, body: 'First announcement' }
+    const b: NonAssignableSlot = { kind: 'ANNOUNCEMENTS', id: 'ann-b', position: 1, body: 'Second announcement' }
+    const slots: ServiceSlot[] = [a, b]
+
+    const reindexed = reindexSlots(slots)
+
+    expect(reindexed).toHaveLength(2)
+    expect(reindexed[0]!.id).not.toBe(reindexed[1]!.id)
+    expect((reindexed[0] as NonAssignableSlot).body).toBe('First announcement')
+    expect((reindexed[1] as NonAssignableSlot).body).toBe('Second announcement')
+  })
+
+  it('E-05: two adjacent MISC slots remain two distinct entries with distinct ids and independent body values after reindexSlots', () => {
+    const a: NonAssignableSlot = { kind: 'MISC', id: 'misc-a', position: 0, body: 'First misc item' }
+    const b: NonAssignableSlot = { kind: 'MISC', id: 'misc-b', position: 1, body: 'Second misc item' }
+    const slots: ServiceSlot[] = [a, b]
+
+    const reindexed = reindexSlots(slots)
+
+    expect(reindexed).toHaveLength(2)
+    expect(reindexed[0]!.id).not.toBe(reindexed[1]!.id)
+    expect((reindexed[0] as NonAssignableSlot).body).toBe('First misc item')
+    expect((reindexed[1] as NonAssignableSlot).body).toBe('Second misc item')
+  })
+
+  // E-03/E-07 (encoding): body survives reindexSlots and orderSlotsBySection
+  // byte-for-byte — no trim, no case-fold, no Unicode normalization.
+  const ENCODING_PROBE_BODY = '  leading and trailing spaces\nwith an embedded newline, a café (multi-byte) and an emoji 🎉  '
+
+  it('E-03: an ANNOUNCEMENTS body round-trips verbatim through reindexSlots and orderSlotsBySection', () => {
+    const slot: NonAssignableSlot = { kind: 'ANNOUNCEMENTS', id: 'ann-enc', position: 0, section: 'worship', body: ENCODING_PROBE_BODY }
+    const afterReindex = reindexSlots([slot])
+    expect((afterReindex[0] as NonAssignableSlot).body).toBe(ENCODING_PROBE_BODY)
+
+    const afterOrder = orderSlotsBySection([slot])
+    expect((afterOrder[0] as NonAssignableSlot).body).toBe(ENCODING_PROBE_BODY)
+  })
+
+  it('E-07: a MISC body round-trips verbatim through reindexSlots and orderSlotsBySection', () => {
+    const slot: NonAssignableSlot = { kind: 'MISC', id: 'misc-enc', position: 0, section: 'worship', body: ENCODING_PROBE_BODY }
+    const afterReindex = reindexSlots([slot])
+    expect((afterReindex[0] as NonAssignableSlot).body).toBe(ENCODING_PROBE_BODY)
+
+    const afterOrder = orderSlotsBySection([slot])
+    expect((afterOrder[0] as NonAssignableSlot).body).toBe(ENCODING_PROBE_BODY)
+  })
+
+  // E-04/E-08 (ordering): a slot created with a section carries it, and
+  // reindexSlots renumbers position to array index while preserving the
+  // relative order of equal-kind neighbours.
+  it('E-04: createSlot(ANNOUNCEMENTS, undefined, section) carries the section, and reindexSlots renumbers position while preserving relative order of equal-kind neighbours', () => {
+    const slot = createSlot('ANNOUNCEMENTS', undefined, 'sending') as NonAssignableSlot
+    expect(slot.section).toBe('sending')
+
+    const first: NonAssignableSlot = { kind: 'ANNOUNCEMENTS', id: 'ord-a', position: 9, section: 'worship' }
+    const second: NonAssignableSlot = { kind: 'ANNOUNCEMENTS', id: 'ord-b', position: 2, section: 'worship' }
+    const reindexed = reindexSlots([first, second])
+    expect(reindexed[0]!.position).toBe(0)
+    expect(reindexed[0]!.id).toBe('ord-a')
+    expect(reindexed[1]!.position).toBe(1)
+    expect(reindexed[1]!.id).toBe('ord-b')
+  })
+
+  it('E-08: createSlot(MISC, undefined, section) carries the section, and reindexSlots renumbers position while preserving relative order of equal-kind neighbours', () => {
+    const slot = createSlot('MISC', undefined, 'pre-service') as NonAssignableSlot
+    expect(slot.section).toBe('pre-service')
+
+    const first: NonAssignableSlot = { kind: 'MISC', id: 'ord-c', position: 9, section: 'worship' }
+    const second: NonAssignableSlot = { kind: 'MISC', id: 'ord-d', position: 2, section: 'worship' }
+    const reindexed = reindexSlots([first, second])
+    expect(reindexed[0]!.position).toBe(0)
+    expect(reindexed[0]!.id).toBe('ord-c')
+    expect(reindexed[1]!.position).toBe(1)
+    expect(reindexed[1]!.id).toBe('ord-d')
+  })
+})
