@@ -435,7 +435,7 @@ describe('SettingsView Services card (R086) — Wave 2 (44-02)', () => {
       { id: 's2', kind: 'PRAYER', section: 'sending' },
     ]
     const wrapper = mountSettingsView()
-    expect(wrapper.get('[data-testid="template-summary"]').text()).toBe('2 items across 1 sections')
+    expect(wrapper.get('[data-testid="template-summary"]').text()).toBe('2 items across 1 section')
   })
 
   it('clicking "Edit Default Template" opens the ServiceTemplateEditor slide-out', async () => {

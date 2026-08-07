@@ -389,7 +389,9 @@ const templateSummary = computed(() => {
   }
   const grouped = groupBySection(entries, (entry) => entry.section)
   const sectionCount = SERVICE_SECTIONS.filter((section) => grouped.sections[section].length > 0).length
-  return `${entries.length} items across ${sectionCount} sections`
+  const itemWord = entries.length === 1 ? 'item' : 'items'
+  const sectionWord = sectionCount === 1 ? 'section' : 'sections'
+  return `${entries.length} ${itemWord} across ${sectionCount} ${sectionWord}`
 })
 
 // ── Computed ───────────────────────────────────────────────────────────────────
