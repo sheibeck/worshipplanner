@@ -138,6 +138,14 @@ export interface GroupSlideEntry {
  * Both `scriptureReadingId` and `innerSlideId` stay in the union as OPTIONAL
  * legacy fields rather than being removed: every entry written before Phase
  * 38 stays readable (both fields are ignored on read).
+ *
+ * Phase 42 (R079/R080): the `imported` member's `innerSlideId` carries EITHER
+ * a parsed `deck.slides[i].id` OR the synthetic `rendered-page-N` identity
+ * `src/utils/importedRenderReconciler.ts` mints for a ready-state rendered
+ * page (no reliable positional pairing exists between the two — see that
+ * module's doc comment). `derivedIdentityKey`'s existing
+ * `imported:{importId}:{innerSlideId}` scheme needs no widening for this —
+ * a synthetic id is just another string value for that key to carry.
  */
 export type SourceRef =
   | { kind: 'lyric'; songId: string; sectionId: string }

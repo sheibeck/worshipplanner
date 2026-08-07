@@ -32,6 +32,7 @@ import type { SongLyrics } from '@/types/songLyrics'
 import type { ScriptureReading } from '@/types/scriptureReading'
 import type { ImportedDeck } from '@/types/importedDeck'
 import type { SlideGroup, GroupSlideEntry, SourceRef } from '@/types/slideGroup'
+import type { PptxRenderDoc } from '@/types/pptxRender'
 import { slotLabel } from './slotTypes'
 import {
   formatScriptureReference,
@@ -52,6 +53,29 @@ export interface AssemblyInputs {
    * derivation path, producing today's output.
    */
   groupsBySlotId: Map<string, SlideGroup>
+  /**
+   * Phase 42 (R079/R080) render-status documents, keyed by
+   * `ImportedDeck.renderImportId` — NOT by `ImportedDeck.id`/
+   * `ImportedSlot.importId`, which is what the sibling `importedDecksById`
+   * above is keyed by. The two identifiers are deliberately distinct
+   * (`src/types/importedDeck.ts:19-30`); conflating them shows one deck's
+   * render status under another deck's identity (T-42-07). OPTIONAL — an
+   * absent map is the legitimate "no render data loaded" state, and for a
+   * deck with no `renderImportId` this must behave byte-identically to
+   * today's parsed-text-only path regardless of whether this map is present.
+   */
+  pptxRendersByImportId?: Map<string, PptxRenderDoc>
+  /**
+   * Phase 42 (R079/R080) resolved rendered-page download URLs, keyed by
+   * `ImportedDeck.renderImportId` (same keying caveat as
+   * `pptxRendersByImportId` above — NOT `ImportedDeck.id`). Array index `i`
+   * holds the URL for page `i + 1` — the single 1-based↔0-based boundary in
+   * the whole phase; every other consumer goes through
+   * `renderedPageNumberFromIdentity` instead of touching this index
+   * directly. OPTIONAL for the same "no render data loaded yet" reason as
+   * `pptxRendersByImportId`.
+   */
+  renderedImageUrlsByImportId?: Map<string, string[]>
 }
 
 /** A Slide variant's fields minus the id/position this engine assigns on emit. */

@@ -47,6 +47,30 @@ export interface SlideBase {
    * never drift apart the way `audioUrl`/`audioFromBed` historically did.
    */
   backgroundSource?: 'slide' | 'group' | 'song'
+  /**
+   * Phase 42 (R079/R080) render-state discriminator for a slide sourced from
+   * a PPTX deck whose server-side render (`organizations/{orgId}/pptxRenders/
+   * {importId}`) has not yet produced a usable page for it. This field's
+   * PRESENCE is the discriminator every consumer must branch on FIRST, ahead
+   * of `contentKind` — a slide carrying `renderState` never carries drawable
+   * content (`SlideCard.vue`/`PresentationViewer.vue` render pending/failed
+   * chrome instead of the normal `contentKind: 'image'` `<img>` path). Set
+   * only by `src/utils/importedRenderReconciler.ts`'s `importedEntryContent`;
+   * absent on every slide from every other content path (lyric, scripture,
+   * text, video, or a rendered-ready image with a resolved URL).
+   */
+  renderState?: 'pending' | 'failed'
+  /**
+   * The raw machine slug copied unchanged off the render document's own
+   * `failureReason` (e.g. `'incomplete-render'`, `'render-service-error'`).
+   * Present only alongside `renderState: 'failed'`. Never rendered directly —
+   * it MUST route through the failure-sentence lookup 42-06 introduces
+   * (`slideDisplay.ts`), whose fallback arm exists precisely so an unmapped
+   * slug never surfaces to a congregation as raw text (T-42-04). This field
+   * carries the untranslated slug on purpose, named so that displaying it
+   * verbatim looks obviously wrong at the call site.
+   */
+  renderFailureReason?: string
 }
 
 /** A lyric slide — one section of a song's lyrics. */
