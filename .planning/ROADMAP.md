@@ -148,6 +148,7 @@ merge gaps. Full reasoning recorded in `.planning/STATE.md` § "v1.5 ROADMAP.md 
 
 - [x] **Phase 39: Org Settings Infrastructure & Feature Toggles** - Typed org settings plus AI/Planning Center toggles gated at the `claudeApi.ts` choke point
 - [x] **Phase 40: Custom Auth Claim for Org Membership** - A testable, dual-read Storage-rules membership check (built, tested, undeployed — two owner deploys with a 1-hour soak between them)
+- [ ] **Phase 40.1: Close the Self-Service Membership Hole** (INSERTED 2026-08-06) - Only an invite-holder or an org's creator can create a membership document
 - [ ] **Phase 41: Sharing Correctness** - One permanent share link per service, auto-refreshed on every change
 - [ ] **Phase 42: PowerPoint Rendered-Image Display** - Client-side display of the already-deployed server-rendered PPTX images (carryover R062)
 - [ ] **Phase 43: Service Item Types** - Announcements, Miscellaneous, a plain-text Message, and Hymn retired from the add-item palette
@@ -210,6 +211,24 @@ Plans:
 **UI hint**: no
 **Research flag**: needs research — dual-read rollout design, the 1000-byte claim-payload budget against live multi-org membership (`users/{uid}.orgIds` is already an array), and the race condition at invite-acceptance time.
 **Notes**: Scoped to `storage.rules` only — `firestore.rules` uses same-service `exists()`/`get()`, unaffected by firebase-js-sdk#6803, and migrating it too would trade one staleness class for a worse, unnecessary one (role changes lagging a token refresh). This phase's success is measured entirely by emulator evidence and a written handoff, never by a live deploy — see the v1.5 standing autonomy grant in STATE.md. **This phase structurally cannot fully close inside an autonomous run** — the soak-and-fallback-removal step needs the owner's clock, not just their command.
+
+### Phase 40.1: Close the Self-Service Membership Hole
+
+**Goal:** Only a user holding a valid invite — or the creator of a brand-new organization — can create a membership document. Self-joining an arbitrary org, at an arbitrary role, is denied.
+**Depends on**: Nothing — independent of the claim work, but sequenced here so all three rules-touching phases stay contiguous and can ship in one deploy session.
+**Requirements**: R104
+**Success Criteria** (what must be TRUE):
+
+  1. A signed-in user who holds no invite to an organization **cannot** create `organizations/{orgId}/members/{their-uid}` — proven by a DENY-case test against the real Firestore emulator
+  2. A user accepting a genuine outstanding invite **can** create their membership document — proven by an ALLOW-case test that actually runs, not a source assertion
+  3. The creator of a brand-new organization **can** still create their own first membership document — the second legitimate flow the current loose rule exists to serve, and the one most likely to be broken by a careless tightening
+  4. A user cannot choose their own `role` on create — a self-created membership carrying `role: 'editor'` is denied, or the role is forced server-side regardless of the submitted body
+  5. `firestore.rules` is modified but **NOT deployed** — the change is handed to the owner to ship alongside Phase 40's deploy 2
+
+**Plans**: TBD
+**UI hint**: no
+**Research flag**: needs research — trace both legitimate creation flows (org creation and invite acceptance) in real source before touching the rule. The current rule is loose *on purpose*; a fix that only considers the invite path will silently break org creation, and a fix that only considers org creation leaves the hole open.
+**Notes**: INSERTED 2026-08-06 after Phase 40's code review filed WR-03. **This is a pre-existing vulnerability, not one v1.5 introduced** — `firestore.rules:36-41` reads `allow create: if isSignedIn() && request.auth.uid == uid`, which lets any signed-in user self-join any organization, and because the document body is client-controlled they can also set their own `role`. Phase 40 does not widen it, but it does slow its remediation: once Phase 40's deploy 2 removes the Firestore-membership fallback, the custom claim becomes the sole authority and revocation latency stretches from per-request to **up to one hour**. Numbered 40.1 rather than renumbering 41-48, and sequenced immediately after 40 so the owner can deploy `storage.rules` and `firestore.rules` together rather than in two separate sessions.
 
 ### Phase 41: Sharing Correctness
 

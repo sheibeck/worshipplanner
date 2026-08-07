@@ -57,6 +57,24 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
       <br>**Deploy-gated.** Both deploys are the owner's step per the v1.5 standing autonomy grant, so
       this requirement cannot fully close during an autonomous run.
 
+### Membership Integrity
+
+- [ ] **R104**: Only a user holding a valid invite — or the creator of a brand-new organization — can
+      create a membership document. A signed-in user cannot self-join an arbitrary organization, and
+      cannot choose their own role on create.
+      <br>**Added 2026-08-06** after Phase 40's code review (WR-03). **Pre-existing vulnerability, not
+      introduced by v1.5:** `firestore.rules:36-41` reads
+      `allow create: if isSignedIn() && request.auth.uid == uid`, so any signed-in user can create
+      `organizations/{ANY_ORG}/members/{their-uid}` — and because the document body is client-controlled,
+      set `role: 'editor'` while doing it. That is privilege escalation, not merely unwanted membership.
+      <br>**Why it belongs in v1.5 rather than the backlog:** Phase 40 does not widen the hole, but it
+      slows remediation. Once Phase 40's deploy 2 removes the Firestore-membership fallback, the custom
+      claim becomes the sole authority and revocation latency stretches from per-request to **up to one
+      hour**. Fixing it in the same deploy session is strictly cheaper than fixing it after.
+      <br>⚠ The current rule is loose **on purpose** — its own comment says *"Allow creator to write
+      their own membership when creating an org or accepting an invite."* Both flows are legitimate and
+      both must survive. A fix considering only the invite path silently breaks org creation.
+
 ### Sharing
 
 - [ ] **R076**: A service's share link is created once and never changes, however many times the service
@@ -288,12 +306,18 @@ Explicitly excluded. Documented to prevent scope creep.
 | R101 | Phase 48 | Pending |
 | R102 | Phase 48 | Pending |
 | R103 | Phase 48 | Pending |
+| R104 | Phase 40.1 | Pending |
 
 **Coverage:**
 
-- v1.5 requirements: 31 total
-- Mapped to phases: 31 (Phases 39-48)
+- v1.5 requirements: 32 total
+- Mapped to phases: 32 (Phases 39-48, including inserted Phase 40.1)
 - Unmapped: 0
+
+> **R104 inserted 2026-08-06** mid-milestone, after Phase 40's code review surfaced a pre-existing
+> `firestore.rules` privilege-escalation gap. Phase 40.1 was numbered as a decimal rather than
+> renumbering Phases 41-48, and sequenced immediately after Phase 40 so both rules files ship in one
+> owner deploy session.
 
 ---
 *Requirements defined: 2026-08-06*
