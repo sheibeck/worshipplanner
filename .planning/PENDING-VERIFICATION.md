@@ -711,8 +711,60 @@ that criterion 4 deliberately places *outside* the phase — the code is built, 
 > after deploy 2 the claim becomes the sole authority and revocation latency stretches to **up to
 > one hour**. The hole does not get wider — its consequences get slower to undo. Worth a decision
 > before you remove the fallback, not after.
+>
+> **UPDATE (Phase 40.1, 2026-08-06): the fix is built and tested, and it is undeployed.**
+> `firestore.rules`' `allow create` on `organizations/{orgId}/members/{uid}` now authorizes exactly
+> the two legitimate creation flows (org founding, invite acceptance) and denies both an uninvited
+> self-join and a role-escalated invite acceptance — proven against the real Firestore emulator by
+> four new tests in `src/rules.test.ts` (107/107 passing; two of the four were first observed
+> FAILING against the unmodified rule, then confirmed passing after the fix). It ships in the same
+> deploy session as this phase's deploy 2 — see the Phase 40.1 section below.
 
 **Rollback at any point:** re-deploy the dual-read rule. The fallback arm restores access immediately.
+
+---
+
+## Phase 40.1 — Close the Self-Service Membership Hole (R104)
+
+**Phase status: built and tested, NOT deployed.** `firestore.rules`' `allow create` predicate on
+`organizations/{orgId}/members/{uid}` (used to read only `isSignedIn() && request.auth.uid == uid`)
+now authorizes exactly the two legitimate creation flows — org founding (via `getAfter()` on the
+sibling same-batch org doc) and invite acceptance (via `get()`/`exists()` on the pre-existing invite
+doc, with the submitted role checked against the invite's stored role) — and denies both an
+uninvited self-join and a role-escalated invite acceptance. Proven against the real Firestore
+emulator: `npx vitest run --config vitest.rules.config.ts` reports 107/107, and the two new DENY
+tests were first run against the unmodified rule and observed to fail, per
+`40.1-01-SUMMARY.md`. Nothing was deployed.
+
+- [ ] **Deploy the tightened `firestore.rules` alongside Phase 40's deploy 2** — same file set, one
+      session. Full runbook: `functions/DEPLOY-ORG-CLAIMS.md` (no separate runbook is written for
+      this change). As the WR-03 note above states, closing this Firestore hole *before* deploy 2
+      removes the fallback is the cheap ordering — after deploy 2 the custom claim becomes the sole
+      authority and revocation latency stretches to up to an hour, so any residual membership hole
+      would take longer to undo.
+- [ ] **Exercise the one real pending invite in production** after deploy — accept it and confirm
+      the membership document is created carrying the role the invite actually granted, not a
+      higher one.
+- [ ] **Create a genuinely new organization** through a real signup after deploy — confirm the
+      founder becomes an editor member. This is criterion 3's production counterpart: the failure
+      mode most likely to silently block every new church from onboarding, and the one Test C in
+      `src/rules.test.ts` exists specifically to catch before deploy.
+
+**Out of scope, recorded but NOT fixed this phase** (see `40.1-RESEARCH.md` § Other
+Over-Permissive Findings):
+
+1. `organizations/{orgId}`'s document-level `allow write: if isOrgEditor(orgId)` (firestore.rules:31)
+   lets an existing editor rewrite `createdBy`, which weakens the org-creation branch's predicate
+   above (it reads `createdBy`). This does **not** grant an editor any new capability — they already
+   have unrestricted `write` on `members/{uid}` via the sibling rule on that same match block — and
+   it is not exploitable by a non-member, who cannot pass `isOrgEditor` at all.
+2. `inviteLookup/{email}`'s `allow create: if isSignedIn()` (firestore.rules:173) lets any signed-in
+   user create an `inviteLookup` doc for any email with an arbitrary `orgId`/`role` payload — a
+   structurally similar self-invite vector. This does **not** defeat this phase's fix: the fix reads
+   the org-scoped `organizations/{orgId}/invites/{email}` document, which is editor-write-only, never
+   `inviteLookup`.
+
+Both are candidates for a future phase.
 
 ---
 
