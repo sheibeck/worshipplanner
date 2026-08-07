@@ -36,8 +36,37 @@ service cloud.firestore {
       match /members/{uid} {
         allow read: if isOrgMember(orgId);
         allow write: if isOrgEditor(orgId);
-        // Allow creator to write their own membership when creating an org or accepting an invite
-        allow create: if isSignedIn() && request.auth.uid == uid;
+
+        // R104 — replaces the unconditional `isSignedIn() && request.auth.uid == uid`,
+        // which let ANY signed-in user self-join ANY org with a client-controlled role.
+        // Both legitimate flows (see 40.1-RESEARCH.md, ensureUserDocument in
+        // src/stores/auth.ts:264-350) are handled explicitly; nothing else authorizes
+        // a create.
+        allow create: if isSignedIn() && request.auth.uid == uid && (
+          // Flow 1: org creation. The org doc is created in the SAME atomic batch as
+          // this write (ensureUserDocument, auth.ts:327 then :334) — getAfter(), not
+          // get(), because get()/exists() reflect state as of the START of the
+          // batch and will not see the sibling org-create operation. getAfter() is
+          // Firestore's documented primitive for "these writes must land together."
+          // Role is forced to 'editor', matching the hardcoded value the client
+          // already sends on this path — no client discretion is lost.
+          (getAfter(/databases/$(database)/documents/organizations/$(orgId)).data.createdBy == request.auth.uid
+            && request.resource.data.role == 'editor')
+
+          ||
+
+          // Flow 2: invite acceptance. The invite doc predates this batch (created
+          // earlier by an org editor via TeamView) and is being DELETED later in
+          // THIS SAME batch (auth.ts:301) -- plain get()/exists() is correct here
+          // specifically because it does NOT see that same-batch delete; it
+          // reflects pre-batch state. request.auth.token.email is guarded non-null
+          // first so `.lower()` never errors for an auth method with no email.
+          // Role is compared against the invite's stored role, not trusted from
+          // the client -- closes R104 criterion 4.
+          (request.auth.token.email != null
+            && exists(/databases/$(database)/documents/organizations/$(orgId)/invites/$(request.auth.token.email.lower()))
+            && request.resource.data.role == get(/databases/$(database)/documents/organizations/$(orgId)/invites/$(request.auth.token.email.lower())).data.role)
+        );
       }
 
       // Invites subcollection
