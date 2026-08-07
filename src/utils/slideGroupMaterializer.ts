@@ -31,6 +31,7 @@ import {
   congregationalSectionsFromSlot,
   congregationalSectionFromRef,
 } from '@/utils/scripture'
+import { resolveImportedRender, importedEntryIdentities, importedSourceSignature } from '@/utils/importedRenderReconciler'
 
 /**
  * Derives a slide group's structure from its slot's canonical source.
@@ -117,14 +118,34 @@ export function deriveGroupEntries(slot: ServiceSlot, inputs: AssemblyInputs): G
     }
 
     case 'IMPORTED': {
+      // Loading-race guards, unchanged (`rebuildUnstableIdGroup` relies on
+      // the second one to leave a group untouched rather than blank it while
+      // a deck is still loading, T-30-02-04).
       if (!slot.importId) return []
       const deck = inputs.importedDecksById.get(slot.importId)
       if (!deck) return []
 
-      return deck.slides.map((innerSlide, index) => ({
+      // Phase 42 (R079/R080): the render document, if one exists, is looked
+      // up ONLY through the deck's own `renderImportId` — never through
+      // `slot.importId`, which is a different identifier entirely
+      // (T-42-07). `resolveImportedRender`/`importedEntryIdentities` are the
+      // ONE shared decision table imported above; this branch never
+      // re-derives entry count or identity itself.
+      const render = deck.renderImportId ? inputs.pptxRendersByImportId?.get(deck.renderImportId) : undefined
+      const resolution = resolveImportedRender(deck, render)
+      const identities = importedEntryIdentities(deck, resolution)
+
+      // In the ready state an identity is the reconciler's synthetic
+      // `rendered-page-N` string, page-scoped rather than a parsed inner
+      // slide id — never `deck.slides[i].id` (no positional pairing exists,
+      // 42-RESEARCH.md Pitfall 1). In every other mode it IS a parsed inner
+      // slide id, unchanged from before this phase. A deck with no
+      // `renderImportId` resolves to `parsed` mode here, which is
+      // byte-identical to the pre-Phase-42 behaviour (D-16).
+      return identities.map((innerSlideId, index) => ({
         id: crypto.randomUUID(),
         order: index,
-        sourceRef: { kind: 'imported' as const, importId: slot.importId!, innerSlideId: innerSlide.id },
+        sourceRef: { kind: 'imported' as const, importId: slot.importId!, innerSlideId },
       }))
     }
 
@@ -190,11 +211,25 @@ export function sourceSignature(slot: ServiceSlot, inputs: AssemblyInputs): stri
     }
 
     case 'IMPORTED': {
+      // Same two loading-race guards as `deriveGroupEntries`'s IMPORTED case.
       if (!slot.importId) return undefined
       const deck = inputs.importedDecksById.get(slot.importId)
       if (!deck) return undefined
-      const texts = deck.slides.map((s) => (s.contentKind === 'image' ? s.imageUrl : s.body))
-      return `${texts.length}:${texts.join('|')}`
+
+      // D-09: `importedSourceSignature` folds in BOTH the resolved mode and,
+      // for a ready render, the page count — a re-render that changes the
+      // count while staying `ready` therefore produces a different
+      // signature. It also replaces the old pipe/colon-delimited
+      // count-then-texts form with the `\x1e`/`\x1f` ASCII control-character
+      // encoding the SCRIPTURE branch above already uses and justifies:
+      // PPTX-parsed text can itself contain either legacy delimiter
+      // character, so two distinct decks or render states could otherwise
+      // collide on one signature (T-42-10). A deck with no `renderImportId`
+      // resolves to `parsed` mode, which signs byte-identically to the old
+      // parsed-only path's slide count/text (D-16) — only the delimiter
+      // changed, not what is compared.
+      const render = deck.renderImportId ? inputs.pptxRendersByImportId?.get(deck.renderImportId) : undefined
+      return importedSourceSignature(deck, resolveImportedRender(deck, render))
     }
 
     case 'PRAYER':
