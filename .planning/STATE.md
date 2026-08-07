@@ -5,15 +5,15 @@ milestone_name: Settings, Sharing, and Fidelity
 current_phase: 43
 current_phase_name: Service Item Types
 status: executing
-stopped_at: Completed 43-01-PLAN.md
-last_updated: "2026-08-07T18:03:16.761Z"
+stopped_at: Completed 43-02-PLAN.md
+last_updated: "2026-08-07T18:18:04.320Z"
 last_activity: 2026-08-07
 last_activity_desc: Phase 43 execution started
 progress:
   total_phases: 11
   completed_phases: 5
   total_plans: 27
-  completed_plans: 24
+  completed_plans: 25
   percent: 45
 ---
 
@@ -151,7 +151,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 43 (Service Item Types) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-08-07 — Phase 43 execution started
 module, authStore.settings merged once in loadOrgContext, vwModeEnabled dual-read, R073 test
@@ -1344,6 +1344,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 42 P07 | 40min | 2 tasks | 2 files |
 | Phase 42 P08 | 24min | 3 tasks | 3 files |
 | Phase 43 P01 | 9min | 3 tasks | 8 files |
+| Phase 43 P02 | 22min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -1645,6 +1646,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Switched useSlideshowAssembly's lifecycle hook from onUnmounted to onScopeDispose so render-listener teardown is testable outside a mounted component and works identically inside one
 - [Phase ?]: distinctRenderImportIds/renderReadySignal follow the existing synchronous-computed-decides-WHAT / async-watch-does-the-work split; renderedUrlCache is keyed renderImportId:renderedCount so a re-render's page-count change cannot serve a stale URL array
 - [Phase ?]: 43-01: One shared NonAssignableSlot.body?: string (not per-kind fields) for MESSAGE/ANNOUNCEMENTS/MISC; ANNOUNCEMENTS/MISC reuse PRAYER's neutral badge colour; projected slide shows kind label not body (deferred owner check in PENDING-VERIFICATION.md)
+- [Phase ?]: Exhaustiveness backstop binds on slot.kind, not slot — NonAssignableSlot's shared 4-literal kind union doesn't narrow to never at the whole-object level via sequential if-return checks
+- [Phase ?]: MESSAGE branch prefers body over sermonPassage; ANNOUNCEMENTS/MISC pass length through per plan instruction
 
 ### Roadmap Evolution
 
@@ -1956,8 +1959,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-07T18:03:16.722Z
-Stopped at: Completed 43-01-PLAN.md
+Last session: 2026-08-07T18:18:04.275Z
+Stopped at: Completed 43-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

@@ -126,7 +126,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
       `hymnName`/`hymnNumber`/`verses` that `SONG` (which requires a catalog `songId`) cannot represent
       losslessly.
 
-- [ ] **R085**: The new item types export to Planning Center as themselves, never silently as
+- [x] **R085**: The new item types export to Planning Center as themselves, never silently as
       "Message".
       <br>`[ARCH]` `addSlotAsItem`'s export is an **unguarded if-chain that falls through to a "Message"
       branch** for any unhandled `SlotKind`. `IMPORTED` already needed an explicit skip, with a comment
@@ -287,7 +287,7 @@ Explicitly excluded. Documented to prevent scope creep.
 | R082 | Phase 43 | Complete |
 | R083 | Phase 43 | Pending |
 | R084 | Phase 43 | Complete |
-| R085 | Phase 43 | Pending |
+| R085 | Phase 43 | Complete |
 | R086 | Phase 44 | Pending |
 | R087 | Phase 44 | Pending |
 | R088 | Phase 39 | Complete |

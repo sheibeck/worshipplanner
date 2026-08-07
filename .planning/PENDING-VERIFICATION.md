@@ -952,6 +952,20 @@ projection withholds it.
 - [ ] **Owner confirms this is the wanted behaviour**, or asks for `body` to project instead (which
       would require also solving the `sourceSignature` staleness problem above — not a one-line change).
 
+### Plan 43-02 — live Planning Center round-trip for the widened export dispatch (R085)
+
+**Unit-level proof only.** `addSlotAsItem` in `src/utils/planningCenterApi.ts` now has an explicit
+branch for every `SlotKind` member (ANNOUNCEMENTS → `Announcements`, MISC → `Miscellaneous`, MESSAGE
+converted from an implicit else to an explicit test, IMPORTED returns `''`), plus a `never`-typed
+exhaustiveness backstop after the chain. This is proven against a mocked `fetch` in
+`src/utils/__tests__/planningCenterApi.test.ts` — the mock proves the outbound request shape, not that
+Planning Center actually creates three distinctly-titled items when given that shape.
+
+- [ ] **Owner runs a real export** (against live Planning Center credentials) of a service containing
+      at least one ANNOUNCEMENTS slot, one MISC slot, and one MESSAGE slot, and confirms in the
+      Planning Center plan that all three items appear with their own titles — `Announcements`,
+      `Miscellaneous`, `Message` — and that none of them is mislabeled `Message`.
+
 ---
 
 ## Notes and failures
