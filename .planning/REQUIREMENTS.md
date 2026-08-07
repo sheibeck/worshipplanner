@@ -101,7 +101,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 
 ### PowerPoint Fidelity (carryover R062)
 
-- [ ] **R079**: An imported PowerPoint displays as its original rendered slides — in the slide grid and
+- [x] **R079**: An imported PowerPoint displays as its original rendered slides — in the slide grid and
       when presenting — so it looks the way it looked in PowerPoint.
       <br>`[ARCH]` **Not a URL swap.** The render count structurally disagrees with the parsed-slide
       count (documented in the render trigger's own comments). Needs new `IMPORTED`-branch logic in
@@ -281,7 +281,7 @@ Explicitly excluded. Documented to prevent scope creep.
 | R076 | Phase 41 | Complete |
 | R077 | Phase 41 | Complete |
 | R078 | Phase 41 | Complete |
-| R079 | Phase 42 | Pending |
+| R079 | Phase 42 | Complete |
 | R080 | Phase 42 | Complete |
 | R081 | Phase 43 | Pending |
 | R082 | Phase 43 | Pending |

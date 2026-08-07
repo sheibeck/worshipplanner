@@ -5,15 +5,15 @@ milestone_name: Settings, Sharing, and Fidelity
 current_phase: 42
 current_phase_name: PowerPoint Rendered-Image Display
 status: executing
-stopped_at: Completed 42-01-PLAN.md — pptxRenders write hole closed, member-tier read granted, Phase 41 deploy handoff amended
-last_updated: "2026-08-07T09:57:49.903Z"
+stopped_at: Completed 42-02-PLAN.md — render-status data layer (type, path convention, store, Wave 0 mocks)
+last_updated: "2026-08-07T10:22:08.590Z"
 last_activity: 2026-08-07
 last_activity_desc: Phase 42 execution started
 progress:
   total_phases: 11
   completed_phases: 4
   total_plans: 23
-  completed_plans: 16
+  completed_plans: 17
   percent: 36
 ---
 
@@ -113,7 +113,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 42 (PowerPoint Rendered-Image Display) — EXECUTING
-Plan: 2 of 8
+Plan: 3 of 8
 Status: Ready to execute
 Last activity: 2026-08-07 — Phase 42 execution started
 module, authStore.settings merged once in loadOrgContext, vwModeEnabled dual-read, R073 test
@@ -1298,6 +1298,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 41 P03 | 35min | 3 tasks | 2 files |
 | Phase 41 P04 | 20min | 2 tasks | 2 files |
 | Phase 42 P01 | 8min | 3 tasks | 3 files |
+| Phase 42 P02 | 12min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -1586,6 +1587,10 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: WR-06 soft-fail must be tested with two independent Pinia instances — after a refresh failure, shareLinkCache caches false for that service, so a shared-store test of a second action's resolution would short-circuit silently
 - [Phase ?]: 42-01: proved D-01/D-02 write-hole premise via emulator PROBE before fixing; kept pptxRenders read at member tier (isOrgMember), not editor tier, per D-02
 - [Phase ?]: 42-01: amended Phase 41's existing PENDING-VERIFICATION.md deploy checkbox rather than adding a second handoff, per D-18 — one firebase deploy --only firestore:rules now covers both phases
+- [Phase ?]: PptxRenderDoc omits storagePath entirely (T-42-05) — the only sanctioned producer of a rendered-page path is renderedPagePath(orgId, renderImportId, pageNumber)
+- [Phase ?]: One onSnapshot listener per distinct renderImportId (D-20/A2), not a single in-query — recorded default, revisit only if listener count becomes a measured problem
+- [Phase ?]: Absence from rendersByImportId is the sole representation of 'no render document yet' — never a synthesized placeholder (T-42-07 stale-render guard)
+- [Phase ?]: SlideCard.vue and PresentationViewer.vue both consume an already-resolved imageUrl and never call Storage — neither needs a resolveImageUrl/getDownloadURL test mock (Wave 0 Q3, recorded for 42-06/42-07)
 
 ### Roadmap Evolution
 
@@ -1897,8 +1902,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-07T09:57:49.865Z
-Stopped at: Completed 42-01-PLAN.md — pptxRenders write hole closed, member-tier read granted, Phase 41 deploy handoff amended
+Last session: 2026-08-07T10:22:08.549Z
+Stopped at: Completed 42-02-PLAN.md — render-status data layer (type, path convention, store, Wave 0 mocks)
 Resume file: None
 
 ## Operator Next Steps
