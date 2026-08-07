@@ -5,15 +5,15 @@ milestone_name: Settings, Sharing, and Fidelity
 current_phase: 42
 current_phase_name: PowerPoint Rendered-Image Display
 status: executing
-stopped_at: Completed 42-02-PLAN.md — render-status data layer (type, path convention, store, Wave 0 mocks)
-last_updated: "2026-08-07T10:22:08.590Z"
+stopped_at: Completed 42-03-PLAN.md
+last_updated: "2026-08-07T10:36:53.296Z"
 last_activity: 2026-08-07
 last_activity_desc: Phase 42 execution started
 progress:
   total_phases: 11
   completed_phases: 4
   total_plans: 23
-  completed_plans: 17
+  completed_plans: 18
   percent: 36
 ---
 
@@ -113,7 +113,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 42 (PowerPoint Rendered-Image Display) — EXECUTING
-Plan: 3 of 8
+Plan: 4 of 8
 Status: Ready to execute
 Last activity: 2026-08-07 — Phase 42 execution started
 module, authStore.settings merged once in loadOrgContext, vwModeEnabled dual-read, R073 test
@@ -1299,6 +1299,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 41 P04 | 20min | 2 tasks | 2 files |
 | Phase 42 P01 | 8min | 3 tasks | 3 files |
 | Phase 42 P02 | 12min | 3 tasks | 6 files |
+| Phase 42 P03 | 16min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -1591,6 +1592,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: One onSnapshot listener per distinct renderImportId (D-20/A2), not a single in-query — recorded default, revisit only if listener count becomes a measured problem
 - [Phase ?]: Absence from rendersByImportId is the sole representation of 'no render document yet' — never a synthesized placeholder (T-42-07 stale-render guard)
 - [Phase ?]: SlideCard.vue and PresentationViewer.vue both consume an already-resolved imageUrl and never call Storage — neither needs a resolveImageUrl/getDownloadURL test mock (Wave 0 Q3, recorded for 42-06/42-07)
+- [Phase ?]: resolveImportedRender checks the absent-renderImportId case first, unconditionally, so a deck with no renderImportId is byte-identical to today's parsed path (D-16, T-42-07 defense in depth)
+- [Phase ?]: The self-contradictory 'ready' + renderedCount<1 render doc resolves to failed with no failureReason, never zero entries -- the server's own ready gate makes this state unproducible in practice
+- [Phase ?]: IMPORTED sourceSignature switches from an unsafe pipe-delimited encoding to the SCRIPTURE branch's control-character separators (importedRenderReconciler.ts); slideGroupMaterializer.ts is rewired to call it in 42-04
 
 ### Roadmap Evolution
 
@@ -1902,8 +1906,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-07T10:22:08.549Z
-Stopped at: Completed 42-02-PLAN.md — render-status data layer (type, path convention, store, Wave 0 mocks)
+Last session: 2026-08-07T10:36:53.254Z
+Stopped at: Completed 42-03-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
