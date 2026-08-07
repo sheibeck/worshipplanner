@@ -54,6 +54,16 @@ async function defaultLyricsLoader(orgId: string, songId: string): Promise<SongL
   return { id: docSnap.id, songId, ...data } as SongLyrics
 }
 
+// WR-02 (42-REVIEW.md): `pptxRendersStore` is a Pinia singleton, but this composable's
+// `cleanup()` calls its `unsubscribeAll()`, which tears down EVERY outstanding listener
+// in the store, not just the ones this particular instance opened. That is safe only
+// under the "single call site" assumption documented on `pptxRenders.ts` and below — an
+// assumption nothing in the store enforces. This module-level counter is a dev-mode
+// tripwire for exactly that assumption: it does not change teardown behavior (still a
+// full `unsubscribeAll()`, since scoping it per-instance is a real design change no plan
+// here authorizes), it only makes a violation loud instead of silent.
+let activeSlideshowAssemblyInstances = 0
+
 export interface UseSlideshowAssemblyOptions {
   /** Injectable lyrics loader — defaults to a real Firestore `getDocs` query. */
   lyricsLoader?: LyricsLoader
@@ -150,6 +160,9 @@ export function useSlideshowAssembly(
   const slideGroupsStore = useSlideGroups()
   const pptxRendersStore = usePptxRenders()
   const loadLyrics = options?.lyricsLoader ?? defaultLyricsLoader
+
+  // WR-02: see the module-level counter's doc comment above.
+  activeSlideshowAssemblyInstances += 1
 
   const canWrite = computed<boolean>(() => {
     const cw = options?.canWrite
@@ -705,6 +718,23 @@ export function useSlideshowAssembly(
     stopRebuildWatch()
     stopRenderSubscriptionWatch()
     stopRenderedUrlsWatch()
+
+    // WR-02: `activeSlideshowAssemblyInstances` still includes THIS instance at this
+    // point (it decrements below), so > 1 here means at least one other instance is
+    // still live — the single-call-site assumption `unsubscribeAll()`'s teardown-of-
+    // EVERY-listener behavior relies on is violated. Warn loudly rather than let this
+    // instance's unmount silently kill another instance's still-open render listeners.
+    if (import.meta.env.DEV && activeSlideshowAssemblyInstances > 1) {
+      console.warn(
+        '[useSlideshowAssembly] cleanup() is tearing down ALL pptxRenders listeners ' +
+          `(pptxRendersStore.unsubscribeAll() is store-wide, not per-instance) while ` +
+          `${activeSlideshowAssemblyInstances} instances of this composable are active. ` +
+          'A second concurrent consumer will have its render-status listeners silently ' +
+          'killed by this unmount. See WR-02, 42-REVIEW.md.',
+      )
+    }
+    activeSlideshowAssemblyInstances = Math.max(0, activeSlideshowAssemblyInstances - 1)
+
     pptxRendersStore.unsubscribeAll()
   }
 
