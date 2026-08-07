@@ -780,6 +780,44 @@ Both are candidates for a future phase.
 
 ---
 
+## Phase 41 — Sharing Correctness (R076, R077, R078)
+
+**Phase status: `firestore.rules` built and tested, NOT deployed.** `shareTokens`' `allow update`
+clause loosened from an unconditional `if false` to the org-scoped `serviceShares` idiom
+(`isOrgEditor(resource.data.orgId) && request.resource.data.orgId == resource.data.orgId`), and a new
+`serviceShareLinks/{serviceId}` block added with full org-editor CRUD, `orgId` immutable on update,
+and **no public read** — proven against the real Firestore emulator in `src/rules.test.ts` (see
+`41-01-SUMMARY.md` for before/after counts). Nothing was deployed.
+
+- [ ] **Deploy the updated `firestore.rules`** — `firebase deploy --only firestore:rules`.
+      **Ordering constraint, load-bearing:** deploy this **before, or in the same session as**, any
+      hosting deploy carrying Phase 41's app code (Plans 02-04). `ensureShareLink` reads
+      `serviceShareLinks/{serviceId}`, which the catch-all rule currently denies outright — if the app
+      ships to hosting before or without this rules deploy, the Share button fails outright for every
+      user and every service. There is deliberately no client-side fallback to the old
+      mint-fresh-every-time behaviour: a fallback would silently defeat R076 (link stability) and hide
+      a missed deploy behind working-looking UI, whereas a loud failure surfaces the ordering mistake
+      immediately.
+
+**`deleteService` share revocation — resolved as OUT OF SCOPE, not fixed this phase.**
+`41-RESEARCH.md` § Open Questions flags that `src/stores/services.ts::deleteService` (line 259) does
+not revoke a service's `shareTokens`/`serviceShares`/`serviceShareLinks` documents the way
+`quarters.ts::deleteQuarter` revokes `quarterShares`. Rationale for leaving it alone:
+
+1. None of R076/R077/R078 mentions delete — it is outside this phase's literal scope.
+2. It is **pre-existing** behaviour, not a regression this phase introduces — an orphaned public share
+   already outlives a deleted service today.
+3. This phase does make the orphan *more durable*: the token is now permanent (refreshed in place)
+   instead of being superseded by the next re-share, which raises rather than lowers the case for
+   building revocation deliberately later.
+4. The `allow delete` clauses on `shareTokens`, `serviceShares`, and the new `serviceShareLinks` are
+   all already in place and org-scoped, so a future phase can implement revocation without another
+   rules change or another owner deploy.
+
+Candidate for a future phase; not blocking v1.5.
+
+---
+
 ## Notes and failures
 
 _(Record anything that failed here, with what you saw versus what was expected.)_
