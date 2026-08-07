@@ -130,10 +130,33 @@ export function resolveImportedRender(
  * Mints the stable per-entry identity `derivedIdentityKey`/
  * `carryStoredDerivedEntries` key on across a rebuild. `ready` mode mints
  * synthetic `rendered-page-N` identities (Fact 1 — no `deck.slides[i].id`
- * pairing); every other mode reuses `deck.slides[i].id` so a pending→ready
- * transition for the first `deck.slides.length` slides can still carry
- * forward any per-entry label/audio/notes a user set before the render
- * completed. The returned array's length always equals `resolution.entryCount`.
+ * pairing); every other mode (`parsed`/`pending`/`failed`) reuses
+ * `deck.slides[i].id`.
+ *
+ * CR-01 (42-REVIEW.md) — corrected 2026-08-07: a `pending`/`failed` ->
+ * `ready` transition does NOT carry forward per-entry customization. A
+ * previous version of this comment claimed it could — that was false.
+ * `pending`/`failed` identities key on `deck.slides[i].id` (a parsed-slide
+ * UUID); `ready` identities key on the synthetic `rendered-page-N` string
+ * minted above. The two key spaces never overlap, so
+ * `carryStoredDerivedEntries` cannot match a stored pending/failed entry to
+ * its post-render counterpart: any label, per-slide `audioUrl`/`audioLoop`,
+ * or `notes` a user attached via "Edit details" while the render was still
+ * pending/failed is silently dropped — and the entry's `id` itself churns —
+ * the instant the render completes.
+ *
+ * This is an accepted trade-off, not an oversight left unfixed: Fact 1 (this
+ * module's header comment) rules out the one alternative that would restore
+ * the promise — a positional `deck.slides[i]` <-> rendered-page-`i+1` pairing
+ * — because `mapAstToSlides` (pptxParser.ts) skips slides and emits one entry
+ * per image on a multi-image slide, so an index-based carry-forward would
+ * attach a user's note to the WRONG slide, which is worse than dropping it.
+ * Neither `slideActionMenuItems` nor `EditSlideDrawer.vue` currently warns a
+ * user that edits made while a deck's render is pending/failed will not
+ * survive the transition to `ready` — see CR-01 for the follow-up options
+ * (a render-stable identity scheme, or a UI warning) if this trade-off ever
+ * needs revisiting. The returned array's length always equals
+ * `resolution.entryCount`.
  */
 export function importedEntryIdentities(
   deck: Pick<ImportedDeck, 'slides'>,

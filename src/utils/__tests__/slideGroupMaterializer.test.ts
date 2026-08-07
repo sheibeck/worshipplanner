@@ -2585,8 +2585,12 @@ describe('rebuildImportedGroup — render transitions', () => {
     const pendingInputs = makeRenderInputs(deck, makeRenderDoc({ status: 'pending' }))
 
     const initial = buildInitialGroup(slot, 'svc-1', pendingInputs)
-    const storedGroup: SlideGroup = makeGroup({ ...initial })
+    const pendingLabeledSlides = initial.slides.map((e, i) =>
+      i === 2 ? { ...e, label: 'Custom label (set while pending)', audioUrl: 'https://example.com/pending.mp3' } : e,
+    )
+    const storedGroup: SlideGroup = makeGroup({ ...initial, slides: pendingLabeledSlides })
     expect(storedGroup.slides).toHaveLength(5)
+    const pendingCustomizedEntry = storedGroup.slides[2]!
 
     const readyInputs = makeRenderInputs(deck, makeRenderDoc({ status: 'ready', renderedCount: 5 }))
     const firstRebuild = rebuildImportedGroup(storedGroup, slot, readyInputs)
@@ -2599,6 +2603,23 @@ describe('rebuildImportedGroup — render transitions', () => {
           e.sourceRef.kind === 'imported' && e.sourceRef.innerSlideId === `${RENDERED_PAGE_IDENTITY_PREFIX}${i + 1}`,
       ),
     ).toBe(true)
+
+    // CR-01 (42-REVIEW.md), corrected 2026-08-07: `pending`/`failed` entries
+    // key on `deck.slides[i].id`; `ready` entries key on the synthetic
+    // `rendered-page-N` string. The two key spaces never overlap, so
+    // `carryStoredDerivedEntries` cannot match the stored pending entry to its
+    // post-render counterpart — the label/audio a user set while the render
+    // was pending is DROPPED, and the entry's own `id` churns, on the very
+    // first pending -> ready rebuild. This is the documented (not accidental)
+    // behavior; `importedRenderReconciler.ts`'s `importedEntryIdentities` doc
+    // comment used to claim the opposite. Asserting it here is what closes
+    // the asymmetry with `Assumption A1` below, which pins the ready -> ready
+    // case where the SAME identity scheme genuinely does carry customization
+    // forward.
+    const readyCounterpart = firstRebuild.slides[2]!
+    expect(readyCounterpart.id).not.toBe(pendingCustomizedEntry.id)
+    expect(readyCounterpart.label).toBeUndefined()
+    expect(readyCounterpart.audioUrl).toBeUndefined()
 
     const rebuiltGroup: SlideGroup = { ...storedGroup, slides: firstRebuild.slides }
     const secondRebuild = rebuildImportedGroup(rebuiltGroup, slot, readyInputs)
