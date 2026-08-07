@@ -1,3 +1,20 @@
+import type { SlotKind, ServiceSection } from '@/types/service'
+
+/**
+ * A single entry in a church's default service template (R086/R087). Carries
+ * ONLY the item's type and its section — never chosen content (no `songId`,
+ * scripture reference, or body text) and never a computed Vertical Worship
+ * type. VW typing is derived fresh at service-creation time by
+ * `buildSlotsFromTemplate` (`src/utils/slotTypes.ts`) and is never stored
+ * here. Array order in `OrgSettings.defaultServiceTemplate` IS the
+ * creation/display order — there is no `position` field (Assumption A3).
+ */
+export interface ServiceTemplateEntry {
+  id: string
+  kind: SlotKind
+  section?: ServiceSection
+}
+
 /**
  * Church-level settings stored on `organizations/{orgId}.settings` (R073).
  *
@@ -40,6 +57,15 @@ export interface OrgSettings {
    * dual-read shape.
    */
   vwModeEnabled: boolean
+  /**
+   * Church-defined default set/order of items for a new blank service
+   * (R086/R087). Entries carry ONLY `{ id, kind, section }` — never chosen
+   * content and never a computed VW type, which is derived fresh at
+   * service-creation time. An empty array is a valid, deliberate default:
+   * per the owner's 2026-08-07 override, an empty/unset template produces
+   * an EMPTY new service, NOT `buildSlots()`'s 1-2-3 shape.
+   */
+  defaultServiceTemplate: ServiceTemplateEntry[]
 }
 
 /**
@@ -88,4 +114,5 @@ export const DEFAULT_ORG_SETTINGS: OrgSettings = {
   aiEnabled: true,
   pcEnabled: true,
   vwModeEnabled: true,
+  defaultServiceTemplate: [],
 }
