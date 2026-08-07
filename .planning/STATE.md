@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Settings, Sharing, and Fidelity
-current_phase: 39
-current_phase_name: org-settings-infrastructure-feature-toggles
-status: in_progress
-stopped_at: Completed 40.1-01-PLAN.md
-last_updated: "2026-08-07T01:59:30.131Z"
-last_activity: 2026-08-06
-last_activity_desc: "Phase 39 Plan 02 executed: OrgSettings/DEFAULT_ORG_SETTINGS type"
+current_phase: 41
+current_phase_name: Sharing Correctness
+status: executing
+stopped_at: Completed 41-01-PLAN.md
+last_updated: "2026-08-07T06:16:23.439Z"
+last_activity: 2026-08-07
+last_activity_desc: Phase 41 execution started
 progress:
   total_phases: 11
   completed_phases: 3
-  total_plans: 11
-  completed_plans: 11
+  total_plans: 15
+  completed_plans: 12
   percent: 27
 ---
 
@@ -102,7 +102,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** v1.5 Settings, Sharing, and Fidelity — ROADMAP.md created, ready to plan Phase 39
+**Current focus:** Phase 41 — Sharing Correctness
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -112,10 +112,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 39 of 48 (Org Settings Infrastructure & Feature Toggles)
-Plan: 6 of 6 in current phase (39-03 next)
-Status: Plan 02 (org settings infrastructure) complete — settings shape and dual-read merged
-Last activity: 2026-08-06 — Phase 39 Plan 02 executed: OrgSettings/DEFAULT_ORG_SETTINGS type
+Phase: 41 (Sharing Correctness) — EXECUTING
+Plan: 2 of 4
+Status: Ready to execute
+Last activity: 2026-08-07 — Phase 41 execution started
 module, authStore.settings merged once in loadOrgContext, vwModeEnabled dual-read, R073 test
 coverage (src/stores/__tests__/auth.test.ts)
 
@@ -1293,6 +1293,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 40 P03 | 35min | 2 tasks | 2 files |
 | Phase 40 P04 | 15min | 2 tasks | 3 files |
 | Phase 40.1 P01 | 4min | 3 tasks | 3 files |
+| Phase 41 P01 | 11min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -1571,6 +1572,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 40-04: None - plan executed exactly as written
 - [Phase ?]: 40-04: Backfill and runbook both confirmed against real artifacts: firebase.json deploy targets, plan 40-01's exact guard test title, and plan 40-03's exact CLAIM_REFRESH constants -- nothing invented or stale.
 - [Phase ?]: R104 fix: getAfter() for org-creation branch, get()/exists() for invite-acceptance branch — recommended arrangement worked on first emulator run, no swap needed
+- [Phase ?]: shareTokens/serviceShareLinks rules: null-resource-tolerant read clause overrides PATTERNS.md's bare isOrgEditor proposal to avoid bricking ensureShareLink's first call
+- [Phase ?]: deleteService share revocation left out of scope for Phase 41; recorded in PENDING-VERIFICATION.md as a future-phase candidate
 
 ### Roadmap Evolution
 
@@ -1882,8 +1885,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-07T01:59:30.063Z
-Stopped at: Completed 40.1-01-PLAN.md
+Last session: 2026-08-07T06:16:23.399Z
+Stopped at: Completed 41-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

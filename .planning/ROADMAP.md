@@ -248,10 +248,11 @@ Plans:
   4. Running the backfill against a service that already has several `shareTokens` documents (from the old mint-fresh-every-time behavior) adopts the most recent existing token rather than minting a new one, so links already circulated to a congregation keep working — proven by test
   5. The snapshot's existing PII guard (names only, never the raw Person object) is proven intact after the rework; deploying the updated `firestore.rules` remains the owner's step, with the exact command handed off in this phase's notes
 
-**Plans**: 4 plans
+**Plans**: 1/4 plans executed
 
 Plans:
-- [ ] 41-01-PLAN.md — Wave 1: loosen the `shareTokens` update rule, add the `serviceShareLinks` rules block with an absence-tolerant read, prove both against the emulator (20 tests), record the owner deploy handoff and the `deleteService` scope decision
+
+- [x] 41-01-PLAN.md — Wave 1: loosen the `shareTokens` update rule, add the `serviceShareLinks` rules block with an absence-tolerant read, prove both against the emulator (20 tests), record the owner deploy handoff and the `deleteService` scope decision
 - [ ] 41-02-PLAN.md — Wave 1: `src/utils/shareTokens.ts` — dependency-free `mintShareToken` / `shareTokenCreatedAtMillis` / `pickAdoptableToken`, with the R078 adoption ordering (org filter, `createdAt` desc, doc-id tiebreak, null-safe) proven without a Firestore mock
 - [ ] 41-03-PLAN.md — Wave 2: Wave 0 mock extension (`where`/`getDocs`/`limit`/`runTransaction`), extract `buildServiceSnapshot`, implement `ensureShareLink` (adopt-or-create via transaction, then write payload in place), retain `createShareToken` as a delegating wrapper
 - [ ] 41-04-PLAN.md — Wave 3: `maybeRefreshShareLink` hooked into `updateService` / `setRoleOverride` / `clearRoleOverride` behind the session cache and WR-06 soft-fail; prove no write-back and the PII guard on the refresh path
@@ -390,7 +391,7 @@ Plans:
 | 29-38 | v1.4 | 61/61 | Complete (archived) | 2026-08-05 |
 | 39. Org Settings Infrastructure & Feature Toggles | v1.5 | 6/6 | In Progress|  |
 | 40. Custom Auth Claim for Org Membership | v1.5 | 4/4 | In Progress|  |
-| 41. Sharing Correctness | v1.5 | 0/? | Not started | - |
+| 41. Sharing Correctness | v1.5 | 1/4 | In Progress|  |
 | 42. PowerPoint Rendered-Image Display | v1.5 | 0/? | Not started | - |
 | 43. Service Item Types | v1.5 | 0/? | Not started | - |
 | 44. Default Service Template | v1.5 | 0/? | Not started | - |

@@ -77,7 +77,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 
 ### Sharing
 
-- [ ] **R076**: A service's share link is created once and never changes, however many times the service
+- [x] **R076**: A service's share link is created once and never changes, however many times the service
       is shared or edited.
       <br>`[ARCH]` **Do not persist the token on the service document** as PROJECT.md's original decision
       states — a bare `{shareToken}` write matches none of the three R036 draft-lock carve-outs
@@ -86,7 +86,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
       `serviceShareLinks/{serviceId}` document. The owner's intent is unchanged; only the storage
       location moves.
 
-- [ ] **R077**: A shared service always shows the current plan and the current role overrides, without
+- [x] **R077**: A shared service always shows the current plan and the current role overrides, without
       anyone re-pressing Share.
       <br>`[ARCH]` `shareTokens` currently has `allow update: if false`, which blocks the refresh
       regardless of where the token lives — it must be loosened to mirror `serviceShares`' existing
@@ -278,8 +278,8 @@ Explicitly excluded. Documented to prevent scope creep.
 | R073 | Phase 39 | Complete |
 | R074 | Phase 40 | Complete |
 | R075 | Phase 40 | Complete |
-| R076 | Phase 41 | Pending |
-| R077 | Phase 41 | Pending |
+| R076 | Phase 41 | Complete |
+| R077 | Phase 41 | Complete |
 | R078 | Phase 41 | Pending |
 | R079 | Phase 42 | Pending |
 | R080 | Phase 42 | Pending |
