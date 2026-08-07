@@ -1081,6 +1081,277 @@ describe('useServiceStore', () => {
     })
   })
 
+  // ── R077 (41-04) — share-link auto-refresh on updateService/setRoleOverride/
+  // clearRoleOverride ───────────────────────────────────────────────────────
+  //
+  // getDoc responses are queued in CALL ORDER: maybeRefreshShareLink's own
+  // serviceShareLinks/{id} read is queued explicitly per case (shared vs.
+  // unshared). The NEXT getDoc call is writeSharePayload's memorable-URL org
+  // read, which is left to the mock's shared default (exists: true,
+  // { name: 'Grace Church', slug: 'grace-church' }) unless a case says
+  // otherwise — so it needs no explicit queuing for the ordinary shared cases.
+  describe('share-link auto-refresh (R077)', () => {
+    const EXISTING_LINK = { exists: () => true, data: () => ({ token: 'tok-existing', orgId: 'org-1', serviceId: 'service-1' }) }
+    const NO_LINK = { exists: () => false, data: () => ({}) }
+
+    it('updateService refreshes the payload with the new data (ROADMAP criterion 2)', async () => {
+      const { getDoc, setDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService({ notes: 'original notes' })])
+
+      vi.mocked(getDoc).mockResolvedValueOnce(EXISTING_LINK as never)
+
+      await store.updateService('service-1', { notes: 'a different value' })
+
+      const [docRef, data] = vi.mocked(setDoc).mock.calls[0]!
+      expect((docRef as { id: string }).id).toBe('tok-existing')
+      const snapshot = (data as Record<string, unknown>).serviceSnapshot as Record<string, unknown>
+      expect(snapshot.notes).toBe('a different value')
+    })
+
+    it("setRoleOverride refreshes the payload with the new override (R077)", async () => {
+      const { getDoc, setDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService()])
+
+      vi.mocked(getDoc).mockResolvedValueOnce(EXISTING_LINK as never)
+
+      await store.setRoleOverride('service-1', 'role-guitar', ['person-2'])
+
+      const [, data] = vi.mocked(setDoc).mock.calls[0]!
+      const snapshot = (data as Record<string, unknown>).serviceSnapshot as Record<string, unknown>
+      const roleAssignments = snapshot.roleAssignments as Array<{ roleId: string; personNames: string[] }>
+      const guitar = roleAssignments.find((r) => r.roleId === 'role-guitar')
+      expect(guitar?.personNames).toEqual(['Bob Jones'])
+    })
+
+    it('clearRoleOverride refreshes the payload back to the schedule, with no sentinel leaking through', async () => {
+      const { getDoc, setDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeService({ roleAssignmentOverrides: { 'role-guitar': ['person-2'] } } as never),
+      ])
+
+      vi.mocked(getDoc).mockResolvedValueOnce(EXISTING_LINK as never)
+
+      await store.clearRoleOverride('service-1', 'role-guitar')
+
+      const [, data] = vi.mocked(setDoc).mock.calls[0]!
+      const snapshot = (data as Record<string, unknown>).serviceSnapshot as Record<string, unknown>
+      const roleAssignments = snapshot.roleAssignments as Array<{ roleId: string; personNames: string[] }>
+      const guitar = roleAssignments.find((r) => r.roleId === 'role-guitar')
+      // role-guitar's schedule for 2026-03-08 is ['person-1'] -> Alice Smith.
+      expect(guitar?.personNames).toEqual(['Alice Smith'])
+      expect(JSON.stringify(data)).not.toContain('__DELETE_FIELD_SENTINEL__')
+    })
+
+    it('T-41-02: the only services write is the user\'s own save — no write-back — while the two forward share writes DO happen', async () => {
+      const { getDoc, updateDoc, setDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService()])
+
+      vi.mocked(getDoc).mockResolvedValueOnce(EXISTING_LINK as never)
+
+      await store.updateService('service-1', { notes: 'edited' })
+
+      // The forward writes happened — this case must not pass by the
+      // refresh silently doing nothing.
+      expect(setDoc).toHaveBeenCalledTimes(2) // shareTokens + serviceShares
+
+      // The ONLY services write is the user's own save.
+      expect(updateDoc).toHaveBeenCalledTimes(1)
+      const [updateDocRef] = vi.mocked(updateDoc).mock.calls[0]!
+      expect((updateDocRef as { path: string }).path).toContain('services')
+
+      // Neither setDoc call targeted a services path.
+      for (const [ref] of vi.mocked(setDoc).mock.calls) {
+        expect((ref as { path?: string }).path ?? '').not.toContain('organizations/org-1/services')
+      }
+    })
+
+    it('T-41-03: the PII guard holds on the REFRESH path (ROADMAP criterion 5)', async () => {
+      const { getDoc, setDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService()])
+
+      vi.mocked(getDoc).mockResolvedValueOnce(EXISTING_LINK as never)
+
+      await store.updateService('service-1', { notes: 'edited' })
+
+      // First setDoc call is the refresh's shareTokens write.
+      const [, data] = vi.mocked(setDoc).mock.calls[0]!
+      const serialized = JSON.stringify(data)
+      expect(serialized).not.toMatch(/email/i)
+      expect(serialized).not.toMatch(/phone/i)
+      expect(serialized).not.toMatch(/pcPersonId/i)
+    })
+
+    it('empty-service edge: empty slots and zero roles/people still write a valid snapshot with no throw', async () => {
+      const { getDoc, setDoc } = await import('firebase/firestore')
+      const { useRosterStore } = await import('@/stores/roster')
+      const { useServiceStore } = await import('../services')
+      vi.mocked(useRosterStore).mockReturnValueOnce({ people: [], roles: [] } as never)
+
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService({ slots: [] })])
+
+      vi.mocked(getDoc).mockResolvedValueOnce(EXISTING_LINK as never)
+
+      await expect(store.updateService('service-1', { notes: 'edited' })).resolves.not.toThrow()
+
+      const [, data] = vi.mocked(setDoc).mock.calls[0]!
+      const snapshot = (data as Record<string, unknown>).serviceSnapshot as Record<string, unknown>
+      expect(snapshot.slots).toEqual([])
+      expect(snapshot.roleAssignments).toEqual([])
+    })
+
+    it('idempotency edge: two consecutive refreshes with no intervening change write the same serviceSnapshot content', async () => {
+      const { getDoc, setDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService()])
+
+      vi.mocked(getDoc).mockResolvedValueOnce(EXISTING_LINK as never)
+      await store.updateService('service-1', {})
+      const [, data1] = vi.mocked(setDoc).mock.calls[0]!
+      const payload1 = data1 as Record<string, unknown>
+
+      // Second refresh: the token is now cached, so no second serviceShareLinks
+      // read is queued — the cached path is exercised here.
+      await store.updateService('service-1', {})
+      const [, data2] = vi.mocked(setDoc).mock.calls[2]! // 0,1 = first refresh's two writes; 2 = second refresh's shareTokens write
+      const payload2 = data2 as Record<string, unknown>
+
+      expect(payload2.serviceSnapshot).toEqual(payload1.serviceSnapshot)
+      expect(payload1.updatedAt).toBeDefined()
+      expect(payload2.updatedAt).toBeDefined()
+    })
+
+    it('single-write / atomicity edge: exactly one setDoc targets shareTokens and exactly one targets serviceShares per refresh', async () => {
+      const { getDoc, setDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService()])
+
+      vi.mocked(getDoc).mockResolvedValueOnce(EXISTING_LINK as never)
+
+      await store.updateService('service-1', { notes: 'edited' })
+
+      expect(setDoc).toHaveBeenCalledTimes(2)
+      const paths = vi.mocked(setDoc).mock.calls.map(([ref]) => (ref as { path?: string }).path ?? '')
+      expect(paths.filter((p) => p.includes('shareTokens'))).toHaveLength(1)
+      expect(paths.filter((p) => p.includes('serviceShares'))).toHaveLength(1)
+    })
+
+    it('an unshared service pays nothing per write: no share write, and getDoc is called at most once across two calls', async () => {
+      const { getDoc, setDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService()])
+
+      vi.mocked(getDoc).mockResolvedValueOnce(NO_LINK as never)
+
+      await store.updateService('service-1', { notes: 'first edit' })
+      await store.updateService('service-1', { notes: 'second edit' })
+
+      expect(setDoc).not.toHaveBeenCalled()
+      expect(vi.mocked(getDoc).mock.calls.length).toBeLessThanOrEqual(1)
+    })
+
+    it('an ordinary edit never creates a share link — the transaction set spy is never called', async () => {
+      const { getDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService()])
+
+      vi.mocked(getDoc).mockResolvedValueOnce(NO_LINK as never)
+
+      await store.updateService('service-1', { notes: 'edited' })
+
+      expect(mockTxSet).not.toHaveBeenCalled()
+    })
+
+    // Split into two independent cases, each with its own fresh Pinia
+    // instance: after a refresh failure, maybeRefreshShareLink deliberately
+    // caches `false` for that service (T-41-13, unbounded-retry guard), so a
+    // second refresh attempt on the SAME store instance would short-circuit
+    // before ever calling setDoc or console.error again — that's the correct
+    // production behavior, but it would make a shared-store version of this
+    // test pass or fail for the wrong reason.
+    it('soft-fail (WR-06): a rejected refresh write still lets updateService resolve, and logs console.error', async () => {
+      const { getDoc, setDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService()])
+
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+      vi.mocked(getDoc).mockResolvedValueOnce(EXISTING_LINK as never)
+      vi.mocked(setDoc).mockImplementationOnce(() => Promise.reject(new Error('shareTokens write failed')))
+
+      const resolvedValue = await store.updateService('service-1', { notes: 'edited' })
+      expect(resolvedValue).toBeUndefined() // resolved, not rejected
+      expect(consoleErrorSpy).toHaveBeenCalled()
+
+      consoleErrorSpy.mockRestore()
+    })
+
+    it('soft-fail (WR-06): a rejected refresh write still lets setRoleOverride resolve, and logs console.error', async () => {
+      setActivePinia(createPinia())
+      vi.clearAllMocks()
+      snapshotCallback = null
+      snapshotOptions = undefined
+
+      const { getDoc, setDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService()])
+
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+      vi.mocked(getDoc).mockResolvedValueOnce(EXISTING_LINK as never)
+      vi.mocked(setDoc).mockImplementationOnce(() => Promise.reject(new Error('shareTokens write failed')))
+
+      const roleResolvedValue = await store.setRoleOverride('service-1', 'role-guitar', ['person-2'])
+      expect(roleResolvedValue).toBeUndefined()
+      expect(consoleErrorSpy).toHaveBeenCalled()
+
+      consoleErrorSpy.mockRestore()
+    })
+
+    it('status-only transitions (markAsPlanned, reopenService) do NOT refresh the share payload', async () => {
+      const { setDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService({ status: 'draft' })])
+
+      await store.markAsPlanned('service-1')
+      expect(setDoc).not.toHaveBeenCalled()
+
+      triggerSnapshot([makeService({ status: 'planned' })])
+      await store.reopenService('service-1')
+      expect(setDoc).not.toHaveBeenCalled()
+    })
+  })
+
   // ── R036 / R037 — the store's draft-only write guard + status transitions ────
   //
   // Layer 2 of 3. These assertions deliberately mirror the `/services`
