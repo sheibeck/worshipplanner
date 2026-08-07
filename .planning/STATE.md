@@ -5,15 +5,15 @@ milestone_name: Settings, Sharing, and Fidelity
 current_phase: 43
 current_phase_name: Service Item Types
 status: executing
-stopped_at: Completed 43-02-PLAN.md
-last_updated: "2026-08-07T18:18:04.320Z"
+stopped_at: Completed 43-03-PLAN.md (resumed after power-loss crash, 2026-08-07)
+last_updated: "2026-08-07T21:30:00.000Z"
 last_activity: 2026-08-07
-last_activity_desc: Phase 43 execution started
+last_activity_desc: Resumed autonomous run; closed interrupted 43-03, next is 43-04
 progress:
   total_phases: 11
   completed_phases: 5
   total_plans: 27
-  completed_plans: 25
+  completed_plans: 26
   percent: 45
 ---
 
