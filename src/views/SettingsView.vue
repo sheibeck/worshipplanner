@@ -291,7 +291,28 @@
         <p v-if="aiSavedFeedback" class="text-green-400 text-sm mt-2">Saved!</p>
         <p v-if="aiSaveError" class="text-red-400 text-sm mt-2">{{ aiSaveError }}</p>
       </div>
+
+      <!-- Services section (R086/R087) — Phase 44's default service template. -->
+      <div class="rounded-lg bg-gray-900 border border-gray-800 p-4 mt-6">
+        <h2 class="text-sm font-semibold text-gray-300 mb-3">Services</h2>
+
+        <p class="text-xs text-gray-400 mb-3">
+          Define the default set and order of items every new blank service starts with.
+        </p>
+
+        <p class="text-sm text-gray-300 mb-3" data-testid="template-summary">{{ templateSummary }}</p>
+
+        <button
+          type="button"
+          :disabled="!authStore.isEditor"
+          class="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-md px-4 py-2 text-sm font-medium transition-colors"
+          data-testid="open-template-editor"
+          @click="templateEditorOpen = true"
+        >Edit Default Template</button>
+      </div>
     </div>
+
+    <ServiceTemplateEditor :is-open="templateEditorOpen" @close="templateEditorOpen = false" />
   </AppShell>
 </template>
 
@@ -301,8 +322,11 @@ import { doc, updateDoc, getDoc } from 'firebase/firestore'
 import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
 import AppShell from '@/components/AppShell.vue'
+import ServiceTemplateEditor from '@/components/settings/ServiceTemplateEditor.vue'
 import { validatePcCredentials } from '@/utils/planningCenterApi'
 import { deriveSlug, claimSlug } from '@/utils/slug'
+import { groupBySection } from '@/utils/slotTypes'
+import { SERVICE_SECTIONS } from '@/types/service'
 
 const authStore = useAuthStore()
 
@@ -347,6 +371,26 @@ const aiSaveError = ref<string | null>(null)
 const pcEnabledInput = ref(authStore.settings.pcEnabled)
 const pcEnabledSavedFeedback = ref(false)
 const pcEnabledSaveError = ref<string | null>(null)
+
+// ── Services / default service template state (R086/R087) ─────────────────────
+// No local defaults-merge/`?? []` here — `authStore.settings.defaultServiceTemplate`
+// is already defaulted by `loadOrgContext`'s single merge point (44-CONTEXT.md).
+
+const templateEditorOpen = ref(false)
+
+/** Copywriting Contract (44-UI-SPEC.md): "{N} items across {M} sections" when
+ *  configured, or the exact empty-template sentence when not. `M` counts only
+ *  non-empty NAMED `SERVICE_SECTIONS` buckets — mirrors the editor's own
+ *  `groupBySection` bucketing rule, so the two surfaces can never disagree. */
+const templateSummary = computed(() => {
+  const entries = authStore.settings.defaultServiceTemplate
+  if (entries.length === 0) {
+    return 'No default template set — new services start empty until you add items here.'
+  }
+  const grouped = groupBySection(entries, (entry) => entry.section)
+  const sectionCount = SERVICE_SECTIONS.filter((section) => grouped.sections[section].length > 0).length
+  return `${entries.length} items across ${sectionCount} sections`
+})
 
 // ── Computed ───────────────────────────────────────────────────────────────────
 
