@@ -303,14 +303,14 @@ Plans:
   4. Hymn no longer appears in the add-item palette, while every existing Hymn item already in a saved service still renders, prints, and presents exactly as before — palette-only removal, no migration
   5. Exporting a service to Planning Center shows Announcements, Miscellaneous, and Message as themselves, never silently relabeled "Message" — `addSlotAsItem`'s unguarded if-chain gets an explicit branch for each, proven by test, since this is a silent-fallthrough trap the compiler's exhaustive-switch checking does not catch
 
-**Plans**: 2/4 plans executed
+**Plans**: 4/4 plans executed
 
 Plans:
 
 - [x] 43-01-PLAN.md — widen `SlotKind` with ANNOUNCEMENTS/MISC, add the shared optional `body`, close every compiler-surfaced kind-dispatch site plus the two the compiler cannot see (wave 1)
 - [x] 43-02-PLAN.md — Planning Center: an explicit export branch per kind, the implicit else converted, and a `never`-typed exhaustiveness backstop (wave 2)
-- [ ] 43-03-PLAN.md — editor: Announcements/Miscellaneous chips in both palettes, Hymn chip retired, one shared body editor, Message URL control removed (wave 2)
-- [ ] 43-04-PLAN.md — print and share surfaces for the new kinds, the cross-surface HYMN absence-of-regression suite, and empirical proof the backstop fires (wave 3)
+- [x] 43-03-PLAN.md — editor: Announcements/Miscellaneous chips in both palettes, Hymn chip retired, one shared body editor, Message URL control removed (wave 2)
+- [x] 43-04-PLAN.md — print and share surfaces for the new kinds, the cross-surface HYMN absence-of-regression suite, and empirical proof the backstop fires (wave 3)
 
 **UI hint**: yes
 **Research flag**: skip — compiler-guided, existing well-understood architecture (widening `SlotKind`, matching the pattern `IMPORTED` already set for exactly this trap).
@@ -413,7 +413,7 @@ Plans:
 | 40. Custom Auth Claim for Org Membership | v1.5 | 4/4 | In Progress|  |
 | 41. Sharing Correctness | v1.5 | 4/4 | Complete    | 2026-08-07 |
 | 42. PowerPoint Rendered-Image Display | v1.5 | 8/8 | Complete    | 2026-08-07 |
-| 43. Service Item Types | v1.5 | 2/4 | In Progress|  |
+| 43. Service Item Types | v1.5 | 4/4 | In Progress|  |
 | 44. Default Service Template | v1.5 | 0/? | Not started | - |
 | 45. ESV/NLT Bible Version Selection | v1.5 | 0/? | Not started | - |
 | 46. Global Slide Typography | v1.5 | 0/? | Not started | - |

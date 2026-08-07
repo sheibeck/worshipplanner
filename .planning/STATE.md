@@ -5,16 +5,16 @@ milestone_name: Settings, Sharing, and Fidelity
 current_phase: 43
 current_phase_name: Service Item Types
 status: executing
-stopped_at: Completed 43-03-PLAN.md (resumed after power-loss crash, 2026-08-07)
-last_updated: "2026-08-07T21:30:00.000Z"
+stopped_at: Completed 43-04-PLAN.md (Phase 43 fully executed)
+last_updated: "2026-08-07T20:06:33.945Z"
 last_activity: 2026-08-07
-last_activity_desc: Resumed autonomous run; closed interrupted 43-03, next is 43-04
+last_activity_desc: Phase 43 execution started
 progress:
   total_phases: 11
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 27
-  completed_plans: 26
-  percent: 45
+  completed_plans: 27
+  percent: 55
 ---
 
 # Project State
@@ -151,7 +151,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 43 (Service Item Types) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-08-07 — Phase 43 execution started
 module, authStore.settings merged once in loadOrgContext, vwModeEnabled dual-read, R073 test
@@ -1345,6 +1345,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 42 P08 | 24min | 3 tasks | 3 files |
 | Phase 43 P01 | 9min | 3 tasks | 8 files |
 | Phase 43 P02 | 22min | 2 tasks | 2 files |
+| Phase 43 P04 | 35min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -1648,6 +1649,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 43-01: One shared NonAssignableSlot.body?: string (not per-kind fields) for MESSAGE/ANNOUNCEMENTS/MISC; ANNOUNCEMENTS/MISC reuse PRAYER's neutral badge colour; projected slide shows kind label not body (deferred owner check in PENDING-VERIFICATION.md)
 - [Phase ?]: Exhaustiveness backstop binds on slot.kind, not slot — NonAssignableSlot's shared 4-literal kind union doesn't narrow to never at the whole-object level via sequential if-return checks
 - [Phase ?]: MESSAGE branch prefers body over sermonPassage; ANNOUNCEMENTS/MISC pass length through per plan instruction
+- [Phase ?]: 43-04: SlotKind is a parallel, non-structural type — widening it alone does not reach addSlotAsItem's exhaustiveness backstop; the probe must widen NonAssignableSlot['kind'] to actually prove the backstop fires
+- [Phase ?]: 43-04: body renders on ServicePrintLayout.vue/ShareView.vue via each surface's own free-text vocabulary (whitespace-pre-wrap notes precedent), text interpolation only, absent body renders label-only like PRAYER — no shared component, no v-html
+- [Phase ?]: 43-04: T-43-03 (body visible in published share snapshot) accepted not mitigated — buildServiceSnapshot already copied slots wholesale since plan 01, and notes has published under the same share token since v1.0; recorded in PENDING-VERIFICATION.md for owner confirmation
 
 ### Roadmap Evolution
 
@@ -1959,8 +1963,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-07T18:18:04.275Z
-Stopped at: Completed 43-02-PLAN.md
+Last session: 2026-08-07T20:06:33.908Z
+Stopped at: Completed 43-04-PLAN.md (Phase 43 fully executed)
 Resume file: None
 
 ## Operator Next Steps

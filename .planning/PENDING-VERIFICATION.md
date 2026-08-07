@@ -980,6 +980,38 @@ assertion), stored-link survival and ordering stability are all proven against a
       box with **no URL control**; and confirms long pasted body text **wraps and grows downward**
       rather than scrolling the row sideways.
 
+### Plan 43-04 — team-facing surfaces, HYMN regression proof, and the compiler backstop (R081-R085)
+
+**Unit-level proof only**, on all three fronts below. Automated coverage lives in
+`src/components/__tests__/ServicePrintLayout.test.ts`, `src/views/__tests__/ShareView.test.ts`,
+`src/views/__tests__/hymnRetirement.regression.test.ts`, and `src/utils/__tests__/planningCenterApi.test.ts`.
+
+**T-43-03 (accepted, not mitigated) — `body` is published to anyone holding a share URL.**
+`buildServiceSnapshot` copies every slot wholesale into the published share document, so `body` enters
+that payload the moment plan 01 added the field — this plan's decision to render it on
+`ServicePrintLayout.vue`/`ShareView.vue` changes *visibility*, not *exposure*. Accepted on three
+grounds recorded in 43-04-PLAN.md's threat model: (1) the exposure already existed before this plan
+rendered anything, (2) `notes` — unbounded planner-authored free text — has published under the same
+share token since v1.0, and (3) the UI-SPEC defines Message `body` as "whatever text a planner wants
+the team to see," which is incompatible with keeping it off a team-facing share link.
+
+- [ ] **Owner confirms this is the wanted behaviour** — that `body` on MESSAGE/ANNOUNCEMENTS/MISC
+      slots should be visible to anyone holding a service's share URL, same as `notes` already is — or
+      asks for a narrower share-token trust model (a larger change, out of this phase's scope).
+
+**Backstop UI-B1 — a pre-existing HYMN slot looks right end-to-end.** `hymnRetirement.regression.test.ts`
+proves render/print/share/present/export in jsdom against a mounted component and a mocked `fetch` —
+not that the printed page or a projected slide looks right to a human eye.
+
+- [ ] **Owner opens a saved service containing a Hymn item** and confirms it still renders correctly in
+      the editor, prints correctly (use Print Preview), and presents correctly (start a presentation and
+      advance to the Hymn slide) — exactly as it did before this phase.
+
+**A real Planning Center export (43-VALIDATION.md's manual-only entry, restated here for this plan's
+sign-off).** Already recorded under Plan 43-02 above — not duplicated as a separate checkbox. The same
+live-credentials export that plan 02 asks for also exercises this plan's HYMN-export regression test's
+real-world counterpart: confirm the exported Hymn item's title is unaffected by the palette change.
+
 ---
 
 ## Notes and failures
