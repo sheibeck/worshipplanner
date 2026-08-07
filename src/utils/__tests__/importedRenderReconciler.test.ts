@@ -185,8 +185,8 @@ describe('importedEntryContent', () => {
 
   it("mode 'parsed' finds the slide by id and strips id/position", () => {
     const resolution: ImportedRenderResolution = { mode: 'parsed', entryCount: 5 }
-    const content = importedEntryContent(deck, resolution, 'is-2', undefined)
-    expect(content).toEqual({ contentKind: 'image', imageUrl: 'https://example.com/2.png' })
+    const content = importedEntryContent(deck, resolution, 'is-1', undefined)
+    expect(content).toEqual({ contentKind: 'image', imageUrl: 'https://example.com/1.png' })
   })
 
   it("mode 'parsed' returns undefined when the id no longer resolves", () => {
