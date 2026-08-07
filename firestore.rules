@@ -43,14 +43,21 @@ service cloud.firestore {
         // src/stores/auth.ts:264-350) are handled explicitly; nothing else authorizes
         // a create.
         allow create: if isSignedIn() && request.auth.uid == uid && (
-          // Flow 1: org creation. The org doc is created in the SAME atomic batch as
-          // this write (ensureUserDocument, auth.ts:327 then :334) — getAfter(), not
-          // get(), because get()/exists() reflect state as of the START of the
-          // batch and will not see the sibling org-create operation. getAfter() is
-          // Firestore's documented primitive for "these writes must land together."
-          // Role is forced to 'editor', matching the hardcoded value the client
-          // already sends on this path — no client discretion is lost.
-          (getAfter(/databases/$(database)/documents/organizations/$(orgId)).data.createdBy == request.auth.uid
+          // Flow 1: org creation. CR-01: getAfter() alone only proves "createdBy
+          // CURRENTLY equals my uid" -- createdBy is set once and never cleared, so
+          // without the !exists() guard below, ANY past founder (even one explicitly
+          // removed via TeamView's "Remove member") could re-grant themselves
+          // role: 'editor' at any later time with a bare setDoc, no batch required.
+          // !exists() reflects state as of the START of this operation -- unlike
+          // getAfter(), it CANNOT see this batch's own sibling org-create write, so
+          // it is only true when the org genuinely did not exist before this batch
+          // began. Combined with getAfter()'s post-batch createdBy check, the two
+          // together prove genuine same-batch creation ("this org is being created
+          // right now, by me"), not merely a createdBy field match. Role is forced
+          // to 'editor', matching the hardcoded value the client already sends on
+          // this path — no client discretion is lost.
+          (!exists(/databases/$(database)/documents/organizations/$(orgId))
+            && getAfter(/databases/$(database)/documents/organizations/$(orgId)).data.createdBy == request.auth.uid
             && request.resource.data.role == 'editor')
 
           ||

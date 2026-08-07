@@ -245,6 +245,26 @@ describe('Members create — R104 self-service membership hole', () => {
     })
     await assertFails(batch.commit())
   })
+
+  // CR-01 regression — the org-creation branch used getAfter() alone, which only proves
+  // "createdBy currently equals my uid," not "this org is being created right now, by me."
+  // createdBy is set once and never cleared, so ANY past founder — even one explicitly
+  // removed via TeamView's "Remove member" — could re-grant themselves role: 'editor' at
+  // any later time with a bare setDoc. This test seeds exactly that scenario: an org that
+  // already exists, whose createdBy already equals the attempting user, with NO member doc
+  // present (simulating removal having already run). Confirmed FAILING against the
+  // unfixed rule before the !exists() guard was added (per Pitfall-4 discipline).
+  it('DENIES a removed former founder from recreating their own editor membership', async () => {
+    await seedDoc('organizations/orgA', { name: "Founder's Church", createdBy: 'founder' })
+    const context = testEnv.authenticatedContext('founder', { email: 'founder@example.com' })
+    const db = context.firestore()
+    await assertFails(
+      setDoc(doc(db, 'organizations', 'orgA', 'members', 'founder'), {
+        role: 'editor',
+        joinedAt: new Date(),
+      }),
+    )
+  })
 })
 
 describe('Catch-all deny', () => {
