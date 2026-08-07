@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ref, reactive, computed, nextTick, effectScope, type EffectScope } from 'vue'
 import { useSlideshowAssembly as useSlideshowAssemblyImpl } from '@/composables/useSlideshowAssembly'
+import { renderedPagePath } from '@/utils/renderedPagePaths'
 import type { Service, ServiceSlot, HymnSlot, SongSlot, ScriptureSlot } from '@/types/service'
 import type { SongLyrics } from '@/types/songLyrics'
 import type { ScriptureReading } from '@/types/scriptureReading'
@@ -1566,6 +1567,172 @@ describe('useSlideshowAssembly', () => {
 
       activeScopes.splice(0).forEach((scope) => scope.stop())
       expect(mockUnsubscribeAllPptxRenders).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  // --- Phase 42 (R079/R080): resolved rendered-page URL caching (42-08 Task 2) ---
+  describe('rendered-page URL resolution and caching (Task 2)', () => {
+    function importedSlot(id: string, importId: string): ServiceSlot {
+      return { kind: 'IMPORTED', id, position: 0, importId, section: 'pre-service' }
+    }
+
+    function deckWithRender(id: string, renderImportId: string, slideIds: string[]): ImportedDeck {
+      return {
+        id,
+        sourceFileName: `${id}.pptx`,
+        section: 'pre-service',
+        slides: slideIds.map((slideId, i) => ({
+          id: slideId,
+          position: i,
+          contentKind: 'text',
+          title: `T${i}`,
+          body: `B${i}`,
+        })),
+        renderImportId,
+        createdAt: {} as never,
+        updatedAt: {} as never,
+      }
+    }
+
+    function fakeUrl(path: string): string {
+      return `https://fake-storage.test/${path}`
+    }
+
+    it('resolves one URL per rendered page for a ready render, with the correct 1-based padded path for the first and last page', async () => {
+      importedState.decks = [deckWithRender('deck-1', 'render-1', ['inner-1'])]
+      const service = ref<Service | null>(makeService([importedSlot('slot-imported-a', 'deck-1')]))
+      useSlideshowAssembly(service, 'org-1')
+      await nextTick()
+
+      pptxRendersState.rendersByImportId.set('render-1', { status: 'ready', renderedCount: 3 })
+      await nextTick()
+      await vi.waitFor(() => expect(mockResolveImageUrl).toHaveBeenCalledTimes(3))
+
+      expect(mockResolveImageUrl).toHaveBeenCalledWith(renderedPagePath('org-1', 'render-1', 1))
+      expect(mockResolveImageUrl).toHaveBeenCalledWith(renderedPagePath('org-1', 'render-1', 3))
+    })
+
+    it('accessing assembledSlideshow.value repeatedly does not re-issue Storage calls for an already-resolved render (42-RESEARCH.md Pitfall 4)', async () => {
+      importedState.decks = [deckWithRender('deck-1', 'render-1', ['inner-1'])]
+      const service = ref<Service | null>(makeService([importedSlot('slot-imported-a', 'deck-1')]))
+      const { assembledSlideshow } = useSlideshowAssembly(service, 'org-1')
+
+      pptxRendersState.rendersByImportId.set('render-1', { status: 'ready', renderedCount: 1 })
+      await nextTick()
+      await vi.waitFor(() => expect(mockResolveImageUrl).toHaveBeenCalledTimes(1))
+
+      void assembledSlideshow.value
+      void assembledSlideshow.value
+      void assembledSlideshow.value
+      expect(mockResolveImageUrl).toHaveBeenCalledTimes(1)
+    })
+
+    it('a renderedCount change re-resolves and the exposed slideshow serves the NEW array, never the previous one (T-42-07)', async () => {
+      importedState.decks = [deckWithRender('deck-1', 'render-1', ['inner-1'])]
+      const service = ref<Service | null>(makeService([importedSlot('slot-imported-a', 'deck-1')]))
+      const { assembledSlideshow } = useSlideshowAssembly(service, 'org-1')
+
+      pptxRendersState.rendersByImportId.set('render-1', { status: 'ready', renderedCount: 1 })
+      await nextTick()
+      await vi.waitFor(() => expect(mockResolveImageUrl).toHaveBeenCalledTimes(1))
+      expect(assembledSlideshow.value).toHaveLength(1)
+      expect((assembledSlideshow.value[0]!.slide as { imageUrl?: string }).imageUrl).toBe(
+        fakeUrl(renderedPagePath('org-1', 'render-1', 1)),
+      )
+
+      mockResolveImageUrl.mockClear()
+      pptxRendersState.rendersByImportId.set('render-1', { status: 'ready', renderedCount: 2 })
+      await nextTick()
+      await vi.waitFor(() => expect(mockResolveImageUrl).toHaveBeenCalledTimes(2))
+
+      const slides = assembledSlideshow.value
+      expect(slides).toHaveLength(2)
+      expect((slides[0]!.slide as { imageUrl?: string }).imageUrl).toBe(fakeUrl(renderedPagePath('org-1', 'render-1', 1)))
+      expect((slides[1]!.slide as { imageUrl?: string }).imageUrl).toBe(fakeUrl(renderedPagePath('org-1', 'render-1', 2)))
+    })
+  })
+
+  // --- Phase 42 (R079/R080): a render transition writes the group exactly
+  // once, with no special case for the state it started from (42-08 Task 2) ---
+  describe('render-status transition write count (D-10 / D-12)', () => {
+    function importedSlot(id: string, importId: string): ServiceSlot {
+      return { kind: 'IMPORTED', id, position: 0, importId, section: 'pre-service' }
+    }
+
+    function deckWithRender(id: string, renderImportId: string, slideIds: string[]): ImportedDeck {
+      return {
+        id,
+        sourceFileName: `${id}.pptx`,
+        section: 'pre-service',
+        slides: slideIds.map((slideId, i) => ({
+          id: slideId,
+          position: i,
+          contentKind: 'text',
+          title: `T${i}`,
+          body: `B${i}`,
+        })),
+        renderImportId,
+        createdAt: {} as never,
+        updatedAt: {} as never,
+      }
+    }
+
+    /** A group whose stored entries already match the deck's pending/failed
+     * (parsed-identity) fallback derivation, so the FIRST recompute after
+     * mount is a no-op (`changed: false`) — isolating the assertion to the
+     * transition itself, not to an unrelated initial materialization. */
+    function matchingImportedGroup(slotId: string, importId: string, slideIds: string[]): SlideGroup {
+      return {
+        id: slotId,
+        slotId,
+        serviceId: 'service-1',
+        slides: slideIds.map((innerSlideId, i) => ({
+          id: `${slotId}-entry-${i}`,
+          order: i,
+          sourceRef: { kind: 'imported', importId, innerSlideId },
+        })),
+        createdAt: {} as never,
+        updatedAt: {} as never,
+      }
+    }
+
+    it('a pending → ready transition issues exactly ONE replaceGroupSlides call, and no more on subsequent recomputes (D-10)', async () => {
+      importedState.decks = [deckWithRender('deck-1', 'render-1', ['inner-1', 'inner-2'])]
+      slideGroupsState.groups = [matchingImportedGroup('slot-imported-a', 'deck-1', ['inner-1', 'inner-2'])]
+      const service = ref<Service | null>(makeService([importedSlot('slot-imported-a', 'deck-1')]))
+      useSlideshowAssembly(service, 'org-1', { canWrite: true })
+      // No render document yet → pending mode, byte-identical to the stored group.
+      await nextTick()
+      await nextTick()
+      expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
+
+      pptxRendersState.rendersByImportId.set('render-1', { status: 'ready', renderedCount: 2 })
+      await nextTick()
+      await nextTick()
+      expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+
+      // Further recomputes against the SAME unrebuilt stored group (e.g. the
+      // async URL resolution settling) must not re-issue the write.
+      await nextTick()
+      await nextTick()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+    })
+
+    it('a failed → ready transition produces an identical single-write result, with no special case (D-12)', async () => {
+      importedState.decks = [deckWithRender('deck-2', 'render-2', ['inner-1', 'inner-2'])]
+      slideGroupsState.groups = [matchingImportedGroup('slot-imported-b', 'deck-2', ['inner-1', 'inner-2'])]
+      pptxRendersState.rendersByImportId.set('render-2', { status: 'failed', renderedCount: 0, failureReason: 'x' })
+      const service = ref<Service | null>(makeService([importedSlot('slot-imported-b', 'deck-2')]))
+      useSlideshowAssembly(service, 'org-1', { canWrite: true })
+      await nextTick()
+      await nextTick()
+      expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
+
+      pptxRendersState.rendersByImportId.set('render-2', { status: 'ready', renderedCount: 2 })
+      await nextTick()
+      await nextTick()
+      expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
     })
   })
 })

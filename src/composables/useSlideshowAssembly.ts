@@ -19,6 +19,8 @@ import { useScriptureSlides } from '@/stores/scriptureSlides'
 import { useImportedSlides } from '@/stores/importedSlides'
 import { useSlideGroups } from '@/stores/slideGroups'
 import { usePptxRenders } from '@/stores/pptxRenders'
+import { resolveImageUrl } from '@/utils/pptxUpload'
+import { renderedPagePath } from '@/utils/renderedPagePaths'
 import { assembleSlideshow, type AssemblyInputs } from '@/utils/slideshowAssembler'
 import { buildInitialGroup, rebuildGroup, sourceSignature, type RebuildResult } from '@/utils/slideGroupMaterializer'
 import { SERVICE_SECTIONS, SERVICE_SECTION_LABELS, type Service } from '@/types/service'
@@ -226,6 +228,92 @@ export function useSlideshowAssembly(
     { immediate: true },
   )
 
+  // --- Phase 42 (R079/R080): resolve and cache rendered-page download URLs ---
+  //
+  // Keyed `${renderImportId}:${renderedCount}` — the count is load-bearing TWICE
+  // (42-RESEARCH.md Pitfall 4 / T-42-07): it invalidates the cache the instant a
+  // re-render changes the page count, AND it makes serving a previous render's
+  // URL array structurally impossible, since a differently-counted re-render can
+  // never collide with the old key.
+  const renderedUrlCache = reactive(new Map<string, string[]>())
+
+  function renderedUrlCacheKey(renderImportId: string, renderedCount: number): string {
+    return `${renderImportId}:${renderedCount}`
+  }
+
+  // Fully SYNCHRONOUS (same split as `distinctSongIds`/`distinctRenderImportIds`
+  // above) — a string signal encoding each currently-referenced id's status and
+  // renderedCount, so the watch below re-fires exactly when a document transitions
+  // (pending → ready, or a re-render's count changes) rather than only when the id
+  // SET changes. This is what gives criterion 4 its LIVE reactivity: the id set
+  // alone does not change across a pending → ready transition, only this signal does.
+  const renderReadySignal = computed<string>(() =>
+    distinctRenderImportIds.value
+      .map((id) => {
+        const render = pptxRendersStore.rendersByImportId.get(id)
+        return `${id}:${render?.status ?? ''}:${render?.renderedCount ?? ''}`
+      })
+      .join('|'),
+  )
+
+  async function loadMissingRenderedUrls(org: string | null, ids: string[]) {
+    if (!org) return
+
+    const toLoad: { id: string; count: number }[] = []
+    for (const id of ids) {
+      const render = pptxRendersStore.rendersByImportId.get(id)
+      if (!render || render.status !== 'ready') continue
+      const count = render.renderedCount
+      if (count === undefined || count < 1) continue
+      if (renderedUrlCache.has(renderedUrlCacheKey(id, count))) continue
+      toLoad.push({ id, count })
+    }
+    if (toLoad.length === 0) return
+
+    await Promise.all(
+      toLoad.map(async ({ id, count }) => {
+        try {
+          const urls = await Promise.all(
+            Array.from({ length: count }, (_, i) => resolveImageUrl(renderedPagePath(org, id, i + 1))),
+          )
+          renderedUrlCache.set(renderedUrlCacheKey(id, count), urls)
+        } catch (err) {
+          // Same containment posture as `materializeCandidates`/`applyRebuildOutcomes`
+          // (HI-01): one unreadable page must not abort resolution for other decks in
+          // the same batch. Logged, not thrown — a failed resolution simply leaves the
+          // cache miss, so `renderedImageUrlsByImportId` continues to omit this deck.
+          console.error('[useSlideshowAssembly] rendered-page URL resolution failed:', err)
+        }
+      }),
+    )
+  }
+
+  const stopRenderedUrlsWatch = watch(
+    [distinctRenderImportIds, renderReadySignal, resolvedOrgId],
+    ([ids, , org]) => {
+      void loadMissingRenderedUrls(org, ids)
+    },
+    { immediate: true },
+  )
+
+  // Walks the LIVE render documents (not the id list) so a `pending → ready`
+  // transition is reflected the moment the store's `onSnapshot` updates
+  // `rendersByImportId`. Emits an entry ONLY when the cache holds the array for
+  // THAT document's CURRENT `renderedCount` — never a stale array left over from a
+  // previous render's count — which is what makes a stale array unreachable
+  // rather than merely unlikely (T-42-07).
+  const renderedImageUrlsByImportId = computed<Map<string, string[]>>(() => {
+    const map = new Map<string, string[]>()
+    for (const [id, render] of pptxRendersStore.rendersByImportId) {
+      if (render.status !== 'ready') continue
+      const count = render.renderedCount
+      if (count === undefined || count < 1) continue
+      const urls = renderedUrlCache.get(renderedUrlCacheKey(id, count))
+      if (urls) map.set(id, urls)
+    }
+    return map
+  })
+
   // --- per-song current lyrics: songLyrics store is single-song, so gather here ---
   const songLyricsById = reactive(new Map<string, SongLyrics>())
   const isLoading = ref(false)
@@ -275,6 +363,8 @@ export function useSlideshowAssembly(
       scriptureReadingsById: scriptureReadingsById.value,
       importedDecksById: importedDecksById.value,
       groupsBySlotId: slideGroupsStore.groupsBySlotId,
+      pptxRendersByImportId: pptxRendersStore.rendersByImportId,
+      renderedImageUrlsByImportId: renderedImageUrlsByImportId.value,
     })
   })
 
@@ -322,6 +412,8 @@ export function useSlideshowAssembly(
       scriptureReadingsById: scriptureReadingsById.value,
       importedDecksById: importedDecksById.value,
       groupsBySlotId: slideGroupsStore.groupsBySlotId,
+      pptxRendersByImportId: pptxRendersStore.rendersByImportId,
+      renderedImageUrlsByImportId: renderedImageUrlsByImportId.value,
     }
 
     const candidates: MaterializationCandidate[] = []
@@ -448,6 +540,8 @@ export function useSlideshowAssembly(
           scriptureReadingsById: scriptureReadingsById.value,
           importedDecksById: importedDecksById.value,
           groupsBySlotId: slideGroupsStore.groupsBySlotId,
+          pptxRendersByImportId: pptxRendersStore.rendersByImportId,
+          renderedImageUrlsByImportId: renderedImageUrlsByImportId.value,
         }
         // Deliberately does NOT skip a zero-slide derivation the way
         // `materializationCandidates` does above — see this function's own
@@ -501,6 +595,8 @@ export function useSlideshowAssembly(
       scriptureReadingsById: scriptureReadingsById.value,
       importedDecksById: importedDecksById.value,
       groupsBySlotId: slideGroupsStore.groupsBySlotId,
+      pptxRendersByImportId: pptxRendersStore.rendersByImportId,
+      renderedImageUrlsByImportId: renderedImageUrlsByImportId.value,
     }
 
     const outcomes: RebuildOutcome[] = []
@@ -599,6 +695,7 @@ export function useSlideshowAssembly(
     stopMaterializeWatch()
     stopRebuildWatch()
     stopRenderSubscriptionWatch()
+    stopRenderedUrlsWatch()
     pptxRendersStore.unsubscribeAll()
   }
 
