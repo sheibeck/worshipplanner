@@ -81,6 +81,44 @@ writing a comment. See CLAUDE.md.
 `.planning/PENDING-VERIFICATION.md` — one running list across all phases, written as the owner's
 to-do for when they return.
 
+### ★ OWNER DECISION 2026-08-07 — Phase 39's dependency is SATISFIED for planning purposes
+
+Asked and answered during the autonomous run, at the point it would first have blocked Phase 44.
+
+**Question:** Phases 44, 45, 46 and 47 all declare `Depends on: Phase 39`. Phase 39 is code-complete
+and 4/4 automatically verified, but is still `verification_deferred_human` — so `phase_complete` is
+false and the roadmap projection reports `deps_satisfied: false` for all four.
+
+**Owner's answer: proceed — treat Phase 39 as satisfied.** Build 44-47 against the existing, tested
+`OrgSettings` shape.
+
+**Rationale, recorded so it is not re-litigated:** what those four phases actually consume from Phase 39
+is the typed `OrgSettings` shape and its single defaults-merge in `auth.ts::loadOrgContext` — which
+exists, is tested, and passed automated verification. Phase 39's outstanding item is the owner's
+hands-on UI pass (5 UI-SPEC backstops, starred item 39.03-1 on Planning Center credential retention),
+not the code contract these phases build on.
+
+**The accepted risk, stated plainly:** if the owner's later verification of Phase 39 turns up a real
+defect in the settings shape itself, work built on top of it may need rework. That trade was made
+knowingly.
+
+**This does NOT mark Phase 39 complete.** It stays `verification_deferred_human`, its
+`PENDING-VERIFICATION.md` items stay unchecked, and `/gsd-verify-work 39` remains the resume path. The
+decision unblocks *dependent planning*, nothing else — consistent with the grant's rule that a deferred
+check is never recorded as passed.
+
+### ★ OWNER DECISION 2026-08-07 — deploys stay prohibited, including for the live T-37-15 hole
+
+Also asked and answered mid-run. Phase 42 **proved by emulator probe** that an org editor can currently
+forge a PPTX render `ready` flip on their own org — a live production vulnerability caused by
+`firestore.rules`' generic wildcard granting write to any nested collection not explicitly excluded.
+
+The owner was offered a one-time authorization to run `firebase deploy --only firestore:rules` and
+**declined**: the deploy prohibition stands. The fix ships built, tested, and undeployed, and the hole
+stays open in production until the owner deploys. Bounded — an editor can affect only their own org's
+render state, never another org's. One deploy now covers both Phase 41's and Phase 42's rules clauses.
+See `.planning/PENDING-VERIFICATION.md` and `42-SECURITY.md`.
+
 ---
 
 <details>
