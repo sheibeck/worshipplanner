@@ -10,6 +10,9 @@ import {
   deleteSlideConfirmBody,
   slideActionMenuItems,
   backgroundImageLabel,
+  RENDER_FAILURE_SENTENCES,
+  RENDER_FAILURE_FALLBACK_SENTENCE,
+  renderFailureSentence,
   type MenuItemKey,
 } from '../slideDisplay'
 import type { ServiceSlot, SlotKind } from '@/types/service'
@@ -34,6 +37,63 @@ describe('slideDisplay', () => {
       // glued into a class name that a purge-scanner couldn't find verbatim.
       for (const kind of ALL_KINDS) {
         expect(KIND_BADGE_CLASSES[kind]).not.toContain('${')
+      }
+    })
+  })
+
+  describe('renderFailureSentence', () => {
+    it('maps missing-render-doc to its authored sentence', () => {
+      expect(renderFailureSentence('missing-render-doc')).toBe("This deck's render record is missing.")
+    })
+
+    it('maps missing-storage-path to its authored sentence', () => {
+      expect(renderFailureSentence('missing-storage-path')).toBe("The rendered file couldn't be located.")
+    })
+
+    it('falls back to the generic sentence for undefined', () => {
+      expect(renderFailureSentence(undefined)).toBe(RENDER_FAILURE_FALLBACK_SENTENCE)
+    })
+
+    it('falls back to the generic sentence for incomplete-render, a real backend value the table deliberately does not map', () => {
+      expect(renderFailureSentence('incomplete-render')).toBe(RENDER_FAILURE_FALLBACK_SENTENCE)
+    })
+
+    it('falls back to the generic sentence for the empty string', () => {
+      expect(renderFailureSentence('')).toBe(RENDER_FAILURE_FALLBACK_SENTENCE)
+    })
+
+    it('falls back to the generic sentence for a markup-shaped string, and never echoes it back', () => {
+      const hostile = '<script>alert(1)</script>'
+      const result = renderFailureSentence(hostile)
+      expect(result).toBe(RENDER_FAILURE_FALLBACK_SENTENCE)
+      expect(result).not.toContain(hostile)
+    })
+
+    it('returns one of exactly three authored sentences for any hostile or unexpected input', () => {
+      const authoredSentences = [
+        "This deck's render record is missing.",
+        "The rendered file couldn't be located.",
+        RENDER_FAILURE_FALLBACK_SENTENCE,
+      ]
+      const hostileInputs = [
+        '',
+        'incomplete-render',
+        '<script>alert(1)</script>',
+        'MISSING-RENDER-DOC',
+        '   ',
+        'undefined',
+        'null',
+        '{"injected":true}',
+        'missing-render-doc; DROP TABLE renders;',
+      ]
+      for (const input of hostileInputs) {
+        expect(authoredSentences).toContain(renderFailureSentence(input))
+      }
+    })
+
+    it('RENDER_FAILURE_SENTENCES contains no value built by string interpolation', () => {
+      for (const value of Object.values(RENDER_FAILURE_SENTENCES)) {
+        expect(value).not.toContain('${')
       }
     })
   })

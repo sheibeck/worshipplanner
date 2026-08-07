@@ -52,6 +52,45 @@ export const KIND_BADGE_CLASSES: Record<SlotKind, string> = {
 }
 
 /**
+ * Static, fully-spelled-out failure-reason → human-sentence lookup — the
+ * copywriting-contract table from 42-UI-SPEC.md, reproduced verbatim, in the
+ * same shape as `KIND_BADGE_CLASSES` above: a complete literal `Record`,
+ * never a value built by string interpolation. The backend's `failureReason`
+ * slug space is open (`functions/src/index.ts` can add a new reason without a
+ * client deploy), so this table is deliberately NOT exhaustive — see
+ * `RENDER_FAILURE_FALLBACK_SENTENCE` and `renderFailureSentence` below for
+ * the arm that covers everything this table doesn't name, including
+ * `incomplete-render` (a real backend value the UI-SPEC's contract
+ * deliberately leaves unmapped; see 42-06-PLAN.md's recorded decision).
+ */
+export const RENDER_FAILURE_SENTENCES: Record<string, string> = {
+  'missing-render-doc': "This deck's render record is missing.",
+  'missing-storage-path': "The rendered file couldn't be located.",
+}
+
+/** The fallback sentence `renderFailureSentence` returns for any input not a key of `RENDER_FAILURE_SENTENCES` — including `undefined`, the empty string, and any value a tampered document might carry (T-42-04). */
+export const RENDER_FAILURE_FALLBACK_SENTENCE = "This slide couldn't be rendered."
+
+/**
+ * The ONE sanctioned route from a render document's raw `failureReason` slug
+ * to the DOM (`SlideBase.renderFailureReason`'s own doc comment names this
+ * function as its only legal consumer). Never render `failureReason` any
+ * other way.
+ *
+ * The fallback arm is written out explicitly rather than left to
+ * exhaustiveness — the same defensive posture `slideActionMenuItems`'s
+ * `default` arm takes below, and for the same reason: the key space here is
+ * open. This closes off T-42-04 structurally — whatever string a tampered
+ * render document carries, including markup, the return value is always one
+ * of exactly three authored sentences, and the input string itself never
+ * appears in the output.
+ */
+export function renderFailureSentence(reason: string | undefined): string {
+  if (reason === undefined) return RENDER_FAILURE_FALLBACK_SENTENCE
+  return RENDER_FAILURE_SENTENCES[reason] ?? RENDER_FAILURE_FALLBACK_SENTENCE
+}
+
+/**
  * Display title for a plan item's rail row. Returns the song title for a
  * SONG slot, a readable passage reference for a SCRIPTURE slot, the hymn
  * name for a HYMN slot, and the existing per-kind label (`slotLabel`) for
