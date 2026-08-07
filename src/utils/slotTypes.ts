@@ -12,6 +12,22 @@ import {
   type ServiceSection,
 } from '@/types/service'
 import type { VWType } from '@/types/song'
+import type { ServiceTemplateEntry } from '@/types/organization'
+
+/** Every SlotKind value, for the T-44-03 defensive guard in
+ *  `buildSlotsFromTemplate` — a stored template entry with a `kind` outside
+ *  this set (e.g. tampered/corrupt data) is skipped rather than passed into
+ *  `createSlot`'s exhaustive switch. */
+const KNOWN_SLOT_KINDS: readonly SlotKind[] = [
+  'SONG',
+  'SCRIPTURE',
+  'PRAYER',
+  'MESSAGE',
+  'ANNOUNCEMENTS',
+  'MISC',
+  'HYMN',
+  'IMPORTED',
+]
 
 export const PROGRESSION_SLOT_TYPES: Record<Progression, Record<number, VWType>> = {
   '1-2-2-3': {
@@ -300,4 +316,65 @@ export function buildSlots(progression: Progression): ServiceSlot[] {
     nonAssignableSlot('MESSAGE', 7),
     songSlot(8),
   ]
+}
+
+/**
+ * Reads `PROGRESSION_SLOT_TYPES[progression]` as an ORDERED SEQUENCE of VW
+ * types, not a position lookup (Pitfall #2, 44-RESEARCH.md). The map's keys
+ * are absolute array indices that only mean anything against `buildSlots()`'s
+ * fixed 9-slot layout — sorting those keys ascending and mapping to their
+ * values yields the sequence a custom (arbitrary-shape) template must walk
+ * by SONG ordinal instead.
+ *
+ * '1-2-2-3' → [1, 2, 2, 3, 3]   '1-2-3-3' → [1, 2, 3, 3, 3]
+ */
+export function progressionVwTypeSequence(progression: Progression): VWType[] {
+  const map = PROGRESSION_SLOT_TYPES[progression]
+  return Object.keys(map)
+    .map(Number)
+    .sort((a, b) => a - b)
+    .map((pos) => map[pos] as VWType)
+}
+
+/**
+ * Builds a new service's `ServiceSlot[]` from the church's stored
+ * `defaultServiceTemplate` (R086/R087). Composes `progressionVwTypeSequence`,
+ * `createSlot`, and `reindexSlots` — no duplicated logic.
+ *
+ * VW typing is computed HERE, at creation, and never read back from the
+ * template: a running `songOrdinal` counter (starting at 0) increments only
+ * on `SONG` entries, indexing `sequence[songOrdinal % sequence.length]` —
+ * the modulo-cycle choice for templates with more than 5 SONG entries is a
+ * deliberate discretionary decision (Open Question 1 / Assumption A1 in
+ * 44-RESEARCH.md); the alternative considered and rejected was clamping to
+ * the sequence's last value instead of cycling. When `vwModeEnabled` is
+ * false, `vwType` is left `undefined` so `createSlot`'s own `?? 2` default
+ * applies — the ordinal sequence is not consulted at all in that case.
+ *
+ * An entry whose `kind` is not a recognized `SlotKind` is skipped (T-44-03
+ * defensive guard) rather than passed into `createSlot`'s exhaustive switch.
+ *
+ * An empty `entries` array returns `[]` — buildSlotsFromTemplate is NEVER a
+ * vehicle for reinstating `buildSlots()` as a fallback; that call is the
+ * caller's decision (services.ts::createService does not make it, per the
+ * owner's 2026-08-07 override).
+ */
+export function buildSlotsFromTemplate(
+  entries: ServiceTemplateEntry[],
+  vwModeEnabled: boolean,
+  progression: Progression = '1-2-2-3',
+): ServiceSlot[] {
+  const sequence = progressionVwTypeSequence(progression)
+  let songOrdinal = 0
+  const slots: ServiceSlot[] = []
+  for (const entry of entries) {
+    if (!KNOWN_SLOT_KINDS.includes(entry.kind)) continue
+    let vwType: VWType | undefined
+    if (entry.kind === 'SONG' && vwModeEnabled) {
+      vwType = sequence[songOrdinal % sequence.length]
+      songOrdinal++
+    }
+    slots.push(createSlot(entry.kind, vwType, entry.section))
+  }
+  return reindexSlots(slots)
 }
