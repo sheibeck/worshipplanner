@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Settings, Sharing, and Fidelity
-current_phase: 44
-current_phase_name: Default Service Template
+current_phase: 45
+current_phase_name: ESV/NLT Bible Version Selection
 status: executing
-stopped_at: Completed 44-02-PLAN.md
-last_updated: "2026-08-07T22:39:38.396Z"
+stopped_at: Phase 44 code-complete & code-verified (10/10, review fixed); human-verify DEFERRED per grant; starting Phase 45 (DEPLOY-GATED — new NLT proxy Cloud Function)
+last_updated: "2026-08-07T23:05:00.000Z"
 last_activity: 2026-08-07
-last_activity_desc: Phase 43 (4/4 plans) complete, verification deferred per the standing
+last_activity_desc: Phase 44 done (deferred human-verify); autonomous run advancing to Phase 45
 progress:
   total_phases: 11
   completed_phases: 7
@@ -837,6 +837,7 @@ vitest run` passes 39/39 directly. Logged in the phase's `deferred-items.md`. Us
 |-------|-------|--------|
 | 39 | verification_deferred_human — **4/4 ROADMAP criteria verified automatically**; 5 UI-SPEC backstops outstanding, all recorded unchecked in `PENDING-VERIFICATION.md` § Phase 39 | /gsd-verify-work 39 |
 | 43 | verification_deferred_human — **5/5 ROADMAP criteria + 12/12 sampled must-haves verified in code** (type-check 0, full suite at 2-file baseline); 4 owner checkpoints in `PENDING-VERIFICATION.md` § Phase 43. Code review: 0 Critical / 2 Warning / 1 Info — WR-01/WR-02 (PC export bucketing) filed as ROADMAP backlog 999.4 (pre-existing, not a phase regression); IN-01 is a deliberate documented choice | /gsd-verify-work 43 |
+| 44 | verification_deferred_human — **10/10 must-haves verified in code** (type-check 0, full suite at 2-file baseline; ordinal VW mapping + empty-by-default createService + single merge point traced). Code review: 0 Critical / 2 Warning / 2 Info — **all 4 fixed** in-phase. 4 live-app owner checkpoints in `PENDING-VERIFICATION.md` § Phase 44 (empty-by-default creation, template round-trip, real drag feel, no-scrim/summary copy). ⚠ R087's "buildSlots fallback" wording was superseded by owner's dated 2026-08-07 EMPTY-fallback correction | /gsd-verify-work 44 |
 
 > Phase 39 is **code-complete and automatically verified**. Its code review found 1 Critical + 3
 > Warnings, all fixed and independently re-verified at iteration 2 (`39-REVIEW.md` status: clean).
