@@ -1,229 +1,182 @@
 ---
 phase: 42-powerpoint-rendered-image-display
-reviewed: 2026-08-07T00:00:00Z
+reviewed: 2026-08-07T13:30:00Z
 depth: standard
-files_reviewed: 17
+files_reviewed: 7
 files_reviewed_list:
   - firestore.rules
   - src/rules.test.ts
-  - src/types/pptxRender.ts
-  - src/types/slide.ts
-  - src/types/slideGroup.ts
-  - src/utils/renderedPagePaths.ts
-  - src/utils/__tests__/renderedPagePaths.test.ts
   - src/utils/importedRenderReconciler.ts
-  - src/utils/__tests__/importedRenderReconciler.test.ts
-  - src/utils/slideGroupMaterializer.ts
-  - src/utils/slideshowAssembler.ts
+  - src/utils/__tests__/slideGroupMaterializer.test.ts
+  - src/composables/useSlideshowAssembly.ts
   - src/stores/pptxRenders.ts
   - src/stores/__tests__/pptxRenders.test.ts
-  - src/composables/useSlideshowAssembly.ts
-  - src/components/slides/slideDisplay.ts
-  - src/components/slides/SlideCard.vue
-  - src/components/PresentationViewer.vue
 findings:
-  critical: 1
-  warning: 5
+  critical: 0
+  warning: 2
   info: 0
-  total: 6
+  total: 2
 status: issues_found
 ---
 
 # Phase 42: Code Review Report
 
-**Reviewed:** 2026-08-07T00:00:00Z
+**Reviewed:** 2026-08-07T13:30:00Z
 **Depth:** standard
-**Files Reviewed:** 17
+**Files Reviewed:** 7
 **Status:** issues_found
 
 ## Summary
 
-The `firestore.rules` fix (adding the `pptxRenders` write exclusion, T-42-01) is correct and
-well-tested: I audited the entire file for any other rule that could still grant write access to
-`organizations/{orgId}/pptxRenders/{importId}` (per the focus-area instruction not to stop at the
-two changed blocks) and found none — the dedicated block is read-only, the generic wildcard's
-three-way exclusion is the only other rule touching nested single-segment collections, and the
-catch-all denies everything else. `src/rules.test.ts`'s `pptxRenders` describe block genuinely
-exercises the exclusion (an editor `updateDoc` attempting to flip `status: 'ready'` via the generic
-wildcard, asserted `assertFails`) rather than merely re-testing the dedicated read block.
+Re-review of iteration 2's fix pass (commits `afa9817`, `b89dd52`, `7835f21`, `9791549`, `9818898`,
+`0235789`) against the six findings from `42-REVIEW.iter2.md` (1 Critical + 5 Warnings). I read the
+fixer's report, then verified every claim against the actual code — not the report's prose — including
+running the affected test files, `npm run type-check`, and the rules suite against a live emulator.
 
-`importedRenderReconciler.ts`/`slideGroupMaterializer.ts`/`slideshowAssembler.ts` are genuinely pure
-(no Firestore/Storage/Vue imports), the `deck.renderImportId` vs `deck.id`/`slot.importId` distinction
-is consistently honored at every lookup site I traced (grid, presenter fallback, presenter
-stored-group path, the composable's subscription/URL-resolution layer), the `renderFailureSentence`
-mapping is a single table reused verbatim by both `SlideCard.vue` and `PresentationViewer.vue`, and
-the `if (!content) continue`/`return` guards in `assembleSlideshow` are provably unreachable for
-pending/failed renders since `importedEntryContent` never returns `undefined` for those modes. The
-1-based/4-padded page-path convention and its off-by-one test coverage are correct.
+**All six findings are genuinely closed, with two residual concerns worth surfacing.**
 
-The one Critical finding is a real, traceable data-loss defect: a PPTX slide's attached label/audio/
-notes are silently discarded the moment its deck's render transitions from `pending`/`failed` to
-`ready`, contradicting the explicit invariant `importedEntryIdentities`'s own doc comment claims to
-uphold. The Warning findings cover an unbounded local cache, a fragile singleton-store teardown
-pattern, a defensive-coding gap in the render-mode fallback, and two test-coverage gaps (one in the
-rules suite, one in the listener-leak suite) relative to what the stated focus areas asked to be
-proven.
+- **CR-01** — verified fixed as claimed. The doc comment on `importedEntryIdentities`
+  (`importedRenderReconciler.ts:144-176`) no longer claims a pending/failed→ready transition "can
+  still carry forward" customization; it now states plainly that the two identity key spaces
+  (`deck.slides[i].id` vs. synthetic `rendered-page-N`) never overlap, so the drop (and entry-id
+  churn) is real and unavoidable given `deck.slides` has no positional pairing to a rendered page
+  (Fact 1, corroborated independently against `derivedIdentityKey`/`carryStoredDerivedEntries` in
+  `slideGroupMaterializer.ts`). The `D-10` test (`slideGroupMaterializer.test.ts:2582-2629`) now
+  attaches a label + `audioUrl` to a `pending`-mode stored entry and asserts, post-transition, that
+  `readyCounterpart.id` differs from the original and `label`/`audioUrl` are both `undefined` — this
+  is a real pin: reintroducing carry-forward (or accidentally matching by position) would fail this
+  assertion, unlike a test that merely restates current output. I independently confirmed
+  `EditSlideDrawer.vue` has no `renderState` awareness (grep: zero matches) and that
+  `slideActionMenuItems`'s `imported` case offers `edit-details` unconditionally
+  (`slideDisplay.ts:419-427`), so the UI-level claim in the fixer's report checks out. Choosing
+  resolution (b) over (a) is technically sound — 42-RESEARCH.md Pitfall 1 genuinely rules out a safe
+  positional carry-forward, and forcing one would silently attach a user's note to the wrong slide,
+  which is strictly worse. See WR-01 below for the one open question this resolution leaves behind.
+- **WR-01 (prior)** — verified fixed. The eviction loop in `loadMissingRenderedUrls`
+  (`useSlideshowAssembly.ts:296-301`) removes every other `${id}:*` key before inserting the fresh
+  one, bounding the cache to at most one entry per `renderImportId` cache-wide (not just per call).
+  Traced the eviction key-prefix match (`key.startsWith(`${id}:`)`) for false-positive collisions
+  across different ids sharing a prefix — none possible, since the delimiter is included in the
+  match string. No stale-URL-serving path: `renderedImageUrlsByImportId` only ever looks up the
+  *current* `(id, render.status/renderedCount)` key, and a miss (evicted-but-not-yet-refetched)
+  correctly reads as "not ready yet," never as an old array.
+- **WR-02 (prior)** — verified fixed as described, but see the new Warning below: the fix is a
+  detection tripwire, not a resolution, and it ships with no test of its own.
+- **WR-03 (prior)** — verified fixed. Ran the `pptxRenders` rules block against a live Firestore
+  emulator: all 7 tests pass, including the two new editor-role `create`/`delete` denial cases, and
+  the stderr trace confirms both denial predicates (`L234`, `L354`) actually fire — this is a real
+  rule-engine exercise, not a mocked assertion. Confirmed via `git diff` that `firestore.rules` has
+  no changes since the prior review, so the fixer's "no deploy handoff needed" claim is correct.
+- **WR-04 (prior)** — verified fixed. `resolveImportedRender` (`importedRenderReconciler.ts:100-142`)
+  now has an explicit `if (render.status === 'ready')` guard with an explicit fallback branch for any
+  status value outside the closed union, degrading to `failed`. Traced that a legitimately-ready
+  document (status `'ready'` AND `renderedCount >= 1`) is unaffected — the fallback branch is
+  unreachable for it, since the `'ready'` branch's own internal `renderedCount` check is the only
+  other exit from that arm, and it too resolves to `mode: 'ready'` whenever the count is valid.
+- **WR-05 (prior)** — verified fixed. The new test
+  (`pptxRenders.test.ts` — "an id removed then re-added...") genuinely asserts
+  `firstUnsubA` (the specific mock `Unsubscribe` function returned for id `'a'`'s first listener) was
+  `toHaveBeenCalledOnce()`, not merely that teardown ran without throwing, and separately asserts
+  `onSnapshot` was called exactly twice total and that the second open's callback is live via
+  `triggerSnapshot`.
 
-## Critical Issues
+**Verification performed directly (not taken on faith):**
+- `npx vitest run` on all four affected test files: 215/215 pass
+  (`pptxRenders.test.ts` 11, `slideGroupMaterializer.test.ts` 122, `useSlideshowAssembly.test.ts` 49,
+  `importedRenderReconciler.test.ts` 33) — matches the fixer's per-file counts.
+- `npm run type-check` (`vue-tsc --build`, the documented gate that also checks test files): clean.
+- `npx vitest run --config vitest.rules.config.ts` against a live, already-running emulator: 140/140
+  pass (127 `rules.test.ts` + 13 `storage.rules.test.ts`), matching the fixer's claim exactly.
+- `git diff 914e3c2 HEAD -- firestore.rules`: empty — confirms no rules file changed, so no deploy
+  handoff is implicated by this iteration.
+- Purity: `importedRenderReconciler.ts` still imports only types (`ImportedDeck`, `PptxRenderDoc`,
+  `ImageSlide`, `TextSlide`) — no Firestore/Storage/Vue imports introduced by any of the six fixes.
+- Standing focus areas re-checked against the diff: no new listener-leak surface, `renderImportId`
+  vs. `deck.id`/`slot.importId` distinction still consistently honored (unchanged code), and
+  `renderFailureReason` is still routed exclusively through `renderFailureSentence` in both
+  `SlideCard.vue` and `PresentationViewer.vue` (unchanged by this iteration, re-confirmed by grep).
 
-### CR-01: `pending`/`failed` → `ready` render transition silently drops per-slide customization (label/audio/notes)
-
-**File:** `src/utils/importedRenderReconciler.ts:129-146` (contract), `src/utils/slideGroupMaterializer.ts:285-297,343-355,474-547` (implementation)
-
-**Issue:** `importedEntryIdentities`'s doc comment states the design contract explicitly:
-
-> `ready` mode mints synthetic `rendered-page-N` identities (Fact 1 — no `deck.slides[i].id`
-> pairing); every other mode reuses `deck.slides[i].id` **so a pending→ready transition for the
-> first `deck.slides.length` slides can still carry forward any per-entry label/audio/notes a user
-> set before the render completed.**
-
-This is not what the code does. `pending` and `failed` modes key an entry's identity on
-`deck.slides[i].id` (a parsed-slide UUID), while `ready` mode keys it on the synthetic
-`rendered-page-N` string (`importedRenderReconciler.ts:142-146`). `slideGroupMaterializer.ts`'s
-`derivedIdentityKey` for the `imported` ref kind is `` `imported:${ref.importId}:${ref.innerSlideId}` ``
-(line 348) — so a stored entry minted while the deck was `pending` (key
-`imported:{importId}:<parsed-uuid>`) and a freshly-derived entry once the deck turns `ready` (key
-`imported:{importId}:rendered-page-1`) **never share a key**. `carryStoredDerivedEntries`
-(`slideGroupMaterializer.ts:474-547`) only carries a stored entry forward when its key appears in the
-fresh derivation; a key that never appears at all is dropped, not treated as surplus
-(`slideGroupMaterializer.ts:538` comment: "A stored entry whose key never appears in `fresh` at all
-... is DROPPED"). `isSlotDerivableRef`'s `IMPORTED` case (`slideGroupMaterializer.ts:291-292`) also
-classifies every `imported` entry for this slot's `importId` as slot-derivable regardless of render
-state, so `survivingEntries` never rescues it either — there is no fallback rescue path.
-
-Net effect: for **every** parsed slide of a deck (not just some), any label, per-slide `audioUrl`,
-`audioLoop`, or `notes` a user attaches via the "Edit details" 3-dot menu (`slideActionMenuItems`'s
-`imported` case offers `edit-details`/`duplicate`/`delete` unconditionally — it does not gate on
-`renderState`, and `EditSlideDrawer.vue` has no `renderState` awareness at all, confirmed by grep)
-while the deck's render is still `pending` (or has `failed` and is being retried) is silently deleted
-the instant the render completes, with the entry ids themselves also churning (breaking the
-`GroupSlideEntry.id` stability invariant `slide.ts`/`slideGroup.ts` document elsewhere as load-bearing
-for `PresentationViewer`'s per-slide media-component keying).
-
-This is confirmed by the test suite's own asymmetry (`src/utils/__tests__/slideGroupMaterializer.test.ts`,
-not in this phase's required-reading list but read for corroboration): the `pending -> ready`
-idempotence test (`D-10`, lines ~2582-2608) asserts only `sourceRef`/count/order equality after the
-transition and never asserts entry-`id` continuity, while the `ready -> ready` re-derivation test
-(`Assumption A1`, lines ~2632-2659) explicitly asserts `carried.id === labeledGroup.slides[2]!.id`,
-`carried.label`, and `carried.audioUrl` are preserved. No test anywhere asserts that a label/audio/
-notes attached during `pending` survives into `ready` — because it does not.
-
-**Fix:** Either (a) implement the carry-over the doc comment promises — e.g. give `pending`/`failed`
-mode's identities a stable *positional* fallback key (`` `imported:${importId}:pos:${index}` ``) that
-`ready` mode's synthetic identities can also produce for their first `deck.slides.length` entries, so
-`derivedIdentityKey` can match them positionally across the transition; or (b) if losing
-pre-render-completion customization is an accepted trade-off, correct the doc comment to say so
-explicitly (removing the false "can still carry forward" claim) and consider disabling
-`edit-details`/`duplicate` on an `imported` entry while `renderState` is `pending`/`failed`, so users
-are not invited to do work that will silently vanish.
+Two residual Warnings remain — both are judgment calls about whether a technically-correct fix fully
+closes the underlying concern, not newly-discovered bugs in the diff.
 
 ## Warnings
 
-### WR-01: `renderedUrlCache` in `useSlideshowAssembly.ts` grows unbounded across re-renders within one session
+### WR-01: CR-01's accepted trade-off (b) leaves a genuinely silent, untracked, UI-invisible data-loss gap for end users
 
-**File:** `src/composables/useSlideshowAssembly.ts:238,268,279`
+**File:** `src/utils/importedRenderReconciler.ts:152-176` (comment), `src/components/slides/EditSlideDrawer.vue` (no `renderState` gating), `src/components/slides/slideDisplay.ts:419-427` (`imported` case offers `edit-details` unconditionally)
 
-**Issue:** `renderedUrlCache` is keyed by `` `${renderImportId}:${renderedCount}` `` (line 240-242) and
-is never evicted — only added to (`loadMissingRenderedUrls`, line 279). This is deliberate for
-correctness (the doc comment at lines 233-237 explains the count-in-key design avoids ever serving a
-stale array), but it means every distinct `(renderImportId, renderedCount)` pair ever observed during
-the life of one `useSlideshowAssembly` instance stays resident forever, even though only the
-*current* count's entry (`renderedImageUrlsByImportId`, lines 305-315) is ever read again. A deck
-re-rendered several times in one editing session (re-upload, retry after `failed`) accumulates one
-permanently-unread array of resolved download URLs per distinct count.
+**Issue:** The fix correctly closes the *code-defect* framing of CR-01 — the doc comment now matches
+the code's actual behavior, and a test pins the drop so a future regression would be caught. That is
+real progress and should not be re-opened as a Critical.
 
-**Fix:** When `loadMissingRenderedUrls` resolves a new `(id, count)` entry, delete any other cached
-key that starts with `` `${id}: ` `` before inserting the new one — the map should hold at most one
-entry per `renderImportId`.
+But judged as a product question rather than a documentation-accuracy question, disclosure-in-a-source-comment
+is not sufficient on its own, for two reasons:
 
-### WR-02: `cleanup()` calls the singleton `pptxRenders` store's `unsubscribeAll()`, tearing down every listener regardless of which composable instance opened it
+1. **The end user experiences this as silent**, regardless of how accurate the internal comment is. A
+   user who opens "Edit details" on an imported slide while its deck's render is `pending` (the normal
+   state for the first several seconds/minutes after any PPTX upload) or `failed` (during a retry), sets
+   a label and an audio track, sees no warning, no disabled state, and no indicator anywhere in
+   `EditSlideDrawer.vue` or the 3-dot menu that this work is time-bombed. It vanishes the instant the
+   render completes — which, from the user's perspective, is indistinguishable from a bug. Phase 24
+   D-02's "never *silently* drop a user's added slide" is written from the code's point of view; from
+   the user's point of view, a loss with no on-screen cause is silent no matter how well the source is
+   commented.
+2. **The follow-up is not tracked anywhere durable.** I grepped `ROADMAP.md` and searched for a
+   `.planning/backlog` (none exists in this repo) for any trace of "render-stable identity scheme" or
+   a UI warning on `EditSlideDrawer.vue` — there is none. The only record of this being a known,
+   deliberately-deferred gap is the source comment itself. A comment is not discoverable by product
+   planning, is easy to lose in a future refactor that touches this file for an unrelated reason, and
+   gives no one outside this codebase (a PM, a support engineer investigating a "my slide notes
+   disappeared" ticket) anywhere to look.
 
-**File:** `src/composables/useSlideshowAssembly.ts:699`, `src/stores/pptxRenders.ts:95-100`
+This was also a real product decision — "users lose their work with no warning in this specific
+window" — made unilaterally inside a review-fix pass rather than being surfaced to a human product
+owner for a call. Reasonable engineers could choose (b) here, but the choice deserved visibility
+outside a code comment.
 
-**Issue:** `usePptxRenders()` is a Pinia store — a singleton for the app's lifetime — but
-`useSlideshowAssembly`'s `cleanup()` (fired from `onScopeDispose`, so on every unmount of every
-component that calls this composable) calls `pptxRendersStore.unsubscribeAll()`, which tears down
-**every** outstanding listener in the store, not just the ones this particular composable instance
-opened. The design comment on `pptxRenders.ts:11-19` and `useSlideshowAssembly.ts` both note "the
-single call site (`ServiceEditorView.vue`)" as the reason this is safe today. That is an assumption
-about caller cardinality baked into a teardown method's behavior, with nothing in the store enforcing
-it — a second concurrent consumer (an admin dashboard preview, a second open tab sharing the same Pinia
-instance in a future SSR/multi-pane context, or simply a future refactor that reuses this composable
-from two components at once) would have its listeners silently killed by an unrelated component's
-unmount, with no error and no signal other than the render status silently going stale.
+**Fix:** At minimum, add an explicit backlog/ROADMAP entry recording this as a known, deferred gap
+(not just a source comment) so it survives a refactor and is discoverable by non-code-reading
+stakeholders. Stronger: add a lightweight UI signal — e.g., disable or badge `edit-details` on an
+`imported` entry in `slideActionMenuItems` while `renderState` is `pending`/`failed`, or show a toast/
+inline note in `EditSlideDrawer.vue` when it opens against such an entry ("this deck is still
+rendering — customizations made now will not be saved once rendering completes"). Either materially
+reduces the chance a user does work that is silently discarded, without requiring the (correctly
+ruled-out) positional carry-forward.
 
-**Fix:** Either scope subscriptions per-consumer (return a per-call `unsubscribeAll` from
-`syncSubscriptions`'s caller-side tracking, e.g. reference-count each `renderImportId` across callers
-so `unsubscribeAll` only closes listeners this instance itself opened), or add an explicit comment +
-runtime guard (e.g. a dev-mode warning if a second `useSlideshowAssembly` instance is constructed
-while one is still active) so the single-call-site assumption fails loudly instead of silently if it
-is ever violated.
+### WR-02: WR-02's dev-mode instance-counter tripwire is an unverified diagnostic, not a fix, and has no test of its own
 
-### WR-03: `rules.test.ts`'s `pptxRenders` write-denial coverage tests only the `update` path for an editor, not `create`/`delete`
+**File:** `src/composables/useSlideshowAssembly.ts:57-65,164-165,714-738`
 
-**File:** `src/rules.test.ts:1497-1558`
+**Issue:** The fix is the review's own offered fallback ("add an explicit comment + runtime guard"),
+so it is not a defect — but it should be weighed honestly rather than treated as closing the
+underlying hazard. `cleanup()` still calls `pptxRendersStore.unsubscribeAll()` unconditionally, tearing
+down every render listener in the store regardless of which composable instance opened them; the only
+change is a `console.warn` that fires when `activeSlideshowAssemblyInstances > 1` at teardown time,
+and only `if (import.meta.env.DEV)`.
 
-**Issue:** The `pptxRenders` describe block (lines 1496-1559) has exactly one write-denial test for
-an org **editor**: `updateDoc` on a pre-seeded document (T-42-01, lines 1497-1511). The only
-`create`-path (`setDoc`) denial test in the block is for a **viewer** (lines 1548-1558), not an
-editor. There is no test asserting an editor's `setDoc`/`deleteDoc` against a not-yet-existing (or
-existing) `pptxRenders` doc is denied. Since the rule's `allow write` predicate
-(`firestore.rules:234-237`) is a single unified condition covering create/update/delete, this is very
-likely covered by construction — but the review instructions for this phase specifically call out
-that "the write-denial case must genuinely exercise the new exclusion," and today only the `update`
-half of "write" has editor-role coverage. The originally-demonstrated threat (T-37-15, forging a
-`ready` flip) is an update, so the load-bearing case is covered — but a reader auditing this suite for
-completeness (as the phase's own commentary asks reviewers to do for the rules file itself) would
-reasonably expect the mirrored create/delete cases here too, matching the pattern every other
-collection in this file uses (see `serviceShareLinks`'s explicit CREATE/UPDATE/DELETE-each-4-cases
-structure).
+Two gaps this leaves:
 
-**Fix:** Add an editor-role `setDoc` (create) denial test and an editor-role `deleteDoc` denial test
-to the `pptxRenders` describe block, mirroring the shape already used for every other collection in
-this file.
+1. **No production signal at all.** If the single-call-site assumption is ever violated in production
+   (a second concurrent consumer, a future refactor), the failure mode is exactly what it was before
+   this fix: listeners silently die, render status silently goes stale, with nothing in the
+   console, logs, or error tracking to point at the cause. The tripwire only helps a developer who
+   happens to be running a DEV build with devtools open at the exact moment the violation occurs.
+2. **The tripwire itself is untested.** None of the four files in this iteration's diff touch
+   `useSlideshowAssembly.test.ts`, and I confirmed no test asserts `console.warn` fires when a second
+   instance's `cleanup()` runs while another instance is still active. A tripwire that can silently
+   regress (e.g., a future edit that moves the increment/decrement out of sync, or changes `cleanup()`
+   ordering) is a weaker guarantee than the review's own goal of "fails loudly instead of silently."
 
-### WR-04: `resolveImportedRender`'s ready-mode branch is reached by elimination, not by an explicit `status === 'ready'` check
-
-**File:** `src/utils/importedRenderReconciler.ts:100-126`
-
-**Issue:** After the `pending` and `failed` branches return, the comment at line 115 says
-`// render.status === 'ready'`, but the code never actually re-checks `render.status`; it proceeds
-straight to inspecting `render.renderedCount`. This is type-safe *only* because `PptxRenderStatus` is
-declared as a closed `'pending' | 'failed' | 'ready'` union (`src/types/pptxRender.ts:19`) — but the
-value crossing the Firestore boundary is cast with `snap.data() as PptxRenderDoc`
-(`src/stores/pptxRenders.ts:84`), with no runtime validation. If the render document ever legitimately
-gains a fourth status value in the future (`functions/src/index.ts` can add one without a client
-deploy — `slideDisplay.ts`'s own failure-sentence table comment makes exactly this point about the
-sibling `failureReason` slug space), or a document is malformed/corrupted, this function will treat it
-as `ready` whenever `renderedCount >= 1` happens to be present, rather than falling back to `pending`
-or `failed` safely.
-
-**Fix:** Replace the two early-return `if` statements with an explicit `switch (render.status)` (or add
-an explicit `if (render.status === 'ready') { ... }` guard before the `renderedCount` check, with a
-final safe fallback for anything else), so a future or corrupted status value degrades to `pending`/
-`failed` instead of being silently treated as `ready`.
-
-### WR-05: No test proves the "same id re-added after removal" listener-leak scenario the focus areas asked to be checked
-
-**File:** `src/stores/__tests__/pptxRenders.test.ts`
-
-**Issue:** The `syncSubscriptions — closing listeners (T-42-06 listener-leak guard)` block tests
-removal (id present → removed) and org-switch, and the `opening listeners` block tests id-set growth
-and a no-op repeat call — but no test exercises "an id is removed, then re-added in a later call,"
-which is the scenario most likely to reveal a leak (e.g. a stale entry left in the internal
-`listeners` map that suppresses re-subscription, or a double-`onSnapshot` call). I traced
-`syncSubscriptions`'s code (`src/stores/pptxRenders.ts:60-93`) and it is correct — `closeListener`
-deletes the id from `listeners`, so a later re-add finds `listeners.has(id)` false and opens a fresh
-listener — but this is exactly the kind of guarantee that should be pinned by a test rather than left
-to code inspection, especially given this store's own doc comment calls out that it has "no prior
-analog in this codebase to have gotten it right by imitation."
-
-**Fix:** Add a test: `syncSubscriptions('orgA', ['a'])` → `syncSubscriptions('orgA', [])` (closes `a`)
-→ `syncSubscriptions('orgA', ['a'])` again, asserting `onSnapshot` was called twice total (once per
-open) and the second open's data flows through `rendersByImportId` correctly.
+**Fix:** Add a test exercising two concurrently-active `useSlideshowAssembly` instances (construct two
+inside separate effect scopes, dispose one) that asserts `console.warn` was called with the expected
+message — this is cheap given the existing `useSlideshowAssembly.test.ts` harness already drives
+`onScopeDispose` via `effectScope().stop()`. Separately, consider whether the warning should also fire
+(via a non-DEV-gated path, e.g. reporting to whatever error-tracking this project already uses in
+production) rather than being invisible outside local development, since production is exactly where a
+silent multi-instance violation would be most costly to debug.
 
 ---
 
-_Reviewed: 2026-08-07T00:00:00Z_
+_Reviewed: 2026-08-07T13:30:00Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_

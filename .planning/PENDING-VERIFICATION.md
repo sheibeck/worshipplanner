@@ -892,6 +892,41 @@ trip against the deployed Cloud Run render service, neither of which a unit test
       repeated here. Until that deploy runs, the T-37-15/T-42-01 write hole (an org editor can forge
       their own org's render document to `ready`) stays open in production.
 
+### ⚠ Known behaviour gap Phase 42 ships WITH — a decision for the owner, not a defect to find
+
+**Per-entry customization attached to a deck slide BEFORE its render completes is lost when the render
+finishes.** If a planner opens a still-rendering PPTX deck and sets a slide's label, attaches audio, or
+adds notes, that work disappears the moment the render flips `pending → ready`.
+
+**Why it happens.** Pending/failed entries are identified by `deck.slides[i].id`; ready entries are
+identified by synthetic `rendered-page-N` strings. The two key spaces never overlap, so
+`carryStoredDerivedEntries` finds nothing to carry.
+
+**Why it was not "fixed."** Carrying forward correctly is not possible with the data available.
+42-RESEARCH.md Pitfall 1 establishes there is **no reliable positional pairing** between
+`deck.slides[i]` and rendered page `i+1` — `mapAstToSlides` skips slides and emits one entry per image
+on multi-image slides. A naive index-based carry-forward would silently attach a planner's note to the
+**wrong slide**, which is worse than losing it. Code review considered both options and chose
+disclosure over a wrong pairing.
+
+**What was actually done (2026-08-07, Phase 42 code review CR-01):** the reconciler's doc comment,
+which had falsely promised the carry-forward works, was corrected to state the real behaviour, and the
+`pending → ready` test now asserts the loss explicitly so it can never regress unnoticed. That closes
+the *dishonesty*; it does not close the *gap*.
+
+**What is still open, and is the owner's call:**
+
+- **`EditSlideDrawer.vue` has no `renderState` awareness** — the UI actively invites a planner to
+  customize a pending slide it will then discard. At minimum this warrants disabling or warning on
+  customization while a render is pending. No v1.5 requirement covers it, so nothing was built.
+- Whether this is worth a follow-up phase at all. Realistically the window is small (a render completes
+  in seconds to a minute) and a planner is unlikely to be labelling slides inside it — which is the
+  honest argument for leaving it. Recorded here so that argument is made deliberately rather than by
+  omission.
+
+Raised by the Phase 42 re-review as "tracked nowhere durable — only a source comment." This entry is
+that durable record.
+
 ---
 
 ## Notes and failures
