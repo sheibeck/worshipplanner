@@ -213,11 +213,22 @@ service cloud.firestore {
       );
     }
 
-    // Share tokens: public read (anyone with token URL), authenticated create,
+    // Share tokens: public read (anyone with token URL), editor-scoped create,
     // editor-scoped update, editor-scoped delete.
     match /shareTokens/{token} {
       allow read: if true;
-      allow create: if isSignedIn();
+      // 41-REVIEW CR-01: was `isSignedIn()` with no org check. Phase 41's
+      // adoption logic (`pickAdoptableToken`/`ensureShareLink` in
+      // src/stores/services.ts) reads and TRUSTS the `orgId`/`createdAt` of
+      // arbitrary pre-existing shareTokens docs to decide a service's
+      // permanent public link, so a signed-in non-editor (or non-member,
+      // given a known serviceId) could plant a document that gets adopted as
+      // the official token. Every legitimate create (writeSharePayload,
+      // reached only via ensureShareLink/maybeRefreshShareLink from
+      // editor-gated UI actions) always writes the real orgId, so this is not
+      // a behavior change for any sanctioned path — mirrors
+      // serviceShareLinks/quarterShares/serviceShares' isOrgEditor idiom.
+      allow create: if isOrgEditor(request.resource.data.orgId);
       // R077/CR-01: refreshed in place by an editor of the owning org so the
       // frozen snapshot never goes stale — mirrors quarterShares/serviceShares'
       // org-scoped idiom verbatim. The equality guard makes orgId immutable, so

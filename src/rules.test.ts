@@ -587,12 +587,83 @@ describe('serviceShares — public read, org-editor-scoped create/update', () =>
   })
 })
 
-describe('shareTokens — public read, signed-in create, editor-scoped in-place update, editor-scoped delete', () => {
+describe('shareTokens — public read, editor-scoped create, editor-scoped in-place update, editor-scoped delete', () => {
   it('allows unauthenticated read of a shareTokens doc (public share link)', async () => {
     await seedDoc('shareTokens/tok-abc', { orgId: 'orgA', quarterId: 'q1' })
     const context = testEnv.unauthenticatedContext()
     const db = context.firestore()
     await assertSucceeds(getDoc(doc(db, 'shareTokens', 'tok-abc')))
+  })
+
+  // CREATE (4) — CR-01 (41-REVIEW): the rule used to be `isSignedIn()` alone,
+  // which let any signed-in user — editor, viewer, or a member of a totally
+  // different org — plant a shareTokens doc claiming an arbitrary orgId.
+  // ensureShareLink's adopt-or-create path (src/stores/services.ts) trusts
+  // that orgId to decide a service's permanent public link, so this gap was
+  // an exploitable trust-boundary violation, not just loose input validation.
+  // These four mirror the serviceShareLinks create block above and must fail
+  // against the pre-fix rule.
+  it('ALLOW — an editor of orgA creates a shareTokens doc for orgA', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    const context = testEnv.authenticatedContext('userA')
+    const db = context.firestore()
+    await assertSucceeds(
+      setDoc(doc(db, 'shareTokens', 'tok-new'), {
+        orgId: 'orgA',
+        serviceId: 'service-1',
+        serviceSnapshot: { name: 'Sunday Service' },
+      }),
+    )
+  })
+
+  it('DENY (CR-01) — an editor of a DIFFERENT org cannot create a shareTokens doc carrying orgId orgA (cross-tenant)', async () => {
+    await seedMembershipDoc('orgB', 'userB', 'editor')
+    const context = testEnv.authenticatedContext('userB')
+    const db = context.firestore()
+    await assertFails(
+      setDoc(doc(db, 'shareTokens', 'tok-new'), {
+        orgId: 'orgA',
+        serviceId: 'service-1',
+        serviceSnapshot: { name: 'Hijacked' },
+      }),
+    )
+  })
+
+  it('DENY (CR-01) — a signed-in user with no org membership anywhere cannot create a shareTokens doc', async () => {
+    const context = testEnv.authenticatedContext('userC')
+    const db = context.firestore()
+    await assertFails(
+      setDoc(doc(db, 'shareTokens', 'tok-new'), {
+        orgId: 'orgA',
+        serviceId: 'service-1',
+        serviceSnapshot: { name: 'Hijacked' },
+      }),
+    )
+  })
+
+  it('DENY (CR-01) — a viewer-role member of orgA cannot create a shareTokens doc for orgA', async () => {
+    await seedMembershipDoc('orgA', 'userV', 'viewer')
+    const context = testEnv.authenticatedContext('userV')
+    const db = context.firestore()
+    await assertFails(
+      setDoc(doc(db, 'shareTokens', 'tok-new'), {
+        orgId: 'orgA',
+        serviceId: 'service-1',
+        serviceSnapshot: { name: 'Hijacked' },
+      }),
+    )
+  })
+
+  it('DENY (CR-01) — an unauthenticated caller cannot create a shareTokens doc', async () => {
+    const context = testEnv.unauthenticatedContext()
+    const db = context.firestore()
+    await assertFails(
+      setDoc(doc(db, 'shareTokens', 'tok-new'), {
+        orgId: 'orgA',
+        serviceId: 'service-1',
+        serviceSnapshot: { name: 'Hijacked' },
+      }),
+    )
   })
 
   it('allows an editor of the owning org to delete a shareTokens doc', async () => {
