@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Settings, Sharing, and Fidelity
-current_phase: 42
-current_phase_name: PowerPoint Rendered-Image Display
-status: verifying
+current_phase: 43
+current_phase_name: Service Item Types
+status: planning
 stopped_at: Completed 42-08-PLAN.md (Phase 42 code-complete, ready for verification)
-last_updated: "2026-08-07T12:04:13.276Z"
+last_updated: "2026-08-07T13:32:32.207Z"
 last_activity: 2026-08-07
-last_activity_desc: Phase 42 execution started
+last_activity_desc: Phase 42 complete, transitioned to Phase 43
 progress:
   total_phases: 11
   completed_phases: 5
@@ -112,10 +112,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 42 (PowerPoint Rendered-Image Display) — EXECUTING
-Plan: 8 of 8
-Status: Phase complete — ready for verification
-Last activity: 2026-08-07 — Phase 42 execution started
+Phase: 43 — Service Item Types
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-08-07 — Phase 42 complete, transitioned to Phase 43
 module, authStore.settings merged once in loadOrgContext, vwModeEnabled dual-read, R073 test
 coverage (src/stores/__tests__/auth.test.ts)
 
