@@ -672,15 +672,30 @@ export const useServiceStore = defineStore('services', () => {
       // or an ordinary edit to a never-shared service would publish it.
       await writeSharePayload(effectiveService, orgId.value, token)
     } catch (err) {
-      // Disabling refresh for this service for the remainder of the session
-      // is deliberate: before the owner deploys Plan 01's rules, every
-      // attempt is denied, and retrying on every keystroke would flood the
-      // console for no benefit. A page reload clears the cache and retries.
+      // WR-02 (41-REVIEW): only a genuine `permission-denied` is treated as
+      // permanent-for-session. Before this distinction, ANY error — including
+      // a transient network blip or a brief rules-propagation delay —
+      // permanently disabled refresh for the service for the rest of the
+      // Pinia instance's lifetime, silently drifting an already-public
+      // service out of sync with no way to recover short of a page reload.
+      // Caching `false` on permission-denied specifically is still
+      // deliberate: before the owner deploys Plan 01's rules, every attempt
+      // is denied, and retrying on every keystroke would flood the console
+      // for no benefit. Any other error code (or no code at all — e.g. a
+      // plain network Error) leaves the cache untouched, so the very next
+      // edit gets a fresh attempt instead of being silently skipped forever.
+      const code = (err as { code?: string } | undefined)?.code
+      const isPermanent = code === 'permission-denied'
       console.error(
-        `services.ts share-link auto-refresh: failed for service ${id} — the user's own save already succeeded; disabling share refresh for this service for the remainder of the session`,
+        `services.ts share-link auto-refresh: failed for service ${id} — the user's own save already succeeded; ` +
+          (isPermanent
+            ? 'disabling share refresh for this service for the remainder of the session (permission denied)'
+            : 'this looks transient — refresh will be retried on the next edit'),
         err,
       )
-      shareLinkCache.set(id, false)
+      if (isPermanent) {
+        shareLinkCache.set(id, false)
+      }
     }
   }
 

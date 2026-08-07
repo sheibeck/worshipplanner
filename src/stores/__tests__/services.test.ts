@@ -1336,6 +1336,73 @@ describe('useServiceStore', () => {
       consoleErrorSpy.mockRestore()
     })
 
+    // WR-02 (41-REVIEW): before this fix, ANY refresh error — transient or
+    // permanent — permanently cached `false` for the service, so a single
+    // network blip disabled refresh for the rest of the session. Now only a
+    // genuine `permission-denied` does that; a transient error (no `.code`,
+    // like a plain network Error) must NOT poison the cache, so the very
+    // next edit gets a fresh retry instead of being silently skipped.
+    it('WR-02: a TRANSIENT refresh failure (no permission-denied code) does not permanently disable refresh — the next edit retries', async () => {
+      const { getDoc, setDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService()])
+
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+      // First attempt: link lookup succeeds, but the payload write itself
+      // rejects with a plain (code-less) Error — a stand-in for a transient
+      // network failure, not an authorization denial.
+      vi.mocked(getDoc).mockResolvedValueOnce(EXISTING_LINK as never)
+      vi.mocked(setDoc).mockImplementationOnce(() => Promise.reject(new Error('network blip')))
+
+      await store.updateService('service-1', { notes: 'first edit' })
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(1)
+
+      // Second attempt: the write succeeds this time. If the transient
+      // failure above had (incorrectly) cached `false`, this second call
+      // would short-circuit before ever reaching setDoc — asserting a
+      // successful write here proves the cache was NOT poisoned.
+      vi.mocked(setDoc).mockClear()
+
+      await store.updateService('service-1', { notes: 'second edit' })
+      expect(setDoc).toHaveBeenCalled()
+      const [, data] = vi.mocked(setDoc).mock.calls[0]!
+      const snapshot = (data as Record<string, unknown>).serviceSnapshot as Record<string, unknown>
+      expect(snapshot.notes).toBe('second edit')
+
+      consoleErrorSpy.mockRestore()
+    })
+
+    it('WR-02: a permission-denied refresh failure DOES permanently disable refresh for the session — a second edit does not retry', async () => {
+      const { getDoc, setDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService()])
+
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+      vi.mocked(getDoc).mockResolvedValueOnce(EXISTING_LINK as never)
+      const denied = Object.assign(new Error('Missing or insufficient permissions'), { code: 'permission-denied' })
+      vi.mocked(setDoc).mockImplementationOnce(() => Promise.reject(denied))
+
+      await store.updateService('service-1', { notes: 'first edit' })
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(1)
+
+      vi.mocked(setDoc).mockClear()
+      vi.mocked(getDoc).mockClear()
+
+      await store.updateService('service-1', { notes: 'second edit' })
+      // Cached `false` short-circuits BEFORE the write (and before another
+      // getDoc lookup) — neither should have been called this time.
+      expect(setDoc).not.toHaveBeenCalled()
+      expect(getDoc).not.toHaveBeenCalled()
+
+      consoleErrorSpy.mockRestore()
+    })
+
     it('status-only transitions (markAsPlanned, reopenService) do NOT refresh the share payload', async () => {
       const { setDoc } = await import('firebase/firestore')
       const { useServiceStore } = await import('../services')
