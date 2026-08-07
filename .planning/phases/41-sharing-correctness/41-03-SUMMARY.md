@@ -197,3 +197,13 @@ Plan 04 (the automatic refresh-on-edit hook, R077's remaining half) can now buil
 ---
 *Phase: 41-sharing-correctness*
 *Completed: 2026-08-07*
+
+## Self-Check: PASSED
+
+- FOUND: src/stores/services.ts
+- FOUND: src/stores/__tests__/services.test.ts
+- FOUND: .planning/phases/41-sharing-correctness/41-03-SUMMARY.md
+- FOUND: 812de86
+- FOUND: 4dd3d29
+- FOUND: 1b5e964
+- FOUND: 4a4ebc3
