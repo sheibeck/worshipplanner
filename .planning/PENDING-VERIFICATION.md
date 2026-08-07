@@ -716,9 +716,9 @@ that criterion 4 deliberately places *outside* the phase — the code is built, 
 > `firestore.rules`' `allow create` on `organizations/{orgId}/members/{uid}` now authorizes exactly
 > the two legitimate creation flows (org founding, invite acceptance) and denies both an uninvited
 > self-join and a role-escalated invite acceptance — proven against the real Firestore emulator by
-> four new tests in `src/rules.test.ts` (107/107 passing; two of the four were first observed
-> FAILING against the unmodified rule, then confirmed passing after the fix). It ships in the same
-> deploy session as this phase's deploy 2 — see the Phase 40.1 section below.
+> five new tests in `src/rules.test.ts` (**108/108 passing**; three of the five were first observed
+> FAILING against the rule as it then stood, then confirmed passing after each fix). It ships in the
+> same deploy session as this phase's deploy 2 — see the Phase 40.1 section below.
 
 **Rollback at any point:** re-deploy the dual-read rule. The fallback arm restores access immediately.
 
@@ -728,13 +728,25 @@ that criterion 4 deliberately places *outside* the phase — the code is built, 
 
 **Phase status: built and tested, NOT deployed.** `firestore.rules`' `allow create` predicate on
 `organizations/{orgId}/members/{uid}` (used to read only `isSignedIn() && request.auth.uid == uid`)
-now authorizes exactly the two legitimate creation flows — org founding (via `getAfter()` on the
-sibling same-batch org doc) and invite acceptance (via `get()`/`exists()` on the pre-existing invite
-doc, with the submitted role checked against the invite's stored role) — and denies both an
-uninvited self-join and a role-escalated invite acceptance. Proven against the real Firestore
-emulator: `npx vitest run --config vitest.rules.config.ts` reports 107/107, and the two new DENY
-tests were first run against the unmodified rule and observed to fail, per
-`40.1-01-SUMMARY.md`. Nothing was deployed.
+now authorizes exactly the two legitimate creation flows — org founding (via **`!exists()` AND
+`getAfter()`** on the sibling same-batch org doc) and invite acceptance (via `get()`/`exists()` on
+the pre-existing invite doc, with the submitted role checked against the invite's stored role) — and
+denies an uninvited self-join, a role-escalated invite acceptance, **and a removed past founder
+re-granting themselves editor**. Proven against the real Firestore emulator:
+`npx vitest run --config vitest.rules.config.ts` reports **108/108**, and three of the five new
+tests were first run against the then-current rule and observed to fail. Nothing was deployed.
+
+> **⚠ The `!exists()` half is load-bearing — do not simplify it away.** Code review finding CR-01
+> caught that `getAfter(org).data.createdBy == uid` **alone** proves only the field's *current*
+> value, not that the org is being created right now. Because `createdBy` is set once and never
+> cleared, that predicate let **any past founder — including one explicitly removed via TeamView's
+> "Remove member" — re-grant themselves `role: 'editor'` at any later time.** Worse, combined with
+> the still-open `organizations/{orgId}` unrestricted-editor-write finding below, a current editor
+> could rewrite `createdBy` and plant a durable backdoor for a uid that was never a member.
+> `!exists()` reflects batch-START state and cannot see the batch's own sibling org-create, so
+> together the two clauses mean "this org is being created right now, by me." A regression test
+> (`a removed past founder cannot re-create their membership`) was observed failing against the
+> `getAfter()`-only rule before the guard was added.
 
 - [ ] **Deploy the tightened `firestore.rules` alongside Phase 40's deploy 2** — same file set, one
       session. Full runbook: `functions/DEPLOY-ORG-CLAIMS.md` (no separate runbook is written for
