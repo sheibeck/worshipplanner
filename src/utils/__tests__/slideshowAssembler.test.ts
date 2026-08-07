@@ -15,8 +15,11 @@ import type { ScriptureReading } from '@/types/scriptureReading'
 import type { ImportedDeck } from '@/types/importedDeck'
 import type { ScriptureSlide, CopyrightSlide, LyricSlide, TextSlide, ImageSlide, VideoSlide, CongregationalSection } from '@/types/slide'
 import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
+import type { PptxRenderDoc } from '@/types/pptxRender'
 import type { Timestamp } from 'firebase/firestore'
 import { slotLabel, reindexSlots, orderSlotsBySection } from '@/utils/slotTypes'
+import { resolveImportedRender, importedEntryIdentities, type ImportedRenderResolution } from '@/utils/importedRenderReconciler'
+import { slideContentLabel } from '@/components/slides/slideDisplay'
 
 const mockTimestamp = { toDate: () => new Date('2026-01-01') } as unknown as Timestamp
 
@@ -1813,5 +1816,315 @@ describe('assembleSlideshow — R045 order lock (permutation property)', () => {
     const afterIds = afterResult.map((r) => after[r.slotIndex]!.id)
     const afterCollapsed = afterIds.filter((id, idx) => id !== afterIds[idx - 1])
     expect(afterCollapsed).toEqual(['slot-song-a', 'slot-scripture-b', 'slot-song-c'])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Phase 42 (42-05): IMPORTED render-reconciliation fixtures, local to the two
+// describe blocks below. Deliberately NOT folded into `makeImportedDeck`
+// above — every existing IMPORTED fixture in this file has no
+// `renderImportId` on purpose, so all 76 pre-existing tests continue to
+// prove the byte-identical parsed-mode fallthrough (D-16) untouched by any
+// of this.
+// ---------------------------------------------------------------------------
+
+/** A 5-parsed-slide deck carrying a `renderImportId`, so it resolves through
+ * every mode `resolveImportedRender` can produce rather than always `parsed`. */
+function makeRenderedImportedDeck(overrides: Partial<ImportedDeck> = {}): ImportedDeck {
+  return makeImportedDeck({
+    id: 'deck-1',
+    renderImportId: 'render-1',
+    slides: [
+      { id: 'is-1', position: 0, contentKind: 'text', title: 'Slide 1', body: 'Body 1' } as TextSlide,
+      { id: 'is-2', position: 1, contentKind: 'text', title: 'Slide 2', body: 'Body 2' } as TextSlide,
+      { id: 'is-3', position: 2, contentKind: 'text', title: 'Slide 3', body: 'Body 3' } as TextSlide,
+      { id: 'is-4', position: 3, contentKind: 'text', title: 'Slide 4', body: 'Body 4' } as TextSlide,
+      { id: 'is-5', position: 4, contentKind: 'text', title: 'Slide 5', body: 'Body 5' } as TextSlide,
+    ],
+    ...overrides,
+  })
+}
+
+function makeRenderDoc(overrides: Partial<PptxRenderDoc> = {}): PptxRenderDoc {
+  return { status: 'pending', ...overrides }
+}
+
+/** Builds `AssemblyInputs` with `deck` registered under `deck.id` and, when
+ * `render`/`urls` are provided, registered under the deck's OWN
+ * `renderImportId` (never under `deck.id` — T-42-07's two-identifier design). */
+function makeRenderInputs(
+  deck: ImportedDeck,
+  render: PptxRenderDoc | undefined,
+  urls?: string[],
+  overrides: Partial<AssemblyInputs> = {},
+): AssemblyInputs {
+  const pptxRendersByImportId = new Map<string, PptxRenderDoc>()
+  if (render && deck.renderImportId) pptxRendersByImportId.set(deck.renderImportId, render)
+  const renderedImageUrlsByImportId = new Map<string, string[]>()
+  if (urls && deck.renderImportId) renderedImageUrlsByImportId.set(deck.renderImportId, urls)
+  return makeInputs({
+    importedDecksById: new Map([[deck.id, deck]]),
+    pptxRendersByImportId,
+    renderedImageUrlsByImportId,
+    ...overrides,
+  })
+}
+
+/** Mirrors what `slideGroupMaterializer.ts` (42-04) would have stored for
+ * this (deck, resolution) pair — built through the SAME shared
+ * `importedEntryIdentities` helper the materializer itself calls, so the
+ * stored-group tests below exercise a group shaped exactly like production
+ * would produce it, never a hand-picked shortcut. */
+function groupEntriesForRender(deck: ImportedDeck, resolution: ImportedRenderResolution): GroupSlideEntry[] {
+  return importedEntryIdentities(deck, resolution).map((innerSlideId, i) =>
+    makeGroupSlideEntry({
+      id: `entry-${innerSlideId}`,
+      order: i,
+      sourceRef: { kind: 'imported', importId: deck.id, innerSlideId },
+    }),
+  )
+}
+
+describe('resolveEntryContent — imported with a render (stored-group path, R079/R080)', () => {
+  it('R080: page 1 and page 12 of a 12-page ready render resolve to their own distinct URLs', () => {
+    const deck = makeRenderedImportedDeck()
+    const slot = importedSlot({ id: 'slot-imported-0', importId: 'deck-1' })
+    const service = makeService([slot])
+    const urls = Array.from({ length: 12 }, (_, i) => `https://example.com/render-1/page-${i + 1}.png`)
+    const entryFirst = makeGroupSlideEntry({
+      id: 'entry-page-1',
+      order: 0,
+      sourceRef: { kind: 'imported', importId: 'deck-1', innerSlideId: 'rendered-page-1' },
+    })
+    const entryLast = makeGroupSlideEntry({
+      id: 'entry-page-12',
+      order: 1,
+      sourceRef: { kind: 'imported', importId: 'deck-1', innerSlideId: 'rendered-page-12' },
+    })
+    const group = makeSlideGroup({ id: 'slot-imported-0', slotId: 'slot-imported-0', slides: [entryFirst, entryLast] })
+    const inputs = makeRenderInputs(deck, makeRenderDoc({ status: 'ready', renderedCount: 12 }), urls, {
+      groupsBySlotId: new Map([['slot-imported-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result).toHaveLength(2)
+    expect((result[0]!.slide as ImageSlide).imageUrl).toBe(urls[0])
+    expect((result[1]!.slide as ImageSlide).imageUrl).toBe(urls[11])
+    expect((result[0]!.slide as ImageSlide).imageUrl).not.toBe((result[1]!.slide as ImageSlide).imageUrl)
+  })
+
+  it('R079: a pending render resolves every entry to a defined object with renderState "pending" and no parsed body text', () => {
+    const deck = makeRenderedImportedDeck()
+    const slot = importedSlot({ id: 'slot-imported-0', importId: 'deck-1' })
+    const service = makeService([slot])
+    const entries = deck.slides.map((s, i) =>
+      makeGroupSlideEntry({
+        id: `entry-${s.id}`,
+        order: i,
+        sourceRef: { kind: 'imported', importId: 'deck-1', innerSlideId: s.id },
+      }),
+    )
+    const group = makeSlideGroup({ id: 'slot-imported-0', slotId: 'slot-imported-0', slides: entries })
+    const inputs = makeRenderInputs(deck, makeRenderDoc({ status: 'pending' }), undefined, {
+      groupsBySlotId: new Map([['slot-imported-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result).toHaveLength(5)
+    for (const assembled of result) {
+      const slide = assembled.slide as ImageSlide
+      expect(slide.contentKind).toBe('image')
+      expect(slide.renderState).toBe('pending')
+      expect(slide.imageUrl).toBe('')
+      expect((slide as unknown as Record<string, unknown>).body).toBeUndefined()
+      expect((slide as unknown as Record<string, unknown>).title).toBeUndefined()
+    }
+  })
+
+  it('R079: a failed render resolves every entry to a defined object carrying the failure reason straight off the document', () => {
+    const deck = makeRenderedImportedDeck()
+    const slot = importedSlot({ id: 'slot-imported-0', importId: 'deck-1' })
+    const service = makeService([slot])
+    const entries = deck.slides.map((s, i) =>
+      makeGroupSlideEntry({
+        id: `entry-${s.id}`,
+        order: i,
+        sourceRef: { kind: 'imported', importId: 'deck-1', innerSlideId: s.id },
+      }),
+    )
+    const group = makeSlideGroup({ id: 'slot-imported-0', slotId: 'slot-imported-0', slides: entries })
+    const inputs = makeRenderInputs(deck, makeRenderDoc({ status: 'failed', failureReason: 'render-timeout' }), undefined, {
+      groupsBySlotId: new Map([['slot-imported-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result).toHaveLength(5)
+    for (const assembled of result) {
+      const slide = assembled.slide as ImageSlide
+      expect(slide.renderState).toBe('failed')
+      expect(slide.renderFailureReason).toBe('render-timeout')
+      expect(slide.imageUrl).toBe('')
+    }
+  })
+
+  it('R079: a ready render whose URL array has not resolved yet falls back to pending rather than a broken image or undefined', () => {
+    const deck = makeRenderedImportedDeck()
+    const slot = importedSlot({ id: 'slot-imported-0', importId: 'deck-1' })
+    const service = makeService([slot])
+    const resolution = resolveImportedRender(deck, makeRenderDoc({ status: 'ready', renderedCount: 5 }))
+    const entries = groupEntriesForRender(deck, resolution)
+    const group = makeSlideGroup({ id: 'slot-imported-0', slotId: 'slot-imported-0', slides: entries })
+    // No urls array passed — models the async getDownloadURL cache not having caught up yet.
+    const inputs = makeRenderInputs(deck, makeRenderDoc({ status: 'ready', renderedCount: 5 }), undefined, {
+      groupsBySlotId: new Map([['slot-imported-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result).toHaveLength(5)
+    for (const assembled of result) {
+      expect(assembled.slide).toBeDefined()
+      const slide = assembled.slide as ImageSlide
+      expect(slide.renderState).toBe('pending')
+      expect(slide.imageUrl).toBe('')
+    }
+  })
+
+  it('D-07: a ready/3 render over a 5-parsed-slide deck assembles exactly 3 slides', () => {
+    const deck = makeRenderedImportedDeck()
+    const slot = importedSlot({ id: 'slot-imported-0', importId: 'deck-1' })
+    const service = makeService([slot])
+    const resolution = resolveImportedRender(deck, makeRenderDoc({ status: 'ready', renderedCount: 3 }))
+    const entries = groupEntriesForRender(deck, resolution)
+    const group = makeSlideGroup({ id: 'slot-imported-0', slotId: 'slot-imported-0', slides: entries })
+    const urls = ['url-1', 'url-2', 'url-3']
+    const inputs = makeRenderInputs(deck, makeRenderDoc({ status: 'ready', renderedCount: 3 }), urls, {
+      groupsBySlotId: new Map([['slot-imported-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result).toHaveLength(3)
+  })
+
+  it('D-07: a ready/8 render over a 5-parsed-slide deck assembles 8 slides — the 3 surplus present, not dropped, labeled IMAGE', () => {
+    const deck = makeRenderedImportedDeck()
+    const slot = importedSlot({ id: 'slot-imported-0', importId: 'deck-1' })
+    const service = makeService([slot])
+    const resolution = resolveImportedRender(deck, makeRenderDoc({ status: 'ready', renderedCount: 8 }))
+    const entries = groupEntriesForRender(deck, resolution)
+    const group = makeSlideGroup({ id: 'slot-imported-0', slotId: 'slot-imported-0', slides: entries })
+    const urls = Array.from({ length: 8 }, (_, i) => `url-${i + 1}`)
+    const inputs = makeRenderInputs(deck, makeRenderDoc({ status: 'ready', renderedCount: 8 }), urls, {
+      groupsBySlotId: new Map([['slot-imported-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result).toHaveLength(8)
+    for (const assembled of result) {
+      expect(assembled.slide.contentKind).toBe('image')
+      expect(slideContentLabel(assembled.slide)).toBe('IMAGE')
+    }
+  })
+
+  it('D-06: for a ready render, no assembled slide carries any of the deck\'s parsed slide bodies (an absence assertion)', () => {
+    const deck = makeRenderedImportedDeck()
+    const slot = importedSlot({ id: 'slot-imported-0', importId: 'deck-1' })
+    const service = makeService([slot])
+    const resolution = resolveImportedRender(deck, makeRenderDoc({ status: 'ready', renderedCount: 5 }))
+    const entries = groupEntriesForRender(deck, resolution)
+    const group = makeSlideGroup({ id: 'slot-imported-0', slotId: 'slot-imported-0', slides: entries })
+    const urls = Array.from({ length: 5 }, (_, i) => `url-${i + 1}`)
+    const inputs = makeRenderInputs(deck, makeRenderDoc({ status: 'ready', renderedCount: 5 }), urls, {
+      groupsBySlotId: new Map([['slot-imported-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    const parsedBodies = deck.slides.map((s) => (s.contentKind === 'text' ? s.body : s.imageUrl))
+    for (const assembled of result) {
+      const slide = assembled.slide as unknown as Record<string, unknown>
+      expect(parsedBodies).not.toContain(slide.body)
+      expect(parsedBodies).not.toContain(slide.title)
+      expect(parsedBodies).not.toContain(slide.altText)
+    }
+  })
+})
+
+describe('assembleSlideshow fallback — IMPORTED with a render (no-group path, R079/R080)', () => {
+  it('R079: the fallback path resolves a ready render content-for-content the same as the stored-group path (ids differ by construction)', () => {
+    const deck = makeRenderedImportedDeck()
+    const slot = importedSlot({ id: 'slot-imported-0', importId: 'deck-1' })
+    const service = makeService([slot])
+    const urls = ['url-1', 'url-2', 'url-3', 'url-4', 'url-5']
+
+    const fallbackInputs = makeRenderInputs(deck, makeRenderDoc({ status: 'ready', renderedCount: 5 }), urls)
+    const fallbackResult = assembleSlideshow(service, fallbackInputs)
+
+    const resolution = resolveImportedRender(deck, makeRenderDoc({ status: 'ready', renderedCount: 5 }))
+    const groupEntries = groupEntriesForRender(deck, resolution)
+    const group = makeSlideGroup({ id: 'slot-imported-0', slotId: 'slot-imported-0', slides: groupEntries })
+    const groupInputs = makeRenderInputs(deck, makeRenderDoc({ status: 'ready', renderedCount: 5 }), urls, {
+      groupsBySlotId: new Map([['slot-imported-0', group]]),
+    })
+    const groupResult = assembleSlideshow(service, groupInputs)
+
+    expect(fallbackResult).toHaveLength(groupResult.length)
+    fallbackResult.forEach((assembled, i) => {
+      expect(assembled.slide.contentKind).toBe(groupResult[i]!.slide.contentKind)
+      expect((assembled.slide as ImageSlide).imageUrl).toBe((groupResult[i]!.slide as ImageSlide).imageUrl)
+      // ids differ by construction — the fallback derives ids from slot.id, existing behaviour.
+      expect(assembled.slide.id).not.toBe(groupResult[i]!.slide.id)
+    })
+  })
+
+  it('R079/T-42-11: a pending render assembles the full parsed-count number of slides on the fallback path — none omitted by the content guard', () => {
+    const deck = makeRenderedImportedDeck()
+    const slot = importedSlot({ id: 'slot-imported-0', importId: 'deck-1' })
+    const service = makeService([slot])
+    const inputs = makeRenderInputs(deck, makeRenderDoc({ status: 'pending' }))
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result).toHaveLength(deck.slides.length)
+    for (const assembled of result) {
+      expect((assembled.slide as ImageSlide).renderState).toBe('pending')
+    }
+  })
+
+  it('T-42-07: a deck with no renderImportId, sharing a service with a rendered deck, assembles exactly its own parsed slides', () => {
+    const renderedDeck = makeRenderedImportedDeck({ id: 'deck-rendered' })
+    const plainDeck = makeImportedDeck({ id: 'deck-plain' }) // no renderImportId (D-16) — 2 parsed slides
+    const slotRendered = importedSlot({ id: 'slot-rendered', position: 0, importId: 'deck-rendered' })
+    const slotPlain = importedSlot({ id: 'slot-plain', position: 1, importId: 'deck-plain' })
+    const service = makeService([slotRendered, slotPlain])
+    const urls = ['url-1', 'url-2', 'url-3']
+    const inputs = makeInputs({
+      importedDecksById: new Map([
+        ['deck-rendered', renderedDeck],
+        ['deck-plain', plainDeck],
+      ]),
+      pptxRendersByImportId: new Map([['render-1', makeRenderDoc({ status: 'ready', renderedCount: 3 })]]),
+      renderedImageUrlsByImportId: new Map([['render-1', urls]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    const renderedResults = result.filter((r) => r.slotIndex === 0)
+    const plainResults = result.filter((r) => r.slotIndex === 1)
+
+    expect(renderedResults).toHaveLength(3)
+    for (const assembled of renderedResults) {
+      expect(assembled.slide.contentKind).toBe('image')
+    }
+
+    expect(plainResults).toHaveLength(plainDeck.slides.length)
+    expect(plainResults[0]!.slide.contentKind).toBe('text')
+    const firstPlainSlide = plainDeck.slides[0] as TextSlide
+    expect((plainResults[0]!.slide as TextSlide).body).toBe(firstPlainSlide.body)
   })
 })
