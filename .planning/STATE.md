@@ -5,15 +5,15 @@ milestone_name: Settings, Sharing, and Fidelity
 current_phase: 46
 current_phase_name: Global Slide Typography
 status: executing
-stopped_at: Completed 46-02-PLAN.md
-last_updated: "2026-08-08T17:41:21.509Z"
+stopped_at: Completed 46-03-PLAN.md
+last_updated: "2026-08-08T18:04:35.994Z"
 last_activity: 2026-08-08
 last_activity_desc: Phase 46 execution started
 progress:
   total_phases: 11
   completed_phases: 8
   total_plans: 37
-  completed_plans: 35
+  completed_plans: 36
   percent: 73
 ---
 
@@ -151,7 +151,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 46 (Global Slide Typography) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 client (DEPLOY-GATED, see below). 45-02 added `bibleVersion: 'ESV' | 'NLT'` to `OrgSettings`
 (`DEFAULT_ORG_SETTINGS.bibleVersion: 'NLT'`, owner's locked override) plus the Settings "Bible
@@ -1373,6 +1373,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 45 P04 | 50min | 3 tasks | 8 files |
 | Phase 46 P01 | 17min | 2 tasks | 6 files |
 | Phase 46 P02 | 25min | 3 tasks | 5 files |
+| Phase 46 P03 | 35min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -1693,6 +1694,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 46-01: Task 1 package-legitimacy checkpoint pre-resolved and recorded DEFERRED in PENDING-VERIFICATION.md per v1.5 standing autonomy grant; RESEARCH.md's direct tarball verification stands in for the owner's pending sign-off
 - [Phase ?]: 46-02: cssVarsFor falls back to the FULL Inter/400/md default (not a partial per-field snap) when family/weight/scale fails validation
 - [Phase ?]: 46-02: loadFontCss hardcodes one dynamic-import per curated family (static @fontsource/<package> prefix) so Vite can bundle the weight chunks
+- [Phase ?]: Slide Typography save mirrors the whole authStore.settings.slideTypography object in one assignment (not three independent field mirrors), since family/weight/scale are always saved together as one selection; the Firestore write itself stays three separate leaf dot-paths.
+- [Phase ?]: Split 46-03 Task 1/Task 2 so each commit leaves the Slide Typography card in a working, testable state: Task 1 wires save directly on change; Task 2 replaces the family-change handler with snapWeight + loadFontCss and adds the live Preview panel.
 
 ### Roadmap Evolution
 
@@ -2004,8 +2007,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-08T17:41:21.443Z
-Stopped at: Completed 46-02-PLAN.md
+Last session: 2026-08-08T18:04:22.650Z
+Stopped at: Completed 46-03-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

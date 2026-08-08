@@ -190,7 +190,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 
 ### Slide Typography
 
-- [ ] **R093**: A church can set one font family, weight and size that applies to every slide.
+- [x] **R093**: A church can set one font family, weight and size that applies to every slide.
       <br>Family **and weight**, because "Helvetica Neue Light" is a weight and a family-only picker
       cannot reach it. Curated self-hosted woff2 via `@fontsource/*` `[STACK]` — **not** the runtime
       Google Fonts API, which would fail on a projector without internet at service time. Inter is the
@@ -303,7 +303,7 @@ Explicitly excluded. Documented to prevent scope creep.
 | R090 | Phase 45 | Complete |
 | R091 | Phase 45 | Complete |
 | R092 | Phase 45 | Complete |
-| R093 | Phase 46 | Pending |
+| R093 | Phase 46 | Complete |
 | R094 | Phase 46 | Pending |
 | R095 | Phase 47 | Pending |
 | R096 | Phase 47 | Pending |
