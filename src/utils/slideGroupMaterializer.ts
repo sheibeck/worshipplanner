@@ -113,6 +113,11 @@ export function deriveGroupEntries(slot: ServiceSlot, inputs: AssemblyInputs): G
           speaker: section.speaker,
           text: section.text,
           ...(section.verseRange !== undefined ? { verseRange: section.verseRange } : {}),
+          // R092: a passthrough spread of the section's OWN stamped value —
+          // never recomputed from the org's current bibleVersion setting.
+          // Kept out of sourceSignature() below on purpose (provenance, not
+          // structure) so a setting change can never trigger a rebuild.
+          ...(section.translationSource !== undefined ? { translationSource: section.translationSource } : {}),
         },
       }))
     }

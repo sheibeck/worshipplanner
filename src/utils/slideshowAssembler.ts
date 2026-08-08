@@ -212,6 +212,11 @@ function resolveEntryContent(
               verseRange: section.verseRange ?? '',
               readingMode: 'congregational',
               section,
+              // R092: read back the passthrough SourceRef.translationSource —
+              // never re-derived here. Absent when the ref carries none
+              // (pre-phase entry), which resolveTranslationSource() later
+              // reads as 'ESV'.
+              ...(ref.translationSource !== undefined ? { translationSource: ref.translationSource } : {}),
             }
       return content
     }
@@ -502,6 +507,9 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
             verseRange: section.verseRange ?? '',
             readingMode: 'congregational',
             section,
+            // R092: same passthrough as the stored-group path above — read
+            // straight off the slot's own section, never re-derived.
+            ...(section.translationSource !== undefined ? { translationSource: section.translationSource } : {}),
           }
           emitFallback(slot, index, content, null, localSeq)
         })

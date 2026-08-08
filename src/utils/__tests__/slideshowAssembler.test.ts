@@ -20,6 +20,7 @@ import type { Timestamp } from 'firebase/firestore'
 import { slotLabel, reindexSlots, orderSlotsBySection } from '@/utils/slotTypes'
 import { resolveImportedRender, importedEntryIdentities, type ImportedRenderResolution } from '@/utils/importedRenderReconciler'
 import { slideContentLabel } from '@/components/slides/slideDisplay'
+import { resolveTranslationSource } from '@/utils/scripture'
 
 const mockTimestamp = { toDate: () => new Date('2026-01-01') } as unknown as Timestamp
 
@@ -632,6 +633,83 @@ describe('assembleSlideshow — congregational reading (D1)', () => {
     expect(resultWith[0]!.slide.position).toBe(resultWithout[0]!.slide.position)
     expect(resultWith[0]!.sourceId).toBe(resultWithout[0]!.sourceId)
     expect(resultWith[0]!.groupId).toBe(resultWithout[0]!.groupId)
+  })
+})
+
+// R092/T-45-31 (Phase 45): a SourceRef's stamped translationSource threads
+// onto the assembled ScriptureSlide with no re-derivation, on both the
+// stored-group and no-group fallback paths — never read from any org
+// setting, which this function's inputs don't even carry.
+describe('assembleSlideshow — translationSource passthrough (Phase 45, R092)', () => {
+  function sectionEntryWithSource(section: CongregationalSection, order: number, id: string): GroupSlideEntry {
+    return makeGroupSlideEntry({
+      id,
+      order,
+      sourceRef: {
+        kind: 'scripture',
+        speaker: section.speaker,
+        text: section.text,
+        ...(section.verseRange !== undefined ? { verseRange: section.verseRange } : {}),
+        ...(section.translationSource !== undefined ? { translationSource: section.translationSource } : {}),
+      },
+    })
+  }
+
+  it('stored-group path: a SourceRef carrying translationSource: \'NLT\' threads onto ScriptureSlide.translationSource', () => {
+    const section = makeCongregationalSection({ text: 'One', translationSource: 'NLT' })
+    const slot = scriptureSlot({ id: 'slot-scripture-0', congregationalSections: [section] })
+    const entry = sectionEntryWithSource(section, 0, 'entry-scripture-0')
+    const group = makeSlideGroup({ id: slot.id, slotId: slot.id, slides: [entry] })
+    const inputs = makeInputs({ groupsBySlotId: new Map([[slot.id, group]]) })
+
+    const result = assembleSlideshow(makeService([slot]), inputs)
+
+    expect((result[0]!.slide as ScriptureSlide).translationSource).toBe('NLT')
+  })
+
+  it('stored-group path: a SourceRef with no translationSource yields a ScriptureSlide with no translationSource key at all', () => {
+    const section = makeCongregationalSection({ text: 'Field-less' })
+    const slot = scriptureSlot({ id: 'slot-scripture-0', congregationalSections: [section] })
+    const entry = sectionEntryWithSource(section, 0, 'entry-scripture-0')
+    const group = makeSlideGroup({ id: slot.id, slotId: slot.id, slides: [entry] })
+    const inputs = makeInputs({ groupsBySlotId: new Map([[slot.id, group]]) })
+
+    const result = assembleSlideshow(makeService([slot]), inputs)
+
+    expect(Object.prototype.hasOwnProperty.call(result[0]!.slide, 'translationSource')).toBe(false)
+  })
+
+  it('no-group fallback path: a slot section carrying translationSource: \'ESV\' threads onto the fallback-derived ScriptureSlide', () => {
+    const section = makeCongregationalSection({ text: 'One', translationSource: 'ESV' })
+    const slot = scriptureSlot({ congregationalSections: [section] })
+
+    const result = assembleSlideshow(makeService([slot]), makeInputs())
+
+    expect((result[0]!.slide as ScriptureSlide).translationSource).toBe('ESV')
+  })
+
+  it('the Reference-state (non-congregational) branch never carries translationSource — no body text exists there to attribute (Pitfall 3)', () => {
+    const slot = scriptureSlot({ id: 'slot-scripture-0' })
+
+    const fallbackResult = assembleSlideshow(makeService([slot]), makeInputs())
+    const group = makeSlideGroup({
+      id: slot.id,
+      slotId: slot.id,
+      slides: [makeGroupSlideEntry({ id: 'entry-scripture', order: 0, sourceRef: { kind: 'scripture' } })],
+    })
+    const storedResult = assembleSlideshow(makeService([slot]), makeInputs({ groupsBySlotId: new Map([[slot.id, group]]) }))
+
+    expect(Object.prototype.hasOwnProperty.call(fallbackResult[0]!.slide, 'translationSource')).toBe(false)
+    expect(Object.prototype.hasOwnProperty.call(storedResult[0]!.slide, 'translationSource')).toBe(false)
+  })
+
+  it('NAMED R092 invariant: resolveTranslationSource on a field-less assembled slide resolves to \'ESV\', independent of any org setting the assembler was never given', () => {
+    const slot = scriptureSlot({ congregationalSections: [makeCongregationalSection({ text: 'Pre-phase section' })] })
+    const result = assembleSlideshow(makeService([slot]), makeInputs())
+    const slide = result[0]!.slide as ScriptureSlide
+
+    expect(slide.translationSource).toBeUndefined()
+    expect(resolveTranslationSource(slide)).toBe('ESV')
   })
 })
 

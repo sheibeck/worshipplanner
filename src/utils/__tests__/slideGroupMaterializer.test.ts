@@ -443,6 +443,79 @@ describe('sourceSignature', () => {
   })
 })
 
+// R092/T-45-31 (Phase 45): translation provenance threads from a stamped
+// CongregationalSection into the produced SourceRef with no re-derivation,
+// and neither sourceSignature nor a materializer rebuild ever reads the
+// org's current bibleVersion setting to decide anything.
+describe('deriveGroupEntries — translationSource passthrough (Phase 45, R092)', () => {
+  it('a section carrying translationSource: \'NLT\' spreads that value onto the produced SourceRef, unchanged', () => {
+    const sections = [
+      makeSection({ text: 'One', translationSource: 'NLT' }),
+      makeSection({ text: 'Two', translationSource: 'ESV' }),
+    ]
+    const slot = scriptureSlot({ congregationalSections: sections })
+
+    const entries = deriveGroupEntries(slot, makeInputs())
+
+    expect((entries[0]!.sourceRef as { translationSource?: string }).translationSource).toBe('NLT')
+    expect((entries[1]!.sourceRef as { translationSource?: string }).translationSource).toBe('ESV')
+  })
+
+  it('a section with no translationSource produces a SourceRef with no translationSource key at all', () => {
+    const sections = [makeSection({ text: 'Field-less' })]
+    const slot = scriptureSlot({ congregationalSections: sections })
+
+    const entries = deriveGroupEntries(slot, makeInputs())
+
+    expect(Object.prototype.hasOwnProperty.call(entries[0]!.sourceRef, 'translationSource')).toBe(false)
+  })
+})
+
+describe('R092 invariant — a bibleVersion setting change never alters an already-materialized group (Phase 45)', () => {
+  it('NAMED R092 invariant: sourceSignature is identical for congregational sections that differ ONLY in translationSource — the signature cannot be the thing a setting change would flip', () => {
+    const inputs = makeInputs()
+    const esvSections = [makeSection({ translationSource: 'ESV' })]
+    const nltSections = [makeSection({ translationSource: 'NLT' })]
+
+    const sigEsv = sourceSignature(scriptureSlot({ congregationalSections: esvSections }), inputs)
+    const sigNlt = sourceSignature(scriptureSlot({ congregationalSections: nltSections }), inputs)
+
+    expect(sigEsv).toBe(sigNlt)
+  })
+
+  it('NAMED R092 invariant: a DETACHED congregational group materialized while stamped \'ESV\' still reports changed:false and returns its stored slides reference-equal — re-running the materializer never overwrites a section\'s stored translationSource with any current setting value', () => {
+    const esvSections: CongregationalSection[] = [
+      { speaker: 'LEADER', text: 'The Lord is my shepherd;', translationSource: 'ESV' },
+      { speaker: 'CONGREGATION', text: 'I shall not want.', translationSource: 'ESV' },
+    ]
+    const slot = scriptureSlot({ congregationalSections: esvSections })
+    const inputs = makeInputs()
+    const group = makeGroup({
+      sourceSignature: sourceSignature(slot, inputs),
+      slides: deriveGroupEntries(slot, inputs),
+    })
+
+    // Every stored entry carries the ESV stamp from materialization time.
+    for (const entry of group.slides) {
+      expect((entry.sourceRef as { translationSource?: string }).translationSource).toBe('ESV')
+    }
+
+    // Simulate the org's bibleVersion setting having since flipped to 'NLT':
+    // the SLOT itself is unchanged (its stored sections are exactly what
+    // they were at materialization time) — `rebuildScriptureGroup` and
+    // `sourceSignature` take no OrgSettings argument at all, so this call is
+    // indistinguishable from "the setting never changed." That is the
+    // guarantee: there is nothing here for a setting change to touch.
+    const result = rebuildScriptureGroup(group, slot, inputs)
+
+    expect(result.changed).toBe(false)
+    expect(result.slides).toBe(group.slides)
+    for (const entry of result.slides) {
+      expect((entry.sourceRef as { translationSource?: string }).translationSource).toBe('ESV')
+    }
+  })
+})
+
 describe('rebuildSongGroup', () => {
   function makeStoredSongGroup(slides: SlideGroup['slides']): SlideGroup {
     return makeGroup({ id: 'slot-1', slotId: 'slot-1', slides })
