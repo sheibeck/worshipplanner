@@ -1,8 +1,21 @@
 <template>
-  <div v-if="!allDone" class="bg-gray-900 border border-gray-800 rounded-xl shadow-xl overflow-hidden">
-    <div class="px-6 py-4 border-b border-gray-800">
-      <h2 class="text-sm font-semibold text-gray-100">Getting Started</h2>
-      <p class="text-xs text-gray-500 mt-0.5">Get set up in a few quick steps</p>
+  <div v-if="!allDone && !dismissed" class="bg-gray-900 border border-gray-800 rounded-xl shadow-xl overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-800 flex items-start justify-between gap-3">
+      <div>
+        <h2 class="text-sm font-semibold text-gray-100">Getting Started</h2>
+        <p class="text-xs text-gray-500 mt-0.5">Get set up in a few quick steps</p>
+      </div>
+      <button
+        type="button"
+        aria-label="Dismiss Getting Started"
+        data-testid="getting-started-dismiss"
+        class="-m-1.5 p-1.5 rounded-md text-gray-500 hover:text-gray-300 hover:bg-gray-800 transition-colors shrink-0"
+        @click="onDismiss"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
     </div>
     <ul class="divide-y divide-gray-800">
       <li
@@ -73,6 +86,18 @@ const serviceStore = useServiceStore()
 
 const memberCount = ref(0)
 let unsub: Unsubscribe | null = null
+
+// R103 — dismiss control, persisted per-device. Flat, unscoped key (matches
+// CollapsibleSection.vue's precedent) since this is UI-state chrome, not church
+// data. Read synchronously at setup() — no onMounted, no watcher — so an
+// already-dismissed panel never flashes before hiding.
+const DISMISS_KEY = 'wp:gettingStartedDismissed'
+const dismissed = ref(localStorage.getItem(DISMISS_KEY) !== null)
+
+function onDismiss() {
+  localStorage.setItem(DISMISS_KEY, 'true')
+  dismissed.value = true
+}
 
 onMounted(() => {
   const orgId = authStore.orgId
