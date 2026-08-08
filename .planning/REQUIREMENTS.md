@@ -175,7 +175,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
       `DOMParser`, no new dependency). *Confidence: LOW-MEDIUM on the exact response shape — verify
       against a real sample using the owner's key during planning.*
 
-- [ ] **R091**: Scripture text carries its required translation attribution wherever it is displayed or
+- [x] **R091**: Scripture text carries its required translation attribution wherever it is displayed or
       projected.
       <br>`[FEAT]` ESV and NLT are structurally near-identical here: 500 verses without formal
       permission, and for non-saleable media (bulletins, projected slides) **only the initials "(ESV)" or
@@ -183,7 +183,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
       scripture-slide path and the new congregational-reading path. *Confidence: MEDIUM-HIGH — sourced
       from Crossway's own permissions page and Tyndale's standard notice.*
 
-- [ ] **R092**: Changing the translation setting does not retroactively alter scripture on slides that
+- [x] **R092**: Changing the translation setting does not retroactively alter scripture on slides that
       already exist.
       <br>`[ARCH]` Requires a per-slide translation-source field — a schema decision that must be made in
       the same phase, not deferred.
@@ -301,8 +301,8 @@ Explicitly excluded. Documented to prevent scope creep.
 | R088 | Phase 39 | Complete |
 | R089 | Phase 39 | Complete |
 | R090 | Phase 45 | Complete |
-| R091 | Phase 45 | Pending |
-| R092 | Phase 45 | Pending |
+| R091 | Phase 45 | Complete |
+| R092 | Phase 45 | Complete |
 | R093 | Phase 46 | Pending |
 | R094 | Phase 46 | Pending |
 | R095 | Phase 47 | Pending |

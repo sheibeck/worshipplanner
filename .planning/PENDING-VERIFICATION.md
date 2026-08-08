@@ -1097,12 +1097,35 @@ this function branch MUST be deployed in the SAME session — never the frontend
       against `/api/nlt` until step 2 completes. This is a human process guarantee — the emulator
       proves the function branch works, but cannot prove the two halves ship together.
 - [ ] **4. Deferred live check.** With a church set to NLT, fetch a passage and confirm it renders
-      with `(NLT)` attribution (attribution itself ships in a later plan of this phase, R091).
+      with `(NLT)` attribution. Attribution itself now ships in Plan 45-04 (R091) — this check can run
+      as soon as steps 1-3 above are done, no further plan needed.
 - [ ] **5. Confirm the real fetch matches this plan's fixtures.** This plan's tests use RESEARCH.md's
       documented real (redacted) NLT sample shapes rather than a fresh live fetch (sandbox could not
       read `.env.local`). After deploying, fetch a real passage (e.g. `John 3:16-18`) through the
       deployed proxy and confirm the returned text matches the `[N] text` shape these tests assert —
       footnotes/headings stripped, red-letter/small-caps text kept, no leaked digit before each verse.
+
+### Plan 45-04 — consumption wiring: fetch routing + stamp-once + attribution (R090/R091/R092)
+
+**Status: built and tested, all automated.** `CongregationalEditor.vue`/`ScriptureInput.vue` route
+ESV/NLT fetches by `authStore.settings.bibleVersion`; `CongregationalEditor.vue` stamps
+`translationSource` once at fetch time; both render sites (`PresentationViewer.vue`,
+`slideDisplay.ts::slideBodyText()`) append the shared `(ESV)`/`(NLT)` suffix via
+`scriptureAttribution(resolveTranslationSource(slide))`. `npm run type-check` clean; the four touched
+suites (231 tests) plus the full app suite (2-file baseline, no new failure) and `functions && npm
+test` (112/112) all pass. Deferred items below are visual/live-integration checks jsdom cannot prove:
+
+- [ ] **1. Overflow backstop (45-UI-SPEC.md § UI Considerations).** Confirm a long scripture passage
+      running to the projector container's edge does not visually clip the trailing `(ESV)`/`(NLT)`
+      suffix at 48px (`text-5xl`) display size, in both the normal-mode and congregational-mode
+      paragraphs of `PresentationViewer.vue`. Held out as a backstop in the UI-SPEC, not asserted by
+      the unit suite, since exact clip thresholds are query-dependent.
+- [ ] **2. Post-deploy round trip (depends on Plan 45-01 steps 1-3 above).** Once the NLT function is
+      deployed and the secret is set: set a church's Bible Translation setting to NLT in Settings,
+      fetch a real passage in `CongregationalEditor.vue`, and confirm (a) the fetched sections show
+      NLT-sourced text, (b) the projected/presented slide shows the `(NLT)` suffix, and (c) an
+      already-existing ESV-sourced slide elsewhere in the same service still shows `(ESV)` unchanged
+      after the setting flip (R092, provable live — not just in the unit suite's mocked fetches).
 
 ---
 

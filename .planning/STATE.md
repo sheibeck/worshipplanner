@@ -5,16 +5,16 @@ milestone_name: Settings, Sharing, and Fidelity
 current_phase: 45
 current_phase_name: ESV/NLT Bible Version Selection
 status: executing
-stopped_at: Completed 45-02-PLAN.md
-last_updated: "2026-08-08T04:33:36.058Z"
+stopped_at: Completed 45-04-PLAN.md — Phase 45 (ESV/NLT Bible Version Selection) now code-complete, all 4 plans done
+last_updated: "2026-08-08T05:32:07.269Z"
 last_activity: 2026-08-08
-last_activity_desc: Phase 45 Plan 02 (2/4) complete; 2 plans remain in Phase 45.
+last_activity_desc: Phase 45 Plan 04 (4/4) complete; Phase 45 code-complete (R090/R091/R092 done).
 progress:
   total_phases: 11
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 33
-  completed_plans: 32
-  percent: 64
+  completed_plans: 33
+  percent: 73
 ---
 
 # Project State
@@ -150,22 +150,29 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 45 (ESV/NLT Bible Version Selection) — IN PROGRESS
-Plan: 2 of 4 executed (45-01, 45-02)
-Status: 45-01 (NLT proxy Cloud Function branch — DEPLOY-GATED, see below) and 45-02 (OrgSettings.
-bibleVersion field + Settings "Bible Translation" card) are both complete. 45-02 added
-`bibleVersion: 'ESV' | 'NLT'` to `OrgSettings` with `DEFAULT_ORG_SETTINGS.bibleVersion: 'NLT'`
-(owner's locked override), flowing through the single existing `auth.ts::loadOrgContext` merge
-with no second merge point added, plus a "Bible Translation" card in `SettingsView.vue` mirroring
-the AI/Planning Center/Vertical Worship toggle cards exactly (editor-gated ESV/NLT radio,
-dot-path `updateDoc` + store mirror-write, Saved!/revert-on-error). R090's storage + settings-UI
-half delivered; per-slide translationSource provenance (45-03) and consumption wiring (45-04)
-remain. `npm run type-check` clean; app suite failing-file-set unchanged from the documented
-2-file baseline (`src/storage.rules.test.ts`, `RosterView.test.ts`). 45-01's NLT Cloud Function
-remains **DEPLOY-GATED per the standing v1.5 NO-DEPLOYS grant** — ships built/tested/UNDEPLOYED;
-owner handoff recorded in `.planning/PENDING-VERIFICATION.md` § Phase 45 (unaffected by 45-02).
-Next: plan 45-03 (wave 1, no dependency on 45-01/45-02), then 45-04 (wave 2, depends on 45-01).
-Last activity: 2026-08-08 — Phase 45 Plan 02 (2/4) complete; 2 plans remain in Phase 45.
+Phase: 45 (ESV/NLT Bible Version Selection) — CODE-COMPLETE, 4/4 plans done
+Plan: 4 of 4 executed (45-01, 45-02, 45-03, 45-04)
+Status: All four plans complete. 45-01 built the NLT proxy Cloud Function branch + `nltApi.ts`
+client (DEPLOY-GATED, see below). 45-02 added `bibleVersion: 'ESV' | 'NLT'` to `OrgSettings`
+(`DEFAULT_ORG_SETTINGS.bibleVersion: 'NLT'`, owner's locked override) plus the Settings "Bible
+Translation" card. 45-03 added the `translationSource?` field + `scriptureAttribution()`/
+`resolveTranslationSource()` helpers and threaded them through the materializer/assembler. 45-04
+(this plan) wired consumption: `CongregationalEditor.vue`/`ScriptureInput.vue` route ESV/NLT
+fetches by `authStore.settings.bibleVersion`; `CongregationalEditor.vue` stamps
+`translationSource` once at fetch time (never restamped by a later setting change or a
+subsequent AI split — `lastFetchedVersion` threads the captured value into `onAiSplit` too); both
+scripture render sites (`PresentationViewer.vue`, `slideDisplay.ts::slideBodyText()`) append the
+shared `(ESV)`/`(NLT)` suffix via `resolveTranslationSource(slide)`, never the live org setting.
+R090, R091 and R092 are all marked complete in `REQUIREMENTS.md`. `npm run type-check` clean;
+231/231 in the four touched suites; full app suite at the documented 2-file baseline
+(`src/storage.rules.test.ts`, `RosterView.test.ts`), no new failure; `cd functions && npm test`
+112/112. 45-01's NLT Cloud Function remains **DEPLOY-GATED per the standing v1.5 NO-DEPLOYS
+grant** — ships built/tested/UNDEPLOYED; owner handoff (secret + deploy + two new deferred
+human-verify items: the 48px overflow backstop, and the full post-deploy live round trip) recorded
+in `.planning/PENDING-VERIFICATION.md` § Phase 45.
+Next: Phase 45 is code-complete; the owner's deploy step and the deferred human-verify items are
+the only remaining work for this phase (non-blocking). No further plan needed for Phase 45 itself.
+Last activity: 2026-08-08 — Phase 45 Plan 04 (4/4) complete; Phase 45 code-complete.
 
 ## ⏸ RESUME HERE (2026-08-06 — v1.5 ROADMAP.md created, ready to plan Phase 39)
 
@@ -1362,6 +1369,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 44 P02 | 30min | 2 tasks | 5 files |
 | Phase 45 P01 | 30min | 2 tasks | 4 files |
 | Phase 45 P02 | 10min | 2 tasks | 4 files |
+| Phase 45 P04 | 50min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -1675,6 +1683,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: All five SERVICE_SECTIONS containers render as live Sortable drop targets whenever the draft is non-empty, even when currently empty
 - [Phase ?]: 45-01: buildUpstreamUrl extracted as an exported pure function for testability; .vn glyph span stripped (not just ignored as source) to prevent a leaked duplicate digit before [N]; RESEARCH.md fixtures used in place of a fresh live NLT fetch (.env.local unreadable in this sandbox)
 - [Phase ?]: 45-02: bibleVersion field defaults to NLT (owner override) via the single existing loadOrgContext merge; no second defaults path
+- [Phase ?]: 45-04: AI-split-produced congregational sections are stamped from the version captured at the ORIGINAL fetch (lastFetchedVersion), never a live re-read of authStore.settings.bibleVersion at split time, since a split transforms already-fetched text rather than re-fetching (R092).
+- [Phase ?]: 45-04: both ScriptureInput.vue preview fetch call sites (reference-preview panel + AI-suggestion expanded preview) route through one shared fetchPassageByOrgSetting() helper by the church's bibleVersion setting, not just the primary one, for consistency.
+- [Phase ?]: 45-04: discovered and worked around a pre-existing test-harness race in src/stores/auth.ts — its real onAuthStateChanged listener resets settings.value to defaults on a microtask after store creation, which can silently discard a test's synchronous settings mutation if read back across an async gap. Not a production bug; fixed only in test mutation timing.
 
 ### Roadmap Evolution
 
@@ -1986,8 +1997,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-08T04:33:36.002Z
-Stopped at: Completed 45-02-PLAN.md
+Last session: 2026-08-08T05:32:07.214Z
+Stopped at: Completed 45-04-PLAN.md — Phase 45 (ESV/NLT Bible Version Selection) now code-complete, all 4 plans done
 Resume file: None
 
 ## Operator Next Steps
