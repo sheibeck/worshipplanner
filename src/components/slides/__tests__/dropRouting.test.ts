@@ -36,6 +36,16 @@ describe('dropRouting', () => {
       expect(result.decks).toEqual([pptx])
     })
 
+    it('sorts multi-image drops into filename natural order (R098) — slide2/slide10/slide1 → slide1/slide2/slide10, not lexicographic', () => {
+      const slide2 = file('slide2.png', 'image/png')
+      const slide10 = file('slide10.png', 'image/png')
+      const slide1 = file('slide1.png', 'image/png')
+
+      const result = classifyFiles([slide2, slide10, slide1])
+
+      expect(result.images).toEqual([slide1, slide2, slide10])
+    })
+
     it('classifies every file exactly once across all buckets', () => {
       const files = [
         file('a.pptx', ''),
@@ -80,6 +90,16 @@ describe('dropRouting', () => {
       expect(result.images).toEqual([])
       expect(result.skipped).toEqual(expect.arrayContaining([pptx2, image]))
       expect(result.skipped).toHaveLength(2)
+    })
+
+    it('surfaces the same natural order through resolveDrop.images for a scrambled multi-image drop (R098)', () => {
+      const slide2 = file('slide2.png', 'image/png')
+      const slide10 = file('slide10.png', 'image/png')
+      const slide1 = file('slide1.png', 'image/png')
+
+      const result = resolveDrop([slide2, slide10, slide1])
+
+      expect(result.images).toEqual([slide1, slide2, slide10])
     })
 
     it('every image is imported as one deck when no PPTX is present', () => {

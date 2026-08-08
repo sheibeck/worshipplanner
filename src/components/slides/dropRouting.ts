@@ -59,6 +59,12 @@ export function classifyFiles(files: File[]): ClassifiedFiles {
     }
   }
 
+  // R098 — natural-order sort so slide2/slide10/slide1 lands as slide1/slide2/slide10,
+  // not lexicographic slide1/slide10/slide2. Images only (per D-098): decks/videos/audio
+  // stay in drop order. Mutates the same array `resolveDrop` reads via `classified.images`.
+  const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
+  images.sort((a, b) => collator.compare(a.name, b.name))
+
   return { decks, images, videos, audioFiles, rejected }
 }
 
