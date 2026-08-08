@@ -92,7 +92,14 @@ export interface CopyrightSlide extends SlideBase {
 }
 
 export interface CongregationalSection {
-  speaker: 'LEADER' | 'CONGREGATION'
+  /**
+   * R095/R096/R097 (Phase 47): 'ALL' is an additive third value — every
+   * section persisted before this phase carries only 'LEADER' or
+   * 'CONGREGATION' and remains valid with no migration. 'ALL' marks a
+   * section every voice reads together (unison), distinct from the
+   * two-party call-and-response the original two values model.
+   */
+  speaker: 'LEADER' | 'CONGREGATION' | 'ALL'
   text: string
   verseRange?: string
   /**
@@ -124,6 +131,18 @@ export interface ScriptureSlide extends SlideBase {
    * unrepresentable. Absent entirely on a Reference-state slide.
    */
   section?: CongregationalSection
+  /**
+   * R097 (Phase 47): set by the two content-resolution paths in
+   * `slideshowAssembler.ts` from the section's own ordinal
+   * (`entry.order === 0` / `localSeq === 0`) — true only for the FIRST
+   * slide of a congregational reading. Meaningful ONLY when `section` is
+   * also present; a Reference-state slide has no section and no "first"
+   * concept. Consumed by the presenter and the grid card to gate the
+   * scripture reference so R097's "first slide shows the reference, later
+   * slides show only the speaker label" holds. Do not add this field to any
+   * other slide variant.
+   */
+  isFirstSection?: boolean
   /**
    * R092 (Phase 45): the translation this slide's text was fetched from,
    * threaded from the owning `CongregationalSection`/`SourceRef` with no

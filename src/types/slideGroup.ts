@@ -154,7 +154,8 @@ export type SourceRef =
       kind: 'scripture'
       scriptureReadingId?: string
       innerSlideId?: string
-      speaker?: 'LEADER' | 'CONGREGATION'
+      /** Widened Phase 47 (R095/R096/R097) to admit 'ALL', matching CongregationalSection.speaker — additive, no migration. */
+      speaker?: 'LEADER' | 'CONGREGATION' | 'ALL'
       text?: string
       verseRange?: string
       /**

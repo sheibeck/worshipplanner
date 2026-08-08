@@ -465,7 +465,7 @@ describe('SPLIT_SCHEMA', () => {
     expect([...SPLIT_SCHEMA.required]).toEqual(['sections'])
   })
 
-  it('(P-02) has no string-typed property anywhere except speaker, and speaker enum is exactly LEADER/CONGREGATION', () => {
+  it('(P-02) has no string-typed property anywhere except speaker, and speaker enum is exactly LEADER/CONGREGATION/ALL', () => {
     // A deep walk of the whole schema — not a spot-check — because P-02 says
     // there must be NO field anywhere the model could populate with scripture
     // words, including one added later without anyone re-reading this test.
@@ -490,7 +490,12 @@ describe('SPLIT_SCHEMA', () => {
 
     expect(stringTypedNodes).toHaveLength(1)
     expect(stringTypedNodes[0]!.path.endsWith('.speaker')).toBe(true)
-    expect(stringTypedNodes[0]!.node.enum).toEqual(['LEADER', 'CONGREGATION'])
+    expect(stringTypedNodes[0]!.node.enum).toEqual(['LEADER', 'CONGREGATION', 'ALL'])
+  })
+
+  it('(Phase 47, R095/R096/R097) speaker enum equals exactly LEADER/CONGREGATION/ALL', () => {
+    const itemProps = SPLIT_SCHEMA.properties.sections.items.properties
+    expect([...itemProps.speaker.enum]).toEqual(['LEADER', 'CONGREGATION', 'ALL'])
   })
 
   it('declares startBoundary and endBoundary as integer type', () => {
@@ -686,6 +691,37 @@ describe('validateSplitResult', () => {
       ],
     }
     expect(validateSplitResult(bad, boundaries)).toBeNull()
+  })
+
+  it('rejects a speaker of PASTOR (still outside the three-value closed set)', () => {
+    const bad = {
+      sections: [
+        { speaker: 'PASTOR', startBoundary: 0, endBoundary: 1 },
+        { speaker: 'CONGREGATION', startBoundary: 1, endBoundary: 2 },
+        { speaker: 'LEADER', startBoundary: 2, endBoundary: 3 },
+      ],
+    }
+    expect(validateSplitResult(bad, boundaries)).toBeNull()
+  })
+
+  it('(Phase 47, R095/R096/R097 - T-47-01) accepts a well-formed result whose speaker is ALL, against a real boundaries array from computeBoundaries', () => {
+    const rawText =
+      '[1] The Lord is my shepherd; I shall not want. [2] He makes me lie down in green pastures.'
+    const realBoundaries = computeBoundaries(rawText)
+    const maxIndex = realBoundaries.length - 1
+    const midIndex = Math.max(1, Math.floor(maxIndex / 2))
+
+    const wellFormed = {
+      sections: [
+        { speaker: 'ALL', startBoundary: 0, endBoundary: midIndex },
+        { speaker: 'CONGREGATION', startBoundary: midIndex, endBoundary: maxIndex },
+      ],
+    }
+
+    const result = validateSplitResult(wellFormed, realBoundaries)
+
+    expect(result).not.toBeNull()
+    expect(result).toEqual(wellFormed.sections)
   })
 
   it('rejects a lowercase variant of a legal speaker value', () => {

@@ -391,7 +391,7 @@ export async function getScriptureSuggestions(
  * legal-boundary array (see `src/utils/scriptureBoundaries.ts`). Never text.
  */
 export interface SplitSection {
-  speaker: 'LEADER' | 'CONGREGATION'
+  speaker: 'LEADER' | 'CONGREGATION' | 'ALL'
   startBoundary: number
   endBoundary: number
 }
@@ -407,7 +407,8 @@ export interface SplitSection {
  *
  * Structured outputs' JSON Schema subset has no `minimum`, `maximum`, or
  * `multipleOf` — this schema proves SHAPE only (an integer where an integer
- * is expected, one of two enum strings). Every bounds, ordering, adjacency
+ * is expected, one of three enum strings — 'ALL' added Phase 47, R095/R096/
+ * R097, additively alongside LEADER/CONGREGATION). Every bounds, ordering, adjacency
  * and coverage check lives in `validateSplitResult` below, in plain
  * TypeScript, because the schema is structurally incapable of expressing
  * them. Do not reach for `strict: true` here — that field belongs to tool
@@ -422,7 +423,7 @@ export const SPLIT_SCHEMA = {
       items: {
         type: 'object',
         properties: {
-          speaker: { type: 'string', enum: ['LEADER', 'CONGREGATION'] },
+          speaker: { type: 'string', enum: ['LEADER', 'CONGREGATION', 'ALL'] },
           startBoundary: { type: 'integer' },
           endBoundary: { type: 'integer' },
         },
@@ -479,7 +480,10 @@ export function validateSplitResult(
       endBoundary: unknown
     }
 
-    if (speaker !== 'LEADER' && speaker !== 'CONGREGATION') return null
+    // T-47-01: widened ADDITIVELY to admit 'ALL' (R095/R096/R097) — every
+    // other check in this loop (integer range, adjacency, coverage) is
+    // unchanged, so a malformed reply is still rejected whole.
+    if (speaker !== 'LEADER' && speaker !== 'CONGREGATION' && speaker !== 'ALL') return null
     if (!Number.isInteger(startBoundary) || !Number.isInteger(endBoundary)) return null
 
     const start = startBoundary as number
