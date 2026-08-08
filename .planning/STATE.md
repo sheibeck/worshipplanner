@@ -5,15 +5,15 @@ milestone_name: Settings, Sharing, and Fidelity
 current_phase: 47
 current_phase_name: Congregational Reading Divider UX
 status: executing
-stopped_at: Completed 47-01-PLAN.md
-last_updated: "2026-08-08T20:58:02.051Z"
+stopped_at: Completed 47-02-PLAN.md
+last_updated: "2026-08-08T21:22:27.664Z"
 last_activity: 2026-08-08
 last_activity_desc: Phase 47 execution started
 progress:
   total_phases: 11
   completed_phases: 9
   total_plans: 40
-  completed_plans: 38
+  completed_plans: 39
   percent: 82
 ---
 
@@ -151,7 +151,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 47 (Congregational Reading Divider UX) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 client (DEPLOY-GATED, see below). 45-02 added `bibleVersion: 'ESV' | 'NLT'` to `OrgSettings`
 (`DEFAULT_ORG_SETTINGS.bibleVersion: 'NLT'`, owner's locked override) plus the Settings "Bible
@@ -1377,6 +1377,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 46 P03 | 35min | 3 tasks | 2 files |
 | Phase 46 P04 | 30min | 3 tasks | 9 files |
 | Phase 47 P01 | ~25m | 2 tasks | 6 files |
+| Phase 47 P02 | 45min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -1703,6 +1704,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 46-04: PresentationViewer's playCurrentMedia() moved to fire after the font gate resolves, since AudioPlayer/VideoPlayer refs don't exist until the gated canvas mounts
 - [Phase ?]: 47-01: isFirstSection added only to ScriptureSlide (not any other slide variant) since it is meaningless without a section field
 - [Phase ?]: 47-01: splitPerVerse reuses parseVerses directly rather than splitPassage/splitBySentences, so it never groups multiple verses onto one segment
+- [Phase ?]: 47-02: kept claudeApi.ts's splitCongregationalReading return contract unchanged; editor maps AI text back to boundary indices via alignSegmentsToBoundaries instead of refactoring claudeApi.ts
 
 ### Roadmap Evolution
 
@@ -2014,8 +2016,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-08T20:58:02.003Z
-Stopped at: Completed 47-01-PLAN.md
+Last session: 2026-08-08T21:22:27.552Z
+Stopped at: Completed 47-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
