@@ -1152,6 +1152,23 @@ per the plan's own pre-resolution instructions.
 - [ ] Confirm the `5.3.0` pin landed cleanly in `package-lock.json` with integrity hashes present
       (already true as of this plan's commit; owner re-confirmation is the outstanding item).
 
+### Plan 46-04 — render-site typography + presenter font gate (2026-08-08)
+
+Three manual-only items carried verbatim from 46-04-PLAN.md's `<verification>` §
+Manual-only verification — jsdom cannot render real fonts, measure a real paint, or judge
+projection legibility/overflow, so these are unprovable by the automated suite regardless of how
+thoroughly the gate logic itself is unit-tested.
+
+- [ ] **No fallback-font flash mid-service (R094).** On a real projector, present a service and
+      confirm the chosen font is resident on the first slide — no visible swap from a fallback.
+- [ ] **Projection legibility of each curated family/weight/size (R093).** Present with each
+      curated family at each size on a real projector; confirm readability at projection distance.
+- [ ] **Long-line overflow at Large (1.25) scale (R093, UI-SPEC unresolved item #2).** On a real
+      projector at Large scale, present an already-long lyric/scripture line and confirm the
+      overflow is acceptable. No auto-fit/shrink-to-fit was built this phase (out of scope per
+      REQUIREMENTS.md) — Large scale can overflow a long line, same as the fixed base sizes can
+      today. If it bites in practice, revisit auto-fit in a later phase.
+
 ---
 
 ## Notes and failures

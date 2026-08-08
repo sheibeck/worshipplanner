@@ -199,7 +199,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
       shadow — and **slide surfaces only** (slide grid, Edit Slide drawer preview, presenter view).
       `ServicePrintLayout.vue` is explicitly out of scope.
 
-- [ ] **R094**: The presenter never renders a fallback font — the chosen font is loaded before first
+- [x] **R094**: The presenter never renders a fallback font — the chosen font is loaded before first
       paint.
       <br>`[PITFALL]` A font flash mid-service on a projection screen is the failure mode. Requires
       `document.fonts.ready`-gated first paint and pre-measurement gating.
@@ -304,7 +304,7 @@ Explicitly excluded. Documented to prevent scope creep.
 | R091 | Phase 45 | Complete |
 | R092 | Phase 45 | Complete |
 | R093 | Phase 46 | Complete |
-| R094 | Phase 46 | Pending |
+| R094 | Phase 46 | Complete |
 | R095 | Phase 47 | Pending |
 | R096 | Phase 47 | Pending |
 | R097 | Phase 47 | Pending |

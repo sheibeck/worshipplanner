@@ -4,17 +4,17 @@ milestone: v1.5
 milestone_name: Settings, Sharing, and Fidelity
 current_phase: 46
 current_phase_name: Global Slide Typography
-status: executing
-stopped_at: Completed 46-03-PLAN.md
-last_updated: "2026-08-08T18:04:35.994Z"
+status: verifying
+stopped_at: Completed 46-04-PLAN.md
+last_updated: "2026-08-08T18:43:24.077Z"
 last_activity: 2026-08-08
 last_activity_desc: Phase 46 execution started
 progress:
   total_phases: 11
-  completed_phases: 8
+  completed_phases: 9
   total_plans: 37
-  completed_plans: 36
-  percent: 73
+  completed_plans: 37
+  percent: 82
 ---
 
 # Project State
@@ -152,7 +152,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 46 (Global Slide Typography) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 client (DEPLOY-GATED, see below). 45-02 added `bibleVersion: 'ESV' | 'NLT'` to `OrgSettings`
 (`DEFAULT_ORG_SETTINGS.bibleVersion: 'NLT'`, owner's locked override) plus the Settings "Bible
 Translation" card. 45-03 added the `translationSource?` field + `scriptureAttribution()`/
@@ -1374,6 +1374,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 46 P01 | 17min | 2 tasks | 6 files |
 | Phase 46 P02 | 25min | 3 tasks | 5 files |
 | Phase 46 P03 | 35min | 3 tasks | 2 files |
+| Phase 46 P04 | 30min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -1696,6 +1697,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 46-02: loadFontCss hardcodes one dynamic-import per curated family (static @fontsource/<package> prefix) so Vite can bundle the weight chunks
 - [Phase ?]: Slide Typography save mirrors the whole authStore.settings.slideTypography object in one assignment (not three independent field mirrors), since family/weight/scale are always saved together as one selection; the Firestore write itself stays three separate leaf dot-paths.
 - [Phase ?]: Split 46-03 Task 1/Task 2 so each commit leaves the Slide Typography card in a working, testable state: Task 1 wires save directly on change; Task 2 replaces the family-change handler with snapWeight + loadFontCss and adds the live Preview panel.
+- [Phase ?]: 46-04: SlideCard receives typography via a parent-computed prop rather than importing the auth store itself, preserving its 'reads no store' contract
+- [Phase ?]: 46-04: PresentationViewer's playCurrentMedia() moved to fire after the font gate resolves, since AudioPlayer/VideoPlayer refs don't exist until the gated canvas mounts
 
 ### Roadmap Evolution
 
@@ -2007,8 +2010,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-08T18:04:22.650Z
-Stopped at: Completed 46-03-PLAN.md
+Last session: 2026-08-08T18:43:23.997Z
+Stopped at: Completed 46-04-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

@@ -371,12 +371,12 @@ Plans:
   3. The presenter never shows a fallback font mid-service — first paint is gated on `document.fonts.ready` plus pre-measurement, closing off the font-flash failure mode
   4. The curated self-hosted `@fontsource/*` font list (Inter as the Helvetica Neue stand-in, plus the other curated families) ships with a recorded license for every family actually added, not assumed by analogy to Inter
 
-**Plans**: 3/4 plans executed
+**Plans**: 4/4 plans executed
 
 - [x] 46-01-PLAN.md — Font packages (5 @fontsource, legitimacy checkpoint) + SLIDE_FONTS registry with verified licenses [wave 1]
 - [x] 46-02-PLAN.md — OrgSettings.slideTypography field + default; slideTypography.ts pure helpers (cssVarsFor/snapWeight/waitForSlideFont/loadFontCss); :root CSS vars + app-init eager font load [wave 2, depends 46-01]
 - [x] 46-03-PLAN.md — Slide Typography Settings card: family/weight/size picker + weight snap + live Preview [wave 3, depends 46-02]
-- [ ] 46-04-PLAN.md — Render-site application (grid, drawer preview, presenter) + presenter R094 font-load gate with bounded timeout [wave 3, depends 46-02]
+- [x] 46-04-PLAN.md — Render-site application (grid, drawer preview, presenter) + presenter R094 font-load gate with bounded timeout [wave 3, depends 46-02]
 
 **UI hint**: yes
 **Research flag**: needs light research — the owner's two original open scope questions (text outline/shadow; print-surface inclusion) are already resolved (both declined/excluded, see REQUIREMENTS.md Out of Scope), so implementation scope is settled; SUMMARY's remaining research ask is projection-legibility validation of the curated list and per-family license verification, not scope discovery.
@@ -432,7 +432,7 @@ Plans:
 | 43. Service Item Types | v1.5 | 4/4 | In Progress|  |
 | 44. Default Service Template | v1.5 | 2/2 | In Progress|  |
 | 45. ESV/NLT Bible Version Selection | v1.5 | 4/4 | In Progress|  |
-| 46. Global Slide Typography | v1.5 | 3/4 | In Progress|  |
+| 46. Global Slide Typography | v1.5 | 4/4 | In Progress|  |
 | 47. Congregational Reading Divider UX | v1.5 | 0/? | Not started | - |
 | 48. Multi-Image Ordering & Mobile Polish | v1.5 | 0/? | Not started | - |
 
