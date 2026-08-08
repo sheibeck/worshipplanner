@@ -145,7 +145,7 @@
            is not already a divider; a remove control sits at every existing
            divider between two segments. -->
       <div v-if="isBoundaryMode && draft.length > 0" data-testid="sections-container">
-        <template v-for="(section, idx) in draft" :key="idx">
+        <template v-for="(section, idx) in draft" :key="section.id">
           <button
             v-for="gap in interiorGaps(section)"
             :key="`gap-${gap}`"
@@ -233,7 +233,7 @@
       <div v-else-if="!isBoundaryMode && mountedSections.length > 0" class="space-y-3" data-testid="sections-container">
         <div
           v-for="(section, idx) in mountedSections"
-          :key="idx"
+          :key="mountedSectionIds[idx]"
           class="rounded-lg border-y border-r border-gray-700/50 bg-gray-800/40 border-l-4 p-4"
           :class="segmentBorderClass(section.speaker)"
         >
@@ -347,6 +347,11 @@ type DraftSpeaker = 'LEADER' | 'CONGREGATION' | 'ALL'
 type SeedKind = 'ai' | 'alternate' | 'blank'
 
 interface DraftSection {
+  // WR-03 (47-REVIEW): minted once per segment and carried across every
+  // insert/remove splice — never the array index, which shifts for every
+  // segment after an edit point and defeats Vue's diffing identity for the
+  // whole list on every divider edit.
+  id: string
   speaker: DraftSpeaker
   startBoundary: number
   endBoundary: number
@@ -375,6 +380,13 @@ const fetchError = ref(false)
 // first fetch of THIS session; a fetch fully replaces the editing surface
 // with the boundary-indexed `draft` below, same as the pre-47-02 component.
 const mountedSections = ref<CongregationalSection[]>([...props.sections])
+// WR-03 (47-REVIEW): a stable id per mounted section, minted once here and
+// never regenerated — `CongregationalSection` itself carries no id, and
+// this array never changes length (the legacy path only relabels via
+// `setSpeaker`, it has no insert/remove), so a 1:1 parallel array is
+// sufficient to give the `v-for` below an identity that survives a
+// content-only update instead of keying on the array index.
+const mountedSectionIds = mountedSections.value.map(() => crypto.randomUUID())
 
 // rawText/boundaries are local-only state, never persisted anywhere (not
 // even emitted). Re-opening the editor on a slot that already has sections
@@ -508,7 +520,7 @@ function alignSegmentsToBoundaries(
       )
       return null
     }
-    result.push({ speaker: segment.speaker, startBoundary: cursor, endBoundary: end })
+    result.push({ id: crypto.randomUUID(), speaker: segment.speaker, startBoundary: cursor, endBoundary: end })
     cursor = end
   }
   return result
@@ -665,8 +677,16 @@ function insertDivider(boundaryIndex: number): void {
   next.splice(
     idx,
     1,
-    { speaker: seg.speaker, startBoundary: seg.startBoundary, endBoundary: boundaryIndex },
-    { speaker: seg.speaker, startBoundary: boundaryIndex, endBoundary: seg.endBoundary },
+    // WR-03: the upper half keeps the split segment's own id (it is, in
+    // every meaningful sense, the same card that just got shorter); the
+    // lower half is a genuinely new segment and gets a freshly-minted one.
+    { id: seg.id, speaker: seg.speaker, startBoundary: seg.startBoundary, endBoundary: boundaryIndex },
+    {
+      id: crypto.randomUUID(),
+      speaker: seg.speaker,
+      startBoundary: boundaryIndex,
+      endBoundary: seg.endBoundary,
+    },
   )
   draft.value = next
   hasManuallyEdited.value = true
@@ -681,6 +701,9 @@ function removeDivider(boundaryIndex: number): void {
   if (b.startBoundary !== boundaryIndex) return
   const next = [...draft.value]
   next.splice(idx, 2, {
+    // WR-03: keeps the UPPER segment's id, matching the existing "keeps the
+    // upper segment's speaker role" convention for a merge.
+    id: a.id,
     speaker: a.speaker,
     startBoundary: a.startBoundary,
     endBoundary: b.endBoundary,
@@ -741,7 +764,14 @@ async function onFetchPassage() {
     emit('update:reference', scriptureRef)
     // R096: fetch renders the passage as ONE undivided Leader block — it no
     // longer auto-commits any split. The user picks a seed next.
-    draft.value = [{ speaker: 'LEADER', startBoundary: 0, endBoundary: boundaries.value.length - 1 }]
+    draft.value = [
+      {
+        id: crypto.randomUUID(),
+        speaker: 'LEADER',
+        startBoundary: 0,
+        endBoundary: boundaries.value.length - 1,
+      },
+    ]
     hasManuallyEdited.value = false
     pendingSeed.value = null
     emitSections()

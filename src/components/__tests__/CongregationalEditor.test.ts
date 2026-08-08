@@ -538,6 +538,39 @@ describe('CongregationalEditor', () => {
     })
   })
 
+  // ── WR-03 (47-REVIEW): stable segment identity across a splice ──────────
+
+  describe('WR-03: segment identity survives an earlier insert (stable :key, not array index)', () => {
+    it('a segment untouched by an earlier divider insert keeps the same underlying DOM node across the reindex', async () => {
+      const wrapper = mountEditor()
+      await fetchDefaultPassage(wrapper)
+      await wrapper.find('[data-testid="seed-blank-btn"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.findAll('[data-testid^="preview-section-"]')).toHaveLength(3)
+
+      // Capture the DOM node for the LAST (untouched, verse 3) segment's
+      // chip before an earlier divider insert shifts its index.
+      const before = wrapper.find('[data-testid="speaker-chip-2-leader"]').element
+
+      // Insert the one interior gap (inside segment 0 / verse 1, which the
+      // fixture's own doc comment guarantees has internal clause structure).
+      const gapsBefore = wrapper.findAll('[data-testid^="divider-insert-"]')
+      expect(gapsBefore.length).toBeGreaterThan(0)
+      await gapsBefore[0]!.trigger('click')
+      await flushPromises()
+
+      // The untouched verse-3 segment now sits one index later...
+      expect(wrapper.findAll('[data-testid^="preview-section-"]')).toHaveLength(4)
+      const after = wrapper.find('[data-testid="speaker-chip-3-leader"]').element
+
+      // ...but is the SAME underlying DOM node — with a stable `:key`, Vue
+      // moves it rather than treating position 2's old node as "the same"
+      // (patching it to show verse 2's content) and fabricating a brand
+      // new node for position 3.
+      expect(after).toBe(before)
+    })
+  })
+
   // ── R095: hand-divide — insert / remove, 3-way chip ─────────────────────
 
   describe('divider editing', () => {
