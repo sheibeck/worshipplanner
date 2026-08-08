@@ -8,3 +8,20 @@ body,
   color: #f3f4f6; /* gray-100 */
   height: 100%;
 }
+
+/*
+ * Slide typography CSS variables (R093/46-02). These are RUNTIME, per-org
+ * values loaded from Firestore after the app boots — set from
+ * `authStore.settings.slideTypography` via `cssVarsFor()`
+ * (src/utils/slideTypography.ts) on each render site's root element.
+ * Declared here only as safe fallbacks matching DEFAULT_ORG_SETTINGS, so
+ * anything reading these vars before an org's settings resolve still gets
+ * a sane value. Deliberately NOT declared via Tailwind v4's `@theme` —
+ * `@theme` is a build-time mechanism and cannot hold a per-org runtime
+ * value (46-RESEARCH.md Pattern 1).
+ */
+:root {
+  --slide-font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --slide-font-weight: 400;
+  --slide-font-scale: 1;
+}
