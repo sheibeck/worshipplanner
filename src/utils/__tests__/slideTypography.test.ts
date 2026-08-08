@@ -1,0 +1,122 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import {
+  SCALE_MAP,
+  FONT_LOAD_TIMEOUT_MS,
+  cssVarsFor,
+  snapWeight,
+  waitForSlideFont,
+} from '@/utils/slideTypography'
+
+describe('slideTypography', () => {
+  describe('SCALE_MAP / FONT_LOAD_TIMEOUT_MS', () => {
+    it('maps sm/md/lg to the locked scale multipliers', () => {
+      expect(SCALE_MAP.sm).toBe(0.85)
+      expect(SCALE_MAP.md).toBe(1.0)
+      expect(SCALE_MAP.lg).toBe(1.25)
+    })
+
+    it('bounds the font-load gate at 3000ms', () => {
+      expect(FONT_LOAD_TIMEOUT_MS).toBe(3000)
+    })
+  })
+
+  describe('cssVarsFor', () => {
+    it('returns the serif stack + scaled values for a serif family', () => {
+      const vars = cssVarsFor({ fontFamily: 'Lora', fontWeight: 600, fontScale: 'lg' })
+      expect(vars).toEqual({
+        '--slide-font-family': '"Lora", ui-serif, Georgia, serif',
+        '--slide-font-weight': 600,
+        '--slide-font-scale': 1.25,
+      })
+    })
+
+    it('returns the sans stack for a sans-category family', () => {
+      const vars = cssVarsFor({ fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' })
+      expect(vars).toEqual({
+        '--slide-font-family': '"Inter", ui-sans-serif, system-ui, sans-serif',
+        '--slide-font-weight': 400,
+        '--slide-font-scale': 1.0,
+      })
+    })
+
+    it('falls back to Inter/400/md for undefined input', () => {
+      const vars = cssVarsFor(undefined)
+      expect(vars).toEqual({
+        '--slide-font-family': '"Inter", ui-sans-serif, system-ui, sans-serif',
+        '--slide-font-weight': 400,
+        '--slide-font-scale': 1.0,
+      })
+    })
+
+    it('falls back to Inter/400/md for a tampered value (unknown family, unreachable weight, invalid scale)', () => {
+      const vars = cssVarsFor({
+        fontFamily: 'Comic Sans MS',
+        fontWeight: 250,
+        fontScale: 'xl' as never,
+      })
+      expect(vars).toEqual({
+        '--slide-font-family': '"Inter", ui-sans-serif, system-ui, sans-serif',
+        '--slide-font-weight': 400,
+        '--slide-font-scale': 1.0,
+      })
+    })
+  })
+
+  describe('snapWeight', () => {
+    it('snaps to 400 when the family does not ship the requested weight', () => {
+      expect(snapWeight('Lora', 300)).toBe(400)
+    })
+
+    it('keeps a weight that is reachable for the family', () => {
+      expect(snapWeight('Inter', 300)).toBe(300)
+    })
+
+    it('snaps to 400 for an unknown family', () => {
+      expect(snapWeight('Unknown', 700)).toBe(400)
+    })
+  })
+
+  describe('waitForSlideFont', () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+      vi.restoreAllMocks()
+    })
+
+    it('resolves ready when document.fonts.ready and document.fonts.load both settle', async () => {
+      Object.defineProperty(document, 'fonts', {
+        value: {
+          ready: Promise.resolve(),
+          load: vi.fn().mockResolvedValue([]),
+        },
+        configurable: true,
+        writable: true,
+      })
+
+      const resultPromise = waitForSlideFont('Inter', 400)
+      // Let the microtask queue settle without needing real timers.
+      await vi.advanceTimersByTimeAsync(0)
+      const result = await resultPromise
+      expect(result).toBe(true)
+    })
+
+    it('resolves not-ready after FONT_LOAD_TIMEOUT_MS when the load promise never settles', async () => {
+      Object.defineProperty(document, 'fonts', {
+        value: {
+          ready: Promise.resolve(),
+          load: vi.fn(() => new Promise(() => {})),
+        },
+        configurable: true,
+        writable: true,
+      })
+
+      const resultPromise = waitForSlideFont('Inter', 400)
+      await vi.advanceTimersByTimeAsync(FONT_LOAD_TIMEOUT_MS)
+      const result = await resultPromise
+      expect(result).toBe(false)
+    })
+  })
+})
