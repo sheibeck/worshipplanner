@@ -249,8 +249,13 @@ describe('CongregationalEditor', () => {
     })
 
     it('AI-off: ai-split-btn is absent while the other two seeds remain present and fully functional', async () => {
-      useAuthStore().settings.aiEnabled = false
       const wrapper = mountEditor()
+      // See the "explicit ESV fetch fails" precedent elsewhere in this
+      // file — the setting is mutated only after the store's own async
+      // onAuthStateChanged listener settles, otherwise this mutation can be
+      // silently overwritten by that unrelated reset.
+      await flushPromises()
+      useAuthStore().settings.aiEnabled = false
       await fetchDefaultPassage(wrapper)
 
       expect(wrapper.find('[data-testid="ai-split-btn"]').exists()).toBe(false)
