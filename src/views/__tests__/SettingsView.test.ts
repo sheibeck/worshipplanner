@@ -695,6 +695,22 @@ describe('SettingsView Slide Typography card (R093) — 46-03', () => {
     expect(mockLoadFontCss).toHaveBeenCalledWith('Lora', 400)
   })
 
+  // WR-03 (46-REVIEW.md): a REJECTED loadFontCss must not surface as an
+  // unhandled promise rejection, and must not block the save itself — the
+  // family-change handler's own save action is independent of whether the
+  // on-demand preview load succeeds.
+  it('does not throw or block saving when loadFontCss rejects on a family change', async () => {
+    mockLoadFontCss.mockRejectedValueOnce(new Error('chunk load failed'))
+    const wrapper = mountSettingsView()
+
+    await wrapper.get('[data-testid="slide-font-family-select"]').setValue('Lora')
+    await flushPromises()
+
+    expect(mockLoadFontCss).toHaveBeenCalledWith('Lora', 400)
+    expect(mockUpdateDoc).toHaveBeenCalledTimes(1)
+    expect(wrapper.text()).toContain('Saved!')
+  })
+
   it('reverts the selection and surfaces the save-error string when the write rejects', async () => {
     mockUpdateDoc.mockRejectedValueOnce(new Error('network error'))
     const wrapper = mountSettingsView()

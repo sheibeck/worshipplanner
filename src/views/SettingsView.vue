@@ -1003,7 +1003,13 @@ async function saveSlideTypography() {
 async function onChangeSlideFontFamily() {
   const snapped = snapWeight(slideFontFamilyInput.value, slideFontWeightInput.value)
   slideFontWeightInput.value = snapped
-  void loadFontCss(slideFontFamilyInput.value, snapped)
+  // WR-03 (46-REVIEW.md): a genuinely failed dynamic import here would
+  // otherwise surface as an unhandled promise rejection on every affected
+  // family switch. Not user-visible either way — the preview box's native
+  // CSS-stack fallback already covers a failed/missing asset — but every
+  // other async handler in this file is careful to swallow non-fatal
+  // failures rather than leave one loose.
+  loadFontCss(slideFontFamilyInput.value, snapped).catch(() => {})
   await saveSlideTypography()
 }
 </script>
