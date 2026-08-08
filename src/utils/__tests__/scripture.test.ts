@@ -9,6 +9,8 @@ import {
   congregationalSectionsFromSlot,
   congregationalSectionFromRef,
   scriptureSlotAfterReferenceChange,
+  scriptureAttribution,
+  resolveTranslationSource,
 } from '@/utils/scripture'
 import type { ScriptureRef, ScriptureSlot } from '@/types/service'
 import type { CongregationalSection } from '@/types/slide'
@@ -462,5 +464,68 @@ describe('scriptureSlotAfterReferenceChange', () => {
     const slot = makeSlot({ book: 'John', chapter: 3, verseStart: 16, verseEnd: 18 })
     const result = scriptureSlotAfterReferenceChange(slot, { book: 'Psalms', chapter: 24 })
     expect(Object.prototype.hasOwnProperty.call(result, 'congregationalSections')).toBe(false)
+  })
+})
+
+// R091 (Phase 45): initials-only attribution, shared by every render site —
+// CONTEXT.md Area 2 "build once, shared". No full copyright notice, ever.
+describe('scriptureAttribution', () => {
+  it("returns '(ESV)' for the ESV version", () => {
+    expect(scriptureAttribution('ESV')).toBe('(ESV)')
+  })
+
+  it("returns '(NLT)' for the NLT version", () => {
+    expect(scriptureAttribution('NLT')).toBe('(NLT)')
+  })
+
+  it('emits parenthesized initials only — no full copyright notice text', () => {
+    expect(scriptureAttribution('ESV')).not.toMatch(/English Standard|copyright|Crossway/i)
+    expect(scriptureAttribution('NLT')).not.toMatch(/New Living|copyright|Tyndale/i)
+  })
+})
+
+// R092 (Phase 45): the ONE field-less-fallback decision point. This is the
+// single most important test in the whole phase — see 45-RESEARCH.md § Don't
+// Hand-Roll #4 and the "T-45-31" threat register entry in 45-03-PLAN.md.
+describe('resolveTranslationSource', () => {
+  it("returns 'NLT' when the slide carries translationSource: 'NLT'", () => {
+    expect(resolveTranslationSource({ translationSource: 'NLT' })).toBe('NLT')
+  })
+
+  it("returns 'ESV' when the slide carries translationSource: 'ESV'", () => {
+    expect(resolveTranslationSource({ translationSource: 'ESV' })).toBe('ESV')
+  })
+
+  it("returns 'ESV' — the hardcoded fallback — for a field-less pre-phase slide, independent of any org setting", () => {
+    expect(resolveTranslationSource({})).toBe('ESV')
+  })
+
+  it("returns 'ESV' for a slide whose translationSource is explicitly undefined", () => {
+    expect(resolveTranslationSource({ translationSource: undefined })).toBe('ESV')
+  })
+
+  // T-45-31: proves the correctness guarantee by source inspection, not just
+  // by behavior — a future edit that adds `authStore`/`OrgSettings` back into
+  // this function's own body would trip this test even if some clever import
+  // alias hid it from a plain text search of the module's import list.
+  it('never references authStore/OrgSettings/DEFAULT_ORG_SETTINGS in its own function body', () => {
+    const src = resolveTranslationSource.toString()
+    expect(src).not.toMatch(/authStore/)
+    expect(src).not.toMatch(/OrgSettings/)
+    expect(src).not.toMatch(/DEFAULT_ORG_SETTINGS/)
+    expect(src).not.toMatch(/bibleVersion/)
+  })
+
+  // Belt-and-suspenders: also assert the whole module file never imports the
+  // auth store or org-settings types at all, so a future edit cannot smuggle
+  // a setting-read in through a module-level import used elsewhere in the
+  // function (the .toString() check above only sees this function's body).
+  it('the scripture.ts module imports no authStore / organization settings module at all', async () => {
+    const fs = await import('node:fs')
+    const path = await import('node:path')
+    const source = fs.readFileSync(path.resolve(__dirname, '../scripture.ts'), 'utf-8')
+    expect(source).not.toMatch(/from ['"].*authStore['"]/)
+    expect(source).not.toMatch(/from ['"].*\/organization['"]/)
+    expect(source).not.toMatch(/useAuthStore/)
   })
 })

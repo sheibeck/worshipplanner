@@ -157,6 +157,13 @@ export type SourceRef =
       speaker?: 'LEADER' | 'CONGREGATION'
       text?: string
       verseRange?: string
+      /**
+       * R092 (Phase 45): passthrough of the owning `CongregationalSection`'s
+       * `translationSource` — spread in by `deriveGroupEntries`'s SCRIPTURE
+       * branch, never recomputed here. Optional for the same
+       * field-less-fallback reason as the type it mirrors.
+       */
+      translationSource?: 'ESV' | 'NLT'
     }
   | { kind: 'imported'; importId: string; innerSlideId: string }
   | { kind: 'text'; title?: string; body?: string }

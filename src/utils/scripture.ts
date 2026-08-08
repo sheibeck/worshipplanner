@@ -247,6 +247,33 @@ export function congregationalSectionFromRef(ref: SourceRef): CongregationalSect
 }
 
 /**
+ * R091: initials-only scripture attribution, shared by BOTH the
+ * scripture-slide path and the congregational-reading path (CONTEXT.md Area
+ * 2 — "build once, shared", not a second copy inline in a render component).
+ * Non-saleable projected media needs only the initials, never a full
+ * copyright notice.
+ */
+export function scriptureAttribution(version: 'ESV' | 'NLT'): string {
+  return `(${version})`
+}
+
+/**
+ * R092: the ONE field-less-fallback decision point for translation
+ * provenance. A slide/section with no stored `translationSource` predates
+ * this phase, when ESV was the only source — resolves to `'ESV'`, never to
+ * the org's CURRENT `bibleVersion` setting.
+ *
+ * This function MUST NEVER import or read `authStore`/`OrgSettings`/
+ * `DEFAULT_ORG_SETTINGS` — reading the church's current setting here would
+ * silently violate "changing the setting never retroactively alters an
+ * existing slide" (45-RESEARCH.md § Don't Hand-Roll #4). The fallback is
+ * deliberately the hardcoded literal `'ESV'`, not a lookup of any kind.
+ */
+export function resolveTranslationSource(slide: { translationSource?: 'ESV' | 'NLT' }): 'ESV' | 'NLT' {
+  return slide.translationSource ?? 'ESV'
+}
+
+/**
  * Writes a new reference onto a `ScriptureSlot` (the same four-field spread
  * `ServiceEditorView.onScriptureChange` performs inline today) and owns ONE
  * additional rule: a stored congregational reading is never carried onto a

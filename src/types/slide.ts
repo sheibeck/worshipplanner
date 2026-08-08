@@ -95,6 +95,17 @@ export interface CongregationalSection {
   speaker: 'LEADER' | 'CONGREGATION'
   text: string
   verseRange?: string
+  /**
+   * R092 (Phase 45): which Bible translation this section's text was fetched
+   * from, stamped ONCE by `CongregationalEditor.vue` at fetch time from the
+   * church's CURRENT `bibleVersion` setting. OPTIONAL — a section created
+   * before this phase has no such field and resolves to `'ESV'` at read time
+   * via `resolveTranslationSource()` (the only source before this phase).
+   * Never re-derived from the org's setting after stamping — that is the
+   * whole point of the field (see `resolveTranslationSource` in
+   * `src/utils/scripture.ts`).
+   */
+  translationSource?: 'ESV' | 'NLT'
 }
 
 /** A scripture slide — one chunk of a Bible passage. */
@@ -113,6 +124,15 @@ export interface ScriptureSlide extends SlideBase {
    * unrepresentable. Absent entirely on a Reference-state slide.
    */
   section?: CongregationalSection
+  /**
+   * R092 (Phase 45): the translation this slide's text was fetched from,
+   * threaded from the owning `CongregationalSection`/`SourceRef` with no
+   * re-derivation at assembly time. OPTIONAL for the same field-less-fallback
+   * reason as `CongregationalSection.translationSource` above — read this
+   * only through `resolveTranslationSource()`, never a raw `??` against the
+   * org's current setting.
+   */
+  translationSource?: 'ESV' | 'NLT'
 }
 
 /**
