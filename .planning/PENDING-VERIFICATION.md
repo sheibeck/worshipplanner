@@ -1129,6 +1129,31 @@ test` (112/112) all pass. Deferred items below are visual/live-integration check
 
 ---
 
+## Phase 46 — Global Slide Typography (Plan 46-01, 2026-08-08)
+
+### Plan 46-01 Task 1 — package-legitimacy checkpoint for the five `@fontsource/*` packages (DEFERRED)
+
+**Status: DEFERRED under the STATE.md v1.5 standing autonomy grant — NOT self-approved.**
+`gsd-tools query package-legitimacy check` flagged all five (`@fontsource/inter`,
+`@fontsource/open-sans`, `@fontsource/poppins`, `@fontsource/lora`, `@fontsource/source-serif-4`,
+all `5.3.0`) as `SUS` with reason `too-new`. 46-RESEARCH.md's independent investigation (direct npm
+registry `npm view` calls plus downloading and reading each tarball's own `metadata.json`/`LICENSE`
+files) found the SUS verdict is a structural false positive from `@fontsource`'s catalog-wide
+lockstep release cadence (all five published within the same publish window), not a genuine
+supply-chain signal: all five resolve to the canonical `github.com/fontsource/font-files` repo,
+weekly downloads range 104K–2.37M, `postinstall` is `null` on every package, and license is
+`OFL-1.1` on every package. Execution proceeded to Task 2 (install + registry) on this basis,
+per the plan's own pre-resolution instructions.
+
+- [ ] **Owner confirms the five packages on npmjs.com** — fontsource-published, links to
+      `github.com/fontsource/font-files`, version `5.3.0`, license `OFL-1.1`, no install scripts —
+      for `@fontsource/inter`, `@fontsource/open-sans`, `@fontsource/poppins`, `@fontsource/lora`,
+      and `@fontsource/source-serif-4`.
+- [ ] Confirm the `5.3.0` pin landed cleanly in `package-lock.json` with integrity hashes present
+      (already true as of this plan's commit; owner re-confirmation is the outstanding item).
+
+---
+
 ## Notes and failures
 
 _(Record anything that failed here, with what you saw versus what was expected.)_
