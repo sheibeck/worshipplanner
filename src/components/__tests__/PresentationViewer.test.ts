@@ -2,6 +2,39 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises, DOMWrapper, enableAutoUnmount } from '@vue/test-utils'
 import PresentationViewer from '../PresentationViewer.vue'
 import type { AssembledSlide } from '@/types/slide'
+import { FONT_LOAD_TIMEOUT_MS, loadFontCss } from '@/utils/slideTypography'
+
+// --- 46-04: PresentationViewer reads authStore.settings.slideTypography for
+// its CSS-variable wrapper (R093) and the R094 font-load gate. Mutable so the
+// non-default-family test (below) can override it per-test; every other test
+// in this file gets the Inter/400/md default, matching
+// DEFAULT_ORG_SETTINGS.slideTypography. ---
+let mockSlideTypography: { fontFamily: string; fontWeight: number; fontScale: 'sm' | 'md' | 'lg' } = {
+  fontFamily: 'Inter',
+  fontWeight: 400,
+  fontScale: 'md',
+}
+vi.mock('@/stores/auth', () => ({
+  useAuthStore: () => ({
+    settings: {
+      get slideTypography() {
+        return mockSlideTypography
+      },
+    },
+  }),
+}))
+
+// --- 46-04 (R094): only `loadFontCss` is mocked (asserted on directly below)
+// — `cssVarsFor`/`snapWeight`/`waitForSlideFont`/`FONT_LOAD_TIMEOUT_MS` stay
+// real so the font-load gate's actual race/timeout logic is exercised, not a
+// stand-in for it. ---
+vi.mock('@/utils/slideTypography', async () => {
+  const actual = await vi.importActual<typeof import('@/utils/slideTypography')>('@/utils/slideTypography')
+  return {
+    ...actual,
+    loadFontCss: vi.fn().mockResolvedValue(undefined),
+  }
+})
 
 // The viewer renders its content via <Teleport to="body">, so the mounted
 // wrapper's own DOM tree does not contain it — every assertion in this suite
@@ -216,6 +249,42 @@ function markupSlide(id: string): AssembledSlide {
   }
 }
 
+/**
+ * 46-04 (R094): jsdom does not implement the Font Loading API at all — every
+ * mount needs SOME `document.fonts` stub or `waitForSlideFont`'s internal
+ * `document.fonts.ready`/`.load()` calls throw. Default (used by every
+ * pre-existing test in this file, unchanged): both settle immediately, so
+ * the gate resolves on the next microtask flush exactly like the real
+ * default-family case. `stubPendingFonts()` overrides this per-test with a
+ * controllable, never-resolving-until-told promise for the gate tests below.
+ */
+function stubResolvedFonts(): void {
+  Object.defineProperty(document, 'fonts', {
+    value: {
+      ready: Promise.resolve(),
+      load: vi.fn().mockResolvedValue([]),
+    },
+    configurable: true,
+    writable: true,
+  })
+}
+
+function stubPendingFonts(): { resolve: () => void } {
+  let resolveFn!: () => void
+  const pending = new Promise<void>((resolve) => {
+    resolveFn = resolve
+  })
+  Object.defineProperty(document, 'fonts', {
+    value: {
+      ready: pending,
+      load: vi.fn(() => pending),
+    },
+    configurable: true,
+    writable: true,
+  })
+  return { resolve: resolveFn }
+}
+
 describe('PresentationViewer', () => {
   beforeEach(() => {
     // jsdom does not implement the Fullscreen API at all — stub per test.
@@ -226,6 +295,9 @@ describe('PresentationViewer', () => {
       configurable: true,
       writable: true,
     })
+    stubResolvedFonts()
+    mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' }
+    vi.mocked(loadFontCss).mockClear()
   })
 
   it('mounts with 3 slides, renders slide at index 0, and shows "Worship · 1 / 3" for a sectioned slide', async () => {
@@ -1744,6 +1816,67 @@ describe('PresentationViewer', () => {
 
       await body().find('[data-testid="presentation-next"]').trigger('click')
       expect(body().find('[data-testid="presentation-background"]').attributes('style')).toContain('inherited.jpg')
+    })
+  })
+
+  // ── 46-04 Task 2/3: the R094 presenter first-paint font-load gate ──────────
+  describe('R094 presenter font-load gate', () => {
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('font gate: holds presentation-loading and keeps presentation-slide absent while the font-load promise is pending, then releases once it resolves', async () => {
+      const { resolve } = stubPendingFonts()
+      mount(PresentationViewer, { props: { slides: [lyricSlide('a')] } })
+      await flushPromises()
+
+      expect(body().find('[data-testid="presentation-loading"]').exists()).toBe(true)
+      expect(body().find('[data-testid="presentation-slide"]').exists()).toBe(false)
+
+      resolve()
+      await flushPromises()
+
+      expect(body().find('[data-testid="presentation-slide"]').exists()).toBe(true)
+      expect(body().find('[data-testid="presentation-loading"]').exists()).toBe(false)
+    })
+
+    it('font gate: proceeds after the bounded FONT_LOAD_TIMEOUT_MS timeout even when the font-load promise never resolves', async () => {
+      vi.useFakeTimers()
+      stubPendingFonts()
+      mount(PresentationViewer, { props: { slides: [lyricSlide('a')] } })
+      await vi.advanceTimersByTimeAsync(0)
+
+      expect(body().find('[data-testid="presentation-slide"]').exists()).toBe(false)
+
+      await vi.advanceTimersByTimeAsync(FONT_LOAD_TIMEOUT_MS)
+
+      expect(body().find('[data-testid="presentation-slide"]').exists()).toBe(true)
+    })
+
+    it('font gate: a non-default chosen family triggers loadFontCss for that family/weight before rendering', async () => {
+      mockSlideTypography = { fontFamily: 'Lora', fontWeight: 600, fontScale: 'md' }
+      mount(PresentationViewer, { props: { slides: [lyricSlide('a')] } })
+      await flushPromises()
+
+      expect(loadFontCss).toHaveBeenCalledWith('Lora', 600)
+      expect(body().find('[data-testid="presentation-slide"]').exists()).toBe(true)
+    })
+
+    it('font gate: the default (Inter/400) chosen family never calls loadFontCss — it is already eager-imported', async () => {
+      mount(PresentationViewer, { props: { slides: [lyricSlide('a')] } })
+      await flushPromises()
+
+      expect(loadFontCss).not.toHaveBeenCalled()
+      expect(body().find('[data-testid="presentation-slide"]').exists()).toBe(true)
+    })
+
+    it('font gate: does not hold the empty state hostage — isEmptyState renders immediately regardless of font-load progress', async () => {
+      stubPendingFonts()
+      mount(PresentationViewer, { props: { slides: [] } })
+      await flushPromises()
+
+      expect(body().find('[data-testid="presentation-empty-state"]').exists()).toBe(true)
+      expect(body().find('[data-testid="presentation-loading"]').exists()).toBe(false)
     })
   })
 })

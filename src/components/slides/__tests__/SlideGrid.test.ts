@@ -47,6 +47,17 @@ vi.mock('@/stores/importedSlides', () => ({
   }),
 }))
 
+// --- 46-04: SlideGrid reads authStore.settings.slideTypography for its CSS-
+// variable wrapper (R093) — mocked to the same default the real
+// DEFAULT_ORG_SETTINGS ships, matching ScriptureInput.test.ts's convention. ---
+vi.mock('@/stores/auth', () => ({
+  useAuthStore: () => ({
+    settings: {
+      slideTypography: { fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' },
+    },
+  }),
+}))
+
 // --- 25-07 Task 3: PptxImportModal's own transitive dependencies — mounted
 // FOR REAL inside SlideGrid (not stubbed), so its module graph must resolve
 // exactly like `PptxImportModal.test.ts` already mocks it. ---

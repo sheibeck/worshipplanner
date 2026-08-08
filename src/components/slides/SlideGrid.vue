@@ -1,5 +1,5 @@
 <template>
-  <div class="flex h-full min-w-0 flex-1 flex-col" data-testid="slide-grid">
+  <div class="flex h-full min-w-0 flex-1 flex-col" data-testid="slide-grid" :style="slideTypographyStyle">
     <template v-if="selectedSlot">
       <div class="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-gray-800 px-6 py-3">
         <h2 class="text-sm font-medium text-gray-100" data-testid="slide-grid-title">{{ groupTitle }}</h2>
@@ -246,6 +246,7 @@
             :reorderable="canReorder"
             :menu-items="card.menuItems"
             :menu-open="openMenuEntryId === card.assembledSlide.slide.id"
+            :typography-style="slideTypographyStyle"
             @select="emit('select', $event)"
             @menu-toggle="onCardMenuToggle"
             @menu-select="onCardMenuSelect"
@@ -329,6 +330,8 @@ import type { AssembledSlide } from '@/types/slide'
 import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
 import { useSlideGroups } from '@/stores/slideGroups'
 import { useImportedSlides } from '@/stores/importedSlides'
+import { useAuthStore } from '@/stores/auth'
+import { cssVarsFor } from '@/utils/slideTypography'
 import { useMediaUpload } from '@/composables/useMediaUpload'
 import { slotLabel } from '@/utils/slotTypes'
 import SlideCard from './SlideCard.vue'
@@ -390,6 +393,21 @@ const emit = defineEmits<{
 
 const slideGroupsStore = useSlideGroups()
 const importedSlidesStore = useImportedSlides()
+const authStore = useAuthStore()
+
+/**
+ * R093 (46-04) — this grid's ONE CSS-variable wrapper (key_links: three
+ * render sites read `authStore.settings.slideTypography` via `cssVarsFor`,
+ * this is the grid's). Bound on the grid's own root AND passed down to every
+ * `SlideCard` (which also carries it on its own root — see that component's
+ * `typographyStyle` prop comment for why): the container's binding is what
+ * this plan's action text calls for; the per-card pass-through keeps a card
+ * self-contained/testable in isolation without importing the store itself.
+ */
+const slideTypographyStyle = computed(() => ({
+  ...cssVarsFor(authStore.settings.slideTypography),
+  fontFamily: 'var(--slide-font-family)',
+}))
 
 // One shared upload composable for both drop-triggered media paths (video
 // append, audio bed) — a single drop is handled sequentially (videos then

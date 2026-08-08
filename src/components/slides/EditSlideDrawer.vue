@@ -83,7 +83,7 @@
 
           <div
             class="aspect-video rounded-md bg-gray-950 border border-gray-800 flex items-center justify-center overflow-hidden bg-cover bg-center"
-            :style="resolvedBackgroundUrl ? { backgroundImage: `url(${resolvedBackgroundUrl})` } : {}"
+            :style="[previewTypographyStyle, resolvedBackgroundUrl ? { backgroundImage: `url(${resolvedBackgroundUrl})` } : {}]"
             data-testid="drawer-preview"
           >
             <img
@@ -507,6 +507,8 @@ import type { ServiceSlot } from '@/types/service'
 import type { AssembledSlide, ImageSlide, CopyrightSlide, ScriptureSlide } from '@/types/slide'
 import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
 import { useSlideGroups } from '@/stores/slideGroups'
+import { useAuthStore } from '@/stores/auth'
+import { cssVarsFor } from '@/utils/slideTypography'
 import { KIND_BADGE_CLASSES, slotDisplayTitle, slideBodyText, bedAudioLabel, backgroundImageLabel, deleteSlideConfirmBody, speakerDisplayName } from './slideDisplay'
 import { congregationalSectionFromRef } from '@/utils/scripture'
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
@@ -585,6 +587,20 @@ const emit = defineEmits<{
 }>()
 
 const slideGroupsStore = useSlideGroups()
+const authStore = useAuthStore()
+
+/**
+ * R093 (46-04) — this drawer's ONE CSS-variable wrapper (key_links: three
+ * render sites read `authStore.settings.slideTypography` via `cssVarsFor`,
+ * this is the preview box's — the preview ONLY, never the whole drawer
+ * chrome). Merged via the template's array `:style` binding with the
+ * existing `resolvedBackgroundUrl` background-image style, so neither
+ * clobbers the other.
+ */
+const previewTypographyStyle = computed(() => ({
+  ...cssVarsFor(authStore.settings.slideTypography),
+  fontFamily: 'var(--slide-font-family)',
+}))
 
 // ── Open/close, focus and Escape (Task 1) ──────────────────────────────────
 
@@ -1459,3 +1475,17 @@ watch(
 // `onKeydown` above do.
 defineExpose({ confirmDiscard: unsavedGuard.confirmDiscard })
 </script>
+
+<style scoped>
+/*
+ * R093 (46-04) — reads the `--slide-font-*` custom properties
+ * `previewTypographyStyle` sets on the preview box above. Unlayered scoped
+ * styles win over Tailwind's `@layer utilities` regardless of selector
+ * specificity, so this overrides the template's fixed `text-[13px]` class
+ * without touching it.
+ */
+[data-testid='drawer-preview-text'] {
+  font-weight: var(--slide-font-weight);
+  font-size: calc(13px * var(--slide-font-scale));
+}
+</style>

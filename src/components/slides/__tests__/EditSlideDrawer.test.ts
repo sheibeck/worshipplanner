@@ -20,6 +20,17 @@ vi.mock('@/stores/slideGroups', () => ({
   }),
 }))
 
+// --- 46-04: EditSlideDrawer reads authStore.settings.slideTypography for the
+// preview box's CSS-variable wrapper (R093) — mocked to the same default the
+// real DEFAULT_ORG_SETTINGS ships, matching ScriptureInput.test.ts's convention. ---
+vi.mock('@/stores/auth', () => ({
+  useAuthStore: () => ({
+    settings: {
+      slideTypography: { fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' },
+    },
+  }),
+}))
+
 // --- 26-08 Task 1: audio file attach goes through the existing upload
 // composable (never a second uploader) — mocked here exactly like
 // SlideGroupMusicControl.test.ts's own convention, so these tests never touch

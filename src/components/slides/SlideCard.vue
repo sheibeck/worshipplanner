@@ -6,6 +6,7 @@
     :class="selected ? 'border-indigo-500' : 'border-gray-800 hover:bg-gray-800/60'"
     :data-testid="`slide-card-${assembledSlide.slide.id}`"
     :data-selected="selected ? 'true' : 'false'"
+    :style="typographyStyle"
     @click="emit('select', assembledSlide.slide.id)"
     @keydown.enter="emit('select', assembledSlide.slide.id)"
     @keydown.space.prevent="emit('select', assembledSlide.slide.id)"
@@ -165,21 +166,38 @@ import {
 } from './slideDisplay'
 import type { MenuItem, MenuItemKey } from './slideDisplay'
 import SlideActionMenu from './SlideActionMenu.vue'
+import { cssVarsFor } from '@/utils/slideTypography'
 
-const props = defineProps<{
-  /** The assembled slide this card renders. */
-  assembledSlide: AssembledSlide
-  /** One-based slide number within the selected group (not the whole service). */
-  number: number
-  /** True only for the currently-selected card — the sole visual difference (accent border). */
-  selected: boolean
-  /** True when the parent grid can offer drag-reorder for this card (editor + a stored group document to reorder) — decided by `SlideGrid`, never by this component. */
-  reorderable?: boolean
-  /** Pre-computed by the parent via `slideActionMenuItems` — an empty list (the default) renders no menu at all. */
-  menuItems?: MenuItem[]
-  /** Parent-controlled open state for this card's menu — the card holds none of its own. */
-  menuOpen?: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    /** The assembled slide this card renders. */
+    assembledSlide: AssembledSlide
+    /** One-based slide number within the selected group (not the whole service). */
+    number: number
+    /** True only for the currently-selected card — the sole visual difference (accent border). */
+    selected: boolean
+    /** True when the parent grid can offer drag-reorder for this card (editor + a stored group document to reorder) — decided by `SlideGrid`, never by this component. */
+    reorderable?: boolean
+    /** Pre-computed by the parent via `slideActionMenuItems` — an empty list (the default) renders no menu at all. */
+    menuItems?: MenuItem[]
+    /** Parent-controlled open state for this card's menu — the card holds none of its own. */
+    menuOpen?: boolean
+    /**
+     * CSS custom-property + font-family style for this card's own root
+     * (46-04, R093) — computed once by `SlideGrid.vue` from
+     * `cssVarsFor(authStore.settings.slideTypography)` and passed down
+     * rather than read from the store here: this component still "reads no
+     * store and calls no composable" (see the header comment above).
+     * Defaults to `cssVarsFor`'s own Inter/400/md fallback so every
+     * standalone mount (this component's own test suite) still carries the
+     * correct default custom properties.
+     */
+    typographyStyle?: Record<string, string | number>
+  }>(),
+  {
+    typographyStyle: () => ({ ...cssVarsFor(undefined), fontFamily: 'var(--slide-font-family)' }),
+  },
+)
 
 const emit = defineEmits<{
   select: [slideId: string]
@@ -216,3 +234,16 @@ const menuOpen = computed(() => props.menuOpen ?? false)
 /** Associates the drag handle's `aria-describedby` with this card's own footer label, so a screen reader announces which slide it moves. */
 const labelId = computed(() => `slide-label-${props.assembledSlide.slide.id}`)
 </script>
+
+<style scoped>
+/*
+ * R093 (46-04) — reads the `--slide-font-*` custom properties `typographyStyle`
+ * sets on this card's own root above. Unlayered scoped styles win over
+ * Tailwind's `@layer utilities` regardless of selector specificity, so this
+ * overrides the template's fixed `text-[13px]` class without touching it.
+ */
+[data-testid='slide-card-body'] {
+  font-weight: var(--slide-font-weight);
+  font-size: calc(13px * var(--slide-font-scale));
+}
+</style>
