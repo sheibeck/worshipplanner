@@ -563,19 +563,23 @@ const slideFontWeightOptions = computed(
  *  (no custom error UI) — both per 46-UI-SPEC.md's covered UI Considerations
  *  rows, requiring no extra state here. */
 const slideTypographyPreviewStyle = computed(() => {
+  // IN-02 (46-REVIEW.md): pass cssVarsFor's output through unmodified — no
+  // String(...) re-typing — matching the other three render sites exactly,
+  // so this preview is a true single-source-of-truth match, not merely an
+  // equivalent-looking one. The DOM's setProperty binding coerces a numeric
+  // custom-property value the same as every other call site already relies
+  // on (PresentationViewer.vue, SlideGrid.vue, EditSlideDrawer.vue).
   const vars = cssVarsFor({
     fontFamily: slideFontFamilyInput.value,
     fontWeight: slideFontWeightInput.value,
     fontScale: slideFontScaleInput.value,
   })
   return {
-    '--slide-font-family': vars['--slide-font-family'],
-    '--slide-font-weight': String(vars['--slide-font-weight']),
-    '--slide-font-scale': String(vars['--slide-font-scale']),
+    ...vars,
     fontFamily: 'var(--slide-font-family)',
     fontWeight: 'var(--slide-font-weight)',
     fontSize: 'calc(1rem * var(--slide-font-scale))',
-  } as Record<string, string>
+  }
 })
 
 // ── Services / default service template state (R086/R087) ─────────────────────
