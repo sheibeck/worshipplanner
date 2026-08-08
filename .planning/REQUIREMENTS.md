@@ -168,7 +168,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 
 ### Bible Translation
 
-- [ ] **R090**: A church can choose ESV or NLT as the source for scripture passages, in Settings.
+- [x] **R090**: A church can choose ESV or NLT as the source for scripture passages, in Settings.
       <br>`[STACK]` NLT is **not a drop-in ESV swap** — authentication is a `key` query parameter rather
       than a header, and the response is **HTML, not JSON**, so the proxy in `functions/src/index.ts`
       needs a genuinely different branch and a new `nltApi.ts` needs an HTML-stripping step (native
@@ -300,7 +300,7 @@ Explicitly excluded. Documented to prevent scope creep.
 | R087 | Phase 44 | Complete |
 | R088 | Phase 39 | Complete |
 | R089 | Phase 39 | Complete |
-| R090 | Phase 45 | Pending |
+| R090 | Phase 45 | Complete |
 | R091 | Phase 45 | Pending |
 | R092 | Phase 45 | Pending |
 | R093 | Phase 46 | Pending |
