@@ -176,9 +176,7 @@
                     type="button"
                     data-testid="drawer-speaker-toggle"
                     class="text-xs font-semibold uppercase tracking-wider px-2 py-1 rounded transition-colors"
-                    :class="sectionFromEntry.speaker === 'LEADER'
-                      ? 'text-indigo-300 bg-indigo-900/50'
-                      : 'text-amber-300 bg-amber-900/50'"
+                    :class="speakerToggleColorClass"
                     @click="onSpeakerToggle"
                   >{{ speakerLabel }}</button>
                   <span v-else class="text-[13px] text-gray-300" data-testid="drawer-speaker-readonly">{{ speakerLabel }}</span>
@@ -504,7 +502,7 @@
  */
 import { ref, computed, watch, onUnmounted, nextTick } from 'vue'
 import type { ServiceSlot } from '@/types/service'
-import type { AssembledSlide, ImageSlide, CopyrightSlide, ScriptureSlide } from '@/types/slide'
+import type { AssembledSlide, ImageSlide, CopyrightSlide, ScriptureSlide, CongregationalSection } from '@/types/slide'
 import type { SlideGroup, GroupSlideEntry } from '@/types/slideGroup'
 import { useSlideGroups } from '@/stores/slideGroups'
 import { useAuthStore } from '@/stores/auth'
@@ -734,22 +732,51 @@ const speakerLabel = computed(() =>
 )
 
 /**
- * Flips the selected section entry's speaker. Modeled on `onLoopToggle`'s
- * immediate-write shape (this plan's key_links): re-checks `canMutate` inside
- * the handler (not just the template `v-if`), reads the group's CURRENT
- * slides as the base, maps only the selected entry, and awaits the store call
- * so a rejected write reaches Vue's handler like every other write here.
- * Deliberately NOT debounced — a discrete two-value choice, not a stream of
- * keystrokes, so routing it through the debounced `body` machinery could lose
- * a flip to a pending flush for a different field. Passes the group's stored
- * `sourceSignature` through unchanged, for the same reason `writeField` does.
+ * R095 (Phase 47): the toggle's colour, widened from the old
+ * indigo/amber binary (which collided with indigo's role as the UI-accent
+ * colour, 47-UI-SPEC.md § Color) to the same sky/amber/violet used
+ * everywhere else this speaker identity renders (presenter, grid eyebrow).
+ */
+const speakerToggleColorClass = computed(() => {
+  const speaker = sectionFromEntry.value?.speaker
+  if (speaker === 'LEADER') return 'text-sky-300 bg-sky-900/50'
+  if (speaker === 'CONGREGATION') return 'text-amber-300 bg-amber-900/50'
+  return 'text-violet-300 bg-violet-900/50'
+})
+
+/**
+ * R095: the next speaker in the 3-way cycle LEADER -> CONGREGATION -> ALL ->
+ * LEADER. A single shared table (rather than three independent ternaries)
+ * so there is exactly one place this ordering is expressed — widening it
+ * again (a fourth role) would touch only this map.
+ */
+const NEXT_SPEAKER: Record<CongregationalSection['speaker'], CongregationalSection['speaker']> = {
+  LEADER: 'CONGREGATION',
+  CONGREGATION: 'ALL',
+  ALL: 'LEADER',
+}
+
+/**
+ * Flips the selected section entry's speaker to the next one in the 3-way
+ * cycle (RESEARCH Pitfall 5 — the old binary ternary silently mapped ANY
+ * non-LEADER value, including ALL, straight to LEADER, corrupting an ALL
+ * slide on a single click). Modeled on `onLoopToggle`'s immediate-write
+ * shape (this plan's key_links): re-checks `canMutate` inside the handler
+ * (not just the template `v-if`), reads the group's CURRENT slides as the
+ * base, maps only the selected entry, and awaits the store call so a
+ * rejected write reaches Vue's handler like every other write here.
+ * Deliberately NOT debounced — a discrete choice, not a stream of
+ * keystrokes, so routing it through the debounced `body` machinery could
+ * lose a flip to a pending flush for a different field. Passes the group's
+ * stored `sourceSignature` through unchanged, for the same reason
+ * `writeField` does.
  */
 async function onSpeakerToggle(): Promise<void> {
   if (!canMutate.value) return
   if (!props.group || !props.entry) return
   const section = congregationalSectionFromRef(props.entry.sourceRef)
   if (!section) return
-  const nextSpeaker: 'LEADER' | 'CONGREGATION' = section.speaker === 'LEADER' ? 'CONGREGATION' : 'LEADER'
+  const nextSpeaker = NEXT_SPEAKER[section.speaker]
   const entryId = props.entry.id
   const base = props.group.slides
   const next = base.map((e) => {

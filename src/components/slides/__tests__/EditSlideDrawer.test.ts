@@ -172,7 +172,7 @@ function makeScriptureFixtures() {
  * no `text`, `readingMode: 'normal'`) above.
  */
 function makeScriptureSectionFixtures(
-  overrides: { speaker?: 'LEADER' | 'CONGREGATION'; text?: string; verseRange?: string; id?: string } = {},
+  overrides: { speaker?: 'LEADER' | 'CONGREGATION' | 'ALL'; text?: string; verseRange?: string; id?: string } = {},
 ) {
   const speaker = overrides.speaker ?? 'LEADER'
   const text = overrides.text ?? 'For God so loved the world'
@@ -917,7 +917,10 @@ describe('EditSlideDrawer (Phase 38-03 Task 3 — flip a section between Leader 
     expect(body().find('[data-testid="drawer-speaker-readonly"]').exists()).toBe(false)
   })
 
-  it('activating it writes only that entry\'s speaker flipped — id, order, words, notes and audio unchanged, every sibling byte-identical', async () => {
+  // R095: the cycle is now 3-way (LEADER -> CONGREGATION -> ALL -> LEADER),
+  // widened from the old binary LEADER<->CONGREGATION toggle — a click on a
+  // CONGREGATION entry now advances to ALL, not back to LEADER.
+  it('activating it writes only that entry\'s speaker advanced to the next role — id, order, words, notes and audio unchanged, every sibling byte-identical', async () => {
     const { entry: entryOne } = makeScriptureSectionFixtures({ speaker: 'LEADER', text: 'Leader words' })
     entryOne.notes = 'Keep these notes'
     entryOne.audioUrl = 'https://example.com/a.mp3'
@@ -937,12 +940,68 @@ describe('EditSlideDrawer (Phase 38-03 Task 3 — flip a section between Leader 
     expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
     const written = mockReplaceGroupSlides.mock.calls[0]![2] as GroupSlideEntry[]
     const writtenTwo = written.find((e) => e.id === 'entry-2')!
-    expect(writtenTwo.sourceRef).toEqual({ kind: 'scripture', speaker: 'LEADER', text: 'Congregation words' })
+    expect(writtenTwo.sourceRef).toEqual({ kind: 'scripture', speaker: 'ALL', text: 'Congregation words' })
     expect(writtenTwo.id).toBe('entry-2')
     expect(writtenTwo.order).toBe(entryTwo.order)
     // The untouched sibling (entry-1) is byte-identical, including its own
     // words, notes and audio.
     expect(written.find((e) => e.id === 'entry-1')).toEqual(entryOne)
+  })
+
+  // RESEARCH Pitfall 5: the old binary ternary mapped ANY non-LEADER value
+  // (including ALL) straight to LEADER on a single click — silently
+  // corrupting an ALL slide. This proves the fix: ALL advances to LEADER
+  // only as the cycle's own wrap-around, and a full LEADER->CONGREGATION->
+  // ALL->LEADER cycle is observable across three sequential clicks.
+  it('cycles LEADER -> CONGREGATION -> ALL -> LEADER across three sequential clicks, never collapsing ALL to LEADER except as the wrap', async () => {
+    let entry = makeScriptureSectionFixtures({ speaker: 'LEADER', text: 'Words' }).entry
+    let assembledSlide = makeScriptureSectionFixtures({ speaker: 'LEADER', text: 'Words' }).assembledSlide
+    const group = makeGroup({ slides: [entry], sourceSignature: 'sig-cycle' })
+    const wrapper = mountDrawer({ entry, assembledSlide, group })
+
+    const expectedSequence: Array<'CONGREGATION' | 'ALL' | 'LEADER'> = ['CONGREGATION', 'ALL', 'LEADER']
+    for (const expectedNext of expectedSequence) {
+      await body().find('[data-testid="drawer-speaker-toggle"]').trigger('click')
+      await flushPromises()
+
+      const written = mockReplaceGroupSlides.mock.calls[mockReplaceGroupSlides.mock.calls.length - 1]![2] as GroupSlideEntry[]
+      const writtenEntry = written.find((e) => e.id === entry.id)!
+      expect((writtenEntry.sourceRef as SourceRef & { speaker: string }).speaker).toBe(expectedNext)
+
+      // Simulate the store's snapshot round-trip updating the live prop, as
+      // the "updates what the drawer displays immediately" test does, so the
+      // next click in this loop reads the newly-written speaker.
+      entry = writtenEntry
+      assembledSlide = makeScriptureSectionFixtures({
+        speaker: expectedNext as 'LEADER' | 'CONGREGATION' | 'ALL',
+        text: 'Words',
+      }).assembledSlide
+      await wrapper.setProps({ entry, group: makeGroup({ slides: [entry], sourceSignature: 'sig-cycle' }) })
+      expect(body().find('[data-testid="drawer-speaker-toggle"]').text()).toBe(
+        expectedNext === 'ALL' ? 'All' : expectedNext === 'LEADER' ? 'Leader' : 'Congregation',
+      )
+    }
+
+    expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(3)
+  })
+
+  it('the label reads "All" on an ALL-speaker entry, coloured violet, and clicking its toggle advances to LEADER (not skipped)', async () => {
+    const { entry, assembledSlide } = makeScriptureSectionFixtures({ speaker: 'ALL', text: 'Unison words' })
+    const group = makeGroup({ slides: [entry], sourceSignature: 'sig-all' })
+    mountDrawer({ entry, assembledSlide, group })
+
+    const toggle = body().find('[data-testid="drawer-speaker-toggle"]')
+    expect(toggle.text()).toBe('All')
+    expect(toggle.classes()).toContain('text-violet-300')
+    expect(toggle.classes()).not.toContain('text-indigo-300')
+
+    await body().find('[data-testid="drawer-speaker-toggle"]').trigger('click')
+    await flushPromises()
+
+    expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+    const written = mockReplaceGroupSlides.mock.calls[0]![2] as GroupSlideEntry[]
+    const writtenEntry = written.find((e) => e.id === entry.id)!
+    expect((writtenEntry.sourceRef as SourceRef & { speaker: string }).speaker).toBe('LEADER')
   })
 
   it("passes the group's stored sourceSignature through unchanged on the flip", async () => {
