@@ -1,6 +1,6 @@
 <template>
   <div class="flex h-full min-h-0 flex-col" data-testid="slides-tab">
-    <div class="flex flex-1 min-h-0">
+    <div class="flex flex-1 min-h-0 flex-col sm:flex-row">
       <SlidePlanRail
         :slots="slots"
         :assembled-slideshow="assembledSlideshow"

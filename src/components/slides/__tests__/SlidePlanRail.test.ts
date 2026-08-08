@@ -139,6 +139,42 @@ describe('SlidePlanRail', () => {
     expect(wrapper.find('[data-testid="rail-empty-state"]').exists()).toBe(false)
   })
 
+  // R099 (48-02 Task 1) — the responsive two-pane stack + rail-strip layout.
+  describe('R099 — responsive mobile layout', () => {
+    it('root carries the full-width-below-sm, fixed-width-at-sm+ class pair', () => {
+      const wrapper = mountRail({ slots: [] })
+      const root = wrapper.get('[data-testid="slide-plan-rail"]')
+      expect(root.classes()).toContain('w-full')
+      expect(root.classes()).toContain('sm:w-[260px]')
+    })
+
+    it('the populated rows container is a horizontal-scroll strip below sm and a vertical list at sm+', () => {
+      const slots: ServiceSlot[] = [makeSlot({ kind: 'PRAYER', id: 'slot-a', position: 0 })]
+      const wrapper = mountRail({ slots })
+      const rows = wrapper.get('[data-testid="rail-rows"]')
+      expect(rows.classes()).toContain('flex-row')
+      expect(rows.classes()).toContain('overflow-x-auto')
+      expect(rows.classes()).toContain('sm:flex-col')
+    })
+
+    it('each row button keeps a fixed touch-friendly width below sm and goes full-width at sm+', () => {
+      const slots: ServiceSlot[] = [makeSlot({ kind: 'PRAYER', id: 'slot-a', position: 0 })]
+      const wrapper = mountRail({ slots })
+      const row = wrapper.get('[data-testid="rail-row-slot-a"]')
+      expect(row.classes()).toContain('w-[220px]')
+      expect(row.classes()).toContain('shrink-0')
+      expect(row.classes()).toContain('sm:w-full')
+    })
+
+    it('the skeleton wrapper takes the same axis treatment as the populated rows', () => {
+      const wrapper = mountRail({ slots: [], groupsLoading: true })
+      const skeleton = wrapper.get('[data-testid="rail-skeleton"]')
+      expect(skeleton.classes()).toContain('flex-row')
+      expect(skeleton.classes()).toContain('overflow-x-auto')
+      expect(skeleton.classes()).toContain('sm:flex-col')
+    })
+  })
+
   describe('D-06 negative assertions — no drag affordance of any kind', () => {
     it('renders no drag-handle class, no grab-cursor class, no draggable attribute and no drop handler', () => {
       const slots: ServiceSlot[] = [

@@ -1,5 +1,5 @@
 <template>
-  <div class="w-[260px] shrink-0 border-r border-gray-800 overflow-y-auto overflow-x-hidden" data-testid="slide-plan-rail">
+  <div class="w-full sm:w-[260px] shrink-0 border-b sm:border-b-0 sm:border-r border-gray-800 overflow-y-auto overflow-x-hidden" data-testid="slide-plan-rail">
     <div class="p-3">
       <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">SERVICE PLAN</h2>
       <p class="mt-1 text-[10px] text-gray-500">order locked &#8644; Service Order</p>
@@ -8,7 +8,11 @@
     <!-- Loading: skeleton rows while the group subscription is still cold and
          there is nothing real to show yet (D-07's empty state would be a
          false negative in this window). -->
-    <div v-if="showSkeleton" class="px-3 pb-3 space-y-1.5" data-testid="rail-skeleton">
+    <div
+      v-if="showSkeleton"
+      class="flex flex-row gap-1.5 overflow-x-auto px-3 py-3 sm:flex-col sm:space-y-1.5 sm:gap-0 sm:overflow-x-visible sm:px-3 sm:pb-3 sm:py-0"
+      data-testid="rail-skeleton"
+    >
       <div
         v-for="n in 4"
         :key="n"
@@ -33,12 +37,16 @@
          handle, no cursor-grab, no draggable attribute, no drop handler
          anywhere in this branch (D-06) — the note above is the only
          explanation offered. -->
-    <div v-else class="px-3 pb-3 space-y-1.5" data-testid="rail-rows">
+    <div
+      v-else
+      class="flex flex-row gap-1.5 overflow-x-auto px-3 py-3 sm:flex-col sm:space-y-1.5 sm:gap-0 sm:overflow-x-visible sm:px-3 sm:pb-3 sm:py-0"
+      data-testid="rail-rows"
+    >
       <button
         v-for="row in rows"
         :key="row.slot.id"
         type="button"
-        class="w-full text-left rounded-lg border p-3 transition-colors"
+        class="w-[220px] shrink-0 sm:w-full sm:shrink text-left rounded-lg border p-3 transition-colors"
         :class="row.selected
           ? 'border-indigo-500 bg-indigo-950/50'
           : 'border-gray-800 bg-gray-900 hover:bg-gray-800/60'"
