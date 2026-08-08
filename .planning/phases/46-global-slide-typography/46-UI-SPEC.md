@@ -120,7 +120,7 @@ No empty-state copy is needed: the font-family, weight, and size controls are ne
 
 ## UI Considerations
 
-Applicable state considerations resolved: 6 covered, 2 backstop, 1 unresolved
+Applicable state considerations resolved: 6 covered, 1 backstop, 2 unresolved
 
 | Category | Element(s) | Status | Resolution / Reason |
 |----------|------------|--------|---------------------|
@@ -176,11 +176,21 @@ Each row's `license`/`weights` values above are **stated intent, not verified ev
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: FLAG (non-blocking) — recorded below
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: FLAG (non-blocking) — recorded below
+- [x] Dimension 5 Spacing: PASS
+- [~] Dimension 6 Registry Safety: SKIPPED (`ui_safety_gate: false`; the `@fontsource/*` npm provenance check is deferred to execution and recorded in Registry Safety above)
 
-**Approval:** pending
+**Approval:** APPROVED (2 non-blocking FLAGs)
+
+**Flag resolutions (from gsd-ui-checker, 2026-08-08):**
+- **D2 Visuals — visual focal point (recorded):** the **live "Preview" panel is the primary visual
+  focal point** of the Slide Typography card — it is the element that demonstrates the effect of the
+  three controls (family/weight/size), so the card's visual hierarchy leads the eye to it.
+- **D4 Typography — weight-ramp exemption (recorded):** the slide-typography contract's 5-value weight
+  ramp (300/400/500/600/700) is **exempt from the ≤2-weight UI-chrome constraint**. It is a
+  single-selection *runtime* property — only one weight renders on any given slide at a time — not five
+  weights exposed simultaneously across chrome, and offering Inter Light (300) is an explicit R093
+  requirement. Chrome typography (system A) remains within the 2-size/2-weight limit.
