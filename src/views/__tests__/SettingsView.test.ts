@@ -94,6 +94,8 @@ let mockSettingsVwModeEnabled = true
 // 44-02: R086 Services card summary + ServiceTemplateEditor.vue (mounted as a
 // child, which also calls useAuthStore() directly) both read this field.
 let mockDefaultServiceTemplate: ServiceTemplateEntry[] = []
+// 45-02: R090 Bible Translation card.
+let mockBibleVersion: 'ESV' | 'NLT' = 'NLT'
 
 const mockSetPcCredentials = vi.fn()
 
@@ -163,6 +165,15 @@ vi.mock('@/stores/auth', () => ({
       set defaultServiceTemplate(v: ServiceTemplateEntry[]) {
         mockDefaultServiceTemplate = v
       },
+      // 45-02: setter required for onChangeBibleVersion's mirror-write
+      // (`authStore.settings.bibleVersion = newValue`), mirroring every
+      // other settings.* setter above.
+      get bibleVersion() {
+        return mockBibleVersion
+      },
+      set bibleVersion(v: 'ESV' | 'NLT') {
+        mockBibleVersion = v
+      },
     },
   }),
 }))
@@ -191,6 +202,7 @@ describe('SettingsView (Wave 0 harness — Phase 39)', () => {
     mockPcEnabled = true
     mockSettingsVwModeEnabled = true
     mockDefaultServiceTemplate = []
+    mockBibleVersion = 'NLT'
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
     mockSetPcCredentials.mockClear()
@@ -233,6 +245,7 @@ describe('SettingsView dot-path writes (R073) — Wave 2 (39-03)', () => {
     mockPcEnabled = true
     mockSettingsVwModeEnabled = true
     mockDefaultServiceTemplate = []
+    mockBibleVersion = 'NLT'
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
     mockSetPcCredentials.mockClear()
@@ -333,6 +346,7 @@ describe('SettingsView Planning Center credential retention (R089) — Wave 2 (3
     mockPcEnabled = true
     mockSettingsVwModeEnabled = true
     mockDefaultServiceTemplate = []
+    mockBibleVersion = 'NLT'
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
     mockSetPcCredentials.mockClear()
@@ -400,6 +414,7 @@ describe('SettingsView Services card (R086) — Wave 2 (44-02)', () => {
     mockPcEnabled = true
     mockSettingsVwModeEnabled = true
     mockDefaultServiceTemplate = []
+    mockBibleVersion = 'NLT'
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
     mockSetPcCredentials.mockClear()
@@ -464,5 +479,102 @@ describe('SettingsView Services card (R086) — Wave 2 (44-02)', () => {
     mockIsEditor = false
     const wrapper = mountSettingsView()
     expect(wrapper.get('[data-testid="open-template-editor"]').attributes('disabled')).toBeDefined()
+  })
+})
+
+describe('SettingsView Bible Translation card (R090) — 45-02', () => {
+  beforeEach(() => {
+    mockOrgId = 'org-1'
+    mockOrgName = 'Test Church'
+    mockOrgSlug = 'test-church'
+    mockIsEditor = true
+    mockHasPcCredentials = false
+    mockPcAppId = null
+    mockPcSecret = null
+    mockVwModeEnabled = true
+    mockAiEnabled = true
+    mockPcEnabled = true
+    mockSettingsVwModeEnabled = true
+    mockDefaultServiceTemplate = []
+    mockBibleVersion = 'NLT'
+    mockUpdateDoc.mockClear()
+    mockGetDoc.mockClear()
+    mockSetPcCredentials.mockClear()
+  })
+
+  it('renders the Bible Translation heading and both option labels', () => {
+    const wrapper = mountSettingsView()
+    expect(wrapper.text()).toContain('Bible Translation')
+    expect(wrapper.text()).toContain('ESV (English Standard Version)')
+    expect(wrapper.text()).toContain('NLT (New Living Translation)')
+  })
+
+  it('checks the option matching the current authStore.settings.bibleVersion', () => {
+    mockBibleVersion = 'NLT'
+    const wrapper = mountSettingsView()
+    const esv = wrapper.get('[data-testid="bible-version-esv"]').element as HTMLInputElement
+    const nlt = wrapper.get('[data-testid="bible-version-nlt"]').element as HTMLInputElement
+    expect(esv.checked).toBe(false)
+    expect(nlt.checked).toBe(true)
+  })
+
+  it('writes a dot-path leaf key when the ESV option is selected', async () => {
+    mockBibleVersion = 'NLT'
+    const wrapper = mountSettingsView()
+    await wrapper.get('[data-testid="bible-version-esv"]').setValue(true)
+    await flushPromises()
+
+    expect(mockUpdateDoc).toHaveBeenCalledTimes(1)
+    const payload = mockUpdateDoc.mock.calls[0]![1] as Record<string, unknown>
+    expect(Object.keys(payload)).toHaveLength(1)
+    expect(payload).toHaveProperty('settings.bibleVersion', 'ESV')
+    expect(payload).not.toHaveProperty('settings')
+  })
+
+  it('mirrors the saved value onto the store and shows "Saved!" feedback', async () => {
+    mockBibleVersion = 'NLT'
+    const wrapper = mountSettingsView()
+    await wrapper.get('[data-testid="bible-version-esv"]').setValue(true)
+    await flushPromises()
+
+    expect(mockBibleVersion).toBe('ESV')
+    expect(wrapper.text()).toContain('Saved!')
+  })
+
+  it('reverts the selection and surfaces the shared failure string when the write rejects', async () => {
+    mockBibleVersion = 'NLT'
+    mockUpdateDoc.mockRejectedValueOnce(new Error('network error'))
+    const wrapper = mountSettingsView()
+
+    await wrapper.get('[data-testid="bible-version-esv"]').setValue(true)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Failed to save. Please try again.')
+    const esv = wrapper.get('[data-testid="bible-version-esv"]').element as HTMLInputElement
+    const nlt = wrapper.get('[data-testid="bible-version-nlt"]').element as HTMLInputElement
+    expect(esv.checked).toBe(false)
+    expect(nlt.checked).toBe(true)
+    // The store must not have been mirror-written, since the Firestore write
+    // itself never succeeded.
+    expect(mockBibleVersion).toBe('NLT')
+  })
+
+  it('disables both radio options for a non-editor (viewer)', () => {
+    mockIsEditor = false
+    const wrapper = mountSettingsView()
+    expect(wrapper.get('[data-testid="bible-version-esv"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-testid="bible-version-nlt"]').attributes('disabled')).toBeDefined()
+  })
+
+  it('a non-editor cannot trigger a save even if the DOM were manipulated (handler early-return)', async () => {
+    mockIsEditor = false
+    const wrapper = mountSettingsView()
+    // Force-select despite disabled, exercising the handler guard directly
+    // rather than relying on jsdom to block interaction with a disabled input.
+    await wrapper.get('[data-testid="bible-version-esv"]').setValue(true)
+    await flushPromises()
+
+    expect(mockUpdateDoc).not.toHaveBeenCalled()
+    expect(mockBibleVersion).toBe('NLT')
   })
 })

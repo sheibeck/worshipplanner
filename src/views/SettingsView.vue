@@ -292,6 +292,56 @@
         <p v-if="aiSaveError" class="text-red-400 text-sm mt-2">{{ aiSaveError }}</p>
       </div>
 
+      <!-- Bible Translation section (R090) — explains before offering the choice,
+           mirrors the AI Features card exactly (45-UI-SPEC.md). -->
+      <div class="rounded-lg bg-gray-900 border border-gray-800 p-4 mt-6">
+        <h2 class="text-sm font-semibold text-gray-300 mb-3">Bible Translation</h2>
+
+        <p class="text-xs text-gray-400 mb-3">
+          Choose which Bible translation this church uses for new scripture passages. Existing
+          slides keep the translation they were created with — changing this here never rewrites
+          what's already on a slide.
+        </p>
+
+        <div class="space-y-2">
+          <label
+            class="flex items-center gap-3"
+            :class="authStore.isEditor ? 'cursor-pointer' : 'opacity-60 cursor-not-allowed'"
+          >
+            <input
+              v-model="bibleVersionInput"
+              type="radio"
+              value="ESV"
+              name="bibleVersion"
+              :disabled="!authStore.isEditor"
+              @change="onChangeBibleVersion"
+              data-testid="bible-version-esv"
+              class="h-4 w-4 border-gray-700 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0"
+            />
+            <span class="text-sm text-gray-200">ESV (English Standard Version)</span>
+          </label>
+          <label
+            class="flex items-center gap-3"
+            :class="authStore.isEditor ? 'cursor-pointer' : 'opacity-60 cursor-not-allowed'"
+          >
+            <input
+              v-model="bibleVersionInput"
+              type="radio"
+              value="NLT"
+              name="bibleVersion"
+              :disabled="!authStore.isEditor"
+              @change="onChangeBibleVersion"
+              data-testid="bible-version-nlt"
+              class="h-4 w-4 border-gray-700 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0"
+            />
+            <span class="text-sm text-gray-200">NLT (New Living Translation)</span>
+          </label>
+        </div>
+
+        <p v-if="bibleVersionSavedFeedback" class="text-green-400 text-sm mt-2">Saved!</p>
+        <p v-if="bibleVersionSaveError" class="text-red-400 text-sm mt-2">{{ bibleVersionSaveError }}</p>
+      </div>
+
       <!-- Services section (R086/R087) — Phase 44's default service template. -->
       <div class="rounded-lg bg-gray-900 border border-gray-800 p-4 mt-6">
         <h2 class="text-sm font-semibold text-gray-300 mb-3">Services</h2>
@@ -371,6 +421,12 @@ const aiSaveError = ref<string | null>(null)
 const pcEnabledInput = ref(authStore.settings.pcEnabled)
 const pcEnabledSavedFeedback = ref(false)
 const pcEnabledSaveError = ref<string | null>(null)
+
+// ── Bible Translation choice state (R090) ───────────────────────────────────────
+
+const bibleVersionInput = ref(authStore.settings.bibleVersion)
+const bibleVersionSavedFeedback = ref(false)
+const bibleVersionSaveError = ref<string | null>(null)
 
 // ── Services / default service template state (R086/R087) ─────────────────────
 // No local defaults-merge/`?? []` here — `authStore.settings.defaultServiceTemplate`
@@ -469,6 +525,13 @@ watch(
   () => authStore.settings.pcEnabled,
   (val) => {
     pcEnabledInput.value = val
+  },
+)
+
+watch(
+  () => authStore.settings.bibleVersion,
+  (val) => {
+    bibleVersionInput.value = val
   },
 )
 
@@ -699,6 +762,36 @@ async function onTogglePcEnabled() {
     pcEnabledSaveError.value = 'Failed to save. Please try again.'
     // Revert the local checkbox to reflect the unsaved state
     pcEnabledInput.value = !newValue
+  }
+}
+
+// ── Bible Translation choice action (R090) ──────────────────────────────────────
+// Mirror-write template follows onToggleAiEnabled/onTogglePcEnabled: a quoted
+// dot-path leaf key, never a whole-map write. The control is a two-option
+// exclusive radio (T-45-21) — only 'ESV'/'NLT' can ever be selected, so the
+// revert-on-error can safely flip to "the other option", the same shape as
+// the boolean toggles' `= !newValue` revert.
+async function onChangeBibleVersion() {
+  if (!authStore.orgId || !authStore.isEditor) return
+
+  const newValue = bibleVersionInput.value
+  bibleVersionSaveError.value = null
+
+  try {
+    await updateDoc(doc(db, 'organizations', authStore.orgId), {
+      'settings.bibleVersion': newValue,
+    })
+    authStore.settings.bibleVersion = newValue
+
+    bibleVersionSavedFeedback.value = true
+    setTimeout(() => {
+      bibleVersionSavedFeedback.value = false
+    }, 2000)
+  } catch (err) {
+    console.error('[SettingsView] save bibleVersion error:', err)
+    bibleVersionSaveError.value = 'Failed to save. Please try again.'
+    // Revert the local radio selection to reflect the unsaved state
+    bibleVersionInput.value = newValue === 'ESV' ? 'NLT' : 'ESV'
   }
 }
 </script>
