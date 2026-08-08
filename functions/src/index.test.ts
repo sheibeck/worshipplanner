@@ -11,6 +11,7 @@ import {
   MEDIA_PATH_GUARD,
   ORPHAN_RENDER_STALE_HOURS,
   PROXY_TARGETS,
+  redactUrl,
   RENDERED_OBJECT_GUARD,
   RETENTION_DAYS,
   SECRET_INJECTED,
@@ -1007,5 +1008,31 @@ describe("buildUpstreamUrl", () => {
     const parsed = new URL(built);
     expect(parsed.searchParams.get("key")).toBe("SERVER_SECRET");
     expect(parsed.searchParams.getAll("key")).toEqual(["SERVER_SECRET"]);
+  });
+});
+
+describe("redactUrl", () => {
+  it("WR-02: masks the nlt `key` query-param value, never the live secret", () => {
+    const built = buildUpstreamUrl(
+      "nlt",
+      "https://api.nlt.to/api/passages?ref=John+3:16&version=NLT",
+      "LIVE_SECRET_VALUE",
+    );
+    const redacted = redactUrl(built);
+    expect(redacted).not.toContain("LIVE_SECRET_VALUE");
+    const parsed = new URL(redacted);
+    expect(parsed.searchParams.get("key")).toBe("REDACTED");
+    // Non-secret params survive untouched -- only `key` is masked.
+    expect(parsed.searchParams.get("ref")).toBe("John 3:16");
+    expect(parsed.searchParams.get("version")).toBe("NLT");
+  });
+
+  it("leaves a URL with no `key` param byte-unchanged (esv/anthropic never have one)", () => {
+    const url = "https://api.esv.org/v3/passage/text/?q=John+3:16";
+    expect(redactUrl(url)).toBe(url);
+  });
+
+  it("fails closed to a generic placeholder on an unparseable URL, rather than risking a raw leak", () => {
+    expect(redactUrl("not a url")).toBe("[unparseable URL]");
   });
 });

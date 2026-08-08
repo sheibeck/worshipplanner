@@ -73,6 +73,27 @@ export function buildUpstreamUrl(
   return nltUrl.toString();
 }
 
+/**
+ * Redaction boundary for any URL that might carry a live secret in its query
+ * string (today: only the nlt `key` param injected by buildUpstreamUrl
+ * above). Every log/error path in the `api` handler that could include
+ * `upstreamUrl` must route it through this first -- the real key must never
+ * be loggable, even via a future `cause`/stack-trace field on a Node/undici
+ * version bump. Malformed input fails closed to a generic placeholder
+ * rather than risking a raw, unredacted string leaking through.
+ */
+export function redactUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (parsed.searchParams.has("key")) {
+      parsed.searchParams.set("key", "REDACTED");
+    }
+    return parsed.toString();
+  } catch {
+    return "[unparseable URL]";
+  }
+}
+
 // Headers we forward from the client to the upstream API. Note: `x-api-key` and
 // `authorization` for secret-injected services are overwritten below, never trusted
 // from the client.
@@ -167,7 +188,15 @@ export const api = onRequest(
       const body = await upstream.text();
       res.send(body);
     } catch (err) {
-      console.error("Proxy error:", err);
+      // Never log `err` verbatim -- a future `cause`/stack-trace field could
+      // embed `upstreamUrl` (which, for nlt, carries the live secret in its
+      // query string). Log only the service, the redacted URL, and a plain
+      // message string.
+      console.error("Proxy error:", {
+        service,
+        url: redactUrl(upstreamUrl),
+        message: err instanceof Error ? err.message : String(err),
+      });
       res.status(502).json({ error: "Upstream request failed" });
     }
   },
