@@ -116,9 +116,15 @@ function scriptureSlide(id: string, section: AssembledSlide['section'] = 'messag
 // 38-02: a ScriptureSlide carries at most ONE congregational section — the
 // fixture takes a single section (or undefined for the no-section fallback
 // case), never a list.
+// R097 (Phase 47): `isFirstSection` defaults to `true` so every EXISTING
+// call site that doesn't care about first/later position (most of this
+// file's fixtures predate R097) keeps seeing the reference render exactly
+// as before. Callers proving the R097 later-slide behavior pass `false`
+// explicitly.
 function congregationalScriptureSlide(
   id: string,
   section: import('@/types/slide').CongregationalSection | undefined,
+  isFirstSection = true,
 ): AssembledSlide {
   return {
     slide: {
@@ -130,7 +136,7 @@ function congregationalScriptureSlide(
       text: section?.text ?? 'Give thanks to the LORD, for he is good. His love endures forever.',
       verseRange: 'vv. 1-4',
       readingMode: 'congregational',
-      ...(section !== undefined && { section }),
+      ...(section !== undefined && { section, isFirstSection }),
     },
     slotIndex: 1,
     slotKind: 'SCRIPTURE',
@@ -781,8 +787,8 @@ describe('PresentationViewer', () => {
     mount(PresentationViewer, {
       props: {
         slides: [
-          congregationalScriptureSlide('a', leaderSection),
-          congregationalScriptureSlide('b', congregationSection),
+          congregationalScriptureSlide('a', leaderSection, true),
+          congregationalScriptureSlide('b', congregationSection, false),
         ],
       },
     })
@@ -794,6 +800,10 @@ describe('PresentationViewer', () => {
     expect(speaker1.text()).toBe('Leader:')
     expect(words1.text()).toBe(`${leaderSection.text} (ESV)`)
     expect(slideText()).not.toContain(congregationSection.text)
+
+    // R097 (NEWLY BUILT): the first section slide of the reading shows the
+    // scripture reference.
+    expect(body().find('[data-testid="presentation-scripture-reference"]').exists()).toBe(true)
 
     // Snapshot the class lists NOW, before advancing. `speaker1`/`words1` hold
     // live element references, and Vue patches this v-if branch's nodes in
@@ -818,6 +828,12 @@ describe('PresentationViewer', () => {
       speaker2.element.compareDocumentPosition(words2.element) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
 
+    // R097 (NEWLY BUILT): a LATER section slide shows only the speaker label
+    // and its own words — the reference is suppressed. Today's code shows it
+    // unconditionally on every section slide; this is the assertion that
+    // proves the new gating.
+    expect(body().find('[data-testid="presentation-scripture-reference"]').exists()).toBe(false)
+
     // The PASSAGE text is treated identically on both slides — the words are
     // never colour-coded by who says them.
     expect(words1Classes).toEqual(words2.classes().slice().sort())
@@ -832,6 +848,42 @@ describe('PresentationViewer', () => {
     expect(speaker2Classes).toContain('text-amber-300')
     expect(speaker1Classes.filter((c) => !speaker2Classes.includes(c))).toEqual(['text-sky-300'])
     expect(speaker2Classes.filter((c) => !speaker1Classes.includes(c))).toEqual(['text-amber-300'])
+  })
+
+  // R095: the third ALL role — extends the sky/amber colour-diff pattern
+  // above to a third section. The label is always rendered as text
+  // ('All:'), colour is never the sole signal.
+  it('an ALL section reads "All:" in violet-300, the ONLY class delta versus Leader/Congregation', async () => {
+    const leaderSection = { speaker: 'LEADER' as const, text: 'Give thanks to the LORD, for he is good.' }
+    const congregationSection = { speaker: 'CONGREGATION' as const, text: 'His love endures forever.' }
+    const allSection = { speaker: 'ALL' as const, text: 'Let the redeemed of the LORD say so.' }
+    mount(PresentationViewer, {
+      props: {
+        slides: [
+          congregationalScriptureSlide('a', leaderSection, true),
+          congregationalScriptureSlide('b', congregationSection, false),
+          congregationalScriptureSlide('c', allSection, false),
+        ],
+      },
+    })
+    await flushPromises()
+
+    const speaker1 = body().find('[data-testid="presentation-speaker"]')
+    const speaker1Classes = speaker1.classes().slice().sort()
+
+    await body().find('[data-testid="presentation-next"]').trigger('click')
+    await body().find('[data-testid="presentation-next"]').trigger('click')
+
+    const speaker3 = body().find('[data-testid="presentation-speaker"]')
+    expect(speaker3.text()).toBe('All:')
+    const speaker3Classes = speaker3.classes().slice().sort()
+    expect(speaker3Classes).toContain('text-violet-300')
+    expect(speaker1Classes.filter((c) => !speaker3Classes.includes(c))).toEqual(['text-sky-300'])
+    expect(speaker3Classes.filter((c) => !speaker1Classes.includes(c))).toEqual(['text-violet-300'])
+
+    // Later section slide — reference stays suppressed for ALL too (R097
+    // applies regardless of speaker role).
+    expect(body().find('[data-testid="presentation-scripture-reference"]').exists()).toBe(false)
   })
 
   it('readingMode congregational with no section falls back to normal-mode rendering', async () => {

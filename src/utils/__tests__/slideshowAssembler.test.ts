@@ -524,7 +524,54 @@ describe('assembleSlideshow — congregational reading (D1)', () => {
       expect(storedSlide.text).toBe(sections[i]!.text)
       expect(storedSlide.section).toEqual(sections[i])
       expect(fallbackSlide.section).toEqual(sections[i])
+      // R097: isFirstSection true only for the first slide of the reading —
+      // computed from the section's own ordinal (entry.order on the
+      // stored-group path, localSeq on the fallback path) — and the two
+      // paths must agree slide-for-slide.
+      expect(storedSlide.isFirstSection).toBe(i === 0)
+      expect(fallbackSlide.isFirstSection).toBe(i === 0)
+      expect(storedSlide.isFirstSection).toBe(fallbackSlide.isFirstSection)
     }
+  })
+
+  // R097 (this is NEWLY BUILT, not merely verified — today every section
+  // slide's isFirstSection is undefined on both paths). Also proves the
+  // assembler is role-agnostic: an ALL-speaker section's speaker passes
+  // through unchanged on both paths, exactly like LEADER/CONGREGATION.
+  it('R097: isFirstSection is true only on the first section slide, on BOTH the stored-group and fallback paths, and ALL speaker passes through unchanged', () => {
+    const sections = [
+      makeCongregationalSection({ speaker: 'LEADER', text: 'One' }),
+      makeCongregationalSection({ speaker: 'ALL', text: 'Two' }),
+      makeCongregationalSection({ speaker: 'CONGREGATION', text: 'Three' }),
+    ]
+    const slot = scriptureSlot({ congregationalSections: sections })
+
+    const storedResult = assembleViaStoredGroup(slot, sections)
+    const fallbackResult = assembleViaFallback(slot)
+
+    expect(storedResult).toHaveLength(3)
+    expect(fallbackResult).toHaveLength(3)
+
+    for (let i = 0; i < 3; i++) {
+      const storedSlide = storedResult[i]!.slide as ScriptureSlide
+      const fallbackSlide = fallbackResult[i]!.slide as ScriptureSlide
+      expect(storedSlide.isFirstSection).toBe(i === 0)
+      expect(fallbackSlide.isFirstSection).toBe(i === 0)
+      expect(storedSlide.section!.speaker).toBe(sections[i]!.speaker)
+      expect(fallbackSlide.section!.speaker).toBe(sections[i]!.speaker)
+    }
+    // The ALL section (index 1) is not the first slide and passes through
+    // its speaker unaltered on both paths.
+    expect((storedResult[1]!.slide as ScriptureSlide).section!.speaker).toBe('ALL')
+    expect((fallbackResult[1]!.slide as ScriptureSlide).section!.speaker).toBe('ALL')
+  })
+
+  it('R097: a Reference-state (non-congregational) scripture slide carries no isFirstSection at all', () => {
+    const slot = scriptureSlot({ id: 'slot-scripture-0' })
+    const result = assembleSlideshow(makeService([slot]), makeInputs())
+    expect(result).toHaveLength(1)
+    const slide = result[0]!.slide as ScriptureSlide
+    expect(Object.prototype.hasOwnProperty.call(slide, 'isFirstSection')).toBe(false)
   })
 
   it('dual-path parity: a slot with NO congregationalSections yields the identical backward-compatible shape on both paths', () => {

@@ -303,12 +303,28 @@ describe('slideDisplay', () => {
       expect(slideContentLabel(leader)).not.toBe(slideContentLabel(congregation))
       expect(slideContentLabel(leader)).not.toBe(slideContentLabel(referenceState))
     })
+
+    // R095/R097: the ALL role names itself in the eyebrow too, and this
+    // eyebrow is NOT reference-gated — it names the speaker regardless of
+    // the slide's position in the reading.
+    it('names ALL in the eyebrow, unaffected by isFirstSection', () => {
+      const allLater = {
+        id: 's11',
+        position: 0,
+        contentKind: 'scripture',
+        reference: 'John 3:16',
+        section: { speaker: 'ALL', text: 'y' },
+        isFirstSection: false,
+      } as Slide
+      expect(slideContentLabel(allLater)).toBe('ALL')
+    })
   })
 
-  describe('speakerDisplayName (Phase 38-03)', () => {
-    it('returns readable natural-case names for both speakers', () => {
+  describe('speakerDisplayName (Phase 38-03, widened Phase 47 R095)', () => {
+    it('returns readable natural-case names for all three speakers, including ALL', () => {
       expect(speakerDisplayName('LEADER')).toBe('Leader')
       expect(speakerDisplayName('CONGREGATION')).toBe('Congregation')
+      expect(speakerDisplayName('ALL')).toBe('All')
     })
   })
 
@@ -377,7 +393,12 @@ describe('slideDisplay', () => {
     // Phase 38-03: no logic change from the case above — a section slide
     // already carries its words in `text`, so the existing joined form
     // applies unchanged, now with the 45-04 attribution suffix appended.
-    it('combines the reference and text for a Congregational-state section slide, with the attribution suffix', () => {
+    //
+    // R097 (Phase 47): this is now the FIRST-section case explicitly —
+    // isFirstSection: true keeps the reference-prefixed shape. See the two
+    // new cases below for the later-section (reference suppressed) and
+    // Reference-state (unaffected) behavior this phase adds.
+    it('combines the reference and text for the FIRST Congregational-state section slide, with the attribution suffix', () => {
       const scripture = {
         id: 's3b',
         position: 0,
@@ -385,8 +406,38 @@ describe('slideDisplay', () => {
         reference: 'John 3:16',
         text: 'For God so loved the world',
         section: { speaker: 'LEADER', text: 'For God so loved the world' },
+        isFirstSection: true,
       } as Slide
       expect(slideBodyText(scripture)).toBe('John 3:16\nFor God so loved the world (ESV)')
+    })
+
+    // R097 (NEWLY BUILT): a later section slide (section present,
+    // isFirstSection falsy) omits the reference prefix entirely — only its
+    // own words + attribution.
+    it('omits the reference for a LATER Congregational-state section slide (isFirstSection falsy)', () => {
+      const scripture = {
+        id: 's3b-later',
+        position: 0,
+        contentKind: 'scripture',
+        reference: 'John 3:16',
+        text: 'that he gave his only Son',
+        section: { speaker: 'CONGREGATION', text: 'that he gave his only Son' },
+      } as Slide
+      expect(slideBodyText(scripture)).toBe('that he gave his only Son (ESV)')
+      expect(slideBodyText(scripture)).not.toContain('John 3:16')
+    })
+
+    // R097: a Reference-state slide (no section at all) is unaffected by the
+    // isFirstSection gate — it always shows its reference, exactly as before.
+    it('a Reference-state slide (no section) still returns its reference regardless of isFirstSection', () => {
+      const scripture = {
+        id: 's3b-ref',
+        position: 0,
+        contentKind: 'scripture',
+        reference: 'Psalms 23:1-6',
+        text: 'The LORD is my shepherd',
+      } as Slide
+      expect(slideBodyText(scripture)).toBe('Psalms 23:1-6\nThe LORD is my shepherd (ESV)')
     })
 
     it('returns the body for a text slide', () => {
@@ -451,6 +502,20 @@ describe('slideDisplay', () => {
       } as Slide
       expect(slideFooterLabel(leader)).toBe('John 3:16 · Leader')
       expect(slideFooterLabel(congregation)).toBe('John 3:16 · Congregation')
+    })
+
+    // R097 (key_links): slideFooterLabel names the speaker regardless of
+    // position — it is NOT reference-gated the way slideBodyText's prefix is.
+    it('still names the speaker on a LATER section slide (isFirstSection falsy) — not reference-gated', () => {
+      const later = {
+        id: 's3e',
+        position: 0,
+        contentKind: 'scripture',
+        reference: 'John 3:16',
+        section: { speaker: 'ALL', text: 'x' },
+        isFirstSection: false,
+      } as Slide
+      expect(slideFooterLabel(later)).toBe('John 3:16 · All')
     })
 
     it("returns the title for a text slide, 'Text' otherwise", () => {
