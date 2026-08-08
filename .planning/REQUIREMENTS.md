@@ -234,7 +234,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 
 ### Mobile and Layout
 
-- [ ] **R099**: The Slides tab is usable on a phone.
+- [x] **R099**: The Slides tab is usable on a phone.
       <br>`[ARCH]` The Slides tab's mobile-blocking layout was **not** independently audited during
       research — the implementing phase must audit it first rather than assume the scope.
       `[PITFALL]` Retrofitting touch onto SortableJS risks reproducing the documented index bug
@@ -309,7 +309,7 @@ Explicitly excluded. Documented to prevent scope creep.
 | R096 | Phase 47 | Complete |
 | R097 | Phase 47 | Complete |
 | R098 | Phase 48 | Complete |
-| R099 | Phase 48 | Pending |
+| R099 | Phase 48 | Complete |
 | R100 | Phase 48 | Pending |
 | R101 | Phase 48 | Pending |
 | R102 | Phase 48 | Pending |
