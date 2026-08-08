@@ -398,6 +398,29 @@ describe('congregationalSectionFromRef', () => {
     expect(congregationalSectionFromRef(ref)).toEqual({ speaker: 'LEADER', text: '' })
   })
 
+  // IN-02 (47-REVIEW): defense-in-depth — a consumer that treats this
+  // return value as a COMPLETE CongregationalSection should not silently
+  // lose translation provenance.
+  it('a section reconstructed from a ref carrying a translationSource has that translationSource', () => {
+    const ref: SourceRef = {
+      kind: 'scripture',
+      speaker: 'CONGREGATION',
+      text: 'for his steadfast love endures forever.',
+      translationSource: 'NLT',
+    }
+    expect(congregationalSectionFromRef(ref)).toEqual({
+      speaker: 'CONGREGATION',
+      text: 'for his steadfast love endures forever.',
+      translationSource: 'NLT',
+    })
+  })
+
+  it('a section reconstructed from a ref with no translationSource has no translationSource key at all', () => {
+    const ref: SourceRef = { kind: 'scripture', speaker: 'LEADER', text: 'No translation source here' }
+    const section = congregationalSectionFromRef(ref)
+    expect(Object.prototype.hasOwnProperty.call(section, 'translationSource')).toBe(false)
+  })
+
   it('round trip: a three-section fixture including curly quotes and an em dash reconstructs with strictly === equal text', () => {
     const sections: CongregationalSection[] = [
       { speaker: 'LEADER', text: 'One' },

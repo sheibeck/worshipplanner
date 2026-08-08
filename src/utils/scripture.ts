@@ -243,6 +243,14 @@ export function congregationalSectionFromRef(ref: SourceRef): CongregationalSect
     speaker: ref.speaker,
     text: ref.text ?? '',
     ...(ref.verseRange !== undefined ? { verseRange: ref.verseRange } : {}),
+    // IN-02 (47-REVIEW): defense-in-depth — thread translationSource through
+    // so a future consumer that treats this return value as a COMPLETE
+    // CongregationalSection (as its name implies) doesn't silently lose
+    // translation provenance. Today's two callers are unaffected either
+    // way (slideshowAssembler.ts re-reads ref.translationSource directly;
+    // EditSlideDrawer.vue spreads the whole sourceRef, preserving it as a
+    // sibling field), so this is additive, not a behavior change.
+    ...(ref.translationSource !== undefined ? { translationSource: ref.translationSource } : {}),
   }
 }
 
