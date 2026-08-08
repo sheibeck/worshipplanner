@@ -481,6 +481,26 @@ describe('useAuthStore', () => {
       await store.logout()
       expect(store.settings).toEqual(DEFAULT_ORG_SETTINGS)
     })
+
+    // WR-01 (46-REVIEW.md): `slideTypography` must be deep-merged, not
+    // shallow-replaced — a partial stored value (hand-edited Firestore
+    // document, or any future write path that persists fewer than all
+    // three leaf keys) must still resolve its missing sibling fields to
+    // their per-field defaults, never `undefined`.
+    it('deep-merges a partial stored slideTypography — missing leaf fields fall back to their own defaults', async () => {
+      mockOrgDocPath({
+        name: 'Test Org',
+        settings: { slideTypography: { fontFamily: 'Poppins' } },
+      })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.settings.slideTypography).toEqual({
+        fontFamily: 'Poppins',
+        fontWeight: DEFAULT_ORG_SETTINGS.slideTypography.fontWeight,
+        fontScale: DEFAULT_ORG_SETTINGS.slideTypography.fontScale,
+      })
+    })
   })
 
   describe('OrgSettings.bibleVersion (R090)', () => {

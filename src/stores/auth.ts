@@ -200,10 +200,23 @@ export const useAuthStore = defineStore('auth', () => {
       const resolvedVwModeEnabled =
         orgSettings.vwModeEnabled ?? (orgData.vwModeEnabled as boolean | undefined) ?? true
 
+      // WR-01 (46-REVIEW.md): `slideTypography` is deep-merged specifically
+      // — the plain `...orgSettings` spread above is shallow, so a
+      // partial/legacy stored value (e.g. a hand-edited Firestore document,
+      // or any future write path that persists fewer than all three leaf
+      // keys) would otherwise replace the whole nested object wholesale,
+      // leaving `fontWeight`/`fontScale` `undefined` rather than falling
+      // back to the per-field defaults. `cssVarsFor` already tolerates this
+      // at render time, but `SettingsView.vue`'s local refs are initialized
+      // directly from this object with no equivalent guard.
       settings.value = {
         ...DEFAULT_ORG_SETTINGS,
         ...orgSettings,
-        vwModeEnabled: resolvedVwModeEnabled
+        vwModeEnabled: resolvedVwModeEnabled,
+        slideTypography: {
+          ...DEFAULT_ORG_SETTINGS.slideTypography,
+          ...orgSettings.slideTypography,
+        },
       }
       vwModeEnabled.value = resolvedVwModeEnabled
 
