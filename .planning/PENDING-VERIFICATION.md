@@ -1066,6 +1066,46 @@ pointer drag.
 
 ---
 
+---
+
+## Phase 45 — ESV/NLT Bible Version Selection (Plan 45-01, 2026-08-08)
+
+**Plan 45-01 status: built and tested, NOT deployed** (standing v1.5 autonomy grant — NO DEPLOYS).
+`functions/src/index.ts`'s new `nlt` proxy branch (query-param secret injection, `buildUpstreamUrl`
+helper) and `src/utils/nltApi.ts` (DOMParser strip + `[N]` bracket reformat) are both built and
+unit-tested against real, redacted NLT API response shapes captured live during phase research —
+`cd functions && npm test` 112/112 passing, `npx vitest run src/utils/__tests__/nltApi.test.ts`
+10/10 passing, `npm run type-check` clean, `functions && npm run build` clean. **Nothing was
+deployed. `NLT_API_KEY` was never printed anywhere** (redacted as `<owner-key>` in all research/
+planning artifacts; this plan could not even read `.env.local` directly — sandboxed — so it built
+and tested against RESEARCH.md's documented real fixture shapes rather than a fresh live fetch).
+
+⚠ **DEPLOY-COUPLING (locked by 45-CONTEXT.md, owner override 2026-08-07):**
+`OrgSettings.bibleVersion` defaults to **`'NLT'`**, not `'ESV'`, once a later plan in this phase
+wires the Settings default and call-site routing. Because the NLT Cloud Function branch ships
+UNDEPLOYED, **new scripture fetching will not work for any church that hasn't explicitly chosen
+ESV until the owner deploys this function.** The frontend build that carries the NLT default and
+this function branch MUST be deployed in the SAME session — never the frontend first.
+
+- [ ] **1. Set the secret.** `firebase functions:secrets:set NLT_API_KEY` — the owner already holds
+      the key; it is NOT read from `.env.local` by the deployed function (only used locally by this
+      plan's own dev-proxy config, mirroring `ESV_API_KEY`/`CLAUDE_API_KEY`).
+- [ ] **2. Deploy the function.** `firebase deploy --only functions` — ships the new `nlt` branch
+      (`PROXY_TARGETS.nlt`, `SECRET_INJECTED` membership, `NLT_API_KEY` secret wiring).
+- [ ] **3. ⚠ Deploy in the SAME session as the NLT-default frontend build** (a later plan in this
+      phase). If the frontend ships first, every new scripture fetch against the NLT default 404s
+      against `/api/nlt` until step 2 completes. This is a human process guarantee — the emulator
+      proves the function branch works, but cannot prove the two halves ship together.
+- [ ] **4. Deferred live check.** With a church set to NLT, fetch a passage and confirm it renders
+      with `(NLT)` attribution (attribution itself ships in a later plan of this phase, R091).
+- [ ] **5. Confirm the real fetch matches this plan's fixtures.** This plan's tests use RESEARCH.md's
+      documented real (redacted) NLT sample shapes rather than a fresh live fetch (sandbox could not
+      read `.env.local`). After deploying, fetch a real passage (e.g. `John 3:16-18`) through the
+      deployed proxy and confirm the returned text matches the `[N] text` shape these tests assert —
+      footnotes/headings stripped, red-letter/small-caps text kept, no leaked digit before each verse.
+
+---
+
 ## Notes and failures
 
 _(Record anything that failed here, with what you saw versus what was expected.)_
