@@ -5,15 +5,15 @@ milestone_name: Settings, Sharing, and Fidelity
 current_phase: 46
 current_phase_name: Global Slide Typography
 status: executing
-stopped_at: Completed 46-01-PLAN.md
-last_updated: "2026-08-08T17:12:53.743Z"
+stopped_at: Completed 46-02-PLAN.md
+last_updated: "2026-08-08T17:41:21.509Z"
 last_activity: 2026-08-08
 last_activity_desc: Phase 46 execution started
 progress:
   total_phases: 11
   completed_phases: 8
   total_plans: 37
-  completed_plans: 34
+  completed_plans: 35
   percent: 73
 ---
 
@@ -151,7 +151,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 46 (Global Slide Typography) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 client (DEPLOY-GATED, see below). 45-02 added `bibleVersion: 'ESV' | 'NLT'` to `OrgSettings`
 (`DEFAULT_ORG_SETTINGS.bibleVersion: 'NLT'`, owner's locked override) plus the Settings "Bible
@@ -1372,6 +1372,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 45 P02 | 10min | 2 tasks | 4 files |
 | Phase 45 P04 | 50min | 3 tasks | 8 files |
 | Phase 46 P01 | 17min | 2 tasks | 6 files |
+| Phase 46 P02 | 25min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -1690,6 +1691,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 45-04: discovered and worked around a pre-existing test-harness race in src/stores/auth.ts — its real onAuthStateChanged listener resets settings.value to defaults on a microtask after store creation, which can silently discard a test's synchronous settings mutation if read back across an async gap. Not a production bug; fixed only in test mutation timing.
 - [Phase ?]: 46-01: Built SLIDE_FONTS from RESEARCH.md's corrected weight table (Open Sans/Source Serif 4 ship 500; Source Serif 4 also ships 300; Lora excludes 300), not the UI-SPEC's unverified draft
 - [Phase ?]: 46-01: Task 1 package-legitimacy checkpoint pre-resolved and recorded DEFERRED in PENDING-VERIFICATION.md per v1.5 standing autonomy grant; RESEARCH.md's direct tarball verification stands in for the owner's pending sign-off
+- [Phase ?]: 46-02: cssVarsFor falls back to the FULL Inter/400/md default (not a partial per-field snap) when family/weight/scale fails validation
+- [Phase ?]: 46-02: loadFontCss hardcodes one dynamic-import per curated family (static @fontsource/<package> prefix) so Vite can bundle the weight chunks
 
 ### Roadmap Evolution
 
@@ -2001,8 +2004,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-08T17:12:53.696Z
-Stopped at: Completed 46-01-PLAN.md
+Last session: 2026-08-08T17:41:21.443Z
+Stopped at: Completed 46-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
