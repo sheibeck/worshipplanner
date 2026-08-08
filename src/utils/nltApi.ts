@@ -38,7 +38,17 @@ export async function fetchNltPassageText(query: string): Promise<string> {
     throw new Error('Failed to fetch passage')
   }
 
-  return stripNltHtml(html)
+  const stripped = stripNltHtml(html)
+  // `stripNltHtml` can independently collapse to an empty string even when
+  // the raw HTML is non-empty -- e.g. a `#bibletext` root present but with
+  // zero `verse_export` children. Treat that the same as the raw-body empty
+  // guard above, so a structurally-empty-but-non-empty-HTML response fails
+  // the same way instead of silently resolving to ''.
+  if (!stripped.trim()) {
+    throw new Error('Failed to fetch passage')
+  }
+
+  return stripped
 }
 
 /**

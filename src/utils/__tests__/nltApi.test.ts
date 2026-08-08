@@ -162,6 +162,14 @@ describe('fetchNltPassageText', () => {
     await expect(fetchNltPassageText('Nonexistent 99:99')).rejects.toThrow('Failed to fetch passage')
   })
 
+  it('WR-01: throws Failed to fetch passage when #bibletext is present but non-empty raw HTML strips to an empty string (zero verse_export children)', async () => {
+    const NO_VERSES_HTML =
+      '<!DOCTYPE html><html><body><div id="bibletext" class=" NLT NLT BibleText section"><section></section></div></body></html>'
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve(NO_VERSES_HTML) }))
+
+    await expect(fetchNltPassageText('John 3:16')).rejects.toThrow('Failed to fetch passage')
+  })
+
   it('Pitfall 1 contract survival: splitPassage() over the client output yields per-verse granularity (parseVerses finds the [N] boundaries)', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve(MULTI_VERSE_HTML) }))
 
