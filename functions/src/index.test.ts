@@ -5,12 +5,15 @@ import { getStorage } from "firebase-admin/storage";
 import { getFirestore } from "firebase-admin/firestore";
 import type { CallableRequest } from "firebase-functions/v2/https";
 import {
+  buildUpstreamUrl,
   cleanupExpiredMediaHandler,
   cleanupOrphanRendersHandler,
   MEDIA_PATH_GUARD,
   ORPHAN_RENDER_STALE_HOURS,
+  PROXY_TARGETS,
   RENDERED_OBJECT_GUARD,
   RETENTION_DAYS,
+  SECRET_INJECTED,
   parsePptxHandler,
   requestPptxRenderHandler,
 } from "./index";
@@ -950,5 +953,59 @@ describe("cleanupOrphanRendersHandler", () => {
     expect(handlerBody).toMatch(
       /const dryRun = process\.env\.PPTX_RENDER_CLEANUP_ENABLED !== "true";/,
     );
+  });
+});
+
+// --- NLT proxy branch (45-01: query-param secret injection) -------------
+//
+// The `api` onRequest handler itself has no existing test harness
+// (Assumption A2, 45-RESEARCH.md), so this suite exercises the pure
+// `buildUpstreamUrl` helper directly plus the PROXY_TARGETS/SECRET_INJECTED
+// membership the handler's existing auth gate reuses -- proving R090's
+// proxy half without needing a full onRequest test harness.
+
+describe("PROXY_TARGETS / SECRET_INJECTED (nlt membership)", () => {
+  it("registers the nlt upstream host in PROXY_TARGETS", () => {
+    expect(PROXY_TARGETS.nlt).toBe("https://api.nlt.to");
+  });
+
+  it("adds nlt to SECRET_INJECTED, reusing the existing x-app-auth gate -- unauthenticated callers get 401, no new auth surface (T-45-12)", () => {
+    expect(SECRET_INJECTED.has("nlt")).toBe(true);
+  });
+
+  it("leaves the esv and anthropic PROXY_TARGETS/SECRET_INJECTED entries byte-unchanged", () => {
+    expect(PROXY_TARGETS.esv).toBe("https://api.esv.org");
+    expect(PROXY_TARGETS.anthropic).toBe("https://api.anthropic.com");
+    expect(SECRET_INJECTED.has("esv")).toBe(true);
+    expect(SECRET_INJECTED.has("anthropic")).toBe(true);
+  });
+});
+
+describe("buildUpstreamUrl", () => {
+  it("returns the esv URL unchanged -- esv's key travels in a header, not the URL", () => {
+    const url = "https://api.esv.org/v3/passage/text/?q=John+3:16";
+    expect(buildUpstreamUrl("esv", url, "SERVER_SECRET")).toBe(url);
+  });
+
+  it("returns the anthropic URL unchanged", () => {
+    const url = "https://api.anthropic.com/v1/messages";
+    expect(buildUpstreamUrl("anthropic", url, "SERVER_SECRET")).toBe(url);
+  });
+
+  it("appends key=<secret> to an nlt URL that carries no key param yet", () => {
+    const url = "https://api.nlt.to/api/passages?ref=John+3:16&version=NLT";
+    const built = buildUpstreamUrl("nlt", url, "SERVER_SECRET");
+    const parsed = new URL(built);
+    expect(parsed.searchParams.get("key")).toBe("SERVER_SECRET");
+    expect(parsed.searchParams.get("ref")).toBe("John 3:16");
+    expect(parsed.searchParams.get("version")).toBe("NLT");
+  });
+
+  it("T-45-11: OVERWRITES a client-supplied key on an nlt URL rather than trusting it -- spoofing/quota-theft prevention", () => {
+    const url = "https://api.nlt.to/api/passages?ref=John+3:16&version=NLT&key=attacker";
+    const built = buildUpstreamUrl("nlt", url, "SERVER_SECRET");
+    const parsed = new URL(built);
+    expect(parsed.searchParams.get("key")).toBe("SERVER_SECRET");
+    expect(parsed.searchParams.getAll("key")).toEqual(["SERVER_SECRET"]);
   });
 });
