@@ -11,7 +11,12 @@ import type { ServiceSlot, SlotKind } from '@/types/service'
 import type { CongregationalSection, Slide } from '@/types/slide'
 import type { GroupSlideEntry } from '@/types/slideGroup'
 import { slotLabel } from '@/utils/slotTypes'
-import { formatScriptureReference, scriptureRefFromSlot } from '@/utils/scripture'
+import {
+  formatScriptureReference,
+  scriptureRefFromSlot,
+  scriptureAttribution,
+  resolveTranslationSource,
+} from '@/utils/scripture'
 
 /** One key in the 3-dot slide action menu (33-UI-SPEC.md § Copywriting Contract). */
 export type MenuItemKey =
@@ -188,7 +193,16 @@ export function slideBodyText(slide: Slide): string {
       // trailing blank line. A Congregational-state section slide (Phase
       // 38-01/38-02) carries that section's own words in `text`, so the
       // joined form applies for that slide only.
-      return slide.text ? `${slide.reference}\n${slide.text}` : slide.reference
+      //
+      // 45-04/R091: the shared attribution suffix is appended only when
+      // there is passage text to attribute — a reference-only slide shows
+      // no suffix (nothing to attribute). Driven by resolveTranslationSource
+      // (the slide's OWN stamped/field-less value), never the org's current
+      // bibleVersion setting — a field-less pre-phase slide resolves to
+      // '(ESV)' regardless of what the church has since chosen.
+      return slide.text
+        ? `${slide.reference}\n${slide.text} ${scriptureAttribution(resolveTranslationSource(slide))}`
+        : slide.reference
     case 'text':
       return slide.body
     case 'image':

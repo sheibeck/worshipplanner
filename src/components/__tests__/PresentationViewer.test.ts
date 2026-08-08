@@ -550,7 +550,9 @@ describe('PresentationViewer', () => {
     expect(body().find('[data-testid="presentation-scripture-reference"]').text()).toBe('John 3:16')
     const text = body().find('[data-testid="presentation-body"]').text()
     expect(text.length).toBeGreaterThan(400)
-    expect(text).toBe('For God so loved the world '.repeat(15).trim())
+    // 45-04/R091: a field-less slide (this fixture sets no translationSource)
+    // resolves to the '(ESV)' attribution suffix appended to the full text.
+    expect(text).toBe('For God so loved the world '.repeat(15).trim() + ' (ESV)')
   })
 
   it('D1: a normal-mode ScriptureSlide renders its reference in the same treatment as song lyrics, not an accented label', async () => {
@@ -608,7 +610,8 @@ describe('PresentationViewer', () => {
 
     const words = body().find('[data-testid="presentation-congregational-section"]')
     expect(words.exists()).toBe(true)
-    expect(words.text()).toBe(section.text)
+    // 45-04/R091: field-less section -> '(ESV)' attribution suffix appended.
+    expect(words.text()).toBe(`${section.text} (ESV)`)
   })
 
   it('N-1 (D1 regression): an unfetched scripture passage still projects its reference as the entire visible content of the slide, never a blank one', async () => {
@@ -622,6 +625,82 @@ describe('PresentationViewer', () => {
     expect(reference.classes()).toContain('text-gray-100')
     expect(reference.classes()).toContain('text-5xl')
     expect(slideText().replace(/\s+/g, ' ').trim()).toBe('Romans 8:28-30')
+  })
+
+  // ── 45-04 Task 3: shared (ESV)/(NLT) attribution suffix (R091/R092) ──────
+  describe('scripture attribution suffix (45-04, R091/R092)', () => {
+    it('a normal-mode slide with a stamped NLT translationSource shows (NLT), not (ESV)', async () => {
+      const slide = scriptureSlide('a')
+      ;(slide.slide as import('@/types/slide').ScriptureSlide).translationSource = 'NLT'
+      mount(PresentationViewer, { props: { slides: [slide] } })
+      await Promise.resolve()
+
+      const text = body().find('[data-testid="presentation-body"]').text()
+      expect(text.endsWith('(NLT)')).toBe(true)
+      expect(text).not.toContain('(ESV)')
+    })
+
+    it('a field-less normal-mode slide (no translationSource) shows (ESV) — proving no reliance on the current org setting', async () => {
+      const slide = scriptureSlide('a')
+      expect((slide.slide as import('@/types/slide').ScriptureSlide).translationSource).toBeUndefined()
+      mount(PresentationViewer, { props: { slides: [slide] } })
+      await Promise.resolve()
+
+      const text = body().find('[data-testid="presentation-body"]').text()
+      expect(text.endsWith('(ESV)')).toBe(true)
+    })
+
+    it('a reference-only slide (empty text) shows no attribution suffix — nothing to attribute', async () => {
+      const emptyPassageSlide = scriptureSlide('a')
+      ;(emptyPassageSlide.slide as import('@/types/slide').ScriptureSlide).text = ''
+      mount(PresentationViewer, { props: { slides: [emptyPassageSlide] } })
+      await Promise.resolve()
+
+      expect(slideText()).not.toContain('(ESV)')
+      expect(slideText()).not.toContain('(NLT)')
+    })
+
+    it('a congregational section slide with a stamped NLT translationSource shows (NLT) on the section paragraph', async () => {
+      const section = { speaker: 'LEADER' as const, text: 'Give thanks to the LORD, for he is good.' }
+      const slide = congregationalScriptureSlide('a', section)
+      ;(slide.slide as import('@/types/slide').ScriptureSlide).translationSource = 'NLT'
+      mount(PresentationViewer, { props: { slides: [slide] } })
+      await Promise.resolve()
+
+      const words = body().find('[data-testid="presentation-congregational-section"]')
+      expect(words.text()).toBe(`${section.text} (NLT)`)
+    })
+
+    it('two consecutive congregational sections each carry their own suffix, independently — not just the first or last slide of the reading', async () => {
+      const leaderSection = { speaker: 'LEADER' as const, text: 'Give thanks to the LORD, for he is good.' }
+      const congregationSection = { speaker: 'CONGREGATION' as const, text: 'His love endures forever.' }
+      const leaderSlide = congregationalScriptureSlide('a', leaderSection)
+      ;(leaderSlide.slide as import('@/types/slide').ScriptureSlide).translationSource = 'NLT'
+      const congregationSlide = congregationalScriptureSlide('b', congregationSection)
+      ;(congregationSlide.slide as import('@/types/slide').ScriptureSlide).translationSource = 'NLT'
+
+      mount(PresentationViewer, { props: { slides: [leaderSlide, congregationSlide] } })
+      await Promise.resolve()
+
+      expect(body().find('[data-testid="presentation-congregational-section"]').text()).toBe(
+        `${leaderSection.text} (NLT)`,
+      )
+      await body().find('[data-testid="presentation-next"]').trigger('click')
+      expect(body().find('[data-testid="presentation-congregational-section"]').text()).toBe(
+        `${congregationSection.text} (NLT)`,
+      )
+    })
+
+    it('the suffix renders as plain text interpolation, not v-html — no markup executes even if section text contained HTML-looking characters', async () => {
+      const section = { speaker: 'LEADER' as const, text: 'He said <b>this</b> & that.' }
+      const slide = congregationalScriptureSlide('a', section)
+      mount(PresentationViewer, { props: { slides: [slide] } })
+      await Promise.resolve()
+
+      const words = body().find('[data-testid="presentation-congregational-section"]')
+      expect(words.text()).toBe('He said <b>this</b> & that. (ESV)')
+      expect(words.find('b').exists()).toBe(false)
+    })
   })
 
   it('two consecutive sections produce two slides, each showing only its own speaker and words, in document order speaker-then-words', async () => {
@@ -641,7 +720,7 @@ describe('PresentationViewer', () => {
     const speaker1 = body().find('[data-testid="presentation-speaker"]')
     const words1 = body().find('[data-testid="presentation-congregational-section"]')
     expect(speaker1.text()).toBe('Leader:')
-    expect(words1.text()).toBe(leaderSection.text)
+    expect(words1.text()).toBe(`${leaderSection.text} (ESV)`)
     expect(slideText()).not.toContain(congregationSection.text)
 
     // Snapshot the class lists NOW, before advancing. `speaker1`/`words1` hold
@@ -661,7 +740,7 @@ describe('PresentationViewer', () => {
     const speaker2 = body().find('[data-testid="presentation-speaker"]')
     const words2 = body().find('[data-testid="presentation-congregational-section"]')
     expect(speaker2.text()).toBe('Congregation:')
-    expect(words2.text()).toBe(congregationSection.text)
+    expect(words2.text()).toBe(`${congregationSection.text} (ESV)`)
     expect(slideText()).not.toContain(leaderSection.text)
     expect(
       speaker2.element.compareDocumentPosition(words2.element) & Node.DOCUMENT_POSITION_FOLLOWING,
@@ -1622,7 +1701,9 @@ describe('PresentationViewer', () => {
 
       expect(body().find('[data-testid="presentation-background"]').exists()).toBe(true)
       expect(body().find('[data-testid="presentation-speaker"]').exists()).toBe(true)
-      expect(body().find('[data-testid="presentation-congregational-section"]').text()).toBe(section.text)
+      expect(body().find('[data-testid="presentation-congregational-section"]').text()).toBe(
+        `${section.text} (ESV)`,
+      )
     })
 
     it('advancing from a slide with a background to a slide without one removes both elements', async () => {

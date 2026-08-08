@@ -336,7 +336,11 @@ describe('slideDisplay', () => {
       expect(slideBodyText(copyright)).toBe('Amazing Grace')
     })
 
-    it('combines the reference and text for a scripture slide', () => {
+    // 45-04/R091: a field-less slide (no translationSource, matching every
+    // pre-phase slide) resolves to '(ESV)' via resolveTranslationSource's
+    // fallback — proving the suffix does not depend on the org's current
+    // bibleVersion setting.
+    it('combines the reference and text for a scripture slide, appending the (ESV) attribution suffix for a field-less slide', () => {
       const scripture = {
         id: 's3',
         position: 0,
@@ -344,10 +348,22 @@ describe('slideDisplay', () => {
         reference: 'Psalms 23:1-6',
         text: 'The LORD is my shepherd',
       } as Slide
-      expect(slideBodyText(scripture)).toBe('Psalms 23:1-6\nThe LORD is my shepherd')
+      expect(slideBodyText(scripture)).toBe('Psalms 23:1-6\nThe LORD is my shepherd (ESV)')
     })
 
-    it('returns just the reference for a scripture slide with no text (R047 default: reference-only)', () => {
+    it('appends (NLT) when the slide carries a stamped NLT translationSource', () => {
+      const scripture = {
+        id: 's3-nlt',
+        position: 0,
+        contentKind: 'scripture',
+        reference: 'Psalms 23:1-6',
+        text: 'The LORD is my shepherd',
+        translationSource: 'NLT',
+      } as Slide
+      expect(slideBodyText(scripture)).toBe('Psalms 23:1-6\nThe LORD is my shepherd (NLT)')
+    })
+
+    it('returns just the reference for a scripture slide with no text (R047 default: reference-only) — no attribution suffix', () => {
       const scripture = {
         id: 's3',
         position: 0,
@@ -360,8 +376,8 @@ describe('slideDisplay', () => {
 
     // Phase 38-03: no logic change from the case above — a section slide
     // already carries its words in `text`, so the existing joined form
-    // applies unchanged.
-    it('combines the reference and text for a Congregational-state section slide', () => {
+    // applies unchanged, now with the 45-04 attribution suffix appended.
+    it('combines the reference and text for a Congregational-state section slide, with the attribution suffix', () => {
       const scripture = {
         id: 's3b',
         position: 0,
@@ -370,7 +386,7 @@ describe('slideDisplay', () => {
         text: 'For God so loved the world',
         section: { speaker: 'LEADER', text: 'For God so loved the world' },
       } as Slide
-      expect(slideBodyText(scripture)).toBe('John 3:16\nFor God so loved the world')
+      expect(slideBodyText(scripture)).toBe('John 3:16\nFor God so loved the world (ESV)')
     })
 
     it('returns the body for a text slide', () => {

@@ -199,7 +199,8 @@
               data-testid="presentation-congregational-section"
               class="text-gray-100 whitespace-pre-line text-5xl font-normal leading-[1.4]"
             >
-              {{ ((currentSlide.slide as ScriptureSlide).section as CongregationalSection).text }}
+              {{ ((currentSlide.slide as ScriptureSlide).section as CongregationalSection).text
+              }}{{ scriptureAttributionSuffix(((currentSlide.slide as ScriptureSlide).section as CongregationalSection).text, currentSlide.slide as ScriptureSlide) }}
             </p>
           </template>
           <p
@@ -207,7 +208,8 @@
             data-testid="presentation-body"
             class="text-gray-100 whitespace-pre-line text-5xl font-normal leading-[1.4]"
           >
-            {{ (currentSlide.slide as ScriptureSlide).text }}
+            {{ (currentSlide.slide as ScriptureSlide).text
+            }}{{ scriptureAttributionSuffix((currentSlide.slide as ScriptureSlide).text, currentSlide.slide as ScriptureSlide) }}
           </p>
         </template>
 
@@ -386,6 +388,7 @@ import type {
 } from '@/types/slide'
 import { SERVICE_SECTION_LABELS } from '@/types/service'
 import { renderFailureSentence } from './slides/slideDisplay'
+import { scriptureAttribution, resolveTranslationSource } from '@/utils/scripture'
 import AudioPlayer from './AudioPlayer.vue'
 import VideoPlayer from './VideoPlayer.vue'
 
@@ -596,6 +599,25 @@ const speakerColorClass = computed(() => {
   if (!section) return 'text-gray-100'
   return section.speaker === 'LEADER' ? 'text-sky-300' : 'text-amber-300'
 })
+
+/**
+ * 45-04/R091: the shared `(ESV)`/`(NLT)` attribution suffix for BOTH
+ * scripture render sites below (the normal-mode passage paragraph and the
+ * congregational-mode section paragraph) — one implementation, per
+ * 45-CONTEXT.md Area 2 "build once, shared". Returns '' when `text` is
+ * empty (a reference-only slide has nothing to attribute, 45-UI-SPEC.md §
+ * Attribution Contract), otherwise a leading-space-prefixed suffix so the
+ * template's `{{ text }}{{ suffix }}` interpolation never produces a
+ * dangling space when there is nothing to attribute.
+ *
+ * Driven by `resolveTranslationSource(slide)` — the slide's OWN
+ * stamped/field-less value — NEVER the org's current `bibleVersion`
+ * setting (R092: a later setting change must not alter what an existing
+ * slide's attribution shows).
+ */
+function scriptureAttributionSuffix(text: string, slide: ScriptureSlide): string {
+  return text ? ` ${scriptureAttribution(resolveTranslationSource(slide))}` : ''
+}
 
 // A live edit that shortens the show cannot leave currentIndex out of range.
 // Clamping must route through the same pause/reset/play lifecycle as
