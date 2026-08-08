@@ -5,15 +5,15 @@ milestone_name: Settings, Sharing, and Fidelity
 current_phase: 45
 current_phase_name: ESV/NLT Bible Version Selection
 status: executing
-stopped_at: Completed 45-01-PLAN.md (NLT proxy + nltApi.ts client, DEPLOY-GATED, built/tested/undeployed)
-last_updated: "2026-08-08T04:17:41.386Z"
+stopped_at: Completed 45-02-PLAN.md
+last_updated: "2026-08-08T04:33:36.058Z"
 last_activity: 2026-08-08
-last_activity_desc: Phase 45 Plan 01 complete (NLT proxy + nltApi.ts client, DEPLOY-GATED, built/tested/undeployed); 3 plans remain in Phase 45 (45-02, 45-03, 45-04)
+last_activity_desc: Phase 45 Plan 02 (2/4) complete; 2 plans remain in Phase 45.
 progress:
   total_phases: 11
   completed_phases: 7
   total_plans: 33
-  completed_plans: 30
+  completed_plans: 32
   percent: 64
 ---
 
@@ -151,19 +151,21 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 45 (ESV/NLT Bible Version Selection) — IN PROGRESS
-Plan: 1 of 4 executed (45-01)
-Status: 45-01 (NLT proxy Cloud Function branch in `functions/src/index.ts` — query-param secret
-injection via a new pure `buildUpstreamUrl` helper, `nlt` added to `PROXY_TARGETS`/`SECRET_INJECTED`
-— plus `src/utils/nltApi.ts`, a DOMParser-based client emitting the exact `[N]` bracket convention
-`scriptureSplitter.ts::parseVerses` depends on) is complete. R090's fetch-source half delivered;
-the Settings UI half (45-02), per-slide translationSource provenance (45-03), and consumption
-wiring (45-04) remain. `npm run type-check` clean; app suite failing-file-set unchanged from the
-documented 2-file baseline (`src/storage.rules.test.ts`, `RosterView.test.ts`); `functions && npm
-test` 112/112, `functions && npm run build` clean. **DEPLOY-GATED per the standing v1.5 NO-DEPLOYS
-grant** — the NLT Cloud Function ships built/tested/UNDEPLOYED; owner handoff (secrets:set +
-deploy + the NLT-default deploy-coupling warning) recorded in `.planning/PENDING-VERIFICATION.md`
-§ Phase 45. Next: plans 45-02/45-03 (both wave 1, no dependency on 45-01), then 45-04 (wave 2).
-Last activity: 2026-08-08 — Phase 45 Plan 01 (1/4) complete; 3 plans remain in Phase 45.
+Plan: 2 of 4 executed (45-01, 45-02)
+Status: 45-01 (NLT proxy Cloud Function branch — DEPLOY-GATED, see below) and 45-02 (OrgSettings.
+bibleVersion field + Settings "Bible Translation" card) are both complete. 45-02 added
+`bibleVersion: 'ESV' | 'NLT'` to `OrgSettings` with `DEFAULT_ORG_SETTINGS.bibleVersion: 'NLT'`
+(owner's locked override), flowing through the single existing `auth.ts::loadOrgContext` merge
+with no second merge point added, plus a "Bible Translation" card in `SettingsView.vue` mirroring
+the AI/Planning Center/Vertical Worship toggle cards exactly (editor-gated ESV/NLT radio,
+dot-path `updateDoc` + store mirror-write, Saved!/revert-on-error). R090's storage + settings-UI
+half delivered; per-slide translationSource provenance (45-03) and consumption wiring (45-04)
+remain. `npm run type-check` clean; app suite failing-file-set unchanged from the documented
+2-file baseline (`src/storage.rules.test.ts`, `RosterView.test.ts`). 45-01's NLT Cloud Function
+remains **DEPLOY-GATED per the standing v1.5 NO-DEPLOYS grant** — ships built/tested/UNDEPLOYED;
+owner handoff recorded in `.planning/PENDING-VERIFICATION.md` § Phase 45 (unaffected by 45-02).
+Next: plan 45-03 (wave 1, no dependency on 45-01/45-02), then 45-04 (wave 2, depends on 45-01).
+Last activity: 2026-08-08 — Phase 45 Plan 02 (2/4) complete; 2 plans remain in Phase 45.
 
 ## ⏸ RESUME HERE (2026-08-06 — v1.5 ROADMAP.md created, ready to plan Phase 39)
 
@@ -1359,6 +1361,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 44 P01 | 45min | 3 tasks | 5 files |
 | Phase 44 P02 | 30min | 2 tasks | 5 files |
 | Phase 45 P01 | 30min | 2 tasks | 4 files |
+| Phase 45 P02 | 10min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -1671,6 +1674,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Per-item remove fires immediately with no confirm (template entries carry no user content, unlike live ServiceEditorView slots)
 - [Phase ?]: All five SERVICE_SECTIONS containers render as live Sortable drop targets whenever the draft is non-empty, even when currently empty
 - [Phase ?]: 45-01: buildUpstreamUrl extracted as an exported pure function for testability; .vn glyph span stripped (not just ignored as source) to prevent a leaked duplicate digit before [N]; RESEARCH.md fixtures used in place of a fresh live NLT fetch (.env.local unreadable in this sandbox)
+- [Phase ?]: 45-02: bibleVersion field defaults to NLT (owner override) via the single existing loadOrgContext merge; no second defaults path
 
 ### Roadmap Evolution
 
@@ -1982,8 +1986,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-08T04:17:17.096Z
-Stopped at: Completed 45-01-PLAN.md (NLT proxy + nltApi.ts client, DEPLOY-GATED, built/tested/undeployed)
+Last session: 2026-08-08T04:33:36.002Z
+Stopped at: Completed 45-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
