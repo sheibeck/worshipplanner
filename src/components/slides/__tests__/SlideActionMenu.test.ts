@@ -141,6 +141,19 @@ describe('SlideActionMenu', () => {
     expect(wrapper.get('[data-testid="slide-action-item-delete"]').classes()).toContain('text-red-400')
   })
 
+  it('R099 (48-02 Task 2): gives the trigger a >=44px hit area via unconditional padding + compensating negative margin, without enlarging the icon', () => {
+    const wrapper = mount(SlideActionMenu, {
+      props: { entryId: 'entry-1', items: FOUR_ITEMS, open: false },
+    })
+
+    const trigger = wrapper.get('[data-testid="slide-action-trigger-entry-1"]')
+    expect(trigger.classes()).toContain('p-3')
+    expect(trigger.classes()).toContain('-m-3')
+    const svg = trigger.find('svg')
+    expect(svg.classes()).toContain('h-5')
+    expect(svg.classes()).toContain('w-5')
+  })
+
   it('backstop: the panel carries the fixed width token and the right-edge anchor, so it cannot grow past the narrowest card', () => {
     const wrapper = mount(SlideActionMenu, {
       props: { entryId: 'entry-1', items: FOUR_ITEMS, open: true },

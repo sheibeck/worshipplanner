@@ -359,6 +359,19 @@ describe('SlideCard', () => {
     expect(reorderable.emitted('select')).toBeUndefined()
   })
 
+  it('R099 (48-02 Task 2): gives the drag grip a >=44px hit area via unconditional padding + compensating negative margin, without enlarging the icon', () => {
+    const assembled = makeAssembled({
+      slide: { id: 'grip-3', position: 0, contentKind: 'text', body: 'body' },
+    })
+    const wrapper = mountCard({ assembledSlide: assembled, reorderable: true })
+    const grip = wrapper.get('[data-testid="slide-card-drag-handle"]')
+    expect(grip.classes()).toContain('p-3.5')
+    expect(grip.classes()).toContain('-m-3.5')
+    const svg = grip.find('svg')
+    expect(svg.classes()).toContain('h-4')
+    expect(svg.classes()).toContain('w-4')
+  })
+
   it('gives the drag grip an accessible name describing which slide it moves', () => {
     const assembled = makeAssembled({
       slide: { id: 'grip-2', position: 0, contentKind: 'text', title: 'Welcome', body: 'body' },

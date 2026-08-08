@@ -3,7 +3,7 @@
     <button
       ref="triggerRef"
       type="button"
-      class="p-1 rounded-md text-gray-500 hover:text-gray-300 hover:bg-gray-800 transition-colors"
+      class="p-3 -m-3 rounded-md text-gray-500 hover:text-gray-300 hover:bg-gray-800 transition-colors"
       :aria-haspopup="'menu'"
       :aria-expanded="open ? 'true' : 'false'"
       aria-label="Slide options"

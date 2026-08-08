@@ -91,7 +91,7 @@
       >{{ assembledSlide.slotKind }}</span>
       <span
         v-if="reorderable"
-        class="drag-handle flex-shrink-0 cursor-grab text-gray-600 hover:text-gray-400 active:cursor-grabbing"
+        class="drag-handle flex-shrink-0 cursor-grab p-3.5 -m-3.5 text-gray-600 hover:text-gray-400 active:cursor-grabbing"
         tabindex="0"
         aria-label="Reorder slide"
         :aria-describedby="labelId"
