@@ -437,6 +437,18 @@
 
         <p v-if="slideTypographySavedFeedback" class="text-green-400 text-sm mt-2">Saved!</p>
         <p v-if="slideTypographySaveError" class="text-red-400 text-sm mt-2">{{ slideTypographySaveError }}</p>
+
+        <!-- Live Preview panel — the card's visual focal point (UI-SPEC D2 flag). -->
+        <div class="mt-4">
+          <p class="text-xs text-gray-400 mb-1" data-testid="slide-typography-preview-label">Preview</p>
+          <div
+            class="rounded-md bg-gray-950/40 border border-gray-800 p-3 text-gray-100"
+            data-testid="slide-typography-preview"
+            :style="slideTypographyPreviewStyle"
+          >
+            Amazing grace, how sweet the sound
+          </div>
+        </div>
       </div>
 
       <!-- Services section (R086/R087) — Phase 44's default service template. -->
@@ -475,6 +487,7 @@ import { deriveSlug, claimSlug } from '@/utils/slug'
 import { groupBySection } from '@/utils/slotTypes'
 import { SERVICE_SECTIONS } from '@/types/service'
 import { SLIDE_FONTS, SLIDE_FONT_FAMILY_NAMES } from '@/config/slideFonts'
+import { cssVarsFor, snapWeight, loadFontCss } from '@/utils/slideTypography'
 
 const authStore = useAuthStore()
 
@@ -541,6 +554,29 @@ const slideTypographySaveError = ref<string | null>(null)
 const slideFontWeightOptions = computed(
   () => SLIDE_FONTS[slideFontFamilyInput.value]?.weights ?? [400],
 )
+
+/** Live Preview panel style (UI-SPEC D2 visual focal point) — binds the SAME
+ *  `cssVarsFor` the render sites (46-04) consume, so the preview always
+ *  matches exactly what a slide will look like. A fetching previewed family
+ *  keeps rendering the last successfully-loaded face via `font-display:
+ *  swap` (no spinner); a failed asset falls through the native CSS stack
+ *  (no custom error UI) — both per 46-UI-SPEC.md's covered UI Considerations
+ *  rows, requiring no extra state here. */
+const slideTypographyPreviewStyle = computed(() => {
+  const vars = cssVarsFor({
+    fontFamily: slideFontFamilyInput.value,
+    fontWeight: slideFontWeightInput.value,
+    fontScale: slideFontScaleInput.value,
+  })
+  return {
+    '--slide-font-family': vars['--slide-font-family'],
+    '--slide-font-weight': String(vars['--slide-font-weight']),
+    '--slide-font-scale': String(vars['--slide-font-scale']),
+    fontFamily: 'var(--slide-font-family)',
+    fontWeight: 'var(--slide-font-weight)',
+    fontSize: 'calc(1rem * var(--slide-font-scale))',
+  } as Record<string, string>
+})
 
 // ── Services / default service template state (R086/R087) ─────────────────────
 // No local defaults-merge/`?? []` here — `authStore.settings.defaultServiceTemplate`
@@ -959,9 +995,15 @@ async function saveSlideTypography() {
   }
 }
 
-// Family-change handler is a placeholder here (Task 1) — Task 2 replaces its
-// body with the snap-on-family-change + on-demand loadFontCss logic.
+// On family change: re-derive the weight ramp (slideFontWeightOptions above),
+// snap an unreachable weight to 400 BEFORE saving (e.g. 300 selected, family
+// switched to Lora which has no 300 — 46-UI-SPEC.md "partial" row), and
+// on-demand load that family's face for the live Preview (the eager import
+// in main.ts only covers the org's currently-saved default).
 async function onChangeSlideFontFamily() {
+  const snapped = snapWeight(slideFontFamilyInput.value, slideFontWeightInput.value)
+  slideFontWeightInput.value = snapped
+  void loadFontCss(slideFontFamilyInput.value, snapped)
   await saveSlideTypography()
 }
 </script>
