@@ -59,6 +59,8 @@ export interface ActionBarHandlers {
   onExportToPC: () => void
   onSave: () => void
   onPresent: () => void
+  onPrint: () => void
+  onShare: () => void
 }
 
 export interface ActionBarContext {
@@ -86,6 +88,19 @@ export interface ActionBarContext {
   isDirty: boolean
   isSaving: boolean
   canPresent: boolean
+  /**
+   * R101 (48-03): whether the current viewer is an editor. Required (not
+   * optional) so the compiler forces the one call site to supply it — a
+   * share denormalizes an editor-only roster/schedule snapshot, so this
+   * gate must move WITH `buildShareItem`, not be dropped (T-48-03-01).
+   */
+  isEditor: boolean
+  /** R101 (48-03): mirrors ServiceEditorView.vue's `isSharing` ref. */
+  isSharing: boolean
+  /** R101 (48-03): mirrors ServiceEditorView.vue's `shareCopied` ref. */
+  shareCopied: boolean
+  /** R101 (48-03): mirrors ServiceEditorView.vue's `shareError` ref. */
+  shareError: string | null
   handlers: ActionBarHandlers
 }
 
@@ -166,6 +181,41 @@ function buildPresentItem(ctx: ActionBarContext): ActionBarItem {
   }
 }
 
+/**
+ * R101 (48-03): Print, relocated verbatim from the page-bottom button
+ * (ServiceEditorView.vue:1303-1314) — unconditional, same as the button it
+ * replaces (no editor gate on Print today). testId is preserved so the
+ * `print-btn` selector keeps working once the bottom button is deleted
+ * (Pitfall 3 / Anti-Patterns: exactly one print-btn must exist).
+ */
+function buildPrintItem(ctx: ActionBarContext): ActionBarItem {
+  return {
+    key: 'print',
+    label: 'Print',
+    icon: 'print',
+    testId: 'print-btn',
+    onClick: ctx.handlers.onPrint,
+  }
+}
+
+/**
+ * R101 (48-03): Share, relocated verbatim from the page-bottom button
+ * (ServiceEditorView.vue:1319-1333). Preserves the exact `isEditor` gate
+ * the bottom-row button used — a share denormalizes an editor-only
+ * roster/schedule snapshot, so a viewer-created share would silently omit
+ * "Who's Serving" (T-48-03-01). The gate moves with the control; it is not
+ * dropped.
+ */
+function buildShareItem(ctx: ActionBarContext): ActionBarItem | undefined {
+  if (!ctx.isEditor) return undefined
+  return {
+    key: 'share',
+    label: ctx.isSharing ? 'Sharing...' : ctx.shareCopied ? 'Link Copied!' : ctx.shareError ? ctx.shareError : 'Share',
+    icon: 'share',
+    onClick: ctx.handlers.onShare,
+  }
+}
+
 function buildServiceOrderItems(ctx: ActionBarContext): ActionBarItem[] {
   const items: ActionBarItem[] = []
   // WR-01: "Suggest All Songs" is a live AI entry point (calls
@@ -184,6 +234,15 @@ function buildServiceOrderItems(ctx: ActionBarContext): ActionBarItem[] {
   }
   if (ctx.canEditService) {
     items.push(buildSaveItem(ctx))
+  }
+  // R101 (48-03): Print/Share relocated here from the page bottom, appended
+  // AFTER Save — Save stays the row's one `tone: 'primary'` item; Print and
+  // Share both use the bar's `default` gray tone (same as Present), reading
+  // as an appendix to the primary actions rather than a competitor to Save.
+  items.push(buildPrintItem(ctx))
+  const shareItem = buildShareItem(ctx)
+  if (shareItem) {
+    items.push(shareItem)
   }
   return items
 }

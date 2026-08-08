@@ -1297,43 +1297,14 @@
           />
         </div>
 
-        <!-- Bottom actions: Print, Share, Delete -->
-        <div class="mt-6 pt-4 border-t border-gray-800 flex flex-wrap items-center gap-2 print:hidden">
-          <!-- Print button -->
-          <button
-            type="button"
-            data-testid="print-btn"
-            @click="onPrint"
-            :disabled="!localService"
-            class="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-gray-200 bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-            </svg>
-            Print
-          </button>
-
-          <!-- Share button: editor only — a share denormalizes an editor-only
-               roster/schedule snapshot (roster/quarters are subscribed for editors
-               only), so a viewer-created share would silently omit "Who's Serving". -->
-          <button
-            v-if="authStore.isEditor"
-            type="button"
-            @click="onShare"
-            :disabled="!localService || isSharing"
-            class="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-gray-200 bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700"
-          >
-            <svg v-if="!shareCopied" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-            </svg>
-            <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-            {{ isSharing ? 'Sharing...' : shareCopied ? 'Link Copied!' : shareError ? shareError : 'Share' }}
-          </button>
-
-          <div class="flex-1" />
-
+        <!-- Bottom actions: Delete only. Print and Share moved into the top
+             ContextualActionBar (R101, 48-03) — see serviceEditorActionBar.ts's
+             buildPrintItem/buildShareItem. Delete stays here deliberately,
+             below the fold, away from the primary actions a destructive
+             control must never sit beside. The `flex-1` spacer that used to
+             push Delete past Print/Share is removed; `justify-end` on this
+             row now does that job directly (Anti-Patterns / Pitfall 4). -->
+        <div class="mt-6 pt-4 border-t border-gray-800 flex flex-wrap items-center justify-end gap-2 print:hidden">
           <!-- Delete button: editor only -->
           <button
             v-if="authStore.isEditor"
@@ -2065,11 +2036,19 @@ const activeActionItems = computed(() =>
     isDirty: isDirty.value,
     isSaving: isSaving.value,
     canPresent: slidesTabRef.value?.canPresent ?? false,
+    // R101 (48-03): threaded so buildServiceOrderItems can build Print/Share
+    // with the exact same gate/labels the page-bottom buttons used.
+    isEditor: authStore.isEditor,
+    isSharing: isSharing.value,
+    shareCopied: shareCopied.value,
+    shareError: shareError.value,
     handlers: {
       suggestAllSongs,
       onExportToPC,
       onSave,
       onPresent: () => slidesTabRef.value?.onPresentClick(),
+      onPrint,
+      onShare,
     },
   }),
 )

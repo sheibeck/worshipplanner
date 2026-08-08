@@ -39,6 +39,8 @@ export type ActionBarIcon =
   | 'check'
   | 'present'
   | 'spinner'
+  | 'print'
+  | 'share'
 
 export interface ActionBarItem {
   key: string

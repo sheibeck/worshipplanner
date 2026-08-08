@@ -5188,22 +5188,32 @@ describe('ServiceEditorView - locked service renders all three tabs read-only (R
 
     // Owner follow-up: Copy for PC dropped from this D-08 carve-out list — it
     // no longer exists, deleted rather than gated, and no replacement takes
-    // its place. Print, Share and Delete are unaffected by that deletion.
-    it(`${status}: Print, Share and Delete all stay rendered and enabled; no export/copy button of any kind`, async () => {
+    // its place. Print and Share are unaffected by that deletion.
+    //
+    // R101 (48-03): Print/Share moved from the page-bottom row into the top
+    // ContextualActionBar; Delete stays at the bottom. Asserted by container,
+    // not merely by presence, so a future regression that moves Delete back
+    // in with Print/Share (or leaves Print/Share stranded at the bottom) is
+    // caught.
+    it(`${status}: Print and Share render in the top contextual action bar; Delete stays at the bottom row; no export/copy button of any kind`, async () => {
       mockServicesList = [{ ...mockService, status }]
       const wrapper = await mountView()
 
-      const printBtn = wrapper.find('[data-testid="print-btn"]')
+      const bar = wrapper.find('[data-testid="contextual-action-bar"]')
+      const printBtn = bar.find('[data-testid="print-btn"]')
       expect(printBtn.exists()).toBe(true)
       expect(printBtn.attributes('disabled')).toBeUndefined()
 
       expect(wrapper.find('[data-testid="copy-pc-btn"]').exists()).toBe(false)
       expect(wrapper.find('[data-testid="export-pc-btn"]').exists()).toBe(false)
 
-      const shareBtn = wrapper.findAll('button').find((b) => b.text() === 'Share')
+      const shareBtn = bar.findAll('button').find((b) => b.text() === 'Share')
       expect(shareBtn).toBeDefined()
       expect(shareBtn!.attributes('disabled')).toBeUndefined()
 
+      // Delete is NOT in the top bar — it stays at the page bottom, away from
+      // the primary actions a destructive control must never sit beside.
+      expect(bar.findAll('button').some((b) => b.text() === 'Delete')).toBe(false)
       expect(wrapper.findAll('button').some((b) => b.text() === 'Delete')).toBe(true)
     })
 
