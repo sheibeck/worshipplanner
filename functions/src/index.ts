@@ -13,24 +13,65 @@ import { syncOrgMembershipClaim } from "./orgMembershipClaims";
 // Server-held secrets (Google Secret Manager). Set once with:
 //   firebase functions:secrets:set CLAUDE_API_KEY
 //   firebase functions:secrets:set ESV_API_KEY
+//   firebase functions:secrets:set NLT_API_KEY
 // These are NEVER shipped to the browser — that is the whole point of this proxy.
 const CLAUDE_API_KEY = defineSecret("CLAUDE_API_KEY");
 const ESV_API_KEY = defineSecret("ESV_API_KEY");
+const NLT_API_KEY = defineSecret("NLT_API_KEY");
 
 if (!getApps().length) {
   initializeApp();
 }
 
-const PROXY_TARGETS: Record<string, string> = {
+// Exported (not just used internally) so the SECRET_INJECTED/PROXY_TARGETS
+// membership assertions below have something to import — the `api` onRequest
+// handler itself has no existing test harness (Assumption A2).
+export const PROXY_TARGETS: Record<string, string> = {
   planningcenter: "https://api.planningcenteronline.com",
   anthropic: "https://api.anthropic.com",
   esv: "https://api.esv.org",
+  nlt: "https://api.nlt.to",
 };
 
 // Services where THIS proxy injects one of our own secrets. Because we spend our
 // own money/quota on these, they must not be an open relay — the caller has to be
 // a signed-in app user (verified Firebase ID token in X-App-Auth).
-const SECRET_INJECTED = new Set(["anthropic", "esv"]);
+export const SECRET_INJECTED = new Set(["anthropic", "esv", "nlt"]);
+
+/**
+ * NLT auth travels as a `key` QUERY PARAMETER, not a header — unlike the esv/
+ * anthropic branches, which only ever rewrite `headers`. `upstreamUrl` is built
+ * once as a `const` before any service-specific branching runs (see below), so
+ * this is a small pure helper rather than an inline mutation, both to avoid
+ * restructuring that `const` into a `let` inline in the handler body and to be
+ * unit-testable in isolation (Pitfall 6 / Assumption A2 — the `api` onRequest
+ * handler otherwise has zero existing test precedent).
+ *
+ * For `esv`/`anthropic` (and any other service), the URL is returned
+ * byte-unchanged — their secrets are injected into `headers` elsewhere, never
+ * into the URL.
+ *
+ * For `nlt`, the `key` search param is always SET (overwritten, never merged)
+ * to the server-held secret — a client-supplied `key=attacker` on the inbound
+ * request must never survive onto the outbound URL (T-45-11, spoofing/quota
+ * theft). This holds even though NLT's own upstream does not actually enforce
+ * the key (verified live, 45-RESEARCH.md Pitfall 4: a missing or garbage key
+ * still returns HTTP 200 with correct content) — the point of injecting here
+ * is keeping NLT_API_KEY out of the client bundle, independent of whether the
+ * upstream enforces it. Do NOT "fix" this by removing the injection.
+ */
+export function buildUpstreamUrl(
+  service: string,
+  upstreamUrl: string,
+  secretValue: string,
+): string {
+  if (service !== "nlt") {
+    return upstreamUrl;
+  }
+  const nltUrl = new URL(upstreamUrl);
+  nltUrl.searchParams.set("key", secretValue);
+  return nltUrl.toString();
+}
 
 // Headers we forward from the client to the upstream API. Note: `x-api-key` and
 // `authorization` for secret-injected services are overwritten below, never trusted
@@ -55,7 +96,7 @@ async function callerIsAuthenticated(idToken: string | undefined): Promise<boole
 }
 
 export const api = onRequest(
-  { secrets: [CLAUDE_API_KEY, ESV_API_KEY] },
+  { secrets: [CLAUDE_API_KEY, ESV_API_KEY, NLT_API_KEY] },
   async (req, res) => {
     // Extract service name from /api/<service>/...
     const match = req.path.match(/^\/api\/(\w+)(\/.*)?$/);
@@ -84,7 +125,10 @@ export const api = onRequest(
     // Strip /api/<service> prefix to get the upstream path
     const prefix = `/api/${service}`;
     const upstreamPath = req.originalUrl.replace(prefix, "");
-    const upstreamUrl = `${target}${upstreamPath}`;
+    const builtUpstreamUrl = `${target}${upstreamPath}`;
+    // nlt's key is a query param, not a header — see buildUpstreamUrl above.
+    // Byte-unchanged for esv/anthropic/planningcenter.
+    const upstreamUrl = buildUpstreamUrl(service, builtUpstreamUrl, NLT_API_KEY.value());
 
     // Forward relevant headers
     const headers: Record<string, string> = {};
