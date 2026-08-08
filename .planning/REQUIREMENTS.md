@@ -225,7 +225,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 
 ### Slide Media
 
-- [ ] **R098**: Dropping several images at once produces slides in filename natural order.
+- [x] **R098**: Dropping several images at once produces slides in filename natural order.
       <br>`[STACK]` JPEG **already works** — `dropRouting.ts:51` classifies on
       `file.type.startsWith('image/')`. Only the *ordering* is defective: `classifyFiles` preserves the
       browser's `DataTransfer` order, which for a multi-file OS drag is selection/filesystem order.
@@ -251,7 +251,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 - [ ] **R102**: Undo is a link beside the last-saved text rather than a button among the primary
       actions.
 
-- [ ] **R103**: The Getting Started panel on the dashboard can be dismissed.
+- [x] **R103**: The Getting Started panel on the dashboard can be dismissed.
 
 ---
 
@@ -308,12 +308,12 @@ Explicitly excluded. Documented to prevent scope creep.
 | R095 | Phase 47 | Complete |
 | R096 | Phase 47 | Complete |
 | R097 | Phase 47 | Complete |
-| R098 | Phase 48 | Pending |
+| R098 | Phase 48 | Complete |
 | R099 | Phase 48 | Pending |
 | R100 | Phase 48 | Pending |
 | R101 | Phase 48 | Pending |
 | R102 | Phase 48 | Pending |
-| R103 | Phase 48 | Pending |
+| R103 | Phase 48 | Complete |
 | R104 | Phase 40.1 | Complete |
 
 **Coverage:**

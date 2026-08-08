@@ -416,11 +416,11 @@ Plans:
   3. Buttons stack vertically on the service edit screen on a phone, matching `QuarterView.vue`'s existing responsive button-stacking recipe on the Schedule screen
   4. Print and Share appear in the top contextual action bar on the Services screens instead of at the page bottom; Undo is a link beside the last-saved text rather than a button among the primary actions; the Getting Started panel on the dashboard can be dismissed
 
-**Plans**: 3 plans
+**Plans**: 1/3 plans executed
 
 Plans:
 
-- [ ] 48-01-PLAN.md — R098 natural-order multi-image (Intl.Collator in classifyFiles) + R103 Getting Started dismiss (localStorage)
+- [x] 48-01-PLAN.md — R098 natural-order multi-image (Intl.Collator in classifyFiles) + R103 Getting Started dismiss (localStorage)
 - [ ] 48-02-PLAN.md — R099 Slides tab mobile: responsive rail/grid stack, 44px hit areas, additive SortableJS touch options (+ human-verify backstops)
 - [ ] 48-03-PLAN.md — R100/R101/R102 service-edit screen: Print/Share into the top action bar, Undo as a link, action rows stack (QuarterView recipe)
 
@@ -446,7 +446,7 @@ Plans:
 | 45. ESV/NLT Bible Version Selection | v1.5 | 4/4 | In Progress|  |
 | 46. Global Slide Typography | v1.5 | 4/4 | In Progress|  |
 | 47. Congregational Reading Divider UX | v1.5 | 3/3 | In Progress|  |
-| 48. Multi-Image Ordering & Mobile Polish | v1.5 | 0/3 | Planned | - |
+| 48. Multi-Image Ordering & Mobile Polish | v1.5 | 1/3 | In Progress|  |
 
 ## Backlog
 

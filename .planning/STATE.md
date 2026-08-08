@@ -5,15 +5,15 @@ milestone_name: Settings, Sharing, and Fidelity
 current_phase: 48
 current_phase_name: Multi-Image Ordering & Mobile Polish
 status: executing
-stopped_at: Phase 47 code-complete & code-verified (16/16 must-haves); human-verify DEFERRED (touch/feel/legibility + WR sign-off); NOT deploy-gated; starting Phase 48
-last_updated: "2026-08-08T21:50:00.000Z"
+stopped_at: Completed 48-01-PLAN.md
+last_updated: "2026-08-08T23:37:54.095Z"
 last_activity: 2026-08-08
-last_activity_desc: Phase 47 done (deferred, not deploy-gated); autonomous run advancing to Phase 48
+last_activity_desc: Phase 48 execution started
 progress:
   total_phases: 11
   completed_phases: 10
-  total_plans: 40
-  completed_plans: 40
+  total_plans: 43
+  completed_plans: 41
   percent: 91
 ---
 
@@ -140,7 +140,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 47 — Congregational Reading Divider UX
+**Current focus:** Phase 48 — Multi-Image Ordering & Mobile Polish
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -150,9 +150,9 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 47 (Congregational Reading Divider UX) — EXECUTING
-Plan: 3 of 3
-Status: Phase complete — ready for verification
+Phase: 48 (Multi-Image Ordering & Mobile Polish) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
 client (DEPLOY-GATED, see below). 45-02 added `bibleVersion: 'ESV' | 'NLT'` to `OrgSettings`
 (`DEFAULT_ORG_SETTINGS.bibleVersion: 'NLT'`, owner's locked override) plus the Settings "Bible
 Translation" card. 45-03 added the `translationSource?` field + `scriptureAttribution()`/
@@ -172,7 +172,7 @@ human-verify items: the 48px overflow backstop, and the full post-deploy live ro
 in `.planning/PENDING-VERIFICATION.md` § Phase 45.
 Next: Phase 45 is code-complete; the owner's deploy step and the deferred human-verify items are
 the only remaining work for this phase (non-blocking). No further plan needed for Phase 45 itself.
-Last activity: 2026-08-08 — Phase 47 execution started
+Last activity: 2026-08-08 — Phase 48 execution started
 
 ## ⏸ RESUME HERE (2026-08-06 — v1.5 ROADMAP.md created, ready to plan Phase 39)
 
@@ -1380,6 +1380,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 47 P01 | ~25m | 2 tasks | 6 files |
 | Phase 47 P02 | 45min | 2 tasks | 2 files |
 | Phase 47 P03 | ~35m | 3 tasks | 8 files |
+| Phase 48 P01 | 6min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -1710,6 +1711,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 47-03: isFirstSection set as a plain boolean directly inside each content-resolution path's section-present branch (not a conditional-spread) — the surrounding branch already guarantees a Reference-state slide never reaches it.
 - [Phase ?]: 47-03: PresentationViewer's 3-way speaker label/colour kept as its own literal-string computed rather than routed through slideDisplay.ts's speakerDisplayName, matching the file's existing independent style.
 - [Phase ?]: 47-03: EditSlideDrawer's 3-way speaker cycle expressed as one NEXT_SPEAKER lookup table so a future 4th role touches only one place.
+- [Phase ?]: 48-01: Sort only images bucket in classifyFiles via Intl.Collator (numeric, base sensitivity); decks/videos/audio keep drop order (D-098)
+- [Phase ?]: 48-01: GettingStarted dismiss uses flat unscoped localStorage key wp:gettingStartedDismissed, matching CollapsibleSection.vue precedent for per-device UI chrome
 
 ### Roadmap Evolution
 
@@ -2021,8 +2024,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-08T21:42:13.027Z
-Stopped at: Completed 47-03-PLAN.md
+Last session: 2026-08-08T23:37:54.047Z
+Stopped at: Completed 48-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
