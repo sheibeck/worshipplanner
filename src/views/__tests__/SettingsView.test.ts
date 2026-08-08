@@ -76,6 +76,24 @@ vi.mock('@/utils/slug', () => ({
   claimSlug: vi.fn((s: string) => Promise.resolve(s)),
 }))
 
+// 46-03: partial mock — keeps the REAL cssVarsFor/snapWeight (so the snap
+// case and the Preview's computed style exercise the genuine SLIDE_FONTS
+// ramp, not a stub), replacing only loadFontCss with a spy so the family-
+// change on-demand-load call can be asserted without a real dynamic
+// `@fontsource/*` import.
+const { mockLoadFontCss } = vi.hoisted(() => ({
+  mockLoadFontCss: vi.fn(() => Promise.resolve()),
+}))
+
+vi.mock('@/utils/slideTypography', async () => {
+  const actual =
+    await vi.importActual<typeof import('@/utils/slideTypography')>('@/utils/slideTypography')
+  return {
+    ...actual,
+    loadFontCss: mockLoadFontCss,
+  }
+})
+
 // ── @/stores/auth mock — module-scope mutable state exposed via getters, the
 //    same shape SongTable.test.ts:39 established (`get vwModeEnabled() { ... }`),
 //    so a later wave can flip a toggle between assertions without rebuilding the
@@ -596,5 +614,138 @@ describe('SettingsView Bible Translation card (R090) — 45-02', () => {
 
     expect(mockUpdateDoc).not.toHaveBeenCalled()
     expect(mockBibleVersion).toBe('NLT')
+  })
+})
+
+describe('SettingsView Slide Typography card (R093) — 46-03', () => {
+  beforeEach(() => {
+    mockOrgId = 'org-1'
+    mockOrgName = 'Test Church'
+    mockOrgSlug = 'test-church'
+    mockIsEditor = true
+    mockHasPcCredentials = false
+    mockPcAppId = null
+    mockPcSecret = null
+    mockVwModeEnabled = true
+    mockAiEnabled = true
+    mockPcEnabled = true
+    mockSettingsVwModeEnabled = true
+    mockDefaultServiceTemplate = []
+    mockBibleVersion = 'NLT'
+    mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' }
+    mockUpdateDoc.mockClear()
+    mockGetDoc.mockClear()
+    mockSetPcCredentials.mockClear()
+    mockLoadFontCss.mockClear()
+  })
+
+  it('renders the Slide Typography heading, controls, and Preview panel', () => {
+    const wrapper = mountSettingsView()
+    expect(wrapper.text()).toContain('Slide Typography')
+    expect(wrapper.find('[data-testid="slide-font-family-select"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="slide-font-weight-select"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="slide-font-scale-sm"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="slide-font-scale-md"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="slide-font-scale-lg"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="slide-typography-preview-label"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Amazing grace, how sweet the sound')
+  })
+
+  it('saves family/weight/size as three leaf dot-paths and mirrors into the store', async () => {
+    const wrapper = mountSettingsView()
+
+    await wrapper.get('[data-testid="slide-font-scale-lg"]').setValue(true)
+    await flushPromises()
+
+    expect(mockUpdateDoc).toHaveBeenCalledTimes(1)
+    const payload = mockUpdateDoc.mock.calls[0]![1] as Record<string, unknown>
+    // Assert on the KEY SET, not merely that the expected keys are present —
+    // rules out a whole-map { 'settings.slideTypography': {...} } write.
+    expect(Object.keys(payload)).toHaveLength(3)
+    expect(payload).toHaveProperty('settings.slideTypography.fontFamily', 'Inter')
+    expect(payload).toHaveProperty('settings.slideTypography.fontWeight', 400)
+    expect(payload).toHaveProperty('settings.slideTypography.fontScale', 'lg')
+    expect(payload).not.toHaveProperty('settings')
+
+    expect(mockSlideTypography).toEqual({ fontFamily: 'Inter', fontWeight: 400, fontScale: 'lg' })
+    expect(wrapper.text()).toContain('Saved!')
+  })
+
+  it('snaps the weight to 400 when switching family to Lora while weight 300 is selected', async () => {
+    mockSlideTypography = { fontFamily: 'Inter', fontWeight: 300, fontScale: 'md' }
+    const wrapper = mountSettingsView()
+
+    const weightSelectBefore = wrapper.get('[data-testid="slide-font-weight-select"]')
+      .element as HTMLSelectElement
+    expect(weightSelectBefore.value).toBe('300')
+
+    await wrapper.get('[data-testid="slide-font-family-select"]').setValue('Lora')
+    await flushPromises()
+
+    const weightSelectAfter = wrapper.get('[data-testid="slide-font-weight-select"]')
+      .element as HTMLSelectElement
+    expect(weightSelectAfter.value).toBe('400')
+
+    expect(mockUpdateDoc).toHaveBeenCalledTimes(1)
+    const payload = mockUpdateDoc.mock.calls[0]![1] as Record<string, unknown>
+    expect(payload).toHaveProperty('settings.slideTypography.fontFamily', 'Lora')
+    expect(payload).toHaveProperty('settings.slideTypography.fontWeight', 400)
+
+    // On-demand load of the newly-selected family, at the snapped weight.
+    expect(mockLoadFontCss).toHaveBeenCalledWith('Lora', 400)
+  })
+
+  it('reverts the selection and surfaces the save-error string when the write rejects', async () => {
+    mockUpdateDoc.mockRejectedValueOnce(new Error('network error'))
+    const wrapper = mountSettingsView()
+
+    await wrapper.get('[data-testid="slide-font-scale-lg"]').setValue(true)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain("Couldn't save your slide typography settings. Try again.")
+    const scaleMd = wrapper.get('[data-testid="slide-font-scale-md"]').element as HTMLInputElement
+    expect(scaleMd.checked).toBe(true)
+    expect(mockSlideTypography).toEqual({ fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' })
+  })
+
+  it('disables all three controls and blocks saving for a non-editor (viewer)', async () => {
+    mockIsEditor = false
+    const wrapper = mountSettingsView()
+
+    expect(wrapper.get('[data-testid="slide-font-family-select"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-testid="slide-font-weight-select"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-testid="slide-font-scale-sm"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-testid="slide-font-scale-md"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-testid="slide-font-scale-lg"]').attributes('disabled')).toBeDefined()
+
+    // Force-select despite disabled, exercising the handler guard directly
+    // rather than relying on jsdom to block interaction with a disabled input.
+    await wrapper.get('[data-testid="slide-font-scale-lg"]').setValue(true)
+    await flushPromises()
+
+    expect(mockUpdateDoc).not.toHaveBeenCalled()
+    expect(mockSlideTypography).toEqual({ fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' })
+  })
+
+  it('offers weight 300 (Inter Light) when Inter is the selected family', () => {
+    const wrapper = mountSettingsView()
+    const options = wrapper.get('[data-testid="slide-font-weight-select"]').findAll('option')
+    const values = options.map((option) => option.element.value)
+    expect(values).toContain('300')
+  })
+
+  it("the live Preview reflects the current local selection's cssVarsFor output", async () => {
+    const wrapper = mountSettingsView()
+    const preview = wrapper.get('[data-testid="slide-typography-preview"]')
+    expect((preview.element as HTMLElement).style.fontFamily).toBe('var(--slide-font-family)')
+    expect((preview.element as HTMLElement).style.getPropertyValue('--slide-font-family')).toContain(
+      'Inter',
+    )
+
+    await wrapper.get('[data-testid="slide-font-family-select"]').setValue('Lora')
+    await flushPromises()
+
+    const updatedPreview = wrapper.get('[data-testid="slide-typography-preview"]').element as HTMLElement
+    expect(updatedPreview.style.getPropertyValue('--slide-font-family')).toContain('Lora')
   })
 })
