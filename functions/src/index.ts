@@ -148,8 +148,15 @@ export const api = onRequest(
     const upstreamPath = req.originalUrl.replace(prefix, "");
     const builtUpstreamUrl = `${target}${upstreamPath}`;
     // nlt's key is a query param, not a header — see buildUpstreamUrl above.
-    // Byte-unchanged for esv/anthropic/planningcenter.
-    const upstreamUrl = buildUpstreamUrl(service, builtUpstreamUrl, NLT_API_KEY.value());
+    // Byte-unchanged for esv/anthropic/planningcenter. Only read the NLT
+    // secret on the nlt branch -- buildUpstreamUrl ignores the third
+    // argument for every other service, so there is no reason to touch an
+    // unrelated secret on every request.
+    const upstreamUrl = buildUpstreamUrl(
+      service,
+      builtUpstreamUrl,
+      service === "nlt" ? NLT_API_KEY.value() : "",
+    );
 
     // Forward relevant headers
     const headers: Record<string, string> = {};
