@@ -118,7 +118,15 @@ export function waitForSlideFont(
   const load = Promise.all([
     document.fonts.ready,
     document.fonts.load(`${weight} 1em "${family}"`),
-  ]).then(() => true)
+  ]).then(
+    () => true,
+    // WR-02 (46-REVIEW.md): a rejected document.fonts.load() is a FAILED
+    // load, not a stalled one — resolve `false` (same as a timeout)
+    // instead of letting the rejection propagate through Promise.race
+    // below, which would break this function's documented "never hangs
+    // the caller" contract for the reject case.
+    () => false,
+  )
 
   const timeout = new Promise<boolean>((resolve) => {
     setTimeout(() => resolve(false), timeoutMs)

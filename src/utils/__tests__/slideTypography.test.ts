@@ -118,5 +118,23 @@ describe('slideTypography', () => {
       const result = await resultPromise
       expect(result).toBe(false)
     })
+
+    // WR-02 (46-REVIEW.md): a REJECTED document.fonts.load() is a failed
+    // load, not a stalled one — must resolve `false` immediately (well
+    // before the timeout), not reject/propagate through Promise.race.
+    it('resolves not-ready (does not reject) when document.fonts.load() rejects', async () => {
+      Object.defineProperty(document, 'fonts', {
+        value: {
+          ready: Promise.resolve(),
+          load: vi.fn(() => Promise.reject(new Error('font decode error'))),
+        },
+        configurable: true,
+        writable: true,
+      })
+
+      const resultPromise = waitForSlideFont('Inter', 400)
+      await vi.advanceTimersByTimeAsync(0)
+      await expect(resultPromise).resolves.toBe(false)
+    })
   })
 })
