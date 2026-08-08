@@ -128,11 +128,18 @@ export function waitForSlideFont(
     () => false,
   )
 
+  // IN-01 (46-REVIEW.md): capture the timer id so the losing side of the
+  // race can be cleared once a result is known, rather than leaving a live
+  // timer running for up to `timeoutMs` on every mount for no purpose.
+  let timeoutId: ReturnType<typeof setTimeout>
   const timeout = new Promise<boolean>((resolve) => {
-    setTimeout(() => resolve(false), timeoutMs)
+    timeoutId = setTimeout(() => resolve(false), timeoutMs)
   })
 
-  return Promise.race([load, timeout])
+  return Promise.race([load, timeout]).then((result) => {
+    clearTimeout(timeoutId)
+    return result
+  })
 }
 
 /**
