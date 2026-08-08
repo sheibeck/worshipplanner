@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Settings, Sharing, and Fidelity
-current_phase: 47
-current_phase_name: Congregational Reading Divider UX
-status: verifying
-stopped_at: Completed 47-03-PLAN.md
-last_updated: "2026-08-08T21:42:13.080Z"
+current_phase: 48
+current_phase_name: Multi-Image Ordering & Mobile Polish
+status: executing
+stopped_at: Phase 47 code-complete & code-verified (16/16 must-haves); human-verify DEFERRED (touch/feel/legibility + WR sign-off); NOT deploy-gated; starting Phase 48
+last_updated: "2026-08-08T21:50:00.000Z"
 last_activity: 2026-08-08
-last_activity_desc: Phase 47 execution started
+last_activity_desc: Phase 47 done (deferred, not deploy-gated); autonomous run advancing to Phase 48
 progress:
   total_phases: 11
   completed_phases: 10
@@ -851,6 +851,7 @@ vitest run` passes 39/39 directly. Logged in the phase's `deferred-items.md`. Us
 | 44 | verification_deferred_human — **10/10 must-haves verified in code** (type-check 0, full suite at 2-file baseline; ordinal VW mapping + empty-by-default createService + single merge point traced). Code review: 0 Critical / 2 Warning / 2 Info — **all 4 fixed** in-phase. 4 live-app owner checkpoints in `PENDING-VERIFICATION.md` § Phase 44 (empty-by-default creation, template round-trip, real drag feel, no-scrim/summary copy). ⚠ R087's "buildSlots fallback" wording was superseded by owner's dated 2026-08-07 EMPTY-fallback correction | /gsd-verify-work 44 |
 | 45 | verification_deferred_human — **7/7 must-haves verified in code** (type-check 0, app suite at 2-file baseline, functions 115/115; R092 immutability proven by named invariant tests; NLT proxy key-overwrite + redactUrl + dual empty-body guard + [N] bracket convention verified). Code review: 0 Critical / 2 Warning / 3 Info — WR-01/WR-02/IN-01/IN-02 fixed, IN-03 pre-existing. ⚠ **DEPLOY-GATED**: NLT proxy ships UNDEPLOYED; owner must `firebase functions:secrets:set NLT_API_KEY` + `firebase deploy --only functions` — and because bibleVersion defaults to **NLT**, the frontend + function MUST deploy together or new scripture fetch fails. Live round-trip deferred in `PENDING-VERIFICATION.md` § Phase 45 | /gsd-verify-work 45 |
 | 46 | verification_deferred_human — **18/18 must-haves verified in code** (type-check 0; app `src/` suite at 2-file baseline; R093/R094 wired end-to-end: `@fontsource` registry → `slideTypography` OrgSettings field → Settings card → all 3 render sites + presenter first-paint font gate). Code review: **2 Critical / 3 Warning / 2 Info — ALL fixed** (CR-01 grid/drawer bound the CSS var but never loaded the chosen family → now eager-loaded at the single `loadOrgContext` merge point; CR-02 presenter gate could hang on a rejected font load → now try/catch/finally always releases the gate). **NOT deploy-gated** (self-hosted `@fontsource` woff2, pure client bundle — no owner deploy needed). 4 owner items in `PENDING-VERIFICATION.md` § Phase 46: package-legitimacy sign-off (5 @fontsource pkgs, SUS = documented false-positive) + 3 projector checks (font-flash, legibility, Large-scale overflow) | /gsd-verify-work 46 |
+| 47 | verification_deferred_human — **16/16 must-haves verified in code** (type-check 0; app `src/` suite at 2-file baseline; R095 hand-divide via click-between-verses snapped to `computeBoundaries` + 3-way chips, R096 three equal seeds → same `CongregationalSection[]` with AI hidden when `aiEnabled` off, R097 first-slide-reference gated on `isFirstSection`; ALL role reaches every render site; `SPLIT_SCHEMA` enum + `validateSplitResult` widened together; R092 capture-once preserved). Code review: **1 Critical / 3 Warning / 2 Info — ALL fixed** (CR-01 stale-AI-response overwrite guard; WR-01/WR-02 alignment correctness; WR-03 stable keys). **NOT deploy-gated** (client-only; the AI call already exists and is gated). 4 owner items in `PENDING-VERIFICATION.md` § Phase 47: touch discoverability, hand-division feel, projected 3-role legibility, WR-01/WR-02 sign-off | /gsd-verify-work 47 |
 
 > Phase 39 is **code-complete and automatically verified**. Its code review found 1 Critical + 3
 > Warnings, all fixed and independently re-verified at iteration 2 (`39-REVIEW.md` status: clean).

@@ -1171,6 +1171,35 @@ thoroughly the gate logic itself is unit-tested.
 
 ---
 
+## Phase 47 — Congregational Reading Divider UX (2026-08-08)
+
+Deferred under the v1.5 standing autonomy grant. **16/16 must-haves verified in code**; `npm run
+type-check` clean; app `src/` suite at the documented 2-file baseline. Code review: **1 Critical /
+3 Warning / 2 Info — ALL fixed** (CR-01 stale-AI-response overwrite guard; WR-01 verse-range
+swallowing; WR-02 silent alignment-mismatch detection; WR-03 stable v-for keys; IN-01/IN-02). The
+four items below are inherently manual/visual/judgment — jsdom cannot render real fonts, simulate a
+real touch viewport, or judge projection legibility.
+
+- [ ] **47.1 Touch discoverability of the gap-+ / divider-remove affordance.** On a phone-width
+      viewport, confirm the gap-+ and divider-remove controls are visible (persistent `opacity-40`)
+      below the `md` breakpoint without hovering, reveal fully on hover/focus at `md`+, and have a
+      44×44px hit area around the 24px control — discoverable and tappable on a real touch device.
+      (UI-SPEC backstop, 47-02-SUMMARY.md D9.)
+- [ ] **47.2 Hand-dividing feels low-friction (R095).** Hand-divide **Psalm 136** (refrain) and
+      **Psalm 24** (call/response) with the gap-+ and 3-way chip; confirm placing/removing dividers
+      and labeling is natural, not clunky.
+- [ ] **47.3 Projected 3-role legibility (R097).** Present a hand-divided reading; confirm the
+      first slide shows the reference, later slides show only the speaker label, and Leader (sky) /
+      Congregation (amber) / All (violet) read distinctly at projection distance — and the reference
+      genuinely disappears after slide 1.
+- [ ] **47.4 WR-01/WR-02 logic-change sign-off.** Spot-check real (non-fixture) passages with
+      run-on verses through the **Start Blank** seed; confirm verse ranges are never over-reported,
+      and that an intentionally unmatchable-seed condition fires the toast cleanly with no
+      end-user-visible console noise. (The fixer flagged both correctness-sensitive text-matching
+      fixes "requires human verification" despite passing regression tests.)
+
+---
+
 ## Notes and failures
 
 _(Record anything that failed here, with what you saw versus what was expected.)_
