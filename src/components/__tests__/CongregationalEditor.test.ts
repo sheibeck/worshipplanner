@@ -4,13 +4,15 @@ import { createPinia, setActivePinia } from 'pinia'
 import CongregationalEditor from '../CongregationalEditor.vue'
 import { useToasts } from '@/stores/toasts'
 import { useAuthStore } from '@/stores/auth'
-import type { ScriptureSlide, CongregationalSection } from '@/types/slide'
+import type { CongregationalSection } from '@/types/slide'
 import type { ScriptureRef } from '@/types/service'
 
-// 34-06: this component is now a controlled prop/emit component that
-// persists NOTHING itself — the reading-document store (`useScriptureSlides`)
-// and auto-save/save-status machinery it used to own were removed, so those
-// mocks and the tests that asserted against them are gone too.
+// 47-02: this component was reworked from "fetch auto-splits, then a binary
+// Leader/Congregation toggle" into a hand-divide editor with three equal
+// seeds (AI / Alternate / Blank), a click-between-verses gap-+ divider, and a
+// 3-way Leader/Congregation/All chip (R095/R096). Every test below that
+// exercised the OLD auto-split-on-fetch / binary-toggle contract has been
+// rewritten to the new one — this is not a mechanical append.
 //
 // enableAutoUnmount (matching ServiceEditorView.test.ts's own precedent) is
 // still load-bearing: Pinia wraps every store action (including
@@ -27,70 +29,55 @@ vi.mock('@/utils/esvApi', () => ({
   fetchPassageText: (...args: unknown[]) => mockFetchPassageText(...args),
 }))
 
-// 45-04: NLT client mock, sibling to the ESV mock above. DEFAULT_ORG_SETTINGS
-// .bibleVersion is 'NLT' (45-02's owner-locked default), so every existing
-// test in this file that fetches (and never explicitly sets bibleVersion to
-// 'ESV') now routes through THIS mock, not mockFetchPassageText — it must
-// resolve the same default text so pre-existing assertions on rendered
-// content stay correct regardless of which client the routing picks.
 const mockFetchNltPassageText = vi.fn()
 vi.mock('@/utils/nltApi', () => ({
   fetchNltPassageText: (...args: unknown[]) => mockFetchNltPassageText(...args),
 }))
 
+// splitPassage is spied (not replaced) — most seed math in the reworked
+// component derives boundary indices by matching a seed's returned TEXT
+// byte-exactly against sliceAtBoundaries+stripVerseMarkers, the same trick
+// the AI seed needs (RESEARCH Pitfall 2). splitPerVerse is left as the real
+// implementation throughout (it is not mocked at all) so the Blank seed's
+// per-verse boundary alignment is exercised for real.
 const mockSplitPassage = vi.fn()
-vi.mock('@/utils/scriptureSplitter', () => ({
-  splitPassage: (...args: unknown[]) => mockSplitPassage(...args),
-}))
+vi.mock('@/utils/scriptureSplitter', async () => {
+  const actual =
+    await vi.importActual<typeof import('@/utils/scriptureSplitter')>('@/utils/scriptureSplitter')
+  return {
+    ...actual,
+    splitPassage: (...args: unknown[]) => mockSplitPassage(...args),
+  }
+})
 
-// 34-04: splitCongregationalReading is mocked wholesale — this test file
-// exercises the component's wiring (gating, wholesale replace, failure
-// toast), not the already-tested-elsewhere (34-03) call shape/validation
-// behavior of the real function.
 const mockSplitCongregationalReading = vi.fn()
 vi.mock('@/utils/claudeApi', () => ({
   splitCongregationalReading: (...args: unknown[]) => mockSplitCongregationalReading(...args),
 }))
 
-function makeSampleSlides(): ScriptureSlide[] {
-  return [
-    {
-      id: 'scripture-0',
-      position: 0,
-      contentKind: 'scripture',
-      reference: 'Psalm 136:1-3',
-      bookRef: { book: 'Psalms', chapter: 136, verseStart: 1, verseEnd: 3 },
-      text: 'Give thanks to the LORD, for he is good,',
-      verseRange: 'v. 1',
-      readingMode: 'normal',
-    },
-    {
-      id: 'scripture-1',
-      position: 1,
-      contentKind: 'scripture',
-      reference: 'Psalm 136:1-3',
-      bookRef: { book: 'Psalms', chapter: 136, verseStart: 1, verseEnd: 3 },
-      text: 'for his steadfast love endures forever.',
-      verseRange: 'v. 2',
-      readingMode: 'normal',
-    },
-    {
-      id: 'scripture-2',
-      position: 2,
-      contentKind: 'scripture',
-      reference: 'Psalm 136:1-3',
-      bookRef: { book: 'Psalms', chapter: 136, verseStart: 1, verseEnd: 3 },
-      text: 'Give thanks to the God of gods,',
-      verseRange: 'v. 3',
-      readingMode: 'normal',
-    },
-  ]
-}
-
 const SAMPLE_REFERENCE: ScriptureRef = { book: 'Psalms', chapter: 136, verseStart: 1, verseEnd: 3 }
 const SAMPLE_SECTIONS: CongregationalSection[] = [
   { speaker: 'LEADER', text: 'Give thanks to the LORD', verseRange: 'v. 1' },
   { speaker: 'CONGREGATION', text: 'for his steadfast love endures forever', verseRange: 'v. 2' },
+]
+
+// The fixture passage for every fetch-driven test below. Verified offline
+// (see 47-02 execution notes) against the real computeBoundaries/
+// sliceAtBoundaries/stripVerseMarkers pipeline: it has 8 boundary indices
+// (0,1..6,7 — indices 0 and 7 are the anchors), 3 verses, and enough internal
+// clause structure (verse 1 has two sentences) that every seed produces a
+// segment with at least one interior gap to divide.
+const DEFAULT_PASSAGE_TEXT =
+  '[1] Leader line one. Leader line one continued. [2] Congregation line two. [3] Leader line three.'
+
+// The two-group split every Alternate/AI seed test below uses. Verified to
+// byte-exactly match sliceAtBoundaries(DEFAULT_PASSAGE_TEXT, boundaries, 0, 3)
+// and (3, 7) respectively, so alignSegmentsToBoundaries locates them at
+// startBoundary/endBoundary 0/3 and 3/7 — the same split either seed's real
+// (non-mocked) grouping logic would have produced for this fixture.
+const TWO_GROUP_SPLIT_TEXT: [string, string] = [
+  'Leader line one. Leader line one continued.',
+  'Congregation line two. Leader line three.',
 ]
 
 function mountEditor(props?: { reference?: ScriptureRef | null; sections?: CongregationalSection[] }) {
@@ -113,13 +100,28 @@ function customEmittedKeys(wrapper: ReturnType<typeof mountEditor>): string[] {
   return Object.keys(wrapper.emitted()).filter((key) => CUSTOM_EVENT_NAMES.includes(key))
 }
 
+function lastEmittedSections(wrapper: ReturnType<typeof mountEditor>): CongregationalSection[] {
+  const emits = wrapper.emitted('update:sections')
+  return emits![emits!.length - 1]![0] as CongregationalSection[]
+}
+
+async function fetchDefaultPassage(wrapper: ReturnType<typeof mountEditor>) {
+  await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
+  await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
+  await flushPromises()
+}
+
 describe('CongregationalEditor', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockFetchPassageText.mockResolvedValue('[1] Give thanks to the LORD...')
-    mockFetchNltPassageText.mockResolvedValue('[1] Give thanks to the LORD...')
-    mockSplitPassage.mockReturnValue(makeSampleSlides())
+    mockFetchPassageText.mockResolvedValue(DEFAULT_PASSAGE_TEXT)
+    mockFetchNltPassageText.mockResolvedValue(DEFAULT_PASSAGE_TEXT)
+    mockSplitPassage.mockReturnValue(
+      TWO_GROUP_SPLIT_TEXT.map((text, i) => ({ text, verseRange: i === 0 ? '1' : '2-3' })),
+    )
   })
+
+  // ── Baseline mount / fetch affordances ──────────────────────────────────
 
   it('renders reference input and fetch button, and emits nothing on a bare mount', () => {
     const wrapper = mountEditor()
@@ -134,159 +136,24 @@ describe('CongregationalEditor', () => {
     expect(btn.attributes('disabled')).toBeDefined()
   })
 
-  it('mounted with two sections and a reference: reference input is pre-filled and both sections render', () => {
-    const wrapper = mountEditor({ reference: SAMPLE_REFERENCE, sections: SAMPLE_SECTIONS })
-
-    expect((wrapper.find('[data-testid="reference-input"]').element as HTMLInputElement).value).toBe(
-      'Psalms 136:1-3',
-    )
-    expect(wrapper.find('[data-testid="speaker-toggle-0"]').text()).toBe('Leader')
-    expect(wrapper.find('[data-testid="speaker-toggle-1"]').text()).toBe('Congregation')
-    expect(wrapper.find('[data-testid="preview-section-0"]').text()).toContain(SAMPLE_SECTIONS[0]!.text)
-    expect(wrapper.find('[data-testid="preview-section-1"]').text()).toContain(SAMPLE_SECTIONS[1]!.text)
-  })
-
-  it('prohibition: mounting with populated props and immediately unmounting emits zero events', () => {
-    const wrapper = mountEditor({ reference: SAMPLE_REFERENCE, sections: SAMPLE_SECTIONS })
-    expect(Object.keys(wrapper.emitted())).toHaveLength(0)
-
-    wrapper.unmount()
-    expect(Object.keys(wrapper.emitted())).toHaveLength(0)
-  })
-
-  it('after fetch, displays verse chunks with speaker role toggles', async () => {
+  it('does not show sections, seed row, or preview when no passage is fetched', () => {
     const wrapper = mountEditor()
-    await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
-    await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
-    await flushPromises()
-
-    expect(wrapper.find('[data-testid="sections-container"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="speaker-toggle-0"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="speaker-toggle-1"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="speaker-toggle-2"]').exists()).toBe(true)
-  })
-
-  it('default alternating speaker assignment (LEADER, CONGREGATION, LEADER)', async () => {
-    const wrapper = mountEditor()
-    await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
-    await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
-    await flushPromises()
-
-    expect(wrapper.find('[data-testid="speaker-toggle-0"]').text()).toBe('Leader')
-    expect(wrapper.find('[data-testid="speaker-toggle-1"]').text()).toBe('Congregation')
-    expect(wrapper.find('[data-testid="speaker-toggle-2"]').text()).toBe('Leader')
-  })
-
-  it('Fetch Passage success emits update:reference then update:sections with alternating speakers', async () => {
-    const wrapper = mountEditor()
-    await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
-    await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
-    await flushPromises()
-
-    // Object key insertion order proves emission order: update:reference,
-    // then update:sections — the reference the user fetched must never be
-    // recorded as belonging to a different passage than the sections.
-    expect(customEmittedKeys(wrapper)).toEqual(['update:reference', 'update:sections'])
-
-    const refEmits = wrapper.emitted('update:reference')
-    expect(refEmits).toHaveLength(1)
-    expect(refEmits![0]).toEqual([SAMPLE_REFERENCE])
-
-    const sectionsEmits = wrapper.emitted('update:sections')
-    expect(sectionsEmits).toHaveLength(1)
-    expect(sectionsEmits![0]![0]).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ speaker: 'LEADER' }),
-        expect.objectContaining({ speaker: 'CONGREGATION' }),
-      ]),
-    )
-  })
-
-  it('prohibition: a successful onFetchPassage does not call the AI split util at all', async () => {
-    const wrapper = mountEditor()
-    await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
-    await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
-    await flushPromises()
-
-    expect(mockSplitCongregationalReading).not.toHaveBeenCalled()
-  })
-
-  it('toggling speaker role updates section assignment and emits update:sections with the flipped speaker only', async () => {
-    const wrapper = mountEditor({ reference: SAMPLE_REFERENCE, sections: SAMPLE_SECTIONS })
-
-    expect(wrapper.find('[data-testid="speaker-toggle-1"]').text()).toBe('Congregation')
-    await wrapper.find('[data-testid="speaker-toggle-1"]').trigger('click')
-    expect(wrapper.find('[data-testid="speaker-toggle-1"]').text()).toBe('Leader')
-
-    const emits = wrapper.emitted('update:sections')
-    expect(emits).toHaveLength(1)
-    const emitted = emits![0]![0] as CongregationalSection[]
-    expect(emitted[0]).toEqual(SAMPLE_SECTIONS[0])
-    expect(emitted[1]).toEqual({ ...SAMPLE_SECTIONS[1], speaker: 'LEADER' })
-  })
-
-  it('preview shows Leader/Congregation labels with distinct styling', async () => {
-    const wrapper = mountEditor()
-    await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
-    await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
-    await flushPromises()
-
-    expect(wrapper.find('[data-testid="preview-panel"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="preview-label-0"]').text()).toBe('Leader:')
-    expect(wrapper.find('[data-testid="preview-label-1"]').text()).toBe('Congregation:')
-    expect(wrapper.find('[data-testid="preview-label-2"]').text()).toBe('Leader:')
+    expect(wrapper.find('[data-testid="sections-container"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="preview-panel"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="ai-split-btn"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="seed-alternate-btn"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="seed-blank-btn"]').exists()).toBe(false)
   })
 
   it('shows error message when the (default NLT) fetch fails, and emits nothing', async () => {
     mockFetchNltPassageText.mockRejectedValueOnce(new Error('Network error'))
     const wrapper = mountEditor()
-    await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
-    await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
-    await flushPromises()
+    await fetchDefaultPassage(wrapper)
 
     const errorEl = wrapper.find('[data-testid="fetch-error"]')
     expect(errorEl.exists()).toBe(true)
     expect(errorEl.text()).toContain('Could not load passage')
     expect(customEmittedKeys(wrapper)).toHaveLength(0)
-  })
-
-  it('shows error message when an explicit ESV fetch fails, and emits nothing', async () => {
-    mockFetchPassageText.mockRejectedValueOnce(new Error('Network error'))
-    const wrapper = mountEditor()
-    // Mutate the setting only AFTER letting the store's own async
-    // onAuthStateChanged listener (registered at store setup, resolves on a
-    // microtask with no test user and resets `settings` to defaults) settle
-    // — otherwise a mutation made before/immediately-after mount can be
-    // silently overwritten by that unrelated reset before this test's click
-    // handler ever reads it. This is a pre-existing store/test-harness race,
-    // not something this plan's fetch-routing logic introduces.
-    await flushPromises()
-    useAuthStore().settings.bibleVersion = 'ESV'
-    await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
-    await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
-    await flushPromises()
-
-    const errorEl = wrapper.find('[data-testid="fetch-error"]')
-    expect(errorEl.exists()).toBe(true)
-    expect(errorEl.text()).toContain('Could not load passage')
-    expect(customEmittedKeys(wrapper)).toHaveLength(0)
-  })
-
-  it('does not show sections or preview when no passage is fetched', () => {
-    const wrapper = mountEditor()
-    expect(wrapper.find('[data-testid="sections-container"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="preview-panel"]').exists()).toBe(false)
-  })
-
-  it('preview labels update after toggling speaker role', async () => {
-    const wrapper = mountEditor()
-    await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
-    await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
-    await flushPromises()
-
-    expect(wrapper.find('[data-testid="preview-label-0"]').text()).toBe('Leader:')
-    await wrapper.find('[data-testid="speaker-toggle-0"]').trigger('click')
-    expect(wrapper.find('[data-testid="preview-label-0"]').text()).toBe('Congregation:')
   })
 
   it('close control emits close and no section or reference change', async () => {
@@ -298,348 +165,353 @@ describe('CongregationalEditor', () => {
     expect(wrapper.emitted('update:reference')).toBeUndefined()
   })
 
-  // ── 34-04 Task 1: the opt-in "Split with AI" affordance ────────────────────
+  // ── Mounted with already-persisted sections (no fetch yet this session) ──
 
-  describe('AI split (34-04, Task 1: affordance + success path)', () => {
-    beforeEach(() => {
-      mockSplitCongregationalReading.mockReset()
+  describe('mounted with existing sections', () => {
+    it('pre-fills the reference input and renders both sections in the preview, with no divider affordances', () => {
+      const wrapper = mountEditor({ reference: SAMPLE_REFERENCE, sections: SAMPLE_SECTIONS })
+
+      expect(
+        (wrapper.find('[data-testid="reference-input"]').element as HTMLInputElement).value,
+      ).toBe('Psalms 136:1-3')
+      expect(wrapper.find('[data-testid="preview-label-0"]').text()).toBe('Leader:')
+      expect(wrapper.find('[data-testid="preview-label-1"]').text()).toBe('Congregation:')
+      expect(wrapper.find('[data-testid="preview-section-0"]').text()).toContain(SAMPLE_SECTIONS[0]!.text)
+      expect(wrapper.find('[data-testid="preview-section-1"]').text()).toContain(SAMPLE_SECTIONS[1]!.text)
+      // No boundaries exist yet (rawText is fetch-only) — no divide affordance.
+      expect(wrapper.find('[data-testid^="divider-insert-"]').exists()).toBe(false)
     })
 
-    it('is the only new data-testid, and is disabled before a passage has been fetched', () => {
-      const wrapper = mountEditor()
-      const btn = wrapper.find('[data-testid="ai-split-btn"]')
-      expect(btn.exists()).toBe(true)
-      expect(btn.attributes('disabled')).toBeDefined()
-    })
+    it('the 3-way chip still works for relabeling and emits update:sections with only that section changed', async () => {
+      const wrapper = mountEditor({ reference: SAMPLE_REFERENCE, sections: SAMPLE_SECTIONS })
 
-    it('is enabled after a fetch whose text has internal boundaries', async () => {
-      const wrapper = mountEditor()
-      await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
-      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
-      await flushPromises()
+      await wrapper.find('[data-testid="speaker-chip-1-leader"]').trigger('click')
 
-      expect(wrapper.find('[data-testid="ai-split-btn"]').attributes('disabled')).toBeUndefined()
-    })
-
-    it('empty edge: stays disabled and issues no split call when the fetched text offers no internal boundary, leaving the manual sections untouched', async () => {
-      mockFetchNltPassageText.mockResolvedValueOnce('no boundaries here at all')
-      const wrapper = mountEditor()
-      await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
-      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
-      await flushPromises()
-
-      const manualToggleCount = wrapper.findAll('[data-testid^="speaker-toggle-"]').length
-      const btn = wrapper.find('[data-testid="ai-split-btn"]')
-      expect(btn.attributes('disabled')).toBeDefined()
-
-      await btn.trigger('click')
-      await flushPromises()
-
-      expect(mockSplitCongregationalReading).not.toHaveBeenCalled()
-      expect(wrapper.findAll('[data-testid^="speaker-toggle-"]').length).toBe(manualToggleCount)
-    })
-
-    it('disables the button and switches its label while a split is in flight', async () => {
-      const wrapper = mountEditor()
-      await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
-      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
-      await flushPromises()
-
-      let resolveSplit!: (value: CongregationalSection[] | null) => void
-      mockSplitCongregationalReading.mockReturnValueOnce(
-        new Promise<CongregationalSection[] | null>((resolve) => {
-          resolveSplit = resolve
-        }),
-      )
-
-      const clickPromise = wrapper.find('[data-testid="ai-split-btn"]').trigger('click')
-      await Promise.resolve()
-      await Promise.resolve()
-
-      const inFlightBtn = wrapper.find('[data-testid="ai-split-btn"]')
-      expect(inFlightBtn.attributes('disabled')).toBeDefined()
-      expect(inFlightBtn.text()).toContain('Splitting...')
-
-      resolveSplit([
-        { speaker: 'LEADER', text: 'a' },
-        { speaker: 'CONGREGATION', text: 'b' },
-      ])
-      await clickPromise
-      await flushPromises()
-
-      expect(wrapper.find('[data-testid="ai-split-btn"]').text()).not.toContain('Splitting...')
-    })
-
-    it('on success, replaces sections wholesale in the returned order and emits update:sections — never merged, appended, or re-sorted', async () => {
-      const wrapper = mountEditor()
-      await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
-      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
-      await flushPromises()
-
-      const aiSections: CongregationalSection[] = [
-        { speaker: 'CONGREGATION', text: 'Second thing first', verseRange: 'v. 2' },
-        { speaker: 'LEADER', text: 'Then this', verseRange: 'v. 1' },
-      ]
-      mockSplitCongregationalReading.mockResolvedValueOnce(aiSections)
-
-      await wrapper.find('[data-testid="ai-split-btn"]').trigger('click')
-      await flushPromises()
-
-      const toggles = wrapper.findAll('[data-testid^="speaker-toggle-"]')
-      expect(toggles).toHaveLength(2)
-      expect(wrapper.find('[data-testid="preview-section-0"]').text()).toContain('Second thing first')
-      expect(wrapper.find('[data-testid="preview-section-1"]').text()).toContain('Then this')
-      expect(wrapper.find('[data-testid="preview-label-0"]').text()).toBe('Congregation:')
+      const emitted = lastEmittedSections(wrapper)
+      expect(emitted[0]).toEqual(SAMPLE_SECTIONS[0])
+      expect(emitted[1]).toEqual({ ...SAMPLE_SECTIONS[1], speaker: 'LEADER' })
       expect(wrapper.find('[data-testid="preview-label-1"]').text()).toBe('Leader:')
-
-      // update:sections is emitted twice here — once by the preceding fetch,
-      // once by the split — the split's own emission is the last one and
-      // carries exactly the returned array, PLUS the translationSource
-      // stamp (45-04/R092) captured from the fetch that produced rawText.
-      const sectionsEmits = wrapper.emitted('update:sections')
-      expect(sectionsEmits).toHaveLength(2)
-      expect(sectionsEmits![1]![0]).toEqual(
-        aiSections.map((section) => ({ ...section, translationSource: 'NLT' })),
-      )
     })
 
-    it('encoding backstop: rendered section text is strictly === to the mocked section text, including curly quotes and an em dash', async () => {
-      const wrapper = mountEditor()
-      await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
-      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
-      await flushPromises()
+    it('the chip supports the ALL role on a mounted section', async () => {
+      const wrapper = mountEditor({ reference: SAMPLE_REFERENCE, sections: SAMPLE_SECTIONS })
 
-      const NON_ASCII_TEXT = '“He restores—my soul,” said the shepherd’s voice'
-      mockSplitCongregationalReading.mockResolvedValueOnce([
-        { speaker: 'LEADER', text: NON_ASCII_TEXT },
-      ])
+      await wrapper.find('[data-testid="speaker-chip-0-all"]').trigger('click')
 
-      await wrapper.find('[data-testid="ai-split-btn"]').trigger('click')
-      await flushPromises()
-
-      const rendered = wrapper.find('[data-testid="preview-section-0"] span:last-child')
-      expect(rendered.text() === NON_ASCII_TEXT).toBe(true)
+      expect(wrapper.find('[data-testid="preview-label-0"]').text()).toBe('All:')
+      const emitted = lastEmittedSections(wrapper)
+      expect(emitted[0]!.speaker).toBe('ALL')
     })
 
-    it('a successful split leaves the manual speaker-toggle affordance working on the new sections', async () => {
-      const wrapper = mountEditor()
-      await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
-      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
-      await flushPromises()
-
-      mockSplitCongregationalReading.mockResolvedValueOnce([
-        { speaker: 'LEADER', text: 'a' },
-        { speaker: 'CONGREGATION', text: 'b' },
-      ])
-      await wrapper.find('[data-testid="ai-split-btn"]').trigger('click')
-      await flushPromises()
-
-      expect(wrapper.find('[data-testid="speaker-toggle-0"]').text()).toBe('Leader')
-      await wrapper.find('[data-testid="speaker-toggle-0"]').trigger('click')
-      expect(wrapper.find('[data-testid="speaker-toggle-0"]').text()).toBe('Congregation')
-    })
-  })
-
-  // ── 34-04 Task 2: the failure path and the manual-path regression proof ────
-
-  describe('AI split (34-04, Task 2: failure path)', () => {
-    const FAILURE_TOAST_TEXT =
-      "Couldn't split this passage — your reading is unchanged. Build it by hand or try again."
-
-    beforeEach(() => {
-      mockSplitCongregationalReading.mockReset()
-    })
-
-    async function fetchAndPrime(wrapper: ReturnType<typeof mountEditor>) {
-      await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
-      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
-      await flushPromises()
-    }
-
-    // Reads a snapshot of the rendered sections (speaker + text per row) via
-    // the DOM rather than an internal expose — `draftSections` itself is not
-    // part of this component's public seam (there is no defineExpose at all
-    // any more), so the DOM is the honest external observation point for
-    // "did anything change".
-    function sectionsSnapshot(wrapper: ReturnType<typeof mountEditor>) {
-      const toggles = wrapper.findAll('[data-testid^="speaker-toggle-"]')
-      return toggles.map((toggle, idx) => ({
-        speaker: toggle.text(),
-        text: wrapper.find(`[data-testid="preview-section-${idx}"] span:last-child`).text(),
-      }))
-    }
-
-    it('pushes exactly one verbatim toast, leaves sections byte-identical, and emits no additional update:sections when the split resolves null', async () => {
-      const wrapper = mountEditor()
-      await fetchAndPrime(wrapper)
-      const before = sectionsSnapshot(wrapper)
-      // The preceding fetch already emitted update:sections once (34-06's
-      // contract); a failed split must add NO further emission. Since a
-      // split can only be attempted after a fetch (rawText is fetch-only,
-      // per 34-06's documented AI-split-needs-a-fetch-first consequence),
-      // "wrapper.emitted('update:sections') is undefined" cannot be tested
-      // literally in this state — the count-stays-flat assertion below is
-      // the equivalent proof.
-      const emissionsBeforeSplit = wrapper.emitted('update:sections')?.length ?? 0
-
-      mockSplitCongregationalReading.mockResolvedValueOnce(null)
-      await wrapper.find('[data-testid="ai-split-btn"]').trigger('click')
-      await flushPromises()
-
-      const toasts = useToasts()
-      expect(toasts.toasts).toHaveLength(1)
-      expect(toasts.toasts[0]!.message).toBe(FAILURE_TOAST_TEXT)
-      expect(sectionsSnapshot(wrapper)).toEqual(before)
-      expect(wrapper.emitted('update:sections')?.length ?? 0).toBe(emissionsBeforeSplit)
-    })
-
-    it('pushes the same toast, leaves sections unchanged and emits no additional update:sections when the split call rejects, with no error escaping the handler', async () => {
-      const wrapper = mountEditor()
-      await fetchAndPrime(wrapper)
-      const before = sectionsSnapshot(wrapper)
-      const emissionsBeforeSplit = wrapper.emitted('update:sections')?.length ?? 0
-
-      mockSplitCongregationalReading.mockRejectedValueOnce(new Error('network down'))
-
-      await expect(
-        wrapper.find('[data-testid="ai-split-btn"]').trigger('click'),
-      ).resolves.not.toThrow()
-      await flushPromises()
-
-      const toasts = useToasts()
-      expect(toasts.toasts).toHaveLength(1)
-      expect(toasts.toasts[0]!.message).toBe(FAILURE_TOAST_TEXT)
-      expect(sectionsSnapshot(wrapper)).toEqual(before)
-      expect(wrapper.emitted('update:sections')?.length ?? 0).toBe(emissionsBeforeSplit)
-    })
-
-    it('clears isSplitting (button usable again) after both a null result and a rejection', async () => {
-      const wrapper = mountEditor()
-      await fetchAndPrime(wrapper)
-
-      mockSplitCongregationalReading.mockResolvedValueOnce(null)
-      await wrapper.find('[data-testid="ai-split-btn"]').trigger('click')
-      await flushPromises()
-      expect(wrapper.find('[data-testid="ai-split-btn"]').attributes('disabled')).toBeUndefined()
-
-      mockSplitCongregationalReading.mockRejectedValueOnce(new Error('boom'))
-      await wrapper.find('[data-testid="ai-split-btn"]').trigger('click')
-      await flushPromises()
-      expect(wrapper.find('[data-testid="ai-split-btn"]').attributes('disabled')).toBeUndefined()
-    })
-
-    it('pushes no toast on a successful split — this surface is failure-only', async () => {
-      const wrapper = mountEditor()
-      await fetchAndPrime(wrapper)
-
-      mockSplitCongregationalReading.mockResolvedValueOnce([
-        { speaker: 'LEADER', text: 'a' },
-        { speaker: 'CONGREGATION', text: 'b' },
-      ])
-      await wrapper.find('[data-testid="ai-split-btn"]').trigger('click')
-      await flushPromises()
-
-      expect(useToasts().toasts).toHaveLength(0)
-    })
-
-    it('regression: after a failed split, the manual speaker-toggle still works and the manual Fetch Passage flow still rebuilds sections', async () => {
-      const wrapper = mountEditor()
-      await fetchAndPrime(wrapper)
-
-      mockSplitCongregationalReading.mockResolvedValueOnce(null)
-      await wrapper.find('[data-testid="ai-split-btn"]').trigger('click')
-      await flushPromises()
-
-      // Manual toggle still works.
-      expect(wrapper.find('[data-testid="speaker-toggle-0"]').text()).toBe('Leader')
-      await wrapper.find('[data-testid="speaker-toggle-0"]').trigger('click')
-      expect(wrapper.find('[data-testid="speaker-toggle-0"]').text()).toBe('Congregation')
-
-      // Manual fetch-and-build flow still works, from scratch.
-      mockSplitPassage.mockReturnValueOnce(makeSampleSlides())
-      await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
-      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
-      await flushPromises()
-
-      expect(wrapper.find('[data-testid="speaker-toggle-0"]').text()).toBe('Leader')
-      expect(wrapper.find('[data-testid="speaker-toggle-1"]').text()).toBe('Congregation')
-      expect(wrapper.find('[data-testid="speaker-toggle-2"]').text()).toBe('Leader')
-    })
-
-    it('does not add any new data-testid beyond ai-split-btn and congregational-close-btn', () => {
-      const wrapper = mountEditor()
-      const html = wrapper.html()
-      const testIds = [...html.matchAll(/data-testid="([^"]+)"/g)].map((m) => m[1]!)
-      const knownPrefixes = [
-        'reference-input',
-        'fetch-btn',
-        'ai-split-btn',
-        'fetch-error',
-        'sections-container',
-        'speaker-toggle-',
-        'preview-panel',
-        'preview-section-',
-        'preview-label-',
-        'congregational-close-btn',
-      ]
-      for (const id of testIds) {
-        expect(knownPrefixes.some((prefix) => id === prefix || id.startsWith(prefix))).toBe(true)
-      }
-    })
-  })
-
-  // ── 39-04: AI toggle — hide the AI split button, prove existing splits ────
-  // are never altered when AI is off. A real Pinia is already active
-  // (beforeEach above) and useAuthStore().settings is a plain writable ref
-  // defaulting to DEFAULT_ORG_SETTINGS (aiEnabled: true), so tests flip it
-  // directly rather than mocking the store.
-  describe('AI toggle (39-04)', () => {
-    it('renders the AI split button when AI is on', () => {
-      const wrapper = mountEditor()
-      expect(wrapper.find('[data-testid="ai-split-btn"]').exists()).toBe(true)
-    })
-
-    it('hides the AI split button when AI is off, while Fetch Passage and the reference input still render', () => {
-      useAuthStore().settings.aiEnabled = false
-      const wrapper = mountEditor()
-
-      expect(wrapper.find('[data-testid="ai-split-btn"]').exists()).toBe(false)
-      expect(wrapper.find('[data-testid="fetch-btn"]').exists()).toBe(true)
-      expect(wrapper.find('[data-testid="reference-input"]').exists()).toBe(true)
-    })
-
-    it('mounted over an existing AI-generated split with AI off: content is unaltered and a hand edit (speaker toggle) still applies', async () => {
+    it('mounted over an existing AI-generated split with AI off: content is unaltered and a hand relabel still applies', async () => {
       useAuthStore().settings.aiEnabled = false
       const wrapper = mountEditor({ reference: SAMPLE_REFERENCE, sections: SAMPLE_SECTIONS })
 
-      // Not cleared, not regenerated, not made read-only — every section
-      // renders exactly the content passed in.
       expect(wrapper.find('[data-testid="preview-section-0"]').text()).toContain(SAMPLE_SECTIONS[0]!.text)
       expect(wrapper.find('[data-testid="preview-section-1"]').text()).toContain(SAMPLE_SECTIONS[1]!.text)
-      expect(wrapper.find('[data-testid="speaker-toggle-0"]').text()).toBe('Leader')
-      expect(wrapper.find('[data-testid="speaker-toggle-1"]').text()).toBe('Congregation')
       expect(mockSplitCongregationalReading).not.toHaveBeenCalled()
 
-      // Hand-dividing still works: a speaker toggle takes effect and is
-      // reported upward via update:sections, same as with AI on.
-      await wrapper.find('[data-testid="speaker-toggle-1"]').trigger('click')
-      expect(wrapper.find('[data-testid="speaker-toggle-1"]').text()).toBe('Leader')
-
-      const emits = wrapper.emitted('update:sections')
-      expect(emits).toHaveLength(1)
-      const emitted = emits![0]![0] as CongregationalSection[]
-      expect(emitted[0]).toEqual(SAMPLE_SECTIONS[0])
-      expect(emitted[1]).toEqual({ ...SAMPLE_SECTIONS[1], speaker: 'LEADER' })
+      await wrapper.find('[data-testid="speaker-chip-1-leader"]').trigger('click')
+      expect(wrapper.find('[data-testid="preview-label-1"]').text()).toBe('Leader:')
     })
   })
 
-  // ── 45-04 Task 1: ESV/NLT fetch routing + stamp-once-at-fetch (R090/R092) ──
-  describe('ESV/NLT routing + translationSource stamping (45-04)', () => {
+  // ── R096: fetch renders raw text only — no auto-split, three equal seeds ─
+
+  describe('after fetch: three equal seeds, no auto-split', () => {
+    it('renders one undivided Leader block and a "Choose a starting point" row with all three seeds (AI on)', async () => {
+      const wrapper = mountEditor()
+      await fetchDefaultPassage(wrapper)
+
+      expect(wrapper.find('[data-testid="sections-container"]').exists()).toBe(true)
+      expect(wrapper.findAll('[data-testid^="preview-section-"]')).toHaveLength(1)
+      expect(wrapper.find('[data-testid="preview-label-0"]').text()).toBe('Leader:')
+      expect(wrapper.find('[data-testid="ai-split-btn"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="seed-alternate-btn"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="seed-blank-btn"]').exists()).toBe(true)
+
+      // Prohibition: fetch never auto-commits any seed.
+      expect(mockSplitCongregationalReading).not.toHaveBeenCalled()
+      expect(mockSplitPassage).not.toHaveBeenCalled()
+    })
+
+    it('emits update:reference then update:sections (one Leader section) on fetch', async () => {
+      const wrapper = mountEditor()
+      await fetchDefaultPassage(wrapper)
+
+      expect(customEmittedKeys(wrapper)).toEqual(['update:reference', 'update:sections'])
+      const refEmits = wrapper.emitted('update:reference')
+      expect(refEmits![0]).toEqual([SAMPLE_REFERENCE])
+
+      const sections = lastEmittedSections(wrapper)
+      expect(sections).toHaveLength(1)
+      expect(sections[0]!.speaker).toBe('LEADER')
+    })
+
+    it('AI-off: ai-split-btn is absent while the other two seeds remain present and fully functional', async () => {
+      useAuthStore().settings.aiEnabled = false
+      const wrapper = mountEditor()
+      await fetchDefaultPassage(wrapper)
+
+      expect(wrapper.find('[data-testid="ai-split-btn"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="seed-alternate-btn"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="seed-blank-btn"]').exists()).toBe(true)
+
+      await wrapper.find('[data-testid="seed-blank-btn"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.findAll('[data-testid^="preview-section-"]')).toHaveLength(3)
+    })
+
+    it('Pitfall 3: a passage with no internal boundary still renders one undivided block; AI stays disabled, Blank/Alternate stay usable', async () => {
+      mockFetchNltPassageText.mockResolvedValueOnce('no boundaries here at all')
+      const wrapper = mountEditor()
+      await fetchDefaultPassage(wrapper)
+
+      expect(wrapper.find('[data-testid="sections-container"]').exists()).toBe(true)
+      expect(wrapper.findAll('[data-testid^="preview-section-"]')).toHaveLength(1)
+
+      const aiBtn = wrapper.find('[data-testid="ai-split-btn"]')
+      expect(aiBtn.attributes('disabled')).toBeDefined()
+      await aiBtn.trigger('click')
+      await flushPromises()
+      expect(mockSplitCongregationalReading).not.toHaveBeenCalled()
+
+      await wrapper.find('[data-testid="seed-blank-btn"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.findAll('[data-testid^="preview-section-"]')).toHaveLength(1)
+    })
+  })
+
+  // ── The three seeds ──────────────────────────────────────────────────────
+
+  describe('Start Blank seed', () => {
+    it('produces one segment per verse, all Leader, and does not call splitPassage', async () => {
+      const wrapper = mountEditor()
+      await fetchDefaultPassage(wrapper)
+
+      await wrapper.find('[data-testid="seed-blank-btn"]').trigger('click')
+      await flushPromises()
+
+      const previews = wrapper.findAll('[data-testid^="preview-section-"]')
+      expect(previews).toHaveLength(3)
+      for (let i = 0; i < 3; i++) {
+        expect(wrapper.find(`[data-testid="preview-label-${i}"]`).text()).toBe('Leader:')
+      }
+      expect(mockSplitPassage).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('Alternate Leader/Congregation seed', () => {
+    it('reproduces alternating Leader/Congregation from splitPassage grouping, boundary-aligned', async () => {
+      const wrapper = mountEditor()
+      await fetchDefaultPassage(wrapper)
+
+      await wrapper.find('[data-testid="seed-alternate-btn"]').trigger('click')
+      await flushPromises()
+
+      expect(mockSplitPassage).toHaveBeenCalledTimes(1)
+      const previews = wrapper.findAll('[data-testid^="preview-section-"]')
+      expect(previews).toHaveLength(2)
+      expect(wrapper.find('[data-testid="preview-label-0"]').text()).toBe('Leader:')
+      expect(wrapper.find('[data-testid="preview-label-1"]').text()).toBe('Congregation:')
+      expect(wrapper.find('[data-testid="preview-section-0"]').text()).toContain(TWO_GROUP_SPLIT_TEXT[0])
+      expect(wrapper.find('[data-testid="preview-section-1"]').text()).toContain(TWO_GROUP_SPLIT_TEXT[1])
+    })
+  })
+
+  describe('Split with AI seed', () => {
+    it('maps the AI result into the boundary-indexed draft, and the resulting segment is sub-dividable', async () => {
+      const wrapper = mountEditor()
+      await fetchDefaultPassage(wrapper)
+
+      mockSplitCongregationalReading.mockResolvedValueOnce([
+        { speaker: 'LEADER', text: TWO_GROUP_SPLIT_TEXT[0] },
+        { speaker: 'CONGREGATION', text: TWO_GROUP_SPLIT_TEXT[1] },
+      ])
+      await wrapper.find('[data-testid="ai-split-btn"]').trigger('click')
+      await flushPromises()
+
+      expect(mockSplitCongregationalReading).toHaveBeenCalledWith(DEFAULT_PASSAGE_TEXT)
+      let previews = wrapper.findAll('[data-testid^="preview-section-"]')
+      expect(previews).toHaveLength(2)
+      expect(wrapper.find('[data-testid="preview-label-0"]').text()).toBe('Leader:')
+      expect(wrapper.find('[data-testid="preview-label-1"]').text()).toBe('Congregation:')
+
+      // Sub-divide the AI-produced CONGREGATION segment: pick the LAST
+      // insert-gap in the document — it always belongs to the final (here,
+      // CONGREGATION) segment, since gaps render in ascending boundary order
+      // and the AI segment's own gaps sort after the LEADER segment's.
+      const gaps = wrapper.findAll('[data-testid^="divider-insert-"]')
+      expect(gaps.length).toBeGreaterThan(0)
+      await gaps[gaps.length - 1]!.trigger('click')
+      await flushPromises()
+
+      previews = wrapper.findAll('[data-testid^="preview-section-"]')
+      expect(previews).toHaveLength(3)
+      // The new lower segment inherits the SAME speaker as its parent.
+      expect(wrapper.find('[data-testid="preview-label-1"]').text()).toBe('Congregation:')
+      expect(wrapper.find('[data-testid="preview-label-2"]').text()).toBe('Congregation:')
+      expect(wrapper.find('[data-testid="preview-section-1"]').text()).toContain('Congregation line two.')
+      expect(wrapper.find('[data-testid="preview-section-2"]').text()).toContain('Leader line three.')
+      // Segment 0 (LEADER) is untouched by the split of segment 1.
+      expect(wrapper.find('[data-testid="preview-label-0"]').text()).toBe('Leader:')
+    })
+
+    it('failure: pushes exactly one verbatim toast, leaves the draft byte-identical, and emits no extra update:sections', async () => {
+      const wrapper = mountEditor()
+      await fetchDefaultPassage(wrapper)
+      const emissionsBefore = wrapper.emitted('update:sections')!.length
+
+      mockSplitCongregationalReading.mockResolvedValueOnce(null)
+      await wrapper.find('[data-testid="ai-split-btn"]').trigger('click')
+      await flushPromises()
+
+      const toasts = useToasts()
+      expect(toasts.toasts).toHaveLength(1)
+      expect(toasts.toasts[0]!.message).toBe(
+        "Couldn't split this passage — your reading is unchanged. Build it by hand or try again.",
+      )
+      expect(wrapper.findAll('[data-testid^="preview-section-"]')).toHaveLength(1)
+      expect(wrapper.emitted('update:sections')!.length).toBe(emissionsBefore)
+    })
+  })
+
+  // ── R095: hand-divide — insert / remove, 3-way chip ─────────────────────
+
+  describe('divider editing', () => {
+    async function seedTwoSegments(wrapper: ReturnType<typeof mountEditor>) {
+      await fetchDefaultPassage(wrapper)
+      mockSplitCongregationalReading.mockResolvedValueOnce([
+        { speaker: 'LEADER', text: TWO_GROUP_SPLIT_TEXT[0] },
+        { speaker: 'CONGREGATION', text: TWO_GROUP_SPLIT_TEXT[1] },
+      ])
+      await wrapper.find('[data-testid="ai-split-btn"]').trigger('click')
+      await flushPromises()
+    }
+
+    it('clicking a gap-+ inserts a divider, splitting one segment into two that together reconstruct the original text', async () => {
+      const wrapper = mountEditor()
+      await seedTwoSegments(wrapper)
+
+      const gaps = wrapper.findAll('[data-testid^="divider-insert-"]')
+      await gaps[gaps.length - 1]!.trigger('click')
+      await flushPromises()
+
+      const sections = lastEmittedSections(wrapper)
+      expect(sections).toHaveLength(3)
+      // Nothing lost: rejoining the split halves with a single space
+      // reconstructs the pre-split segment's text exactly.
+      expect(`${sections[1]!.text} ${sections[2]!.text}`).toBe(TWO_GROUP_SPLIT_TEXT[1])
+    })
+
+    it('clicking an existing divider removes it, merging the neighbours and keeping the UPPER segment speaker', async () => {
+      const wrapper = mountEditor()
+      await seedTwoSegments(wrapper)
+
+      const removeBtn = wrapper.find('[data-testid^="divider-remove-"]')
+      expect(removeBtn.exists()).toBe(true)
+      await removeBtn.trigger('click')
+      await flushPromises()
+
+      const sections = lastEmittedSections(wrapper)
+      expect(sections).toHaveLength(1)
+      expect(sections[0]!.speaker).toBe('LEADER')
+      expect(sections[0]!.text).toBe(`${TWO_GROUP_SPLIT_TEXT[0]} ${TWO_GROUP_SPLIT_TEXT[1]}`)
+    })
+
+    it('the 3-way chip sets each segment independently — a non-adjacent refrain (Psalm 136) shares a label with a different role in between', async () => {
+      const wrapper = mountEditor()
+      await fetchDefaultPassage(wrapper)
+      await wrapper.find('[data-testid="seed-blank-btn"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.findAll('[data-testid^="preview-section-"]')).toHaveLength(3)
+
+      await wrapper.find('[data-testid="speaker-chip-0-congregation"]').trigger('click')
+      await wrapper.find('[data-testid="speaker-chip-2-congregation"]').trigger('click')
+
+      expect(wrapper.find('[data-testid="preview-label-0"]').text()).toBe('Congregation:')
+      expect(wrapper.find('[data-testid="preview-label-1"]').text()).toBe('Leader:')
+      expect(wrapper.find('[data-testid="preview-label-2"]').text()).toBe('Congregation:')
+    })
+
+    it('the chip supports the ALL role', async () => {
+      const wrapper = mountEditor()
+      await fetchDefaultPassage(wrapper)
+      await wrapper.find('[data-testid="seed-blank-btn"]').trigger('click')
+      await flushPromises()
+
+      await wrapper.find('[data-testid="speaker-chip-1-all"]').trigger('click')
+      expect(wrapper.find('[data-testid="preview-label-1"]').text()).toBe('All:')
+    })
+  })
+
+  // ── R096: re-seed confirm ────────────────────────────────────────────────
+
+  describe('re-seed confirm', () => {
+    it('applies the FIRST seed on a freshly-fetched, never-edited draft with no confirm', async () => {
+      const wrapper = mountEditor()
+      await fetchDefaultPassage(wrapper)
+
+      await wrapper.find('[data-testid="seed-blank-btn"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="reseed-confirm"]').exists()).toBe(false)
+      expect(wrapper.findAll('[data-testid^="preview-section-"]')).toHaveLength(3)
+    })
+
+    it('shows a confirm on re-seeding after a manual edit; cancel leaves the draft untouched', async () => {
+      const wrapper = mountEditor()
+      await fetchDefaultPassage(wrapper)
+      await wrapper.find('[data-testid="seed-blank-btn"]').trigger('click')
+      await flushPromises()
+
+      // Manual edit: relabel one segment.
+      await wrapper.find('[data-testid="speaker-chip-0-congregation"]').trigger('click')
+
+      await wrapper.find('[data-testid="seed-alternate-btn"]').trigger('click')
+      const confirm = wrapper.find('[data-testid="reseed-confirm"]')
+      expect(confirm.exists()).toBe(true)
+      expect(confirm.text()).toContain('Replace your dividers?')
+      // Not yet applied — still the Blank seed's 3 segments with the manual edit.
+      expect(wrapper.findAll('[data-testid^="preview-section-"]')).toHaveLength(3)
+      expect(wrapper.find('[data-testid="preview-label-0"]').text()).toBe('Congregation:')
+
+      await wrapper.find('[data-testid="reseed-confirm-cancel"]').trigger('click')
+      expect(wrapper.find('[data-testid="reseed-confirm"]').exists()).toBe(false)
+      expect(wrapper.findAll('[data-testid^="preview-section-"]')).toHaveLength(3)
+      expect(wrapper.find('[data-testid="preview-label-0"]').text()).toBe('Congregation:')
+    })
+
+    it('confirming replace applies the new seed', async () => {
+      const wrapper = mountEditor()
+      await fetchDefaultPassage(wrapper)
+      await wrapper.find('[data-testid="seed-blank-btn"]').trigger('click')
+      await flushPromises()
+      await wrapper.find('[data-testid="speaker-chip-0-congregation"]').trigger('click')
+
+      await wrapper.find('[data-testid="seed-alternate-btn"]').trigger('click')
+      await wrapper.find('[data-testid="reseed-confirm-replace"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="reseed-confirm"]').exists()).toBe(false)
+      expect(wrapper.findAll('[data-testid^="preview-section-"]')).toHaveLength(2)
+      expect(wrapper.find('[data-testid="preview-label-0"]').text()).toBe('Leader:')
+      expect(wrapper.find('[data-testid="preview-label-1"]').text()).toBe('Congregation:')
+
+      // A fresh seed re-applies without a confirm until the user edits again.
+      await wrapper.find('[data-testid="seed-blank-btn"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.find('[data-testid="reseed-confirm"]').exists()).toBe(false)
+      expect(wrapper.findAll('[data-testid^="preview-section-"]')).toHaveLength(3)
+    })
+  })
+
+  // ── ESV/NLT routing + translationSource stamping (45-04/R092) ───────────
+
+  describe('ESV/NLT routing + translationSource stamping', () => {
     it('bibleVersion defaults to NLT (45-02) and fetch routes to nltApi, not esvApi', async () => {
       const wrapper = mountEditor()
-      await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
-      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
-      await flushPromises()
+      await fetchDefaultPassage(wrapper)
 
       expect(mockFetchNltPassageText).toHaveBeenCalledWith('Psalms 136:1-3')
       expect(mockFetchPassageText).not.toHaveBeenCalled()
@@ -647,96 +519,45 @@ describe('CongregationalEditor', () => {
 
     it('bibleVersion=ESV routes fetch to esvApi, not nltApi', async () => {
       const wrapper = mountEditor()
-      // See the comment on the "explicit ESV fetch fails" test above — the
-      // setting is mutated only after the store's own async reset settles.
       await flushPromises()
       useAuthStore().settings.bibleVersion = 'ESV'
-      await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
-      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
-      await flushPromises()
+      await fetchDefaultPassage(wrapper)
 
       expect(mockFetchPassageText).toHaveBeenCalledWith('Psalms 136:1-3')
       expect(mockFetchNltPassageText).not.toHaveBeenCalled()
     })
 
-    it('stamps every produced section with translationSource matching the setting at fetch time (NLT)', async () => {
+    it('R092: a settings change AFTER fetch does not restamp — survives a seed AND a subsequent divider edit', async () => {
       const wrapper = mountEditor()
-      await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
-      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
-      await flushPromises()
+      await fetchDefaultPassage(wrapper)
+      expect(lastEmittedSections(wrapper).every((s) => s.translationSource === 'NLT')).toBe(true)
 
-      const sectionsEmits = wrapper.emitted('update:sections')
-      const sections = sectionsEmits![0]![0] as CongregationalSection[]
-      expect(sections.length).toBeGreaterThan(0)
-      for (const section of sections) {
-        expect(section.translationSource).toBe('NLT')
-      }
-    })
-
-    it('stamps every produced section with translationSource=ESV when the setting is ESV at fetch time', async () => {
-      const wrapper = mountEditor()
-      await flushPromises()
+      // Flip the church's setting AFTER the fetch.
       useAuthStore().settings.bibleVersion = 'ESV'
-      await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
-      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
+
+      // First seed on the unedited draft applies immediately.
+      await wrapper.find('[data-testid="seed-blank-btn"]').trigger('click')
       await flushPromises()
+      let sections = lastEmittedSections(wrapper)
+      expect(sections).toHaveLength(3)
+      expect(sections.every((s) => s.translationSource === 'NLT')).toBe(true)
 
-      const sectionsEmits = wrapper.emitted('update:sections')
-      const sections = sectionsEmits![0]![0] as CongregationalSection[]
-      for (const section of sections) {
-        expect(section.translationSource).toBe('ESV')
-      }
-    })
-
-    it('R092: a setting change AFTER fetch does not restamp already-created sections', async () => {
-      const wrapper = mountEditor()
-      await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
-      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
+      // A subsequent divider edit must not restamp either.
+      const gaps = wrapper.findAll('[data-testid^="divider-insert-"]')
+      expect(gaps.length).toBeGreaterThan(0)
+      await gaps[0]!.trigger('click')
       await flushPromises()
-
-      const firstFetchSections = wrapper.emitted('update:sections')![0]![0] as CongregationalSection[]
-      expect(firstFetchSections.every((s) => s.translationSource === 'NLT')).toBe(true)
-
-      // Flip the church's setting AFTER the fetch — a speaker toggle (which
-      // mutates the already-stamped sections, not a new fetch) must preserve
-      // the ORIGINAL stamped value, not adopt the new live setting.
-      useAuthStore().settings.bibleVersion = 'ESV'
-      await wrapper.find('[data-testid="speaker-toggle-0"]').trigger('click')
-
-      const afterToggleEmits = wrapper.emitted('update:sections')!
-      const afterToggleSections = afterToggleEmits[afterToggleEmits.length - 1]![0] as CongregationalSection[]
-      expect(afterToggleSections.every((s) => s.translationSource === 'NLT')).toBe(true)
+      sections = lastEmittedSections(wrapper)
+      expect(sections.length).toBeGreaterThan(3)
+      expect(sections.every((s) => s.translationSource === 'NLT')).toBe(true)
     })
 
     it('a fetch failure surfaces the shared fetchError contract identically for the NLT client', async () => {
       mockFetchNltPassageText.mockRejectedValueOnce(new Error('boom'))
       const wrapper = mountEditor()
-      await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
-      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
-      await flushPromises()
+      await fetchDefaultPassage(wrapper)
 
       expect(wrapper.find('[data-testid="fetch-error"]').exists()).toBe(true)
-    })
-
-    it('AI-split-produced sections are stamped from the version captured at the fetch that produced rawText, not a live re-read of the setting', async () => {
-      const wrapper = mountEditor()
-      await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
-      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
-      await flushPromises()
-
-      // Setting flips to ESV between the fetch and the AI split click.
-      useAuthStore().settings.bibleVersion = 'ESV'
-
-      mockSplitCongregationalReading.mockResolvedValueOnce([
-        { speaker: 'LEADER', text: 'a' },
-        { speaker: 'CONGREGATION', text: 'b' },
-      ])
-      await wrapper.find('[data-testid="ai-split-btn"]').trigger('click')
-      await flushPromises()
-
-      const splitEmits = wrapper.emitted('update:sections')!
-      const splitSections = splitEmits[splitEmits.length - 1]![0] as CongregationalSection[]
-      expect(splitSections.every((s) => s.translationSource === 'NLT')).toBe(true)
     })
   })
 })
