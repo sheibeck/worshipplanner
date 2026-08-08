@@ -489,6 +489,31 @@ describe('CongregationalEditor', () => {
     })
   })
 
+  // ── WR-01 (47-REVIEW): verse-range does not swallow the next verse ──────
+
+  describe('WR-01: verse range for a run-on verse (no terminal clause punctuation)', () => {
+    it('a per-verse Start Blank segment does not report the next verse in its range', async () => {
+      // No punctuation between "Lord" and "[2]" — the only legal boundary a
+      // segment containing just verse 1 can end at is the START of verse
+      // 2's own marker, exercising the exact swallowing edge case WR-01
+      // describes.
+      const RUN_ON_TEXT = '[1] Give thanks to the Lord [2] for he is good.'
+      mockFetchNltPassageText.mockResolvedValueOnce(RUN_ON_TEXT)
+      const wrapper = mountEditor()
+      await fetchDefaultPassage(wrapper)
+
+      await wrapper.find('[data-testid="seed-blank-btn"]').trigger('click')
+      await flushPromises()
+
+      const sections = lastEmittedSections(wrapper)
+      expect(sections).toHaveLength(2)
+      expect(sections[0]!.text).toBe('Give thanks to the Lord')
+      expect(sections[0]!.verseRange).toBe('1')
+      expect(sections[1]!.text).toBe('for he is good.')
+      expect(sections[1]!.verseRange).toBe('2')
+    })
+  })
+
   // ── R095: hand-divide — insert / remove, 3-way chip ─────────────────────
 
   describe('divider editing', () => {

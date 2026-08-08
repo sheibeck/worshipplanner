@@ -313,8 +313,12 @@
 // = computeBoundaries(rawText)`, computed exactly ONCE per fetch (RESEARCH
 // Pitfall 1). `CongregationalSection[]` — what actually gets emitted — is a
 // pure, derived projection of `draft` via `sliceAtBoundaries` +
-// `stripVerseMarkers` + `verseRangeForSlice` (the codebase's existing
-// "encoding backstop", reused verbatim, never reimplemented).
+// `stripVerseMarkers` + `verseRangeForBoundaryRange` (the codebase's
+// existing "encoding backstop", reused verbatim, never reimplemented;
+// `verseRangeForBoundaryRange` rather than the raw-text-scanning
+// `verseRangeForSlice` — see WR-01, 47-REVIEW — since a segment's own
+// verse-marker-swallowing edge case needs boundary-index awareness, not
+// raw-text `[N]` scanning).
 //
 // Fetch no longer auto-commits a split (R096): it renders one undivided
 // Leader block, and the user picks one of three equal seeds (AI / Alternate
@@ -332,7 +336,7 @@ import {
   hasSplittableBoundaries,
   sliceAtBoundaries,
   stripVerseMarkers,
-  verseRangeForSlice,
+  verseRangeForBoundaryRange,
 } from '@/utils/scriptureBoundaries'
 import { useToasts } from '@/stores/toasts'
 import { useAuthStore } from '@/stores/auth'
@@ -429,7 +433,18 @@ const congregationalSections = computed<CongregationalSection[]>(() => {
     const section: CongregationalSection = {
       speaker,
       text: stripVerseMarkers(slice),
-      verseRange: verseRangeForSlice(slice),
+      // WR-01: derived from boundary POSITION, not by re-scanning `slice`
+      // for every `[N]` it contains — a run-on verse with no terminal
+      // clause punctuation forces this segment's raw span to extend
+      // through the NEXT verse's own marker even though none of that
+      // verse's words are included; verseRangeForBoundaryRange correctly
+      // excludes it.
+      verseRange: verseRangeForBoundaryRange(
+        rawText.value,
+        boundaries.value,
+        startBoundary,
+        endBoundary,
+      ),
     }
     if (lastFetchedVersion.value) section.translationSource = lastFetchedVersion.value
     return section

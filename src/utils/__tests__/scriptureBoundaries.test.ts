@@ -7,6 +7,7 @@ import {
   hasSplittableBoundaries,
   sliceAtBoundaries,
   stripVerseMarkers,
+  verseRangeForBoundaryRange,
   verseRangeForSlice,
 } from '@/utils/scriptureBoundaries'
 
@@ -248,5 +249,46 @@ describe('verseRangeForSlice', () => {
 
   it('returns undefined when the slice carries no verse marker', () => {
     expect(verseRangeForSlice('no markers here')).toBeUndefined()
+  })
+})
+
+describe('verseRangeForBoundaryRange (WR-01, 47-REVIEW)', () => {
+  it('excludes the next verse marker when a run-on verse has no terminal clause punctuation before it', () => {
+    // No punctuation between "Lord" and "[2]" — the only legal boundary a
+    // segment containing just verse 1 can end at is the START of verse 2's
+    // own marker, so the raw slice necessarily contains "[2]" even though
+    // none of verse 2's words are included.
+    const text = '[1] Give thanks to the Lord [2] for he is good.'
+    const boundaries = computeBoundaries(text)
+    const verse2MarkerBoundary = boundaries.indexOf(text.indexOf('for he is good'))
+    expect(verse2MarkerBoundary).toBeGreaterThan(0)
+
+    expect(verseRangeForBoundaryRange(text, boundaries, 0, verse2MarkerBoundary)).toBe('1')
+
+    // Sanity check proving this is a real regression this function fixes:
+    // the raw-text-scanning verseRangeForSlice DOES over-report on the
+    // identical slice.
+    const slice = sliceAtBoundaries(text, boundaries, 0, verse2MarkerBoundary)
+    expect(verseRangeForSlice(slice)).toBe('1-2')
+  })
+
+  it('includes every verse whose own marker boundary falls strictly before endBoundary', () => {
+    const text = '[1] one. [2] two. [3] three.'
+    const boundaries = computeBoundaries(text)
+    const verse3MarkerBoundary = boundaries.indexOf(text.indexOf('three'))
+    expect(verseRangeForBoundaryRange(text, boundaries, 0, verse3MarkerBoundary)).toBe('1-2')
+  })
+
+  it('reports a single verse number when only one marker boundary falls in range', () => {
+    const text = '[1] one. [2] two. [3] three.'
+    const boundaries = computeBoundaries(text)
+    const verse2MarkerBoundary = boundaries.indexOf(text.indexOf('two'))
+    expect(verseRangeForBoundaryRange(text, boundaries, 0, verse2MarkerBoundary)).toBe('1')
+  })
+
+  it('returns undefined when no verse marker boundary falls within the given range', () => {
+    const text = 'First sentence. Second sentence.'
+    const boundaries = computeBoundaries(text)
+    expect(verseRangeForBoundaryRange(text, boundaries, 0, boundaries.length - 1)).toBeUndefined()
   })
 })
