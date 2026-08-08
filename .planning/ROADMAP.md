@@ -348,7 +348,11 @@ Plans:
   3. Changing the translation setting never retroactively alters scripture on slides that already exist, because each slide records a per-slide translation-source field set at creation
   4. The NLT proxy (`key` query-parameter auth, `DOMParser`-based HTML-stripping — NLT's response is HTML, not JSON, so the ESV branch's header-injection code cannot be reused verbatim) is built and tested against a real sample fetched with the owner's key; it ships undeployed, with the exact `firebase deploy --only functions` command for the new branch handed to the owner
 
-**Plans**: TBD
+**Plans**: 4 plans
+- [ ] 45-01-PLAN.md — NLT proxy Cloud Function branch + nltApi.ts client (DEPLOY-GATED; built/tested/undeployed) [wave 1]
+- [ ] 45-02-PLAN.md — OrgSettings.bibleVersion field (default NLT) + Settings Bible Translation card [wave 1]
+- [ ] 45-03-PLAN.md — Per-slide translationSource provenance: types + shared attribution/resolve helpers + assembly threading + R092 invariant [wave 1]
+- [ ] 45-04-PLAN.md — Consumption wiring: ESV/NLT fetch routing + stamping + attribution suffix at both render sites [wave 2, depends 45-01/02/03]
 **UI hint**: yes
 **Research flag**: needs research — NLT's exact response shape is LOW-MEDIUM confidence from a single manual fetch; verify against the owner's real key during planning before writing the stripping logic.
 **Notes**: Precedes Phase 47 (congregational reading) since the divider operates on already-fetched, already-attributed scripture text.
