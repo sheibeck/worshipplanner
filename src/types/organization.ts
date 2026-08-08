@@ -74,6 +74,27 @@ export interface OrgSettings {
    * (R092) never changes when this setting changes.
    */
   bibleVersion: 'ESV' | 'NLT'
+  /**
+   * Church's one house font, applied to every slide surface — the Slides
+   * grid, the Edit Slide drawer preview, and the presenter
+   * (`PresentationViewer.vue`) — via CSS custom properties (R093).
+   * `ServicePrintLayout.vue` is deliberately excluded; the printed Order of
+   * Service is out of scope for this setting.
+   *
+   * `fontFamily` must be one of `SLIDE_FONTS`'s keys (`src/config/
+   * slideFonts.ts`); `fontWeight` must be one of that family's `weights`;
+   * both are defensively re-validated at render time by
+   * `src/utils/slideTypography.ts::cssVarsFor`/`snapWeight`, never trusted
+   * as free text (ASVS V5). `fontScale` is a **multiplier** applied via
+   * `--slide-font-scale`, not an absolute pixel size — `'md'` is the
+   * identity scale (1.0), so a church that never opens this setting sees
+   * zero size change.
+   */
+  slideTypography: {
+    fontFamily: string
+    fontWeight: number
+    fontScale: 'sm' | 'md' | 'lg'
+  }
 }
 
 /**
@@ -130,4 +151,12 @@ export const DEFAULT_ORG_SETTINGS: OrgSettings = {
   // the slide types, R092) — this default only governs scripture fetched
   // going forward.
   bibleVersion: 'NLT',
+  // Medium (1.0) = identity scale: a church that never opens the Slide
+  // Typography setting sees zero size change. Family default anchors on the
+  // ROADMAP's designated Helvetica-Neue stand-in (Inter, weight 400).
+  slideTypography: {
+    fontFamily: 'Inter',
+    fontWeight: 400,
+    fontScale: 'md',
+  },
 }
