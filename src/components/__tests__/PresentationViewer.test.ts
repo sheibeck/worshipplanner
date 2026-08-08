@@ -1878,5 +1878,39 @@ describe('PresentationViewer', () => {
       expect(body().find('[data-testid="presentation-empty-state"]').exists()).toBe(true)
       expect(body().find('[data-testid="presentation-loading"]').exists()).toBe(false)
     })
+
+    // CR-02 (46-REVIEW.md): a rejected loadFontCss (e.g. a stale-chunk
+    // deploy or flaky venue Wi-Fi failing the dynamic CSS import) must
+    // release the gate — never permanently strand fontReady at false.
+    // Distinct from the timeout test above: this promise REJECTS, it
+    // never merely stalls.
+    it('font gate: releases fontReady when loadFontCss REJECTS — never permanently hangs "Loading slideshow…"', async () => {
+      mockSlideTypography = { fontFamily: 'Lora', fontWeight: 600, fontScale: 'md' }
+      vi.mocked(loadFontCss).mockRejectedValueOnce(new Error('chunk load failed'))
+      mount(PresentationViewer, { props: { slides: [lyricSlide('a')] } })
+      await flushPromises()
+
+      expect(body().find('[data-testid="presentation-slide"]').exists()).toBe(true)
+      expect(body().find('[data-testid="presentation-loading"]').exists()).toBe(false)
+    })
+
+    // CR-02: a rejected document.fonts.load() (surfaced through
+    // waitForSlideFont) must degrade the same way as a timeout, not throw
+    // out of the onMounted callback and leave fontReady stuck false.
+    it('font gate: releases fontReady when document.fonts.load() REJECTS', async () => {
+      Object.defineProperty(document, 'fonts', {
+        value: {
+          ready: Promise.resolve(),
+          load: vi.fn().mockRejectedValue(new Error('font decode error')),
+        },
+        configurable: true,
+        writable: true,
+      })
+      mount(PresentationViewer, { props: { slides: [lyricSlide('a')] } })
+      await flushPromises()
+
+      expect(body().find('[data-testid="presentation-slide"]').exists()).toBe(true)
+      expect(body().find('[data-testid="presentation-loading"]').exists()).toBe(false)
+    })
   })
 })

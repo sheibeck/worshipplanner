@@ -909,17 +909,34 @@ onMounted(async () => {
   // R094 — the font-load gate. Runs regardless of whether there are slides
   // yet (`fontReady` only ever gates rendering when `hasSlides` is true, see
   // `fontGateActive` above), so it never races the assembly-in-flight state.
-  const { family, weight } = resolvedFontChoice()
-  if (family !== DEFAULT_FONT_FAMILY || weight !== DEFAULT_FONT_WEIGHT) {
-    // On-demand load of a non-eager curated face BEFORE asking the browser
-    // to resolve it — document.fonts.load() can only find a face whose
-    // @font-face rule has already been registered.
-    await loadFontCss(family, weight)
+  //
+  // CR-02 (46-REVIEW.md): the whole sequence — including loadFontCss's
+  // unbounded network fetch, NOT just waitForSlideFont's own internal
+  // timeout — is raced against ONE shared FONT_LOAD_TIMEOUT_MS timeout and
+  // wrapped in try/catch/finally, so a rejected dynamic import (stale-chunk
+  // deploy, flaky venue Wi-Fi) or a rejected document.fonts.load() can
+  // never permanently strand fontReady at false and hang "Loading
+  // slideshow…" for the rest of the service.
+  try {
+    const { family, weight } = resolvedFontChoice()
+    await Promise.race([
+      (async () => {
+        if (family !== DEFAULT_FONT_FAMILY || weight !== DEFAULT_FONT_WEIGHT) {
+          // On-demand load of a non-eager curated face BEFORE asking the
+          // browser to resolve it — document.fonts.load() can only find a
+          // face whose @font-face rule has already been registered.
+          await loadFontCss(family, weight)
+        }
+        await waitForSlideFont(family, weight, FONT_LOAD_TIMEOUT_MS)
+      })(),
+      new Promise((resolve) => setTimeout(resolve, FONT_LOAD_TIMEOUT_MS)),
+    ])
+  } catch {
+    // A rejected dynamic import / font-load call must never leave the
+    // presenter stuck — degrade to "render anyway", same as a timeout.
+  } finally {
+    fontReady.value = true
   }
-  // Bounded (Promise.race against FONT_LOAD_TIMEOUT_MS) — always settles,
-  // never leaves fontReady stuck false (T-46-04).
-  await waitForSlideFont(family, weight, FONT_LOAD_TIMEOUT_MS)
-  fontReady.value = true
 
   // Deferred until AFTER the font gate (and its DOM update) so the slide
   // canvas — and the AudioPlayer/VideoPlayer refs it mounts — actually
