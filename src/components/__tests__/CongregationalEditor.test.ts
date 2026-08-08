@@ -27,6 +27,17 @@ vi.mock('@/utils/esvApi', () => ({
   fetchPassageText: (...args: unknown[]) => mockFetchPassageText(...args),
 }))
 
+// 45-04: NLT client mock, sibling to the ESV mock above. DEFAULT_ORG_SETTINGS
+// .bibleVersion is 'NLT' (45-02's owner-locked default), so every existing
+// test in this file that fetches (and never explicitly sets bibleVersion to
+// 'ESV') now routes through THIS mock, not mockFetchPassageText — it must
+// resolve the same default text so pre-existing assertions on rendered
+// content stay correct regardless of which client the routing picks.
+const mockFetchNltPassageText = vi.fn()
+vi.mock('@/utils/nltApi', () => ({
+  fetchNltPassageText: (...args: unknown[]) => mockFetchNltPassageText(...args),
+}))
+
 const mockSplitPassage = vi.fn()
 vi.mock('@/utils/scriptureSplitter', () => ({
   splitPassage: (...args: unknown[]) => mockSplitPassage(...args),
@@ -106,6 +117,7 @@ describe('CongregationalEditor', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockFetchPassageText.mockResolvedValue('[1] Give thanks to the LORD...')
+    mockFetchNltPassageText.mockResolvedValue('[1] Give thanks to the LORD...')
     mockSplitPassage.mockReturnValue(makeSampleSlides())
   })
 
@@ -225,9 +237,31 @@ describe('CongregationalEditor', () => {
     expect(wrapper.find('[data-testid="preview-label-2"]').text()).toBe('Leader:')
   })
 
-  it('shows error message when ESV fetch fails, and emits nothing', async () => {
+  it('shows error message when the (default NLT) fetch fails, and emits nothing', async () => {
+    mockFetchNltPassageText.mockRejectedValueOnce(new Error('Network error'))
+    const wrapper = mountEditor()
+    await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
+    await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
+    await flushPromises()
+
+    const errorEl = wrapper.find('[data-testid="fetch-error"]')
+    expect(errorEl.exists()).toBe(true)
+    expect(errorEl.text()).toContain('Could not load passage')
+    expect(customEmittedKeys(wrapper)).toHaveLength(0)
+  })
+
+  it('shows error message when an explicit ESV fetch fails, and emits nothing', async () => {
     mockFetchPassageText.mockRejectedValueOnce(new Error('Network error'))
     const wrapper = mountEditor()
+    // Mutate the setting only AFTER letting the store's own async
+    // onAuthStateChanged listener (registered at store setup, resolves on a
+    // microtask with no test user and resets `settings` to defaults) settle
+    // — otherwise a mutation made before/immediately-after mount can be
+    // silently overwritten by that unrelated reset before this test's click
+    // handler ever reads it. This is a pre-existing store/test-harness race,
+    // not something this plan's fetch-routing logic introduces.
+    await flushPromises()
+    useAuthStore().settings.bibleVersion = 'ESV'
     await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
     await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
     await flushPromises()
@@ -288,7 +322,7 @@ describe('CongregationalEditor', () => {
     })
 
     it('empty edge: stays disabled and issues no split call when the fetched text offers no internal boundary, leaving the manual sections untouched', async () => {
-      mockFetchPassageText.mockResolvedValueOnce('no boundaries here at all')
+      mockFetchNltPassageText.mockResolvedValueOnce('no boundaries here at all')
       const wrapper = mountEditor()
       await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
       await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
@@ -360,10 +394,13 @@ describe('CongregationalEditor', () => {
 
       // update:sections is emitted twice here — once by the preceding fetch,
       // once by the split — the split's own emission is the last one and
-      // carries exactly the returned array.
+      // carries exactly the returned array, PLUS the translationSource
+      // stamp (45-04/R092) captured from the fetch that produced rawText.
       const sectionsEmits = wrapper.emitted('update:sections')
       expect(sectionsEmits).toHaveLength(2)
-      expect(sectionsEmits![1]![0]).toEqual(aiSections)
+      expect(sectionsEmits![1]![0]).toEqual(
+        aiSections.map((section) => ({ ...section, translationSource: 'NLT' })),
+      )
     })
 
     it('encoding backstop: rendered section text is strictly === to the mocked section text, including curly quotes and an em dash', async () => {
@@ -593,6 +630,113 @@ describe('CongregationalEditor', () => {
       const emitted = emits![0]![0] as CongregationalSection[]
       expect(emitted[0]).toEqual(SAMPLE_SECTIONS[0])
       expect(emitted[1]).toEqual({ ...SAMPLE_SECTIONS[1], speaker: 'LEADER' })
+    })
+  })
+
+  // ── 45-04 Task 1: ESV/NLT fetch routing + stamp-once-at-fetch (R090/R092) ──
+  describe('ESV/NLT routing + translationSource stamping (45-04)', () => {
+    it('bibleVersion defaults to NLT (45-02) and fetch routes to nltApi, not esvApi', async () => {
+      const wrapper = mountEditor()
+      await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
+      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
+      await flushPromises()
+
+      expect(mockFetchNltPassageText).toHaveBeenCalledWith('Psalms 136:1-3')
+      expect(mockFetchPassageText).not.toHaveBeenCalled()
+    })
+
+    it('bibleVersion=ESV routes fetch to esvApi, not nltApi', async () => {
+      const wrapper = mountEditor()
+      // See the comment on the "explicit ESV fetch fails" test above — the
+      // setting is mutated only after the store's own async reset settles.
+      await flushPromises()
+      useAuthStore().settings.bibleVersion = 'ESV'
+      await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
+      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
+      await flushPromises()
+
+      expect(mockFetchPassageText).toHaveBeenCalledWith('Psalms 136:1-3')
+      expect(mockFetchNltPassageText).not.toHaveBeenCalled()
+    })
+
+    it('stamps every produced section with translationSource matching the setting at fetch time (NLT)', async () => {
+      const wrapper = mountEditor()
+      await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
+      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
+      await flushPromises()
+
+      const sectionsEmits = wrapper.emitted('update:sections')
+      const sections = sectionsEmits![0]![0] as CongregationalSection[]
+      expect(sections.length).toBeGreaterThan(0)
+      for (const section of sections) {
+        expect(section.translationSource).toBe('NLT')
+      }
+    })
+
+    it('stamps every produced section with translationSource=ESV when the setting is ESV at fetch time', async () => {
+      const wrapper = mountEditor()
+      await flushPromises()
+      useAuthStore().settings.bibleVersion = 'ESV'
+      await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
+      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
+      await flushPromises()
+
+      const sectionsEmits = wrapper.emitted('update:sections')
+      const sections = sectionsEmits![0]![0] as CongregationalSection[]
+      for (const section of sections) {
+        expect(section.translationSource).toBe('ESV')
+      }
+    })
+
+    it('R092: a setting change AFTER fetch does not restamp already-created sections', async () => {
+      const wrapper = mountEditor()
+      await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
+      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
+      await flushPromises()
+
+      const firstFetchSections = wrapper.emitted('update:sections')![0]![0] as CongregationalSection[]
+      expect(firstFetchSections.every((s) => s.translationSource === 'NLT')).toBe(true)
+
+      // Flip the church's setting AFTER the fetch — a speaker toggle (which
+      // mutates the already-stamped sections, not a new fetch) must preserve
+      // the ORIGINAL stamped value, not adopt the new live setting.
+      useAuthStore().settings.bibleVersion = 'ESV'
+      await wrapper.find('[data-testid="speaker-toggle-0"]').trigger('click')
+
+      const afterToggleEmits = wrapper.emitted('update:sections')!
+      const afterToggleSections = afterToggleEmits[afterToggleEmits.length - 1]![0] as CongregationalSection[]
+      expect(afterToggleSections.every((s) => s.translationSource === 'NLT')).toBe(true)
+    })
+
+    it('a fetch failure surfaces the shared fetchError contract identically for the NLT client', async () => {
+      mockFetchNltPassageText.mockRejectedValueOnce(new Error('boom'))
+      const wrapper = mountEditor()
+      await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
+      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="fetch-error"]').exists()).toBe(true)
+    })
+
+    it('AI-split-produced sections are stamped from the version captured at the fetch that produced rawText, not a live re-read of the setting', async () => {
+      const wrapper = mountEditor()
+      await wrapper.find('[data-testid="reference-input"]').setValue('Psalms 136:1-3')
+      await wrapper.find('[data-testid="fetch-btn"]').trigger('click')
+      await flushPromises()
+
+      // Setting flips to ESV between the fetch and the AI split click.
+      useAuthStore().settings.bibleVersion = 'ESV'
+
+      mockSplitCongregationalReading.mockResolvedValueOnce([
+        { speaker: 'LEADER', text: 'a' },
+        { speaker: 'CONGREGATION', text: 'b' },
+      ])
+      await wrapper.find('[data-testid="ai-split-btn"]').trigger('click')
+      await flushPromises()
+
+      const splitEmits = wrapper.emitted('update:sections')!
+      const splitSections = splitEmits[splitEmits.length - 1]![0] as CongregationalSection[]
+      expect(splitSections.every((s) => s.translationSource === 'NLT')).toBe(true)
     })
   })
 })

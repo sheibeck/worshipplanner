@@ -148,6 +148,7 @@
 import { ref, computed } from 'vue'
 import { parseScriptureInput, formatScriptureReference } from '@/utils/scripture'
 import { fetchPassageText } from '@/utils/esvApi'
+import { fetchNltPassageText } from '@/utils/nltApi'
 import { splitPassage } from '@/utils/scriptureSplitter'
 import { splitCongregationalReading } from '@/utils/claudeApi'
 import { computeBoundaries, hasSplittableBoundaries } from '@/utils/scriptureBoundaries'
@@ -187,17 +188,31 @@ const canFetch = computed(() => parsedRef.value !== null)
 // the section text that already contains it would duplicate data for no
 // reason, and Fetch Passage sits directly next to Split with AI.
 const rawText = ref('')
+// 45-04 (R092): the church's bibleVersion setting captured ONCE at the
+// moment of the last successful fetch — never re-read afterward. Both the
+// alternating-assignment route (below, in the same fetch) and the AI-split
+// route (onAiSplit, which transforms the SAME already-fetched rawText and
+// never re-fetches) stamp their produced sections from this captured value,
+// not from a fresh read of authStore.settings.bibleVersion. This is what
+// makes "a later setting change does not restamp already-created sections"
+// true even for a split triggered after the setting changes mid-session.
+const lastFetchedVersion = ref<'ESV' | 'NLT' | null>(null)
 
 function emitSections(): void {
   emit('update:sections', draftSections.value)
 }
 
-function buildAlternatingSections(text: string, scriptureRef: ScriptureRef): CongregationalSection[] {
+function buildAlternatingSections(
+  text: string,
+  scriptureRef: ScriptureRef,
+  translationSource: 'ESV' | 'NLT',
+): CongregationalSection[] {
   const slides = splitPassage(text, scriptureRef)
   return slides.map((slide, idx) => ({
     speaker: (idx % 2 === 0 ? 'LEADER' : 'CONGREGATION') as 'LEADER' | 'CONGREGATION',
     text: slide.text,
     verseRange: slide.verseRange,
+    translationSource,
   }))
 }
 
@@ -209,15 +224,21 @@ async function onFetchPassage() {
   fetchError.value = false
 
   const query = formatQuery(scriptureRef)
+  // R090/R092: captured ONCE, right before the fetch it governs — routes the
+  // fetch to the correct client AND is the exact value stamped onto every
+  // section this fetch (and any AI-split derived from it) produces. Never
+  // re-read authStore.settings.bibleVersion after this point for this fetch.
+  const version = authStore.settings.bibleVersion
 
   try {
-    const text = await fetchPassageText(query)
+    const text = version === 'NLT' ? await fetchNltPassageText(query) : await fetchPassageText(query)
     rawText.value = text
+    lastFetchedVersion.value = version
     // The reference the user actually fetched is what the sections belong
     // to — emit it first so the slot's own reference fields never end up
     // recording a different passage than the sections that follow.
     emit('update:reference', scriptureRef)
-    draftSections.value = buildAlternatingSections(text, scriptureRef)
+    draftSections.value = buildAlternatingSections(text, scriptureRef, version)
     emitSections()
   } catch {
     fetchError.value = true
@@ -247,7 +268,14 @@ async function onAiSplit() {
   try {
     const result = await splitCongregationalReading(rawText.value)
     if (result) {
-      draftSections.value = result
+      // R092: stamp from the version captured at the ORIGINAL fetch that
+      // produced rawText — never a fresh read of authStore.settings
+      // .bibleVersion, which may have changed since that fetch. Falls back
+      // to 'ESV' only in the defensive case where a split somehow runs
+      // without a prior fetch (canAiSplit already guards rawText.value.length
+      // > 0, so this fallback should be unreachable in practice).
+      const translationSource = lastFetchedVersion.value ?? 'ESV'
+      draftSections.value = result.map((section) => ({ ...section, translationSource }))
       emitSections()
     } else {
       toasts.push(AI_SPLIT_FAILURE_TEXT)
