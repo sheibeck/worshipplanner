@@ -4,17 +4,17 @@ milestone: v1.5
 milestone_name: Settings, Sharing, and Fidelity
 current_phase: 47
 current_phase_name: Congregational Reading Divider UX
-status: executing
-stopped_at: Completed 47-02-PLAN.md
-last_updated: "2026-08-08T21:22:27.664Z"
+status: verifying
+stopped_at: Completed 47-03-PLAN.md
+last_updated: "2026-08-08T21:42:13.080Z"
 last_activity: 2026-08-08
 last_activity_desc: Phase 47 execution started
 progress:
   total_phases: 11
-  completed_phases: 9
+  completed_phases: 10
   total_plans: 40
-  completed_plans: 39
-  percent: 82
+  completed_plans: 40
+  percent: 91
 ---
 
 # Project State
@@ -152,7 +152,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 47 (Congregational Reading Divider UX) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 client (DEPLOY-GATED, see below). 45-02 added `bibleVersion: 'ESV' | 'NLT'` to `OrgSettings`
 (`DEFAULT_ORG_SETTINGS.bibleVersion: 'NLT'`, owner's locked override) plus the Settings "Bible
 Translation" card. 45-03 added the `translationSource?` field + `scriptureAttribution()`/
@@ -1378,6 +1378,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 46 P04 | 30min | 3 tasks | 9 files |
 | Phase 47 P01 | ~25m | 2 tasks | 6 files |
 | Phase 47 P02 | 45min | 2 tasks | 2 files |
+| Phase 47 P03 | ~35m | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -1705,6 +1706,9 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 47-01: isFirstSection added only to ScriptureSlide (not any other slide variant) since it is meaningless without a section field
 - [Phase ?]: 47-01: splitPerVerse reuses parseVerses directly rather than splitPassage/splitBySentences, so it never groups multiple verses onto one segment
 - [Phase ?]: 47-02: kept claudeApi.ts's splitCongregationalReading return contract unchanged; editor maps AI text back to boundary indices via alignSegmentsToBoundaries instead of refactoring claudeApi.ts
+- [Phase ?]: 47-03: isFirstSection set as a plain boolean directly inside each content-resolution path's section-present branch (not a conditional-spread) — the surrounding branch already guarantees a Reference-state slide never reaches it.
+- [Phase ?]: 47-03: PresentationViewer's 3-way speaker label/colour kept as its own literal-string computed rather than routed through slideDisplay.ts's speakerDisplayName, matching the file's existing independent style.
+- [Phase ?]: 47-03: EditSlideDrawer's 3-way speaker cycle expressed as one NEXT_SPEAKER lookup table so a future 4th role touches only one place.
 
 ### Roadmap Evolution
 
@@ -2016,8 +2020,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-08T21:22:27.552Z
-Stopped at: Completed 47-02-PLAN.md
+Last session: 2026-08-08T21:42:13.027Z
+Stopped at: Completed 47-03-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

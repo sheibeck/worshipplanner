@@ -394,11 +394,11 @@ Plans:
   3. The first slide of a congregational reading shows the scripture reference; every later slide shows only the speaker label
   4. A refrain that recurs in non-adjacent segments can share the same speaker label
 
-**Plans**: 2/3 plans executed
+**Plans**: 3/3 plans executed
 
 - [x] 47-01-PLAN.md — Foundation: ALL speaker unions, ScriptureSlide.isFirstSection, widened AI split schema/validator, splitPerVerse
 - [x] 47-02-PLAN.md — CongregationalEditor.vue rework: boundary-indexed draft, 3 equal seeds, click-divider, 3-way chips, re-seed confirm
-- [ ] 47-03-PLAN.md — 3-way presenter/grid/drawer render + R097 first-slide-reference (isFirstSection plumbing)
+- [x] 47-03-PLAN.md — 3-way presenter/grid/drawer render + R097 first-slide-reference (isFirstSection plumbing)
 
 **UI hint**: yes
 **Research flag**: needs research — no church-software precedent exists (ProPresenter, EasyWorship, and Proclaim all lack a documented leader/congregation split editor); treat the subtitle/caption-editor interaction-pattern analysis in FEATURES.md as required reading before designing.
@@ -438,7 +438,7 @@ Plans:
 | 44. Default Service Template | v1.5 | 2/2 | In Progress|  |
 | 45. ESV/NLT Bible Version Selection | v1.5 | 4/4 | In Progress|  |
 | 46. Global Slide Typography | v1.5 | 4/4 | In Progress|  |
-| 47. Congregational Reading Divider UX | v1.5 | 2/3 | In Progress|  |
+| 47. Congregational Reading Divider UX | v1.5 | 3/3 | In Progress|  |
 | 48. Multi-Image Ordering & Mobile Polish | v1.5 | 0/? | Not started | - |
 
 ## Backlog
