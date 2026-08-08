@@ -5,15 +5,15 @@ milestone_name: Settings, Sharing, and Fidelity
 current_phase: 47
 current_phase_name: Congregational Reading Divider UX
 status: executing
-stopped_at: Phase 46 code-complete & code-verified (18/18 must-haves); human-verify DEFERRED (projector-only + pkg-legitimacy); NOT deploy-gated; starting Phase 47
-last_updated: "2026-08-08T20:10:00.000Z"
+stopped_at: Completed 47-01-PLAN.md
+last_updated: "2026-08-08T20:58:02.051Z"
 last_activity: 2026-08-08
-last_activity_desc: Phase 46 done (deferred, not deploy-gated); autonomous run advancing to Phase 47
+last_activity_desc: Phase 47 execution started
 progress:
   total_phases: 11
   completed_phases: 9
-  total_plans: 37
-  completed_plans: 37
+  total_plans: 40
+  completed_plans: 38
   percent: 82
 ---
 
@@ -140,7 +140,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 46 — Global Slide Typography
+**Current focus:** Phase 47 — Congregational Reading Divider UX
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -150,9 +150,9 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 46 (Global Slide Typography) — EXECUTING
-Plan: 4 of 4
-Status: Phase complete — ready for verification
+Phase: 47 (Congregational Reading Divider UX) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
 client (DEPLOY-GATED, see below). 45-02 added `bibleVersion: 'ESV' | 'NLT'` to `OrgSettings`
 (`DEFAULT_ORG_SETTINGS.bibleVersion: 'NLT'`, owner's locked override) plus the Settings "Bible
 Translation" card. 45-03 added the `translationSource?` field + `scriptureAttribution()`/
@@ -172,7 +172,7 @@ human-verify items: the 48px overflow backstop, and the full post-deploy live ro
 in `.planning/PENDING-VERIFICATION.md` § Phase 45.
 Next: Phase 45 is code-complete; the owner's deploy step and the deferred human-verify items are
 the only remaining work for this phase (non-blocking). No further plan needed for Phase 45 itself.
-Last activity: 2026-08-08 — Phase 46 execution started
+Last activity: 2026-08-08 — Phase 47 execution started
 
 ## ⏸ RESUME HERE (2026-08-06 — v1.5 ROADMAP.md created, ready to plan Phase 39)
 
@@ -1376,6 +1376,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 46 P02 | 25min | 3 tasks | 5 files |
 | Phase 46 P03 | 35min | 3 tasks | 2 files |
 | Phase 46 P04 | 30min | 3 tasks | 9 files |
+| Phase 47 P01 | ~25m | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -1700,6 +1701,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Split 46-03 Task 1/Task 2 so each commit leaves the Slide Typography card in a working, testable state: Task 1 wires save directly on change; Task 2 replaces the family-change handler with snapWeight + loadFontCss and adds the live Preview panel.
 - [Phase ?]: 46-04: SlideCard receives typography via a parent-computed prop rather than importing the auth store itself, preserving its 'reads no store' contract
 - [Phase ?]: 46-04: PresentationViewer's playCurrentMedia() moved to fire after the font gate resolves, since AudioPlayer/VideoPlayer refs don't exist until the gated canvas mounts
+- [Phase ?]: 47-01: isFirstSection added only to ScriptureSlide (not any other slide variant) since it is meaningless without a section field
+- [Phase ?]: 47-01: splitPerVerse reuses parseVerses directly rather than splitPassage/splitBySentences, so it never groups multiple verses onto one segment
 
 ### Roadmap Evolution
 
@@ -2011,8 +2014,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-08T18:43:23.997Z
-Stopped at: Completed 46-04-PLAN.md
+Last session: 2026-08-08T20:58:02.003Z
+Stopped at: Completed 47-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

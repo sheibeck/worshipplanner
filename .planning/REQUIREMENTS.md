@@ -206,7 +206,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 
 ### Congregational Reading
 
-- [ ] **R095**: A user can divide a scripture passage into Leader, Congregation and All sections by
+- [x] **R095**: A user can divide a scripture passage into Leader, Congregation and All sections by
       hand, placing the dividers themselves.
       <br>`[FEAT]` **No church-software precedent exists** — ProPresenter, EasyWorship and Proclaim all
       have Bible modules but no leader/congregation split editor. The reference class is subtitle/caption
@@ -215,12 +215,12 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
       reasoning — read `FEATURES.md` before designing this. Refrains require non-adjacent segments to
       share a label.
 
-- [ ] **R096**: The AI-proposed split is offered as one starting point among several — alongside
+- [x] **R096**: The AI-proposed split is offered as one starting point among several — alongside
       one-click alternating assignment and starting blank — and disappears entirely when AI is off.
       <br>All three seeding routes write to the same editable `{ text, role }[]` structure. Depends on
       R088.
 
-- [ ] **R097**: The first slide of a congregational reading shows the scripture reference; every later
+- [x] **R097**: The first slide of a congregational reading shows the scripture reference; every later
       slide shows only the speaker label.
 
 ### Slide Media
@@ -305,9 +305,9 @@ Explicitly excluded. Documented to prevent scope creep.
 | R092 | Phase 45 | Complete |
 | R093 | Phase 46 | Complete |
 | R094 | Phase 46 | Complete |
-| R095 | Phase 47 | Pending |
-| R096 | Phase 47 | Pending |
-| R097 | Phase 47 | Pending |
+| R095 | Phase 47 | Complete |
+| R096 | Phase 47 | Complete |
+| R097 | Phase 47 | Complete |
 | R098 | Phase 48 | Pending |
 | R099 | Phase 48 | Pending |
 | R100 | Phase 48 | Pending |
