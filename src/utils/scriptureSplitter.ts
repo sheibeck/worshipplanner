@@ -83,6 +83,31 @@ function buildSlide(
   }
 }
 
+/**
+ * The per-verse splitter for the R096 "Start Blank" seed: every verse
+ * becomes its own segment, unconditionally. This is deliberately NOT
+ * `splitPassage`, which groups verses under a word-count threshold
+ * (`DEFAULT_WORDS_PER_SLIDE`) — reusing it here would silently violate the
+ * seed's "every verse its own segment" contract whenever consecutive short
+ * verses fit under the threshold together. Purely additive: does not touch
+ * `splitPassage`, `parseVerses`, or any other existing export.
+ */
+export function splitPerVerse(text: string): { text: string; verseRange: string }[] {
+  const trimmed = text.trim()
+  if (!trimmed) return []
+
+  const verses = parseVerses(trimmed)
+
+  if (verses.length === 0) {
+    return [{ text: trimmed, verseRange: '' }]
+  }
+
+  return verses.map((verse) => ({
+    text: verse.text,
+    verseRange: String(verse.number),
+  }))
+}
+
 export function splitPassage(
   text: string,
   ref: ScriptureRef,

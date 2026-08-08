@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { splitPassage } from '@/utils/scriptureSplitter'
+import { splitPassage, splitPerVerse } from '@/utils/scriptureSplitter'
 import type { ScriptureRef } from '@/types/service'
 
 const ref: ScriptureRef = { book: 'Romans', chapter: 8, verseStart: 28, verseEnd: 39 }
@@ -116,5 +116,58 @@ describe('splitPassage', () => {
 
     const slides3 = splitPassage('[28] Test.', range)
     expect(slides3[0]!.reference).toBe('Romans 8:28-39')
+  })
+})
+
+describe('splitPerVerse', () => {
+  it('returns empty array for empty text', () => {
+    expect(splitPerVerse('')).toEqual([])
+    expect(splitPerVerse('   ')).toEqual([])
+  })
+
+  it('returns exactly one entry per verse for a 20-verse fixture, with ascending single-number verseRanges', () => {
+    const verses = Array.from({ length: 20 }, (_, i) => {
+      const num = i + 1
+      return `[${num}] ${'word '.repeat(15).trim()}.`
+    }).join(' ')
+
+    const entries = splitPerVerse(verses)
+
+    expect(entries).toHaveLength(20)
+    entries.forEach((entry, i) => {
+      expect(entry.verseRange).toBe(String(i + 1))
+    })
+  })
+
+  it('returns a single entry with verseRange "" for text with no verse markers', () => {
+    const text = 'The Lord is my shepherd; I shall not want.'
+    const entries = splitPerVerse(text)
+
+    expect(entries).toHaveLength(1)
+    expect(entries[0]!.verseRange).toBe('')
+    expect(entries[0]!.text).toBe(text)
+  })
+
+  it('produces one-entry-per-verse where splitPassage groups the same fixture into fewer slides, proving the two functions differ', () => {
+    const verses = Array.from({ length: 6 }, (_, i) => {
+      const num = 28 + i
+      return `[${num}] ${'word '.repeat(20).trim()}.`
+    }).join(' ')
+    const ref: ScriptureRef = { book: 'Romans', chapter: 8, verseStart: 28, verseEnd: 33 }
+
+    const grouped = splitPassage(verses, ref, { wordsPerSlide: 50 })
+    const perVerse = splitPerVerse(verses)
+
+    expect(perVerse).toHaveLength(6)
+    expect(grouped.length).toBeLessThan(perVerse.length)
+  })
+
+  it('strips the verse marker and trims each entry text', () => {
+    const text = '[1]   First verse words.   [2]   Second verse words.  '
+    const entries = splitPerVerse(text)
+
+    expect(entries).toHaveLength(2)
+    expect(entries[0]!.text).toBe('First verse words.')
+    expect(entries[1]!.text).toBe('Second verse words.')
   })
 })
