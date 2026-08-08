@@ -476,21 +476,37 @@ function emitSections(): void {
  * match always exists; this loop is a search for WHERE it is, never a
  * repair for when it isn't. This is what lets every seed — including the AI
  * seed — produce a boundary-indexed draft that stays re-divisible.
+ *
+ * WR-02 (47-REVIEW): the doc comment above states the invariant but the
+ * loop used to have no assertion enforcing it — if it were ever violated
+ * (a stale AI response matched against a re-fetched passage's boundaries,
+ * for instance), the loop would silently terminate at `end = maxIndex` and
+ * emit a degenerate/out-of-range section with no signal at all. Every
+ * candidate is now checked against `segment.text` before being accepted,
+ * including the final one at `maxIndex`; on ANY failure, this function logs
+ * a diagnostic and returns `null` for the WHOLE batch rather than a partial
+ * or wrong result — callers must treat `null` exactly like an AI-split
+ * failure (leave the draft untouched, surface a toast).
  */
 function alignSegmentsToBoundaries(
   segments: { speaker: DraftSpeaker; text: string }[],
-): DraftSection[] {
+): DraftSection[] | null {
   const maxIndex = boundaries.value.length - 1
   const result: DraftSection[] = []
   let cursor = 0
   for (const segment of segments) {
     let end = cursor + 1
-    while (end < maxIndex) {
-      const candidate = stripVerseMarkers(
-        sliceAtBoundaries(rawText.value, boundaries.value, cursor, end),
-      )
-      if (candidate === segment.text) break
+    let candidate = stripVerseMarkers(sliceAtBoundaries(rawText.value, boundaries.value, cursor, end))
+    while (end < maxIndex && candidate !== segment.text) {
       end++
+      candidate = stripVerseMarkers(sliceAtBoundaries(rawText.value, boundaries.value, cursor, end))
+    }
+    if (candidate !== segment.text) {
+      console.error(
+        '[CongregationalEditor] alignSegmentsToBoundaries: no exact match found for segment',
+        { segment, cursor },
+      )
+      return null
     }
     result.push({ speaker: segment.speaker, startBoundary: cursor, endBoundary: end })
     cursor = end
@@ -513,16 +529,30 @@ function buildBlankSegments(): { speaker: DraftSpeaker; text: string }[] {
   }))
 }
 
-function applyAlternateSeed(): void {
-  draft.value = alignSegmentsToBoundaries(buildAlternateSegments())
+// WR-02: the single place a freshly-aligned draft is actually committed —
+// `null` (alignSegmentsToBoundaries's honest-match invariant violated) is
+// treated exactly like an AI-split failure: the draft is left completely
+// untouched (no clearing, no partial array, no emission) and the only
+// externally visible effect is this toast.
+const SEED_ALIGN_FAILURE_TEXT =
+  "Something went wrong applying that starting point — your reading is unchanged. Try again or build it by hand."
+
+function applyAlignedDraft(aligned: DraftSection[] | null): void {
+  if (!aligned) {
+    toasts.push(SEED_ALIGN_FAILURE_TEXT)
+    return
+  }
+  draft.value = aligned
   hasManuallyEdited.value = false
   emitSections()
 }
 
+function applyAlternateSeed(): void {
+  applyAlignedDraft(alignSegmentsToBoundaries(buildAlternateSegments()))
+}
+
 function applyBlankSeed(): void {
-  draft.value = alignSegmentsToBoundaries(buildBlankSegments())
-  hasManuallyEdited.value = false
-  emitSections()
+  applyAlignedDraft(alignSegmentsToBoundaries(buildBlankSegments()))
 }
 
 // CR-01: the one place an already-resolved AI result (fresh or a
@@ -530,11 +560,9 @@ function applyBlankSeed(): void {
 // — pulled out so both `applyAiSeed`'s immediate-apply path and
 // `confirmReseed`'s deferred-apply path share the exact same commit logic.
 function applyAiResult(sections: CongregationalSection[]): void {
-  draft.value = alignSegmentsToBoundaries(
-    sections.map((section) => ({ speaker: section.speaker, text: section.text })),
+  applyAlignedDraft(
+    alignSegmentsToBoundaries(sections.map((section) => ({ speaker: section.speaker, text: section.text }))),
   )
-  hasManuallyEdited.value = false
-  emitSections()
 }
 
 async function applyAiSeed(): Promise<void> {

@@ -514,6 +514,30 @@ describe('CongregationalEditor', () => {
     })
   })
 
+  // ── WR-02 (47-REVIEW): alignment failure is surfaced, never silent ──────
+
+  describe('WR-02: an unmatchable seed result leaves the draft untouched and surfaces a toast', () => {
+    it('an AI result whose text cannot be matched against any boundary is rejected, not silently mislabeled', async () => {
+      const wrapper = mountEditor()
+      await fetchDefaultPassage(wrapper)
+      const emissionsBefore = wrapper.emitted('update:sections')!.length
+
+      mockSplitCongregationalReading.mockResolvedValueOnce([
+        { speaker: 'LEADER', text: 'this text does not appear anywhere in the fetched passage' },
+      ])
+      await wrapper.find('[data-testid="ai-split-btn"]').trigger('click')
+      await flushPromises()
+
+      const toasts = useToasts()
+      expect(toasts.toasts).toHaveLength(1)
+      expect(toasts.toasts[0]!.message).toBe(
+        "Something went wrong applying that starting point — your reading is unchanged. Try again or build it by hand.",
+      )
+      expect(wrapper.findAll('[data-testid^="preview-section-"]')).toHaveLength(1)
+      expect(wrapper.emitted('update:sections')!.length).toBe(emissionsBefore)
+    })
+  })
+
   // ── R095: hand-divide — insert / remove, 3-way chip ─────────────────────
 
   describe('divider editing', () => {
