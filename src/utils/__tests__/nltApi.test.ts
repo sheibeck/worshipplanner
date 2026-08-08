@@ -170,6 +170,15 @@ describe('fetchNltPassageText', () => {
     await expect(fetchNltPassageText('John 3:16')).rejects.toThrow('Failed to fetch passage')
   })
 
+  it('IN-01: rewraps an unexpected-shape response (no #bibletext root) into the uniform Failed to fetch passage contract', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve('<html><body>not nlt</body></html>') }),
+    )
+
+    await expect(fetchNltPassageText('John 3:16')).rejects.toThrow('Failed to fetch passage')
+  })
+
   it('Pitfall 1 contract survival: splitPassage() over the client output yields per-verse granularity (parseVerses finds the [N] boundaries)', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve(MULTI_VERSE_HTML) }))
 

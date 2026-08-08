@@ -38,7 +38,17 @@ export async function fetchNltPassageText(query: string): Promise<string> {
     throw new Error('Failed to fetch passage')
   }
 
-  const stripped = stripNltHtml(html)
+  let stripped: string
+  try {
+    stripped = stripNltHtml(html)
+  } catch {
+    // stripNltHtml throws its own Error('Unexpected NLT response shape') on
+    // a malformed response -- rewrap it here so every failure path this
+    // function can take honors the uniform `Error('Failed to fetch
+    // passage')` contract promised by this file's header doc comment
+    // (mirrors esvApi.ts::fetchPassageText's failure mode).
+    throw new Error('Failed to fetch passage')
+  }
   // `stripNltHtml` can independently collapse to an empty string even when
   // the raw HTML is non-empty -- e.g. a `#bibletext` root present but with
   // zero `verse_export` children. Treat that the same as the raw-body empty
