@@ -212,6 +212,12 @@ function resolveEntryContent(
               verseRange: section.verseRange ?? '',
               readingMode: 'congregational',
               section,
+              // R097: true only for the reading's first section slide — the
+              // stored-group path's ordinal is the entry's own `order`. Set
+              // only in this (section-present) branch; a Reference-state
+              // slide (the `section === null` branch above) has no "first"
+              // concept and carries no isFirstSection field at all.
+              isFirstSection: entry.order === 0,
               // R092: read back the passthrough SourceRef.translationSource —
               // never re-derived here. Absent when the ref carries none
               // (pre-phase entry), which resolveTranslationSource() later
@@ -507,6 +513,10 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
             verseRange: section.verseRange ?? '',
             readingMode: 'congregational',
             section,
+            // R097: mirrors the stored-group path's `entry.order === 0` —
+            // the fallback path's ordinal is `localSeq`. Both paths must
+            // agree slide-for-slide (dual-path parity tests).
+            isFirstSection: localSeq === 0,
             // R092: same passthrough as the stored-group path above — read
             // straight off the slot's own section, never re-derived.
             ...(section.translationSource !== undefined ? { translationSource: section.translationSource } : {}),

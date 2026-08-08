@@ -150,13 +150,22 @@
         <!-- scripture -->
         <template v-else-if="slideKind === 'scripture'">
           <!--
-            D1: the reference always renders, unconditionally — the
-            assembler builds reference-only scripture slides with an empty
-            passage string, so this is frequently the slide's ENTIRE
-            visible content. It carries the same body treatment as every
-            other kind, with no size/weight step against the passage below.
+            D1: for a Reference-state (non-congregational) slide, the
+            reference always renders unconditionally — the assembler builds
+            reference-only scripture slides with an empty passage string, so
+            this is frequently the slide's ENTIRE visible content.
+
+            R097 (Phase 47, NEWLY BUILT): for a congregational reading, the
+            reference renders ONLY on the first section slide —
+            `isFirstSection`, set by `slideshowAssembler.ts` from the
+            section's own ordinal. Every later section slide shows only its
+            speaker label and words, since the reference was already shown
+            once. Either way, the paragraph carries the same body treatment
+            as every other kind, with no size/weight step against the
+            passage below.
           -->
           <p
+            v-if="!isCongregational || isFirstSection"
             data-testid="presentation-scripture-reference"
             class="text-gray-100 whitespace-pre-line text-5xl font-normal leading-[1.4] mb-8"
           >
@@ -196,7 +205,7 @@
               class="text-5xl font-normal leading-[1.4] mb-2"
               :class="speakerColorClass"
             >
-              {{ ((currentSlide.slide as ScriptureSlide).section as CongregationalSection).speaker === 'LEADER' ? 'Leader:' : 'Congregation:' }}
+              {{ speakerLabelText }}
             </p>
             <p
               data-testid="presentation-congregational-section"
@@ -644,6 +653,37 @@ const isCongregational = computed(() => {
 })
 
 /**
+ * R097 (Phase 47): true only for the FIRST slide of a congregational
+ * reading — mirrors `isCongregational`'s shape but additionally requires the
+ * slide's own `isFirstSection` flag (set by `slideshowAssembler.ts` from the
+ * section's ordinal). Gates the `presentation-scripture-reference` paragraph
+ * so a Reference-state slide (non-congregational, `!isCongregational`) and
+ * the first congregational section slide both show the reference, while
+ * later section slides do not.
+ */
+const isFirstSection = computed(() => {
+  const slide = currentSlide.value?.slide
+  if (!slide || slide.contentKind !== 'scripture') return false
+  const scripture = slide as ScriptureSlide
+  return scripture.readingMode === 'congregational' && scripture.section !== undefined && scripture.isFirstSection === true
+})
+
+/**
+ * R095: the speaker label text, always rendered as text regardless of
+ * colour (FEATURES.md — colour is never the sole signal). Widened from a
+ * binary ternary to a 3-way map for the ALL role.
+ */
+const speakerLabelText = computed(() => {
+  const slide = currentSlide.value?.slide
+  if (!slide || slide.contentKind !== 'scripture') return ''
+  const section = (slide as ScriptureSlide).section
+  if (!section) return ''
+  if (section.speaker === 'LEADER') return 'Leader:'
+  if (section.speaker === 'CONGREGATION') return 'Congregation:'
+  return 'All:'
+})
+
+/**
  * The speaker line's colour, and ONLY its colour — see the template comment
  * on `presentation-speaker` for why size/weight/casing deliberately stay put.
  *
@@ -653,13 +693,18 @@ const isCongregational = computed(() => {
  * produce no CSS at all — the tags would render colourless in the built app
  * while looking correct in the source and passing any test that asserts on
  * `classes()`, which reads the class attribute rather than the applied style.
+ *
+ * R095: widened to a 3-way map — LEADER sky, CONGREGATION amber, ALL violet
+ * (perceptually separated from both, per 47-UI-SPEC.md § Color).
  */
 const speakerColorClass = computed(() => {
   const slide = currentSlide.value?.slide
   if (!slide || slide.contentKind !== 'scripture') return 'text-gray-100'
   const section = (slide as ScriptureSlide).section
   if (!section) return 'text-gray-100'
-  return section.speaker === 'LEADER' ? 'text-sky-300' : 'text-amber-300'
+  if (section.speaker === 'LEADER') return 'text-sky-300'
+  if (section.speaker === 'CONGREGATION') return 'text-amber-300'
+  return 'text-violet-300'
 })
 
 /**

@@ -132,16 +132,20 @@ export function slotDisplayTitle(slot: ServiceSlot): string {
 
 /**
  * Readable, natural-case speaker name for a congregational section's
- * `speaker` enum value (Phase 38-03) — `'LEADER'` -> `'Leader'`,
- * `'CONGREGATION'` -> `'Congregation'`. This module already exists so the
- * rail and the grid never fork the kind-badge vocabulary; the two speaker
- * words are exactly that kind of vocabulary, so this is the ONE producer of
- * them — `slideContentLabel`'s eyebrow (uppercased from this),
- * `slideFooterLabel`'s footer, and `EditSlideDrawer.vue`'s speaker control
- * all read through this rather than re-deriving the spelling.
+ * `speaker` enum value (Phase 38-03, widened Phase 47 R095) — `'LEADER'` ->
+ * `'Leader'`, `'CONGREGATION'` -> `'Congregation'`, `'ALL'` -> `'All'`. This
+ * module already exists so the rail and the grid never fork the kind-badge
+ * vocabulary; the three speaker words are exactly that kind of vocabulary,
+ * so this is the ONE producer of them — `slideContentLabel`'s eyebrow
+ * (uppercased from this), `slideFooterLabel`'s footer, and
+ * `EditSlideDrawer.vue`'s speaker control all read through this rather than
+ * re-deriving the spelling. Widening this single 3-way match is what
+ * propagates 'ALL' -> 'All' to every one of those call sites automatically.
  */
 export function speakerDisplayName(speaker: CongregationalSection['speaker']): string {
-  return speaker === 'LEADER' ? 'Leader' : 'Congregation'
+  if (speaker === 'LEADER') return 'Leader'
+  if (speaker === 'CONGREGATION') return 'Congregation'
+  return 'All'
 }
 
 /**
@@ -187,7 +191,7 @@ export function slideBodyText(slide: Slide): string {
   switch (slide.contentKind) {
     case 'lyric':
       return 'sectionId' in slide ? slide.lines.join('\n') : slide.title
-    case 'scripture':
+    case 'scripture': {
       // R047: a Reference-state slide (no congregational section) defaults
       // to reference-only (empty text) — return just the reference, with no
       // trailing blank line. A Congregational-state section slide (Phase
@@ -200,9 +204,22 @@ export function slideBodyText(slide: Slide): string {
       // (the slide's OWN stamped/field-less value), never the org's current
       // bibleVersion setting — a field-less pre-phase slide resolves to
       // '(ESV)' regardless of what the church has since chosen.
-      return slide.text
-        ? `${slide.reference}\n${slide.text} ${scriptureAttribution(resolveTranslationSource(slide))}`
-        : slide.reference
+      //
+      // R097 (Phase 47, NEWLY BUILT): the reference prefix is gated to the
+      // FIRST section slide of a congregational reading — `!slide.section ||
+      // slide.isFirstSection`. A Reference-state slide (no `section`) always
+      // shows its reference (first half of the OR, unaffected by this
+      // phase). A later section slide (`section` present, `isFirstSection`
+      // falsy) returns just its own words + attribution, no reference —
+      // it was already shown once, on the first slide. This gate applies
+      // ONLY to this prefix — `slideContentLabel`'s eyebrow and
+      // `slideFooterLabel`'s footer below are NOT reference-gated; they
+      // name the speaker per-slide regardless of position.
+      if (!slide.text) return slide.reference
+      const suffix = ` ${scriptureAttribution(resolveTranslationSource(slide))}`
+      const showReference = !slide.section || slide.isFirstSection
+      return showReference ? `${slide.reference}\n${slide.text}${suffix}` : `${slide.text}${suffix}`
+    }
     case 'text':
       return slide.body
     case 'image':
