@@ -381,6 +381,114 @@ describe('CongregationalEditor', () => {
     })
   })
 
+  // ── CR-01 (47-REVIEW): async AI-split race safety ───────────────────────
+
+  describe('CR-01: in-flight AI split does not silently overwrite a later edit', () => {
+    it('disables Fetch/Alternate/Blank while an AI split is in flight, and re-enables them once it resolves', async () => {
+      const wrapper = mountEditor()
+      await fetchDefaultPassage(wrapper)
+
+      let resolveSplit!: (value: CongregationalSection[] | null) => void
+      mockSplitCongregationalReading.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveSplit = resolve
+        }),
+      )
+      await wrapper.find('[data-testid="ai-split-btn"]').trigger('click')
+
+      expect(wrapper.find('[data-testid="fetch-btn"]').attributes('disabled')).toBeDefined()
+      expect(wrapper.find('[data-testid="seed-alternate-btn"]').attributes('disabled')).toBeDefined()
+      expect(wrapper.find('[data-testid="seed-blank-btn"]').attributes('disabled')).toBeDefined()
+
+      resolveSplit(null)
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="fetch-btn"]').attributes('disabled')).toBeUndefined()
+      expect(wrapper.find('[data-testid="seed-alternate-btn"]').attributes('disabled')).toBeUndefined()
+      expect(wrapper.find('[data-testid="seed-blank-btn"]').attributes('disabled')).toBeUndefined()
+    })
+
+    it('a hand edit made while the AI request is in flight defers the resolving result behind the re-seed confirm instead of silently overwriting it, and confirming applies it without a second network call', async () => {
+      const wrapper = mountEditor()
+      await fetchDefaultPassage(wrapper)
+
+      let resolveSplit!: (value: CongregationalSection[] | null) => void
+      mockSplitCongregationalReading.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveSplit = resolve
+        }),
+      )
+      await wrapper.find('[data-testid="ai-split-btn"]').trigger('click')
+
+      // Hand-edit the still-undivided Leader block while the AI call is
+      // outstanding — the chip control is not blocked during isSplitting.
+      await wrapper.find('[data-testid="speaker-chip-0-congregation"]').trigger('click')
+      expect(wrapper.find('[data-testid="preview-label-0"]').text()).toBe('Congregation:')
+      const emissionsBeforeResolve = wrapper.emitted('update:sections')!.length
+
+      resolveSplit([
+        { speaker: 'LEADER', text: TWO_GROUP_SPLIT_TEXT[0] },
+        { speaker: 'CONGREGATION', text: TWO_GROUP_SPLIT_TEXT[1] },
+      ])
+      await flushPromises()
+
+      // Not silently applied: the hand edit is still showing, gated behind
+      // the same confirm a same-tick re-seed click would show.
+      expect(wrapper.find('[data-testid="preview-label-0"]').text()).toBe('Congregation:')
+      expect(wrapper.find('[data-testid="reseed-confirm"]').exists()).toBe(true)
+      expect(wrapper.emitted('update:sections')!.length).toBe(emissionsBeforeResolve)
+
+      await wrapper.find('[data-testid="reseed-confirm-replace"]').trigger('click')
+      await flushPromises()
+
+      // Confirming applies the ALREADY-fetched AI result directly — no
+      // second call to splitCongregationalReading.
+      expect(mockSplitCongregationalReading).toHaveBeenCalledTimes(1)
+      expect(wrapper.find('[data-testid="reseed-confirm"]').exists()).toBe(false)
+      const previews = wrapper.findAll('[data-testid^="preview-section-"]')
+      expect(previews).toHaveLength(2)
+      expect(wrapper.find('[data-testid="preview-label-0"]').text()).toBe('Leader:')
+      expect(wrapper.find('[data-testid="preview-label-1"]').text()).toBe('Congregation:')
+    })
+
+    it('cancelling the re-seed confirm after a mid-flight hand edit discards the deferred AI result and keeps the hand edit', async () => {
+      const wrapper = mountEditor()
+      await fetchDefaultPassage(wrapper)
+
+      let resolveSplit!: (value: CongregationalSection[] | null) => void
+      mockSplitCongregationalReading.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveSplit = resolve
+        }),
+      )
+      await wrapper.find('[data-testid="ai-split-btn"]').trigger('click')
+      await wrapper.find('[data-testid="speaker-chip-0-congregation"]').trigger('click')
+
+      resolveSplit([
+        { speaker: 'LEADER', text: TWO_GROUP_SPLIT_TEXT[0] },
+        { speaker: 'CONGREGATION', text: TWO_GROUP_SPLIT_TEXT[1] },
+      ])
+      await flushPromises()
+      expect(wrapper.find('[data-testid="reseed-confirm"]').exists()).toBe(true)
+
+      await wrapper.find('[data-testid="reseed-confirm-cancel"]').trigger('click')
+
+      expect(wrapper.find('[data-testid="reseed-confirm"]').exists()).toBe(false)
+      expect(wrapper.findAll('[data-testid^="preview-section-"]')).toHaveLength(1)
+      expect(wrapper.find('[data-testid="preview-label-0"]').text()).toBe('Congregation:')
+
+      // The discarded deferred result must not resurface on a later,
+      // unrelated re-seed confirm.
+      await wrapper.find('[data-testid="seed-blank-btn"]').trigger('click')
+      const confirm = wrapper.find('[data-testid="reseed-confirm"]')
+      expect(confirm.exists()).toBe(true)
+      await wrapper.find('[data-testid="reseed-confirm-replace"]').trigger('click')
+      await flushPromises()
+      expect(mockSplitCongregationalReading).toHaveBeenCalledTimes(1)
+      expect(wrapper.findAll('[data-testid^="preview-section-"]')).toHaveLength(3)
+    })
+  })
+
   // ── R095: hand-divide — insert / remove, 3-way chip ─────────────────────
 
   describe('divider editing', () => {

@@ -29,10 +29,10 @@
         <button
           type="button"
           data-testid="fetch-btn"
-          :disabled="!canFetch || isFetching"
+          :disabled="!canFetch || isFetching || isSplitting"
           @click="onFetchPassage"
           class="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors border"
-          :class="canFetch && !isFetching
+          :class="canFetch && !isFetching && !isSplitting
             ? 'text-indigo-400 bg-gray-800 border-gray-700 hover:bg-gray-700'
             : 'text-gray-600 bg-gray-900 border-gray-800 cursor-not-allowed'"
         >
@@ -64,10 +64,10 @@
             v-if="authStore.settings.aiEnabled"
             type="button"
             data-testid="ai-split-btn"
-            :disabled="!canAiSplit || isSplitting"
+            :disabled="!canAiSplit || isSplitting || isFetching"
             @click="onSeedClick('ai')"
             class="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-semibold border transition-colors"
-            :class="canAiSplit && !isSplitting
+            :class="canAiSplit && !isSplitting && !isFetching
               ? 'text-gray-200 bg-gray-800 border-gray-700 hover:bg-gray-700'
               : 'text-gray-600 bg-gray-900 border-gray-800 cursor-not-allowed'"
           >
@@ -77,19 +77,31 @@
             </svg>
             {{ isSplitting ? 'Splitting...' : '✨ Split with AI' }}
           </button>
+          <!-- CR-01/IN-01: disabled (and dimmed) while an in-flight AI split
+               or fetch is pending — clicking either mid-flight is exactly
+               what let a stale AI response silently overwrite a competing
+               seed choice. -->
           <button
             type="button"
             data-testid="seed-alternate-btn"
+            :disabled="isSplitting || isFetching"
             @click="onSeedClick('alternate')"
-            class="rounded-md px-3 py-2 text-xs font-semibold border text-gray-200 bg-gray-800 border-gray-700 hover:bg-gray-700 transition-colors"
+            class="rounded-md px-3 py-2 text-xs font-semibold border transition-colors"
+            :class="isSplitting || isFetching
+              ? 'text-gray-600 bg-gray-900 border-gray-800 cursor-not-allowed'
+              : 'text-gray-200 bg-gray-800 border-gray-700 hover:bg-gray-700'"
           >
             Alternate Leader/Congregation
           </button>
           <button
             type="button"
             data-testid="seed-blank-btn"
+            :disabled="isSplitting || isFetching"
             @click="onSeedClick('blank')"
-            class="rounded-md px-3 py-2 text-xs font-semibold border text-gray-200 bg-gray-800 border-gray-700 hover:bg-gray-700 transition-colors"
+            class="rounded-md px-3 py-2 text-xs font-semibold border transition-colors"
+            :class="isSplitting || isFetching
+              ? 'text-gray-600 bg-gray-900 border-gray-800 cursor-not-allowed'
+              : 'text-gray-200 bg-gray-800 border-gray-700 hover:bg-gray-700'"
           >
             Start Blank
           </button>
@@ -380,6 +392,17 @@ const draft = ref<DraftSection[]>([])
 // applies immediately, since there is nothing to lose yet.
 const hasManuallyEdited = ref(false)
 const pendingSeed = ref<SeedKind | null>(null)
+// CR-01 (47-REVIEW): set alongside `pendingSeed` ONLY when the AI seed's
+// network call already resolved while the draft was hand-edited mid-flight —
+// carries the already-fetched result so `confirmReseed` applies it directly
+// instead of re-issuing the network call. Left `null` for the ordinary
+// "user clicked a seed before any network call was made" case.
+const pendingAiResult = ref<CongregationalSection[] | null>(null)
+// CR-01: bumped on every fetch and every AI-seed dispatch. A resolving AI
+// response whose captured generation no longer matches the current value
+// means a re-fetch or another seed attempt started while it was in flight —
+// its result must be discarded, never applied.
+let seedGeneration = 0
 
 const parsedRef = computed<ScriptureRef | null>(() => parseScriptureInput(referenceText.value))
 const canFetch = computed(() => parsedRef.value !== null)
@@ -487,24 +510,57 @@ function applyBlankSeed(): void {
   emitSections()
 }
 
+// CR-01: the one place an already-resolved AI result (fresh or a
+// previously-deferred `pendingAiResult`) is actually committed to the draft
+// — pulled out so both `applyAiSeed`'s immediate-apply path and
+// `confirmReseed`'s deferred-apply path share the exact same commit logic.
+function applyAiResult(sections: CongregationalSection[]): void {
+  draft.value = alignSegmentsToBoundaries(
+    sections.map((section) => ({ speaker: section.speaker, text: section.text })),
+  )
+  hasManuallyEdited.value = false
+  emitSections()
+}
+
 async function applyAiSeed(): Promise<void> {
   if (!canAiSplit.value || isSplitting.value) return
   isSplitting.value = true
+  // CR-01: this generation + the exact text the request was issued against
+  // are captured now, before the `await` — `boundaries`/`rawText` are read
+  // fresh (not from these captures) by `alignSegmentsToBoundaries` only
+  // once we've confirmed below that nothing invalidated this request.
+  const myGeneration = ++seedGeneration
+  const textAtRequestTime = rawText.value
   try {
-    const result = await splitCongregationalReading(rawText.value)
-    if (result) {
-      draft.value = alignSegmentsToBoundaries(
-        result.map((section) => ({ speaker: section.speaker, text: section.text })),
-      )
-      hasManuallyEdited.value = false
-      emitSections()
-    } else {
+    const result = await splitCongregationalReading(textAtRequestTime)
+    // A re-fetch (bumps seedGeneration and replaces rawText) started while
+    // this request was in flight — the passage this result was computed
+    // for no longer matches the current draft. Discard rather than
+    // misapply it against unrelated text (RESEARCH boundary-indexed model:
+    // a stale result's indices are meaningless against a different
+    // rawText/boundaries pair).
+    if (myGeneration !== seedGeneration || rawText.value !== textAtRequestTime) {
+      return
+    }
+    if (!result) {
       // R064 "additive and never blocking": a failed split leaves the
       // editor exactly as usable as it was a moment before — the draft is
       // left completely untouched (no clearing, no partial array, no
       // emission) and the only externally visible effect is this toast.
       toasts.push(AI_SPLIT_FAILURE_TEXT)
+      return
     }
+    if (hasManuallyEdited.value) {
+      // The user hand-edited the draft (a divider/chip change) while this
+      // request was in flight. The passage is still the same one, so the
+      // result itself is valid — but silently overwriting a hand edit is
+      // exactly what the re-seed confirm exists to prevent. Route through
+      // the same confirm gate a same-tick AI-seed click would have hit.
+      pendingAiResult.value = result
+      pendingSeed.value = 'ai'
+      return
+    }
+    applyAiResult(result)
   } catch {
     toasts.push(AI_SPLIT_FAILURE_TEXT)
   } finally {
@@ -529,12 +585,23 @@ function onSeedClick(kind: SeedKind): void {
 
 function confirmReseed(): void {
   const kind = pendingSeed.value
+  const aiResult = pendingAiResult.value
   pendingSeed.value = null
-  if (kind) void performSeed(kind)
+  pendingAiResult.value = null
+  if (!kind) return
+  // CR-01: a deferred AI result (already fetched while hand-edited) is
+  // applied directly — re-running `performSeed('ai')` here would re-issue a
+  // needless second network call for a result we already have.
+  if (kind === 'ai' && aiResult) {
+    applyAiResult(aiResult)
+    return
+  }
+  void performSeed(kind)
 }
 
 function cancelReseed(): void {
   pendingSeed.value = null
+  pendingAiResult.value = null
 }
 
 /** Every boundary index strictly between a segment's own start and end —
@@ -603,6 +670,14 @@ const isSplitting = ref(false)
 async function onFetchPassage() {
   const scriptureRef = parsedRef.value
   if (!scriptureRef) return
+
+  // CR-01: invalidate any AI split still in flight for the passage being
+  // replaced — the fetch-btn is also disabled while `isSplitting` (below),
+  // so this is defense-in-depth against a stale response applying against
+  // the new rawText/boundaries this fetch is about to install.
+  seedGeneration++
+  pendingSeed.value = null
+  pendingAiResult.value = null
 
   isFetching.value = true
   fetchError.value = false
