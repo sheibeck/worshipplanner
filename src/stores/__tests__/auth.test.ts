@@ -62,6 +62,20 @@ vi.mock('@/firebase', () => ({
   db: {},
 }))
 
+// CR-01 (46-REVIEW.md) — loadOrgContext eager-loads the org's chosen slide
+// font. Only `loadFontCss` is mocked/asserted on directly; `snapWeight`/
+// `SLIDE_FONTS` stay real so the family/weight resolution under test is the
+// actual logic, not a stand-in for it.
+vi.mock('@/utils/slideTypography', async () => {
+  const actual = await vi.importActual<typeof import('@/utils/slideTypography')>(
+    '@/utils/slideTypography',
+  )
+  return {
+    ...actual,
+    loadFontCss: vi.fn().mockResolvedValue(undefined),
+  }
+})
+
 import {
   signInWithPopup,
   signInWithEmailAndPassword,
@@ -72,6 +86,7 @@ import {
 } from 'firebase/auth'
 import { doc, getDoc, updateDoc } from 'firebase/firestore'
 import { DEFAULT_ORG_SETTINGS } from '@/types/organization'
+import { loadFontCss } from '@/utils/slideTypography'
 
 const mockUser = {
   uid: 'test-uid',
@@ -494,6 +509,62 @@ describe('useAuthStore', () => {
       const store = useAuthStore()
       await triggerAuthStateChange(mockUser)
       expect(store.settings.bibleVersion).toBe('ESV')
+    })
+  })
+
+  // CR-01 (46-REVIEW.md) — loadOrgContext must eager-load the org's actual
+  // chosen slide face, not just resolve the settings object, so the Slides
+  // grid and Edit Slide drawer (soft-gate surfaces) don't silently fall
+  // back to a system font before Settings or the Presenter has had a
+  // chance to load it in the current session.
+  describe('OrgSettings.slideTypography font eager-load (R093, CR-01)', () => {
+    it('does not call loadFontCss for the default Inter family — it is already eager-imported in main.ts', async () => {
+      mockOrgDocPath({ name: 'Test Org' })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.settings.slideTypography.fontFamily).toBe('Inter')
+      expect(loadFontCss).not.toHaveBeenCalled()
+    })
+
+    it('calls loadFontCss with the resolved family/weight for a non-default stored family', async () => {
+      mockOrgDocPath({
+        name: 'Test Org',
+        settings: { slideTypography: { fontFamily: 'Lora', fontWeight: 600, fontScale: 'md' } },
+      })
+      const { useAuthStore } = await import('../auth')
+      useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(loadFontCss).toHaveBeenCalledWith('Lora', 600)
+    })
+
+    it('snaps an unreachable stored weight to 400 before calling loadFontCss', async () => {
+      mockOrgDocPath({
+        name: 'Test Org',
+        // Lora does not ship 300 (46-01-SUMMARY.md's corrected ramp).
+        settings: { slideTypography: { fontFamily: 'Lora', fontWeight: 300, fontScale: 'md' } },
+      })
+      const { useAuthStore } = await import('../auth')
+      useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(loadFontCss).toHaveBeenCalledWith('Lora', 400)
+    })
+
+    it('does not call loadFontCss when the user belongs to no organization', async () => {
+      vi.mocked(doc).mockImplementation(
+        (_db: unknown, ...segments: string[]) => ({ path: segments.join('/') }) as never,
+      )
+      vi.mocked(getDoc).mockImplementation((ref: unknown) => {
+        const path = (ref as { path?: string }).path
+        if (path === 'users/test-uid') {
+          return Promise.resolve({ exists: () => true, data: () => ({ orgIds: [] }) }) as never
+        }
+        return Promise.resolve({ exists: () => false, data: () => null }) as never
+      })
+      const { useAuthStore } = await import('../auth')
+      useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(loadFontCss).not.toHaveBeenCalled()
     })
   })
 

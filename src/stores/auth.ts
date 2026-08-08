@@ -25,6 +25,8 @@ import {
 import { auth, db } from '@/firebase'
 import type { OrgSettings } from '@/types/organization'
 import { DEFAULT_ORG_SETTINGS } from '@/types/organization'
+import { SLIDE_FONTS } from '@/config/slideFonts'
+import { loadFontCss, snapWeight } from '@/utils/slideTypography'
 
 let memberUnsub: Unsubscribe | null = null
 
@@ -204,6 +206,34 @@ export const useAuthStore = defineStore('auth', () => {
         vwModeEnabled: resolvedVwModeEnabled
       }
       vwModeEnabled.value = resolvedVwModeEnabled
+
+      // CR-01 (46-REVIEW.md) — eager-load the org's actual chosen slide
+      // face here, the ONE point every render site's settings flow
+      // through. Without this, SlideGrid.vue and EditSlideDrawer.vue (the
+      // grid and the Edit Slide drawer preview — soft-gate surfaces per
+      // 46-UI-SPEC.md, font-display: swap) bind `--slide-font-family` to a
+      // family whose @font-face rule was never registered, so the browser
+      // silently falls through to its generic fallback instead of the
+      // chosen font for any org whose choice differs from main.ts's eager
+      // Inter default — until something ELSE (Settings, or the Presenter)
+      // happens to load it first in that session. Fire-and-forget: a
+      // rejected dynamic import degrades to the CSS stack's native
+      // fallback, never a user-visible error (same posture as WR-03's
+      // SettingsView.vue fix).
+      const resolvedTypographyFamily = SLIDE_FONTS[settings.value.slideTypography.fontFamily]
+        ? settings.value.slideTypography.fontFamily
+        : DEFAULT_ORG_SETTINGS.slideTypography.fontFamily
+      if (resolvedTypographyFamily !== DEFAULT_ORG_SETTINGS.slideTypography.fontFamily) {
+        const resolvedTypographyWeight = snapWeight(
+          resolvedTypographyFamily,
+          settings.value.slideTypography.fontWeight,
+        )
+        loadFontCss(resolvedTypographyFamily, resolvedTypographyWeight).catch(() => {
+          // A failed dynamic import here must never surface as an
+          // unhandled rejection — the grid/drawer's font-display: swap
+          // fallback already covers this case visually.
+        })
+      }
     }
 
     // Unsubscribe from previous listener if any
