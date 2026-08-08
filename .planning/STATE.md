@@ -5,15 +5,15 @@ milestone_name: Settings, Sharing, and Fidelity
 current_phase: 46
 current_phase_name: Global Slide Typography
 status: executing
-stopped_at: Phase 45 code-complete & code-verified (7/7); human-verify DEPLOY-GATED & deferred; starting Phase 46
-last_updated: "2026-08-08T05:45:00.000Z"
+stopped_at: Completed 46-01-PLAN.md
+last_updated: "2026-08-08T17:12:53.743Z"
 last_activity: 2026-08-08
-last_activity_desc: Phase 45 done (deferred, deploy-gated); autonomous run advancing to Phase 46
+last_activity_desc: Phase 46 execution started
 progress:
   total_phases: 11
   completed_phases: 8
-  total_plans: 33
-  completed_plans: 33
+  total_plans: 37
+  completed_plans: 34
   percent: 73
 ---
 
@@ -140,7 +140,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 43 — Service Item Types
+**Current focus:** Phase 46 — Global Slide Typography
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -150,9 +150,9 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 45 (ESV/NLT Bible Version Selection) — CODE-COMPLETE, 4/4 plans done
-Plan: 4 of 4 executed (45-01, 45-02, 45-03, 45-04)
-Status: All four plans complete. 45-01 built the NLT proxy Cloud Function branch + `nltApi.ts`
+Phase: 46 (Global Slide Typography) — EXECUTING
+Plan: 2 of 4
+Status: Ready to execute
 client (DEPLOY-GATED, see below). 45-02 added `bibleVersion: 'ESV' | 'NLT'` to `OrgSettings`
 (`DEFAULT_ORG_SETTINGS.bibleVersion: 'NLT'`, owner's locked override) plus the Settings "Bible
 Translation" card. 45-03 added the `translationSource?` field + `scriptureAttribution()`/
@@ -172,7 +172,7 @@ human-verify items: the 48px overflow backstop, and the full post-deploy live ro
 in `.planning/PENDING-VERIFICATION.md` § Phase 45.
 Next: Phase 45 is code-complete; the owner's deploy step and the deferred human-verify items are
 the only remaining work for this phase (non-blocking). No further plan needed for Phase 45 itself.
-Last activity: 2026-08-08 — Phase 45 Plan 04 (4/4) complete; Phase 45 code-complete.
+Last activity: 2026-08-08 — Phase 46 execution started
 
 ## ⏸ RESUME HERE (2026-08-06 — v1.5 ROADMAP.md created, ready to plan Phase 39)
 
@@ -1371,6 +1371,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 45 P01 | 30min | 2 tasks | 4 files |
 | Phase 45 P02 | 10min | 2 tasks | 4 files |
 | Phase 45 P04 | 50min | 3 tasks | 8 files |
+| Phase 46 P01 | 17min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -1687,6 +1688,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 45-04: AI-split-produced congregational sections are stamped from the version captured at the ORIGINAL fetch (lastFetchedVersion), never a live re-read of authStore.settings.bibleVersion at split time, since a split transforms already-fetched text rather than re-fetching (R092).
 - [Phase ?]: 45-04: both ScriptureInput.vue preview fetch call sites (reference-preview panel + AI-suggestion expanded preview) route through one shared fetchPassageByOrgSetting() helper by the church's bibleVersion setting, not just the primary one, for consistency.
 - [Phase ?]: 45-04: discovered and worked around a pre-existing test-harness race in src/stores/auth.ts — its real onAuthStateChanged listener resets settings.value to defaults on a microtask after store creation, which can silently discard a test's synchronous settings mutation if read back across an async gap. Not a production bug; fixed only in test mutation timing.
+- [Phase ?]: 46-01: Built SLIDE_FONTS from RESEARCH.md's corrected weight table (Open Sans/Source Serif 4 ship 500; Source Serif 4 also ships 300; Lora excludes 300), not the UI-SPEC's unverified draft
+- [Phase ?]: 46-01: Task 1 package-legitimacy checkpoint pre-resolved and recorded DEFERRED in PENDING-VERIFICATION.md per v1.5 standing autonomy grant; RESEARCH.md's direct tarball verification stands in for the owner's pending sign-off
 
 ### Roadmap Evolution
 
@@ -1998,8 +2001,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-08T05:32:07.214Z
-Stopped at: Completed 45-04-PLAN.md — Phase 45 (ESV/NLT Bible Version Selection) now code-complete, all 4 plans done
+Last session: 2026-08-08T17:12:53.696Z
+Stopped at: Completed 46-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
