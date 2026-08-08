@@ -66,6 +66,14 @@ export interface OrgSettings {
    * an EMPTY new service, NOT `buildSlots()`'s 1-2-3 shape.
    */
   defaultServiceTemplate: ServiceTemplateEntry[]
+  /**
+   * Church-level choice of scripture translation for NEW passages (R090).
+   * `'ESV'` (English Standard Version) or `'NLT'` (New Living Translation).
+   * Set in Settings, gated to org editors. Governs only scripture fetched
+   * going forward — an existing slide's own `translationSource` field
+   * (R092) never changes when this setting changes.
+   */
+  bibleVersion: 'ESV' | 'NLT'
 }
 
 /**
@@ -115,4 +123,11 @@ export const DEFAULT_ORG_SETTINGS: OrgSettings = {
   pcEnabled: true,
   vwModeEnabled: true,
   defaultServiceTemplate: [],
+  // Owner's LOCKED override (45-CONTEXT.md § Area 1, 2026-08-07): NLT, not
+  // ESV. This is deliberately NOT "preserve current behavior" — a church
+  // that never opens the Bible Translation setting fetches NEW scripture
+  // from NLT. Existing slides are unaffected (see `translationSource` on
+  // the slide types, R092) — this default only governs scripture fetched
+  // going forward.
+  bibleVersion: 'NLT',
 }

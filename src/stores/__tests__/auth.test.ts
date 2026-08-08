@@ -468,6 +468,35 @@ describe('useAuthStore', () => {
     })
   })
 
+  describe('OrgSettings.bibleVersion (R090)', () => {
+    // The DEFAULT constant itself — the owner's locked override (45-CONTEXT.md
+    // § Area 1) is NLT, NOT the "preserve current behavior" ESV default.
+    it('DEFAULT_ORG_SETTINGS.bibleVersion is NLT (owner override, not ESV)', () => {
+      expect(DEFAULT_ORG_SETTINGS.bibleVersion).toBe('NLT')
+    })
+
+    // Default resolution: an org whose stored settings omit bibleVersion
+    // entirely resolves to NLT through the existing `...DEFAULT_ORG_SETTINGS`
+    // spread — no second merge point needed.
+    it('resolves bibleVersion to NLT for an org that has never configured it', async () => {
+      mockOrgDocPath({ name: 'Test Org' })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.settings.bibleVersion).toBe('NLT')
+    })
+
+    // Stored-value-wins: an org that has already chosen ESV must not be
+    // silently switched to the new NLT default by this phase.
+    it('prefers a stored ESV bibleVersion over the NLT default', async () => {
+      mockOrgDocPath({ name: 'Test Org', settings: { bibleVersion: 'ESV' } })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.settings.bibleVersion).toBe('ESV')
+    })
+  })
+
   // ── 40-03 (R075/P-01) ─────────────────────────────────────────────────────────
   // Forced claim refresh on every org-context load, bounded retry scoped to the
   // just-created-membership path only. Call-count assertions are the point: a
