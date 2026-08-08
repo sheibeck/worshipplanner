@@ -8,6 +8,7 @@
       aria-label="Presentation"
       data-testid="presentation-viewer"
       class="fixed inset-0 z-50 bg-black outline-none flex items-center justify-center"
+      :style="typographyStyle"
       @keydown="handleKeydown"
       @mousemove="registerActivity"
     >
@@ -36,9 +37,11 @@
         :style="{ zIndex: -1 }"
       ></div>
 
-      <!-- Loading state: assembly still in flight and nothing to show yet. -->
+      <!-- Loading state: assembly still in flight and nothing to show yet, OR
+           (R094) slides are ready but the chosen face is not resident yet —
+           see `showLoadingState`/`fontGateActive` below. -->
       <div
-        v-if="isLoadingState"
+        v-if="showLoadingState"
         data-testid="presentation-loading"
         class="flex flex-col items-center gap-4"
       >
@@ -131,7 +134,7 @@
           >
             {{ (currentSlide.slide as CopyrightSlide).title }}
           </p>
-          <p class="text-2xl font-semibold leading-[1.3] text-gray-300 mt-4">
+          <p class="text-2xl font-semibold leading-[1.3] text-gray-300 mt-4 presentation-copyright-authors">
             {{ (currentSlide.slide as CopyrightSlide).authors.join(', ') }}
           </p>
           <div
@@ -389,6 +392,9 @@ import type {
 import { SERVICE_SECTION_LABELS } from '@/types/service'
 import { renderFailureSentence } from './slides/slideDisplay'
 import { scriptureAttribution, resolveTranslationSource } from '@/utils/scripture'
+import { useAuthStore } from '@/stores/auth'
+import { SLIDE_FONTS } from '@/config/slideFonts'
+import { cssVarsFor, snapWeight, waitForSlideFont, loadFontCss, FONT_LOAD_TIMEOUT_MS } from '@/utils/slideTypography'
 import AudioPlayer from './AudioPlayer.vue'
 import VideoPlayer from './VideoPlayer.vue'
 
@@ -405,9 +411,51 @@ const emit = defineEmits<{
   exit: []
 }>()
 
+const authStore = useAuthStore()
+
+/**
+ * R093 (46-04) — the presenter's ONE CSS-variable wrapper (key_links: three
+ * render sites read `authStore.settings.slideTypography` via `cssVarsFor`,
+ * this is the presenter's). `font-family` is set explicitly so it inherits to
+ * every projected element; weight/size are applied per-element by the scoped
+ * rules below (`<style scoped>`), reading each element's own base size.
+ */
+const typographyStyle = computed(() => ({
+  ...cssVarsFor(authStore.settings.slideTypography),
+  fontFamily: 'var(--slide-font-family)',
+}))
+
+const DEFAULT_FONT_FAMILY = 'Inter'
+const DEFAULT_FONT_WEIGHT = 400
+
+/**
+ * R094 — resolves the org's chosen family/weight against the curated
+ * `SLIDE_FONTS` registry, falling back to the eager-loaded default (Inter/400)
+ * for an unknown family and snapping an unreachable weight to 400 (same
+ * defensive posture as `cssVarsFor`, kept independent because the font-load
+ * gate needs the raw family/weight pair for `document.fonts.load()`, not the
+ * CSS-var string `cssVarsFor` builds).
+ */
+function resolvedFontChoice(): { family: string; weight: number } {
+  const typography = authStore.settings.slideTypography
+  const family =
+    typography?.fontFamily !== undefined && SLIDE_FONTS[typography.fontFamily]
+      ? typography.fontFamily
+      : DEFAULT_FONT_FAMILY
+  const weight = snapWeight(family, typography?.fontWeight ?? DEFAULT_FONT_WEIGHT)
+  return { family, weight }
+}
+
 // ── Refs / state ─────────────────────────────────────────────────────────────
 
 const viewerRoot = ref<HTMLElement | null>(null)
+/**
+ * R094 — false until the chosen face is resident (or the bounded
+ * FONT_LOAD_TIMEOUT_MS elapses). Gates the slide canvas's first paint so a
+ * projector never flashes a fallback font mid-service; see `showLoadingState`
+ * and the font-gate block in `onMounted` below.
+ */
+const fontReady = ref(false)
 // R061 — seeded from `initialIndex` (SlidesTab's presentStartIndex), clamped
 // with the SAME formula as the length-change watcher below (:459 as the file
 // stood before this change) so the two clamps agree by construction rather
@@ -442,14 +490,28 @@ const isLoadingState = computed(() => !!props.isLoading && props.slides.length =
 const isEmptyState = computed(() => !isLoadingState.value && props.slides.length === 0)
 
 /**
+ * R094 — true while slides are ready to show but the chosen face is not yet
+ * resident (or the bounded timeout hasn't elapsed). Kept distinct from
+ * `isLoadingState` (which means "assembly itself is still in flight") so
+ * `hasSlides.value === false` (isEmptyState) is never gated on font load —
+ * there is nothing to flash when there is nothing to show.
+ */
+const fontGateActive = computed(() => !fontReady.value && hasSlides.value)
+
+/** The union the template's "Loading slideshow…" branch renders for. */
+const showLoadingState = computed(() => isLoadingState.value || fontGateActive.value)
+
+/**
  * WR-04: the exit button must stay reachable even if the idle-hide timer has
  * already fired while there is still nothing else on screen to interact
  * with (assembly taking >3s, or the rare empty/race state) — on a
  * touch-only device there would otherwise be no way to trigger Escape.
  * `chromeVisible`'s own value (and its 3s timer) are untouched; this only
- * overrides what's DISPLAYED while loading/empty.
+ * overrides what's DISPLAYED while loading/empty. Widened (46-04) to also
+ * cover the R094 font-load gate — the exit affordance must stay reachable
+ * for however long that gate holds too.
  */
-const exitVisible = computed(() => chromeVisible.value || isLoadingState.value || isEmptyState.value)
+const exitVisible = computed(() => chromeVisible.value || showLoadingState.value || isEmptyState.value)
 
 const currentSlide = computed<AssembledSlide | null>(() => props.slides[currentIndex.value] ?? null)
 const atFirst = computed(() => currentIndex.value <= 0)
@@ -843,6 +905,25 @@ onMounted(async () => {
   registerActivity()
   document.addEventListener('fullscreenchange', handleFullscreenChange)
   enterPresentation()
+
+  // R094 — the font-load gate. Runs regardless of whether there are slides
+  // yet (`fontReady` only ever gates rendering when `hasSlides` is true, see
+  // `fontGateActive` above), so it never races the assembly-in-flight state.
+  const { family, weight } = resolvedFontChoice()
+  if (family !== DEFAULT_FONT_FAMILY || weight !== DEFAULT_FONT_WEIGHT) {
+    // On-demand load of a non-eager curated face BEFORE asking the browser
+    // to resolve it — document.fonts.load() can only find a face whose
+    // @font-face rule has already been registered.
+    await loadFontCss(family, weight)
+  }
+  // Bounded (Promise.race against FONT_LOAD_TIMEOUT_MS) — always settles,
+  // never leaves fontReady stuck false (T-46-04).
+  await waitForSlideFont(family, weight, FONT_LOAD_TIMEOUT_MS)
+  fontReady.value = true
+
+  // Deferred until AFTER the font gate (and its DOM update) so the slide
+  // canvas — and the AudioPlayer/VideoPlayer refs it mounts — actually
+  // exist by the time play() is called.
   await nextTick()
   playCurrentMedia()
 })
@@ -861,3 +942,47 @@ onUnmounted(() => {
   if (chromeTimer) clearTimeout(chromeTimer)
 })
 </script>
+
+<style scoped>
+/*
+ * R093 (46-04) — per-element font-weight/font-size overrides reading the
+ * `--slide-font-*` custom properties `typographyStyle` sets on the viewer
+ * root above. Unlayered scoped styles win over Tailwind's `@layer utilities`
+ * regardless of selector specificity, so these override the template's fixed
+ * Tailwind size/weight classes without touching them. Each element's base
+ * rem/px value is its EXISTING Tailwind size class, read directly
+ * (46-UI-SPEC.md § Typography (B)): text-6xl=3.75rem, text-5xl=3rem,
+ * text-2xl=1.5rem, text-xs=0.75rem. `presentation-body` carries two distinct
+ * base sizes depending on slide kind (text-5xl for lyric/scripture/text,
+ * text-6xl for the copyright title) — targeted by combining the testid with
+ * the existing size class rather than a single ambiguous rule.
+ */
+[data-testid='presentation-body'].text-5xl {
+  font-weight: var(--slide-font-weight);
+  font-size: calc(3rem * var(--slide-font-scale));
+}
+[data-testid='presentation-body'].text-6xl {
+  font-size: calc(3.75rem * var(--slide-font-scale));
+}
+[data-testid='presentation-scripture-reference'] {
+  font-weight: var(--slide-font-weight);
+  font-size: calc(3rem * var(--slide-font-scale));
+}
+[data-testid='presentation-speaker'] {
+  font-weight: var(--slide-font-weight);
+  font-size: calc(3rem * var(--slide-font-scale));
+}
+[data-testid='presentation-congregational-section'] {
+  font-weight: var(--slide-font-weight);
+  font-size: calc(3rem * var(--slide-font-scale));
+}
+/* Deliberately NO font-weight override here — the copyright title/authors
+   keep their existing font-semibold hierarchy (only the primary font-normal
+   body/scripture/speaker/congregational elements above get the weight var). */
+[data-testid='presentation-copyright-fine-print'] {
+  font-size: calc(0.75rem * var(--slide-font-scale));
+}
+.presentation-copyright-authors {
+  font-size: calc(1.5rem * var(--slide-font-scale));
+}
+</style>

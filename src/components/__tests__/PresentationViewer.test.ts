@@ -307,7 +307,7 @@ describe('PresentationViewer', () => {
       scriptureSlide('c', 'message'),
     ]
     mount(PresentationViewer, { props: { slides } })
-    await Promise.resolve()
+    await flushPromises()
 
     expect(body().find('[data-testid="presentation-viewer"]').exists()).toBe(true)
     expect(slideText()).toContain('Amazing grace, how sweet the sound')
@@ -321,7 +321,7 @@ describe('PresentationViewer', () => {
       scriptureSlide('c', 'message'),
     ]
     mount(PresentationViewer, { props: { slides } })
-    await Promise.resolve()
+    await flushPromises()
 
     await body().find('[data-testid="presentation-next"]').trigger('click')
     expect(body().find('[data-testid="presentation-progress"]').text()).toBe('2 / 3')
@@ -330,7 +330,7 @@ describe('PresentationViewer', () => {
   it('ArrowRight on the viewer root advances to index 1', async () => {
     const slides: AssembledSlide[] = [lyricSlide('a'), copyrightSlide('b'), scriptureSlide('c')]
     mount(PresentationViewer, { props: { slides } })
-    await Promise.resolve()
+    await flushPromises()
 
     await body().find('[data-testid="presentation-viewer"]').trigger('keydown', { key: 'ArrowRight' })
     expect(slideText()).toContain('Amazing Grace')
@@ -339,12 +339,12 @@ describe('PresentationViewer', () => {
   it('Space advances and calls preventDefault', async () => {
     const slides: AssembledSlide[] = [lyricSlide('a'), copyrightSlide('b'), scriptureSlide('c')]
     mount(PresentationViewer, { props: { slides } })
-    await Promise.resolve()
+    await flushPromises()
 
     const event = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true })
     const preventDefaultSpy = vi.spyOn(event, 'preventDefault')
     body().find('[data-testid="presentation-viewer"]').element.dispatchEvent(event)
-    await Promise.resolve()
+    await flushPromises()
 
     expect(preventDefaultSpy).toHaveBeenCalled()
     expect(slideText()).toContain('Amazing Grace')
@@ -353,7 +353,7 @@ describe('PresentationViewer', () => {
   it('ArrowLeft and Backspace go back', async () => {
     const slides: AssembledSlide[] = [lyricSlide('a'), copyrightSlide('b'), scriptureSlide('c')]
     mount(PresentationViewer, { props: { slides } })
-    await Promise.resolve()
+    await flushPromises()
 
     const viewer = body().find('[data-testid="presentation-viewer"]')
     await viewer.trigger('keydown', { key: 'ArrowRight' })
@@ -370,7 +370,7 @@ describe('PresentationViewer', () => {
   it('ArrowRight at the last index does not change the rendered slide; ArrowLeft at index 0 does not change it', async () => {
     const slides: AssembledSlide[] = [lyricSlide('a'), copyrightSlide('b')]
     mount(PresentationViewer, { props: { slides } })
-    await Promise.resolve()
+    await flushPromises()
 
     const viewer = body().find('[data-testid="presentation-viewer"]')
     await viewer.trigger('keydown', { key: 'ArrowLeft' })
@@ -385,7 +385,7 @@ describe('PresentationViewer', () => {
   it('with exactly 1 slide, the progress pill reads "1 / 1" and both nav buttons are disabled but present', async () => {
     const slides: AssembledSlide[] = [withoutSection(lyricSlide('a'))]
     mount(PresentationViewer, { props: { slides } })
-    await Promise.resolve()
+    await flushPromises()
 
     expect(body().find('[data-testid="presentation-progress"]').text()).toBe('1 / 1')
     expect(body().find('[data-testid="presentation-prev"]').exists()).toBe(true)
@@ -397,7 +397,7 @@ describe('PresentationViewer', () => {
   it('keydown Escape emits exit exactly once', async () => {
     const slides: AssembledSlide[] = [lyricSlide('a')]
     const wrapper = mount(PresentationViewer, { props: { slides } })
-    await Promise.resolve()
+    await flushPromises()
 
     await body().find('[data-testid="presentation-viewer"]').trigger('keydown', { key: 'Escape' })
     expect(wrapper.emitted('exit')).toHaveLength(1)
@@ -406,7 +406,7 @@ describe('PresentationViewer', () => {
   it('clicking presentation-exit emits exit', async () => {
     const slides: AssembledSlide[] = [lyricSlide('a')]
     const wrapper = mount(PresentationViewer, { props: { slides } })
-    await Promise.resolve()
+    await flushPromises()
 
     await body().find('[data-testid="presentation-exit"]').trigger('click')
     expect(wrapper.emitted('exit')).toBeTruthy()
@@ -415,7 +415,7 @@ describe('PresentationViewer', () => {
   it('the teleported viewer root carries role="dialog" and aria-modal="true" (WR-06)', async () => {
     const slides: AssembledSlide[] = [lyricSlide('a')]
     mount(PresentationViewer, { props: { slides } })
-    await Promise.resolve()
+    await flushPromises()
 
     const viewer = body().find('[data-testid="presentation-viewer"]')
     expect(viewer.attributes('role')).toBe('dialog')
@@ -426,7 +426,7 @@ describe('PresentationViewer', () => {
     it('Tab on the last focusable element wraps focus to the first', async () => {
       const slides: AssembledSlide[] = [lyricSlide('a'), copyrightSlide('b')]
       mount(PresentationViewer, { props: { slides } })
-      await Promise.resolve()
+      await flushPromises()
 
       const exitEl = body().find('[data-testid="presentation-exit"]').element as HTMLElement
       const nextEl = body().find('[data-testid="presentation-next"]').element as HTMLElement
@@ -444,7 +444,7 @@ describe('PresentationViewer', () => {
     it('Shift+Tab on the first focusable element wraps focus to the last', async () => {
       const slides: AssembledSlide[] = [lyricSlide('a'), copyrightSlide('b')]
       mount(PresentationViewer, { props: { slides } })
-      await Promise.resolve()
+      await flushPromises()
 
       const exitEl = body().find('[data-testid="presentation-exit"]').element as HTMLElement
       const nextEl = body().find('[data-testid="presentation-next"]').element as HTMLElement
@@ -462,7 +462,7 @@ describe('PresentationViewer', () => {
     it('with only one focusable element (both nav buttons disabled), Tab keeps focus on it rather than escaping the viewer', async () => {
       const slides: AssembledSlide[] = [withoutSection(lyricSlide('a'))]
       mount(PresentationViewer, { props: { slides } })
-      await Promise.resolve()
+      await flushPromises()
 
       const exitEl = body().find('[data-testid="presentation-exit"]').element as HTMLElement
       exitEl.focus()
@@ -480,8 +480,8 @@ describe('PresentationViewer', () => {
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const slides: AssembledSlide[] = [lyricSlide('a')]
     mount(PresentationViewer, { props: { slides } })
-    await Promise.resolve()
-    await Promise.resolve()
+    await flushPromises()
+    await flushPromises()
 
     expect(body().find('[data-testid="presentation-slide"]').exists()).toBe(true)
     expect(body().find('[data-testid="presentation-chrome"]').exists()).toBe(true)
@@ -493,11 +493,11 @@ describe('PresentationViewer', () => {
     Element.prototype.requestFullscreen = vi.fn().mockResolvedValue(undefined)
     const slides: AssembledSlide[] = [lyricSlide('a')]
     const wrapper = mount(PresentationViewer, { props: { slides } })
-    await Promise.resolve()
-    await Promise.resolve()
+    await flushPromises()
+    await flushPromises()
 
     document.dispatchEvent(new Event('fullscreenchange'))
-    await Promise.resolve()
+    await flushPromises()
 
     expect(wrapper.emitted('exit')).toBeTruthy()
   })
@@ -513,7 +513,7 @@ describe('PresentationViewer', () => {
     it('hides chrome and exit button after 3100ms idle, restores on mousemove', async () => {
       const slides: AssembledSlide[] = [lyricSlide('a')]
       mount(PresentationViewer, { props: { slides } })
-      await Promise.resolve()
+      await flushPromises()
 
       await vi.advanceTimersByTimeAsync(3100)
 
@@ -528,7 +528,7 @@ describe('PresentationViewer', () => {
 
     it('the exit button stays fully opaque and interactive through the idle timeout while isLoading (WR-04)', async () => {
       mount(PresentationViewer, { props: { slides: [], isLoading: true } })
-      await Promise.resolve()
+      await flushPromises()
 
       await vi.advanceTimersByTimeAsync(3100)
 
@@ -540,7 +540,7 @@ describe('PresentationViewer', () => {
 
     it('the exit button stays fully opaque and interactive through the idle timeout in the empty state (WR-04)', async () => {
       mount(PresentationViewer, { props: { slides: [] } })
-      await Promise.resolve()
+      await flushPromises()
 
       await vi.advanceTimersByTimeAsync(3100)
 
@@ -553,7 +553,7 @@ describe('PresentationViewer', () => {
 
   it('slides: [] and isLoading: true renders presentation-loading with the loading copy, no empty-state', async () => {
     mount(PresentationViewer, { props: { slides: [], isLoading: true } })
-    await Promise.resolve()
+    await flushPromises()
 
     expect(body().find('[data-testid="presentation-loading"]').text()).toContain('Loading slideshow…')
     expect(body().find('[data-testid="presentation-empty-state"]').exists()).toBe(false)
@@ -561,7 +561,7 @@ describe('PresentationViewer', () => {
 
   it('slides: [] and isLoading absent/false renders the empty-state copy with a reachable exit and no nav', async () => {
     mount(PresentationViewer, { props: { slides: [] } })
-    await Promise.resolve()
+    await flushPromises()
 
     expect(body().find('[data-testid="presentation-empty-state"]').text()).toBe(
       'No slides yet — add songs or scripture to see the assembled slideshow.',
@@ -576,7 +576,7 @@ describe('PresentationViewer', () => {
 
   it('R059: a LyricSlide does not project its sectionLabel, and renders exactly one paragraph of body text', async () => {
     mount(PresentationViewer, { props: { slides: [lyricSlide('a')] } })
-    await Promise.resolve()
+    await flushPromises()
 
     expect(slideText()).not.toContain('Verse 1')
     expect(body().find('[data-testid="presentation-slide"]').findAll('p')).toHaveLength(1)
@@ -589,7 +589,7 @@ describe('PresentationViewer', () => {
     const emptyLabelSlide = lyricSlide('a')
     ;(emptyLabelSlide.slide as import('@/types/slide').LyricSlide).sectionLabel = ''
     mount(PresentationViewer, { props: { slides: [emptyLabelSlide] } })
-    await Promise.resolve()
+    await flushPromises()
 
     expect(body().find('[data-testid="presentation-slide"]').findAll('p')).toHaveLength(1)
     const bodyText = body().find('[data-testid="presentation-body"]').text()
@@ -599,7 +599,7 @@ describe('PresentationViewer', () => {
 
   it('a CopyrightSlide renders title, authors, and CCLI lines at fine-print scale with no line-limiting/ellipsis', async () => {
     mount(PresentationViewer, { props: { slides: [copyrightSlide('a')] } })
-    await Promise.resolve()
+    await flushPromises()
 
     const titleEl = body().find('[data-testid="presentation-body"]')
     expect(titleEl.text()).toBe('Amazing Grace')
@@ -617,7 +617,7 @@ describe('PresentationViewer', () => {
 
   it('a normal-mode ScriptureSlide renders reference in presentation-scripture-reference and the FULL text in presentation-body', async () => {
     mount(PresentationViewer, { props: { slides: [longScriptureSlide('a')] } })
-    await Promise.resolve()
+    await flushPromises()
 
     expect(body().find('[data-testid="presentation-scripture-reference"]').text()).toBe('John 3:16')
     const text = body().find('[data-testid="presentation-body"]').text()
@@ -629,7 +629,7 @@ describe('PresentationViewer', () => {
 
   it('D1: a normal-mode ScriptureSlide renders its reference in the same treatment as song lyrics, not an accented label', async () => {
     mount(PresentationViewer, { props: { slides: [longScriptureSlide('a')] } })
-    await Promise.resolve()
+    await flushPromises()
 
     const classes = body().find('[data-testid="presentation-scripture-reference"]').classes()
     expect(classes).toContain('text-gray-100')
@@ -648,7 +648,7 @@ describe('PresentationViewer', () => {
   it('D1: a congregational ScriptureSlide renders its reference in the unified body treatment too, and its speaker tag is coloured but otherwise unaccented, in a LEADER section slide showing that section\'s words', async () => {
     const section = { speaker: 'LEADER' as const, text: 'Give thanks to the LORD, for he is good.' }
     mount(PresentationViewer, { props: { slides: [congregationalScriptureSlide('a', section)] } })
-    await Promise.resolve()
+    await flushPromises()
 
     const classes = body().find('[data-testid="presentation-scripture-reference"]').classes()
     expect(classes).toContain('text-gray-100')
@@ -690,7 +690,7 @@ describe('PresentationViewer', () => {
     const emptyPassageSlide = scriptureSlide('a')
     ;(emptyPassageSlide.slide as import('@/types/slide').ScriptureSlide).text = ''
     mount(PresentationViewer, { props: { slides: [emptyPassageSlide] } })
-    await Promise.resolve()
+    await flushPromises()
 
     const reference = body().find('[data-testid="presentation-scripture-reference"]')
     expect(reference.text()).toBe('Romans 8:28-30')
@@ -705,7 +705,7 @@ describe('PresentationViewer', () => {
       const slide = scriptureSlide('a')
       ;(slide.slide as import('@/types/slide').ScriptureSlide).translationSource = 'NLT'
       mount(PresentationViewer, { props: { slides: [slide] } })
-      await Promise.resolve()
+      await flushPromises()
 
       const text = body().find('[data-testid="presentation-body"]').text()
       expect(text.endsWith('(NLT)')).toBe(true)
@@ -716,7 +716,7 @@ describe('PresentationViewer', () => {
       const slide = scriptureSlide('a')
       expect((slide.slide as import('@/types/slide').ScriptureSlide).translationSource).toBeUndefined()
       mount(PresentationViewer, { props: { slides: [slide] } })
-      await Promise.resolve()
+      await flushPromises()
 
       const text = body().find('[data-testid="presentation-body"]').text()
       expect(text.endsWith('(ESV)')).toBe(true)
@@ -726,7 +726,7 @@ describe('PresentationViewer', () => {
       const emptyPassageSlide = scriptureSlide('a')
       ;(emptyPassageSlide.slide as import('@/types/slide').ScriptureSlide).text = ''
       mount(PresentationViewer, { props: { slides: [emptyPassageSlide] } })
-      await Promise.resolve()
+      await flushPromises()
 
       expect(slideText()).not.toContain('(ESV)')
       expect(slideText()).not.toContain('(NLT)')
@@ -737,7 +737,7 @@ describe('PresentationViewer', () => {
       const slide = congregationalScriptureSlide('a', section)
       ;(slide.slide as import('@/types/slide').ScriptureSlide).translationSource = 'NLT'
       mount(PresentationViewer, { props: { slides: [slide] } })
-      await Promise.resolve()
+      await flushPromises()
 
       const words = body().find('[data-testid="presentation-congregational-section"]')
       expect(words.text()).toBe(`${section.text} (NLT)`)
@@ -752,7 +752,7 @@ describe('PresentationViewer', () => {
       ;(congregationSlide.slide as import('@/types/slide').ScriptureSlide).translationSource = 'NLT'
 
       mount(PresentationViewer, { props: { slides: [leaderSlide, congregationSlide] } })
-      await Promise.resolve()
+      await flushPromises()
 
       expect(body().find('[data-testid="presentation-congregational-section"]').text()).toBe(
         `${leaderSection.text} (NLT)`,
@@ -767,7 +767,7 @@ describe('PresentationViewer', () => {
       const section = { speaker: 'LEADER' as const, text: 'He said <b>this</b> & that.' }
       const slide = congregationalScriptureSlide('a', section)
       mount(PresentationViewer, { props: { slides: [slide] } })
-      await Promise.resolve()
+      await flushPromises()
 
       const words = body().find('[data-testid="presentation-congregational-section"]')
       expect(words.text()).toBe('He said <b>this</b> & that. (ESV)')
@@ -786,7 +786,7 @@ describe('PresentationViewer', () => {
         ],
       },
     })
-    await Promise.resolve()
+    await flushPromises()
 
     // Slide 1: only the LEADER section's speaker and words are present.
     const speaker1 = body().find('[data-testid="presentation-speaker"]')
@@ -836,7 +836,7 @@ describe('PresentationViewer', () => {
 
   it('readingMode congregational with no section falls back to normal-mode rendering', async () => {
     mount(PresentationViewer, { props: { slides: [congregationalScriptureSlide('a', undefined)] } })
-    await Promise.resolve()
+    await flushPromises()
 
     expect(body().find('[data-testid="presentation-body"]').text()).toContain(
       'Give thanks to the LORD, for he is good.',
@@ -847,7 +847,7 @@ describe('PresentationViewer', () => {
 
   it('D2: a TextSlide with a title projects only its body — the title never reaches the projector', async () => {
     mount(PresentationViewer, { props: { slides: [textSlide('a', 'Message')] } })
-    await Promise.resolve()
+    await flushPromises()
 
     expect(body().find('[data-testid="presentation-body"]').text()).toContain(
       'Please stand for the reading of the Word.',
@@ -858,7 +858,7 @@ describe('PresentationViewer', () => {
 
   it('D2: a TextSlide without a title projects identically to one with a title — same single-paragraph structure', async () => {
     mount(PresentationViewer, { props: { slides: [textSlide('a')] } })
-    await Promise.resolve()
+    await flushPromises()
 
     expect(body().find('[data-testid="presentation-body"]').text()).toContain(
       'Please stand for the reading of the Word.',
@@ -873,14 +873,14 @@ describe('PresentationViewer', () => {
   describe('unified text-5xl size across every projected kind (D1/D2/D3)', () => {
     it('a lyric slide body renders at text-5xl', async () => {
       mount(PresentationViewer, { props: { slides: [lyricSlide('a')] } })
-      await Promise.resolve()
+      await flushPromises()
 
       expect(body().find('[data-testid="presentation-body"]').classes()).toContain('text-5xl')
     })
 
     it('a normal-mode scripture slide renders both its reference and its body at text-5xl', async () => {
       mount(PresentationViewer, { props: { slides: [scriptureSlide('a')] } })
-      await Promise.resolve()
+      await flushPromises()
 
       expect(body().find('[data-testid="presentation-scripture-reference"]').classes()).toContain('text-5xl')
       expect(body().find('[data-testid="presentation-body"]').classes()).toContain('text-5xl')
@@ -889,7 +889,7 @@ describe('PresentationViewer', () => {
     it('a congregational scripture slide renders its reference, its speaker and its section text all at text-5xl', async () => {
       const section = { speaker: 'LEADER' as const, text: 'Give thanks to the LORD, for he is good.' }
       mount(PresentationViewer, { props: { slides: [congregationalScriptureSlide('a', section)] } })
-      await Promise.resolve()
+      await flushPromises()
 
       expect(body().find('[data-testid="presentation-scripture-reference"]').classes()).toContain('text-5xl')
       expect(body().find('[data-testid="presentation-speaker"]').classes()).toContain('text-5xl')
@@ -898,7 +898,7 @@ describe('PresentationViewer', () => {
 
     it('a text slide body renders at text-5xl', async () => {
       mount(PresentationViewer, { props: { slides: [textSlide('a', 'Message')] } })
-      await Promise.resolve()
+      await flushPromises()
 
       expect(body().find('[data-testid="presentation-body"]').classes()).toContain('text-5xl')
     })
@@ -906,7 +906,7 @@ describe('PresentationViewer', () => {
 
   it('an ImageSlide renders an img with src/alt and object-contain/max-h-[80vh] classes', async () => {
     mount(PresentationViewer, { props: { slides: [imageSlide('a')] } })
-    await Promise.resolve()
+    await flushPromises()
 
     const img = body().find('[data-testid="presentation-image"]')
     expect(img.attributes('src')).toBe('https://example.com/announcement.png')
@@ -917,7 +917,7 @@ describe('PresentationViewer', () => {
 
   it('a slide with angle-bracket markup renders those characters literally, not as child elements', async () => {
     mount(PresentationViewer, { props: { slides: [markupSlide('a')] } })
-    await Promise.resolve()
+    await flushPromises()
 
     const slideContainer = body().find('[data-testid="presentation-slide"]')
     expect(slideContainer.find('script').exists()).toBe(false)
@@ -932,7 +932,7 @@ describe('PresentationViewer', () => {
   describe('render-pending and render-failed canvas states (R080/D-15)', () => {
     it('a pending current slide renders presentation-render-pending with the rendering heading, and neither presentation-image nor presentation-body', async () => {
       mount(PresentationViewer, { props: { slides: [withRenderState(imageSlide('a'), 'pending')] } })
-      await Promise.resolve()
+      await flushPromises()
 
       const pending = body().find('[data-testid="presentation-render-pending"]')
       expect(pending.exists()).toBe(true)
@@ -945,7 +945,7 @@ describe('PresentationViewer', () => {
       mount(PresentationViewer, {
         props: { slides: [withRenderState(imageSlide('a'), 'failed', 'missing-render-doc')] },
       })
-      await Promise.resolve()
+      await flushPromises()
 
       const failed = body().find('[data-testid="presentation-render-failed"]')
       expect(failed.exists()).toBe(true)
@@ -959,7 +959,7 @@ describe('PresentationViewer', () => {
       mount(PresentationViewer, {
         props: { slides: [withRenderState(imageSlide('a'), 'failed', 'some-unmapped-future-reason')] },
       })
-      await Promise.resolve()
+      await flushPromises()
 
       const html = document.body.innerHTML
       expect(html).not.toContain('some-unmapped-future-reason')
@@ -970,14 +970,14 @@ describe('PresentationViewer', () => {
 
     it('the pending and failed headings share the same text-4xl font-semibold size and weight — failed is never louder', async () => {
       let wrapper = mount(PresentationViewer, { props: { slides: [withRenderState(imageSlide('a'), 'pending')] } })
-      await Promise.resolve()
+      await flushPromises()
       const pendingHeading = body().find('[data-testid="presentation-render-pending"] h2')
       expect(pendingHeading.classes()).toContain('text-4xl')
       expect(pendingHeading.classes()).toContain('font-semibold')
       wrapper.unmount()
 
       wrapper = mount(PresentationViewer, { props: { slides: [withRenderState(imageSlide('a'), 'failed')] } })
-      await Promise.resolve()
+      await flushPromises()
       const failedHeading = body().find('[data-testid="presentation-render-failed"] h2')
       expect(failedHeading.classes()).toContain('text-4xl')
       expect(failedHeading.classes()).toContain('font-semibold')
@@ -985,7 +985,7 @@ describe('PresentationViewer', () => {
 
     it('a slide with no renderState and contentKind image still renders presentation-image byte-identically', async () => {
       mount(PresentationViewer, { props: { slides: [imageSlide('a')] } })
-      await Promise.resolve()
+      await flushPromises()
 
       const img = body().find('[data-testid="presentation-image"]')
       expect(img.exists()).toBe(true)
@@ -1006,7 +1006,7 @@ describe('PresentationViewer', () => {
         withoutSection(imageSlide('c')),
       ]
       mount(PresentationViewer, { props: { slides } })
-      await Promise.resolve()
+      await flushPromises()
 
       // Mounted at slide 1: the pending slide is counted in the denominator.
       expect(body().find('[data-testid="presentation-progress"]').text()).toBe('1 / 3')
@@ -1036,7 +1036,7 @@ describe('PresentationViewer', () => {
         withoutSection(imageSlide('c')),
       ]
       mount(PresentationViewer, { props: { slides } })
-      await Promise.resolve()
+      await flushPromises()
 
       expect(body().find('[data-testid="presentation-progress"]').text()).toBe('1 / 3')
 
@@ -1059,7 +1059,7 @@ describe('PresentationViewer', () => {
         withRenderState(withoutSection(imageSlide('c')), 'pending'),
       ]
       mount(PresentationViewer, { props: { slides } })
-      await Promise.resolve()
+      await flushPromises()
 
       expect(body().find('[data-testid="presentation-progress"]').text()).toBe('1 / 3')
       expect(body().find('[data-testid="presentation-render-pending"]').exists()).toBe(true)
@@ -1477,11 +1477,11 @@ describe('PresentationViewer', () => {
 
       it('presentation-media-unavailable does not carry opacity-0 after the idle timer fires, while presentation-chrome does', async () => {
         mount(PresentationViewer, { props: { slides: [videoSlide('v1', 'https://example.com/clip.mp4')] } })
-        await Promise.resolve()
-        await Promise.resolve()
+        await flushPromises()
+        await flushPromises()
 
         await body().find('[data-testid="presentation-video"] video').trigger('error')
-        await Promise.resolve()
+        await flushPromises()
 
         await vi.advanceTimersByTimeAsync(3100)
 
@@ -1654,7 +1654,7 @@ describe('PresentationViewer', () => {
         withoutSection(copyrightSlide('e')),
       ]
       mount(PresentationViewer, { props: { slides, initialIndex: 2 } })
-      await Promise.resolve()
+      await flushPromises()
 
       expect(body().find('[data-testid="presentation-progress"]').text()).toBe('3 / 5')
     })
@@ -1666,7 +1666,7 @@ describe('PresentationViewer', () => {
         withoutSection(scriptureSlide('c')),
       ]
       mount(PresentationViewer, { props: { slides } })
-      await Promise.resolve()
+      await flushPromises()
 
       expect(body().find('[data-testid="presentation-progress"]').text()).toBe('1 / 3')
     })
@@ -1678,7 +1678,7 @@ describe('PresentationViewer', () => {
         withoutSection(scriptureSlide('c')),
       ]
       mount(PresentationViewer, { props: { slides, initialIndex: 99 } })
-      await Promise.resolve()
+      await flushPromises()
 
       expect(body().find('[data-testid="presentation-progress"]').text()).toBe('3 / 3')
     })
@@ -1690,7 +1690,7 @@ describe('PresentationViewer', () => {
         withoutSection(scriptureSlide('c')),
       ]
       mount(PresentationViewer, { props: { slides, initialIndex: -1 } })
-      await Promise.resolve()
+      await flushPromises()
 
       expect(body().find('[data-testid="presentation-progress"]').text()).toBe('1 / 3')
     })
@@ -1699,7 +1699,7 @@ describe('PresentationViewer', () => {
       expect(() => {
         mount(PresentationViewer, { props: { slides: [], initialIndex: 4 } })
       }).not.toThrow()
-      await Promise.resolve()
+      await flushPromises()
 
       expect(body().find('[data-testid="presentation-empty-state"]').exists()).toBe(true)
     })
@@ -1711,7 +1711,7 @@ describe('PresentationViewer', () => {
         withoutSection(scriptureSlide('c')),
       ]
       mount(PresentationViewer, { props: { slides, initialIndex: 1 } })
-      await Promise.resolve()
+      await flushPromises()
 
       // Same chrome elements as any other mount — no additional "started
       // partway through" element exists anywhere in the viewer.
@@ -1727,7 +1727,7 @@ describe('PresentationViewer', () => {
     it('a lyric slide with a resolved backgroundImageUrl renders a background element with that url inline, plus a scrim', async () => {
       const slide = withBackground(lyricSlide('a'), 'https://example.com/bg.jpg')
       mount(PresentationViewer, { props: { slides: [slide] } })
-      await Promise.resolve()
+      await flushPromises()
 
       const bg = body().find('[data-testid="presentation-background"]')
       expect(bg.exists()).toBe(true)
@@ -1738,7 +1738,7 @@ describe('PresentationViewer', () => {
     it("the same slide's text still renders unchanged", async () => {
       const slide = withBackground(lyricSlide('a'), 'https://example.com/bg.jpg')
       mount(PresentationViewer, { props: { slides: [slide] } })
-      await Promise.resolve()
+      await flushPromises()
 
       const text = body().find('[data-testid="presentation-body"]').text()
       expect(text).toContain('Amazing grace, how sweet the sound')
@@ -1747,7 +1747,7 @@ describe('PresentationViewer', () => {
 
     it('a slide with no resolved backgroundImageUrl renders neither the background nor scrim element', async () => {
       mount(PresentationViewer, { props: { slides: [lyricSlide('a')] } })
-      await Promise.resolve()
+      await flushPromises()
 
       expect(body().find('[data-testid="presentation-background"]').exists()).toBe(false)
       expect(body().find('[data-testid="presentation-background-scrim"]').exists()).toBe(false)
@@ -1769,7 +1769,7 @@ describe('PresentationViewer', () => {
       const section = { speaker: 'LEADER' as const, text: 'Give thanks to the LORD, for he is good.' }
       const slide = withBackground(congregationalScriptureSlide('a', section), 'https://example.com/bg.jpg')
       mount(PresentationViewer, { props: { slides: [slide] } })
-      await Promise.resolve()
+      await flushPromises()
 
       expect(body().find('[data-testid="presentation-background"]').exists()).toBe(true)
       expect(body().find('[data-testid="presentation-speaker"]').exists()).toBe(true)
@@ -1781,7 +1781,7 @@ describe('PresentationViewer', () => {
     it('advancing from a slide with a background to a slide without one removes both elements', async () => {
       const slides = [withBackground(lyricSlide('a'), 'https://example.com/bg.jpg'), copyrightSlide('b')]
       mount(PresentationViewer, { props: { slides } })
-      await Promise.resolve()
+      await flushPromises()
 
       expect(body().find('[data-testid="presentation-background"]').exists()).toBe(true)
 
@@ -1796,7 +1796,7 @@ describe('PresentationViewer', () => {
         withBackground(copyrightSlide('b'), 'https://example.com/bg2.jpg'),
       ]
       mount(PresentationViewer, { props: { slides } })
-      await Promise.resolve()
+      await flushPromises()
 
       expect(body().find('[data-testid="presentation-background"]').attributes('style')).toContain('bg1.jpg')
 
@@ -1810,7 +1810,7 @@ describe('PresentationViewer', () => {
         withBackground(copyrightSlide('b'), 'https://example.com/inherited.jpg', 'group'),
       ]
       mount(PresentationViewer, { props: { slides } })
-      await Promise.resolve()
+      await flushPromises()
 
       expect(body().find('[data-testid="presentation-background"]').attributes('style')).toContain('own.jpg')
 
