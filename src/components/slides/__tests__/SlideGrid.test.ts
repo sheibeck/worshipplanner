@@ -2241,6 +2241,29 @@ describe('SlideGrid - locked service (R036)', () => {
     expect(capturedSortableOptions!.handle).toBe('.drag-handle')
   })
 
+  // R099 (48-02 Task 3) — additive SortableJS touch options on the existing instance.
+  it('R099: Sortable.create is called once with touch options ADDED to the existing options object, leaving handle/draggable/animation unchanged', async () => {
+    const group = makeGroup({ slides: [{ id: 'e1', order: 0, sourceRef: { kind: 'text', title: 'a', body: '' } }] })
+    const wrapper = mountGrid({
+      selectedSlot: makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 }),
+      assembledSlideshow: [makeAssembled(0, 'e1')],
+      group,
+      isEditor: true,
+    })
+    await wrapper.vm.$nextTick()
+
+    expect(capturedSortableOptions).toBeDefined()
+    expect(capturedSortableOptions).toMatchObject({
+      handle: '.drag-handle',
+      draggable: '.slide-card',
+      animation: 150,
+      ghostClass: 'opacity-30',
+      delay: 150,
+      delayOnTouchOnly: true,
+      touchStartThreshold: 5,
+    })
+  })
+
   // ---- ★ Handler-level guards (30-VERIFICATION I-01) ------------------------
   //
   // Six of the seven mutation entry points here were guarded by template `v-if`

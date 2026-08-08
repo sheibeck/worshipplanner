@@ -970,6 +970,9 @@ watch(
         draggable: '.slide-card',
         animation: 150,
         ghostClass: 'opacity-30',
+        delay: 150,
+        delayOnTouchOnly: true,
+        touchStartThreshold: 5,
         async onEnd(evt) {
           // R036: second lock over the instance itself. It is destroyed when
           // `canReorder` goes false, so this only catches a drag already in
