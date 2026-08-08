@@ -96,6 +96,12 @@ let mockSettingsVwModeEnabled = true
 let mockDefaultServiceTemplate: ServiceTemplateEntry[] = []
 // 45-02: R090 Bible Translation card.
 let mockBibleVersion: 'ESV' | 'NLT' = 'NLT'
+// 46-03: R093 Slide Typography card.
+let mockSlideTypography: { fontFamily: string; fontWeight: number; fontScale: 'sm' | 'md' | 'lg' } = {
+  fontFamily: 'Inter',
+  fontWeight: 400,
+  fontScale: 'md',
+}
 
 const mockSetPcCredentials = vi.fn()
 
@@ -174,6 +180,15 @@ vi.mock('@/stores/auth', () => ({
       set bibleVersion(v: 'ESV' | 'NLT') {
         mockBibleVersion = v
       },
+      // 46-03: setter required for saveSlideTypography's mirror-write
+      // (`authStore.settings.slideTypography = newValue`), mirroring every
+      // other settings.* setter above.
+      get slideTypography() {
+        return mockSlideTypography
+      },
+      set slideTypography(v: { fontFamily: string; fontWeight: number; fontScale: 'sm' | 'md' | 'lg' }) {
+        mockSlideTypography = v
+      },
     },
   }),
 }))
@@ -203,6 +218,7 @@ describe('SettingsView (Wave 0 harness — Phase 39)', () => {
     mockSettingsVwModeEnabled = true
     mockDefaultServiceTemplate = []
     mockBibleVersion = 'NLT'
+    mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' }
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
     mockSetPcCredentials.mockClear()
@@ -246,6 +262,7 @@ describe('SettingsView dot-path writes (R073) — Wave 2 (39-03)', () => {
     mockSettingsVwModeEnabled = true
     mockDefaultServiceTemplate = []
     mockBibleVersion = 'NLT'
+    mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' }
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
     mockSetPcCredentials.mockClear()
@@ -347,6 +364,7 @@ describe('SettingsView Planning Center credential retention (R089) — Wave 2 (3
     mockSettingsVwModeEnabled = true
     mockDefaultServiceTemplate = []
     mockBibleVersion = 'NLT'
+    mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' }
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
     mockSetPcCredentials.mockClear()
@@ -415,6 +433,7 @@ describe('SettingsView Services card (R086) — Wave 2 (44-02)', () => {
     mockSettingsVwModeEnabled = true
     mockDefaultServiceTemplate = []
     mockBibleVersion = 'NLT'
+    mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' }
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
     mockSetPcCredentials.mockClear()
@@ -497,6 +516,7 @@ describe('SettingsView Bible Translation card (R090) — 45-02', () => {
     mockSettingsVwModeEnabled = true
     mockDefaultServiceTemplate = []
     mockBibleVersion = 'NLT'
+    mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' }
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
     mockSetPcCredentials.mockClear()

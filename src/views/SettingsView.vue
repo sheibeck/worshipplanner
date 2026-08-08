@@ -342,6 +342,103 @@
         <p v-if="bibleVersionSaveError" class="text-red-400 text-sm mt-2">{{ bibleVersionSaveError }}</p>
       </div>
 
+      <!-- Slide Typography section (R093) — explains before offering the choice,
+           mirrors the Bible Translation card pattern (46-UI-SPEC.md). -->
+      <div class="rounded-lg bg-gray-900 border border-gray-800 p-4 mt-6">
+        <h2 class="text-sm font-semibold text-gray-300 mb-3">Slide Typography</h2>
+
+        <p class="text-xs text-gray-400 mb-3">
+          Choose one font, weight, and size for every slide across your services — the Slides
+          grid, the Edit Slide drawer preview, and the presenter all match. The printed Order of
+          Service is unaffected.
+        </p>
+
+        <div class="space-y-3">
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Font family</label>
+            <select
+              v-model="slideFontFamilyInput"
+              :disabled="!authStore.isEditor"
+              @change="onChangeSlideFontFamily"
+              data-testid="slide-font-family-select"
+              class="w-full sm:w-80 bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            >
+              <option v-for="name in SLIDE_FONT_FAMILY_NAMES" :key="name" :value="name">{{ name }}</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Weight</label>
+            <select
+              v-model.number="slideFontWeightInput"
+              :disabled="!authStore.isEditor"
+              @change="saveSlideTypography"
+              data-testid="slide-font-weight-select"
+              class="w-full sm:w-80 bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            >
+              <option v-for="weight in slideFontWeightOptions" :key="weight" :value="weight">{{ weight }}</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Size</label>
+            <div class="flex items-center gap-4">
+              <label
+                class="flex items-center gap-2"
+                :class="authStore.isEditor ? 'cursor-pointer' : 'opacity-60 cursor-not-allowed'"
+              >
+                <input
+                  v-model="slideFontScaleInput"
+                  type="radio"
+                  value="sm"
+                  name="slideFontScale"
+                  :disabled="!authStore.isEditor"
+                  @change="saveSlideTypography"
+                  data-testid="slide-font-scale-sm"
+                  class="h-4 w-4 border-gray-700 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0"
+                />
+                <span class="text-sm text-gray-200">Small</span>
+              </label>
+              <label
+                class="flex items-center gap-2"
+                :class="authStore.isEditor ? 'cursor-pointer' : 'opacity-60 cursor-not-allowed'"
+              >
+                <input
+                  v-model="slideFontScaleInput"
+                  type="radio"
+                  value="md"
+                  name="slideFontScale"
+                  :disabled="!authStore.isEditor"
+                  @change="saveSlideTypography"
+                  data-testid="slide-font-scale-md"
+                  class="h-4 w-4 border-gray-700 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0"
+                />
+                <span class="text-sm text-gray-200">Medium</span>
+              </label>
+              <label
+                class="flex items-center gap-2"
+                :class="authStore.isEditor ? 'cursor-pointer' : 'opacity-60 cursor-not-allowed'"
+              >
+                <input
+                  v-model="slideFontScaleInput"
+                  type="radio"
+                  value="lg"
+                  name="slideFontScale"
+                  :disabled="!authStore.isEditor"
+                  @change="saveSlideTypography"
+                  data-testid="slide-font-scale-lg"
+                  class="h-4 w-4 border-gray-700 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0"
+                />
+                <span class="text-sm text-gray-200">Large</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <p v-if="slideTypographySavedFeedback" class="text-green-400 text-sm mt-2">Saved!</p>
+        <p v-if="slideTypographySaveError" class="text-red-400 text-sm mt-2">{{ slideTypographySaveError }}</p>
+      </div>
+
       <!-- Services section (R086/R087) — Phase 44's default service template. -->
       <div class="rounded-lg bg-gray-900 border border-gray-800 p-4 mt-6">
         <h2 class="text-sm font-semibold text-gray-300 mb-3">Services</h2>
@@ -377,6 +474,7 @@ import { validatePcCredentials } from '@/utils/planningCenterApi'
 import { deriveSlug, claimSlug } from '@/utils/slug'
 import { groupBySection } from '@/utils/slotTypes'
 import { SERVICE_SECTIONS } from '@/types/service'
+import { SLIDE_FONTS, SLIDE_FONT_FAMILY_NAMES } from '@/config/slideFonts'
 
 const authStore = useAuthStore()
 
@@ -427,6 +525,22 @@ const pcEnabledSaveError = ref<string | null>(null)
 const bibleVersionInput = ref(authStore.settings.bibleVersion)
 const bibleVersionSavedFeedback = ref(false)
 const bibleVersionSaveError = ref<string | null>(null)
+
+// ── Slide Typography choice state (R093) ────────────────────────────────────────
+// No local defaults-merge/`?? ...` here — `authStore.settings.slideTypography`
+// is already defaulted by `loadOrgContext`'s single merge point (46-02-SUMMARY.md).
+
+const slideFontFamilyInput = ref(authStore.settings.slideTypography.fontFamily)
+const slideFontWeightInput = ref(authStore.settings.slideTypography.fontWeight)
+const slideFontScaleInput = ref(authStore.settings.slideTypography.fontScale)
+const slideTypographySavedFeedback = ref(false)
+const slideTypographySaveError = ref<string | null>(null)
+
+/** Per-family weight ramp (46-01's SLIDE_FONTS), re-derived every time the
+ *  selected family changes — drives the Weight <select>'s option list. */
+const slideFontWeightOptions = computed(
+  () => SLIDE_FONTS[slideFontFamilyInput.value]?.weights ?? [400],
+)
 
 // ── Services / default service template state (R086/R087) ─────────────────────
 // No local defaults-merge/`?? []` here — `authStore.settings.defaultServiceTemplate`
@@ -533,6 +647,16 @@ watch(
   (val) => {
     bibleVersionInput.value = val
   },
+)
+
+watch(
+  () => authStore.settings.slideTypography,
+  (val) => {
+    slideFontFamilyInput.value = val.fontFamily
+    slideFontWeightInput.value = val.fontWeight
+    slideFontScaleInput.value = val.fontScale
+  },
+  { deep: true },
 )
 
 // ── Save action (Org name) ─────────────────────────────────────────────────────
@@ -793,5 +917,51 @@ async function onChangeBibleVersion() {
     // Revert the local radio selection to reflect the unsaved state
     bibleVersionInput.value = newValue === 'ESV' ? 'NLT' : 'ESV'
   }
+}
+
+// ── Slide Typography save action (R093) ─────────────────────────────────────────
+// Writes all three leaf dot-paths in a single updateDoc call (never a whole-map
+// write), then mirrors the whole object into authStore.settings.slideTypography
+// (matching onSave's Services-template whole-object mirror, since family/weight/
+// scale are always saved together as one selection, unlike the independent
+// toggles above).
+
+async function saveSlideTypography() {
+  if (!authStore.orgId || !authStore.isEditor) return
+
+  const previous = { ...authStore.settings.slideTypography }
+  const newValue = {
+    fontFamily: slideFontFamilyInput.value,
+    fontWeight: slideFontWeightInput.value,
+    fontScale: slideFontScaleInput.value,
+  }
+  slideTypographySaveError.value = null
+
+  try {
+    await updateDoc(doc(db, 'organizations', authStore.orgId), {
+      'settings.slideTypography.fontFamily': newValue.fontFamily,
+      'settings.slideTypography.fontWeight': newValue.fontWeight,
+      'settings.slideTypography.fontScale': newValue.fontScale,
+    })
+    authStore.settings.slideTypography = newValue
+
+    slideTypographySavedFeedback.value = true
+    setTimeout(() => {
+      slideTypographySavedFeedback.value = false
+    }, 2000)
+  } catch (err) {
+    console.error('[SettingsView] save slideTypography error:', err)
+    slideTypographySaveError.value = "Couldn't save your slide typography settings. Try again."
+    // Revert the local selection to reflect the unsaved state
+    slideFontFamilyInput.value = previous.fontFamily
+    slideFontWeightInput.value = previous.fontWeight
+    slideFontScaleInput.value = previous.fontScale
+  }
+}
+
+// Family-change handler is a placeholder here (Task 1) — Task 2 replaces its
+// body with the snap-on-family-change + on-demand loadFontCss logic.
+async function onChangeSlideFontFamily() {
+  await saveSlideTypography()
 }
 </script>
