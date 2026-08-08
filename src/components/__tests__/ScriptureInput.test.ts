@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { nextTick } from 'vue'
 import { mount, flushPromises } from '@vue/test-utils'
 import ScriptureInput from '../ScriptureInput.vue'
@@ -94,27 +94,44 @@ vi.mock('@/utils/esvApi', () => ({
   fetchPassageText: vi.fn(() => Promise.resolve('Mocked passage text')),
 }))
 
+// 45-04: sibling mock to the ESV client above, for the NLT routing path.
+vi.mock('@/utils/nltApi', () => ({
+  fetchNltPassageText: vi.fn(() => Promise.resolve('Mocked passage text')),
+}))
+
 vi.mock('@/utils/claudeApi', () => ({
   getScriptureSuggestions: vi.fn(() => Promise.resolve(null)),
 }))
 
 // This component did not use the auth store before 39-04. Getter-mock
 // precedent: src/components/__tests__/SongTable.test.ts:39. Defaults to
-// `true` so every pre-existing test in this file keeps its current
-// behavior — none of them mounted with showAiSuggest before this phase.
+// `true`/`'ESV'` so every pre-existing test in this file keeps its current
+// behavior — none of them mounted with showAiSuggest before this phase, and
+// every pre-45-04 preview-fetch test asserts against the ESV mock.
 let mockAiEnabled = true
+let mockBibleVersion: 'ESV' | 'NLT' = 'ESV'
 vi.mock('@/stores/auth', () => ({
   useAuthStore: () => ({
     settings: {
       get aiEnabled() {
         return mockAiEnabled
       },
+      get bibleVersion() {
+        return mockBibleVersion
+      },
     },
   }),
 }))
 
+beforeEach(() => {
+  // Only clears call/result history, not the default implementations set
+  // via the vi.fn(() => ...) factories above — those stay intact.
+  vi.clearAllMocks()
+})
+
 afterEach(() => {
   mockAiEnabled = true
+  mockBibleVersion = 'ESV'
 })
 
 describe('ScriptureInput', () => {
@@ -464,5 +481,105 @@ describe('AI toggle (39-04)', () => {
     expect(wrapper.find('input[placeholder^="Search passages"]').exists()).toBe(false)
     const firstInput = wrapper.find('input')
     expect(firstInput.attributes('placeholder')).not.toMatch(/^Search passages/)
+  })
+})
+
+// 45-04 Task 2: the preview fetch (both the reference-preview panel and the
+// AI-suggestion expanded preview) routes to nltApi/esvApi by the church's
+// bibleVersion setting — preview-only, nothing persisted, no
+// translationSource stamping (that is CongregationalEditor.vue's job, Task
+// 1). R090.
+describe('ESV/NLT preview routing (45-04, R090)', () => {
+  const defaultProps = {
+    modelValue: null,
+    sermonPassage: null,
+    showOverlapWarning: true,
+    label: 'Scripture Reading',
+  }
+
+  it('bibleVersion=ESV (default in this mock) routes the preview fetch to esvApi, not nltApi', async () => {
+    const { fetchPassageText } = await import('@/utils/esvApi')
+    const { fetchNltPassageText } = await import('@/utils/nltApi')
+
+    const wrapper = mount(ScriptureInput, {
+      props: { ...defaultProps, modelValue: { book: 'John', chapter: 3, verseStart: 16, verseEnd: 17 } },
+    })
+    const previewBtn = wrapper.findAll('button').find((b) => b.text().includes('Preview passage'))
+    await previewBtn!.trigger('click')
+    await flushPromises()
+
+    expect(fetchPassageText).toHaveBeenCalledWith('John 3:16-17')
+    expect(fetchNltPassageText).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('Mocked passage text')
+  })
+
+  it('bibleVersion=NLT routes the preview fetch to nltApi, not esvApi', async () => {
+    mockBibleVersion = 'NLT'
+    const { fetchPassageText } = await import('@/utils/esvApi')
+    const { fetchNltPassageText } = await import('@/utils/nltApi')
+
+    const wrapper = mount(ScriptureInput, {
+      props: { ...defaultProps, modelValue: { book: 'John', chapter: 3, verseStart: 16, verseEnd: 17 } },
+    })
+    const previewBtn = wrapper.findAll('button').find((b) => b.text().includes('Preview passage'))
+    await previewBtn!.trigger('click')
+    await flushPromises()
+
+    expect(fetchNltPassageText).toHaveBeenCalledWith('John 3:16-17')
+    expect(fetchPassageText).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('Mocked passage text')
+  })
+
+  it('a preview fetch failure surfaces the existing previewError message unchanged, regardless of which client is routed to', async () => {
+    mockBibleVersion = 'NLT'
+    const { fetchNltPassageText } = await import('@/utils/nltApi')
+    vi.mocked(fetchNltPassageText).mockRejectedValueOnce(new Error('boom'))
+
+    const wrapper = mount(ScriptureInput, {
+      props: { ...defaultProps, modelValue: { book: 'John', chapter: 3, verseStart: 16, verseEnd: 17 } },
+    })
+    const previewBtn = wrapper.findAll('button').find((b) => b.text().includes('Preview passage'))
+    await previewBtn!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Could not load passage. Check your connection and try again.')
+  })
+
+  it('the AI-suggestion expanded preview also routes by the church setting (NLT)', async () => {
+    mockBibleVersion = 'NLT'
+    const { getScriptureSuggestions } = await import('@/utils/claudeApi')
+    vi.mocked(getScriptureSuggestions).mockResolvedValueOnce([
+      {
+        book: 'John',
+        chapter: 3,
+        verseStart: 16,
+        verseEnd: 17,
+        reason: 'test reason',
+        recentlyUsed: false,
+        weeksAgoUsed: null,
+      },
+    ])
+    const { fetchPassageText } = await import('@/utils/esvApi')
+    const { fetchNltPassageText } = await import('@/utils/nltApi')
+
+    const wrapper = mount(ScriptureInput, {
+      props: {
+        modelValue: null,
+        sermonPassage: null,
+        showOverlapWarning: true,
+        showAiSuggest: true,
+        label: 'Scripture Reading',
+      },
+    })
+    await wrapper.find('input[placeholder^="Search passages"]').setValue('comfort')
+    await wrapper.find('input[placeholder^="Search passages"]').trigger('keydown.enter')
+    await flushPromises()
+
+    const resultButton = wrapper.findAll('button').find((b) => b.text().includes('John'))
+    await resultButton!.trigger('click')
+    await flushPromises()
+
+    expect(fetchNltPassageText).toHaveBeenCalledWith('John 3:16-17')
+    expect(fetchPassageText).not.toHaveBeenCalled()
   })
 })

@@ -198,6 +198,7 @@
 import { ref, computed, watch } from 'vue'
 import { esvLink, scripturesOverlap, parseScriptureInput, formatScriptureReference } from '@/utils/scripture'
 import { fetchPassageText } from '@/utils/esvApi'
+import { fetchNltPassageText } from '@/utils/nltApi'
 import { getScriptureSuggestions, type AiScriptureSuggestion } from '@/utils/claudeApi'
 import { useAuthStore } from '@/stores/auth'
 import type { ScriptureRef } from '@/types/service'
@@ -338,6 +339,20 @@ function dismissPreview() {
   previewError.value = ''
 }
 
+// 45-04 (R090): routes a passage fetch to the church's chosen source. This
+// component is preview-only — nothing it fetches is ever persisted (unlike
+// CongregationalEditor.vue's onFetchPassage, which additionally stamps
+// translationSource at fetch time) — so there is no provenance to capture
+// here, only the routing choice itself. Shared by both fetch call sites
+// below (the reference preview panel AND the AI-suggestion expanded
+// preview) so neither silently stays ESV-only when the church has chosen
+// NLT.
+function fetchPassageByOrgSetting(query: string): Promise<string> {
+  return authStore.settings.bibleVersion === 'NLT'
+    ? fetchNltPassageText(query)
+    : fetchPassageText(query)
+}
+
 async function fetchPreview() {
   const query = passageQuery.value
   if (!query) return
@@ -345,7 +360,7 @@ async function fetchPreview() {
   previewError.value = ''
   previewText.value = ''
   try {
-    const text = await fetchPassageText(query)
+    const text = await fetchPassageByOrgSetting(query)
     previewText.value = text || 'No passage text found for this reference.'
     previewRef.value = query
   } catch {
@@ -432,7 +447,7 @@ async function togglePreview(index: number) {
     const r = aiResults.value[index]
     if (!r) return
     const query = `${r.book} ${r.chapter}:${r.verseStart}-${r.verseEnd}`
-    const text = await fetchPassageText(query)
+    const text = await fetchPassageByOrgSetting(query)
     aiPreviewText.value = text || 'No passage text found.'
   } catch {
     aiPreviewError.value = true
