@@ -1615,7 +1615,13 @@ function onCongregationalDelete(index: number): void {
   if (!localService.value) return
   const slot = localService.value.slots[index]
   if (!slot || slot.kind !== 'SCRIPTURE') return
-  localService.value.slots[index] = { ...slot, congregationalSections: undefined } as ScriptureSlot
+  // Reverting to a plain reference means the field must be ABSENT, not
+  // `undefined` — Firestore's updateDoc rejects an undefined field value. Mirror
+  // the canonical drop in `scriptureSlotAfterReferenceChange` (spread + delete
+  // the key) so the written slot looks exactly like one that never had a reading.
+  const nextSlot: ScriptureSlot = { ...slot }
+  delete nextSlot.congregationalSections
+  localService.value.slots[index] = nextSlot
 }
 
 

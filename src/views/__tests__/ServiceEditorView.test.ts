@@ -3773,6 +3773,12 @@ describe('ServiceEditorView - congregational reading (34-07)', () => {
     // only the reading is dropped.
     expect(scriptureSlot!.book).toBe('Psalms')
     expect(scriptureSlot!.chapter).toBe(23)
+    // The key must be ABSENT from the written patch, not present-with-undefined:
+    // Firestore's updateDoc rejects an undefined field value. (`toBeUndefined`
+    // alone passed even for the buggy `congregationalSections: undefined`, since
+    // reading a present-but-undefined key also yields undefined — hence the
+    // stricter `in` check that mirrors what Firestore actually requires.)
+    expect('congregationalSections' in scriptureSlot!).toBe(false)
     expect(scriptureSlot!.congregationalSections).toBeUndefined()
   })
 
