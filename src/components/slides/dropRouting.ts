@@ -24,6 +24,12 @@ function isPptxFile(file: File): boolean {
   return PPTX_EXTENSION_RE.test(file.name)
 }
 
+// IN-02 (48-REVIEW): hoisted to module scope — previously allocated fresh
+// inside classifyFiles on every call. A drop's file list is small so this was
+// never a correctness issue, but the allocation is trivially avoidable since
+// the collator's options never vary per call.
+const NATURAL_ORDER_COLLATOR = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
+
 /** The four accepted-kind buckets, plus everything that matched none of them. */
 export interface ClassifiedFiles {
   decks: File[]
@@ -62,8 +68,7 @@ export function classifyFiles(files: File[]): ClassifiedFiles {
   // R098 — natural-order sort so slide2/slide10/slide1 lands as slide1/slide2/slide10,
   // not lexicographic slide1/slide10/slide2. Images only (per D-098): decks/videos/audio
   // stay in drop order. Mutates the same array `resolveDrop` reads via `classified.images`.
-  const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
-  images.sort((a, b) => collator.compare(a.name, b.name))
+  images.sort((a, b) => NATURAL_ORDER_COLLATOR.compare(a.name, b.name))
 
   return { decks, images, videos, audioFiles, rejected }
 }
