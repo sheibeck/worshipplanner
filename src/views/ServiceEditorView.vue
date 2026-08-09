@@ -3502,6 +3502,12 @@ async function onConfirmExport() {
 
 async function onShare() {
   if (!localService.value || !serviceStore.orgId) return
+  // WR-01 (48-REVIEW): re-entrancy guard — the action-bar button's own
+  // `disabled: ctx.isSharing` is the primary defense, but this backstop
+  // ensures a second concurrent invocation (e.g. a rapid double-click before
+  // the disabled state re-renders) can never fire a second createShareToken
+  // write while one is already in flight.
+  if (isSharing.value) return
   isSharing.value = true
   try {
     const token = await serviceStore.createShareToken(localService.value, serviceStore.orgId)

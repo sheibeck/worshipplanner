@@ -288,6 +288,17 @@ const mockAssignSongToSlot = vi.fn<
   (id: string, index: number, song: { id: string; title: string; key: string }) => Promise<void>
 >(() => Promise.resolve())
 
+// WR-01 (48-REVIEW): mutable so the Share in-flight regression test can give
+// the store a real orgId (the module default below stays `null`, preserving
+// every pre-existing test's behavior — none of them reach the `orgId`-gated
+// `onShare` guard). `mockCreateShareToken` is likewise controllable per-test
+// so the regression test can hold its promise pending to simulate an
+// in-flight request.
+let mockServiceStoreOrgId: string | null = null
+const mockCreateShareToken = vi.fn(
+  (_service: Service, _orgId: string) => Promise.resolve('mock-share-token'),
+)
+
 // BL-02: the view branches on `err instanceof ServiceLockedError` to tell a
 // refusal it can never retry (the service is locked) from a transport blip it
 // can. Because this whole module is mocked, the mock must export a REAL class
@@ -313,7 +324,7 @@ vi.mock('@/stores/services', () => ({
   useServiceStore: () => ({
     services: mockServicesList,
     isLoading: false,
-    orgId: null,
+    orgId: mockServiceStoreOrgId,
     subscribe: vi.fn(),
     updateService: mockUpdateService,
     markAsPlanned: mockMarkAsPlanned,
@@ -322,6 +333,7 @@ vi.mock('@/stores/services', () => ({
     clearSongFromSlot: vi.fn(() => Promise.resolve()),
     setRoleOverride: mockSetRoleOverride,
     clearRoleOverride: mockClearRoleOverride,
+    createShareToken: mockCreateShareToken,
     // R039 (32-01): arrow function evaluated lazily at call time — same reason
     // `services: mockServicesList` above stays live across a test's mutation
     // of `mockOwnWriteEchoIds` rather than snapshotting it at mock-creation time.
@@ -486,6 +498,12 @@ vi.mock('@/stores/quarters', () => ({
 beforeEach(() => {
   setActivePinia(createPinia())
   mockRoute.params.id = 'service-1'
+  // WR-01 (48-REVIEW): reset to the pre-existing default (`orgId: null`) and
+  // clear call history so the Share in-flight regression test's setup never
+  // leaks into an unrelated later test.
+  mockServiceStoreOrgId = null
+  mockCreateShareToken.mockClear()
+  mockCreateShareToken.mockImplementation(() => Promise.resolve('mock-share-token'))
 })
 
 /** Reads the real useSaveStatus store's entry for `service:{id}` — the
@@ -594,6 +612,81 @@ describe('ServiceEditorView - Print button', () => {
     const wrapper = await mountView()
     expect(wrapper.find('[data-testid="copy-pc-btn"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="export-pc-btn"]').exists()).toBe(false)
+  })
+})
+
+// WR-01 (48-REVIEW): the pre-migration bottom-row Share button was
+// `:disabled="!localService || isSharing"`. That guard was dropped when Share
+// moved into the top action bar's `buildShareItem` (no `disabled` at all) and
+// `onShare()` had no re-entrancy check of its own — so a second click while a
+// share was already in flight could fire a second concurrent
+// `createShareToken` write. Both halves of the fix (the action-bar item's
+// `disabled: ctx.isSharing` AND `onShare()`'s own `if (isSharing.value) return`
+// guard) are covered here.
+describe('ServiceEditorView - Share button in-flight guard (WR-01)', () => {
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockServiceStoreOrgId = 'org-1'
+    Object.defineProperty(navigator, 'clipboard', {
+      value: {
+        writeText: vi.fn(() => Promise.resolve()),
+      },
+      writable: true,
+      configurable: true,
+    })
+  })
+
+  async function mountView() {
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          ContextualActionBar: false,
+          RouterLink: { template: '<a><slot /></a>' },
+          SaveStatusIndicator: false,
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+        },
+      },
+    })
+  }
+
+  it('a second click while a share is in flight does not issue a second createShareToken write', async () => {
+    // Hold the token promise pending so the first click's request is still
+    // "in flight" when the second click fires.
+    let resolveToken: (token: string) => void = () => {}
+    mockCreateShareToken.mockImplementation(
+      () => new Promise<string>((resolve) => { resolveToken = resolve }),
+    )
+
+    const wrapper = await mountView()
+    const bar = wrapper.find('[data-testid="contextual-action-bar"]')
+    const shareBtn = bar.findAll('button').find((b) => b.text().startsWith('Share') || b.text() === 'Sharing...')
+    expect(shareBtn).toBeDefined()
+
+    // First click starts the in-flight share.
+    await shareBtn!.trigger('click')
+    expect(mockCreateShareToken).toHaveBeenCalledTimes(1)
+
+    // Re-query: the action bar re-renders with the button now disabled and
+    // labeled "Sharing...". Trigger click again on the SAME element (a stale
+    // handle still fires the same @click listener bound at mount) to also
+    // exercise onShare()'s own re-entrancy guard, not just Vue's native
+    // disabled-button click suppression.
+    await shareBtn!.trigger('click')
+    expect(mockCreateShareToken).toHaveBeenCalledTimes(1)
+
+    const sharingBtn = bar.findAll('button').find((b) => b.text() === 'Sharing...')
+    expect(sharingBtn).toBeDefined()
+    expect(sharingBtn!.attributes('disabled')).toBeDefined()
+
+    // Let the in-flight request resolve and confirm the flow completes normally.
+    resolveToken('mock-share-token')
+    await flushPromises()
+    expect(mockCreateShareToken).toHaveBeenCalledTimes(1)
   })
 })
 

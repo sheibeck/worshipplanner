@@ -212,6 +212,12 @@ function buildShareItem(ctx: ActionBarContext): ActionBarItem | undefined {
     key: 'share',
     label: ctx.isSharing ? 'Sharing...' : ctx.shareCopied ? 'Link Copied!' : ctx.shareError ? ctx.shareError : 'Share',
     icon: 'share',
+    // WR-01 (48-REVIEW): the pre-migration bottom-row button was
+    // `:disabled="!localService || isSharing"` — the `!localService` half is
+    // moot here (the whole action bar only mounts once localService is
+    // truthy), but `isSharing` must be preserved so a double-click can't fire
+    // concurrent createShareToken writes while a share is in flight.
+    disabled: ctx.isSharing,
     onClick: ctx.handlers.onShare,
   }
 }
