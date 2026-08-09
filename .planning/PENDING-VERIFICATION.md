@@ -1200,6 +1200,37 @@ real touch viewport, or judge projection legibility.
 
 ---
 
+## Phase 48 — Multi-Image Ordering & Mobile Polish (2026-08-09)
+
+Deferred under the v1.5 standing autonomy grant. **13/13 must-haves verified in code**; `npm run
+type-check` clean; app `src/` suite at the documented 2-file baseline. Code review: **0 Critical /
+3 Warning / 2 Info** — WR-01 (Share re-entrancy guard restored), WR-03 (44px hit-area no longer
+swallows selection taps), IN-01 (localStorage guarded), IN-02 (Collator hoisted) all **fixed**;
+WR-02 **deferred to owner** (item 48.4 below). R098 (natural-order multi-image) and R103
+(dismissible Getting Started) are fully code-verified with automated tests. The items below are
+inherently physical-device / owner-judgment.
+
+- [ ] **48.1 Real touch-drag reorder correctness (R099).** On a real touch device, long-press +
+      drag a slide card to reorder; confirm it lands where dropped with no off-by-one, on a fresh
+      grid and after a prior reorder. The desktop `*DraggableIndex`/`onEnd` logic is byte-unchanged
+      and touch options were only appended (`delay`/`delayOnTouchOnly`/`touchStartThreshold`), but
+      only a real touch gesture proves the reorder.
+- [ ] **48.2 Real-thumb 44px reachability (R099).** On a phone, confirm the slide-card drag handle
+      and the action-menu trigger are comfortably thumb-tappable (44px hit area), and that the
+      enlarged hit area does not swallow card-selection taps (WR-03's asymmetric-padding fix).
+- [ ] **48.3 Real ~375px layout (R099/R100).** At phone width confirm: the Slides tab has no
+      horizontal overflow (the plan rail stacks above the grid as a horizontal-scroll strip), and
+      the service edit screen's header action buttons stack vertically (QuarterView recipe).
+- [ ] **48.4 ★ OWNER DECISION — WR-02: Print/Share are now Service-Order-tab-only.** Moving Print
+      and Share into the top contextual action bar (R101) scoped them to the Service Order tab; the
+      previous page-bottom row made them reachable from **every** tab. This is a documented,
+      UI-checker-approved 48-UI-SPEC.md decision that satisfies R101's text, but it narrows where
+      Print/Share are reachable. **Confirm this is acceptable, or request they appear across all
+      service tabs.** If cross-tab access is wanted, it is a small follow-up (add the keys to each
+      tab's action set), not a redo.
+
+---
+
 ## Notes and failures
 
 _(Record anything that failed here, with what you saw versus what was expected.)_

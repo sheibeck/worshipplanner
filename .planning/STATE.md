@@ -4,11 +4,11 @@ milestone: v1.5
 milestone_name: Settings, Sharing, and Fidelity
 current_phase: 48
 current_phase_name: Multi-Image Ordering & Mobile Polish
-status: verifying
-stopped_at: Completed 48-03-PLAN.md
-last_updated: "2026-08-09T00:22:18.733Z"
-last_activity: 2026-08-08
-last_activity_desc: Phase 48 execution started
+status: milestone-code-complete-awaiting-verification
+stopped_at: All 11 v1.5 phases code-complete & code-verified. Phase 48 done (13/13). STOPPED at the milestone lifecycle gate — NOT archived, because 7 phases (39,43,44,45,46,47,48) are verification_deferred_human and archiving would bless deferred checks as passed (grant violation + v1.4 precedent). Awaiting owner verification.
+last_updated: "2026-08-09T02:20:00.000Z"
+last_activity: 2026-08-09
+last_activity_desc: Phase 48 done (deferred, not deploy-gated); milestone code-complete; autonomous run stopped before archive pending owner verification
 progress:
   total_phases: 11
   completed_phases: 11
@@ -852,6 +852,7 @@ vitest run` passes 39/39 directly. Logged in the phase's `deferred-items.md`. Us
 | 45 | verification_deferred_human — **7/7 must-haves verified in code** (type-check 0, app suite at 2-file baseline, functions 115/115; R092 immutability proven by named invariant tests; NLT proxy key-overwrite + redactUrl + dual empty-body guard + [N] bracket convention verified). Code review: 0 Critical / 2 Warning / 3 Info — WR-01/WR-02/IN-01/IN-02 fixed, IN-03 pre-existing. ⚠ **DEPLOY-GATED**: NLT proxy ships UNDEPLOYED; owner must `firebase functions:secrets:set NLT_API_KEY` + `firebase deploy --only functions` — and because bibleVersion defaults to **NLT**, the frontend + function MUST deploy together or new scripture fetch fails. Live round-trip deferred in `PENDING-VERIFICATION.md` § Phase 45 | /gsd-verify-work 45 |
 | 46 | verification_deferred_human — **18/18 must-haves verified in code** (type-check 0; app `src/` suite at 2-file baseline; R093/R094 wired end-to-end: `@fontsource` registry → `slideTypography` OrgSettings field → Settings card → all 3 render sites + presenter first-paint font gate). Code review: **2 Critical / 3 Warning / 2 Info — ALL fixed** (CR-01 grid/drawer bound the CSS var but never loaded the chosen family → now eager-loaded at the single `loadOrgContext` merge point; CR-02 presenter gate could hang on a rejected font load → now try/catch/finally always releases the gate). **NOT deploy-gated** (self-hosted `@fontsource` woff2, pure client bundle — no owner deploy needed). 4 owner items in `PENDING-VERIFICATION.md` § Phase 46: package-legitimacy sign-off (5 @fontsource pkgs, SUS = documented false-positive) + 3 projector checks (font-flash, legibility, Large-scale overflow) | /gsd-verify-work 46 |
 | 47 | verification_deferred_human — **16/16 must-haves verified in code** (type-check 0; app `src/` suite at 2-file baseline; R095 hand-divide via click-between-verses snapped to `computeBoundaries` + 3-way chips, R096 three equal seeds → same `CongregationalSection[]` with AI hidden when `aiEnabled` off, R097 first-slide-reference gated on `isFirstSection`; ALL role reaches every render site; `SPLIT_SCHEMA` enum + `validateSplitResult` widened together; R092 capture-once preserved). Code review: **1 Critical / 3 Warning / 2 Info — ALL fixed** (CR-01 stale-AI-response overwrite guard; WR-01/WR-02 alignment correctness; WR-03 stable keys). **NOT deploy-gated** (client-only; the AI call already exists and is gated). 4 owner items in `PENDING-VERIFICATION.md` § Phase 47: touch discoverability, hand-division feel, projected 3-role legibility, WR-01/WR-02 sign-off | /gsd-verify-work 47 |
+| 48 | verification_deferred_human — **13/13 must-haves verified in code** (type-check 0; app `src/` suite at 2-file baseline; R098 natural-order images-bucket sort, R099 responsive rail + 44px targets + additive SortableJS touch options with `*DraggableIndex`/`onEnd` byte-unchanged, R100 QuarterView stacking, R101 Print/Share → top bar / Delete stays bottom, R102 Undo→link + unconditional save-status flex, R103 dismissible Getting Started via guarded localStorage). Code review: **0 Critical / 3 Warning / 2 Info** — WR-01/WR-03/IN-01/IN-02 fixed; **WR-02 deferred to owner** (Print/Share narrowed to Service-Order tab). **NOT deploy-gated** (client-only). 4 owner items in `PENDING-VERIFICATION.md` § Phase 48: touch-drag correctness, 44px reachability, ~375px layout, WR-02 cross-tab sign-off | /gsd-verify-work 48 |
 
 > Phase 39 is **code-complete and automatically verified**. Its code review found 1 Critical + 3
 > Warnings, all fixed and independently re-verified at iteration 2 (`39-REVIEW.md` status: clean).
