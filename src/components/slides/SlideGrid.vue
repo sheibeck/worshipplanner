@@ -119,7 +119,7 @@
            (or, for background, on the minimal testid wrapper below) rather
            than on a padded child div — there is no padded child div left. -->
       <div
-        v-if="showGroupMusicControl || showGroupBackgroundControl"
+        v-if="showGroupMusicControl || showGroupBackgroundControl || showCongregationalControl"
         class="mx-6 mt-3 flex flex-wrap items-start gap-x-3 gap-y-2 rounded-md border border-gray-800 bg-gray-900 px-3 py-2"
         data-testid="slide-grid-group-media-panel"
       >
@@ -176,6 +176,20 @@
             @remove="onRemoveGroupBackground"
           />
         </div>
+
+        <!-- Congregational-reading action (owner request) — a discoverable
+             button beside "+ Add background for this group" that opens the same
+             editor the slide 3-dot menu's `edit-in-scripture` does. Scripture
+             groups only. Label reflects whether a reading already exists. -->
+        <button
+          v-if="showCongregationalControl"
+          type="button"
+          data-testid="slide-grid-congregational-btn"
+          @click="emit('edit-congregational')"
+          class="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-gray-700 px-2.5 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:bg-gray-800"
+        >
+          {{ congregationalButtonLabel }}
+        </button>
 
         <!-- The group caption, relocated out of `BackgroundControl` (owner
              follow-up #4 (b) above). `basis-full` makes it take a whole flex
@@ -389,6 +403,14 @@ const emit = defineEmits<{
    * relay (Task 3).
    */
   'menu-action': [slideId: string, key: MenuItemKey]
+  /**
+   * The group-level "Make this / Modify congregational reading" button was
+   * clicked (a more discoverable path to the same editor the 3-dot menu's
+   * `edit-in-scripture` opens). Args-free: the tab one level up already knows
+   * the selected plan item's array index and routes this through the exact same
+   * `navigate-to-scripture-editor` relay.
+   */
+  'edit-congregational': []
 }>()
 
 const slideGroupsStore = useSlideGroups()
@@ -465,6 +487,26 @@ const canWriteGroupMedia = computed(() => props.isEditor && !props.serviceLocked
 const showGroupMusicControl = computed(() => Boolean(props.group?.bedAudioUrl) || canWriteGroupMedia.value)
 const showGroupBackgroundControl = computed(
   () => Boolean(props.group?.backgroundImageUrl) || canWriteGroupMedia.value,
+)
+
+/**
+ * Congregational-reading group action (owner request): a discoverable button
+ * that sits beside "+ Add background for this group", instead of only living in
+ * a slide's 3-dot menu. Scripture groups only; gated on the same edit permission
+ * as the group's other content controls (`canMutateGroup` = editor + not locked;
+ * scripture is never a song group, so its carve-out never applies here).
+ */
+const isScriptureGroup = computed(() => props.selectedSlot?.kind === 'SCRIPTURE')
+const isCongregationalReading = computed(() => {
+  const slot = props.selectedSlot
+  if (!slot || slot.kind !== 'SCRIPTURE') return false
+  return Array.isArray(slot.congregationalSections) && slot.congregationalSections.length > 0
+})
+const showCongregationalControl = computed(() => isScriptureGroup.value && canMutateGroup.value)
+const congregationalButtonLabel = computed(() =>
+  isCongregationalReading.value
+    ? 'Modify congregational reading'
+    : 'Make this a congregational reading',
 )
 
 interface CardEntry {

@@ -2311,3 +2311,59 @@ describe('SlideGrid - locked service (R036)', () => {
     expect(wrapper.findComponent(SlideGroupMusicControl).props('isEditor')).toBe(false)
   })
 })
+
+describe('SlideGrid — congregational reading action (group-level button)', () => {
+  function makeScriptureSlot(overrides: Record<string, unknown> = {}): ServiceSlot {
+    return makeSlot({
+      kind: 'SCRIPTURE',
+      id: 'slot-1',
+      position: 0,
+      book: 'Psalms',
+      chapter: 23,
+      verseStart: 1,
+      verseEnd: 6,
+      ...overrides,
+    } as never)
+  }
+  const SEL = '[data-testid="slide-grid-congregational-btn"]'
+
+  it('shows "Make this a congregational reading" for a scripture group with no reading yet', () => {
+    const wrapper = mountGrid({ selectedSlot: makeScriptureSlot(), slotArrayIndex: 0 })
+    const btn = wrapper.find(SEL)
+    expect(btn.exists()).toBe(true)
+    expect(btn.text()).toBe('Make this a congregational reading')
+  })
+
+  it('shows "Modify congregational reading" when a reading already exists', () => {
+    const slot = makeScriptureSlot({ congregationalSections: [{ speaker: 'LEADER', text: 'A' }] })
+    const wrapper = mountGrid({ selectedSlot: slot, slotArrayIndex: 0 })
+    expect(wrapper.find(SEL).text()).toBe('Modify congregational reading')
+  })
+
+  it('emits edit-congregational when clicked', async () => {
+    const wrapper = mountGrid({ selectedSlot: makeScriptureSlot(), slotArrayIndex: 0 })
+    await wrapper.find(SEL).trigger('click')
+    expect(wrapper.emitted('edit-congregational')).toHaveLength(1)
+  })
+
+  it('is not shown for a non-scripture group', () => {
+    const song = makeSlot({
+      kind: 'SONG',
+      id: 'slot-1',
+      position: 0,
+      songId: 's1',
+      songTitle: 'X',
+      songKey: null,
+      requiredVwType: 1,
+    } as never)
+    const wrapper = mountGrid({ selectedSlot: song, slotArrayIndex: 0 })
+    expect(wrapper.find(SEL).exists()).toBe(false)
+  })
+
+  it('is hidden on a locked service and for non-editors', () => {
+    const locked = mountGrid({ selectedSlot: makeScriptureSlot(), slotArrayIndex: 0, serviceLocked: true })
+    expect(locked.find(SEL).exists()).toBe(false)
+    const viewer = mountGrid({ selectedSlot: makeScriptureSlot(), slotArrayIndex: 0, isEditor: false })
+    expect(viewer.find(SEL).exists()).toBe(false)
+  })
+})

@@ -1080,3 +1080,30 @@ describe('SlidesTab - lifecycle lock threading (R036)', () => {
     expect((wrapper.vm as unknown as { canPresent: boolean }).canPresent).toBe(true)
   })
 })
+
+describe('SlidesTab — group-level congregational reading relay', () => {
+  it("relays SlideGrid's edit-congregational to navigate-to-scripture-editor for the selected slot", async () => {
+    const slots: ServiceSlot[] = [
+      makeSlot({
+        kind: 'SCRIPTURE',
+        id: 'slot-s',
+        position: 0,
+        book: 'Psalms',
+        chapter: 23,
+        verseStart: 1,
+        verseEnd: 6,
+      } as never),
+    ]
+    const wrapper = mountTab({ slots })
+    await wrapper.vm.$nextTick()
+
+    wrapper.findComponent(SlideGrid).vm.$emit('edit-congregational')
+    await wrapper.vm.$nextTick()
+
+    const emitted = wrapper.emitted('navigate-to-scripture-editor')
+    expect(emitted).toHaveLength(1)
+    // The selected plan item's RAW array index (0 here) — the same value the
+    // 3-dot menu's edit-in-scripture relay carries.
+    expect(emitted![0]).toEqual([0])
+  })
+})

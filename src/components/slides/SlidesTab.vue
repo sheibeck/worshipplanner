@@ -29,6 +29,7 @@
           :ensure-group-materialized="ensureGroupMaterialized"
           @select="onSelectSlide"
           @menu-action="onMenuAction"
+          @edit-congregational="onEditCongregational"
         />
       </div>
     </div>
@@ -450,6 +451,21 @@ function requestEditInScripture(): void {
 function confirmLeavingOpenDrawer(): boolean {
   if (!drawerOpen.value) return true
   return editSlideDrawerRef.value?.confirmDiscard() ?? true
+}
+
+/**
+ * The group-level "Make this / Modify congregational reading" button
+ * (SlideGrid's `edit-congregational` emit). A more discoverable route to the
+ * SAME editor the 3-dot menu's `edit-in-scripture` opens, so it takes the exact
+ * same path: honour the open drawer's unsaved-edit guard, close the drawer (two
+ * editing surfaces must not stack on one entry), then relay via
+ * `requestEditInScripture` — which uses the selected plan item's array index,
+ * the group this button belongs to.
+ */
+function onEditCongregational(): void {
+  if (!confirmLeavingOpenDrawer()) return
+  drawerOpen.value = false
+  requestEditInScripture()
 }
 
 function onMenuAction(slideId: string, key: MenuItemKey): void {
