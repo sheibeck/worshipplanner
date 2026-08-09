@@ -846,6 +846,18 @@ describe('ServiceEditorView - contextual action bar wiring (36-03, R068)', () =>
     expect(shareBtn!.find('svg').exists()).toBe(true)
   })
 
+  // R100 (48-03): the header Save-area row (Mark as Planned + the action bar)
+  // uses QuarterView's button-cluster recipe so it stacks full-width below
+  // `sm` and sits inline at `sm` and above, matching the Schedule screen.
+  it('the header Save-area row carries the QuarterView flex-col/sm:flex-row stacking recipe', async () => {
+    const wrapper = await mountView({ status: 'draft' })
+    await wrapper.vm.$nextTick()
+
+    const saveAreaRow = wrapper.find('[data-testid="mark-planned-btn"]').element.parentElement
+    expect(saveAreaRow?.classList.contains('flex-col')).toBe(true)
+    expect(saveAreaRow?.classList.contains('sm:flex-row')).toBe(true)
+  })
+
   it('Service Order + editor + unlocked + credentialed: export-pc-btn renders, the R071 note does not', async () => {
     mockAuthState.hasPcCredentials = true
     mockAuthState.pcCredentials = { appId: 'placeholder-app-id', secret: 'placeholder-secret' }

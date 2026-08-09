@@ -93,8 +93,12 @@
             </div>
           </div>
 
-          <!-- Save area -->
-          <div class="flex items-center gap-3">
+          <!-- Save area. R100 (48-03): QuarterView's button-cluster recipe
+               (QuarterView.vue:13) applied verbatim — Mark as Planned and the
+               action-bar items stack full-width below `sm` and sit inline at
+               `sm` and above, matching the Schedule screen's existing
+               convention (same breakpoint project-wide). -->
+          <div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-end gap-2 w-full sm:w-auto [&>*]:w-full sm:[&>*]:w-auto [&>*]:justify-center sm:[&>*]:justify-start">
             <!-- D-02: Mark as Planned — the draft half of the two named
                  transitions that replace the deleted cycle. Placed immediately
                  left of Export so the lifecycle reads left-to-right in the
