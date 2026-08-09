@@ -1171,6 +1171,26 @@ thoroughly the gate logic itself is unit-tested.
 
 ---
 
+## ★ Phase 47 UX SUPERSEDED (2026-08-09) — read before verifying items 47.1/47.2
+
+Per direct owner feedback ("the divider UX is not intuitive at all… make this really easier"), the
+click-between-verses **divider** editor was replaced with a `---`-delimited **textarea** editor
+(commits `173bf4f`, `a71da5a`; see `src/utils/congregationalText.ts` + reworked
+`CongregationalEditor.vue`). The 3-dot menu item is now simply **"Congregational Reading"**. The new
+editor: auto-fetches the passage into a textarea on open, uses `---` on its own line to split slides
+with a `Leader`/`Congregation`/`All` label line per slide, has New-Slide/Leader/Congregation/All
+insert buttons, a Save (overwrite) and a Delete (confirm → revert to plain reference), and keeps AI
+as an `aiEnabled`-gated **"Split with AI"** textarea-fill button. R092 (translationSource capture-once)
+and R096 (AI split offered) are preserved; type-check clean, new parser 11 tests + component 13 tests
+green, app suite at the 2-file baseline.
+
+**Effect on the items below:** **47.1 is now MOOT** (there is no gap-+/divider affordance to
+discover). **47.2's divider-specific mechanics are MOOT** — but its intent survives: verify instead
+that **hand-dividing Psalm 136 / Psalm 24 in the new textarea (typing `---` + labels, using the
+insert buttons) feels low-friction**. **47.3 (projected 3-role legibility) and 47.4 (WR-01/WR-02
+logic sign-off) are UNCHANGED and still apply.** Also newly worth a look: **auto-fetch-on-open**,
+**Save overwrites existing slides**, **Delete reverts to a plain reference**, and the AI-fill button.
+
 ## Phase 47 — Congregational Reading Divider UX (2026-08-08)
 
 Deferred under the v1.5 standing autonomy grant. **16/16 must-haves verified in code**; `npm run
