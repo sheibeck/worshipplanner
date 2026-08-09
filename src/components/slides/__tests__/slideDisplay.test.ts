@@ -654,7 +654,7 @@ describe('slideDisplay', () => {
     // 34-07 (owner UAT F1): the scripture route's label/tone changed — it now
     // opens an editor in place rather than routing away — but the key order
     // is unchanged, and no item may mention a lyrics route it does not offer.
-    it('34-07: the scripture route item is labelled "Set up congregational reading" with a default (non-nav) tone, key order unchanged', () => {
+    it('34-07: the scripture route item is labelled "Congregational Reading" with a default (non-nav) tone, key order unchanged', () => {
       for (const canMutate of [true, false]) {
         const entry = makeMenuEntry({ kind: 'scripture' })
         const items = slideActionMenuItems(entry, 'SCRIPTURE', canMutate)
@@ -662,7 +662,7 @@ describe('slideDisplay', () => {
           canMutate ? ['edit-details', 'edit-in-scripture', 'duplicate', 'delete'] : ['edit-details', 'edit-in-scripture'],
         )
         const routeItem = items.find((item) => item.key === 'edit-in-scripture')
-        expect(routeItem?.label).toBe('Set up congregational reading')
+        expect(routeItem?.label).toBe('Congregational Reading')
         expect(routeItem?.tone).toBe('default')
       }
     })

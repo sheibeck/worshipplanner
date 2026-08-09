@@ -222,7 +222,7 @@
                   class="mt-2 px-2.5 py-1 rounded-md text-xs font-medium border border-gray-700 text-gray-300 hover:bg-gray-800 transition-colors"
                   data-testid="drawer-edit-scripture-text-btn"
                   @click="emit('edit-scripture-text')"
-                >Set up congregational reading</button>
+                >Congregational Reading</button>
               </template>
             </template>
 

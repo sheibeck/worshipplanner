@@ -353,7 +353,7 @@ const MENU_ITEM_LABELS: Record<MenuItemKey, string> = {
   // revisiting a reading that already exists — accepted, because the modal's
   // own heading names the state correctly once open, and the previous label
   // was actively wrong on every visit rather than mildly imprecise on some.
-  'edit-in-scripture': 'Set up congregational reading',
+  'edit-in-scripture': 'Congregational Reading',
   duplicate: 'Duplicate',
   delete: 'Delete Slide',
 }
