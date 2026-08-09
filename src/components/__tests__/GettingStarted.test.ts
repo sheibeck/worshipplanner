@@ -112,4 +112,37 @@ describe('GettingStarted', () => {
 
     expect(wrapper.find('[data-testid="getting-started-dismiss"]').exists()).toBe(false)
   })
+
+  // IN-01 (48-REVIEW): a throwing localStorage (private-browsing modes that
+  // fully disable Web Storage, enterprise policies, some extensions) must not
+  // crash the component during setup() — it should degrade to "not dismissed"
+  // (getItem) / "in-memory only for this session" (setItem) instead.
+  describe('IN-01: localStorage throws (private mode / quota)', () => {
+    it('mounts without throwing and renders visibly when getItem throws', () => {
+      const getItemSpy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+        throw new Error('SecurityError: storage is disabled')
+      })
+
+      expect(() => mountPanel()).not.toThrow()
+      const wrapper = mountPanel()
+      expect(wrapper.find('[data-testid="getting-started-dismiss"]').exists()).toBe(true)
+
+      getItemSpy.mockRestore()
+    })
+
+    it('clicking dismiss does not throw when setItem throws, and still hides the panel for this session', async () => {
+      const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new Error('QuotaExceededError')
+      })
+
+      const wrapper = mountPanel()
+      await expect(
+        wrapper.find('[data-testid="getting-started-dismiss"]').trigger('click'),
+      ).resolves.not.toThrow()
+
+      expect(wrapper.find('[data-testid="getting-started-dismiss"]').exists()).toBe(false)
+
+      setItemSpy.mockRestore()
+    })
+  })
 })

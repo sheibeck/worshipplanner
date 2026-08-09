@@ -92,10 +92,27 @@ let unsub: Unsubscribe | null = null
 // data. Read synchronously at setup() — no onMounted, no watcher — so an
 // already-dismissed panel never flashes before hiding.
 const DISMISS_KEY = 'wp:gettingStartedDismissed'
-const dismissed = ref(localStorage.getItem(DISMISS_KEY) !== null)
+
+// IN-01 (48-REVIEW): localStorage can throw (private-browsing modes that fully
+// disable Web Storage, enterprise policies, some extensions) — unguarded, that
+// throws during setup() with no error boundary above it, which can crash this
+// panel (mounted on every Dashboard visit) rather than degrading gracefully.
+// Mirrors src/stores/songs.ts's established try/catch pattern for the same
+// localStorage risk.
+function readDismissed(): boolean {
+  try {
+    return localStorage.getItem(DISMISS_KEY) !== null
+  } catch {
+    return false // degrade to "not dismissed" rather than crashing setup()
+  }
+}
+
+const dismissed = ref(readDismissed())
 
 function onDismiss() {
-  localStorage.setItem(DISMISS_KEY, 'true')
+  try {
+    localStorage.setItem(DISMISS_KEY, 'true')
+  } catch { /* ignore: private mode / quota — degrade to in-memory only for this session */ }
   dismissed.value = true
 }
 
