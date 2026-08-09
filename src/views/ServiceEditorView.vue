@@ -550,7 +550,7 @@
                   :reference="slotToScriptureRef(congregationalSlot)"
                   :sections="congregationalSlot.congregationalSections ?? []"
                   @update:sections="onCongregationalSectionsChange(congregationalSlotIndex!, $event)"
-                  @update:reference="onScriptureChange(congregationalSlotIndex!, $event)"
+                  @delete="onCongregationalDelete(congregationalSlotIndex!)"
                   @close="closeCongregationalEditor"
                 />
               </div>
@@ -1600,6 +1600,22 @@ function onCongregationalSectionsChange(index: number, sections: CongregationalS
     ...slot,
     congregationalSections: sections,
   } as ScriptureSlot
+}
+
+/**
+ * `CongregationalEditor`'s `delete` — reverts the slot to a plain scripture
+ * reference by dropping its `congregationalSections`. Consumers read
+ * `congregationalSections ?? []` and the assembler renders reference-only when
+ * empty, so clearing the field is the whole revert. Same slot-mutation shape
+ * as `onCongregationalSectionsChange`, persisted through the one existing
+ * `useAutoSave(localService, ...)` path — no save call belongs here.
+ */
+function onCongregationalDelete(index: number): void {
+  if (!canEditService.value) return
+  if (!localService.value) return
+  const slot = localService.value.slots[index]
+  if (!slot || slot.kind !== 'SCRIPTURE') return
+  localService.value.slots[index] = { ...slot, congregationalSections: undefined } as ScriptureSlot
 }
 
 

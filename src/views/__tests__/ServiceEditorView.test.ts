@@ -3596,7 +3596,7 @@ describe('ServiceEditorView - congregational reading (34-07)', () => {
     return new DOMWrapper(document.body)
   }
 
-  it('relays navigate-to-scripture-editor for a SCRIPTURE slot: update:sections lands on that slot, book/chapter/verseStart/verseEnd/id/position unchanged, and no free-text field exists', async () => {
+  it('relays navigate-to-scripture-editor for a SCRIPTURE slot: update:sections lands on that slot, book/chapter/verseStart/verseEnd/id/position unchanged, and the textarea editor is present', async () => {
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
 
@@ -3607,9 +3607,9 @@ describe('ServiceEditorView - congregational reading (34-07)', () => {
     const editor = wrapper.findComponent(CongregationalEditor)
     expect(editor.exists()).toBe(true)
 
-    // No free-text scripture override exists anywhere in the delivered
-    // surface — the fetched-then-split passage is the only source of text.
-    expect(body().find('textarea').exists()).toBe(false)
+    // The reading is now edited as a `---`-delimited textarea (supersedes the
+    // click-between-verses divider UX per owner feedback).
+    expect(body().find('[data-testid="congregational-textarea"]').exists()).toBe(true)
 
     const newSections = [
       { speaker: 'LEADER' as const, text: 'The Lord is my shepherd' },
@@ -3742,7 +3742,7 @@ describe('ServiceEditorView - congregational reading (34-07)', () => {
     expect(mockUpdateService).not.toHaveBeenCalled()
   })
 
-  it('update:reference routes through onScriptureChange: updates the reference fields and clears a reading that no longer belongs to the slot', async () => {
+  it('delete routes through onCongregationalDelete: clears the slot\'s congregationalSections while leaving the reference fields intact', async () => {
     const withReading: Service = {
       ...mockService,
       slots: mockService.slots.map((slot) =>
@@ -3758,7 +3758,7 @@ describe('ServiceEditorView - congregational reading (34-07)', () => {
     await wrapper.vm.$nextTick()
 
     const editor = wrapper.findComponent(CongregationalEditor)
-    editor.vm.$emit('update:reference', { book: 'John', chapter: 3, verseStart: 16, verseEnd: 16 })
+    editor.vm.$emit('delete')
     await wrapper.vm.$nextTick()
     await new Promise((resolve) => setTimeout(resolve, 900))
     await flushPromises()
@@ -3769,8 +3769,10 @@ describe('ServiceEditorView - congregational reading (34-07)', () => {
       .pop()
     const scriptureSlot = written?.find((s) => s.id === 'slot-1')
     expect(scriptureSlot).toBeDefined()
-    expect(scriptureSlot!.book).toBe('John')
-    expect(scriptureSlot!.chapter).toBe(3)
+    // Reverts to a plain scripture reference — the reference fields are intact,
+    // only the reading is dropped.
+    expect(scriptureSlot!.book).toBe('Psalms')
+    expect(scriptureSlot!.chapter).toBe(23)
     expect(scriptureSlot!.congregationalSections).toBeUndefined()
   })
 
@@ -3862,11 +3864,13 @@ describe('ServiceEditorView - WR-04 keyed mount (34-07 Task 3)', () => {
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
 
-    // Open the panel on the first slot (array index 1).
+    // Open the panel on the first slot (array index 1). The reading is seeded
+    // into the textarea (its VALUE, not text content — read `.value`).
     await wrapper.findComponent(SlidesTab).vm.$emit('navigate-to-scripture-editor', 1)
     await wrapper.vm.$nextTick()
-    const firstPanelText = body().find('[data-testid="congregational-editor-panel"]').text()
-    expect(firstPanelText).toContain('FIRST-SLOT-ONLY-TEXT')
+    const firstTextarea = body().find('[data-testid="congregational-textarea"]')
+      .element as HTMLTextAreaElement
+    expect(firstTextarea.value).toContain('FIRST-SLOT-ONLY-TEXT')
     const firstVm = wrapper.findComponent(CongregationalEditor).vm
 
     // Swap to the second slot (array index 4) — the misattribution guard.
@@ -3877,9 +3881,10 @@ describe('ServiceEditorView - WR-04 keyed mount (34-07 Task 3)', () => {
 
     // The seeding guard — the fresh instance really re-seeded from the new
     // props, not retained once-at-setup state from the first slot.
-    const secondPanelText = body().find('[data-testid="congregational-editor-panel"]').text()
-    expect(secondPanelText).toContain('SECOND-SLOT-ONLY-TEXT')
-    expect(secondPanelText).not.toContain('FIRST-SLOT-ONLY-TEXT')
+    const secondTextarea = body().find('[data-testid="congregational-textarea"]')
+      .element as HTMLTextAreaElement
+    expect(secondTextarea.value).toContain('SECOND-SLOT-ONLY-TEXT')
+    expect(secondTextarea.value).not.toContain('FIRST-SLOT-ONLY-TEXT')
 
     // The write-attribution guard — a post-swap update:sections lands on the
     // SECOND slot only, leaving the first slot's sections byte-unchanged.
