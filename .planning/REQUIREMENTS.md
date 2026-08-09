@@ -241,14 +241,14 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
       (reproduction case `ZTXcpNRcJTalEQp42fTx`); reuse the exact desktop config with touch-only options
       added rather than reconfiguring.
 
-- [ ] **R100**: Buttons stack on the service edit screen on a phone, the way the Schedule screen already
+- [x] **R100**: Buttons stack on the service edit screen on a phone, the way the Schedule screen already
       does.
       <br>`[ARCH]` `QuarterView.vue` carries the responsive button-stacking recipe to copy.
 
-- [ ] **R101**: Print and Share appear in the contextual action bar at the top of the Services screens
+- [x] **R101**: Print and Share appear in the contextual action bar at the top of the Services screens
       rather than at the bottom of the page.
 
-- [ ] **R102**: Undo is a link beside the last-saved text rather than a button among the primary
+- [x] **R102**: Undo is a link beside the last-saved text rather than a button among the primary
       actions.
 
 - [x] **R103**: The Getting Started panel on the dashboard can be dismissed.
@@ -310,9 +310,9 @@ Explicitly excluded. Documented to prevent scope creep.
 | R097 | Phase 47 | Complete |
 | R098 | Phase 48 | Complete |
 | R099 | Phase 48 | Complete |
-| R100 | Phase 48 | Pending |
-| R101 | Phase 48 | Pending |
-| R102 | Phase 48 | Pending |
+| R100 | Phase 48 | Complete |
+| R101 | Phase 48 | Complete |
+| R102 | Phase 48 | Complete |
 | R103 | Phase 48 | Complete |
 | R104 | Phase 40.1 | Complete |
 
