@@ -840,6 +840,45 @@ vitest run` passes 39/39 directly. Logged in the phase's `deferred-items.md`. Us
 **Suite counts at this point:** app `src/` ~2284 passing / 9 baseline failures ·
 `functions/` 55/55 · `render-service/` 39/39.
 
+## ⛔ v1.5 AUTONOMOUS RUN STOPPED BEFORE MILESTONE LIFECYCLE — 2026-08-09, and why
+
+The `/gsd-autonomous --from 46` run executed the last three v1.5 phases (46 Global Slide Typography,
+47 Congregational Reading Divider UX, 48 Multi-Image Ordering & Mobile Polish) discuss→plan→execute,
+each with code review + fixes and goal-backward verification. **All 11 v1.5 phases are now
+code-complete.** The autonomous workflow's next step is the milestone lifecycle — **audit → complete
+→ cleanup**, which archives v1.5 and deletes phase directories. **That was deliberately NOT run.**
+
+**Why.** 7 of the 11 phases — **39, 43, 44, 45, 46, 47, 48** — are `verification_deferred_human`:
+code-complete and code-verified, but their hands-on owner checks were deferred under the v1.5
+standing autonomy grant, never performed. Archiving the milestone in that state would, in substance,
+bless seven phases of deferred checks as passed. The grant is explicit that this is the one thing
+deferral must never become: *"Never record a deferred check as passed. 'Skip the checkpoint' means
+defer and disclose, not self-approve."* This is the same boundary the v1.4 run stopped at
+(2026-08-05) for the same reason.
+
+**Nothing is lost by stopping.** No phase work remains — only the owner's verification pass does.
+Every deferred phase has code-verified must-haves (39: 4/4, 43: 5/5, 44: 10/10, 45: 7/7, 46: 18/18,
+47: 16/16, 48: 13/13), type-check clean, and the app `src/` suite at the documented 2-file baseline.
+
+**Deploy status (v1.5):** Phases 46/47/48 are **NOT deploy-gated** (pure client bundle — self-hosted
+`@fontsource` fonts, client-only congregational editor, client-only mobile/layout polish). The
+outstanding v1.5 deploys remain the earlier owner-gated ones: Phase 40/40.1 (custom-claims function +
+backfill + `storage.rules` + tightened `firestore.rules`, two-deploy soak), Phase 41
+(`firestore.rules` sharing loosening), Phase 45 (NLT proxy function + `NLT_API_KEY` secret — and
+because `bibleVersion` defaults to NLT, frontend + function must deploy together). See each phase's
+section in `PENDING-VERIFICATION.md` and `functions/DEPLOY-ORG-CLAIMS.md`.
+
+### What the owner does on return
+
+1. Work through `.planning/PENDING-VERIFICATION.md` — v1.5 items are under §§ Phase 39, 43, 44, 45,
+   46, 47, 48 (Phase 48 newest). Starred/highest-value: **39.03-1** (PC credential retention across
+   reload), **48.4** (owner decision: Print/Share narrowed to the Service Order tab).
+2. Run `/gsd-verify-work 39` · `43` · `44` · `45` · `46` · `47` · `48` as each phase's items pass.
+3. Run the owner-gated deploys (Phases 40/40.1/41/45) per their runbooks when ready.
+4. Only then `/gsd-audit-milestone` → `/gsd-complete-milestone v1.5` → `/gsd-cleanup`.
+
+---
+
 ## Deferred Verification
 
 ### v1.5 (current milestone)
