@@ -154,7 +154,7 @@
 // gated). It fills the textarea with the split reading; nothing is committed
 // until Save. A failed split leaves the textarea untouched and surfaces a
 // toast.
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { fetchPassageText } from '@/utils/esvApi'
 import { fetchNltPassageText } from '@/utils/nltApi'
 import { stripVerseMarkers } from '@/utils/scriptureBoundaries'
@@ -247,19 +247,30 @@ async function autoFetch(): Promise<void> {
   }
 }
 
-async function insertAtCursor(snippet: string): Promise<void> {
+function insertAtCursor(snippet: string): void {
   const el = textareaRef.value
   if (!el) {
     text.value += snippet
     return
   }
-  const start = el.selectionStart ?? text.value.length
-  const end = el.selectionEnd ?? text.value.length
-  text.value = text.value.slice(0, start) + snippet + text.value.slice(end)
-  await nextTick()
-  const caret = start + snippet.length
+  // Insert via setRangeText rather than replacing the whole textarea value
+  // through v-model. A full-value reassignment resets the caret to the end and
+  // scrolls the textarea to the bottom (the reported bug) before we can restore
+  // the caret; setRangeText edits in place, preserves the surrounding scroll
+  // position, and (selectMode 'end') leaves the caret right after the snippet.
   el.focus()
-  el.setSelectionRange(caret, caret)
+  const start = el.selectionStart ?? el.value.length
+  const end = el.selectionEnd ?? el.value.length
+  if (typeof el.setRangeText === 'function') {
+    el.setRangeText(snippet, start, end, 'end')
+    // setRangeText does not emit an `input` event, so sync the v-model ref by hand.
+    text.value = el.value
+  } else {
+    // Fallback for environments without setRangeText.
+    text.value = text.value.slice(0, start) + snippet + text.value.slice(end)
+    const caret = start + snippet.length
+    el.setSelectionRange(caret, caret)
+  }
 }
 
 async function onAiSplit(): Promise<void> {
