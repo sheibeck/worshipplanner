@@ -359,14 +359,27 @@ describe('SlideCard', () => {
     expect(reorderable.emitted('select')).toBeUndefined()
   })
 
-  it('R099 (48-02 Task 2): gives the drag grip a >=44px hit area via unconditional padding + compensating negative margin, without enlarging the icon', () => {
+  it('R099 (48-02 Task 2, adjusted by WR-03/48-REVIEW): gives the drag grip an enlarged hit area via unconditional padding + compensating negative margin, without enlarging the icon', () => {
     const assembled = makeAssembled({
       slide: { id: 'grip-3', position: 0, contentKind: 'text', body: 'body' },
     })
     const wrapper = mountCard({ assembledSlide: assembled, reorderable: true })
     const grip = wrapper.get('[data-testid="slide-card-drag-handle"]')
-    expect(grip.classes()).toContain('p-3.5')
-    expect(grip.classes()).toContain('-m-3.5')
+    // WR-03 (48-REVIEW): asymmetric, not a uniform p-3.5/-m-3.5 (44px every
+    // side) — left/right are capped at 6px (the row's own `gap-1.5` to the
+    // kind-badge/label siblings) and top is capped at 8px (the `mt-2` to the
+    // preview above), so the enlarged hit-testable box never crosses into a
+    // neighboring element's own box and silently swallows a selection click
+    // meant for it. Bottom keeps the full 14px (nothing sits directly below
+    // the footer row within the card).
+    expect(grip.classes()).toContain('pl-1.5')
+    expect(grip.classes()).toContain('-ml-1.5')
+    expect(grip.classes()).toContain('pr-1.5')
+    expect(grip.classes()).toContain('-mr-1.5')
+    expect(grip.classes()).toContain('pt-2')
+    expect(grip.classes()).toContain('-mt-2')
+    expect(grip.classes()).toContain('pb-3.5')
+    expect(grip.classes()).toContain('-mb-3.5')
     const svg = grip.find('svg')
     expect(svg.classes()).toContain('h-4')
     expect(svg.classes()).toContain('w-4')
