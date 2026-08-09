@@ -95,22 +95,6 @@
 
           <!-- Save area -->
           <div class="flex items-center gap-3">
-            <!-- Undo button (editor only, only visible when a previous snapshot
-                 exists). Removed while locked (31-UI-SPEC § 3): restoring a
-                 pre-lock snapshot is a write. -->
-            <button
-              v-if="canEditService && previousService"
-              type="button"
-              @click="onUndo"
-              title="Undo last save (Ctrl+Z)"
-              class="print:hidden inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-              </svg>
-              Undo
-            </button>
-
             <!-- D-02: Mark as Planned — the draft half of the two named
                  transitions that replace the deleted cycle. Placed immediately
                  left of Export so the lifecycle reads left-to-right in the
@@ -251,15 +235,40 @@
              node it matched. Do NOT "simplify" this back to a permission-only
              gate, and do NOT fix the collision by giving the modal a
              different surface id — that would create two DISAGREEING
-             statuses instead, which is worse. -->
+             statuses instead, which is worse.
+
+             R102 (48-03): the wrapper's `flex items-center gap-2` is now
+             UNCONDITIONAL (previously part of the serviceSaveStatusVisible
+             ternary) so the relocated Undo link lays out correctly beside
+             SaveStatusIndicator even at idle — only border/background/
+             padding/sticky/mb-3 stay conditional on there being a status to
+             report. This does not reintroduce the 31-UI-SPEC E5 empty-box
+             regression: SaveStatusIndicator renders nothing visible at idle
+             and the Undo link is `v-if="previousService"`-gated, so an idle
+             service with no undo-able snapshot still renders a
+             zero-visible-chrome `<div>`. -->
         <div
           v-if="canEditService && congregationalSlotIndex === null"
-          :class="serviceSaveStatusVisible
-            ? 'sticky top-0 z-10 mb-3 flex items-center gap-2 rounded-md border border-gray-800 bg-gray-900 px-4 py-2'
-            : ''"
+          :class="['flex items-center gap-2', serviceSaveStatusVisible
+            ? 'sticky top-0 z-10 mb-3 rounded-md border border-gray-800 bg-gray-900 px-4 py-2'
+            : '']"
           data-testid="service-save-status-bar"
         >
           <SaveStatusIndicator :surface-id="`service:${serviceId}`" />
+          <!-- R102 (48-03): Undo relocated here from the header Save area —
+               same gate (previousService; the wrapper already carries
+               canEditService, so the redundant `canEditService &&` prefix is
+               dropped), same onUndo handler, same Ctrl+Z keybinding, now
+               rendered as a link beside the save-status text instead of a
+               bordered button among the primary actions. -->
+          <button
+            v-if="previousService"
+            type="button"
+            data-testid="undo-link"
+            title="Undo last save (Ctrl+Z)"
+            class="text-xs text-indigo-400 hover:text-indigo-300 underline transition-colors"
+            @click="onUndo"
+          >Undo</button>
         </div>
 
         <!-- D-05/D-06: THE lock banner. One element, rendered once, and its

@@ -826,6 +826,26 @@ describe('ServiceEditorView - contextual action bar wiring (36-03, R068)', () =>
     expect(note.find('a').attributes('data-route-name')).toBe('settings')
   })
 
+  // R101 (48-03), Pitfall 3: the ActionBarIcon union and ContextualActionBar's
+  // template branches are two files with no compiler link between them — a
+  // missing template branch type-checks cleanly but renders a bare-text
+  // button. This test closes that gap by asserting the icon SVGs actually
+  // render, not merely that the buttons exist.
+  it('Print and Share render WITH their icons in the top action bar (Pitfall 3 closure)', async () => {
+    mockAuthState.isEditor = true
+    const wrapper = await mountView({ status: 'draft' })
+    await wrapper.vm.$nextTick()
+
+    const bar = wrapper.find('[data-testid="contextual-action-bar"]')
+    const printBtn = bar.find('[data-testid="print-btn"]')
+    expect(printBtn.exists()).toBe(true)
+    expect(printBtn.find('svg').exists()).toBe(true)
+
+    const shareBtn = bar.findAll('button').find((b) => b.text().includes('Share'))
+    expect(shareBtn).toBeDefined()
+    expect(shareBtn!.find('svg').exists()).toBe(true)
+  })
+
   it('Service Order + editor + unlocked + credentialed: export-pc-btn renders, the R071 note does not', async () => {
     mockAuthState.hasPcCredentials = true
     mockAuthState.pcCredentials = { appId: 'placeholder-app-id', secret: 'placeholder-secret' }
@@ -848,12 +868,12 @@ describe('ServiceEditorView - contextual action bar wiring (36-03, R068)', () =>
     expect(wrapper.find('[data-testid="pc-credentials-missing-note"]').exists()).toBe(false)
   })
 
-  it('Roles tab: the bar renders zero buttons, no leaked Service Order actions, and Mark as Planned/Undo still render outside it', async () => {
+  it('Roles tab: the bar renders zero buttons, no leaked Service Order actions, and Mark as Planned/the undo-link still render outside it', async () => {
     const wrapper = await mountView({ status: 'draft' })
     await wrapper.vm.$nextTick()
     // Force a previousService snapshot directly (bypassing the real autosave
-    // debounce/flow, which is exercised elsewhere) so the Undo button's own
-    // `v-if="canEditService && previousService"` has something to gate on.
+    // debounce/flow, which is exercised elsewhere) so the undo-link's own
+    // `v-if="previousService"` has something to gate on.
     ;(wrapper.vm as unknown as { previousService: Service | null }).previousService = { ...mockService }
     await wrapper.vm.$nextTick()
 
@@ -867,7 +887,9 @@ describe('ServiceEditorView - contextual action bar wiring (36-03, R068)', () =>
     expect(wrapper.find('[data-testid="export-pc-btn"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="pc-credentials-missing-note"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="mark-planned-btn"]').exists()).toBe(true)
-    expect(texts.some((t) => t.includes('Undo'))).toBe(true)
+    // R102 (48-03): the undo-link lives in the save-status bar, which is
+    // mounted regardless of activeTab (34-10) — still reachable on Roles.
+    expect(wrapper.find('[data-testid="undo-link"]').exists()).toBe(true)
   })
 
   it('design 1a: Present renders in the page header on the Slides tab, immediately before Save, and NOT inside the slides tab panel', async () => {
@@ -1062,7 +1084,10 @@ describe('ServiceEditorView - contextual action bar wiring (36-03, R068)', () =>
 
     const bar = wrapper.find('[data-testid="service-save-status-bar"]')
     expect(bar.exists()).toBe(true)
-    expect(bar.classes()).toEqual([])
+    // R102 (48-03): the wrapper's flex layout is now unconditional (so the
+    // Undo link lays out beside SaveStatusIndicator even at idle) — only
+    // border/background/padding/sticky stay conditional.
+    expect(bar.classes()).toEqual(['flex', 'items-center', 'gap-2'])
     expect(bar.find('[data-testid="save-status"]').exists()).toBe(true)
   })
 
@@ -2368,7 +2393,10 @@ describe('ServiceEditorView - Service Order preservation sweep (36-05, R067)', (
 
     const bar = wrapper.find('[data-testid="service-save-status-bar"]')
     expect(bar.exists()).toBe(true)
-    expect(bar.classes()).toEqual([])
+    // R102 (48-03): the wrapper's flex layout is now unconditional (so the
+    // Undo link lays out beside SaveStatusIndicator even at idle) — only
+    // border/background/padding/sticky stay conditional.
+    expect(bar.classes()).toEqual(['flex', 'items-center', 'gap-2'])
   })
 
   it('five section headers, five band labels, five counts; the empty-band placeholder still renders its pre-phase copy verbatim for the editor variant', async () => {
@@ -4970,7 +4998,10 @@ describe('ServiceEditorView - service lifecycle transitions (R036, R037)', () =>
     expect(wrapper.find('[data-testid="service-status-pill"]').text()).toContain('Draft')
     const bar = wrapper.find('[data-testid="service-save-status-bar"]')
     expect(bar.exists()).toBe(true)
-    expect(bar.classes()).toEqual([])
+    // R102 (48-03): the wrapper's flex layout is now unconditional (so the
+    // Undo link lays out beside SaveStatusIndicator even at idle) — only
+    // border/background/padding/sticky stay conditional.
+    expect(bar.classes()).toEqual(['flex', 'items-center', 'gap-2'])
   })
 
   it('a locked service renders the lock banner and no save-status bar; a viewer renders neither', async () => {
@@ -6006,7 +6037,10 @@ describe('ServiceEditorView - 32-05: migrated onto useAutoSave/useSaveStatus, st
 
     const bar = wrapper.find('[data-testid="service-save-status-bar"]')
     expect(bar.exists()).toBe(true)
-    expect(bar.classes()).toEqual([])
+    // R102 (48-03): the wrapper's flex layout is now unconditional (so the
+    // Undo link lays out beside SaveStatusIndicator even at idle) — only
+    // border/background/padding/sticky stay conditional.
+    expect(bar.classes()).toEqual(['flex', 'items-center', 'gap-2'])
   })
 
   for (const status of ['pending', 'saving', 'saved', 'error'] as const) {
@@ -6034,7 +6068,8 @@ describe('ServiceEditorView - 32-05: migrated onto useAutoSave/useSaveStatus, st
 
     useSaveStatus().set('service:service-1', { status: 'idle' })
     await wrapper.vm.$nextTick()
-    expect(wrapper.find('[data-testid="service-save-status-bar"]').classes()).toEqual([])
+    // R102 (48-03): flex layout is unconditional now — only chrome strips.
+    expect(wrapper.find('[data-testid="service-save-status-bar"]').classes()).toEqual(['flex', 'items-center', 'gap-2'])
   })
 
   it('the aria-live element is the SAME DOM node across idle -> pending -> saving -> saved, with changing text', async () => {
@@ -6067,8 +6102,16 @@ describe('ServiceEditorView - 32-05: migrated onto useAutoSave/useSaveStatus, st
   // button row rather than beside it) is the only surviving export-related
   // affordance for this state, so it stands in for the old "Export/Copy"
   // assertion here.
-  it('the header Save area keeps Undo, Suggest All Songs and Mark as Planned once the inline status block is removed; the credentials-missing note is the sole export affordance', async () => {
+  // R102 (48-03): rewritten — Undo no longer lives in the header Save area
+  // (Pitfall 5: this test's title used to claim it did, while its
+  // assertions never actually checked for it). Undo is now a link inside
+  // the save-status bar, beside SaveStatusIndicator.
+  it('the header Save area keeps Suggest All Songs and Mark as Planned but NOT Undo once the inline status block is removed; Undo lives in the save-status bar; the credentials-missing note is the sole export affordance', async () => {
     const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    // Force a previousService snapshot so the undo-link's own
+    // `v-if="previousService"` has something to gate on.
+    ;(wrapper.vm as unknown as { previousService: unknown }).previousService = { ...mockService }
     await wrapper.vm.$nextTick()
 
     expect(wrapper.find('[data-testid="mark-planned-btn"]').exists()).toBe(true)
@@ -6077,6 +6120,14 @@ describe('ServiceEditorView - 32-05: migrated onto useAutoSave/useSaveStatus, st
     expect(wrapper.find('[data-testid="export-pc-btn"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="copy-pc-btn"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="pc-credentials-missing-note"]').exists()).toBe(true)
+
+    // NOT in the header Save area (mark-planned-btn's own row).
+    const markPlannedRow = wrapper.find('[data-testid="mark-planned-btn"]').element.parentElement
+    expect(markPlannedRow?.querySelector('[data-testid="undo-link"]')).toBeNull()
+
+    // IS inside the save-status bar, beside SaveStatusIndicator.
+    const saveStatusBar = wrapper.find('[data-testid="service-save-status-bar"]')
+    expect(saveStatusBar.find('[data-testid="undo-link"]').exists()).toBe(true)
   })
 
   // ── Reporting into useSaveStatus ────────────────────────────────────────────
