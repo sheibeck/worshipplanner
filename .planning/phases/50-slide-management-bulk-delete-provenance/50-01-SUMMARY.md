@@ -111,6 +111,26 @@ None - no external service configuration required. **This change is deploy-gated
 - The actual browser-cache behavior after a real production deploy is a deferred human-verify item (see phase-level `PENDING-VERIFICATION.md` once the phase completes) — not executed here, consistent with the standing NO-DEPLOYS grant.
 - No blockers for subsequent plans in this phase (50-02 through 50-05 cover different R106-R109 concerns and were not touched by this plan).
 
+## Post-Review Revision (2026-08-10, commit `dd9adc8`)
+
+The original implementation above scoped the header to `source: "/index.html"` only, and explicitly
+deferred the deep-SPA-route / root-path matching nuance (see "Decisions Made" line 96) to human
+verify. **Phase code review (WR-01) determined this was a functional gap, not just a verify concern:**
+Firebase matches header `source` globs against the incoming (pre-rewrite) request path, so
+`/index.html`-only never applies to `/` or SPA deep links — the paths of virtually every real page
+load — meaning R109's own goal (a deploy is visible without a manual cache-clear) was not met for the
+common case.
+
+**Owner chose "fix now" (2026-08-10).** `firebase.json` was widened to `source:"**"`
+(no-cache/must-revalidate) followed by `source:"/assets/**"` (`public, max-age=31536000, immutable`),
+so the shell revalidates on every route while hashed assets keep their long cache. This relies on
+Firebase's **last-match-wins** header precedence (confirmed from community sources; official docs are
+silent — a production backstop check was added as PENDING-VERIFICATION item 50.1(b)). The guard test
+was rewritten to assert per-path effective `Cache-Control` behaviorally (closing WR-02), 3/3 green;
+`npm run type-check` clean. The original LOCKED `/index.html`-only decision in `50-CONTEXT.md` was
+formally revised (its asset-immutability intent preserved). This supersedes the `key-decisions` and
+"Decisions Made" notes above about scoping to `/index.html` only.
+
 ---
 *Phase: 50-slide-management-bulk-delete-provenance*
 *Completed: 2026-08-10*

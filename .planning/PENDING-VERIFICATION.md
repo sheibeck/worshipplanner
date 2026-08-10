@@ -1275,6 +1275,43 @@ but only a real projected render confirms the on-screen result and media continu
 
 ---
 
+## Phase 50 — Slide Management: Bulk Delete, Provenance & Render Fidelity (2026-08-10)
+
+Deferred under the v1.5 standing autonomy grant. **4/4 must-haves verified in code**; `npm run
+type-check` clean; app `src/` suite at the documented 2-file baseline (2988/3001, no new failures);
+code review 0 critical / 2 warning / 2 info. R106 (per-group "Remove imported slides"), R107
+(rebuilds preserve every manual add — `slideGroupMaterializer.ts` untouched, existing survivor
+mechanism proven by a new 9-case suite), and R108 (render-stable `sourcePage`/`renderedPage`
+recorded and consumed) are fully code-complete and tested. The two warnings were both about R109 and
+have been **fixed** (see below). The two items here are inherently deploy-/live-gated.
+
+- [ ] **50.1 Post-deploy cache refresh + asset immutability (R109).** After a real
+      `firebase deploy --only hosting`, in a browser that previously had the app cached and WITHOUT a
+      manual cache-clear: (a) load the production **root URL `/`** (not `/index.html`) and a **deep
+      link** (e.g. `/services/<id>`) — the DevTools Network tab should show `index.html` re-fetched
+      fresh (a real request, not `(disk cache)`/`(memory cache)`) and the newly deployed bundle should
+      load immediately; and (b) open a hashed asset request under `/assets/` and confirm its response
+      `Cache-Control` is still the long/immutable value (`public, max-age=31536000, immutable`), **not**
+      `no-cache`. **Why human:** deploy-gated per the NO-DEPLOYS grant — no `firebase deploy` was run.
+      **Why (b) matters:** the config is `source:"**"` no-cache followed by `source:"/assets/**"`
+      immutable, which is correct under Firebase's last-match-wins header precedence (confirmed against
+      community sources; the official docs don't state it). If, in production, assets come back
+      `no-cache`, Firebase resolved precedence differently — the one-line fix is to reorder so
+      `/assets/**` wins. This item is the backstop for that residual doc-silence risk. (Context:
+      the original `/index.html`-only header was found by code review WR-01 to miss `/` and deep links
+      entirely; it was widened per owner decision 2026-08-10.)
+
+- [ ] **50.2 Live multi-image PPTX round-trip (R108).** Import a real multi-image PPTX deck — one
+      where at least one source slide contains **more than one image**, so parsed-slide count ≠
+      rendered-page count — into a group, hand-add one of its slides into another (non-imported) group,
+      and once the render pipeline finishes, confirm it shows the **correct rendered page image** (not a
+      perpetual "Rendering" placeholder). **Why human:** R108's resolution logic is proven by unit
+      tests over synthetic fixtures; a live upload → parse (Cloud Function) → render-service → Storage →
+      client round-trip has not been exercised. This is the multi-image defect from 2026-08-10 that R108
+      exists to close.
+
+---
+
 ## Notes and failures
 
 _(Record anything that failed here, with what you saw versus what was expected.)_

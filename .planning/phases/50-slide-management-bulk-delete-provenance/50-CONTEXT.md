@@ -48,9 +48,19 @@ delete UI. No deck re-sync on re-import.
   the ec217aa positional fallback path must keep working (legacy entries lacking the new reference
   fall back to positional, or are re-keyed by a one-time migration — planner's call).
 
-### Deploy cache (R109 — LOCKED)
-- `firebase.json` hosting `headers` entry serving `index.html` no-cache/revalidate; hashed
+### Deploy cache (R109 — LOCKED; scope REVISED 2026-08-10 post-review)
+- `firebase.json` hosting `headers` entry serving the SPA shell no-cache/revalidate; hashed
   `assets/*` keep their immutable cache. Confirm no service worker caches the shell.
+- **REVISION (owner decision 2026-08-10, executing WR-01):** the original LOCKED wording said
+  serve `index.html` no-cache, and 50-01 first implemented that as a `source: "/index.html"`
+  entry. Code review found Firebase matches header `source` globs against the **incoming
+  (pre-rewrite)** request path, so a `/index.html`-only entry never covers `/` or SPA deep
+  links — the actual navigation paths — leaving the common page loads cached (the exact bug
+  R109 targets). The shell entry was widened to `source: "**"` (no-cache) with a following
+  `source: "/assets/**"` (immutable) override so the shell revalidates on every route while
+  hashed assets keep their long cache (Firebase last-match-wins header precedence). The
+  asset-immutability intent of the original LOCKED decision is preserved. Do NOT revert to the
+  `/index.html`-only form.
 
 ### UI (skip-ui rationale)
 - The only new UI is one per-group control; it mirrors the existing group affordances, so no

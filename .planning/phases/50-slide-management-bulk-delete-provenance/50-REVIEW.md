@@ -24,7 +24,9 @@ findings:
   warning: 2
   info: 2
   total: 4
-status: issues_found
+warnings_resolved: 2  # WR-01, WR-02 fixed 2026-08-10 (commit dd9adc8)
+info_accepted: 2      # IN-01 unreachable edge; IN-02 mitigated by CR-02 merge
+status: resolved
 ---
 
 # Phase 50: Code Review Report
@@ -127,6 +129,16 @@ combined with an explicit long-cache override for the hashed `assets/**` glob pr
 "hashed assets keep their immutable cache" decision while actually covering every real navigation
 path, including `/`.)
 
+**✅ RESOLVED 2026-08-10 (commit `dd9adc8`).** Owner chose "fix now." `firebase.json` was widened to
+`source:"**"` no-cache followed by `source:"/assets/**"` immutable. One correction to the mechanism
+above: Firebase resolves overlapping header globs by **last-match-wins** (array order), not
+"most-specific" — verified against community sources; the official docs are silent. So the override
+must come **after** the catch-all (as implemented: `**` then `/assets/**`), the reverse of the
+snippet above, which would have left assets `no-cache` under last-match-wins. A deploy-time backstop
+that re-checks asset immutability in production was added as PENDING-VERIFICATION item 50.1(b) to
+cover the residual doc-silence risk. The LOCKED `/index.html`-only decision in `50-CONTEXT.md` was
+formally revised with this rationale.
+
 ### WR-02: `firebaseHostingHeaders.test.ts` proves only the JSON shape, not the functional claim it's named for
 
 **File:** `src/__tests__/firebaseHostingHeaders.test.ts:23-36`
@@ -142,6 +154,13 @@ reasonably conclude R109 is fully solved; it is not.
 pointing at the WR-01 gap, or (b) once the header source is broadened per WR-01's fix, update this test
 to assert the broadened `source` pattern (e.g. `**`) instead of the substring-matched `index.html`
 check, so a future narrowing regression is actually caught.
+
+**✅ RESOLVED 2026-08-10 (commit `dd9adc8`).** `firebaseHostingHeaders.test.ts` was rewritten to
+assert behavior, not shape: it models Firebase's per-path effective `Cache-Control` (applying every
+matching glob in array order, last-match-wins) and asserts `/`, `/index.html`, and SPA deep links
+(`/services/abc123`, `/songs`, `/roster/42`) are all no-cache while `/assets/*` files stay
+immutable. This test fails under the old `/index.html`-only config and passes under the widened one,
+so a future narrowing regression is now caught. 3/3 green.
 
 ## Info
 
