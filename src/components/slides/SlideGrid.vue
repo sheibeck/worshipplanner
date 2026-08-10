@@ -509,6 +509,17 @@ const congregationalButtonLabel = computed(() =>
     : 'Make this a congregational reading',
 )
 
+/**
+ * R106 (Phase 50) — per-group "Remove imported slides" bulk action. Song
+ * groups can never hold imported entries (deck import is blocked there via
+ * `canMutateGroup`'s existing song-group exclusion), so `hasImportedEntries`
+ * needs no separate song-group check — `canMutateGroup` already covers it.
+ */
+const hasImportedEntries = computed(() =>
+  Boolean(props.group?.slides.some((entry) => entry.sourceRef.kind === 'imported')),
+)
+const showRemoveImportedControl = computed(() => canMutateGroup.value && hasImportedEntries.value)
+
 interface CardEntry {
   assembledSlide: AssembledSlide
   number: number
@@ -670,6 +681,40 @@ async function onRemoveGroupBackground(): Promise<void> {
     })
   } catch (err) {
     console.error('Failed to remove group background:', err)
+  }
+}
+
+// --- R106: per-group "Remove imported slides" bulk action ---
+//
+// The handler re-checks `canMutateGroup.value` itself rather than relying on
+// the template `v-if` alone (30-VERIFICATION I-01) — every other mutation
+// handler in this file does the same. Entries are sorted by their existing
+// `order` before filtering, mirroring the drag-reorder handler's own
+// defensive sort, so the survivors' relative PLAY order (not raw array
+// insertion order) is what gets renumbered. Does NOT touch
+// `group.sourceSignature` — a removal changes no source (R107 territory is
+// untouched here) — and passes `group.slides` as `baseSlides` so the write
+// routes through the CR-02 concurrent-write transaction merge, exactly like
+// every other group-slides write in this file.
+async function onRemoveImportedSlides(): Promise<void> {
+  if (!canMutateGroup.value) return
+  if (!props.selectedSlot || !props.group) return
+  const group = props.group
+  const sorted = [...group.slides].sort((a, b) => a.order - b.order)
+  const remaining = sorted.filter((entry) => entry.sourceRef.kind !== 'imported')
+  if (remaining.length === sorted.length) return
+  if (!window.confirm('Remove all imported slides from this group? This cannot be undone.')) return
+  const renumbered = remaining.map((entry, i) => ({ ...entry, order: i }))
+  try {
+    await slideGroupsStore.replaceGroupSlides(
+      props.orgId,
+      props.selectedSlot.id,
+      renumbered,
+      group.sourceSignature,
+      group.slides,
+    )
+  } catch (err) {
+    console.error('Failed to remove imported slides:', err)
   }
 }
 
