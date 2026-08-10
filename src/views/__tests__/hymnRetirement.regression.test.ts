@@ -374,7 +374,7 @@ describe('R084 hard half — HYMN survives across every surface (Phase 43 Plan 0
         new Response(JSON.stringify({ data: { id: 'pc-item-1' } }), { status: 201 }),
       )
 
-      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', hymnSlot(), 0, [])
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', hymnSlot(), 0, [], 'ESV')
 
       const [, options] = vi.mocked(fetch).mock.calls[0]!
       const requestBody = JSON.parse(options?.body as string)
@@ -388,7 +388,7 @@ describe('R084 hard half — HYMN survives across every surface (Phase 43 Plan 0
       )
       const slot = hymnSlot({ hymnNumber: '', verses: '' })
 
-      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 0, [])
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 0, [], 'ESV')
 
       const [, options] = vi.mocked(fetch).mock.calls[0]!
       const requestBody = JSON.parse(options?.body as string)
@@ -432,8 +432,8 @@ describe('E-13 (adjacency) — two consecutive HYMN slots stay distinct on every
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: { id: 'pc-item-b' } }), { status: 201 }))
 
     const [slotA, slotB] = buildAdjacentHymnsService().slots as [HymnSlot, HymnSlot]
-    const idA = await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slotA, 0, [])
-    const idB = await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slotB, 1, [])
+    const idA = await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slotA, 0, [], 'ESV')
+    const idB = await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slotB, 1, [], 'ESV')
 
     expect(idA).toBe('pc-item-a')
     expect(idB).toBe('pc-item-b')
@@ -473,7 +473,7 @@ describe('E-15 (encoding) — HYMN free-text fields round-trip verbatim; the pal
     )
     const slot = buildEncodedHymnService().slots[0] as HymnSlot
 
-    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 0, [])
+    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 0, [], 'ESV')
 
     const [, options] = vi.mocked(fetch).mock.calls[0]!
     const requestBody = JSON.parse(options?.body as string)

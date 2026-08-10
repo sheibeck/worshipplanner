@@ -372,7 +372,9 @@ const mockAuthState = reactive<{
   // directly — without this, accessing `.aiEnabled` on an undefined
   // `settings` throws at mount. Defaults to true so every pre-existing
   // test in this file keeps its current behavior.
-  settings: { aiEnabled: boolean; pcEnabled: boolean; vwModeEnabled: boolean }
+  // quick/260809-vvq: onConfirmExport now threads authStore.settings.bibleVersion
+  // into every addSlotAsItem call, so the mock settings must carry it too.
+  settings: { aiEnabled: boolean; pcEnabled: boolean; vwModeEnabled: boolean; bibleVersion: 'ESV' | 'NLT' }
 }>({
   user: { uid: 'user-1' },
   isEditor: false,
@@ -381,7 +383,7 @@ const mockAuthState = reactive<{
   // "Copy for PC" branch it always took. Only the export tests flip these.
   hasPcCredentials: false,
   pcCredentials: null,
-  settings: { aiEnabled: true, pcEnabled: true, vwModeEnabled: true },
+  settings: { aiEnabled: true, pcEnabled: true, vwModeEnabled: true, bibleVersion: 'NLT' },
 })
 
 vi.mock('@/stores/auth', () => ({
@@ -5824,6 +5826,7 @@ describe('ServiceEditorView - ME-01: export failure copy and the pre-flight stat
     exportSelectedServiceTypeId: string
     exportSelectedTemplateId: string
     exportMode: string
+    existingPlan: { id: string; title: string; dates: string } | null
     exportError: string | null
     onConfirmExport: () => Promise<void>
   }
@@ -5915,6 +5918,84 @@ describe('ServiceEditorView - ME-01: export failure copy and the pre-flight stat
       expect.objectContaining({ status: 'exported', pcPlanId: 'pc-plan-new' }),
     )
     expect(vm.localService.status).toBe('exported')
+  })
+
+  // quick/260809-vvq Sub-task B: PRAYER/MESSAGE/ANNOUNCEMENTS/MISC must be
+  // exported in ALL three paths (previously dropped in existing-plan and
+  // new-plan-with-template); IMPORTED stays excluded. Sub-task A: every call
+  // threads authStore.settings.bibleVersion.
+  const kindFixtureSlots: Service['slots'] = [
+    { kind: 'SONG', id: 's-song', position: 0, requiredVwType: 1, songId: 'song-1', songTitle: 'Amazing Grace', songKey: 'G' },
+    { kind: 'SCRIPTURE', id: 's-scr', position: 1, book: 'Psalms', chapter: 23, verseStart: 1, verseEnd: 6 },
+    { kind: 'PRAYER', id: 's-pray', position: 2 },
+    { kind: 'MESSAGE', id: 's-msg', position: 3 },
+    { kind: 'ANNOUNCEMENTS', id: 's-ann', position: 4 },
+    { kind: 'MISC', id: 's-misc', position: 5 },
+    { kind: 'IMPORTED', id: 's-imp', position: 6, importId: 'import-1' },
+  ]
+
+  // 5th positional arg (index 4) is the slot; 8th (index 7) is bibleVersion.
+  // The mock is typed with no params, so read each call as an untyped tuple.
+  const exportedKinds = () =>
+    (mockAddSlotAsItem.mock.calls as unknown as unknown[][]).map(
+      (c) => (c[4] as { kind: string }).kind,
+    )
+
+  it('exports PRAYER/MESSAGE/ANNOUNCEMENTS/MISC (never IMPORTED) in the new-plan no-template path, with bibleVersion threaded', async () => {
+    mockServicesList = [{ ...mockService, status: 'planned', slots: kindFixtureSlots }]
+    const wrapper = await mountView()
+    const vm = await armExport(wrapper)
+    vm.exportMode = 'new'
+    vm.exportSelectedTemplateId = ''
+    await wrapper.vm.$nextTick()
+
+    await vm.onConfirmExport()
+    await flushPromises()
+
+    const kinds = exportedKinds()
+    expect(kinds).toEqual(expect.arrayContaining(['PRAYER', 'MESSAGE', 'ANNOUNCEMENTS', 'MISC']))
+    expect(kinds).not.toContain('IMPORTED')
+    // Sub-task A: bibleVersion (arg index 7) is the org setting on every call.
+    expect(mockAddSlotAsItem.mock.calls.length).toBeGreaterThan(0)
+    for (const call of mockAddSlotAsItem.mock.calls as unknown as unknown[][]) {
+      expect(call[7]).toBe(mockAuthState.settings.bibleVersion)
+    }
+  })
+
+  it('exports the four non-song kinds in the new-plan WITH-template path (previously dropped)', async () => {
+    mockServicesList = [{ ...mockService, status: 'planned', slots: kindFixtureSlots }]
+    mockFetchTemplateItems.mockResolvedValueOnce([
+      { title: 'Worship Song', itemType: 'song', sequence: 1, description: undefined },
+    ] as unknown as never)
+    const wrapper = await mountView()
+    const vm = await armExport(wrapper)
+    vm.exportMode = 'new'
+    vm.exportSelectedTemplateId = 'tmpl-1'
+    await wrapper.vm.$nextTick()
+
+    await vm.onConfirmExport()
+    await flushPromises()
+
+    const kinds = exportedKinds()
+    expect(kinds).toEqual(expect.arrayContaining(['PRAYER', 'MESSAGE', 'ANNOUNCEMENTS', 'MISC']))
+    expect(kinds).not.toContain('IMPORTED')
+  })
+
+  it('appends the four non-song kinds in the existing-plan path (previously dropped)', async () => {
+    mockServicesList = [{ ...mockService, status: 'planned', slots: kindFixtureSlots }]
+    mockFetchPlanItems.mockResolvedValueOnce([] as unknown as never)
+    const wrapper = await mountView()
+    const vm = await armExport(wrapper)
+    vm.exportMode = 'existing'
+    vm.existingPlan = { id: 'pc-plan-existing', title: 'Existing', dates: '2026-03-08' }
+    await wrapper.vm.$nextTick()
+
+    await vm.onConfirmExport()
+    await flushPromises()
+
+    const kinds = exportedKinds()
+    expect(kinds).toEqual(expect.arrayContaining(['PRAYER', 'MESSAGE', 'ANNOUNCEMENTS', 'MISC']))
+    expect(kinds).not.toContain('IMPORTED')
   })
 })
 

@@ -3219,6 +3219,13 @@ async function onConfirmExport() {
     // (slot as any) narrowing (RESEARCH Pitfall 2).
     const songSlots = localService.value.slots.filter(s => s.kind === 'SONG' || s.kind === 'HYMN')
     const scriptureSlots = localService.value.slots.filter(s => s.kind === 'SCRIPTURE')
+    // The four remaining exportable kinds (IMPORTED stays excluded; SONG/HYMN/
+    // SCRIPTURE are handled by the buckets above). `.filter` preserves service
+    // slot order; these are APPENDED like the leftover passes in the
+    // existing-plan and new-plan-with-template branches (LOCKED design).
+    const otherSlots = localService.value.slots.filter(
+      s => s.kind === 'PRAYER' || s.kind === 'MESSAGE' || s.kind === 'ANNOUNCEMENTS' || s.kind === 'MISC',
+    )
 
     if (exportMode.value === 'existing' && existingPlan.value) {
       // ── Add to existing plan: replace placeholders, then append leftovers (D-02) ──
@@ -3243,7 +3250,7 @@ async function onConfirmExport() {
         // Match scripture placeholders (template 'scripture reading' title), items created by a
         // prior export which now carry the 'Scripture - ' prefix, OR regular items that are not
         // known non-scripture slots (Message, Prayer).
-        const NON_SCRIPTURE_REGULAR_TITLES = new Set(['message', 'prayer'])
+        const NON_SCRIPTURE_REGULAR_TITLES = new Set(['message', 'prayer', 'announcements', 'miscellaneous'])
         const isScriptureItem = titleLower.startsWith('scripture - ')
           || titleLower.includes('scripture reading')
           || (item.itemType === 'regular' && !NON_SCRIPTURE_REGULAR_TITLES.has(titleLower))
@@ -3275,7 +3282,7 @@ async function onConfirmExport() {
           await deleteItem(appId, secret, serviceTypeId, planId, item.id)
           await addSlotAsItem(
             appId, secret, serviceTypeId, planId,
-            slot, item.sequence, songStore.songs, localService.value.sermonPassage,
+            slot, item.sequence, songStore.songs, authStore.settings.bibleVersion, localService.value.sermonPassage,
             item.length ?? undefined,
           )
         } catch {
@@ -3292,7 +3299,7 @@ async function onConfirmExport() {
           await deleteItem(appId, secret, serviceTypeId, planId, item.id)
           await addSlotAsItem(
             appId, secret, serviceTypeId, planId,
-            slot, item.sequence, songStore.songs, localService.value.sermonPassage,
+            slot, item.sequence, songStore.songs, authStore.settings.bibleVersion, localService.value.sermonPassage,
             item.length ?? undefined,
           )
         } catch {
@@ -3309,7 +3316,7 @@ async function onConfirmExport() {
         try {
           await addSlotAsItem(
             appId, secret, serviceTypeId, planId,
-            songSlots[i]!, sequence, songStore.songs, localService.value.sermonPassage,
+            songSlots[i]!, sequence, songStore.songs, authStore.settings.bibleVersion, localService.value.sermonPassage,
           )
           sequence++
         } catch {
@@ -3324,11 +3331,25 @@ async function onConfirmExport() {
         try {
           await addSlotAsItem(
             appId, secret, serviceTypeId, planId,
-            scriptureSlots[i]!, sequence, songStore.songs, localService.value.sermonPassage,
+            scriptureSlots[i]!, sequence, songStore.songs, authStore.settings.bibleVersion, localService.value.sermonPassage,
           )
           sequence++
         } catch {
           failures.push('Scripture')
+        }
+      }
+
+      // Sixth pass — append PRAYER/MESSAGE/ANNOUNCEMENTS/MISC slots (D-02:
+      // appended like the leftover passes above; not title-matched/replaced).
+      for (const slot of otherSlots) {
+        try {
+          await addSlotAsItem(
+            appId, secret, serviceTypeId, planId,
+            slot, sequence, songStore.songs, authStore.settings.bibleVersion, localService.value.sermonPassage,
+          )
+          sequence++
+        } catch {
+          failures.push(slot.kind)
         }
       }
     } else {
@@ -3388,10 +3409,10 @@ async function onConfirmExport() {
 
           try {
             if (isSongItem && songIndex < songSlots.length) {
-              await addSlotAsItem(appId, secret, serviceTypeId, planId, songSlots[songIndex]!, sequence, songStore.songs, localService.value.sermonPassage, tItem.length)
+              await addSlotAsItem(appId, secret, serviceTypeId, planId, songSlots[songIndex]!, sequence, songStore.songs, authStore.settings.bibleVersion, localService.value.sermonPassage, tItem.length)
               songIndex++
             } else if (isScriptureItem && scriptureIndex < scriptureSlots.length) {
-              await addSlotAsItem(appId, secret, serviceTypeId, planId, scriptureSlots[scriptureIndex]!, sequence, songStore.songs, localService.value.sermonPassage, tItem.length)
+              await addSlotAsItem(appId, secret, serviceTypeId, planId, scriptureSlots[scriptureIndex]!, sequence, songStore.songs, authStore.settings.bibleVersion, localService.value.sermonPassage, tItem.length)
               scriptureIndex++
             } else if (!isSongItem && !isScriptureItem) {
               await createItem(appId, secret, serviceTypeId, planId, {
@@ -3410,7 +3431,7 @@ async function onConfirmExport() {
 
         for (let i = songIndex; i < songSlots.length; i++) {
           try {
-            await addSlotAsItem(appId, secret, serviceTypeId, planId, songSlots[i]!, sequence, songStore.songs, localService.value.sermonPassage)
+            await addSlotAsItem(appId, secret, serviceTypeId, planId, songSlots[i]!, sequence, songStore.songs, authStore.settings.bibleVersion, localService.value.sermonPassage)
             sequence++
           } catch {
             const slot = songSlots[i]!
@@ -3420,10 +3441,21 @@ async function onConfirmExport() {
 
         for (let i = scriptureIndex; i < scriptureSlots.length; i++) {
           try {
-            await addSlotAsItem(appId, secret, serviceTypeId, planId, scriptureSlots[i]!, sequence, songStore.songs, localService.value.sermonPassage)
+            await addSlotAsItem(appId, secret, serviceTypeId, planId, scriptureSlots[i]!, sequence, songStore.songs, authStore.settings.bibleVersion, localService.value.sermonPassage)
             sequence++
           } catch {
             failures.push('Scripture')
+          }
+        }
+
+        // Append PRAYER/MESSAGE/ANNOUNCEMENTS/MISC slots (previously dropped in
+        // the with-template path). Appended like the leftover passes above.
+        for (const slot of otherSlots) {
+          try {
+            await addSlotAsItem(appId, secret, serviceTypeId, planId, slot, sequence, songStore.songs, authStore.settings.bibleVersion, localService.value.sermonPassage)
+            sequence++
+          } catch {
+            failures.push(slot.kind)
           }
         }
       } else {
@@ -3435,7 +3467,7 @@ async function onConfirmExport() {
           // we skip before ever reaching the label-building catch block below.
           if (slot.kind === 'IMPORTED') continue
           try {
-            await addSlotAsItem(appId, secret, serviceTypeId, planId, slot, sequence, songStore.songs, localService.value.sermonPassage)
+            await addSlotAsItem(appId, secret, serviceTypeId, planId, slot, sequence, songStore.songs, authStore.settings.bibleVersion, localService.value.sermonPassage)
             sequence++
           } catch {
             const label = slot.kind === 'SONG' ? (slot as any).songTitle ?? 'Song'
