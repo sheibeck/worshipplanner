@@ -212,6 +212,7 @@ export function importedEntryContent(
   resolution: ImportedRenderResolution,
   innerSlideId: string,
   renderedUrls: string[] | undefined,
+  renderedPage?: number,
 ): ImportedEntryContent | undefined {
   switch (resolution.mode) {
     case 'parsed': {
@@ -235,22 +236,33 @@ export function importedEntryContent(
       }
 
     case 'ready': {
+      // R108 (Phase 50, part 2 of 2 — CONSUME the page): an imported deck's
+      // slides can be manually added into ANOTHER slot's group (e.g. a Prayer
+      // group, alongside auto-generated slides). Such a hand-added entry keeps
+      // the deck's PARSED-slide id as its innerSlideId — the synthetic
+      // `rendered-page-N` identity is only ever minted by the IMPORTED-slot
+      // materializer, never for an entry dropped into a non-imported group.
+      // Resolution order, strictly extending the ec217aa positional stopgap:
+      //   1. A synthetic `rendered-page-N` identity (the materializer's own
+      //      entries) resolves by N — unconditional on renderedPage.
+      //   2. Else a supplied `renderedPage` (the 50-03 render-stable reference
+      //      recorded on a hand-added entry's sourceRef at add-time) resolves
+      //      directly — this is what makes a MULTI-IMAGE deck (parsed-slide
+      //      count != rendered-page count) work, closing the gap the ec217aa
+      //      positional resolver could not.
+      //   3. Else, when parsed/rendered counts match 1:1 (the common
+      //      single-image-per-slide deck), fall back to the ec217aa positional
+      //      resolver: map the entry to its page by its position in
+      //      `deck.slides`. Kept in place for legacy entries added before
+      //      50-03 recorded renderedPage (50-CONTEXT.md: fallback, no
+      //      migration).
+      //   4. Else — a multi-image deck with no renderedPage (a legacy entry
+      //      that has never worked) — leave it pending rather than risk
+      //      pairing to the wrong page.
       let pageNumber = renderedPageNumberFromIdentity(innerSlideId)
-      // An imported deck's slides can be manually added into ANOTHER slot's
-      // group (e.g. a Prayer group, alongside auto-generated slides). Such a
-      // hand-added entry keeps the deck's PARSED-slide id as its innerSlideId —
-      // the synthetic `rendered-page-N` identity is only ever minted by the
-      // IMPORTED-slot materializer, never for an entry dropped into a
-      // non-imported group. Without this branch that parsed-slide id never
-      // resolves to a page and the slide hangs on the "Rendering" spinner
-      // forever even after the render is ready. When the parsed-slide count
-      // matches the rendered-page count 1:1 (the common single-image-per-slide
-      // deck), map the entry to its page by its position in `deck.slides`. If
-      // the two counts differ — a multi-image deck, where `mapAstToSlides`
-      // emits one entry per image and cannot be positionally paired to pages
-      // (Fact 1) — leave it pending rather than risk pairing to the wrong page.
-      // Full render-stable identity handling for hand-added imported entries is
-      // scoped to a follow-up phase.
+      if (pageNumber === null && renderedPage !== undefined) {
+        pageNumber = renderedPage
+      }
       if (pageNumber === null && deck.slides.length === resolution.entryCount) {
         const idx = deck.slides.findIndex((s) => s.id === innerSlideId)
         if (idx >= 0) pageNumber = idx + 1

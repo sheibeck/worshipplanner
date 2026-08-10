@@ -257,11 +257,38 @@ describe('importedEntryContent', () => {
     expect(content).not.toHaveProperty('renderState')
   })
 
-  it("mode 'ready' with a parsed-slide id but MISMATCHED parsed/rendered counts stays pending (multi-image positional-pairing guard)", () => {
+  it("mode 'ready' with a parsed-slide id but MISMATCHED parsed/rendered counts stays pending (multi-image positional-pairing guard) when NO renderedPage is supplied", () => {
     const resolution: ImportedRenderResolution = { mode: 'ready', entryCount: 3 } // deck has 5 parsed slides — counts differ
     const urls = ['https://cdn.example.com/page-0001.png', 'https://cdn.example.com/page-0002.png', 'https://cdn.example.com/page-0003.png']
     const content = importedEntryContent(deck, resolution, 'is-2', urls)
     expect(content).toEqual({ contentKind: 'image', imageUrl: '', renderState: 'pending' })
+  })
+
+  // R108 (Phase 50, part 2 of 2): a hand-added imported entry carrying the
+  // 50-03 render-stable `renderedPage` reference resolves directly, EVEN for
+  // a multi-image deck (mismatched parsed/rendered counts) — the exact case
+  // the ec217aa positional resolver could never handle.
+  it("mode 'ready' with a parsed-slide id and a supplied renderedPage resolves by that page, even with MISMATCHED parsed/rendered counts", () => {
+    const resolution: ImportedRenderResolution = { mode: 'ready', entryCount: 3 } // deck has 5 parsed slides — counts differ
+    const urls = ['https://cdn.example.com/page-0001.png', 'https://cdn.example.com/page-0002.png', 'https://cdn.example.com/page-0003.png']
+    const content = importedEntryContent(deck, resolution, 'is-2', urls, 2)
+    expect(content).toEqual({ contentKind: 'image', imageUrl: 'https://cdn.example.com/page-0002.png' })
+    expect(content).not.toHaveProperty('renderState')
+  })
+
+  it("mode 'ready' with a supplied renderedPage but the URL not yet resolved stays a pending placeholder, never a broken image", () => {
+    const resolution: ImportedRenderResolution = { mode: 'ready', entryCount: 3 } // mismatched counts
+    const urls = ['https://cdn.example.com/page-0001.png'] // page 2's url not yet resolved
+    const content = importedEntryContent(deck, resolution, 'is-2', urls, 2)
+    expect(content).toEqual({ contentKind: 'image', imageUrl: '', renderState: 'pending' })
+  })
+
+  it("mode 'ready' with a synthetic rendered-page-N id resolves by N regardless of a supplied renderedPage", () => {
+    const resolution: ImportedRenderResolution = { mode: 'ready', entryCount: 3 }
+    const urls = ['https://cdn.example.com/page-0001.png', 'https://cdn.example.com/page-0002.png', 'https://cdn.example.com/page-0003.png']
+    // renderedPage: 99 is deliberately wrong/irrelevant — the synthetic identity always wins.
+    const content = importedEntryContent(deck, resolution, 'rendered-page-3', urls, 99)
+    expect(content).toEqual({ contentKind: 'image', imageUrl: 'https://cdn.example.com/page-0003.png' })
   })
 })
 
