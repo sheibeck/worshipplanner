@@ -8,7 +8,14 @@ vi.mock('@/utils/esvApi', () => ({
   fetchPassageText: vi.fn(),
 }))
 
+// Mock nltApi alongside esvApi so the SCRIPTURE branch's version routing can be
+// asserted without a network call.
+vi.mock('@/utils/nltApi', () => ({
+  fetchNltPassageText: vi.fn(),
+}))
+
 import { fetchPassageText } from '@/utils/esvApi'
+import { fetchNltPassageText } from '@/utils/nltApi'
 
 import {
   validatePcCredentials,
@@ -58,12 +65,12 @@ function makeService(overrides: Partial<Service> = {}): Service {
 }
 
 describe('buildPlanTitle', () => {
-  it('returns scripture ref with teams in parens when sermonPassage and teams are present', () => {
+  it('returns the bare scripture ref (no teams suffix) when a single team is present', () => {
     const service = makeService({
       sermonPassage: { book: 'Romans', chapter: 8, verseStart: 1, verseEnd: 11 },
       teams: ['Choir'],
     })
-    expect(buildPlanTitle(service)).toBe('Romans 8:1-11 (Choir)')
+    expect(buildPlanTitle(service)).toBe('Romans 8:1-11')
   })
 
   it('returns service name when sermonPassage is null and name is non-empty', () => {
@@ -76,15 +83,15 @@ describe('buildPlanTitle', () => {
     expect(buildPlanTitle(service)).toBe('Service')
   })
 
-  it('returns scripture ref with multiple teams joined by comma', () => {
+  it('returns the bare scripture ref (no teams suffix) even with multiple teams present', () => {
     const service = makeService({
       sermonPassage: { book: 'Revelation', chapter: 12 },
       teams: ['Choir', 'Orchestra'],
     })
-    expect(buildPlanTitle(service)).toBe('Revelation 12 (Choir, Orchestra)')
+    expect(buildPlanTitle(service)).toBe('Revelation 12')
   })
 
-  it('returns scripture ref without parens when no teams', () => {
+  it('returns scripture ref without any suffix when no teams', () => {
     const service = makeService({
       sermonPassage: { book: 'Romans', chapter: 8, verseStart: 1, verseEnd: 11 },
       teams: [],
@@ -522,7 +529,10 @@ describe('createItem type union', () => {
 describe('addSlotAsItem', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn())
+    vi.mocked(fetchPassageText).mockReset()
+    vi.mocked(fetchNltPassageText).mockReset()
     vi.mocked(fetchPassageText).mockResolvedValue('In the beginning God created the heavens...')
+    vi.mocked(fetchNltPassageText).mockResolvedValue('In the beginning God created the heavens... (NLT)')
   })
 
   const defaultFetchResponse = () =>
@@ -540,7 +550,7 @@ describe('addSlotAsItem', () => {
       songKey: 'G',
     }
 
-    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 0, [])
+    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 0, [], 'ESV')
 
     const [, options] = vi.mocked(fetch).mock.calls[0]!
     const body = JSON.parse(options?.body as string)
@@ -586,7 +596,7 @@ describe('addSlotAsItem', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 })) // song_schedules (no history)
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: { id: 'item-99' } }), { status: 201 })) // createItem
 
-    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 0, songs)
+    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 0, songs, 'ESV')
 
     // 4 fetch calls: search, arrangements, song_schedules, createItem
     expect(vi.mocked(fetch)).toHaveBeenCalledTimes(4)
@@ -640,7 +650,7 @@ describe('addSlotAsItem', () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: { id: 'item-99' } }), { status: 201 }))
 
-    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 0, songs)
+    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 0, songs, 'ESV')
 
     // Only 1 fetch call (createItem), no search
     expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1)
@@ -680,7 +690,7 @@ describe('addSlotAsItem', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 })) // searchSongByCcli returns empty
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: { id: 'item-99' } }), { status: 201 })) // createItem
 
-    const result = await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 0, songs)
+    const result = await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 0, songs, 'ESV')
 
     expect(result).toBe('item-99')
     // 2 fetch calls: search (no match) + createItem (as song_arrangement)
@@ -727,7 +737,7 @@ describe('addSlotAsItem', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [] }), { status: 200 })) // song_schedules (no history)
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: { id: 'item-99' } }), { status: 201 })) // createItem
 
-    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 0, songs)
+    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 0, songs, 'ESV')
 
     // 4 fetch calls: search + arrangements (empty) + song_schedules + createItem (as song with song relationship)
     expect(vi.mocked(fetch)).toHaveBeenCalledTimes(4)
@@ -749,7 +759,7 @@ describe('addSlotAsItem', () => {
       verses: '',
     }
 
-    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 1, [])
+    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 1, [], 'ESV')
 
     const [, options] = vi.mocked(fetch).mock.calls[0]!
     const body = JSON.parse(options?.body as string)
@@ -767,7 +777,7 @@ describe('addSlotAsItem', () => {
       verses: '1, 3, 4',
     }
 
-    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 1, [])
+    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 1, [], 'ESV')
 
     const [, options] = vi.mocked(fetch).mock.calls[0]!
     const body = JSON.parse(options?.body as string)
@@ -786,7 +796,7 @@ describe('addSlotAsItem', () => {
       verses: '',
     }
 
-    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 1, [])
+    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 1, [], 'ESV')
 
     const [, options] = vi.mocked(fetch).mock.calls[0]!
     const body = JSON.parse(options?.body as string)
@@ -806,7 +816,7 @@ describe('addSlotAsItem', () => {
       verseEnd: 17,
     }
 
-    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 2, [])
+    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 2, [], 'ESV')
 
     const [, options] = vi.mocked(fetch).mock.calls[0]!
     const body = JSON.parse(options?.body as string)
@@ -833,7 +843,7 @@ describe('addSlotAsItem', () => {
       verseEnd: null,
     }
 
-    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 2, [])
+    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 2, [], 'ESV')
 
     expect(vi.mocked(fetchPassageText)).toHaveBeenCalledWith('Romans 8:28')
     const [, options] = vi.mocked(fetch).mock.calls[0]!
@@ -854,7 +864,7 @@ describe('addSlotAsItem', () => {
       verseEnd: null,
     }
 
-    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 2, [])
+    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 2, [], 'ESV')
 
     expect(vi.mocked(fetchPassageText)).toHaveBeenCalledWith('Psalms 103')
     const [, options] = vi.mocked(fetch).mock.calls[0]!
@@ -866,7 +876,7 @@ describe('addSlotAsItem', () => {
     defaultFetchResponse()
     const slot: NonAssignableSlot = { kind: 'PRAYER', id: 'slot-prayer-3', position: 3 }
 
-    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 3, [])
+    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 3, [], 'ESV')
 
     const [, options] = vi.mocked(fetch).mock.calls[0]!
     const body = JSON.parse(options?.body as string)
@@ -878,7 +888,7 @@ describe('addSlotAsItem', () => {
     defaultFetchResponse()
     const slot: NonAssignableSlot = { kind: 'MESSAGE', id: 'slot-message-4', position: 4 }
 
-    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 4, [], null)
+    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 4, [], 'ESV', null)
 
     const [, options] = vi.mocked(fetch).mock.calls[0]!
     const body = JSON.parse(options?.body as string)
@@ -892,7 +902,7 @@ describe('addSlotAsItem', () => {
     const slot: NonAssignableSlot = { kind: 'MESSAGE', id: 'slot-message-4', position: 4 }
     const sermonPassage: ScriptureRef = { book: 'Romans', chapter: 8, verseStart: 1, verseEnd: 11 }
 
-    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 4, [], sermonPassage)
+    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 4, [], 'ESV', sermonPassage)
 
     const [, options] = vi.mocked(fetch).mock.calls[0]!
     const body = JSON.parse(options?.body as string)
@@ -911,7 +921,7 @@ describe('addSlotAsItem', () => {
       songKey: null,
     }
 
-    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 0, [])
+    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 0, [], 'ESV')
 
     // fetch should NOT be called (slot is skipped)
     expect(vi.mocked(fetch)).not.toHaveBeenCalled()
@@ -932,8 +942,108 @@ describe('addSlotAsItem', () => {
 
     // Should not throw
     await expect(
-      addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 2, []),
+      addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 2, [], 'ESV'),
     ).resolves.not.toThrow()
+  })
+
+  // A (bug fix): the SCRIPTURE branch used to call fetchPassageText (ESV)
+  // unconditionally, ignoring the church's bibleVersion. It must now route by
+  // version.
+  it('routes a SCRIPTURE slot to NLT when bibleVersion is "NLT" and not ESV', async () => {
+    defaultFetchResponse()
+    vi.mocked(fetchNltPassageText).mockResolvedValueOnce('[16] For this is how God loved the world... (NLT)')
+    const slot: ScriptureSlot = {
+      kind: 'SCRIPTURE',
+      id: 'slot-scripture-2',
+      position: 2,
+      book: 'John',
+      chapter: 3,
+      verseStart: 16,
+      verseEnd: 17,
+    }
+
+    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 2, [], 'NLT')
+
+    expect(vi.mocked(fetchNltPassageText)).toHaveBeenCalledWith('John 3:16-17')
+    expect(vi.mocked(fetchPassageText)).not.toHaveBeenCalled()
+    const [, options] = vi.mocked(fetch).mock.calls[0]!
+    const body = JSON.parse(options?.body as string)
+    expect(body.data.attributes.title).toBe('Scripture - John 3:16-17')
+    expect(body.data.attributes.html_details).toBe('[16] For this is how God loved the world... (NLT)')
+  })
+
+  it('routes a SCRIPTURE slot to ESV when bibleVersion is "ESV" and not NLT', async () => {
+    defaultFetchResponse()
+    vi.mocked(fetchPassageText).mockResolvedValueOnce('For God so loved the world... (ESV)')
+    const slot: ScriptureSlot = {
+      kind: 'SCRIPTURE',
+      id: 'slot-scripture-2',
+      position: 2,
+      book: 'John',
+      chapter: 3,
+      verseStart: 16,
+      verseEnd: 17,
+    }
+
+    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 2, [], 'ESV')
+
+    expect(vi.mocked(fetchPassageText)).toHaveBeenCalledWith('John 3:16-17')
+    expect(vi.mocked(fetchNltPassageText)).not.toHaveBeenCalled()
+    const [, options] = vi.mocked(fetch).mock.calls[0]!
+    const body = JSON.parse(options?.body as string)
+    expect(body.data.attributes.html_details).toBe('For God so loved the world... (ESV)')
+  })
+
+  // A (bug fix): an unresolvable reference (book/chapter null) used to send an
+  // empty query that returns HTTP 400. Now NEITHER fetch fires, no throw, and
+  // the item is still created with no html_details.
+  it('skips BOTH fetches for a SCRIPTURE slot whose ref resolves to empty, still creating the item (ESV)', async () => {
+    defaultFetchResponse()
+    const slot = {
+      kind: 'SCRIPTURE',
+      id: 'slot-scripture-empty',
+      position: 2,
+      book: null,
+      chapter: null,
+      verseStart: null,
+      verseEnd: null,
+    } as unknown as ScriptureSlot
+
+    await expect(
+      addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 2, [], 'ESV'),
+    ).resolves.not.toThrow()
+
+    expect(vi.mocked(fetchPassageText)).not.toHaveBeenCalled()
+    expect(vi.mocked(fetchNltPassageText)).not.toHaveBeenCalled()
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1)
+    const [, options] = vi.mocked(fetch).mock.calls[0]!
+    const body = JSON.parse(options?.body as string)
+    expect(body.data.attributes.title).toBe('Scripture - ')
+    expect(body.data.attributes.html_details).toBeUndefined()
+  })
+
+  it('skips BOTH fetches for a SCRIPTURE slot whose ref resolves to empty, still creating the item (NLT)', async () => {
+    defaultFetchResponse()
+    const slot = {
+      kind: 'SCRIPTURE',
+      id: 'slot-scripture-empty',
+      position: 2,
+      book: null,
+      chapter: null,
+      verseStart: null,
+      verseEnd: null,
+    } as unknown as ScriptureSlot
+
+    await expect(
+      addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 2, [], 'NLT'),
+    ).resolves.not.toThrow()
+
+    expect(vi.mocked(fetchPassageText)).not.toHaveBeenCalled()
+    expect(vi.mocked(fetchNltPassageText)).not.toHaveBeenCalled()
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1)
+    const [, options] = vi.mocked(fetch).mock.calls[0]!
+    const body = JSON.parse(options?.body as string)
+    expect(body.data.attributes.html_details).toBeUndefined()
   })
 
   it('copies item notes per category from last scheduled item via POST', async () => {
@@ -1003,7 +1113,7 @@ describe('addSlotAsItem', () => {
       .mockResolvedValueOnce(new Response('{}', { status: 201 })) // createItemNote for note-1
       .mockResolvedValueOnce(new Response('{}', { status: 201 })) // createItemNote for note-2
 
-    const result = await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 0, songs)
+    const result = await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 0, songs, 'ESV')
 
     expect(result).toBe('item-99')
     // 7 fetch calls: search + arrangements + song_schedules + lastItem + createItem + 2 note POSTs
@@ -1084,7 +1194,7 @@ describe('addSlotAsItem', () => {
       .mockResolvedValueOnce(new Response('Internal Server Error', { status: 500 })) // createItemNote fails
 
     // Should not throw despite note POST failing
-    const result = await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 0, songs)
+    const result = await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 0, songs, 'ESV')
     expect(result).toBe('item-99')
   })
 
@@ -1104,8 +1214,8 @@ describe('addSlotAsItem', () => {
       const announcements: NonAssignableSlot = { kind: 'ANNOUNCEMENTS', id: 'slot-ann-0', position: 0 }
       const misc: NonAssignableSlot = { kind: 'MISC', id: 'slot-misc-1', position: 1 }
 
-      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', announcements, 2, [])
-      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', misc, 3, [])
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', announcements, 2, [], 'ESV')
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', misc, 3, [], 'ESV')
 
       const [, opts0] = vi.mocked(fetch).mock.calls[0]!
       const [, opts1] = vi.mocked(fetch).mock.calls[1]!
@@ -1123,7 +1233,7 @@ describe('addSlotAsItem', () => {
       defaultFetchResponse()
       const slot: NonAssignableSlot = { kind: 'ANNOUNCEMENTS', id: 'slot-ann-5', position: 5 }
 
-      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 5, [])
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 5, [], 'ESV')
 
       const [, options] = vi.mocked(fetch).mock.calls[0]!
       const body = JSON.parse(options?.body as string)
@@ -1136,7 +1246,7 @@ describe('addSlotAsItem', () => {
       defaultFetchResponse()
       const slot: NonAssignableSlot = { kind: 'MISC', id: 'slot-misc-6', position: 6 }
 
-      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 6, [])
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 6, [], 'ESV')
 
       const [, options] = vi.mocked(fetch).mock.calls[0]!
       const body = JSON.parse(options?.body as string)
@@ -1149,7 +1259,7 @@ describe('addSlotAsItem', () => {
       defaultFetchResponse()
       const slot: NonAssignableSlot = { kind: 'ANNOUNCEMENTS', id: 'slot-ann-7', position: 7, body: '   \n\t  ' }
 
-      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 7, [])
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 7, [], 'ESV')
 
       const [, options] = vi.mocked(fetch).mock.calls[0]!
       const body = JSON.parse(options?.body as string)
@@ -1162,7 +1272,7 @@ describe('addSlotAsItem', () => {
       defaultFetchResponse()
       const slot: NonAssignableSlot = { kind: 'MISC', id: 'slot-misc-8', position: 8, body: '  ' }
 
-      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 8, [])
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 8, [], 'ESV')
 
       const [, options] = vi.mocked(fetch).mock.calls[0]!
       const body = JSON.parse(options?.body as string)
@@ -1176,7 +1286,7 @@ describe('addSlotAsItem', () => {
       const rawBody = ' Line one\ncafé opens at 9am 🎉 '
       const slot: NonAssignableSlot = { kind: 'ANNOUNCEMENTS', id: 'slot-ann-9', position: 9, body: rawBody }
 
-      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 9, [])
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 9, [], 'ESV')
 
       const [, options] = vi.mocked(fetch).mock.calls[0]!
       const body = JSON.parse(options?.body as string)
@@ -1192,8 +1302,8 @@ describe('addSlotAsItem', () => {
       const announcements: NonAssignableSlot = { kind: 'ANNOUNCEMENTS', id: 'slot-ann-10', position: 10 }
       const misc: NonAssignableSlot = { kind: 'MISC', id: 'slot-misc-11', position: 11 }
 
-      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', announcements, 42, [])
-      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', misc, 43, [])
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', announcements, 42, [], 'ESV')
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', misc, 43, [], 'ESV')
 
       const [, opts0] = vi.mocked(fetch).mock.calls[0]!
       const [, opts1] = vi.mocked(fetch).mock.calls[1]!
@@ -1206,7 +1316,7 @@ describe('addSlotAsItem', () => {
       const slot: NonAssignableSlot = { kind: 'MESSAGE', id: 'slot-msg-12', position: 12 }
 
       await expect(
-        addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 12, [], null),
+        addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 12, [], 'ESV', null),
       ).resolves.not.toThrow()
 
       const [, options] = vi.mocked(fetch).mock.calls[0]!
@@ -1225,7 +1335,7 @@ describe('addSlotAsItem', () => {
         body: 'Series: Hope, week 3',
       }
 
-      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 13, [], sermonPassage)
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 13, [], 'ESV', sermonPassage)
 
       const [, options] = vi.mocked(fetch).mock.calls[0]!
       const body = JSON.parse(options?.body as string)
@@ -1243,7 +1353,7 @@ describe('addSlotAsItem', () => {
         verses: '',
       }
 
-      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 14, [])
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 14, [], 'ESV')
 
       const [, options] = vi.mocked(fetch).mock.calls[0]!
       const body = JSON.parse(options?.body as string)
@@ -1255,7 +1365,7 @@ describe('addSlotAsItem', () => {
     it('an IMPORTED slot returns the empty string and issues no POST', async () => {
       const slot: ImportedSlot = { kind: 'IMPORTED', id: 'slot-imp-15', position: 15, importId: 'import-1' }
 
-      const result = await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 15, [])
+      const result = await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 15, [], 'ESV')
 
       expect(result).toBe('')
       expect(vi.mocked(fetch)).not.toHaveBeenCalled()
@@ -1272,7 +1382,7 @@ describe('addSlotAsItem', () => {
       const slot = { kind: 'BULLETIN_INSERT', id: 'slot-unknown-16', position: 16 } as unknown as ServiceSlot
 
       await expect(
-        addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 16, []),
+        addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 16, [], 'ESV'),
       ).rejects.toThrow(/BULLETIN_INSERT/)
 
       expect(vi.mocked(fetch)).not.toHaveBeenCalled()
@@ -1430,7 +1540,7 @@ describe('addSlotAsItem - Worship Song prefix', () => {
       songKey: 'G',
     } as unknown as import('@/types/service').ServiceSlot
 
-    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 1, [])
+    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 1, [], 'ESV')
 
     // Find the fetch call whose URL ends with /items (createItem POST)
     const createCall = vi.mocked(fetch).mock.calls.find(([url]) =>
@@ -1454,7 +1564,7 @@ describe('addSlotAsItem - Worship Song prefix', () => {
       songKey: null,
     } as unknown as import('@/types/service').ServiceSlot
 
-    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 1, [])
+    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 1, [], 'ESV')
 
     const createCall = vi.mocked(fetch).mock.calls.find(([url]) =>
       (url as string).endsWith('/items'),
@@ -1476,7 +1586,7 @@ describe('addSlotAsItem - Worship Song prefix', () => {
       verses: '1-3',
     } as unknown as import('@/types/service').ServiceSlot
 
-    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 2, [])
+    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 2, [], 'ESV')
 
     const createCall = vi.mocked(fetch).mock.calls.find(([url]) =>
       (url as string).endsWith('/items'),
@@ -1498,7 +1608,7 @@ describe('addSlotAsItem - Worship Song prefix', () => {
       verses: undefined,
     } as unknown as import('@/types/service').ServiceSlot
 
-    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 2, [])
+    await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 2, [], 'ESV')
 
     const createCall = vi.mocked(fetch).mock.calls.find(([url]) =>
       (url as string).endsWith('/items'),

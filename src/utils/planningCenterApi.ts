@@ -4,6 +4,7 @@ import type { UpsertPersonInput } from '@/types/roster'
 import { formatScriptureRef } from '@/utils/planningCenterExport'
 import { formatScriptureReference, scriptureRefFromSlot } from '@/utils/scripture'
 import { fetchPassageText } from '@/utils/esvApi'
+import { fetchNltPassageText } from '@/utils/nltApi'
 
 /**
  * Base URL for Planning Center API calls.
@@ -858,23 +859,17 @@ export async function createItemNote(
 
 /**
  * Build a plan title from a service.
- * Format: "Sermon Scripture (Teams)" or "Service Name" or "Service" as fallback.
+ * Format: "Sermon Scripture" or "Service Name" or "Service" as fallback.
+ * The sermon passage alone is the title — no teams suffix (teams are no longer read).
  */
-export function buildPlanTitle(service: Pick<Service, 'sermonPassage' | 'name' | 'teams'>): string {
-  let base: string
+export function buildPlanTitle(service: Pick<Service, 'sermonPassage' | 'name'>): string {
   if (service.sermonPassage) {
-    base = formatScriptureRef(service.sermonPassage)
-  } else if (service.name && service.name.trim() !== '') {
-    base = service.name.trim()
-  } else {
-    base = 'Service'
+    return formatScriptureRef(service.sermonPassage)
   }
-
-  if (service.teams && service.teams.length > 0) {
-    return `${base} (${service.teams.join(', ')})`
+  if (service.name && service.name.trim() !== '') {
+    return service.name.trim()
   }
-
-  return base
+  return 'Service'
 }
 
 /**
@@ -905,6 +900,7 @@ export async function addSlotAsItem(
   slot: ServiceSlot,
   sequence: number,
   songs: Song[],
+  bibleVersion: 'ESV' | 'NLT',
   sermonPassage?: ScriptureRef | null,
   length?: number,
 ): Promise<string> {
@@ -985,10 +981,18 @@ export async function addSlotAsItem(
     const title = `Scripture - ${refText}`
 
     let description: string | undefined
-    try {
-      description = await fetchPassageText(refText)
-    } catch {
-      // silently ignore ESV fetch errors
+    // Skip the fetch entirely for an unresolvable reference (empty refText) —
+    // an empty query returns HTTP 400 upstream and there is nothing to fetch.
+    // The item is still created below, just without an html_details description.
+    if (refText) {
+      try {
+        description =
+          bibleVersion === 'NLT'
+            ? await fetchNltPassageText(refText)
+            : await fetchPassageText(refText)
+      } catch {
+        // silently ignore scripture fetch errors (ESV or NLT)
+      }
     }
 
     return createItem(appId, secret, serviceTypeId, planId, {
