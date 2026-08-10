@@ -191,7 +191,7 @@ human-verify items: the 48px overflow backstop, and the full post-deploy live ro
 in `.planning/PENDING-VERIFICATION.md` § Phase 45.
 Next: Phase 45 is code-complete; the owner's deploy step and the deferred human-verify items are
 the only remaining work for this phase (non-blocking). No further plan needed for Phase 45 itself.
-Last activity: 2026-08-10 — v1.5 DEPLOYED TO PRODUCTION (all targets; Phase 40 Deploy 1 + 40.1 firestore.rules included; backfill + Phase 40 Deploy 2 remain owner-run, non-blocking)
+Last activity: 2026-08-10 — Phase 50 planned (5 plans/2 waves: R106 remove-imported, R107 preserve-manual-on-regen, R108 render-stable page id, R109 index.html no-cache); ready to execute
 
 ## ⏸ RESUME HERE (2026-08-06 — v1.5 ROADMAP.md created, ready to plan Phase 39)
 

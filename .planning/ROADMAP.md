@@ -463,9 +463,14 @@ Plans:
 **Plans**: 5 plans
 
 Plans:
+**Wave 1**
+
 - [ ] 50-01-PLAN.md — R109: serve index.html no-cache in firebase.json (+ guard test) [wave 1]
 - [ ] 50-02-PLAN.md — R107: prove/guarantee rebuilds preserve manual adds incl. scripture↔congregational [wave 1]
 - [ ] 50-03-PLAN.md — R108 (record): parser sourcePage → deck slide → imported sourceRef.renderedPage [wave 1]
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 50-04-PLAN.md — R106: per-group "Remove imported slides" control (SlideGrid) [wave 2, depends 50-03]
 - [ ] 50-05-PLAN.md — R108 (resolve): importedEntryContent/assembler consume renderedPage for multi-image decks [wave 2, depends 50-03]
 
