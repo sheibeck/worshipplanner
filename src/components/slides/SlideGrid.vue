@@ -786,7 +786,15 @@ async function onImportConfirmed(payload: { importId: string; section: ServiceSe
     const newEntries: GroupSlideEntry[] = deck.slides.map((innerSlide) => ({
       id: crypto.randomUUID(),
       order: 0, // overwritten by appendToGroup's renumber below
-      sourceRef: { kind: 'imported', importId: payload.importId, innerSlideId: innerSlide.id },
+      sourceRef: {
+        kind: 'imported',
+        importId: payload.importId,
+        innerSlideId: innerSlide.id,
+        // R108: record the render-stable page (never `renderedPage: undefined` --
+        // Firestore rejects undefined) so a multi-image deck's hand-added
+        // entries can resolve without the ec217aa positional fallback.
+        ...(innerSlide.sourcePage !== undefined ? { renderedPage: innerSlide.sourcePage } : {}),
+      },
     }))
     // CR-02: see `onAddSlide` — `entries` (unsorted) is this append's base snapshot.
     const nextSlides = appendToGroup(entries, newEntries)

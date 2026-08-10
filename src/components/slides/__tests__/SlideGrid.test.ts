@@ -1536,7 +1536,9 @@ describe('SlideGrid', () => {
         sourceFileName: 'deck.pptx',
         section: 'pre-service',
         slides: [
-          { id: 'inner-1', position: 0, contentKind: 'text', body: 'First' },
+          // sourcePage present -- this entry's imported sourceRef must record renderedPage.
+          { id: 'inner-1', position: 0, contentKind: 'text', body: 'First', sourcePage: 1 },
+          // sourcePage absent (legacy deck slide) -- no renderedPage key, never `renderedPage: undefined`.
           { id: 'inner-2', position: 1, contentKind: 'text', body: 'Second' },
         ],
       })
@@ -1556,9 +1558,16 @@ describe('SlideGrid', () => {
       // `appendToGroup` copies every entry while renumbering (R050) — the
       // reference is no longer preserved, compare by value.
       expect(slides[0]).toEqual(existingEntries[0])
-      expect(slides[1]!.sourceRef).toEqual({ kind: 'imported', importId: 'deck-1', innerSlideId: 'inner-1' })
+      expect(slides[1]!.sourceRef).toEqual({
+        kind: 'imported',
+        importId: 'deck-1',
+        innerSlideId: 'inner-1',
+        renderedPage: 1,
+      })
       expect(slides[1]!.order).toBe(1)
+      // No sourcePage on the deck slide -> no renderedPage key at all (not `renderedPage: undefined`).
       expect(slides[2]!.sourceRef).toEqual({ kind: 'imported', importId: 'deck-1', innerSlideId: 'inner-2' })
+      expect(slides[2]!.sourceRef).not.toHaveProperty('renderedPage')
       expect(slides[2]!.order).toBe(2)
       expect(sigArg).toBe('sig-abc')
       expect(mockUpdateService).not.toHaveBeenCalled()
