@@ -448,6 +448,24 @@ Plans:
 **Research flag**: skip — the subsystem is already mapped; the design decision (assembly-time synthetic reference slide vs. stored reference entry) is captured in this phase's PRD/CONTEXT.
 **Notes**: Owner decision (2026-08-09): implement the reference slide as an assembly-time synthetic leading slide (approach B), NOT as a stored group entry — this avoids the group-rebuild/carry migration hazard where all scripture entries share one identity key and are matched positionally. Section slides are text-only (eyebrow suppressed). See 49-CONTEXT.md.
 
+### Phase 50: Slide Management — Bulk Delete, Manual/Auto Provenance & Render Fidelity
+
+**Goal:** A user can bulk-remove imported PPTX slides from a group; regeneration never destroys manually-added slides; hand-added imported slides always render (even for multi-image decks); and deploys are visible without a manual cache-clear.
+**Depends on**: Phase 49 and the two live fixes that preceded it (1f3271a render-subscription for imported entries in non-imported groups; ec217aa interim 1:1 positional resolver). Independent of other phases.
+**Requirements**: R106, R107, R108, R109
+**Success Criteria** (what must be TRUE):
+
+  1. A per-group "Remove imported slides" action removes exactly the group's `imported`-kind entries in one operation and leaves every auto-generated and other manually-added entry untouched (R106)
+  2. Rebuilding a group's auto-generated slides on a service change — including a scripture slot toggling to/from a congregational reading — preserves every manually-added entry (imported PPTX, hand-added text/blank, added media) in place; only derived entries are re-derived (R107)
+  3. A manually-added imported slide resolves to its correct rendered page for a multi-image deck (parsed-slide count ≠ rendered-page count), via a render-stable page identity on the entry, superseding the interim 1:1 positional fallback (R108)
+  4. After a production deploy, a normal page load shows the new bundle with no manual cache-clear — `index.html` is served no-cache/revalidate (R109)
+
+**Plans**: not yet planned
+
+**UI hint**: yes (a per-group "Remove imported slides" control on the Slides grid) — the rest is assembly/reconciliation + a hosting-config change
+**Research flag**: audit-first — read the existing derived-vs-user-added reconciliation (`carryStoredDerivedEntries`/`survivingEntries` in `slideGroupMaterializer.ts`) and the imported-entry identity scheme before scoping; R107 likely leans on the existing survivor mechanism, R108 needs a source-page reference carried on the imported entry's `sourceRef`.
+**Notes**: Owner decisions (2026-08-10): (1) bulk delete = per-group "Remove imported slides" action (not a general multi-select mode); (2) regeneration ALWAYS preserves manual adds (user-added slides, incl. imported, are never removed/reordered by a rebuild — only auto-generated entries re-derive). R108 supersedes the ec217aa interim positional resolver. R109 is a small `firebase.json` hosting-headers change. See 50-CONTEXT.md.
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -468,6 +486,7 @@ Plans:
 | 47. Congregational Reading Divider UX | v1.5 | 3/3 | In Progress|  |
 | 48. Multi-Image Ordering & Mobile Polish | v1.5 | 3/3 | In Progress|  |
 | 49. Congregational Reading — Dedicated Reference Slide | v1.5 | 1/1 | In Progress|  |
+| 50. Slide Management — Bulk Delete, Provenance & Render Fidelity | v1.5 | 0/0 | Not Started|  |
 
 ## Backlog
 

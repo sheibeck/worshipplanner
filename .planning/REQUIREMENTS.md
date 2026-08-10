@@ -230,6 +230,29 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
       reference. Refines R097's realization: the reference moves from an eyebrow on the first section
       slide to a slide of its own.
 
+### Slide Management & Deploy Fidelity (v1.5 follow-ups)
+
+- [ ] **R106**: A user can remove all imported (PPTX) slides from a slide group in one action —
+      a per-group "Remove imported slides" control — without deleting them one card at a time. Only
+      the group's `imported`-kind entries are removed; auto-generated and other manually-added
+      entries are left intact.
+
+- [ ] **R107**: Regeneration never destroys manual work. When a service change rebuilds a group's
+      auto-generated slides — including a scripture slot becoming (or ceasing to be) a
+      congregational reading — every manually-added entry (imported PPTX slides, hand-added blank/
+      text slides, added media) is preserved in place; only the auto-generated (derived) entries are
+      re-derived.
+
+- [ ] **R108**: A manually-added imported slide always resolves to its correct rendered page, even
+      for a multi-image deck where the parsed-slide count differs from the rendered-page count
+      (i.e. `mapAstToSlides` emitted more entries than there are pages). Supersedes the interim 1:1
+      positional fallback (ec217aa), which only resolves single-image-per-slide decks, with a
+      render-stable page identity carried on the entry.
+
+- [ ] **R109**: A production deploy is visible to users without a manual cache-clear — `index.html`
+      is served with a no-cache/revalidate policy so the browser always re-fetches the current
+      document (and thus the current hashed bundle) rather than a stale cached copy.
+
 ### Slide Media
 
 - [x] **R098**: Dropping several images at once produces slides in filename natural order.
