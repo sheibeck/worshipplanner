@@ -205,19 +205,17 @@ export function slideBodyText(slide: Slide): string {
       // bibleVersion setting — a field-less pre-phase slide resolves to
       // '(ESV)' regardless of what the church has since chosen.
       //
-      // R097 (Phase 47, NEWLY BUILT): the reference prefix is gated to the
-      // FIRST section slide of a congregational reading — `!slide.section ||
-      // slide.isFirstSection`. A Reference-state slide (no `section`) always
-      // shows its reference (first half of the OR, unaffected by this
-      // phase). A later section slide (`section` present, `isFirstSection`
-      // falsy) returns just its own words + attribution, no reference —
-      // it was already shown once, on the first slide. This gate applies
-      // ONLY to this prefix — `slideContentLabel`'s eyebrow and
-      // `slideFooterLabel`'s footer below are NOT reference-gated; they
+      // R105 (Phase 49): the reference now lives on its OWN dedicated slide
+      // (the assembler emits it as a synthetic leading slide), so NO section
+      // slide prefixes the reference — the gate is simply `!slide.section`. A
+      // Reference-state slide (no `section`) always shows its reference; every
+      // congregational section slide returns just its own words + attribution.
+      // This gate applies ONLY to this prefix — `slideContentLabel`'s eyebrow
+      // and `slideFooterLabel`'s footer below are NOT reference-gated; they
       // name the speaker per-slide regardless of position.
       if (!slide.text) return slide.reference
       const suffix = ` ${scriptureAttribution(resolveTranslationSource(slide))}`
-      const showReference = !slide.section || slide.isFirstSection
+      const showReference = !slide.section
       return showReference ? `${slide.reference}\n${slide.text}${suffix}` : `${slide.text}${suffix}`
     }
     case 'text':

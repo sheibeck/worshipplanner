@@ -155,17 +155,15 @@
             reference-only scripture slides with an empty passage string, so
             this is frequently the slide's ENTIRE visible content.
 
-            R097 (Phase 47, NEWLY BUILT): for a congregational reading, the
-            reference renders ONLY on the first section slide —
-            `isFirstSection`, set by `slideshowAssembler.ts` from the
-            section's own ordinal. Every later section slide shows only its
-            speaker label and words, since the reference was already shown
-            once. Either way, the paragraph carries the same body treatment
-            as every other kind, with no size/weight step against the
-            passage below.
+            R105 (Phase 49): for a congregational reading, the reference now
+            has its OWN dedicated slide (a Reference-state slide, itself
+            `!isCongregational`), so it renders on NO congregational section
+            slide — the gate is simply `!isCongregational`. Either way, the
+            paragraph carries the same body treatment as every other kind,
+            with no size/weight step against the passage below.
           -->
           <p
-            v-if="!isCongregational || isFirstSection"
+            v-if="!isCongregational"
             data-testid="presentation-scripture-reference"
             class="text-gray-100 whitespace-pre-line text-5xl font-normal leading-[1.4] mb-8"
           >
@@ -650,22 +648,6 @@ const isCongregational = computed(() => {
   if (!slide || slide.contentKind !== 'scripture') return false
   const scripture = slide as ScriptureSlide
   return scripture.readingMode === 'congregational' && scripture.section !== undefined
-})
-
-/**
- * R097 (Phase 47): true only for the FIRST slide of a congregational
- * reading — mirrors `isCongregational`'s shape but additionally requires the
- * slide's own `isFirstSection` flag (set by `slideshowAssembler.ts` from the
- * section's ordinal). Gates the `presentation-scripture-reference` paragraph
- * so a Reference-state slide (non-congregational, `!isCongregational`) and
- * the first congregational section slide both show the reference, while
- * later section slides do not.
- */
-const isFirstSection = computed(() => {
-  const slide = currentSlide.value?.slide
-  if (!slide || slide.contentKind !== 'scripture') return false
-  const scripture = slide as ScriptureSlide
-  return scripture.readingMode === 'congregational' && scripture.section !== undefined && scripture.isFirstSection === true
 })
 
 /**

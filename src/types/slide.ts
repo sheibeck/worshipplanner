@@ -132,18 +132,6 @@ export interface ScriptureSlide extends SlideBase {
    */
   section?: CongregationalSection
   /**
-   * R097 (Phase 47): set by the two content-resolution paths in
-   * `slideshowAssembler.ts` from the section's own ordinal
-   * (`entry.order === 0` / `localSeq === 0`) — true only for the FIRST
-   * slide of a congregational reading. Meaningful ONLY when `section` is
-   * also present; a Reference-state slide has no section and no "first"
-   * concept. Consumed by the presenter and the grid card to gate the
-   * scripture reference so R097's "first slide shows the reference, later
-   * slides show only the speaker label" holds. Do not add this field to any
-   * other slide variant.
-   */
-  isFirstSection?: boolean
-  /**
    * R092 (Phase 45): the translation this slide's text was fetched from,
    * threaded from the owning `CongregationalSection`/`SourceRef` with no
    * re-derivation at assembly time. OPTIONAL for the same field-less-fallback

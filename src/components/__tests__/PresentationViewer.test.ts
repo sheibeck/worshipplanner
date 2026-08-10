@@ -116,15 +116,13 @@ function scriptureSlide(id: string, section: AssembledSlide['section'] = 'messag
 // 38-02: a ScriptureSlide carries at most ONE congregational section — the
 // fixture takes a single section (or undefined for the no-section fallback
 // case), never a list.
-// R097 (Phase 47): `isFirstSection` defaults to `true` so every EXISTING
-// call site that doesn't care about first/later position (most of this
-// file's fixtures predate R097) keeps seeing the reference render exactly
-// as before. Callers proving the R097 later-slide behavior pass `false`
-// explicitly.
+// R105 (Phase 49): the reference now has its own dedicated slide, so a
+// congregational section slide never renders the reference regardless of
+// position — the `isFirstSection` param is gone. Use `referenceScriptureSlide`
+// below for the dedicated reference slide (readingMode 'normal', no section).
 function congregationalScriptureSlide(
   id: string,
   section: import('@/types/slide').CongregationalSection | undefined,
-  isFirstSection = true,
 ): AssembledSlide {
   return {
     slide: {
@@ -136,7 +134,31 @@ function congregationalScriptureSlide(
       text: section?.text ?? 'Give thanks to the LORD, for he is good. His love endures forever.',
       verseRange: 'vv. 1-4',
       readingMode: 'congregational',
-      ...(section !== undefined && { section, isFirstSection }),
+      ...(section !== undefined && { section }),
+    },
+    slotIndex: 1,
+    slotKind: 'SCRIPTURE',
+    section: 'worship',
+    sourceId: 'reading-2',
+  }
+}
+
+// R105: the dedicated leading reference slide of a congregational reading —
+// byte-identical to a plain scripture reference slide (readingMode 'normal',
+// empty text, NO section). Shares the same reference string as
+// `congregationalScriptureSlide` so a reading can be modelled as
+// [referenceScriptureSlide, congregationalScriptureSlide, ...].
+function referenceScriptureSlide(id: string): AssembledSlide {
+  return {
+    slide: {
+      id,
+      position: 2,
+      contentKind: 'scripture',
+      reference: 'Psalm 136:1-4',
+      bookRef: { book: 'Psalm', chapter: 136, verseStart: 1, verseEnd: 4 },
+      text: '',
+      verseRange: '',
+      readingMode: 'normal',
     },
     slotIndex: 1,
     slotKind: 'SCRIPTURE',
@@ -651,11 +673,15 @@ describe('PresentationViewer', () => {
     expect(classes).not.toContain('tracking-wider')
   })
 
-  it('D1: a congregational ScriptureSlide renders its reference in the unified body treatment too, and its speaker tag is coloured but otherwise unaccented, in a LEADER section slide showing that section\'s words', async () => {
+  it('D1/R105: the dedicated reference slide renders its reference in the unified body treatment, and the following LEADER section slide shows a coloured-but-otherwise-unaccented speaker tag with that section\'s words and NO reference', async () => {
     const section = { speaker: 'LEADER' as const, text: 'Give thanks to the LORD, for he is good.' }
-    mount(PresentationViewer, { props: { slides: [congregationalScriptureSlide('a', section)] } })
+    mount(PresentationViewer, {
+      props: { slides: [referenceScriptureSlide('ref'), congregationalScriptureSlide('a', section)] },
+    })
     await flushPromises()
 
+    // Slide 0: the dedicated reference slide carries the reference in the
+    // unified body treatment.
     const classes = body().find('[data-testid="presentation-scripture-reference"]').classes()
     expect(classes).toContain('text-gray-100')
     expect(classes).toContain('text-5xl')
@@ -668,6 +694,10 @@ describe('PresentationViewer', () => {
     expect(classes).not.toContain('text-indigo-400')
     expect(classes).not.toContain('uppercase')
     expect(classes).not.toContain('tracking-wider')
+
+    // Advance to slide 1: the LEADER section slide. R105 — no reference here.
+    await body().find('[data-testid="presentation-next"]').trigger('click')
+    expect(body().find('[data-testid="presentation-scripture-reference"]').exists()).toBe(false)
 
     // Owner follow-up 2026-08-05: the speaker tag carries COLOUR again, and
     // colour is the ONLY thing 260805-kzd removed that came back. The size,
@@ -787,8 +817,8 @@ describe('PresentationViewer', () => {
     mount(PresentationViewer, {
       props: {
         slides: [
-          congregationalScriptureSlide('a', leaderSection, true),
-          congregationalScriptureSlide('b', congregationSection, false),
+          congregationalScriptureSlide('a', leaderSection),
+          congregationalScriptureSlide('b', congregationSection),
         ],
       },
     })
@@ -801,9 +831,9 @@ describe('PresentationViewer', () => {
     expect(words1.text()).toBe(`${leaderSection.text} (ESV)`)
     expect(slideText()).not.toContain(congregationSection.text)
 
-    // R097 (NEWLY BUILT): the first section slide of the reading shows the
-    // scripture reference.
-    expect(body().find('[data-testid="presentation-scripture-reference"]').exists()).toBe(true)
+    // R105 (NEWLY BUILT): a congregational section slide NEVER shows the
+    // scripture reference — it now lives on its own dedicated slide.
+    expect(body().find('[data-testid="presentation-scripture-reference"]').exists()).toBe(false)
 
     // Snapshot the class lists NOW, before advancing. `speaker1`/`words1` hold
     // live element references, and Vue patches this v-if branch's nodes in
@@ -828,10 +858,9 @@ describe('PresentationViewer', () => {
       speaker2.element.compareDocumentPosition(words2.element) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
 
-    // R097 (NEWLY BUILT): a LATER section slide shows only the speaker label
-    // and its own words — the reference is suppressed. Today's code shows it
-    // unconditionally on every section slide; this is the assertion that
-    // proves the new gating.
+    // R105: every section slide shows only the speaker label and its own
+    // words — the reference is suppressed on all of them (it has its own
+    // dedicated slide now).
     expect(body().find('[data-testid="presentation-scripture-reference"]').exists()).toBe(false)
 
     // The PASSAGE text is treated identically on both slides — the words are
@@ -860,9 +889,9 @@ describe('PresentationViewer', () => {
     mount(PresentationViewer, {
       props: {
         slides: [
-          congregationalScriptureSlide('a', leaderSection, true),
-          congregationalScriptureSlide('b', congregationSection, false),
-          congregationalScriptureSlide('c', allSection, false),
+          congregationalScriptureSlide('a', leaderSection),
+          congregationalScriptureSlide('b', congregationSection),
+          congregationalScriptureSlide('c', allSection),
         ],
       },
     })
@@ -881,8 +910,8 @@ describe('PresentationViewer', () => {
     expect(speaker1Classes.filter((c) => !speaker3Classes.includes(c))).toEqual(['text-sky-300'])
     expect(speaker3Classes.filter((c) => !speaker1Classes.includes(c))).toEqual(['text-violet-300'])
 
-    // Later section slide — reference stays suppressed for ALL too (R097
-    // applies regardless of speaker role).
+    // Section slide — reference stays suppressed for ALL too (R105 applies
+    // regardless of speaker role).
     expect(body().find('[data-testid="presentation-scripture-reference"]').exists()).toBe(false)
   })
 
@@ -938,12 +967,19 @@ describe('PresentationViewer', () => {
       expect(body().find('[data-testid="presentation-body"]').classes()).toContain('text-5xl')
     })
 
-    it('a congregational scripture slide renders its reference, its speaker and its section text all at text-5xl', async () => {
+    it('a congregational reading renders its dedicated reference slide, and its section slides\' speaker and text, all at text-5xl', async () => {
       const section = { speaker: 'LEADER' as const, text: 'Give thanks to the LORD, for he is good.' }
-      mount(PresentationViewer, { props: { slides: [congregationalScriptureSlide('a', section)] } })
+      mount(PresentationViewer, {
+        props: { slides: [referenceScriptureSlide('ref'), congregationalScriptureSlide('a', section)] },
+      })
       await flushPromises()
 
+      // Slide 0: the dedicated reference slide.
       expect(body().find('[data-testid="presentation-scripture-reference"]').classes()).toContain('text-5xl')
+
+      // Slide 1: the section slide (no reference; speaker + section text).
+      await body().find('[data-testid="presentation-next"]').trigger('click')
+      expect(body().find('[data-testid="presentation-scripture-reference"]').exists()).toBe(false)
       expect(body().find('[data-testid="presentation-speaker"]').classes()).toContain('text-5xl')
       expect(body().find('[data-testid="presentation-congregational-section"]').classes()).toContain('text-5xl')
     })
