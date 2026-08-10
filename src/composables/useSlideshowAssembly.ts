@@ -219,9 +219,29 @@ export function useSlideshowAssembly(
     if (!svc) return []
     const ids = new Set<string>()
     for (const slot of svc.slots) {
-      if (slot.kind !== 'IMPORTED' || !slot.importId) continue
-      const deck = importedDecksById.value.get(slot.importId)
-      if (deck?.renderImportId) ids.add(deck.renderImportId)
+      // 1. A dedicated IMPORTED slot — the deck attached at the slot level.
+      if (slot.kind === 'IMPORTED' && slot.importId) {
+        const deck = importedDecksById.value.get(slot.importId)
+        if (deck?.renderImportId) ids.add(deck.renderImportId)
+      }
+      // 2. `imported` ENTRIES living inside ANY slot's slide group. A PPTX deck's
+      //    rendered slides can be added straight into a non-IMPORTED slot's group
+      //    (e.g. a Prayer or Scripture group), where the render linkage lives on the
+      //    entry's deck (`sourceRef.importId` → `ImportedDeck.id` → `renderImportId`),
+      //    NOT on an IMPORTED slot and NOT on the group's own `renderImportId` (which
+      //    stays null for a non-imported slot). Without collecting these, the render
+      //    doc is never subscribed, its `ready` status is never seen, and every such
+      //    entry hangs on the "Rendering" spinner permanently even after the render
+      //    has completed — a real production defect (a deck imported into a Prayer
+      //    group's slides). Same identifier hop as the IMPORTED-slot branch above.
+      const group = slideGroupsStore.groupsBySlotId.get(slot.id)
+      if (group) {
+        for (const entry of group.slides) {
+          if (entry.sourceRef.kind !== 'imported') continue
+          const deck = importedDecksById.value.get(entry.sourceRef.importId)
+          if (deck?.renderImportId) ids.add(deck.renderImportId)
+        }
+      }
     }
     return Array.from(ids)
   })

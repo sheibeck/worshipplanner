@@ -1559,6 +1559,42 @@ describe('useSlideshowAssembly', () => {
       expect(mockSyncPptxRenderSubscriptions).toHaveBeenLastCalledWith('org-1', ['render-1'])
     })
 
+    it('subscribes to the renderImportId of an imported deck added as ENTRIES into a NON-IMPORTED slot group (regression: prayer group with manually-added PPTX slides)', async () => {
+      // A PPTX deck's rendered slides added straight into a Prayer slot's group —
+      // some auto-generated slides, some manually added. There is NO IMPORTED slot,
+      // and the group's own renderImportId is null; the render linkage lives only on
+      // the entry's deck. Before the fix, distinctRenderImportIds looked at IMPORTED
+      // slots alone, so this deck's render was never subscribed and every imported
+      // entry hung on the "Rendering" spinner forever even after the render finished.
+      importedState.decks = [deckWithRender('deck-mixed', 'render-mixed')]
+      const service = ref<Service | null>(
+        makeService([{ kind: 'PRAYER', id: 'slot-prayer-1', position: 0, section: 'pre-service' }]),
+      )
+      slideGroupsState.groups = [
+        {
+          id: 'slot-prayer-1',
+          slotId: 'slot-prayer-1',
+          serviceId: 'service-1',
+          slides: [
+            { id: 'e-text', order: 0, sourceRef: { kind: 'text' } },
+            {
+              id: 'e-img-1',
+              order: 1,
+              sourceRef: { kind: 'imported', importId: 'deck-mixed', innerSlideId: 'deck-mixed-inner-1' },
+            },
+          ],
+          createdAt: {} as never,
+          updatedAt: {} as never,
+        },
+      ]
+      useSlideshowAssembly(service, 'org-1')
+      await nextTick()
+
+      const calls = mockSyncPptxRenderSubscriptions.mock.calls
+      const lastCallIds = calls[calls.length - 1]![1] as string[]
+      expect(lastCallIds).toContain('render-mixed')
+    })
+
     it("calls unsubscribeAll exactly once when the composable's effect scope is stopped", async () => {
       const service = ref<Service | null>(makeService([hymnSlot({ position: 0 })]))
       useSlideshowAssembly(service, 'org-1')
