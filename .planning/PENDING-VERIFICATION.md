@@ -686,10 +686,19 @@ that criterion 4 deliberately places *outside* the phase — the code is built, 
 
 **Full runbook with verbatim commands: `functions/DEPLOY-ORG-CLAIMS.md`.** This list is the tracker.
 
-- [ ] **40.1 — Deploy 1: dual-read rule + `syncOrgMembershipClaim`.** Additive and safe; the
-      Firestore fallback arm stays live. **Observe:** an existing member can still upload.
-- [ ] **40.2 — Run the backfill.** Dry-run first, then `--apply`. Population is 2 users, so read the
-      whole output. **Observe:** processed/skipped/failed counts, and no failures listed by uid.
+- [x] **40.1 — Deploy 1: dual-read rule + `syncOrgMembershipClaim`.** ✅ **DEPLOYED 2026-08-10** (by
+      assistant at owner's explicit request, as part of the full v1.5 production release —
+      `firebase deploy --only hosting,functions,firestore,storage`). `syncOrgMembershipClaim` created;
+      dual-read `storage.rules` released; fallback arm live. Additive and safe. **⧗ OBSERVE (owner,
+      pending):** confirm an existing member can still upload in the LIVE app (PPTX import or media) —
+      this is the only behavioral proof the Firestore fallback arm still works in production.
+- [ ] **40.2 — Run the backfill.** ⚠ **NOT RUN 2026-08-10** — the deploy host had no gcloud ADC
+      (`GOOGLE_APPLICATION_CREDENTIALS` unset), which the backfill requires. **Non-blocking:** the
+      dual-read fallback covers existing members, and `refreshOrgClaim` (auth.ts) sets each user's
+      claim on their next `loadOrgContext`. Owner may still run it for immediacy:
+      `gcloud auth application-default login`, then `cd functions && npm run build && node
+      lib/backfillOrgClaims.js` (dry-run) → `--apply`. **Required before Deploy 2** (Step 4), since
+      after the fallback is gone the claim is the sole authority.
 - [ ] **40.3 — Soak one full hour.** Every live token must expire and re-issue carrying the claim.
       Skipping this is what locks people out at deploy 2.
 - [ ] **40.4 ★ MANDATORY PRE-CHECK before deploy 2** — confirm neither user's `orgIds` has more than
@@ -748,12 +757,10 @@ tests were first run against the then-current rule and observed to fail. Nothing
 > (`a removed past founder cannot re-create their membership`) was observed failing against the
 > `getAfter()`-only rule before the guard was added.
 
-- [ ] **Deploy the tightened `firestore.rules` alongside Phase 40's deploy 2** — same file set, one
-      session. Full runbook: `functions/DEPLOY-ORG-CLAIMS.md` (no separate runbook is written for
-      this change). As the WR-03 note above states, closing this Firestore hole *before* deploy 2
-      removes the fallback is the cheap ordering — after deploy 2 the custom claim becomes the sole
-      authority and revocation latency stretches to up to an hour, so any residual membership hole
-      would take longer to undo.
+- [x] **Deploy the tightened `firestore.rules`.** ✅ **DEPLOYED 2026-08-10** with the full v1.5
+      production release (ahead of Phase 40's Deploy 2, which is the recommended "cheap ordering" —
+      the self-join hole is now closed in production before the storage fallback is ever removed).
+      `firebase deploy` reported `firestore: released firestore.rules to cloud.firestore` successfully.
 - [ ] **Exercise the one real pending invite in production** after deploy — accept it and confirm
       the membership document is created carrying the role the invite actually granted, not a
       higher one.

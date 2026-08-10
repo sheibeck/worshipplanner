@@ -150,6 +150,25 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
+> ## ✅ v1.5 DEPLOYED TO PRODUCTION — 2026-08-10
+> All of v1.5 (Phases 39–49) shipped to production in one release, at the owner's explicit request
+> and authorization (which overrides the standing NO-DEPLOYS grant for this action). Command:
+> `firebase deploy --only hosting,functions,firestore,storage --project worship-planner-bc515` — all
+> targets succeeded (hosting bundle, `syncOrgMembershipClaim` created + all other functions updated,
+> dual-read `storage.rules`, tightened `firestore.rules`, indexes). Live at
+> https://worship-planner-bc515.web.app
+>
+> **This also executed Phase 40 Deploy 1** (dual-read rule + claims function together) and the Phase
+> 40.1 firestore.rules tightening. **Still pending (all non-blocking, owner-run):** the backfill (no
+> gcloud ADC on the deploy host — fallback + `refreshOrgClaim` cover it), and Phase 40 **Deploy 2**
+> (remove the storage Firestore fallback) which still requires its 1-hour token soak + the
+> multi-org pre-check — see `PENDING-VERIFICATION.md` § Phase 40. Deploy 1 is safe to leave in place
+> indefinitely. NLT (Phase 45) is no longer deploy-gated — the function is live.
+>
+> **Post-deploy smoke check recommended before declaring the milestone shipped:** sign in, confirm a
+> member can still upload (Phase 40.1 observe), an NLT scripture preview loads, and a service exports
+> to Planning Center.
+
 Phase: 48 (Multi-Image Ordering & Mobile Polish) — EXECUTING
 Plan: 3 of 3
 Status: Ready to execute
@@ -172,7 +191,7 @@ human-verify items: the 48px overflow backstop, and the full post-deploy live ro
 in `.planning/PENDING-VERIFICATION.md` § Phase 45.
 Next: Phase 45 is code-complete; the owner's deploy step and the deferred human-verify items are
 the only remaining work for this phase (non-blocking). No further plan needed for Phase 45 itself.
-Last activity: 2026-08-10 — Phase 49 executed (R105 dedicated congregational reference slide; 8/8 must-haves verified in code, live-render checkpoint deferred to owner)
+Last activity: 2026-08-10 — v1.5 DEPLOYED TO PRODUCTION (all targets; Phase 40 Deploy 1 + 40.1 firestore.rules included; backfill + Phase 40 Deploy 2 remain owner-run, non-blocking)
 
 ## ⏸ RESUME HERE (2026-08-06 — v1.5 ROADMAP.md created, ready to plan Phase 39)
 
