@@ -16,12 +16,28 @@ export interface MappedTextSlide {
   contentKind: "text";
   title?: string;
   body: string;
+  /**
+   * 1-based index of the source PPTX slide this text was extracted from
+   * (position within `ast.content`, counting skipped/empty slides). The
+   * render service renders one page per source slide in the same order, so
+   * this index IS the slide's rendered page number -- see the
+   * source-slide-index = rendered-page-number contract documented on
+   * `mapAstToSlides` below.
+   */
+  sourcePage: number;
 }
 
 export interface MappedImageSlide {
   contentKind: "image";
   imageUrl: string;
   altText?: string;
+  /**
+   * 1-based index of the source PPTX slide this image was extracted from.
+   * A multi-image slide emits multiple MappedImageSlides that all share the
+   * same sourcePage. See MappedTextSlide.sourcePage for the render-page
+   * contract this relies on.
+   */
+  sourcePage: number;
 }
 
 export type MappedSlide = MappedTextSlide | MappedImageSlide;
@@ -82,6 +98,16 @@ interface MinimalOfficeAst {
  *   3. Else if the slide has one or more image children, emit one ImageSlide
  *      per image, in order, via resolveImagePath.
  *   4. Else (no substantial text, no images) skip the slide entirely.
+ *
+ * Source-slide-index = rendered-page-number contract (R108): every emitted
+ * slide carries `sourcePage`, the 1-based index of the `ast.content` node it
+ * came from -- incremented per source slide BEFORE any skip, so a skipped
+ * (empty) slide still consumes a page number and the next emitted slide's
+ * sourcePage reflects its true position in the original deck. The render
+ * service (functions/src/... render pipeline, see src/utils/renderedPagePaths.ts)
+ * renders one page per source .pptx slide in the same order, from the same
+ * file, so this index IS the slide's rendered page number. A multi-image
+ * slide's several MappedImageSlides all share that one sourcePage.
  */
 export async function mapAstToSlides(
   ast: MinimalOfficeAst,
@@ -89,8 +115,11 @@ export async function mapAstToSlides(
 ): Promise<MappedSlide[]> {
   const result: MappedSlide[] = [];
   let imageSequenceIndex = 0;
+  let sourcePage = 0;
 
   for (const slideNode of ast.content ?? []) {
+    sourcePage += 1;
+
     const children = slideNode.children ?? [];
     const imageChildren = children.filter((child) => child.type === "image");
     const textChildren = children.filter((child) => child.type !== "image");
@@ -106,6 +135,7 @@ export async function mapAstToSlides(
       const textSlide: MappedTextSlide = {
         contentKind: "text",
         body: flattenedText,
+        sourcePage,
         ...(title ? { title } : {}),
       };
       result.push(textSlide);
@@ -121,6 +151,7 @@ export async function mapAstToSlides(
         const imageSlide: MappedImageSlide = {
           contentKind: "image",
           imageUrl,
+          sourcePage,
           ...(altText ? { altText } : {}),
         };
         result.push(imageSlide);
@@ -129,6 +160,8 @@ export async function mapAstToSlides(
     }
 
     // Neither substantial text nor images -- skip this slide entirely.
+    // sourcePage was already incremented above, so the next emitted slide's
+    // sourcePage correctly reflects this skip.
   }
 
   return result;
