@@ -119,7 +119,7 @@
            (or, for background, on the minimal testid wrapper below) rather
            than on a padded child div — there is no padded child div left. -->
       <div
-        v-if="showGroupMusicControl || showGroupBackgroundControl || showCongregationalControl"
+        v-if="showGroupMusicControl || showGroupBackgroundControl || showCongregationalControl || showRemoveImportedControl"
         class="mx-6 mt-3 flex flex-wrap items-start gap-x-3 gap-y-2 rounded-md border border-gray-800 bg-gray-900 px-3 py-2"
         data-testid="slide-grid-group-media-panel"
       >
@@ -190,6 +190,19 @@
         >
           {{ congregationalButtonLabel }}
         </button>
+
+        <!-- R106 (Phase 50) — per-group bulk removal of imported-deck
+             entries, styled to match the congregational button beside it.
+             Offered only when the group has at least one imported entry
+             (`hasImportedEntries`) AND the caller can mutate the group's
+             slides (`canMutateGroup`) — same gate `handler` re-checks. -->
+        <button
+          v-if="showRemoveImportedControl"
+          type="button"
+          data-testid="slide-grid-remove-imported-btn"
+          @click="onRemoveImportedSlides"
+          class="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-gray-700 px-2.5 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:bg-gray-800"
+        >Remove imported slides</button>
 
         <!-- The group caption, relocated out of `BackgroundControl` (owner
              follow-up #4 (b) above). `basis-full` makes it take a whole flex
