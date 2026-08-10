@@ -460,7 +460,7 @@ Plans:
   3. A manually-added imported slide resolves to its correct rendered page for a multi-image deck (parsed-slide count ≠ rendered-page count), via a render-stable page identity on the entry, superseding the interim 1:1 positional fallback (R108)
   4. After a production deploy, a normal page load shows the new bundle with no manual cache-clear — `index.html` is served no-cache/revalidate (R109)
 
-**Plans**: 3/5 plans executed
+**Plans**: 4/5 plans executed
 
 Plans:
 **Wave 1**
@@ -471,7 +471,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 50-04-PLAN.md — R106: per-group "Remove imported slides" control (SlideGrid) [wave 2, depends 50-03]
+- [x] 50-04-PLAN.md — R106: per-group "Remove imported slides" control (SlideGrid) [wave 2, depends 50-03]
 - [ ] 50-05-PLAN.md — R108 (resolve): importedEntryContent/assembler consume renderedPage for multi-image decks [wave 2, depends 50-03]
 
 **UI hint**: yes (a per-group "Remove imported slides" control on the Slides grid) — the rest is assembly/reconciliation + a hosting-config change
@@ -498,7 +498,7 @@ Plans:
 | 47. Congregational Reading Divider UX | v1.5 | 3/3 | In Progress|  |
 | 48. Multi-Image Ordering & Mobile Polish | v1.5 | 3/3 | In Progress|  |
 | 49. Congregational Reading — Dedicated Reference Slide | v1.5 | 1/1 | In Progress|  |
-| 50. Slide Management — Bulk Delete, Provenance & Render Fidelity | v1.5 | 3/5 | In Progress|  |
+| 50. Slide Management — Bulk Delete, Provenance & Render Fidelity | v1.5 | 4/5 | In Progress|  |
 
 ## Backlog
 

@@ -232,7 +232,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 
 ### Slide Management & Deploy Fidelity (v1.5 follow-ups)
 
-- [ ] **R106**: A user can remove all imported (PPTX) slides from a slide group in one action —
+- [x] **R106**: A user can remove all imported (PPTX) slides from a slide group in one action —
       a per-group "Remove imported slides" control — without deleting them one card at a time. Only
       the group's `imported`-kind entries are removed; auto-generated and other manually-added
       entries are left intact.

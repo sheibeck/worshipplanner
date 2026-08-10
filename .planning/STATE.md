@@ -5,15 +5,15 @@ milestone_name: Settings, Sharing, and Fidelity
 current_phase: 50
 current_phase_name: slide-management-bulk-delete-provenance
 status: executing
-stopped_at: Completed 50-03-PLAN.md
-last_updated: "2026-08-10T21:11:56.405Z"
+stopped_at: Completed 50-04-PLAN.md
+last_updated: "2026-08-10T21:28:41.815Z"
 last_activity: 2026-08-10
 last_activity_desc: Phase 50 execution started
 progress:
   total_phases: 13
   completed_phases: 12
   total_plans: 49
-  completed_plans: 47
+  completed_plans: 48
   percent: 92
 ---
 
@@ -170,7 +170,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 > to Planning Center.
 
 Phase: 50 (slide-management-bulk-delete-provenance) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
 client (DEPLOY-GATED, see below). 45-02 added `bibleVersion: 'ESV' | 'NLT'` to `OrgSettings`
 (`DEFAULT_ORG_SETTINGS.bibleVersion: 'NLT'`, owner's locked override) plus the Settings "Bible
@@ -1447,6 +1447,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 50 P01 | 15min | 2 tasks | 2 files |
 | Phase 50 P02 | 35min | 2 tasks | 1 files |
 | Phase 50 P03 | 40min | 3 tasks | 8 files |
+| Phase 50 P04 | 25 min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -1786,6 +1787,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: R107 (50-02): the existing slideGroupMaterializer.ts survivor mechanism (isSlotDerivableRef/survivingEntries/carryStoredDerivedEntries/orderedByStoredPosition) already satisfies manual-add preservation across every rebuild path — proven by a 9-case suite (manualAddPreservation.test.ts) with zero production code changed
 - [Phase ?]: R108 requirement left unchecked after 50-03: this plan is part 1 of 2 (RECORD sourcePage/renderedPage); part 2 (CONSUME, plan 50-05) is what actually resolves multi-image decks and will mark R108 complete.
 - [Phase ?]: renderedPage deliberately excluded from SourceRef.derivedIdentityKey (documented in slideGroup.ts) -- it is provenance, not identity, so existing carry/survival matching (R107) is unaffected.
+- [Phase ?]: R106: per-group 'Remove imported slides' bulk action, gated on window.confirm reusing the existing codebase confirm pattern — Removal is irreversible and multi-slide; reused the established window.confirm pattern from useUnsavedGuard.ts/LyricPasteRegion.vue rather than inventing a new modal
 
 ### Roadmap Evolution
 
@@ -2098,8 +2100,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-10T21:11:56.350Z
-Stopped at: Completed 50-03-PLAN.md
+Last session: 2026-08-10T21:28:41.770Z
+Stopped at: Completed 50-04-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
