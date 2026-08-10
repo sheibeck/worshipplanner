@@ -4,11 +4,11 @@ milestone: v1.5
 milestone_name: Settings, Sharing, and Fidelity
 current_phase: 48
 current_phase_name: Multi-Image Ordering & Mobile Polish
-status: milestone-code-complete-awaiting-verification
+status: executing
 stopped_at: All 11 v1.5 phases code-complete & code-verified. Phase 48 done (13/13). STOPPED at the milestone lifecycle gate — NOT archived, because 7 phases (39,43,44,45,46,47,48) are verification_deferred_human and archiving would bless deferred checks as passed (grant violation + v1.4 precedent). Awaiting owner verification.
-last_updated: "2026-08-09T02:20:00.000Z"
-last_activity: 2026-08-09
-last_activity_desc: Phase 48 done (deferred, not deploy-gated); milestone code-complete; autonomous run stopped before archive pending owner verification
+last_updated: "2026-08-10T01:06:03.545Z"
+last_activity: 2026-08-08
+last_activity_desc: Phase 48 execution started
 progress:
   total_phases: 11
   completed_phases: 11
@@ -152,7 +152,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 48 (Multi-Image Ordering & Mobile Polish) — EXECUTING
 Plan: 3 of 3
-Status: Phase complete — ready for verification
+Status: Ready to execute
 client (DEPLOY-GATED, see below). 45-02 added `bibleVersion: 'ESV' | 'NLT'` to `OrgSettings`
 (`DEFAULT_ORG_SETTINGS.bibleVersion: 'NLT'`, owner's locked override) plus the Settings "Bible
 Translation" card. 45-03 added the `translationSource?` field + `scriptureAttribution()`/
@@ -873,6 +873,7 @@ section in `PENDING-VERIFICATION.md` and `functions/DEPLOY-ORG-CLAIMS.md`.
 1. Work through `.planning/PENDING-VERIFICATION.md` — v1.5 items are under §§ Phase 39, 43, 44, 45,
    46, 47, 48 (Phase 48 newest). Starred/highest-value: **39.03-1** (PC credential retention across
    reload), **48.4** (owner decision: Print/Share narrowed to the Service Order tab).
+
 2. Run `/gsd-verify-work 39` · `43` · `44` · `45` · `46` · `47` · `48` as each phase's items pass.
 3. Run the owner-gated deploys (Phases 40/40.1/41/45) per their runbooks when ready.
 4. Only then `/gsd-audit-milestone` → `/gsd-complete-milestone v1.5` → `/gsd-cleanup`.
