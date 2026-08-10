@@ -111,6 +111,28 @@ export default defineConfig(({ mode, command }) => {
             })
           },
         },
+        '/api/nlt': {
+          // Dev-only mirror of the prod Cloud Function's nlt branch. NLT auth
+          // is a `key` QUERY PARAMETER (not a header like esv/anthropic), so
+          // it must be injected into the URL here, exactly as
+          // functions/src/index.ts::buildUpstreamUrl does server-side. Without
+          // this entry `/api/nlt/...` fell through to the SPA and returned
+          // index.html, which has no #bibletext → "Could not load passage".
+          target: 'https://api.nlt.to',
+          changeOrigin: true,
+          rewrite: (path: string) => {
+            const stripped = path.replace(/^\/api\/nlt/, '')
+            const url = new URL(stripped, 'https://api.nlt.to')
+            // Always SET (overwrite any inbound key) — mirrors the prod proxy.
+            if (env.NLT_API_KEY) url.searchParams.set('key', env.NLT_API_KEY)
+            return url.pathname + url.search
+          },
+          configure: (proxy) => {
+            proxy.on('proxyReq', (proxyReq: { removeHeader: (k: string) => void }) => {
+              proxyReq.removeHeader('x-app-auth')
+            })
+          },
+        },
         '/api/planningcenter': {
           target: 'https://api.planningcenteronline.com',
           changeOrigin: true,
