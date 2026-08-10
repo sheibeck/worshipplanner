@@ -133,58 +133,66 @@
 
           <!-- Edit mode: no credentials yet, or editing existing -->
           <template v-else>
-            <div class="space-y-3">
-              <div>
-                <label class="block text-xs text-gray-400 mb-1">App ID</label>
-                <input
-                  v-model="pcAppIdInput"
-                  type="text"
-                  placeholder="Your Planning Center App ID"
-                  class="w-full sm:w-80 bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500"
-                />
+            <!-- Wrapped in a <form> so the password field is form-contained
+                 (Chrome warns otherwise) and Enter submits. autocomplete is
+                 off: these are third-party Planning Center API credentials,
+                 not the user's own login, so browser password-save prompts
+                 would be misleading. -->
+            <form @submit.prevent="onSavePcCredentials">
+              <div class="space-y-3">
+                <div>
+                  <label class="block text-xs text-gray-400 mb-1">App ID</label>
+                  <input
+                    v-model="pcAppIdInput"
+                    type="text"
+                    autocomplete="off"
+                    placeholder="Your Planning Center App ID"
+                    class="w-full sm:w-80 bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500"
+                  />
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-400 mb-1">Secret</label>
+                  <input
+                    v-model="pcSecretInput"
+                    type="password"
+                    autocomplete="off"
+                    placeholder="Your Planning Center Secret"
+                    class="w-full sm:w-80 bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500"
+                  />
+                </div>
+                <p class="text-xs">
+                  <a
+                    href="https://planningcenteronline.com/api_passwords"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-indigo-400 hover:text-indigo-300"
+                  >
+                    Generate at planningcenteronline.com/api_passwords
+                  </a>
+                </p>
               </div>
-              <div>
-                <label class="block text-xs text-gray-400 mb-1">Secret</label>
-                <input
-                  v-model="pcSecretInput"
-                  type="password"
-                  placeholder="Your Planning Center Secret"
-                  class="w-full sm:w-80 bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500"
-                />
-              </div>
-              <p class="text-xs">
-                <a
-                  href="https://planningcenteronline.com/api_passwords"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="text-indigo-400 hover:text-indigo-300"
+
+              <p v-if="pcValidationError" class="text-red-400 text-sm mt-2">{{ pcValidationError }}</p>
+              <p v-if="pcSaveSuccess" class="text-green-400 text-sm mt-2">Credentials saved!</p>
+
+              <div class="mt-3 flex items-center gap-2 flex-wrap">
+                <button
+                  type="submit"
+                  :disabled="pcValidating || !pcAppIdInput.trim() || !pcSecretInput.trim()"
+                  class="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white rounded-md px-4 py-2 text-sm font-medium transition-colors"
                 >
-                  Generate at planningcenteronline.com/api_passwords
-                </a>
-              </p>
-            </div>
-
-            <p v-if="pcValidationError" class="text-red-400 text-sm mt-2">{{ pcValidationError }}</p>
-            <p v-if="pcSaveSuccess" class="text-green-400 text-sm mt-2">Credentials saved!</p>
-
-            <div class="mt-3 flex items-center gap-2 flex-wrap">
-              <button
-                type="button"
-                @click="onSavePcCredentials"
-                :disabled="pcValidating || !pcAppIdInput.trim() || !pcSecretInput.trim()"
-                class="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white rounded-md px-4 py-2 text-sm font-medium transition-colors"
-              >
-                {{ pcValidating ? 'Validating...' : 'Save & Validate' }}
-              </button>
-              <button
-                v-if="editingPcCreds"
-                type="button"
-                @click="cancelEditPcCreds"
-                class="bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-md px-4 py-2 text-sm font-medium transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
+                  {{ pcValidating ? 'Validating...' : 'Save & Validate' }}
+                </button>
+                <button
+                  v-if="editingPcCreds"
+                  type="button"
+                  @click="cancelEditPcCreds"
+                  class="bg-gray-800 hover:bg-gray-700 text-gray-200 rounded-md px-4 py-2 text-sm font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
           </template>
         </div>
       </div>
