@@ -23,6 +23,14 @@ vi.mock('@/stores/songs', () => ({
   }),
 }))
 
+// ServiceCard reads bibleVersion to route its scripture reader links to the
+// church's chosen translation (ESV.org vs BibleGateway/NLT).
+vi.mock('@/stores/auth', () => ({
+  useAuthStore: () => ({
+    settings: { bibleVersion: 'ESV' },
+  }),
+}))
+
 const mockTimestamp = { toDate: () => new Date('2026-03-04') } as unknown as Timestamp
 
 const mockService: Service = {

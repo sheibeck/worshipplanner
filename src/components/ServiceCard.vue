@@ -66,7 +66,8 @@ import type { Service, ServiceSlot } from '@/types/service'
 import { useServiceStore } from '@/stores/services'
 import { useSongStore } from '@/stores/songs'
 import TeamTagPill from '@/components/TeamTagPill.vue'
-import { esvLink } from '@/utils/scripture'
+import { scriptureWebLink } from '@/utils/scripture'
+import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps<{
   service: Service
@@ -75,6 +76,7 @@ const props = defineProps<{
 const router = useRouter()
 const serviceStore = useServiceStore()
 const songStore = useSongStore()
+const authStore = useAuthStore()
 
 const isSharing = ref(false)
 const shareCopied = ref(false)
@@ -117,7 +119,7 @@ const sermonPassageLabel = computed(() => {
 const sermonPassageUrl = computed(() => {
   const sp = props.service.sermonPassage
   if (!sp) return ''
-  return esvLink(sp.book, sp.chapter)
+  return scriptureWebLink(sp.book, sp.chapter, authStore.settings.bibleVersion)
 })
 
 const messageIndex = computed(() =>
@@ -190,7 +192,7 @@ function slotUrl(slot: ServiceSlot): string | null {
     if (ccli) return `https://songselect.ccli.com/songs/${ccli}`
   }
   if (slot.kind === 'SCRIPTURE' && slot.book && slot.chapter) {
-    return esvLink(slot.book, slot.chapter)
+    return scriptureWebLink(slot.book, slot.chapter, authStore.settings.bibleVersion)
   }
   return null
 }

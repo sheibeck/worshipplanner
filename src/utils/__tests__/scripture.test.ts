@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import {
   BIBLE_BOOKS,
   esvLink,
+  nltLink,
+  scriptureWebLink,
   scripturesOverlap,
   parseScriptureInput,
   formatScriptureReference,
@@ -130,6 +132,32 @@ describe('esvLink', () => {
 
   it('handles books with numbers (e.g., 2 Corinthians)', () => {
     expect(esvLink('2 Corinthians', 5)).toBe('https://www.esv.org/2+Corinthians+5')
+  })
+})
+
+describe('nltLink', () => {
+  it('points at BibleGateway with the NLT version param', () => {
+    expect(nltLink('John', 3)).toBe(
+      'https://www.biblegateway.com/passage/?search=John%203&version=NLT',
+    )
+  })
+
+  it('URL-encodes multi-word book names', () => {
+    expect(nltLink('1 John', 3)).toBe(
+      'https://www.biblegateway.com/passage/?search=1%20John%203&version=NLT',
+    )
+  })
+})
+
+describe('scriptureWebLink', () => {
+  it('routes ESV to esv.org', () => {
+    expect(scriptureWebLink('John', 3, 'ESV')).toBe('https://www.esv.org/John+3')
+  })
+
+  it('routes NLT to BibleGateway', () => {
+    expect(scriptureWebLink('John', 3, 'NLT')).toBe(
+      'https://www.biblegateway.com/passage/?search=John%203&version=NLT',
+    )
   })
 })
 

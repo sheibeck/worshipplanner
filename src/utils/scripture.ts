@@ -78,6 +78,31 @@ export function esvLink(book: string, chapter: number): string {
   return `https://www.esv.org/${bookSlug}+${chapter}`
 }
 
+/**
+ * Public NLT reader link. NLT's own host (`api.nlt.to`) is a JSON/HTML API,
+ * not a human-facing reader, so the "View on ..." affordance points at
+ * BibleGateway, which serves the NLT and accepts a free-form `Book Chapter`
+ * search string plus a `version` param.
+ */
+export function nltLink(book: string, chapter: number): string {
+  const search = encodeURIComponent(`${book} ${chapter}`)
+  return `https://www.biblegateway.com/passage/?search=${search}&version=NLT`
+}
+
+/**
+ * Version-aware reader link (R090). Routes to the church's chosen translation
+ * so an NLT church's "View on ..." link never silently lands on ESV — the
+ * bug behind the service editor showing "View on ESV.org" while NLT was the
+ * selected version.
+ */
+export function scriptureWebLink(
+  book: string,
+  chapter: number,
+  version: 'ESV' | 'NLT',
+): string {
+  return version === 'NLT' ? nltLink(book, chapter) : esvLink(book, chapter)
+}
+
 export function parseScriptureInput(text: string): ScriptureRef | null {
   const trimmed = text.trim()
   if (!trimmed) return null

@@ -26,6 +26,18 @@ vi.mock('@/utils/scripture', () => ({
     (book: string, chapter: number) =>
       `https://www.esv.org/${book}+${chapter}`,
   ),
+  nltLink: vi.fn(
+    (book: string, chapter: number) =>
+      `https://www.biblegateway.com/passage/?search=${book}+${chapter}&version=NLT`,
+  ),
+  // Version-aware reader link — routes by the church's bibleVersion so an NLT
+  // church's "View on ..." link lands on BibleGateway, not ESV.org.
+  scriptureWebLink: vi.fn(
+    (book: string, chapter: number, version: 'ESV' | 'NLT') =>
+      version === 'NLT'
+        ? `https://www.biblegateway.com/passage/?search=${book}+${chapter}&version=NLT`
+        : `https://www.esv.org/${book}+${chapter}`,
+  ),
   scripturesOverlap: vi.fn(() => false),
   // Use a simple real implementation so component behaviour is testable
   parseScriptureInput: vi.fn((text: string) => {
@@ -300,6 +312,21 @@ describe('ScriptureInput', () => {
         props: { ...defaultProps, modelValue: null },
       })
       expect(wrapper.text()).not.toContain('ESV')
+    })
+
+    it('shows a BibleGateway (NLT) link, not ESV.org, when bibleVersion=NLT', () => {
+      mockBibleVersion = 'NLT'
+      const wrapper = mount(ScriptureInput, {
+        props: {
+          ...defaultProps,
+          modelValue: { book: 'John', chapter: 3, verseStart: 16, verseEnd: 16 },
+        },
+      })
+      expect(wrapper.text()).toContain('View on BibleGateway')
+      expect(wrapper.text()).not.toContain('ESV')
+      const link = wrapper.find('a[target="_blank"]')
+      expect(link.attributes('href')).toContain('version=NLT')
+      expect(link.attributes('href')).toContain('biblegateway.com')
     })
   })
 

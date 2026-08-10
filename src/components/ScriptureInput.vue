@@ -124,10 +124,11 @@
     />
     <p v-if="parseError" class="text-xs text-red-400 mt-1">{{ parseError }}</p>
 
-    <!-- ESV link (shown when book and chapter are filled) -->
+    <!-- Reader link (shown when book and chapter are filled) — routes to the
+         church's chosen translation, not always ESV. -->
     <a
       v-if="canPreview"
-      :href="esvUrl"
+      :href="readerUrl"
       target="_blank"
       rel="noopener"
       class="inline-flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
@@ -135,7 +136,7 @@
       <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
         <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
       </svg>
-      View on ESV.org
+      {{ readerLabel }}
     </a>
 
     <!-- Preview passage button -->
@@ -196,7 +197,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { esvLink, scripturesOverlap, parseScriptureInput, formatScriptureReference } from '@/utils/scripture'
+import { scriptureWebLink, scripturesOverlap, parseScriptureInput, formatScriptureReference } from '@/utils/scripture'
 import { fetchPassageText } from '@/utils/esvApi'
 import { fetchNltPassageText } from '@/utils/nltApi'
 import { getScriptureSuggestions, type AiScriptureSuggestion } from '@/utils/claudeApi'
@@ -288,10 +289,18 @@ const currentRef = computed<ScriptureRef | null>(() => {
 
 const canPreview = computed(() => currentRef.value !== null)
 
-const esvUrl = computed(() => {
+// Version-aware reader link + label (R090): follows the church's chosen
+// translation so an NLT church never sees an ESV.org link. ESV reads on
+// esv.org; NLT reads on BibleGateway (NLT has no human-facing reader of its
+// own — api.nlt.to is an API host).
+const readerUrl = computed(() => {
   if (!currentRef.value) return ''
-  return esvLink(currentRef.value.book, currentRef.value.chapter)
+  return scriptureWebLink(currentRef.value.book, currentRef.value.chapter, authStore.settings.bibleVersion)
 })
+
+const readerLabel = computed(() =>
+  authStore.settings.bibleVersion === 'NLT' ? 'View on BibleGateway' : 'View on ESV.org',
+)
 
 const isComplete = computed(() => {
   const r = currentRef.value
