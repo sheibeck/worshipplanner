@@ -256,7 +256,11 @@ function resolveEntryContent(
       const render = deck.renderImportId ? inputs.pptxRendersByImportId?.get(deck.renderImportId) : undefined
       const resolution = resolveImportedRender(deck, render)
       const urls = deck.renderImportId ? inputs.renderedImageUrlsByImportId?.get(deck.renderImportId) : undefined
-      return importedEntryContent(deck, resolution, ref.innerSlideId, urls)
+      // R108 (Phase 50, part 2 of 2): thread the 50-03 render-stable
+      // renderedPage reference so a hand-added entry resolves for a
+      // multi-image deck; importedEntryContent prefers it over the ec217aa
+      // positional fallback, which stays as the legacy no-renderedPage path.
+      return importedEntryContent(deck, resolution, ref.innerSlideId, urls, ref.renderedPage)
     }
 
     case 'text': {

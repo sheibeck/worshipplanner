@@ -2363,3 +2363,75 @@ describe('assembleSlideshow fallback — IMPORTED with a render (no-group path, 
     expect((plainResults[0]!.slide as TextSlide).body).toBe(firstPlainSlide.body)
   })
 })
+
+// ---------------------------------------------------------------------------
+// R108 (Phase 50, 50-05): resolveEntryContent threads sourceRef.renderedPage
+// into importedEntryContent for a hand-added imported entry stored inside a
+// NON-imported group (the case the ec217aa positional resolver could not
+// handle for a multi-image deck).
+// ---------------------------------------------------------------------------
+describe('resolveEntryContent — imported entry inside a non-imported group carrying renderedPage (R108)', () => {
+  it('a hand-added imported entry with renderedPage resolves to its page URL for a MULTI-IMAGE deck (mismatched parsed/rendered counts)', () => {
+    const deck = makeRenderedImportedDeck() // 5 parsed slides
+    const slot = scriptureSlot({ id: 'slot-scripture-0' })
+    const service = makeService([slot])
+    const urls = ['url-1', 'url-2', 'url-3'] // renderedCount 3, mismatched against 5 parsed slides
+    const entry = makeGroupSlideEntry({
+      id: 'entry-hand-added',
+      order: 0,
+      sourceRef: { kind: 'imported', importId: 'deck-1', innerSlideId: 'is-2', renderedPage: 2 },
+    })
+    const group = makeSlideGroup({ id: 'slot-scripture-0', slotId: 'slot-scripture-0', slides: [entry] })
+    const inputs = makeRenderInputs(deck, makeRenderDoc({ status: 'ready', renderedCount: 3 }), urls, {
+      groupsBySlotId: new Map([['slot-scripture-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result).toHaveLength(1)
+    const slide = result[0]!.slide as ImageSlide
+    expect(slide.contentKind).toBe('image')
+    expect(slide.imageUrl).toBe(urls[1])
+    expect(slide.renderState).toBeUndefined()
+  })
+
+  it('the same entry WITHOUT renderedPage against the same mismatched deck stays a pending placeholder (proving renderedPage is what fixes it)', () => {
+    const deck = makeRenderedImportedDeck() // 5 parsed slides
+    const slot = scriptureSlot({ id: 'slot-scripture-0' })
+    const service = makeService([slot])
+    const urls = ['url-1', 'url-2', 'url-3'] // renderedCount 3, mismatched against 5 parsed slides
+    const entry = makeGroupSlideEntry({
+      id: 'entry-hand-added',
+      order: 0,
+      sourceRef: { kind: 'imported', importId: 'deck-1', innerSlideId: 'is-2' },
+    })
+    const group = makeSlideGroup({ id: 'slot-scripture-0', slotId: 'slot-scripture-0', slides: [entry] })
+    const inputs = makeRenderInputs(deck, makeRenderDoc({ status: 'ready', renderedCount: 3 }), urls, {
+      groupsBySlotId: new Map([['slot-scripture-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result).toHaveLength(1)
+    const slide = result[0]!.slide as ImageSlide
+    expect(slide.contentKind).toBe('image')
+    expect(slide.imageUrl).toBe('')
+    expect(slide.renderState).toBe('pending')
+  })
+
+  it('the no-group IMPORTED fallback path is unchanged — a synthetic-identity ready entry resolves the same with or without this change', () => {
+    const deck = makeRenderedImportedDeck()
+    const slot = importedSlot({ id: 'slot-imported-0', importId: 'deck-1' })
+    const service = makeService([slot])
+    const urls = Array.from({ length: 5 }, (_, i) => `url-${i + 1}`)
+    const inputs = makeRenderInputs(deck, makeRenderDoc({ status: 'ready', renderedCount: 5 }), urls)
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result).toHaveLength(5)
+    result.forEach((assembled, i) => {
+      expect(assembled.slide.contentKind).toBe('image')
+      expect((assembled.slide as ImageSlide).imageUrl).toBe(urls[i])
+    })
+  })
+})
