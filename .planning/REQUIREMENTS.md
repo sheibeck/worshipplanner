@@ -223,6 +223,13 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
 - [x] **R097**: The first slide of a congregational reading shows the scripture reference; every later
       slide shows only the speaker label.
 
+- [ ] **R105**: The scripture reference occupies its OWN dedicated first slide of a congregational
+      reading — byte-identical to a plain (non-congregational) scripture reference slide. Turning a
+      scripture slot congregational keeps that reference slide unchanged and appends one text slide per
+      section after it; the section slides show only the scripture text and speaker label, never the
+      reference. Refines R097's realization: the reference moves from an eyebrow on the first section
+      slide to a slide of its own.
+
 ### Slide Media
 
 - [x] **R098**: Dropping several images at once produces slides in filename natural order.

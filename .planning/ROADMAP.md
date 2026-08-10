@@ -428,6 +428,24 @@ Plans:
 **Research flag**: skip for R098 (native `Intl.Collator`, a solved problem); audit-first (not full research) for R099-R103 — read the Slides tab's actual mobile-blocking layout before scoping the plan, rather than assuming the scope SUMMARY.md could not independently verify.
 **Notes**: Merged from SUMMARY's separate Phase 49 (Multi-Image Import Ordering) and Phase 50 (Mobile & Layout Polish) — see the departure note above. Both were independently flagged low-risk and schedulable "wherever convenient" in SUMMARY.md; nothing in either's scope conflicts with the other.
 
+### Phase 49: Congregational Reading — Dedicated Reference Slide
+
+**Goal:** A congregational reading always begins with the plain scripture-reference slide, unchanged, followed by one text slide per section — the reference is a slide of its own, not an eyebrow on the first section.
+**Depends on**: Phase 47 (refines how that phase's congregational slide model realizes its own Success Criterion #3). Independent of all other phases.
+**Requirements**: R105
+**Success Criteria** (what must be TRUE):
+
+  1. Assembling a congregational reading produces N+1 slides for N sections: slide 1 is the scripture reference (byte-identical to a plain, non-congregational scripture reference slide), slides 2..N+1 are the sections
+  2. The section (text) slides show only the scripture text and speaker label — the reference eyebrow no longer appears on any section slide
+  3. Both the fallback (no stored group) and stored-group assembly paths emit the identical slide list, proven by the existing dual-path parity tests extended to the new shape
+  4. Existing stored congregational readings are handled without corrupting per-section entry ids/attached media (no group-rebuild carry misalignment) — congregational readings were never deployed, but the group reconciliation invariants must still hold
+
+**Plans**: not yet planned
+
+**UI hint**: no (slide-assembly + display change; no new UI controls)
+**Research flag**: skip — the subsystem is already mapped; the design decision (assembly-time synthetic reference slide vs. stored reference entry) is captured in this phase's PRD/CONTEXT.
+**Notes**: Owner decision (2026-08-09): implement the reference slide as an assembly-time synthetic leading slide (approach B), NOT as a stored group entry — this avoids the group-rebuild/carry migration hazard where all scripture entries share one identity key and are matched positionally. Section slides are text-only (eyebrow suppressed). See 49-CONTEXT.md.
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -447,6 +465,7 @@ Plans:
 | 46. Global Slide Typography | v1.5 | 4/4 | In Progress|  |
 | 47. Congregational Reading Divider UX | v1.5 | 3/3 | In Progress|  |
 | 48. Multi-Image Ordering & Mobile Polish | v1.5 | 3/3 | In Progress|  |
+| 49. Congregational Reading — Dedicated Reference Slide | v1.5 | 0/0 | Not Started|  |
 
 ## Backlog
 
