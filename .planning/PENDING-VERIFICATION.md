@@ -1259,13 +1259,12 @@ B (assembly-time synthetic reference slide on both paths; `slideGroupMaterialize
 The item below is inherently visual — jsdom asserts the slide *list* shape and the display gates,
 but only a real projected render confirms the on-screen result and media continuity.
 
-- [ ] **49.1 Live projected render of a real congregational reading (R105).** Create a scripture
-      slot (e.g. **1 John 4:1-2**), make it congregational, and split it into sections. Present it
-      and confirm: **slide 1 shows the reference alone** ("1 John 4:1-2", no section text); **slides
-      2..N show only the section text + speaker label** with NO reference eyebrow; and any group
-      background / bed audio stays continuous across the reference→first-section transition. This is
-      the exact scenario the owner reported as broken before this phase (reference + first section
-      were rendering together on slide 1).
+- [x] **49.1 Live projected render of a real congregational reading (R105).** ✅ **Owner-verified
+      2026-08-10** — tested with **1 John 4:1-2** made congregational: slide 1 is the reference
+      alone, sections follow. (Original scenario: create a scripture slot, make it congregational,
+      split into sections; slide 1 shows the reference alone, slides 2..N show only section text +
+      speaker with no reference eyebrow, and group background / bed audio stays continuous across the
+      reference→first-section transition.)
 
 ---
 
