@@ -150,6 +150,16 @@ export interface TextSlide extends SlideBase {
   contentKind: 'text'
   title?: string
   body: string
+  /**
+   * R108 (Phase 50, part 1 of 2): 1-based index of the source PPTX slide this
+   * entry was parsed from (= its rendered page number — the render service
+   * renders one page per source slide in the same order, see
+   * `functions/src/pptxParser.ts`'s `mapAstToSlides` doc comment). Set at
+   * parse time by `PptxImportModal.vue` from the `parsePptx` callable result.
+   * OPTIONAL — a deck imported before this phase has no such field and stays
+   * valid; consuming code falls back to positional resolution (plan 50-05).
+   */
+  sourcePage?: number
 }
 
 /**
@@ -161,6 +171,14 @@ export interface ImageSlide extends SlideBase {
   contentKind: 'image'
   imageUrl: string
   altText?: string
+  /**
+   * R108 (Phase 50, part 1 of 2): 1-based index of the source PPTX slide this
+   * entry was parsed from (= its rendered page number). See `TextSlide.sourcePage`
+   * for the full contract — identical here. A multi-image source slide's several
+   * ImageSlides all share the same sourcePage. OPTIONAL for the same
+   * backward-compatibility reason.
+   */
+  sourcePage?: number
 }
 
 /**

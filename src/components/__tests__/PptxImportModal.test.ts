@@ -27,8 +27,8 @@ vi.mock('@/utils/pptxUpload', () => ({
 // The onCall RPC. The modal must invoke this with { orgId, importId, storagePath }
 // only — never raw file bytes.
 type RawSlide =
-  | { contentKind: 'text'; title?: string; body: string }
-  | { contentKind: 'image'; imageUrl: string; altText?: string }
+  | { contentKind: 'text'; title?: string; body: string; sourcePage: number }
+  | { contentKind: 'image'; imageUrl: string; altText?: string; sourcePage: number }
 const mockParsePptxCallable = vi.fn<(...args: unknown[]) => Promise<{ data: { slides: RawSlide[] } }>>(
   () => Promise.resolve({ data: { slides: [] } }),
 )
@@ -155,11 +155,12 @@ describe('PptxImportModal', () => {
     parseDeferred.resolve({
       data: {
         slides: [
-          { contentKind: 'text', title: 'Welcome', body: 'Hello church' },
+          { contentKind: 'text', title: 'Welcome', body: 'Hello church', sourcePage: 1 },
           {
             contentKind: 'image',
             imageUrl: 'orgs/org-1/pptx-imports/import-abc/images/0.png',
             altText: 'photo',
+            sourcePage: 2,
           },
         ],
       },
@@ -188,6 +189,10 @@ describe('PptxImportModal', () => {
         slides: expect.any(Array),
       }),
     )
+    // Stored deck slides carry sourcePage copied from the parsePptx result (R108).
+    const storedSlides = mockCreateDeck.mock.calls[0]?.[1]?.slides as Array<{ sourcePage?: number }>
+    expect(storedSlides[0]?.sourcePage).toBe(1)
+    expect(storedSlides[1]?.sourcePage).toBe(2)
     expect(wrapper.emitted('confirmed')).toBeTruthy()
     expect(wrapper.emitted('confirmed')![0]).toEqual([{ importId: 'new-import-id', section: 'message' }])
     expect(mockDeleteObject).not.toHaveBeenCalled()
@@ -229,13 +234,18 @@ describe('PptxImportModal', () => {
       'org-1',
       expect.objectContaining({ section: 'message', slides: expect.any(Array) }),
     )
+    // Image-only slides carry a 1-based sourcePage (shape uniformity only -- no
+    // render record exists for image-only imports to resolve against).
+    const storedSlides = mockCreateDeck.mock.calls[0]?.[1]?.slides as Array<{ sourcePage?: number }>
+    expect(storedSlides[0]?.sourcePage).toBe(1)
+    expect(storedSlides[1]?.sourcePage).toBe(2)
     expect(wrapper.emitted('confirmed')![0]).toEqual([{ importId: 'new-image-import-id', section: 'message' }])
   })
 
   it('persists renderImportId onto the confirmed deck, equal to the id used for the Storage upload (not merely UUID-shaped)', async () => {
     mockUploadPptx.mockResolvedValueOnce('orgs/org-1/pptx-imports/import-abc/source.pptx')
     mockParsePptxCallable.mockResolvedValueOnce({
-      data: { slides: [{ contentKind: 'text', body: 'hello' }] },
+      data: { slides: [{ contentKind: 'text', body: 'hello', sourcePage: 1 }] },
     })
     mockCreateDeck.mockResolvedValueOnce('new-import-id')
 
@@ -283,7 +293,7 @@ describe('PptxImportModal', () => {
   it('cancelling a PPTX import at preview, then running an image import, never leaks the id onto the image payload', async () => {
     mockUploadPptx.mockResolvedValueOnce('orgs/org-1/pptx-imports/import-abc/source.pptx')
     mockParsePptxCallable.mockResolvedValueOnce({
-      data: { slides: [{ contentKind: 'text', body: 'hi' }] },
+      data: { slides: [{ contentKind: 'text', body: 'hi', sourcePage: 1 }] },
     })
 
     const wrapper = mountModal()
