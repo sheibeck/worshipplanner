@@ -249,7 +249,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
       positional fallback (ec217aa), which only resolves single-image-per-slide decks, with a
       render-stable page identity carried on the entry.
 
-- [ ] **R109**: A production deploy is visible to users without a manual cache-clear — `index.html`
+- [x] **R109**: A production deploy is visible to users without a manual cache-clear — `index.html`
       is served with a no-cache/revalidate policy so the browser always re-fetches the current
       document (and thus the current hashed bundle) rather than a stale cached copy.
 

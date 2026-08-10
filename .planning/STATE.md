@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Settings, Sharing, and Fidelity
-current_phase: 48
-current_phase_name: Multi-Image Ordering & Mobile Polish
+current_phase: 50
+current_phase_name: slide-management-bulk-delete-provenance
 status: executing
-stopped_at: All 11 v1.5 phases code-complete & code-verified. Phase 48 done (13/13). STOPPED at the milestone lifecycle gate — NOT archived, because 7 phases (39,43,44,45,46,47,48) are verification_deferred_human and archiving would bless deferred checks as passed (grant violation + v1.4 precedent). Awaiting owner verification.
-last_updated: "2026-08-10T01:06:03.545Z"
-last_activity: 2026-08-08
-last_activity_desc: Phase 48 execution started
+stopped_at: Completed 50-01-PLAN.md
+last_updated: "2026-08-10T20:36:45.509Z"
+last_activity: 2026-08-10
+last_activity_desc: Phase 50 execution started
 progress:
-  total_phases: 11
-  completed_phases: 11
-  total_plans: 43
-  completed_plans: 43
-  percent: 100
+  total_phases: 13
+  completed_phases: 12
+  total_plans: 49
+  completed_plans: 45
+  percent: 92
 ---
 
 # Project State
@@ -140,7 +140,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 48 — Multi-Image Ordering & Mobile Polish
+**Current focus:** Phase 50 — slide-management-bulk-delete-provenance
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -169,8 +169,8 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 > member can still upload (Phase 40.1 observe), an NLT scripture preview loads, and a service exports
 > to Planning Center.
 
-Phase: 48 (Multi-Image Ordering & Mobile Polish) — EXECUTING
-Plan: 3 of 3
+Phase: 50 (slide-management-bulk-delete-provenance) — EXECUTING
+Plan: 2 of 5
 Status: Ready to execute
 client (DEPLOY-GATED, see below). 45-02 added `bibleVersion: 'ESV' | 'NLT'` to `OrgSettings`
 (`DEFAULT_ORG_SETTINGS.bibleVersion: 'NLT'`, owner's locked override) plus the Settings "Bible
@@ -191,7 +191,7 @@ human-verify items: the 48px overflow backstop, and the full post-deploy live ro
 in `.planning/PENDING-VERIFICATION.md` § Phase 45.
 Next: Phase 45 is code-complete; the owner's deploy step and the deferred human-verify items are
 the only remaining work for this phase (non-blocking). No further plan needed for Phase 45 itself.
-Last activity: 2026-08-10 — Phase 50 planned (5 plans/2 waves: R106 remove-imported, R107 preserve-manual-on-regen, R108 render-stable page id, R109 index.html no-cache); ready to execute
+Last activity: 2026-08-10 — Phase 50 execution started
 
 ## ⏸ RESUME HERE (2026-08-06 — v1.5 ROADMAP.md created, ready to plan Phase 39)
 
@@ -1444,6 +1444,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 48 P01 | 6min | 2 tasks | 4 files |
 | Phase 48 P02 | 6min | 3 tasks | 9 files |
 | Phase 48 P03 | 25min | 3 tasks | 6 files |
+| Phase 50 P01 | 15min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -1779,6 +1780,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 48-02: 44px hit-area padding applied unconditionally (not breakpoint-gated) per 48-UI-SPEC; SortableJS touch options (delay/delayOnTouchOnly/touchStartThreshold) added strictly additively to preserve the ZTXcpNRcJTalEQp42fTx index-bug guard
 - [Phase ?]: 48-03: Task 1 landed the full ActionBarContext/ActionBarHandlers type contract AND its one consumer (ServiceEditorView.vue's activeActionItems) in the same commit, so npm run type-check stayed green on every committed intermediate.
 - [Phase ?]: 48-03: The save-status wrapper's 'flex items-center gap-2' is now unconditional (only border/background/padding/sticky stay tied to serviceSaveStatusVisible) so the relocated Undo link lays out correctly beside SaveStatusIndicator even at idle.
+- [Phase ?]: R109: firebase.json hosting.headers serves /index.html with Cache-Control no-cache, no-store, must-revalidate; assets/* left untouched; deploy-gated per standing NO-DEPLOYS grant
 
 ### Roadmap Evolution
 
@@ -2091,8 +2093,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-09T00:21:39.425Z
-Stopped at: Completed 48-03-PLAN.md
+Last session: 2026-08-10T20:36:45.452Z
+Stopped at: Completed 50-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

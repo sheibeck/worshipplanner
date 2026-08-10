@@ -460,12 +460,12 @@ Plans:
   3. A manually-added imported slide resolves to its correct rendered page for a multi-image deck (parsed-slide count ≠ rendered-page count), via a render-stable page identity on the entry, superseding the interim 1:1 positional fallback (R108)
   4. After a production deploy, a normal page load shows the new bundle with no manual cache-clear — `index.html` is served no-cache/revalidate (R109)
 
-**Plans**: 5 plans
+**Plans**: 1/5 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 50-01-PLAN.md — R109: serve index.html no-cache in firebase.json (+ guard test) [wave 1]
+- [x] 50-01-PLAN.md — R109: serve index.html no-cache in firebase.json (+ guard test) [wave 1]
 - [ ] 50-02-PLAN.md — R107: prove/guarantee rebuilds preserve manual adds incl. scripture↔congregational [wave 1]
 - [ ] 50-03-PLAN.md — R108 (record): parser sourcePage → deck slide → imported sourceRef.renderedPage [wave 1]
 
@@ -498,7 +498,7 @@ Plans:
 | 47. Congregational Reading Divider UX | v1.5 | 3/3 | In Progress|  |
 | 48. Multi-Image Ordering & Mobile Polish | v1.5 | 3/3 | In Progress|  |
 | 49. Congregational Reading — Dedicated Reference Slide | v1.5 | 1/1 | In Progress|  |
-| 50. Slide Management — Bulk Delete, Provenance & Render Fidelity | v1.5 | 0/5 | Planned|  |
+| 50. Slide Management — Bulk Delete, Provenance & Render Fidelity | v1.5 | 1/5 | In Progress|  |
 
 ## Backlog
 
