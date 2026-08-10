@@ -237,7 +237,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
       the group's `imported`-kind entries are removed; auto-generated and other manually-added
       entries are left intact.
 
-- [ ] **R107**: Regeneration never destroys manual work. When a service change rebuilds a group's
+- [x] **R107**: Regeneration never destroys manual work. When a service change rebuilds a group's
       auto-generated slides — including a scripture slot becoming (or ceasing to be) a
       congregational reading — every manually-added entry (imported PPTX slides, hand-added blank/
       text slides, added media) is preserved in place; only the auto-generated (derived) entries are

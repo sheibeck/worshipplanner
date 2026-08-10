@@ -5,15 +5,15 @@ milestone_name: Settings, Sharing, and Fidelity
 current_phase: 50
 current_phase_name: slide-management-bulk-delete-provenance
 status: executing
-stopped_at: Completed 50-01-PLAN.md
-last_updated: "2026-08-10T20:36:45.509Z"
+stopped_at: Completed 50-02-PLAN.md
+last_updated: "2026-08-10T20:49:55.775Z"
 last_activity: 2026-08-10
 last_activity_desc: Phase 50 execution started
 progress:
   total_phases: 13
   completed_phases: 12
   total_plans: 49
-  completed_plans: 45
+  completed_plans: 46
   percent: 92
 ---
 
@@ -170,7 +170,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 > to Planning Center.
 
 Phase: 50 (slide-management-bulk-delete-provenance) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
 client (DEPLOY-GATED, see below). 45-02 added `bibleVersion: 'ESV' | 'NLT'` to `OrgSettings`
 (`DEFAULT_ORG_SETTINGS.bibleVersion: 'NLT'`, owner's locked override) plus the Settings "Bible
@@ -1445,6 +1445,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 48 P02 | 6min | 3 tasks | 9 files |
 | Phase 48 P03 | 25min | 3 tasks | 6 files |
 | Phase 50 P01 | 15min | 2 tasks | 2 files |
+| Phase 50 P02 | 35min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -1781,6 +1782,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 48-03: Task 1 landed the full ActionBarContext/ActionBarHandlers type contract AND its one consumer (ServiceEditorView.vue's activeActionItems) in the same commit, so npm run type-check stayed green on every committed intermediate.
 - [Phase ?]: 48-03: The save-status wrapper's 'flex items-center gap-2' is now unconditional (only border/background/padding/sticky stay tied to serviceSaveStatusVisible) so the relocated Undo link lays out correctly beside SaveStatusIndicator even at idle.
 - [Phase ?]: R109: firebase.json hosting.headers serves /index.html with Cache-Control no-cache, no-store, must-revalidate; assets/* left untouched; deploy-gated per standing NO-DEPLOYS grant
+- [Phase ?]: R107 (50-02): the existing slideGroupMaterializer.ts survivor mechanism (isSlotDerivableRef/survivingEntries/carryStoredDerivedEntries/orderedByStoredPosition) already satisfies manual-add preservation across every rebuild path — proven by a 9-case suite (manualAddPreservation.test.ts) with zero production code changed
 
 ### Roadmap Evolution
 
@@ -2093,8 +2095,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-10T20:36:45.452Z
-Stopped at: Completed 50-01-PLAN.md
+Last session: 2026-08-10T20:49:55.711Z
+Stopped at: Completed 50-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
