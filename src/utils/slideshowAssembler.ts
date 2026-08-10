@@ -26,7 +26,7 @@
  *    ids are derived from the slot's stable `id` (not slot array index), so
  *    a pre-materialization render cannot churn Vue keys across recomputes.
  */
-import type { Service, ServiceSlot } from '@/types/service'
+import type { Service, ServiceSlot, ScriptureRef } from '@/types/service'
 import type { AssembledSlide, Slide, LyricSlide, CopyrightSlide, ScriptureSlide, TextSlide, VideoSlide } from '@/types/slide'
 import type { SongLyrics } from '@/types/songLyrics'
 import type { ScriptureReading } from '@/types/scriptureReading'
@@ -82,6 +82,27 @@ export interface AssemblyInputs {
 /** A Slide variant's fields minus the id/position this engine assigns on emit. */
 type DistributiveOmit<T, K extends keyof any> = T extends unknown ? Omit<T, K> : never
 type SlideContent = DistributiveOmit<Slide, 'id' | 'position'>
+
+/**
+ * R105 (Phase 49): the SINGLE producer of reference-only scripture slide
+ * content — a plain scripture reference slide AND the dedicated leading
+ * reference slide of a congregational reading are byte-identical by
+ * construction (AC3). Called from all THREE reference-slide sites:
+ * `resolveEntryContent`'s `section === null` branch, the SCRIPTURE fallback's
+ * `sections.length === 0` branch, and the new synthetic leading-slide emission
+ * on both assembly paths. `readingMode: 'normal'`, empty `text`/`verseRange`,
+ * and NO `section` field — exactly today's plain reference-slide shape.
+ */
+function buildScriptureReferenceContent(ref: ScriptureRef): Omit<ScriptureSlide, 'id' | 'position'> {
+  return {
+    contentKind: 'scripture',
+    reference: formatScriptureReference(ref),
+    bookRef: ref,
+    text: '',
+    verseRange: '',
+    readingMode: 'normal',
+  }
+}
 
 function buildCopyrightSlideContent(lyrics: SongLyrics): Omit<CopyrightSlide, 'id' | 'position'> {
   return {
@@ -193,17 +214,16 @@ function resolveEntryContent(
       //   — there is no canonical record to resolve against once detached —
       //   with readingMode 'congregational' and the singular `section` field.
       //   Each assembled slide carries exactly one section (38-02).
+      //
+      // R105 (Phase 49): the reference eyebrow no longer lives on the first
+      // section slide — it has its own dedicated leading slide, emitted at
+      // assembly time (see the synthetic emission in `assembleSlideshow`). So
+      // a section slide no longer carries any first/later distinction, and
+      // `isFirstSection` is gone from the type entirely.
       const section = congregationalSectionFromRef(entry.sourceRef)
       const content: Omit<ScriptureSlide, 'id' | 'position'> =
         section === null
-          ? {
-              contentKind: 'scripture',
-              reference: formatScriptureReference(scriptureRef),
-              bookRef: scriptureRef,
-              text: '',
-              verseRange: '',
-              readingMode: 'normal',
-            }
+          ? buildScriptureReferenceContent(scriptureRef)
           : {
               contentKind: 'scripture',
               reference: formatScriptureReference(scriptureRef),
@@ -212,12 +232,6 @@ function resolveEntryContent(
               verseRange: section.verseRange ?? '',
               readingMode: 'congregational',
               section,
-              // R097: true only for the reading's first section slide — the
-              // stored-group path's ordinal is the entry's own `order`. Set
-              // only in this (section-present) branch; a Reference-state
-              // slide (the `section === null` branch above) has no "first"
-              // concept and carries no isFirstSection field at all.
-              isFirstSection: entry.order === 0,
               // R092: read back the passthrough SourceRef.translationSource —
               // never re-derived here. Absent when the ref carries none
               // (pre-phase entry), which resolveTranslationSource() later
@@ -365,7 +379,10 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
     slotIndex: number,
     content: SlideContent,
     sourceId: string | null,
-    localSeq: number,
+    // R105: normally the numeric section/section-index sequence; the synthetic
+    // leading reference slide passes the string 'ref' so its id
+    // (`${slot.id}:ref`) cannot collide with any numeric section id.
+    localSeq: number | string,
   ): void => {
     // Fallback ids derive from the slot's stable id (not the slot's array
     // index), so a pre-materialization render is stable across recomputes.
@@ -431,9 +448,64 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
     globalPosition += 1
   }
 
+  /**
+   * R105 (Phase 49, approach B): the dedicated leading reference slide of a
+   * congregational reading on the STORED-GROUP path. It is NOT a stored
+   * `GroupSlideEntry` (see 49-CONTEXT.md) — it is synthesised here, so it must
+   * resolve group media the way an entry-less section slide would: background
+   * from the GROUP tier (`backgroundSource: 'group'`), bed audio from
+   * `group.bedAudioUrl` with `audioFromBed: true` and `groupId: group.id` set,
+   * so the presenter's `AudioPlayer` key `group:{groupId}:{url}` stays
+   * continuous across the reference->section transition (AC7). NO
+   * `groupSlideId` is set — there is no entry, and media never keys on a
+   * fabricated entry id (background reads `slide.backgroundImageUrl`, audio
+   * keys on `groupId`); omitting it is what preserves the Phase 23 WR-02
+   * invariant rather than inventing an id to violate it.
+   */
+  const emitSyntheticReferenceFromGroup = (
+    slot: ServiceSlot,
+    slotIndex: number,
+    group: SlideGroup,
+    ref: ScriptureRef,
+  ): void => {
+    const backgroundImageUrl = group.backgroundImageUrl
+    const audioUrl = group.bedAudioUrl
+    const slide = {
+      ...buildScriptureReferenceContent(ref),
+      id: `${slot.id}:ref`,
+      position: globalPosition,
+      ...(audioUrl ? { audioUrl } : {}),
+      ...(backgroundImageUrl ? { backgroundImageUrl } : {}),
+      ...(backgroundImageUrl ? { backgroundSource: 'group' as const } : {}),
+    } as Slide
+    assembled.push({
+      slide,
+      slotIndex,
+      slotKind: slot.kind,
+      section: slot.section,
+      // A slot-derived reference has no canonical record behind it (R047).
+      sourceId: null,
+      groupId: group.id,
+      // No groupSlideId — there is no entry (WR-02 boundary, see above).
+      audioFromBed: !!audioUrl,
+    })
+    globalPosition += 1
+  }
+
   for (const { slot, index } of sorted) {
     const group = inputs.groupsBySlotId.get(slot.id)
     if (group) {
+      // R105 (approach B, LOCKED): a congregational SCRIPTURE reading gets a
+      // dedicated leading reference slide emitted here, BEFORE the entry loop.
+      // Gate on the SAME slot-side predicate the fallback path uses
+      // (`congregationalSectionsFromSlot`) so the two paths agree on whether
+      // to emit it — and so a PLAIN slot, whose stored group holds one
+      // reference entry and zero sections, never gets a second synthetic
+      // reference prepended.
+      if (slot.kind === 'SCRIPTURE' && congregationalSectionsFromSlot(slot).length > 0) {
+        const scriptureRef = scriptureRefFromSlot(slot)
+        if (scriptureRef) emitSyntheticReferenceFromGroup(slot, index, group, scriptureRef)
+      }
       const orderedEntries = [...group.slides].sort((a, b) => a.order - b.order)
       for (const entry of orderedEntries) {
         const content = resolveEntryContent(slot, entry, inputs)
@@ -483,26 +555,26 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
         // slot's slide content must not visibly change the moment its group
         // document materializes. With no sections this is R047's original
         // single reference-only slide, unchanged. With sections present,
-        // emit one fallback slide per section, same fields as the
-        // stored-group path, advancing the local sequence number per
-        // section so derived fallback ids stay distinct and stable.
+        // R105 emits the dedicated leading reference slide FIRST, then one
+        // fallback slide per section, same fields as the stored-group path,
+        // advancing the local sequence number per section so derived fallback
+        // ids stay distinct and stable.
         const sections = congregationalSectionsFromSlot(slot)
         const reference = formatScriptureReference(scriptureRef)
 
         if (sections.length === 0) {
-          const content: Omit<ScriptureSlide, 'id' | 'position'> = {
-            contentKind: 'scripture',
-            reference,
-            bookRef: scriptureRef,
-            text: '',
-            verseRange: '',
-            readingMode: 'normal',
-          }
           // No canonical record id behind a slot-derived reference — same
           // convention `sourceIdForRef` now applies to a payload-free ref.
-          emitFallback(slot, index, content, null, 0)
+          emitFallback(slot, index, buildScriptureReferenceContent(scriptureRef), null, 0)
           break
         }
+
+        // R105 (approach B): the dedicated leading reference slide, byte-
+        // identical to a plain reference slide via the shared helper. The
+        // fallback path carries NO media (D-19: no legacy slot-level media),
+        // so this slide gets none either. Id suffix 'ref' keeps it clear of
+        // the numeric section ids below.
+        emitFallback(slot, index, buildScriptureReferenceContent(scriptureRef), null, 'ref')
 
         sections.forEach((section, localSeq) => {
           const content: Omit<ScriptureSlide, 'id' | 'position'> = {
@@ -513,10 +585,6 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
             verseRange: section.verseRange ?? '',
             readingMode: 'congregational',
             section,
-            // R097: mirrors the stored-group path's `entry.order === 0` —
-            // the fallback path's ordinal is `localSeq`. Both paths must
-            // agree slide-for-slide (dual-path parity tests).
-            isFirstSection: localSeq === 0,
             // R092: same passthrough as the stored-group path above — read
             // straight off the slot's own section, never re-derived.
             ...(section.translationSource !== undefined ? { translationSource: section.translationSource } : {}),
