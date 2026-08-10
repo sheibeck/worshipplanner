@@ -243,7 +243,7 @@ these requirements are cited inline as `[SUMMARY]`, `[ARCH]`, `[PITFALL]`, `[STA
       text slides, added media) is preserved in place; only the auto-generated (derived) entries are
       re-derived.
 
-- [ ] **R108**: A manually-added imported slide always resolves to its correct rendered page, even
+- [x] **R108**: A manually-added imported slide always resolves to its correct rendered page, even
       for a multi-image deck where the parsed-slide count differs from the rendered-page count
       (i.e. `mapAstToSlides` emitted more entries than there are pages). Supersedes the interim 1:1
       positional fallback (ec217aa), which only resolves single-image-per-slide decks, with a

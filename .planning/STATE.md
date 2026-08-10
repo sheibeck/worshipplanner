@@ -4,17 +4,17 @@ milestone: v1.5
 milestone_name: Settings, Sharing, and Fidelity
 current_phase: 50
 current_phase_name: slide-management-bulk-delete-provenance
-status: executing
-stopped_at: Completed 50-04-PLAN.md
-last_updated: "2026-08-10T21:28:41.815Z"
+status: verifying
+stopped_at: Completed 50-05-PLAN.md (Phase 50 complete, 5/5 plans)
+last_updated: "2026-08-10T21:40:11.365Z"
 last_activity: 2026-08-10
 last_activity_desc: Phase 50 execution started
 progress:
   total_phases: 13
-  completed_phases: 12
+  completed_phases: 13
   total_plans: 49
-  completed_plans: 48
-  percent: 92
+  completed_plans: 49
+  percent: 100
 ---
 
 # Project State
@@ -171,7 +171,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 50 (slide-management-bulk-delete-provenance) — EXECUTING
 Plan: 5 of 5
-Status: Ready to execute
+Status: Phase complete — ready for verification
 client (DEPLOY-GATED, see below). 45-02 added `bibleVersion: 'ESV' | 'NLT'` to `OrgSettings`
 (`DEFAULT_ORG_SETTINGS.bibleVersion: 'NLT'`, owner's locked override) plus the Settings "Bible
 Translation" card. 45-03 added the `translationSource?` field + `scriptureAttribution()`/
@@ -1448,6 +1448,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 50 P02 | 35min | 2 tasks | 1 files |
 | Phase 50 P03 | 40min | 3 tasks | 8 files |
 | Phase 50 P04 | 25 min | 2 tasks | 2 files |
+| Phase 50 P05 | 6min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -1788,6 +1789,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: R108 requirement left unchecked after 50-03: this plan is part 1 of 2 (RECORD sourcePage/renderedPage); part 2 (CONSUME, plan 50-05) is what actually resolves multi-image decks and will mark R108 complete.
 - [Phase ?]: renderedPage deliberately excluded from SourceRef.derivedIdentityKey (documented in slideGroup.ts) -- it is provenance, not identity, so existing carry/survival matching (R107) is unaffected.
 - [Phase ?]: R106: per-group 'Remove imported slides' bulk action, gated on window.confirm reusing the existing codebase confirm pattern — Removal is irreversible and multi-slide; reused the established window.confirm pattern from useUnsavedGuard.ts/LyricPasteRegion.vue rather than inventing a new modal
+- [Phase ?]: R108: importedEntryContent resolution order strictly extends ec217aa — synthetic rendered-page-N identity, then supplied renderedPage (50-03), then the 1:1 positional fallback for legacy entries, then pending; legacy multi-image entries stay unfixed by design (fallback, no migration, per 50-CONTEXT.md).
 
 ### Roadmap Evolution
 
@@ -2100,8 +2102,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-10T21:28:41.770Z
-Stopped at: Completed 50-04-PLAN.md
+Last session: 2026-08-10T21:40:11.310Z
+Stopped at: Completed 50-05-PLAN.md (Phase 50 complete, 5/5 plans)
 Resume file: None
 
 ## Operator Next Steps
