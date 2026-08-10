@@ -37,8 +37,15 @@
       </div>
       <p v-else-if="!hideCaption" class="mb-1.5 text-[11px] text-gray-500" data-testid="background-control-caption">{{ caption }}</p>
 
+      <!-- Owner request: when the background is INHERITED FROM A SONG, do not
+           offer "+ Add background for this group" — the background is managed at
+           the song level, and a group-level override here is confusing. The
+           inherited thumbnail + provenance line above still render; only the
+           add/override affordance is suppressed. Own-background and
+           no-inheritance cases (inheritedFrom undefined) are unaffected, as is
+           the song-level call site (which never passes inheritedFrom). -->
       <label
-        v-if="isEditor"
+        v-if="isEditor && !inheritedFrom"
         class="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-gray-700 px-2.5 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:bg-gray-800"
         data-testid="background-control-add"
       >
@@ -83,8 +90,10 @@
  * every non-SONG group and the song-level call site pass `undefined` (the
  * song is the least specific level; there is nothing below it to inherit
  * from). Renders the inherited thumbnail and the
- * "inherited from the song — {label}" line from the Copywriting Contract,
- * plus still offers the add affordance (setting an override at this level).
+ * "inherited from the song — {label}" line from the Copywriting Contract. The
+ * add/override affordance is NOT offered while inherited (owner request): a
+ * song-sourced background is managed at the song level, so a group-level
+ * override here is suppressed to avoid confusion.
  *
  * There is no confirmation dialog for Remove at any level — a plain,
  * unconfirmed clear, matching `SlideGroupMusicControl.vue`'s own documented

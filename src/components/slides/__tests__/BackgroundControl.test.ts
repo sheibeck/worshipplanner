@@ -103,7 +103,7 @@ describe('BackgroundControl', () => {
     expect(wrapper.get('[data-testid="background-control-caption"]').text()).toBe(GROUP_CAPTION)
   })
 
-  it('with imageUrl unset and inheritedFrom provided, renders the inherited thumbnail, the provenance line, and still offers the add affordance', () => {
+  it('with imageUrl unset and inheritedFrom provided, renders the inherited thumbnail and provenance line but does NOT offer the add affordance (owner request — a song-sourced background is managed at the song level)', () => {
     const wrapper = mount(BackgroundControl, {
       props: {
         caption: GROUP_CAPTION,
@@ -118,7 +118,8 @@ describe('BackgroundControl', () => {
     const inherited = wrapper.get('[data-testid="background-control-inherited"]')
     expect(inherited.text()).toContain('inherited from the song')
     expect(inherited.text()).toContain('song-bg.jpg')
-    expect(wrapper.find('[data-testid="background-control-add"]').exists()).toBe(true)
+    // The "+ Add background for this group" override is suppressed while inherited.
+    expect(wrapper.find('[data-testid="background-control-add"]').exists()).toBe(false)
   })
 
   it('selecting a valid image file uploads it and emits attach exactly once with the resolved URL', async () => {
