@@ -473,7 +473,7 @@ describe('congregational detachment — composed durability across repeated rebu
     expect(tick2.group.slides.map((entry) => congregationalSectionFromRef(entry.sourceRef))).toEqual(TWO_SECTIONS)
   })
 
-  it('MIGRATION, congregational: a group in the shape a Phase-34 service actually holds today (one payload-free entry, sourceSignature equal to the bare formatted reference) on a slot that already carries three sections converts to three section entries on tick one and reports no change on tick two — assembling yields three slides', () => {
+  it('MIGRATION, congregational: a group in the shape a Phase-34 service actually holds today (one payload-free entry, sourceSignature equal to the bare formatted reference) on a slot that already carries three sections converts to three section entries on tick one and reports no change on tick two — assembling yields N+1 = four slides (R105 reference slide + three sections)', () => {
     const sectionsSlot = baseSlot({ congregationalSections: THREE_SECTIONS })
     const inputs = makeInputs()
     const bareSignature = formatScriptureReference(scriptureRefFromSlot(sectionsSlot)!)
@@ -500,7 +500,14 @@ describe('congregational detachment — composed durability across repeated rebu
       makeService([sectionsSlot]),
       makeInputs({ groupsBySlotId: new Map([[sectionsSlot.id, tick2.group]]) }),
     )
-    expect(result).toHaveLength(3)
+    // R105: N+1 — the group's three converted section entries plus the
+    // assembly-time synthetic leading reference slide. The stored group is
+    // unchanged (still three entries, asserted above); the reference slide is
+    // added purely at assembly time (approach B).
+    expect(result).toHaveLength(4)
+    const refSlide = result[0]!.slide as ScriptureSlide
+    expect(refSlide.readingMode).toBe('normal')
+    expect(Object.prototype.hasOwnProperty.call(refSlide, 'section')).toBe(false)
   })
 
   it('MIGRATION, non-regression: a group in that same stored shape on a slot with NO sections reports no change on the very first tick — deploying this phase must not rewrite a single ordinary scripture group', () => {
@@ -522,7 +529,7 @@ describe('congregational detachment — composed durability across repeated rebu
     expect(tick1.changed).toBe(false)
   })
 
-  it('PROJECTED OUTPUT: after conversion, assembleSlideshow over the group yields one slide per surviving entry, each carrying its own speaker and words, in group order', () => {
+  it('PROJECTED OUTPUT: after conversion, assembleSlideshow over the group yields the R105 reference slide then one slide per surviving entry, each carrying its own speaker and words, in group order', () => {
     const sectionsSlot = baseSlot({ congregationalSections: THREE_SECTIONS })
     const inputs = makeInputs()
     const converted = convertedGroup(sectionsSlot, inputs)
@@ -538,12 +545,16 @@ describe('congregational detachment — composed durability across repeated rebu
       makeService([sectionsSlot]),
       makeInputs({ groupsBySlotId: new Map([[sectionsSlot.id, tick2.group]]) }),
     )
-    expect(result).toHaveLength(2)
+    // R105: the synthetic leading reference slide plus the two surviving
+    // section entries.
+    expect(result).toHaveLength(3)
     const slides = result.map((r) => r.slide as ScriptureSlide)
-    expect(slides[0]!.section).toEqual(THREE_SECTIONS[0])
-    expect(slides[1]!.section).toEqual(THREE_SECTIONS[2])
-    expect(slides[0]!.text).toBe(THREE_SECTIONS[0]!.text)
-    expect(slides[1]!.text).toBe(THREE_SECTIONS[2]!.text)
+    expect(slides[0]!.readingMode).toBe('normal')
+    expect(Object.prototype.hasOwnProperty.call(slides[0]!, 'section')).toBe(false)
+    expect(slides[1]!.section).toEqual(THREE_SECTIONS[0])
+    expect(slides[2]!.section).toEqual(THREE_SECTIONS[2])
+    expect(slides[1]!.text).toBe(THREE_SECTIONS[0]!.text)
+    expect(slides[2]!.text).toBe(THREE_SECTIONS[2]!.text)
   })
 
   it('encoding backstop: a section carrying curly quotes and an em dash survives conversion and two further ticks with strict === equality', () => {

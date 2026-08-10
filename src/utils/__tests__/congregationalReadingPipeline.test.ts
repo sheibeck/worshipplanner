@@ -13,12 +13,34 @@ import type { Timestamp } from 'firebase/firestore'
  * machinery passed 118 targeted tests while no user could reach any of it.
  * This file is deliberately NOT another test of any one piece. It asserts
  * the COMPOSITION: a congregational reading stored on a `ScriptureSlot`
- * reaches N assembled `ScriptureSlide`s — one per section (Phase 38, D1) — on
- * both materialization paths, SURVIVES a group rebuild without re-deriving
- * (D1's detachment guarantee, the whole point of converting), and satisfies
- * the exact predicate `PresentationViewer.vue`'s `isCongregational` computed
+ * reaches N+1 assembled `ScriptureSlide`s — a dedicated leading reference
+ * slide plus one per section (Phase 49, R105; refines Phase 38 D1) — on both
+ * materialization paths, SURVIVES a group rebuild without re-deriving (D1's
+ * detachment guarantee, the whole point of converting), and satisfies the
+ * exact predicate `PresentationViewer.vue`'s `isCongregational` computed
  * evaluates before it will render the Leader/Congregation layout at all.
+ *
+ * R105 (Phase 49): the reference is no longer an eyebrow on the first section
+ * slide — it is emitted as a synthetic leading reference slide (readingMode
+ * 'normal', no section) at assembly time on BOTH paths. So a reading with N
+ * sections assembles to N+1 slides: index 0 the reference slide, indices 1..N
+ * the sections. The group-rebuild/carry machinery is UNTOUCHED (approach B) —
+ * the stored group still holds exactly N section entries, and the reference
+ * slide is added purely at assembly time.
  */
+
+/** Helper: the section slides of an assembled reading (everything after the
+ * synthetic leading reference slide at index 0). */
+function sectionsOf(slides: ScriptureSlide[]): ScriptureSlide[] {
+  return slides.slice(1)
+}
+
+/** Helper: assert a slide is the dedicated leading reference slide (R105). */
+function expectReferenceSlide(slide: ScriptureSlide): void {
+  expect(slide.readingMode).toBe('normal')
+  expect(slide.text).toBe('')
+  expect(Object.prototype.hasOwnProperty.call(slide, 'section')).toBe(false)
+}
 
 const mockTimestamp = { toDate: () => new Date('2026-01-01') } as unknown as Timestamp
 
@@ -144,44 +166,55 @@ describe('congregational reading pipeline — composed slot -> group -> slide co
     expect(THREE_SECTIONS.map((s) => s.text).join('')).toBe(SOURCE_PASSAGE)
   })
 
-  it('fallback path: a slot with three sections assembles to exactly THREE scripture slides, each readingMode congregational, each carrying its own section', () => {
+  it('fallback path: a slot with three sections assembles to N+1 = FOUR scripture slides — the reference slide, then one congregational slide per section', () => {
     const slot = baseSlot({ congregationalSections: THREE_SECTIONS })
     const result = assembleSlideshow(makeService([slot]), makeInputs())
 
-    expect(result).toHaveLength(3)
+    expect(result).toHaveLength(4)
     const slides = result.map((r) => r.slide as ScriptureSlide)
+    expectReferenceSlide(slides[0]!)
+    const sections = sectionsOf(slides)
     for (let i = 0; i < 3; i++) {
-      expect(slides[i]!.contentKind).toBe('scripture')
-      expect(slides[i]!.readingMode).toBe('congregational')
-      expect(slides[i]!.section).toEqual(THREE_SECTIONS[i])
-      expect(slides[i]!.text).toBe(THREE_SECTIONS[i]!.text)
+      expect(sections[i]!.contentKind).toBe('scripture')
+      expect(sections[i]!.readingMode).toBe('congregational')
+      expect(sections[i]!.section).toEqual(THREE_SECTIONS[i])
+      expect(sections[i]!.text).toBe(THREE_SECTIONS[i]!.text)
     }
   })
 
-  it('stored-group path: the same slot fed through buildInitialGroup produces the same three slides, same readingMode, same per-slide section', () => {
+  it('stored-group path: the same slot fed through buildInitialGroup produces the same N+1 slides — reference slide then per-section slides, identical to the fallback path', () => {
     const slot = baseSlot({ congregationalSections: THREE_SECTIONS })
     const { fallback, storedGroup } = assembleBothPaths(slot)
 
-    expect(storedGroup).toHaveLength(3)
-    expect(fallback).toHaveLength(3)
+    expect(storedGroup).toHaveLength(4)
+    expect(fallback).toHaveLength(4)
+    // Index 0: the dedicated reference slide, identical on both paths.
+    expectReferenceSlide(storedGroup[0]!)
+    expectReferenceSlide(fallback[0]!)
+    expect(storedGroup[0]!.reference).toBe(fallback[0]!.reference)
+    // Indices 1..N: the sections.
+    const storedSections = sectionsOf(storedGroup)
+    const fallbackSections = sectionsOf(fallback)
     for (let i = 0; i < 3; i++) {
-      expect(storedGroup[i]!.readingMode).toBe(fallback[i]!.readingMode)
-      expect(storedGroup[i]!.section).toEqual(fallback[i]!.section)
-      expect(storedGroup[i]!.readingMode).toBe('congregational')
-      expect(storedGroup[i]!.section).toEqual(THREE_SECTIONS[i])
+      expect(storedSections[i]!.readingMode).toBe(fallbackSections[i]!.readingMode)
+      expect(storedSections[i]!.section).toEqual(fallbackSections[i]!.section)
+      expect(storedSections[i]!.readingMode).toBe('congregational')
+      expect(storedSections[i]!.section).toEqual(THREE_SECTIONS[i])
     }
   })
 
-  it('rebuild survival (D1 detachment): rebuildGroup followed by reassembly yields the SAME three sections in the same order — not re-derived, not collapsed', () => {
+  it('rebuild survival (D1 detachment): rebuildGroup followed by reassembly yields the reference slide + the SAME three sections in order — not re-derived, not collapsed', () => {
     const slot = baseSlot({ congregationalSections: THREE_SECTIONS })
-    const beforeRebuild = assembleBothPaths(slot).storedGroup
+    const beforeRebuild = sectionsOf(assembleBothPaths(slot).storedGroup)
     const afterRebuild = assembleAfterRebuild(slot)
 
-    expect(afterRebuild).toHaveLength(3)
+    expect(afterRebuild).toHaveLength(4)
+    expectReferenceSlide(afterRebuild[0]!)
+    const afterSections = sectionsOf(afterRebuild)
     for (let i = 0; i < 3; i++) {
-      expect(afterRebuild[i]!.readingMode).toBe('congregational')
-      expect(afterRebuild[i]!.section).toEqual(beforeRebuild[i]!.section)
-      expect(afterRebuild[i]!.section).toEqual(THREE_SECTIONS[i])
+      expect(afterSections[i]!.readingMode).toBe('congregational')
+      expect(afterSections[i]!.section).toEqual(beforeRebuild[i]!.section)
+      expect(afterSections[i]!.section).toEqual(THREE_SECTIONS[i])
     }
   })
 
@@ -191,7 +224,9 @@ describe('congregational reading pipeline — composed slot -> group -> slide co
     const initial = buildInitialGroup(slot, 'svc-pipeline', inputs)
     const fullGroup: SlideGroup = { ...initial, createdAt: mockTimestamp, updatedAt: mockTimestamp }
 
-    // The user deletes the middle section slide.
+    // The user deletes the middle section slide. The stored group holds only
+    // section entries (approach B — no stored reference entry), so it drops to
+    // two entries.
     const editedGroup: SlideGroup = { ...fullGroup, slides: [fullGroup.slides[0]!, fullGroup.slides[2]!] }
 
     const rebuildResult = rebuildGroup(editedGroup, slot, inputs)
@@ -202,9 +237,11 @@ describe('congregational reading pipeline — composed slot -> group -> slide co
       groupsBySlotId: new Map([[slot.id, { ...editedGroup, slides: rebuildResult.slides }]]),
     })
     const result = assembleSlideshow(makeService([slot]), rebuiltInputs)
-    expect(result).toHaveLength(2)
+    // N+1: the synthetic reference slide plus the two surviving sections.
+    expect(result).toHaveLength(3)
     const slides = result.map((r) => r.slide as ScriptureSlide)
-    expect(slides.map((s) => s.text)).toEqual([THREE_SECTIONS[0]!.text, THREE_SECTIONS[2]!.text])
+    expectReferenceSlide(slides[0]!)
+    expect(sectionsOf(slides).map((s) => s.text)).toEqual([THREE_SECTIONS[0]!.text, THREE_SECTIONS[2]!.text])
   })
 
   it('destroy: changing the slot to a different passage (which clears congregationalSections) collapses the group to exactly ONE Reference-state slide on the next rebuild', () => {
@@ -234,19 +271,22 @@ describe('congregational reading pipeline — composed slot -> group -> slide co
     const { fallback, storedGroup } = assembleBothPaths(slot)
 
     for (const slides of [fallback, storedGroup]) {
-      expect(slides).toHaveLength(3)
-      expect(slides[1]!.section!.speaker).toBe('CONGREGATION')
-      expect(slides[2]!.section!.speaker).toBe('CONGREGATION')
-      expect(slides[1]!.text).not.toBe(slides[2]!.text)
+      expect(slides).toHaveLength(4)
+      const sections = sectionsOf(slides)
+      // THREE_SECTIONS[1] and [2] are the two consecutive CONGREGATION sections.
+      expect(sections[1]!.section!.speaker).toBe('CONGREGATION')
+      expect(sections[2]!.section!.speaker).toBe('CONGREGATION')
+      expect(sections[1]!.text).not.toBe(sections[2]!.text)
     }
   })
 
-  it('text adjacency: concatenating the assembled slides\' section text reproduces the source passage with nothing duplicated and nothing dropped, on both paths', () => {
+  it('text adjacency: concatenating the assembled section slides\' text reproduces the source passage with nothing duplicated and nothing dropped, on both paths', () => {
     const slot = baseSlot({ congregationalSections: THREE_SECTIONS })
     const { fallback, storedGroup } = assembleBothPaths(slot)
 
     for (const slides of [fallback, storedGroup]) {
-      const reconstructed = slides.map((s) => s.text).join('')
+      // Skip the index-0 reference slide (empty text); concatenate the sections.
+      const reconstructed = sectionsOf(slides).map((s) => s.text).join('')
       expect(reconstructed).toBe(SOURCE_PASSAGE)
     }
   })
@@ -284,14 +324,16 @@ describe('congregational reading pipeline — composed slot -> group -> slide co
     const { fallback, storedGroup } = assembleBothPaths(slot)
 
     for (const slides of [fallback, storedGroup]) {
-      expect(slides).toHaveLength(1)
-      expect(slides[0]!.section).toBeDefined()
-      expect(slides[0]!.section!.text === NON_ASCII_SECTION.text).toBe(true)
-      expect(slides[0]!.text === NON_ASCII_SECTION.text).toBe(true)
+      // N+1: the reference slide plus the single section slide.
+      expect(slides).toHaveLength(2)
+      const section = slides[1]!
+      expect(section.section).toBeDefined()
+      expect(section.section!.text === NON_ASCII_SECTION.text).toBe(true)
+      expect(section.text === NON_ASCII_SECTION.text).toBe(true)
     }
   })
 
-  it('presentation predicate: the inlined isCongregational condition is true for every congregational slide and false for both backward-compatible cases', () => {
+  it('presentation predicate: the inlined isCongregational condition is true for every congregational SECTION slide, false for the dedicated reference slide and for both backward-compatible cases', () => {
     const congregationalSlot = baseSlot({ congregationalSections: THREE_SECTIONS })
     const absentSlot = baseSlot()
     const emptySlot = baseSlot({ congregationalSections: [] })
@@ -300,7 +342,13 @@ describe('congregational reading pipeline — composed slot -> group -> slide co
     const absent = assembleBothPaths(absentSlot)
     const empty = assembleBothPaths(emptySlot)
 
-    for (const slide of [...congregational.fallback, ...congregational.storedGroup]) {
+    // R105: the dedicated reference slide (index 0) is a Reference-state slide
+    // — the predicate is FALSE for it, exactly as for a plain scripture slide.
+    expect(presentationPredicate(congregational.fallback[0]!)).toBe(false)
+    expect(presentationPredicate(congregational.storedGroup[0]!)).toBe(false)
+
+    // Every SECTION slide (indices 1..N) satisfies the predicate.
+    for (const slide of [...sectionsOf(congregational.fallback), ...sectionsOf(congregational.storedGroup)]) {
       expect(presentationPredicate(slide)).toBe(true)
     }
 
