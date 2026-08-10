@@ -242,6 +242,27 @@ describe('importedEntryContent', () => {
     const content = importedEntryContent(deck, resolution, 'rendered-page-3', urls)
     expect(content).toEqual({ contentKind: 'image', imageUrl: '', renderState: 'pending' })
   })
+
+  // Regression: a deck's slides manually added into ANOTHER slot's group (e.g. a
+  // Prayer group) keep the deck's PARSED-slide id as innerSlideId, not the
+  // synthetic `rendered-page-N` identity. When parsed and rendered counts match
+  // 1:1, ready mode must resolve them positionally instead of hanging on the
+  // "Rendering" spinner forever.
+  it("mode 'ready' resolves a hand-added entry keyed by a PARSED-slide id to its positional page URL when parsed/rendered counts match 1:1", () => {
+    const resolution: ImportedRenderResolution = { mode: 'ready', entryCount: 5 } // deck has 5 parsed slides
+    const urls = [1, 2, 3, 4, 5].map((n) => `https://cdn.example.com/page-000${n}.png`)
+    // 'is-3' is deck.slides[2] → page 3 → urls[2]
+    const content = importedEntryContent(deck, resolution, 'is-3', urls)
+    expect(content).toEqual({ contentKind: 'image', imageUrl: 'https://cdn.example.com/page-0003.png' })
+    expect(content).not.toHaveProperty('renderState')
+  })
+
+  it("mode 'ready' with a parsed-slide id but MISMATCHED parsed/rendered counts stays pending (multi-image positional-pairing guard)", () => {
+    const resolution: ImportedRenderResolution = { mode: 'ready', entryCount: 3 } // deck has 5 parsed slides — counts differ
+    const urls = ['https://cdn.example.com/page-0001.png', 'https://cdn.example.com/page-0002.png', 'https://cdn.example.com/page-0003.png']
+    const content = importedEntryContent(deck, resolution, 'is-2', urls)
+    expect(content).toEqual({ contentKind: 'image', imageUrl: '', renderState: 'pending' })
+  })
 })
 
 describe('importedSourceSignature', () => {

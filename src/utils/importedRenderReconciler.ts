@@ -235,7 +235,26 @@ export function importedEntryContent(
       }
 
     case 'ready': {
-      const pageNumber = renderedPageNumberFromIdentity(innerSlideId)
+      let pageNumber = renderedPageNumberFromIdentity(innerSlideId)
+      // An imported deck's slides can be manually added into ANOTHER slot's
+      // group (e.g. a Prayer group, alongside auto-generated slides). Such a
+      // hand-added entry keeps the deck's PARSED-slide id as its innerSlideId —
+      // the synthetic `rendered-page-N` identity is only ever minted by the
+      // IMPORTED-slot materializer, never for an entry dropped into a
+      // non-imported group. Without this branch that parsed-slide id never
+      // resolves to a page and the slide hangs on the "Rendering" spinner
+      // forever even after the render is ready. When the parsed-slide count
+      // matches the rendered-page count 1:1 (the common single-image-per-slide
+      // deck), map the entry to its page by its position in `deck.slides`. If
+      // the two counts differ — a multi-image deck, where `mapAstToSlides`
+      // emits one entry per image and cannot be positionally paired to pages
+      // (Fact 1) — leave it pending rather than risk pairing to the wrong page.
+      // Full render-stable identity handling for hand-added imported entries is
+      // scoped to a follow-up phase.
+      if (pageNumber === null && deck.slides.length === resolution.entryCount) {
+        const idx = deck.slides.findIndex((s) => s.id === innerSlideId)
+        if (idx >= 0) pageNumber = idx + 1
+      }
       const url = pageNumber !== null ? renderedUrls?.[pageNumber - 1] : undefined
       if (url) {
         return { contentKind: 'image', imageUrl: url }
