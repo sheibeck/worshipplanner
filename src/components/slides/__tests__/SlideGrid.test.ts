@@ -1225,12 +1225,12 @@ describe('SlideGrid', () => {
       const scriptureKeys = (cards[1]!.props('menuItems') as MenuItem[]).map((i) => i.key)
       // D2 (260805-bvo): exact-list assertion — a negative containment check
       // on the text card would go vacuous once 'edit-lyrics' stops existing
-      // at all, so this pins the whole list instead. The scripture card's
-      // OWN negative assertion is dropped as redundant, not weakened: the
-      // very next line already asserts its route key positively, which is
-      // strictly stronger.
+      // at all, so this pins the whole list instead.
       expect(textKeys).toEqual(['edit-details', 'duplicate', 'delete'])
-      expect(scriptureKeys).toContain('edit-in-scripture')
+      // Congregational reading moved to a group-level button (owner request) —
+      // the scripture 3-dot menu no longer offers 'edit-in-scripture'.
+      expect(scriptureKeys).not.toContain('edit-in-scripture')
+      expect(scriptureKeys).toEqual(['edit-details', 'duplicate', 'delete'])
     })
 
     it('toggles one card open, then toggling a DIFFERENT card menu closes the first and opens the second', async () => {

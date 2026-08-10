@@ -626,11 +626,10 @@ describe('slideDisplay', () => {
       expect(keysOf(entry, 'SONG', true)).toEqual(['edit-details', 'edit-in-song'])
     })
 
-    it('a scripture entry with mutation allowed returns edit-details, edit-in-scripture, duplicate, delete', () => {
+    it('a scripture entry with mutation allowed returns edit-details, duplicate, delete (congregational reading moved to a group-level button)', () => {
       const entry = makeMenuEntry({ kind: 'scripture' })
       expect(keysOf(entry, 'SCRIPTURE', true)).toEqual([
         'edit-details',
-        'edit-in-scripture',
         'duplicate',
         'delete',
       ])
@@ -645,40 +644,23 @@ describe('slideDisplay', () => {
       const entry = makeMenuEntry({ kind: 'scripture', speaker: 'LEADER', text: 'For God so loved the world' })
       expect(keysOf(entry, 'SCRIPTURE', true)).toEqual([
         'edit-details',
-        'edit-in-scripture',
         'duplicate',
         'delete',
       ])
     })
 
-    // 34-07 (owner UAT F1): the scripture route's label/tone changed — it now
-    // opens an editor in place rather than routing away — but the key order
-    // is unchanged, and no item may mention a lyrics route it does not offer.
-    it('34-07: the scripture route item is labelled "Congregational Reading" with a default (non-nav) tone, key order unchanged', () => {
+    // The congregational-reading action moved out of the 3-dot menu to a
+    // discoverable group-level button beside "+ Add background for this group"
+    // (owner request — the menu item was too buried). The scripture 3-dot menu
+    // therefore no longer offers 'edit-in-scripture' for either canMutate value.
+    it('the scripture 3-dot menu no longer offers edit-in-scripture (moved to a group-level button)', () => {
       for (const canMutate of [true, false]) {
         const entry = makeMenuEntry({ kind: 'scripture' })
         const items = slideActionMenuItems(entry, 'SCRIPTURE', canMutate)
+        expect(items.map((item) => item.key)).not.toContain('edit-in-scripture')
         expect(items.map((item) => item.key)).toEqual(
-          canMutate ? ['edit-details', 'edit-in-scripture', 'duplicate', 'delete'] : ['edit-details', 'edit-in-scripture'],
+          canMutate ? ['edit-details', 'duplicate', 'delete'] : ['edit-details'],
         )
-        const routeItem = items.find((item) => item.key === 'edit-in-scripture')
-        expect(routeItem?.label).toBe('Congregational Reading')
-        expect(routeItem?.tone).toBe('default')
-      }
-    })
-
-    // Owner 2026-08-05: the destination has no free-text scripture override and
-    // never will (34-07 — the owner was shown the shadow-copy tension and
-    // declined it), so this item must not promise editing. Pinned as a negative
-    // because the failure mode is a plausible-sounding relabel drifting back
-    // toward "Edit …", which reads fine in a diff and is wrong in the product.
-    it('the scripture route item never promises text editing, for either canMutate value', () => {
-      for (const canMutate of [true, false]) {
-        const entry = makeMenuEntry({ kind: 'scripture' })
-        const items = slideActionMenuItems(entry, 'SCRIPTURE', canMutate)
-        const label = items.find((item) => item.key === 'edit-in-scripture')?.label ?? ''
-        expect(label.toLowerCase()).not.toContain('edit')
-        expect(label.toLowerCase()).toContain('congregational reading')
       }
     })
 
@@ -779,11 +761,9 @@ describe('slideDisplay', () => {
       for (const item of items) {
         expect(['default', 'nav', 'destructive']).toContain(item.tone)
       }
-      // 34-07: 'edit-in-scripture' no longer routes away — it opens an editor
-      // in place — so it now carries the default tone, not 'nav'.
-      // 'edit-in-song' still routes away and keeps the 'nav' tone.
-      const scriptureRouteItem = items.find((item) => item.key === 'edit-in-scripture')
-      expect(scriptureRouteItem?.tone).toBe('default')
+      // 'edit-in-scripture' is no longer in the scripture menu (moved to a
+      // group-level button), so there is no scripture route item to tone-check
+      // here. 'edit-in-song' still routes away and keeps the 'nav' tone.
       const songNavItem = slideActionMenuItems(
         makeMenuEntry({ kind: 'lyric', songId: 'song-1', sectionId: 'sec-1' }),
         'SONG',

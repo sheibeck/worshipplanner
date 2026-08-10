@@ -436,7 +436,14 @@ export function slideActionMenuItems(
       return [menuItem('edit-details'), menuItem('edit-in-song')]
 
     case 'scripture': {
-      const items = [menuItem('edit-details'), menuItem('edit-in-scripture')]
+      // The congregational-reading action moved OUT of the 3-dot menu to a
+      // discoverable group-level button beside "+ Add background for this group"
+      // (owner request — the menu item was too buried). See SlideGrid.vue's
+      // `edit-congregational` emit → SlidesTab's `onEditCongregational`, which
+      // relays to the same editor `requestEditInScripture` opens. The
+      // 'edit-in-scripture' key + relay are retained for that button; only the
+      // menu no longer offers it.
+      const items = [menuItem('edit-details')]
       if (canMutate) items.push(menuItem('duplicate'), menuItem('delete'))
       return items
     }
