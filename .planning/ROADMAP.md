@@ -440,8 +440,9 @@ Plans:
   3. Both the fallback (no stored group) and stored-group assembly paths emit the identical slide list, proven by the existing dual-path parity tests extended to the new shape
   4. Existing stored congregational readings are handled without corrupting per-section entry ids/attached media (no group-rebuild carry misalignment) — congregational readings were never deployed, but the group reconciliation invariants must still hold
 
-**Plans**: 1 plan
-- [ ] 49-01-PLAN.md — Emit the synthetic leading reference slide on both assembly paths (N+1 shape, dual-path parity, group-media resolution) and suppress the section-slide reference eyebrow (retire isFirstSection)
+**Plans**: 1/1 plans executed
+
+- [x] 49-01-PLAN.md — Emit the synthetic leading reference slide on both assembly paths (N+1 shape, dual-path parity, group-media resolution) and suppress the section-slide reference eyebrow (retire isFirstSection)
 
 **UI hint**: no (slide-assembly + display change; no new UI controls)
 **Research flag**: skip — the subsystem is already mapped; the design decision (assembly-time synthetic reference slide vs. stored reference entry) is captured in this phase's PRD/CONTEXT.
@@ -466,7 +467,7 @@ Plans:
 | 46. Global Slide Typography | v1.5 | 4/4 | In Progress|  |
 | 47. Congregational Reading Divider UX | v1.5 | 3/3 | In Progress|  |
 | 48. Multi-Image Ordering & Mobile Polish | v1.5 | 3/3 | In Progress|  |
-| 49. Congregational Reading — Dedicated Reference Slide | v1.5 | 0/1 | Planned|  |
+| 49. Congregational Reading — Dedicated Reference Slide | v1.5 | 1/1 | In Progress|  |
 
 ## Backlog
 

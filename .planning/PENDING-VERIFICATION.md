@@ -1251,6 +1251,24 @@ inherently physical-device / owner-judgment.
 
 ---
 
+## Phase 49 — Congregational Reading: Dedicated Reference Slide (Plan 49-01, 2026-08-10)
+
+Deferred under the v1.5 standing autonomy grant. **8/8 must-haves verified in code**; `npm run
+type-check` clean; app `src/` suite at the documented 2-file baseline. Implements R105 via approach
+B (assembly-time synthetic reference slide on both paths; `slideGroupMaterializer.ts` untouched).
+The item below is inherently visual — jsdom asserts the slide *list* shape and the display gates,
+but only a real projected render confirms the on-screen result and media continuity.
+
+- [ ] **49.1 Live projected render of a real congregational reading (R105).** Create a scripture
+      slot (e.g. **1 John 4:1-2**), make it congregational, and split it into sections. Present it
+      and confirm: **slide 1 shows the reference alone** ("1 John 4:1-2", no section text); **slides
+      2..N show only the section text + speaker label** with NO reference eyebrow; and any group
+      background / bed audio stays continuous across the reference→first-section transition. This is
+      the exact scenario the owner reported as broken before this phase (reference + first section
+      were rendering together on slide 1).
+
+---
+
 ## Notes and failures
 
 _(Record anything that failed here, with what you saw versus what was expected.)_
