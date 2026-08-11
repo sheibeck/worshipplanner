@@ -4,6 +4,7 @@ import {
   ADD_SECTION_KINDS,
   addSection,
   buildSectionRows,
+  deriveSectionKind,
   duplicateRow,
   mintSectionId,
   moveRow,
@@ -107,6 +108,64 @@ describe('buildSectionRows', () => {
       const followedAfter = after.find((r) => !r.isRepeat && r.sectionId === 'chorus')!
       expect(followedAfter.stableKey).toBe('s3')
     })
+  })
+})
+
+describe('deriveSectionKind (R120)', () => {
+  it('strips a single trailing arabic number for every real label shape', () => {
+    expect(deriveSectionKind('Verse 1')).toBe('Verse')
+    expect(deriveSectionKind('Verse')).toBe('Verse')
+    expect(deriveSectionKind('Chorus')).toBe('Chorus')
+    expect(deriveSectionKind('Pre-Chorus')).toBe('Pre-Chorus')
+    expect(deriveSectionKind('Pre-Chorus 2')).toBe('Pre-Chorus')
+    expect(deriveSectionKind('Bridge')).toBe('Bridge')
+    expect(deriveSectionKind('Section 1')).toBe('Section')
+  })
+})
+
+describe('buildSectionRows displayLabel (R120)', () => {
+  it('numbers a bare "Verse" after pasted "Verse 1"/"Verse 2" as "Verse 3" (the bug)', () => {
+    const v1: LyricSection = { id: 'verse-1', label: 'Verse 1', lines: ['a'] }
+    const v2: LyricSection = { id: 'verse-2', label: 'Verse 2', lines: ['b'] }
+    const vBare: LyricSection = { id: 'verse', label: 'Verse', lines: ['c'] }
+
+    const rows = buildSectionRows([v1, v2, vBare], ['verse-1', 'verse-2', 'verse'])
+
+    expect(rows.map((r) => r.displayLabel)).toEqual(['Verse 1', 'Verse 2', 'Verse 3'])
+  })
+
+  it('numbers per KIND by position, not by global row position', () => {
+    const v1: LyricSection = { id: 'verse-1', label: 'Verse 1', lines: ['a'] }
+    const c: LyricSection = { id: 'chorus', label: 'Chorus', lines: ['b'] }
+    const v2: LyricSection = { id: 'verse-2', label: 'Verse 2', lines: ['c'] }
+
+    const rows = buildSectionRows([v1, c, v2], ['verse-1', 'chorus', 'verse-2'])
+
+    expect(rows.map((r) => r.displayLabel)).toEqual(['Verse 1', 'Chorus 1', 'Verse 2'])
+  })
+
+  it('reuses the same displayLabel/number on both rows of a repeat', () => {
+    const rows = buildSectionRows([verse1, chorus], ['chorus', 'verse-1', 'chorus'])
+    expect(rows[0]?.displayLabel).toBe('Chorus 1')
+    expect(rows[2]?.displayLabel).toBe('Chorus 1')
+    expect(rows[1]?.displayLabel).toBe('Verse 1')
+  })
+
+  it('numbers a lone section of a kind as "{Kind} 1" (nothing unnumbered)', () => {
+    const rows = buildSectionRows([chorus], ['chorus'])
+    expect(rows[0]?.displayLabel).toBe('Chorus 1')
+  })
+
+  it('never mutates the stored section.label', () => {
+    const v1: LyricSection = { id: 'verse-1', label: 'Verse 1', lines: ['a'] }
+    const vBare: LyricSection = { id: 'verse', label: 'Verse', lines: ['c'] }
+    const sections = [v1, vBare]
+    const labelsBefore = sections.map((s) => s.label)
+
+    buildSectionRows(sections, ['verse-1', 'verse'])
+
+    expect(sections.map((s) => s.label)).toEqual(labelsBefore)
+    expect(vBare.label).toBe('Verse')
   })
 })
 
