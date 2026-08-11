@@ -4,17 +4,17 @@ milestone: v1.6
 milestone_name: Editing Reliability & Song Slides
 current_phase: 54
 current_phase_name: service-item-enhancements
-status: executing
-stopped_at: Completed 53-03-PLAN.md
-last_updated: "2026-08-11T23:18:01.368Z"
+status: verifying
+stopped_at: Completed 54-02-PLAN.md
+last_updated: "2026-08-11T23:52:17.236Z"
 last_activity: 2026-08-11
-last_activity_desc: Phase 54 execution started
+last_activity_desc: "Completed 54-02-PLAN.md (R122: slot-level notes field beside every item selector)"
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 13
-  completed_plans: 11
-  percent: 60
+  completed_plans: 13
+  percent: 80
 ---
 
 # Project State
@@ -203,10 +203,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 54 (service-item-enhancements) — EXECUTING
-Plan: 2 of 2
-Status: Executing Phase 54 (plan 54-01 complete)
-Last activity: 2026-08-11 — Completed 54-01-PLAN.md (R123: MISC item derives no slides)
+Phase: 54 (service-item-enhancements) — CODE-COMPLETE, ready for verification
+Plan: 2 of 2 (both complete)
+Status: Phase 54 code-complete (54-01 R123 + 54-02 R122). Human-visual checks DEFERRED per v1.6 grant → run `/gsd-verify-work 54`.
+Last activity: 2026-08-11 — Completed 54-02-PLAN.md (R122: slot-level notes field beside every item selector)
 
 ## ⏸ RESUME HERE (2026-08-11 — v1.6 ROADMAP.md created, ready to plan Phase 51)
 
@@ -1546,6 +1546,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 53 P01 | 15min | 3 tasks | 4 files |
 | Phase 53 P02 | 13min | 2 tasks | 3 files |
 | Phase 53 P03 | 20min | 2 tasks | 2 files |
+| Phase 54 P02 | 40 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -1891,6 +1892,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: R117 split = additive slideBreaks LINE indices over section.lines (not a slides array); sliceSectionIntoSlides is the single pure definition, read-tolerant clamp
 - [Phase ?]: R120 numbering derived at render time in buildSectionRows (deriveSectionKind + per-kind displayLabel); stored LyricSection.label never rewritten (BWC)
 - [Phase ?]: 53-02: split lyric sections resolve LIVE to N slides at both assembler call sites via sliceSectionIntoSlides; ids ${entry.id}:${i} (stored) / advancing localSeq (fallback), unsplit byte-identical; R118 falls out for free, no group-model change
+- [Phase ?]: R122: slot-level notes? on the base MediaAttachableSlot (cast-free on all 5 kinds, distinct from Service.notes); one shared responsive notes input beside every selector; emptied value dropped by stripUndefined
 
 ### Roadmap Evolution
 
@@ -2203,8 +2205,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-11T22:41:11.588Z
-Stopped at: Completed 53-03-PLAN.md
+Last session: 2026-08-11T23:52:16.542Z
+Stopped at: Completed 54-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

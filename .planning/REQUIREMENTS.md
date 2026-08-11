@@ -80,7 +80,7 @@ FINDINGS".
 
 ### Service Item Enhancements
 
-- [ ] **R122**: Every service item exposes a **notes field beside its selector** (song selector,
+- [x] **R122**: Every service item exposes a **notes field beside its selector** (song selector,
       scripture selector, etc.) for recording who leads the item or who sings which parts. The selector
       and notes sit side-by-side on desktop and stack on small screens, with a consistent layout across
       item types.
@@ -147,7 +147,7 @@ Which phases cover which requirements. Filled during roadmap creation (2026-08-1
 | R119 | Phase 53 — Song Lyric Editing | Complete |
 | R120 | Phase 53 — Song Lyric Editing | Complete |
 | R121 | Phase 53 — Song Lyric Editing | Complete |
-| R122 | Phase 54 — Service Item Enhancements | Pending |
+| R122 | Phase 54 — Service Item Enhancements | Complete |
 | R123 | Phase 54 — Service Item Enhancements | Complete |
 | R124 | Phase 55 — Preview & Export Polish | Pending |
 | R125 | Phase 55 — Preview & Export Polish | Pending |
