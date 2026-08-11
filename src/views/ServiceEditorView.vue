@@ -889,6 +889,15 @@
 
             <!-- Slot content -->
             <div class="flex-1 min-w-0">
+              <!-- R122 (54-02): two-column responsive wrapper. The existing
+                   per-kind selector chain sits in the left column; ONE shared
+                   plain-text notes input sits in the right column, written once
+                   for every kind. Side-by-side on desktop (sm:flex-row), stacked
+                   below the sm breakpoint (flex-col) — the QuarterView/Phase 48
+                   recipe, no new responsive pattern. -->
+              <div class="flex flex-col sm:flex-row sm:items-start gap-3">
+                <!-- Selector column: the existing chain, unchanged -->
+                <div class="flex-1 min-w-0">
               <!-- SONG slot -->
               <template v-if="slot.kind === 'SONG'">
                 <div class="flex items-center justify-between gap-3 mb-1">
@@ -1149,6 +1158,26 @@
                 </div>
                 <p v-if="!(slot as ImportedSlot).importId" class="text-sm text-gray-400 italic">Imported Slides — Empty</p>
               </template>
+                </div>
+                <!-- Notes column: written ONCE, shared by every kind (R122
+                     consistency). slot.notes takes NO cast — notes? lives on the
+                     base MediaAttachableSlot. Plain text only: :value binding +
+                     {{ }} interpolation auto-escape, never v-html (T-54-01).
+                     Setting `= value || undefined` on empty lets stripUndefined
+                     drop it so a raw undefined never reaches Firestore. -->
+                <div class="sm:w-64 flex-shrink-0">
+                  <input
+                    v-if="canEditService"
+                    :value="slot.notes"
+                    @input="slot.notes = ($event.target as HTMLInputElement).value || undefined"
+                    type="text"
+                    placeholder="Notes (e.g. who leads, who sings which parts)"
+                    data-testid="slot-notes-input"
+                    class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-200 text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500"
+                  />
+                  <p v-else-if="slot.notes" data-testid="slot-notes-text" class="text-xs text-gray-400 whitespace-pre-wrap">{{ slot.notes }}</p>
+                </div>
+              </div>
 
             </div>
 
