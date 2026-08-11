@@ -129,33 +129,33 @@ Explicitly excluded. Documented to prevent scope creep.
 
 ## Traceability
 
-Which phases cover which requirements. Filled during roadmap creation.
+Which phases cover which requirements. Filled during roadmap creation (2026-08-11).
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R110 | TBD | Pending |
-| R111 | TBD | Pending |
-| R112 | TBD | Pending |
-| R113 | TBD | Pending |
-| R114 | TBD | Pending |
-| R115 | TBD | Pending |
-| R116 | TBD | Pending |
-| R117 | TBD | Pending |
-| R118 | TBD | Pending |
-| R119 | TBD | Pending |
-| R120 | TBD | Pending |
-| R121 | TBD | Pending |
-| R122 | TBD | Pending |
-| R123 | TBD | Pending |
-| R124 | TBD | Pending |
-| R125 | TBD | Pending |
-| R126 | TBD | Pending |
+| R110 | Phase 51 — Service Order Editing Reliability | Pending |
+| R111 | Phase 51 — Service Order Editing Reliability | Pending |
+| R112 | Phase 51 — Service Order Editing Reliability | Pending |
+| R113 | Phase 52 — Default Service Template | Pending |
+| R114 | Phase 52 — Default Service Template | Pending |
+| R115 | Phase 52 — Default Service Template | Pending |
+| R116 | Phase 52 — Default Service Template | Pending |
+| R117 | Phase 53 — Song Lyric Editing | Pending |
+| R118 | Phase 53 — Song Lyric Editing | Pending |
+| R119 | Phase 53 — Song Lyric Editing | Pending |
+| R120 | Phase 53 — Song Lyric Editing | Pending |
+| R121 | Phase 53 — Song Lyric Editing | Pending |
+| R122 | Phase 54 — Service Item Enhancements | Pending |
+| R123 | Phase 54 — Service Item Enhancements | Pending |
+| R124 | Phase 55 — Preview & Export Polish | Pending |
+| R125 | Phase 55 — Preview & Export Polish | Pending |
+| R126 | Phase 55 — Preview & Export Polish | Pending |
 
 **Coverage:**
 - v1.6 requirements: 17 total (R110–R126)
-- Mapped to phases: 0 (roadmap not yet created)
-- Unmapped: 17 ⚠️
+- Mapped to phases: 17 (Phases 51–55)
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-08-11 at the start of milestone v1.6*
-*Last updated: 2026-08-11*
+*Last updated: 2026-08-11 — roadmap created, traceability filled (17/17 mapped to Phases 51–55)*

@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Editing Reliability & Song Slides
 status: planning
-last_updated: "2026-08-11T03:05:52.788Z"
-last_activity: 2026-08-10
+last_updated: "2026-08-11T14:00:00.000Z"
+last_activity: 2026-08-11
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -146,12 +146,81 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: Not started (roadmap created; ready to plan Phase 51)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-08-10 — Milestone v1.6 started
+Status: Roadmap created — ready for /gsd-plan-phase 51
+Last activity: 2026-08-11 — v1.6 ROADMAP.md created, 17/17 requirements (R110–R126) mapped to Phases 51–55
 
-## ⏸ RESUME HERE (2026-08-06 — v1.5 ROADMAP.md created, ready to plan Phase 39)
+## ⏸ RESUME HERE (2026-08-11 — v1.6 ROADMAP.md created, ready to plan Phase 51)
+
+**`.planning/ROADMAP.md` and `.planning/REQUIREMENTS.md` traceability are filled for v1.6** (Phases
+51–55, 17/17 requirements R110–R126 mapped, 0 unmapped). No plan has been created yet — the milestone
+is at the roadmap-created, not-yet-planned stage.
+
+**Next step:** `/gsd-plan-phase 51` (optionally preceded by `/gsd-discuss-phase 51`). Phase 51 (Service
+Order Editing Reliability, R110–R112) is FIRST by explicit owner instruction (2026-08-11): the
+cross-section drag phantom-duplicate (R110), the "No Section" dropdown save error (R111), and the
+empty-body ordering defect on the listing/share surfaces (R112) are the most disruptive bugs and block
+trust in every other editing surface. **Write a FAILING reproduction test before touching the reorder
+handlers** — the same discipline the v1.4 drag fix used. The corrupting machinery is
+`ServiceEditorView.vue`'s Sortable `onEnd` with its copy in `SlideGrid.vue`; all three symptoms clear on
+refresh → a client/persisted-state desync, not lost data. v1.4 Phase 29 already fixed the earlier
+index/key/DOM-revert bugs, so these are NEW symptoms on top of that rebuild. See STATE.md § "v1.4
+RESEARCH FINDINGS" for the reorder-machinery map.
+
+See `.planning/ROADMAP.md` § Phase Details for the full phase table, dependencies, and success criteria.
+
+## ★ v1.6 ROADMAP.md phase breakdown (created 2026-08-11)
+
+5 phases (51–55), derived directly from `.planning/REQUIREMENTS.md` (no `research/SUMMARY.md` this
+milestone — research was skipped) with this project's `coarse` granularity setting applied. **Numbering
+continues from v1.5, which ended at Phase 50** — v1.6 starts at Phase 51, not reset to 1.
+
+| Phase | Goal | Requirements | UI hint |
+|-------|------|--------------|---------|
+| 51 Service Order Editing Reliability | Cross-section drags never corrupt item state; items keep true order everywhere | R110, R111, R112 | yes |
+| 52 Default Service Template | Template lives on the Services page behind a cog, is the universal new-service starting point, pre-fills Misc content | R113, R114, R115, R116 | yes |
+| 53 Song Lyric Editing | Hand-split sections into slides, duplicate a split as one unit, Pre-Chorus, position numbering, "Save" button | R117–R121 | yes |
+| 54 Service Item Enhancements | Responsive notes field beside every item's selector; Misc items default to no slides | R122, R123 | yes |
+| 55 Preview & Export Polish | No auto-appended Bible version in preview; PC export spinner; Roboto slide font | R124, R125, R126 | no |
+
+**Hard sequencing constraint (owner instruction, non-negotiable):** R110/R111/R112 are Phase 51, FIRST.
+R110/R111 are the same cross-section drag machinery (`ServiceEditorView.vue` Sortable `onEnd` + the
+`SlideGrid.vue` copy); R112 is an ordering/serialization defect on the same surface (empty-bodied items
+sort last until text is typed). Grouped as one foundational reliability phase.
+
+**Other sequencing & dependencies:**
+
+- **Phase 52** (template) depends on Phase 51 — the template editor (`ServiceTemplateEditor.vue`) reuses
+  the same per-section SortableJS reorder, and R110 explicitly covers the default-template editor, so it
+  must inherit the reliability fix before becoming the universal starting point. Builds on v1.5 Phase 44's
+  template infrastructure and Phase 43's item-type palette. **R115 supersedes v1.5 Phase 44's "no template
+  → EMPTY service"** — the Suggested Template is now the universal start, decoupled from Vertical Worship
+  (PROJECT.md Key Decision, "Blank service template eliminated").
+
+- **Phase 53** (song editing, the largest new-build) depends on Phase 51 — R117/R118 build on the slide
+  reorder/duplicate machinery. Owner decision (PROJECT.md, "A split song section is one logical unit"): a
+  split section duplicates together and keeps one position-based number. Editor is `SongLyricEditor.vue`
+  (v1.3 Phase 28 `songSectionOrder.ts`); R121's button is on `LyricPasteRegion.vue` (v1.4 Phase 35).
+
+- **Phase 54** (item enhancements) depends on Phase 51 — R122 re-lays-out the same item row Phase 51
+  stabilizes; use `QuarterView.vue`'s responsive stacking recipe (as v1.5 Phase 48 did). R123's Misc item
+  is the `MISC` slot kind from v1.5 Phase 43.
+
+- **Phase 55** (polish) is independent, sequenced last. **R124 partially reverses v1.5 Phase 45's R091
+  auto-attribution in preview** (the "(ESV)"/"(NLT)" suffix at `PresentationViewer.vue` /
+  `slideDisplay.ts::slideBodyText()`) — reconcile with the per-slide `translationSource` provenance so
+  required attribution is not regressed elsewhere. R126 adds Roboto to v1.5 Phase 46's `SLIDE_FONTS`
+  @fontsource registry (self-hosted woff2 only), confirming Inter stays.
+
+**Granularity note:** under `coarse`, the two smallest requirement groups are kept as coherent,
+user-observable phases rather than split into thin single-requirement phases — service-item enhancements
+(R122–R123) as one phase, and the three unrelated polish items (R124–R126) combined into one phase.
+
+Full phase table, success criteria, and per-phase notes: `.planning/ROADMAP.md`. Traceability:
+`.planning/REQUIREMENTS.md` (17/17 mapped, 0 unmapped).
+
+## Historical — v1.5 RESUME HERE (2026-08-06 — SUPERSEDED; v1.5 shipped 2026-08-10, see the v1.6 RESUME HERE above)
 
 **`.planning/ROADMAP.md` and `.planning/REQUIREMENTS.md` traceability are filled for v1.5** (Phases
 39-48, 31/31 requirements R073–R103 mapped, 0 unmapped). No plan has been created yet — the milestone
