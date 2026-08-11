@@ -1,20 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.5
-milestone_name: Settings, Sharing, and Fidelity
-status: Awaiting next milestone
-stopped_at: Completed 50-05-PLAN.md (Phase 50 complete, 5/5 plans)
-last_updated: "2026-08-11T02:06:59.628Z"
+milestone: v1.6
+milestone_name: Editing Reliability & Song Slides
+status: planning
+last_updated: "2026-08-11T03:05:52.788Z"
 last_activity: 2026-08-10
-last_activity_desc: Milestone v1.5 completed and archived
 progress:
-  total_phases: 13
-  completed_phases: 13
-  total_plans: 49
-  completed_plans: 49
-  percent: 100
-current_phase: 50
-current_phase_name: Slide Management — Bulk Delete, Manual/Auto Provenance & Render Fidelity
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -150,10 +146,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: Milestone v1.5 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-08-10 — Milestone v1.5 completed and archived
+Status: Defining requirements
+Last activity: 2026-08-10 — Milestone v1.6 started
 
 ## ⏸ RESUME HERE (2026-08-06 — v1.5 ROADMAP.md created, ready to plan Phase 39)
 
