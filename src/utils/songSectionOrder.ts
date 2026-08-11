@@ -11,8 +11,8 @@ import type { LyricSection } from '@/types/songLyrics'
  * pooled section, not a copy (D-02).
  */
 
-/** The five quick-add kinds the option 2a mockup draws, in mockup order. */
-export const ADD_SECTION_KINDS = ['Verse', 'Chorus', 'Bridge', 'Tag', 'Ending'] as const
+/** The six quick-add kinds the option 2a mockup draws, in mockup order (R119 adds 'Pre-Chorus'). */
+export const ADD_SECTION_KINDS = ['Verse', 'Chorus', 'Pre-Chorus', 'Bridge', 'Tag', 'Ending'] as const
 
 export type AddSectionKind = (typeof ADD_SECTION_KINDS)[number]
 
