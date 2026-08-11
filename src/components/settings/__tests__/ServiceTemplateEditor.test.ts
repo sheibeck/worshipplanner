@@ -251,7 +251,13 @@ describe('ServiceTemplateEditor — per-item section, remove, and accessibility'
   })
 })
 
-describe('ServiceTemplateEditor — Reset to 1-2-3 default', () => {
+describe('ServiceTemplateEditor — Suggested Template seed (R114)', () => {
+  it('labels the seed button "Suggested Template" while keeping the template-reset testid', () => {
+    mountEditor(true)
+    const seedButton = body().get('[data-testid="template-reset"]')
+    expect(seedButton.text()).toBe('Suggested Template')
+  })
+
   it('applies directly (no confirm) when the draft is empty, loading a content-free 9-item shape', async () => {
     mountEditor(true)
     await body().get('[data-testid="template-reset"]').trigger('click')
@@ -293,7 +299,7 @@ describe('ServiceTemplateEditor — Reset to 1-2-3 default', () => {
     await flushPromises()
 
     expect(body().get('[data-testid="template-reset-confirm"]').text()).toContain(
-      "Replace your custom template with the standard 1-2-3 flow? This clears every item you've added.",
+      "Replace your custom template with the Suggested Template? This clears every item you've added.",
     )
     expect(templateItems()).toHaveLength(1)
 
