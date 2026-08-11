@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Editing Reliability & Song Slides
-current_phase: 51
-current_phase_name: service-order-editing-reliability
+current_phase: 52
+current_phase_name: default-service-template
 status: executing
 stopped_at: Completed 50-05-PLAN.md (Phase 50 complete, 5/5 plans)
-last_updated: "2026-08-11T18:24:36.878Z"
+last_updated: "2026-08-11T20:09:05.921Z"
 last_activity: 2026-08-11
-last_activity_desc: Phase 51 execution started
+last_activity_desc: Phase 52 execution started
 progress:
   total_phases: 5
-  completed_phases: 0
-  total_plans: 4
-  completed_plans: 0
-  percent: 0
+  completed_phases: 1
+  total_plans: 7
+  completed_plans: 4
+  percent: 20
 ---
 
 # Project State
@@ -193,7 +193,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 51 — service-order-editing-reliability
+**Current focus:** Phase 52 — default-service-template
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -203,10 +203,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 51 (service-order-editing-reliability) — CODE-COMPLETE, verification_deferred_human
-Plan: 4 of 4 complete (51-01, 51-02, 51-03, 51-04)
-Status: Phase 51 all plans executed + automated verification 4/4; 3 manual checks DEFERRED per v1.6 grant. Autonomous run advancing to Phase 52.
-Last activity: 2026-08-11 — Phase 51 verified (human_needed). All four R110/R111/R112 source fixes present in code and covered by genuine RED-first repros; `npm run type-check` clean, app suite 2994 pass at the 2-file baseline, 373/373 phase tests. 3 owner checks deferred to `/gsd-verify-work 51` (see PENDING-VERIFICATION.md § Phase 51). Not deploy-gated (client-only).
+Phase: 52 (default-service-template) — EXECUTING
+Plan: 1 of 3 complete (52-01 done; next: 52-02)
+Status: Executing Phase 52
+Last activity: 2026-08-11 — 52-01 executed (R115 suggested-template default + R116 body threading); slotTypes/services tests green, type-check clean, baseline 2-file
 
 ## ⏸ RESUME HERE (2026-08-11 — v1.6 ROADMAP.md created, ready to plan Phase 51)
 
