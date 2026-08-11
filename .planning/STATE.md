@@ -2,17 +2,17 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Editing Reliability & Song Slides
-current_phase: 53
-current_phase_name: song-lyric-editing
-status: verifying
+current_phase: 54
+current_phase_name: service-item-enhancements
+status: executing
 stopped_at: Completed 53-03-PLAN.md
-last_updated: "2026-08-11T22:41:12.556Z"
+last_updated: "2026-08-11T23:18:01.368Z"
 last_activity: 2026-08-11
-last_activity_desc: "53-03 shipped editor UI: derived displayLabel numbering (R120), Pre-Chorus chip (R119), click-between-lines split writing slideBreaks (R117)"
+last_activity_desc: Phase 54 execution started
 progress:
   total_phases: 5
   completed_phases: 3
-  total_plans: 11
+  total_plans: 13
   completed_plans: 11
   percent: 60
 ---
@@ -193,7 +193,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 53 — song-lyric-editing
+**Current focus:** Phase 54 — service-item-enhancements
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -203,10 +203,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 53 (song-lyric-editing) — CODE-COMPLETE, verification_deferred_human
-Plan: 4 of 4 complete (53-01, 53-02, 53-03, 53-04)
-Status: Phase 53 all plans executed + automated verification 5/5; 4 UAT checks DEFERRED per v1.6 grant. Autonomous run advancing to Phase 54.
-Last activity: 2026-08-11 — Phase 53 verified (human_needed). R117 manual split (`slideBreaks` + `sliceSectionIntoSlides` + both assembler paths sliced + editor click-between-lines divider), R118 duplicate-as-unit (test-proven, zero slide-group-model change), R119 Pre-Chorus, R120 position numbering (derived `displayLabel`, stored label immutable), R121 "Save" first-paste. BWC guards intact (unsplit byte-identical), `npm run type-check` clean, app suite 3050 pass at the 2-file baseline, 390/390 phase tests. 4 owner UATs → /gsd-verify-work 53. Not deploy-gated.
+Phase: 54 (service-item-enhancements) — EXECUTING
+Plan: 2 of 2
+Status: Executing Phase 54 (plan 54-01 complete)
+Last activity: 2026-08-11 — Completed 54-01-PLAN.md (R123: MISC item derives no slides)
 
 ## ⏸ RESUME HERE (2026-08-11 — v1.6 ROADMAP.md created, ready to plan Phase 51)
 

@@ -85,7 +85,7 @@ FINDINGS".
       and notes sit side-by-side on desktop and stack on small screens, with a consistent layout across
       item types.
 
-- [ ] **R123**: Miscellaneous service items **default to no slides**. Slides can still be added to a
+- [x] **R123**: Miscellaneous service items **default to no slides**. Slides can still be added to a
       Miscellaneous item when the user chooses.
 
 ### Preview & Export Polish
@@ -148,7 +148,7 @@ Which phases cover which requirements. Filled during roadmap creation (2026-08-1
 | R120 | Phase 53 — Song Lyric Editing | Complete |
 | R121 | Phase 53 — Song Lyric Editing | Complete |
 | R122 | Phase 54 — Service Item Enhancements | Pending |
-| R123 | Phase 54 — Service Item Enhancements | Pending |
+| R123 | Phase 54 — Service Item Enhancements | Complete |
 | R124 | Phase 55 — Preview & Export Polish | Pending |
 | R125 | Phase 55 — Preview & Export Polish | Pending |
 | R126 | Phase 55 — Preview & Export Polish | Pending |
