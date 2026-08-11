@@ -209,11 +209,13 @@ Plans:
   3. Creating a new service always starts it from the org's Suggested Template — there is no blank-template starting path — and with Vertical Worship mode on, the template's song slots still receive their required VW types at creation time (R115)
   4. A Miscellaneous item added **inside the template** exposes its body input box, so an org can pre-fill recurring content (canned music, standing announcement slides) into the default (R116)
 
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
 
-- [ ] TBD — created by `/gsd-plan-phase 52`
+- [ ] 52-01-PLAN.md — R115 + R116(util/type/store): `buildSuggestedTemplateEntries()` helper, `ServiceTemplateEntry.body?`, `createSlot` 4th body param, `buildSlotsFromTemplate` body threading, `createService` empty→suggested fallback (kept pure); reverse services `@489` empty→0 test (Wave 1)
+- [ ] 52-02-PLAN.md — R114 + R116(UI): rename seed button to "Suggested Template" (drop 1-2-3/VW copy, keep `template-reset` testid, `applyReset` via shared helper) + `template-item-body` textarea for MISC/ANNOUNCEMENTS rows (Wave 2, depends on 52-01)
+- [ ] 52-03-PLAN.md — R113: relocate editor to an editor-gated cog on ServicesView (new `ServicesView.test.ts`), remove the Services card + dead imports from SettingsView (Wave 1)
 
 **UI hint**: yes
 **Research flag**: skip (milestone research skipped) — reuses v1.5 Phase 44's `ServiceTemplateEditor.vue`, `OrgSettings.defaultServiceTemplate`, and `buildSlotsFromTemplate()`; the one behavioural change is R115's "always start from the template."
@@ -294,7 +296,7 @@ Plans:
 | 29-38 | v1.4 | 61/61 | Complete (archived) | 2026-08-05 |
 | 39-50 | v1.5 | all | Complete (archived) | 2026-08-10 |
 | 51. Service Order Editing Reliability | v1.6 | 4/4 | In Progress|  |
-| 52. Default Service Template | v1.6 | 0/TBD | Not started | - |
+| 52. Default Service Template | v1.6 | 0/3 | Planned | - |
 | 53. Song Lyric Editing | v1.6 | 0/TBD | Not started | - |
 | 54. Service Item Enhancements | v1.6 | 0/TBD | Not started | - |
 | 55. Preview & Export Polish | v1.6 | 0/TBD | Not started | - |
