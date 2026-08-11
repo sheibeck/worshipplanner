@@ -60,17 +60,17 @@ FINDINGS".
 > Goal, stated by the owner: make song editing as intuitive and easy as possible for a user who may not
 > be overly technical.
 
-- [ ] **R117**: Any song lyric item (verse, chorus, pre-chorus, etc.) can be **split into multiple
+- [x] **R117**: Any song lyric item (verse, chorus, pre-chorus, etc.) can be **split into multiple
       slides**, with the user manually choosing which lines land on each slide (e.g. an 8-line chorus
       divided into two 4-line slides).
 
 - [ ] **R118**: **Duplicating** a song item that has been split into multiple slides duplicates the
       whole multi-slide unit together, not a single slide.
 
-- [ ] **R119**: **Pre-Chorus** is available as an addable song lyric item type alongside Verse and
+- [x] **R119**: **Pre-Chorus** is available as an addable song lyric item type alongside Verse and
       Chorus.
 
-- [ ] **R120**: Song lyric sections are numbered by their **position** among sections of the same kind:
+- [x] **R120**: Song lyric sections are numbered by their **position** among sections of the same kind:
       the first verse is "Verse 1", a verse added after two existing verses is "Verse 3", and the second
       slide of a split "Verse 1" is still "Verse 1". No section is left unnumbered.
 
@@ -142,10 +142,10 @@ Which phases cover which requirements. Filled during roadmap creation (2026-08-1
 | R114 | Phase 52 — Default Service Template | Complete |
 | R115 | Phase 52 — Default Service Template | Complete |
 | R116 | Phase 52 — Default Service Template | Complete |
-| R117 | Phase 53 — Song Lyric Editing | Pending |
+| R117 | Phase 53 — Song Lyric Editing | Complete |
 | R118 | Phase 53 — Song Lyric Editing | Pending |
-| R119 | Phase 53 — Song Lyric Editing | Pending |
-| R120 | Phase 53 — Song Lyric Editing | Pending |
+| R119 | Phase 53 — Song Lyric Editing | Complete |
+| R120 | Phase 53 — Song Lyric Editing | Complete |
 | R121 | Phase 53 — Song Lyric Editing | Pending |
 | R122 | Phase 54 — Service Item Enhancements | Pending |
 | R123 | Phase 54 — Service Item Enhancements | Pending |

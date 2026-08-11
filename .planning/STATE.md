@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Editing Reliability & Song Slides
-current_phase: 52
-current_phase_name: default-service-template
+current_phase: 53
+current_phase_name: song-lyric-editing
 status: executing
-stopped_at: Completed 52-02-PLAN.md
-last_updated: "2026-08-11T20:48:46.315Z"
+stopped_at: Completed 53-01-PLAN.md
+last_updated: "2026-08-11T21:45:06.992Z"
 last_activity: 2026-08-11
-last_activity_desc: 52-01 executed (R115 suggested-template default + R116 body threading); slotTypes/services tests green, type-check clean, baseline 2-file
+last_activity_desc: Completed 53-01-PLAN.md (pure model core — R117/R119/R120)
 progress:
   total_phases: 5
   completed_phases: 2
-  total_plans: 7
-  completed_plans: 7
+  total_plans: 11
+  completed_plans: 8
   percent: 40
 ---
 
@@ -193,7 +193,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 52 — default-service-template
+**Current focus:** Phase 53 — song-lyric-editing
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -203,10 +203,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 52 (default-service-template) — CODE-COMPLETE, verification_deferred_human
-Plan: 3 of 3 complete (52-01, 52-02, 52-03)
-Status: Phase 52 all plans executed + automated verification 4/4; 3 manual checks DEFERRED per v1.6 grant. Autonomous run advancing to Phase 53.
-Last activity: 2026-08-11 — Phase 52 verified (human_needed). R113 cog relocation (editor off Settings, onto Services page), R114 "Suggested Template" rename (VW-decoupled), R115 no-blank fallback (`createService` seeds from `buildSuggestedTemplateEntries()`), R116 template Misc body input — all present in code, critical guards intact (buildSlotsFromTemplate purity @818, absent-body @654/@663, exhaustive switch), `npm run type-check` clean, app suite 3009 pass at the 2-file baseline. 3 owner checks → /gsd-verify-work 52 (PENDING-VERIFICATION.md § Phase 52). Not deploy-gated.
+Phase: 53 (song-lyric-editing) — EXECUTING
+Plan: 2 of 4
+Status: Ready to execute
+Last activity: 2026-08-11 — Phase 53 execution started
 
 ## ⏸ RESUME HERE (2026-08-11 — v1.6 ROADMAP.md created, ready to plan Phase 51)
 
@@ -1542,6 +1542,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 50 P05 | 6min | 2 tasks | 5 files |
 | Phase 52 P03 | 12 | 2 tasks | 4 files |
 | Phase 52 P02 | 9min | 2 tasks | 2 files |
+| Phase 53 P01 | 15min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -1884,6 +1885,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: R106: per-group 'Remove imported slides' bulk action, gated on window.confirm reusing the existing codebase confirm pattern — Removal is irreversible and multi-slide; reused the established window.confirm pattern from useUnsavedGuard.ts/LyricPasteRegion.vue rather than inventing a new modal
 - [Phase ?]: R108: importedEntryContent resolution order strictly extends ec217aa — synthetic rendered-page-N identity, then supplied renderedPage (50-03), then the 1:1 positional fallback for legacy entries, then pending; legacy multi-image entries stay unfixed by design (fallback, no migration, per 50-CONTEXT.md).
 - [Phase ?]: 52-02: template body input scoped to MISC + ANNOUNCEMENTS; editor seed + createService fallback share the one buildSuggestedTemplateEntries() preset
+- [Phase ?]: R117 split = additive slideBreaks LINE indices over section.lines (not a slides array); sliceSectionIntoSlides is the single pure definition, read-tolerant clamp
+- [Phase ?]: R120 numbering derived at render time in buildSectionRows (deriveSectionKind + per-kind displayLabel); stored LyricSection.label never rewritten (BWC)
 
 ### Roadmap Evolution
 
@@ -2196,8 +2199,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-11T20:48:33.853Z
-Stopped at: Completed 52-02-PLAN.md
+Last session: 2026-08-11T21:45:06.931Z
+Stopped at: Completed 53-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
