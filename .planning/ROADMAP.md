@@ -184,11 +184,14 @@ enhancements (R122–R123) as one phase, and the three unrelated preview/export/
   3. The Services listing page and the public share link show every service item in the same order as the service edit screen, including items with an empty body (e.g. two blank Miscellaneous items) — the empty-bodied item no longer sorts to the bottom until text is typed (R112)
   4. All three symptoms stay fixed without a page refresh — the fix corrects the client/persisted-state desync at its source, rather than being masked by a reload
 
-**Plans**: TBD
+**Plans**: 4 plans (repro-test-first; Wave 1 = 51-01/51-02/51-03, Wave 2 = 51-04)
 
 Plans:
 
-- [ ] TBD — created by `/gsd-plan-phase 51`
+- [ ] 51-01-PLAN.md — R110 live-plan editor: RED cross-section drag repro + nonce-rebuild fix in `ServiceEditorView.vue`
+- [ ] 51-02-PLAN.md — R110 default-template editor: RED cross-section drag repro + nonce-rebuild fix in `ServiceTemplateEditor.vue`
+- [ ] 51-03-PLAN.md — R111 save-safety: RED store test + `stripUndefined` in the `updateService` funnel
+- [ ] 51-04-PLAN.md — R112 read-surface order: RED listing/share tests + route `ServiceCard` & `buildServiceSnapshot` through `orderSlotsBySection` (new `ServiceCard.test.ts`)
 
 **UI hint**: yes
 **Research flag**: skip (milestone research skipped) — but the root cause must be isolated by reading the live reorder handlers first, per STATE.md § "v1.4 RESEARCH FINDINGS" and CLAUDE.md's graph caveat. Write a failing reproduction test BEFORE changing code, exactly as the v1.4 drag-and-drop fix did.
@@ -290,7 +293,7 @@ Plans:
 | 24-28 | v1.3 | 33/33 | Complete (archived) | 2026-07-28 |
 | 29-38 | v1.4 | 61/61 | Complete (archived) | 2026-08-05 |
 | 39-50 | v1.5 | all | Complete (archived) | 2026-08-10 |
-| 51. Service Order Editing Reliability | v1.6 | 0/TBD | Not started | - |
+| 51. Service Order Editing Reliability | v1.6 | 0/4 | Planned | - |
 | 52. Default Service Template | v1.6 | 0/TBD | Not started | - |
 | 53. Song Lyric Editing | v1.6 | 0/TBD | Not started | - |
 | 54. Service Item Enhancements | v1.6 | 0/TBD | Not started | - |
