@@ -25,7 +25,7 @@ import { useQuartersStore } from '@/stores/quarters'
 import { useAuthStore } from '@/stores/auth'
 import { deriveSlug, claimSlug } from '@/utils/slug'
 import { resolveServiceRoleAssignments } from '@/utils/serviceRoles'
-import { buildSlotsFromTemplate, orderSlotsBySection } from '@/utils/slotTypes'
+import { buildSlotsFromTemplate, buildSuggestedTemplateEntries, orderSlotsBySection } from '@/utils/slotTypes'
 import { stripUndefined } from '@/utils/stripUndefined'
 import { mintShareToken, pickAdoptableToken, type ShareTokenCandidate } from '@/utils/shareTokens'
 import type { Service, ServiceStatus, Progression, ScriptureRef, ServiceSlot } from '@/types/service'
@@ -232,14 +232,20 @@ export const useServiceStore = defineStore('services', () => {
 
   async function createService(data: CreateServiceInput): Promise<string> {
     if (!orgId.value) throw new Error('No orgId set — call subscribe() first')
-    // 44-01/R087: slots come from the church's default service template —
-    // or an EMPTY service when the template is unset (owner override
-    // 2026-08-07). buildSlots() is NEVER reinstated as a fallback here; it
-    // remains available only as the template editor's "Reset to 1-2-3
-    // default" preset source (44-02).
+    // R115 (52-01, supersedes the 2026-08-07 EMPTY override): every new service
+    // starts from a template. When the church has a stored default template we
+    // use it verbatim; when it is empty/unset we seed from the Suggested
+    // Template (`buildSuggestedTemplateEntries()`, the 1-2-2-3-derived preset —
+    // the SAME preset the template editor's "Suggested Template" button uses).
+    // The empty→suggested resolution is the CALLER's decision, made here;
+    // `buildSlotsFromTemplate` stays pure (`[]` → `[]`) and never reinstates a
+    // fallback of its own. VW types are still applied at creation via the
+    // ordinal walk inside `buildSlotsFromTemplate` when `vwModeEnabled`.
     const authStore = useAuthStore()
+    const stored = authStore.settings.defaultServiceTemplate
+    const effectiveTemplate = stored.length > 0 ? stored : buildSuggestedTemplateEntries()
     const slots = buildSlotsFromTemplate(
-      authStore.settings.defaultServiceTemplate,
+      effectiveTemplate,
       authStore.settings.vwModeEnabled,
     )
     const ref = await addDoc(collection(db, 'organizations', orgId.value, 'services'), {
