@@ -258,11 +258,12 @@ Plans:
   2. The selector and notes sit side-by-side on desktop and stack on small screens — a responsive layout that reuses the project's existing mobile-stacking recipe (R122)
   3. A newly added Miscellaneous item defaults to no slides, and slides can still be added to it when the user chooses (R123)
 
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
 
-- [ ] TBD — created by `/gsd-plan-phase 54`
+- [ ] 54-01-PLAN.md — R123: RED-first MISC-derives-nothing + BWC/hand-add-survival tests, then split `case 'MISC': return []` in `deriveGroupEntries` (Wave 1)
+- [ ] 54-02-PLAN.md — R122: `notes?` on `MediaAttachableSlot` + one shared `slot-notes-input` in a `flex flex-col sm:flex-row` wrapper at `ServiceEditorView.vue:891`, autosave/stripUndefined round-trip (Wave 1)
 
 **UI hint**: yes
 **Research flag**: skip (milestone research skipped).
@@ -301,7 +302,7 @@ Plans:
 | 51. Service Order Editing Reliability | v1.6 | 4/4 | In Progress|  |
 | 52. Default Service Template | v1.6 | 3/3 | In Progress|  |
 | 53. Song Lyric Editing | v1.6 | 4/4 | In Progress|  |
-| 54. Service Item Enhancements | v1.6 | 0/TBD | Not started | - |
+| 54. Service Item Enhancements | v1.6 | 0/2 | Not started | - |
 | 55. Preview & Export Polish | v1.6 | 0/TBD | Not started | - |
 
 ## Backlog
