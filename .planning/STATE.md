@@ -204,9 +204,9 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 51 (service-order-editing-reliability) — EXECUTING
-Plan: 4 of 4 (51-01, 51-02, 51-03 complete)
-Status: Executing Phase 51
-Last activity: 2026-08-11 — Plan 51-03 complete: R111 fixed at the single `updateService` write funnel (src/stores/services.ts) — `updateDoc` now receives `{ ...stripUndefined(data), updatedAt: serverTimestamp() }`, so moving a service item back to "No Section" (which sets `slot.section = undefined`) no longer throws Firestore's "Unsupported field value: undefined". Repro-test-first (RED fea6c1a → GREEN 42ff9f9); `assertWritable` still runs on original data before stripping and the Phase 41 `maybeRefreshShareLink` call is unchanged. services store suite 82/82, type-check clean, only the 2-file known baseline red. Remaining R112 belongs to plan 51-04.
+Plan: 4 of 4 complete (51-01, 51-02, 51-03, 51-04 complete)
+Status: Phase 51 plans all executed — ready for /gsd-verify-work
+Last activity: 2026-08-11 — Plan 51-04 complete: R112 fixed. Both service read surfaces — the Services listing card (`src/components/ServiceCard.vue`) and the public share snapshot (`buildServiceSnapshot` in `src/stores/services.ts`) — now route slots through the editor's `orderSlotsBySection` contract, so empty-bodied items render section-major (in their band) instead of sinking to the bottom until text is typed. Repro-test-first (RED c314683 → GREEN f3f1e4e). Read-surface only: no data migration, `orderSlotsBySection` is identity-preserving (no churn on already-ordered services), editor load/merge watcher untouched (Pitfall 3), Phase 41 refresh cadence + PII name-only block untouched. Scoped suites 91/91, type-check clean, only the 2-file known baseline red.
 
 ## ⏸ RESUME HERE (2026-08-11 — v1.6 ROADMAP.md created, ready to plan Phase 51)
 

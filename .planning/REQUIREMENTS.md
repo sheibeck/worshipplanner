@@ -35,7 +35,7 @@ FINDINGS".
 - [x] **R111**: Moving an item that is in a section back to "No Section" via the section dropdown saves
       successfully, with no save error.
 
-- [ ] **R112**: The Services listing page and the public share link show every service item in the same
+- [x] **R112**: The Services listing page and the public share link show every service item in the same
       order as the service edit screen, **including items with an empty body** (e.g. two blank
       Miscellaneous items). Today an empty-bodied item sorts to the bottom until text is typed into it.
 
@@ -137,7 +137,7 @@ Which phases cover which requirements. Filled during roadmap creation (2026-08-1
 |-------------|-------|--------|
 | R110 | Phase 51 — Service Order Editing Reliability | Pending |
 | R111 | Phase 51 — Service Order Editing Reliability | Complete |
-| R112 | Phase 51 — Service Order Editing Reliability | Pending |
+| R112 | Phase 51 — Service Order Editing Reliability | Complete |
 | R113 | Phase 52 — Default Service Template | Pending |
 | R114 | Phase 52 — Default Service Template | Pending |
 | R115 | Phase 52 — Default Service Template | Pending |
