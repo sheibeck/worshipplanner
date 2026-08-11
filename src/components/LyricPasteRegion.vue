@@ -92,7 +92,8 @@
     </p>
 
     <div class="flex shrink-0 items-center gap-3 border-t border-gray-800 px-4 py-3">
-      <span class="text-[11.5px] text-gray-500">Replaces the current {{ currentSectionCount }} section{{ currentSectionCount === 1 ? '' : 's' }} &middot; undoable from History.</span>
+      <span v-if="currentSectionCount === 0" class="text-[11.5px] text-gray-500">Saving lyrics for this song &middot; undoable from History.</span>
+      <span v-else class="text-[11.5px] text-gray-500">Replaces the current {{ currentSectionCount }} section{{ currentSectionCount === 1 ? '' : 's' }} &middot; undoable from History.</span>
       <div class="ml-auto flex gap-2">
         <button
           type="button"
@@ -107,7 +108,7 @@
           :class="canConfirm ? 'bg-indigo-600 hover:bg-indigo-500' : 'bg-indigo-600/40 cursor-default text-white/50'"
           :disabled="!canConfirm || isSaving"
           @click="onConfirm"
-        >{{ isSaving ? 'Saving...' : 'Replace lyrics' }}</button>
+        >{{ isSaving ? 'Saving...' : (currentSectionCount === 0 ? 'Save' : 'Replace lyrics') }}</button>
       </div>
     </div>
   </div>
