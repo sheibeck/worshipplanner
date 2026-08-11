@@ -32,7 +32,7 @@ FINDINGS".
       service plan. Today a drag spawns a second, undeletable copy stuck at "No Section" while the real
       item shows the target section.
 
-- [ ] **R111**: Moving an item that is in a section back to "No Section" via the section dropdown saves
+- [x] **R111**: Moving an item that is in a section back to "No Section" via the section dropdown saves
       successfully, with no save error.
 
 - [ ] **R112**: The Services listing page and the public share link show every service item in the same
@@ -108,9 +108,11 @@ Deferred; tracked but not in this milestone's roadmap.
 
 - **Backlog 999.1**: Extract a shared song-browse component used by both the Songs page and the
   service-plan picker.
+
 - **Backlog 999.2**: Clearing a song should clear its slides, even when the song is reprised.
 - **Backlog 999.3**: Confirm the production draft lock by hand and deploy `firestore.rules` (deploy is
   the owner's step).
+
 - **AI-assisted slide split**: automatically proposing where to break a long section into slides. v1.6's
   split (R117) is manual only.
 
@@ -134,7 +136,7 @@ Which phases cover which requirements. Filled during roadmap creation (2026-08-1
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | R110 | Phase 51 — Service Order Editing Reliability | Pending |
-| R111 | Phase 51 — Service Order Editing Reliability | Pending |
+| R111 | Phase 51 — Service Order Editing Reliability | Complete |
 | R112 | Phase 51 — Service Order Editing Reliability | Pending |
 | R113 | Phase 52 — Default Service Template | Pending |
 | R114 | Phase 52 — Default Service Template | Pending |
@@ -152,6 +154,7 @@ Which phases cover which requirements. Filled during roadmap creation (2026-08-1
 | R126 | Phase 55 — Preview & Export Polish | Pending |
 
 **Coverage:**
+
 - v1.6 requirements: 17 total (R110–R126)
 - Mapped to phases: 17 (Phases 51–55)
 - Unmapped: 0 ✓

@@ -204,9 +204,9 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 51 (service-order-editing-reliability) — EXECUTING
-Plan: 3 of 4 (51-01, 51-02 complete)
+Plan: 4 of 4 (51-01, 51-02, 51-03 complete)
 Status: Executing Phase 51
-Last activity: 2026-08-11 — Plan 51-02 complete: R110 phantom fixed in the DEFAULT-TEMPLATE editor (ServiceTemplateEditor.vue) via a templateRenderNonce container rebuild paired with destroySectionSortables() — the same mechanism 51-01 proved in the live editor (RED test 21f3b2c → GREEN fix fcca4c0). ServiceTemplateEditor suite 21/21, type-check clean, only the 2-file known baseline red. Both editors now share one nonce-rebuild mechanism. Remaining R111, R112 belong to later 51 plans.
+Last activity: 2026-08-11 — Plan 51-03 complete: R111 fixed at the single `updateService` write funnel (src/stores/services.ts) — `updateDoc` now receives `{ ...stripUndefined(data), updatedAt: serverTimestamp() }`, so moving a service item back to "No Section" (which sets `slot.section = undefined`) no longer throws Firestore's "Unsupported field value: undefined". Repro-test-first (RED fea6c1a → GREEN 42ff9f9); `assertWritable` still runs on original data before stripping and the Phase 41 `maybeRefreshShareLink` call is unchanged. services store suite 82/82, type-check clean, only the 2-file known baseline red. Remaining R112 belongs to plan 51-04.
 
 ## ⏸ RESUME HERE (2026-08-11 — v1.6 ROADMAP.md created, ready to plan Phase 51)
 
