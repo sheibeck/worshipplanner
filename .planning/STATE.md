@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Settings, Sharing, and Fidelity
-current_phase: 43
-current_phase_name: Service Item Types
+current_phase: 50
+current_phase_name: Slide Management — Bulk Delete, Manual/Auto Provenance & Render Fidelity
 status: planning
 stopped_at: Completed 50-05-PLAN.md (Phase 50 complete, 5/5 plans)
-last_updated: "2026-08-11T01:31:49.694Z"
+last_updated: "2026-08-11T01:48:18.156Z"
 last_activity: 2026-08-10
-last_activity_desc: Phase 50 complete, transitioned to Phase 43
+last_activity_desc: Phase 49 complete, transitioned to Phase 50
 progress:
   total_phases: 13
   completed_phases: 13
@@ -169,7 +169,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 > member can still upload (Phase 40.1 observe), an NLT scripture preview loads, and a service exports
 > to Planning Center.
 
-Phase: 43 — Service Item Types
+Phase: 50 — Slide Management — Bulk Delete, Manual/Auto Provenance & Render Fidelity
 Plan: Not started
 Status: Ready to plan
 client (DEPLOY-GATED, see below). 45-02 added `bibleVersion: 'ESV' | 'NLT'` to `OrgSettings`
@@ -191,7 +191,7 @@ human-verify items: the 48px overflow backstop, and the full post-deploy live ro
 in `.planning/PENDING-VERIFICATION.md` § Phase 45.
 Next: Phase 45 is code-complete; the owner's deploy step and the deferred human-verify items are
 the only remaining work for this phase (non-blocking). No further plan needed for Phase 45 itself.
-Last activity: 2026-08-10 — Phase 50 complete, transitioned to Phase 43
+Last activity: 2026-08-10 — Phase 49 complete, transitioned to Phase 50
 
 ## ⏸ RESUME HERE (2026-08-06 — v1.5 ROADMAP.md created, ready to plan Phase 39)
 

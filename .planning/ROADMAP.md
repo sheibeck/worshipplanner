@@ -151,12 +151,12 @@ merge gaps. Full reasoning recorded in `.planning/STATE.md` § "v1.5 ROADMAP.md 
 - [x] **Phase 40.1: Close the Self-Service Membership Hole** (INSERTED 2026-08-06) - Only an invite-holder or an org's creator can create a membership document
 - [x] **Phase 41: Sharing Correctness** - One permanent share link per service, auto-refreshed on every change (completed 2026-08-07)
 - [x] **Phase 42: PowerPoint Rendered-Image Display** - Client-side display of the already-deployed server-rendered PPTX images (carryover R062) (completed 2026-08-07)
-- [ ] **Phase 43: Service Item Types** - Announcements, Miscellaneous, a plain-text Message, and Hymn retired from the add-item palette
-- [ ] **Phase 44: Default Service Template** - A church-defined default item set for new blank services
-- [ ] **Phase 45: ESV/NLT Bible Version Selection** - Scripture source choice with required attribution and no retroactive slide changes
-- [ ] **Phase 46: Global Slide Typography** - One house font (family/weight/size) for every slide, flash-free
-- [ ] **Phase 47: Congregational Reading Divider UX** - Hand-divided Leader/Congregation/All sections, AI split as one of three equal starting points
-- [ ] **Phase 48: Multi-Image Ordering & Mobile Polish** - Deterministic multi-image import order; a usable Slides tab and service edit screen on a phone
+- [x] **Phase 43: Service Item Types** - Announcements, Miscellaneous, a plain-text Message, and Hymn retired from the add-item palette (completed 2026-08-10)
+- [x] **Phase 44: Default Service Template** - A church-defined default item set for new blank services (completed 2026-08-10)
+- [x] **Phase 45: ESV/NLT Bible Version Selection** - Scripture source choice with required attribution and no retroactive slide changes (completed 2026-08-10)
+- [x] **Phase 46: Global Slide Typography** - One house font (family/weight/size) for every slide, flash-free (completed 2026-08-10)
+- [x] **Phase 47: Congregational Reading Divider UX** - Hand-divided Leader/Congregation/All sections, AI split as one of three equal starting points (completed 2026-08-10)
+- [x] **Phase 48: Multi-Image Ordering & Mobile Polish** - Deterministic multi-image import order; a usable Slides tab and service edit screen on a phone (completed 2026-08-10)
 
 ## Phase Details
 
@@ -491,13 +491,13 @@ Plans:
 | 40. Custom Auth Claim for Org Membership | v1.5 | 4/4 | In Progress|  |
 | 41. Sharing Correctness | v1.5 | 4/4 | Complete    | 2026-08-07 |
 | 42. PowerPoint Rendered-Image Display | v1.5 | 8/8 | Complete    | 2026-08-07 |
-| 43. Service Item Types | v1.5 | 4/4 | In Progress|  |
-| 44. Default Service Template | v1.5 | 2/2 | In Progress|  |
-| 45. ESV/NLT Bible Version Selection | v1.5 | 4/4 | In Progress|  |
-| 46. Global Slide Typography | v1.5 | 4/4 | In Progress|  |
-| 47. Congregational Reading Divider UX | v1.5 | 3/3 | In Progress|  |
-| 48. Multi-Image Ordering & Mobile Polish | v1.5 | 3/3 | In Progress|  |
-| 49. Congregational Reading — Dedicated Reference Slide | v1.5 | 1/1 | In Progress|  |
+| 43. Service Item Types | v1.5 | 4/4 | Complete    | 2026-08-10 |
+| 44. Default Service Template | v1.5 | 2/2 | Complete    | 2026-08-10 |
+| 45. ESV/NLT Bible Version Selection | v1.5 | 4/4 | Complete    | 2026-08-10 |
+| 46. Global Slide Typography | v1.5 | 4/4 | Complete    | 2026-08-10 |
+| 47. Congregational Reading Divider UX | v1.5 | 3/3 | Complete    | 2026-08-10 |
+| 48. Multi-Image Ordering & Mobile Polish | v1.5 | 3/3 | Complete    | 2026-08-10 |
+| 49. Congregational Reading — Dedicated Reference Slide | v1.5 | 1/1 | Complete    | 2026-08-10 |
 | 50. Slide Management — Bulk Delete, Provenance & Render Fidelity | v1.5 | 5/5 | Complete    | 2026-08-10 |
 
 ## Backlog
