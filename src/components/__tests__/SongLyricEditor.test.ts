@@ -1155,6 +1155,78 @@ describe('SongLyricEditor', () => {
     }))
   })
 
+  // ── 53-03 Task 1: derived per-kind numbering display (R120) + Pre-Chorus (R119) ──
+
+  const NUMBERED_SECTIONS: LyricSection[] = [
+    { id: 'verse-1', label: 'Verse 1', lines: ['Line 1a', 'Line 1b'] },
+    { id: 'verse-2', label: 'Verse 2', lines: ['Line 2a', 'Line 2b'] },
+  ]
+
+  it('R120: pasted "Verse 1"/"Verse 2" render their derived per-kind numbers', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics({
+      sections: NUMBERED_SECTIONS,
+      performanceOrder: ['verse-1', 'verse-2'],
+    })
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    const rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    expect(rows[0]!.text()).toContain('VERSE 1')
+    expect(rows[1]!.text()).toContain('VERSE 2')
+  })
+
+  it('R120: adding a Verse after pasted "Verse 1"/"Verse 2" shows "VERSE 3" — the bare-Verse bug is fixed by displayLabel', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics({
+      sections: NUMBERED_SECTIONS,
+      performanceOrder: ['verse-1', 'verse-2'],
+    })
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    await wrapper.find('[data-testid="add-section-chip-Verse"]').trigger('click')
+    await flushPromises()
+
+    const rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    expect(rows).toHaveLength(3)
+    const newRowText = rows[2]!.text()
+    expect(newRowText).toContain('VERSE 3')
+    // Not the bare kind, and not skipping/over-counting to VERSE 4.
+    expect(newRowText).not.toContain('VERSE 4')
+  })
+
+  it('R120: a repeat row shows the SAME derived number as the origin row', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeRepeatLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    // REPEAT_ORDER = ['chorus', 'verse-1', 'chorus', 'verse-2'] — rows 0 and 2
+    // are the same pooled 'Chorus' section (row 2 is the repeat).
+    const rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    expect(rows[0]!.attributes('data-repeat')).toBe('false')
+    expect(rows[2]!.attributes('data-repeat')).toBe('true')
+    expect(rows[0]!.text()).toContain('CHORUS 1')
+    expect(rows[2]!.text()).toContain('CHORUS 1')
+  })
+
+  it('R119: the Pre-Chorus chip adds a section that displays "PRE-CHORUS 1"', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    const chip = wrapper.find('[data-testid="add-section-chip-Pre-Chorus"]')
+    expect(chip.exists()).toBe(true)
+    await chip.trigger('click')
+    await flushPromises()
+
+    const rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    expect(rows).toHaveLength(3)
+    expect(rows[2]!.text()).toContain('PRE-CHORUS 1')
+  })
+
   // ── 33-06: song-level background control (R057) ────────────────────────────
 
   const EMPTY_BACKGROUND_CAPTION = 'Applies to every service using this song, unless a group or slide overrides it.'
