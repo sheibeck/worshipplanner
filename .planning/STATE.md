@@ -203,10 +203,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 52 (default-service-template) — EXECUTING
-Plan: 3 of 3 complete (52-01 done; next: 52-02)
-Status: Ready to execute
-Last activity: 2026-08-11 — 52-01 executed (R115 suggested-template default + R116 body threading); slotTypes/services tests green, type-check clean, baseline 2-file
+Phase: 52 (default-service-template) — CODE-COMPLETE, verification_deferred_human
+Plan: 3 of 3 complete (52-01, 52-02, 52-03)
+Status: Phase 52 all plans executed + automated verification 4/4; 3 manual checks DEFERRED per v1.6 grant. Autonomous run advancing to Phase 53.
+Last activity: 2026-08-11 — Phase 52 verified (human_needed). R113 cog relocation (editor off Settings, onto Services page), R114 "Suggested Template" rename (VW-decoupled), R115 no-blank fallback (`createService` seeds from `buildSuggestedTemplateEntries()`), R116 template Misc body input — all present in code, critical guards intact (buildSlotsFromTemplate purity @818, absent-body @654/@663, exhaustive switch), `npm run type-check` clean, app suite 3009 pass at the 2-file baseline. 3 owner checks → /gsd-verify-work 52 (PENDING-VERIFICATION.md § Phase 52). Not deploy-gated.
 
 ## ⏸ RESUME HERE (2026-08-11 — v1.6 ROADMAP.md created, ready to plan Phase 51)
 
@@ -990,6 +990,7 @@ section in `PENDING-VERIFICATION.md` and `functions/DEPLOY-ORG-CLAIMS.md`.
 | Phase | State | Resume |
 |-------|-------|--------|
 | 51 | verification_deferred_human — **4/4 ROADMAP criteria verified automatically**. All four source fixes present in code: R110 nonce-rebuild + `destroySectionSortables()` in BOTH `ServiceEditorView.vue` (`onSlotSortEnd`) and `ServiceTemplateEditor.vue` (`onTemplateSortEnd`); R111 `stripUndefined` in `updateService`; R112 `orderSlotsBySection` in `ServiceCard.vue` + `buildServiceSnapshot`. RED-first repros genuine (physical DOM node move between section containers, not false-green). `npm run type-check` clean, app suite 2994 pass at the 2-file baseline, 373/373 phase tests. **NOT deploy-gated** (client-only). 3 owner checks in `PENDING-VERIFICATION.md` § Phase 51: real OS cross-section drag (no phantom, no refresh) in both editors, live No-Section save with no error toast, empty-Miscellaneous order on the live listing + share link | /gsd-verify-work 51 |
+| 52 | verification_deferred_human — **4/4 ROADMAP criteria verified in code** (R113 cog on ServicesView + Services card/dead-imports removed from SettingsView; R114 "Suggested Template" label, `template-reset` testid kept, no VW gate; R115 `createService` seeds `buildSuggestedTemplateEntries()` when template empty — defined ONCE, shared with the button — purity `buildSlotsFromTemplate([],true)→[]` intact; R116 `ServiceTemplateEntry.body?` + guarded `createSlot` body spread + `template-item-body` textarea, absent-body shape intact). `npm run type-check` clean, app suite 3009 pass at the 2-file baseline. **NOT deploy-gated** (client-only). 3 owner checks in `PENDING-VERIFICATION.md` § Phase 52: cog opens editor + gone from Settings, new service from unset template starts from Suggested Template (not blank), MISC pre-filled body carries into a created service | /gsd-verify-work 52 |
 
 ### v1.5 (historical — milestone shipped and archived 2026-08-10)
 

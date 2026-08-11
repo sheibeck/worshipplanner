@@ -1355,3 +1355,25 @@ be confirmed by hand in the running app:
       edit-screen position (their band), NOT sunk to the bottom.
 
 After confirming, run `/gsd-verify-work 51` to close these and flip Phase 51's VERIFICATION.md to passed.
+
+---
+
+## Phase 52 — Default Service Template (v1.6) — DEFERRED 2026-08-11
+
+**Status:** verification_deferred_human. 4/4 ROADMAP criteria verified in code + automated (all source
+present; critical guards intact — `buildSlotsFromTemplate` purity, absent-body shape, exhaustive switch;
+`npm run type-check` clean; app suite 3009 pass at the 2-file baseline). NOT deploy-gated (client-only).
+Resume: `/gsd-verify-work 52`.
+
+- [ ] **52.1 (R113) — Cog relocation.** On the Services page, the cog/settings control opens the
+      default-service-template slide-out editor. Confirm the main Settings page no longer shows a
+      Services template card. A viewer (non-editor) does not see the cog.
+- [ ] **52.2 (R115) — No blank service.** As a church whose default template is unset/never customized,
+      create a brand-new service. Expect it to open pre-populated from the Suggested Template (the
+      9-slot suggested order), NOT an empty service. With Vertical Worship mode on, the song slots carry
+      their VW types.
+- [ ] **52.3 (R116) — Misc body carries through.** In the template editor, add a Miscellaneous item and
+      type body text into its input (e.g. "Canned music"). Save the template, then create a new service.
+      Expect the Miscellaneous item to carry that body text into the created service.
+
+After confirming, run `/gsd-verify-work 52`.

@@ -48,7 +48,7 @@ FINDINGS".
       regardless of whether Vertical Worship mode is on, and carries no dependence on the 1-2-3
       progression in its label or availability.
 
-- [ ] **R115**: Every newly created service starts from the org's Suggested Template; there is no
+- [x] **R115**: Every newly created service starts from the org's Suggested Template; there is no
       blank-template starting path. (When Vertical Worship mode is on, the template's song slots still
       receive their required VW types, as established in v1.5.)
 
@@ -140,7 +140,7 @@ Which phases cover which requirements. Filled during roadmap creation (2026-08-1
 | R112 | Phase 51 — Service Order Editing Reliability | Complete |
 | R113 | Phase 52 — Default Service Template | Complete |
 | R114 | Phase 52 — Default Service Template | Complete |
-| R115 | Phase 52 — Default Service Template | Pending |
+| R115 | Phase 52 — Default Service Template | Complete |
 | R116 | Phase 52 — Default Service Template | Complete |
 | R117 | Phase 53 — Song Lyric Editing | Pending |
 | R118 | Phase 53 — Song Lyric Editing | Pending |
