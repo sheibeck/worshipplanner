@@ -4408,6 +4408,95 @@ describe('ServiceEditorView - Phase 29 reorder repro', () => {
 
     errSpy.mockRestore()
   })
+
+  // ── R110: cross-section drag must not orphan a phantom "No Section" duplicate ──
+  // 51-RESEARCH Pitfall 1 / "CRITICAL caveat": the module-level `sortablejs` mock
+  // (top of file) only CAPTURES options — its `Sortable.create` never performs a
+  // real DOM move. A test that merely invokes the captured `onEnd` therefore
+  // exercises only the (already-correct) reactive move logic and passes GREEN even
+  // against today's buggy code, proving nothing. To reproduce the phantom this test
+  // PHYSICALLY relocates the dragged `.slot-item` node from the source (ungrouped)
+  // container into the target (worship) container BEFORE invoking `onEnd` — exactly
+  // what real SortableJS does on a cross-`<ul>` drag — then asserts on RENDERED DOM
+  // node counts, never on the reactive `slots` array (which is already correct).
+  it('leaves exactly one rendered .slot-item after a cross-section drag — no orphaned "No Section" phantom (R110)', async () => {
+    // A single section-less song sits in the ungrouped ("No Section") container.
+    // Dragging the ONLY ungrouped item out empties the legacy bucket, so the whole
+    // ungrouped container is removed on re-render — the exact condition that orphans
+    // the Sortable-moved node: Vue tears down the container subtree without ever
+    // reclaiming the child it no longer physically owns (the node now lives in the
+    // worship container after the real DOM move). This mirrors the owner's verbatim
+    // repro: add a Song at No Section, drag it to Worship, end up with two songs.
+    mockServicesList = [{
+      ...makeSectionedService(),
+      slots: [
+        ...makeSectionedService().slots,
+        // section-less -> ungrouped ("No Section")
+        { kind: 'SONG', id: 's9', position: 8, requiredVwType: 1, songId: null, songTitle: null, songKey: null },
+      ],
+    }]
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+
+    const ungroupedContainer = wrapper.find('[data-testid="section-list-ungrouped"]').element as HTMLElement
+    const worshipContainer = wrapper.find('[data-testid="section-list-worship"]').element as HTMLElement
+
+    // The dragged node and its SortableJS indices, derived from the LIVE DOM.
+    const movedNode = Array.from(ungroupedContainer.children)
+      .find((el) => (el as HTMLElement).dataset.slotId === 's9') as HTMLElement | undefined
+    if (!movedNode) throw new Error('R110 repro: no ungrouped .slot-item for s9 rendered')
+    const oldDraggableIndex = draggableIndex(ungroupedContainer, movedNode)
+    const worshipItemsBefore = Array.from(worshipContainer.children)
+      .filter((c) => (c as HTMLElement).classList.contains('slot-item')).length
+
+    // Physically perform SortableJS's cross-container move: detach from the source
+    // list and append into the target list. The mocked Sortable.create does NOT do
+    // this — omitting it is the exact reason a naive onEnd-only test is false-GREEN.
+    ungroupedContainer.removeChild(movedNode)
+    worshipContainer.appendChild(movedNode)
+
+    // The ungrouped container carries no `data-section` attribute, so flatCapture()
+    // resolves its Sortable options.
+    const capture = flatCapture()
+    if (!capture) throw new Error('R110 repro: no ungrouped Sortable capture resolved')
+    await capture.options.onEnd!({
+      oldIndex: oldDraggableIndex,
+      newIndex: worshipItemsBefore,
+      oldDraggableIndex,
+      newDraggableIndex: worshipItemsBefore, // dropped after worship's existing items
+      item: movedNode,
+      from: ungroupedContainer,
+      to: worshipContainer,
+    } as never)
+    await flushPromises()
+    await wrapper.vm.$nextTick()
+
+    // (a) The source "No Section" list holds ZERO copies of the moved slot. Once the
+    //     only ungrouped item leaves, the container is removed entirely, so its
+    //     absence also satisfies this — the point is that no phantom clone survives
+    //     in the source region.
+    const ungroupedAfter = wrapper.find('[data-testid="section-list-ungrouped"]')
+    const strandedInSource = ungroupedAfter.exists()
+      ? ungroupedAfter.element.querySelectorAll('.slot-item[data-slot-id="s9"]').length
+      : 0
+    expect(strandedInSource).toBe(0)
+
+    // (b) THE R110 gate: exactly ONE `.slot-item` for the moved id exists anywhere in
+    //     the tree. Buggy code leaves a second, handler-less clone (the phantom) that
+    //     the SortableJS DOM move orphaned; the fix rebuilds the container from state
+    //     and reclaims it.
+    const allS9 = wrapper.element.querySelectorAll('.slot-item[data-slot-id="s9"]')
+    expect(allS9.length).toBe(1)
+
+    // (c) Architecture-unchanged guard (must-have): whatever mechanism reclaims the
+    //     orphan must NOT leave the target section without a live Sortable. If the fix
+    //     recreates the container element, a fresh Sortable instance must be bound to
+    //     the CURRENT worship container — otherwise cross-section drop / reorder would
+    //     silently go dead for the rest of the session. Passes trivially on today's
+    //     (no-rebuild) code; guards a container-rebuild fix that forgets to rebind.
+    const currentWorship = wrapper.find('[data-testid="section-list-worship"]').element as HTMLElement
+    expect(sortableCaptures.some((c) => c.el === currentWorship)).toBe(true)
+  })
 })
 
 // ── R047: the scripture slot's own reference is the slide's source ────────────
