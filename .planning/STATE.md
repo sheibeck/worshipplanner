@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Settings, Sharing, and Fidelity
-current_phase: 50
-current_phase_name: slide-management-bulk-delete-provenance
-status: verifying
-stopped_at: "Phase 50 CODE-COMPLETE (5/5 plans) + DEPLOYED TO PRODUCTION 2026-08-10 (owner-authorized `firebase deploy --only hosting,functions` — overrode the standing NO-DEPLOYS grant for this action; hosting + all 6 functions incl. parsePptx updated; rules NOT touched). Code-reviewed (0 critical; R109 WR-01 header-scope gap FIXED in dd9adc8). UAT 1/2: item 50.1 (R109 cache/asset-immutability) VERIFIED IN PRODUCTION via header inspection — /, /index.html, deep links all no-cache; /assets/* immutable; last-match-wins precedence held. REMAINING: item 50.2 (R108 live multi-image PPTX round-trip) needs a real multi-image deck + signed-in session — owner-run. Phase still human_needed on 50.2 (phase.complete refuses until then). RESUME: /gsd-verify-work 50 (or do the 50.2 import test)."
-last_updated: "2026-08-10T22:38:02Z"
+current_phase: 43
+current_phase_name: Service Item Types
+status: planning
+stopped_at: Completed 50-05-PLAN.md (Phase 50 complete, 5/5 plans)
+last_updated: "2026-08-11T01:31:49.694Z"
 last_activity: 2026-08-10
-last_activity_desc: Phase 50 executed, reviewed, deployed to production; R109 verified live, R108 multi-image round-trip remains
+last_activity_desc: Phase 50 complete, transitioned to Phase 43
 progress:
   total_phases: 13
   completed_phases: 13
@@ -169,9 +169,9 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 > member can still upload (Phase 40.1 observe), an NLT scripture preview loads, and a service exports
 > to Planning Center.
 
-Phase: 50 (slide-management-bulk-delete-provenance) — EXECUTING
-Plan: 5 of 5
-Status: Phase complete — ready for verification
+Phase: 43 — Service Item Types
+Plan: Not started
+Status: Ready to plan
 client (DEPLOY-GATED, see below). 45-02 added `bibleVersion: 'ESV' | 'NLT'` to `OrgSettings`
 (`DEFAULT_ORG_SETTINGS.bibleVersion: 'NLT'`, owner's locked override) plus the Settings "Bible
 Translation" card. 45-03 added the `translationSource?` field + `scriptureAttribution()`/
@@ -191,7 +191,7 @@ human-verify items: the 48px overflow backstop, and the full post-deploy live ro
 in `.planning/PENDING-VERIFICATION.md` § Phase 45.
 Next: Phase 45 is code-complete; the owner's deploy step and the deferred human-verify items are
 the only remaining work for this phase (non-blocking). No further plan needed for Phase 45 itself.
-Last activity: 2026-08-10 — Phase 50 execution started
+Last activity: 2026-08-10 — Phase 50 complete, transitioned to Phase 43
 
 ## ⏸ RESUME HERE (2026-08-06 — v1.5 ROADMAP.md created, ready to plan Phase 39)
 

@@ -498,7 +498,7 @@ Plans:
 | 47. Congregational Reading Divider UX | v1.5 | 3/3 | In Progress|  |
 | 48. Multi-Image Ordering & Mobile Polish | v1.5 | 3/3 | In Progress|  |
 | 49. Congregational Reading — Dedicated Reference Slide | v1.5 | 1/1 | In Progress|  |
-| 50. Slide Management — Bulk Delete, Provenance & Render Fidelity | v1.5 | 5/5 | In Progress|  |
+| 50. Slide Management — Bulk Delete, Provenance & Render Fidelity | v1.5 | 5/5 | Complete    | 2026-08-10 |
 
 ## Backlog
 
