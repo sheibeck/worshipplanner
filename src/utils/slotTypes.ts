@@ -75,10 +75,21 @@ export function slotLabel(slot: ServiceSlot, _index?: number | string): string {
  * Factory function to create a new slot of the given kind.
  * Position defaults to 0 — it will be set to the array index via reindexSlots.
  */
-export function createSlot(kind: SlotKind, vwType?: VWType, section?: ServiceSection): ServiceSlot {
+export function createSlot(
+  kind: SlotKind,
+  vwType?: VWType,
+  section?: ServiceSection,
+  body?: string,
+): ServiceSlot {
   // Omit the `section` key entirely when not provided — preserves the legacy
   // (section === undefined, key absent) shape for backward compatibility.
   const sectionFields = section ? { section } : {}
+  // Omit the `body` key entirely when not provided (R116) — a bodyless MISC/
+  // ANNOUNCEMENTS/MESSAGE slot must keep the SAME absent-body shape as every
+  // stored legacy slot (`'body' in slot === false`, pinned by tests @643/@656).
+  // NEVER set `body: ''` or `body: undefined` — Firestore rejects raw
+  // `undefined`, and an empty string would break the absent-key contract.
+  const bodyFields = body ? { body } : {}
   // `id` is ALWAYS written (D-01) — unlike `section`, there is no legacy
   // absent-id shape to preserve for a brand-new slot; every new slot gets a
   // real, stable id immediately.
@@ -109,11 +120,11 @@ export function createSlot(kind: SlotKind, vwType?: VWType, section?: ServiceSec
     case 'PRAYER':
       return { kind: 'PRAYER', id, position: 0, ...sectionFields } as NonAssignableSlot
     case 'MESSAGE':
-      return { kind: 'MESSAGE', id, position: 0, ...sectionFields } as NonAssignableSlot
+      return { kind: 'MESSAGE', id, position: 0, ...bodyFields, ...sectionFields } as NonAssignableSlot
     case 'ANNOUNCEMENTS':
-      return { kind: 'ANNOUNCEMENTS', id, position: 0, ...sectionFields } as NonAssignableSlot
+      return { kind: 'ANNOUNCEMENTS', id, position: 0, ...bodyFields, ...sectionFields } as NonAssignableSlot
     case 'MISC':
-      return { kind: 'MISC', id, position: 0, ...sectionFields } as NonAssignableSlot
+      return { kind: 'MISC', id, position: 0, ...bodyFields, ...sectionFields } as NonAssignableSlot
     case 'HYMN':
       return { kind: 'HYMN', id, position: 0, hymnName: '', hymnNumber: '', verses: '', ...sectionFields } as HymnSlot
     case 'IMPORTED':
@@ -356,8 +367,14 @@ export function progressionVwTypeSequence(progression: Progression): VWType[] {
  *
  * An empty `entries` array returns `[]` — buildSlotsFromTemplate is NEVER a
  * vehicle for reinstating `buildSlots()` as a fallback; that call is the
- * caller's decision (services.ts::createService does not make it, per the
- * owner's 2026-08-07 override).
+ * caller's decision. Under R115, `services.ts::createService` DOES resolve a
+ * fallback (empty stored template → `buildSuggestedTemplateEntries()`), but it
+ * does so at the call site before calling this function — this function stays
+ * pure (`[]` → `[]`, pinned by `slotTypes.test.ts:798`).
+ *
+ * An entry's optional `body` (R116) is threaded through to `createSlot` for
+ * body-bearing kinds; a bodyless entry leaves the created slot's `body` key
+ * absent.
  */
 export function buildSlotsFromTemplate(
   entries: ServiceTemplateEntry[],
@@ -374,7 +391,28 @@ export function buildSlotsFromTemplate(
       vwType = sequence[songOrdinal % sequence.length]
       songOrdinal++
     }
-    slots.push(createSlot(entry.kind, vwType, entry.section))
+    slots.push(createSlot(entry.kind, vwType, entry.section, entry.body))
   }
   return reindexSlots(slots)
+}
+
+/**
+ * Builds the Suggested Template's `ServiceTemplateEntry[]` — the single shared
+ * definition of the suggested-template content (R114 button `applyReset` in
+ * plan 52-02 and the R115 `createService` empty-template fallback BOTH call
+ * this, so the preset can never fork into two copies).
+ *
+ * Derived from `buildSlots('1-2-2-3')` so the suggested order and section
+ * defaults stay in lockstep with the canonical progression preset. Fresh
+ * `crypto.randomUUID()` ids are minted per call (the editor draft needs unique
+ * per-row keys; `buildSlotsFromTemplate` never reads `entry.id`, so fresh ids
+ * are harmless on the createService path). Carries no `body` — the suggested
+ * entries are bodyless; a church adds recurring MISC body text itself.
+ */
+export function buildSuggestedTemplateEntries(): ServiceTemplateEntry[] {
+  return buildSlots('1-2-2-3').map((slot) => ({
+    id: crypto.randomUUID(),
+    kind: slot.kind,
+    ...(slot.section ? { section: slot.section } : {}),
+  }))
 }
