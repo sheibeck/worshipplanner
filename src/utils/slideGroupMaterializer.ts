@@ -154,10 +154,16 @@ export function deriveGroupEntries(slot: ServiceSlot, inputs: AssemblyInputs): G
       }))
     }
 
+    // R123: a Miscellaneous item starts with NO derived slides. Split out of
+    // the one-text-slide fall-through so a new MISC slot materializes empty;
+    // the user can still hand-add slides. Existing MISC groups are untouched —
+    // rebuildGroup(MISC) stays a no-op below, so their legacy blank auto-slide
+    // and any hand-added slides persist byte-identical (54-RESEARCH.md).
+    case 'MISC':
+      return []
     case 'PRAYER':
     case 'MESSAGE':
     case 'ANNOUNCEMENTS':
-    case 'MISC':
     case 'HYMN':
       return [{ id: crypto.randomUUID(), order: 0, sourceRef: { kind: 'text' } }]
   }
