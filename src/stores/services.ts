@@ -25,7 +25,7 @@ import { useQuartersStore } from '@/stores/quarters'
 import { useAuthStore } from '@/stores/auth'
 import { deriveSlug, claimSlug } from '@/utils/slug'
 import { resolveServiceRoleAssignments } from '@/utils/serviceRoles'
-import { buildSlotsFromTemplate } from '@/utils/slotTypes'
+import { buildSlotsFromTemplate, orderSlotsBySection } from '@/utils/slotTypes'
 import { stripUndefined } from '@/utils/stripUndefined'
 import { mintShareToken, pickAdoptableToken, type ShareTokenCandidate } from '@/utils/shareTokens'
 import type { Service, ServiceStatus, Progression, ScriptureRef, ServiceSlot } from '@/types/service'
@@ -102,9 +102,17 @@ export interface ServiceSnapshot {
  * inline code did before extraction.
  */
 export function buildServiceSnapshot(service: Service): ServiceSnapshot {
+  // R112 — serialize slots in the editor's section-major ordering contract, not
+  // the raw persisted array, so the public share link agrees with the editor
+  // (and the listing card) even for a service never normalized by a save. This
+  // reorders WHAT is serialized only; it does NOT change WHEN/WHETHER the
+  // snapshot is written, so the Phase 41 maybeRefreshShareLink/ensureShareLink
+  // cadence is untouched. orderSlotsBySection is identity-preserving.
+  const orderedSlots = orderSlotsBySection(service.slots)
+
   // Resolve BPM for each song slot from song store
   const songStore = useSongStore()
-  const slotsWithBpm = service.slots.map((slot) => {
+  const slotsWithBpm = orderedSlots.map((slot) => {
     if (slot.kind === 'SONG' && (slot as SongSlot).songId) {
       const songSlot = slot as SongSlot
       const song = songStore.songs.find((s) => s.id === songSlot.songId)

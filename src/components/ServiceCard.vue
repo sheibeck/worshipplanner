@@ -67,6 +67,7 @@ import { useServiceStore } from '@/stores/services'
 import { useSongStore } from '@/stores/songs'
 import TeamTagPill from '@/components/TeamTagPill.vue'
 import { scriptureWebLink } from '@/utils/scripture'
+import { orderSlotsBySection } from '@/utils/slotTypes'
 import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps<{
@@ -122,16 +123,23 @@ const sermonPassageUrl = computed(() => {
   return scriptureWebLink(sp.book, sp.chapter, authStore.settings.bibleVersion)
 })
 
+// R112 — render in the editor's single ordering contract, not the raw
+// persisted array. orderSlotsBySection is identity-preserving, so an
+// already-section-major service incurs no churn; a service persisted in
+// template/insertion order (never normalized by a save) is shown section-major
+// here without any edit, matching the editor and the share snapshot.
+const orderedSlots = computed(() => orderSlotsBySection(props.service.slots))
+
 const messageIndex = computed(() =>
-  props.service.slots.findIndex((s) => s.kind === 'MESSAGE'),
+  orderedSlots.value.findIndex((s) => s.kind === 'MESSAGE'),
 )
 
 const openingSlots = computed(() =>
-  props.service.slots.slice(0, messageIndex.value),
+  orderedSlots.value.slice(0, messageIndex.value),
 )
 
 const sendingSlots = computed(() =>
-  props.service.slots.slice(messageIndex.value + 1),
+  orderedSlots.value.slice(messageIndex.value + 1),
 )
 
 function slotLabel(slot: ServiceSlot): string {
