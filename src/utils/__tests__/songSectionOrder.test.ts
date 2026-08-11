@@ -407,8 +407,30 @@ describe('uniqueSectionLabel', () => {
 })
 
 describe('ADD_SECTION_KINDS', () => {
-  it('holds the five quick-add kinds in mockup order', () => {
-    expect(ADD_SECTION_KINDS).toEqual(['Verse', 'Chorus', 'Bridge', 'Tag', 'Ending'])
+  it('holds the six quick-add kinds in mockup order, with Pre-Chorus after Chorus', () => {
+    expect(ADD_SECTION_KINDS).toEqual(['Verse', 'Chorus', 'Pre-Chorus', 'Bridge', 'Tag', 'Ending'])
+  })
+
+  it('includes Pre-Chorus (R119)', () => {
+    expect(ADD_SECTION_KINDS).toContain('Pre-Chorus')
+  })
+})
+
+describe('Pre-Chorus (R119)', () => {
+  it('mints id "pre-chorus" from the "Pre-Chorus" label (hyphen preserved, whitespace-free)', () => {
+    expect(mintSectionId('Pre-Chorus', [])).toBe('pre-chorus')
+  })
+
+  it('addSection produces a section labelled "Pre-Chorus" with id "pre-chorus", appended to the order', () => {
+    const result = addSection([], [], 'Pre-Chorus')
+    const added = result.sections.find((section) => section.id === result.newSectionId)
+    expect(added?.label).toBe('Pre-Chorus')
+    expect(added?.id).toBe('pre-chorus')
+    expect(result.performanceOrder).toEqual(['pre-chorus'])
+  })
+
+  it('deriveSectionKind maps "Pre-Chorus 2" back to "Pre-Chorus"', () => {
+    expect(deriveSectionKind('Pre-Chorus 2')).toBe('Pre-Chorus')
   })
 })
 
