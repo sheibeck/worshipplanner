@@ -18,6 +18,16 @@ export interface LyricSection {
   label: string
   /** Lyric lines for this section. */
   lines: string[]
+  /**
+   * Optional manual slide-split (R117). Sorted, de-duped LINE indices `k`
+   * (1 ≤ k < lines.length) each meaning "a new slide begins before lines[k]".
+   * Absent or empty ⇒ the section is one slide (today's behavior). Additive,
+   * optional, and read-tolerant: `sliceSectionIntoSlides` ignores out-of-range,
+   * unsorted, duplicate or non-integer values, so a legacy/corrupt value can
+   * never throw. Backward compatible — every existing lyrics document lacks the
+   * field and therefore renders as one slide per section.
+   */
+  slideBreaks?: number[]
 }
 
 /** CCLI copyright metadata extracted from a SongSelect paste. */

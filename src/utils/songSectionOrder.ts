@@ -113,6 +113,38 @@ export function buildSectionRows(
 }
 
 /**
+ * Slices a section's `lines` into consecutive slide line-groups at its
+ * `slideBreaks` (R117). This is the SINGLE definition of what a split means —
+ * both assembler paths (Plan 02) and the editor split affordance (Plan 03)
+ * consume this one helper.
+ *
+ * Read-tolerant: keeps only integer break indices `k` with
+ * `1 <= k < lines.length`, sorts ascending and de-duplicates. An absent, empty
+ * or fully-invalid break set yields exactly one group equal to `section.lines`
+ * (today's behavior — backward compatible). Never throws, never mutates its
+ * argument (builds new arrays only). Pure — imports only the `LyricSection`
+ * type, no Vue/store/Firestore.
+ */
+export function sliceSectionIntoSlides(section: LyricSection): string[][] {
+  const n = section.lines.length
+  const breaks = (section.slideBreaks ?? [])
+    .filter((k) => Number.isInteger(k) && k >= 1 && k < n)
+    .sort((a, b) => a - b)
+  const unique = [...new Set(breaks)]
+
+  if (unique.length === 0) return [section.lines]
+
+  const groups: string[][] = []
+  let start = 0
+  for (const k of unique) {
+    groups.push(section.lines.slice(start, k))
+    start = k
+  }
+  groups.push(section.lines.slice(start))
+  return groups
+}
+
+/**
  * Enforces the pool/order invariants over a (sections, order) pair:
  * - the pool is de-duplicated by id, keeping the first occurrence;
  * - order ids with no pooled section are dropped;
