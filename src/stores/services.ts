@@ -26,6 +26,7 @@ import { useAuthStore } from '@/stores/auth'
 import { deriveSlug, claimSlug } from '@/utils/slug'
 import { resolveServiceRoleAssignments } from '@/utils/serviceRoles'
 import { buildSlotsFromTemplate } from '@/utils/slotTypes'
+import { stripUndefined } from '@/utils/stripUndefined'
 import { mintShareToken, pickAdoptableToken, type ShareTokenCandidate } from '@/utils/shareTokens'
 import type { Service, ServiceStatus, Progression, ScriptureRef, ServiceSlot } from '@/types/service'
 import type { SongSlot } from '@/types/service'
@@ -299,8 +300,15 @@ export const useServiceStore = defineStore('services', () => {
   async function updateService(id: string, data: Record<string, unknown>) {
     if (!orgId.value) return
     assertWritable(id, data)
+    // R111 (51-03): a "No Section" move sets slot.section = undefined, which
+    // rides through onSave into this payload. Firestore rejects raw `undefined`
+    // at any depth ("Unsupported field value: undefined"), so strip the plain
+    // payload here — the single funnel every live-plan write path uses. Add the
+    // serverTimestamp() FieldValue sentinel AFTER stripping (stripUndefined's
+    // contract). assertWritable ran on the ORIGINAL data above, so the lock
+    // contract is unchanged.
     await updateDoc(doc(db, 'organizations', orgId.value, 'services', id), {
-      ...data,
+      ...stripUndefined(data),
       updatedAt: serverTimestamp(),
     })
     // R077 (41-04) — keep a previously-shared service's public payload
