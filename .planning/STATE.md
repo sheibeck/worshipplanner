@@ -5,15 +5,15 @@ milestone_name: Editing Reliability & Song Slides
 current_phase: 52
 current_phase_name: default-service-template
 status: executing
-stopped_at: Completed 50-05-PLAN.md (Phase 50 complete, 5/5 plans)
-last_updated: "2026-08-11T20:09:05.921Z"
+stopped_at: Completed 52-03-PLAN.md (R113 — template editor relocated to Services cog)
+last_updated: "2026-08-11T20:35:47.489Z"
 last_activity: 2026-08-11
-last_activity_desc: Phase 52 execution started
+last_activity_desc: 52-03 executed (R113 — default-template editor relocated from Settings to an editor-gated Services-page cog); ServicesView/SettingsView tests green, type-check clean, baseline 2-file
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 7
-  completed_plans: 4
+  completed_plans: 6
   percent: 20
 ---
 
@@ -204,8 +204,8 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 52 (default-service-template) — EXECUTING
-Plan: 1 of 3 complete (52-01 done; next: 52-02)
-Status: Executing Phase 52
+Plan: 2 of 3 complete (52-01 done; next: 52-02)
+Status: Ready to execute
 Last activity: 2026-08-11 — 52-01 executed (R115 suggested-template default + R116 body threading); slotTypes/services tests green, type-check clean, baseline 2-file
 
 ## ⏸ RESUME HERE (2026-08-11 — v1.6 ROADMAP.md created, ready to plan Phase 51)
@@ -1539,6 +1539,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 50 P03 | 40min | 3 tasks | 8 files |
 | Phase 50 P04 | 25 min | 2 tasks | 2 files |
 | Phase 50 P05 | 6min | 2 tasks | 5 files |
+| Phase 52 P03 | 12 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -2192,8 +2193,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-10T21:40:11.310Z
-Stopped at: Completed 50-05-PLAN.md (Phase 50 complete, 5/5 plans)
+Last session: 2026-08-11T20:35:46.701Z
+Stopped at: Completed 52-03-PLAN.md (R113 — template editor relocated to Services cog)
 Resume file: None
 
 ## Operator Next Steps
