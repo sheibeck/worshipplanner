@@ -574,13 +574,21 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
         for (const sectionId of order) {
           const section = lyrics.sections.find((s) => s.id === sectionId)
           if (!section) continue
-          const lyricContent: Omit<LyricSlide, 'id' | 'position'> = {
-            contentKind: 'lyric',
-            sectionId: section.id,
-            sectionLabel: section.label,
-            lines: section.lines,
+          // R117 (Phase 53): slice through the SAME `sliceSectionIntoSlides`
+          // the stored-group loop uses, so the two paths agree slide-for-slide
+          // (the D1 lockstep discipline). An unsplit section yields exactly one
+          // group -> one emitFallback at the current localSeq -> byte-identical
+          // to today. Each group advances localSeq so fallback ids stay
+          // distinct and stable (`${slot.id}:${localSeq}`).
+          for (const lines of sliceSectionIntoSlides(section)) {
+            const lyricContent: Omit<LyricSlide, 'id' | 'position'> = {
+              contentKind: 'lyric',
+              sectionId: section.id,
+              sectionLabel: section.label,
+              lines,
+            }
+            emitFallback(slot, index, lyricContent, slot.songId, localSeq++)
           }
-          emitFallback(slot, index, lyricContent, slot.songId, localSeq++)
         }
 
         emitFallback(slot, index, copyrightContent, slot.songId, localSeq++)
