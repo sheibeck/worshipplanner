@@ -15,6 +15,57 @@ progress:
 
 # Project State
 
+## ★★ STANDING AUTONOMY GRANT — v1.6, granted 2026-08-11
+
+**This is the ACTIVE grant. It supersedes the v1.5 grant of 2026-08-06 (now historical, preserved
+below).** Re-read this before deciding to stop for a checkpoint — it survives context compaction.
+
+Owner request: run `/gsd-autonomous` for milestone v1.6. Boundaries settled by explicit question and
+answer at launch, 2026-08-11.
+
+### What this authorizes
+
+- **Do not block on human-verify checkpoints.** When a phase's verification is `human_needed`, record
+  each unmet check as DEFERRED in `.planning/PENDING-VERIFICATION.md` and continue to the next phase.
+  Owner's choice: "Defer & keep going."
+
+- Proceed through every v1.6 phase without pausing for approval on ordinary implementation decisions.
+  Owner is **away** — run default smart-discuss, pick the reasonable default for each grey area, state
+  it, and keep moving.
+
+### What this does NOT authorize
+
+- **Never record a deferred check as passed.** Defer and disclose, not self-approve.
+
+- **STOP BEFORE THE MILESTONE LIFECYCLE.** Because human verification is being deferred, do NOT run
+  audit → complete → cleanup at the end — archiving phases whose checks were deferred is self-approval
+  by another name (the documented v1.4/v1.5 lesson; see the ⛔ note further down for v1.4's precedent).
+  When all 5 phases are code-complete, STOP and hand the owner the `/gsd-verify-work` list. The owner
+  runs the lifecycle after verifying.
+
+- **NO DEPLOYS** without an explicit owner ask. v1.6 has no deploy-gated phases (all client-side Vue —
+  drag-and-drop, template UI, song editor, notes field, preview, fonts), so none is expected. If a
+  phase somehow needs one, ship it built/tested/undeployed and hand over the command.
+
+- **No `.env.local` changes** — it holds live secrets and is gitignored.
+
+- **No destructive or irreversible actions** without asking: no `git stash` (multi-worktree repo), no
+  project-wide `lint --fix`, no history rewrites, no bulk deletions of tracked files beyond what a
+  plan explicitly scopes.
+
+- **Stop and ask** only when proceeding under an assumption would be unsafe or would waste the work if
+  the assumption is wrong. Otherwise pick the reasonable default, state it, and continue.
+
+### Where deferred items go
+
+`.planning/PENDING-VERIFICATION.md` — one running list across all v1.6 phases, written as the owner's
+to-do for when they return.
+
+---
+
+<details>
+<summary>Historical — the v1.5 grant of 2026-08-06 (superseded by v1.6 above, kept for provenance)</summary>
+
 ## ★★ STANDING AUTONOMY GRANT — v1.5, granted 2026-08-06
 
 **This supersedes the v1.4 grant of 2026-07-30, which was scoped to one weekend and is now
@@ -128,6 +179,8 @@ literally can't work because of outstanding issues that must have answers, or un
 Authorized deferring human-verify checkpoints through Phases 31 → 37; prohibited deploys,
 `.env.local` changes, destructive actions, and recording any deferred check as passed. Its deploy
 prohibition and its never-self-approve rule are both carried forward above.
+
+</details>
 
 </details>
 
