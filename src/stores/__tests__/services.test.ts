@@ -462,7 +462,7 @@ describe('useServiceStore', () => {
     })
   })
 
-  describe('createService (44-01 — template-driven, empty-by-default)', () => {
+  describe('createService (52-01 — template-driven, suggested-by-default)', () => {
     it('calls addDoc with correct shape including serverTimestamp, progression, and status draft', async () => {
       const { addDoc, serverTimestamp } = await import('firebase/firestore')
       const { useServiceStore } = await import('../services')
@@ -486,7 +486,7 @@ describe('useServiceStore', () => {
       expect(serverTimestamp).toHaveBeenCalled()
     })
 
-    it('an empty/unset defaultServiceTemplate produces a new service with 0 slots (owner override 2026-08-07 — EMPTY, never buildSlots)', async () => {
+    it('an empty/unset defaultServiceTemplate produces a new service seeded from the Suggested Template (9 slots, 1-2-2-3-derived order — R115 supersedes the 2026-08-07 EMPTY override)', async () => {
       const { addDoc } = await import('firebase/firestore')
       const { useServiceStore } = await import('../services')
       const store = useServiceStore()
@@ -501,8 +501,41 @@ describe('useServiceStore', () => {
 
       const callArgs = vi.mocked(addDoc).mock.calls[0]!
       const data = callArgs[1] as Record<string, unknown>
-      const slots = data.slots as unknown[]
-      expect(slots).toHaveLength(0)
+      const slots = data.slots as Array<{ kind: string }>
+      expect(slots).toHaveLength(9)
+      expect(slots.map((s) => s.kind)).toEqual([
+        'SONG',
+        'SCRIPTURE',
+        'SONG',
+        'PRAYER',
+        'SCRIPTURE',
+        'SONG',
+        'SONG',
+        'MESSAGE',
+        'SONG',
+      ])
+    })
+
+    it('empty template AND vwModeEnabled ON: the 5 suggested SONG slots receive requiredVwType [1,2,2,3,3] in order (R115 criterion 3 holds for the suggested fallback)', async () => {
+      const { addDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+
+      // Empty template (beforeEach default) + VW on
+      mockAuthState.settings.vwModeEnabled = true
+
+      await store.createService({
+        date: '2026-03-08',
+        name: '',
+        teams: [],
+      })
+
+      const callArgs = vi.mocked(addDoc).mock.calls[0]!
+      const data = callArgs[1] as Record<string, unknown>
+      const slots = data.slots as Array<{ kind: string; requiredVwType?: number }>
+      const songSlots = slots.filter((s) => s.kind === 'SONG')
+      expect(songSlots.map((s) => s.requiredVwType)).toEqual([1, 2, 2, 3, 3])
     })
 
     it('a non-empty template produces slots matching kind/section/order exactly', async () => {

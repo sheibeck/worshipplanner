@@ -11,6 +11,7 @@ import {
   orderSlotsBySection,
   progressionVwTypeSequence,
   buildSlotsFromTemplate,
+  buildSuggestedTemplateEntries,
 } from '@/utils/slotTypes'
 import { SERVICE_SECTIONS, type SongSlot, type ScriptureSlot, type NonAssignableSlot, type HymnSlot, type ImportedSlot, type Service, type ServiceSlot } from '@/types/service'
 import type { ServiceTemplateEntry } from '@/types/organization'
@@ -662,6 +663,24 @@ describe('ANNOUNCEMENTS and MISC (43-01)', () => {
     expect('body' in slot).toBe(false)
   })
 
+  it('createSlot(MISC, undefined, undefined, body) sets slot.body to the passed text (R116)', () => {
+    const slot = createSlot('MISC', undefined, undefined, 'canned music') as NonAssignableSlot
+    expect(slot.kind).toBe('MISC')
+    expect(slot.body).toBe('canned music')
+  })
+
+  it('createSlot(ANNOUNCEMENTS, undefined, undefined, body) sets slot.body to the passed text (R116)', () => {
+    const slot = createSlot('ANNOUNCEMENTS', undefined, undefined, 'more announcement slides') as NonAssignableSlot
+    expect(slot.kind).toBe('ANNOUNCEMENTS')
+    expect(slot.body).toBe('more announcement slides')
+  })
+
+  it('createSlot(MISC, undefined, section, body) carries both section and body (R116)', () => {
+    const slot = createSlot('MISC', undefined, 'worship', 'pre-service music') as NonAssignableSlot
+    expect(slot.section).toBe('worship')
+    expect(slot.body).toBe('pre-service music')
+  })
+
   it('two successive createSlot(ANNOUNCEMENTS) calls return different ids', () => {
     const a = createSlot('ANNOUNCEMENTS')
     const b = createSlot('ANNOUNCEMENTS')
@@ -856,5 +875,66 @@ describe('buildSlotsFromTemplate (44-01)', () => {
     expect(slots).toHaveLength(2)
     expect(slots.map((s) => s.kind)).toEqual(['SONG', 'PRAYER'])
     expect(slots.map((s) => s.position)).toEqual([0, 1])
+  })
+
+  it('an entry { kind: MISC, body } threads body into the built slot (R116)', () => {
+    const template: ServiceTemplateEntry[] = [{ id: 'm-1', kind: 'MISC', body: 'x' }]
+    const slots = buildSlotsFromTemplate(template, true)
+    expect(slots).toHaveLength(1)
+    expect((slots[0] as NonAssignableSlot).body).toBe('x')
+  })
+
+  it('an entry { kind: MISC } with no body yields a slot where the body key is absent (R116 — legacy shape preserved)', () => {
+    const template: ServiceTemplateEntry[] = [{ id: 'm-2', kind: 'MISC' }]
+    const slots = buildSlotsFromTemplate(template, true)
+    expect(slots).toHaveLength(1)
+    expect('body' in (slots[0] as NonAssignableSlot)).toBe(false)
+  })
+})
+
+describe('buildSuggestedTemplateEntries (52-01)', () => {
+  const SUGGESTED_KINDS = ['SONG', 'SCRIPTURE', 'SONG', 'PRAYER', 'SCRIPTURE', 'SONG', 'SONG', 'MESSAGE', 'SONG']
+
+  it('returns 9 entries whose kinds match the 1-2-2-3-derived suggested order', () => {
+    const entries = buildSuggestedTemplateEntries()
+    expect(entries).toHaveLength(9)
+    expect(entries.map((e) => e.kind)).toEqual(SUGGESTED_KINDS)
+  })
+
+  it('every entry has a non-empty string id', () => {
+    const entries = buildSuggestedTemplateEntries()
+    for (const e of entries) {
+      expect(typeof e.id).toBe('string')
+      expect(e.id.length).toBeGreaterThan(0)
+    }
+  })
+
+  it('two successive calls return different ids for the same ordinal position (fresh ids per call)', () => {
+    const a = buildSuggestedTemplateEntries()
+    const b = buildSuggestedTemplateEntries()
+    for (let i = 0; i < a.length; i++) {
+      expect(a[i]!.id).not.toBe(b[i]!.id)
+    }
+  })
+
+  it('sections match buildSlots(1-2-2-3) defaults: worship for positions 0-6, message for 7, sending for 8', () => {
+    const entries = buildSuggestedTemplateEntries()
+    expect(entries.map((e) => e.section)).toEqual([
+      'worship',
+      'worship',
+      'worship',
+      'worship',
+      'worship',
+      'worship',
+      'worship',
+      'message',
+      'sending',
+    ])
+  })
+
+  it('buildSlotsFromTemplate(buildSuggestedTemplateEntries(), true) yields 5 SONG slots with requiredVwType [1,2,2,3,3]', () => {
+    const slots = buildSlotsFromTemplate(buildSuggestedTemplateEntries(), true)
+    const songSlots = slots.filter((s) => s.kind === 'SONG') as SongSlot[]
+    expect(songSlots.map((s) => s.requiredVwType)).toEqual([1, 2, 2, 3, 3])
   })
 })
