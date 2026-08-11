@@ -1,7 +1,8 @@
 ---
 phase: 48-multi-image-ordering-mobile-polish
 verified: 2026-08-09T12:08:08Z
-status: human_needed
+status: passed
+status_source: owner-attributed 2026-08-10 (v1.5 milestone close — code deployed to production & in real-world use; owner explicitly accepted these deferred phases as verified)
 score: 13/13 must-haves verified
 behavior_unverified: 0
 overrides_applied: 0

@@ -631,6 +631,23 @@ below — it was never run, and nothing in this item was self-approved.**
 
 ---
 
+## ✅ v1.5 PHASES 43–49 ACCEPTED AS VERIFIED — 2026-08-10 (owner decision, milestone close)
+
+**The owner explicitly accepted Phases 43, 44, 45, 46, 47, 48 and 49 as verified** at v1.5 milestone
+close, on the basis that all of v1.5 was **deployed to production on 2026-08-10 and has been in
+real-world use**. Chosen via an explicit question/answer during the milestone-cleanup step (the v1.4
+precedent). Each of those phases' `*-VERIFICATION.md` was accordingly set to `status: passed` with
+`status_source: owner-attributed`, and any still-unchecked items in their sections below were checked
+off as owner-accepted rather than individually re-run.
+
+This is **owner attribution, not self-approval** — the record shows plainly that the owner accepted
+them based on production use rather than that each listed check was independently executed. If a defect
+later surfaces in phases 43–49, the item that would have caught it is still written below, and this
+banner shows it was accepted-by-use, not run. Phase 50's two items were genuinely verified
+(50.1 by production header inspection, 50.2 owner-verified) and are not part of this attribution.
+
+---
+
 ## Phase 39 — Org Settings Infrastructure & Feature Toggles (v1.5)
 
 Deferred under the v1.5 standing autonomy grant (STATE.md, 2026-08-06). All automated gates
@@ -1207,19 +1224,19 @@ swallowing; WR-02 silent alignment-mismatch detection; WR-03 stable v-for keys; 
 four items below are inherently manual/visual/judgment — jsdom cannot render real fonts, simulate a
 real touch viewport, or judge projection legibility.
 
-- [ ] **47.1 Touch discoverability of the gap-+ / divider-remove affordance.** On a phone-width
+- [x] **47.1 Touch discoverability of the gap-+ / divider-remove affordance.** On a phone-width
       viewport, confirm the gap-+ and divider-remove controls are visible (persistent `opacity-40`)
       below the `md` breakpoint without hovering, reveal fully on hover/focus at `md`+, and have a
       44×44px hit area around the 24px control — discoverable and tappable on a real touch device.
       (UI-SPEC backstop, 47-02-SUMMARY.md D9.)
-- [ ] **47.2 Hand-dividing feels low-friction (R095).** Hand-divide **Psalm 136** (refrain) and
+- [x] **47.2 Hand-dividing feels low-friction (R095).** Hand-divide **Psalm 136** (refrain) and
       **Psalm 24** (call/response) with the gap-+ and 3-way chip; confirm placing/removing dividers
       and labeling is natural, not clunky.
-- [ ] **47.3 Projected 3-role legibility (R097).** Present a hand-divided reading; confirm the
+- [x] **47.3 Projected 3-role legibility (R097).** Present a hand-divided reading; confirm the
       first slide shows the reference, later slides show only the speaker label, and Leader (sky) /
       Congregation (amber) / All (violet) read distinctly at projection distance — and the reference
       genuinely disappears after slide 1.
-- [ ] **47.4 WR-01/WR-02 logic-change sign-off.** Spot-check real (non-fixture) passages with
+- [x] **47.4 WR-01/WR-02 logic-change sign-off.** Spot-check real (non-fixture) passages with
       run-on verses through the **Start Blank** seed; confirm verse ranges are never over-reported,
       and that an intentionally unmatchable-seed condition fires the toast cleanly with no
       end-user-visible console noise. (The fixer flagged both correctness-sensitive text-matching
@@ -1237,18 +1254,18 @@ WR-02 **deferred to owner** (item 48.4 below). R098 (natural-order multi-image) 
 (dismissible Getting Started) are fully code-verified with automated tests. The items below are
 inherently physical-device / owner-judgment.
 
-- [ ] **48.1 Real touch-drag reorder correctness (R099).** On a real touch device, long-press +
+- [x] **48.1 Real touch-drag reorder correctness (R099).** On a real touch device, long-press +
       drag a slide card to reorder; confirm it lands where dropped with no off-by-one, on a fresh
       grid and after a prior reorder. The desktop `*DraggableIndex`/`onEnd` logic is byte-unchanged
       and touch options were only appended (`delay`/`delayOnTouchOnly`/`touchStartThreshold`), but
       only a real touch gesture proves the reorder.
-- [ ] **48.2 Real-thumb 44px reachability (R099).** On a phone, confirm the slide-card drag handle
+- [x] **48.2 Real-thumb 44px reachability (R099).** On a phone, confirm the slide-card drag handle
       and the action-menu trigger are comfortably thumb-tappable (44px hit area), and that the
       enlarged hit area does not swallow card-selection taps (WR-03's asymmetric-padding fix).
-- [ ] **48.3 Real ~375px layout (R099/R100).** At phone width confirm: the Slides tab has no
+- [x] **48.3 Real ~375px layout (R099/R100).** At phone width confirm: the Slides tab has no
       horizontal overflow (the plan rail stacks above the grid as a horizontal-scroll strip), and
       the service edit screen's header action buttons stack vertically (QuarterView recipe).
-- [ ] **48.4 ★ OWNER DECISION — WR-02: Print/Share are now Service-Order-tab-only.** Moving Print
+- [x] **48.4 ★ OWNER DECISION — WR-02: Print/Share are now Service-Order-tab-only.** Moving Print
       and Share into the top contextual action bar (R101) scoped them to the Service Order tab; the
       previous page-bottom row made them reachable from **every** tab. This is a documented,
       UI-checker-approved 48-UI-SPEC.md decision that satisfies R101's text, but it narrows where

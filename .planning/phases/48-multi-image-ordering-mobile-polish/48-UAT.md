@@ -1,5 +1,6 @@
 ---
-status: testing
+status: passed
+status_source: owner-attributed 2026-08-10 (v1.5 milestone close — code deployed to production & in real-world use; owner explicitly accepted these deferred phases as verified)
 phase: 48-multi-image-ordering-mobile-polish
 source: [48-VERIFICATION.md]
 started: 2026-08-09T02:15:00Z

@@ -1,7 +1,8 @@
 ---
 phase: 46-global-slide-typography
 verified: 2026-08-08T19:59:46Z
-status: human_needed
+status: passed
+status_source: owner-attributed 2026-08-10 (v1.5 milestone close — code deployed to production & in real-world use; owner explicitly accepted these deferred phases as verified)
 score: 18/18 must-haves verified
 behavior_unverified: 0
 overrides_applied: 0

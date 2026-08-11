@@ -1,7 +1,8 @@
 ---
 phase: 43-service-item-types
 verified: 2026-08-07T21:00:00Z
-status: human_needed
+status: passed
+status_source: owner-attributed 2026-08-10 (v1.5 milestone close — code deployed to production & in real-world use; owner explicitly accepted these deferred phases as verified)
 score: 12/12 must-haves verified (code-level)
 behavior_unverified: 0
 overrides_applied: 0

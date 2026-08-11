@@ -1,5 +1,6 @@
 ---
-status: testing
+status: passed
+status_source: owner-attributed 2026-08-10 (v1.5 milestone close — code deployed to production & in real-world use; owner explicitly accepted these deferred phases as verified)
 phase: 47-congregational-reading-divider-ux
 source: [47-VERIFICATION.md]
 started: 2026-08-08T20:45:00Z

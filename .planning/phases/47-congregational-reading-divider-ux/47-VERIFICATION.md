@@ -1,7 +1,8 @@
 ---
 phase: 47-congregational-reading-divider-ux
 verified: 2026-08-08T22:44:34Z
-status: human_needed
+status: passed
+status_source: owner-attributed 2026-08-10 (v1.5 milestone close — code deployed to production & in real-world use; owner explicitly accepted these deferred phases as verified)
 score: 16/16 must-haves verified
 behavior_unverified: 0
 overrides_applied: 0
