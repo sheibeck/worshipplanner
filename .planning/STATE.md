@@ -204,9 +204,9 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 51 (service-order-editing-reliability) — EXECUTING
-Plan: 2 of 4 (51-01 complete)
+Plan: 3 of 4 (51-01, 51-02 complete)
 Status: Executing Phase 51
-Last activity: 2026-08-11 — Plan 51-01 complete: R110 phantom fixed in the LIVE plan editor (ServiceEditorView.vue) via a slotRenderNonce container rebuild (RED test 07a5a1c → GREEN fix 9440e24). ServiceEditorView suite 261/261, type-check clean, only the 2-file known baseline red. Remaining R110 (template editor), R111, R112 belong to later 51 plans.
+Last activity: 2026-08-11 — Plan 51-02 complete: R110 phantom fixed in the DEFAULT-TEMPLATE editor (ServiceTemplateEditor.vue) via a templateRenderNonce container rebuild paired with destroySectionSortables() — the same mechanism 51-01 proved in the live editor (RED test 21f3b2c → GREEN fix fcca4c0). ServiceTemplateEditor suite 21/21, type-check clean, only the 2-file known baseline red. Both editors now share one nonce-rebuild mechanism. Remaining R111, R112 belong to later 51 plans.
 
 ## ⏸ RESUME HERE (2026-08-11 — v1.6 ROADMAP.md created, ready to plan Phase 51)
 
