@@ -52,7 +52,12 @@
                trailing unlabeled bucket for section-less entries), mirroring
                ServiceEditorView.vue's per-section grouping/Sortable pattern. -->
           <div v-else class="space-y-2">
-            <template v-for="group in sectionGroups" :key="group.key">
+            <!-- The render nonce rides the section v-for key (NOT the container <div> key —
+                 Vue forbids :key on a child of <template v-for>). Bumping it in
+                 onTemplateSortEnd discards and rebuilds each section fragment from reactive
+                 state, reclaiming any DOM node SortableJS orphaned in a cross-section drag
+                 (R110). Mirrors ServiceEditorView.vue's slotRenderNonce (51-01). -->
+            <template v-for="group in sectionGroups" :key="`${group.key}-${templateRenderNonce}`">
               <div
                 v-if="group.label"
                 class="section-header flex items-center gap-2 pt-3 pb-1 first:pt-0"
@@ -309,6 +314,10 @@ const sectionGroups = computed(() => {
 //    once). ──
 
 const dragOverSection = ref<ServiceSection | 'ungrouped' | null>(null)
+// Container render nonce (R110): bumped after a drag to force Vue to rebuild the
+// Sortable-mutated section containers from state. Mirrors ServiceEditorView.vue's
+// slotRenderNonce and SlideGrid.vue's gridRenderNonce.
+const templateRenderNonce = ref(0)
 const sectionListEls = ref(new Map<ServiceSection | 'ungrouped', HTMLElement>())
 const sectionSortables = new Map<ServiceSection | 'ungrouped', Sortable>()
 
@@ -358,6 +367,17 @@ function onTemplateSortEnd(evt: Sortable.SortableEvent): void {
   toBucket.splice(newDraggableIndex, 0, moved)
 
   draft.value = flattenBySection(grouped)
+
+  // R110: the reactive move above is already correct, but SortableJS has physically
+  // relocated the dragged row's DOM node into the target container — a node Vue believes
+  // it still owns in the source list. Tear down every section Sortable, then bump the
+  // nonce so Vue discards and rebuilds all section containers from state; the watcher below
+  // (flush: 'post') then re-binds a fresh Sortable onto each rebuilt container. The
+  // destroy is REQUIRED, not belt-and-braces: the watcher only creates when
+  // `!sectionSortables.has(key)`, so without clearing the map the rebuilt containers would
+  // be left drag-dead with a stale instance bound to the discarded element (51-01 lesson).
+  destroySectionSortables()
+  templateRenderNonce.value += 1
 }
 
 watch(
