@@ -375,6 +375,45 @@ describe('deriveGroupEntries — PRAYER/MESSAGE/HYMN', () => {
   })
 })
 
+describe('deriveGroupEntries — MISC (R123)', () => {
+  it('a MISC slot derives NO slides (empty array)', () => {
+    const slot: NonAssignableSlot = { kind: 'MISC', id: 'slot-misc-0', position: 0 }
+    const entries = deriveGroupEntries(slot, makeInputs())
+    expect(entries).toEqual([])
+  })
+
+  it('an ANNOUNCEMENTS slot still derives exactly one text entry (sibling regression)', () => {
+    const slot: NonAssignableSlot = { kind: 'ANNOUNCEMENTS', id: 'slot-ann-0', position: 0 }
+    const entries = deriveGroupEntries(slot, makeInputs())
+    expect(entries).toHaveLength(1)
+    expect(entries[0]!.sourceRef).toEqual({ kind: 'text' })
+  })
+})
+
+describe('rebuildGroup — MISC no-op (R123 backward-compat)', () => {
+  it('preserves an existing MISC group\'s legacy blank auto-slide unchanged', () => {
+    const slot: NonAssignableSlot = { kind: 'MISC', id: 'slot-misc-0', position: 0 }
+    const group = makeGroup({ slides: [{ id: 'e1', order: 0, sourceRef: { kind: 'text' } }] })
+
+    const result = rebuildGroup(group, slot, makeInputs())
+
+    expect(result.changed).toBe(false)
+    expect(result.slides).toEqual(group.slides)
+  })
+
+  it('preserves a hand-added MISC slide unchanged', () => {
+    const slot: NonAssignableSlot = { kind: 'MISC', id: 'slot-misc-0', position: 0 }
+    const group = makeGroup({
+      slides: [{ id: 'h1', order: 0, sourceRef: { kind: 'text', title: 'New slide', body: '' } }],
+    })
+
+    const result = rebuildGroup(group, slot, makeInputs())
+
+    expect(result.changed).toBe(false)
+    expect(result.slides).toEqual(group.slides)
+  })
+})
+
 describe('buildInitialGroup', () => {
   it('never sets bedAudioUrl — no legacy slot-media migration exists under D-19', () => {
     const slot = songSlot({ id: 'slot-1', songId: 'song-1' })
