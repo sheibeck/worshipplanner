@@ -11,10 +11,16 @@ Smart weekly service planning that follows the Vertical Worship methodology (1�
 ## Current State
 
 **Shipped:** v1.0 MVP (Phases 1–4, 6–7) · v1.1 (Phases 8–17) · v1.2 Worship Service Slide Management
-(Phases 18–23) · v1.3 Slides Tab Rework (Phases 24–28) · **v1.4 Service and Slides (Phases 29–38,
-shipped 2026-08-05)** — all archived.
+(Phases 18–23) · v1.3 Slides Tab Rework (Phases 24–28) · v1.4 Service and Slides (Phases 29–38,
+shipped 2026-08-05) · **v1.5 Settings, Sharing, and Fidelity (Phases 39–50, shipped & deployed to
+production 2026-08-10)** — all archived.
 
-**Open:** **v1.5 Settings, Sharing, and Fidelity** — scoped 2026-08-06, phases 39+.
+**Open:** none — planning the next milestone (`/gsd-new-milestone`). v1.5 delivered per-church settings
+& feature toggles, custom-auth-claim org membership, sharing correctness, PPTX rendered-image display,
+service item types, default service template, ESV/NLT Bible selection, global slide typography,
+congregational reading UX, multi-image/mobile polish, and slide bulk-delete/provenance/render-fidelity.
+Phase 50 was genuinely verified (incl. live R109/R108 in production); Phases 39, 43–49 were
+owner-accepted at milestone close on the basis of the production deploy + real-world use.
 
 ### v1.4 shipped on owner acceptance, with two things left genuinely unfinished
 
@@ -367,4 +373,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-06 after scoping milestone v1.5 (Settings, Sharing, and Fidelity)*
+*Last updated: 2026-08-10 after completing & archiving milestone v1.5 (Settings, Sharing, and Fidelity)*
