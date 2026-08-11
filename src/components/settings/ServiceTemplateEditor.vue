@@ -107,6 +107,19 @@
 
                   <div class="flex-1 min-w-0">
                     <p class="text-sm text-gray-200">{{ kindLabel(entry.kind) }}</p>
+                    <!-- Recurring body text for the body-bearing template kinds (R116). Mirrors
+                         the live editor's MESSAGE/ANNOUNCEMENTS/MISC textarea (ServiceEditorView.vue:1092).
+                         Scoped to MISC + ANNOUNCEMENTS per the recorded decision. Bound via :value / @input
+                         (auto-escaped Vue binding — never v-html; T-52-03). -->
+                    <textarea
+                      v-if="entry.kind === 'MISC' || entry.kind === 'ANNOUNCEMENTS'"
+                      :value="entry.body ?? ''"
+                      rows="2"
+                      placeholder="Recurring content for this item…"
+                      data-testid="template-item-body"
+                      class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-200 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500 resize-y mt-2"
+                      @input="onBodyChange(entry.id, ($event.target as HTMLTextAreaElement).value)"
+                    ></textarea>
                   </div>
 
                   <!-- Section-assignment control — same option set as ServiceEditorView.vue's `section-select`. -->
@@ -285,6 +298,15 @@ function onSectionChange(id: string, value: string): void {
   const entry = draft.value.find((e) => e.id === id)
   if (!entry) return
   entry.section = value === '' ? undefined : (value as ServiceSection)
+}
+
+// R116 — recurring body text on a body-bearing template entry. Mirrors
+// onSectionChange's empty→undefined rule so a cleared body stays truly absent
+// and onSave's stripUndefined drops it rather than persisting `body: undefined`.
+function onBodyChange(id: string, value: string): void {
+  const entry = draft.value.find((e) => e.id === id)
+  if (!entry) return
+  entry.body = value === '' ? undefined : value
 }
 
 // ── Grouping for render — reuses slotTypes.ts's generic groupBySection/flattenBySection
