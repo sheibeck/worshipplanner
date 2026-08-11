@@ -985,7 +985,7 @@ describe('SongLyricEditor', () => {
     expect(survivor!.attributes('data-repeat')).toBe('false')
   })
 
-  it('the add row renders the five quick-add chips in mockup order', async () => {
+  it('the add row renders the six quick-add chips in mockup order, incl. Pre-Chorus (R119)', async () => {
     mockIsLoading.value = false
     mockCurrentLyrics.value = makeLyrics()
     const wrapper = await mountEditor()
@@ -994,7 +994,14 @@ describe('SongLyricEditor', () => {
     const addRow = wrapper.find('[data-testid="add-section-row"]')
     expect(addRow.exists()).toBe(true)
     const chips = addRow.findAll('button')
-    expect(chips.map((c) => c.text())).toEqual(['Verse', 'Chorus', 'Bridge', 'Tag', 'Ending'])
+    expect(chips.map((c) => c.text())).toEqual([
+      'Verse',
+      'Chorus',
+      'Pre-Chorus',
+      'Bridge',
+      'Tag',
+      'Ending',
+    ])
   })
 
   it('activating a chip appends a new empty row under that kind, and expands it', async () => {
