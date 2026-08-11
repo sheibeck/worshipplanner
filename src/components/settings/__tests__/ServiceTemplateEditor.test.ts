@@ -445,4 +445,53 @@ describe('ServiceTemplateEditor — drag-reorder (SortableJS, per-section instan
     const song = entries.find((e) => e.kind === 'SONG')
     expect(song?.section).toBe('message')
   })
+
+  // R110 (default-template editor half). The module `sortablejs` mock only captures
+  // options — it NEVER relocates a DOM node (51-RESEARCH Pitfall 1) — so an onEnd-only
+  // test is false-GREEN on buggy code because the reactive `draft` is already correct.
+  // The defect is a SortableJS↔Vue DOM-ownership desync: SortableJS physically moves the
+  // dragged row's real DOM node into the target container, and Vue — patching from state
+  // it believes it owns — mints a SECOND row for that entry, leaving a handler-less
+  // phantom behind. This test physically performs SortableJS's real move BEFORE onEnd,
+  // then asserts on RENDERED node counts (never on the reactive array).
+  it('cross-section drag leaves exactly one rendered row for the moved item — no phantom duplicate (R110)', async () => {
+    mockAuthState.settings.defaultServiceTemplate = [
+      { id: 'song-1', kind: 'SONG' },
+      { id: 'scripture-1', kind: 'SCRIPTURE', section: 'worship' },
+    ]
+    mountEditor(true)
+    await flushPromises()
+
+    const ungroupedCapture = captureForUngrouped()
+    const worshipCapture = captureForSection('worship')
+    if (!ungroupedCapture || !worshipCapture) throw new Error('expected both ungrouped and worship captures')
+
+    const ungroupedContainer = body().get('[data-testid="template-section-list-ungrouped"]').element
+    const worshipContainer = body().get('[data-testid="template-section-list-worship"]').element
+
+    // Simulate SortableJS's real DOM relocation of the dragged row BEFORE onEnd fires:
+    // detach the "No Section" song node from the ungrouped container and append it into
+    // the worship container, exactly as a live cross-section drag would.
+    const draggedRow = ungroupedContainer.querySelector('[data-entry-id="song-1"]')
+    if (!draggedRow) throw new Error('dragged row not found in ungrouped container')
+    ungroupedContainer.removeChild(draggedRow)
+    worshipContainer.appendChild(draggedRow)
+
+    ungroupedCapture.options.onEnd?.({
+      oldDraggableIndex: 0,
+      newDraggableIndex: 1,
+      from: ungroupedContainer,
+      to: worshipContainer,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any)
+    await flushPromises()
+
+    // (a) the source (ungrouped) list holds ZERO rows for the moved id, and
+    // (b) the whole rendered subtree contains EXACTLY ONE row for that id.
+    const ungroupedAfter = body().find('[data-testid="template-section-list-ungrouped"]')
+    if (ungroupedAfter.exists()) {
+      expect(ungroupedAfter.element.querySelectorAll('[data-entry-id="song-1"]').length).toBe(0)
+    }
+    expect(body().findAll('[data-entry-id="song-1"]')).toHaveLength(1)
+  })
 })
