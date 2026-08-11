@@ -785,7 +785,15 @@
 
         <!-- Dynamic Service Flow -->
         <div class="space-y-1.5">
-          <template v-for="group in slotSectionGroups" :key="group.key">
+          <!-- R110: the key folds in `slotRenderNonce` (bumped in `onSlotSortEnd`
+               after a drag). Vue does not allow a `:key` on a child of a
+               `<template v-for>` — it must live on the template tag — so the nonce
+               rides the group key here. A bump gives every section fragment a fresh
+               key, forcing Vue to discard and rebuild the ref-bearing section-list
+               container `<div>` (and its Sortable-orphaned child) from reactive
+               state. `group.key` alone still uniquely identifies each section, so
+               ordering/identity across sections is unchanged between bumps. -->
+          <template v-for="group in slotSectionGroups" :key="`${group.key}-${slotRenderNonce}`">
             <!-- Section header: rendered unconditionally once per real section (UI-SPEC §1) —
                  never rendered for the trailing ungrouped bucket, which has no header. Structurally
                  a sibling of the section's list container, not a member of it, so it is excluded from
@@ -1753,6 +1761,17 @@ const slotSectionGroups = computed(() => {
  *  because the template's `:class` binding on every section container reads it. */
 const dragOverSection = ref<ServiceSection | 'ungrouped' | null>(null)
 
+/** R110 render nonce. On a cross-section drag SortableJS physically moves the
+ *  dragged `.slot-item` from the source `<ul>` into the target `<ul>` before
+ *  `onEnd` fires; when the source section then empties, Vue tears down that
+ *  container subtree without reclaiming the node it no longer physically owns,
+ *  leaving a handler-less "No Section" phantom clone. Every section-list
+ *  container `<div>` keys on `${group.key}-${slotRenderNonce}`, so bumping this
+ *  after the reactive move forces Vue to discard and rebuild each container from
+ *  state — reclaiming the orphan. Mirrors SlideGrid.vue's `gridRenderNonce`
+ *  (the in-repo precedent), including its destroy-then-rebuild Sortable pairing. */
+const slotRenderNonce = ref(0)
+
 /** Ref-callback populating the per-section container element map Task 2's Sortable
  *  lifecycle watcher consumes. Declared here because the template wires the callback;
  *  Task 2 owns the watcher that turns this map into `Sortable.create` calls. */
@@ -1920,6 +1939,22 @@ async function onSlotSortEnd(evt: Sortable.SortableEvent): Promise<void> {
 
   const reindexed = reindexSlots(flattenBySection(grouped))
   localService.value.slots = reindexed
+
+  // R110: reclaim any node SortableJS physically relocated across containers.
+  // On a cross-section drag Sortable moves the dragged `.slot-item` into the
+  // target `<ul>` before this handler runs; the reactive reassignment above is
+  // correct, but Vue does not reconcile that stray node — when the source
+  // section empties it removes the container subtree without reclaiming the
+  // moved child, orphaning a handler-less "No Section" phantom. Tear the section
+  // Sortables down FIRST, then bump the nonce so every keyed container `<div>`
+  // is discarded and rebuilt from state (reclaiming the orphan). The teardown is
+  // load-bearing, not belt-and-braces: the lifecycle watcher only creates a
+  // Sortable when `!sectionSortables.has(key)`, so without clearing the map it
+  // would leave the stale instances bound to the discarded elements and the
+  // rebuilt containers with no Sortable at all (dead drag). This is exactly the
+  // destroy-then-nonce pairing SlideGrid.vue uses (destroySortable + gridRenderNonce).
+  destroySectionSortables()
+  slotRenderNonce.value += 1
 
   // D-15: persist immediately rather than waiting on the 800ms debounce. A
   // cross-section move updates only the `slots` array field, so order and section
