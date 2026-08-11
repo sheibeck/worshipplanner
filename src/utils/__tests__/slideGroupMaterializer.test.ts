@@ -200,6 +200,35 @@ describe('deriveGroupEntries — SONG', () => {
       expect(raw).not.toHaveProperty('body')
     }
   })
+
+  // Phase 53 (R117/R118): the split is resolved LIVE at assembly, never stored.
+  // The stored slide-group model must therefore be UNCHANGED — a split section
+  // referenced twice in performanceOrder still yields exactly one lyric entry
+  // per occurrence, with no split payload leaking onto the entry. This documents
+  // that R118 (duplicate a split as one unit) needs zero group-model change.
+  it('R118: a split section referenced twice yields exactly one lyric entry per occurrence, no split payload on the entry', () => {
+    const slot = songSlot({ songId: 'song-1' })
+    const lyrics = makeSongLyrics({
+      sections: [{ id: 'verse-1', label: 'Verse 1', lines: ['L0', 'L1', 'L2', 'L3'], slideBreaks: [2] }],
+      performanceOrder: ['verse-1', 'verse-1'],
+    })
+    const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
+
+    const entries = deriveGroupEntries(slot, inputs)
+
+    // copyright, lyric, lyric, copyright — one lyric entry per occurrence, NOT
+    // pre-split into 2 slides per occurrence.
+    expect(entries.map((e) => e.sourceRef.kind)).toEqual(['copyright', 'lyric', 'lyric', 'copyright'])
+    const lyricEntries = entries.filter((e) => e.sourceRef.kind === 'lyric')
+    expect(lyricEntries).toHaveLength(2)
+    expect(new Set(entries.map((e) => e.id)).size).toBe(4)
+    for (const entry of lyricEntries) {
+      expect(entry.sourceRef.kind === 'lyric' && entry.sourceRef.sectionId).toBe('verse-1')
+      const raw = entry as unknown as Record<string, unknown>
+      expect(raw).not.toHaveProperty('slideBreaks')
+      expect(raw).not.toHaveProperty('lines')
+    }
+  })
 })
 
 describe('deriveGroupEntries — SCRIPTURE', () => {

@@ -1447,6 +1447,143 @@ describe('assembleSlideshow — lyric split (R117/R118, Plan 53-02)', () => {
       }
     })
   })
+
+  function isCopyright(assembled: { slide: unknown }): boolean {
+    return Object.prototype.hasOwnProperty.call(assembled.slide as object, 'ccliSongNumber')
+  }
+  const lyricLinesOf = (result: { slide: unknown }[]): string[][] =>
+    result.filter((r) => !isCopyright(r)).map((r) => (r.slide as LyricSlide).lines)
+
+  describe('fallback path (R117)', () => {
+    it('a section with slideBreaks emits N lyric fallback slides with distinct consecutive ids, partitioned lines, between the copyright bracket', () => {
+      const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+      const service = makeService([slot])
+      const lyrics = splitSongLyrics()
+      const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) }) // no group
+
+      const result = assembleSlideshow(service, inputs)
+
+      expect(result).toHaveLength(4) // copyright, split0, split1, copyright
+      expect(result.map((r) => r.slide.id)).toEqual([
+        'slot-song-0:0',
+        'slot-song-0:1',
+        'slot-song-0:2',
+        'slot-song-0:3',
+      ])
+      expect(isCopyright(result[0]!)).toBe(true)
+      expect(isCopyright(result[3]!)).toBe(true)
+      expect((result[1]!.slide as LyricSlide).lines).toEqual(['L0', 'L1', 'L2', 'L3'])
+      expect((result[2]!.slide as LyricSlide).lines).toEqual(['L4', 'L5', 'L6', 'L7'])
+    })
+
+    it('BWC: an unsplit section emits exactly one fallback lyric slide, byte-identical id/lines to today', () => {
+      const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+      const service = makeService([slot])
+      const lyrics = makeSongLyrics({ performanceOrder: ['verse-1'] })
+      const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
+
+      const result = assembleSlideshow(service, inputs)
+
+      expect(result).toHaveLength(3) // copyright, verse, copyright
+      expect(result[1]!.slide.id).toBe('slot-song-0:1')
+      expect((result[1]!.slide as LyricSlide).lines).toEqual(['Line A', 'Line B'])
+    })
+  })
+
+  describe('dual-path lockstep (D1) + duplicate proof (R118)', () => {
+    it('the stored-group and fallback paths emit the same number of lyric slides with the same lines for the same split section', () => {
+      const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+      const lyrics = splitSongLyrics()
+
+      const fallback = assembleSlideshow(
+        makeService([slot]),
+        makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) }),
+      )
+
+      const entry = makeGroupSlideEntry({
+        id: 'entry-verse',
+        order: 0,
+        sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+      })
+      const group = makeSlideGroup({ id: 'slot-song-0', slotId: 'slot-song-0', slides: [entry] })
+      const stored = assembleSlideshow(
+        makeService([slot]),
+        makeInputs({
+          songLyricsById: new Map([['song-1', lyrics]]),
+          groupsBySlotId: new Map([['slot-song-0', group]]),
+        }),
+      )
+
+      expect(lyricLinesOf(fallback)).toEqual(lyricLinesOf(stored))
+      expect(lyricLinesOf(stored)).toEqual([
+        ['L0', 'L1', 'L2', 'L3'],
+        ['L4', 'L5', 'L6', 'L7'],
+      ])
+    })
+
+    it('R118 stored path: a split section referenced by two entries emits all N slides on both occurrences with distinct ids', () => {
+      const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+      const lyrics = splitSongLyrics()
+      const entryA = makeGroupSlideEntry({
+        id: 'entry-a',
+        order: 0,
+        sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+      })
+      const entryB = makeGroupSlideEntry({
+        id: 'entry-b',
+        order: 1,
+        sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+      })
+      const group = makeSlideGroup({ id: 'slot-song-0', slotId: 'slot-song-0', slides: [entryA, entryB] })
+      const originalSlides = group.slides
+
+      const result = assembleSlideshow(
+        makeService([slot]),
+        makeInputs({
+          songLyricsById: new Map([['song-1', lyrics]]),
+          groupsBySlotId: new Map([['slot-song-0', group]]),
+        }),
+      )
+
+      expect(result.map((r) => r.slide.id)).toEqual(['entry-a:0', 'entry-a:1', 'entry-b:0', 'entry-b:1'])
+      expect(new Set(result.map((r) => r.slide.id)).size).toBe(4)
+      expect((result[0]!.slide as LyricSlide).lines).toEqual(['L0', 'L1', 'L2', 'L3'])
+      expect((result[1]!.slide as LyricSlide).lines).toEqual(['L4', 'L5', 'L6', 'L7'])
+      expect((result[2]!.slide as LyricSlide).lines).toEqual(['L0', 'L1', 'L2', 'L3'])
+      expect((result[3]!.slide as LyricSlide).lines).toEqual(['L4', 'L5', 'L6', 'L7'])
+      // The stored group document is never mutated (no duplicateRow/model change).
+      expect(group.slides).toBe(originalSlides)
+      expect(group.slides).toHaveLength(2)
+    })
+
+    it('R118 fallback path: a split section repeated in performanceOrder emits all N slides on both occurrences with distinct consecutive ids', () => {
+      const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+      const lyrics = splitSongLyrics({ performanceOrder: ['verse-1', 'verse-1'] })
+
+      const result = assembleSlideshow(
+        makeService([slot]),
+        makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) }),
+      )
+
+      // copyright, split0, split1, split0, split1, copyright
+      expect(result).toHaveLength(6)
+      expect(result.map((r) => r.slide.id)).toEqual([
+        'slot-song-0:0',
+        'slot-song-0:1',
+        'slot-song-0:2',
+        'slot-song-0:3',
+        'slot-song-0:4',
+        'slot-song-0:5',
+      ])
+      expect(new Set(result.map((r) => r.slide.id)).size).toBe(6)
+      expect(lyricLinesOf(result)).toEqual([
+        ['L0', 'L1', 'L2', 'L3'],
+        ['L4', 'L5', 'L6', 'L7'],
+        ['L0', 'L1', 'L2', 'L3'],
+        ['L4', 'L5', 'L6', 'L7'],
+      ])
+    })
+  })
 })
 
 describe('assembleSlideshow — D-04 two-level audio precedence (R030)', () => {
