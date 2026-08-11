@@ -617,6 +617,52 @@ describe('useServiceStore', () => {
       expect(data.updatedAt).toBeDefined()
       expect(serverTimestamp).toHaveBeenCalled()
     })
+
+    // R111 (51-03): moving an item back to "No Section" via the dropdown sets
+    // `slot.section = undefined` (an explicit own key, per onSectionChange('')),
+    // which rides through onSave into the updateService payload. The funnel MUST
+    // strip raw `undefined` before it reaches Firestore's updateDoc — otherwise
+    // the write throws "Unsupported field value: undefined (found in ... slots)".
+    // RED baseline: current code spreads `...data` unmodified, so the recorded
+    // updateDoc payload still carries `section: undefined` on the moved slot.
+    it('R111: strips raw undefined from the slots payload when an item is moved to "No Section"', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      // A draft service so assertWritable permits the write.
+      triggerSnapshot([makeService({ id: 'service-1', status: 'draft' })])
+
+      // Mirror onSectionChange('') for a "No Section" move: an explicit own
+      // `section: undefined` key on the moved slot.
+      await store.updateService('service-1', {
+        slots: [
+          { kind: 'SONG', position: 0, section: undefined },
+          { kind: 'PRAYER', position: 1, section: 'Worship' },
+        ],
+      })
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const written = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+
+      // The moved slot must carry NO `section` key (omission reads back as
+      // "No Section"); the other slot's real section value survives.
+      const writtenSlots = written.slots as Array<Record<string, unknown>>
+      expect('section' in writtenSlots[0]!).toBe(false)
+      expect(writtenSlots[1]!.section).toBe('Worship')
+
+      // Belt-and-braces: a deep scan of the whole written payload finds no
+      // value strictly equal to `undefined` — the exact thing Firestore rejects.
+      const hasRawUndefined = (v: unknown): boolean => {
+        if (v === undefined) return true
+        if (Array.isArray(v)) return v.some(hasRawUndefined)
+        if (v !== null && typeof v === 'object') {
+          return Object.values(v as Record<string, unknown>).some(hasRawUndefined)
+        }
+        return false
+      }
+      expect(hasRawUndefined(written)).toBe(false)
+    })
   })
 
   describe('deleteService', () => {
