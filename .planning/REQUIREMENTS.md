@@ -44,7 +44,7 @@ FINDINGS".
 - [x] **R113**: The default-service-template editor is reached from the **Services page** via a
       cog/settings control, and is no longer presented on the main Settings page.
 
-- [ ] **R114**: The template's seed-order button is labelled **"Suggested Template"**, is shown
+- [x] **R114**: The template's seed-order button is labelled **"Suggested Template"**, is shown
       regardless of whether Vertical Worship mode is on, and carries no dependence on the 1-2-3
       progression in its label or availability.
 
@@ -52,7 +52,7 @@ FINDINGS".
       blank-template starting path. (When Vertical Worship mode is on, the template's song slots still
       receive their required VW types, as established in v1.5.)
 
-- [ ] **R116**: A Miscellaneous item added **inside the template** exposes its body input box, so an org
+- [x] **R116**: A Miscellaneous item added **inside the template** exposes its body input box, so an org
       can pre-fill recurring content (canned music, standing announcement slides) into the default.
 
 ### Song Lyric Editing
@@ -139,9 +139,9 @@ Which phases cover which requirements. Filled during roadmap creation (2026-08-1
 | R111 | Phase 51 — Service Order Editing Reliability | Complete |
 | R112 | Phase 51 — Service Order Editing Reliability | Complete |
 | R113 | Phase 52 — Default Service Template | Complete |
-| R114 | Phase 52 — Default Service Template | Pending |
+| R114 | Phase 52 — Default Service Template | Complete |
 | R115 | Phase 52 — Default Service Template | Pending |
-| R116 | Phase 52 — Default Service Template | Pending |
+| R116 | Phase 52 — Default Service Template | Complete |
 | R117 | Phase 53 — Song Lyric Editing | Pending |
 | R118 | Phase 53 — Song Lyric Editing | Pending |
 | R119 | Phase 53 — Song Lyric Editing | Pending |

@@ -5,16 +5,16 @@ milestone_name: Editing Reliability & Song Slides
 current_phase: 52
 current_phase_name: default-service-template
 status: executing
-stopped_at: Completed 52-03-PLAN.md (R113 — template editor relocated to Services cog)
-last_updated: "2026-08-11T20:35:47.489Z"
+stopped_at: Completed 52-02-PLAN.md
+last_updated: "2026-08-11T20:48:46.315Z"
 last_activity: 2026-08-11
-last_activity_desc: 52-03 executed (R113 — default-template editor relocated from Settings to an editor-gated Services-page cog); ServicesView/SettingsView tests green, type-check clean, baseline 2-file
+last_activity_desc: 52-01 executed (R115 suggested-template default + R116 body threading); slotTypes/services tests green, type-check clean, baseline 2-file
 progress:
   total_phases: 5
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 7
-  completed_plans: 6
-  percent: 20
+  completed_plans: 7
+  percent: 40
 ---
 
 # Project State
@@ -204,7 +204,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 52 (default-service-template) — EXECUTING
-Plan: 2 of 3 complete (52-01 done; next: 52-02)
+Plan: 3 of 3 complete (52-01 done; next: 52-02)
 Status: Ready to execute
 Last activity: 2026-08-11 — 52-01 executed (R115 suggested-template default + R116 body threading); slotTypes/services tests green, type-check clean, baseline 2-file
 
@@ -1540,6 +1540,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 50 P04 | 25 min | 2 tasks | 2 files |
 | Phase 50 P05 | 6min | 2 tasks | 5 files |
 | Phase 52 P03 | 12 | 2 tasks | 4 files |
+| Phase 52 P02 | 9min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -1881,6 +1882,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: renderedPage deliberately excluded from SourceRef.derivedIdentityKey (documented in slideGroup.ts) -- it is provenance, not identity, so existing carry/survival matching (R107) is unaffected.
 - [Phase ?]: R106: per-group 'Remove imported slides' bulk action, gated on window.confirm reusing the existing codebase confirm pattern — Removal is irreversible and multi-slide; reused the established window.confirm pattern from useUnsavedGuard.ts/LyricPasteRegion.vue rather than inventing a new modal
 - [Phase ?]: R108: importedEntryContent resolution order strictly extends ec217aa — synthetic rendered-page-N identity, then supplied renderedPage (50-03), then the 1:1 positional fallback for legacy entries, then pending; legacy multi-image entries stay unfixed by design (fallback, no migration, per 50-CONTEXT.md).
+- [Phase ?]: 52-02: template body input scoped to MISC + ANNOUNCEMENTS; editor seed + createService fallback share the one buildSuggestedTemplateEntries() preset
 
 ### Roadmap Evolution
 
@@ -2193,8 +2195,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-11T20:35:46.701Z
-Stopped at: Completed 52-03-PLAN.md (R113 — template editor relocated to Services cog)
+Last session: 2026-08-11T20:48:33.853Z
+Stopped at: Completed 52-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
