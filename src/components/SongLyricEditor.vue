@@ -117,7 +117,7 @@
 
             <template v-if="!row.isRepeat">
               <span :class="isExpanded(row) ? LABEL_CHIP_CLASSES.expanded : LABEL_CHIP_CLASSES.collapsed">
-                {{ row.section.label.toUpperCase() }}
+                {{ row.displayLabel.toUpperCase() }}
                 <span aria-hidden="true">{{ isExpanded(row) ? '⌃' : '⌄' }}</span>
               </span>
               <span
@@ -152,7 +152,7 @@
             <template v-else>
               <span :class="LABEL_CHIP_CLASSES.repeat">
                 <span aria-hidden="true">&#8635;</span>
-                {{ row.section.label.toUpperCase() }}
+                {{ row.displayLabel.toUpperCase() }}
               </span>
               <span
                 data-testid="row-repeat-note"
