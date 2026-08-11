@@ -1,7 +1,8 @@
 ---
 phase: 39-org-settings-infrastructure-feature-toggles
 verified: 2026-08-06T21:30:00Z
-status: human_needed
+status: passed
+status_source: owner-attributed 2026-08-10 (v1.5 milestone close — deployed to production & in real-world use; owner explicitly accepted)
 score: 4/4 must-haves verified (automated); 5 backstop items outstanding (insufficient_spec — deferred, not failed)
 behavior_unverified: 0
 overrides_applied: 0

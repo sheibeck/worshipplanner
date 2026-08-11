@@ -1,4 +1,6 @@
 ---
+status: complete
+completed_at: v1.5-milestone-cleanup 2026-08-10
 phase: quick-4
 plan: 1
 subsystem: PcImportModal
