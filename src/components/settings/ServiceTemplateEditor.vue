@@ -43,8 +43,8 @@
           >
             <p class="text-sm text-gray-500">No items yet</p>
             <p class="mt-1 text-xs text-gray-600">
-              Add items below to build your church's default service, or click Reset to 1-2-3 default
-              to start from the standard Vertical Worship flow.
+              Add items below to build your church's default service, or click Suggested Template
+              to start from the suggested service order.
             </p>
           </div>
 
@@ -158,7 +158,7 @@
         <!-- Footer — Reset + Save, or the Reset-overwrite confirm. -->
         <div class="border-t border-gray-800 px-4 py-4 shrink-0" data-testid="template-editor-footer">
           <div v-if="showResetConfirm" class="rounded-lg bg-red-900/20 border border-red-800 p-4 mb-3" data-testid="template-reset-confirm">
-            <p class="text-sm text-gray-200 mb-3">Replace your custom template with the standard 1-2-3 flow? This clears every item you've added.</p>
+            <p class="text-sm text-gray-200 mb-3">Replace your custom template with the Suggested Template? This clears every item you've added.</p>
             <div class="flex gap-2">
               <button
                 type="button"
@@ -182,7 +182,7 @@
               :disabled="!authStore.isEditor"
               data-testid="template-reset"
               @click="onResetClick"
-            >Reset to 1-2-3 default</button>
+            >Suggested Template</button>
             <button
               type="button"
               class="inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white rounded-md px-4 py-2 text-sm font-medium transition-colors"
@@ -214,7 +214,7 @@ import { doc, updateDoc } from 'firebase/firestore'
 import Sortable from 'sortablejs'
 import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
-import { buildSlots, createSlot, slotLabel, groupBySection, flattenBySection } from '@/utils/slotTypes'
+import { buildSuggestedTemplateEntries, createSlot, slotLabel, groupBySection, flattenBySection } from '@/utils/slotTypes'
 import { stripUndefined } from '@/utils/stripUndefined'
 import { SERVICE_SECTIONS, SERVICE_SECTION_LABELS } from '@/types/service'
 import type { SlotKind, ServiceSection } from '@/types/service'
@@ -422,9 +422,11 @@ onUnmounted(() => {
   destroySectionSortables()
 })
 
-// ── Reset to 1-2-3 default ───────────────────────────────────────────────────
-// `buildSlots()`'s 1-2-3 content is repurposed as this preset (44-CONTEXT.md
-// Area 1 override) — never an automatic fallback for an unset template.
+// ── Suggested Template seed ──────────────────────────────────────────────────
+// Seeds the draft from the single shared buildSuggestedTemplateEntries() preset
+// (slotTypes.ts) — the same suggested starting template createService now falls
+// back to for an unset template (R115). One source, so the editor's seed and a
+// newly-created service can never drift apart.
 
 function onResetClick(): void {
   if (!authStore.isEditor) return
@@ -437,11 +439,7 @@ function onResetClick(): void {
 
 function applyReset(): void {
   if (!authStore.isEditor) return
-  draft.value = buildSlots('1-2-2-3').map((slot) => ({
-    id: crypto.randomUUID(),
-    kind: slot.kind,
-    ...(slot.section ? { section: slot.section } : {}),
-  }))
+  draft.value = buildSuggestedTemplateEntries()
   showResetConfirm.value = false
 }
 
