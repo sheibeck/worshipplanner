@@ -326,6 +326,68 @@ describe('ServiceTemplateEditor — Suggested Template seed (R114)', () => {
   })
 })
 
+describe('ServiceTemplateEditor — template-item body (R116)', () => {
+  it('renders a template-item-body textarea for a MISC row, bound to entry.body', async () => {
+    mockAuthState.settings.defaultServiceTemplate = [{ id: 'misc-1', kind: 'MISC', body: 'Canned music' }]
+    mountEditor(true)
+    await flushPromises()
+
+    const bodies = body().findAll('[data-testid="template-item-body"]')
+    expect(bodies).toHaveLength(1)
+    expect((bodies[0]!.element as HTMLTextAreaElement).value).toBe('Canned music')
+  })
+
+  it('renders a template-item-body textarea for an ANNOUNCEMENTS row', async () => {
+    mountEditor(true)
+    await body().get('[data-testid="palette-add-announcements"]').trigger('click')
+    await flushPromises()
+
+    expect(body().findAll('[data-testid="template-item-body"]')).toHaveLength(1)
+  })
+
+  it('renders no template-item-body textarea for non-body kinds (SONG / PRAYER)', async () => {
+    mountEditor(true)
+    await body().get('[data-testid="palette-add-song"]').trigger('click')
+    await body().get('[data-testid="palette-add-prayer"]').trigger('click')
+    await flushPromises()
+
+    expect(body().findAll('[data-testid="template-item-body"]')).toHaveLength(0)
+  })
+
+  it('typing sets the draft entry body; the save payload carries the typed text', async () => {
+    mountEditor(true)
+    await body().get('[data-testid="palette-add-misc"]').trigger('click')
+    await flushPromises()
+
+    await body().get('[data-testid="template-item-body"]').setValue('Recurring slide content')
+    await flushPromises()
+    await body().get('[data-testid="template-save"]').trigger('click')
+    await flushPromises()
+
+    const payload = mockUpdateDoc.mock.calls[0]![1] as Record<string, unknown>
+    const entries = payload['settings.defaultServiceTemplate'] as ServiceTemplateEntry[]
+    expect(entries).toHaveLength(1)
+    expect(entries[0]!.kind).toBe('MISC')
+    expect(entries[0]!.body).toBe('Recurring slide content')
+  })
+
+  it('clearing the body to empty leaves the saved entry bodyless (undefined stripped)', async () => {
+    mockAuthState.settings.defaultServiceTemplate = [{ id: 'misc-1', kind: 'MISC', body: 'Something' }]
+    mountEditor(true)
+    await flushPromises()
+
+    await body().get('[data-testid="template-item-body"]').setValue('')
+    await flushPromises()
+    await body().get('[data-testid="template-save"]').trigger('click')
+    await flushPromises()
+
+    const payload = mockUpdateDoc.mock.calls[0]![1] as Record<string, unknown>
+    const entries = payload['settings.defaultServiceTemplate'] as ServiceTemplateEntry[]
+    expect(entries).toHaveLength(1)
+    expect('body' in entries[0]!).toBe(false)
+  })
+})
+
 describe('ServiceTemplateEditor — Save Template', () => {
   it('writes the dot-path leaf key with a stripUndefined payload, then reassigns the store', async () => {
     mountEditor(true)
