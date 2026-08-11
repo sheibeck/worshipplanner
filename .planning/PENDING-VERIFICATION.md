@@ -1377,3 +1377,25 @@ Resume: `/gsd-verify-work 52`.
       Expect the Miscellaneous item to carry that body text into the created service.
 
 After confirming, run `/gsd-verify-work 52`.
+
+---
+
+## Phase 53 — Song Lyric Editing (v1.6) — DEFERRED 2026-08-11
+
+**Status:** verification_deferred_human. 5/5 ROADMAP criteria verified in code + automated (all source
+present; BWC guards git-confirmed — unsplit sections byte-identical, stored labels immutable,
+slideGroupMaterializer/duplicateRow untouched; `npm run type-check` clean; app suite 3050 pass at the
+2-file baseline; 390/390 phase tests). NOT deploy-gated (client-only). Resume: `/gsd-verify-work 53`.
+
+- [ ] **53.1 (R117) — Hand split + present.** In the song lyric editor, split an 8-line chorus into two
+      4-line slides using the click-between-lines divider. Save, then present the service. Expect the
+      chorus to show as two slides.
+- [ ] **53.2 (R118) — Duplicate a split as one unit.** Duplicate that split chorus. Present. Expect
+      BOTH occurrences to each show both slides.
+- [ ] **53.3 (R120) — Position numbering.** In a song pasted with "Verse 1" and "Verse 2", click the
+      Verse add button. Expect the new section to read "Verse 3" (and a repeated section to share its
+      origin's number; a split section's slides keep the one number).
+- [ ] **53.4 (R121) — First-paste "Save".** On a brand-new song with no lyrics yet, open paste-lyrics.
+      Expect the commit button to read "Save" (not "Replace lyrics").
+
+After confirming, run `/gsd-verify-work 53`.
