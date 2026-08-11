@@ -1299,14 +1299,13 @@ have been **fixed** (see below). The two items here are inherently deploy-/live-
       the long/immutable Cache-Control. Context: code review WR-01 found the original `/index.html`-only
       header missed `/` and deep links; widened per owner decision 2026-08-10.)
 
-- [ ] **50.2 Live multi-image PPTX round-trip (R108).** Import a real multi-image PPTX deck — one
-      where at least one source slide contains **more than one image**, so parsed-slide count ≠
-      rendered-page count — into a group, hand-add one of its slides into another (non-imported) group,
-      and once the render pipeline finishes, confirm it shows the **correct rendered page image** (not a
-      perpetual "Rendering" placeholder). **Why human:** R108's resolution logic is proven by unit
-      tests over synthetic fixtures; a live upload → parse (Cloud Function) → render-service → Storage →
-      client round-trip has not been exercised. This is the multi-image defect from 2026-08-10 that R108
-      exists to close.
+- [x] **50.2 Live multi-image PPTX round-trip (R108).** ✅ **OWNER-VERIFIED 2026-08-10** against the
+      production deploy: a real multi-image PPTX deck imported through the live UI, and a hand-added
+      slide resolves to the correct rendered page (no perpetual "Rendering" placeholder) — confirming
+      `renderedPage` round-trips through the live upload → parse (Cloud Function) → render-service →
+      Storage → client cycle, not just unit fixtures. (Original scenario: import a deck where a source
+      slide contains more than one image so parsed-slide count ≠ rendered-page count, hand-add one of
+      its slides into a non-imported group, confirm the correct rendered page shows.)
 
 ---
 

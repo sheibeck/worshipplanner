@@ -1,20 +1,17 @@
 ---
-status: testing
+status: passed
 phase: 50-slide-management-bulk-delete-provenance
 source: [50-VERIFICATION.md]
 started: "2026-08-10T22:38:02Z"
-updated: "2026-08-10T22:38:02Z"
+updated: "2026-08-10T22:52:00Z"
 ---
 
 ## Current Test
 
 number: 2
 name: Live multi-image PPTX round-trip (R108)
-expected: |
-  Import a real multi-image PPTX deck (a source slide with >1 image) into a group, hand-add
-  one of its slides into another (non-imported) group, and confirm it shows the CORRECT
-  rendered page image — not a perpetual "Rendering" placeholder.
-awaiting: user response (needs a real multi-image PPTX + signed-in session)
+expected: All tests passed — UAT complete.
+awaiting: none — all tests passed
 
 ## Tests
 
@@ -46,14 +43,17 @@ expected: |
 why_human: R108's resolution logic is proven by unit tests over synthetic fixtures; a live
   upload → parse (Cloud Function) → render-service → Storage → client round-trip has not been
   exercised. This is the multi-image defect from 2026-08-10 that R108 closes.
-result: [pending]
+result: passed — OWNER-VERIFIED 2026-08-10 against the production deploy. A real multi-image PPTX
+  deck imported through the live UI; a hand-added slide resolves to the correct rendered page (no
+  perpetual "Rendering" placeholder). Confirms `renderedPage` round-trips through the live
+  parse -> render-service -> Storage -> client cycle, not just unit fixtures.
 
 ## Summary
 
 total: 2
-passed: 1
+passed: 2
 issues: 0
-pending: 1
+pending: 0
 skipped: 0
 blocked: 0
 
