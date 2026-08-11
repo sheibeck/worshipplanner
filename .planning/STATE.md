@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Settings, Sharing, and Fidelity
-current_phase: 50
-current_phase_name: Slide Management — Bulk Delete, Manual/Auto Provenance & Render Fidelity
-status: planning
+status: Awaiting next milestone
 stopped_at: Completed 50-05-PLAN.md (Phase 50 complete, 5/5 plans)
-last_updated: "2026-08-11T01:48:18.156Z"
+last_updated: "2026-08-11T02:06:59.628Z"
 last_activity: 2026-08-10
-last_activity_desc: Phase 49 complete, transitioned to Phase 50
+last_activity_desc: Milestone v1.5 completed and archived
 progress:
   total_phases: 13
   completed_phases: 13
   total_plans: 49
   completed_plans: 49
   percent: 100
+current_phase: 50
+current_phase_name: Slide Management — Bulk Delete, Manual/Auto Provenance & Render Fidelity
 ---
 
 # Project State
@@ -150,48 +150,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-> ## ✅ v1.5 DEPLOYED TO PRODUCTION — 2026-08-10
-> All of v1.5 (Phases 39–49) shipped to production in one release, at the owner's explicit request
-> and authorization (which overrides the standing NO-DEPLOYS grant for this action). Command:
-> `firebase deploy --only hosting,functions,firestore,storage --project worship-planner-bc515` — all
-> targets succeeded (hosting bundle, `syncOrgMembershipClaim` created + all other functions updated,
-> dual-read `storage.rules`, tightened `firestore.rules`, indexes). Live at
-> https://worship-planner-bc515.web.app
->
-> **This also executed Phase 40 Deploy 1** (dual-read rule + claims function together) and the Phase
-> 40.1 firestore.rules tightening. **Still pending (all non-blocking, owner-run):** the backfill (no
-> gcloud ADC on the deploy host — fallback + `refreshOrgClaim` cover it), and Phase 40 **Deploy 2**
-> (remove the storage Firestore fallback) which still requires its 1-hour token soak + the
-> multi-org pre-check — see `PENDING-VERIFICATION.md` § Phase 40. Deploy 1 is safe to leave in place
-> indefinitely. NLT (Phase 45) is no longer deploy-gated — the function is live.
->
-> **Post-deploy smoke check recommended before declaring the milestone shipped:** sign in, confirm a
-> member can still upload (Phase 40.1 observe), an NLT scripture preview loads, and a service exports
-> to Planning Center.
-
-Phase: 50 — Slide Management — Bulk Delete, Manual/Auto Provenance & Render Fidelity
-Plan: Not started
-Status: Ready to plan
-client (DEPLOY-GATED, see below). 45-02 added `bibleVersion: 'ESV' | 'NLT'` to `OrgSettings`
-(`DEFAULT_ORG_SETTINGS.bibleVersion: 'NLT'`, owner's locked override) plus the Settings "Bible
-Translation" card. 45-03 added the `translationSource?` field + `scriptureAttribution()`/
-`resolveTranslationSource()` helpers and threaded them through the materializer/assembler. 45-04
-(this plan) wired consumption: `CongregationalEditor.vue`/`ScriptureInput.vue` route ESV/NLT
-fetches by `authStore.settings.bibleVersion`; `CongregationalEditor.vue` stamps
-`translationSource` once at fetch time (never restamped by a later setting change or a
-subsequent AI split — `lastFetchedVersion` threads the captured value into `onAiSplit` too); both
-scripture render sites (`PresentationViewer.vue`, `slideDisplay.ts::slideBodyText()`) append the
-shared `(ESV)`/`(NLT)` suffix via `resolveTranslationSource(slide)`, never the live org setting.
-R090, R091 and R092 are all marked complete in `REQUIREMENTS.md`. `npm run type-check` clean;
-231/231 in the four touched suites; full app suite at the documented 2-file baseline
-(`src/storage.rules.test.ts`, `RosterView.test.ts`), no new failure; `cd functions && npm test`
-112/112. 45-01's NLT Cloud Function remains **DEPLOY-GATED per the standing v1.5 NO-DEPLOYS
-grant** — ships built/tested/UNDEPLOYED; owner handoff (secret + deploy + two new deferred
-human-verify items: the 48px overflow backstop, and the full post-deploy live round trip) recorded
-in `.planning/PENDING-VERIFICATION.md` § Phase 45.
-Next: Phase 45 is code-complete; the owner's deploy step and the deferred human-verify items are
-the only remaining work for this phase (non-blocking). No further plan needed for Phase 45 itself.
-Last activity: 2026-08-10 — Phase 49 complete, transitioned to Phase 50
+Phase: Milestone v1.5 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-08-10 — Milestone v1.5 completed and archived
 
 ## ⏸ RESUME HERE (2026-08-06 — v1.5 ROADMAP.md created, ready to plan Phase 39)
 
