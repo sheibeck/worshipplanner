@@ -45,7 +45,7 @@ created: 2026-08-11
 | R110 | Cross-section drag leaves no phantom in source list — live plan (`ServiceEditorView.vue`) | unit (simulate DOM move + `onEnd`) | `npx vitest run src/views/__tests__/ServiceEditorView.test.ts` | ✅ extend |
 | R110 | Cross-section drag leaves no phantom — default template (`ServiceTemplateEditor.vue`) | unit | `npx vitest run src/components/settings/__tests__/ServiceTemplateEditor.test.ts` | ✅ extend |
 | R111 | Section→"No Section" save carries no raw `undefined` (`updateService`) | unit | `npx vitest run src/stores/__tests__/services.test.ts` | ✅ extend |
-| R112 | Listing renders section-major incl. empty-body items (`ServiceCard.vue`) | unit | `npx vitest run src/components/__tests__/ServiceCard.test.ts` | ❌ Wave 0 |
+| R112 | Listing renders section-major incl. empty-body items (`ServiceCard.vue`) | unit | `npx vitest run src/components/__tests__/ServiceCard.test.ts` | ✅ extend (7 existing tests) |
 | R112 | Share snapshot slots are section-major (`buildServiceSnapshot`) | unit | `npx vitest run src/stores/__tests__/services.test.ts` | ✅ extend |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
@@ -54,7 +54,7 @@ created: 2026-08-11
 
 ## Wave 0 Requirements
 
-- [ ] `src/components/__tests__/ServiceCard.test.ts` — NEW file; covers R112 listing order (no existing test for `ServiceCard`).
+- [ ] `src/components/__tests__/ServiceCard.test.ts` — EXISTING file (git-tracked, 159 lines, 7 passing tests); EXTEND it with the R112 listing-order test, preserving all 7 current tests.
 - [ ] Extend `ServiceEditorView.test.ts` with a **DOM-mutating** cross-section drag repro — the `sortablejs` mock does NOT move nodes, so the RED test must physically relocate the row between containers before asserting no duplicate `.slot-item` (Pitfall 1).
 - [ ] Extend `ServiceTemplateEditor.test.ts` with the same cross-section phantom repro.
 - [ ] Extend `services.test.ts` for `updateService` `stripUndefined` (R111) and `buildServiceSnapshot` ordering (R112).
