@@ -10,6 +10,7 @@ import {
   normalizeLyricOrder,
   normalizeParsedSections,
   removeRow,
+  sliceSectionIntoSlides,
   uniqueSectionLabel,
 } from '@/utils/songSectionOrder'
 
@@ -106,6 +107,77 @@ describe('buildSectionRows', () => {
       const followedAfter = after.find((r) => !r.isRepeat && r.sectionId === 'chorus')!
       expect(followedAfter.stableKey).toBe('s3')
     })
+  })
+})
+
+describe('sliceSectionIntoSlides (R117)', () => {
+  it('returns exactly one group (the section lines) when slideBreaks is undefined', () => {
+    const section: LyricSection = { id: 'v', label: 'Verse', lines: ['a', 'b', 'c'] }
+    expect(sliceSectionIntoSlides(section)).toEqual([['a', 'b', 'c']])
+  })
+
+  it('returns exactly one group when slideBreaks is empty', () => {
+    const section: LyricSection = { id: 'v', label: 'Verse', lines: ['a', 'b'], slideBreaks: [] }
+    expect(sliceSectionIntoSlides(section)).toEqual([['a', 'b']])
+  })
+
+  it('splits an 8-line section at break [4] into two groups of four (owner chorus example)', () => {
+    const lines = ['1', '2', '3', '4', '5', '6', '7', '8']
+    const section: LyricSection = { id: 'c', label: 'Chorus', lines, slideBreaks: [4] }
+    expect(sliceSectionIntoSlides(section)).toEqual([
+      ['1', '2', '3', '4'],
+      ['5', '6', '7', '8'],
+    ])
+  })
+
+  it('splits a 7-line section at breaks [2,5] into three consecutive groups', () => {
+    const lines = ['0', '1', '2', '3', '4', '5', '6']
+    const section: LyricSection = { id: 'v', label: 'Verse', lines, slideBreaks: [2, 5] }
+    expect(sliceSectionIntoSlides(section)).toEqual([
+      ['0', '1'],
+      ['2', '3', '4'],
+      ['5', '6'],
+    ])
+  })
+
+  it('ignores out-of-range break indices (0, n and beyond) — collapses to one group', () => {
+    const lines = ['a', 'b', 'c', 'd', 'e', 'f'] // n = 6
+    for (const bad of [[0], [6], [99]]) {
+      const section: LyricSection = { id: 'v', label: 'Verse', lines, slideBreaks: bad }
+      expect(sliceSectionIntoSlides(section)).toEqual([lines])
+    }
+  })
+
+  it('dedupes, sorts and integer-filters unsorted/duplicate/non-integer input [5,2,2,3.5]', () => {
+    const lines = ['0', '1', '2', '3', '4', '5', '6'] // n = 7, breaks -> {2,5}
+    const section: LyricSection = { id: 'v', label: 'Verse', lines, slideBreaks: [5, 2, 2, 3.5] }
+    expect(sliceSectionIntoSlides(section)).toEqual([
+      ['0', '1'],
+      ['2', '3', '4'],
+      ['5', '6'],
+    ])
+  })
+
+  it('never throws on legacy/corrupt input', () => {
+    const lines = ['a', 'b']
+    expect(() =>
+      sliceSectionIntoSlides({ id: 'v', label: 'V', lines, slideBreaks: [-1, 99, 0, 1.5] }),
+    ).not.toThrow()
+  })
+
+  it('does not mutate section.lines or section.slideBreaks', () => {
+    const lines = ['0', '1', '2', '3', '4', '5', '6']
+    const slideBreaks = [5, 2, 2, 3.5]
+    const section: LyricSection = { id: 'v', label: 'Verse', lines, slideBreaks }
+    const linesClone = [...lines]
+    const breaksClone = [...slideBreaks]
+
+    sliceSectionIntoSlides(section)
+
+    expect(section.lines).toBe(lines)
+    expect(section.lines).toEqual(linesClone)
+    expect(section.slideBreaks).toBe(slideBreaks)
+    expect(section.slideBreaks).toEqual(breaksClone)
   })
 })
 
