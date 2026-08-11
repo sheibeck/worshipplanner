@@ -45,6 +45,19 @@ export interface MediaAttachableSlot {
    * `position`, both of which a drag-reorder rewrites.
    */
   id: string
+  /**
+   * Slot-level free-text notes (R122, Phase 54). Plain text only — a planner
+   * jots who leads / who sings which parts beside the item's selector. Lives
+   * on the shared base so `slot.notes` is reachable cast-free on all five slot
+   * kinds. OPTIONAL and schemaless: absent on every slot written before this
+   * field existed, so no migration is required; an emptied value is set back to
+   * `undefined` and dropped by `stripUndefined` before the Firestore write
+   * (Phase 51), so a raw `undefined` never reaches the document.
+   *
+   * NOT to be confused with the SEPARATE required top-level `Service.notes`
+   * below — that is a service-level field on a different object.
+   */
+  notes?: string
 }
 
 export interface SongSlot extends MediaAttachableSlot {

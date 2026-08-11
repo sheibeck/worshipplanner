@@ -2350,6 +2350,118 @@ describe('ServiceEditorView - shared body editor: Message/Announcements/Misc, Hy
   })
 })
 
+// ── R122 (54-02): a slot-level plain-text notes field beside every selector ──────
+//
+// One shared notes input written ONCE inside the :891 content wrapper covers all
+// five slot kinds (the field lives on the base MediaAttachableSlot, so slot.notes
+// is reachable cast-free). The selector and notes sit in a two-column responsive
+// flex — side-by-side on desktop (sm:flex-row), stacked below sm (flex-col), reusing
+// the QuarterView / Phase 48 recipe. Editing rides the existing autosave path; an
+// emptied notes is set to undefined (never '') so stripUndefined drops it. A viewer
+// (locked / read-only) shows notes as text via slot-notes-text, never an input,
+// never v-html.
+
+describe('ServiceEditorView - R122 slot-level notes field (54-02)', () => {
+  interface SlotsVm {
+    localService: { slots: Array<Record<string, unknown>> }
+  }
+
+  async function mountView() {
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          ContextualActionBar: false,
+          RouterLink: { template: '<a><slot /></a>' },
+          SaveStatusIndicator: false,
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+          PresentationViewer: true,
+        },
+      },
+    })
+  }
+
+  // A multi-kind service so the "once per slot, every kind" claim is exercised
+  // across SONG / SCRIPTURE / MESSAGE / HYMN in one mount.
+  function multiKindService(): Service {
+    return {
+      ...buildSectionedService(),
+      slots: [
+        { kind: 'SONG', id: 'n-song', position: 0, requiredVwType: 1, songId: null, songTitle: null, songKey: null, section: 'worship' },
+        { kind: 'SCRIPTURE', id: 'n-scr', position: 1, book: 'Psalms', chapter: 23, verseStart: 1, verseEnd: 6, section: 'worship' },
+        { kind: 'MESSAGE', id: 'n-msg', position: 2, section: 'message' },
+        { kind: 'HYMN', id: 'n-hymn', position: 3, hymnName: 'It Is Well', hymnNumber: '', verses: '', section: 'sending' },
+      ],
+    }
+  }
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockServicesList = [multiKindService()]
+  })
+
+  // ── (a) one notes input per slot, every kind ────────────────────────────────
+  it('renders exactly one slot-notes-input per slot, across every item kind', async () => {
+    const wrapper = await mountView()
+
+    const inputs = wrapper.findAll('[data-testid="slot-notes-input"]')
+    const slotCount = (wrapper.vm as unknown as SlotsVm).localService.slots.length
+    expect(slotCount).toBe(4)
+    expect(inputs).toHaveLength(slotCount)
+  })
+
+  // ── (b) the selector/notes wrapper carries the responsive recipe classes ────
+  it('wraps selector and notes in a flex flex-col sm:flex-row responsive container', async () => {
+    const wrapper = await mountView()
+
+    // At least one wrapper per slot carries the QuarterView responsive recipe.
+    const responsiveWrappers = wrapper.findAll('.slot-item .flex.flex-col.sm\\:flex-row')
+    expect(responsiveWrappers.length).toBeGreaterThanOrEqual(1)
+  })
+
+  // ── (c) editing sets slot.notes; clearing yields undefined (not '') ─────────
+  it('typing into slot-notes-input sets slot.notes; clearing it to empty yields undefined', async () => {
+    const wrapper = await mountView()
+
+    const input = wrapper.find('[data-testid="slot-notes-input"]')
+    expect(input.exists()).toBe(true)
+
+    await input.setValue('Who leads: Sam')
+    await wrapper.vm.$nextTick()
+    expect((wrapper.vm as unknown as SlotsVm).localService.slots[0]!.notes).toBe('Who leads: Sam')
+
+    await input.setValue('')
+    await wrapper.vm.$nextTick()
+    expect((wrapper.vm as unknown as SlotsVm).localService.slots[0]!.notes).toBeUndefined()
+  })
+
+  // ── (d) viewer shows slot-notes-text and NO input, plain text only ──────────
+  it('a locked/viewer service renders slot-notes-text (not an input) for a slot carrying notes', async () => {
+    // Markup-bearing notes proves text-only rendering: {{ }} interpolation
+    // escapes it (T-54-01), so the literal string round-trips and no live
+    // <b> element is injected into the DOM.
+    mockServicesList = [{
+      ...buildSectionedService(),
+      slots: [{ kind: 'MESSAGE', id: 'v-msg', position: 0, notes: 'Read <b>slowly</b>', section: 'message' }],
+    }]
+    mockAuthState.isEditor = false
+    const wrapper = await mountView()
+
+    const text = wrapper.find('[data-testid="slot-notes-text"]')
+    expect(text.exists()).toBe(true)
+    // The literal markup survives as text — nothing was parsed into an element.
+    expect(text.text()).toBe('Read <b>slowly</b>')
+    expect(text.element.querySelector('b')).toBeNull()
+    // Plain text only — no editable input, no v-html injection sink (T-54-01).
+    expect(wrapper.find('[data-testid="slot-notes-input"]').exists()).toBe(false)
+  })
+})
+
 // ── Service Order preservation sweep and the phase gate (36-05, R067) ────────────
 //
 // This block proves the rebuild across 36-01..36-05 removed nothing from the

@@ -696,6 +696,45 @@ describe('useServiceStore', () => {
       }
       expect(hasRawUndefined(written)).toBe(false)
     })
+
+    // R122 (54-02): slot-level `notes` rides the same slots[] write path. An
+    // emptied notes arrives as `notes: undefined` on the slot (the editor binds
+    // `= value || undefined`); the funnel's stripUndefined MUST drop it at slot
+    // depth so Firestore never sees a raw `undefined` (same guarantee Phase 51
+    // gave `section`). A defined notes must round-trip unchanged.
+    it('R122: strips an undefined slot.notes and round-trips a defined one through the slots payload', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService({ id: 'service-1', status: 'draft' })])
+
+      await store.updateService('service-1', {
+        slots: [
+          { kind: 'SONG', position: 0, notes: undefined },
+          { kind: 'PRAYER', position: 1, notes: 'Who leads: Sam' },
+        ],
+      })
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const written = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+      const writtenSlots = written.slots as Array<Record<string, unknown>>
+
+      // The emptied slot carries NO `notes` key; the other slot's value survives.
+      expect('notes' in writtenSlots[0]!).toBe(false)
+      expect(writtenSlots[1]!.notes).toBe('Who leads: Sam')
+
+      // Deep scan: no value strictly equal to `undefined` anywhere in the payload.
+      const hasRawUndefined = (v: unknown): boolean => {
+        if (v === undefined) return true
+        if (Array.isArray(v)) return v.some(hasRawUndefined)
+        if (v !== null && typeof v === 'object') {
+          return Object.values(v as Record<string, unknown>).some(hasRawUndefined)
+        }
+        return false
+      }
+      expect(hasRawUndefined(written)).toBe(false)
+    })
   })
 
   describe('deleteService', () => {
