@@ -203,10 +203,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 51 (service-order-editing-reliability) — EXECUTING
-Plan: 4 of 4 complete (51-01, 51-02, 51-03, 51-04 complete)
-Status: Phase 51 plans all executed — ready for /gsd-verify-work
-Last activity: 2026-08-11 — Plan 51-04 complete: R112 fixed. Both service read surfaces — the Services listing card (`src/components/ServiceCard.vue`) and the public share snapshot (`buildServiceSnapshot` in `src/stores/services.ts`) — now route slots through the editor's `orderSlotsBySection` contract, so empty-bodied items render section-major (in their band) instead of sinking to the bottom until text is typed. Repro-test-first (RED c314683 → GREEN f3f1e4e). Read-surface only: no data migration, `orderSlotsBySection` is identity-preserving (no churn on already-ordered services), editor load/merge watcher untouched (Pitfall 3), Phase 41 refresh cadence + PII name-only block untouched. Scoped suites 91/91, type-check clean, only the 2-file known baseline red.
+Phase: 51 (service-order-editing-reliability) — CODE-COMPLETE, verification_deferred_human
+Plan: 4 of 4 complete (51-01, 51-02, 51-03, 51-04)
+Status: Phase 51 all plans executed + automated verification 4/4; 3 manual checks DEFERRED per v1.6 grant. Autonomous run advancing to Phase 52.
+Last activity: 2026-08-11 — Phase 51 verified (human_needed). All four R110/R111/R112 source fixes present in code and covered by genuine RED-first repros; `npm run type-check` clean, app suite 2994 pass at the 2-file baseline, 373/373 phase tests. 3 owner checks deferred to `/gsd-verify-work 51` (see PENDING-VERIFICATION.md § Phase 51). Not deploy-gated (client-only).
 
 ## ⏸ RESUME HERE (2026-08-11 — v1.6 ROADMAP.md created, ready to plan Phase 51)
 
@@ -985,7 +985,13 @@ section in `PENDING-VERIFICATION.md` and `functions/DEPLOY-ORG-CLAIMS.md`.
 
 ## Deferred Verification
 
-### v1.5 (current milestone)
+### v1.6 (current milestone)
+
+| Phase | State | Resume |
+|-------|-------|--------|
+| 51 | verification_deferred_human — **4/4 ROADMAP criteria verified automatically**. All four source fixes present in code: R110 nonce-rebuild + `destroySectionSortables()` in BOTH `ServiceEditorView.vue` (`onSlotSortEnd`) and `ServiceTemplateEditor.vue` (`onTemplateSortEnd`); R111 `stripUndefined` in `updateService`; R112 `orderSlotsBySection` in `ServiceCard.vue` + `buildServiceSnapshot`. RED-first repros genuine (physical DOM node move between section containers, not false-green). `npm run type-check` clean, app suite 2994 pass at the 2-file baseline, 373/373 phase tests. **NOT deploy-gated** (client-only). 3 owner checks in `PENDING-VERIFICATION.md` § Phase 51: real OS cross-section drag (no phantom, no refresh) in both editors, live No-Section save with no error toast, empty-Miscellaneous order on the live listing + share link | /gsd-verify-work 51 |
+
+### v1.5 (historical — milestone shipped and archived 2026-08-10)
 
 | Phase | State | Resume |
 |-------|-------|--------|

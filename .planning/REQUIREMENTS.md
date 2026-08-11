@@ -27,7 +27,7 @@ FINDINGS".
 > a page refresh, which points at a client-state / persisted-state desync, not lost data. **Sequenced
 > as the first phase** (owner instruction, 2026-08-11): it blocks trust in every other editing surface.
 
-- [ ] **R110**: Dragging a service item into a section places exactly one item in that section and
+- [x] **R110**: Dragging a service item into a section places exactly one item in that section and
       leaves no phantom duplicate — proven in **both** the default-template editor **and** the live
       service plan. Today a drag spawns a second, undeletable copy stuck at "No Section" while the real
       item shows the target section.
@@ -135,7 +135,7 @@ Which phases cover which requirements. Filled during roadmap creation (2026-08-1
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R110 | Phase 51 — Service Order Editing Reliability | Pending |
+| R110 | Phase 51 — Service Order Editing Reliability | Complete |
 | R111 | Phase 51 — Service Order Editing Reliability | Complete |
 | R112 | Phase 51 — Service Order Editing Reliability | Complete |
 | R113 | Phase 52 — Default Service Template | Pending |

@@ -1329,3 +1329,29 @@ have been **fixed** (see below). The two items here are inherently deploy-/live-
 ## Notes and failures
 
 _(Record anything that failed here, with what you saw versus what was expected.)_
+
+---
+
+## Phase 51 — Service Order Editing Reliability (v1.6) — DEFERRED 2026-08-11
+
+**Status:** verification_deferred_human. 4/4 ROADMAP success criteria verified automatically (all
+source fixes present + genuine RED-first repros green; `npm run type-check` clean; app suite 2994 pass
+at the 2-file baseline; 373/373 phase tests). NOT deploy-gated (client-only). Resume: `/gsd-verify-work 51`.
+
+These three behaviors are jsdom-inexpressible (native SortableJS DOM move / live shared render) and must
+be confirmed by hand in the running app:
+
+- [ ] **51.1 (R110) — Real OS cross-section drag, both editors.** In the default-service-template editor
+      AND in a live service plan, drag an item (e.g. a Song) into a different section (e.g. Worship) and
+      drop it. Expect exactly ONE item in the target section with its dropdown showing that section — NO
+      second, undeletable "No Section" phantom — and the item stays draggable afterward (do a second
+      cross-section drag to confirm the container is not drag-dead). No page refresh.
+- [ ] **51.2 (R111) — Live "No Section" save.** Take an item that is in a section, use its section
+      dropdown to move it back to "No Section". Expect a clean save (Saved indicator) with NO error
+      toast / no Firestore "Unsupported field value: undefined".
+- [ ] **51.3 (R112) — Empty-item order on read surfaces.** Create a service with two blank Miscellaneous
+      items placed mid-order (e.g. in Worship). Without typing any text into them, view the Services
+      listing page and open the public share link. Expect both blank items to appear in their true
+      edit-screen position (their band), NOT sunk to the bottom.
+
+After confirming, run `/gsd-verify-work 51` to close these and flip Phase 51's VERIFICATION.md to passed.
