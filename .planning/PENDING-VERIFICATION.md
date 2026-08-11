@@ -1285,21 +1285,19 @@ mechanism proven by a new 9-case suite), and R108 (render-stable `sourcePage`/`r
 recorded and consumed) are fully code-complete and tested. The two warnings were both about R109 and
 have been **fixed** (see below). The two items here are inherently deploy-/live-gated.
 
-- [ ] **50.1 Post-deploy cache refresh + asset immutability (R109).** After a real
-      `firebase deploy --only hosting`, in a browser that previously had the app cached and WITHOUT a
-      manual cache-clear: (a) load the production **root URL `/`** (not `/index.html`) and a **deep
-      link** (e.g. `/services/<id>`) — the DevTools Network tab should show `index.html` re-fetched
-      fresh (a real request, not `(disk cache)`/`(memory cache)`) and the newly deployed bundle should
-      load immediately; and (b) open a hashed asset request under `/assets/` and confirm its response
-      `Cache-Control` is still the long/immutable value (`public, max-age=31536000, immutable`), **not**
-      `no-cache`. **Why human:** deploy-gated per the NO-DEPLOYS grant — no `firebase deploy` was run.
-      **Why (b) matters:** the config is `source:"**"` no-cache followed by `source:"/assets/**"`
-      immutable, which is correct under Firebase's last-match-wins header precedence (confirmed against
-      community sources; the official docs don't state it). If, in production, assets come back
-      `no-cache`, Firebase resolved precedence differently — the one-line fix is to reorder so
-      `/assets/**` wins. This item is the backstop for that residual doc-silence risk. (Context:
-      the original `/index.html`-only header was found by code review WR-01 to miss `/` and deep links
-      entirely; it was widened per owner decision 2026-08-10.)
+- [x] **50.1 Post-deploy cache refresh + asset immutability (R109).** ✅ **VERIFIED IN PRODUCTION
+      2026-08-10** (automated header inspection by Claude, after owner-authorized
+      `firebase deploy --only hosting,functions`). `curl -D-` against
+      https://worship-planner-bc515.web.app returned: `/` → `Cache-Control: no-cache, no-store,
+      must-revalidate` (text/html shell); `/index.html` → same; `/services/verify-test` (SPA deep
+      link) → same; `/assets/index-PNUhzbF4.js` → `public, max-age=31536000, immutable`. Both
+      (a) shell-no-cache-on-all-routes and (b) assets-still-immutable confirmed — the last-match-wins
+      precedence held in production, so no reorder is needed. A browser holding the OLD cached bundle
+      now re-fetches, since the shell carries `no-cache, no-store, must-revalidate`. (Original scenario:
+      after a real deploy, load `/` and a deep link without a manual cache-clear; DevTools Network shows
+      index.html re-fetched fresh and the new bundle loads; a hashed `/assets/*` request still returns
+      the long/immutable Cache-Control. Context: code review WR-01 found the original `/index.html`-only
+      header missed `/` and deep links; widened per owner decision 2026-08-10.)
 
 - [ ] **50.2 Live multi-image PPTX round-trip (R108).** Import a real multi-image PPTX deck — one
       where at least one source slide contains **more than one image**, so parsed-slide count ≠

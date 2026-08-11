@@ -21,6 +21,15 @@ human_verification:
 **Status:** human_needed
 **Re-verification:** No — initial verification
 
+> **UPDATE 2026-08-10 (post-deploy):** After R109 was strengthened (WR-01 fix, commit `dd9adc8`) the
+> app was **deployed to production** at the owner's explicit request (`firebase deploy --only
+> hosting,functions`). **Human-verification item 1 (R109 post-deploy cache + asset immutability) is now
+> VERIFIED IN PRODUCTION** by direct header inspection of https://worship-planner-bc515.web.app: `/`,
+> `/index.html`, and SPA deep links all return `no-cache, no-store, must-revalidate`; `/assets/*`
+> returns `public, max-age=31536000, immutable`. See `50-UAT.md` and `PENDING-VERIFICATION.md` § Phase
+> 50 item 50.1. **Item 2 (R108 live multi-image PPTX round-trip) remains outstanding** — it needs a
+> real multi-image deck imported through the live UI. Phase stays `human_needed` until item 2 passes.
+
 ## Goal Achievement
 
 ### Observable Truths

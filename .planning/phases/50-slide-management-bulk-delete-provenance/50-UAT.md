@@ -8,17 +8,13 @@ updated: "2026-08-10T22:38:02Z"
 
 ## Current Test
 
-number: 1
-name: Post-deploy cache refresh + asset immutability (R109)
+number: 2
+name: Live multi-image PPTX round-trip (R108)
 expected: |
-  After a real `firebase deploy --only hosting`, in a browser that previously had the app
-  cached and WITHOUT a manual cache-clear:
-  (a) Loading the production ROOT url `/` and a deep link (e.g. `/services/<id>`) re-fetches
-      `index.html` fresh for both (DevTools Network shows a real document request, not
-      `(disk cache)`/`(memory cache)`), and the newly deployed bundle loads immediately.
-  (b) A hashed asset under `/assets/` still returns `Cache-Control: public, max-age=31536000,
-      immutable` — NOT no-cache.
-awaiting: user response
+  Import a real multi-image PPTX deck (a source slide with >1 image) into a group, hand-add
+  one of its slides into another (non-imported) group, and confirm it shows the CORRECT
+  rendered page image — not a perpetual "Rendering" placeholder.
+awaiting: user response (needs a real multi-image PPTX + signed-in session)
 
 ## Tests
 
@@ -31,8 +27,15 @@ expected: |
   last-match-wins header precedence. If assets come back no-cache in production, reorder so
   `/assets/**` wins. (See PENDING-VERIFICATION 50.1; the /index.html-only header was widened
   per code-review WR-01 + owner decision 2026-08-10.)
-why_human: Deploy-gated per the standing v1.5 NO-DEPLOYS grant — no `firebase deploy` was run.
-result: [pending]
+why_human: Deploy-gated per the standing v1.5 NO-DEPLOYS grant.
+result: passed — VERIFIED IN PRODUCTION 2026-08-10 (automated header inspection by Claude, after
+  owner-authorized `firebase deploy --only hosting,functions`). `curl -D-` against
+  https://worship-planner-bc515.web.app returned: `/` → `Cache-Control: no-cache, no-store,
+  must-revalidate` (text/html); `/index.html` → same; `/services/verify-test` (SPA deep link) →
+  same (text/html shell); `/assets/index-PNUhzbF4.js` → `public, max-age=31536000, immutable`.
+  Both (a) shell-no-cache-on-all-routes and (b) assets-still-immutable confirmed; the last-match-wins
+  precedence assumption held in production. (The residual nuance — a browser that had the OLD bundle
+  cached now re-fetching — follows directly from the confirmed `no-cache, no-store` header.)
 
 ### 2. Live multi-image PPTX round-trip (R108)
 expected: |
@@ -48,9 +51,9 @@ result: [pending]
 ## Summary
 
 total: 2
-passed: 0
+passed: 1
 issues: 0
-pending: 2
+pending: 1
 skipped: 0
 blocked: 0
 

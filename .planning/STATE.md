@@ -5,10 +5,10 @@ milestone_name: Settings, Sharing, and Fidelity
 current_phase: 50
 current_phase_name: slide-management-bulk-delete-provenance
 status: verifying
-stopped_at: "Phase 50 CODE-COMPLETE (5/5 plans), code-reviewed (0 critical; R109 code-review WR-01 header-scope gap FIXED in dd9adc8 — /index.html-only widened to ** no-cache + /assets/** immutable), verifier scored 4/4 must-haves at code level. Verification is human_needed (NOT phase-complete — phase.complete correctly refuses until verify-work runs). 2 deferred items in PENDING-VERIFICATION.md (§ Phase 50) + 50-UAT.md: 50.1 post-deploy cache + asset immutability, 50.2 live multi-image PPTX round-trip. RESUME: /gsd-verify-work 50."
+stopped_at: "Phase 50 CODE-COMPLETE (5/5 plans) + DEPLOYED TO PRODUCTION 2026-08-10 (owner-authorized `firebase deploy --only hosting,functions` — overrode the standing NO-DEPLOYS grant for this action; hosting + all 6 functions incl. parsePptx updated; rules NOT touched). Code-reviewed (0 critical; R109 WR-01 header-scope gap FIXED in dd9adc8). UAT 1/2: item 50.1 (R109 cache/asset-immutability) VERIFIED IN PRODUCTION via header inspection — /, /index.html, deep links all no-cache; /assets/* immutable; last-match-wins precedence held. REMAINING: item 50.2 (R108 live multi-image PPTX round-trip) needs a real multi-image deck + signed-in session — owner-run. Phase still human_needed on 50.2 (phase.complete refuses until then). RESUME: /gsd-verify-work 50 (or do the 50.2 import test)."
 last_updated: "2026-08-10T22:38:02Z"
 last_activity: 2026-08-10
-last_activity_desc: Phase 50 executed, code-reviewed, verified (human_needed — 2 deferred items)
+last_activity_desc: Phase 50 executed, reviewed, deployed to production; R109 verified live, R108 multi-image round-trip remains
 progress:
   total_phases: 13
   completed_phases: 13
