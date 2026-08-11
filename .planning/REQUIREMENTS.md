@@ -74,7 +74,7 @@ FINDINGS".
       the first verse is "Verse 1", a verse added after two existing verses is "Verse 3", and the second
       slide of a split "Verse 1" is still "Verse 1". No section is left unnumbered.
 
-- [ ] **R121**: On a brand-new song being given lyrics for the first time, the paste-lyrics commit
+- [x] **R121**: On a brand-new song being given lyrics for the first time, the paste-lyrics commit
       button reads **"Save"** (not "Replace Lyrics"); the existing helper text already notes that it
       replaces lyrics.
 
@@ -146,7 +146,7 @@ Which phases cover which requirements. Filled during roadmap creation (2026-08-1
 | R118 | Phase 53 — Song Lyric Editing | Pending |
 | R119 | Phase 53 — Song Lyric Editing | Complete |
 | R120 | Phase 53 — Song Lyric Editing | Complete |
-| R121 | Phase 53 — Song Lyric Editing | Pending |
+| R121 | Phase 53 — Song Lyric Editing | Complete |
 | R122 | Phase 54 — Service Item Enhancements | Pending |
 | R123 | Phase 54 — Service Item Enhancements | Pending |
 | R124 | Phase 55 — Preview & Export Polish | Pending |
