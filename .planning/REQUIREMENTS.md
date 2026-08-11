@@ -64,7 +64,7 @@ FINDINGS".
       slides**, with the user manually choosing which lines land on each slide (e.g. an 8-line chorus
       divided into two 4-line slides).
 
-- [ ] **R118**: **Duplicating** a song item that has been split into multiple slides duplicates the
+- [x] **R118**: **Duplicating** a song item that has been split into multiple slides duplicates the
       whole multi-slide unit together, not a single slide.
 
 - [x] **R119**: **Pre-Chorus** is available as an addable song lyric item type alongside Verse and
@@ -143,7 +143,7 @@ Which phases cover which requirements. Filled during roadmap creation (2026-08-1
 | R115 | Phase 52 — Default Service Template | Complete |
 | R116 | Phase 52 — Default Service Template | Complete |
 | R117 | Phase 53 — Song Lyric Editing | Complete |
-| R118 | Phase 53 — Song Lyric Editing | Pending |
+| R118 | Phase 53 — Song Lyric Editing | Complete |
 | R119 | Phase 53 — Song Lyric Editing | Complete |
 | R120 | Phase 53 — Song Lyric Editing | Complete |
 | R121 | Phase 53 — Song Lyric Editing | Complete |
