@@ -1346,6 +1346,109 @@ describe('assembleSlideshow — stored group resolution (D-02, R028)', () => {
   })
 })
 
+// Phase 53 Plan 02 (R117/R118): a split lyric section (slideBreaks present)
+// resolves LIVE to N slides at BOTH lockstep lyric-emission call sites, keyed
+// through Plan 01's `sliceSectionIntoSlides`. An unsplit section stays byte-
+// identical to today (one slide, verbatim id). The stored slide-group model is
+// unchanged — the split is never persisted.
+describe('assembleSlideshow — lyric split (R117/R118, Plan 53-02)', () => {
+  const eightLines = ['L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7']
+
+  function splitSongLyrics(overrides: Partial<SongLyrics> = {}): SongLyrics {
+    return makeSongLyrics({
+      sections: [{ id: 'verse-1', label: 'Verse 1', lines: [...eightLines], slideBreaks: [4] }],
+      performanceOrder: ['verse-1'],
+      ...overrides,
+    })
+  }
+
+  describe('stored-group path (R117)', () => {
+    it('a section with slideBreaks emits N lyric slides with ids `${entry.id}:${i}` and partitioned lines; sectionLabel is the stored label', () => {
+      const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+      const service = makeService([slot])
+      const lyrics = splitSongLyrics()
+      const entry = makeGroupSlideEntry({
+        id: 'entry-verse',
+        order: 0,
+        sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+      })
+      const group = makeSlideGroup({ id: 'slot-song-0', slotId: 'slot-song-0', slides: [entry] })
+      const inputs = makeInputs({
+        songLyricsById: new Map([['song-1', lyrics]]),
+        groupsBySlotId: new Map([['slot-song-0', group]]),
+      })
+
+      const result = assembleSlideshow(service, inputs)
+
+      expect(result).toHaveLength(2)
+      expect(result.map((r) => r.slide.id)).toEqual(['entry-verse:0', 'entry-verse:1'])
+      expect(result.map((r) => r.groupSlideId)).toEqual(['entry-verse:0', 'entry-verse:1'])
+      expect((result[0]!.slide as LyricSlide).lines).toEqual(['L0', 'L1', 'L2', 'L3'])
+      expect((result[1]!.slide as LyricSlide).lines).toEqual(['L4', 'L5', 'L6', 'L7'])
+      expect((result[0]!.slide as LyricSlide).sectionId).toBe('verse-1')
+      expect((result[1]!.slide as LyricSlide).sectionId).toBe('verse-1')
+      expect((result[0]!.slide as LyricSlide).sectionLabel).toBe('Verse 1')
+      expect((result[1]!.slide as LyricSlide).sectionLabel).toBe('Verse 1')
+    })
+
+    it('BWC: an UNSPLIT section emits exactly ONE lyric slide whose id is `entry.id` byte-identical to today', () => {
+      const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+      const service = makeService([slot])
+      const lyrics = makeSongLyrics() // verse-1 (2 lines), chorus (1 line), no slideBreaks
+      const entry = makeGroupSlideEntry({
+        id: 'entry-verse',
+        order: 0,
+        sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+      })
+      const group = makeSlideGroup({ id: 'slot-song-0', slotId: 'slot-song-0', slides: [entry] })
+      const inputs = makeInputs({
+        songLyricsById: new Map([['song-1', lyrics]]),
+        groupsBySlotId: new Map([['slot-song-0', group]]),
+      })
+
+      const result = assembleSlideshow(service, inputs)
+
+      expect(result).toHaveLength(1)
+      expect(result[0]!.slide.id).toBe('entry-verse')
+      expect(result[0]!.groupSlideId).toBe('entry-verse')
+      expect((result[0]!.slide as LyricSlide).lines).toEqual(['Line A', 'Line B'])
+    })
+
+    it('all split slides of one section share that section group media (background + bed audio)', () => {
+      const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+      const service = makeService([slot])
+      const lyrics = splitSongLyrics()
+      const entry = makeGroupSlideEntry({
+        id: 'entry-verse',
+        order: 0,
+        sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+      })
+      const group = makeSlideGroup({
+        id: 'slot-song-0',
+        slotId: 'slot-song-0',
+        slides: [entry],
+        backgroundImageUrl: 'https://example.com/bg.png',
+        bedAudioUrl: 'https://example.com/bed.mp3',
+      })
+      const inputs = makeInputs({
+        songLyricsById: new Map([['song-1', lyrics]]),
+        groupsBySlotId: new Map([['slot-song-0', group]]),
+      })
+
+      const result = assembleSlideshow(service, inputs)
+
+      expect(result).toHaveLength(2)
+      for (const r of result) {
+        expect(r.slide.backgroundImageUrl).toBe('https://example.com/bg.png')
+        expect(r.slide.backgroundSource).toBe('group')
+        expect(r.slide.audioUrl).toBe('https://example.com/bed.mp3')
+        expect(r.groupId).toBe('slot-song-0')
+        expect(r.audioFromBed).toBe(true)
+      }
+    })
+  })
+})
+
 describe('assembleSlideshow — D-04 two-level audio precedence (R030)', () => {
   it("an entry with its own audioUrl resolves to that url even when the group has a bed", () => {
     const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
