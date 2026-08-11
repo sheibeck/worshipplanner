@@ -234,11 +234,14 @@ Plans:
   4. Song lyric sections are numbered by their position among sections of the same kind — the first verse is "Verse 1", a verse added after two existing verses is "Verse 3", and both slides of a split "Verse 1" stay "Verse 1"; no section is left unnumbered (R120)
   5. On a brand-new song being given lyrics for the first time, the paste-lyrics commit button reads **"Save"** rather than "Replace Lyrics" (R121)
 
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
 
-- [ ] TBD — created by `/gsd-plan-phase 53`
+- [ ] 53-01-PLAN.md — Pure model core (Wave 1): `slideBreaks?: number[]` on `LyricSection` + `sliceSectionIntoSlides` (R117) + `deriveSectionKind`/per-kind `displayLabel` numbering in `buildSectionRows` (R120) + `'Pre-Chorus'` in `ADD_SECTION_KINDS` (R119), RED-first in `songSectionOrder.test.ts`
+- [ ] 53-02-PLAN.md — Assembler wiring (Wave 2, depends 01): slice both lyric-emission sites in `slideshowAssembler.ts` (`${entry.id}:${i}`, unsplit byte-identical), dual-path lockstep + R118 duplicate proof + BWC (R117, R118)
+- [ ] 53-03-PLAN.md — Editor UI (Wave 2, depends 01): render `displayLabel` numbering (R120) + Pre-Chorus palette (R119) + manual click-between-lines split affordance writing `slideBreaks` (R117) in `SongLyricEditor.vue`
+- [ ] 53-04-PLAN.md — Paste button (Wave 1): first-paste commit button reads "Save" via `currentSectionCount === 0` in `LyricPasteRegion.vue` (R121)
 
 **UI hint**: yes
 **Research flag**: skip (milestone research skipped) — the design work is the manual split-slide assignment interface; R117/R118 are the core design decisions to settle during planning.
@@ -297,7 +300,7 @@ Plans:
 | 39-50 | v1.5 | all | Complete (archived) | 2026-08-10 |
 | 51. Service Order Editing Reliability | v1.6 | 4/4 | In Progress|  |
 | 52. Default Service Template | v1.6 | 3/3 | In Progress|  |
-| 53. Song Lyric Editing | v1.6 | 0/TBD | Not started | - |
+| 53. Song Lyric Editing | v1.6 | 0/4 | Planned | - |
 | 54. Service Item Enhancements | v1.6 | 0/TBD | Not started | - |
 | 55. Preview & Export Polish | v1.6 | 0/TBD | Not started | - |
 
