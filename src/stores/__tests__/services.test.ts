@@ -1019,6 +1019,45 @@ describe('useServiceStore', () => {
     })
   })
 
+  // ── R112 — buildServiceSnapshot serializes slots in section-major order ──────
+  //
+  // The public share snapshot is one of the two read surfaces that render the
+  // RAW persisted slot array; a service created in template/insertion order was
+  // never `orderSlotsBySection`'d, so an empty-bodied item sinks to the bottom
+  // until a normalizing save fires. The snapshot must route slots through the
+  // editor's ordering contract so all three surfaces agree with no edit.
+  describe('buildServiceSnapshot slot ordering (R112)', () => {
+    it('serializes slots in orderSlotsBySection (section-major) order, including empty-bodied items', async () => {
+      const { buildServiceSnapshot } = await import('../services')
+
+      // Raw array is NOT section-major: a sending MISC (slot-b) precedes a
+      // worship MISC (slot-c), and the MESSAGE trails both. Section-major order
+      // is worship [a, c], message [d], sending [b] → ['a','c','d','b'].
+      const service = makeService({
+        slots: [
+          {
+            kind: 'SONG',
+            id: 'slot-a',
+            position: 0,
+            requiredVwType: 1,
+            songId: 'song-abc',
+            songTitle: 'Amazing Grace',
+            songKey: 'G',
+            section: 'worship',
+          },
+          { kind: 'MISC', id: 'slot-b', position: 1, section: 'sending' },
+          { kind: 'MISC', id: 'slot-c', position: 2, section: 'worship' },
+          { kind: 'MESSAGE', id: 'slot-d', position: 3, section: 'message' },
+        ],
+      }) as unknown as Service
+
+      const snapshot = buildServiceSnapshot(service)
+      const orderedIds = snapshot.slots.map((s) => s.id)
+
+      expect(orderedIds).toEqual(['slot-a', 'slot-c', 'slot-d', 'slot-b'])
+    })
+  })
+
   // ── R076/R078 — ensureShareLink stability, adoption and convergence ─────────
   //
   // getDoc responses are queued in CALL ORDER: ensureShareLink's link-document
