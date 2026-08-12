@@ -108,12 +108,20 @@ describe('SongTable', () => {
       expect(wrapper.emitted('import')).toBeTruthy()
     })
 
-    it('does not render the Import Songs button when pcEnabled is false, but keeps Add song manually', () => {
+    it('does not render the Import Songs button when pcEnabled is false, but keeps the Add Song button', () => {
       mockPcEnabled = false
       const wrapper = mountTable([])
       const buttons = wrapper.findAll('button')
       expect(buttons.some((b) => b.text().includes('Import Songs'))).toBe(false)
-      expect(buttons.some((b) => b.text().includes('Add song manually'))).toBe(true)
+      expect(buttons.some((b) => b.text().includes('Add Song'))).toBe(true)
+    })
+
+    it('the empty-state Add Song button emits add when clicked', async () => {
+      const wrapper = mountTable([])
+      const addButton = wrapper.findAll('button').find((b) => b.text().includes('Add Song'))
+      expect(addButton).toBeTruthy()
+      await addButton!.trigger('click')
+      expect(wrapper.emitted('add')).toBeTruthy()
     })
   })
 
