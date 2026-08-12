@@ -1575,7 +1575,11 @@ ServiceTemplateEditor is at 37/37. The items below are visual/feel judgments jsd
 
 After confirming, run `/gsd-verify-work` for phase 57 (or record acceptance in the phase verification record).
 
-## Post-56/57 owner follow-up tweaks (2026-08-12) — committed, awaiting owner visual verification
+## Post-56/57 owner follow-up tweaks (2026-08-12) — ✅ OWNER-ACCEPTED 2026-08-12
+
+> **✅ Owner confirmed 2026-08-12** ("confirmed") — the full batch below is accepted, including the
+> deployed delete-rule fix verified working in production. The checkboxes are retained as the record
+> of what was accepted.
 
 A batch of owner-requested refinements landed after Phases 56–57. All are committed, type-check
 clean, and green at the 2-file test baseline. This is the visual/behavioural check list. (Some items
