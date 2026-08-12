@@ -145,20 +145,122 @@ export function waitForSlideFont(
 /**
  * On-demand loader for a non-eager curated family (RESEARCH's "bundle
  * strategy": only the org's chosen default face is eager-imported in
- * `main.ts`; the other four curated families load lazily when previewed in
- * Settings — 46-03 — or requested by the presenter gate — 46-04). Each
- * entry uses a static `@fontsource/<package>` prefix so Vite's
- * import-analysis can statically discover and bundle the per-weight
- * chunks; do NOT replace this with a single dynamically-templated package
- * name.
+ * `main.ts`; the other five curated families load lazily when previewed in
+ * Settings — 46-03 — or requested by the presenter gate — 46-04).
+ *
+ * Every `import()` below is a FULLY STATIC string literal — one per
+ * `{family, weight}` pair drawn from `SLIDE_FONTS` — so Vite's
+ * import-analysis discovers and bundles each per-weight chunk on its own.
+ *
+ * Do NOT collapse these back to a templated `import(\`…/${weight}.css\`)`.
+ * A `@fontsource/*` specifier is a BARE (node_modules) import, and Vite 7's
+ * `dynamic-import-vars` cannot statically analyze a variable inside a bare
+ * specifier ("must start with ./ or ../"). It warns at build/dev time AND,
+ * worse, leaves the import un-bundled — so the lazy font load would throw at
+ * runtime in a production build (a bare specifier can't resolve in the
+ * browser). The verbose per-weight literals are the price of correctness.
+ *
+ * Each family value stays a `(weight) => Promise` function so `loadFontCss`
+ * and the FONT_CSS_LOADERS membership test are unaffected; an unlisted
+ * weight (e.g. a stale 300 for Lora) resolves to a no-op, mirroring the
+ * `snapWeight` ramp.
  */
 export const FONT_CSS_LOADERS: Record<string, (weight: number) => Promise<unknown>> = {
-  Inter: (weight) => import(`@fontsource/inter/${weight}.css`),
-  Roboto: (weight) => import(`@fontsource/roboto/${weight}.css`),
-  'Open Sans': (weight) => import(`@fontsource/open-sans/${weight}.css`),
-  Poppins: (weight) => import(`@fontsource/poppins/${weight}.css`),
-  Lora: (weight) => import(`@fontsource/lora/${weight}.css`),
-  'Source Serif 4': (weight) => import(`@fontsource/source-serif-4/${weight}.css`),
+  Inter: (weight) => {
+    switch (weight) {
+      case 300:
+        return import('@fontsource/inter/300.css')
+      case 400:
+        return import('@fontsource/inter/400.css')
+      case 500:
+        return import('@fontsource/inter/500.css')
+      case 600:
+        return import('@fontsource/inter/600.css')
+      case 700:
+        return import('@fontsource/inter/700.css')
+      default:
+        return Promise.resolve()
+    }
+  },
+  Roboto: (weight) => {
+    switch (weight) {
+      case 300:
+        return import('@fontsource/roboto/300.css')
+      case 400:
+        return import('@fontsource/roboto/400.css')
+      case 500:
+        return import('@fontsource/roboto/500.css')
+      case 600:
+        return import('@fontsource/roboto/600.css')
+      case 700:
+        return import('@fontsource/roboto/700.css')
+      default:
+        return Promise.resolve()
+    }
+  },
+  'Open Sans': (weight) => {
+    switch (weight) {
+      case 300:
+        return import('@fontsource/open-sans/300.css')
+      case 400:
+        return import('@fontsource/open-sans/400.css')
+      case 500:
+        return import('@fontsource/open-sans/500.css')
+      case 600:
+        return import('@fontsource/open-sans/600.css')
+      case 700:
+        return import('@fontsource/open-sans/700.css')
+      default:
+        return Promise.resolve()
+    }
+  },
+  Poppins: (weight) => {
+    switch (weight) {
+      case 300:
+        return import('@fontsource/poppins/300.css')
+      case 400:
+        return import('@fontsource/poppins/400.css')
+      case 500:
+        return import('@fontsource/poppins/500.css')
+      case 600:
+        return import('@fontsource/poppins/600.css')
+      case 700:
+        return import('@fontsource/poppins/700.css')
+      default:
+        return Promise.resolve()
+    }
+  },
+  Lora: (weight) => {
+    // Lora ships no 300 weight (see SLIDE_FONTS) — omitted here on purpose.
+    switch (weight) {
+      case 400:
+        return import('@fontsource/lora/400.css')
+      case 500:
+        return import('@fontsource/lora/500.css')
+      case 600:
+        return import('@fontsource/lora/600.css')
+      case 700:
+        return import('@fontsource/lora/700.css')
+      default:
+        return Promise.resolve()
+    }
+  },
+  'Source Serif 4': (weight) => {
+    switch (weight) {
+      case 300:
+        return import('@fontsource/source-serif-4/300.css')
+      case 400:
+        return import('@fontsource/source-serif-4/400.css')
+      case 500:
+        return import('@fontsource/source-serif-4/500.css')
+      case 600:
+        return import('@fontsource/source-serif-4/600.css')
+      case 700:
+        return import('@fontsource/source-serif-4/700.css')
+      default:
+        return Promise.resolve()
+    }
+  },
 }
 
 export function loadFontCss(family: string, weight: number): Promise<unknown> {
