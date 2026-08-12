@@ -1542,6 +1542,63 @@ describe('ServiceEditorView - Roles tab (Phase 17-04)', () => {
     expect(lastCallArgs?.[2]).toEqual(expect.arrayContaining(['person-1', 'person-3']))
     expect(lastCallArgs?.[2]).toHaveLength(2)
   })
+
+  // ── quick 260812-jjj regression ──────────────────────────────────────────
+  // "Reset to schedule" must clear an override and restore "Nobody scheduled"
+  // even when NO quarter covers the service date at all — not just when
+  // there's a generated schedule assignment for it to fall back to.
+  it('editor: Reset to schedule clears an override and shows "Nobody scheduled" when no quarter covers the service date (260812-jjj)', async () => {
+    mockAuthState.isEditor = true
+    mockQuarters = [] // no quarter covers '2026-03-08' -> hasQuarterForServiceDate is false
+    mockServicesList = [{
+      ...mockService,
+      status: 'draft',
+      roleAssignmentOverrides: { 'role-vox': ['person-1'] },
+    }]
+
+    const wrapper = await mountView()
+    const rolesTabBtn = wrapper.findAll('button').find((b) => b.text() === 'Roles')
+    await rolesTabBtn!.trigger('click')
+
+    const vocalsCard = wrapper.findAll('.rounded-lg').find((c) => c.text().includes('Vocals'))
+    expect(vocalsCard?.exists()).toBe(true)
+    expect(vocalsCard!.text()).toContain('Overridden')
+
+    const resetBtn = wrapper.findAll('button').find((b) => b.text() === 'Reset to schedule')
+    expect(resetBtn?.exists()).toBe(true)
+
+    await resetBtn!.trigger('click')
+    expect(mockClearRoleOverride).toHaveBeenCalledWith('service-1', 'role-vox')
+
+    await wrapper.vm.$nextTick()
+
+    const vm = wrapper.vm as unknown as {
+      resolvedRoleAssignments: Array<{ roleId: string; roleName: string; overriddenPersonIds: string[] | null }>
+    }
+    const vocalsAssignment = vm.resolvedRoleAssignments.find((a) => a.roleId === 'role-vox')
+    expect(vocalsAssignment?.overriddenPersonIds).toBeNull()
+
+    expect(wrapper.text()).not.toContain('Overridden')
+    expect(wrapper.text()).toContain('Nobody scheduled')
+  })
+
+  it('editor: Reset to schedule button shows the pointer cursor (260812-jjj)', async () => {
+    mockAuthState.isEditor = true
+    mockQuarters = []
+    mockServicesList = [{
+      ...mockService,
+      status: 'draft',
+      roleAssignmentOverrides: { 'role-vox': ['person-1'] },
+    }]
+
+    const wrapper = await mountView()
+    const rolesTabBtn = wrapper.findAll('button').find((b) => b.text() === 'Roles')
+    await rolesTabBtn!.trigger('click')
+
+    const resetBtn = wrapper.findAll('button').find((b) => b.text() === 'Reset to schedule')
+    expect(resetBtn?.exists()).toBe(true)
+    expect(resetBtn!.classes()).toContain('cursor-pointer')
+  })
 })
 
 // ── Sections and inline slideshow preview (Phase 20-04) ─────────────────────────
