@@ -1332,6 +1332,24 @@ _(Record anything that failed here, with what you saw versus what was expected.)
 
 ---
 
+## ✅ v1.6 PHASES 51–57 ACCEPTED AS VERIFIED — 2026-08-12 (owner decision, milestone close)
+
+**The owner explicitly accepted Phases 51, 52, 53, 54, 55, 56 and 57 as verified** at v1.6 milestone
+close, on the basis that all of v1.6 was **deployed to production on 2026-08-12
+(`firebase deploy --only hosting`; the firestore.rules delete-fix deployed the same day) and the
+2026-08-12 owner follow-up batch was confirmed working in production** (see the "Post-56/57 owner
+follow-up tweaks" section below). This mirrors the v1.4/v1.5 owner-acceptance-at-close precedent.
+Each phase's `*-VERIFICATION.md` is accordingly treated as `status: passed` /
+`status_source: owner-attributed`, and the still-unchecked items in the phase sections below are
+accepted-by-use rather than individually re-run.
+
+This is **owner attribution, not self-approval** — the record shows plainly that the owner accepted
+these phases based on a production deploy + confirmed use, not that each listed check was independently
+executed. If a defect later surfaces in 51–57, the item that would have caught it is still written
+below, and this banner shows it was accepted-by-use, not run.
+
+---
+
 ## Phase 51 — Service Order Editing Reliability (v1.6) — DEFERRED 2026-08-11
 
 **Status:** verification_deferred_human. 4/4 ROADMAP success criteria verified automatically (all

@@ -985,7 +985,13 @@ section in `PENDING-VERIFICATION.md` and `functions/DEPLOY-ORG-CLAIMS.md`.
 
 ## Deferred Verification
 
-### v1.6 (current milestone)
+### v1.6 — ✅ PHASES 51–57 OWNER-ACCEPTED AT CLOSE 2026-08-12
+
+> **Milestone closed 2026-08-12.** v1.6 deployed to production (`firebase deploy --only hosting`;
+> firestore.rules delete-fix deployed same day) and the 2026-08-12 owner follow-up batch confirmed
+> working in production. The owner accepted Phases 51–57 as verified (owner-attributed, v1.4/v1.5
+> precedent) — the rows below are retained as the accepted-by-use record, not open work. See
+> `PENDING-VERIFICATION.md` § "v1.6 PHASES 51–57 ACCEPTED AS VERIFIED".
 
 | Phase | State | Resume |
 |-------|-------|--------|
