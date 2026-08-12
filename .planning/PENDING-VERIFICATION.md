@@ -1472,3 +1472,29 @@ projection legibility.
       available and unchanged.
 
 After confirming, run `/gsd-verify-work 55`.
+
+---
+
+## Quick task 260811-vsr — Service Order editor UI pass (deferred owner visual/mobile check)
+
+Deferred under the v1.6 standing autonomy grant. Automated gates (type-check + app suite at the
+2-file known baseline) are green; the following are visual/feel judgments jsdom cannot make. Do NOT
+self-approve.
+
+- [ ] **Three-rail row layout reads clean on desktop.** Open a service with mixed item kinds (Song,
+      Scripture, Prayer, Message, Announcements, Misc, Hymn). Confirm each row shows: drag handle ·
+      colored per-kind badge (w-32 rail) · stacked field column (selector/content above a full-width
+      notes field) · right-aligned ⋯ menu, and the list column is capped (not edge-to-edge on a wide
+      screen). Badge tints per DESIGN-SPEC (Song indigo, Scripture cyan, Message/Announcements rose,
+      Prayer/Misc gray, Hymn amber, Imported gray).
+- [ ] **Mobile single-stack (≤ sm / ~390px).** Narrow the viewport; confirm each row collapses to a
+      vertical stack with no horizontal scrolling and tap targets ≥ ~34px.
+- [ ] **Consolidated field feels right.** Prayer/Misc/Announcements/Message each show exactly ONE
+      free-text field with a sensible per-kind placeholder; a legacy `body`-only item still shows its
+      text; editing persists and re-exports/prints via `notes ?? body`.
+- [ ] **⋯ menu.** Move-to-section reassigns the slot; Delete opens the confirm dialog; menu closes on
+      outside-click and selection; it is absent for viewers/locked services.
+- [ ] **No-Section band.** An un-sectioned item shows a muted/dashed "No Section" band, clearly
+      distinct from Post-Service; absent when every item is sectioned.
+
+After confirming, run `/gsd-verify-work` for this quick task (or record acceptance in the quick-tasks table).
