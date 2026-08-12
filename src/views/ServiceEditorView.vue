@@ -821,6 +821,22 @@
               >＋ Add item</button>
             </div>
 
+            <!-- No-Section band (260811-vsr): the trailing ungrouped/legacy bucket gets a
+                 muted/dashed header so its items read as "not placed yet", clearly distinct
+                 from the last real section (Post-Service). Rendered ONLY for the ungrouped
+                 group and ONLY when non-empty. Deliberately NOT the `section-header-*` testid,
+                 and carries NO slide-count or add-item control, so the "exactly 5 real
+                 headers" and "no ungrouped count/add-item" assertions stay valid. A sibling
+                 of the list container, never a member of its Sortable instance. -->
+            <div
+              v-if="group.key === 'ungrouped' && group.entries.length > 0"
+              class="flex items-center gap-2 mt-3 mb-1 rounded-lg border border-dashed border-gray-700 px-3 py-1.5 text-gray-500"
+              data-testid="no-section-band"
+            >
+              <span class="text-[11px] uppercase tracking-[.14em]">No Section</span>
+              <span class="h-px flex-1 bg-gradient-to-r from-gray-800 to-transparent"></span>
+            </div>
+
             <!-- Per-band inline add chip row (36-04, UI-SPEC §9 discretionary call: inline,
                  not a popover). A sibling of BOTH the header above and the section list
                  container below — never a member of either, so it never enters that

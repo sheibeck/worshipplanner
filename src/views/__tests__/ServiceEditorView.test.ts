@@ -1963,6 +1963,34 @@ describe('ServiceEditorView - section-band slide count and per-band add (36-04, 
     expect(wrapper.find('[data-testid="section-add-item-ungrouped"]').exists()).toBe(false)
   })
 
+  // ── 260811-vsr: muted/dashed "No Section" band for the ungrouped bucket ──────
+  it('renders a muted/dashed no-section-band labeled "No Section" when a legacy/ungrouped slot is present, distinct from the 5 real section headers', async () => {
+    mockServicesList = [{
+      ...buildSectionedService(),
+      slots: [...buildSectionedService().slots, { kind: 'PRAYER', id: 'legacy-1', position: 4 }],
+    }]
+    const wrapper = await mountView()
+
+    const band = wrapper.find('[data-testid="no-section-band"]')
+    expect(band.exists()).toBe(true)
+    expect(band.text()).toContain('No Section')
+    // Muted/dashed styling, distinct from a real section header.
+    expect(band.classes()).toContain('border-dashed')
+    // It is NOT one of the real section headers, and carries no count/add-item control.
+    expect(wrapper.findAll('[data-testid^="section-header-"]')).toHaveLength(5)
+    expect(band.attributes('data-testid')).not.toMatch(/^section-header-/)
+    expect(wrapper.find('[data-testid="section-slide-count-ungrouped"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="section-add-item-ungrouped"]').exists()).toBe(false)
+  })
+
+  it('does not render the no-section-band when every slot is sectioned', async () => {
+    mockServicesList = [buildSectionedService()] // all four slots carry a section
+    const wrapper = await mountView()
+
+    expect(wrapper.find('[data-testid="section-list-ungrouped"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="no-section-band"]').exists()).toBe(false)
+  })
+
   it('reads singular "1 slide" for worship and message, and "0 slides" for the sending band whose one slot contributes no assembled slide', async () => {
     // buildSectionedService: worship = [SONG w/ songId but no lyrics loaded (0) + SCRIPTURE (1)] = 1;
     // message = [MESSAGE (1)] = 1; sending = [SONG w/ no songId (0)] = 0 despite having one slot.
