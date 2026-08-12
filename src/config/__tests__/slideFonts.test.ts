@@ -2,16 +2,24 @@ import { describe, it, expect } from 'vitest'
 import { SLIDE_FONTS, SLIDE_FONT_FAMILY_NAMES } from '@/config/slideFonts'
 
 describe('slideFonts registry', () => {
-  it('has exactly the five expected family keys', () => {
+  it('has exactly the six expected family keys', () => {
     expect(Object.keys(SLIDE_FONTS).sort()).toEqual(
-      ['Inter', 'Lora', 'Open Sans', 'Poppins', 'Source Serif 4'].sort(),
+      ['Inter', 'Lora', 'Open Sans', 'Poppins', 'Roboto', 'Source Serif 4'].sort(),
     )
-    expect(Object.keys(SLIDE_FONTS)).toHaveLength(5)
+    expect(Object.keys(SLIDE_FONTS)).toHaveLength(6)
   })
 
   it('lists Inter first', () => {
     expect(Object.keys(SLIDE_FONTS)[0]).toBe('Inter')
     expect(SLIDE_FONT_FAMILY_NAMES[0]).toBe('Inter')
+  })
+
+  it('adds Roboto with the full 300-700 ramp and OFL-1.1 (R126)', () => {
+    const roboto = SLIDE_FONTS['Roboto']!
+    expect(roboto.package).toBe('@fontsource/roboto')
+    expect(roboto.category).toBe('sans')
+    expect(roboto.weights).toEqual([300, 400, 500, 600, 700])
+    expect(roboto.license).toBe('OFL-1.1')
   })
 
   it('gives every entry an OFL-1.1 license and a non-empty licenseUrl', () => {
