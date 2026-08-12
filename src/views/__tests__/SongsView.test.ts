@@ -54,6 +54,7 @@ const mockSubscribe = vi.fn()
 const mockUnsubscribeAll = vi.fn()
 const mockUpdateSong = vi.fn(() => Promise.resolve())
 const mockRestoreSong = vi.fn(() => Promise.resolve())
+const mockHardDeleteSong = vi.fn(() => Promise.resolve())
 const mockClearTagFilter = vi.fn()
 
 vi.mock('@/stores/songs', () => ({
@@ -75,6 +76,7 @@ vi.mock('@/stores/songs', () => ({
     unsubscribeAll: mockUnsubscribeAll,
     updateSong: mockUpdateSong,
     restoreSong: mockRestoreSong,
+    hardDeleteSong: mockHardDeleteSong,
   }),
 }))
 
@@ -122,6 +124,7 @@ describe('SongsView (Wave 0 harness — Phase 39)', () => {
     mockUnsubscribeAll.mockClear()
     mockUpdateSong.mockClear()
     mockRestoreSong.mockClear()
+    mockHardDeleteSong.mockClear()
     mockClearTagFilter.mockClear()
   })
 
@@ -138,5 +141,58 @@ describe('SongsView (Wave 0 harness — Phase 39)', () => {
     const wrapper = mountSongsView()
     expect(findImportSongsButton(wrapper)).toBeFalsy()
     expect(wrapper.findAll('button').some((b) => b.text().includes('Add Song'))).toBe(true)
+  })
+
+  // KHB-03: permanent delete from the Hidden Songs list requires an in-app
+  // confirmation (no window.confirm) before songStore.hardDeleteSong is called.
+  describe('Hidden Songs — permanent delete (KHB-03)', () => {
+    async function mountWithHiddenPanelOpen() {
+      mockSongs = [
+        { id: 'song-1', title: 'Old Hymn', author: 'Unknown Author', hidden: true, vwTypes: [] },
+      ]
+      const wrapper = mountSongsView()
+      const toggle = wrapper.findAll('button').find((b) => b.text().includes('Hidden ('))
+      expect(toggle).toBeTruthy()
+      await toggle!.trigger('click')
+      return wrapper
+    }
+
+    it('clicking Delete shows an in-app confirmation and does not call hardDeleteSong yet', async () => {
+      const wrapper = await mountWithHiddenPanelOpen()
+      const deleteButton = wrapper.findAll('button').find((b) => b.text() === 'Delete')
+      expect(deleteButton).toBeTruthy()
+      await deleteButton!.trigger('click')
+
+      expect(wrapper.text()).toContain('Permanently delete')
+      expect(wrapper.text()).toContain('Old Hymn')
+      expect(mockHardDeleteSong).not.toHaveBeenCalled()
+    })
+
+    it('clicking Cancel in the confirm hides it and still does not call hardDeleteSong', async () => {
+      const wrapper = await mountWithHiddenPanelOpen()
+      const deleteButton = wrapper.findAll('button').find((b) => b.text() === 'Delete')
+      await deleteButton!.trigger('click')
+
+      const cancelButton = wrapper.findAll('button').find((b) => b.text() === 'Cancel')
+      expect(cancelButton).toBeTruthy()
+      await cancelButton!.trigger('click')
+
+      expect(wrapper.text()).not.toContain('Permanently delete')
+      expect(mockHardDeleteSong).not.toHaveBeenCalled()
+    })
+
+    it('confirming Delete calls songStore.hardDeleteSong with the song id', async () => {
+      const wrapper = await mountWithHiddenPanelOpen()
+      const deleteButton = wrapper.findAll('button').find((b) => b.text() === 'Delete')
+      await deleteButton!.trigger('click')
+
+      // The row's plain Delete button is replaced (v-if) by the confirm panel,
+      // which re-uses the same "Delete" label for its own confirm button.
+      const confirmDeleteButton = wrapper.findAll('button').find((b) => b.text() === 'Delete')
+      expect(confirmDeleteButton).toBeTruthy()
+      await confirmDeleteButton!.trigger('click')
+
+      expect(mockHardDeleteSong).toHaveBeenCalledWith('song-1')
+    })
   })
 })

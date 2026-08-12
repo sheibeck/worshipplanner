@@ -134,16 +134,51 @@
               :key="song.id"
               class="flex items-center justify-between px-4 py-3 hover:bg-gray-800/40"
             >
-              <div>
-                <p class="text-sm text-gray-400 line-through">{{ song.title }}</p>
-                <p class="text-xs text-gray-600">{{ song.author || 'Unknown' }}</p>
-              </div>
-              <button
-                @click="onRestoreSong(song)"
-                class="text-xs px-3 py-1.5 rounded-md border border-indigo-700 text-indigo-300 hover:bg-indigo-900/30 transition-colors"
-              >
-                Restore
-              </button>
+              <template v-if="deleteConfirmId === song.id">
+                <div class="w-full rounded-lg bg-red-900/20 border border-red-800 p-3">
+                  <p class="text-sm text-gray-200 mb-3">
+                    Permanently delete <strong class="text-white">"{{ song.title }}"</strong>? This cannot be undone.
+                  </p>
+                  <div class="flex gap-2">
+                    <button
+                      type="button"
+                      class="px-3 py-1.5 rounded-md text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 border border-gray-700 transition-colors"
+                      @click="deleteConfirmId = null"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      class="px-3 py-1.5 rounded-md text-sm font-medium text-white bg-red-700 hover:bg-red-600 transition-colors disabled:opacity-50"
+                      :disabled="deletingId === song.id"
+                      @click="onHardDeleteSong(song)"
+                    >
+                      {{ deletingId === song.id ? 'Deleting…' : 'Delete' }}
+                    </button>
+                  </div>
+                </div>
+              </template>
+              <template v-else>
+                <div>
+                  <p class="text-sm text-gray-400 line-through">{{ song.title }}</p>
+                  <p class="text-xs text-gray-600">{{ song.author || 'Unknown' }}</p>
+                </div>
+                <div class="flex gap-2">
+                  <button
+                    @click="onRestoreSong(song)"
+                    class="text-xs px-3 py-1.5 rounded-md border border-indigo-700 text-indigo-300 hover:bg-indigo-900/30 transition-colors"
+                  >
+                    Restore
+                  </button>
+                  <button
+                    type="button"
+                    @click="deleteConfirmId = song.id"
+                    class="text-xs px-3 py-1.5 rounded-md border border-red-700 text-red-300 hover:bg-red-900/30 transition-colors"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </template>
             </div>
           </div>
         </div>
@@ -208,6 +243,22 @@ const hiddenSongs = computed(() => songStore.songs.filter((s) => s.hidden === tr
 
 async function onRestoreSong(song: Song) {
   await songStore.restoreSong(song.id)
+}
+
+// Permanent delete (KHB-03): tracked per song id (not a single boolean) since
+// the Hidden Songs panel lists multiple rows. Requires an in-app confirmation
+// step (no window.confirm) before the destructive songStore.hardDeleteSong call.
+const deleteConfirmId = ref<string | null>(null)
+const deletingId = ref<string | null>(null)
+
+async function onHardDeleteSong(song: Song) {
+  deletingId.value = song.id
+  try {
+    await songStore.hardDeleteSong(song.id)
+  } finally {
+    deletingId.value = null
+    deleteConfirmId.value = null
+  }
 }
 
 // Uncategorized songs (for batch assign)
