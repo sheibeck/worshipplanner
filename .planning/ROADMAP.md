@@ -306,7 +306,9 @@ Plans:
   3. A Scripture item exposes a Bible-version choice (ESV/NLT) that, when set, overrides the org default `bibleVersion` for that one item everywhere its text is produced — slide materialization, preview, print, and PC export routing — while unset items keep using the org default (R128)
   4. Both fields are non-destructive optional additions to the slot/template-entry types; absent values reproduce today's behavior exactly (R127, R128)
 
-**Plans**: TBD (planned during autonomous run)
+**Plans**: 2 plans
+- [ ] 56-01-PLAN.md — R127 MISC editable label: NonAssignableSlot.label? + miscLabel() helper, wired through the live editor, the default-template editor (ServiceTemplateEntry.label? → createSlot), PC export title, and print
+- [ ] 56-02-PLAN.md — R128 per-item Scripture ESV/NLT override: ScriptureSlot.bibleVersion? + Scripture-row selector, threaded into PC export routing + ScriptureInput preview + CongregationalEditor split (slide/preview/print are reference-only → documented no-op)
 **UI hint**: yes
 **Research flag**: skip (milestone research skipped).
 **Notes**: The MISC label is a distinct short "name/title" field, NOT a second free-text/notes box — the consolidated notes field (R122 / 260811-vsr) remains the item's details/description; PC export title = label, description = notes ?? body. "Available versions" = ESV and NLT only (`bibleVersion: 'ESV' | 'NLT'`). R128's override must thread through the same seams quick task 260809-vvq established for org-default routing (`fetchPassageText` ESV / `fetchNltPassageText` NLT) plus slide materialization and print. Owner scope addition 2026-08-12; runs autonomously under the v1.6 standing grant (defer human verification, STOP before lifecycle, no deploys).
