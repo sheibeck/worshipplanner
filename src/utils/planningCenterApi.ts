@@ -1016,7 +1016,7 @@ export async function addSlotAsItem(
     return createItem(appId, secret, serviceTypeId, planId, {
       title: 'Announcements',
       itemType: 'regular',
-      description: bodyDescription(slot.body),
+      description: bodyDescription(slot.notes ?? slot.body),
       sequence,
       length,
     })
@@ -1026,18 +1026,19 @@ export async function addSlotAsItem(
     return createItem(appId, secret, serviceTypeId, planId, {
       title: 'Miscellaneous',
       itemType: 'regular',
-      description: bodyDescription(slot.body),
+      description: bodyDescription(slot.notes ?? slot.body),
       sequence,
       length,
     })
   }
 
   if (slot.kind === 'MESSAGE') {
-    // `body` wins when present (R085); the pre-existing `sermonPassage`
-    // fallback is preserved, not replaced, so a Message slot with no body
-    // still gets the formatted sermon passage as its description.
+    // notes-canonical (260811-vsr): the consolidated free-text field is `notes`,
+    // falling back to legacy `body`. `notes ?? body` wins when present (R085); the
+    // pre-existing `sermonPassage` fallback is preserved, not replaced, so a Message
+    // slot with neither notes nor body still gets the formatted sermon passage.
     const description =
-      bodyDescription(slot.body) ?? (sermonPassage ? formatScriptureRef(sermonPassage) : undefined)
+      bodyDescription(slot.notes ?? slot.body) ?? (sermonPassage ? formatScriptureRef(sermonPassage) : undefined)
 
     return createItem(appId, secret, serviceTypeId, planId, {
       title: 'Message',

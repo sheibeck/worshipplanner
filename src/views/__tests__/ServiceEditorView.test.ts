@@ -2226,20 +2226,23 @@ describe('ServiceEditorView - shared body editor: Message/Announcements/Misc, Hy
     expect(lastTwoNew[0]!.id).not.toBe(lastTwoNew[1]!.id)
   })
 
-  // ── E-02 / UI-01: empty body is a valid state, ANNOUNCEMENTS ────────────────
+  // ── E-02 / UI-01: consolidated notes-canonical field, ANNOUNCEMENTS (260811-vsr) ─
+  // Plain kinds now show ONE field (the notes-canonical field). A legacy body-only
+  // slot still displays via the `notes ?? body` fallback; the old `slot-body-input`
+  // textarea and `slot-body-empty` placeholder are gone.
 
-  it('E-02: an ANNOUNCEMENTS slot with no body renders the empty textarea + placeholder in the editor, and a whitespace-only body renders the italic empty state in the viewer, with no error styling', async () => {
+  it('E-02: a legacy body-only ANNOUNCEMENTS shows its text via notes ?? body in the viewer, and an empty one renders the consolidated field with the ANNOUNCEMENTS placeholder in the editor, with no error styling', async () => {
     mockServicesList = [{
       ...buildSectionedService(),
-      slots: [{ kind: 'ANNOUNCEMENTS', id: 'a1', position: 0, body: '   ' }],
+      slots: [{ kind: 'ANNOUNCEMENTS', id: 'a1', position: 0, body: 'Potluck this Sunday' }],
     }]
     mockAuthState.isEditor = false
     const viewerWrapper = await mountView()
 
-    const empty = viewerWrapper.find('[data-testid="slot-body-empty"]')
-    expect(empty.exists()).toBe(true)
-    expect(empty.text()).toBe('Announcements — Empty')
-    expect(viewerWrapper.find('[data-testid="slot-body-text"]').exists()).toBe(false)
+    const text = viewerWrapper.find('[data-testid="slot-notes-text"]')
+    expect(text.exists()).toBe(true)
+    expect(text.text()).toBe('Potluck this Sunday')
+    expect(viewerWrapper.find('[data-testid="slot-body-input"]').exists()).toBe(false)
     expect(viewerWrapper.findAll('.text-red-400').length + viewerWrapper.findAll('.text-red-500').length).toBe(0)
 
     mockServicesList = [{
@@ -2248,26 +2251,27 @@ describe('ServiceEditorView - shared body editor: Message/Announcements/Misc, Hy
     }]
     mockAuthState.isEditor = true
     const editorWrapper = await mountView()
-    const textarea = editorWrapper.find('[data-testid="slot-body-input"]')
-    expect(textarea.exists()).toBe(true)
-    expect((textarea.element as HTMLTextAreaElement).value).toBe('')
-    expect(textarea.attributes('placeholder')).toBe('Announcement details…')
+    const input = editorWrapper.find('[data-testid="slot-notes-input"]')
+    expect(input.exists()).toBe(true)
+    expect((input.element as HTMLInputElement).value).toBe('')
+    expect(input.attributes('placeholder')).toBe('Church-wide announcements')
+    expect(editorWrapper.find('[data-testid="slot-body-input"]').exists()).toBe(false)
   })
 
-  // ── E-06: the same predicate, independently, for MISC ───────────────────────
+  // ── E-06: the same predicate, independently, for MISC (260811-vsr) ──────────
 
-  it('E-06: a MISC slot with no body renders the empty textarea + placeholder in the editor, and a whitespace-only body renders the italic empty state in the viewer, with no error styling', async () => {
+  it('E-06: a legacy body-only MISC shows its text via notes ?? body in the viewer, and an empty one renders the consolidated field with the MISC placeholder in the editor, with no error styling', async () => {
     mockServicesList = [{
       ...buildSectionedService(),
-      slots: [{ kind: 'MISC', id: 'x1', position: 0, body: '  \n ' }],
+      slots: [{ kind: 'MISC', id: 'x1', position: 0, body: 'Building closes early Monday' }],
     }]
     mockAuthState.isEditor = false
     const viewerWrapper = await mountView()
 
-    const empty = viewerWrapper.find('[data-testid="slot-body-empty"]')
-    expect(empty.exists()).toBe(true)
-    expect(empty.text()).toBe('Miscellaneous — Empty')
-    expect(viewerWrapper.find('[data-testid="slot-body-text"]').exists()).toBe(false)
+    const text = viewerWrapper.find('[data-testid="slot-notes-text"]')
+    expect(text.exists()).toBe(true)
+    expect(text.text()).toBe('Building closes early Monday')
+    expect(viewerWrapper.find('[data-testid="slot-body-input"]').exists()).toBe(false)
     expect(viewerWrapper.findAll('.text-red-400').length + viewerWrapper.findAll('.text-red-500').length).toBe(0)
 
     mockServicesList = [{
@@ -2276,15 +2280,15 @@ describe('ServiceEditorView - shared body editor: Message/Announcements/Misc, Hy
     }]
     mockAuthState.isEditor = true
     const editorWrapper = await mountView()
-    const textarea = editorWrapper.find('[data-testid="slot-body-input"]')
-    expect(textarea.exists()).toBe(true)
-    expect((textarea.element as HTMLTextAreaElement).value).toBe('')
-    expect(textarea.attributes('placeholder')).toBe('Details…')
+    const input = editorWrapper.find('[data-testid="slot-notes-input"]')
+    expect(input.exists()).toBe(true)
+    expect((input.element as HTMLInputElement).value).toBe('')
+    expect(input.attributes('placeholder')).toBe('Details')
   })
 
-  // ── UI-02: populated body round-trips into the read-only viewer ─────────────
+  // ── UI-02: legacy body round-trips into the read-only viewer via notes ?? body ─
 
-  it('a populated MESSAGE body renders read-only with preserved line breaks in the viewer, matching what the editor textarea holds', async () => {
+  it('a legacy MESSAGE body renders read-only with preserved line breaks in the viewer, via the notes ?? body fallback (260811-vsr)', async () => {
     const populatedBody = 'Line one\nLine two'
     mockServicesList = [{
       ...buildSectionedService(),
@@ -2293,17 +2297,18 @@ describe('ServiceEditorView - shared body editor: Message/Announcements/Misc, Hy
     mockAuthState.isEditor = false
     const wrapper = await mountView()
 
-    const text = wrapper.find('[data-testid="slot-body-text"]')
+    const text = wrapper.find('[data-testid="slot-notes-text"]')
     expect(text.exists()).toBe(true)
     // .text() collapses whitespace (including the embedded newline) per VTU's
     // normalization — assert the exact preserved-newline content via textContent.
+    // The consolidated field's viewer <p> keeps whitespace-pre-wrap.
     expect(text.element.textContent).toBe(populatedBody)
-    expect(wrapper.find('[data-testid="slot-body-empty"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="slot-body-text"]').exists()).toBe(false)
   })
 
-  // ── E-09: adjacency — two MESSAGE slots stay independent ────────────────────
+  // ── E-09: adjacency — two MESSAGE slots stay independent (260811-vsr) ───────
 
-  it('E-09: two adjacent MESSAGE slots each render their own textarea, and editing one leaves the other\'s body untouched', async () => {
+  it('E-09: two adjacent MESSAGE slots each render their own consolidated field, and editing one writes its notes while leaving the other untouched', async () => {
     mockServicesList = [{
       ...buildSectionedService(),
       slots: [
@@ -2313,43 +2318,48 @@ describe('ServiceEditorView - shared body editor: Message/Announcements/Misc, Hy
     }]
     const wrapper = await mountView()
 
-    const textareas = wrapper.findAll('[data-testid="slot-body-input"]')
-    expect(textareas).toHaveLength(2)
-    expect((textareas[0]!.element as HTMLTextAreaElement).value).toBe('First message')
-    expect((textareas[1]!.element as HTMLTextAreaElement).value).toBe('Second message')
+    const inputs = wrapper.findAll('[data-testid="slot-notes-input"]')
+    expect(inputs).toHaveLength(2)
+    // Legacy body-only slots still display via notes ?? body.
+    expect((inputs[0]!.element as HTMLInputElement).value).toBe('First message')
+    expect((inputs[1]!.element as HTMLInputElement).value).toBe('Second message')
 
-    await textareas[0]!.setValue('Changed first')
+    await inputs[0]!.setValue('Changed first')
     await wrapper.vm.$nextTick()
 
     const slots = (wrapper.vm as unknown as SlotsVm).localService.slots
-    expect(slots[0]!.body).toBe('Changed first')
+    // The edit writes the canonical `notes`, never `body`; the other slot is untouched.
+    expect(slots[0]!.notes).toBe('Changed first')
     expect(slots[1]!.body).toBe('Second message')
   })
 
-  // ── E-11: verbatim encoding round-trip AND stored linkUrl survival ──────────
+  // ── E-11: typed text writes notes verbatim AND stored linkUrl survives (260811-vsr) ─
 
-  it('E-11: a typed body round-trips verbatim through the binding, and a stored linkUrl/linkLabel on the same MESSAGE slot is neither read into body nor destroyed', async () => {
+  it('E-11: typing into the consolidated field writes slot.notes verbatim (never body), and a stored linkUrl/linkLabel on the same MESSAGE slot survives the edit', async () => {
     mockServicesList = [{
       ...buildSectionedService(),
       slots: [{ kind: 'MESSAGE', id: 'm1', position: 0, linkUrl: 'https://example.com/notes', linkLabel: 'Sermon notes' }],
     }]
     const wrapper = await mountView()
 
-    // Half 1: body is NOT populated from linkUrl, and linkUrl/linkLabel survive mount.
+    // Half 1: neither notes nor body is populated from linkUrl; linkUrl/linkLabel survive mount.
     const slotsBefore = (wrapper.vm as unknown as SlotsVm).localService.slots
+    expect(slotsBefore[0]!.notes).toBeUndefined()
     expect(slotsBefore[0]!.body).toBeUndefined()
     expect(slotsBefore[0]!.linkUrl).toBe('https://example.com/notes')
     expect(slotsBefore[0]!.linkLabel).toBe('Sermon notes')
 
-    // Half 2: typed text (leading/trailing space, newline, multi-byte, emoji)
-    // round-trips verbatim, AND linkUrl/linkLabel are untouched by the edit.
-    const encoded = ' leading and trailing space \nnewline · café · 🎵 '
-    const textarea = wrapper.find('[data-testid="slot-body-input"]')
-    await textarea.setValue(encoded)
+    // Half 2: typed text (leading/trailing space, multi-byte, emoji) round-trips verbatim
+    // into notes; body stays undefined; linkUrl/linkLabel are untouched by the edit.
+    // (No embedded newline: the consolidated field is a single-line <input type="text">.)
+    const encoded = ' leading and trailing space · café · 🎵 '
+    const input = wrapper.find('[data-testid="slot-notes-input"]')
+    await input.setValue(encoded)
     await wrapper.vm.$nextTick()
 
     const slotsAfter = (wrapper.vm as unknown as SlotsVm).localService.slots
-    expect(slotsAfter[0]!.body).toBe(encoded)
+    expect(slotsAfter[0]!.notes).toBe(encoded)
+    expect(slotsAfter[0]!.body).toBeUndefined()
     expect(slotsAfter[0]!.linkUrl).toBe('https://example.com/notes')
     expect(slotsAfter[0]!.linkLabel).toBe('Sermon notes')
   })
@@ -2399,9 +2409,9 @@ describe('ServiceEditorView - shared body editor: Message/Announcements/Misc, Hy
     expect((hymnNameInput.element as HTMLInputElement).value).toBe('Great Is Thy Faithfulness')
   })
 
-  // ── R083: the URL control is scoped to Message, not global (paired w/ Prayer) ─
+  // ── 260811-vsr: link controls removed from BOTH Message AND Prayer (data retained) ─
 
-  it('a MESSAGE row renders no url-typed input and no link anchor; a PRAYER row in the same service still has both, proving the removal is scoped to Message', async () => {
+  it('neither a MESSAGE nor a PRAYER row renders a url-typed input or a link anchor anymore; each renders exactly one consolidated notes field', async () => {
     mockServicesList = [{
       ...buildSectionedService(),
       slots: [
@@ -2417,11 +2427,15 @@ describe('ServiceEditorView - shared body editor: Message/Announcements/Misc, Hy
     expect(messageRow).toBeDefined()
     expect(prayerRow).toBeDefined()
 
+    // The link fields moved out of the UI (linkUrl/linkLabel retained on the type).
     expect(messageRow!.find('input[type="url"]').exists()).toBe(false)
     expect(messageRow!.find('a').exists()).toBe(false)
+    expect(prayerRow!.find('input[type="url"]').exists()).toBe(false)
+    expect(prayerRow!.find('a').exists()).toBe(false)
 
-    expect(prayerRow!.find('input[type="url"]').exists()).toBe(true)
-    expect(prayerRow!.find('a').exists()).toBe(true)
+    // Each plain-kind row now has exactly one consolidated free-text field.
+    expect(messageRow!.findAll('[data-testid="slot-notes-input"]')).toHaveLength(1)
+    expect(prayerRow!.findAll('[data-testid="slot-notes-input"]')).toHaveLength(1)
   })
 
   // ── UI-06: elementLabel copy for the remove-element confirmation ────────────

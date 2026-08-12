@@ -1342,6 +1342,56 @@ describe('addSlotAsItem', () => {
       expect(body.data.attributes.html_details).toBe('Series: Hope, week 3')
     })
 
+    // ── 260811-vsr: notes-canonical export (notes ?? body) ──────────────────────
+    // The consolidated free-text field is `notes`, falling back to legacy `body`.
+    // A notes-only slot exports its notes; a legacy body-only slot still exports its
+    // body (covered by E-18/E-19 above); notes wins when both are present.
+
+    it('exports a notes-only ANNOUNCEMENTS slot description from notes', async () => {
+      defaultFetchResponse()
+      const slot: NonAssignableSlot = { kind: 'ANNOUNCEMENTS', id: 'slot-ann-n1', position: 0, notes: 'Nursery moved to Room 4' }
+
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 0, [], 'ESV')
+
+      const [, options] = vi.mocked(fetch).mock.calls[0]!
+      const body = JSON.parse(options?.body as string)
+      expect(body.data.attributes.html_details).toBe('Nursery moved to Room 4')
+    })
+
+    it('exports a notes-only MISC slot description from notes', async () => {
+      defaultFetchResponse()
+      const slot: NonAssignableSlot = { kind: 'MISC', id: 'slot-misc-n2', position: 1, notes: 'Set up chairs early' }
+
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 1, [], 'ESV')
+
+      const [, options] = vi.mocked(fetch).mock.calls[0]!
+      const body = JSON.parse(options?.body as string)
+      expect(body.data.attributes.html_details).toBe('Set up chairs early')
+    })
+
+    it('exports a notes-only MESSAGE slot description from notes, over the sermonPassage fallback', async () => {
+      defaultFetchResponse()
+      const sermonPassage: ScriptureRef = { book: 'Romans', chapter: 8, verseStart: 1, verseEnd: 11 }
+      const slot: NonAssignableSlot = { kind: 'MESSAGE', id: 'slot-msg-n3', position: 2, notes: 'Guest speaker: Pastor Lee' }
+
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 2, [], 'ESV', sermonPassage)
+
+      const [, options] = vi.mocked(fetch).mock.calls[0]!
+      const body = JSON.parse(options?.body as string)
+      expect(body.data.attributes.html_details).toBe('Guest speaker: Pastor Lee')
+    })
+
+    it('prefers notes over legacy body when a MESSAGE slot carries both', async () => {
+      defaultFetchResponse()
+      const slot: NonAssignableSlot = { kind: 'MESSAGE', id: 'slot-msg-n4', position: 3, notes: 'New notes win', body: 'stale body' }
+
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 3, [], 'ESV', null)
+
+      const [, options] = vi.mocked(fetch).mock.calls[0]!
+      const body = JSON.parse(options?.body as string)
+      expect(body.data.attributes.html_details).toBe('New notes win')
+    })
+
     it('E-14: a HYMN slot with empty hymnNumber and empty verses exports the bare title with no # and no (vv. )', async () => {
       defaultFetchResponse()
       const slot: HymnSlot = {

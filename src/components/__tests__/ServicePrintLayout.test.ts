@@ -246,4 +246,35 @@ describe('ServicePrintLayout', () => {
     const row = wrapper.findAll('[data-slot-row]')[0]!
     expect(row.find('p.whitespace-pre-wrap').exists()).toBe(false)
   })
+
+  // ── 260811-vsr: notes-canonical print (notes ?? body) ─────────────────────────
+  // The consolidated free-text field is `notes`, falling back to legacy `body`.
+
+  it('prints a notes-only MESSAGE slot from its notes (notes ?? body)', () => {
+    const service: Service = {
+      ...mockService,
+      slots: [{ kind: 'MESSAGE', id: 'msg-notes-1', position: 0, notes: 'Guest speaker this week' }],
+    }
+    const wrapper = mount(ServicePrintLayout, { props: { service, songs: mockSongs } })
+    expect(wrapper.text()).toContain('Guest speaker this week')
+  })
+
+  it('prints a notes-only ANNOUNCEMENTS slot from its notes (notes ?? body)', () => {
+    const service: Service = {
+      ...mockService,
+      slots: [{ kind: 'ANNOUNCEMENTS', id: 'ann-notes-1', position: 0, notes: 'Coffee in the lobby' }],
+    }
+    const wrapper = mount(ServicePrintLayout, { props: { service, songs: mockSongs } })
+    expect(wrapper.text()).toContain('Coffee in the lobby')
+  })
+
+  it('prefers notes over legacy body when a MISC slot carries both', () => {
+    const service: Service = {
+      ...mockService,
+      slots: [{ kind: 'MISC', id: 'misc-both-1', position: 0, notes: 'New notes win', body: 'stale body' }],
+    }
+    const wrapper = mount(ServicePrintLayout, { props: { service, songs: mockSongs } })
+    expect(wrapper.text()).toContain('New notes win')
+    expect(wrapper.text()).not.toContain('stale body')
+  })
 })
