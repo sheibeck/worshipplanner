@@ -16,23 +16,34 @@ owner decisions.
 
 ---
 
-## ★ C1 — Phase 40 auth-claim migration is HALF DONE (Deploy 2 never ran)
+## ⏳ C1 — Phase 40 auth-claim migration — IN PROGRESS 2026-08-12 (soak, then deploy)
 
-**Highest-value carry-forward.** The org-membership custom-auth-claim migration
-shipped Deploy 1 (dual-read fallback) on 2026-08-10 but never completed Deploy 2
-(claim as sole authority). Production runs today on the intermediate dual-read
-state — it works, but the migration is unfinished. Archived: lines 699–750.
+Owner decided (2026-08-12) to FINISH the migration. Progress this session:
+- **Accidental multi-org cleanup — DONE (prod).** The pre-check found 2 of 3 users
+  were members of accidental, abandoned orgs (`1dcn4…`, `vi9Xw…`) beyond Berean
+  (`6vyK2…`). Owner confirmed those orgs are unused/abandonable. A one-off admin
+  script (dry-run then `--apply`) deleted the 2 orphaned `members/{uid}` docs. All
+  3 users are now single-org (Berean).
+- **40.4 MANDATORY pre-check — PASSES.** Backfill dry-run now shows 3 users, all
+  single-org in Berean. No multi-org user remains.
+- **40.2 backfill — DONE (prod).** `node lib/backfillOrgClaims.js --apply` set
+  `{orgId: 6vyK2…, role: editor}` for all 3 users (processed 3, failed 0).
+- **Deploy-2 rules change — PREPARED & LOCALLY VERIFIED (not yet deployed).**
+  `storage.rules` `isOrgMember` is now claim-only; the `storage.rules.test.ts`
+  guard was rewritten to assert the fallback stays removed. type-check clean;
+  `test:rules` green **149/149** — and the storage allow-cases now pass in the
+  emulator (they never could under the fallback: firestore.exists() is inert there).
 
-Outstanding before Deploy 2 can safely run:
-- **40.1 OBSERVE** — confirm an existing member can still upload in the LIVE app (proves the Firestore fallback arm still works).
-- **40.2 backfill** — NOT RUN (deploy host lacked gcloud ADC). Required before Deploy 2, since afterward the claim is the sole authority.
-- **40.3 soak** — one full hour after backfill; skipping it is what locks people out at Deploy 2.
-- **40.4 ★ MANDATORY pre-check** — confirm no user's `orgIds` has more than one entry. The claim carries `orgIds[0]` only; a multi-org user loses access the moment the fallback is removed.
-- **40.5 Deploy 2** — remove the Firestore fallback.
-- **40.6** — exercise the real pending invite end-to-end.
+**Remaining:**
+- **40.3 soak** — wait ≥1 hour after the backfill (done ~20:35 UTC 2026-08-12) so
+  every live token re-mints carrying the claim. **Do NOT deploy before then.**
+- **40.5 Deploy 2** — `firebase deploy --only storage --project worship-planner-bc515`,
+  then confirm all users can still upload/read Berean media.
+- **40.6** — exercise the one real pending invite end-to-end after deploy.
 
-**Decision needed:** finish Deploy 2 (backfill → soak → pre-check → deploy), or
-explicitly decide to remain on the dual-read fallback permanently.
+**Multi-org note:** the claim still carries the primary org only. Safe now (all
+single-org). Before any user ever joins a second real org, widen the claim — see
+ROADMAP backlog **999.5**.
 
 ## C2 — Phase 40.1 prod exercises undone + 2 known-open rules findings
 
@@ -63,21 +74,17 @@ Archived 871–886. `deleteService` does not revoke a service's
 public share token is now permanent. `allow delete` rules are already in place, so
 a future phase can implement revocation with no rules change.
 
-## C6 — Confirm `NLT_API_KEY` secret is set (quick check)
+## ✅ C6 — `NLT_API_KEY` secret is set — CONFIRMED IN PRODUCTION 2026-08-12
 
-Archived 1114–1116. `firebase functions:secrets:set NLT_API_KEY` is an owner-only
-step a `firebase deploy --only functions` does NOT perform. NLT is the default
-Bible version, so a missing secret breaks scripture fetch for any church that
-didn't pick ESV. Prod fetch works, so it was very likely set — **confirm and close.**
+Owner confirmed the secret is set and NLT scripture fetch works in prod. Closed.
+(Archived detail: v1.6-PENDING-VERIFICATION.md 1114–1116.)
 
-## C7 — Confirm Phase 41/42 rules clauses are live (quick console check)
+## ✅ C7 — Phase 41/42 rules clauses are live — CONFIRMED IN PRODUCTION 2026-08-12
 
-Archived 864–869. Confirm in the Firebase console that the deployed ruleset has:
-`shareTokens` `allow create: if isOrgEditor(...)` (not `isSignedIn()`, CR-01), and a
-`match /pptxRenders/{importId}` read block with `collection != 'pptxRenders'` on the
-generic wildcard's write clause (Phase 42 write-hole fix — otherwise an org editor
-could forge their own org's render doc to `ready`). Almost certainly satisfied by
-the 2026-08-12 whole-file rules deploy — **2-minute confirm, then close.**
+Owner confirmed in the Firebase console that the deployed ruleset carries the
+`shareTokens` `allow create: if isOrgEditor(...)` clause (CR-01) and the
+`pptxRenders` write-hole fix (Phase 42 T-37-15/T-42-01). Closed.
+(Archived detail: v1.6-PENDING-VERIFICATION.md 864–869.)
 
 ---
 

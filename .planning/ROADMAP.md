@@ -261,3 +261,15 @@ Plans:
 Plans:
 
 - [ ] TBD (promote with /gsd-review-backlog when ready)
+
+### Phase 999.5: Multi-org-aware auth claim for Storage membership (BACKLOG)
+
+**Goal:** Widen the org-membership custom auth claim to carry ALL of a user's orgs (and roles), and update `storage.rules`' `isOrgMemberByClaim` to check the requested `orgId` against that set — so a user who belongs to more than one organization retains Storage access to every org, not just their primary.
+**Motivation:** Phase 40 Deploy 2 (2026-08-12) removed the cross-service `firestore.exists()` fallback, making the claim the sole authority for Storage membership. By design (D-01/D-04) the claim carries only the PRIMARY org (`users/{uid}.orgIds[0]`). This is safe today because every user is single-org (verified + cleaned up at the 2026-08-12 migration), but the moment a real user joins a second real org their non-primary org's Storage access would silently fail. This must be built BEFORE any such user is onboarded.
+**Blocking condition:** onboarding a user into a second organization.
+**Requirements:** relates to R074 (Phase 40 custom-claim membership)
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (promote with /gsd-review-backlog when ready — and BEFORE onboarding any multi-org user)

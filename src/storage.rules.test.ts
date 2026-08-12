@@ -59,14 +59,11 @@ const MEDIA_UNDER_CAP_BYTES = new Uint8Array(40 * 1024 * 1024)
 const MEDIA_OVER_CAP_BYTES = new Uint8Array(52428801)
 
 describe('storage.rules — org membership', () => {
-  // Phase 40 (v1.5 claim migration): these tests prove the CLAIM arm of the dual-read
-  // in isolation. No members document is seeded -- a pass can only have come from
-  // request.auth.token.orgId / .role, not from firestore.exists(). The
-  // Firestore-fallback arm's allow case is NOT behaviourally provable in the Storage
-  // emulator (firebase-js-sdk#6803: firestore.exists() is inert there even for a
-  // document proven to exist by an admin read) -- it is proven instead by the source
-  // assertion in the "dual-read structure" describe block below, plus the owner's
-  // post-deploy-1 confirmation recorded in functions/DEPLOY-ORG-CLAIMS.md.
+  // Phase 40 (v1.5 claim migration, Deploy 2 complete 2026-08-12): membership is now the
+  // claim ALONE. No members document is seeded -- a pass can only have come from
+  // request.auth.token.orgId / .role. This is the single membership path (the
+  // cross-service firestore.exists() fallback was removed at Deploy 2), and it is fully
+  // emulator-verifiable precisely because no cross-service call is involved.
   it('allows an org member to write and read an object under their org path', async () => {
     const context = testEnv.authenticatedContext('userA', { orgId: 'orgA', role: 'editor' })
     const storage = context.storage()
@@ -195,52 +192,46 @@ describe('storage.rules — media path', () => {
   })
 })
 
-describe('storage.rules — dual-read structure (R075 lockout guard)', () => {
+describe('storage.rules — claim-only membership (Deploy 2, R075 guard)', () => {
   // No emulator interaction needed -- this is a static assertion against the rules
   // file's own text. It lives in this file because vitest.rules.config.ts already
   // includes it and it is the file it guards.
   //
-  // Automated guard against Pitfall 1 (40-RESEARCH.md): an AND instead of an OR, or a
-  // deleted Firestore-fallback predicate, locks out every member whose token predates
-  // the claim rollout. This test fails on either mistake.
-  //
-  // The Firestore-fallback arm's ALLOW behaviour cannot be proven in the Storage
-  // emulator (firebase-js-sdk#6803) -- see the comment on the org-membership
-  // describe block's allow-cases. This test proves the arm's continued STRUCTURAL
-  // presence instead, which is the honest substitute.
-  it('keeps the Firestore-membership fallback ORed, never ANDed, into the membership check', () => {
+  // Deploy 2 (2026-08-12) removed the cross-service Firestore-membership fallback arm.
+  // Membership is now proven SOLELY by the custom auth claim (functions/DEPLOY-ORG-CLAIMS.md
+  // Step 4). This test replaced the former "keeps the fallback ORed" tripwire: it is the
+  // deliberate, written acknowledgment that the fallback is gone, and it now guards the
+  // INVERSE invariant -- that no cross-service firestore.exists() read is ever
+  // re-introduced into storage.rules. Re-adding one would be inert in the Storage emulator
+  // (firebase-js-sdk#6803) and is exactly how a deny-everyone rule once shipped undetected
+  // for a milestone (see CLAUDE.md). Before this removal every user was confirmed single-org
+  // (backfill dry-run + mandatory pre-check) and all live tokens were soaked to carry the
+  // claim; the migration is safe precisely because those gates passed.
+  it('proves membership on the claim ALONE, with no Firestore fallback re-introduced', () => {
     const raw = readFileSync('storage.rules', 'utf8')
-    // Collapse whitespace so formatting differences (line breaks, indentation) can't
-    // defeat the substring/regex checks below.
-    const normalized = raw.replace(/\s+/g, ' ')
-
-    // The production-proven fallback predicate was not deleted.
-    expect(normalized).toContain('firestore.exists(')
+    // Strip `//` line comments FIRST, THEN collapse whitespace. The comments in
+    // storage.rules deliberately discuss the now-removed fallback ("the ...
+    // firestore.exists() fallback arm has been removed"), so the ABSENCE checks below must
+    // run against rule CODE only -- otherwise the prose describing the fix would trip the
+    // very guard that protects it.
+    const codeOnly = raw
+      .split('\n')
+      .map((line) => line.replace(/\/\/.*$/, ''))
+      .join(' ')
+      .replace(/\s+/g, ' ')
 
     // The claim predicate is present and reads the exact two keys plan 40-02 writes.
-    expect(normalized).toContain('request.auth.token.orgId')
-    expect(normalized).toContain('request.auth.token.role')
+    expect(codeOnly).toContain('request.auth.token.orgId')
+    expect(codeOnly).toContain('request.auth.token.role')
 
-    // The two membership predicates must be combined disjunctively: the claim
-    // predicate (helper-function form `isOrgMemberByClaim(...)`, or an inlined claim
-    // expression) must be followed by `||` before the Firestore predicate
-    // (helper-function form `isOrgMemberByFirestore(...)`, or an inlined
-    // `firestore.exists(...)` expression). Written to accept either form per Task 1's
-    // documented fallback (inlining if the emulator rejects helper functions).
-    const claimFragment =
-      /(isOrgMemberByClaim\([^)]*\)|request\.auth\.token\.orgId == orgId[^|]*)/.source
-    const firestoreFragment =
-      /(isOrgMemberByFirestore\([^)]*\)|firestore\.exists\([^)]*\))/.source
-    const orJoinedRegex = new RegExp(`${claimFragment}\\s*\\|\\|\\s*${firestoreFragment}`)
-    expect(normalized).toMatch(orJoinedRegex)
+    // The cross-service Firestore fallback is GONE from the rule logic. Its inertness in
+    // the Storage emulator is the whole reason this migration exists -- re-introducing any
+    // of these three forms must fail this test loudly.
+    expect(codeOnly).not.toContain('firestore.exists(')
+    expect(codeOnly).not.toContain('isOrgMemberByFirestore')
+    expect(codeOnly).not.toContain('/databases/(default)/documents/')
 
-    // The conjunctive form of those same two predicates must NOT appear. Build the
-    // forbidden string at runtime (not as one literal) so a hand-written literal
-    // in this test can't accidentally drift out of sync with what it's guarding.
-    const claimCall = 'isOrgMemberByClaim(orgId)'
-    const firestoreCall = 'isOrgMemberByFirestore(orgId)'
-    const andSeparator = ['&', '&'].join('')
-    const forbiddenConjunction = [claimCall, andSeparator, firestoreCall].join(' ')
-    expect(normalized).not.toContain(forbiddenConjunction)
+    // Membership resolves to the claim helper alone -- no disjunction remains.
+    expect(codeOnly).toMatch(/isOrgMember\(orgId\)\s*{\s*return isOrgMemberByClaim\(orgId\);/)
   })
 })

@@ -4,51 +4,40 @@ rules_version = '2';
 // The generic orgs/{orgId} prefix is intentional (not PPTX-specific) so Phase 22's media
 // attachments and any future Storage-backed feature can reuse this same rule.
 //
-// v1.5 claim migration (phase 40): membership is a DUAL-READ during rollout —
-// `isOrgMemberByClaim(orgId) || isOrgMemberByFirestore(orgId)`, claim first. The claim
-// arm exists so this rule is verifiable in the Storage emulator, where the pre-existing
-// Firestore arm's cross-service call (firestore.exists()) is inert
-// (firebase-js-sdk#6803) — that inertness is exactly how a deny-everyone rule reached
-// production for a full milestone undetected (see CLAUDE.md). The Firestore arm is
-// removed ONLY by the owner's SECOND deploy, after a >=1-hour soak once every live
-// session has had a chance to pick up the claim — never in this phase, never here.
+// v1.5 claim migration (phase 40) — COMPLETE (Deploy 2, 2026-08-12). Membership is now
+// proven SOLELY by the custom auth claim: the pre-existing cross-service
+// firestore.exists() fallback arm has been removed. The claim arm is emulator-verifiable,
+// whereas firestore.exists() is inert in the Storage emulator (firebase-js-sdk#6803) —
+// the exact defect that once let a deny-everyone rule reach production undetected for a
+// milestone (see CLAUDE.md). Before the fallback was removed, every user was confirmed
+// single-org (backfill dry-run + mandatory pre-check) and all live tokens were soaked so
+// they carry the claim. Full runbook: functions/DEPLOY-ORG-CLAIMS.md.
 service firebase.storage {
   match /b/{bucket}/o {
-    // Reads request.auth.token.orgId / .role — a direct JWT claim read set server-side
-    // by Cloud Function syncOrgMembershipClaim (functions/src/orgMembershipClaims.ts,
-    // phase 40-02) via the Admin SDK. Unaffected by firebase-js-sdk#6803: no
-    // cross-service call is involved. `role != null` (not a specific role) is the gate —
-    // any assigned role counts as membership, same as the Firestore arm below.
+    // Reads request.auth.token.orgId / .role — a direct JWT claim read set server-side by
+    // Cloud Function syncOrgMembershipClaim (functions/src/orgMembershipClaims.ts,
+    // phase 40-02) via the Admin SDK, plus the one-off backfill. No cross-service call is
+    // involved, so this is fully verifiable in the emulator. `role != null` (not a specific
+    // role) is the gate — any assigned role counts as membership.
     //
-    // KNOWN LIMITATION (D-01/D-04, locked in 40-CONTEXT.md): the claim carries only the
-    // user's PRIMARY org (orgIds[0]). A user belonging to more than one org is covered
-    // for their non-primary orgs by isOrgMemberByFirestore alone — documented, not an
-    // oversight.
+    // KNOWN LIMITATION (D-01/D-04): the claim carries only the user's PRIMARY org
+    // (orgIds[0]). Safe today because every user is single-org, verified at the 2026-08-12
+    // migration. The Firestore fallback that used to cover a user's NON-primary orgs is
+    // gone, so if a user is ever to belong to more than one org, the claim must first be
+    // widened to carry all their orgs. Tracked in .planning/ROADMAP.md backlog.
     function isOrgMemberByClaim(orgId) {
       return request.auth != null
         && request.auth.token.orgId == orgId
         && request.auth.token.role != null;
     }
 
-    // The pre-existing, production-proven cross-service check, moved verbatim from the
-    // four allow clauses below, never altered. Inert in the Storage emulator
-    // (firebase-js-sdk#6803): returns false even for a membership doc proven to exist by
-    // an admin read. Live and correct in production since the 2026-08-06 IAM grant
-    // (Firebase Rules Firestore Service Agent on the Storage service agent).
-    function isOrgMemberByFirestore(orgId) {
-      return request.auth != null
-        && firestore.exists(
-             /databases/(default)/documents/organizations/$(orgId)/members/$(request.auth.uid));
-    }
-
-    // Claim FIRST is load-bearing, not a micro-optimisation. Firebase Rules `||` is
-    // short-circuiting, so a matching claim means isOrgMemberByFirestore's cross-service
-    // call is never evaluated at all — that is precisely what lets a caller whose token
-    // carries the claim pass in an emulator where firestore.exists() is inert. OR, never
-    // AND (D-05, non-negotiable): an AND would lock out every member whose token
-    // predates the claim rollout.
+    // Membership is CLAIM-ONLY as of Deploy 2 (2026-08-12). Do NOT re-introduce a
+    // cross-service firestore.exists() fallback here: it is inert in the Storage emulator
+    // (firebase-js-sdk#6803), which is exactly how a deny-everyone rule once shipped
+    // undetected. The claim arm is the single source of authority; the "claim-only
+    // membership" test in src/storage.rules.test.ts guards that the fallback stays removed.
     function isOrgMember(orgId) {
-      return isOrgMemberByClaim(orgId) || isOrgMemberByFirestore(orgId);
+      return isOrgMemberByClaim(orgId);
     }
 
     // Cloud Storage rules do NOT cascade between sibling `match` blocks — this
