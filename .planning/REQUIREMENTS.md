@@ -8,7 +8,8 @@ progression) while rotating through the full song stable and respecting team con
 service plans, move the service template to where it is actually used, and make song-slide editing
 intuitive for a non-technical user — plus item-editing and preview polish.
 
-**Numbering:** continues from v1.5 (R073–R109). v1.6 owns **R110–R126**.
+**Numbering:** continues from v1.5 (R073–R109). v1.6 owns **R110–R129** (R110–R126 at milestone open;
+R127–R129 added 2026-08-12 as an owner scope addition — per-item overrides + template-editor UX parity).
 
 **Research basis:** none — research was skipped for this milestone (mostly bug-fixes and UI on patterns
 already in the codebase; the drag-and-drop root cause is best isolated by reading the actual reorder
@@ -102,6 +103,36 @@ FINDINGS".
       (Inter already ships from v1.5's font set — this requirement adds Roboto and confirms Inter
       remains.)
 
+### Service-Item Overrides (added 2026-08-12)
+
+- [ ] **R127**: A **Miscellaneous** service item can carry a **custom label** — defaulting to
+      "Miscellaneous" and editable to any text — that identifies the item in the service order in place
+      of the fixed "Miscellaneous". This applies in **both** the live service editor
+      (`ServiceEditorView.vue`) **and** the Edit Default Template screen (`ServiceTemplateEditor.vue`).
+      When **exporting to Planning Center**, the item's title uses this custom label instead of
+      "Miscellaneous". Non-destructive: a new optional field on the MISC slot / template entry; when
+      empty it displays and exports as "Miscellaneous" (current behavior). The consolidated free-text
+      notes field (R122 / quick task 260811-vsr) remains the item's details/description — the label is
+      the item's short name/title, distinct from that field.
+
+- [ ] **R128**: When editing a **Scripture** item in a service plan, the user can choose a **Bible
+      version for just that item** (ESV or NLT — the app's available versions), overriding the
+      org-wide default `bibleVersion` setting for that one item. The override is honored wherever that
+      item's scripture text is produced — slide materialization, slideshow preview, print, and the
+      Planning Center export routing (quick task 260809-vvq) — while items without an override continue
+      to use the org default. Non-destructive: a new optional per-slot field; absent → org default.
+
+### Template-Editor UX Parity (added 2026-08-12)
+
+- [ ] **R129**: The **Edit Default Template** screen (`ServiceTemplateEditor.vue`) receives the same UX
+      treatment now shipped on the Service Order editor (quick task 260811-vsr): the unified
+      three-rail row structure (colored per-kind badge → stacked field column → action controls), a
+      single consolidated free-text field for plain item kinds, the per-row ⋯ menu for row controls,
+      the muted/dashed "No Section" band for ungrouped items, and consistent mobile-friendly stacking —
+      so the template editor looks and feels consistent with the live service editor. Visual/structural
+      parity only: all template-editor functionality (SortableJS reorder, add-item, Miscellaneous
+      label from R127, save) is preserved.
+
 ## Future Requirements
 
 Deferred; tracked but not in this milestone's roadmap.
@@ -152,13 +183,16 @@ Which phases cover which requirements. Filled during roadmap creation (2026-08-1
 | R124 | Phase 55 — Preview & Export Polish | Complete |
 | R125 | Phase 55 — Preview & Export Polish | Complete |
 | R126 | Phase 55 — Preview & Export Polish | Complete |
+| R127 | Phase 56 — Service-Item Overrides | Pending |
+| R128 | Phase 56 — Service-Item Overrides | Pending |
+| R129 | Phase 57 — Template-Editor UX Parity | Pending |
 
 **Coverage:**
 
-- v1.6 requirements: 17 total (R110–R126)
-- Mapped to phases: 17 (Phases 51–55)
+- v1.6 requirements: 20 total (R110–R129; R127–R129 added 2026-08-12)
+- Mapped to phases: 20 (Phases 51–57)
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-08-11 at the start of milestone v1.6*
-*Last updated: 2026-08-11 — roadmap created, traceability filled (17/17 mapped to Phases 51–55)*
+*Last updated: 2026-08-12 — owner scope addition: R127–R129 added, mapped to new Phases 56–57 (20/20 mapped)*

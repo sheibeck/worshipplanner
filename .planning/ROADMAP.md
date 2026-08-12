@@ -147,7 +147,8 @@ Full phase details archived to `milestones/v1.5-ROADMAP.md`; requirements to `mi
 service plans, move the service template to where it is actually used, and make song-slide editing
 intuitive for a non-technical user — plus item-editing and preview polish.
 
-**Requirements:** `.planning/REQUIREMENTS.md` (R110–R126, 17 total, 17/17 mapped)
+**Requirements:** `.planning/REQUIREMENTS.md` (R110–R129, 20 total, 20/20 mapped; R127–R129 added
+2026-08-12 as an owner scope addition → Phases 56–57)
 
 **Derived from** `.planning/REQUIREMENTS.md` directly — there is no `research/SUMMARY.md` this milestone
 (research was skipped: it is mostly bug-fixes and UI on patterns already in the codebase, and the
@@ -169,6 +170,8 @@ enhancements (R122–R123) as one phase, and the three unrelated preview/export/
 - [ ] **Phase 53: Song Lyric Editing** - Split song sections into slides by hand, duplicate a split as one unit, add Pre-Chorus, number sections by position, and rename the first-save button to "Save"
 - [ ] **Phase 54: Service Item Enhancements** - A responsive notes field beside every item's selector, and Miscellaneous items that start with no slides
 - [ ] **Phase 55: Preview & Export Polish** - Stop auto-appending the Bible version in preview, add a Planning Center export spinner, and add Roboto to the self-hosted slide fonts
+- [ ] **Phase 56: Service-Item Overrides** - Editable Miscellaneous label (default "Miscellaneous", used as the Planning Center item title) across both editors, and a per-item Scripture Bible-version override (ESV/NLT) that overrides the org default for that one item *(owner scope addition 2026-08-12)*
+- [ ] **Phase 57: Template-Editor UX Parity** - Apply the 260811-vsr Service Order redesign (three-rail rows, colored badges, consolidated field, per-row ⋯ menu, "No Section" band, mobile stacking) to the Edit Default Template screen *(owner scope addition 2026-08-12)*
 
 ## Phase Details
 
@@ -291,6 +294,39 @@ Plans:
 **Research flag**: skip (milestone research skipped).
 **Notes**: R124 partially reverses v1.5 Phase 45's auto-attribution — R091 appended the "(ESV)"/"(NLT)" suffix at both render sites (`PresentationViewer.vue`, `slideDisplay.ts::slideBodyText()`). R124 removes the *automatic* append in preview while leaving manual addition possible; reconcile carefully with the R091/R092 attribution and per-slide `translationSource` provenance machinery so this does not regress required attribution elsewhere. R125's export flow lives in `ServiceEditorView.vue`. R126 adds Roboto to the `SLIDE_FONTS` @fontsource registry from v1.5 Phase 46 (curated self-hosted woff2 only — not the runtime Google Fonts API), with a recorded license, and confirms Inter stays in the set.
 
+### Phase 56: Service-Item Overrides
+
+**Goal:** Two per-item overrides of a default: a Miscellaneous item can be given a custom label (used everywhere it's identified, including as the Planning Center item title), and a Scripture item can override the org's default Bible version for just that item.
+**Depends on**: quick task 260811-vsr (the consolidated free-text field + row layout these overrides sit within) and Phase 45/quick 260809-vvq (org `bibleVersion` setting + PC scripture routing that R128 overrides).
+**Requirements**: R127, R128
+**Success Criteria** (what must be TRUE):
+
+  1. A Miscellaneous item exposes an editable label defaulting to "Miscellaneous"; when empty it displays and exports as "Miscellaneous"; when set it identifies the item in the service order and is sent as the Planning Center item title in place of "Miscellaneous" (R127)
+  2. The custom Miscellaneous label works identically in both `ServiceEditorView.vue` and `ServiceTemplateEditor.vue` (R127)
+  3. A Scripture item exposes a Bible-version choice (ESV/NLT) that, when set, overrides the org default `bibleVersion` for that one item everywhere its text is produced — slide materialization, preview, print, and PC export routing — while unset items keep using the org default (R128)
+  4. Both fields are non-destructive optional additions to the slot/template-entry types; absent values reproduce today's behavior exactly (R127, R128)
+
+**Plans**: TBD (planned during autonomous run)
+**UI hint**: yes
+**Research flag**: skip (milestone research skipped).
+**Notes**: The MISC label is a distinct short "name/title" field, NOT a second free-text/notes box — the consolidated notes field (R122 / 260811-vsr) remains the item's details/description; PC export title = label, description = notes ?? body. "Available versions" = ESV and NLT only (`bibleVersion: 'ESV' | 'NLT'`). R128's override must thread through the same seams quick task 260809-vvq established for org-default routing (`fetchPassageText` ESV / `fetchNltPassageText` NLT) plus slide materialization and print. Owner scope addition 2026-08-12; runs autonomously under the v1.6 standing grant (defer human verification, STOP before lifecycle, no deploys).
+
+### Phase 57: Template-Editor UX Parity
+
+**Goal:** The Edit Default Template screen looks and feels consistent with the redesigned Service Order editor.
+**Depends on**: quick task 260811-vsr (the source design/redesign to mirror) and Phase 56 (the MISC label the template editor must now lay out consistently).
+**Requirements**: R129
+**Success Criteria** (what must be TRUE):
+
+  1. `ServiceTemplateEditor.vue` rows use the same three-rail structure as the service editor — colored per-kind badge, stacked field column, action controls in a per-row ⋯ menu (R129)
+  2. Plain item kinds show a single consolidated free-text field; a muted/dashed "No Section" band labels ungrouped items; per-kind colored badges and mobile-friendly stacking match the service editor (R129)
+  3. All existing template-editor functionality is preserved — SortableJS reorder, add-item, the R127 Miscellaneous label, and save (R129)
+
+**Plans**: TBD (planned during autonomous run)
+**UI hint**: yes
+**Research flag**: skip (milestone research skipped).
+**Notes**: Mirror the 260811-vsr DESIGN-SPEC and SUMMARY (`.planning/quick/260811-vsr-service-editor-ui-pass-consolidate-redun/`). `ServiceTemplateEditor.vue` ports `ServiceEditorView.vue`'s per-section SortableJS reorder, so the same row structure applies; adapt controls to the template context (no lock/lifecycle, no live slide counts). Visual/structural parity only — no behavior change. Owner scope addition 2026-08-12; runs autonomously under the v1.6 standing grant.
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -306,6 +342,8 @@ Plans:
 | 53. Song Lyric Editing | v1.6 | 4/4 | In Progress|  |
 | 54. Service Item Enhancements | v1.6 | 2/2 | In Progress|  |
 | 55. Preview & Export Polish | v1.6 | 3/3 | In Progress|  |
+| 56. Service-Item Overrides | v1.6 | 0/? | Planned (2026-08-12 scope add) |  |
+| 57. Template-Editor UX Parity | v1.6 | 0/? | Planned (2026-08-12 scope add) |  |
 
 ## Backlog
 
