@@ -351,11 +351,12 @@ describe('slideDisplay', () => {
       expect(slideBodyText(copyright)).toBe('Amazing Grace')
     })
 
-    // 45-04/R091: a field-less slide (no translationSource, matching every
-    // pre-phase slide) resolves to '(ESV)' via resolveTranslationSource's
-    // fallback — proving the suffix does not depend on the org's current
-    // bibleVersion setting.
-    it('combines the reference and text for a scripture slide, appending the (ESV) attribution suffix for a field-less slide', () => {
+    // R124: the slideshow preview no longer auto-appends the (ESV)/(NLT)
+    // Bible version to scripture slides. A field-less slide (no
+    // translationSource, matching every pre-phase slide) shows only its own
+    // reference + text — no version suffix. The provenance helper
+    // (resolveTranslationSource) is untouched; this is a render-only change.
+    it('combines the reference and text for a scripture slide with NO auto-appended version suffix (R124), even for a field-less slide', () => {
       const scripture = {
         id: 's3',
         position: 0,
@@ -363,10 +364,12 @@ describe('slideDisplay', () => {
         reference: 'Psalms 23:1-6',
         text: 'The LORD is my shepherd',
       } as Slide
-      expect(slideBodyText(scripture)).toBe('Psalms 23:1-6\nThe LORD is my shepherd (ESV)')
+      expect(slideBodyText(scripture)).toBe('Psalms 23:1-6\nThe LORD is my shepherd')
+      expect(slideBodyText(scripture)).not.toContain('(ESV)')
+      expect(slideBodyText(scripture)).not.toContain('(NLT)')
     })
 
-    it('appends (NLT) when the slide carries a stamped NLT translationSource', () => {
+    it('does NOT append (NLT) even when the slide carries a stamped NLT translationSource (R124 — render-only, provenance preserved)', () => {
       const scripture = {
         id: 's3-nlt',
         position: 0,
@@ -375,7 +378,9 @@ describe('slideDisplay', () => {
         text: 'The LORD is my shepherd',
         translationSource: 'NLT',
       } as Slide
-      expect(slideBodyText(scripture)).toBe('Psalms 23:1-6\nThe LORD is my shepherd (NLT)')
+      expect(slideBodyText(scripture)).toBe('Psalms 23:1-6\nThe LORD is my shepherd')
+      expect(slideBodyText(scripture)).not.toContain('(NLT)')
+      expect(slideBodyText(scripture)).not.toContain('(ESV)')
     })
 
     it('returns just the reference for a scripture slide with no text (R047 default: reference-only) — no attribution suffix', () => {
@@ -392,7 +397,7 @@ describe('slideDisplay', () => {
     // R105 (Phase 49): the reference now has its OWN dedicated slide, so a
     // congregational section slide NEVER prefixes the reference — regardless
     // of position. It returns only its own words + attribution suffix.
-    it('a Congregational-state section slide returns only its words + attribution — never the reference prefix', () => {
+    it('a Congregational-state section slide returns only its words — never the reference prefix, and no auto version suffix (R124)', () => {
       const scripture = {
         id: 's3b',
         position: 0,
@@ -401,12 +406,14 @@ describe('slideDisplay', () => {
         text: 'For God so loved the world',
         section: { speaker: 'LEADER', text: 'For God so loved the world' },
       } as Slide
-      expect(slideBodyText(scripture)).toBe('For God so loved the world (ESV)')
+      expect(slideBodyText(scripture)).toBe('For God so loved the world')
       expect(slideBodyText(scripture)).not.toContain('John 3:16')
+      expect(slideBodyText(scripture)).not.toContain('(ESV)')
+      expect(slideBodyText(scripture)).not.toContain('(NLT)')
     })
 
     // R105: the same holds for any later section slide — no reference prefix.
-    it('omits the reference for a LATER Congregational-state section slide too', () => {
+    it('omits the reference for a LATER Congregational-state section slide too — and no auto version suffix (R124)', () => {
       const scripture = {
         id: 's3b-later',
         position: 0,
@@ -415,13 +422,15 @@ describe('slideDisplay', () => {
         text: 'that he gave his only Son',
         section: { speaker: 'CONGREGATION', text: 'that he gave his only Son' },
       } as Slide
-      expect(slideBodyText(scripture)).toBe('that he gave his only Son (ESV)')
+      expect(slideBodyText(scripture)).toBe('that he gave his only Son')
       expect(slideBodyText(scripture)).not.toContain('John 3:16')
+      expect(slideBodyText(scripture)).not.toContain('(ESV)')
+      expect(slideBodyText(scripture)).not.toContain('(NLT)')
     })
 
     // R105: a Reference-state slide (no section at all) — including the new
     // dedicated reference slide — always shows its reference, exactly as before.
-    it('a Reference-state slide (no section) still returns its reference', () => {
+    it('a Reference-state slide (no section) still returns its reference — with no auto version suffix (R124)', () => {
       const scripture = {
         id: 's3b-ref',
         position: 0,
@@ -429,7 +438,9 @@ describe('slideDisplay', () => {
         reference: 'Psalms 23:1-6',
         text: 'The LORD is my shepherd',
       } as Slide
-      expect(slideBodyText(scripture)).toBe('Psalms 23:1-6\nThe LORD is my shepherd (ESV)')
+      expect(slideBodyText(scripture)).toBe('Psalms 23:1-6\nThe LORD is my shepherd')
+      expect(slideBodyText(scripture)).not.toContain('(ESV)')
+      expect(slideBodyText(scripture)).not.toContain('(NLT)')
     })
 
     it('returns the body for a text slide', () => {
