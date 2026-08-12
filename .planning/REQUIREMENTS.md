@@ -98,7 +98,7 @@ FINDINGS".
 
 ### Slide Fonts
 
-- [ ] **R126**: **Roboto** is available as a curated, self-hosted slide font in the typography picker.
+- [x] **R126**: **Roboto** is available as a curated, self-hosted slide font in the typography picker.
       (Inter already ships from v1.5's font set — this requirement adds Roboto and confirms Inter
       remains.)
 
@@ -151,7 +151,7 @@ Which phases cover which requirements. Filled during roadmap creation (2026-08-1
 | R123 | Phase 54 — Service Item Enhancements | Complete |
 | R124 | Phase 55 — Preview & Export Polish | Complete |
 | R125 | Phase 55 — Preview & Export Polish | Complete |
-| R126 | Phase 55 — Preview & Export Polish | Pending |
+| R126 | Phase 55 — Preview & Export Polish | Complete |
 
 **Coverage:**
 
