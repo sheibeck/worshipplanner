@@ -80,6 +80,16 @@ export interface ScriptureSlot extends MediaAttachableSlot {
   scriptureReadingId?: string | null
   readingMode?: 'normal' | 'congregational'
   congregationalSections?: CongregationalSection[]
+  /**
+   * Optional per-item override of the org-wide default Bible version (R128,
+   * Phase 56). Absent => use the org default (`authStore.settings.bibleVersion`)
+   * exactly as today. The only supported versions are ESV and NLT. The effective
+   * version everywhere scripture TEXT is produced is `slot.bibleVersion ?? orgDefault`.
+   * OPTIONAL and non-destructive: absent on every scripture slot written before
+   * this field existed (no migration), and an emptied value is stored as
+   * `undefined` and dropped by `stripUndefined` before the Firestore write.
+   */
+  bibleVersion?: 'ESV' | 'NLT'
   section?: ServiceSection
 }
 

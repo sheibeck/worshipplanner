@@ -1,4 +1,4 @@
-import type { Service, ServiceSlot, ScriptureRef } from '@/types/service'
+import type { Service, ServiceSlot, ScriptureSlot, ScriptureRef } from '@/types/service'
 import type { Song } from '@/types/song'
 import type { UpsertPersonInput } from '@/types/roster'
 import { formatScriptureRef } from '@/utils/planningCenterExport'
@@ -986,9 +986,14 @@ export async function addSlotAsItem(
     // an empty query returns HTTP 400 upstream and there is nothing to fetch.
     // The item is still created below, just without an html_details description.
     if (refText) {
+      // R128 (Phase 56): the per-item override wins over the org-default param.
+      // `slot` is already narrowed to the SCRIPTURE member here; the cast only
+      // reaches the new optional field. Any value other than exactly 'NLT'
+      // (including a corrupt or absent one) safely routes to the ESV fetch.
+      const effectiveVersion = (slot as ScriptureSlot).bibleVersion ?? bibleVersion
       try {
         description =
-          bibleVersion === 'NLT'
+          effectiveVersion === 'NLT'
             ? await fetchNltPassageText(refText)
             : await fetchPassageText(refText)
       } catch {

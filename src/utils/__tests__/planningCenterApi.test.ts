@@ -994,6 +994,67 @@ describe('addSlotAsItem', () => {
     expect(body.data.attributes.html_details).toBe('For God so loved the world... (ESV)')
   })
 
+  // R128 (Phase 56): the per-item slot.bibleVersion overrides the org-default
+  // param for the fetch routing; the title stays version-agnostic.
+  describe('R128 per-item bibleVersion override (PC export routing)', () => {
+    const scriptureSlot = (bibleVersion?: 'ESV' | 'NLT'): ScriptureSlot => ({
+      kind: 'SCRIPTURE',
+      id: 'slot-scripture-r128',
+      position: 2,
+      book: 'John',
+      chapter: 3,
+      verseStart: 16,
+      verseEnd: 17,
+      ...(bibleVersion ? { bibleVersion } : {}),
+    })
+
+    it('slot.bibleVersion "NLT" with org-default param "ESV" fetches via NLT', async () => {
+      defaultFetchResponse()
+      vi.mocked(fetchNltPassageText).mockResolvedValueOnce('NLT text')
+
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', scriptureSlot('NLT'), 2, [], 'ESV')
+
+      expect(vi.mocked(fetchNltPassageText)).toHaveBeenCalledWith('John 3:16-17')
+      expect(vi.mocked(fetchPassageText)).not.toHaveBeenCalled()
+      const [, options] = vi.mocked(fetch).mock.calls[0]!
+      const body = JSON.parse(options?.body as string)
+      expect(body.data.attributes.title).toBe('Scripture - John 3:16-17')
+    })
+
+    it('no slot.bibleVersion with org-default param "ESV" fetches via ESV (unchanged from today)', async () => {
+      defaultFetchResponse()
+      vi.mocked(fetchPassageText).mockResolvedValueOnce('ESV text')
+
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', scriptureSlot(), 2, [], 'ESV')
+
+      expect(vi.mocked(fetchPassageText)).toHaveBeenCalledWith('John 3:16-17')
+      expect(vi.mocked(fetchNltPassageText)).not.toHaveBeenCalled()
+      const [, options] = vi.mocked(fetch).mock.calls[0]!
+      const body = JSON.parse(options?.body as string)
+      expect(body.data.attributes.title).toBe('Scripture - John 3:16-17')
+    })
+
+    it('slot.bibleVersion "ESV" with org-default param "NLT" fetches via ESV (per-item override wins)', async () => {
+      defaultFetchResponse()
+      vi.mocked(fetchPassageText).mockResolvedValueOnce('ESV text')
+
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', scriptureSlot('ESV'), 2, [], 'NLT')
+
+      expect(vi.mocked(fetchPassageText)).toHaveBeenCalledWith('John 3:16-17')
+      expect(vi.mocked(fetchNltPassageText)).not.toHaveBeenCalled()
+    })
+
+    it('no slot.bibleVersion with org-default param "NLT" fetches via NLT (org default still applies)', async () => {
+      defaultFetchResponse()
+      vi.mocked(fetchNltPassageText).mockResolvedValueOnce('NLT text')
+
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', scriptureSlot(), 2, [], 'NLT')
+
+      expect(vi.mocked(fetchNltPassageText)).toHaveBeenCalledWith('John 3:16-17')
+      expect(vi.mocked(fetchPassageText)).not.toHaveBeenCalled()
+    })
+  })
+
   // A (bug fix): an unresolvable reference (book/chapter null) used to send an
   // empty query that returns HTTP 400. Now NEITHER fetch fires, no throw, and
   // the item is still created with no html_details.
