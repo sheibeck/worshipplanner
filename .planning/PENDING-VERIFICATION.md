@@ -1574,3 +1574,50 @@ ServiceTemplateEditor is at 37/37. The items below are visual/feel judgments jsd
       above the field column), the ⋯ menu remains reachable, and there is no horizontal overflow.
 
 After confirming, run `/gsd-verify-work` for phase 57 (or record acceptance in the phase verification record).
+
+## Post-56/57 owner follow-up tweaks (2026-08-12) — committed, awaiting owner visual verification
+
+A batch of owner-requested refinements landed after Phases 56–57. All are committed, type-check
+clean, and green at the 2-file test baseline. This is the visual/behavioural check list. (Some items
+supersede earlier Phase 56/57 notes — e.g. the template body textareas below are now REMOVED.)
+
+### Service-plan item delete — the recurring `PERMISSION_DENIED` (rule fix, DEPLOYED)
+- [x] **Rule fix deployed 2026-08-12** (`firebase deploy --only firestore:rules`, owner). Root cause
+      (`03b96bc`): deleting a slot whose slideGroup was **never materialized** made `resource` null,
+      so the delete rule dereferenced null → denied. Fix adds `resource == null` as the first guard,
+      still org-scoped. Emulator suite 149/149.
+- [ ] **Verify in the deployed app:** add an item that never gets slides (e.g. a fresh Prayer/MISC),
+      delete it, and confirm it disappears with no `PERMISSION_DENIED` in the console; also delete a
+      normal item with slides. Both should just work.
+
+### Miscellaneous label — inline-editable badge
+- [ ] In the **service editor** AND the **Edit Default Template**, a MISC item's pill shows a pencil;
+      clicking it turns the pill into an input. Rename it (e.g. "Communion"), blur/Enter saves; Esc
+      cancels; clearing it returns to "Miscellaneous". No separate label input remains.
+- [ ] A renamed MISC item shows that label consistently on: the **Slides tab** (plan rail + group
+      title), the **service listing** card, the **share link** view, the **Planning Center export**
+      item title, and **print**.
+
+### Template editor — recurring-body textareas removed
+- [ ] The Edit Default Template shows **no body textarea** for MISC or ANNOUNCEMENTS — a template item
+      is just its kind (+ the editable MISC label). Existing template items still load; Save works.
+
+### Scripture per-item version override
+- [ ] The **version selector sits on the scripture reference-input line, under the Search button**
+      (not floating below the whole block).
+- [ ] Switching a Scripture item's version (ESV↔NLT) updates its **"View on ESV.org / BibleGateway"
+      reader link** live, and the **Preview passage** panel clears so a re-preview fetches the chosen
+      version. PC export of that item still uses the override.
+
+### ⋯ row menu near the bottom of the screen
+- [ ] Open the ⋯ menu on the **last row** of a long service plan (and of the template editor). The
+      menu **opens upward** and stays fully on screen — no page scroll needed to see Delete.
+
+### Services page + delete feedback
+- [ ] The Services-page button reads **"Service Template"** with the cog icon, styled like the other
+      secondary buttons (Regenerate / Finalize & Share).
+- [ ] Deleting a service item shows a **spinner + "Removing…"** on the Remove button during the (brief)
+      delay, and the button is disabled until it completes — it no longer looks frozen.
+
+After confirming, fold acceptance into the 56/57 verification records (or note it here) and proceed to
+the milestone lifecycle when 51–57 are all accepted.
