@@ -1421,6 +1421,24 @@ After confirming, run `/gsd-verify-work 54`.
 
 ## Phase 55 — Preview & Export Polish (v1.6)
 
+**Status:** verification_deferred_human. 8/8 must-haves verified in code + automated (R124 render-only
+removal with `scripture.ts` untouched / R092 provenance preserved; R125 spinner on existing `isExporting`;
+R126 Roboto registry+loader, Inter+four unchanged). `npm run type-check` clean; app suite 3063 pass at
+the 2-file baseline. NOT deploy-gated (client-side + one build dependency). Resume: `/gsd-verify-work 55`.
+
+### Plan 55-01 — No auto-appended Bible version (manual, R124)
+
+Deferred under the v1.6 standing autonomy grant — jsdom cannot exercise real projection.
+
+- [ ] **55.R124 — No auto version when presenting; manual add works.** Present a service with a
+      scripture slide; confirm NO `(ESV)`/`(NLT)` suffix is auto-shown. Type "(ESV)" into the slide's
+      own text and confirm it displays (manual addition still possible).
+
+### Plan 55-02 — Planning Center export spinner (manual, R125)
+
+- [ ] **55.R125 — Export spinner.** Trigger a real Planning Center export; confirm the Confirm Export
+      button shows a spinner and is disabled until the export completes.
+
 ### Plan 55-03 Task 1 — package-legitimacy checkpoint for `@fontsource/roboto@^5.3.0` (DEFERRED)
 
 **Status: DEFERRED under the STATE.md v1.6 standing autonomy grant — NOT self-approved as passed.**
