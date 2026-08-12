@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Editing Reliability & Song Slides
 status: Awaiting next milestone
-stopped_at: Completed quick task 260812-izz (remove BPM from share/print, universal per-item notes, R123 confirmed)
-last_updated: "2026-08-12T18:01:24.646Z"
+stopped_at: Completed quick task 260812-jjj (fix Reset-to-schedule no-op override clear + cursor-pointer)
+last_updated: "2026-08-12T18:12:00.000Z"
 last_activity: 2026-08-12
 last_activity_desc: Milestone v1.6 completed and archived
 progress:
@@ -1961,6 +1961,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 | 20260811-del | Service-plan item delete blocked by Firestore `PERMISSION_DENIED` ("Null value error" in the `slideGroups` delete rule, `ServiceEditorView.vue:2791`): a present-but-null `serviceId` fell through the missing-key orphan-guard into `parentGone(null)`→`svcPath(null)`, and `isOrgEditor` used an unguarded `get().data.role`. Made both null-safe — present-but-null `serviceId` → deletable orphan; `isOrgEditor` `exists()`-guarded like `isOrgMember` + `.data.get('role','')`. +7 emulator rules tests (147/147 pass, 0 regressions); type-check clean. ⚠ **Needs `firebase deploy --only firestore:rules` (owner step)** to take effect in production. | 2026-08-11 | 38df34f | [20260811-service-plan-item-delete-permission](.planning/quick/20260811-service-plan-item-delete-permission/) |
 | 260811-vsr | Service Order editor UI pass, driven by an owner-imported Claude Design mockup (`Slides Tab.dc.html`, Turns 4a desktop / 4b mobile) mapped onto the app's existing dark-indigo theme. **(1)** Plain kinds (Prayer/Misc/Announcements/Message) collapsed to ONE free-text field via `slotFreeText(slot)=notes ?? body` (writes `notes`); the plain-kind `body` textarea + PRAYER link inputs removed from the UI (data retained on the type); `ServicePrintLayout` + Planning Center export migrated to `notes ?? body` (non-destructive, no data migration). **(2)** Unified "three-rail" rows — drag handle · colored per-kind badge (`kindBadgeClass`) · stacked full-width field+notes · right action rail — capped at `max-w-[1060px]`, single-stack below `sm` (walked back Phase-54 side-by-side). **(3)** Per-row editor-only ⋯ menu now owns Move-to-section (→`onSectionChange`) and Delete (→`removeSlot`); inline section `<select>` and inline ✕ removed. **(4)** Muted/dashed "No Section" band (`data-testid=no-section-band`) for the ungrouped bucket. Scope calls (disclosed): template-editor write-to-`notes` deferred behind the read-fallback; no new PRAYER PC data-flow; `slideGroupMaterializer` confirmed not a `body` consumer. type-check clean; app suite green at the 2-file baseline. ⚠ Owner visual/mobile feel verification DEFERRED (see `.planning/PENDING-VERIFICATION.md`). | 2026-08-12 | 35cdc0e, 72b4301, d0157d9, 1094282, 100ff68 | [260811-vsr-service-editor-ui-pass-consolidate-redun](.planning/quick/260811-vsr-service-editor-ui-pass-consolidate-redun/) |
 | 260812-izz | Removed BPM (tempo) from the public share link (`ShareView.vue`) and the print output (`ServicePrintLayout.vue` — deleted `getBpmForSlot` + the now-unused `songs` prop, dropped the `:songs` binding in `ServiceEditorView.vue`); song rows now show Key only. Added ONE universal per-item notes paragraph (`slot.notes ?? legacy body`) rendered once per row for EVERY slot kind on both surfaces, replacing the three per-kind free-text blocks; auto-escaped via `{{ }}` only (T-quick-01, public/unauthenticated). Confirmed MISC-defaults-to-0-slides (R123, `slideGroupMaterializer.ts`) still correct — verification-only, no code change. type-check clean; `npx vitest run` green at the documented 2-file baseline (plus a pre-existing, unrelated `render-service/render.test.ts` vitest 4.0.18/4.1.10 version-mismatch, flagged for owner). | 2026-08-12 | 3c3ac2f, f08a8d0 | [260812-izz-remove-bpm-from-song-share-link-and-prin](.planning/quick/260812-izz-remove-bpm-from-song-share-link-and-prin/) |
+| 260812-jjj | Fixed the Roles-tab "Reset to schedule" control (`ServiceEditorView.vue`). **Root cause:** `onResetRoleOverride` called `serviceStore.clearRoleOverride` (a `deleteField()` write) with NO optimistic local update — unlike its sibling `onToggleOverridePerson` — and the store snapshot watcher's R039 `isOwnWriteEcho` guard swallows the client's own delete echo, so `localService.roleAssignmentOverrides` kept the stale key and the "Overridden" pill (and the button) never cleared. Independent of whether a generated schedule exists (owner just hit it in the no-schedule case). **Fix:** handler now synchronously deletes the local override before awaiting the store call, with rollback on rejection (lock/editor guards preserved); added `cursor-pointer` to the button. +2 regression tests (reset-with-no-schedule → pill clears to "Nobody scheduled"; cursor-pointer), RED→GREEN. type-check clean; `npx vitest run` green at the documented baseline. | 2026-08-12 | 1bb81e7, 71229cd | [260812-jjj-reset-to-schedule-button-needs-a-proper-](.planning/quick/260812-jjj-reset-to-schedule-button-needs-a-proper-/) |
 
 ### Blockers/Concerns
 
@@ -2221,8 +2222,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-12T18:01:15.536Z
-Stopped at: Completed quick task 260812-izz (remove BPM from share/print, universal per-item notes, R123 confirmed)
+Last session: 2026-08-12T18:12:00.000Z
+Stopped at: Completed quick task 260812-jjj (fix Reset-to-schedule no-op override clear + cursor-pointer)
 Resume file: None
 
 ## Operator Next Steps
