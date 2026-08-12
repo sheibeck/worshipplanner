@@ -228,4 +228,16 @@ describe('ServicePrintLayout', () => {
     expect(wrapper.text()).toContain('New notes win')
     expect(wrapper.text()).not.toContain('stale body')
   })
+
+  // 260812-izz: a SONG slot previously showed no notes at all — the universal
+  // per-row notes paragraph now covers every slot kind, not just the three
+  // NonAssignableSlot kinds.
+  it('prints a SONG slot\'s notes (260812-izz)', () => {
+    const service: Service = {
+      ...mockService,
+      slots: [{ kind: 'SONG', id: 'song-notes-1', position: 0, requiredVwType: 1, songId: 'song-0', songTitle: 'Come Thou Fount', songKey: 'G', notes: 'Sarah leads' }],
+    }
+    const wrapper = mount(ServicePrintLayout, { props: { service } })
+    expect(wrapper.text()).toContain('Sarah leads')
+  })
 })

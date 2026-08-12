@@ -310,4 +310,50 @@ describe('ShareView', () => {
     expect(wrapper.text()).not.toContain('[not assigned]')
     expect(wrapper.find('p.whitespace-pre-wrap').exists()).toBe(false)
   })
+
+  // ── 260812-izz: notes render for every slot kind on the share link ─────────
+
+  it('renders a SONG slot\'s notes on the share view (260812-izz)', async () => {
+    mockGetDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({
+        serviceSnapshot: {
+          ...mockSnapshot,
+          notes: '',
+          slots: [
+            {
+              kind: 'SONG',
+              position: 0,
+              requiredVwType: 1,
+              songId: 'song-abc',
+              songTitle: 'Amazing Grace',
+              songKey: 'G',
+              notes: 'Sarah leads',
+            },
+          ],
+        },
+      }),
+    })
+    const wrapper = await mountShareView()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Sarah leads')
+  })
+
+  it('renders a MESSAGE slot\'s notes on the share view, not just legacy body (260812-izz)', async () => {
+    mockGetDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({
+        serviceSnapshot: {
+          ...mockSnapshot,
+          notes: '',
+          slots: [{ kind: 'MESSAGE', position: 0, notes: 'Guest speaker this week' }],
+        },
+      }),
+    })
+    const wrapper = await mountShareView()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Guest speaker this week')
+  })
 })

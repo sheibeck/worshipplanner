@@ -61,19 +61,16 @@
             <p v-if="serviceSnapshot.sermonPassage" class="text-base text-gray-900">
               {{ formatScriptureRef(serviceSnapshot.sermonPassage) }}
             </p>
-            <p v-if="slot.body?.trim()" class="whitespace-pre-wrap text-sm text-gray-700 mt-1">{{ slot.body }}</p>
           </template>
 
           <!-- ANNOUNCEMENTS slot -->
           <template v-else-if="slot.kind === 'ANNOUNCEMENTS'">
             <p class="text-xs text-gray-500 uppercase tracking-wider mb-0.5">Announcements</p>
-            <p v-if="slot.body?.trim()" class="whitespace-pre-wrap text-sm text-gray-700 mt-1">{{ slot.body }}</p>
           </template>
 
           <!-- MISC slot -->
           <template v-else-if="slot.kind === 'MISC'">
             <p class="text-xs text-gray-500 uppercase tracking-wider mb-0.5">{{ miscLabel(slot) }}</p>
-            <p v-if="slot.body?.trim()" class="whitespace-pre-wrap text-sm text-gray-700 mt-1">{{ slot.body }}</p>
           </template>
 
           <!-- HYMN slot -->
@@ -85,6 +82,9 @@
             </template>
             <p v-else class="text-gray-400 italic text-sm">[not assigned]</p>
           </template>
+
+          <!-- Per-item free-text notes (notes ?? legacy body), for every slot kind -->
+          <p v-if="(slot.notes ?? slot.body)?.trim()" class="whitespace-pre-wrap text-sm text-gray-700 mt-1">{{ slot.notes ?? slot.body }}</p>
         </div>
       </div>
 

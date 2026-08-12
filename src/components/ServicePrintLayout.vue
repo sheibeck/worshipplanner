@@ -59,25 +59,16 @@
             <span class="text-gray-500"> -- </span>
             <span class="text-gray-900">{{ formatScriptureRef(props.service.sermonPassage) }}</span>
           </template>
-          <template v-if="(slot.notes ?? slot.body)?.trim()">
-            <p class="whitespace-pre-wrap text-gray-700 mt-1">{{ slot.notes ?? slot.body }}</p>
-          </template>
         </template>
 
         <!-- ANNOUNCEMENTS slot -->
         <template v-else-if="slot.kind === 'ANNOUNCEMENTS'">
           <span class="font-semibold text-gray-700">Announcements</span>
-          <template v-if="(slot.notes ?? slot.body)?.trim()">
-            <p class="whitespace-pre-wrap text-gray-700 mt-1">{{ slot.notes ?? slot.body }}</p>
-          </template>
         </template>
 
         <!-- MISC slot -->
         <template v-else-if="slot.kind === 'MISC'">
           <span class="font-semibold text-gray-700">{{ miscLabel(slot) }}</span>
-          <template v-if="(slot.notes ?? slot.body)?.trim()">
-            <p class="whitespace-pre-wrap text-gray-700 mt-1">{{ slot.notes ?? slot.body }}</p>
-          </template>
         </template>
 
         <!-- HYMN slot -->
@@ -98,6 +89,9 @@
             <span class="text-gray-400 italic">[not assigned]</span>
           </template>
         </template>
+
+        <!-- Per-item free-text notes (notes ?? legacy body), for every slot kind -->
+        <p v-if="slotFreeText(slot)?.trim()" class="whitespace-pre-wrap text-gray-700 mt-1">{{ slotFreeText(slot) }}</p>
       </div>
     </div>
 
@@ -116,13 +110,22 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { Service, HymnSlot, ScriptureRef } from '@/types/service'
+import type { Service, HymnSlot, ScriptureRef, ServiceSlot, NonAssignableSlot } from '@/types/service'
 import { slotLabel, miscLabel } from '@/utils/slotTypes'
 import { formatScriptureRef } from '@/utils/planningCenterExport'
 
 const props = defineProps<{
   service: Service
 }>()
+
+/**
+ * Consolidated per-item free-text for a slot: notes is the canonical field on
+ * every slot kind; body is the legacy fallback only MESSAGE/ANNOUNCEMENTS/MISC
+ * can carry. Notes wins when both are present.
+ */
+function slotFreeText(slot: ServiceSlot): string | undefined {
+  return slot.notes ?? (slot as NonAssignableSlot).body
+}
 
 // ── Computed ──────────────────────────────────────────────────────────────────
 
