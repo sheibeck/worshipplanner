@@ -6,6 +6,7 @@ import type { Options as SortableOptions } from 'sortablejs'
 import SongLyricEditor from '../SongLyricEditor.vue'
 import BackgroundControl from '../slides/BackgroundControl.vue'
 import { useSaveStatus } from '@/stores/saveStatus'
+import { sliceSectionIntoSlides } from '@/utils/songSectionOrder'
 import type { SongLyrics, LyricSection, CopyrightInfo } from '@/types/songLyrics'
 
 // 32-06: the shared generic failure sentence — verbatim, the only error copy
@@ -985,7 +986,7 @@ describe('SongLyricEditor', () => {
     expect(survivor!.attributes('data-repeat')).toBe('false')
   })
 
-  it('the add row renders the five quick-add chips in mockup order', async () => {
+  it('the add row renders the six quick-add chips in mockup order, incl. Pre-Chorus (R119)', async () => {
     mockIsLoading.value = false
     mockCurrentLyrics.value = makeLyrics()
     const wrapper = await mountEditor()
@@ -994,7 +995,14 @@ describe('SongLyricEditor', () => {
     const addRow = wrapper.find('[data-testid="add-section-row"]')
     expect(addRow.exists()).toBe(true)
     const chips = addRow.findAll('button')
-    expect(chips.map((c) => c.text())).toEqual(['Verse', 'Chorus', 'Bridge', 'Tag', 'Ending'])
+    expect(chips.map((c) => c.text())).toEqual([
+      'Verse',
+      'Chorus',
+      'Pre-Chorus',
+      'Bridge',
+      'Tag',
+      'Ending',
+    ])
   })
 
   it('activating a chip appends a new empty row under that kind, and expands it', async () => {
@@ -1146,6 +1154,221 @@ describe('SongLyricEditor', () => {
     expect(mockUpdateCurrentLyrics).toHaveBeenCalledWith('org-1', 'song-1', 'lyrics-1', expect.objectContaining({
       performanceOrder: ['verse-1', 'chorus', 'tag'],
     }))
+  })
+
+  // ── 53-03 Task 1: derived per-kind numbering display (R120) + Pre-Chorus (R119) ──
+
+  const NUMBERED_SECTIONS: LyricSection[] = [
+    { id: 'verse-1', label: 'Verse 1', lines: ['Line 1a', 'Line 1b'] },
+    { id: 'verse-2', label: 'Verse 2', lines: ['Line 2a', 'Line 2b'] },
+  ]
+
+  it('R120: pasted "Verse 1"/"Verse 2" render their derived per-kind numbers', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics({
+      sections: NUMBERED_SECTIONS,
+      performanceOrder: ['verse-1', 'verse-2'],
+    })
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    const rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    expect(rows[0]!.text()).toContain('VERSE 1')
+    expect(rows[1]!.text()).toContain('VERSE 2')
+  })
+
+  it('R120: adding a Verse after pasted "Verse 1"/"Verse 2" shows "VERSE 3" — the bare-Verse bug is fixed by displayLabel', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics({
+      sections: NUMBERED_SECTIONS,
+      performanceOrder: ['verse-1', 'verse-2'],
+    })
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    await wrapper.find('[data-testid="add-section-chip-Verse"]').trigger('click')
+    await flushPromises()
+
+    const rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    expect(rows).toHaveLength(3)
+    const newRowText = rows[2]!.text()
+    expect(newRowText).toContain('VERSE 3')
+    // Not the bare kind, and not skipping/over-counting to VERSE 4.
+    expect(newRowText).not.toContain('VERSE 4')
+  })
+
+  it('R120: a repeat row shows the SAME derived number as the origin row', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeRepeatLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    // REPEAT_ORDER = ['chorus', 'verse-1', 'chorus', 'verse-2'] — rows 0 and 2
+    // are the same pooled 'Chorus' section (row 2 is the repeat).
+    const rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    expect(rows[0]!.attributes('data-repeat')).toBe('false')
+    expect(rows[2]!.attributes('data-repeat')).toBe('true')
+    expect(rows[0]!.text()).toContain('CHORUS 1')
+    expect(rows[2]!.text()).toContain('CHORUS 1')
+  })
+
+  it('R119: the Pre-Chorus chip adds a section that displays "PRE-CHORUS 1"', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    const chip = wrapper.find('[data-testid="add-section-chip-Pre-Chorus"]')
+    expect(chip.exists()).toBe(true)
+    await chip.trigger('click')
+    await flushPromises()
+
+    const rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    expect(rows).toHaveLength(3)
+    expect(rows[2]!.text()).toContain('PRE-CHORUS 1')
+  })
+
+  // ── 53-03 Task 2: manual click-between-lines split affordance (R117) ────────
+
+  const FOUR_LINE_SECTIONS: LyricSection[] = [
+    { id: 'verse-1', label: 'Verse 1', lines: ['a', 'b', 'c', 'd'] },
+  ]
+
+  function makeFourLineLyrics(overrides?: Partial<SongLyrics>): SongLyrics {
+    return makeLyrics({ sections: FOUR_LINE_SECTIONS, performanceOrder: ['verse-1'], ...overrides })
+  }
+
+  async function expandFirstRow(wrapper: Awaited<ReturnType<typeof mountEditor>>) {
+    const rows = wrapper.findAll('[data-testid="section-rows"] > div')
+    await rows[0]!.find('[data-testid^="row-toggle-"]').trigger('click')
+    return rows[0]!
+  }
+
+  it('R117: an expanded section renders one divider between each pair of adjacent lines (3 dividers for 4 lines)', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeFourLineLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    const row = await expandFirstRow(wrapper)
+    expect(row.find('[data-testid="row-split-divider-verse-1-1"]').exists()).toBe(true)
+    expect(row.find('[data-testid="row-split-divider-verse-1-2"]').exists()).toBe(true)
+    expect(row.find('[data-testid="row-split-divider-verse-1-3"]').exists()).toBe(true)
+    // No divider after the last line.
+    expect(row.find('[data-testid="row-split-divider-verse-1-4"]').exists()).toBe(false)
+  })
+
+  it('R117: clicking the divider before line 2 writes slideBreaks [2] and slices into 2 groups', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeFourLineLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+    const saveFn = await saveFnFor(wrapper)
+
+    const row = await expandFirstRow(wrapper)
+    await row.find('[data-testid="row-split-divider-verse-1-2"]').trigger('click')
+    await flushPromises()
+
+    mockUpdateCurrentLyrics.mockClear()
+    await saveFn()
+    const call = mockUpdateCurrentLyrics.mock.calls[0] as unknown as [string, string, string, { sections: LyricSection[] }]
+    const section = call[3].sections.find((s) => s.id === 'verse-1')!
+    expect(section.slideBreaks).toEqual([2])
+    expect(sliceSectionIntoSlides(section)).toEqual([['a', 'b'], ['c', 'd']])
+  })
+
+  it('R117: a second distinct divider click adds its index sorted+de-duped; clicking an active divider toggles it off', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeFourLineLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+    const saveFn = await saveFnFor(wrapper)
+
+    const row = await expandFirstRow(wrapper)
+    // Click 3 then 1 — must persist sorted [1, 3], not insertion order [3, 1].
+    await row.find('[data-testid="row-split-divider-verse-1-3"]').trigger('click')
+    await row.find('[data-testid="row-split-divider-verse-1-1"]').trigger('click')
+    await flushPromises()
+    expect(row.find('[data-testid="row-split-divider-verse-1-1"]').attributes('data-active')).toBe('true')
+    expect(row.find('[data-testid="row-split-divider-verse-1-3"]').attributes('data-active')).toBe('true')
+    expect(row.find('[data-testid="row-split-divider-verse-1-2"]').attributes('data-active')).toBe('false')
+
+    mockUpdateCurrentLyrics.mockClear()
+    await saveFn()
+    let call = mockUpdateCurrentLyrics.mock.calls[0] as unknown as [string, string, string, { sections: LyricSection[] }]
+    expect(call[3].sections.find((s) => s.id === 'verse-1')!.slideBreaks).toEqual([1, 3])
+
+    // Toggle divider 1 back off.
+    await row.find('[data-testid="row-split-divider-verse-1-1"]').trigger('click')
+    await flushPromises()
+    expect(row.find('[data-testid="row-split-divider-verse-1-1"]').attributes('data-active')).toBe('false')
+
+    mockUpdateCurrentLyrics.mockClear()
+    await saveFn()
+    call = mockUpdateCurrentLyrics.mock.calls[0] as unknown as [string, string, string, { sections: LyricSection[] }]
+    expect(call[3].sections.find((s) => s.id === 'verse-1')!.slideBreaks).toEqual([3])
+  })
+
+  it('R117: editing the text down to fewer lines drops now-out-of-range slideBreaks (pruned at the write source)', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeFourLineLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+    const saveFn = await saveFnFor(wrapper)
+
+    const row = await expandFirstRow(wrapper)
+    // Break at 3 requires >= 4 lines.
+    await row.find('[data-testid="row-split-divider-verse-1-3"]').trigger('click')
+    await flushPromises()
+
+    // Now shrink the section to 2 lines — break index 3 is out of range.
+    await row.find('[data-testid="row-textarea-verse-1"]').setValue('a\nb')
+    await flushPromises()
+
+    mockUpdateCurrentLyrics.mockClear()
+    await saveFn()
+    const call = mockUpdateCurrentLyrics.mock.calls[0] as unknown as [string, string, string, { sections: LyricSection[] }]
+    const section = call[3].sections.find((s) => s.id === 'verse-1')!
+    expect(section.lines).toEqual(['a', 'b'])
+    expect(section.slideBreaks).toBeUndefined()
+  })
+
+  it('R117 regression: a section never split persists no slideBreaks field and edits through the textarea as before', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeFourLineLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+    const saveFn = await saveFnFor(wrapper)
+
+    const row = await expandFirstRow(wrapper)
+    await row.find('[data-testid="row-textarea-verse-1"]').setValue('a\nb\nc\nd\ne')
+    await flushPromises()
+
+    mockUpdateCurrentLyrics.mockClear()
+    await saveFn()
+    const call = mockUpdateCurrentLyrics.mock.calls[0] as unknown as [string, string, string, { sections: LyricSection[] }]
+    const section = call[3].sections.find((s) => s.id === 'verse-1')!
+    expect(section.lines).toEqual(['a', 'b', 'c', 'd', 'e'])
+    expect('slideBreaks' in section).toBe(false)
+  })
+
+  it('R117: a divider-only click makes the document dirty so the existing autosave persists it', async () => {
+    mockIsLoading.value = false
+    mockCurrentLyrics.value = makeFourLineLyrics()
+    const wrapper = await mountEditor()
+    await flushPromises()
+
+    const { useAutoSave } = await import('@/composables/useAutoSave') as unknown as {
+      useAutoSave: ReturnType<typeof vi.fn>
+    }
+    const isDirty = useAutoSave.mock.calls[0]![2] as { value: boolean }
+    expect(isDirty.value).toBe(false)
+
+    const row = await expandFirstRow(wrapper)
+    await row.find('[data-testid="row-split-divider-verse-1-2"]').trigger('click')
+    await flushPromises()
+
+    expect(isDirty.value).toBe(true)
   })
 
   // ── 33-06: song-level background control (R057) ────────────────────────────

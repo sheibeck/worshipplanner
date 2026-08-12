@@ -11,8 +11,8 @@ import type { LyricSection } from '@/types/songLyrics'
  * pooled section, not a copy (D-02).
  */
 
-/** The five quick-add kinds the option 2a mockup draws, in mockup order. */
-export const ADD_SECTION_KINDS = ['Verse', 'Chorus', 'Bridge', 'Tag', 'Ending'] as const
+/** The six quick-add kinds the option 2a mockup draws, in mockup order (R119 adds 'Pre-Chorus'). */
+export const ADD_SECTION_KINDS = ['Verse', 'Chorus', 'Pre-Chorus', 'Bridge', 'Tag', 'Ending'] as const
 
 export type AddSectionKind = (typeof ADD_SECTION_KINDS)[number]
 
@@ -55,6 +55,27 @@ export interface SectionRow {
   isRepeat: boolean
   /** The 1-based position of occurrence zero, or null on a non-repeat. */
   repeatOfPosition: number | null
+  /**
+   * The per-kind position-numbered label rendered by the editor (R120), e.g.
+   * "Verse 3". Derived at render time from the section's stored `label` via
+   * `deriveSectionKind` and its ordinal among UNIQUE same-kind sections; both
+   * rows of a repeat (and both slides of a split, which live on one section)
+   * share the section's single number. NEVER written back into
+   * `section.label` — this is display-only (BWC).
+   */
+  displayLabel: string
+}
+
+/**
+ * Derives a section's KIND from its stored `label` (R120) by stripping a
+ * single trailing whitespace-plus-digits run: 'Verse 1' -> 'Verse',
+ * 'Pre-Chorus 2' -> 'Pre-Chorus', bare 'Verse' -> 'Verse', 'Chorus' ->
+ * 'Chorus'. CCLI uses arabic numerals only, so this reliably yields the kind
+ * for every real label shape with no hard-coded kind list. Pure — never
+ * mutates and never touches the stored label.
+ */
+export function deriveSectionKind(label: string): string {
+  return label.replace(/\s+\d+$/, '').trim()
 }
 
 /**
@@ -78,6 +99,11 @@ export function buildSectionRows(
   const pool = new Map(sections.map((section) => [section.id, section] as const))
   const occurrenceCounts = new Map<string, number>()
   const firstPositionBySectionId = new Map<string, number>()
+  // R120: per-kind ordinal assigned on a section's FIRST occurrence, reused by
+  // repeats. `kindOrdinals` counts UNIQUE sections seen per derived kind;
+  // `numberBySectionId` remembers the number minted for each section id.
+  const kindOrdinals = new Map<string, number>()
+  const numberBySectionId = new Map<string, number>()
   const rows: SectionRow[] = []
   const hasSlotIds = slotIds !== undefined && slotIds.length === order.length
 
@@ -91,6 +117,15 @@ export function buildSectionRows(
 
     const position = rows.length + 1
     const isRepeat = occurrenceIndex > 0
+
+    const kind = deriveSectionKind(section.label)
+    let number = numberBySectionId.get(sectionId)
+    if (number === undefined) {
+      number = (kindOrdinals.get(kind) ?? 0) + 1
+      kindOrdinals.set(kind, number)
+      numberBySectionId.set(sectionId, number)
+    }
+
     if (!isRepeat) {
       firstPositionBySectionId.set(sectionId, position)
     }
@@ -106,10 +141,43 @@ export function buildSectionRows(
       occurrenceIndex,
       isRepeat,
       repeatOfPosition: isRepeat ? (firstPositionBySectionId.get(sectionId) ?? null) : null,
+      displayLabel: `${kind} ${number}`,
     })
   }
 
   return rows
+}
+
+/**
+ * Slices a section's `lines` into consecutive slide line-groups at its
+ * `slideBreaks` (R117). This is the SINGLE definition of what a split means —
+ * both assembler paths (Plan 02) and the editor split affordance (Plan 03)
+ * consume this one helper.
+ *
+ * Read-tolerant: keeps only integer break indices `k` with
+ * `1 <= k < lines.length`, sorts ascending and de-duplicates. An absent, empty
+ * or fully-invalid break set yields exactly one group equal to `section.lines`
+ * (today's behavior — backward compatible). Never throws, never mutates its
+ * argument (builds new arrays only). Pure — imports only the `LyricSection`
+ * type, no Vue/store/Firestore.
+ */
+export function sliceSectionIntoSlides(section: LyricSection): string[][] {
+  const n = section.lines.length
+  const breaks = (section.slideBreaks ?? [])
+    .filter((k) => Number.isInteger(k) && k >= 1 && k < n)
+    .sort((a, b) => a - b)
+  const unique = [...new Set(breaks)]
+
+  if (unique.length === 0) return [section.lines]
+
+  const groups: string[][] = []
+  let start = 0
+  for (const k of unique) {
+    groups.push(section.lines.slice(start, k))
+    start = k
+  }
+  groups.push(section.lines.slice(start))
+  return groups
 }
 
 /**

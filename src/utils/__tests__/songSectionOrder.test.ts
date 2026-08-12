@@ -4,12 +4,14 @@ import {
   ADD_SECTION_KINDS,
   addSection,
   buildSectionRows,
+  deriveSectionKind,
   duplicateRow,
   mintSectionId,
   moveRow,
   normalizeLyricOrder,
   normalizeParsedSections,
   removeRow,
+  sliceSectionIntoSlides,
   uniqueSectionLabel,
 } from '@/utils/songSectionOrder'
 
@@ -106,6 +108,135 @@ describe('buildSectionRows', () => {
       const followedAfter = after.find((r) => !r.isRepeat && r.sectionId === 'chorus')!
       expect(followedAfter.stableKey).toBe('s3')
     })
+  })
+})
+
+describe('deriveSectionKind (R120)', () => {
+  it('strips a single trailing arabic number for every real label shape', () => {
+    expect(deriveSectionKind('Verse 1')).toBe('Verse')
+    expect(deriveSectionKind('Verse')).toBe('Verse')
+    expect(deriveSectionKind('Chorus')).toBe('Chorus')
+    expect(deriveSectionKind('Pre-Chorus')).toBe('Pre-Chorus')
+    expect(deriveSectionKind('Pre-Chorus 2')).toBe('Pre-Chorus')
+    expect(deriveSectionKind('Bridge')).toBe('Bridge')
+    expect(deriveSectionKind('Section 1')).toBe('Section')
+  })
+})
+
+describe('buildSectionRows displayLabel (R120)', () => {
+  it('numbers a bare "Verse" after pasted "Verse 1"/"Verse 2" as "Verse 3" (the bug)', () => {
+    const v1: LyricSection = { id: 'verse-1', label: 'Verse 1', lines: ['a'] }
+    const v2: LyricSection = { id: 'verse-2', label: 'Verse 2', lines: ['b'] }
+    const vBare: LyricSection = { id: 'verse', label: 'Verse', lines: ['c'] }
+
+    const rows = buildSectionRows([v1, v2, vBare], ['verse-1', 'verse-2', 'verse'])
+
+    expect(rows.map((r) => r.displayLabel)).toEqual(['Verse 1', 'Verse 2', 'Verse 3'])
+  })
+
+  it('numbers per KIND by position, not by global row position', () => {
+    const v1: LyricSection = { id: 'verse-1', label: 'Verse 1', lines: ['a'] }
+    const c: LyricSection = { id: 'chorus', label: 'Chorus', lines: ['b'] }
+    const v2: LyricSection = { id: 'verse-2', label: 'Verse 2', lines: ['c'] }
+
+    const rows = buildSectionRows([v1, c, v2], ['verse-1', 'chorus', 'verse-2'])
+
+    expect(rows.map((r) => r.displayLabel)).toEqual(['Verse 1', 'Chorus 1', 'Verse 2'])
+  })
+
+  it('reuses the same displayLabel/number on both rows of a repeat', () => {
+    const rows = buildSectionRows([verse1, chorus], ['chorus', 'verse-1', 'chorus'])
+    expect(rows[0]?.displayLabel).toBe('Chorus 1')
+    expect(rows[2]?.displayLabel).toBe('Chorus 1')
+    expect(rows[1]?.displayLabel).toBe('Verse 1')
+  })
+
+  it('numbers a lone section of a kind as "{Kind} 1" (nothing unnumbered)', () => {
+    const rows = buildSectionRows([chorus], ['chorus'])
+    expect(rows[0]?.displayLabel).toBe('Chorus 1')
+  })
+
+  it('never mutates the stored section.label', () => {
+    const v1: LyricSection = { id: 'verse-1', label: 'Verse 1', lines: ['a'] }
+    const vBare: LyricSection = { id: 'verse', label: 'Verse', lines: ['c'] }
+    const sections = [v1, vBare]
+    const labelsBefore = sections.map((s) => s.label)
+
+    buildSectionRows(sections, ['verse-1', 'verse'])
+
+    expect(sections.map((s) => s.label)).toEqual(labelsBefore)
+    expect(vBare.label).toBe('Verse')
+  })
+})
+
+describe('sliceSectionIntoSlides (R117)', () => {
+  it('returns exactly one group (the section lines) when slideBreaks is undefined', () => {
+    const section: LyricSection = { id: 'v', label: 'Verse', lines: ['a', 'b', 'c'] }
+    expect(sliceSectionIntoSlides(section)).toEqual([['a', 'b', 'c']])
+  })
+
+  it('returns exactly one group when slideBreaks is empty', () => {
+    const section: LyricSection = { id: 'v', label: 'Verse', lines: ['a', 'b'], slideBreaks: [] }
+    expect(sliceSectionIntoSlides(section)).toEqual([['a', 'b']])
+  })
+
+  it('splits an 8-line section at break [4] into two groups of four (owner chorus example)', () => {
+    const lines = ['1', '2', '3', '4', '5', '6', '7', '8']
+    const section: LyricSection = { id: 'c', label: 'Chorus', lines, slideBreaks: [4] }
+    expect(sliceSectionIntoSlides(section)).toEqual([
+      ['1', '2', '3', '4'],
+      ['5', '6', '7', '8'],
+    ])
+  })
+
+  it('splits a 7-line section at breaks [2,5] into three consecutive groups', () => {
+    const lines = ['0', '1', '2', '3', '4', '5', '6']
+    const section: LyricSection = { id: 'v', label: 'Verse', lines, slideBreaks: [2, 5] }
+    expect(sliceSectionIntoSlides(section)).toEqual([
+      ['0', '1'],
+      ['2', '3', '4'],
+      ['5', '6'],
+    ])
+  })
+
+  it('ignores out-of-range break indices (0, n and beyond) — collapses to one group', () => {
+    const lines = ['a', 'b', 'c', 'd', 'e', 'f'] // n = 6
+    for (const bad of [[0], [6], [99]]) {
+      const section: LyricSection = { id: 'v', label: 'Verse', lines, slideBreaks: bad }
+      expect(sliceSectionIntoSlides(section)).toEqual([lines])
+    }
+  })
+
+  it('dedupes, sorts and integer-filters unsorted/duplicate/non-integer input [5,2,2,3.5]', () => {
+    const lines = ['0', '1', '2', '3', '4', '5', '6'] // n = 7, breaks -> {2,5}
+    const section: LyricSection = { id: 'v', label: 'Verse', lines, slideBreaks: [5, 2, 2, 3.5] }
+    expect(sliceSectionIntoSlides(section)).toEqual([
+      ['0', '1'],
+      ['2', '3', '4'],
+      ['5', '6'],
+    ])
+  })
+
+  it('never throws on legacy/corrupt input', () => {
+    const lines = ['a', 'b']
+    expect(() =>
+      sliceSectionIntoSlides({ id: 'v', label: 'V', lines, slideBreaks: [-1, 99, 0, 1.5] }),
+    ).not.toThrow()
+  })
+
+  it('does not mutate section.lines or section.slideBreaks', () => {
+    const lines = ['0', '1', '2', '3', '4', '5', '6']
+    const slideBreaks = [5, 2, 2, 3.5]
+    const section: LyricSection = { id: 'v', label: 'Verse', lines, slideBreaks }
+    const linesClone = [...lines]
+    const breaksClone = [...slideBreaks]
+
+    sliceSectionIntoSlides(section)
+
+    expect(section.lines).toBe(lines)
+    expect(section.lines).toEqual(linesClone)
+    expect(section.slideBreaks).toBe(slideBreaks)
+    expect(section.slideBreaks).toEqual(breaksClone)
   })
 })
 
@@ -276,8 +407,30 @@ describe('uniqueSectionLabel', () => {
 })
 
 describe('ADD_SECTION_KINDS', () => {
-  it('holds the five quick-add kinds in mockup order', () => {
-    expect(ADD_SECTION_KINDS).toEqual(['Verse', 'Chorus', 'Bridge', 'Tag', 'Ending'])
+  it('holds the six quick-add kinds in mockup order, with Pre-Chorus after Chorus', () => {
+    expect(ADD_SECTION_KINDS).toEqual(['Verse', 'Chorus', 'Pre-Chorus', 'Bridge', 'Tag', 'Ending'])
+  })
+
+  it('includes Pre-Chorus (R119)', () => {
+    expect(ADD_SECTION_KINDS).toContain('Pre-Chorus')
+  })
+})
+
+describe('Pre-Chorus (R119)', () => {
+  it('mints id "pre-chorus" from the "Pre-Chorus" label (hyphen preserved, whitespace-free)', () => {
+    expect(mintSectionId('Pre-Chorus', [])).toBe('pre-chorus')
+  })
+
+  it('addSection produces a section labelled "Pre-Chorus" with id "pre-chorus", appended to the order', () => {
+    const result = addSection([], [], 'Pre-Chorus')
+    const added = result.sections.find((section) => section.id === result.newSectionId)
+    expect(added?.label).toBe('Pre-Chorus')
+    expect(added?.id).toBe('pre-chorus')
+    expect(result.performanceOrder).toEqual(['pre-chorus'])
+  })
+
+  it('deriveSectionKind maps "Pre-Chorus 2" back to "Pre-Chorus"', () => {
+    expect(deriveSectionKind('Pre-Chorus 2')).toBe('Pre-Chorus')
   })
 })
 

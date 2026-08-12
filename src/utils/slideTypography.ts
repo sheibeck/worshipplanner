@@ -152,8 +152,9 @@ export function waitForSlideFont(
  * chunks; do NOT replace this with a single dynamically-templated package
  * name.
  */
-const FONT_CSS_LOADERS: Record<string, (weight: number) => Promise<unknown>> = {
+export const FONT_CSS_LOADERS: Record<string, (weight: number) => Promise<unknown>> = {
   Inter: (weight) => import(`@fontsource/inter/${weight}.css`),
+  Roboto: (weight) => import(`@fontsource/roboto/${weight}.css`),
   'Open Sans': (weight) => import(`@fontsource/open-sans/${weight}.css`),
   Poppins: (weight) => import(`@fontsource/poppins/${weight}.css`),
   Lora: (weight) => import(`@fontsource/lora/${weight}.css`),

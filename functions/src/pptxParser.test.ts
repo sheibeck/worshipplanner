@@ -79,6 +79,7 @@ describe("mapAstToSlides", () => {
         contentKind: "text",
         title: "Selling your idea",
         body: `Selling your idea\n${longBody}`,
+        sourcePage: 1,
       },
     ]);
     expect(resolver).not.toHaveBeenCalled();
@@ -104,11 +105,56 @@ describe("mapAstToSlides", () => {
     const slides = await mapAstToSlides(ast, resolver);
 
     expect(slides).toEqual<MappedSlide[]>([
-      { contentKind: "image", imageUrl: "stub-path-0-image1.png", altText: "Logo" },
-      { contentKind: "image", imageUrl: "stub-path-1-image2.jpg" },
+      { contentKind: "image", imageUrl: "stub-path-0-image1.png", altText: "Logo", sourcePage: 1 },
+      { contentKind: "image", imageUrl: "stub-path-1-image2.jpg", sourcePage: 1 },
     ]);
     expect(resolver).toHaveBeenNthCalledWith(1, "image1.png", 0);
     expect(resolver).toHaveBeenNthCalledWith(2, "image2.jpg", 1);
+  });
+
+  it("gives every image on a multi-image slide the SAME sourcePage (one entry per image, one source slide)", async () => {
+    const ast = {
+      content: [
+        {
+          type: "slide",
+          children: [{ type: "image", text: "", metadata: { attachmentName: "first.png" } }],
+        },
+        {
+          type: "slide",
+          children: [
+            { type: "image", text: "", metadata: { attachmentName: "a.png" } },
+            { type: "image", text: "", metadata: { attachmentName: "b.png" } },
+            { type: "image", text: "", metadata: { attachmentName: "c.png" } },
+          ],
+        },
+      ],
+    };
+
+    const resolver = vi.fn().mockImplementation((name: string) => `path/${name}`);
+    const slides = await mapAstToSlides(ast, resolver);
+
+    expect(slides).toEqual<MappedSlide[]>([
+      { contentKind: "image", imageUrl: "path/first.png", sourcePage: 1 },
+      { contentKind: "image", imageUrl: "path/a.png", sourcePage: 2 },
+      { contentKind: "image", imageUrl: "path/b.png", sourcePage: 2 },
+      { contentKind: "image", imageUrl: "path/c.png", sourcePage: 2 },
+    ]);
+  });
+
+  it("advances sourcePage across skipped (empty) slides, so a text slide after two skips carries sourcePage = 3", async () => {
+    const longBody = "B".repeat(TEXT_DOMINANT_THRESHOLD + 1);
+    const ast = {
+      content: [
+        { type: "slide", children: [{ type: "paragraph", text: "Hi" }] },
+        { type: "slide", children: [] },
+        { type: "slide", children: [{ type: "paragraph", text: longBody }] },
+      ],
+    };
+
+    const resolver = vi.fn();
+    const slides = await mapAstToSlides(ast, resolver);
+
+    expect(slides).toEqual<MappedSlide[]>([{ contentKind: "text", body: longBody, sourcePage: 3 }]);
   });
 
   it("picks the dominant text content on a mixed text+image slide, dropping the image", async () => {
@@ -131,7 +177,7 @@ describe("mapAstToSlides", () => {
     const resolver = vi.fn();
     const slides = await mapAstToSlides(ast, resolver);
 
-    expect(slides).toEqual<MappedSlide[]>([{ contentKind: "text", body: longBody }]);
+    expect(slides).toEqual<MappedSlide[]>([{ contentKind: "text", body: longBody, sourcePage: 1 }]);
     expect(resolver).not.toHaveBeenCalled();
   });
 
@@ -177,9 +223,9 @@ describe("mapAstToSlides", () => {
     const slides = await mapAstToSlides(ast, resolver);
 
     expect(slides).toEqual<MappedSlide[]>([
-      { contentKind: "text", body: longBody },
-      { contentKind: "image", imageUrl: "path/only.png" },
-      { contentKind: "text", body: longBody },
+      { contentKind: "text", body: longBody, sourcePage: 1 },
+      { contentKind: "image", imageUrl: "path/only.png", sourcePage: 2 },
+      { contentKind: "text", body: longBody, sourcePage: 3 },
     ]);
   });
 });
@@ -238,6 +284,7 @@ describe("parsePptxBuffer", () => {
     // ImageSlide. What matters here is real end-to-end extraction succeeding.
     expect(slides.length).toBeGreaterThan(0);
     expect(slides.every((slide) => slide.contentKind === "text")).toBe(true);
+    expect(slides.every((slide) => typeof slide.sourcePage === "number")).toBe(true);
     expect(saveMock).not.toHaveBeenCalled();
   });
 
@@ -281,7 +328,7 @@ describe("parsePptxBuffer", () => {
     const expectedPath = `orgs/${ORG_ID}/pptx-imports/${IMPORT_ID}/images/0.png`;
 
     expect(slides).toEqual<MappedSlide[]>([
-      { contentKind: "image", imageUrl: expectedPath, altText: "A short caption" },
+      { contentKind: "image", imageUrl: expectedPath, altText: "A short caption", sourcePage: 1 },
     ]);
 
     expect(saveMock).toHaveBeenCalledTimes(1);

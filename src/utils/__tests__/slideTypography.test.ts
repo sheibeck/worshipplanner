@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   SCALE_MAP,
   FONT_LOAD_TIMEOUT_MS,
+  FONT_CSS_LOADERS,
   cssVarsFor,
   snapWeight,
   waitForSlideFont,
@@ -59,6 +60,19 @@ describe('slideTypography', () => {
         '--slide-font-weight': 400,
         '--slide-font-scale': 1.0,
       })
+    })
+  })
+
+  describe('FONT_CSS_LOADERS (R126 Roboto wiring)', () => {
+    it('registers a Roboto loader key alongside the other five families', () => {
+      // Direct membership assertion (plan-checker advisory): loadFontCss
+      // no-ops for an unknown family, so proving Roboto is a real loader key
+      // is stronger than proving loadFontCss merely resolves.
+      expect(FONT_CSS_LOADERS).toHaveProperty('Roboto')
+      expect(typeof FONT_CSS_LOADERS['Roboto']).toBe('function')
+      expect(Object.keys(FONT_CSS_LOADERS).sort()).toEqual(
+        ['Inter', 'Lora', 'Open Sans', 'Poppins', 'Roboto', 'Source Serif 4'].sort(),
+      )
     })
   })
 

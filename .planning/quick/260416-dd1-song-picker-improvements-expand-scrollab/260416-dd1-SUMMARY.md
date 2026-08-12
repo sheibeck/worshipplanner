@@ -1,4 +1,6 @@
 ---
+status: complete
+completed_at: v1.5-milestone-cleanup 2026-08-10
 quick_id: 260416-dd1
 plan: 01
 subsystem: song-picker

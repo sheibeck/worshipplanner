@@ -119,7 +119,7 @@
            (or, for background, on the minimal testid wrapper below) rather
            than on a padded child div — there is no padded child div left. -->
       <div
-        v-if="showGroupMusicControl || showGroupBackgroundControl || showCongregationalControl"
+        v-if="showGroupMusicControl || showGroupBackgroundControl || showCongregationalControl || showRemoveImportedControl"
         class="mx-6 mt-3 flex flex-wrap items-start gap-x-3 gap-y-2 rounded-md border border-gray-800 bg-gray-900 px-3 py-2"
         data-testid="slide-grid-group-media-panel"
       >
@@ -190,6 +190,19 @@
         >
           {{ congregationalButtonLabel }}
         </button>
+
+        <!-- R106 (Phase 50) — per-group bulk removal of imported-deck
+             entries, styled to match the congregational button beside it.
+             Offered only when the group has at least one imported entry
+             (`hasImportedEntries`) AND the caller can mutate the group's
+             slides (`canMutateGroup`) — same gate `handler` re-checks. -->
+        <button
+          v-if="showRemoveImportedControl"
+          type="button"
+          data-testid="slide-grid-remove-imported-btn"
+          @click="onRemoveImportedSlides"
+          class="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-gray-700 px-2.5 py-1.5 text-xs font-medium text-gray-300 transition-colors hover:bg-gray-800"
+        >Remove imported slides</button>
 
         <!-- The group caption, relocated out of `BackgroundControl` (owner
              follow-up #4 (b) above). `basis-full` makes it take a whole flex
@@ -347,7 +360,7 @@ import { useImportedSlides } from '@/stores/importedSlides'
 import { useAuthStore } from '@/stores/auth'
 import { cssVarsFor } from '@/utils/slideTypography'
 import { useMediaUpload } from '@/composables/useMediaUpload'
-import { slotLabel } from '@/utils/slotTypes'
+import { slotLabel, miscLabel } from '@/utils/slotTypes'
 import SlideCard from './SlideCard.vue'
 import SlideGroupMusicControl from './SlideGroupMusicControl.vue'
 import BackgroundControl from './BackgroundControl.vue'
@@ -445,7 +458,11 @@ const { progress: mediaUploadProgress, error: mediaUploadError, isUploading: med
  */
 const groupTitle = computed(() => {
   if (!props.selectedSlot) return ''
-  const kindLabel = slotLabel(props.selectedSlot)
+  // MISC uses its custom label as the kind label too (2026-08-12), so a labeled
+  // MISC group reads just "Communion" (not "Miscellaneous — Communion") and an
+  // unlabeled one reads "Miscellaneous" — aligned with the Service Order badge.
+  const kindLabel =
+    props.selectedSlot.kind === 'MISC' ? miscLabel(props.selectedSlot) : slotLabel(props.selectedSlot)
   const display = slotDisplayTitle(props.selectedSlot)
   return display === kindLabel ? kindLabel : `${kindLabel} — ${display}`
 })
@@ -508,6 +525,17 @@ const congregationalButtonLabel = computed(() =>
     ? 'Modify congregational reading'
     : 'Make this a congregational reading',
 )
+
+/**
+ * R106 (Phase 50) — per-group "Remove imported slides" bulk action. Song
+ * groups can never hold imported entries (deck import is blocked there via
+ * `canMutateGroup`'s existing song-group exclusion), so `hasImportedEntries`
+ * needs no separate song-group check — `canMutateGroup` already covers it.
+ */
+const hasImportedEntries = computed(() =>
+  Boolean(props.group?.slides.some((entry) => entry.sourceRef.kind === 'imported')),
+)
+const showRemoveImportedControl = computed(() => canMutateGroup.value && hasImportedEntries.value)
 
 interface CardEntry {
   assembledSlide: AssembledSlide
@@ -673,6 +701,40 @@ async function onRemoveGroupBackground(): Promise<void> {
   }
 }
 
+// --- R106: per-group "Remove imported slides" bulk action ---
+//
+// The handler re-checks `canMutateGroup.value` itself rather than relying on
+// the template `v-if` alone (30-VERIFICATION I-01) — every other mutation
+// handler in this file does the same. Entries are sorted by their existing
+// `order` before filtering, mirroring the drag-reorder handler's own
+// defensive sort, so the survivors' relative PLAY order (not raw array
+// insertion order) is what gets renumbered. Does NOT touch
+// `group.sourceSignature` — a removal changes no source (R107 territory is
+// untouched here) — and passes `group.slides` as `baseSlides` so the write
+// routes through the CR-02 concurrent-write transaction merge, exactly like
+// every other group-slides write in this file.
+async function onRemoveImportedSlides(): Promise<void> {
+  if (!canMutateGroup.value) return
+  if (!props.selectedSlot || !props.group) return
+  const group = props.group
+  const sorted = [...group.slides].sort((a, b) => a.order - b.order)
+  const remaining = sorted.filter((entry) => entry.sourceRef.kind !== 'imported')
+  if (remaining.length === sorted.length) return
+  if (!window.confirm('Remove all imported slides from this group? This cannot be undone.')) return
+  const renumbered = remaining.map((entry, i) => ({ ...entry, order: i }))
+  try {
+    await slideGroupsStore.replaceGroupSlides(
+      props.orgId,
+      props.selectedSlot.id,
+      renumbered,
+      group.sourceSignature,
+      group.slides,
+    )
+  } catch (err) {
+    console.error('Failed to remove imported slides:', err)
+  }
+}
+
 // --- R050: the one append contract every write path below routes through ---
 //
 // Sorts a copy of `entries` by `order`, concatenates `additions` (in the
@@ -786,7 +848,15 @@ async function onImportConfirmed(payload: { importId: string; section: ServiceSe
     const newEntries: GroupSlideEntry[] = deck.slides.map((innerSlide) => ({
       id: crypto.randomUUID(),
       order: 0, // overwritten by appendToGroup's renumber below
-      sourceRef: { kind: 'imported', importId: payload.importId, innerSlideId: innerSlide.id },
+      sourceRef: {
+        kind: 'imported',
+        importId: payload.importId,
+        innerSlideId: innerSlide.id,
+        // R108: record the render-stable page (never `renderedPage: undefined` --
+        // Firestore rejects undefined) so a multi-image deck's hand-added
+        // entries can resolve without the ec217aa positional fallback.
+        ...(innerSlide.sourcePage !== undefined ? { renderedPage: innerSlide.sourcePage } : {}),
+      },
     }))
     // CR-02: see `onAddSlide` — `entries` (unsorted) is this append's base snapshot.
     const nextSlides = appendToGroup(entries, newEntries)

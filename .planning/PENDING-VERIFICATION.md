@@ -631,6 +631,23 @@ below — it was never run, and nothing in this item was self-approved.**
 
 ---
 
+## ✅ v1.5 PHASES 43–49 ACCEPTED AS VERIFIED — 2026-08-10 (owner decision, milestone close)
+
+**The owner explicitly accepted Phases 43, 44, 45, 46, 47, 48 and 49 as verified** at v1.5 milestone
+close, on the basis that all of v1.5 was **deployed to production on 2026-08-10 and has been in
+real-world use**. Chosen via an explicit question/answer during the milestone-cleanup step (the v1.4
+precedent). Each of those phases' `*-VERIFICATION.md` was accordingly set to `status: passed` with
+`status_source: owner-attributed`, and any still-unchecked items in their sections below were checked
+off as owner-accepted rather than individually re-run.
+
+This is **owner attribution, not self-approval** — the record shows plainly that the owner accepted
+them based on production use rather than that each listed check was independently executed. If a defect
+later surfaces in phases 43–49, the item that would have caught it is still written below, and this
+banner shows it was accepted-by-use, not run. Phase 50's two items were genuinely verified
+(50.1 by production header inspection, 50.2 owner-verified) and are not part of this attribution.
+
+---
+
 ## Phase 39 — Org Settings Infrastructure & Feature Toggles (v1.5)
 
 Deferred under the v1.5 standing autonomy grant (STATE.md, 2026-08-06). All automated gates
@@ -1207,19 +1224,19 @@ swallowing; WR-02 silent alignment-mismatch detection; WR-03 stable v-for keys; 
 four items below are inherently manual/visual/judgment — jsdom cannot render real fonts, simulate a
 real touch viewport, or judge projection legibility.
 
-- [ ] **47.1 Touch discoverability of the gap-+ / divider-remove affordance.** On a phone-width
+- [x] **47.1 Touch discoverability of the gap-+ / divider-remove affordance.** On a phone-width
       viewport, confirm the gap-+ and divider-remove controls are visible (persistent `opacity-40`)
       below the `md` breakpoint without hovering, reveal fully on hover/focus at `md`+, and have a
       44×44px hit area around the 24px control — discoverable and tappable on a real touch device.
       (UI-SPEC backstop, 47-02-SUMMARY.md D9.)
-- [ ] **47.2 Hand-dividing feels low-friction (R095).** Hand-divide **Psalm 136** (refrain) and
+- [x] **47.2 Hand-dividing feels low-friction (R095).** Hand-divide **Psalm 136** (refrain) and
       **Psalm 24** (call/response) with the gap-+ and 3-way chip; confirm placing/removing dividers
       and labeling is natural, not clunky.
-- [ ] **47.3 Projected 3-role legibility (R097).** Present a hand-divided reading; confirm the
+- [x] **47.3 Projected 3-role legibility (R097).** Present a hand-divided reading; confirm the
       first slide shows the reference, later slides show only the speaker label, and Leader (sky) /
       Congregation (amber) / All (violet) read distinctly at projection distance — and the reference
       genuinely disappears after slide 1.
-- [ ] **47.4 WR-01/WR-02 logic-change sign-off.** Spot-check real (non-fixture) passages with
+- [x] **47.4 WR-01/WR-02 logic-change sign-off.** Spot-check real (non-fixture) passages with
       run-on verses through the **Start Blank** seed; confirm verse ranges are never over-reported,
       and that an intentionally unmatchable-seed condition fires the toast cleanly with no
       end-user-visible console noise. (The fixer flagged both correctness-sensitive text-matching
@@ -1237,18 +1254,18 @@ WR-02 **deferred to owner** (item 48.4 below). R098 (natural-order multi-image) 
 (dismissible Getting Started) are fully code-verified with automated tests. The items below are
 inherently physical-device / owner-judgment.
 
-- [ ] **48.1 Real touch-drag reorder correctness (R099).** On a real touch device, long-press +
+- [x] **48.1 Real touch-drag reorder correctness (R099).** On a real touch device, long-press +
       drag a slide card to reorder; confirm it lands where dropped with no off-by-one, on a fresh
       grid and after a prior reorder. The desktop `*DraggableIndex`/`onEnd` logic is byte-unchanged
       and touch options were only appended (`delay`/`delayOnTouchOnly`/`touchStartThreshold`), but
       only a real touch gesture proves the reorder.
-- [ ] **48.2 Real-thumb 44px reachability (R099).** On a phone, confirm the slide-card drag handle
+- [x] **48.2 Real-thumb 44px reachability (R099).** On a phone, confirm the slide-card drag handle
       and the action-menu trigger are comfortably thumb-tappable (44px hit area), and that the
       enlarged hit area does not swallow card-selection taps (WR-03's asymmetric-padding fix).
-- [ ] **48.3 Real ~375px layout (R099/R100).** At phone width confirm: the Slides tab has no
+- [x] **48.3 Real ~375px layout (R099/R100).** At phone width confirm: the Slides tab has no
       horizontal overflow (the plan rail stacks above the grid as a horizontal-scroll strip), and
       the service edit screen's header action buttons stack vertically (QuarterView recipe).
-- [ ] **48.4 ★ OWNER DECISION — WR-02: Print/Share are now Service-Order-tab-only.** Moving Print
+- [x] **48.4 ★ OWNER DECISION — WR-02: Print/Share are now Service-Order-tab-only.** Moving Print
       and Share into the top contextual action bar (R101) scoped them to the Service Order tab; the
       previous page-bottom row made them reachable from **every** tab. This is a documented,
       UI-checker-approved 48-UI-SPEC.md decision that satisfies R101's text, but it narrows where
@@ -1275,6 +1292,354 @@ but only a real projected render confirms the on-screen result and media continu
 
 ---
 
+## Phase 50 — Slide Management: Bulk Delete, Provenance & Render Fidelity (2026-08-10)
+
+Deferred under the v1.5 standing autonomy grant. **4/4 must-haves verified in code**; `npm run
+type-check` clean; app `src/` suite at the documented 2-file baseline (2988/3001, no new failures);
+code review 0 critical / 2 warning / 2 info. R106 (per-group "Remove imported slides"), R107
+(rebuilds preserve every manual add — `slideGroupMaterializer.ts` untouched, existing survivor
+mechanism proven by a new 9-case suite), and R108 (render-stable `sourcePage`/`renderedPage`
+recorded and consumed) are fully code-complete and tested. The two warnings were both about R109 and
+have been **fixed** (see below). The two items here are inherently deploy-/live-gated.
+
+- [x] **50.1 Post-deploy cache refresh + asset immutability (R109).** ✅ **VERIFIED IN PRODUCTION
+      2026-08-10** (automated header inspection by Claude, after owner-authorized
+      `firebase deploy --only hosting,functions`). `curl -D-` against
+      https://worship-planner-bc515.web.app returned: `/` → `Cache-Control: no-cache, no-store,
+      must-revalidate` (text/html shell); `/index.html` → same; `/services/verify-test` (SPA deep
+      link) → same; `/assets/index-PNUhzbF4.js` → `public, max-age=31536000, immutable`. Both
+      (a) shell-no-cache-on-all-routes and (b) assets-still-immutable confirmed — the last-match-wins
+      precedence held in production, so no reorder is needed. A browser holding the OLD cached bundle
+      now re-fetches, since the shell carries `no-cache, no-store, must-revalidate`. (Original scenario:
+      after a real deploy, load `/` and a deep link without a manual cache-clear; DevTools Network shows
+      index.html re-fetched fresh and the new bundle loads; a hashed `/assets/*` request still returns
+      the long/immutable Cache-Control. Context: code review WR-01 found the original `/index.html`-only
+      header missed `/` and deep links; widened per owner decision 2026-08-10.)
+
+- [x] **50.2 Live multi-image PPTX round-trip (R108).** ✅ **OWNER-VERIFIED 2026-08-10** against the
+      production deploy: a real multi-image PPTX deck imported through the live UI, and a hand-added
+      slide resolves to the correct rendered page (no perpetual "Rendering" placeholder) — confirming
+      `renderedPage` round-trips through the live upload → parse (Cloud Function) → render-service →
+      Storage → client cycle, not just unit fixtures. (Original scenario: import a deck where a source
+      slide contains more than one image so parsed-slide count ≠ rendered-page count, hand-add one of
+      its slides into a non-imported group, confirm the correct rendered page shows.)
+
+---
+
 ## Notes and failures
 
 _(Record anything that failed here, with what you saw versus what was expected.)_
+
+---
+
+## ✅ v1.6 PHASES 51–57 ACCEPTED AS VERIFIED — 2026-08-12 (owner decision, milestone close)
+
+**The owner explicitly accepted Phases 51, 52, 53, 54, 55, 56 and 57 as verified** at v1.6 milestone
+close, on the basis that all of v1.6 was **deployed to production on 2026-08-12
+(`firebase deploy --only hosting`; the firestore.rules delete-fix deployed the same day) and the
+2026-08-12 owner follow-up batch was confirmed working in production** (see the "Post-56/57 owner
+follow-up tweaks" section below). This mirrors the v1.4/v1.5 owner-acceptance-at-close precedent.
+Each phase's `*-VERIFICATION.md` is accordingly treated as `status: passed` /
+`status_source: owner-attributed`, and the still-unchecked items in the phase sections below are
+accepted-by-use rather than individually re-run.
+
+This is **owner attribution, not self-approval** — the record shows plainly that the owner accepted
+these phases based on a production deploy + confirmed use, not that each listed check was independently
+executed. If a defect later surfaces in 51–57, the item that would have caught it is still written
+below, and this banner shows it was accepted-by-use, not run.
+
+---
+
+## Phase 51 — Service Order Editing Reliability (v1.6) — DEFERRED 2026-08-11
+
+**Status:** verification_deferred_human. 4/4 ROADMAP success criteria verified automatically (all
+source fixes present + genuine RED-first repros green; `npm run type-check` clean; app suite 2994 pass
+at the 2-file baseline; 373/373 phase tests). NOT deploy-gated (client-only). Resume: `/gsd-verify-work 51`.
+
+These three behaviors are jsdom-inexpressible (native SortableJS DOM move / live shared render) and must
+be confirmed by hand in the running app:
+
+- [ ] **51.1 (R110) — Real OS cross-section drag, both editors.** In the default-service-template editor
+      AND in a live service plan, drag an item (e.g. a Song) into a different section (e.g. Worship) and
+      drop it. Expect exactly ONE item in the target section with its dropdown showing that section — NO
+      second, undeletable "No Section" phantom — and the item stays draggable afterward (do a second
+      cross-section drag to confirm the container is not drag-dead). No page refresh.
+- [ ] **51.2 (R111) — Live "No Section" save.** Take an item that is in a section, use its section
+      dropdown to move it back to "No Section". Expect a clean save (Saved indicator) with NO error
+      toast / no Firestore "Unsupported field value: undefined".
+- [ ] **51.3 (R112) — Empty-item order on read surfaces.** Create a service with two blank Miscellaneous
+      items placed mid-order (e.g. in Worship). Without typing any text into them, view the Services
+      listing page and open the public share link. Expect both blank items to appear in their true
+      edit-screen position (their band), NOT sunk to the bottom.
+
+After confirming, run `/gsd-verify-work 51` to close these and flip Phase 51's VERIFICATION.md to passed.
+
+---
+
+## Phase 52 — Default Service Template (v1.6) — DEFERRED 2026-08-11
+
+**Status:** verification_deferred_human. 4/4 ROADMAP criteria verified in code + automated (all source
+present; critical guards intact — `buildSlotsFromTemplate` purity, absent-body shape, exhaustive switch;
+`npm run type-check` clean; app suite 3009 pass at the 2-file baseline). NOT deploy-gated (client-only).
+Resume: `/gsd-verify-work 52`.
+
+- [ ] **52.1 (R113) — Cog relocation.** On the Services page, the cog/settings control opens the
+      default-service-template slide-out editor. Confirm the main Settings page no longer shows a
+      Services template card. A viewer (non-editor) does not see the cog.
+- [ ] **52.2 (R115) — No blank service.** As a church whose default template is unset/never customized,
+      create a brand-new service. Expect it to open pre-populated from the Suggested Template (the
+      9-slot suggested order), NOT an empty service. With Vertical Worship mode on, the song slots carry
+      their VW types.
+- [ ] **52.3 (R116) — Misc body carries through.** In the template editor, add a Miscellaneous item and
+      type body text into its input (e.g. "Canned music"). Save the template, then create a new service.
+      Expect the Miscellaneous item to carry that body text into the created service.
+
+After confirming, run `/gsd-verify-work 52`.
+
+---
+
+## Phase 53 — Song Lyric Editing (v1.6) — DEFERRED 2026-08-11
+
+**Status:** verification_deferred_human. 5/5 ROADMAP criteria verified in code + automated (all source
+present; BWC guards git-confirmed — unsplit sections byte-identical, stored labels immutable,
+slideGroupMaterializer/duplicateRow untouched; `npm run type-check` clean; app suite 3050 pass at the
+2-file baseline; 390/390 phase tests). NOT deploy-gated (client-only). Resume: `/gsd-verify-work 53`.
+
+- [ ] **53.1 (R117) — Hand split + present.** In the song lyric editor, split an 8-line chorus into two
+      4-line slides using the click-between-lines divider. Save, then present the service. Expect the
+      chorus to show as two slides.
+- [ ] **53.2 (R118) — Duplicate a split as one unit.** Duplicate that split chorus. Present. Expect
+      BOTH occurrences to each show both slides.
+- [ ] **53.3 (R120) — Position numbering.** In a song pasted with "Verse 1" and "Verse 2", click the
+      Verse add button. Expect the new section to read "Verse 3" (and a repeated section to share its
+      origin's number; a split section's slides keep the one number).
+- [ ] **53.4 (R121) — First-paste "Save".** On a brand-new song with no lyrics yet, open paste-lyrics.
+      Expect the commit button to read "Save" (not "Replace lyrics").
+
+After confirming, run `/gsd-verify-work 53`.
+
+---
+
+## Phase 54 — Service Item Enhancements (v1.6) — DEFERRED 2026-08-11
+
+**Status:** verification_deferred_human. 9/9 must-haves verified in code + automated (all source present;
+guards intact — emptied notes stripped to no raw undefined, MISC existing blank + hand-added slides
+survive, switch exhaustive; `npm run type-check` clean; app suite 3059 pass at the 2-file baseline).
+NOT deploy-gated (client-only). Resume: `/gsd-verify-work 54`.
+
+- [ ] **54.1 (R122) — Responsive notes layout.** On the service edit screen, confirm the notes field
+      sits beside each item's selector on desktop and stacks below it on a phone-width viewport, and
+      that the layout is consistent across item kinds (song, scripture, message, etc.).
+- [ ] **54.2 (R123) — MISC starts with no slides, add still works.** Add a Miscellaneous item; open the
+      Slides tab; confirm it has no slides. Add a slide to it; confirm the slide appears and persists.
+
+After confirming, run `/gsd-verify-work 54`.
+
+---
+
+## Phase 55 — Preview & Export Polish (v1.6)
+
+**Status:** verification_deferred_human. 8/8 must-haves verified in code + automated (R124 render-only
+removal with `scripture.ts` untouched / R092 provenance preserved; R125 spinner on existing `isExporting`;
+R126 Roboto registry+loader, Inter+four unchanged). `npm run type-check` clean; app suite 3063 pass at
+the 2-file baseline. NOT deploy-gated (client-side + one build dependency). Resume: `/gsd-verify-work 55`.
+
+### Plan 55-01 — No auto-appended Bible version (manual, R124)
+
+Deferred under the v1.6 standing autonomy grant — jsdom cannot exercise real projection.
+
+- [ ] **55.R124 — No auto version when presenting; manual add works.** Present a service with a
+      scripture slide; confirm NO `(ESV)`/`(NLT)` suffix is auto-shown. Type "(ESV)" into the slide's
+      own text and confirm it displays (manual addition still possible).
+
+### Plan 55-02 — Planning Center export spinner (manual, R125)
+
+- [ ] **55.R125 — Export spinner.** Trigger a real Planning Center export; confirm the Confirm Export
+      button shows a spinner and is disabled until the export completes.
+
+### Plan 55-03 Task 1 — package-legitimacy checkpoint for `@fontsource/roboto@^5.3.0` (DEFERRED)
+
+**Status: DEFERRED under the STATE.md v1.6 standing autonomy grant — NOT self-approved as passed.**
+`gsd-tools query package-legitimacy check` flags `@fontsource/roboto` `SUS` with reason `too-new`.
+This is the identical structural false positive already dispositioned for Phase 46's five
+`@fontsource/*` packages: the entire multi-hundred-package `@fontsource` catalog re-publishes in
+lockstep on every upstream Google Fonts refresh, so `publishedAt` always looks new. 55-RESEARCH.md
+§ "Package Legitimacy Audit" performed direct verification this session: OFL-1.1 license (verbatim
+SIL Open Font License 1.1 text in the in-tarball `LICENSE`; `npm view @fontsource/roboto license`
+→ `OFL-1.1` for 5.3.0 — early 5.x reported `Apache-2.0`, relicensed at 5.2.0 following Google's
+upstream OFL relicense), full 100–900 static weight ramp (incl. 600.css) present in the tarball,
+`postinstall` null, ~1.26M weekly downloads, canonical repo `github.com/fontsource/font-files`.
+Pinned `^5.3.0`, consistent with the five existing `@fontsource/*@^5.3.0` deps. Execution proceeded
+to Task 2 (install + registry + loader) on this basis, per the plan's own pre-resolution
+instructions and the Phase 46 precedent.
+
+- [ ] **Owner confirms `@fontsource/roboto` on npmjs.com** — fontsource-published, links to
+      `github.com/fontsource/font-files`, version `5.3.0`, license `OFL-1.1`, no install scripts.
+      Spot-check: `npm view @fontsource/roboto version` → `5.3.0`; `npm view @fontsource/roboto
+      license` → `OFL-1.1`.
+- [ ] Confirm the `5.3.0` pin landed cleanly in `package-lock.json` with integrity hashes present
+      (already true as of this plan's commit; owner re-confirmation is the outstanding item).
+
+### Plan 55-03 — Roboto slide font (manual/visual sign-off, R126)
+
+Deferred under the v1.6 standing autonomy grant — jsdom cannot render a real font or judge
+projection legibility.
+
+- [ ] **Roboto selectable and renders (R126).** In Settings → Slide Typography, pick Roboto; confirm
+      slides render in Roboto and Inter (still first/default) plus the other four families remain
+      available and unchanged.
+
+After confirming, run `/gsd-verify-work 55`.
+
+---
+
+## Quick task 260811-vsr — Service Order editor UI pass (deferred owner visual/mobile check)
+
+Deferred under the v1.6 standing autonomy grant. Automated gates (type-check + app suite at the
+2-file known baseline) are green; the following are visual/feel judgments jsdom cannot make. Do NOT
+self-approve.
+
+- [ ] **Three-rail row layout reads clean on desktop.** Open a service with mixed item kinds (Song,
+      Scripture, Prayer, Message, Announcements, Misc, Hymn). Confirm each row shows: drag handle ·
+      colored per-kind badge (w-32 rail) · stacked field column (selector/content above a full-width
+      notes field) · right-aligned ⋯ menu, and the list column is capped (not edge-to-edge on a wide
+      screen). Badge tints per DESIGN-SPEC (Song indigo, Scripture cyan, Message/Announcements rose,
+      Prayer/Misc gray, Hymn amber, Imported gray).
+- [ ] **Mobile single-stack (≤ sm / ~390px).** Narrow the viewport; confirm each row collapses to a
+      vertical stack with no horizontal scrolling and tap targets ≥ ~34px.
+- [ ] **Consolidated field feels right.** Prayer/Misc/Announcements/Message each show exactly ONE
+      free-text field with a sensible per-kind placeholder; a legacy `body`-only item still shows its
+      text; editing persists and re-exports/prints via `notes ?? body`.
+- [ ] **⋯ menu.** Move-to-section reassigns the slot; Delete opens the confirm dialog; menu closes on
+      outside-click and selection; it is absent for viewers/locked services.
+- [ ] **No-Section band.** An un-sectioned item shows a muted/dashed "No Section" band, clearly
+      distinct from Post-Service; absent when every item is sectioned.
+
+After confirming, run `/gsd-verify-work` for this quick task (or record acceptance in the quick-tasks table).
+
+---
+
+## Phase 56 — Service-Item Overrides (v1.6) — DEFERRED owner visual check
+
+**Deferred under the v1.6 standing grant (autonomous execution, defer human verification).** All
+automated gates for phase 56 are green: `npm run type-check` clean, and the full app suite
+(`npx vitest run --dir src --exclude '**/rules.test.ts'`) is at the exact 2-file known-failing
+baseline (`src/storage.rules.test.ts`, `src/views/__tests__/RosterView.test.ts`) with no other
+regression. The items below are visual/feel judgments jsdom cannot make. **Do NOT self-approve.**
+
+### R127 — MISC editable label
+
+- [ ] **Live editor MISC label input fits the three-rail row.** Add a Miscellaneous item in a service.
+      Confirm a compact label input (placeholder "Miscellaneous") sits ABOVE the shared notes/details
+      field in the field column, does not overflow or crowd the w-32 badge rail, and the per-kind badge
+      still reads "Miscellaneous" (the TYPE), distinct from the custom name.
+- [ ] **Label round-trips + exports.** Type "Communion"; confirm it persists (reload), prints in place
+      of "Miscellaneous", and exports to Planning Center as the item title "Communion". Clear it;
+      confirm the item reverts to "Miscellaneous" everywhere.
+- [ ] **Template editor parity.** In Settings → Edit Default Template, a MISC entry shows a label input;
+      the entry's displayed name reflects the label when set; a saved template MISC label flows into a
+      newly-created service's MISC item.
+- [ ] **Mobile (≤ sm / ~390px).** The label input stacks cleanly with no horizontal scroll.
+
+### R128 — Scripture per-item Bible-version override
+
+- [ ] **Version selector fits the Scripture row.** Add/open a Scripture item as an editor. Confirm a
+      compact version selector shows three states: "Default (<org default ESV/NLT>)", "ESV", "NLT",
+      placed sensibly near the reference input without breaking the three-rail layout.
+- [ ] **Override governs fetched text.** With the org default at ESV, set a Scripture item to NLT;
+      confirm the in-editor reference preview fetches NLT text, and a congregational split for that item
+      fetches + stamps NLT. Choosing "Default" clears the override (fetches revert to the org default).
+- [ ] **PC export routing.** Export a plan where one Scripture item overrides to NLT while the org
+      default is ESV; confirm that item's passage text in Planning Center is NLT and the others are ESV.
+      The item title is unchanged (version-agnostic).
+- [ ] **Reference-only surfaces unaffected (by design).** Confirm the projected slide / preview / print
+      for a scripture item render only the typed reference (e.g. "Romans 8:28") regardless of the
+      override — these are documented no-ops, not a defect.
+- [ ] **Viewer/locked.** Neither the label input (R127) nor the version selector (R128) renders for a
+      viewer or a locked (planned/exported) service.
+
+After confirming, run `/gsd-verify-work` for phase 56 (or record acceptance in the phase verification record).
+
+---
+
+## Phase 57 — Template-Editor UX Parity (v1.6) — DEFERRED owner visual/feel + mobile check
+
+**Deferred under the v1.6 standing grant (autonomous execution, defer human verification).** All
+automated gates for phase 57 are green: `npm run type-check` clean (vue-tsc --build), and the full app
+suite (`npx vitest run --dir src --exclude '**/rules.test.ts'`) is at the exact 2-file known-failing
+baseline (`src/storage.rules.test.ts`, `src/views/__tests__/RosterView.test.ts`) with no other
+regression. ServiceEditorView badge tests stayed green (279/279) after the shared-helper extraction;
+ServiceTemplateEditor is at 37/37. The items below are visual/feel judgments jsdom cannot make.
+**Do NOT self-approve.**
+
+### R129 — Edit Default Template three-rail parity
+
+- [ ] **Three-rail rows.** Open Settings → Edit Default Template. Confirm each row reads as drag handle ·
+      colored per-kind badge · stacked field column · per-row ⋯ menu, matching the live Service Order
+      editor's look. The per-kind badge tint is identical to the service editor (SONG indigo, SCRIPTURE
+      cyan, ANNOUNCEMENTS/MESSAGE rose, PRAYER/MISC gray, etc.).
+- [ ] **⋯ menu owns move + delete.** Open a row's ⋯ menu: "Move to section" reassigns the entry into
+      that section's group (or to No Section); "Delete" removes the row immediately (no confirm). The
+      inline section dropdown and the inline ✕ are gone. Menu closes on selection and on outside-click;
+      opening a second row's menu closes the first.
+- [ ] **No-Section band.** An un-sectioned (ungrouped) entry shows a muted/dashed "No Section" band,
+      distinct from the real section headers; the band is absent when every entry is sectioned, and it
+      carries no item count or add control.
+- [ ] **Preserved features.** SortableJS per-section reorder (incl. cross-section drag) still works; the
+      add-item palette, Suggested Template reset, MISC label input (R127), MISC/ANNOUNCEMENTS body
+      textarea (R116), and Save Template all behave as before. Save stays disabled for non-editors.
+- [ ] **Mobile (≤ sm / ~390px).** In the 480px drawer at narrow width, each row stacks cleanly (badge
+      above the field column), the ⋯ menu remains reachable, and there is no horizontal overflow.
+
+After confirming, run `/gsd-verify-work` for phase 57 (or record acceptance in the phase verification record).
+
+## Post-56/57 owner follow-up tweaks (2026-08-12) — ✅ OWNER-ACCEPTED 2026-08-12
+
+> **✅ Owner confirmed 2026-08-12** ("confirmed") — the full batch below is accepted, including the
+> deployed delete-rule fix verified working in production. The checkboxes are retained as the record
+> of what was accepted.
+
+A batch of owner-requested refinements landed after Phases 56–57. All are committed, type-check
+clean, and green at the 2-file test baseline. This is the visual/behavioural check list. (Some items
+supersede earlier Phase 56/57 notes — e.g. the template body textareas below are now REMOVED.)
+
+### Service-plan item delete — the recurring `PERMISSION_DENIED` (rule fix, DEPLOYED)
+- [x] **Rule fix deployed 2026-08-12** (`firebase deploy --only firestore:rules`, owner). Root cause
+      (`03b96bc`): deleting a slot whose slideGroup was **never materialized** made `resource` null,
+      so the delete rule dereferenced null → denied. Fix adds `resource == null` as the first guard,
+      still org-scoped. Emulator suite 149/149.
+- [ ] **Verify in the deployed app:** add an item that never gets slides (e.g. a fresh Prayer/MISC),
+      delete it, and confirm it disappears with no `PERMISSION_DENIED` in the console; also delete a
+      normal item with slides. Both should just work.
+
+### Miscellaneous label — inline-editable badge
+- [ ] In the **service editor** AND the **Edit Default Template**, a MISC item's pill shows a pencil;
+      clicking it turns the pill into an input. Rename it (e.g. "Communion"), blur/Enter saves; Esc
+      cancels; clearing it returns to "Miscellaneous". No separate label input remains.
+- [ ] A renamed MISC item shows that label consistently on: the **Slides tab** (plan rail + group
+      title), the **service listing** card, the **share link** view, the **Planning Center export**
+      item title, and **print**.
+
+### Template editor — recurring-body textareas removed
+- [ ] The Edit Default Template shows **no body textarea** for MISC or ANNOUNCEMENTS — a template item
+      is just its kind (+ the editable MISC label). Existing template items still load; Save works.
+
+### Scripture per-item version override
+- [ ] The **version selector sits on the scripture reference-input line, under the Search button**
+      (not floating below the whole block).
+- [ ] Switching a Scripture item's version (ESV↔NLT) updates its **"View on ESV.org / BibleGateway"
+      reader link** live, and the **Preview passage** panel clears so a re-preview fetches the chosen
+      version. PC export of that item still uses the override.
+
+### ⋯ row menu near the bottom of the screen
+- [ ] Open the ⋯ menu on the **last row** of a long service plan (and of the template editor). The
+      menu **opens upward** and stays fully on screen — no page scroll needed to see Delete.
+
+### Services page + delete feedback
+- [ ] The Services-page button reads **"Service Template"** with the cog icon, styled like the other
+      secondary buttons (Regenerate / Finalize & Share).
+- [ ] Deleting a service item shows a **spinner + "Removing…"** on the Remove button during the (brief)
+      delay, and the button is disabled until it completes — it no longer looks frozen.
+
+After confirming, fold acceptance into the 56/57 verification records (or note it here) and proceed to
+the milestone lifecycle when 51–57 are all accepted.

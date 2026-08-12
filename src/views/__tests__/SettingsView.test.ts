@@ -9,20 +9,16 @@
  * file with real assertions instead of first having to invent the mock shape.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mount, flushPromises, DOMWrapper, enableAutoUnmount } from '@vue/test-utils'
+import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils'
 import SettingsView from '../SettingsView.vue'
 import type { ServiceTemplateEntry } from '@/types/organization'
 
-// 44-02: ServiceTemplateEditor.vue's own panel markup lives inside a
-// `<Teleport to="body">` (EditSlideDrawer.vue's structural precedent), so
-// once the Services card opens it, its content is NOT inside `wrapper`'s own
-// vnode tree — read it through `document.body` instead, mirroring
-// EditSlideDrawer.test.ts's own `body()` helper. Auto-unmount keeps a test's
-// teleported panel from leaking into the next test's `document.body`.
+// Auto-unmount keeps a test's teleported content (e.g. a child that Teleports
+// to `<body>`) from leaking into the next test's `document.body`. The Services
+// default-template card that used a `body()` DOMWrapper helper here was
+// relocated to the Services page in 52-03 (R113); its teleport-reading coverage
+// now lives in ServicesView.test.ts.
 enableAutoUnmount(afterEach)
-function body(): DOMWrapper<HTMLElement> {
-  return new DOMWrapper(document.body)
-}
 
 // ── firebase/firestore mock (copied verbatim in shape from
 //    src/stores/__tests__/auth.test.ts:31-49). `mockUpdateDoc`/`mockGetDoc` are
@@ -436,7 +432,12 @@ describe('SettingsView Planning Center credential retention (R089) — Wave 2 (3
   })
 })
 
-describe('SettingsView Services card (R086) — Wave 2 (44-02)', () => {
+// R113 (52-03): the Services default-template card was RELOCATED off Settings
+// to an editor-gated cog on the Services page. Its open/gate/open-close coverage
+// now lives in src/views/__tests__/ServicesView.test.ts. What remains here is a
+// single negative assertion proving the card is gone from Settings — the
+// relocation, not a dropped test.
+describe('SettingsView — no Services template card (R113)', () => {
   beforeEach(() => {
     mockOrgId = 'org-1'
     mockOrgName = 'Test Church'
@@ -457,65 +458,10 @@ describe('SettingsView Services card (R086) — Wave 2 (44-02)', () => {
     mockSetPcCredentials.mockClear()
   })
 
-  it('renders the Services heading and card', () => {
+  it('no longer renders the template-editor button or the template summary', () => {
     const wrapper = mountSettingsView()
-    expect(wrapper.text()).toContain('Services')
-    expect(wrapper.find('[data-testid="open-template-editor"]').exists()).toBe(true)
-  })
-
-  it('shows the exact empty-template copy when no template is configured', () => {
-    mockDefaultServiceTemplate = []
-    const wrapper = mountSettingsView()
-    expect(wrapper.get('[data-testid="template-summary"]').text()).toBe(
-      'No default template set — new services start empty until you add items here.',
-    )
-  })
-
-  it('shows "{N} items across {M} sections" for a configured template', () => {
-    mockDefaultServiceTemplate = [
-      { id: 's1', kind: 'SONG', section: 'worship' },
-      { id: 's2', kind: 'SCRIPTURE', section: 'worship' },
-      { id: 's3', kind: 'MESSAGE', section: 'message' },
-    ]
-    const wrapper = mountSettingsView()
-    expect(wrapper.get('[data-testid="template-summary"]').text()).toBe('3 items across 2 sections')
-  })
-
-  it('does not count section-less entries toward the section total', () => {
-    mockDefaultServiceTemplate = [
-      { id: 's1', kind: 'SONG' },
-      { id: 's2', kind: 'PRAYER', section: 'sending' },
-    ]
-    const wrapper = mountSettingsView()
-    expect(wrapper.get('[data-testid="template-summary"]').text()).toBe('2 items across 1 section')
-  })
-
-  it('clicking "Edit Default Template" opens the ServiceTemplateEditor slide-out', async () => {
-    const wrapper = mountSettingsView()
-    expect(body().find('[data-testid="service-template-editor"]').exists()).toBe(false)
-
-    await wrapper.get('[data-testid="open-template-editor"]').trigger('click')
-    await flushPromises()
-
-    expect(body().find('[data-testid="service-template-editor"]').exists()).toBe(true)
-  })
-
-  it('closing the editor closes the slide-out', async () => {
-    const wrapper = mountSettingsView()
-    await wrapper.get('[data-testid="open-template-editor"]').trigger('click')
-    await flushPromises()
-    expect(body().find('[data-testid="service-template-editor"]').exists()).toBe(true)
-
-    await body().get('[data-testid="service-template-editor-close"]').trigger('click')
-    await flushPromises()
-
-    expect(body().find('[data-testid="service-template-editor"]').exists()).toBe(false)
-  })
-
-  it('disables the "Edit Default Template" button for a non-editor (viewer)', () => {
-    mockIsEditor = false
-    const wrapper = mountSettingsView()
-    expect(wrapper.get('[data-testid="open-template-editor"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('[data-testid="open-template-editor"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="template-summary"]').exists()).toBe(false)
   })
 })
 

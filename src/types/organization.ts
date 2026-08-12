@@ -2,17 +2,29 @@ import type { SlotKind, ServiceSection } from '@/types/service'
 
 /**
  * A single entry in a church's default service template (R086/R087). Carries
- * ONLY the item's type and its section — never chosen content (no `songId`,
- * scripture reference, or body text) and never a computed Vertical Worship
- * type. VW typing is derived fresh at service-creation time by
- * `buildSlotsFromTemplate` (`src/utils/slotTypes.ts`) and is never stored
- * here. Array order in `OrgSettings.defaultServiceTemplate` IS the
- * creation/display order — there is no `position` field (Assumption A3).
+ * the item's type, its section, and — for body-bearing kinds (MISC and the
+ * other NonAssignable kinds the live editor treats the same way) — an optional
+ * recurring `body` text (R116, e.g. "canned music", "more announcement
+ * slides"). It never carries chosen content (no `songId` or scripture
+ * reference) and never a computed Vertical Worship type. VW typing is derived
+ * fresh at service-creation time by `buildSlotsFromTemplate`
+ * (`src/utils/slotTypes.ts`) and is never stored here. Array order in
+ * `OrgSettings.defaultServiceTemplate` IS the creation/display order — there
+ * is no `position` field (Assumption A3).
  */
 export interface ServiceTemplateEntry {
   id: string
   kind: SlotKind
   section?: ServiceSection
+  /** Optional recurring body text for a body-bearing MISC entry (R116),
+   *  threaded through `buildSlotsFromTemplate` → `createSlot` into the created
+   *  slot's `NonAssignableSlot.body`. Absent for entries with no default body. */
+  body?: string
+  /** Optional recurring custom label for a MISC entry (R127, Phase 56),
+   *  threaded through `buildSlotsFromTemplate` → `createSlot` into the created
+   *  slot's `NonAssignableSlot.label` so a template's MISC name flows into every
+   *  new service. Absent for entries with no custom label. */
+  label?: string
 }
 
 /**
@@ -58,12 +70,16 @@ export interface OrgSettings {
    */
   vwModeEnabled: boolean
   /**
-   * Church-defined default set/order of items for a new blank service
-   * (R086/R087). Entries carry ONLY `{ id, kind, section }` — never chosen
-   * content and never a computed VW type, which is derived fresh at
-   * service-creation time. An empty array is a valid, deliberate default:
-   * per the owner's 2026-08-07 override, an empty/unset template produces
-   * an EMPTY new service, NOT `buildSlots()`'s 1-2-3 shape.
+   * Church-defined default set/order of items for a new service (R086/R087).
+   * Entries carry `{ id, kind, section, body? }` — never a chosen song/scripture
+   * and never a computed VW type, which is derived fresh at service-creation
+   * time; `body?` carries recurring MISC text for body-bearing kinds (R116).
+   * An empty/unset array does NOT produce an empty service: per R115 (which
+   * supersedes the owner's 2026-08-07 EMPTY override), `createService` seeds a
+   * new service from the Suggested Template (`buildSuggestedTemplateEntries()`,
+   * the 1-2-2-3-derived preset) when this array is empty. The fallback is
+   * resolved at the `createService` call site — `buildSlotsFromTemplate` stays
+   * pure (`[]` → `[]`).
    */
   defaultServiceTemplate: ServiceTemplateEntry[]
   /**

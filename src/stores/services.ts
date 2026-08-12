@@ -25,7 +25,8 @@ import { useQuartersStore } from '@/stores/quarters'
 import { useAuthStore } from '@/stores/auth'
 import { deriveSlug, claimSlug } from '@/utils/slug'
 import { resolveServiceRoleAssignments } from '@/utils/serviceRoles'
-import { buildSlotsFromTemplate } from '@/utils/slotTypes'
+import { buildSlotsFromTemplate, buildSuggestedTemplateEntries, orderSlotsBySection } from '@/utils/slotTypes'
+import { stripUndefined } from '@/utils/stripUndefined'
 import { mintShareToken, pickAdoptableToken, type ShareTokenCandidate } from '@/utils/shareTokens'
 import type { Service, ServiceStatus, Progression, ScriptureRef, ServiceSlot } from '@/types/service'
 import type { SongSlot } from '@/types/service'
@@ -101,9 +102,17 @@ export interface ServiceSnapshot {
  * inline code did before extraction.
  */
 export function buildServiceSnapshot(service: Service): ServiceSnapshot {
+  // R112 — serialize slots in the editor's section-major ordering contract, not
+  // the raw persisted array, so the public share link agrees with the editor
+  // (and the listing card) even for a service never normalized by a save. This
+  // reorders WHAT is serialized only; it does NOT change WHEN/WHETHER the
+  // snapshot is written, so the Phase 41 maybeRefreshShareLink/ensureShareLink
+  // cadence is untouched. orderSlotsBySection is identity-preserving.
+  const orderedSlots = orderSlotsBySection(service.slots)
+
   // Resolve BPM for each song slot from song store
   const songStore = useSongStore()
-  const slotsWithBpm = service.slots.map((slot) => {
+  const slotsWithBpm = orderedSlots.map((slot) => {
     if (slot.kind === 'SONG' && (slot as SongSlot).songId) {
       const songSlot = slot as SongSlot
       const song = songStore.songs.find((s) => s.id === songSlot.songId)
@@ -223,14 +232,20 @@ export const useServiceStore = defineStore('services', () => {
 
   async function createService(data: CreateServiceInput): Promise<string> {
     if (!orgId.value) throw new Error('No orgId set — call subscribe() first')
-    // 44-01/R087: slots come from the church's default service template —
-    // or an EMPTY service when the template is unset (owner override
-    // 2026-08-07). buildSlots() is NEVER reinstated as a fallback here; it
-    // remains available only as the template editor's "Reset to 1-2-3
-    // default" preset source (44-02).
+    // R115 (52-01, supersedes the 2026-08-07 EMPTY override): every new service
+    // starts from a template. When the church has a stored default template we
+    // use it verbatim; when it is empty/unset we seed from the Suggested
+    // Template (`buildSuggestedTemplateEntries()`, the 1-2-2-3-derived preset —
+    // the SAME preset the template editor's "Suggested Template" button uses).
+    // The empty→suggested resolution is the CALLER's decision, made here;
+    // `buildSlotsFromTemplate` stays pure (`[]` → `[]`) and never reinstates a
+    // fallback of its own. VW types are still applied at creation via the
+    // ordinal walk inside `buildSlotsFromTemplate` when `vwModeEnabled`.
     const authStore = useAuthStore()
+    const stored = authStore.settings.defaultServiceTemplate
+    const effectiveTemplate = stored.length > 0 ? stored : buildSuggestedTemplateEntries()
     const slots = buildSlotsFromTemplate(
-      authStore.settings.defaultServiceTemplate,
+      effectiveTemplate,
       authStore.settings.vwModeEnabled,
     )
     const ref = await addDoc(collection(db, 'organizations', orgId.value, 'services'), {
@@ -299,8 +314,15 @@ export const useServiceStore = defineStore('services', () => {
   async function updateService(id: string, data: Record<string, unknown>) {
     if (!orgId.value) return
     assertWritable(id, data)
+    // R111 (51-03): a "No Section" move sets slot.section = undefined, which
+    // rides through onSave into this payload. Firestore rejects raw `undefined`
+    // at any depth ("Unsupported field value: undefined"), so strip the plain
+    // payload here — the single funnel every live-plan write path uses. Add the
+    // serverTimestamp() FieldValue sentinel AFTER stripping (stripUndefined's
+    // contract). assertWritable ran on the ORIGINAL data above, so the lock
+    // contract is unchanged.
     await updateDoc(doc(db, 'organizations', orgId.value, 'services', id), {
-      ...data,
+      ...stripUndefined(data),
       updatedAt: serverTimestamp(),
     })
     // R077 (41-04) — keep a previously-shared service's public payload

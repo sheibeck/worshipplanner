@@ -117,7 +117,7 @@
 
             <template v-if="!row.isRepeat">
               <span :class="isExpanded(row) ? LABEL_CHIP_CLASSES.expanded : LABEL_CHIP_CLASSES.collapsed">
-                {{ row.section.label.toUpperCase() }}
+                {{ row.displayLabel.toUpperCase() }}
                 <span aria-hidden="true">{{ isExpanded(row) ? '⌃' : '⌄' }}</span>
               </span>
               <span
@@ -152,7 +152,7 @@
             <template v-else>
               <span :class="LABEL_CHIP_CLASSES.repeat">
                 <span aria-hidden="true">&#8635;</span>
-                {{ row.section.label.toUpperCase() }}
+                {{ row.displayLabel.toUpperCase() }}
               </span>
               <span
                 data-testid="row-repeat-note"
@@ -190,6 +190,37 @@
               :rows="Math.max(row.section.lines.length, 2)"
               @input="onSectionInput(row.sectionId, ($event.target as HTMLTextAreaElement).value)"
             ></textarea>
+
+            <!-- R117: manual slide-split. The section's `lines` stay the single
+                 canonical text (edited above); a click between two lines toggles
+                 the LINE index in `section.slideBreaks` (additive metadata), so
+                 `sliceSectionIntoSlides` resolves the split live at assembly. A
+                 section with no breaks is one slide, unchanged. Mirrors the
+                 congregational click-between-lines divider — song-local, not a
+                 shared component. -->
+            <div
+              v-if="row.section.lines.length > 1"
+              :data-testid="`row-split-${row.sectionId}`"
+              class="mt-2 rounded-md border border-gray-800 bg-gray-950/40 px-2 py-1.5"
+            >
+              <p class="px-1 pb-1 text-[10px] uppercase tracking-wider text-gray-600">Slide splits &mdash; click between lines to start a new slide</p>
+              <template v-for="(line, li) in row.section.lines" :key="li">
+                <div class="px-1 py-0.5 font-mono text-[12px] leading-relaxed text-gray-300">{{ line || ' ' }}</div>
+                <button
+                  v-if="li < row.section.lines.length - 1"
+                  type="button"
+                  :data-testid="`row-split-divider-${row.sectionId}-${li + 1}`"
+                  :data-active="isSlideBreak(row.section, li + 1) ? 'true' : 'false'"
+                  :aria-pressed="isSlideBreak(row.section, li + 1) ? 'true' : 'false'"
+                  class="group flex w-full items-center gap-2 py-0.5"
+                  @click="toggleSlideBreak(row.sectionId, li + 1)"
+                >
+                  <span :class="isSlideBreak(row.section, li + 1) ? SPLIT_DIVIDER_CLASSES.active : SPLIT_DIVIDER_CLASSES.inactive"></span>
+                  <span :class="isSlideBreak(row.section, li + 1) ? SPLIT_LABEL_CLASSES.active : SPLIT_LABEL_CLASSES.inactive">{{ isSlideBreak(row.section, li + 1) ? 'slide break' : 'split here' }}</span>
+                  <span :class="isSlideBreak(row.section, li + 1) ? SPLIT_DIVIDER_CLASSES.active : SPLIT_DIVIDER_CLASSES.inactive"></span>
+                </button>
+              </template>
+            </div>
           </div>
           <div v-else-if="isExpanded(row) && row.isRepeat" class="space-y-1.5 px-3 pb-3">
             <div
@@ -397,6 +428,14 @@ const isDirty = computed(() => {
     for (let j = 0; j < a.lines.length; j++) {
       if (a.lines[j] !== b.lines[j]) return true
     }
+    // R117: slideBreaks are part of the persisted section, so a divider-only
+    // click (no text change) must register as dirty or the autosave skips it.
+    const aBreaks = a.slideBreaks ?? []
+    const bBreaks = b.slideBreaks ?? []
+    if (aBreaks.length !== bBreaks.length) return true
+    for (let j = 0; j < aBreaks.length; j++) {
+      if (aBreaks[j] !== bBreaks[j]) return true
+    }
   }
 
   return false
@@ -495,6 +534,48 @@ function onSectionInput(sectionId: string, value: string) {
   const lines = value.split('\n')
   if (lines.length > 1 && lines[lines.length - 1] === '') lines.pop()
   section.lines = lines
+  pruneSlideBreaks(section)
+}
+
+// R117: the write-source complement to `sliceSectionIntoSlides`'s read-time
+// clamp (Pitfall 5). After the line list shrinks, a break index that now falls
+// out of `[1, lines.length)` can never point past the text or slice into
+// emptiness — drop it here so it is never persisted. An empty result removes
+// the field entirely, keeping an unsplit section byte-identical to today (BWC).
+function pruneSlideBreaks(section: LyricSection) {
+  if (!section.slideBreaks) return
+  const n = section.lines.length
+  const pruned = section.slideBreaks.filter((k) => Number.isInteger(k) && k >= 1 && k < n)
+  if (pruned.length === 0) {
+    delete section.slideBreaks
+  } else if (pruned.length !== section.slideBreaks.length) {
+    section.slideBreaks = pruned
+  }
+}
+
+function isSlideBreak(section: LyricSection, k: number): boolean {
+  return (section.slideBreaks ?? []).includes(k)
+}
+
+// R117: toggle the LINE index `k` (a break before `lines[k]`) in the section's
+// `slideBreaks`, kept sorted and de-duped. Writing through `editableState` lets
+// the existing single-write autosave (`doAutoSave`) persist it alongside
+// `performanceOrder`. Removing the last break deletes the field so an unsplit
+// section persists nothing new (BWC).
+function toggleSlideBreak(sectionId: string, k: number) {
+  const section = editableState.sections.find((s) => s.id === sectionId)
+  if (!section) return
+  const current = section.slideBreaks ?? []
+  if (current.includes(k)) {
+    const next = current.filter((b) => b !== k)
+    if (next.length === 0) {
+      delete section.slideBreaks
+    } else {
+      section.slideBreaks = next
+    }
+    return
+  }
+  section.slideBreaks = [...new Set([...current, k])].sort((a, b) => a - b)
 }
 
 /**
@@ -696,6 +777,18 @@ const LABEL_CHIP_CLASSES = {
   collapsed: 'inline-flex shrink-0 items-center gap-1 rounded-md border border-indigo-800/60 bg-indigo-950/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-indigo-300',
   expanded: 'inline-flex shrink-0 items-center gap-1 rounded-md border border-indigo-500/60 bg-indigo-900/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-indigo-200',
   repeat: 'inline-flex shrink-0 items-center gap-1 rounded-md border border-gray-700 bg-gray-800/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400',
+} as const
+
+// R117 split-divider styling — static, fully-spelled-out class maps (Tailwind
+// v4 purges dynamically built names — see ROW_CARD_CLASSES rationale above).
+const SPLIT_DIVIDER_CLASSES = {
+  active: 'h-px flex-1 bg-indigo-500/70',
+  inactive: 'h-px flex-1 bg-gray-800 group-hover:bg-indigo-700/50',
+} as const
+
+const SPLIT_LABEL_CLASSES = {
+  active: 'shrink-0 rounded-full border border-indigo-500/60 bg-indigo-900/40 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-indigo-200',
+  inactive: 'shrink-0 rounded-full border border-gray-700 bg-gray-800/60 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wider text-gray-500 opacity-70 transition-opacity group-hover:opacity-100',
 } as const
 
 function rowCardClass(row: SectionRow): string {

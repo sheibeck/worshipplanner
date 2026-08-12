@@ -77,6 +77,59 @@ const mockService: Service = {
   updatedAt: mockTimestamp,
 }
 
+// R112 fixture: a service whose `slots` array is DELIBERATELY NOT section-major.
+// A sending-section song appears EARLY (index 1, before the MESSAGE) and an
+// empty-bodied worship MISC appears LATE (index 3, after the MESSAGE). The
+// editor renders section-major order, so the listing must too: the empty MISC
+// belongs in the worship band (before the "--- Message ---" divider), NOT sunk
+// to the bottom, and the sending song belongs after the divider.
+const mockServiceUnordered: Service = {
+  id: 'svc-order',
+  date: '2026-03-08',
+  name: '',
+  progression: '1-2-2-3',
+  teams: [],
+  status: 'draft',
+  slots: [
+    {
+      kind: 'SONG',
+      id: 'u-song-worship',
+      position: 0,
+      requiredVwType: 1,
+      songId: 'song-1',
+      songTitle: 'Amazing Grace',
+      songKey: 'G',
+      section: 'worship',
+    },
+    {
+      kind: 'SONG',
+      id: 'u-song-sending',
+      position: 1,
+      requiredVwType: 3,
+      songId: 'song-2',
+      songTitle: 'Doxology',
+      songKey: 'C',
+      section: 'sending',
+    },
+    { kind: 'MESSAGE', id: 'u-message', position: 2, section: 'message' },
+    { kind: 'MISC', id: 'u-misc-worship', position: 3, section: 'worship' },
+    {
+      kind: 'SONG',
+      id: 'u-song-worship-2',
+      position: 4,
+      requiredVwType: 2,
+      songId: 'song-3',
+      songTitle: 'Holy Holy Holy',
+      songKey: 'E',
+      section: 'worship',
+    },
+  ],
+  sermonPassage: null,
+  notes: '',
+  createdAt: mockTimestamp,
+  updatedAt: mockTimestamp,
+}
+
 const globalStubs = {
   'router-link': {
     template: '<a :href="to"><slot /></a>',
@@ -155,5 +208,28 @@ describe('ServiceCard', () => {
     // Footer does not shrink
     const footer = wrapper.find('[title="Share"]').element.closest('div')!
     expect(footer.className).toContain('shrink-0')
+  })
+
+  // R112 — the listing must render slots in the editor's section-major order,
+  // including empty-bodied items, with no edit and no refresh. On the pre-fix
+  // code the listing renders the RAW persisted array order, so the empty
+  // worship MISC sinks below the "--- Message ---" divider (RED).
+  it('renders slots in section-major order including an empty-bodied item (R112)', () => {
+    const wrapper = mount(ServiceCard, {
+      props: { service: mockServiceUnordered },
+      global: { stubs: globalStubs },
+    })
+    const text = wrapper.text()
+    const miscIdx = text.indexOf('Miscellaneous')
+    const dividerIdx = text.indexOf('--- Message ---')
+    const doxologyIdx = text.indexOf('Doxology')
+
+    // The empty worship MISC is rendered at all...
+    expect(miscIdx).toBeGreaterThan(-1)
+    // ...and sits in its worship band, BEFORE the message divider — not sunk
+    // to the bottom until text is typed.
+    expect(miscIdx).toBeLessThan(dividerIdx)
+    // The sending-section song renders AFTER the message divider.
+    expect(doxologyIdx).toBeGreaterThan(dividerIdx)
   })
 })

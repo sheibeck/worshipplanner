@@ -146,6 +146,21 @@ export interface GroupSlideEntry {
  * module's doc comment). `derivedIdentityKey`'s existing
  * `imported:{importId}:{innerSlideId}` scheme needs no widening for this —
  * a synthetic id is just another string value for that key to carry.
+ *
+ * R108 (Phase 50, part 1 of 2): the `imported` member also carries an optional
+ * `renderedPage` — the render-stable 1-based page this entry maps to, recorded
+ * at add-time (`SlideGrid.vue::onImportConfirmed`) from the deck slide's own
+ * `sourcePage` (`src/types/slide.ts`). It supersedes the interim positional
+ * resolver (`src/utils/importedRenderReconciler.ts`, commit ec217aa) that
+ * fails whenever parsed-slide count != rendered-page count (a multi-image
+ * deck). A legacy imported entry (added before this phase) omits
+ * `renderedPage` and falls back to that positional resolution — plan 50-05
+ * is what actually consumes this field to resolve a slide.
+ *
+ * `renderedPage` deliberately does NOT participate in `derivedIdentityKey` —
+ * it is provenance (which page this entry renders as), not identity (which
+ * canonical thing this entry points at). Keying on it would break the
+ * existing carry/survival matching this field has no bearing on.
  */
 export type SourceRef =
   | { kind: 'lyric'; songId: string; sectionId: string }
@@ -166,7 +181,7 @@ export type SourceRef =
        */
       translationSource?: 'ESV' | 'NLT'
     }
-  | { kind: 'imported'; importId: string; innerSlideId: string }
+  | { kind: 'imported'; importId: string; innerSlideId: string; renderedPage?: number }
   | { kind: 'text'; title?: string; body?: string }
   | { kind: 'video'; videoSrc: string; originalFileName?: string }
 

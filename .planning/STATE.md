@@ -1,23 +1,74 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.5
-milestone_name: Settings, Sharing, and Fidelity
-current_phase: 48
-current_phase_name: Multi-Image Ordering & Mobile Polish
-status: executing
-stopped_at: All 11 v1.5 phases code-complete & code-verified. Phase 48 done (13/13). STOPPED at the milestone lifecycle gate — NOT archived, because 7 phases (39,43,44,45,46,47,48) are verification_deferred_human and archiving would bless deferred checks as passed (grant violation + v1.4 precedent). Awaiting owner verification.
-last_updated: "2026-08-10T01:06:03.545Z"
-last_activity: 2026-08-08
-last_activity_desc: Phase 48 execution started
+milestone: v1.6
+milestone_name: Editing Reliability & Song Slides
+status: Awaiting next milestone
+stopped_at: Completed 55-03-PLAN.md (R126 Roboto slide font)
+last_updated: "2026-08-12T16:20:41.175Z"
+last_activity: 2026-08-12
+last_activity_desc: Milestone v1.6 completed and archived
 progress:
-  total_phases: 11
-  completed_phases: 11
-  total_plans: 43
-  completed_plans: 43
+  total_phases: 7
+  completed_phases: 7
+  total_plans: 19
+  completed_plans: 19
   percent: 100
+current_phase: 55
+current_phase_name: preview-export-polish
 ---
 
 # Project State
+
+## ★★ STANDING AUTONOMY GRANT — v1.6, granted 2026-08-11
+
+**This is the ACTIVE grant. It supersedes the v1.5 grant of 2026-08-06 (now historical, preserved
+below).** Re-read this before deciding to stop for a checkpoint — it survives context compaction.
+
+Owner request: run `/gsd-autonomous` for milestone v1.6. Boundaries settled by explicit question and
+answer at launch, 2026-08-11.
+
+### What this authorizes
+
+- **Do not block on human-verify checkpoints.** When a phase's verification is `human_needed`, record
+  each unmet check as DEFERRED in `.planning/PENDING-VERIFICATION.md` and continue to the next phase.
+  Owner's choice: "Defer & keep going."
+
+- Proceed through every v1.6 phase without pausing for approval on ordinary implementation decisions.
+  Owner is **away** — run default smart-discuss, pick the reasonable default for each grey area, state
+  it, and keep moving.
+
+### What this does NOT authorize
+
+- **Never record a deferred check as passed.** Defer and disclose, not self-approve.
+
+- **STOP BEFORE THE MILESTONE LIFECYCLE.** Because human verification is being deferred, do NOT run
+  audit → complete → cleanup at the end — archiving phases whose checks were deferred is self-approval
+  by another name (the documented v1.4/v1.5 lesson; see the ⛔ note further down for v1.4's precedent).
+  When all 5 phases are code-complete, STOP and hand the owner the `/gsd-verify-work` list. The owner
+  runs the lifecycle after verifying.
+
+- **NO DEPLOYS** without an explicit owner ask. v1.6 has no deploy-gated phases (all client-side Vue —
+  drag-and-drop, template UI, song editor, notes field, preview, fonts), so none is expected. If a
+  phase somehow needs one, ship it built/tested/undeployed and hand over the command.
+
+- **No `.env.local` changes** — it holds live secrets and is gitignored.
+
+- **No destructive or irreversible actions** without asking: no `git stash` (multi-worktree repo), no
+  project-wide `lint --fix`, no history rewrites, no bulk deletions of tracked files beyond what a
+  plan explicitly scopes.
+
+- **Stop and ask** only when proceeding under an assumption would be unsafe or would waste the work if
+  the assumption is wrong. Otherwise pick the reasonable default, state it, and continue.
+
+### Where deferred items go
+
+`.planning/PENDING-VERIFICATION.md` — one running list across all v1.6 phases, written as the owner's
+to-do for when they return.
+
+---
+
+<details>
+<summary>Historical — the v1.5 grant of 2026-08-06 (superseded by v1.6 above, kept for provenance)</summary>
 
 ## ★★ STANDING AUTONOMY GRANT — v1.5, granted 2026-08-06
 
@@ -135,12 +186,14 @@ prohibition and its never-self-approve rule are both carried forward above.
 
 </details>
 
+</details>
+
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 48 — Multi-Image Ordering & Mobile Polish
+**Current focus:** Phase 57 — template-editor-ux-parity (last of the 2026-08-12 owner scope addition, 56–57)
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -150,50 +203,81 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-> ## ✅ v1.5 DEPLOYED TO PRODUCTION — 2026-08-10
-> All of v1.5 (Phases 39–49) shipped to production in one release, at the owner's explicit request
-> and authorization (which overrides the standing NO-DEPLOYS grant for this action). Command:
-> `firebase deploy --only hosting,functions,firestore,storage --project worship-planner-bc515` — all
-> targets succeeded (hosting bundle, `syncOrgMembershipClaim` created + all other functions updated,
-> dual-read `storage.rules`, tightened `firestore.rules`, indexes). Live at
-> https://worship-planner-bc515.web.app
->
-> **This also executed Phase 40 Deploy 1** (dual-read rule + claims function together) and the Phase
-> 40.1 firestore.rules tightening. **Still pending (all non-blocking, owner-run):** the backfill (no
-> gcloud ADC on the deploy host — fallback + `refreshOrgClaim` cover it), and Phase 40 **Deploy 2**
-> (remove the storage Firestore fallback) which still requires its 1-hour token soak + the
-> multi-org pre-check — see `PENDING-VERIFICATION.md` § Phase 40. Deploy 1 is safe to leave in place
-> indefinitely. NLT (Phase 45) is no longer deploy-gated — the function is live.
->
-> **Post-deploy smoke check recommended before declaring the milestone shipped:** sign in, confirm a
-> member can still upload (Phase 40.1 observe), an NLT scripture preview loads, and a service exports
-> to Planning Center.
+Phase: Milestone v1.6 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-08-12 — Milestone v1.6 completed and archived
 
-Phase: 48 (Multi-Image Ordering & Mobile Polish) — EXECUTING
-Plan: 3 of 3
-Status: Ready to execute
-client (DEPLOY-GATED, see below). 45-02 added `bibleVersion: 'ESV' | 'NLT'` to `OrgSettings`
-(`DEFAULT_ORG_SETTINGS.bibleVersion: 'NLT'`, owner's locked override) plus the Settings "Bible
-Translation" card. 45-03 added the `translationSource?` field + `scriptureAttribution()`/
-`resolveTranslationSource()` helpers and threaded them through the materializer/assembler. 45-04
-(this plan) wired consumption: `CongregationalEditor.vue`/`ScriptureInput.vue` route ESV/NLT
-fetches by `authStore.settings.bibleVersion`; `CongregationalEditor.vue` stamps
-`translationSource` once at fetch time (never restamped by a later setting change or a
-subsequent AI split — `lastFetchedVersion` threads the captured value into `onAiSplit` too); both
-scripture render sites (`PresentationViewer.vue`, `slideDisplay.ts::slideBodyText()`) append the
-shared `(ESV)`/`(NLT)` suffix via `resolveTranslationSource(slide)`, never the live org setting.
-R090, R091 and R092 are all marked complete in `REQUIREMENTS.md`. `npm run type-check` clean;
-231/231 in the four touched suites; full app suite at the documented 2-file baseline
-(`src/storage.rules.test.ts`, `RosterView.test.ts`), no new failure; `cd functions && npm test`
-112/112. 45-01's NLT Cloud Function remains **DEPLOY-GATED per the standing v1.5 NO-DEPLOYS
-grant** — ships built/tested/UNDEPLOYED; owner handoff (secret + deploy + two new deferred
-human-verify items: the 48px overflow backstop, and the full post-deploy live round trip) recorded
-in `.planning/PENDING-VERIFICATION.md` § Phase 45.
-Next: Phase 45 is code-complete; the owner's deploy step and the deferred human-verify items are
-the only remaining work for this phase (non-blocking). No further plan needed for Phase 45 itself.
-Last activity: 2026-08-10 — Phase 50 planned (5 plans/2 waves: R106 remove-imported, R107 preserve-manual-on-regen, R108 render-stable page id, R109 index.html no-cache); ready to execute
+## ⏸ RESUME HERE (2026-08-11 — v1.6 ROADMAP.md created, ready to plan Phase 51)
 
-## ⏸ RESUME HERE (2026-08-06 — v1.5 ROADMAP.md created, ready to plan Phase 39)
+**`.planning/ROADMAP.md` and `.planning/REQUIREMENTS.md` traceability are filled for v1.6** (Phases
+51–55, 17/17 requirements R110–R126 mapped, 0 unmapped). No plan has been created yet — the milestone
+is at the roadmap-created, not-yet-planned stage.
+
+**Next step:** `/gsd-plan-phase 51` (optionally preceded by `/gsd-discuss-phase 51`). Phase 51 (Service
+Order Editing Reliability, R110–R112) is FIRST by explicit owner instruction (2026-08-11): the
+cross-section drag phantom-duplicate (R110), the "No Section" dropdown save error (R111), and the
+empty-body ordering defect on the listing/share surfaces (R112) are the most disruptive bugs and block
+trust in every other editing surface. **Write a FAILING reproduction test before touching the reorder
+handlers** — the same discipline the v1.4 drag fix used. The corrupting machinery is
+`ServiceEditorView.vue`'s Sortable `onEnd` with its copy in `SlideGrid.vue`; all three symptoms clear on
+refresh → a client/persisted-state desync, not lost data. v1.4 Phase 29 already fixed the earlier
+index/key/DOM-revert bugs, so these are NEW symptoms on top of that rebuild. See STATE.md § "v1.4
+RESEARCH FINDINGS" for the reorder-machinery map.
+
+See `.planning/ROADMAP.md` § Phase Details for the full phase table, dependencies, and success criteria.
+
+## ★ v1.6 ROADMAP.md phase breakdown (created 2026-08-11)
+
+5 phases (51–55), derived directly from `.planning/REQUIREMENTS.md` (no `research/SUMMARY.md` this
+milestone — research was skipped) with this project's `coarse` granularity setting applied. **Numbering
+continues from v1.5, which ended at Phase 50** — v1.6 starts at Phase 51, not reset to 1.
+
+| Phase | Goal | Requirements | UI hint |
+|-------|------|--------------|---------|
+| 51 Service Order Editing Reliability | Cross-section drags never corrupt item state; items keep true order everywhere | R110, R111, R112 | yes |
+| 52 Default Service Template | Template lives on the Services page behind a cog, is the universal new-service starting point, pre-fills Misc content | R113, R114, R115, R116 | yes |
+| 53 Song Lyric Editing | Hand-split sections into slides, duplicate a split as one unit, Pre-Chorus, position numbering, "Save" button | R117–R121 | yes |
+| 54 Service Item Enhancements | Responsive notes field beside every item's selector; Misc items default to no slides | R122, R123 | yes |
+| 55 Preview & Export Polish | No auto-appended Bible version in preview; PC export spinner; Roboto slide font | R124, R125, R126 | no |
+
+**Hard sequencing constraint (owner instruction, non-negotiable):** R110/R111/R112 are Phase 51, FIRST.
+R110/R111 are the same cross-section drag machinery (`ServiceEditorView.vue` Sortable `onEnd` + the
+`SlideGrid.vue` copy); R112 is an ordering/serialization defect on the same surface (empty-bodied items
+sort last until text is typed). Grouped as one foundational reliability phase.
+
+**Other sequencing & dependencies:**
+
+- **Phase 52** (template) depends on Phase 51 — the template editor (`ServiceTemplateEditor.vue`) reuses
+  the same per-section SortableJS reorder, and R110 explicitly covers the default-template editor, so it
+  must inherit the reliability fix before becoming the universal starting point. Builds on v1.5 Phase 44's
+  template infrastructure and Phase 43's item-type palette. **R115 supersedes v1.5 Phase 44's "no template
+  → EMPTY service"** — the Suggested Template is now the universal start, decoupled from Vertical Worship
+  (PROJECT.md Key Decision, "Blank service template eliminated").
+
+- **Phase 53** (song editing, the largest new-build) depends on Phase 51 — R117/R118 build on the slide
+  reorder/duplicate machinery. Owner decision (PROJECT.md, "A split song section is one logical unit"): a
+  split section duplicates together and keeps one position-based number. Editor is `SongLyricEditor.vue`
+  (v1.3 Phase 28 `songSectionOrder.ts`); R121's button is on `LyricPasteRegion.vue` (v1.4 Phase 35).
+
+- **Phase 54** (item enhancements) depends on Phase 51 — R122 re-lays-out the same item row Phase 51
+  stabilizes; use `QuarterView.vue`'s responsive stacking recipe (as v1.5 Phase 48 did). R123's Misc item
+  is the `MISC` slot kind from v1.5 Phase 43.
+
+- **Phase 55** (polish) is independent, sequenced last. **R124 partially reverses v1.5 Phase 45's R091
+  auto-attribution in preview** (the "(ESV)"/"(NLT)" suffix at `PresentationViewer.vue` /
+  `slideDisplay.ts::slideBodyText()`) — reconcile with the per-slide `translationSource` provenance so
+  required attribution is not regressed elsewhere. R126 adds Roboto to v1.5 Phase 46's `SLIDE_FONTS`
+  @fontsource registry (self-hosted woff2 only), confirming Inter stays.
+
+**Granularity note:** under `coarse`, the two smallest requirement groups are kept as coherent,
+user-observable phases rather than split into thin single-requirement phases — service-item enhancements
+(R122–R123) as one phase, and the three unrelated polish items (R124–R126) combined into one phase.
+
+Full phase table, success criteria, and per-phase notes: `.planning/ROADMAP.md`. Traceability:
+`.planning/REQUIREMENTS.md` (17/17 mapped, 0 unmapped).
+
+## Historical — v1.5 RESUME HERE (2026-08-06 — SUPERSEDED; v1.5 shipped 2026-08-10, see the v1.6 RESUME HERE above)
 
 **`.planning/ROADMAP.md` and `.planning/REQUIREMENTS.md` traceability are filled for v1.5** (Phases
 39-48, 31/31 requirements R073–R103 mapped, 0 unmapped). No plan has been created yet — the milestone
@@ -901,7 +985,25 @@ section in `PENDING-VERIFICATION.md` and `functions/DEPLOY-ORG-CLAIMS.md`.
 
 ## Deferred Verification
 
-### v1.5 (current milestone)
+### v1.6 — ✅ PHASES 51–57 OWNER-ACCEPTED AT CLOSE 2026-08-12
+
+> **Milestone closed 2026-08-12.** v1.6 deployed to production (`firebase deploy --only hosting`;
+> firestore.rules delete-fix deployed same day) and the 2026-08-12 owner follow-up batch confirmed
+> working in production. The owner accepted Phases 51–57 as verified (owner-attributed, v1.4/v1.5
+> precedent) — the rows below are retained as the accepted-by-use record, not open work. See
+> `PENDING-VERIFICATION.md` § "v1.6 PHASES 51–57 ACCEPTED AS VERIFIED".
+
+| Phase | State | Resume |
+|-------|-------|--------|
+| 51 | verification_deferred_human — **4/4 ROADMAP criteria verified automatically**. All four source fixes present in code: R110 nonce-rebuild + `destroySectionSortables()` in BOTH `ServiceEditorView.vue` (`onSlotSortEnd`) and `ServiceTemplateEditor.vue` (`onTemplateSortEnd`); R111 `stripUndefined` in `updateService`; R112 `orderSlotsBySection` in `ServiceCard.vue` + `buildServiceSnapshot`. RED-first repros genuine (physical DOM node move between section containers, not false-green). `npm run type-check` clean, app suite 2994 pass at the 2-file baseline, 373/373 phase tests. **NOT deploy-gated** (client-only). 3 owner checks in `PENDING-VERIFICATION.md` § Phase 51: real OS cross-section drag (no phantom, no refresh) in both editors, live No-Section save with no error toast, empty-Miscellaneous order on the live listing + share link | /gsd-verify-work 51 |
+| 52 | verification_deferred_human — **4/4 ROADMAP criteria verified in code** (R113 cog on ServicesView + Services card/dead-imports removed from SettingsView; R114 "Suggested Template" label, `template-reset` testid kept, no VW gate; R115 `createService` seeds `buildSuggestedTemplateEntries()` when template empty — defined ONCE, shared with the button — purity `buildSlotsFromTemplate([],true)→[]` intact; R116 `ServiceTemplateEntry.body?` + guarded `createSlot` body spread + `template-item-body` textarea, absent-body shape intact). `npm run type-check` clean, app suite 3009 pass at the 2-file baseline. **NOT deploy-gated** (client-only). 3 owner checks in `PENDING-VERIFICATION.md` § Phase 52: cog opens editor + gone from Settings, new service from unset template starts from Suggested Template (not blank), MISC pre-filled body carries into a created service | /gsd-verify-work 52 |
+| 53 | verification_deferred_human — **5/5 ROADMAP criteria verified in code** (R117 `slideBreaks?` + pure `sliceSectionIntoSlides` + BOTH lockstep assembler paths sliced + editor click-between-lines divider; R118 duplicate-as-unit test-proven with ZERO slideGroupMaterializer/duplicateRow change; R119 `'Pre-Chorus'` in ADD_SECTION_KINDS; R120 `deriveSectionKind` + per-kind `displayLabel` display-only, stored label immutable, bare-"Verse" bug fixed; R121 "Save" via existing `currentSectionCount`). BWC guards git-confirmed (unsplit sections byte-identical). `npm run type-check` clean, app suite 3050 pass at the 2-file baseline, 390/390 phase tests. **NOT deploy-gated** (client-only). 4 owner UATs in `PENDING-VERIFICATION.md` § Phase 53: hand-split an 8-line chorus → present → 2 slides, duplicate the split → both slides both occurrences, add a Verse after pasted Verse 1/2 → "Verse 3", new-song paste button reads "Save" | /gsd-verify-work 53 |
+| 54 | verification_deferred_human — **9/9 must-haves verified in code** (R122 `notes?` on base `MediaAttachableSlot` — one shared `slot-notes-input` in the :891 wrapper, `flex flex-col sm:flex-row` responsive recipe, autosave `= value || undefined` so `stripUndefined` drops an emptied value (store-test-proven), read-only viewer text-interpolated no v-html; R123 `case 'MISC': return []` split, sibling MISC cases + `rebuildGroup` no-op UNCHANGED so existing blank + hand-added slides survive). `npm run type-check` clean, app suite 3059 pass at the 2-file baseline. **NOT deploy-gated** (client-only). 2 owner checks in `PENDING-VERIFICATION.md` § Phase 54: notes side-by-side desktop / stacked mobile consistent across kinds; a new MISC item shows no slides and a slide can still be added | /gsd-verify-work 54 |
+| 55 | verification_deferred_human — **8/8 must-haves verified in code** (R124 auto-attribution removed at both render sites + dead imports gone, `scripture.ts`/R092 provenance UNTOUCHED, print/share independent; R125 `export-spinner` animate-spin gated on existing `isExporting`; R126 Roboto 6th `SLIDE_FONTS` family [300,400,500,600,700] OFL-1.1 + loader, Inter first/default + four unchanged, `@fontsource/roboto@^5.3.0` installed). `npm run type-check` clean, app suite 3063 pass at the 2-file baseline. **NOT deploy-gated** (client + one build dep). 4 owner checks + 1 `@fontsource/roboto` legitimacy sign-off in `PENDING-VERIFICATION.md` § Phase 55: no auto-version-in-preview (+ manual add works), export spinner on a real export, Roboto selectable/renders | /gsd-verify-work 55 |
+| 56 | verification_deferred_human — **R127 + R128 shipped in code** (owner scope addition 2026-08-12; commits 8f72116, 84da0cd, 4ae5fbd, bde3e84). R127: optional `NonAssignableSlot.label?` + `ServiceTemplateEntry.label?` + shared `miscLabel()` helper drives the item's displayed name AND the PC-export title (`planningCenterApi.ts` MISC branch) AND print, in BOTH editors; distinct compact label input (not a second notes box), non-destructive (absent ⇒ "Miscellaneous"). R128: optional `ScriptureSlot.bibleVersion?` ('ESV'/'NLT') resolved as `slot.bibleVersion ?? org default` — wired into the version-dependent surfaces ONLY (PC export routing, `ScriptureInput` preview, `CongregationalEditor` split); materialization/preview/print are reference-only (documented no-op). `npm run type-check` clean, app suite 3112 pass at the 2-file baseline (+12 tests). **NOT deploy-gated** (client-only). Owner checks in `PENDING-VERIFICATION.md` § Phase 56: rename a MISC item + confirm the PC-export item title uses it; set a Scripture item to the non-default version + confirm PC export/preview fetch that version | /gsd-verify-work 56 |
+| 57 | verification_deferred_human — **R129 shipped in code** (owner scope addition 2026-08-12; commits 49135fd, 162f967, 656e842). The 260811-vsr Service Order redesign applied to `ServiceTemplateEditor.vue`: `kindBadgeClass` EXTRACTED to shared `src/utils/slotTypes.ts` (imported by both editors so they can't drift), three-rail rows (handle · colored badge · field column · action rail), per-row ⋯ menu (`template-row-menu-*`) owning Move-to-section + Delete (inline `template-section-select` + `template-item-remove` removed), muted/dashed `template-no-section-band`, mobile stacking. Pure restyle + control-relocation — `ServiceTemplateEntry` shape and all behavior (SortableJS reorder, add-item, MISC label, save) preserved. `npm run type-check` clean, app suite green at the 2-file baseline (ServiceEditorView badge tests still green post-extraction). **NOT deploy-gated** (client-only). Owner check in `PENDING-VERIFICATION.md` § Phase 57: template editor visually matches the service editor (badges, ⋯ menu, No-Section band) on desktop + ~390px mobile | /gsd-verify-work 57 |
+
+### v1.5 (historical — milestone shipped and archived 2026-08-10)
 
 | Phase | State | Resume |
 |-------|-------|--------|
@@ -1444,6 +1546,18 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 48 P01 | 6min | 2 tasks | 4 files |
 | Phase 48 P02 | 6min | 3 tasks | 9 files |
 | Phase 48 P03 | 25min | 3 tasks | 6 files |
+| Phase 50 P01 | 15min | 2 tasks | 2 files |
+| Phase 50 P02 | 35min | 2 tasks | 1 files |
+| Phase 50 P03 | 40min | 3 tasks | 8 files |
+| Phase 50 P04 | 25 min | 2 tasks | 2 files |
+| Phase 50 P05 | 6min | 2 tasks | 5 files |
+| Phase 52 P03 | 12 | 2 tasks | 4 files |
+| Phase 52 P02 | 9min | 2 tasks | 2 files |
+| Phase 53 P01 | 15min | 3 tasks | 4 files |
+| Phase 53 P02 | 13min | 2 tasks | 3 files |
+| Phase 53 P03 | 20min | 2 tasks | 2 files |
+| Phase 54 P02 | 40 | 2 tasks | 4 files |
+| Phase 55 P03 | 35min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -1779,6 +1893,18 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 48-02: 44px hit-area padding applied unconditionally (not breakpoint-gated) per 48-UI-SPEC; SortableJS touch options (delay/delayOnTouchOnly/touchStartThreshold) added strictly additively to preserve the ZTXcpNRcJTalEQp42fTx index-bug guard
 - [Phase ?]: 48-03: Task 1 landed the full ActionBarContext/ActionBarHandlers type contract AND its one consumer (ServiceEditorView.vue's activeActionItems) in the same commit, so npm run type-check stayed green on every committed intermediate.
 - [Phase ?]: 48-03: The save-status wrapper's 'flex items-center gap-2' is now unconditional (only border/background/padding/sticky stay tied to serviceSaveStatusVisible) so the relocated Undo link lays out correctly beside SaveStatusIndicator even at idle.
+- [Phase ?]: R109: firebase.json hosting.headers serves /index.html with Cache-Control no-cache, no-store, must-revalidate; assets/* left untouched; deploy-gated per standing NO-DEPLOYS grant
+- [Phase ?]: R107 (50-02): the existing slideGroupMaterializer.ts survivor mechanism (isSlotDerivableRef/survivingEntries/carryStoredDerivedEntries/orderedByStoredPosition) already satisfies manual-add preservation across every rebuild path — proven by a 9-case suite (manualAddPreservation.test.ts) with zero production code changed
+- [Phase ?]: R108 requirement left unchecked after 50-03: this plan is part 1 of 2 (RECORD sourcePage/renderedPage); part 2 (CONSUME, plan 50-05) is what actually resolves multi-image decks and will mark R108 complete.
+- [Phase ?]: renderedPage deliberately excluded from SourceRef.derivedIdentityKey (documented in slideGroup.ts) -- it is provenance, not identity, so existing carry/survival matching (R107) is unaffected.
+- [Phase ?]: R106: per-group 'Remove imported slides' bulk action, gated on window.confirm reusing the existing codebase confirm pattern — Removal is irreversible and multi-slide; reused the established window.confirm pattern from useUnsavedGuard.ts/LyricPasteRegion.vue rather than inventing a new modal
+- [Phase ?]: R108: importedEntryContent resolution order strictly extends ec217aa — synthetic rendered-page-N identity, then supplied renderedPage (50-03), then the 1:1 positional fallback for legacy entries, then pending; legacy multi-image entries stay unfixed by design (fallback, no migration, per 50-CONTEXT.md).
+- [Phase ?]: 52-02: template body input scoped to MISC + ANNOUNCEMENTS; editor seed + createService fallback share the one buildSuggestedTemplateEntries() preset
+- [Phase ?]: R117 split = additive slideBreaks LINE indices over section.lines (not a slides array); sliceSectionIntoSlides is the single pure definition, read-tolerant clamp
+- [Phase ?]: R120 numbering derived at render time in buildSectionRows (deriveSectionKind + per-kind displayLabel); stored LyricSection.label never rewritten (BWC)
+- [Phase ?]: 53-02: split lyric sections resolve LIVE to N slides at both assembler call sites via sliceSectionIntoSlides; ids ${entry.id}:${i} (stored) / advancing localSeq (fallback), unsplit byte-identical; R118 falls out for free, no group-model change
+- [Phase ?]: R122: slot-level notes? on the base MediaAttachableSlot (cast-free on all 5 kinds, distinct from Service.notes); one shared responsive notes input beside every selector; emptied value dropped by stripUndefined
+- [Phase ?]: Roboto added as sixth curated @fontsource slide font (^5.3.0, OFL-1.1); Inter stays first/default; adding a font = one registry entry + one static-prefix loader line + test count bump
 
 ### Roadmap Evolution
 
@@ -1831,6 +1957,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 | 260805-kzd | Projected slides carry no label/header text and all slide text is one size. Both `presentation-label` elements are gone: the scripture reference became body content (`presentation-scripture-reference`, `text-5xl text-gray-100`) — it renders unconditionally because the assembler builds scripture slides with `text: ''`, so it is frequently the slide's entire content; the TextSlide title element (the blue "Message"/"Prayer") was deleted outright. Congregational speaker tags lost their indigo/amber uppercase accent and match the body size, keeping the "Leader:"/"Congregation:" wording. **Supersedes 260805-bvo's deliberate-divergence comment and 35-UI-SPEC §R059's label-scoping note.** Owner visual checkpoint still pending (see PENDING-VERIFICATION 37.1). | 2026-08-05 | 5a6befe, aaa60e5, 3d36779 | [260805-kzd-remove-slide-labels-unify-slide-text-size](.planning/quick/260805-kzd-remove-slide-labels-unify-slide-text-size/) |
 | 260805-b5h | Slide-grid group media panel laid out as a horizontal row so add-music and add-background sit side by side. Owner follow-up in the same session removed the per-child `min-w-[14rem] flex-1` (it made each button a half-width column) and relocated the "applies to all N slides…" caption out of `BackgroundControl` (new opt-in `hideCaption` prop) onto its own `basis-full` line below both buttons. Owner visual checkpoint (Task 2) still pending. | 2026-08-05 | 8cc6c28, c3dc559 | [260805-b5h-put-the-group-add-music-and-add-backgrou](.planning/quick/260805-b5h-put-the-group-add-music-and-add-backgrou/) |
 | 260809-vvq | Planning Center export fixes: (1) scripture item description now routes by the church's `bibleVersion` (`fetchNltPassageText` for NLT, `fetchPassageText` for ESV) AND skips the fetch when the reference is empty — this eliminated the empty-`q=` HTTP 400 the owner hit exporting with NLT selected; (2) export now sends ALL remaining slot kinds (PRAYER/MESSAGE/ANNOUNCEMENTS/MISC via a new `otherSlots` bucket; IMPORTED still excluded — no PC analog); (3) `buildPlanTitle` returns the sermon passage ONLY (dropped the `(Teams)` suffix), new plans only. `addSlotAsItem` gained a required `bibleVersion` param (all 9 ServiceEditorView call sites + tests updated). | 2026-08-09 | d97ea02, 8c602bc | [260809-vvq-pc-export-nlt-types-title](.planning/quick/260809-vvq-pc-export-nlt-types-title/) |
+| 20260811-del | Service-plan item delete blocked by Firestore `PERMISSION_DENIED` ("Null value error" in the `slideGroups` delete rule, `ServiceEditorView.vue:2791`): a present-but-null `serviceId` fell through the missing-key orphan-guard into `parentGone(null)`→`svcPath(null)`, and `isOrgEditor` used an unguarded `get().data.role`. Made both null-safe — present-but-null `serviceId` → deletable orphan; `isOrgEditor` `exists()`-guarded like `isOrgMember` + `.data.get('role','')`. +7 emulator rules tests (147/147 pass, 0 regressions); type-check clean. ⚠ **Needs `firebase deploy --only firestore:rules` (owner step)** to take effect in production. | 2026-08-11 | 38df34f | [20260811-service-plan-item-delete-permission](.planning/quick/20260811-service-plan-item-delete-permission/) |
+| 260811-vsr | Service Order editor UI pass, driven by an owner-imported Claude Design mockup (`Slides Tab.dc.html`, Turns 4a desktop / 4b mobile) mapped onto the app's existing dark-indigo theme. **(1)** Plain kinds (Prayer/Misc/Announcements/Message) collapsed to ONE free-text field via `slotFreeText(slot)=notes ?? body` (writes `notes`); the plain-kind `body` textarea + PRAYER link inputs removed from the UI (data retained on the type); `ServicePrintLayout` + Planning Center export migrated to `notes ?? body` (non-destructive, no data migration). **(2)** Unified "three-rail" rows — drag handle · colored per-kind badge (`kindBadgeClass`) · stacked full-width field+notes · right action rail — capped at `max-w-[1060px]`, single-stack below `sm` (walked back Phase-54 side-by-side). **(3)** Per-row editor-only ⋯ menu now owns Move-to-section (→`onSectionChange`) and Delete (→`removeSlot`); inline section `<select>` and inline ✕ removed. **(4)** Muted/dashed "No Section" band (`data-testid=no-section-band`) for the ungrouped bucket. Scope calls (disclosed): template-editor write-to-`notes` deferred behind the read-fallback; no new PRAYER PC data-flow; `slideGroupMaterializer` confirmed not a `body` consumer. type-check clean; app suite green at the 2-file baseline. ⚠ Owner visual/mobile feel verification DEFERRED (see `.planning/PENDING-VERIFICATION.md`). | 2026-08-12 | 35cdc0e, 72b4301, d0157d9, 1094282, 100ff68 | [260811-vsr-service-editor-ui-pass-consolidate-redun](.planning/quick/260811-vsr-service-editor-ui-pass-consolidate-redun/) |
 
 ### Blockers/Concerns
 
@@ -2091,8 +2219,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-09T00:21:39.425Z
-Stopped at: Completed 48-03-PLAN.md
+Last session: 2026-08-12T01:33:31.272Z
+Stopped at: Completed 55-03-PLAN.md (R126 Roboto slide font)
 Resume file: None
 
 ## Operator Next Steps

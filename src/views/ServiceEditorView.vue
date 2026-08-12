@@ -379,16 +379,29 @@
                 <button
                   type="button"
                   @click="showSlotDeleteConfirm = false; pendingDeleteIndex = null; pendingDeleteIsClear = false"
-                  class="rounded-md px-4 py-2 text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700"
+                  :disabled="isRemovingSlot"
+                  class="rounded-md px-4 py-2 text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700 disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   @click="confirmSlotDelete"
-                  class="rounded-md px-4 py-2 text-sm font-medium text-white bg-red-700 hover:bg-red-600 transition-colors"
+                  :disabled="isRemovingSlot"
+                  class="inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white bg-red-700 hover:bg-red-600 transition-colors disabled:opacity-70"
                 >
-                  Remove
+                  <svg
+                    v-if="isRemovingSlot"
+                    data-testid="slot-remove-spinner"
+                    class="animate-spin h-4 w-4"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  {{ isRemovingSlot ? 'Removing…' : 'Remove' }}
                 </button>
               </div>
             </div>
@@ -496,8 +509,13 @@
                     type="button"
                     @click="onConfirmExport"
                     :disabled="isExporting || !exportSelectedServiceTypeId"
-                    class="rounded-md px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors disabled:opacity-50"
-                  >{{ isExporting ? 'Exporting...' : exportMode === 'existing' ? 'Add to Plan' : 'Export' }}</button>
+                    class="inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors disabled:opacity-50"
+                  ><span
+                      v-if="isExporting"
+                      data-testid="export-spinner"
+                      aria-hidden="true"
+                      class="h-4 w-4 border-2 border-white/70 border-t-transparent rounded-full animate-spin"
+                    ></span>{{ isExporting ? 'Exporting...' : exportMode === 'existing' ? 'Add to Plan' : 'Export' }}</button>
                 </div>
               </template>
             </div>
@@ -548,6 +566,7 @@
                   :key="congregationalSlot.id"
                   data-testid="congregational-editor-panel"
                   :reference="slotToScriptureRef(congregationalSlot)"
+                  :bibleVersion="congregationalSlot.bibleVersion"
                   :sections="congregationalSlot.congregationalSections ?? []"
                   @update:sections="onCongregationalSectionsChange(congregationalSlotIndex!, $event)"
                   @delete="onCongregationalDelete(congregationalSlotIndex!)"
@@ -783,9 +802,21 @@
           </div>
         </div>
 
-        <!-- Dynamic Service Flow -->
+        <!-- Dynamic Service Flow. 260811-vsr: the item list fills the tab's content
+             width, matching the Teams / Sermon Context blocks above it. (An earlier
+             max-w-[1060px] cap from the mockup was removed — it applied only to this
+             list while the chrome above stayed full-width, so the sections read as a
+             constrained/narrow widget on wide screens. Owner feedback 2026-08-12.) -->
         <div class="space-y-1.5">
-          <template v-for="group in slotSectionGroups" :key="group.key">
+          <!-- R110: the key folds in `slotRenderNonce` (bumped in `onSlotSortEnd`
+               after a drag). Vue does not allow a `:key` on a child of a
+               `<template v-for>` — it must live on the template tag — so the nonce
+               rides the group key here. A bump gives every section fragment a fresh
+               key, forcing Vue to discard and rebuild the ref-bearing section-list
+               container `<div>` (and its Sortable-orphaned child) from reactive
+               state. `group.key` alone still uniquely identifies each section, so
+               ordering/identity across sections is unchanged between bumps. -->
+          <template v-for="group in slotSectionGroups" :key="`${group.key}-${slotRenderNonce}`">
             <!-- Section header: rendered unconditionally once per real section (UI-SPEC §1) —
                  never rendered for the trailing ungrouped bucket, which has no header. Structurally
                  a sibling of the section's list container, not a member of it, so it is excluded from
@@ -805,6 +836,22 @@
                 :data-testid="`section-add-item-${group.key}`"
                 @click="toggleSectionAdd(group.key as ServiceSection)"
               >＋ Add item</button>
+            </div>
+
+            <!-- No-Section band (260811-vsr): the trailing ungrouped/legacy bucket gets a
+                 muted/dashed header so its items read as "not placed yet", clearly distinct
+                 from the last real section (Post-Service). Rendered ONLY for the ungrouped
+                 group and ONLY when non-empty. Deliberately NOT the `section-header-*` testid,
+                 and carries NO slide-count or add-item control, so the "exactly 5 real
+                 headers" and "no ungrouped count/add-item" assertions stay valid. A sibling
+                 of the list container, never a member of its Sortable instance. -->
+            <div
+              v-if="group.key === 'ungrouped' && group.entries.length > 0"
+              class="flex items-center gap-2 mt-3 mb-1 rounded-lg border border-dashed border-gray-700 px-3 py-1.5 text-gray-500"
+              data-testid="no-section-band"
+            >
+              <span class="text-[11px] uppercase tracking-[.14em]">No Section</span>
+              <span class="h-px flex-1 bg-gradient-to-r from-gray-800 to-transparent"></span>
             </div>
 
             <!-- Per-band inline add chip row (36-04, UI-SPEC §9 discretionary call: inline,
@@ -865,7 +912,7 @@
 
               <template v-for="{ slot, index } in group.entries" :key="slot.id">
             <div
-              class="slot-item rounded-lg bg-gray-900 border border-gray-800 p-3 flex items-start gap-2"
+              class="slot-item rounded-lg bg-gray-900 border border-gray-800 p-3 flex flex-col sm:flex-row sm:items-start gap-2"
               :data-testid="`slot-${index}`"
               :data-slot-id="slot.id"
             >
@@ -879,16 +926,38 @@
               </svg>
             </div>
 
-            <!-- Slot content -->
-            <div class="flex-1 min-w-0">
+            <!-- Zone 2 (260811-vsr): badge rail — ONE colored per-kind pill. Replaces
+                 the per-kind inline slotLabel <p> headings. slotLabel(slot, index)
+                 supplies the text; kindBadgeClass(kind) the on-theme tint. Fixed width
+                 on desktop; a plain block above the field column on mobile (row is flex-col). -->
+            <div class="flex-none sm:w-32 sm:pt-0.5">
+              <!-- MISC (2026-08-12): the pill IS the editable label — click it to rename
+                   the item directly (pencil affordance). Replaces the old separate label
+                   input. `label` is the canonical name (miscLabel drives PC title + print). -->
+              <MiscLabelBadge
+                v-if="slot.kind === 'MISC'"
+                :model-value="(slot as NonAssignableSlot).label"
+                :editable="canEditService"
+                :badge-class="kindBadgeClass('MISC')"
+                :testid-base="`slot-misc-${index}`"
+                @update:model-value="(slot as NonAssignableSlot).label = $event"
+              />
+              <span
+                v-else
+                class="inline-flex items-center rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
+                :class="kindBadgeClass(slot.kind)"
+                :data-testid="`slot-badge-${index}`"
+              >{{ slotLabel(slot, index) }}</span>
+            </div>
+
+            <!-- Zone 3 (260811-vsr): field column — the per-kind selector/content
+                 stacked above the consolidated full-width notes field. Walks back
+                 Phase 54's sm:flex-row side-by-side; the notes field is full-width now. -->
+            <div class="flex-1 min-w-0 flex flex-col gap-2">
               <!-- SONG slot -->
               <template v-if="slot.kind === 'SONG'">
-                <div class="flex items-center justify-between gap-3 mb-1">
-                  <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                    {{ slotLabel(slot, index) }}
-                  </p>
+                <div v-if="slot.songId && authStore.vwModeEnabled" class="flex items-center justify-end">
                   <SongBadge
-                    v-if="slot.songId && authStore.vwModeEnabled"
                     :types="songStore.songs.find(s => s.id === slot.songId)?.vwTypes ?? []"
                   />
                 </div>
@@ -985,8 +1054,7 @@
 
               <!-- SCRIPTURE slot -->
               <template v-else-if="slot.kind === 'SCRIPTURE'">
-                <div class="flex items-center gap-4" :data-scripture-slot-index="index">
-                  <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">Scripture Reading</p>
+                <div :data-scripture-slot-index="index">
                   <div class="flex-1">
                     <!-- Editor: ScriptureInput. CLASS A. -->
                     <ScriptureInput
@@ -997,9 +1065,31 @@
                       :showAiSuggest="true"
                       :sermonTopic="localService.sermonTopic ?? ''"
                       :recentScriptures="recentScriptureRefs"
+                      :bibleVersion="(slot as ScriptureSlot).bibleVersion"
                       label="Scripture Reading"
                       @update:modelValue="(ref) => onScriptureChange(index, ref)"
-                    />
+                    >
+                      <!-- R128 (Phase 56): per-item Bible-version override selector,
+                           slotted ONTO the scripture reference-input line (under the
+                           Search button). "Default (<org>)" clears the override so
+                           stripUndefined drops the key; ESV/NLT set it explicitly. The
+                           raw override (not the resolved value) is passed to the children,
+                           which each apply `?? org default` — an unset slot behaves as today. -->
+                      <template #version>
+                        <select
+                          :value="(slot as ScriptureSlot).bibleVersion ?? ''"
+                          data-testid="slot-scripture-version"
+                          class="flex-none rounded-md bg-gray-800 border border-gray-700 text-gray-300 text-xs px-1.5 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          title="Bible version for this item"
+                          aria-label="Bible version for this item"
+                          @change="(slot as ScriptureSlot).bibleVersion = (($event.target as HTMLSelectElement).value as 'ESV' | 'NLT') || undefined"
+                        >
+                          <option value="">Default ({{ authStore.settings.bibleVersion }})</option>
+                          <option value="ESV">ESV</option>
+                          <option value="NLT">NLT</option>
+                        </select>
+                      </template>
+                    </ScriptureInput>
                     <!-- Lifecycle lock: read-only. CLASS D — INVERSE branch, so
                          it keeps pointing at the locked state (`isLocked`), now
                          reached at `planned` as well as `exported`. ME-02 — one
@@ -1024,82 +1114,24 @@
                      congregational-reading concern, not a slide source. -->
               </template>
 
-              <!-- PRAYER slot -->
+              <!-- PRAYER slot (260811-vsr): no content beyond the badge + the shared
+                   notes-canonical field below. linkUrl/linkLabel remain on the type +
+                   in Firestore — UI removal only. The old label + "No assignment needed"
+                   hint are replaced by the per-kind badge. -->
               <template v-else-if="slot.kind === 'PRAYER'">
-                <div class="flex items-center gap-2 mb-1">
-                  <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Prayer</p>
-                  <span class="text-xs text-gray-600 italic">No assignment needed</span>
-                </div>
-                <!-- Editor: editable link fields. CLASS A. -->
-                <div v-if="canEditService" class="flex items-center gap-2 mt-1">
-                  <input
-                    :value="(slot as NonAssignableSlot).linkLabel"
-                    @input="(slot as NonAssignableSlot).linkLabel = ($event.target as HTMLInputElement).value"
-                    type="text"
-                    placeholder="Link label (optional)"
-                    class="rounded-md bg-gray-800 border border-gray-700 text-gray-200 text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500 w-36"
-                  />
-                  <input
-                    :value="(slot as NonAssignableSlot).linkUrl"
-                    @input="(slot as NonAssignableSlot).linkUrl = ($event.target as HTMLInputElement).value"
-                    type="url"
-                    placeholder="https://..."
-                    class="rounded-md bg-gray-800 border border-gray-700 text-gray-200 text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500 flex-1"
-                  />
-                  <a
-                    v-if="(slot as NonAssignableSlot).linkUrl"
-                    :href="(slot as NonAssignableSlot).linkUrl"
-                    target="_blank"
-                    rel="noopener"
-                    class="text-indigo-400 hover:text-indigo-300 transition-colors flex-shrink-0"
-                    title="Open link"
-                    @click.stop
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
-                  </a>
-                </div>
-                <!-- Viewer: read-only link -->
-                <div v-else-if="(slot as NonAssignableSlot).linkUrl" class="flex items-center gap-2 mt-1">
-                  <a
-                    :href="(slot as NonAssignableSlot).linkUrl"
-                    target="_blank"
-                    rel="noopener"
-                    class="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
-                  >{{ (slot as NonAssignableSlot).linkLabel || (slot as NonAssignableSlot).linkUrl }}</a>
-                </div>
               </template>
 
-              <!-- MESSAGE / ANNOUNCEMENTS / MISC slot: one shared free-text body editor
-                   (43-03, R081/R082/R083). The Message URL/link fields are removed from
-                   the UI only — linkUrl/linkLabel stay in NonAssignableSlot and in
-                   Firestore, untouched by this branch. -->
+              <!-- MESSAGE / ANNOUNCEMENTS / MISC slot (260811-vsr): no content beyond the
+                   badge + the shared notes-canonical field below. body/linkUrl/linkLabel
+                   remain on the type + in Firestore, read via slotFreeText's notes ?? body
+                   fallback. For MISC, the item's name is edited inline on the badge pill
+                   itself (MiscLabelBadge, 2026-08-12) — no separate label input here. -->
               <template v-else-if="slot.kind === 'MESSAGE' || slot.kind === 'ANNOUNCEMENTS' || slot.kind === 'MISC'">
-                <div class="flex items-center gap-2 mb-1">
-                  <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">{{ slotLabel(slot, index) }}</p>
-                  <span class="text-xs text-gray-600 italic">No assignment needed</span>
-                </div>
-                <!-- Editor: shared free-text body. CLASS A. -->
-                <textarea
-                  v-if="canEditService"
-                  :value="(slot as NonAssignableSlot).body"
-                  @input="(slot as NonAssignableSlot).body = ($event.target as HTMLTextAreaElement).value"
-                  rows="3"
-                  :placeholder="bodyPlaceholder(slot.kind as 'MESSAGE' | 'ANNOUNCEMENTS' | 'MISC')"
-                  data-testid="slot-body-input"
-                  class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-200 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500 resize-y mt-1"
-                ></textarea>
-                <!-- Viewer / locked: read-only, preserves line breaks -->
-                <p v-else-if="(slot as NonAssignableSlot).body?.trim()" data-testid="slot-body-text" class="text-sm text-gray-200 whitespace-pre-wrap mt-1">{{ (slot as NonAssignableSlot).body }}</p>
-                <p v-else data-testid="slot-body-empty" class="text-sm text-gray-400 italic mt-1">{{ slotLabel(slot, index) }} — Empty</p>
+                <!-- intentionally empty: field column is the shared notes field below -->
               </template>
 
               <!-- HYMN slot -->
               <template v-else-if="slot.kind === 'HYMN'">
-                <div class="mb-1">
-                  <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Hymn</p>
-                </div>
                 <!-- Editor: editable fields. CLASS A. -->
                 <div v-if="canEditService" class="flex flex-wrap items-center gap-2 mt-1">
                   <input
@@ -1134,45 +1166,96 @@
                 </div>
               </template>
 
-              <!-- IMPORTED slot (Phase 21) -->
+              <!-- IMPORTED slot (Phase 21): badge carries the label; keep the empty-state hint. -->
               <template v-else-if="slot.kind === 'IMPORTED'">
-                <div class="flex items-center justify-between gap-3 mb-1">
-                  <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Imported Slides</p>
-                </div>
                 <p v-if="!(slot as ImportedSlot).importId" class="text-sm text-gray-400 italic">Imported Slides — Empty</p>
               </template>
 
+                <!-- Consolidated notes-canonical field (260811-vsr): written ONCE for
+                     every kind, now FULL-WIDTH and stacked in the field column (walks
+                     back Phase 54's sm:w-64 side column). slot.notes takes NO cast —
+                     notes? lives on the base MediaAttachableSlot. Plain text only:
+                     :value + {{ }} auto-escape, never v-html (T-54-01). `= value ||
+                     undefined` on empty lets stripUndefined drop it. -->
+                <div>
+                  <input
+                    v-if="canEditService"
+                    :value="slotFreeText(slot)"
+                    @input="slot.notes = ($event.target as HTMLInputElement).value || undefined"
+                    type="text"
+                    :placeholder="notesPlaceholder(slot)"
+                    data-testid="slot-notes-input"
+                    class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-200 text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500"
+                  />
+                  <p v-else-if="slotFreeText(slot)" data-testid="slot-notes-text" class="text-xs text-gray-400 whitespace-pre-wrap">{{ slotFreeText(slot) }}</p>
+                </div>
             </div>
 
-            <!-- Section-assignment control: editor only, hidden while locked
-                 (D005/R007). CLASS A. Nothing renders in its place and no
-                 information is lost: since Phase 29 every row sits inside a
-                 per-section container beneath a visible section header, so the
-                 section is already stated typographically. -->
-            <select
-              v-if="canEditService"
-              data-testid="section-select"
-              :value="slot.section ?? ''"
-              @change="onSectionChange(index, ($event.target as HTMLSelectElement).value)"
-              class="rounded-md bg-gray-800 border border-gray-700 text-gray-300 text-xs px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 flex-shrink-0 mt-0.5"
-              title="Section"
-            >
-              <option value="">No section</option>
-              <option v-for="s in SERVICE_SECTIONS" :key="s" :value="s">{{ SERVICE_SECTION_LABELS[s] }}</option>
-            </select>
+            <!-- Per-row ⋯ menu (260811-vsr): editor only, hidden while locked
+                 (D005/R007). CLASS A — the trigger AND every menu item are gated
+                 v-if="canEditService" (T-vsr-01). Owns BOTH Move-to-section
+                 (→ onSectionChange, replacing the inline <select>) and Delete
+                 (→ removeSlot, replacing the inline ✕). Mirrors SlideActionMenu's
+                 ARIA pattern INLINE (trigger + fixed backdrop + absolute role="menu"
+                 panel); single-open keyed on slot.id. It lives INSIDE the .slot-item
+                 (the Sortable ITEM, not a container) and only opens on click, so it
+                 never joins a drag. -->
+            <div v-if="canEditService" class="relative flex-shrink-0 mt-0.5">
+              <button
+                type="button"
+                class="p-1 rounded-md text-gray-500 hover:text-gray-300 hover:bg-gray-800 transition-colors"
+                :aria-haspopup="'menu'"
+                :aria-expanded="openRowMenuId === slot.id ? 'true' : 'false'"
+                aria-label="Row options"
+                :data-testid="`row-menu-trigger-${slot.id}`"
+                title="Row options"
+                @click.stop="toggleRowMenu(slot.id, $event)"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                  <circle cx="12" cy="5" r="1.5" />
+                  <circle cx="12" cy="12" r="1.5" />
+                  <circle cx="12" cy="19" r="1.5" />
+                </svg>
+              </button>
 
-            <!-- Remove button: editor only, hidden while locked. CLASS A. -->
-            <button
-              v-if="canEditService"
-              type="button"
-              @click="removeSlot(index)"
-              class="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0 mt-0.5"
-              title="Remove element"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+              <!-- Outside-click backdrop -->
+              <div v-if="openRowMenuId === slot.id" class="fixed inset-0 z-10" @click="openRowMenuId = null" />
+
+              <!-- Menu panel — flips above the trigger (bottom-full) near the fold -->
+              <div
+                v-if="openRowMenuId === slot.id"
+                role="menu"
+                class="absolute right-0 w-48 rounded-lg border border-gray-700 bg-gray-800 shadow-xl z-20 overflow-hidden py-1"
+                :class="rowMenuOpenUp ? 'bottom-full mb-1 origin-bottom-right' : 'top-full mt-1 origin-top-right'"
+                :data-testid="`row-menu-panel-${slot.id}`"
+              >
+                <p class="px-3 pt-1 pb-0.5 text-[10px] uppercase tracking-wider text-gray-500">Move to section</p>
+                <button
+                  type="button"
+                  role="menuitem"
+                  class="block w-full px-3 py-1.5 text-left text-sm text-gray-200 hover:bg-gray-700 transition-colors"
+                  :data-testid="`row-menu-move-${slot.id}-no-section`"
+                  @click="onSectionChange(index, ''); openRowMenuId = null"
+                >No section</button>
+                <button
+                  v-for="s in SERVICE_SECTIONS"
+                  :key="s"
+                  type="button"
+                  role="menuitem"
+                  class="block w-full px-3 py-1.5 text-left text-sm text-gray-200 hover:bg-gray-700 transition-colors"
+                  :data-testid="`row-menu-move-${slot.id}-${s}`"
+                  @click="onSectionChange(index, s); openRowMenuId = null"
+                >{{ SERVICE_SECTION_LABELS[s] }}</button>
+                <div class="my-1 h-px bg-gray-700"></div>
+                <button
+                  type="button"
+                  role="menuitem"
+                  class="block w-full px-3 py-1.5 text-left text-sm text-red-400 hover:bg-gray-700 hover:text-red-300 transition-colors"
+                  :data-testid="`row-menu-delete-${slot.id}`"
+                  @click="removeSlot(index); openRowMenuId = null"
+                >Delete</button>
+              </div>
+            </div>
             </div>
               </template>
             </div>
@@ -1354,7 +1437,7 @@ import { useRosterStore } from '@/stores/roster'
 import { useQuartersStore } from '@/stores/quarters'
 import { useSlideGroups } from '@/stores/slideGroups'
 import { useSaveStatus, hasVisibleSaveStatus } from '@/stores/saveStatus'
-import { slotLabel, createSlot, reindexSlots, backfillSlotIds, groupBySection, flattenBySection, orderSlotsBySection } from '@/utils/slotTypes'
+import { slotLabel, kindBadgeClass, createSlot, reindexSlots, backfillSlotIds, groupBySection, flattenBySection, orderSlotsBySection } from '@/utils/slotTypes'
 import { scripturesOverlap, scriptureRefFromSlot, formatScriptureReference, scriptureSlotAfterReferenceChange } from '@/utils/scripture'
 import type { CongregationalSection } from '@/types/slide'
 import { getPrimaryKey } from '@/utils/songSearch'
@@ -1369,6 +1452,7 @@ import SaveStatusIndicator from '@/components/SaveStatusIndicator.vue'
 import SongBadge from '@/components/SongBadge.vue'
 import SongSlotPicker from '@/components/SongSlotPicker.vue'
 import ScriptureInput from '@/components/ScriptureInput.vue'
+import MiscLabelBadge from '@/components/MiscLabelBadge.vue'
 import ServicePrintLayout from '@/components/ServicePrintLayout.vue'
 import PresentationViewer from '@/components/PresentationViewer.vue'
 import SlidesTab from '@/components/slides/SlidesTab.vue'
@@ -1470,6 +1554,9 @@ const showSlotDeleteConfirm = ref(false)
 const pendingDeleteIndex = ref<number | null>(null)
 // D-14: tracks whether the pending delete is a "clear song" (true) vs remove slot (false)
 const pendingDeleteIsClear = ref(false)
+// 2026-08-12: in-progress flag for the slot remove (the slideGroups deleteDoc round-trip
+// has a visible delay) so the Remove button shows a spinner and can't be double-fired.
+const isRemovingSlot = ref(false)
 
 // D-16: element-type-aware delete-confirmation copy
 const pendingSlotKind = computed<SlotKind | null>(() =>
@@ -1753,6 +1840,17 @@ const slotSectionGroups = computed(() => {
  *  because the template's `:class` binding on every section container reads it. */
 const dragOverSection = ref<ServiceSection | 'ungrouped' | null>(null)
 
+/** R110 render nonce. On a cross-section drag SortableJS physically moves the
+ *  dragged `.slot-item` from the source `<ul>` into the target `<ul>` before
+ *  `onEnd` fires; when the source section then empties, Vue tears down that
+ *  container subtree without reclaiming the node it no longer physically owns,
+ *  leaving a handler-less "No Section" phantom clone. Every section-list
+ *  container `<div>` keys on `${group.key}-${slotRenderNonce}`, so bumping this
+ *  after the reactive move forces Vue to discard and rebuild each container from
+ *  state — reclaiming the orphan. Mirrors SlideGrid.vue's `gridRenderNonce`
+ *  (the in-repo precedent), including its destroy-then-rebuild Sortable pairing. */
+const slotRenderNonce = ref(0)
+
 /** Ref-callback populating the per-section container element map Task 2's Sortable
  *  lifecycle watcher consumes. Declared here because the template wires the callback;
  *  Task 2 owns the watcher that turns this map into `Sortable.create` calls. */
@@ -1778,6 +1876,24 @@ function onSectionChange(index: number, value: string) {
   if (!slot) return
   slot.section = value === '' ? undefined : (value as ServiceSection)
   localService.value.slots = reindexSlots(orderSlotsBySection(localService.value.slots))
+}
+
+/** 260811-vsr: which row's ⋯ menu is open (keyed on the stable slot.id, so exactly
+ *  one is open at a time — the single-open pattern SlideGrid uses). UI state only;
+ *  the trigger toggles, the backdrop and every menu item close it. */
+const openRowMenuId = ref<string | null>(null)
+// Flip the ⋯ panel above its trigger when a near-the-bottom row would push the
+// menu below the fold (2026-08-12 owner report). Measured from the trigger's
+// viewport rect at open time; one shared flag since only one menu is open.
+const rowMenuOpenUp = ref(false)
+function toggleRowMenu(id: string, event?: MouseEvent): void {
+  const opening = openRowMenuId.value !== id
+  openRowMenuId.value = opening ? id : null
+  if (opening && event) {
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+    const spaceBelow = window.innerHeight - rect.bottom
+    rowMenuOpenUp.value = spaceBelow < 300 && rect.top > spaceBelow
+  }
 }
 
 const orgIdRef = computed(() => authStore.orgId)
@@ -1920,6 +2036,22 @@ async function onSlotSortEnd(evt: Sortable.SortableEvent): Promise<void> {
 
   const reindexed = reindexSlots(flattenBySection(grouped))
   localService.value.slots = reindexed
+
+  // R110: reclaim any node SortableJS physically relocated across containers.
+  // On a cross-section drag Sortable moves the dragged `.slot-item` into the
+  // target `<ul>` before this handler runs; the reactive reassignment above is
+  // correct, but Vue does not reconcile that stray node — when the source
+  // section empties it removes the container subtree without reclaiming the
+  // moved child, orphaning a handler-less "No Section" phantom. Tear the section
+  // Sortables down FIRST, then bump the nonce so every keyed container `<div>`
+  // is discarded and rebuilt from state (reclaiming the orphan). The teardown is
+  // load-bearing, not belt-and-braces: the lifecycle watcher only creates a
+  // Sortable when `!sectionSortables.has(key)`, so without clearing the map it
+  // would leave the stale instances bound to the discarded elements and the
+  // rebuilt containers with no Sortable at all (dead drag). This is exactly the
+  // destroy-then-nonce pairing SlideGrid.vue uses (destroySortable + gridRenderNonce).
+  destroySectionSortables()
+  slotRenderNonce.value += 1
 
   // D-15: persist immediately rather than waiting on the 800ms debounce. A
   // cross-section move updates only the `slots` array field, so order and section
@@ -2647,18 +2779,31 @@ function addSlot(kind: SlotKind, vwType?: VWType, targetSection?: ServiceSection
   localService.value.slots = reindexSlots(orderSlotsBySection(localService.value.slots))
 }
 
-// ── Body editor placeholder lookup (43-03) ──────────────────────────────────────
-// Static three-key lookup for the shared MESSAGE/ANNOUNCEMENTS/MISC body textarea.
-// Parameter typed to only those three kinds, not the whole SlotKind union, so a
-// caller passing an unrelated kind is a compile error.
-function bodyPlaceholder(kind: 'MESSAGE' | 'ANNOUNCEMENTS' | 'MISC'): string {
-  const placeholders: Record<'MESSAGE' | 'ANNOUNCEMENTS' | 'MISC', string> = {
-    MESSAGE: 'Message notes or outline…',
-    ANNOUNCEMENTS: 'Announcement details…',
-    MISC: 'Details…',
-  }
-  return placeholders[kind]
+// ── Consolidated free-text field (260811-vsr) ───────────────────────────────────
+// Plain kinds (PRAYER/MESSAGE/ANNOUNCEMENTS/MISC) collapse to ONE field: the
+// notes-canonical field. It READS `notes ?? body` (a legacy body-only slot still
+// displays) and WRITES `notes`. `body` is undefined on selector kinds, so the
+// expression collapses to `slot.notes` there — safe cast-free across the union.
+function slotFreeText(slot: ServiceSlot): string | undefined {
+  return slot.notes ?? (slot as NonAssignableSlot).body
 }
+
+// Per-kind placeholder for the consolidated field. Plain kinds get their own
+// prompt; the selector kinds keep the Phase-54 "who leads / who sings what" text.
+function notesPlaceholder(slot: ServiceSlot): string {
+  switch (slot.kind) {
+    case 'PRAYER': return 'Who is praying? (optional notes)'
+    case 'ANNOUNCEMENTS': return 'Church-wide announcements'
+    case 'MESSAGE': return 'Message notes or outline'
+    case 'MISC': return 'Details'
+    default: return 'Notes (e.g. who leads, who sings which parts)'
+  }
+}
+
+// ── Per-kind badge tint (260811-vsr / DESIGN-SPEC) ──────────────────────────────
+// kindBadgeClass now lives in @/utils/slotTypes (Phase 57 — shared by both the
+// service editor and the template editor so their per-kind badge tints can never
+// fork). Imported alongside the other slotTypes helpers below.
 
 // ── Slot populated check (D-14) ────────────────────────────────────────────────
 // NOTE: isSlotPopulated is known dead code — declared and never called since
@@ -2729,49 +2874,56 @@ async function confirmSlotDelete() {
   if (!canEditService.value) return
   if (pendingDeleteIndex.value == null) return
   const index = pendingDeleteIndex.value
-  if (pendingDeleteIsClear.value) {
-    // Clear-song path (D-14/D-15): empties a SONG slot's assignment — this
-    // is NOT a remove-element delete, so no group is deleted here (R029
-    // scopes the cascade to actually removing the plan item).
-    const slot = localService.value?.slots[index]
-    if (slot?.kind === 'SONG') {
-      const updated: SongSlot = { ...slot as SongSlot, songId: null, songTitle: null, songKey: null }
-      localService.value!.slots[index] = updated
-    }
-  } else {
-    // Remove-element path (R029/D-03): resolve the slot's own id BEFORE the
-    // splice — after performRemoveSlot the anchor is gone. The group delete
-    // is awaited FIRST; a failed delete must not leave the slot removed
-    // locally while its group lingers, so on failure we leave the slot in
-    // place and surface the failure the same way onToggleRoleOverride does
-    // (console.error, no user-facing banner for this scoped-write class of
-    // failure) rather than silently diverging local from remote.
-    const slotId = localService.value?.slots[index]?.id
-    // ME-04 (R045 membership): hold the materialize watcher off this slot for
-    // the whole delete. Firestore drops the group from its LOCAL cache — and
-    // raises onSnapshot — the instant deleteDoc is issued, while the await below
-    // resolves only on server ack. Without the hold, the watcher sees a slot
-    // with no group, re-creates the document, and the splice that follows
-    // performs no second cascade — leaving an orphan group behind forever.
-    const releaseMaterializationHold = slotId ? suppressMaterialization(slotId) : () => {}
-    try {
-      if (slotId && authStore.orgId) {
-        await slideGroupsStore.deleteGroup(authStore.orgId, slotId)
+  // Spinner + guard for the whole confirm: the remove path awaits a Firestore
+  // deleteDoc round-trip with a visible delay; the outer finally always clears it.
+  isRemovingSlot.value = true
+  try {
+    if (pendingDeleteIsClear.value) {
+      // Clear-song path (D-14/D-15): empties a SONG slot's assignment — this
+      // is NOT a remove-element delete, so no group is deleted here (R029
+      // scopes the cascade to actually removing the plan item).
+      const slot = localService.value?.slots[index]
+      if (slot?.kind === 'SONG') {
+        const updated: SongSlot = { ...slot as SongSlot, songId: null, songTitle: null, songKey: null }
+        localService.value!.slots[index] = updated
       }
-      performRemoveSlot(index)
-    } catch (err) {
-      console.error('Failed to delete slide group for removed slot:', err)
-      showSlotDeleteConfirm.value = false
-      pendingDeleteIndex.value = null
-      pendingDeleteIsClear.value = false
-      return
-    } finally {
-      releaseMaterializationHold()
+    } else {
+      // Remove-element path (R029/D-03): resolve the slot's own id BEFORE the
+      // splice — after performRemoveSlot the anchor is gone. The group delete
+      // is awaited FIRST; a failed delete must not leave the slot removed
+      // locally while its group lingers, so on failure we leave the slot in
+      // place and surface the failure the same way onToggleRoleOverride does
+      // (console.error, no user-facing banner for this scoped-write class of
+      // failure) rather than silently diverging local from remote.
+      const slotId = localService.value?.slots[index]?.id
+      // ME-04 (R045 membership): hold the materialize watcher off this slot for
+      // the whole delete. Firestore drops the group from its LOCAL cache — and
+      // raises onSnapshot — the instant deleteDoc is issued, while the await below
+      // resolves only on server ack. Without the hold, the watcher sees a slot
+      // with no group, re-creates the document, and the splice that follows
+      // performs no second cascade — leaving an orphan group behind forever.
+      const releaseMaterializationHold = slotId ? suppressMaterialization(slotId) : () => {}
+      try {
+        if (slotId && authStore.orgId) {
+          await slideGroupsStore.deleteGroup(authStore.orgId, slotId)
+        }
+        performRemoveSlot(index)
+      } catch (err) {
+        console.error('Failed to delete slide group for removed slot:', err)
+        showSlotDeleteConfirm.value = false
+        pendingDeleteIndex.value = null
+        pendingDeleteIsClear.value = false
+        return
+      } finally {
+        releaseMaterializationHold()
+      }
     }
+    showSlotDeleteConfirm.value = false
+    pendingDeleteIndex.value = null
+    pendingDeleteIsClear.value = false
+  } finally {
+    isRemovingSlot.value = false
   }
-  showSlotDeleteConfirm.value = false
-  pendingDeleteIndex.value = null
-  pendingDeleteIsClear.value = false
 }
 
 // ── Song assignment ────────────────────────────────────────────────────────────

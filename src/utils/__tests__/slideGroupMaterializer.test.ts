@@ -200,6 +200,35 @@ describe('deriveGroupEntries — SONG', () => {
       expect(raw).not.toHaveProperty('body')
     }
   })
+
+  // Phase 53 (R117/R118): the split is resolved LIVE at assembly, never stored.
+  // The stored slide-group model must therefore be UNCHANGED — a split section
+  // referenced twice in performanceOrder still yields exactly one lyric entry
+  // per occurrence, with no split payload leaking onto the entry. This documents
+  // that R118 (duplicate a split as one unit) needs zero group-model change.
+  it('R118: a split section referenced twice yields exactly one lyric entry per occurrence, no split payload on the entry', () => {
+    const slot = songSlot({ songId: 'song-1' })
+    const lyrics = makeSongLyrics({
+      sections: [{ id: 'verse-1', label: 'Verse 1', lines: ['L0', 'L1', 'L2', 'L3'], slideBreaks: [2] }],
+      performanceOrder: ['verse-1', 'verse-1'],
+    })
+    const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
+
+    const entries = deriveGroupEntries(slot, inputs)
+
+    // copyright, lyric, lyric, copyright — one lyric entry per occurrence, NOT
+    // pre-split into 2 slides per occurrence.
+    expect(entries.map((e) => e.sourceRef.kind)).toEqual(['copyright', 'lyric', 'lyric', 'copyright'])
+    const lyricEntries = entries.filter((e) => e.sourceRef.kind === 'lyric')
+    expect(lyricEntries).toHaveLength(2)
+    expect(new Set(entries.map((e) => e.id)).size).toBe(4)
+    for (const entry of lyricEntries) {
+      expect(entry.sourceRef.kind === 'lyric' && entry.sourceRef.sectionId).toBe('verse-1')
+      const raw = entry as unknown as Record<string, unknown>
+      expect(raw).not.toHaveProperty('slideBreaks')
+      expect(raw).not.toHaveProperty('lines')
+    }
+  })
 })
 
 describe('deriveGroupEntries — SCRIPTURE', () => {
@@ -343,6 +372,45 @@ describe('deriveGroupEntries — PRAYER/MESSAGE/HYMN', () => {
     const entries = deriveGroupEntries(slot, makeInputs())
     expect(entries).toHaveLength(1)
     expect(entries[0]!.sourceRef).toEqual({ kind: 'text' })
+  })
+})
+
+describe('deriveGroupEntries — MISC (R123)', () => {
+  it('a MISC slot derives NO slides (empty array)', () => {
+    const slot: NonAssignableSlot = { kind: 'MISC', id: 'slot-misc-0', position: 0 }
+    const entries = deriveGroupEntries(slot, makeInputs())
+    expect(entries).toEqual([])
+  })
+
+  it('an ANNOUNCEMENTS slot still derives exactly one text entry (sibling regression)', () => {
+    const slot: NonAssignableSlot = { kind: 'ANNOUNCEMENTS', id: 'slot-ann-0', position: 0 }
+    const entries = deriveGroupEntries(slot, makeInputs())
+    expect(entries).toHaveLength(1)
+    expect(entries[0]!.sourceRef).toEqual({ kind: 'text' })
+  })
+})
+
+describe('rebuildGroup — MISC no-op (R123 backward-compat)', () => {
+  it('preserves an existing MISC group\'s legacy blank auto-slide unchanged', () => {
+    const slot: NonAssignableSlot = { kind: 'MISC', id: 'slot-misc-0', position: 0 }
+    const group = makeGroup({ slides: [{ id: 'e1', order: 0, sourceRef: { kind: 'text' } }] })
+
+    const result = rebuildGroup(group, slot, makeInputs())
+
+    expect(result.changed).toBe(false)
+    expect(result.slides).toEqual(group.slides)
+  })
+
+  it('preserves a hand-added MISC slide unchanged', () => {
+    const slot: NonAssignableSlot = { kind: 'MISC', id: 'slot-misc-0', position: 0 }
+    const group = makeGroup({
+      slides: [{ id: 'h1', order: 0, sourceRef: { kind: 'text', title: 'New slide', body: '' } }],
+    })
+
+    const result = rebuildGroup(group, slot, makeInputs())
+
+    expect(result.changed).toBe(false)
+    expect(result.slides).toEqual(group.slides)
   })
 })
 

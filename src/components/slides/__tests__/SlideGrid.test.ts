@@ -1536,7 +1536,9 @@ describe('SlideGrid', () => {
         sourceFileName: 'deck.pptx',
         section: 'pre-service',
         slides: [
-          { id: 'inner-1', position: 0, contentKind: 'text', body: 'First' },
+          // sourcePage present -- this entry's imported sourceRef must record renderedPage.
+          { id: 'inner-1', position: 0, contentKind: 'text', body: 'First', sourcePage: 1 },
+          // sourcePage absent (legacy deck slide) -- no renderedPage key, never `renderedPage: undefined`.
           { id: 'inner-2', position: 1, contentKind: 'text', body: 'Second' },
         ],
       })
@@ -1556,9 +1558,16 @@ describe('SlideGrid', () => {
       // `appendToGroup` copies every entry while renumbering (R050) — the
       // reference is no longer preserved, compare by value.
       expect(slides[0]).toEqual(existingEntries[0])
-      expect(slides[1]!.sourceRef).toEqual({ kind: 'imported', importId: 'deck-1', innerSlideId: 'inner-1' })
+      expect(slides[1]!.sourceRef).toEqual({
+        kind: 'imported',
+        importId: 'deck-1',
+        innerSlideId: 'inner-1',
+        renderedPage: 1,
+      })
       expect(slides[1]!.order).toBe(1)
+      // No sourcePage on the deck slide -> no renderedPage key at all (not `renderedPage: undefined`).
       expect(slides[2]!.sourceRef).toEqual({ kind: 'imported', importId: 'deck-1', innerSlideId: 'inner-2' })
+      expect(slides[2]!.sourceRef).not.toHaveProperty('renderedPage')
       expect(slides[2]!.order).toBe(2)
       expect(sigArg).toBe('sig-abc')
       expect(mockUpdateService).not.toHaveBeenCalled()
@@ -2365,5 +2374,127 @@ describe('SlideGrid — congregational reading action (group-level button)', () 
     expect(locked.find(SEL).exists()).toBe(false)
     const viewer = mountGrid({ selectedSlot: makeScriptureSlot(), slotArrayIndex: 0, isEditor: false })
     expect(viewer.find(SEL).exists()).toBe(false)
+  })
+})
+
+// --- R106 (Phase 50, plan 04): per-group "Remove imported slides" bulk action ---
+describe('SlideGrid — remove imported slides action (group-level button, R106)', () => {
+  const REMOVE_SEL = '[data-testid="slide-grid-remove-imported-btn"]'
+
+  it('shows the control and, on confirm, removes exactly the imported entries, renumbering the rest contiguously from zero', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+    const group = makeGroup({
+      sourceSignature: 'sig-keep',
+      slides: [
+        { id: 'e1', order: 0, sourceRef: { kind: 'text', title: 'Manual', body: 'kept' } },
+        { id: 'e2', order: 1, sourceRef: { kind: 'imported', importId: 'imp-1', innerSlideId: 'inner-1' } },
+        { id: 'e3', order: 2, sourceRef: { kind: 'imported', importId: 'imp-1', innerSlideId: 'inner-2' } },
+        { id: 'e4', order: 3, sourceRef: { kind: 'video', videoSrc: 'https://storage.example.com/v.mp4' } },
+      ],
+    })
+    const assembledSlideshow = [
+      makeAssembled(0, 'e1'),
+      makeAssembled(0, 'e2'),
+      makeAssembled(0, 'e3'),
+      makeAssembled(0, 'e4'),
+    ]
+    const wrapper = mountGrid({ selectedSlot: slot, assembledSlideshow, group, isEditor: true })
+
+    const btn = wrapper.get(REMOVE_SEL)
+    expect(btn.text()).toBe('Remove imported slides')
+    await btn.trigger('click')
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(window.confirm).toHaveBeenCalled()
+    expect(mockReplaceGroupSlides).toHaveBeenCalledTimes(1)
+    const [orgIdArg, slotIdArg, slidesArg, sigArg, baseSlidesArg] = mockReplaceGroupSlides.mock.calls[0]!
+    expect(orgIdArg).toBe('org-1')
+    expect(slotIdArg).toBe('slot-1')
+    const slides = slidesArg as GroupSlideEntry[]
+    // Imported entries (e2, e3) removed; text (e1) and video (e4) survive, in
+    // their original relative order, renumbered contiguously from zero.
+    expect(slides.map((e) => e.id)).toEqual(['e1', 'e4'])
+    expect(slides.map((e) => e.order)).toEqual([0, 1])
+    expect(slides.every((e) => e.sourceRef.kind !== 'imported')).toBe(true)
+    // R107 territory: the source signature is left alone — a removal changes no source.
+    expect(sigArg).toBe('sig-keep')
+    // CR-02: the pre-removal group snapshot is passed through as `baseSlides`
+    // so the write routes through the concurrent-write merge. (Vue wraps the
+    // prop in a reactive proxy, so this compares by value, not reference —
+    // same reasoning as the drag-reorder test above.)
+    expect(baseSlidesArg).toEqual(group.slides)
+  })
+
+  it('does not persist when the confirm dialog is cancelled', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+    const group = makeGroup({
+      slides: [
+        { id: 'e1', order: 0, sourceRef: { kind: 'imported', importId: 'imp-1', innerSlideId: 'inner-1' } },
+      ],
+    })
+    const assembledSlideshow = [makeAssembled(0, 'e1')]
+    const wrapper = mountGrid({ selectedSlot: slot, assembledSlideshow, group, isEditor: true })
+
+    await wrapper.get(REMOVE_SEL).trigger('click')
+    await Promise.resolve()
+
+    expect(window.confirm).toHaveBeenCalled()
+    expect(mockReplaceGroupSlides).not.toHaveBeenCalled()
+  })
+
+  it('hides the control when the group has no imported entries', () => {
+    const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+    const group = makeGroup({
+      slides: [{ id: 'e1', order: 0, sourceRef: { kind: 'text', title: 'Manual', body: '' } }],
+    })
+    const wrapper = mountGrid({ selectedSlot: slot, group, isEditor: true })
+    expect(wrapper.find(REMOVE_SEL).exists()).toBe(false)
+  })
+
+  it('hides the control on a locked service even with imported entries present', () => {
+    const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+    const group = makeGroup({
+      slides: [
+        { id: 'e1', order: 0, sourceRef: { kind: 'imported', importId: 'imp-1', innerSlideId: 'inner-1' } },
+      ],
+    })
+    const wrapper = mountGrid({ selectedSlot: slot, group, isEditor: true, serviceLocked: true })
+    expect(wrapper.find(REMOVE_SEL).exists()).toBe(false)
+  })
+
+  it('hides the control for a non-editor even with imported entries present', () => {
+    const slot = makeSlot({ kind: 'PRAYER', id: 'slot-1', position: 0 })
+    const group = makeGroup({
+      slides: [
+        { id: 'e1', order: 0, sourceRef: { kind: 'imported', importId: 'imp-1', innerSlideId: 'inner-1' } },
+      ],
+    })
+    const wrapper = mountGrid({ selectedSlot: slot, group, isEditor: false })
+    expect(wrapper.find(REMOVE_SEL).exists()).toBe(false)
+  })
+
+  it('never shows the control for a SONG group (song slides can never carry imported entries, and canMutateGroup already excludes song groups)', () => {
+    const songSlot = makeSlot({
+      kind: 'SONG',
+      id: 'slot-1',
+      position: 0,
+      songId: 's1',
+      songTitle: 'Grace',
+      songKey: null,
+      requiredVwType: 1,
+    } as never)
+    // Hypothetical: even if an imported entry somehow existed on a song
+    // group's stored document, canMutateGroup's song-group exclusion must
+    // still hide the control.
+    const group = makeGroup({
+      slides: [
+        { id: 'e1', order: 0, sourceRef: { kind: 'imported', importId: 'imp-1', innerSlideId: 'inner-1' } },
+      ],
+    })
+    const wrapper = mountGrid({ selectedSlot: songSlot, group, isEditor: true })
+    expect(wrapper.find(REMOVE_SEL).exists()).toBe(false)
   })
 })

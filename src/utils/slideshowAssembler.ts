@@ -41,6 +41,7 @@ import {
   congregationalSectionFromRef,
 } from './scripture'
 import { resolveImportedRender, importedEntryIdentities, importedEntryContent } from './importedRenderReconciler'
+import { sliceSectionIntoSlides } from './songSectionOrder'
 
 /** Content maps the assembly engine resolves slots against. Pre-loaded by the caller. */
 export interface AssemblyInputs {
@@ -256,7 +257,11 @@ function resolveEntryContent(
       const render = deck.renderImportId ? inputs.pptxRendersByImportId?.get(deck.renderImportId) : undefined
       const resolution = resolveImportedRender(deck, render)
       const urls = deck.renderImportId ? inputs.renderedImageUrlsByImportId?.get(deck.renderImportId) : undefined
-      return importedEntryContent(deck, resolution, ref.innerSlideId, urls)
+      // R108 (Phase 50, part 2 of 2): thread the 50-03 render-stable
+      // renderedPage reference so a hand-added entry resolves for a
+      // multi-image deck; importedEntryContent prefers it over the ec217aa
+      // positional fallback, which stays as the legacy no-renderedPage path.
+      return importedEntryContent(deck, resolution, ref.innerSlideId, urls, ref.renderedPage)
     }
 
     case 'text': {
@@ -406,6 +411,13 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
     group: SlideGroup,
     entry: GroupSlideEntry,
     content: SlideContent,
+    // R117 (Phase 53): a manually-split lyric section resolves LIVE to N
+    // slides that all share ONE stored entry; each needs a distinct, stable
+    // slide id. The caller passes `${entry.id}:${i}` for a split's i-th slice.
+    // When absent (every non-lyric entry AND every unsplit lyric section) the
+    // slide keeps `entry.id` verbatim — byte-identical to today, preserving the
+    // Phase 23 WR-02 media-keying invariant (id === groupSlideId === entry.id).
+    idOverride?: string,
   ): void => {
     // WR-01: song lookup keyed on the GROUP's owning song (via the slot),
     // not the individual entry's own `sourceRef.kind`. A SONG group's
@@ -424,11 +436,13 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
           ? inputs.songLyricsById.get(entry.sourceRef.songId)
           : undefined
     const media = resolveEntryMedia(group, entry, song)
+    // Never recompute the base id — the stored GroupSlideEntry.id IS the slide
+    // id (Phase 23 WR-02 keys media children on it). A split's positional
+    // `${entry.id}:${i}` override is likewise stable across recomputes.
+    const slideId = idOverride ?? entry.id
     const slide = {
       ...content,
-      // Never recompute — the stored GroupSlideEntry.id IS the slide id
-      // (Phase 23 WR-02 keys media children on it).
-      id: entry.id,
+      id: slideId,
       position: globalPosition,
       ...(media.audioUrl ? { audioUrl: media.audioUrl } : {}),
       ...(media.audioLoop ? { audioLoop: true } : {}),
@@ -442,7 +456,7 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
       section: slot.section,
       sourceId: sourceIdForRef(entry.sourceRef),
       groupId: group.id,
-      groupSlideId: entry.id,
+      groupSlideId: slideId,
       audioFromBed: media.audioFromBed,
     })
     globalPosition += 1
@@ -508,6 +522,33 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
       }
       const orderedEntries = [...group.slides].sort((a, b) => a.order - b.order)
       for (const entry of orderedEntries) {
+        // R117 (Phase 53): a lyric entry owns its section's live split. The
+        // loop resolves the section (same lookup resolveEntryContent's lyric
+        // case uses) and slices it through the ONE `sliceSectionIntoSlides`
+        // helper — so the stored-group path and the fallback path below agree
+        // slide-for-slide. `resolveEntryContent`'s own lyric case stays valid
+        // for any direct caller; the loop just owns the slicing here.
+        if (entry.sourceRef.kind === 'lyric') {
+          const ref = entry.sourceRef
+          const lyrics = inputs.songLyricsById.get(ref.songId)
+          if (!lyrics) continue // Song no longer resolves — omit, as today.
+          const section = lyrics.sections.find((s) => s.id === ref.sectionId)
+          if (!section) continue // Section no longer resolves — omit, as today.
+          const groups = sliceSectionIntoSlides(section)
+          groups.forEach((lines, i) => {
+            const content: Omit<LyricSlide, 'id' | 'position'> = {
+              contentKind: 'lyric',
+              sectionId: section.id,
+              sectionLabel: section.label,
+              lines,
+            }
+            // One group (unsplit) keeps `entry.id` verbatim (BWC). Multiple
+            // groups get positional `${entry.id}:${i}` ids.
+            const idOverride = groups.length > 1 ? `${entry.id}:${i}` : undefined
+            emitFromGroup(slot, index, group, entry, content, idOverride)
+          })
+          continue
+        }
         const content = resolveEntryContent(slot, entry, inputs)
         if (!content) continue // Entry's source no longer resolves — omitted, not placeholder'd.
         emitFromGroup(slot, index, group, entry, content)
@@ -533,13 +574,21 @@ export function assembleSlideshow(service: Service, inputs: AssemblyInputs): Ass
         for (const sectionId of order) {
           const section = lyrics.sections.find((s) => s.id === sectionId)
           if (!section) continue
-          const lyricContent: Omit<LyricSlide, 'id' | 'position'> = {
-            contentKind: 'lyric',
-            sectionId: section.id,
-            sectionLabel: section.label,
-            lines: section.lines,
+          // R117 (Phase 53): slice through the SAME `sliceSectionIntoSlides`
+          // the stored-group loop uses, so the two paths agree slide-for-slide
+          // (the D1 lockstep discipline). An unsplit section yields exactly one
+          // group -> one emitFallback at the current localSeq -> byte-identical
+          // to today. Each group advances localSeq so fallback ids stay
+          // distinct and stable (`${slot.id}:${localSeq}`).
+          for (const lines of sliceSectionIntoSlides(section)) {
+            const lyricContent: Omit<LyricSlide, 'id' | 'position'> = {
+              contentKind: 'lyric',
+              sectionId: section.id,
+              sectionLabel: section.label,
+              lines,
+            }
+            emitFallback(slot, index, lyricContent, slot.songId, localSeq++)
           }
-          emitFallback(slot, index, lyricContent, slot.songId, localSeq++)
         }
 
         emitFallback(slot, index, copyrightContent, slot.songId, localSeq++)

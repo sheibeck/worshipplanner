@@ -14,8 +14,15 @@ service cloud.firestore {
     }
 
     function isOrgEditor(orgId) {
+      // exists()-guarded like isOrgMember: an unguarded get().data.role throws a
+      // "Null value error" (which Firestore treats as DENY, not false) when the
+      // caller has no member doc, or the doc has no `role` field. That error —
+      // surfacing at this call site — is what blocked the slideGroups delete rule
+      // (evaluation error @ L153) from ever reaching its own conditions. Now it
+      // resolves to a clean false instead of erroring.
       return isSignedIn() &&
-        get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.role in ['editor', 'admin'];
+        exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)).data.get('role', '') in ['editor', 'admin'];
     }
 
     // User profiles - only the owner can read/write their own profile
@@ -151,7 +158,29 @@ service cloud.firestore {
         // service deleted) or a legacy doc with no serviceId must remain
         // deletable, or it is wedged in the database forever with no cleanup path.
         allow delete: if isOrgEditor(orgId)
-          && (!resource.data.keys().hasAll(['serviceId'])
+          // resource == null MUST be the first operand and MUST stay first. A slot
+          // whose slideGroup was never materialized (a slot that never carried
+          // slides) is deleted by confirmSlotDelete → deleteGroup → deleteDoc
+          // against a NON-EXISTENT doc, so `resource` is null. Every branch below
+          // reads `resource.data.…`; without this guard the very first one
+          // (`resource.data.keys()`) dereferences null → "Null value error" → the
+          // rule ERRORS → DENY, so the delete is refused and confirmSlotDelete
+          // aborts, leaving the slot in place. This is the same load-bearing
+          // pattern as serviceShareLinks' `resource == null` guard (T-41-09). It
+          // stays behind isOrgEditor(orgId) above, so org isolation is preserved —
+          // only an editor of THIS org may delete a non-existent doc under it, and
+          // deleting a non-existent doc is a harmless no-op. (2026-08-12: third
+          // recurrence of the "Null value error"; the two prior fixes guarded the
+          // group document's FIELD shapes but never the document not existing.)
+          && (resource == null
+              || !resource.data.keys().hasAll(['serviceId'])
+              // A present-but-null serviceId is an orphan too: without this guard
+              // the OR below would evaluate parentGone/parentDraft(null), and
+              // svcPath(null) raises a "Null value error" → the delete is denied
+              // and the group is wedged undeletable. Reached only when the key is
+              // present (the hasAll clause short-circuits the absent case first),
+              // so this dot-access is null-safe.
+              || resource.data.serviceId == null
               || parentGone(resource.data.serviceId)
               || parentDraft(resource.data.serviceId));
       }

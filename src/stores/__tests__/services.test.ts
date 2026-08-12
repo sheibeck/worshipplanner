@@ -462,7 +462,7 @@ describe('useServiceStore', () => {
     })
   })
 
-  describe('createService (44-01 — template-driven, empty-by-default)', () => {
+  describe('createService (52-01 — template-driven, suggested-by-default)', () => {
     it('calls addDoc with correct shape including serverTimestamp, progression, and status draft', async () => {
       const { addDoc, serverTimestamp } = await import('firebase/firestore')
       const { useServiceStore } = await import('../services')
@@ -486,7 +486,7 @@ describe('useServiceStore', () => {
       expect(serverTimestamp).toHaveBeenCalled()
     })
 
-    it('an empty/unset defaultServiceTemplate produces a new service with 0 slots (owner override 2026-08-07 — EMPTY, never buildSlots)', async () => {
+    it('an empty/unset defaultServiceTemplate produces a new service seeded from the Suggested Template (9 slots, 1-2-2-3-derived order — R115 supersedes the 2026-08-07 EMPTY override)', async () => {
       const { addDoc } = await import('firebase/firestore')
       const { useServiceStore } = await import('../services')
       const store = useServiceStore()
@@ -501,8 +501,41 @@ describe('useServiceStore', () => {
 
       const callArgs = vi.mocked(addDoc).mock.calls[0]!
       const data = callArgs[1] as Record<string, unknown>
-      const slots = data.slots as unknown[]
-      expect(slots).toHaveLength(0)
+      const slots = data.slots as Array<{ kind: string }>
+      expect(slots).toHaveLength(9)
+      expect(slots.map((s) => s.kind)).toEqual([
+        'SONG',
+        'SCRIPTURE',
+        'SONG',
+        'PRAYER',
+        'SCRIPTURE',
+        'SONG',
+        'SONG',
+        'MESSAGE',
+        'SONG',
+      ])
+    })
+
+    it('empty template AND vwModeEnabled ON: the 5 suggested SONG slots receive requiredVwType [1,2,2,3,3] in order (R115 criterion 3 holds for the suggested fallback)', async () => {
+      const { addDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+
+      // Empty template (beforeEach default) + VW on
+      mockAuthState.settings.vwModeEnabled = true
+
+      await store.createService({
+        date: '2026-03-08',
+        name: '',
+        teams: [],
+      })
+
+      const callArgs = vi.mocked(addDoc).mock.calls[0]!
+      const data = callArgs[1] as Record<string, unknown>
+      const slots = data.slots as Array<{ kind: string; requiredVwType?: number }>
+      const songSlots = slots.filter((s) => s.kind === 'SONG')
+      expect(songSlots.map((s) => s.requiredVwType)).toEqual([1, 2, 2, 3, 3])
     })
 
     it('a non-empty template produces slots matching kind/section/order exactly', async () => {
@@ -616,6 +649,91 @@ describe('useServiceStore', () => {
       expect(data.notes).toBe('Updated notes')
       expect(data.updatedAt).toBeDefined()
       expect(serverTimestamp).toHaveBeenCalled()
+    })
+
+    // R111 (51-03): moving an item back to "No Section" via the dropdown sets
+    // `slot.section = undefined` (an explicit own key, per onSectionChange('')),
+    // which rides through onSave into the updateService payload. The funnel MUST
+    // strip raw `undefined` before it reaches Firestore's updateDoc — otherwise
+    // the write throws "Unsupported field value: undefined (found in ... slots)".
+    // RED baseline: current code spreads `...data` unmodified, so the recorded
+    // updateDoc payload still carries `section: undefined` on the moved slot.
+    it('R111: strips raw undefined from the slots payload when an item is moved to "No Section"', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      // A draft service so assertWritable permits the write.
+      triggerSnapshot([makeService({ id: 'service-1', status: 'draft' })])
+
+      // Mirror onSectionChange('') for a "No Section" move: an explicit own
+      // `section: undefined` key on the moved slot.
+      await store.updateService('service-1', {
+        slots: [
+          { kind: 'SONG', position: 0, section: undefined },
+          { kind: 'PRAYER', position: 1, section: 'Worship' },
+        ],
+      })
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const written = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+
+      // The moved slot must carry NO `section` key (omission reads back as
+      // "No Section"); the other slot's real section value survives.
+      const writtenSlots = written.slots as Array<Record<string, unknown>>
+      expect('section' in writtenSlots[0]!).toBe(false)
+      expect(writtenSlots[1]!.section).toBe('Worship')
+
+      // Belt-and-braces: a deep scan of the whole written payload finds no
+      // value strictly equal to `undefined` — the exact thing Firestore rejects.
+      const hasRawUndefined = (v: unknown): boolean => {
+        if (v === undefined) return true
+        if (Array.isArray(v)) return v.some(hasRawUndefined)
+        if (v !== null && typeof v === 'object') {
+          return Object.values(v as Record<string, unknown>).some(hasRawUndefined)
+        }
+        return false
+      }
+      expect(hasRawUndefined(written)).toBe(false)
+    })
+
+    // R122 (54-02): slot-level `notes` rides the same slots[] write path. An
+    // emptied notes arrives as `notes: undefined` on the slot (the editor binds
+    // `= value || undefined`); the funnel's stripUndefined MUST drop it at slot
+    // depth so Firestore never sees a raw `undefined` (same guarantee Phase 51
+    // gave `section`). A defined notes must round-trip unchanged.
+    it('R122: strips an undefined slot.notes and round-trips a defined one through the slots payload', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService({ id: 'service-1', status: 'draft' })])
+
+      await store.updateService('service-1', {
+        slots: [
+          { kind: 'SONG', position: 0, notes: undefined },
+          { kind: 'PRAYER', position: 1, notes: 'Who leads: Sam' },
+        ],
+      })
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const written = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+      const writtenSlots = written.slots as Array<Record<string, unknown>>
+
+      // The emptied slot carries NO `notes` key; the other slot's value survives.
+      expect('notes' in writtenSlots[0]!).toBe(false)
+      expect(writtenSlots[1]!.notes).toBe('Who leads: Sam')
+
+      // Deep scan: no value strictly equal to `undefined` anywhere in the payload.
+      const hasRawUndefined = (v: unknown): boolean => {
+        if (v === undefined) return true
+        if (Array.isArray(v)) return v.some(hasRawUndefined)
+        if (v !== null && typeof v === 'object') {
+          return Object.values(v as Record<string, unknown>).some(hasRawUndefined)
+        }
+        return false
+      }
+      expect(hasRawUndefined(written)).toBe(false)
     })
   })
 
@@ -970,6 +1088,45 @@ describe('useServiceStore', () => {
       expect(token).toMatch(/^[0-9a-f]{36}$/)
       expect(consoleErrorSpy).toHaveBeenCalled()
       consoleErrorSpy.mockRestore()
+    })
+  })
+
+  // ── R112 — buildServiceSnapshot serializes slots in section-major order ──────
+  //
+  // The public share snapshot is one of the two read surfaces that render the
+  // RAW persisted slot array; a service created in template/insertion order was
+  // never `orderSlotsBySection`'d, so an empty-bodied item sinks to the bottom
+  // until a normalizing save fires. The snapshot must route slots through the
+  // editor's ordering contract so all three surfaces agree with no edit.
+  describe('buildServiceSnapshot slot ordering (R112)', () => {
+    it('serializes slots in orderSlotsBySection (section-major) order, including empty-bodied items', async () => {
+      const { buildServiceSnapshot } = await import('../services')
+
+      // Raw array is NOT section-major: a sending MISC (slot-b) precedes a
+      // worship MISC (slot-c), and the MESSAGE trails both. Section-major order
+      // is worship [a, c], message [d], sending [b] → ['a','c','d','b'].
+      const service = makeService({
+        slots: [
+          {
+            kind: 'SONG',
+            id: 'slot-a',
+            position: 0,
+            requiredVwType: 1,
+            songId: 'song-abc',
+            songTitle: 'Amazing Grace',
+            songKey: 'G',
+            section: 'worship',
+          },
+          { kind: 'MISC', id: 'slot-b', position: 1, section: 'sending' },
+          { kind: 'MISC', id: 'slot-c', position: 2, section: 'worship' },
+          { kind: 'MESSAGE', id: 'slot-d', position: 3, section: 'message' },
+        ],
+      }) as unknown as Service
+
+      const snapshot = buildServiceSnapshot(service)
+      const orderedIds = snapshot.slots.map((s) => s.id)
+
+      expect(orderedIds).toEqual(['slot-a', 'slot-c', 'slot-d', 'slot-b'])
     })
   })
 

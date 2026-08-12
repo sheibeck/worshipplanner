@@ -106,6 +106,34 @@ function templateItems() {
   return body().findAll('[data-testid="template-item"]')
 }
 
+// ── Per-row ⋯ menu helpers (Phase 57 — mirror ServiceEditorView.test.ts's
+//    openRowMenu/moveSlotViaRowMenu/deleteSlotViaRowMenu). Rows render in
+//    section-major order; these drive the menu by rendered index and return the
+//    entry id read off the trigger's testid. ──
+async function openRowMenuByIndex(index: number): Promise<string> {
+  const trigger = body().findAll('[data-testid^="template-row-menu-trigger-"]')[index]!
+  const id = trigger.attributes('data-testid')!.replace('template-row-menu-trigger-', '')
+  await trigger.trigger('click')
+  await flushPromises()
+  return id
+}
+
+/** Open a row's ⋯ menu and click a Move-to-section item. `value` is a
+ *  ServiceSection key, or '' for "No section" (maps to the `no-section` suffix). */
+async function moveViaRowMenu(index: number, value: string): Promise<void> {
+  const id = await openRowMenuByIndex(index)
+  const suffix = value === '' ? 'no-section' : value
+  await body().get(`[data-testid="template-row-menu-move-${id}-${suffix}"]`).trigger('click')
+  await flushPromises()
+}
+
+/** Open a row's ⋯ menu and click its Delete item (fires removeEntry immediately). */
+async function deleteViaRowMenu(index: number): Promise<void> {
+  const id = await openRowMenuByIndex(index)
+  await body().get(`[data-testid="template-row-menu-delete-${id}"]`).trigger('click')
+  await flushPromises()
+}
+
 beforeEach(() => {
   mockAuthState.orgId = 'org-1'
   mockAuthState.isEditor = true
@@ -208,17 +236,23 @@ describe('ServiceTemplateEditor — add-item palette (closed six-button set, R08
   })
 })
 
-describe('ServiceTemplateEditor — per-item section, remove, and accessibility', () => {
-  it('each row exposes a section select (SERVICE_SECTIONS + No section) and an immediate remove button', async () => {
+describe('ServiceTemplateEditor — per-row ⋯ menu, badge, and accessibility', () => {
+  it('each row\'s ⋯ menu exposes Move-to-section (No section + SERVICE_SECTIONS) and an immediate Delete; the inline select/remove are gone', async () => {
     mountEditor(true)
     await body().get('[data-testid="palette-add-song"]').trigger('click')
     await flushPromises()
 
-    const select = body().get('[data-testid="template-section-select"]')
-    const optionValues = select.findAll('option').map((o) => o.attributes('value'))
-    expect(optionValues).toEqual(['', 'pre-service', 'worship', 'message', 'sending', 'post-service'])
+    const id = await openRowMenuByIndex(0)
+    // Move-to-section option set mirrors the retired section <select>: No section + the five sections.
+    for (const suffix of ['no-section', 'pre-service', 'worship', 'message', 'sending', 'post-service']) {
+      expect(body().find(`[data-testid="template-row-menu-move-${id}-${suffix}"]`).exists()).toBe(true)
+    }
+    expect(body().find(`[data-testid="template-row-menu-delete-${id}"]`).exists()).toBe(true)
+    // The inline controls no longer exist anywhere in the rendered DOM.
+    expect(body().find('[data-testid="template-section-select"]').exists()).toBe(false)
+    expect(body().find('[data-testid="template-item-remove"]').exists()).toBe(false)
 
-    await body().get('[data-testid="template-item-remove"]').trigger('click')
+    await body().get(`[data-testid="template-row-menu-delete-${id}"]`).trigger('click')
     await flushPromises()
 
     // Fires immediately — no confirmation dialog anywhere in the DOM.
@@ -226,32 +260,69 @@ describe('ServiceTemplateEditor — per-item section, remove, and accessibility'
     expect(body().find('[data-testid="template-reset-confirm"]').exists()).toBe(false)
   })
 
-  it('changing the section select moves the item into that section\'s group', async () => {
+  it('the ⋯ menu Move-to-section moves the item into that section\'s group and closes the menu', async () => {
     mountEditor(true)
     await body().get('[data-testid="palette-add-song"]').trigger('click')
     await flushPromises()
 
-    await body().get('[data-testid="template-section-select"]').setValue('message')
-    await flushPromises()
+    await moveViaRowMenu(0, 'message')
 
     expect(body().find('[data-testid="template-section-header-message"]').exists()).toBe(true)
     expect(body().get('[data-testid="template-section-list-message"]').text()).toContain('Song')
+    // Menu closed after the move.
+    expect(body().find('[data-testid^="template-row-menu-panel-"]').exists()).toBe(false)
   })
 
-  it('carries aria-labels on the icon-only remove and drag-handle controls', async () => {
+  it('opening a second row\'s ⋯ menu closes the first (single-open); the backdrop closes the open menu', async () => {
+    mountEditor(true)
+    await body().get('[data-testid="palette-add-song"]').trigger('click')
+    await body().get('[data-testid="palette-add-prayer"]').trigger('click')
+    await flushPromises()
+
+    const id0 = await openRowMenuByIndex(0)
+    expect(body().find(`[data-testid="template-row-menu-panel-${id0}"]`).exists()).toBe(true)
+
+    const id1 = await openRowMenuByIndex(1)
+    expect(body().find(`[data-testid="template-row-menu-panel-${id0}"]`).exists()).toBe(false)
+    expect(body().find(`[data-testid="template-row-menu-panel-${id1}"]`).exists()).toBe(true)
+
+    // Backdrop click closes the open menu (exactly one backdrop is present while a menu is open).
+    await body().findAll('.fixed.inset-0.z-10')[0]!.trigger('click')
+    await flushPromises()
+    expect(body().find(`[data-testid="template-row-menu-panel-${id1}"]`).exists()).toBe(false)
+  })
+
+  it('renders a per-kind colored badge whose classes come from kindBadgeClass and whose text is kindLabel', async () => {
+    mountEditor(true)
+    await body().get('[data-testid="palette-add-song"]').trigger('click')
+    await flushPromises()
+
+    const badge = body().findAll('[data-testid^="template-item-badge-"]')[0]!
+    expect(badge.classes()).toContain('text-indigo-300') // SONG tint from the shared kindBadgeClass
+    expect(badge.text()).toBe('Song')
+  })
+
+  it('carries aria-labels on the icon-only ⋯ menu trigger and drag-handle controls', async () => {
     mountEditor(true)
     await body().get('[data-testid="palette-add-scripture"]').trigger('click')
     await flushPromises()
 
-    const removeButton = body().get('[data-testid="template-item-remove"]')
-    expect(removeButton.attributes('aria-label')).toBe('Remove Scripture Reading')
+    const menuTrigger = body().findAll('[data-testid^="template-row-menu-trigger-"]')[0]!
+    expect(menuTrigger.attributes('aria-label')).toBe('Row options')
+    expect(menuTrigger.attributes('aria-haspopup')).toBe('menu')
 
     const dragHandle = body().get('.drag-handle')
     expect(dragHandle.attributes('aria-label')).toBe('Drag to reorder Scripture Reading')
   })
 })
 
-describe('ServiceTemplateEditor — Reset to 1-2-3 default', () => {
+describe('ServiceTemplateEditor — Suggested Template seed (R114)', () => {
+  it('labels the seed button "Suggested Template" while keeping the template-reset testid', () => {
+    mountEditor(true)
+    const seedButton = body().get('[data-testid="template-reset"]')
+    expect(seedButton.text()).toBe('Suggested Template')
+  })
+
   it('applies directly (no confirm) when the draft is empty, loading a content-free 9-item shape', async () => {
     mountEditor(true)
     await body().get('[data-testid="template-reset"]').trigger('click')
@@ -293,7 +364,7 @@ describe('ServiceTemplateEditor — Reset to 1-2-3 default', () => {
     await flushPromises()
 
     expect(body().get('[data-testid="template-reset-confirm"]').text()).toContain(
-      "Replace your custom template with the standard 1-2-3 flow? This clears every item you've added.",
+      "Replace your custom template with the Suggested Template? This clears every item you've added.",
     )
     expect(templateItems()).toHaveLength(1)
 
@@ -317,6 +388,112 @@ describe('ServiceTemplateEditor — Reset to 1-2-3 default', () => {
 
     expect(body().find('[data-testid="template-reset-confirm"]').exists()).toBe(false)
     expect(templateItems()).toHaveLength(9)
+  })
+})
+
+describe('ServiceTemplateEditor — no recurring-body textarea (R116 UI removed 2026-08-12)', () => {
+  // Owner: "we don't need that." The recurring-body textarea was dropped for BOTH
+  // MISC and ANNOUNCEMENTS — a template item is now just its kind (+ MISC label).
+
+  it('renders NO template-item-body textarea for a preset MISC or ANNOUNCEMENTS row (even with a legacy body)', async () => {
+    mockAuthState.settings.defaultServiceTemplate = [
+      { id: 'misc-1', kind: 'MISC', body: 'Canned music' },
+      { id: 'ann-1', kind: 'ANNOUNCEMENTS', body: 'Weekly notices' },
+    ]
+    mountEditor(true)
+    await flushPromises()
+
+    expect(body().findAll('[data-testid="template-item-body"]')).toHaveLength(0)
+  })
+
+  it('renders NO template-item-body textarea for freshly added items of any kind', async () => {
+    mountEditor(true)
+    await body().get('[data-testid="palette-add-announcements"]').trigger('click')
+    await body().get('[data-testid="palette-add-misc"]').trigger('click')
+    await body().get('[data-testid="palette-add-song"]').trigger('click')
+    await flushPromises()
+
+    expect(body().findAll('[data-testid="template-item-body"]')).toHaveLength(0)
+  })
+})
+
+describe('ServiceTemplateEditor — MISC label edited inline on the badge (R127 → 2026-08-12)', () => {
+  // The separate template-item-misc-label input was replaced by an editable badge
+  // (MiscLabelBadge): the MISC pill (template-item-misc-<id>-badge) IS the name;
+  // clicking it reveals the inline input (template-item-misc-<id>-input).
+
+  it('renders the MISC badge as an editable pill bound to entry.label (no separate input until clicked)', async () => {
+    mockAuthState.settings.defaultServiceTemplate = [{ id: 'misc-1', kind: 'MISC', label: 'Communion' }]
+    mountEditor(true)
+    await flushPromises()
+
+    const badge = body().get('[data-testid="template-item-misc-misc-1-badge"]')
+    expect(badge.text()).toContain('Communion')
+    expect(body().find('[data-testid="template-item-misc-misc-1-input"]').exists()).toBe(false)
+    // The redundant name <p> is gone for MISC (the badge is the name).
+    expect(body().find('[data-testid="template-item-name"]').exists()).toBe(false)
+  })
+
+  it('renders no MISC editable badge/input for non-MISC kinds (ANNOUNCEMENTS / SONG)', async () => {
+    mountEditor(true)
+    await body().get('[data-testid="palette-add-announcements"]').trigger('click')
+    await body().get('[data-testid="palette-add-song"]').trigger('click')
+    await flushPromises()
+
+    expect(body().findAll('[data-testid^="template-item-misc-"]')).toHaveLength(0)
+  })
+
+  it('the MISC badge shows entry.label when set', async () => {
+    mockAuthState.settings.defaultServiceTemplate = [{ id: 'misc-1', kind: 'MISC', label: 'Communion' }]
+    mountEditor(true)
+    await flushPromises()
+    expect(body().get('[data-testid="template-item-misc-misc-1-badge"]').text()).toContain('Communion')
+  })
+
+  it('the MISC badge falls back to "Miscellaneous" when the label is absent', async () => {
+    mockAuthState.settings.defaultServiceTemplate = [{ id: 'misc-2', kind: 'MISC' }]
+    mountEditor(true)
+    await flushPromises()
+    expect(body().get('[data-testid="template-item-misc-misc-2-badge"]').text()).toContain('Miscellaneous')
+  })
+
+  it('editing the badge sets the draft entry label; the save payload carries the typed text', async () => {
+    mockAuthState.settings.defaultServiceTemplate = [{ id: 'misc-1', kind: 'MISC' }]
+    mountEditor(true)
+    await flushPromises()
+
+    await body().get('[data-testid="template-item-misc-misc-1-badge"]').trigger('click')
+    const input = body().get('[data-testid="template-item-misc-misc-1-input"]')
+    await input.setValue('Communion')
+    await input.trigger('blur')
+    await flushPromises()
+    await body().get('[data-testid="template-save"]').trigger('click')
+    await flushPromises()
+
+    const payload = mockUpdateDoc.mock.calls[0]![1] as Record<string, unknown>
+    const entries = payload['settings.defaultServiceTemplate'] as ServiceTemplateEntry[]
+    expect(entries).toHaveLength(1)
+    expect(entries[0]!.kind).toBe('MISC')
+    expect(entries[0]!.label).toBe('Communion')
+  })
+
+  it('clearing the label to empty leaves the saved entry labelless (undefined stripped)', async () => {
+    mockAuthState.settings.defaultServiceTemplate = [{ id: 'misc-1', kind: 'MISC', label: 'Communion' }]
+    mountEditor(true)
+    await flushPromises()
+
+    await body().get('[data-testid="template-item-misc-misc-1-badge"]').trigger('click')
+    const input = body().get('[data-testid="template-item-misc-misc-1-input"]')
+    await input.setValue('')
+    await input.trigger('blur')
+    await flushPromises()
+    await body().get('[data-testid="template-save"]').trigger('click')
+    await flushPromises()
+
+    const payload = mockUpdateDoc.mock.calls[0]![1] as Record<string, unknown>
+    const entries = payload['settings.defaultServiceTemplate'] as ServiceTemplateEntry[]
+    expect(entries).toHaveLength(1)
+    expect('label' in entries[0]!).toBe(false)
   })
 })
 
@@ -359,8 +536,8 @@ describe('ServiceTemplateEditor — draft cloning (Pitfall #3)', () => {
     await flushPromises()
 
     await body().get('[data-testid="palette-add-song"]').trigger('click')
-    await body().get('[data-testid="template-item-remove"]').trigger('click')
     await flushPromises()
+    await deleteViaRowMenu(0)
 
     // The draft was mutated (added then a remove fired), but the store's own array
     // contents are untouched until Save Template is clicked. (Not asserting reference
@@ -390,9 +567,8 @@ describe('ServiceTemplateEditor — drag-reorder (SortableJS, per-section instan
     await body().get('[data-testid="palette-add-scripture"]').trigger('click')
     await flushPromises()
 
-    const selects = body().findAll('[data-testid="template-section-select"]')
-    await selects[0]!.setValue('worship')
-    await selects[1]!.setValue('worship')
+    await moveViaRowMenu(0, 'worship')
+    await moveViaRowMenu(1, 'worship')
     await flushPromises()
 
     const worshipCapture = captureForSection('worship')
@@ -418,7 +594,7 @@ describe('ServiceTemplateEditor — drag-reorder (SortableJS, per-section instan
     await body().get('[data-testid="palette-add-prayer"]').trigger('click')
     await flushPromises()
 
-    await body().findAll('[data-testid="template-section-select"]')[1]!.setValue('message')
+    await moveViaRowMenu(1, 'message')
     await flushPromises()
 
     const ungroupedCapture = captureForUngrouped()
@@ -444,5 +620,85 @@ describe('ServiceTemplateEditor — drag-reorder (SortableJS, per-section instan
     const entries = payload['settings.defaultServiceTemplate'] as ServiceTemplateEntry[]
     const song = entries.find((e) => e.kind === 'SONG')
     expect(song?.section).toBe('message')
+  })
+
+  // R110 (default-template editor half). The module `sortablejs` mock only captures
+  // options — it NEVER relocates a DOM node (51-RESEARCH Pitfall 1) — so an onEnd-only
+  // test is false-GREEN on buggy code because the reactive `draft` is already correct.
+  // The defect is a SortableJS↔Vue DOM-ownership desync: SortableJS physically moves the
+  // dragged row's real DOM node into the target container, and Vue — patching from state
+  // it believes it owns — mints a SECOND row for that entry, leaving a handler-less
+  // phantom behind. This test physically performs SortableJS's real move BEFORE onEnd,
+  // then asserts on RENDERED node counts (never on the reactive array).
+  it('cross-section drag leaves exactly one rendered row for the moved item — no phantom duplicate (R110)', async () => {
+    mockAuthState.settings.defaultServiceTemplate = [
+      { id: 'song-1', kind: 'SONG' },
+      { id: 'scripture-1', kind: 'SCRIPTURE', section: 'worship' },
+    ]
+    mountEditor(true)
+    await flushPromises()
+
+    const ungroupedCapture = captureForUngrouped()
+    const worshipCapture = captureForSection('worship')
+    if (!ungroupedCapture || !worshipCapture) throw new Error('expected both ungrouped and worship captures')
+
+    const ungroupedContainer = body().get('[data-testid="template-section-list-ungrouped"]').element
+    const worshipContainer = body().get('[data-testid="template-section-list-worship"]').element
+
+    // Simulate SortableJS's real DOM relocation of the dragged row BEFORE onEnd fires:
+    // detach the "No Section" song node from the ungrouped container and append it into
+    // the worship container, exactly as a live cross-section drag would.
+    const draggedRow = ungroupedContainer.querySelector('[data-entry-id="song-1"]')
+    if (!draggedRow) throw new Error('dragged row not found in ungrouped container')
+    ungroupedContainer.removeChild(draggedRow)
+    worshipContainer.appendChild(draggedRow)
+
+    ungroupedCapture.options.onEnd?.({
+      oldDraggableIndex: 0,
+      newDraggableIndex: 1,
+      from: ungroupedContainer,
+      to: worshipContainer,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any)
+    await flushPromises()
+
+    // (a) the source (ungrouped) list holds ZERO rows for the moved id, and
+    // (b) the whole rendered subtree contains EXACTLY ONE row for that id.
+    const ungroupedAfter = body().find('[data-testid="template-section-list-ungrouped"]')
+    if (ungroupedAfter.exists()) {
+      expect(ungroupedAfter.element.querySelectorAll('[data-entry-id="song-1"]').length).toBe(0)
+    }
+    expect(body().findAll('[data-entry-id="song-1"]')).toHaveLength(1)
+  })
+})
+
+describe('ServiceTemplateEditor — No Section band (Phase 57)', () => {
+  it('renders a muted/dashed template-no-section-band labeled "No Section" for a non-empty ungrouped bucket, distinct from the real section headers', async () => {
+    // A stored entry with no section lands in the trailing ungrouped bucket.
+    mockAuthState.settings.defaultServiceTemplate = [
+      { id: 'song-1', kind: 'SONG', section: 'worship' },
+      { id: 'prayer-1', kind: 'PRAYER' },
+    ]
+    mountEditor(true)
+    await flushPromises()
+
+    const band = body().find('[data-testid="template-no-section-band"]')
+    expect(band.exists()).toBe(true)
+    expect(band.text()).toContain('No Section')
+    // Muted/dashed styling, and NOT one of the real template-section-header-* headers.
+    expect(band.classes()).toContain('border-dashed')
+    expect(band.attributes('data-testid')).not.toMatch(/^template-section-header-/)
+  })
+
+  it('does not render the template-no-section-band when every entry is sectioned', async () => {
+    mockAuthState.settings.defaultServiceTemplate = [
+      { id: 'song-1', kind: 'SONG', section: 'worship' },
+      { id: 'msg-1', kind: 'MESSAGE', section: 'message' },
+    ]
+    mountEditor(true)
+    await flushPromises()
+
+    expect(body().find('[data-testid="template-section-list-ungrouped"]').exists()).toBe(false)
+    expect(body().find('[data-testid="template-no-section-band"]').exists()).toBe(false)
   })
 })

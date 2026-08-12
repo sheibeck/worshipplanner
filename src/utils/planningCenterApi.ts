@@ -1,8 +1,9 @@
-import type { Service, ServiceSlot, ScriptureRef } from '@/types/service'
+import type { Service, ServiceSlot, ScriptureSlot, ScriptureRef } from '@/types/service'
 import type { Song } from '@/types/song'
 import type { UpsertPersonInput } from '@/types/roster'
 import { formatScriptureRef } from '@/utils/planningCenterExport'
 import { formatScriptureReference, scriptureRefFromSlot } from '@/utils/scripture'
+import { miscLabel } from '@/utils/slotTypes'
 import { fetchPassageText } from '@/utils/esvApi'
 import { fetchNltPassageText } from '@/utils/nltApi'
 
@@ -985,9 +986,14 @@ export async function addSlotAsItem(
     // an empty query returns HTTP 400 upstream and there is nothing to fetch.
     // The item is still created below, just without an html_details description.
     if (refText) {
+      // R128 (Phase 56): the per-item override wins over the org-default param.
+      // `slot` is already narrowed to the SCRIPTURE member here; the cast only
+      // reaches the new optional field. Any value other than exactly 'NLT'
+      // (including a corrupt or absent one) safely routes to the ESV fetch.
+      const effectiveVersion = (slot as ScriptureSlot).bibleVersion ?? bibleVersion
       try {
         description =
-          bibleVersion === 'NLT'
+          effectiveVersion === 'NLT'
             ? await fetchNltPassageText(refText)
             : await fetchPassageText(refText)
       } catch {
@@ -1016,7 +1022,7 @@ export async function addSlotAsItem(
     return createItem(appId, secret, serviceTypeId, planId, {
       title: 'Announcements',
       itemType: 'regular',
-      description: bodyDescription(slot.body),
+      description: bodyDescription(slot.notes ?? slot.body),
       sequence,
       length,
     })
@@ -1024,20 +1030,21 @@ export async function addSlotAsItem(
 
   if (slot.kind === 'MISC') {
     return createItem(appId, secret, serviceTypeId, planId, {
-      title: 'Miscellaneous',
+      title: miscLabel(slot),
       itemType: 'regular',
-      description: bodyDescription(slot.body),
+      description: bodyDescription(slot.notes ?? slot.body),
       sequence,
       length,
     })
   }
 
   if (slot.kind === 'MESSAGE') {
-    // `body` wins when present (R085); the pre-existing `sermonPassage`
-    // fallback is preserved, not replaced, so a Message slot with no body
-    // still gets the formatted sermon passage as its description.
+    // notes-canonical (260811-vsr): the consolidated free-text field is `notes`,
+    // falling back to legacy `body`. `notes ?? body` wins when present (R085); the
+    // pre-existing `sermonPassage` fallback is preserved, not replaced, so a Message
+    // slot with neither notes nor body still gets the formatted sermon passage.
     const description =
-      bodyDescription(slot.body) ?? (sermonPassage ? formatScriptureRef(sermonPassage) : undefined)
+      bodyDescription(slot.notes ?? slot.body) ?? (sermonPassage ? formatScriptureRef(sermonPassage) : undefined)
 
     return createItem(appId, secret, serviceTypeId, planId, {
       title: 'Message',

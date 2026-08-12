@@ -1346,6 +1346,246 @@ describe('assembleSlideshow — stored group resolution (D-02, R028)', () => {
   })
 })
 
+// Phase 53 Plan 02 (R117/R118): a split lyric section (slideBreaks present)
+// resolves LIVE to N slides at BOTH lockstep lyric-emission call sites, keyed
+// through Plan 01's `sliceSectionIntoSlides`. An unsplit section stays byte-
+// identical to today (one slide, verbatim id). The stored slide-group model is
+// unchanged — the split is never persisted.
+describe('assembleSlideshow — lyric split (R117/R118, Plan 53-02)', () => {
+  const eightLines = ['L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7']
+
+  function splitSongLyrics(overrides: Partial<SongLyrics> = {}): SongLyrics {
+    return makeSongLyrics({
+      sections: [{ id: 'verse-1', label: 'Verse 1', lines: [...eightLines], slideBreaks: [4] }],
+      performanceOrder: ['verse-1'],
+      ...overrides,
+    })
+  }
+
+  describe('stored-group path (R117)', () => {
+    it('a section with slideBreaks emits N lyric slides with ids `${entry.id}:${i}` and partitioned lines; sectionLabel is the stored label', () => {
+      const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+      const service = makeService([slot])
+      const lyrics = splitSongLyrics()
+      const entry = makeGroupSlideEntry({
+        id: 'entry-verse',
+        order: 0,
+        sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+      })
+      const group = makeSlideGroup({ id: 'slot-song-0', slotId: 'slot-song-0', slides: [entry] })
+      const inputs = makeInputs({
+        songLyricsById: new Map([['song-1', lyrics]]),
+        groupsBySlotId: new Map([['slot-song-0', group]]),
+      })
+
+      const result = assembleSlideshow(service, inputs)
+
+      expect(result).toHaveLength(2)
+      expect(result.map((r) => r.slide.id)).toEqual(['entry-verse:0', 'entry-verse:1'])
+      expect(result.map((r) => r.groupSlideId)).toEqual(['entry-verse:0', 'entry-verse:1'])
+      expect((result[0]!.slide as LyricSlide).lines).toEqual(['L0', 'L1', 'L2', 'L3'])
+      expect((result[1]!.slide as LyricSlide).lines).toEqual(['L4', 'L5', 'L6', 'L7'])
+      expect((result[0]!.slide as LyricSlide).sectionId).toBe('verse-1')
+      expect((result[1]!.slide as LyricSlide).sectionId).toBe('verse-1')
+      expect((result[0]!.slide as LyricSlide).sectionLabel).toBe('Verse 1')
+      expect((result[1]!.slide as LyricSlide).sectionLabel).toBe('Verse 1')
+    })
+
+    it('BWC: an UNSPLIT section emits exactly ONE lyric slide whose id is `entry.id` byte-identical to today', () => {
+      const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+      const service = makeService([slot])
+      const lyrics = makeSongLyrics() // verse-1 (2 lines), chorus (1 line), no slideBreaks
+      const entry = makeGroupSlideEntry({
+        id: 'entry-verse',
+        order: 0,
+        sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+      })
+      const group = makeSlideGroup({ id: 'slot-song-0', slotId: 'slot-song-0', slides: [entry] })
+      const inputs = makeInputs({
+        songLyricsById: new Map([['song-1', lyrics]]),
+        groupsBySlotId: new Map([['slot-song-0', group]]),
+      })
+
+      const result = assembleSlideshow(service, inputs)
+
+      expect(result).toHaveLength(1)
+      expect(result[0]!.slide.id).toBe('entry-verse')
+      expect(result[0]!.groupSlideId).toBe('entry-verse')
+      expect((result[0]!.slide as LyricSlide).lines).toEqual(['Line A', 'Line B'])
+    })
+
+    it('all split slides of one section share that section group media (background + bed audio)', () => {
+      const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+      const service = makeService([slot])
+      const lyrics = splitSongLyrics()
+      const entry = makeGroupSlideEntry({
+        id: 'entry-verse',
+        order: 0,
+        sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+      })
+      const group = makeSlideGroup({
+        id: 'slot-song-0',
+        slotId: 'slot-song-0',
+        slides: [entry],
+        backgroundImageUrl: 'https://example.com/bg.png',
+        bedAudioUrl: 'https://example.com/bed.mp3',
+      })
+      const inputs = makeInputs({
+        songLyricsById: new Map([['song-1', lyrics]]),
+        groupsBySlotId: new Map([['slot-song-0', group]]),
+      })
+
+      const result = assembleSlideshow(service, inputs)
+
+      expect(result).toHaveLength(2)
+      for (const r of result) {
+        expect(r.slide.backgroundImageUrl).toBe('https://example.com/bg.png')
+        expect(r.slide.backgroundSource).toBe('group')
+        expect(r.slide.audioUrl).toBe('https://example.com/bed.mp3')
+        expect(r.groupId).toBe('slot-song-0')
+        expect(r.audioFromBed).toBe(true)
+      }
+    })
+  })
+
+  function isCopyright(assembled: { slide: unknown }): boolean {
+    return Object.prototype.hasOwnProperty.call(assembled.slide as object, 'ccliSongNumber')
+  }
+  const lyricLinesOf = (result: { slide: unknown }[]): string[][] =>
+    result.filter((r) => !isCopyright(r)).map((r) => (r.slide as LyricSlide).lines)
+
+  describe('fallback path (R117)', () => {
+    it('a section with slideBreaks emits N lyric fallback slides with distinct consecutive ids, partitioned lines, between the copyright bracket', () => {
+      const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+      const service = makeService([slot])
+      const lyrics = splitSongLyrics()
+      const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) }) // no group
+
+      const result = assembleSlideshow(service, inputs)
+
+      expect(result).toHaveLength(4) // copyright, split0, split1, copyright
+      expect(result.map((r) => r.slide.id)).toEqual([
+        'slot-song-0:0',
+        'slot-song-0:1',
+        'slot-song-0:2',
+        'slot-song-0:3',
+      ])
+      expect(isCopyright(result[0]!)).toBe(true)
+      expect(isCopyright(result[3]!)).toBe(true)
+      expect((result[1]!.slide as LyricSlide).lines).toEqual(['L0', 'L1', 'L2', 'L3'])
+      expect((result[2]!.slide as LyricSlide).lines).toEqual(['L4', 'L5', 'L6', 'L7'])
+    })
+
+    it('BWC: an unsplit section emits exactly one fallback lyric slide, byte-identical id/lines to today', () => {
+      const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+      const service = makeService([slot])
+      const lyrics = makeSongLyrics({ performanceOrder: ['verse-1'] })
+      const inputs = makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) })
+
+      const result = assembleSlideshow(service, inputs)
+
+      expect(result).toHaveLength(3) // copyright, verse, copyright
+      expect(result[1]!.slide.id).toBe('slot-song-0:1')
+      expect((result[1]!.slide as LyricSlide).lines).toEqual(['Line A', 'Line B'])
+    })
+  })
+
+  describe('dual-path lockstep (D1) + duplicate proof (R118)', () => {
+    it('the stored-group and fallback paths emit the same number of lyric slides with the same lines for the same split section', () => {
+      const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+      const lyrics = splitSongLyrics()
+
+      const fallback = assembleSlideshow(
+        makeService([slot]),
+        makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) }),
+      )
+
+      const entry = makeGroupSlideEntry({
+        id: 'entry-verse',
+        order: 0,
+        sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+      })
+      const group = makeSlideGroup({ id: 'slot-song-0', slotId: 'slot-song-0', slides: [entry] })
+      const stored = assembleSlideshow(
+        makeService([slot]),
+        makeInputs({
+          songLyricsById: new Map([['song-1', lyrics]]),
+          groupsBySlotId: new Map([['slot-song-0', group]]),
+        }),
+      )
+
+      expect(lyricLinesOf(fallback)).toEqual(lyricLinesOf(stored))
+      expect(lyricLinesOf(stored)).toEqual([
+        ['L0', 'L1', 'L2', 'L3'],
+        ['L4', 'L5', 'L6', 'L7'],
+      ])
+    })
+
+    it('R118 stored path: a split section referenced by two entries emits all N slides on both occurrences with distinct ids', () => {
+      const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+      const lyrics = splitSongLyrics()
+      const entryA = makeGroupSlideEntry({
+        id: 'entry-a',
+        order: 0,
+        sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+      })
+      const entryB = makeGroupSlideEntry({
+        id: 'entry-b',
+        order: 1,
+        sourceRef: { kind: 'lyric', songId: 'song-1', sectionId: 'verse-1' },
+      })
+      const group = makeSlideGroup({ id: 'slot-song-0', slotId: 'slot-song-0', slides: [entryA, entryB] })
+      const originalSlides = group.slides
+
+      const result = assembleSlideshow(
+        makeService([slot]),
+        makeInputs({
+          songLyricsById: new Map([['song-1', lyrics]]),
+          groupsBySlotId: new Map([['slot-song-0', group]]),
+        }),
+      )
+
+      expect(result.map((r) => r.slide.id)).toEqual(['entry-a:0', 'entry-a:1', 'entry-b:0', 'entry-b:1'])
+      expect(new Set(result.map((r) => r.slide.id)).size).toBe(4)
+      expect((result[0]!.slide as LyricSlide).lines).toEqual(['L0', 'L1', 'L2', 'L3'])
+      expect((result[1]!.slide as LyricSlide).lines).toEqual(['L4', 'L5', 'L6', 'L7'])
+      expect((result[2]!.slide as LyricSlide).lines).toEqual(['L0', 'L1', 'L2', 'L3'])
+      expect((result[3]!.slide as LyricSlide).lines).toEqual(['L4', 'L5', 'L6', 'L7'])
+      // The stored group document is never mutated (no duplicateRow/model change).
+      expect(group.slides).toBe(originalSlides)
+      expect(group.slides).toHaveLength(2)
+    })
+
+    it('R118 fallback path: a split section repeated in performanceOrder emits all N slides on both occurrences with distinct consecutive ids', () => {
+      const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
+      const lyrics = splitSongLyrics({ performanceOrder: ['verse-1', 'verse-1'] })
+
+      const result = assembleSlideshow(
+        makeService([slot]),
+        makeInputs({ songLyricsById: new Map([['song-1', lyrics]]) }),
+      )
+
+      // copyright, split0, split1, split0, split1, copyright
+      expect(result).toHaveLength(6)
+      expect(result.map((r) => r.slide.id)).toEqual([
+        'slot-song-0:0',
+        'slot-song-0:1',
+        'slot-song-0:2',
+        'slot-song-0:3',
+        'slot-song-0:4',
+        'slot-song-0:5',
+      ])
+      expect(new Set(result.map((r) => r.slide.id)).size).toBe(6)
+      expect(lyricLinesOf(result)).toEqual([
+        ['L0', 'L1', 'L2', 'L3'],
+        ['L4', 'L5', 'L6', 'L7'],
+        ['L0', 'L1', 'L2', 'L3'],
+        ['L4', 'L5', 'L6', 'L7'],
+      ])
+    })
+  })
+})
+
 describe('assembleSlideshow — D-04 two-level audio precedence (R030)', () => {
   it("an entry with its own audioUrl resolves to that url even when the group has a bed", () => {
     const slot = songSlot({ id: 'slot-song-0', songId: 'song-1' })
@@ -2361,5 +2601,77 @@ describe('assembleSlideshow fallback — IMPORTED with a render (no-group path, 
     expect(plainResults[0]!.slide.contentKind).toBe('text')
     const firstPlainSlide = plainDeck.slides[0] as TextSlide
     expect((plainResults[0]!.slide as TextSlide).body).toBe(firstPlainSlide.body)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// R108 (Phase 50, 50-05): resolveEntryContent threads sourceRef.renderedPage
+// into importedEntryContent for a hand-added imported entry stored inside a
+// NON-imported group (the case the ec217aa positional resolver could not
+// handle for a multi-image deck).
+// ---------------------------------------------------------------------------
+describe('resolveEntryContent — imported entry inside a non-imported group carrying renderedPage (R108)', () => {
+  it('a hand-added imported entry with renderedPage resolves to its page URL for a MULTI-IMAGE deck (mismatched parsed/rendered counts)', () => {
+    const deck = makeRenderedImportedDeck() // 5 parsed slides
+    const slot = scriptureSlot({ id: 'slot-scripture-0' })
+    const service = makeService([slot])
+    const urls = ['url-1', 'url-2', 'url-3'] // renderedCount 3, mismatched against 5 parsed slides
+    const entry = makeGroupSlideEntry({
+      id: 'entry-hand-added',
+      order: 0,
+      sourceRef: { kind: 'imported', importId: 'deck-1', innerSlideId: 'is-2', renderedPage: 2 },
+    })
+    const group = makeSlideGroup({ id: 'slot-scripture-0', slotId: 'slot-scripture-0', slides: [entry] })
+    const inputs = makeRenderInputs(deck, makeRenderDoc({ status: 'ready', renderedCount: 3 }), urls, {
+      groupsBySlotId: new Map([['slot-scripture-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result).toHaveLength(1)
+    const slide = result[0]!.slide as ImageSlide
+    expect(slide.contentKind).toBe('image')
+    expect(slide.imageUrl).toBe(urls[1])
+    expect(slide.renderState).toBeUndefined()
+  })
+
+  it('the same entry WITHOUT renderedPage against the same mismatched deck stays a pending placeholder (proving renderedPage is what fixes it)', () => {
+    const deck = makeRenderedImportedDeck() // 5 parsed slides
+    const slot = scriptureSlot({ id: 'slot-scripture-0' })
+    const service = makeService([slot])
+    const urls = ['url-1', 'url-2', 'url-3'] // renderedCount 3, mismatched against 5 parsed slides
+    const entry = makeGroupSlideEntry({
+      id: 'entry-hand-added',
+      order: 0,
+      sourceRef: { kind: 'imported', importId: 'deck-1', innerSlideId: 'is-2' },
+    })
+    const group = makeSlideGroup({ id: 'slot-scripture-0', slotId: 'slot-scripture-0', slides: [entry] })
+    const inputs = makeRenderInputs(deck, makeRenderDoc({ status: 'ready', renderedCount: 3 }), urls, {
+      groupsBySlotId: new Map([['slot-scripture-0', group]]),
+    })
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result).toHaveLength(1)
+    const slide = result[0]!.slide as ImageSlide
+    expect(slide.contentKind).toBe('image')
+    expect(slide.imageUrl).toBe('')
+    expect(slide.renderState).toBe('pending')
+  })
+
+  it('the no-group IMPORTED fallback path is unchanged — a synthetic-identity ready entry resolves the same with or without this change', () => {
+    const deck = makeRenderedImportedDeck()
+    const slot = importedSlot({ id: 'slot-imported-0', importId: 'deck-1' })
+    const service = makeService([slot])
+    const urls = Array.from({ length: 5 }, (_, i) => `url-${i + 1}`)
+    const inputs = makeRenderInputs(deck, makeRenderDoc({ status: 'ready', renderedCount: 5 }), urls)
+
+    const result = assembleSlideshow(service, inputs)
+
+    expect(result).toHaveLength(5)
+    result.forEach((assembled, i) => {
+      expect(assembled.slide.contentKind).toBe('image')
+      expect((assembled.slide as ImageSlide).imageUrl).toBe(urls[i])
+    })
   })
 })

@@ -272,4 +272,48 @@ describe('LyricPasteRegion', () => {
       expect(wrapper.find('[data-testid="paste-summary-line"]').text()).toMatch(/\b1 section\b(?!s)/)
     })
   })
+
+  // R121 — the commit button label is a first-paste vs. replace distinction driven
+  // entirely by the already-passed currentSectionCount prop (no new prop).
+  describe('R121 — commit button reads "Save" on a brand-new song, "Replace lyrics" otherwise', () => {
+    it('reads "Save" when the song has no sections yet (currentSectionCount === 0)', async () => {
+      const wrapper = mount(LyricPasteRegion, {
+        props: { songId: 'song-1', orgId: 'org-1', currentSectionCount: 0 },
+      })
+      await wrapper.vm.$nextTick()
+      expect(wrapper.find('[data-testid="paste-replace-btn"]').text()).toBe('Save')
+    })
+
+    it('reads "Replace lyrics" when the song already has sections (currentSectionCount > 0)', async () => {
+      const wrapper = mount(LyricPasteRegion, {
+        props: { songId: 'song-1', orgId: 'org-1', currentSectionCount: 3 },
+      })
+      await wrapper.vm.$nextTick()
+      expect(wrapper.find('[data-testid="paste-replace-btn"]').text()).toBe('Replace lyrics')
+    })
+
+    it('reads "Saving..." while a save is in flight, even on a brand-new song', async () => {
+      let resolveSave: () => void = () => {}
+      mockSaveLyrics.mockImplementationOnce(
+        () => new Promise<void>((resolve) => { resolveSave = resolve }),
+      )
+      const wrapper = mount(LyricPasteRegion, {
+        props: { songId: 'song-1', orgId: 'org-1', currentSectionCount: 0 },
+      })
+      await wrapper.find('[data-testid="paste-textarea"]').setValue(SAMPLE_CCLI)
+      await wrapper.vm.$nextTick()
+      await wrapper.find('[data-testid="paste-replace-btn"]').trigger('click')
+      await wrapper.vm.$nextTick()
+      expect(wrapper.find('[data-testid="paste-replace-btn"]').text()).toBe('Saving...')
+      resolveSave()
+    })
+
+    it('does not claim to replace 0 sections in the footer helper on a first paste', async () => {
+      const wrapper = mount(LyricPasteRegion, {
+        props: { songId: 'song-1', orgId: 'org-1', currentSectionCount: 0 },
+      })
+      await wrapper.vm.$nextTick()
+      expect(wrapper.text()).not.toContain('Replaces the current 0 sections')
+    })
+  })
 })

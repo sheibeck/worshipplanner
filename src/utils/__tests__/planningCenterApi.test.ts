@@ -994,6 +994,67 @@ describe('addSlotAsItem', () => {
     expect(body.data.attributes.html_details).toBe('For God so loved the world... (ESV)')
   })
 
+  // R128 (Phase 56): the per-item slot.bibleVersion overrides the org-default
+  // param for the fetch routing; the title stays version-agnostic.
+  describe('R128 per-item bibleVersion override (PC export routing)', () => {
+    const scriptureSlot = (bibleVersion?: 'ESV' | 'NLT'): ScriptureSlot => ({
+      kind: 'SCRIPTURE',
+      id: 'slot-scripture-r128',
+      position: 2,
+      book: 'John',
+      chapter: 3,
+      verseStart: 16,
+      verseEnd: 17,
+      ...(bibleVersion ? { bibleVersion } : {}),
+    })
+
+    it('slot.bibleVersion "NLT" with org-default param "ESV" fetches via NLT', async () => {
+      defaultFetchResponse()
+      vi.mocked(fetchNltPassageText).mockResolvedValueOnce('NLT text')
+
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', scriptureSlot('NLT'), 2, [], 'ESV')
+
+      expect(vi.mocked(fetchNltPassageText)).toHaveBeenCalledWith('John 3:16-17')
+      expect(vi.mocked(fetchPassageText)).not.toHaveBeenCalled()
+      const [, options] = vi.mocked(fetch).mock.calls[0]!
+      const body = JSON.parse(options?.body as string)
+      expect(body.data.attributes.title).toBe('Scripture - John 3:16-17')
+    })
+
+    it('no slot.bibleVersion with org-default param "ESV" fetches via ESV (unchanged from today)', async () => {
+      defaultFetchResponse()
+      vi.mocked(fetchPassageText).mockResolvedValueOnce('ESV text')
+
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', scriptureSlot(), 2, [], 'ESV')
+
+      expect(vi.mocked(fetchPassageText)).toHaveBeenCalledWith('John 3:16-17')
+      expect(vi.mocked(fetchNltPassageText)).not.toHaveBeenCalled()
+      const [, options] = vi.mocked(fetch).mock.calls[0]!
+      const body = JSON.parse(options?.body as string)
+      expect(body.data.attributes.title).toBe('Scripture - John 3:16-17')
+    })
+
+    it('slot.bibleVersion "ESV" with org-default param "NLT" fetches via ESV (per-item override wins)', async () => {
+      defaultFetchResponse()
+      vi.mocked(fetchPassageText).mockResolvedValueOnce('ESV text')
+
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', scriptureSlot('ESV'), 2, [], 'NLT')
+
+      expect(vi.mocked(fetchPassageText)).toHaveBeenCalledWith('John 3:16-17')
+      expect(vi.mocked(fetchNltPassageText)).not.toHaveBeenCalled()
+    })
+
+    it('no slot.bibleVersion with org-default param "NLT" fetches via NLT (org default still applies)', async () => {
+      defaultFetchResponse()
+      vi.mocked(fetchNltPassageText).mockResolvedValueOnce('NLT text')
+
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', scriptureSlot(), 2, [], 'NLT')
+
+      expect(vi.mocked(fetchNltPassageText)).toHaveBeenCalledWith('John 3:16-17')
+      expect(vi.mocked(fetchPassageText)).not.toHaveBeenCalled()
+    })
+  })
+
   // A (bug fix): an unresolvable reference (book/chapter null) used to send an
   // empty query that returns HTTP 400. Now NEITHER fetch fires, no throw, and
   // the item is still created with no html_details.
@@ -1255,6 +1316,29 @@ describe('addSlotAsItem', () => {
       expect(body.data.attributes.title).not.toBe('Message')
     })
 
+    // R127 (Phase 56): a MISC slot's custom label becomes the PC item title.
+    it('exports a MISC slot with a custom label as that label in the item title', async () => {
+      defaultFetchResponse()
+      const slot: NonAssignableSlot = { kind: 'MISC', id: 'slot-misc-lbl', position: 6, label: 'Communion' }
+
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 6, [], 'ESV')
+
+      const [, options] = vi.mocked(fetch).mock.calls[0]!
+      const body = JSON.parse(options?.body as string)
+      expect(body.data.attributes.title).toBe('Communion')
+    })
+
+    it('exports a MISC slot with a whitespace-only label as "Miscellaneous" (unchanged from today)', async () => {
+      defaultFetchResponse()
+      const slot: NonAssignableSlot = { kind: 'MISC', id: 'slot-misc-lbl2', position: 6, label: '   ' }
+
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 6, [], 'ESV')
+
+      const [, options] = vi.mocked(fetch).mock.calls[0]!
+      const body = JSON.parse(options?.body as string)
+      expect(body.data.attributes.title).toBe('Miscellaneous')
+    })
+
     it('E-18: an ANNOUNCEMENTS slot with a whitespace-only body exports as itself with no description', async () => {
       defaultFetchResponse()
       const slot: NonAssignableSlot = { kind: 'ANNOUNCEMENTS', id: 'slot-ann-7', position: 7, body: '   \n\t  ' }
@@ -1340,6 +1424,56 @@ describe('addSlotAsItem', () => {
       const [, options] = vi.mocked(fetch).mock.calls[0]!
       const body = JSON.parse(options?.body as string)
       expect(body.data.attributes.html_details).toBe('Series: Hope, week 3')
+    })
+
+    // ── 260811-vsr: notes-canonical export (notes ?? body) ──────────────────────
+    // The consolidated free-text field is `notes`, falling back to legacy `body`.
+    // A notes-only slot exports its notes; a legacy body-only slot still exports its
+    // body (covered by E-18/E-19 above); notes wins when both are present.
+
+    it('exports a notes-only ANNOUNCEMENTS slot description from notes', async () => {
+      defaultFetchResponse()
+      const slot: NonAssignableSlot = { kind: 'ANNOUNCEMENTS', id: 'slot-ann-n1', position: 0, notes: 'Nursery moved to Room 4' }
+
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 0, [], 'ESV')
+
+      const [, options] = vi.mocked(fetch).mock.calls[0]!
+      const body = JSON.parse(options?.body as string)
+      expect(body.data.attributes.html_details).toBe('Nursery moved to Room 4')
+    })
+
+    it('exports a notes-only MISC slot description from notes', async () => {
+      defaultFetchResponse()
+      const slot: NonAssignableSlot = { kind: 'MISC', id: 'slot-misc-n2', position: 1, notes: 'Set up chairs early' }
+
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 1, [], 'ESV')
+
+      const [, options] = vi.mocked(fetch).mock.calls[0]!
+      const body = JSON.parse(options?.body as string)
+      expect(body.data.attributes.html_details).toBe('Set up chairs early')
+    })
+
+    it('exports a notes-only MESSAGE slot description from notes, over the sermonPassage fallback', async () => {
+      defaultFetchResponse()
+      const sermonPassage: ScriptureRef = { book: 'Romans', chapter: 8, verseStart: 1, verseEnd: 11 }
+      const slot: NonAssignableSlot = { kind: 'MESSAGE', id: 'slot-msg-n3', position: 2, notes: 'Guest speaker: Pastor Lee' }
+
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 2, [], 'ESV', sermonPassage)
+
+      const [, options] = vi.mocked(fetch).mock.calls[0]!
+      const body = JSON.parse(options?.body as string)
+      expect(body.data.attributes.html_details).toBe('Guest speaker: Pastor Lee')
+    })
+
+    it('prefers notes over legacy body when a MESSAGE slot carries both', async () => {
+      defaultFetchResponse()
+      const slot: NonAssignableSlot = { kind: 'MESSAGE', id: 'slot-msg-n4', position: 3, notes: 'New notes win', body: 'stale body' }
+
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 3, [], 'ESV', null)
+
+      const [, options] = vi.mocked(fetch).mock.calls[0]!
+      const body = JSON.parse(options?.body as string)
+      expect(body.data.attributes.html_details).toBe('New notes win')
     })
 
     it('E-14: a HYMN slot with empty hymnNumber and empty verses exports the bare title with no # and no (vv. )', async () => {

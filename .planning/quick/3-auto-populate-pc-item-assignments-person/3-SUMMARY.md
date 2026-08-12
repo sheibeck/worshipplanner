@@ -1,3 +1,8 @@
+---
+status: complete
+completed_at: v1.5-milestone-cleanup 2026-08-10
+---
+
 # Quick Task 3: Auto-populate PC item metadata from last scheduled item
 
 **Completed:** 2026-03-06

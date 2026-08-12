@@ -171,6 +171,13 @@ import type { ScriptureRef } from '@/types/service'
 const props = defineProps<{
   reference: ScriptureRef | null
   sections: CongregationalSection[]
+  /**
+   * R128 (Phase 56): optional per-item Bible-version override. When present it
+   * governs the split-time passage fetch AND the stamped `translationSource`;
+   * absent => the org default (`authStore.settings.bibleVersion`), reproducing
+   * today's routing and provenance exactly.
+   */
+  bibleVersion?: 'ESV' | 'NLT'
 }>()
 
 const emit = defineEmits<{
@@ -232,7 +239,9 @@ async function autoFetch(): Promise<void> {
   isFetching.value = true
   fetchError.value = false
   // R090/R092: captured ONCE, right before the fetch it governs.
-  const version = authStore.settings.bibleVersion
+  // R128 (Phase 56): the per-item override wins over the org default; absent
+  // prop reproduces today's org-default fetch AND stamped provenance.
+  const version = props.bibleVersion ?? authStore.settings.bibleVersion
   const query = formatQuery(scriptureRef)
   try {
     const raw = version === 'NLT' ? await fetchNltPassageText(query) : await fetchPassageText(query)
@@ -303,7 +312,7 @@ async function onAiSplit(): Promise<void> {
 }
 
 function onSave(): void {
-  const version = capturedVersion.value ?? authStore.settings.bibleVersion
+  const version = capturedVersion.value ?? props.bibleVersion ?? authStore.settings.bibleVersion
   emit('update:sections', parseCongregationalText(text.value, version ?? undefined))
   emit('close')
 }

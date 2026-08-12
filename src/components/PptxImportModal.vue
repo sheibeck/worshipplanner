@@ -314,8 +314,8 @@ async function importPptx(file: File) {
     const parsePptx = httpsCallable<
       { orgId: string; importId: string; storagePath: string },
       { slides: Array<
-        | { contentKind: 'text'; title?: string; body: string }
-        | { contentKind: 'image'; imageUrl: string; altText?: string }
+        | { contentKind: 'text'; title?: string; body: string; sourcePage: number }
+        | { contentKind: 'image'; imageUrl: string; altText?: string; sourcePage: number }
       > }
     >(functions, 'parsePptx')
 
@@ -331,6 +331,7 @@ async function importPptx(file: File) {
           position,
           contentKind: 'image',
           imageUrl,
+          sourcePage: rawSlide.sourcePage,
           // Firestore rejects `undefined` field values, so only include altText when present.
           ...(rawSlide.altText !== undefined && { altText: rawSlide.altText }),
         })
@@ -339,6 +340,7 @@ async function importPptx(file: File) {
           id: crypto.randomUUID(),
           position,
           contentKind: 'text',
+          sourcePage: rawSlide.sourcePage,
           // Firestore rejects `undefined` field values, so only include title when present.
           ...(rawSlide.title !== undefined && { title: rawSlide.title }),
           body: rawSlide.body,
@@ -397,6 +399,10 @@ async function importImages(files: File[]) {
         position: i,
         contentKind: 'image',
         imageUrl,
+        // Image-only decks never produce a render record (no source.pptx for
+        // the render service to convert), so sourcePage has no consumer here
+        // -- set for shape uniformity with the PPTX path only.
+        sourcePage: i + 1,
       })
       uploadProgress.value = ((i + 1) / files.length) * 100
     }

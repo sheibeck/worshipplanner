@@ -328,6 +328,26 @@ describe('ScriptureInput', () => {
       expect(link.attributes('href')).toContain('version=NLT')
       expect(link.attributes('href')).toContain('biblegateway.com')
     })
+
+    it('the per-item bibleVersion override drives the reader link, overriding the org default (2026-08-12)', async () => {
+      mockBibleVersion = 'ESV' // church default is ESV…
+      const wrapper = mount(ScriptureInput, {
+        props: {
+          ...defaultProps,
+          modelValue: { book: 'John', chapter: 3, verseStart: 16, verseEnd: 16 },
+          bibleVersion: 'NLT', // …but this item overrides to NLT
+        },
+      })
+      // …so the reader link follows the override, not the org default.
+      expect(wrapper.text()).toContain('View on BibleGateway')
+      const link = wrapper.find('a[target="_blank"]')
+      expect(link.attributes('href')).toContain('version=NLT')
+
+      // Changing the override back to ESV updates the link live.
+      await wrapper.setProps({ bibleVersion: 'ESV' })
+      expect(wrapper.text()).toContain('View on ESV.org')
+      expect(wrapper.find('a[target="_blank"]').attributes('href')).toContain('esv.org')
+    })
   })
 
   describe('Overlap warning', () => {
@@ -570,6 +590,67 @@ describe('ESV/NLT preview routing (45-04, R090)', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('Could not load passage. Check your connection and try again.')
+  })
+
+  // R128 (Phase 56): a per-item bibleVersion prop overrides the org default for
+  // the preview fetch; an absent prop keeps today's org-default routing.
+  it('R128: prop bibleVersion=NLT routes the preview fetch to nltApi even though the org default is ESV', async () => {
+    // mockBibleVersion stays 'ESV' (the org default) — the prop must win.
+    const { fetchPassageText } = await import('@/utils/esvApi')
+    const { fetchNltPassageText } = await import('@/utils/nltApi')
+
+    const wrapper = mount(ScriptureInput, {
+      props: {
+        ...defaultProps,
+        modelValue: { book: 'John', chapter: 3, verseStart: 16, verseEnd: 17 },
+        bibleVersion: 'NLT' as const,
+      },
+    })
+    const previewBtn = wrapper.findAll('button').find((b) => b.text().includes('Preview passage'))
+    await previewBtn!.trigger('click')
+    await flushPromises()
+
+    expect(fetchNltPassageText).toHaveBeenCalledWith('John 3:16-17')
+    expect(fetchPassageText).not.toHaveBeenCalled()
+  })
+
+  it('R128: prop bibleVersion=ESV routes the preview fetch to esvApi even though the org default is NLT', async () => {
+    mockBibleVersion = 'NLT'
+    const { fetchPassageText } = await import('@/utils/esvApi')
+    const { fetchNltPassageText } = await import('@/utils/nltApi')
+
+    const wrapper = mount(ScriptureInput, {
+      props: {
+        ...defaultProps,
+        modelValue: { book: 'John', chapter: 3, verseStart: 16, verseEnd: 17 },
+        bibleVersion: 'ESV' as const,
+      },
+    })
+    const previewBtn = wrapper.findAll('button').find((b) => b.text().includes('Preview passage'))
+    await previewBtn!.trigger('click')
+    await flushPromises()
+
+    expect(fetchPassageText).toHaveBeenCalledWith('John 3:16-17')
+    expect(fetchNltPassageText).not.toHaveBeenCalled()
+  })
+
+  it('R128: no bibleVersion prop keeps the org-default (NLT) routing', async () => {
+    mockBibleVersion = 'NLT'
+    const { fetchPassageText } = await import('@/utils/esvApi')
+    const { fetchNltPassageText } = await import('@/utils/nltApi')
+
+    const wrapper = mount(ScriptureInput, {
+      props: {
+        ...defaultProps,
+        modelValue: { book: 'John', chapter: 3, verseStart: 16, verseEnd: 17 },
+      },
+    })
+    const previewBtn = wrapper.findAll('button').find((b) => b.text().includes('Preview passage'))
+    await previewBtn!.trigger('click')
+    await flushPromises()
+
+    expect(fetchNltPassageText).toHaveBeenCalledWith('John 3:16-17')
+    expect(fetchPassageText).not.toHaveBeenCalled()
   })
 
   it('the AI-suggestion expanded preview also routes by the church setting (NLT)', async () => {

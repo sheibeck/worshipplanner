@@ -45,6 +45,19 @@ export interface MediaAttachableSlot {
    * `position`, both of which a drag-reorder rewrites.
    */
   id: string
+  /**
+   * Slot-level free-text notes (R122, Phase 54). Plain text only — a planner
+   * jots who leads / who sings which parts beside the item's selector. Lives
+   * on the shared base so `slot.notes` is reachable cast-free on all five slot
+   * kinds. OPTIONAL and schemaless: absent on every slot written before this
+   * field existed, so no migration is required; an emptied value is set back to
+   * `undefined` and dropped by `stripUndefined` before the Firestore write
+   * (Phase 51), so a raw `undefined` never reaches the document.
+   *
+   * NOT to be confused with the SEPARATE required top-level `Service.notes`
+   * below — that is a service-level field on a different object.
+   */
+  notes?: string
 }
 
 export interface SongSlot extends MediaAttachableSlot {
@@ -67,6 +80,16 @@ export interface ScriptureSlot extends MediaAttachableSlot {
   scriptureReadingId?: string | null
   readingMode?: 'normal' | 'congregational'
   congregationalSections?: CongregationalSection[]
+  /**
+   * Optional per-item override of the org-wide default Bible version (R128,
+   * Phase 56). Absent => use the org default (`authStore.settings.bibleVersion`)
+   * exactly as today. The only supported versions are ESV and NLT. The effective
+   * version everywhere scripture TEXT is produced is `slot.bibleVersion ?? orgDefault`.
+   * OPTIONAL and non-destructive: absent on every scripture slot written before
+   * this field existed (no migration), and an emptied value is stored as
+   * `undefined` and dropped by `stripUndefined` before the Firestore write.
+   */
+  bibleVersion?: 'ESV' | 'NLT'
   section?: ServiceSection
 }
 
@@ -84,6 +107,18 @@ export interface NonAssignableSlot extends MediaAttachableSlot {
   body?: string
   linkUrl?: string
   linkLabel?: string
+  /**
+   * Optional custom display name for a MISC item (R127, Phase 56). Only MISC
+   * uses it — a planner can name a Miscellaneous item ("Communion", "Offering")
+   * instead of the generic "Miscellaneous", and that name is exported as the
+   * Planning Center item title. OPTIONAL and non-destructive: absent on every
+   * slot written before this field existed (no migration), and an emptied value
+   * is stored as `undefined` and dropped by `stripUndefined` before the
+   * Firestore write — same lifecycle as `notes` (:48-60). Read through the
+   * shared `miscLabel()` helper (`src/utils/slotTypes.ts`), which coerces any
+   * absent/whitespace value back to "Miscellaneous".
+   */
+  label?: string
   section?: ServiceSection
 }
 

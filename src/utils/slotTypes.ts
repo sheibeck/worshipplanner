@@ -72,13 +72,65 @@ export function slotLabel(slot: ServiceSlot, _index?: number | string): string {
 }
 
 /**
+ * The MISC item's displayed name (R127, Phase 56). Returns the slot's custom
+ * `label` when set (trimmed), else the default "Miscellaneous". This is the
+ * SINGLE helper used by the editor display, the PC export title, and print, so
+ * "label-or-Miscellaneous" can never diverge across surfaces (D-01). A
+ * whitespace-only or absent label coerces to "Miscellaneous" — the same value
+ * that shipped before this field existed.
+ */
+export function miscLabel(slot: NonAssignableSlot): string {
+  return slot.label?.trim() || 'Miscellaneous'
+}
+
+/**
+ * The single per-kind pill-tint source (260811-vsr / DESIGN-SPEC), shared by
+ * BOTH ServiceEditorView.vue and ServiceTemplateEditor.vue so the two editors'
+ * badge colors can never fork (Phase 57, D — "share, don't fork"). Maps each
+ * SlotKind to the app's muted/dark gray+indigo Tailwind theme (not the mockup's
+ * raw hex). Returns a byte-identical class string to the local copy this was
+ * extracted from — behavior-identical, no test change.
+ */
+export function kindBadgeClass(kind: SlotKind): string {
+  switch (kind) {
+    case 'SONG': return 'bg-indigo-950 border border-indigo-800 text-indigo-300'
+    case 'SCRIPTURE': return 'bg-cyan-950 border border-cyan-800 text-cyan-300'
+    case 'ANNOUNCEMENTS':
+    case 'MESSAGE': return 'bg-rose-950 border border-rose-900 text-rose-300'
+    case 'PRAYER':
+    case 'MISC': return 'bg-gray-800 border border-gray-600 text-gray-300'
+    case 'HYMN': return 'bg-amber-950 border border-amber-900 text-amber-300'
+    case 'IMPORTED': return 'bg-gray-800 border border-gray-700 text-gray-400'
+    default: return 'bg-gray-800 border border-gray-600 text-gray-300'
+  }
+}
+
+/**
  * Factory function to create a new slot of the given kind.
  * Position defaults to 0 — it will be set to the array index via reindexSlots.
  */
-export function createSlot(kind: SlotKind, vwType?: VWType, section?: ServiceSection): ServiceSlot {
+export function createSlot(
+  kind: SlotKind,
+  vwType?: VWType,
+  section?: ServiceSection,
+  body?: string,
+  label?: string,
+): ServiceSlot {
   // Omit the `section` key entirely when not provided — preserves the legacy
   // (section === undefined, key absent) shape for backward compatibility.
   const sectionFields = section ? { section } : {}
+  // Omit the `body` key entirely when not provided (R116) — a bodyless MISC/
+  // ANNOUNCEMENTS/MESSAGE slot must keep the SAME absent-body shape as every
+  // stored legacy slot (`'body' in slot === false`, pinned by tests @643/@656).
+  // NEVER set `body: ''` or `body: undefined` — Firestore rejects raw
+  // `undefined`, and an empty string would break the absent-key contract.
+  const bodyFields = body ? { body } : {}
+  // Omit the `label` key entirely when not provided (R127, Phase 56) — a MISC
+  // slot created with no custom label must keep the SAME absent-label shape as
+  // every legacy MISC slot (`'label' in slot === false`). NEVER set `label: ''`
+  // or `label: undefined` — Firestore rejects raw `undefined`, and an empty
+  // string would break the absent-key contract. MISC-only per D-01.
+  const labelFields = label ? { label } : {}
   // `id` is ALWAYS written (D-01) — unlike `section`, there is no legacy
   // absent-id shape to preserve for a brand-new slot; every new slot gets a
   // real, stable id immediately.
@@ -109,11 +161,11 @@ export function createSlot(kind: SlotKind, vwType?: VWType, section?: ServiceSec
     case 'PRAYER':
       return { kind: 'PRAYER', id, position: 0, ...sectionFields } as NonAssignableSlot
     case 'MESSAGE':
-      return { kind: 'MESSAGE', id, position: 0, ...sectionFields } as NonAssignableSlot
+      return { kind: 'MESSAGE', id, position: 0, ...bodyFields, ...sectionFields } as NonAssignableSlot
     case 'ANNOUNCEMENTS':
-      return { kind: 'ANNOUNCEMENTS', id, position: 0, ...sectionFields } as NonAssignableSlot
+      return { kind: 'ANNOUNCEMENTS', id, position: 0, ...bodyFields, ...sectionFields } as NonAssignableSlot
     case 'MISC':
-      return { kind: 'MISC', id, position: 0, ...sectionFields } as NonAssignableSlot
+      return { kind: 'MISC', id, position: 0, ...bodyFields, ...labelFields, ...sectionFields } as NonAssignableSlot
     case 'HYMN':
       return { kind: 'HYMN', id, position: 0, hymnName: '', hymnNumber: '', verses: '', ...sectionFields } as HymnSlot
     case 'IMPORTED':
@@ -356,8 +408,14 @@ export function progressionVwTypeSequence(progression: Progression): VWType[] {
  *
  * An empty `entries` array returns `[]` — buildSlotsFromTemplate is NEVER a
  * vehicle for reinstating `buildSlots()` as a fallback; that call is the
- * caller's decision (services.ts::createService does not make it, per the
- * owner's 2026-08-07 override).
+ * caller's decision. Under R115, `services.ts::createService` DOES resolve a
+ * fallback (empty stored template → `buildSuggestedTemplateEntries()`), but it
+ * does so at the call site before calling this function — this function stays
+ * pure (`[]` → `[]`, pinned by `slotTypes.test.ts:798`).
+ *
+ * An entry's optional `body` (R116) is threaded through to `createSlot` for
+ * body-bearing kinds; a bodyless entry leaves the created slot's `body` key
+ * absent.
  */
 export function buildSlotsFromTemplate(
   entries: ServiceTemplateEntry[],
@@ -374,7 +432,28 @@ export function buildSlotsFromTemplate(
       vwType = sequence[songOrdinal % sequence.length]
       songOrdinal++
     }
-    slots.push(createSlot(entry.kind, vwType, entry.section))
+    slots.push(createSlot(entry.kind, vwType, entry.section, entry.body, entry.label))
   }
   return reindexSlots(slots)
+}
+
+/**
+ * Builds the Suggested Template's `ServiceTemplateEntry[]` — the single shared
+ * definition of the suggested-template content (R114 button `applyReset` in
+ * plan 52-02 and the R115 `createService` empty-template fallback BOTH call
+ * this, so the preset can never fork into two copies).
+ *
+ * Derived from `buildSlots('1-2-2-3')` so the suggested order and section
+ * defaults stay in lockstep with the canonical progression preset. Fresh
+ * `crypto.randomUUID()` ids are minted per call (the editor draft needs unique
+ * per-row keys; `buildSlotsFromTemplate` never reads `entry.id`, so fresh ids
+ * are harmless on the createService path). Carries no `body` — the suggested
+ * entries are bodyless; a church adds recurring MISC body text itself.
+ */
+export function buildSuggestedTemplateEntries(): ServiceTemplateEntry[] {
+  return buildSlots('1-2-2-3').map((slot) => ({
+    id: crypto.randomUUID(),
+    kind: slot.kind,
+    ...(slot.section ? { section: slot.section } : {}),
+  }))
 }
