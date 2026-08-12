@@ -116,6 +116,51 @@ describe('CongregationalEditor', () => {
     expect(lastEmittedSections(wrapper)[0]!.translationSource).toBe('ESV')
   })
 
+  // R128 (Phase 56): a per-item bibleVersion prop overrides the org default for
+  // BOTH the split-time fetch AND the stamped translationSource; an absent prop
+  // keeps today's org-default behavior.
+  it('R128: prop bibleVersion=ESV routes the auto-fetch to ESV and stamps ESV even when the org default is NLT', async () => {
+    await applySettings({ bibleVersion: 'NLT' })
+    const wrapper = mount(CongregationalEditor, {
+      props: { reference: SAMPLE_REFERENCE, sections: [], bibleVersion: 'ESV' as const },
+    })
+    await flushPromises()
+
+    expect(mockFetchPassageText).toHaveBeenCalledWith('Psalms 136:1-3')
+    expect(mockFetchNltPassageText).not.toHaveBeenCalled()
+
+    await wrapper.find('[data-testid="congregational-save"]').trigger('click')
+    expect(lastEmittedSections(wrapper)[0]!.translationSource).toBe('ESV')
+  })
+
+  it('R128: prop bibleVersion=NLT routes the auto-fetch to NLT and stamps NLT even when the org default is ESV', async () => {
+    await applySettings({ bibleVersion: 'ESV' })
+    const wrapper = mount(CongregationalEditor, {
+      props: { reference: SAMPLE_REFERENCE, sections: [], bibleVersion: 'NLT' as const },
+    })
+    await flushPromises()
+
+    expect(mockFetchNltPassageText).toHaveBeenCalledWith('Psalms 136:1-3')
+    expect(mockFetchPassageText).not.toHaveBeenCalled()
+
+    await wrapper.find('[data-testid="congregational-save"]').trigger('click')
+    expect(lastEmittedSections(wrapper)[0]!.translationSource).toBe('NLT')
+  })
+
+  it('R128: no bibleVersion prop keeps the org-default (ESV) fetch and stamp', async () => {
+    await applySettings({ bibleVersion: 'ESV' })
+    const wrapper = mount(CongregationalEditor, {
+      props: { reference: SAMPLE_REFERENCE, sections: [] },
+    })
+    await flushPromises()
+
+    expect(mockFetchPassageText).toHaveBeenCalledWith('Psalms 136:1-3')
+    expect(mockFetchNltPassageText).not.toHaveBeenCalled()
+
+    await wrapper.find('[data-testid="congregational-save"]').trigger('click')
+    expect(lastEmittedSections(wrapper)[0]!.translationSource).toBe('ESV')
+  })
+
   // ── Open with existing sections (no fetch) ──────────────────────────────
 
   it('serializes existing sections into the textarea and does NOT fetch', async () => {

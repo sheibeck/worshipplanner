@@ -214,6 +214,12 @@ const props = defineProps<{
   sermonTopic?: string
   recentScriptures?: ScriptureRef[]
   label: string
+  /**
+   * R128 (Phase 56): optional per-item Bible-version override. When present it
+   * governs the preview passage fetch; absent => the org default
+   * (`authStore.settings.bibleVersion`), reproducing today's routing exactly.
+   */
+  bibleVersion?: 'ESV' | 'NLT'
 }>()
 
 const emit = defineEmits<{
@@ -357,7 +363,10 @@ function dismissPreview() {
 // preview) so neither silently stays ESV-only when the church has chosen
 // NLT.
 function fetchPassageByOrgSetting(query: string): Promise<string> {
-  return authStore.settings.bibleVersion === 'NLT'
+  // R128 (Phase 56): the per-item override wins over the org default; absent
+  // prop reproduces today's org-default routing.
+  const effectiveVersion = props.bibleVersion ?? authStore.settings.bibleVersion
+  return effectiveVersion === 'NLT'
     ? fetchNltPassageText(query)
     : fetchPassageText(query)
 }

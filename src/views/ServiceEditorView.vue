@@ -553,6 +553,7 @@
                   :key="congregationalSlot.id"
                   data-testid="congregational-editor-panel"
                   :reference="slotToScriptureRef(congregationalSlot)"
+                  :bibleVersion="congregationalSlot.bibleVersion"
                   :sections="congregationalSlot.congregationalSections ?? []"
                   @update:sections="onCongregationalSectionsChange(congregationalSlotIndex!, $event)"
                   @delete="onCongregationalDelete(congregationalSlotIndex!)"
@@ -1039,9 +1040,30 @@
                       :showAiSuggest="true"
                       :sermonTopic="localService.sermonTopic ?? ''"
                       :recentScriptures="recentScriptureRefs"
+                      :bibleVersion="(slot as ScriptureSlot).bibleVersion"
                       label="Scripture Reading"
                       @update:modelValue="(ref) => onScriptureChange(index, ref)"
                     />
+                    <!-- R128 (Phase 56): per-item Bible-version override selector.
+                         Editor only (canEditService); NOT rendered for viewers /
+                         locked branches. "Default (<org>)" clears the override so
+                         stripUndefined drops the key; ESV/NLT set it explicitly.
+                         The raw override (not the resolved value) is passed to the
+                         children, which each apply `?? org default` themselves — so
+                         an unset slot behaves exactly as today. -->
+                    <select
+                      v-if="canEditService"
+                      :value="(slot as ScriptureSlot).bibleVersion ?? ''"
+                      data-testid="slot-scripture-version"
+                      class="mt-1 rounded-md bg-gray-800 border border-gray-700 text-gray-300 text-xs px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      title="Bible version for this item"
+                      aria-label="Bible version for this item"
+                      @change="(slot as ScriptureSlot).bibleVersion = (($event.target as HTMLSelectElement).value as 'ESV' | 'NLT') || undefined"
+                    >
+                      <option value="">Default ({{ authStore.settings.bibleVersion }})</option>
+                      <option value="ESV">ESV</option>
+                      <option value="NLT">NLT</option>
+                    </select>
                     <!-- Lifecycle lock: read-only. CLASS D — INVERSE branch, so
                          it keeps pointing at the locked state (`isLocked`), now
                          reached at `planned` as well as `exported`. ME-02 — one

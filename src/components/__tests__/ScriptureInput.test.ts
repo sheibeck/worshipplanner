@@ -572,6 +572,67 @@ describe('ESV/NLT preview routing (45-04, R090)', () => {
     expect(wrapper.text()).toContain('Could not load passage. Check your connection and try again.')
   })
 
+  // R128 (Phase 56): a per-item bibleVersion prop overrides the org default for
+  // the preview fetch; an absent prop keeps today's org-default routing.
+  it('R128: prop bibleVersion=NLT routes the preview fetch to nltApi even though the org default is ESV', async () => {
+    // mockBibleVersion stays 'ESV' (the org default) — the prop must win.
+    const { fetchPassageText } = await import('@/utils/esvApi')
+    const { fetchNltPassageText } = await import('@/utils/nltApi')
+
+    const wrapper = mount(ScriptureInput, {
+      props: {
+        ...defaultProps,
+        modelValue: { book: 'John', chapter: 3, verseStart: 16, verseEnd: 17 },
+        bibleVersion: 'NLT' as const,
+      },
+    })
+    const previewBtn = wrapper.findAll('button').find((b) => b.text().includes('Preview passage'))
+    await previewBtn!.trigger('click')
+    await flushPromises()
+
+    expect(fetchNltPassageText).toHaveBeenCalledWith('John 3:16-17')
+    expect(fetchPassageText).not.toHaveBeenCalled()
+  })
+
+  it('R128: prop bibleVersion=ESV routes the preview fetch to esvApi even though the org default is NLT', async () => {
+    mockBibleVersion = 'NLT'
+    const { fetchPassageText } = await import('@/utils/esvApi')
+    const { fetchNltPassageText } = await import('@/utils/nltApi')
+
+    const wrapper = mount(ScriptureInput, {
+      props: {
+        ...defaultProps,
+        modelValue: { book: 'John', chapter: 3, verseStart: 16, verseEnd: 17 },
+        bibleVersion: 'ESV' as const,
+      },
+    })
+    const previewBtn = wrapper.findAll('button').find((b) => b.text().includes('Preview passage'))
+    await previewBtn!.trigger('click')
+    await flushPromises()
+
+    expect(fetchPassageText).toHaveBeenCalledWith('John 3:16-17')
+    expect(fetchNltPassageText).not.toHaveBeenCalled()
+  })
+
+  it('R128: no bibleVersion prop keeps the org-default (NLT) routing', async () => {
+    mockBibleVersion = 'NLT'
+    const { fetchPassageText } = await import('@/utils/esvApi')
+    const { fetchNltPassageText } = await import('@/utils/nltApi')
+
+    const wrapper = mount(ScriptureInput, {
+      props: {
+        ...defaultProps,
+        modelValue: { book: 'John', chapter: 3, verseStart: 16, verseEnd: 17 },
+      },
+    })
+    const previewBtn = wrapper.findAll('button').find((b) => b.text().includes('Preview passage'))
+    await previewBtn!.trigger('click')
+    await flushPromises()
+
+    expect(fetchNltPassageText).toHaveBeenCalledWith('John 3:16-17')
+    expect(fetchPassageText).not.toHaveBeenCalled()
+  })
+
   it('the AI-suggestion expanded preview also routes by the church setting (NLT)', async () => {
     mockBibleVersion = 'NLT'
     const { getScriptureSuggestions } = await import('@/utils/claudeApi')

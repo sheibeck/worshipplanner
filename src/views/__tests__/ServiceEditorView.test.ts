@@ -2499,6 +2499,43 @@ describe('ServiceEditorView - shared body editor: Message/Announcements/Misc, Hy
     expect(text.text()).toBe('Miscellaneous')
   })
 
+  // ── R128 (Phase 56): per-item Scripture Bible-version selector ───────────────
+
+  it('R128: the Scripture-row version selector round-trips (choose NLT -> slot.bibleVersion, choose Default -> undefined)', async () => {
+    mockServicesList = [{
+      ...buildSectionedService(),
+      slots: [{ kind: 'SCRIPTURE', id: 'sv1', position: 0, book: 'Psalms', chapter: 23, verseStart: 1, verseEnd: 6, section: 'worship' }],
+    }]
+    mockAuthState.isEditor = true
+    const wrapper = await mountView()
+
+    const select = wrapper.find('[data-testid="slot-scripture-version"]')
+    expect(select.exists()).toBe(true)
+    // Unset slot => selector reflects the "Default" (empty) option.
+    expect((select.element as HTMLSelectElement).value).toBe('')
+
+    await select.setValue('NLT')
+    await wrapper.vm.$nextTick()
+    let slots = (wrapper.vm as unknown as SlotsVm).localService.slots
+    expect((slots[0] as unknown as { bibleVersion?: string }).bibleVersion).toBe('NLT')
+
+    await select.setValue('')
+    await wrapper.vm.$nextTick()
+    slots = (wrapper.vm as unknown as SlotsVm).localService.slots
+    expect((slots[0] as unknown as { bibleVersion?: string }).bibleVersion).toBeUndefined()
+  })
+
+  it('R128: the version selector is absent for viewers (non-canEditService)', async () => {
+    mockServicesList = [{
+      ...buildSectionedService(),
+      slots: [{ kind: 'SCRIPTURE', id: 'sv2', position: 0, book: 'Psalms', chapter: 23, verseStart: 1, verseEnd: 6, section: 'worship' }],
+    }]
+    mockAuthState.isEditor = false
+    const wrapper = await mountView()
+
+    expect(wrapper.find('[data-testid="slot-scripture-version"]').exists()).toBe(false)
+  })
+
   // ── UI-02: legacy body round-trips into the read-only viewer via notes ?? body ─
 
   it('a legacy MESSAGE body renders read-only with preserved line breaks in the viewer, via the notes ?? body fallback (260811-vsr)', async () => {
