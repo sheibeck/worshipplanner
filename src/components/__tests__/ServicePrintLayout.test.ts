@@ -220,6 +220,27 @@ describe('ServicePrintLayout', () => {
     expect(wrapper.text()).toContain('Building closes early Monday')
   })
 
+  // R127 (Phase 56): a MISC slot's custom label replaces the hard-coded
+  // "Miscellaneous" label line; an unlabeled MISC still reads "Miscellaneous".
+  it('renders a MISC slot with a custom label in place of "Miscellaneous" (R127)', () => {
+    const service: Service = {
+      ...mockService,
+      slots: [{ kind: 'MISC', id: 'misc-lbl-1', position: 0, label: 'Communion' }],
+    }
+    const wrapper = mount(ServicePrintLayout, { props: { service, songs: mockSongs } })
+    expect(wrapper.text()).toContain('Communion')
+    expect(wrapper.text()).not.toContain('Miscellaneous')
+  })
+
+  it('renders an unlabeled MISC slot as "Miscellaneous" (R127, today\'s behavior)', () => {
+    const service: Service = {
+      ...mockService,
+      slots: [{ kind: 'MISC', id: 'misc-lbl-2', position: 0 }],
+    }
+    const wrapper = mount(ServicePrintLayout, { props: { service, songs: mockSongs } })
+    expect(wrapper.text()).toContain('Miscellaneous')
+  })
+
   it('preserves an embedded newline in a MESSAGE body (43-04)', () => {
     const service: Service = {
       ...mockService,

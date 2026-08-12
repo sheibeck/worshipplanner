@@ -76,7 +76,7 @@
 
         <!-- MISC slot -->
         <template v-else-if="slot.kind === 'MISC'">
-          <span class="font-semibold text-gray-700">Miscellaneous</span>
+          <span class="font-semibold text-gray-700">{{ miscLabel(slot) }}</span>
           <template v-if="(slot.notes ?? slot.body)?.trim()">
             <p class="whitespace-pre-wrap text-gray-700 mt-1">{{ slot.notes ?? slot.body }}</p>
           </template>
@@ -120,7 +120,7 @@
 import { computed } from 'vue'
 import type { Service, SongSlot, HymnSlot, ScriptureRef } from '@/types/service'
 import type { Song } from '@/types/song'
-import { slotLabel } from '@/utils/slotTypes'
+import { slotLabel, miscLabel } from '@/utils/slotTypes'
 import { formatScriptureRef } from '@/utils/planningCenterExport'
 
 const props = defineProps<{

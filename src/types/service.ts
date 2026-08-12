@@ -97,6 +97,18 @@ export interface NonAssignableSlot extends MediaAttachableSlot {
   body?: string
   linkUrl?: string
   linkLabel?: string
+  /**
+   * Optional custom display name for a MISC item (R127, Phase 56). Only MISC
+   * uses it — a planner can name a Miscellaneous item ("Communion", "Offering")
+   * instead of the generic "Miscellaneous", and that name is exported as the
+   * Planning Center item title. OPTIONAL and non-destructive: absent on every
+   * slot written before this field existed (no migration), and an emptied value
+   * is stored as `undefined` and dropped by `stripUndefined` before the
+   * Firestore write — same lifecycle as `notes` (:48-60). Read through the
+   * shared `miscLabel()` helper (`src/utils/slotTypes.ts`), which coerces any
+   * absent/whitespace value back to "Miscellaneous".
+   */
+  label?: string
   section?: ServiceSection
 }
 

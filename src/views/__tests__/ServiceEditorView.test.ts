@@ -2446,6 +2446,59 @@ describe('ServiceEditorView - shared body editor: Message/Announcements/Misc, Hy
     expect(input.attributes('placeholder')).toBe('Details')
   })
 
+  // ── R127 (Phase 56): MISC custom label input ────────────────────────────────
+
+  it('R127: typing into the MISC label input sets slot.label; clearing it to empty yields undefined', async () => {
+    mockServicesList = [{
+      ...buildSectionedService(),
+      slots: [{ kind: 'MISC', id: 'ml1', position: 0 }],
+    }]
+    mockAuthState.isEditor = true
+    const wrapper = await mountView()
+
+    const input = wrapper.find('[data-testid="slot-misc-label-input"]')
+    expect(input.exists()).toBe(true)
+    expect((input.element as HTMLInputElement).value).toBe('')
+    expect(input.attributes('placeholder')).toBe('Miscellaneous')
+
+    await input.setValue('Communion')
+    await wrapper.vm.$nextTick()
+    let slots = (wrapper.vm as unknown as SlotsVm).localService.slots
+    expect((slots[0] as unknown as { label?: string }).label).toBe('Communion')
+
+    await input.setValue('')
+    await wrapper.vm.$nextTick()
+    slots = (wrapper.vm as unknown as SlotsVm).localService.slots
+    expect((slots[0] as unknown as { label?: string }).label).toBeUndefined()
+  })
+
+  it('R127: the MISC label input is absent for viewers, which see miscLabel as read-only text', async () => {
+    mockServicesList = [{
+      ...buildSectionedService(),
+      slots: [{ kind: 'MISC', id: 'ml2', position: 0, label: 'Communion' }],
+    }]
+    mockAuthState.isEditor = false
+    const wrapper = await mountView()
+
+    expect(wrapper.find('[data-testid="slot-misc-label-input"]').exists()).toBe(false)
+    const text = wrapper.find('[data-testid="slot-misc-label-text"]')
+    expect(text.exists()).toBe(true)
+    expect(text.text()).toBe('Communion')
+  })
+
+  it('R127: an unlabeled MISC shows "Miscellaneous" as the viewer label text', async () => {
+    mockServicesList = [{
+      ...buildSectionedService(),
+      slots: [{ kind: 'MISC', id: 'ml3', position: 0 }],
+    }]
+    mockAuthState.isEditor = false
+    const wrapper = await mountView()
+
+    const text = wrapper.find('[data-testid="slot-misc-label-text"]')
+    expect(text.exists()).toBe(true)
+    expect(text.text()).toBe('Miscellaneous')
+  })
+
   // ── UI-02: legacy body round-trips into the read-only viewer via notes ?? body ─
 
   it('a legacy MESSAGE body renders read-only with preserved line breaks in the viewer, via the notes ?? body fallback (260811-vsr)', async () => {

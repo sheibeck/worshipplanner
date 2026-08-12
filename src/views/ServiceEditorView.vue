@@ -1078,6 +1078,25 @@
                    remain on the type + in Firestore, read via slotFreeText's notes ?? body
                    fallback. The old label + hint are replaced by the per-kind badge. -->
               <template v-else-if="slot.kind === 'MESSAGE' || slot.kind === 'ANNOUNCEMENTS' || slot.kind === 'MISC'">
+                <!-- MISC custom label (R127, Phase 56): a DISTINCT compact "name"
+                     input, above the shared notes field. Not a second notes box —
+                     the type badge stays "Miscellaneous"; this names the item and
+                     becomes the Planning Center title. `= value || undefined` on
+                     empty lets stripUndefined drop the key (mirrors the notes
+                     input below). Plain text only: :value + {{ }} auto-escape,
+                     never v-html (T-56-01). -->
+                <template v-if="slot.kind === 'MISC'">
+                  <input
+                    v-if="canEditService"
+                    :value="(slot as NonAssignableSlot).label ?? ''"
+                    @input="(slot as NonAssignableSlot).label = ($event.target as HTMLInputElement).value || undefined"
+                    type="text"
+                    placeholder="Miscellaneous"
+                    data-testid="slot-misc-label-input"
+                    class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-200 text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500"
+                  />
+                  <p v-else data-testid="slot-misc-label-text" class="text-sm text-gray-200">{{ miscLabel(slot as NonAssignableSlot) }}</p>
+                </template>
               </template>
 
               <!-- HYMN slot -->
@@ -1386,7 +1405,7 @@ import { useRosterStore } from '@/stores/roster'
 import { useQuartersStore } from '@/stores/quarters'
 import { useSlideGroups } from '@/stores/slideGroups'
 import { useSaveStatus, hasVisibleSaveStatus } from '@/stores/saveStatus'
-import { slotLabel, createSlot, reindexSlots, backfillSlotIds, groupBySection, flattenBySection, orderSlotsBySection } from '@/utils/slotTypes'
+import { slotLabel, miscLabel, createSlot, reindexSlots, backfillSlotIds, groupBySection, flattenBySection, orderSlotsBySection } from '@/utils/slotTypes'
 import { scripturesOverlap, scriptureRefFromSlot, formatScriptureReference, scriptureSlotAfterReferenceChange } from '@/utils/scripture'
 import type { CongregationalSection } from '@/types/slide'
 import { getPrimaryKey } from '@/utils/songSearch'

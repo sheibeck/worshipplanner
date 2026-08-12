@@ -5,6 +5,7 @@ import {
   createSlot,
   reindexSlots,
   slotLabel,
+  miscLabel,
   backfillSlotIds,
   groupBySection,
   flattenBySection,
@@ -745,6 +746,29 @@ describe('ANNOUNCEMENTS and MISC (43-01)', () => {
     expect(reindexed[0]!.id).not.toBe(reindexed[1]!.id)
     expect((reindexed[0] as NonAssignableSlot).body).toBe('First misc item')
     expect((reindexed[1] as NonAssignableSlot).body).toBe('Second misc item')
+  })
+
+  // R127 (Phase 56) — miscLabel: the single "label-or-Miscellaneous" helper.
+  describe('miscLabel (R127)', () => {
+    it('returns the custom label when set', () => {
+      const slot: NonAssignableSlot = { kind: 'MISC', id: 'm-1', position: 0, label: 'Communion' }
+      expect(miscLabel(slot)).toBe('Communion')
+    })
+
+    it('trims a padded label', () => {
+      const slot: NonAssignableSlot = { kind: 'MISC', id: 'm-2', position: 0, label: '  Offering  ' }
+      expect(miscLabel(slot)).toBe('Offering')
+    })
+
+    it('returns "Miscellaneous" for a whitespace-only label', () => {
+      const slot: NonAssignableSlot = { kind: 'MISC', id: 'm-3', position: 0, label: '   ' }
+      expect(miscLabel(slot)).toBe('Miscellaneous')
+    })
+
+    it('returns "Miscellaneous" for an absent label (today\'s behavior)', () => {
+      const slot: NonAssignableSlot = { kind: 'MISC', id: 'm-4', position: 0 }
+      expect(miscLabel(slot)).toBe('Miscellaneous')
+    })
   })
 
   // E-03/E-07 (encoding): body survives reindexSlots and orderSlotsBySection

@@ -1255,6 +1255,29 @@ describe('addSlotAsItem', () => {
       expect(body.data.attributes.title).not.toBe('Message')
     })
 
+    // R127 (Phase 56): a MISC slot's custom label becomes the PC item title.
+    it('exports a MISC slot with a custom label as that label in the item title', async () => {
+      defaultFetchResponse()
+      const slot: NonAssignableSlot = { kind: 'MISC', id: 'slot-misc-lbl', position: 6, label: 'Communion' }
+
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 6, [], 'ESV')
+
+      const [, options] = vi.mocked(fetch).mock.calls[0]!
+      const body = JSON.parse(options?.body as string)
+      expect(body.data.attributes.title).toBe('Communion')
+    })
+
+    it('exports a MISC slot with a whitespace-only label as "Miscellaneous" (unchanged from today)', async () => {
+      defaultFetchResponse()
+      const slot: NonAssignableSlot = { kind: 'MISC', id: 'slot-misc-lbl2', position: 6, label: '   ' }
+
+      await addSlotAsItem('app-id', 'secret', 'svc-type-1', 'plan-1', slot, 6, [], 'ESV')
+
+      const [, options] = vi.mocked(fetch).mock.calls[0]!
+      const body = JSON.parse(options?.body as string)
+      expect(body.data.attributes.title).toBe('Miscellaneous')
+    })
+
     it('E-18: an ANNOUNCEMENTS slot with a whitespace-only body exports as itself with no description', async () => {
       defaultFetchResponse()
       const slot: NonAssignableSlot = { kind: 'ANNOUNCEMENTS', id: 'slot-ann-7', position: 7, body: '   \n\t  ' }

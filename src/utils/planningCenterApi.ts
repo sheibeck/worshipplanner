@@ -3,6 +3,7 @@ import type { Song } from '@/types/song'
 import type { UpsertPersonInput } from '@/types/roster'
 import { formatScriptureRef } from '@/utils/planningCenterExport'
 import { formatScriptureReference, scriptureRefFromSlot } from '@/utils/scripture'
+import { miscLabel } from '@/utils/slotTypes'
 import { fetchPassageText } from '@/utils/esvApi'
 import { fetchNltPassageText } from '@/utils/nltApi'
 
@@ -1024,7 +1025,7 @@ export async function addSlotAsItem(
 
   if (slot.kind === 'MISC') {
     return createItem(appId, secret, serviceTypeId, planId, {
-      title: 'Miscellaneous',
+      title: miscLabel(slot),
       itemType: 'regular',
       description: bodyDescription(slot.notes ?? slot.body),
       sequence,

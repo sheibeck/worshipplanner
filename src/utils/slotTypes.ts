@@ -72,6 +72,18 @@ export function slotLabel(slot: ServiceSlot, _index?: number | string): string {
 }
 
 /**
+ * The MISC item's displayed name (R127, Phase 56). Returns the slot's custom
+ * `label` when set (trimmed), else the default "Miscellaneous". This is the
+ * SINGLE helper used by the editor display, the PC export title, and print, so
+ * "label-or-Miscellaneous" can never diverge across surfaces (D-01). A
+ * whitespace-only or absent label coerces to "Miscellaneous" — the same value
+ * that shipped before this field existed.
+ */
+export function miscLabel(slot: NonAssignableSlot): string {
+  return slot.label?.trim() || 'Miscellaneous'
+}
+
+/**
  * Factory function to create a new slot of the given kind.
  * Position defaults to 0 — it will be set to the array index via reindexSlots.
  */
