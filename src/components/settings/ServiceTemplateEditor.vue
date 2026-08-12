@@ -68,6 +68,21 @@
                 <span class="text-[11px] text-gray-500">{{ group.entries.length }} {{ group.entries.length === 1 ? 'item' : 'items' }}</span>
               </div>
 
+              <!-- No-Section band (Phase 57 parity with ServiceEditorView.vue's no-section-band):
+                   the trailing ungrouped/legacy bucket gets a muted/dashed header so its items read
+                   as "not placed yet", distinct from the real template-section-header-* headers.
+                   Rendered ONLY for the ungrouped group and ONLY when non-empty. Deliberately NOT a
+                   template-section-header-* testid, and carries NO item count or add control. A SIBLING
+                   of the list container below — never a member of its Sortable instance. -->
+              <div
+                v-if="group.key === 'ungrouped' && group.entries.length > 0"
+                class="flex items-center gap-2 mt-3 mb-1 rounded-lg border border-dashed border-gray-700 px-3 py-1.5 text-gray-500"
+                data-testid="template-no-section-band"
+              >
+                <span class="text-[11px] uppercase tracking-[.14em]">No Section</span>
+                <span class="h-px flex-1 bg-gradient-to-r from-gray-800 to-transparent"></span>
+              </div>
+
               <div
                 :ref="(el) => setSectionListRef(group.key, el as Element | null)"
                 class="space-y-2 rounded-lg transition-colors"

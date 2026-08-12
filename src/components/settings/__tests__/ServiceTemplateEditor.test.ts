@@ -695,3 +695,34 @@ describe('ServiceTemplateEditor — drag-reorder (SortableJS, per-section instan
     expect(body().findAll('[data-entry-id="song-1"]')).toHaveLength(1)
   })
 })
+
+describe('ServiceTemplateEditor — No Section band (Phase 57)', () => {
+  it('renders a muted/dashed template-no-section-band labeled "No Section" for a non-empty ungrouped bucket, distinct from the real section headers', async () => {
+    // A stored entry with no section lands in the trailing ungrouped bucket.
+    mockAuthState.settings.defaultServiceTemplate = [
+      { id: 'song-1', kind: 'SONG', section: 'worship' },
+      { id: 'prayer-1', kind: 'PRAYER' },
+    ]
+    mountEditor(true)
+    await flushPromises()
+
+    const band = body().find('[data-testid="template-no-section-band"]')
+    expect(band.exists()).toBe(true)
+    expect(band.text()).toContain('No Section')
+    // Muted/dashed styling, and NOT one of the real template-section-header-* headers.
+    expect(band.classes()).toContain('border-dashed')
+    expect(band.attributes('data-testid')).not.toMatch(/^template-section-header-/)
+  })
+
+  it('does not render the template-no-section-band when every entry is sectioned', async () => {
+    mockAuthState.settings.defaultServiceTemplate = [
+      { id: 'song-1', kind: 'SONG', section: 'worship' },
+      { id: 'msg-1', kind: 'MESSAGE', section: 'message' },
+    ]
+    mountEditor(true)
+    await flushPromises()
+
+    expect(body().find('[data-testid="template-section-list-ungrouped"]').exists()).toBe(false)
+    expect(body().find('[data-testid="template-no-section-band"]').exists()).toBe(false)
+  })
+})
