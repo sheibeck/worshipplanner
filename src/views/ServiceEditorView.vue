@@ -1427,7 +1427,7 @@ import { useRosterStore } from '@/stores/roster'
 import { useQuartersStore } from '@/stores/quarters'
 import { useSlideGroups } from '@/stores/slideGroups'
 import { useSaveStatus, hasVisibleSaveStatus } from '@/stores/saveStatus'
-import { slotLabel, miscLabel, createSlot, reindexSlots, backfillSlotIds, groupBySection, flattenBySection, orderSlotsBySection } from '@/utils/slotTypes'
+import { slotLabel, miscLabel, kindBadgeClass, createSlot, reindexSlots, backfillSlotIds, groupBySection, flattenBySection, orderSlotsBySection } from '@/utils/slotTypes'
 import { scripturesOverlap, scriptureRefFromSlot, formatScriptureReference, scriptureSlotAfterReferenceChange } from '@/utils/scripture'
 import type { CongregationalSection } from '@/types/slide'
 import { getPrimaryKey } from '@/utils/songSearch'
@@ -2777,22 +2777,9 @@ function notesPlaceholder(slot: ServiceSlot): string {
 }
 
 // ── Per-kind badge tint (260811-vsr / DESIGN-SPEC) ──────────────────────────────
-// The three-rail row's badge rail shows ONE colored pill per kind, mapped to the
-// app's muted/dark gray+indigo theme (not the mockup's raw hex). Central helper so
-// the template stays clean; badge text comes from slotLabel(slot, index).
-function kindBadgeClass(kind: SlotKind): string {
-  switch (kind) {
-    case 'SONG': return 'bg-indigo-950 border border-indigo-800 text-indigo-300'
-    case 'SCRIPTURE': return 'bg-cyan-950 border border-cyan-800 text-cyan-300'
-    case 'ANNOUNCEMENTS':
-    case 'MESSAGE': return 'bg-rose-950 border border-rose-900 text-rose-300'
-    case 'PRAYER':
-    case 'MISC': return 'bg-gray-800 border border-gray-600 text-gray-300'
-    case 'HYMN': return 'bg-amber-950 border border-amber-900 text-amber-300'
-    case 'IMPORTED': return 'bg-gray-800 border border-gray-700 text-gray-400'
-    default: return 'bg-gray-800 border border-gray-600 text-gray-300'
-  }
-}
+// kindBadgeClass now lives in @/utils/slotTypes (Phase 57 — shared by both the
+// service editor and the template editor so their per-kind badge tints can never
+// fork). Imported alongside the other slotTypes helpers below.
 
 // ── Slot populated check (D-14) ────────────────────────────────────────────────
 // NOTE: isSlotPopulated is known dead code — declared and never called since

@@ -84,6 +84,28 @@ export function miscLabel(slot: NonAssignableSlot): string {
 }
 
 /**
+ * The single per-kind pill-tint source (260811-vsr / DESIGN-SPEC), shared by
+ * BOTH ServiceEditorView.vue and ServiceTemplateEditor.vue so the two editors'
+ * badge colors can never fork (Phase 57, D — "share, don't fork"). Maps each
+ * SlotKind to the app's muted/dark gray+indigo Tailwind theme (not the mockup's
+ * raw hex). Returns a byte-identical class string to the local copy this was
+ * extracted from — behavior-identical, no test change.
+ */
+export function kindBadgeClass(kind: SlotKind): string {
+  switch (kind) {
+    case 'SONG': return 'bg-indigo-950 border border-indigo-800 text-indigo-300'
+    case 'SCRIPTURE': return 'bg-cyan-950 border border-cyan-800 text-cyan-300'
+    case 'ANNOUNCEMENTS':
+    case 'MESSAGE': return 'bg-rose-950 border border-rose-900 text-rose-300'
+    case 'PRAYER':
+    case 'MISC': return 'bg-gray-800 border border-gray-600 text-gray-300'
+    case 'HYMN': return 'bg-amber-950 border border-amber-900 text-amber-300'
+    case 'IMPORTED': return 'bg-gray-800 border border-gray-700 text-gray-400'
+    default: return 'bg-gray-800 border border-gray-600 text-gray-300'
+  }
+}
+
+/**
  * Factory function to create a new slot of the given kind.
  * Position defaults to 0 — it will be set to the array index via reindexSlots.
  */
