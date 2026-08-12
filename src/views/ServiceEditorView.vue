@@ -788,9 +788,12 @@
           </div>
         </div>
 
-        <!-- Dynamic Service Flow. 260811-vsr: cap the item-list column to a readable
-             width (mockup's max) so fields don't stretch edge-to-edge on wide screens. -->
-        <div class="space-y-1.5 max-w-[1060px]">
+        <!-- Dynamic Service Flow. 260811-vsr: the item list fills the tab's content
+             width, matching the Teams / Sermon Context blocks above it. (An earlier
+             max-w-[1060px] cap from the mockup was removed — it applied only to this
+             list while the chrome above stayed full-width, so the sections read as a
+             constrained/narrow widget on wide screens. Owner feedback 2026-08-12.) -->
+        <div class="space-y-1.5">
           <!-- R110: the key folds in `slotRenderNonce` (bumped in `onSlotSortEnd`
                after a drag). Vue does not allow a `:key` on a child of a
                `<template v-for>` — it must live on the template tag — so the nonce
