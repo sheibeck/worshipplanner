@@ -1321,7 +1321,7 @@
                     v-if="canEditService && assignment.overriddenPersonIds !== null"
                     type="button"
                     @click="onResetRoleOverride(assignment.roleId)"
-                    class="text-xs text-indigo-400 hover:text-indigo-300 transition-colors flex-shrink-0"
+                    class="text-xs text-indigo-400 hover:text-indigo-300 transition-colors flex-shrink-0 cursor-pointer"
                   >
                     Reset to schedule
                   </button>
@@ -3807,7 +3807,32 @@ async function onToggleOverridePerson(assignment: ResolvedRoleAssignment, person
 async function onResetRoleOverride(roleId: string) {
   if (!canEditService.value) return
   if (!localService.value) return
-  await serviceStore.clearRoleOverride(localService.value.id, roleId)
+
+  // 260812-jjj: optimistic local delete, mirroring onToggleOverridePerson above.
+  // The R039 isOwnWriteEcho guard in the store-snapshot watcher swallows this
+  // client's own deleteField() echo, so without a local delete localService
+  // never re-syncs — the stale override key (and its "Overridden" pill) would
+  // persist even after a successful clear, most visibly when there's no
+  // underlying generated schedule for it to fall back to.
+  const overrides = localService.value.roleAssignmentOverrides
+  const previousOverride = overrides?.[roleId]
+  if (overrides) {
+    delete overrides[roleId]
+  }
+
+  try {
+    await serviceStore.clearRoleOverride(localService.value.id, roleId)
+  } catch (err) {
+    // Roll back the optimistic delete so the UI doesn't show a cleared state
+    // that was never actually persisted.
+    if (localService.value && previousOverride !== undefined) {
+      if (!localService.value.roleAssignmentOverrides) {
+        localService.value.roleAssignmentOverrides = {}
+      }
+      localService.value.roleAssignmentOverrides[roleId] = previousOverride
+    }
+    console.error('Failed to reset role override:', err)
+  }
 }
 
 // ── Delete ─────────────────────────────────────────────────────────────────────
