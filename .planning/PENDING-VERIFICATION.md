@@ -1541,3 +1541,36 @@ regression. The items below are visual/feel judgments jsdom cannot make. **Do NO
       viewer or a locked (planned/exported) service.
 
 After confirming, run `/gsd-verify-work` for phase 56 (or record acceptance in the phase verification record).
+
+---
+
+## Phase 57 — Template-Editor UX Parity (v1.6) — DEFERRED owner visual/feel + mobile check
+
+**Deferred under the v1.6 standing grant (autonomous execution, defer human verification).** All
+automated gates for phase 57 are green: `npm run type-check` clean (vue-tsc --build), and the full app
+suite (`npx vitest run --dir src --exclude '**/rules.test.ts'`) is at the exact 2-file known-failing
+baseline (`src/storage.rules.test.ts`, `src/views/__tests__/RosterView.test.ts`) with no other
+regression. ServiceEditorView badge tests stayed green (279/279) after the shared-helper extraction;
+ServiceTemplateEditor is at 37/37. The items below are visual/feel judgments jsdom cannot make.
+**Do NOT self-approve.**
+
+### R129 — Edit Default Template three-rail parity
+
+- [ ] **Three-rail rows.** Open Settings → Edit Default Template. Confirm each row reads as drag handle ·
+      colored per-kind badge · stacked field column · per-row ⋯ menu, matching the live Service Order
+      editor's look. The per-kind badge tint is identical to the service editor (SONG indigo, SCRIPTURE
+      cyan, ANNOUNCEMENTS/MESSAGE rose, PRAYER/MISC gray, etc.).
+- [ ] **⋯ menu owns move + delete.** Open a row's ⋯ menu: "Move to section" reassigns the entry into
+      that section's group (or to No Section); "Delete" removes the row immediately (no confirm). The
+      inline section dropdown and the inline ✕ are gone. Menu closes on selection and on outside-click;
+      opening a second row's menu closes the first.
+- [ ] **No-Section band.** An un-sectioned (ungrouped) entry shows a muted/dashed "No Section" band,
+      distinct from the real section headers; the band is absent when every entry is sectioned, and it
+      carries no item count or add control.
+- [ ] **Preserved features.** SortableJS per-section reorder (incl. cross-section drag) still works; the
+      add-item palette, Suggested Template reset, MISC label input (R127), MISC/ANNOUNCEMENTS body
+      textarea (R116), and Save Template all behave as before. Save stays disabled for non-editors.
+- [ ] **Mobile (≤ sm / ~390px).** In the 480px drawer at narrow width, each row stacks cleanly (badge
+      above the field column), the ⋯ menu remains reachable, and there is no horizontal overflow.
+
+After confirming, run `/gsd-verify-work` for phase 57 (or record acceptance in the phase verification record).
