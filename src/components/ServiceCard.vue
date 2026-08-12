@@ -67,7 +67,7 @@ import { useServiceStore } from '@/stores/services'
 import { useSongStore } from '@/stores/songs'
 import TeamTagPill from '@/components/TeamTagPill.vue'
 import { scriptureWebLink } from '@/utils/scripture'
-import { orderSlotsBySection } from '@/utils/slotTypes'
+import { orderSlotsBySection, miscLabel } from '@/utils/slotTypes'
 import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps<{
@@ -159,8 +159,9 @@ function slotLabel(slot: ServiceSlot): string {
       // Matches the canonical label used by utils/slotTypes.ts's slotLabel().
       return 'Announcements'
     case 'MISC':
-      // Matches the canonical label used by utils/slotTypes.ts's slotLabel().
-      return 'Miscellaneous'
+      // The item's custom label (2026-08-12) so the listing matches the Service
+      // Order badge; miscLabel falls back to "Miscellaneous" when unset.
+      return miscLabel(slot)
     case 'HYMN':
       return slot.hymnName ? `Hymn — ${slot.hymnName}${slot.hymnNumber ? ` #${slot.hymnNumber}` : ''}` : 'Hymn — Empty'
     case 'IMPORTED':

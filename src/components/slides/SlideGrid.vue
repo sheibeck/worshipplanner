@@ -360,7 +360,7 @@ import { useImportedSlides } from '@/stores/importedSlides'
 import { useAuthStore } from '@/stores/auth'
 import { cssVarsFor } from '@/utils/slideTypography'
 import { useMediaUpload } from '@/composables/useMediaUpload'
-import { slotLabel } from '@/utils/slotTypes'
+import { slotLabel, miscLabel } from '@/utils/slotTypes'
 import SlideCard from './SlideCard.vue'
 import SlideGroupMusicControl from './SlideGroupMusicControl.vue'
 import BackgroundControl from './BackgroundControl.vue'
@@ -458,7 +458,11 @@ const { progress: mediaUploadProgress, error: mediaUploadError, isUploading: med
  */
 const groupTitle = computed(() => {
   if (!props.selectedSlot) return ''
-  const kindLabel = slotLabel(props.selectedSlot)
+  // MISC uses its custom label as the kind label too (2026-08-12), so a labeled
+  // MISC group reads just "Communion" (not "Miscellaneous — Communion") and an
+  // unlabeled one reads "Miscellaneous" — aligned with the Service Order badge.
+  const kindLabel =
+    props.selectedSlot.kind === 'MISC' ? miscLabel(props.selectedSlot) : slotLabel(props.selectedSlot)
   const display = slotDisplayTitle(props.selectedSlot)
   return display === kindLabel ? kindLabel : `${kindLabel} — ${display}`
 })

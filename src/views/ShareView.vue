@@ -72,7 +72,7 @@
 
           <!-- MISC slot -->
           <template v-else-if="slot.kind === 'MISC'">
-            <p class="text-xs text-gray-500 uppercase tracking-wider mb-0.5">Miscellaneous</p>
+            <p class="text-xs text-gray-500 uppercase tracking-wider mb-0.5">{{ miscLabel(slot) }}</p>
             <p v-if="slot.body?.trim()" class="whitespace-pre-wrap text-sm text-gray-700 mt-1">{{ slot.body }}</p>
           </template>
 
@@ -123,7 +123,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { doc, getDoc } from 'firebase/firestore'
 import { db } from '@/firebase'
-import { slotLabel } from '@/utils/slotTypes'
+import { slotLabel, miscLabel } from '@/utils/slotTypes'
 import { formatScriptureRef } from '@/utils/planningCenterExport'
 import type { ScriptureRef } from '@/types/service'
 

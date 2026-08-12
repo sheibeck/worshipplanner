@@ -33,6 +33,7 @@ vi.mock('@/utils/slotTypes', () => ({
       default: return slot.kind
     }
   }),
+  miscLabel: vi.fn((slot: { label?: string }) => slot.label?.trim() || 'Miscellaneous'),
 }))
 
 // Mock firebase/firestore — getDoc and doc are controlled/inspected per test

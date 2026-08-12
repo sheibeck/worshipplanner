@@ -10,7 +10,7 @@
 import type { ServiceSlot, SlotKind } from '@/types/service'
 import type { CongregationalSection, Slide } from '@/types/slide'
 import type { GroupSlideEntry } from '@/types/slideGroup'
-import { slotLabel } from '@/utils/slotTypes'
+import { slotLabel, miscLabel } from '@/utils/slotTypes'
 import { formatScriptureReference, scriptureRefFromSlot } from '@/utils/scripture'
 
 /** One key in the 3-dot slide action menu (33-UI-SPEC.md § Copywriting Contract). */
@@ -116,10 +116,13 @@ export function slotDisplayTitle(slot: ServiceSlot): string {
     }
     case 'HYMN':
       return slot.hymnName && slot.hymnName.trim() ? slot.hymnName : slotLabel(slot)
+    // MISC shows its custom label (2026-08-12) so the Slides tab matches the
+    // Service Order badge; miscLabel falls back to "Miscellaneous" when unset.
+    case 'MISC':
+      return miscLabel(slot)
     case 'PRAYER':
     case 'MESSAGE':
     case 'ANNOUNCEMENTS':
-    case 'MISC':
     case 'IMPORTED':
       return slotLabel(slot)
   }
