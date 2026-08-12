@@ -152,6 +152,15 @@ export default defineConfig(({ mode, command }) => {
         // config (`functions/vitest.config.ts`) which correctly runs the TS
         // sources under node.
         'functions/lib/**',
+        // `render-service/` is a standalone package with its OWN vitest
+        // (4.1.10, pinned in render-service/package.json) and its OWN
+        // `render-service/vitest.config.ts` running under a node environment.
+        // Collected by this root jsdom run it fails two ways at once: the root
+        // vitest (4.0.x) mis-handles render.test.ts's `vi.mock("node:child_process")`
+        // ("No 'default' export…"), and a node service has no business under
+        // jsdom. Run it via `cd render-service && npm test` (39 tests pass).
+        // Same rationale as `functions/lib/**` above.
+        'render-service/**',
       ],
     },
   }
