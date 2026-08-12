@@ -328,6 +328,26 @@ describe('ScriptureInput', () => {
       expect(link.attributes('href')).toContain('version=NLT')
       expect(link.attributes('href')).toContain('biblegateway.com')
     })
+
+    it('the per-item bibleVersion override drives the reader link, overriding the org default (2026-08-12)', async () => {
+      mockBibleVersion = 'ESV' // church default is ESV…
+      const wrapper = mount(ScriptureInput, {
+        props: {
+          ...defaultProps,
+          modelValue: { book: 'John', chapter: 3, verseStart: 16, verseEnd: 16 },
+          bibleVersion: 'NLT', // …but this item overrides to NLT
+        },
+      })
+      // …so the reader link follows the override, not the org default.
+      expect(wrapper.text()).toContain('View on BibleGateway')
+      const link = wrapper.find('a[target="_blank"]')
+      expect(link.attributes('href')).toContain('version=NLT')
+
+      // Changing the override back to ESV updates the link live.
+      await wrapper.setProps({ bibleVersion: 'ESV' })
+      expect(wrapper.text()).toContain('View on ESV.org')
+      expect(wrapper.find('a[target="_blank"]').attributes('href')).toContain('esv.org')
+    })
   })
 
   describe('Overlap warning', () => {

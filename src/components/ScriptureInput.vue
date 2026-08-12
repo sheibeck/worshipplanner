@@ -113,15 +113,20 @@
       </div>
     </div>
 
-    <!-- Freeform scripture text input -->
-    <input
-      v-model="localText"
-      type="text"
-      :placeholder="label === 'Sermon Passage' ? 'e.g. Romans 8:28' : 'e.g. Isaiah 53:1-6'"
-      class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-      :class="parseError ? 'border-red-700 focus:ring-red-500' : ''"
-      @input="onTextInput"
-    />
+    <!-- Freeform scripture text input, with an optional trailing control on the
+         same line (the `version` slot — e.g. the per-item Bible-version selector
+         in the service editor, which then sits under the Search button). -->
+    <div class="flex items-start gap-2">
+      <input
+        v-model="localText"
+        type="text"
+        :placeholder="label === 'Sermon Passage' ? 'e.g. Romans 8:28' : 'e.g. Isaiah 53:1-6'"
+        class="flex-1 min-w-0 rounded-md bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-500 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+        :class="parseError ? 'border-red-700 focus:ring-red-500' : ''"
+        @input="onTextInput"
+      />
+      <slot name="version" />
+    </div>
     <p v-if="parseError" class="text-xs text-red-400 mt-1">{{ parseError }}</p>
 
     <!-- Reader link (shown when book and chapter are filled) — routes to the
@@ -295,17 +300,21 @@ const currentRef = computed<ScriptureRef | null>(() => {
 
 const canPreview = computed(() => currentRef.value !== null)
 
-// Version-aware reader link + label (R090): follows the church's chosen
-// translation so an NLT church never sees an ESV.org link. ESV reads on
-// esv.org; NLT reads on BibleGateway (NLT has no human-facing reader of its
-// own — api.nlt.to is an API host).
+// The version in effect for THIS input: the per-item override (R128) when set,
+// else the church default. Single source for the preview fetch, the reader link,
+// and its label, so all three follow an override the moment it changes.
+const effectiveVersion = computed(() => props.bibleVersion ?? authStore.settings.bibleVersion)
+
+// Version-aware reader link + label (R090): follows the effective translation so
+// an NLT reading never shows an ESV.org link. ESV reads on esv.org; NLT reads on
+// BibleGateway (NLT has no human-facing reader of its own — api.nlt.to is an API host).
 const readerUrl = computed(() => {
   if (!currentRef.value) return ''
-  return scriptureWebLink(currentRef.value.book, currentRef.value.chapter, authStore.settings.bibleVersion)
+  return scriptureWebLink(currentRef.value.book, currentRef.value.chapter, effectiveVersion.value)
 })
 
 const readerLabel = computed(() =>
-  authStore.settings.bibleVersion === 'NLT' ? 'View on BibleGateway' : 'View on ESV.org',
+  effectiveVersion.value === 'NLT' ? 'View on BibleGateway' : 'View on ESV.org',
 )
 
 const isComplete = computed(() => {
@@ -348,6 +357,16 @@ const passageQuery = computed(() => {
 
 const showPreviewButton = computed(() => canPreview.value && passageQuery.value !== previewRef.value)
 
+// When the effective Bible version changes (e.g. the per-item override is
+// switched ESV↔NLT), drop any shown preview so it can't display stale text in
+// the old version. The reader link/label already recompute live via
+// effectiveVersion; re-previewing then fetches the new version.
+watch(effectiveVersion, () => {
+  previewText.value = ''
+  previewRef.value = ''
+  previewError.value = ''
+})
+
 function dismissPreview() {
   previewText.value = ''
   previewRef.value = ''
@@ -364,9 +383,9 @@ function dismissPreview() {
 // NLT.
 function fetchPassageByOrgSetting(query: string): Promise<string> {
   // R128 (Phase 56): the per-item override wins over the org default; absent
-  // prop reproduces today's org-default routing.
-  const effectiveVersion = props.bibleVersion ?? authStore.settings.bibleVersion
-  return effectiveVersion === 'NLT'
+  // prop reproduces today's org-default routing. `effectiveVersion` is the
+  // shared computed used by the reader link + label too.
+  return effectiveVersion.value === 'NLT'
     ? fetchNltPassageText(query)
     : fetchPassageText(query)
 }

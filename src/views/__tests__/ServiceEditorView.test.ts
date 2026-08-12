@@ -2319,7 +2319,9 @@ describe('ServiceEditorView - shared body editor: Message/Announcements/Misc, Hy
           ServicePrintLayout: true,
           SongBadge: true,
           SongSlotPicker: true,
-          ScriptureInput: true,
+          // Stub ScriptureInput but render its `version` slot, so the slotted
+          // per-item Bible-version selector (R128) is reachable in the DOM.
+          ScriptureInput: { template: '<div class="scripture-input-stub"><slot name="version" /></div>' },
           PresentationViewer: true,
           // The MISC badge is now an inline-editable child (MiscLabelBadge);
           // render it for real so its badge/input testids are reachable.
