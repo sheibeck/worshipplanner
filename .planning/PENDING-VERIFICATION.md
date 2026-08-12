@@ -16,9 +16,17 @@ owner decisions.
 
 ---
 
-## ⏳ C1 — Phase 40 auth-claim migration — IN PROGRESS 2026-08-12 (soak, then deploy)
+## ✅ C1 — Phase 40 auth-claim migration — COMPLETE (Deploy 2 shipped 2026-08-12)
 
-Owner decided (2026-08-12) to FINISH the migration. Progress this session:
+**Deploy 2 released to production 2026-08-12 ~21:39 UTC.** `storage.rules` is now
+claim-only; the cross-service `firestore.exists()` fallback is gone. Post-deploy
+verification: all 3 users confirmed to carry `{orgId: 6vyK2…, role: editor}`
+server-side; `test:rules` green 149/149 (storage allow-cases now emulator-provable).
+**Remaining owner spot-check (non-blocking):** do one real upload (PPTX import or
+media) in the LIVE Berean app to confirm end-to-end — the one thing not provable
+without a real user session.
+
+Owner decided (2026-08-12) to FINISH the migration. What was done this session:
 - **Accidental multi-org cleanup — DONE (prod).** The pre-check found 2 of 3 users
   were members of accidental, abandoned orgs (`1dcn4…`, `vi9Xw…`) beyond Berean
   (`6vyK2…`). Owner confirmed those orgs are unused/abandonable. A one-off admin
