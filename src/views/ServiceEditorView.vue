@@ -918,7 +918,19 @@
                  supplies the text; kindBadgeClass(kind) the on-theme tint. Fixed width
                  on desktop; a plain block above the field column on mobile (row is flex-col). -->
             <div class="flex-none sm:w-32 sm:pt-0.5">
+              <!-- MISC (2026-08-12): the pill IS the editable label — click it to rename
+                   the item directly (pencil affordance). Replaces the old separate label
+                   input. `label` is the canonical name (miscLabel drives PC title + print). -->
+              <MiscLabelBadge
+                v-if="slot.kind === 'MISC'"
+                :model-value="(slot as NonAssignableSlot).label"
+                :editable="canEditService"
+                :badge-class="kindBadgeClass('MISC')"
+                :testid-base="`slot-misc-${index}`"
+                @update:model-value="(slot as NonAssignableSlot).label = $event"
+              />
               <span
+                v-else
                 class="inline-flex items-center rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
                 :class="kindBadgeClass(slot.kind)"
                 :data-testid="`slot-badge-${index}`"
@@ -1098,27 +1110,10 @@
               <!-- MESSAGE / ANNOUNCEMENTS / MISC slot (260811-vsr): no content beyond the
                    badge + the shared notes-canonical field below. body/linkUrl/linkLabel
                    remain on the type + in Firestore, read via slotFreeText's notes ?? body
-                   fallback. The old label + hint are replaced by the per-kind badge. -->
+                   fallback. For MISC, the item's name is edited inline on the badge pill
+                   itself (MiscLabelBadge, 2026-08-12) — no separate label input here. -->
               <template v-else-if="slot.kind === 'MESSAGE' || slot.kind === 'ANNOUNCEMENTS' || slot.kind === 'MISC'">
-                <!-- MISC custom label (R127, Phase 56): a DISTINCT compact "name"
-                     input, above the shared notes field. Not a second notes box —
-                     the type badge stays "Miscellaneous"; this names the item and
-                     becomes the Planning Center title. `= value || undefined` on
-                     empty lets stripUndefined drop the key (mirrors the notes
-                     input below). Plain text only: :value + {{ }} auto-escape,
-                     never v-html (T-56-01). -->
-                <template v-if="slot.kind === 'MISC'">
-                  <input
-                    v-if="canEditService"
-                    :value="(slot as NonAssignableSlot).label ?? ''"
-                    @input="(slot as NonAssignableSlot).label = ($event.target as HTMLInputElement).value || undefined"
-                    type="text"
-                    placeholder="Miscellaneous"
-                    data-testid="slot-misc-label-input"
-                    class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-200 text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500"
-                  />
-                  <p v-else data-testid="slot-misc-label-text" class="text-sm text-gray-200">{{ miscLabel(slot as NonAssignableSlot) }}</p>
-                </template>
+                <!-- intentionally empty: field column is the shared notes field below -->
               </template>
 
               <!-- HYMN slot -->
@@ -1427,7 +1422,7 @@ import { useRosterStore } from '@/stores/roster'
 import { useQuartersStore } from '@/stores/quarters'
 import { useSlideGroups } from '@/stores/slideGroups'
 import { useSaveStatus, hasVisibleSaveStatus } from '@/stores/saveStatus'
-import { slotLabel, miscLabel, kindBadgeClass, createSlot, reindexSlots, backfillSlotIds, groupBySection, flattenBySection, orderSlotsBySection } from '@/utils/slotTypes'
+import { slotLabel, kindBadgeClass, createSlot, reindexSlots, backfillSlotIds, groupBySection, flattenBySection, orderSlotsBySection } from '@/utils/slotTypes'
 import { scripturesOverlap, scriptureRefFromSlot, formatScriptureReference, scriptureSlotAfterReferenceChange } from '@/utils/scripture'
 import type { CongregationalSection } from '@/types/slide'
 import { getPrimaryKey } from '@/utils/songSearch'
@@ -1442,6 +1437,7 @@ import SaveStatusIndicator from '@/components/SaveStatusIndicator.vue'
 import SongBadge from '@/components/SongBadge.vue'
 import SongSlotPicker from '@/components/SongSlotPicker.vue'
 import ScriptureInput from '@/components/ScriptureInput.vue'
+import MiscLabelBadge from '@/components/MiscLabelBadge.vue'
 import ServicePrintLayout from '@/components/ServicePrintLayout.vue'
 import PresentationViewer from '@/components/PresentationViewer.vue'
 import SlidesTab from '@/components/slides/SlidesTab.vue'

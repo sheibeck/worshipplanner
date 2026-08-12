@@ -2321,6 +2321,9 @@ describe('ServiceEditorView - shared body editor: Message/Announcements/Misc, Hy
           SongSlotPicker: true,
           ScriptureInput: true,
           PresentationViewer: true,
+          // The MISC badge is now an inline-editable child (MiscLabelBadge);
+          // render it for real so its badge/input testids are reachable.
+          MiscLabelBadge: false,
           // D-14's slot-delete confirmation renders via <Teleport to="body"> —
           // opt it out of shallowMount's default auto-stub so UI-06's test can
           // read the confirm dialog's body text from document.body.
@@ -2446,9 +2449,12 @@ describe('ServiceEditorView - shared body editor: Message/Announcements/Misc, Hy
     expect(input.attributes('placeholder')).toBe('Details')
   })
 
-  // ── R127 (Phase 56): MISC custom label input ────────────────────────────────
+  // ── R127 (Phase 56 → 2026-08-12): MISC label edited INLINE on the badge pill ───
+  // The separate label input was replaced by an editable badge (MiscLabelBadge):
+  // click the pill (testid slot-misc-<i>-badge) to reveal the inline input
+  // (slot-misc-<i>-input); blur/Enter commits, empty clears to undefined.
 
-  it('R127: typing into the MISC label input sets slot.label; clearing it to empty yields undefined', async () => {
+  it('R127: editing the MISC badge sets slot.label; clearing it to empty yields undefined', async () => {
     mockServicesList = [{
       ...buildSectionedService(),
       slots: [{ kind: 'MISC', id: 'ml1', position: 0 }],
@@ -2456,23 +2462,32 @@ describe('ServiceEditorView - shared body editor: Message/Announcements/Misc, Hy
     mockAuthState.isEditor = true
     const wrapper = await mountView()
 
-    const input = wrapper.find('[data-testid="slot-misc-label-input"]')
-    expect(input.exists()).toBe(true)
-    expect((input.element as HTMLInputElement).value).toBe('')
-    expect(input.attributes('placeholder')).toBe('Miscellaneous')
+    // The pill IS the editable surface — no separate label input until clicked.
+    const badge = wrapper.find('[data-testid="slot-misc-0-badge"]')
+    expect(badge.exists()).toBe(true)
+    expect(badge.text()).toContain('Miscellaneous')
+    expect(wrapper.find('[data-testid="slot-misc-0-input"]').exists()).toBe(false)
 
+    await badge.trigger('click')
+    const input = wrapper.find('[data-testid="slot-misc-0-input"]')
+    expect(input.exists()).toBe(true)
     await input.setValue('Communion')
+    await input.trigger('blur')
     await wrapper.vm.$nextTick()
     let slots = (wrapper.vm as unknown as SlotsVm).localService.slots
     expect((slots[0] as unknown as { label?: string }).label).toBe('Communion')
 
-    await input.setValue('')
+    // Re-open and clear → undefined (stripUndefined-friendly).
+    await wrapper.find('[data-testid="slot-misc-0-badge"]').trigger('click')
+    const input2 = wrapper.find('[data-testid="slot-misc-0-input"]')
+    await input2.setValue('')
+    await input2.trigger('blur')
     await wrapper.vm.$nextTick()
     slots = (wrapper.vm as unknown as SlotsVm).localService.slots
     expect((slots[0] as unknown as { label?: string }).label).toBeUndefined()
   })
 
-  it('R127: the MISC label input is absent for viewers, which see miscLabel as read-only text', async () => {
+  it('R127: the MISC badge is a static (non-editable) pill for viewers, showing the label', async () => {
     mockServicesList = [{
       ...buildSectionedService(),
       slots: [{ kind: 'MISC', id: 'ml2', position: 0, label: 'Communion' }],
@@ -2480,13 +2495,16 @@ describe('ServiceEditorView - shared body editor: Message/Announcements/Misc, Hy
     mockAuthState.isEditor = false
     const wrapper = await mountView()
 
-    expect(wrapper.find('[data-testid="slot-misc-label-input"]').exists()).toBe(false)
-    const text = wrapper.find('[data-testid="slot-misc-label-text"]')
-    expect(text.exists()).toBe(true)
-    expect(text.text()).toBe('Communion')
+    const badge = wrapper.find('[data-testid="slot-misc-0-badge"]')
+    expect(badge.exists()).toBe(true)
+    expect(badge.element.tagName).toBe('SPAN') // static, not a <button>
+    expect(badge.text()).toContain('Communion')
+    // Not editable: clicking reveals no input.
+    await badge.trigger('click')
+    expect(wrapper.find('[data-testid="slot-misc-0-input"]').exists()).toBe(false)
   })
 
-  it('R127: an unlabeled MISC shows "Miscellaneous" as the viewer label text', async () => {
+  it('R127: an unlabeled MISC shows "Miscellaneous" on the viewer badge', async () => {
     mockServicesList = [{
       ...buildSectionedService(),
       slots: [{ kind: 'MISC', id: 'ml3', position: 0 }],
@@ -2494,9 +2512,9 @@ describe('ServiceEditorView - shared body editor: Message/Announcements/Misc, Hy
     mockAuthState.isEditor = false
     const wrapper = await mountView()
 
-    const text = wrapper.find('[data-testid="slot-misc-label-text"]')
-    expect(text.exists()).toBe(true)
-    expect(text.text()).toBe('Miscellaneous')
+    const badge = wrapper.find('[data-testid="slot-misc-0-badge"]')
+    expect(badge.exists()).toBe(true)
+    expect(badge.text()).toContain('Miscellaneous')
   })
 
   // ── R128 (Phase 56): per-item Scripture Bible-version selector ───────────────

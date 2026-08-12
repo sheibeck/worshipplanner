@@ -392,14 +392,13 @@ describe('ServiceTemplateEditor — Suggested Template seed (R114)', () => {
 })
 
 describe('ServiceTemplateEditor — template-item body (R116)', () => {
-  it('renders a template-item-body textarea for a MISC row, bound to entry.body', async () => {
+  it('renders NO template-item-body textarea for a MISC row (MISC template textarea dropped 2026-08-12)', async () => {
     mockAuthState.settings.defaultServiceTemplate = [{ id: 'misc-1', kind: 'MISC', body: 'Canned music' }]
     mountEditor(true)
     await flushPromises()
 
-    const bodies = body().findAll('[data-testid="template-item-body"]')
-    expect(bodies).toHaveLength(1)
-    expect((bodies[0]!.element as HTMLTextAreaElement).value).toBe('Canned music')
+    // A MISC template item is now just its editable label — no body textarea.
+    expect(body().findAll('[data-testid="template-item-body"]')).toHaveLength(0)
   })
 
   it('renders a template-item-body textarea for an ANNOUNCEMENTS row', async () => {
@@ -419,9 +418,9 @@ describe('ServiceTemplateEditor — template-item body (R116)', () => {
     expect(body().findAll('[data-testid="template-item-body"]')).toHaveLength(0)
   })
 
-  it('typing sets the draft entry body; the save payload carries the typed text', async () => {
+  it('typing sets the draft entry body for a body kind; the save payload carries the typed text', async () => {
     mountEditor(true)
-    await body().get('[data-testid="palette-add-misc"]').trigger('click')
+    await body().get('[data-testid="palette-add-announcements"]').trigger('click')
     await flushPromises()
 
     await body().get('[data-testid="template-item-body"]').setValue('Recurring slide content')
@@ -432,12 +431,12 @@ describe('ServiceTemplateEditor — template-item body (R116)', () => {
     const payload = mockUpdateDoc.mock.calls[0]![1] as Record<string, unknown>
     const entries = payload['settings.defaultServiceTemplate'] as ServiceTemplateEntry[]
     expect(entries).toHaveLength(1)
-    expect(entries[0]!.kind).toBe('MISC')
+    expect(entries[0]!.kind).toBe('ANNOUNCEMENTS')
     expect(entries[0]!.body).toBe('Recurring slide content')
   })
 
   it('clearing the body to empty leaves the saved entry bodyless (undefined stripped)', async () => {
-    mockAuthState.settings.defaultServiceTemplate = [{ id: 'misc-1', kind: 'MISC', body: 'Something' }]
+    mockAuthState.settings.defaultServiceTemplate = [{ id: 'ann-1', kind: 'ANNOUNCEMENTS', body: 'Something' }]
     mountEditor(true)
     await flushPromises()
 
@@ -453,46 +452,55 @@ describe('ServiceTemplateEditor — template-item body (R116)', () => {
   })
 })
 
-describe('ServiceTemplateEditor — MISC label (R127)', () => {
-  it('renders a template-item-misc-label input for a MISC row, bound to entry.label', async () => {
+describe('ServiceTemplateEditor — MISC label edited inline on the badge (R127 → 2026-08-12)', () => {
+  // The separate template-item-misc-label input was replaced by an editable badge
+  // (MiscLabelBadge): the MISC pill (template-item-misc-<id>-badge) IS the name;
+  // clicking it reveals the inline input (template-item-misc-<id>-input).
+
+  it('renders the MISC badge as an editable pill bound to entry.label (no separate input until clicked)', async () => {
     mockAuthState.settings.defaultServiceTemplate = [{ id: 'misc-1', kind: 'MISC', label: 'Communion' }]
     mountEditor(true)
     await flushPromises()
 
-    const inputs = body().findAll('[data-testid="template-item-misc-label"]')
-    expect(inputs).toHaveLength(1)
-    expect((inputs[0]!.element as HTMLInputElement).value).toBe('Communion')
+    const badge = body().get('[data-testid="template-item-misc-misc-1-badge"]')
+    expect(badge.text()).toContain('Communion')
+    expect(body().find('[data-testid="template-item-misc-misc-1-input"]').exists()).toBe(false)
+    // The redundant name <p> is gone for MISC (the badge is the name).
+    expect(body().find('[data-testid="template-item-name"]').exists()).toBe(false)
   })
 
-  it('renders no template-item-misc-label input for non-MISC kinds (ANNOUNCEMENTS / SONG)', async () => {
+  it('renders no MISC editable badge/input for non-MISC kinds (ANNOUNCEMENTS / SONG)', async () => {
     mountEditor(true)
     await body().get('[data-testid="palette-add-announcements"]').trigger('click')
     await body().get('[data-testid="palette-add-song"]').trigger('click')
     await flushPromises()
 
-    expect(body().findAll('[data-testid="template-item-misc-label"]')).toHaveLength(0)
+    expect(body().findAll('[data-testid^="template-item-misc-"]')).toHaveLength(0)
   })
 
-  it('the MISC entry displayed name shows entry.label when set', async () => {
+  it('the MISC badge shows entry.label when set', async () => {
     mockAuthState.settings.defaultServiceTemplate = [{ id: 'misc-1', kind: 'MISC', label: 'Communion' }]
     mountEditor(true)
     await flushPromises()
-    expect(body().get('[data-testid="template-item-name"]').text()).toBe('Communion')
+    expect(body().get('[data-testid="template-item-misc-misc-1-badge"]').text()).toContain('Communion')
   })
 
-  it('the MISC entry displayed name falls back to "Miscellaneous" when the label is absent', async () => {
+  it('the MISC badge falls back to "Miscellaneous" when the label is absent', async () => {
     mockAuthState.settings.defaultServiceTemplate = [{ id: 'misc-2', kind: 'MISC' }]
     mountEditor(true)
     await flushPromises()
-    expect(body().get('[data-testid="template-item-name"]').text()).toBe('Miscellaneous')
+    expect(body().get('[data-testid="template-item-misc-misc-2-badge"]').text()).toContain('Miscellaneous')
   })
 
-  it('typing sets the draft entry label; the save payload carries the typed text', async () => {
+  it('editing the badge sets the draft entry label; the save payload carries the typed text', async () => {
+    mockAuthState.settings.defaultServiceTemplate = [{ id: 'misc-1', kind: 'MISC' }]
     mountEditor(true)
-    await body().get('[data-testid="palette-add-misc"]').trigger('click')
     await flushPromises()
 
-    await body().get('[data-testid="template-item-misc-label"]').setValue('Communion')
+    await body().get('[data-testid="template-item-misc-misc-1-badge"]').trigger('click')
+    const input = body().get('[data-testid="template-item-misc-misc-1-input"]')
+    await input.setValue('Communion')
+    await input.trigger('blur')
     await flushPromises()
     await body().get('[data-testid="template-save"]').trigger('click')
     await flushPromises()
@@ -509,7 +517,10 @@ describe('ServiceTemplateEditor — MISC label (R127)', () => {
     mountEditor(true)
     await flushPromises()
 
-    await body().get('[data-testid="template-item-misc-label"]').setValue('')
+    await body().get('[data-testid="template-item-misc-misc-1-badge"]').trigger('click')
+    const input = body().get('[data-testid="template-item-misc-misc-1-input"]')
+    await input.setValue('')
+    await input.trigger('blur')
     await flushPromises()
     await body().get('[data-testid="template-save"]').trigger('click')
     await flushPromises()

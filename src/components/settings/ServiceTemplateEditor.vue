@@ -124,35 +124,36 @@
                        supplies the text; the shared kindBadgeClass(entry.kind) the on-theme tint. Fixed width
                        on desktop; a plain block above the field column on mobile (row is flex-col). -->
                   <div class="flex-none sm:w-32 sm:pt-0.5">
+                    <!-- MISC (2026-08-12): the pill IS the editable label — click it to rename
+                         the item directly (pencil affordance). Replaces the old separate label
+                         input. Template editor has no lock, so it is always editable. -->
+                    <MiscLabelBadge
+                      v-if="entry.kind === 'MISC'"
+                      :model-value="entry.label"
+                      :editable="true"
+                      :badge-class="kindBadgeClass('MISC')"
+                      :testid-base="`template-item-misc-${entry.id}`"
+                      @update:model-value="onLabelChange(entry.id, $event ?? '')"
+                    />
                     <span
+                      v-else
                       class="inline-flex items-center rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
                       :class="kindBadgeClass(entry.kind)"
                       :data-testid="`template-item-badge-${entry.id}`"
                     >{{ kindLabel(entry.kind) }}</span>
                   </div>
 
-                  <!-- Zone 3 — field column: entry name + (MISC) label input + (MISC/ANNOUNCEMENTS) body. -->
+                  <!-- Zone 3 — field column: entry name (non-MISC; a MISC item's name is the
+                       editable badge above) + (MISC/ANNOUNCEMENTS) recurring body. -->
                   <div class="flex-1 min-w-0 flex flex-col gap-2">
-                    <p class="text-sm text-gray-200" data-testid="template-item-name">{{ entryDisplayName(entry) }}</p>
-                    <!-- Recurring MISC custom label (R127, Phase 56). Mirrors the live editor's MISC
-                         label input (ServiceEditorView.vue), a DISTINCT compact "name" above the body.
-                         Bound via :value / @input (auto-escaped Vue binding — never v-html; T-56-01).
-                         A template MISC label flows into every created slot via buildSlotsFromTemplate. -->
-                    <input
-                      v-if="entry.kind === 'MISC'"
-                      :value="entry.label ?? ''"
-                      type="text"
-                      placeholder="Miscellaneous"
-                      data-testid="template-item-misc-label"
-                      class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-200 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500 mt-2"
-                      @input="onLabelChange(entry.id, ($event.target as HTMLInputElement).value)"
-                    />
-                    <!-- Recurring body text for the body-bearing template kinds (R116). Mirrors
-                         the live editor's MESSAGE/ANNOUNCEMENTS/MISC textarea (ServiceEditorView.vue:1092).
-                         Scoped to MISC + ANNOUNCEMENTS per the recorded decision. Bound via :value / @input
-                         (auto-escaped Vue binding — never v-html; T-52-03). -->
+                    <p v-if="entry.kind !== 'MISC'" class="text-sm text-gray-200" data-testid="template-item-name">{{ entryDisplayName(entry) }}</p>
+                    <!-- Recurring body text for ANNOUNCEMENTS (R116). MISC dropped its template
+                         textarea 2026-08-12 (owner: "we don't need that") — a MISC template item is
+                         now just its editable label. `body?` stays on the type (non-destructive; any
+                         legacy MISC body is retained in data, simply no longer editable here). Bound
+                         via :value / @input (auto-escaped Vue binding — never v-html; T-52-03). -->
                     <textarea
-                      v-if="entry.kind === 'MISC' || entry.kind === 'ANNOUNCEMENTS'"
+                      v-if="entry.kind === 'ANNOUNCEMENTS'"
                       :value="entry.body ?? ''"
                       rows="2"
                       placeholder="Recurring content for this item…"
@@ -303,6 +304,7 @@ import { doc, updateDoc } from 'firebase/firestore'
 import Sortable from 'sortablejs'
 import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
+import MiscLabelBadge from '@/components/MiscLabelBadge.vue'
 import { buildSuggestedTemplateEntries, createSlot, slotLabel, kindBadgeClass, groupBySection, flattenBySection } from '@/utils/slotTypes'
 import { stripUndefined } from '@/utils/stripUndefined'
 import { SERVICE_SECTIONS, SERVICE_SECTION_LABELS } from '@/types/service'
