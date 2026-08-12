@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Editing Reliability & Song Slides
 status: Awaiting next milestone
-stopped_at: Completed 55-03-PLAN.md (R126 Roboto slide font)
-last_updated: "2026-08-12T16:20:41.175Z"
+stopped_at: Completed quick task 260812-izz (remove BPM from share/print, universal per-item notes, R123 confirmed)
+last_updated: "2026-08-12T18:01:24.646Z"
 last_activity: 2026-08-12
 last_activity_desc: Milestone v1.6 completed and archived
 progress:
@@ -1905,6 +1905,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: 53-02: split lyric sections resolve LIVE to N slides at both assembler call sites via sliceSectionIntoSlides; ids ${entry.id}:${i} (stored) / advancing localSeq (fallback), unsplit byte-identical; R118 falls out for free, no group-model change
 - [Phase ?]: R122: slot-level notes? on the base MediaAttachableSlot (cast-free on all 5 kinds, distinct from Service.notes); one shared responsive notes input beside every selector; emptied value dropped by stripUndefined
 - [Phase ?]: Roboto added as sixth curated @fontsource slide font (^5.3.0, OFL-1.1); Inter stays first/default; adding a font = one registry entry + one static-prefix loader line + test count bump
+- [Phase ?]: Quick task 260812-izz: removed BPM from share link and print, added universal per-item notes for all slot kinds on both surfaces, confirmed MISC-0-slides (R123) still correct with no code change. Full vitest run surfaced a third failing suite (render-service/src/render.test.ts, pre-existing vitest 4.0.18/4.1.10 version mismatch) not in CLAUDE.md's documented 2-file baseline — unrelated to this task, flagged for the owner.
 
 ### Roadmap Evolution
 
@@ -1959,6 +1960,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 | 260809-vvq | Planning Center export fixes: (1) scripture item description now routes by the church's `bibleVersion` (`fetchNltPassageText` for NLT, `fetchPassageText` for ESV) AND skips the fetch when the reference is empty — this eliminated the empty-`q=` HTTP 400 the owner hit exporting with NLT selected; (2) export now sends ALL remaining slot kinds (PRAYER/MESSAGE/ANNOUNCEMENTS/MISC via a new `otherSlots` bucket; IMPORTED still excluded — no PC analog); (3) `buildPlanTitle` returns the sermon passage ONLY (dropped the `(Teams)` suffix), new plans only. `addSlotAsItem` gained a required `bibleVersion` param (all 9 ServiceEditorView call sites + tests updated). | 2026-08-09 | d97ea02, 8c602bc | [260809-vvq-pc-export-nlt-types-title](.planning/quick/260809-vvq-pc-export-nlt-types-title/) |
 | 20260811-del | Service-plan item delete blocked by Firestore `PERMISSION_DENIED` ("Null value error" in the `slideGroups` delete rule, `ServiceEditorView.vue:2791`): a present-but-null `serviceId` fell through the missing-key orphan-guard into `parentGone(null)`→`svcPath(null)`, and `isOrgEditor` used an unguarded `get().data.role`. Made both null-safe — present-but-null `serviceId` → deletable orphan; `isOrgEditor` `exists()`-guarded like `isOrgMember` + `.data.get('role','')`. +7 emulator rules tests (147/147 pass, 0 regressions); type-check clean. ⚠ **Needs `firebase deploy --only firestore:rules` (owner step)** to take effect in production. | 2026-08-11 | 38df34f | [20260811-service-plan-item-delete-permission](.planning/quick/20260811-service-plan-item-delete-permission/) |
 | 260811-vsr | Service Order editor UI pass, driven by an owner-imported Claude Design mockup (`Slides Tab.dc.html`, Turns 4a desktop / 4b mobile) mapped onto the app's existing dark-indigo theme. **(1)** Plain kinds (Prayer/Misc/Announcements/Message) collapsed to ONE free-text field via `slotFreeText(slot)=notes ?? body` (writes `notes`); the plain-kind `body` textarea + PRAYER link inputs removed from the UI (data retained on the type); `ServicePrintLayout` + Planning Center export migrated to `notes ?? body` (non-destructive, no data migration). **(2)** Unified "three-rail" rows — drag handle · colored per-kind badge (`kindBadgeClass`) · stacked full-width field+notes · right action rail — capped at `max-w-[1060px]`, single-stack below `sm` (walked back Phase-54 side-by-side). **(3)** Per-row editor-only ⋯ menu now owns Move-to-section (→`onSectionChange`) and Delete (→`removeSlot`); inline section `<select>` and inline ✕ removed. **(4)** Muted/dashed "No Section" band (`data-testid=no-section-band`) for the ungrouped bucket. Scope calls (disclosed): template-editor write-to-`notes` deferred behind the read-fallback; no new PRAYER PC data-flow; `slideGroupMaterializer` confirmed not a `body` consumer. type-check clean; app suite green at the 2-file baseline. ⚠ Owner visual/mobile feel verification DEFERRED (see `.planning/PENDING-VERIFICATION.md`). | 2026-08-12 | 35cdc0e, 72b4301, d0157d9, 1094282, 100ff68 | [260811-vsr-service-editor-ui-pass-consolidate-redun](.planning/quick/260811-vsr-service-editor-ui-pass-consolidate-redun/) |
+| 260812-izz | Removed BPM (tempo) from the public share link (`ShareView.vue`) and the print output (`ServicePrintLayout.vue` — deleted `getBpmForSlot` + the now-unused `songs` prop, dropped the `:songs` binding in `ServiceEditorView.vue`); song rows now show Key only. Added ONE universal per-item notes paragraph (`slot.notes ?? legacy body`) rendered once per row for EVERY slot kind on both surfaces, replacing the three per-kind free-text blocks; auto-escaped via `{{ }}` only (T-quick-01, public/unauthenticated). Confirmed MISC-defaults-to-0-slides (R123, `slideGroupMaterializer.ts`) still correct — verification-only, no code change. type-check clean; `npx vitest run` green at the documented 2-file baseline (plus a pre-existing, unrelated `render-service/render.test.ts` vitest 4.0.18/4.1.10 version-mismatch, flagged for owner). | 2026-08-12 | 3c3ac2f, f08a8d0 | [260812-izz-remove-bpm-from-song-share-link-and-prin](.planning/quick/260812-izz-remove-bpm-from-song-share-link-and-prin/) |
 
 ### Blockers/Concerns
 
@@ -2219,8 +2221,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-12T01:33:31.272Z
-Stopped at: Completed 55-03-PLAN.md (R126 Roboto slide font)
+Last session: 2026-08-12T18:01:15.536Z
+Stopped at: Completed quick task 260812-izz (remove BPM from share/print, universal per-item notes, R123 confirmed)
 Resume file: None
 
 ## Operator Next Steps
