@@ -2,17 +2,17 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Editing Reliability & Song Slides
-current_phase: 54
-current_phase_name: service-item-enhancements
-status: verifying
+current_phase: 55
+current_phase_name: preview-export-polish
+status: executing
 stopped_at: Completed 54-02-PLAN.md
-last_updated: "2026-08-11T23:52:17.236Z"
+last_updated: "2026-08-12T00:25:54.342Z"
 last_activity: 2026-08-11
-last_activity_desc: "Completed 54-02-PLAN.md (R122: slot-level notes field beside every item selector)"
+last_activity_desc: Phase 55 execution started
 progress:
   total_phases: 5
   completed_phases: 4
-  total_plans: 13
+  total_plans: 16
   completed_plans: 13
   percent: 80
 ---
@@ -193,7 +193,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 54 — service-item-enhancements
+**Current focus:** Phase 55 — preview-export-polish
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -203,10 +203,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 54 (service-item-enhancements) — CODE-COMPLETE, verification_deferred_human
-Plan: 2 of 2 complete (54-01, 54-02)
-Status: Phase 54 all plans executed + automated verification 9/9 must-haves; 2 manual checks DEFERRED per v1.6 grant. Autonomous run advancing to Phase 55 (final phase).
-Last activity: 2026-08-11 — Phase 54 verified (human_needed). R122 slot-level notes on the base `MediaAttachableSlot` (one shared responsive input beside every selector, autosave-stripped when empty) + R123 MISC derives no slides (one-line split, siblings/rebuild untouched, existing blank + hand-added slides survive). `npm run type-check` clean, app suite 3059 pass at the 2-file baseline. 2 owner checks → /gsd-verify-work 54. Not deploy-gated.
+Phase: 55 (preview-export-polish) — EXECUTING
+Plan: 1 of 3 — 55-01 COMPLETE (R124)
+Status: Executing Phase 55
+Last activity: 2026-08-11 — 55-01 done: scripture slides no longer auto-append the (ESV)/(NLT) version (render-only, provenance preserved)
 
 ## ⏸ RESUME HERE (2026-08-11 — v1.6 ROADMAP.md created, ready to plan Phase 51)
 
@@ -2207,7 +2207,7 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
 Last session: 2026-08-11T23:52:16.542Z
-Stopped at: Completed 54-02-PLAN.md
+Stopped at: Completed 55-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

@@ -90,7 +90,7 @@ FINDINGS".
 
 ### Preview & Export Polish
 
-- [ ] **R124**: The slideshow preview **no longer auto-appends the Bible version** (ESV/NLT) to
+- [x] **R124**: The slideshow preview **no longer auto-appends the Bible version** (ESV/NLT) to
       scripture slides. The version can still be added to a slide manually if desired.
 
 - [ ] **R125**: The Planning Center export shows a **spinner / in-progress indicator** while the export
@@ -149,7 +149,7 @@ Which phases cover which requirements. Filled during roadmap creation (2026-08-1
 | R121 | Phase 53 — Song Lyric Editing | Complete |
 | R122 | Phase 54 — Service Item Enhancements | Complete |
 | R123 | Phase 54 — Service Item Enhancements | Complete |
-| R124 | Phase 55 — Preview & Export Polish | Pending |
+| R124 | Phase 55 — Preview & Export Polish | Complete |
 | R125 | Phase 55 — Preview & Export Polish | Pending |
 | R126 | Phase 55 — Preview & Export Polish | Pending |
 
