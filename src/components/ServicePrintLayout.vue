@@ -27,8 +27,6 @@
             <span class="text-gray-900">{{ slot.songTitle }}</span>
             <span class="text-gray-500">  |  </span>
             <span class="text-gray-600">Key: {{ slot.songKey }}</span>
-            <span class="text-gray-500">  |  </span>
-            <span class="text-gray-600">BPM: {{ getBpmForSlot(slot) ?? '--' }}</span>
           </template>
           <template v-else>
             <span class="text-gray-500"> -- </span>
@@ -118,30 +116,13 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { Service, SongSlot, HymnSlot, ScriptureRef } from '@/types/service'
-import type { Song } from '@/types/song'
+import type { Service, HymnSlot, ScriptureRef } from '@/types/service'
 import { slotLabel, miscLabel } from '@/utils/slotTypes'
 import { formatScriptureRef } from '@/utils/planningCenterExport'
 
 const props = defineProps<{
   service: Service
-  songs: Song[]
 }>()
-
-/**
- * Look up BPM for a song slot:
- * 1. Find song by songId in props.songs
- * 2. Find arrangement matching songKey
- * 3. Fall back to first arrangement's BPM
- * 4. Return null if not found
- */
-function getBpmForSlot(slot: SongSlot): number | null {
-  if (!slot.songId) return null
-  const song = props.songs.find((s) => s.id === slot.songId)
-  if (!song) return null
-  const matchingArr = song.arrangements.find((a) => a.key === slot.songKey)
-  return matchingArr?.bpm ?? song.arrangements[0]?.bpm ?? null
-}
 
 // ── Computed ──────────────────────────────────────────────────────────────────
 

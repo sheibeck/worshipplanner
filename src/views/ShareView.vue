@@ -36,7 +36,7 @@
             <p class="text-xs text-gray-500 uppercase tracking-wider mb-0.5">{{ slotLabel(slot, index) }}</p>
             <template v-if="slot.songId">
               <p class="text-base font-medium text-gray-900">{{ slot.songTitle }}</p>
-              <p class="text-sm text-gray-500">Key: {{ slot.songKey }} | BPM: {{ slot.bpm || '--' }}</p>
+              <p class="text-sm text-gray-500">Key: {{ slot.songKey }}</p>
             </template>
             <p v-else class="text-gray-400 italic text-sm">[not assigned]</p>
           </template>

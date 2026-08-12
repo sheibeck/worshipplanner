@@ -1423,7 +1423,6 @@
   <ServicePrintLayout
     v-if="localService"
     :service="localService"
-    :songs="songStore.songs"
   />
 </template>
 

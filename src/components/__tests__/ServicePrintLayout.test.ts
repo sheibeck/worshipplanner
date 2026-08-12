@@ -2,71 +2,9 @@ import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import ServicePrintLayout from '../ServicePrintLayout.vue'
 import type { Service } from '@/types/service'
-import type { Song } from '@/types/song'
 import type { Timestamp } from 'firebase/firestore'
 
 const mockTimestamp = { toDate: () => new Date('2026-03-04') } as unknown as Timestamp
-
-const mockSongs: Song[] = [
-  {
-    id: 'song-0',
-    title: 'Come Thou Fount',
-    ccliNumber: '22025',
-    author: 'Robert Robinson',
-    themes: [],
-    notes: '',
-    tags: [],
-    removedThemes: [],
-    vwTypes: [1],
-    arrangements: [
-      {
-        id: 'arr-0a',
-        name: 'Standard',
-        key: 'G',
-        bpm: 96,
-        lengthSeconds: null,
-        chordChartUrl: '',
-        notes: '',
-        teamTags: [],
-      },
-    ],
-    primaryArrangementId: null,
-    lastUsedAt: null,
-    hidden: false,
-    pcSongId: null,
-    createdAt: mockTimestamp,
-    updatedAt: mockTimestamp,
-  },
-  {
-    id: 'song-2',
-    title: 'Great Is Thy Faithfulness',
-    ccliNumber: '18723',
-    author: 'Thomas Chisholm',
-    themes: [],
-    notes: '',
-    tags: [],
-    removedThemes: [],
-    vwTypes: [2],
-    arrangements: [
-      {
-        id: 'arr-2a',
-        name: 'Standard',
-        key: 'D',
-        bpm: 72,
-        lengthSeconds: null,
-        chordChartUrl: '',
-        notes: '',
-        teamTags: [],
-      },
-    ],
-    primaryArrangementId: null,
-    lastUsedAt: null,
-    hidden: false,
-    pcSongId: null,
-    createdAt: mockTimestamp,
-    updatedAt: mockTimestamp,
-  },
-]
 
 const mockService: Service = {
   id: 'svc-001',
@@ -95,7 +33,7 @@ const mockService: Service = {
 describe('ServicePrintLayout', () => {
   it('renders all 9 slot rows from the service prop', () => {
     const wrapper = mount(ServicePrintLayout, {
-      props: { service: mockService, songs: mockSongs },
+      props: { service: mockService },
     })
     // Each slot should be rendered; check slot container has 9 children
     const slotRows = wrapper.findAll('[data-slot-row]')
@@ -104,30 +42,22 @@ describe('ServicePrintLayout', () => {
 
   it('renders song title and key for a populated song slot', () => {
     const wrapper = mount(ServicePrintLayout, {
-      props: { service: mockService, songs: mockSongs },
+      props: { service: mockService },
     })
     expect(wrapper.text()).toContain('Come Thou Fount')
     expect(wrapper.text()).toContain('Key: G')
   })
 
-  it('renders BPM for a song slot when available from arrangement', () => {
-    const wrapper = mount(ServicePrintLayout, {
-      props: { service: mockService, songs: mockSongs },
-    })
-    // Come Thou Fount has BPM 96 in the G arrangement
-    expect(wrapper.text()).toContain('96')
-  })
-
   it('renders "[not assigned]" for empty song slots (songId is null)', () => {
     const wrapper = mount(ServicePrintLayout, {
-      props: { service: mockService, songs: mockSongs },
+      props: { service: mockService },
     })
     expect(wrapper.text()).toContain('[not assigned]')
   })
 
   it('renders sermon passage in the Message row when sermonPassage exists', () => {
     const wrapper = mount(ServicePrintLayout, {
-      props: { service: mockService, songs: mockSongs },
+      props: { service: mockService },
     })
     expect(wrapper.text()).toContain('Romans 8:1-11')
   })
@@ -135,7 +65,7 @@ describe('ServicePrintLayout', () => {
   it('does not render sermon passage in Message row when sermonPassage is null', () => {
     const serviceNoPassage: Service = { ...mockService, sermonPassage: null }
     const wrapper = mount(ServicePrintLayout, {
-      props: { service: serviceNoPassage, songs: mockSongs },
+      props: { service: serviceNoPassage },
     })
     // Should still have Message label but no passage text
     expect(wrapper.text()).toContain('Message')
@@ -144,7 +74,7 @@ describe('ServicePrintLayout', () => {
 
   it('renders notes section when service.notes is non-empty', () => {
     const wrapper = mount(ServicePrintLayout, {
-      props: { service: mockService, songs: mockSongs },
+      props: { service: mockService },
     })
     expect(wrapper.text()).toContain('Notes')
     expect(wrapper.text()).toContain('Communion Sunday')
@@ -153,14 +83,14 @@ describe('ServicePrintLayout', () => {
   it('does not render notes section when service.notes is empty string', () => {
     const serviceNoNotes: Service = { ...mockService, notes: '' }
     const wrapper = mount(ServicePrintLayout, {
-      props: { service: serviceNoNotes, songs: mockSongs },
+      props: { service: serviceNoNotes },
     })
     expect(wrapper.text()).not.toContain('Notes')
   })
 
   it('renders the formatted date in the header', () => {
     const wrapper = mount(ServicePrintLayout, {
-      props: { service: mockService, songs: mockSongs },
+      props: { service: mockService },
     })
     // date: '2026-03-08' should render as "Sunday, March 8, 2026"
     expect(wrapper.text()).toContain('March 8, 2026')
@@ -168,7 +98,7 @@ describe('ServicePrintLayout', () => {
 
   it('renders teams display in the header', () => {
     const wrapper = mount(ServicePrintLayout, {
-      props: { service: mockService, songs: mockSongs },
+      props: { service: mockService },
     })
     expect(wrapper.text()).toContain('Choir')
     expect(wrapper.text()).toContain('Orchestra')
@@ -189,7 +119,7 @@ describe('ServicePrintLayout', () => {
       ],
     }
     const wrapper = mount(ServicePrintLayout, {
-      props: { service: sectionMajorService, songs: mockSongs },
+      props: { service: sectionMajorService },
     })
     const slotRows = wrapper.findAll('[data-slot-row]')
     expect(slotRows).toHaveLength(4)
@@ -205,7 +135,7 @@ describe('ServicePrintLayout', () => {
       ...mockService,
       slots: [{ kind: 'ANNOUNCEMENTS', id: 'ann-1', position: 0, body: 'Potluck this Sunday after service' }],
     }
-    const wrapper = mount(ServicePrintLayout, { props: { service, songs: mockSongs } })
+    const wrapper = mount(ServicePrintLayout, { props: { service } })
     expect(wrapper.text()).toContain('Announcements')
     expect(wrapper.text()).toContain('Potluck this Sunday after service')
   })
@@ -215,7 +145,7 @@ describe('ServicePrintLayout', () => {
       ...mockService,
       slots: [{ kind: 'MISC', id: 'misc-1', position: 0, body: 'Building closes early Monday' }],
     }
-    const wrapper = mount(ServicePrintLayout, { props: { service, songs: mockSongs } })
+    const wrapper = mount(ServicePrintLayout, { props: { service } })
     expect(wrapper.text()).toContain('Miscellaneous')
     expect(wrapper.text()).toContain('Building closes early Monday')
   })
@@ -227,7 +157,7 @@ describe('ServicePrintLayout', () => {
       ...mockService,
       slots: [{ kind: 'MISC', id: 'misc-lbl-1', position: 0, label: 'Communion' }],
     }
-    const wrapper = mount(ServicePrintLayout, { props: { service, songs: mockSongs } })
+    const wrapper = mount(ServicePrintLayout, { props: { service } })
     expect(wrapper.text()).toContain('Communion')
     expect(wrapper.text()).not.toContain('Miscellaneous')
   })
@@ -237,7 +167,7 @@ describe('ServicePrintLayout', () => {
       ...mockService,
       slots: [{ kind: 'MISC', id: 'misc-lbl-2', position: 0 }],
     }
-    const wrapper = mount(ServicePrintLayout, { props: { service, songs: mockSongs } })
+    const wrapper = mount(ServicePrintLayout, { props: { service } })
     expect(wrapper.text()).toContain('Miscellaneous')
   })
 
@@ -246,7 +176,7 @@ describe('ServicePrintLayout', () => {
       ...mockService,
       slots: [{ kind: 'MESSAGE', id: 'msg-body-1', position: 0, body: 'Line one\nLine two' }],
     }
-    const wrapper = mount(ServicePrintLayout, { props: { service, songs: mockSongs } })
+    const wrapper = mount(ServicePrintLayout, { props: { service } })
     const row = wrapper.findAll('[data-slot-row]')[0]!
     const bodyEl = row.find('p.whitespace-pre-wrap')
     expect(bodyEl.exists()).toBe(true)
@@ -261,7 +191,7 @@ describe('ServicePrintLayout', () => {
       ...mockService,
       slots: [{ kind: 'ANNOUNCEMENTS', id: 'ann-2', position: 0 }],
     }
-    const wrapper = mount(ServicePrintLayout, { props: { service, songs: mockSongs } })
+    const wrapper = mount(ServicePrintLayout, { props: { service } })
     expect(wrapper.text()).toContain('Announcements')
     expect(wrapper.text()).not.toContain('[not assigned]')
     const row = wrapper.findAll('[data-slot-row]')[0]!
@@ -276,7 +206,7 @@ describe('ServicePrintLayout', () => {
       ...mockService,
       slots: [{ kind: 'MESSAGE', id: 'msg-notes-1', position: 0, notes: 'Guest speaker this week' }],
     }
-    const wrapper = mount(ServicePrintLayout, { props: { service, songs: mockSongs } })
+    const wrapper = mount(ServicePrintLayout, { props: { service } })
     expect(wrapper.text()).toContain('Guest speaker this week')
   })
 
@@ -285,7 +215,7 @@ describe('ServicePrintLayout', () => {
       ...mockService,
       slots: [{ kind: 'ANNOUNCEMENTS', id: 'ann-notes-1', position: 0, notes: 'Coffee in the lobby' }],
     }
-    const wrapper = mount(ServicePrintLayout, { props: { service, songs: mockSongs } })
+    const wrapper = mount(ServicePrintLayout, { props: { service } })
     expect(wrapper.text()).toContain('Coffee in the lobby')
   })
 
@@ -294,7 +224,7 @@ describe('ServicePrintLayout', () => {
       ...mockService,
       slots: [{ kind: 'MISC', id: 'misc-both-1', position: 0, notes: 'New notes win', body: 'stale body' }],
     }
-    const wrapper = mount(ServicePrintLayout, { props: { service, songs: mockSongs } })
+    const wrapper = mount(ServicePrintLayout, { props: { service } })
     expect(wrapper.text()).toContain('New notes win')
     expect(wrapper.text()).not.toContain('stale body')
   })
