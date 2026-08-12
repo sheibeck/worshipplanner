@@ -2665,13 +2665,41 @@ describe('ServiceEditorView - R122 slot-level notes field (54-02)', () => {
     expect(inputs).toHaveLength(slotCount)
   })
 
-  // ── (b) the selector/notes wrapper carries the responsive recipe classes ────
-  it('wraps selector and notes in a flex flex-col sm:flex-row responsive container', async () => {
+  // ── (b) three-rail layout: the row itself is the responsive container, badge
+  //        rail present, and the notes field is no longer in an sm:w-64 side column ─
+  it('lays each row out as a three-rail responsive container with a per-kind badge and a full-width (not sm:w-64) notes field (260811-vsr)', async () => {
     const wrapper = await mountView()
 
-    // At least one wrapper per slot carries the QuarterView responsive recipe.
-    const responsiveWrappers = wrapper.findAll('.slot-item .flex.flex-col.sm\\:flex-row')
-    expect(responsiveWrappers.length).toBeGreaterThanOrEqual(1)
+    // The .slot-item ROOT now carries the QuarterView responsive recipe (stack below
+    // sm, three-rail flex-row at sm+), replacing the removed inner side-by-side wrapper.
+    const rows = wrapper.findAll('.slot-item.flex.flex-col.sm\\:flex-row')
+    expect(rows.length).toBeGreaterThanOrEqual(1)
+
+    // Each row renders exactly one per-kind badge (replacing the inline label headings).
+    const badges = wrapper.findAll('[data-testid^="slot-badge-"]')
+    const slotCount = (wrapper.vm as unknown as SlotsVm).localService.slots.length
+    expect(badges).toHaveLength(slotCount)
+
+    // The notes field is full-width in the field column — no sm:w-64 side column remains.
+    expect(wrapper.find('.slot-item .sm\\:w-64').exists()).toBe(false)
+  })
+
+  // ── (b2) the per-kind badge carries kindBadgeClass output + the position label ──
+  it('renders a per-kind colored badge whose classes come from kindBadgeClass and whose text is slotLabel (260811-vsr)', async () => {
+    const wrapper = await mountView()
+
+    // multiKindService(): [SONG, SCRIPTURE, MESSAGE, HYMN] at indices 0..3.
+    const songBadge = wrapper.find('[data-testid="slot-badge-0"]')
+    expect(songBadge.exists()).toBe(true)
+    expect(songBadge.classes()).toContain('text-indigo-300') // SONG tint from kindBadgeClass
+    expect(songBadge.text()).toBe('Song')
+
+    const scriptureBadge = wrapper.find('[data-testid="slot-badge-1"]')
+    expect(scriptureBadge.classes()).toContain('text-cyan-300') // SCRIPTURE tint
+    expect(scriptureBadge.text()).toBe('Scripture Reading')
+
+    const hymnBadge = wrapper.find('[data-testid="slot-badge-3"]')
+    expect(hymnBadge.classes()).toContain('text-amber-300') // HYMN tint
   })
 
   // ── (c) editing sets slot.notes; clearing yields undefined (not '') ─────────

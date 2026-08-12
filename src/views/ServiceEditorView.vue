@@ -788,8 +788,9 @@
           </div>
         </div>
 
-        <!-- Dynamic Service Flow -->
-        <div class="space-y-1.5">
+        <!-- Dynamic Service Flow. 260811-vsr: cap the item-list column to a readable
+             width (mockup's max) so fields don't stretch edge-to-edge on wide screens. -->
+        <div class="space-y-1.5 max-w-[1060px]">
           <!-- R110: the key folds in `slotRenderNonce` (bumped in `onSlotSortEnd`
                after a drag). Vue does not allow a `:key` on a child of a
                `<template v-for>` — it must live on the template tag — so the nonce
@@ -878,7 +879,7 @@
 
               <template v-for="{ slot, index } in group.entries" :key="slot.id">
             <div
-              class="slot-item rounded-lg bg-gray-900 border border-gray-800 p-3 flex items-start gap-2"
+              class="slot-item rounded-lg bg-gray-900 border border-gray-800 p-3 flex flex-col sm:flex-row sm:items-start gap-2"
               :data-testid="`slot-${index}`"
               :data-slot-id="slot.id"
             >
@@ -892,25 +893,26 @@
               </svg>
             </div>
 
-            <!-- Slot content -->
-            <div class="flex-1 min-w-0">
-              <!-- R122 (54-02): two-column responsive wrapper. The existing
-                   per-kind selector chain sits in the left column; ONE shared
-                   plain-text notes input sits in the right column, written once
-                   for every kind. Side-by-side on desktop (sm:flex-row), stacked
-                   below the sm breakpoint (flex-col) — the QuarterView/Phase 48
-                   recipe, no new responsive pattern. -->
-              <div class="flex flex-col sm:flex-row sm:items-start gap-3">
-                <!-- Selector column: the existing chain, unchanged -->
-                <div class="flex-1 min-w-0">
+            <!-- Zone 2 (260811-vsr): badge rail — ONE colored per-kind pill. Replaces
+                 the per-kind inline slotLabel <p> headings. slotLabel(slot, index)
+                 supplies the text; kindBadgeClass(kind) the on-theme tint. Fixed width
+                 on desktop; a plain block above the field column on mobile (row is flex-col). -->
+            <div class="flex-none sm:w-32 sm:pt-0.5">
+              <span
+                class="inline-flex items-center rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
+                :class="kindBadgeClass(slot.kind)"
+                :data-testid="`slot-badge-${index}`"
+              >{{ slotLabel(slot, index) }}</span>
+            </div>
+
+            <!-- Zone 3 (260811-vsr): field column — the per-kind selector/content
+                 stacked above the consolidated full-width notes field. Walks back
+                 Phase 54's sm:flex-row side-by-side; the notes field is full-width now. -->
+            <div class="flex-1 min-w-0 flex flex-col gap-2">
               <!-- SONG slot -->
               <template v-if="slot.kind === 'SONG'">
-                <div class="flex items-center justify-between gap-3 mb-1">
-                  <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                    {{ slotLabel(slot, index) }}
-                  </p>
+                <div v-if="slot.songId && authStore.vwModeEnabled" class="flex items-center justify-end">
                   <SongBadge
-                    v-if="slot.songId && authStore.vwModeEnabled"
                     :types="songStore.songs.find(s => s.id === slot.songId)?.vwTypes ?? []"
                   />
                 </div>
@@ -1007,8 +1009,7 @@
 
               <!-- SCRIPTURE slot -->
               <template v-else-if="slot.kind === 'SCRIPTURE'">
-                <div class="flex items-center gap-4" :data-scripture-slot-index="index">
-                  <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">Scripture Reading</p>
+                <div :data-scripture-slot-index="index">
                   <div class="flex-1">
                     <!-- Editor: ScriptureInput. CLASS A. -->
                     <ScriptureInput
@@ -1046,33 +1047,22 @@
                      congregational-reading concern, not a slide source. -->
               </template>
 
-              <!-- PRAYER slot: label only. The single free-text field is the shared
-                   notes-canonical field below (260811-vsr). linkUrl/linkLabel remain on
-                   NonAssignableSlot + in Firestore — UI removal only, data untouched. -->
+              <!-- PRAYER slot (260811-vsr): no content beyond the badge + the shared
+                   notes-canonical field below. linkUrl/linkLabel remain on the type +
+                   in Firestore — UI removal only. The old label + "No assignment needed"
+                   hint are replaced by the per-kind badge. -->
               <template v-else-if="slot.kind === 'PRAYER'">
-                <div class="flex items-center gap-2 mb-1">
-                  <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Prayer</p>
-                  <span class="text-xs text-gray-600 italic">No assignment needed</span>
-                </div>
               </template>
 
-              <!-- MESSAGE / ANNOUNCEMENTS / MISC slot: label only (260811-vsr). The shared
-                   free-text body/notes textarea is consolidated into the single
-                   notes-canonical field below — one field per plain kind. body/linkUrl/
-                   linkLabel remain on NonAssignableSlot + in Firestore, read via the
-                   `notes ?? body` fallback in slotFreeText (legacy items still display). -->
+              <!-- MESSAGE / ANNOUNCEMENTS / MISC slot (260811-vsr): no content beyond the
+                   badge + the shared notes-canonical field below. body/linkUrl/linkLabel
+                   remain on the type + in Firestore, read via slotFreeText's notes ?? body
+                   fallback. The old label + hint are replaced by the per-kind badge. -->
               <template v-else-if="slot.kind === 'MESSAGE' || slot.kind === 'ANNOUNCEMENTS' || slot.kind === 'MISC'">
-                <div class="flex items-center gap-2 mb-1">
-                  <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">{{ slotLabel(slot, index) }}</p>
-                  <span class="text-xs text-gray-600 italic">No assignment needed</span>
-                </div>
               </template>
 
               <!-- HYMN slot -->
               <template v-else-if="slot.kind === 'HYMN'">
-                <div class="mb-1">
-                  <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Hymn</p>
-                </div>
                 <!-- Editor: editable fields. CLASS A. -->
                 <div v-if="canEditService" class="flex flex-wrap items-center gap-2 mt-1">
                   <input
@@ -1107,21 +1097,18 @@
                 </div>
               </template>
 
-              <!-- IMPORTED slot (Phase 21) -->
+              <!-- IMPORTED slot (Phase 21): badge carries the label; keep the empty-state hint. -->
               <template v-else-if="slot.kind === 'IMPORTED'">
-                <div class="flex items-center justify-between gap-3 mb-1">
-                  <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Imported Slides</p>
-                </div>
                 <p v-if="!(slot as ImportedSlot).importId" class="text-sm text-gray-400 italic">Imported Slides — Empty</p>
               </template>
-                </div>
-                <!-- Notes column: written ONCE, shared by every kind (R122
-                     consistency). slot.notes takes NO cast — notes? lives on the
-                     base MediaAttachableSlot. Plain text only: :value binding +
-                     {{ }} interpolation auto-escape, never v-html (T-54-01).
-                     Setting `= value || undefined` on empty lets stripUndefined
-                     drop it so a raw undefined never reaches Firestore. -->
-                <div class="sm:w-64 flex-shrink-0">
+
+                <!-- Consolidated notes-canonical field (260811-vsr): written ONCE for
+                     every kind, now FULL-WIDTH and stacked in the field column (walks
+                     back Phase 54's sm:w-64 side column). slot.notes takes NO cast —
+                     notes? lives on the base MediaAttachableSlot. Plain text only:
+                     :value + {{ }} auto-escape, never v-html (T-54-01). `= value ||
+                     undefined` on empty lets stripUndefined drop it. -->
+                <div>
                   <input
                     v-if="canEditService"
                     :value="slotFreeText(slot)"
@@ -1133,8 +1120,6 @@
                   />
                   <p v-else-if="slotFreeText(slot)" data-testid="slot-notes-text" class="text-xs text-gray-400 whitespace-pre-wrap">{{ slotFreeText(slot) }}</p>
                 </div>
-              </div>
-
             </div>
 
             <!-- Per-row ⋯ menu (260811-vsr): editor only, hidden while locked
@@ -2728,6 +2713,24 @@ function notesPlaceholder(slot: ServiceSlot): string {
     case 'MESSAGE': return 'Message notes or outline'
     case 'MISC': return 'Details'
     default: return 'Notes (e.g. who leads, who sings which parts)'
+  }
+}
+
+// ── Per-kind badge tint (260811-vsr / DESIGN-SPEC) ──────────────────────────────
+// The three-rail row's badge rail shows ONE colored pill per kind, mapped to the
+// app's muted/dark gray+indigo theme (not the mockup's raw hex). Central helper so
+// the template stays clean; badge text comes from slotLabel(slot, index).
+function kindBadgeClass(kind: SlotKind): string {
+  switch (kind) {
+    case 'SONG': return 'bg-indigo-950 border border-indigo-800 text-indigo-300'
+    case 'SCRIPTURE': return 'bg-cyan-950 border border-cyan-800 text-cyan-300'
+    case 'ANNOUNCEMENTS':
+    case 'MESSAGE': return 'bg-rose-950 border border-rose-900 text-rose-300'
+    case 'PRAYER':
+    case 'MISC': return 'bg-gray-800 border border-gray-600 text-gray-300'
+    case 'HYMN': return 'bg-amber-950 border border-amber-900 text-amber-300'
+    case 'IMPORTED': return 'bg-gray-800 border border-gray-700 text-gray-400'
+    default: return 'bg-gray-800 border border-gray-600 text-gray-300'
   }
 }
 
