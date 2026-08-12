@@ -1212,6 +1212,101 @@ describe('ServiceEditorView - contextual action bar wiring (36-03, R068)', () =>
   })
 })
 
+// ── R125 (55-02): Planning Center export in-progress spinner ────────────────
+// The owner asked for "a spinner to the services planning center export so
+// users can see it's doing something." The export flow already carries the
+// `isExporting` reactive flag (set at the start of onConfirmExport, cleared in
+// its finally), an "Exporting..." text label, and a `:disabled` guard on the
+// Confirm Export button — only the visible spinner GLYPH was missing. This
+// block pins the glyph onto the button while exporting, its absence otherwise,
+// and the pre-existing disabled guard (double-invocation protection, T-55-02),
+// reusing the EXISTING flag — no second export-state flag is introduced.
+describe('ServiceEditorView - R125 export in-progress spinner (55-02)', () => {
+  async function mountView(overrides: Partial<Service> = {}) {
+    mockServicesList = [{ ...mockService, ...overrides }]
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          ContextualActionBar: false,
+          RouterLink: { template: '<a><slot /></a>' },
+          SaveStatusIndicator: false,
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+          // The export dialog is a <Teleport to="body"> block — shallowMount
+          // discards teleported children unless teleport is opted out (34-07).
+          teleport: false,
+        },
+      },
+    })
+  }
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockAuthState.hasPcCredentials = true
+    mockAuthState.pcCredentials = { appId: 'placeholder-app-id', secret: 'placeholder-secret' }
+  })
+
+  afterEach(() => {
+    mockAuthState.hasPcCredentials = false
+    mockAuthState.pcCredentials = null
+  })
+
+  // Drive the export dialog into its "options loaded, export running" state by
+  // setting the component's own reactive flags directly (the same vm-level
+  // approach the WR-02 export tests above use), then assert the glyph + guard.
+  interface ExportVm {
+    showExportDialog: boolean
+    exportLoading: boolean
+    isExporting: boolean
+    exportSelectedServiceTypeId: string
+  }
+
+  it('renders the export-spinner in the Confirm Export button while isExporting, and the button stays disabled', async () => {
+    const wrapper = await mountView({ status: 'planned' })
+    await wrapper.vm.$nextTick()
+
+    const vm = wrapper.vm as unknown as ExportVm
+    vm.showExportDialog = true
+    vm.exportLoading = false
+    vm.exportSelectedServiceTypeId = 'service-type-1'
+    vm.isExporting = true
+    await wrapper.vm.$nextTick()
+
+    const body = new DOMWrapper(document.body)
+    const spinner = body.find('[data-testid="export-spinner"]')
+    expect(spinner.exists()).toBe(true)
+    // The spinner uses the app's established animate-spin ring affordance.
+    expect(spinner.classes()).toContain('animate-spin')
+
+    // The Confirm Export button (the one carrying the "Exporting..." label
+    // while the round-trip runs) stays disabled — the T-55-02 double-fire
+    // guard this presentation-only change must preserve untouched.
+    const confirmBtn = body.findAll('button').find((b) => b.text().includes('Exporting'))
+    expect(confirmBtn).toBeDefined()
+    expect(confirmBtn!.attributes('disabled')).toBeDefined()
+  })
+
+  it('does not render the export-spinner when no export is running', async () => {
+    const wrapper = await mountView({ status: 'planned' })
+    await wrapper.vm.$nextTick()
+
+    const vm = wrapper.vm as unknown as ExportVm
+    vm.showExportDialog = true
+    vm.exportLoading = false
+    vm.exportSelectedServiceTypeId = 'service-type-1'
+    vm.isExporting = false
+    await wrapper.vm.$nextTick()
+
+    const body = new DOMWrapper(document.body)
+    expect(body.find('[data-testid="export-spinner"]').exists()).toBe(false)
+  })
+})
+
 describe('ServiceEditorView - Roles tab (Phase 17-04)', () => {
   async function mountView() {
     const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
