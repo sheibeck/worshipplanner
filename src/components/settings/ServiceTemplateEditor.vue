@@ -143,24 +143,13 @@
                     >{{ kindLabel(entry.kind) }}</span>
                   </div>
 
-                  <!-- Zone 3 — field column: entry name (non-MISC; a MISC item's name is the
-                       editable badge above) + (MISC/ANNOUNCEMENTS) recurring body. -->
+                  <!-- Zone 3 — field column: entry name only (non-MISC; a MISC item's name is
+                       the editable badge above). The recurring-body textarea was removed
+                       2026-08-12 (owner: "we don't need that") for BOTH MISC and ANNOUNCEMENTS —
+                       a template item is now just its kind (+ MISC label). `body?` stays on the
+                       type (non-destructive; any legacy body is retained in data, no longer edited here). -->
                   <div class="flex-1 min-w-0 flex flex-col gap-2">
                     <p v-if="entry.kind !== 'MISC'" class="text-sm text-gray-200" data-testid="template-item-name">{{ entryDisplayName(entry) }}</p>
-                    <!-- Recurring body text for ANNOUNCEMENTS (R116). MISC dropped its template
-                         textarea 2026-08-12 (owner: "we don't need that") — a MISC template item is
-                         now just its editable label. `body?` stays on the type (non-destructive; any
-                         legacy MISC body is retained in data, simply no longer editable here). Bound
-                         via :value / @input (auto-escaped Vue binding — never v-html; T-52-03). -->
-                    <textarea
-                      v-if="entry.kind === 'ANNOUNCEMENTS'"
-                      :value="entry.body ?? ''"
-                      rows="2"
-                      placeholder="Recurring content for this item…"
-                      data-testid="template-item-body"
-                      class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-200 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500 resize-y mt-2"
-                      @input="onBodyChange(entry.id, ($event.target as HTMLTextAreaElement).value)"
-                    ></textarea>
                   </div>
 
                   <!-- Zone 4 — per-row ⋯ menu (Phase 57 parity with ServiceEditorView.vue's row menu).
@@ -179,7 +168,7 @@
                       aria-label="Row options"
                       :data-testid="`template-row-menu-trigger-${entry.id}`"
                       title="Row options"
-                      @click.stop="toggleRowMenu(entry.id)"
+                      @click.stop="toggleRowMenu(entry.id, $event)"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
                         <circle cx="12" cy="5" r="1.5" />
@@ -191,11 +180,12 @@
                     <!-- Outside-click backdrop -->
                     <div v-if="openRowMenuId === entry.id" class="fixed inset-0 z-10" @click="openRowMenuId = null" />
 
-                    <!-- Menu panel -->
+                    <!-- Menu panel — flips above the trigger (bottom-full) near the fold -->
                     <div
                       v-if="openRowMenuId === entry.id"
                       role="menu"
-                      class="absolute right-0 top-full mt-1 w-48 origin-top-right rounded-lg border border-gray-700 bg-gray-800 shadow-xl z-20 overflow-hidden py-1"
+                      class="absolute right-0 w-48 rounded-lg border border-gray-700 bg-gray-800 shadow-xl z-20 overflow-hidden py-1"
+                      :class="rowMenuOpenUp ? 'bottom-full mb-1 origin-bottom-right' : 'top-full mt-1 origin-top-right'"
                       :data-testid="`template-row-menu-panel-${entry.id}`"
                     >
                       <p class="px-3 pt-1 pb-0.5 text-[10px] uppercase tracking-wider text-gray-500">Move to section</p>
@@ -378,8 +368,18 @@ function removeEntry(id: string): void {
 // <select> and inline ✕ remove. No lock/viewer gating here (the template editor
 // has none) — the menu is always rendered, exactly as the inline controls were.
 const openRowMenuId = ref<string | null>(null)
-function toggleRowMenu(id: string): void {
-  openRowMenuId.value = openRowMenuId.value === id ? null : id
+// Flip the ⋯ panel above its trigger when a near-the-bottom row would push the
+// menu below the fold (2026-08-12 owner report). Measured from the trigger's
+// viewport rect at open time; one shared flag since only one menu is open.
+const rowMenuOpenUp = ref(false)
+function toggleRowMenu(id: string, event?: MouseEvent): void {
+  const opening = openRowMenuId.value !== id
+  openRowMenuId.value = opening ? id : null
+  if (opening && event) {
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+    const spaceBelow = window.innerHeight - rect.bottom
+    rowMenuOpenUp.value = spaceBelow < 300 && rect.top > spaceBelow
+  }
 }
 
 function onSectionChange(id: string, value: string): void {
@@ -391,15 +391,10 @@ function onSectionChange(id: string, value: string): void {
 // R116 — recurring body text on a body-bearing template entry. Mirrors
 // onSectionChange's empty→undefined rule so a cleared body stays truly absent
 // and onSave's stripUndefined drops it rather than persisting `body: undefined`.
-function onBodyChange(id: string, value: string): void {
-  const entry = draft.value.find((e) => e.id === id)
-  if (!entry) return
-  entry.body = value === '' ? undefined : value
-}
-
-// R127 (Phase 56) — recurring MISC custom label on a template entry. Same
-// empty→undefined rule as onBodyChange, so a cleared label stays truly absent
-// and onSave's stripUndefined drops it rather than persisting `label: undefined`.
+// R127 (Phase 56) — recurring MISC custom label on a template entry. Empty →
+// undefined so a cleared label stays truly absent and onSave's stripUndefined
+// drops it rather than persisting `label: undefined`. (The recurring-body
+// textarea + its onBodyChange handler were removed 2026-08-12 per owner request.)
 function onLabelChange(id: string, value: string): void {
   const entry = draft.value.find((e) => e.id === id)
   if (!entry) return

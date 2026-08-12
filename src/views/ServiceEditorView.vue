@@ -1196,7 +1196,7 @@
                 aria-label="Row options"
                 :data-testid="`row-menu-trigger-${slot.id}`"
                 title="Row options"
-                @click.stop="toggleRowMenu(slot.id)"
+                @click.stop="toggleRowMenu(slot.id, $event)"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
                   <circle cx="12" cy="5" r="1.5" />
@@ -1208,11 +1208,12 @@
               <!-- Outside-click backdrop -->
               <div v-if="openRowMenuId === slot.id" class="fixed inset-0 z-10" @click="openRowMenuId = null" />
 
-              <!-- Menu panel -->
+              <!-- Menu panel — flips above the trigger (bottom-full) near the fold -->
               <div
                 v-if="openRowMenuId === slot.id"
                 role="menu"
-                class="absolute right-0 top-full mt-1 w-48 origin-top-right rounded-lg border border-gray-700 bg-gray-800 shadow-xl z-20 overflow-hidden py-1"
+                class="absolute right-0 w-48 rounded-lg border border-gray-700 bg-gray-800 shadow-xl z-20 overflow-hidden py-1"
+                :class="rowMenuOpenUp ? 'bottom-full mb-1 origin-bottom-right' : 'top-full mt-1 origin-top-right'"
                 :data-testid="`row-menu-panel-${slot.id}`"
               >
                 <p class="px-3 pt-1 pb-0.5 text-[10px] uppercase tracking-wider text-gray-500">Move to section</p>
@@ -1865,8 +1866,18 @@ function onSectionChange(index: number, value: string) {
  *  one is open at a time — the single-open pattern SlideGrid uses). UI state only;
  *  the trigger toggles, the backdrop and every menu item close it. */
 const openRowMenuId = ref<string | null>(null)
-function toggleRowMenu(id: string): void {
-  openRowMenuId.value = openRowMenuId.value === id ? null : id
+// Flip the ⋯ panel above its trigger when a near-the-bottom row would push the
+// menu below the fold (2026-08-12 owner report). Measured from the trigger's
+// viewport rect at open time; one shared flag since only one menu is open.
+const rowMenuOpenUp = ref(false)
+function toggleRowMenu(id: string, event?: MouseEvent): void {
+  const opening = openRowMenuId.value !== id
+  openRowMenuId.value = opening ? id : null
+  if (opening && event) {
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+    const spaceBelow = window.innerHeight - rect.bottom
+    rowMenuOpenUp.value = spaceBelow < 300 && rect.top > spaceBelow
+  }
 }
 
 const orgIdRef = computed(() => authStore.orgId)

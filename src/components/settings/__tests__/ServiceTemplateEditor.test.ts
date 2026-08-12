@@ -391,64 +391,29 @@ describe('ServiceTemplateEditor — Suggested Template seed (R114)', () => {
   })
 })
 
-describe('ServiceTemplateEditor — template-item body (R116)', () => {
-  it('renders NO template-item-body textarea for a MISC row (MISC template textarea dropped 2026-08-12)', async () => {
-    mockAuthState.settings.defaultServiceTemplate = [{ id: 'misc-1', kind: 'MISC', body: 'Canned music' }]
+describe('ServiceTemplateEditor — no recurring-body textarea (R116 UI removed 2026-08-12)', () => {
+  // Owner: "we don't need that." The recurring-body textarea was dropped for BOTH
+  // MISC and ANNOUNCEMENTS — a template item is now just its kind (+ MISC label).
+
+  it('renders NO template-item-body textarea for a preset MISC or ANNOUNCEMENTS row (even with a legacy body)', async () => {
+    mockAuthState.settings.defaultServiceTemplate = [
+      { id: 'misc-1', kind: 'MISC', body: 'Canned music' },
+      { id: 'ann-1', kind: 'ANNOUNCEMENTS', body: 'Weekly notices' },
+    ]
     mountEditor(true)
     await flushPromises()
 
-    // A MISC template item is now just its editable label — no body textarea.
     expect(body().findAll('[data-testid="template-item-body"]')).toHaveLength(0)
   })
 
-  it('renders a template-item-body textarea for an ANNOUNCEMENTS row', async () => {
+  it('renders NO template-item-body textarea for freshly added items of any kind', async () => {
     mountEditor(true)
     await body().get('[data-testid="palette-add-announcements"]').trigger('click')
-    await flushPromises()
-
-    expect(body().findAll('[data-testid="template-item-body"]')).toHaveLength(1)
-  })
-
-  it('renders no template-item-body textarea for non-body kinds (SONG / PRAYER)', async () => {
-    mountEditor(true)
+    await body().get('[data-testid="palette-add-misc"]').trigger('click')
     await body().get('[data-testid="palette-add-song"]').trigger('click')
-    await body().get('[data-testid="palette-add-prayer"]').trigger('click')
     await flushPromises()
 
     expect(body().findAll('[data-testid="template-item-body"]')).toHaveLength(0)
-  })
-
-  it('typing sets the draft entry body for a body kind; the save payload carries the typed text', async () => {
-    mountEditor(true)
-    await body().get('[data-testid="palette-add-announcements"]').trigger('click')
-    await flushPromises()
-
-    await body().get('[data-testid="template-item-body"]').setValue('Recurring slide content')
-    await flushPromises()
-    await body().get('[data-testid="template-save"]').trigger('click')
-    await flushPromises()
-
-    const payload = mockUpdateDoc.mock.calls[0]![1] as Record<string, unknown>
-    const entries = payload['settings.defaultServiceTemplate'] as ServiceTemplateEntry[]
-    expect(entries).toHaveLength(1)
-    expect(entries[0]!.kind).toBe('ANNOUNCEMENTS')
-    expect(entries[0]!.body).toBe('Recurring slide content')
-  })
-
-  it('clearing the body to empty leaves the saved entry bodyless (undefined stripped)', async () => {
-    mockAuthState.settings.defaultServiceTemplate = [{ id: 'ann-1', kind: 'ANNOUNCEMENTS', body: 'Something' }]
-    mountEditor(true)
-    await flushPromises()
-
-    await body().get('[data-testid="template-item-body"]').setValue('')
-    await flushPromises()
-    await body().get('[data-testid="template-save"]').trigger('click')
-    await flushPromises()
-
-    const payload = mockUpdateDoc.mock.calls[0]![1] as Record<string, unknown>
-    const entries = payload['settings.defaultServiceTemplate'] as ServiceTemplateEntry[]
-    expect(entries).toHaveLength(1)
-    expect('body' in entries[0]!).toBe(false)
   })
 })
 
