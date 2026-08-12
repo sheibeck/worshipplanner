@@ -1416,3 +1416,41 @@ NOT deploy-gated (client-only). Resume: `/gsd-verify-work 54`.
       Slides tab; confirm it has no slides. Add a slide to it; confirm the slide appears and persists.
 
 After confirming, run `/gsd-verify-work 54`.
+
+---
+
+## Phase 55 — Preview & Export Polish (v1.6)
+
+### Plan 55-03 Task 1 — package-legitimacy checkpoint for `@fontsource/roboto@^5.3.0` (DEFERRED)
+
+**Status: DEFERRED under the STATE.md v1.6 standing autonomy grant — NOT self-approved as passed.**
+`gsd-tools query package-legitimacy check` flags `@fontsource/roboto` `SUS` with reason `too-new`.
+This is the identical structural false positive already dispositioned for Phase 46's five
+`@fontsource/*` packages: the entire multi-hundred-package `@fontsource` catalog re-publishes in
+lockstep on every upstream Google Fonts refresh, so `publishedAt` always looks new. 55-RESEARCH.md
+§ "Package Legitimacy Audit" performed direct verification this session: OFL-1.1 license (verbatim
+SIL Open Font License 1.1 text in the in-tarball `LICENSE`; `npm view @fontsource/roboto license`
+→ `OFL-1.1` for 5.3.0 — early 5.x reported `Apache-2.0`, relicensed at 5.2.0 following Google's
+upstream OFL relicense), full 100–900 static weight ramp (incl. 600.css) present in the tarball,
+`postinstall` null, ~1.26M weekly downloads, canonical repo `github.com/fontsource/font-files`.
+Pinned `^5.3.0`, consistent with the five existing `@fontsource/*@^5.3.0` deps. Execution proceeded
+to Task 2 (install + registry + loader) on this basis, per the plan's own pre-resolution
+instructions and the Phase 46 precedent.
+
+- [ ] **Owner confirms `@fontsource/roboto` on npmjs.com** — fontsource-published, links to
+      `github.com/fontsource/font-files`, version `5.3.0`, license `OFL-1.1`, no install scripts.
+      Spot-check: `npm view @fontsource/roboto version` → `5.3.0`; `npm view @fontsource/roboto
+      license` → `OFL-1.1`.
+- [ ] Confirm the `5.3.0` pin landed cleanly in `package-lock.json` with integrity hashes present
+      (already true as of this plan's commit; owner re-confirmation is the outstanding item).
+
+### Plan 55-03 — Roboto slide font (manual/visual sign-off, R126)
+
+Deferred under the v1.6 standing autonomy grant — jsdom cannot render a real font or judge
+projection legibility.
+
+- [ ] **Roboto selectable and renders (R126).** In Settings → Slide Typography, pick Roboto; confirm
+      slides render in Roboto and Inter (still first/default) plus the other four families remain
+      available and unchanged.
+
+After confirming, run `/gsd-verify-work 55`.
