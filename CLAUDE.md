@@ -50,15 +50,21 @@ plan or phase is type-clean.
 - `npx vitest run` — the app suite. **Excludes `src/rules.test.ts`** (see `vite.config.ts`), so it
   proves nothing about Firestore security rules.
 
-> ⚠ **Neither obvious way of scoping the app suite is correct on its own** — verified 2026-08-04.
-> - `npx vitest run src/` picks up **`render-service/src/render.test.ts`** by substring match and dies
->   on a Vitest version mismatch (root `4.0.18` vs `4.1.10`).
-> - `npx vitest run --dir src` fixes that but **bypasses `vite.config.ts`'s relative exclude**, so
->   `src/rules.test.ts` runs and fails whenever no Firestore emulator is up.
->
-> Use **`npx vitest run --dir src --exclude '**/rules.test.ts'`**, or bare `npx vitest run`.
-> A run that reports `src/rules.test.ts` failing is a **tooling artifact of the command**, not a
-> regression — do not chase it, and do not let it mask the real 2-file baseline below.
+> ⚠ **Scoping the app suite — bare `npx vitest run` is now the correct command (updated 2026-08-12).**
+> `vite.config.ts` excludes both `src/rules.test.ts` **and `render-service/**`**, so a bare run returns
+> exactly the 2-file baseline below.
+> - `render-service/**` is excluded because it is a **standalone package** with its own vitest
+>   (`4.1.10`, pinned in `render-service/package.json`) and its own `render-service/vitest.config.ts`
+>   running under a **node** environment. The root jsdom run used to collect
+>   `render-service/src/render.test.ts` under the root vitest (`4.0.x`) and fail two ways at once — a
+>   `vi.mock('node:child_process')` semantics difference (`No "default" export…`) *and* a node service
+>   under jsdom. Test it with **`cd render-service && npm test`** (39 tests pass), never from the root.
+> - **Do not** use `npx vitest run --dir src`: `--dir` **bypasses `vite.config.ts`'s relative
+>   excludes**, so `src/rules.test.ts` runs and fails whenever no Firestore emulator is up. If you must
+>   scope, add `--exclude '**/rules.test.ts'`.
+> A run that reports `src/rules.test.ts` or a `render-service/**` file failing is a **tooling artifact
+> of a non-standard command**, not a regression — do not chase it, and do not let it mask the real
+> 2-file baseline below.
 - `npm run test:rules` — the rules suite, via `firebase emulators:exec`, which starts its **own**
   emulator. **It fails with "port taken" if an emulator is already running.** In that case run
   `npx vitest run --config vitest.rules.config.ts` directly against the running one instead — the
