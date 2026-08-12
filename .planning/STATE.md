@@ -204,9 +204,9 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 55 (preview-export-polish) — EXECUTING
-Plan: 1 of 3 — 55-01 COMPLETE (R124)
+Plan: 2 of 3 — 55-01 COMPLETE (R124), 55-02 COMPLETE (R125)
 Status: Executing Phase 55
-Last activity: 2026-08-11 — 55-01 done: scripture slides no longer auto-append the (ESV)/(NLT) version (render-only, provenance preserved)
+Last activity: 2026-08-11 — 55-02 done: Planning Center Confirm Export button now shows an animate-spin spinner while exporting (reuses existing isExporting flag + :disabled guard, no new state)
 
 ## ⏸ RESUME HERE (2026-08-11 — v1.6 ROADMAP.md created, ready to plan Phase 51)
 
@@ -2207,7 +2207,7 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
 Last session: 2026-08-11T23:52:16.542Z
-Stopped at: Completed 55-01-PLAN.md
+Stopped at: Completed 55-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

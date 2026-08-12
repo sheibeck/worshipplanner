@@ -280,12 +280,12 @@ Plans:
   2. The Planning Center export shows a spinner / in-progress indicator while the export is running, so the user can see it is working (R125)
   3. Roboto is available as a curated, self-hosted slide font in the typography picker, and Inter (shipped in v1.5) remains available (R126)
 
-**Plans**: 1/3 plans executed
+**Plans**: 2/3 plans executed
 
 Plans:
 
 - [x] 55-01-PLAN.md — R124: re-point suffix tests to ABSENCE, then remove the auto-appended version at both render sites (`slideDisplay.ts::slideBodyText`, `PresentationViewer.vue::scriptureAttributionSuffix`) + dead imports; provenance helpers kept green (Wave 1)
-- [ ] 55-02-PLAN.md — R125: RED spinner test, then add the `animate-spin` glyph (`data-testid="export-spinner"`) to the Confirm Export button, reusing the existing `isExporting` flag/guards (Wave 1)
+- [x] 55-02-PLAN.md — R125: RED spinner test, then add the `animate-spin` glyph (`data-testid="export-spinner"`) to the Confirm Export button, reusing the existing `isExporting` flag/guards (Wave 1)
 - [ ] 55-03-PLAN.md — R126: legitimacy checkpoint + `npm install @fontsource/roboto@^5.3.0`, add the Roboto `SLIDE_FONTS` entry + loader line, update registry tests five→six (Wave 1)
 
 **Research flag**: skip (milestone research skipped).
@@ -305,7 +305,7 @@ Plans:
 | 52. Default Service Template | v1.6 | 3/3 | In Progress|  |
 | 53. Song Lyric Editing | v1.6 | 4/4 | In Progress|  |
 | 54. Service Item Enhancements | v1.6 | 2/2 | In Progress|  |
-| 55. Preview & Export Polish | v1.6 | 1/3 | In Progress|  |
+| 55. Preview & Export Polish | v1.6 | 2/3 | In Progress|  |
 
 ## Backlog
 
