@@ -5,14 +5,22 @@ import { setActivePinia, createPinia } from 'pinia'
 let snapshotCallback: ((snap: { docs: { id: string; data: () => Record<string, unknown> }[] }) => void) | null = null
 const mockUnsubscribe = vi.fn()
 
-// Track batch operations for upsertSongs tests
-let mockBatchOps: { type: 'set' | 'update'; ref: unknown; data: Record<string, unknown> }[] = []
+// Track batch operations for upsertSongs / hardDeleteSong tests
+let mockBatchOps: { type: 'set' | 'update' | 'delete'; ref: unknown; data?: Record<string, unknown> }[] = []
+
+// Configurable per-test fake lyrics docs returned by getDocs() for hardDeleteSong.
+// Default: two fake lyrics docs, each with its own ref.
+let mockLyricsDocs: { ref: { path: string } }[] = [
+  { ref: { path: 'lyrics/lyric-1' } },
+  { ref: { path: 'lyrics/lyric-2' } },
+]
 
 // Mock firebase/firestore module
 vi.mock('firebase/firestore', () => {
   const mockBatch = {
     set: vi.fn((ref, data) => { mockBatchOps.push({ type: 'set', ref, data }) }),
     update: vi.fn((ref, data) => { mockBatchOps.push({ type: 'update', ref, data }) }),
+    delete: vi.fn((ref) => { mockBatchOps.push({ type: 'delete', ref }) }),
     commit: vi.fn(() => Promise.resolve()),
   }
 
@@ -27,6 +35,7 @@ vi.mock('firebase/firestore', () => {
     addDoc: vi.fn(() => Promise.resolve({ id: 'new-song-id' })),
     updateDoc: vi.fn(() => Promise.resolve()),
     deleteDoc: vi.fn(() => Promise.resolve()),
+    getDocs: vi.fn(() => Promise.resolve({ docs: mockLyricsDocs })),
     writeBatch: vi.fn(() => ({ ...mockBatch })),
     query: vi.fn((ref) => ref),
     orderBy: vi.fn(),
@@ -127,6 +136,10 @@ describe('useSongStore', () => {
     vi.clearAllMocks()
     snapshotCallback = null
     mockBatchOps = []
+    mockLyricsDocs = [
+      { ref: { path: 'lyrics/lyric-1' } },
+      { ref: { path: 'lyrics/lyric-2' } },
+    ]
     mockAuthUser = null
     mockAuthOrgId = null
     mockAuthVwModeEnabled = true
@@ -774,6 +787,81 @@ describe('useSongStore', () => {
       const data = callArgs[1] as unknown as Record<string, unknown>
       expect(data.hidden).toBe(true)
       expect(data.updatedAt).toBeDefined()
+    })
+  })
+
+  describe('hardDeleteSong', () => {
+    it('permanently deletes a hidden song: commits a batch deleting the song doc and every lyrics doc', async () => {
+      const { getDocs, writeBatch } = await import('firebase/firestore')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'song-1', title: 'Hidden Song', hidden: true }),
+      ])
+
+      await store.hardDeleteSong('song-1')
+
+      expect(getDocs).toHaveBeenCalledOnce()
+      expect(writeBatch).toHaveBeenCalledOnce()
+      // 2 lyrics docs + 1 song doc = 3 deletes
+      expect(mockBatchOps.filter((op) => op.type === 'delete')).toHaveLength(3)
+      const deletedPaths = mockBatchOps
+        .filter((op) => op.type === 'delete')
+        .map((op) => (op.ref as { path: string }).path)
+      expect(deletedPaths).toContain('lyrics/lyric-1')
+      expect(deletedPaths).toContain('lyrics/lyric-2')
+      expect(deletedPaths).toContain('organizations/org-1/songs/song-1')
+    })
+
+    it('is a no-op for a song that is not hidden (defense-in-depth guard)', async () => {
+      const { getDocs, writeBatch } = await import('firebase/firestore')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'song-2', title: 'Visible Song', hidden: false }),
+      ])
+
+      await store.hardDeleteSong('song-2')
+
+      expect(getDocs).not.toHaveBeenCalled()
+      expect(writeBatch).not.toHaveBeenCalled()
+      expect(mockBatchOps).toHaveLength(0)
+    })
+
+    it('is a no-op when orgId is unset', async () => {
+      const { getDocs, writeBatch } = await import('firebase/firestore')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      // Deliberately do not call store.subscribe() — orgId stays null.
+
+      await store.hardDeleteSong('song-3')
+
+      expect(getDocs).not.toHaveBeenCalled()
+      expect(writeBatch).not.toHaveBeenCalled()
+      expect(mockBatchOps).toHaveLength(0)
+    })
+
+    it('is a no-op for a song id that does not exist in songs.value', async () => {
+      const { getDocs, writeBatch } = await import('firebase/firestore')
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      store.subscribe('org-1')
+      triggerSnapshot([
+        makeSong({ id: 'song-1', title: 'Hidden Song', hidden: true }),
+      ])
+
+      await store.hardDeleteSong('does-not-exist')
+
+      expect(getDocs).not.toHaveBeenCalled()
+      expect(writeBatch).not.toHaveBeenCalled()
+    })
+
+    it('hardDeleteSong is exported from the store', async () => {
+      const { useSongStore } = await import('../songs')
+      const store = useSongStore()
+      expect('hardDeleteSong' in store).toBe(true)
     })
   })
 
