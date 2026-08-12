@@ -115,6 +115,7 @@
           :loading="songStore.isLoading"
           @select="onSelectSong"
           @add="onAddSong"
+          @import="importModalOpen = true"
           @update:selectedIds="onSelectionUpdate"
         />
 

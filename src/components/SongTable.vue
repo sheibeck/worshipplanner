@@ -39,19 +39,26 @@
         </svg>
         <h3 class="text-base font-medium text-gray-300 mb-2">Your song library is empty</h3>
         <p class="text-sm text-gray-500 max-w-sm">
-          Import your songs from a Planning Center CSV export or add them one at a time.
+          <template v-if="authStore.settings.pcEnabled">
+            Import your songs from Planning Center or add them one at a time.
+          </template>
+          <template v-else>
+            Add your songs one at a time to get started.
+          </template>
         </p>
       </div>
       <div class="flex flex-col sm:flex-row items-center gap-3">
-        <router-link
-          to="/songs?import=true"
+        <button
+          v-if="authStore.settings.pcEnabled"
+          type="button"
+          @click="$emit('import')"
           class="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 transition-colors"
         >
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
           </svg>
-          Import from CSV
-        </router-link>
+          Import Songs
+        </button>
         <button
           @click="$emit('add')"
           class="text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
@@ -305,6 +312,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   select: [song: Song]
   add: []
+  import: []
   'update:selectedIds': [ids: Set<string>]
 }>()
 

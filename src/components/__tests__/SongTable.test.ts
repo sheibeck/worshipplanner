@@ -34,9 +34,13 @@ vi.mock('@/stores/songs', () => ({
 }))
 
 let mockVwModeEnabled = true
+let mockPcEnabled = true
 vi.mock('@/stores/auth', () => ({
   useAuthStore: () => ({
     get vwModeEnabled() { return mockVwModeEnabled },
+    settings: {
+      get pcEnabled() { return mockPcEnabled },
+    },
   }),
 }))
 
@@ -86,10 +90,31 @@ describe('SongTable', () => {
       themes: true,
     }
     mockVwModeEnabled = true
+    mockPcEnabled = true
     mockSongStore.searchQuery = ''
     mockUpdateSong.mockClear()
     mockToggleColumn.mockClear()
     mockResetColumns.mockClear()
+  })
+
+  describe('empty-state import button (KHB-01, KHB-02)', () => {
+    it('renders an "Import Songs" button (not "Import from CSV") when pcEnabled is true, and clicking it emits import', async () => {
+      const wrapper = mountTable([])
+      const buttons = wrapper.findAll('button')
+      const importButton = buttons.find((b) => b.text().includes('Import Songs'))
+      expect(importButton).toBeTruthy()
+      expect(wrapper.text()).not.toContain('Import from CSV')
+      await importButton!.trigger('click')
+      expect(wrapper.emitted('import')).toBeTruthy()
+    })
+
+    it('does not render the Import Songs button when pcEnabled is false, but keeps Add song manually', () => {
+      mockPcEnabled = false
+      const wrapper = mountTable([])
+      const buttons = wrapper.findAll('button')
+      expect(buttons.some((b) => b.text().includes('Import Songs'))).toBe(false)
+      expect(buttons.some((b) => b.text().includes('Add song manually'))).toBe(true)
+    })
   })
 
   describe('column visibility', () => {
