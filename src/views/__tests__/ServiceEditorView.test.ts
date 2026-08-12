@@ -1267,7 +1267,12 @@ describe('ServiceEditorView - R125 export in-progress spinner (55-02)', () => {
   }
 
   it('renders the export-spinner in the Confirm Export button while isExporting, and the button stays disabled', async () => {
-    const wrapper = await mountView({ status: 'planned' })
+    // status: 'draft' (the mockService default) — the export state is driven
+    // directly via the vm flags below, so the service status is irrelevant to
+    // these assertions; leaving a draft in mockServicesList also keeps this
+    // block from leaking a locked service into the Roles tab describe that
+    // follows (its mountView reuses whatever mockServicesList was last set).
+    const wrapper = await mountView({ status: 'draft' })
     await wrapper.vm.$nextTick()
 
     const vm = wrapper.vm as unknown as ExportVm
@@ -1292,7 +1297,12 @@ describe('ServiceEditorView - R125 export in-progress spinner (55-02)', () => {
   })
 
   it('does not render the export-spinner when no export is running', async () => {
-    const wrapper = await mountView({ status: 'planned' })
+    // status: 'draft' (the mockService default) — the export state is driven
+    // directly via the vm flags below, so the service status is irrelevant to
+    // these assertions; leaving a draft in mockServicesList also keeps this
+    // block from leaking a locked service into the Roles tab describe that
+    // follows (its mountView reuses whatever mockServicesList was last set).
+    const wrapper = await mountView({ status: 'draft' })
     await wrapper.vm.$nextTick()
 
     const vm = wrapper.vm as unknown as ExportVm

@@ -496,8 +496,13 @@
                     type="button"
                     @click="onConfirmExport"
                     :disabled="isExporting || !exportSelectedServiceTypeId"
-                    class="rounded-md px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors disabled:opacity-50"
-                  >{{ isExporting ? 'Exporting...' : exportMode === 'existing' ? 'Add to Plan' : 'Export' }}</button>
+                    class="inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors disabled:opacity-50"
+                  ><span
+                      v-if="isExporting"
+                      data-testid="export-spinner"
+                      aria-hidden="true"
+                      class="h-4 w-4 border-2 border-white/70 border-t-transparent rounded-full animate-spin"
+                    ></span>{{ isExporting ? 'Exporting...' : exportMode === 'existing' ? 'Add to Plan' : 'Export' }}</button>
                 </div>
               </template>
             </div>
