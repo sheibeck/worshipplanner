@@ -1399,3 +1399,20 @@ slideGroupMaterializer/duplicateRow untouched; `npm run type-check` clean; app s
       Expect the commit button to read "Save" (not "Replace lyrics").
 
 After confirming, run `/gsd-verify-work 53`.
+
+---
+
+## Phase 54 — Service Item Enhancements (v1.6) — DEFERRED 2026-08-11
+
+**Status:** verification_deferred_human. 9/9 must-haves verified in code + automated (all source present;
+guards intact — emptied notes stripped to no raw undefined, MISC existing blank + hand-added slides
+survive, switch exhaustive; `npm run type-check` clean; app suite 3059 pass at the 2-file baseline).
+NOT deploy-gated (client-only). Resume: `/gsd-verify-work 54`.
+
+- [ ] **54.1 (R122) — Responsive notes layout.** On the service edit screen, confirm the notes field
+      sits beside each item's selector on desktop and stacks below it on a phone-width viewport, and
+      that the layout is consistent across item kinds (song, scripture, message, etc.).
+- [ ] **54.2 (R123) — MISC starts with no slides, add still works.** Add a Miscellaneous item; open the
+      Slides tab; confirm it has no slides. Add a slide to it; confirm the slide appears and persists.
+
+After confirming, run `/gsd-verify-work 54`.
