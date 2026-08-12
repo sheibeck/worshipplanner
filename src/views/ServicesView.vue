@@ -41,7 +41,7 @@
         <button
           v-if="authStore.isEditor"
           type="button"
-          class="inline-flex items-center gap-2 rounded-md border border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-gray-100 px-3 py-2 text-sm font-medium transition-colors mb-1 mr-2"
+          class="inline-flex items-center gap-2 rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm font-medium text-gray-200 hover:bg-gray-700 hover:text-white transition-colors mb-1 mr-2"
           aria-label="Edit default service template"
           data-testid="open-template-editor"
           @click="templateEditorOpen = true"
