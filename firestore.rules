@@ -158,7 +158,22 @@ service cloud.firestore {
         // service deleted) or a legacy doc with no serviceId must remain
         // deletable, or it is wedged in the database forever with no cleanup path.
         allow delete: if isOrgEditor(orgId)
-          && (!resource.data.keys().hasAll(['serviceId'])
+          // resource == null MUST be the first operand and MUST stay first. A slot
+          // whose slideGroup was never materialized (a slot that never carried
+          // slides) is deleted by confirmSlotDelete → deleteGroup → deleteDoc
+          // against a NON-EXISTENT doc, so `resource` is null. Every branch below
+          // reads `resource.data.…`; without this guard the very first one
+          // (`resource.data.keys()`) dereferences null → "Null value error" → the
+          // rule ERRORS → DENY, so the delete is refused and confirmSlotDelete
+          // aborts, leaving the slot in place. This is the same load-bearing
+          // pattern as serviceShareLinks' `resource == null` guard (T-41-09). It
+          // stays behind isOrgEditor(orgId) above, so org isolation is preserved —
+          // only an editor of THIS org may delete a non-existent doc under it, and
+          // deleting a non-existent doc is a harmless no-op. (2026-08-12: third
+          // recurrence of the "Null value error"; the two prior fixes guarded the
+          // group document's FIELD shapes but never the document not existing.)
+          && (resource == null
+              || !resource.data.keys().hasAll(['serviceId'])
               // A present-but-null serviceId is an orphan too: without this guard
               // the OR below would evaluate parentGone/parentDraft(null), and
               // svcPath(null) raises a "Null value error" → the delete is denied

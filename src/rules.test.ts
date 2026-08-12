@@ -1653,4 +1653,30 @@ describe('slideGroups delete null-safety (2026-08-11 quick fix)', () => {
     const db = testEnv.authenticatedContext('userA').firestore()
     await assertFails(deleteDoc(doc(db, 'organizations', 'orgA', 'slideGroups', 'slot-1')))
   })
+
+  // 2026-08-12 THIRD recurrence. The two prior fixes only guarded the group
+  // DOCUMENT's field shapes (present-but-null / absent serviceId, and
+  // isOrgEditor's role deref). None guarded the document NOT EXISTING. A slot
+  // whose slideGroup was never materialized (a slot that never carried slides)
+  // is deleted by confirmSlotDelete → deleteGroup → deleteDoc against a
+  // non-existent doc, so `resource == null`. The rule's first OR operand
+  // `resource.data.keys().hasAll(['serviceId'])` then dereferences null.data →
+  // "Null value error" → the rule errors → DENY. The client's deleteGroup
+  // relies on "deleteDoc on a missing doc is a no-op", which is only true when
+  // the RULE allows it — so confirmSlotDelete's catch aborted and the slot
+  // stayed. Same failure signature as the load-bearing serviceShareLinks
+  // `resource == null` guard (T-41-09) elsewhere in this file.
+  it('allows an editor to delete a NEVER-MATERIALIZED group (resource == null) — 2026-08-12 recurrence', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    // Deliberately NO seedDoc for the group — the document does not exist.
+    const db = testEnv.authenticatedContext('userA').firestore()
+    await assertSucceeds(deleteDoc(doc(db, 'organizations', 'orgA', 'slideGroups', 'slot-1')))
+  })
+
+  it('the resource == null delete grant stays ORG-SCOPED — a non-member cannot delete a non-existent group', async () => {
+    // No membership seeded for userA under orgA. The resource == null branch must
+    // remain behind isOrgEditor(orgId), so a non-editor is still denied (cleanly).
+    const db = testEnv.authenticatedContext('userA').firestore()
+    await assertFails(deleteDoc(doc(db, 'organizations', 'orgA', 'slideGroups', 'slot-1')))
+  })
 })
