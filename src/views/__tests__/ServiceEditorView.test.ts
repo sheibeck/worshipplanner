@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from 'vitest'
-import { shallowMount, enableAutoUnmount, DOMWrapper, flushPromises } from '@vue/test-utils'
+import { shallowMount, enableAutoUnmount, DOMWrapper, flushPromises, type VueWrapper } from '@vue/test-utils'
 import { reactive } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import type { Options as SortableOptions } from 'sortablejs'
@@ -104,6 +104,34 @@ function captureForSection(section: string): SortableCapture | undefined {
  *  container. Stops resolving once every container carries a section (29-03). */
 function flatCapture(): SortableCapture | undefined {
   return sortableCaptures.find((c) => c.el.dataset.section === undefined)
+}
+
+// ── 260811-vsr: per-row ⋯ menu drivers ─────────────────────────────────────────
+// The per-row three-dot menu replaced the inline section <select> and the inline ✕.
+// These helpers drive it by the slot's ARRAY index (its data-testid="slot-{index}",
+// which renders in section-major array order). openRowMenu returns the slot id.
+async function openRowMenu(wrapper: VueWrapper, index: number): Promise<string> {
+  const row = wrapper.find(`[data-testid="slot-${index}"]`)
+  const slotId = row.attributes('data-slot-id')!
+  await row.find(`[data-testid="row-menu-trigger-${slotId}"]`).trigger('click')
+  await wrapper.vm.$nextTick()
+  return slotId
+}
+
+/** Open a row's ⋯ menu and click a Move-to-section item. `value` is a ServiceSection
+ *  key, or '' for "No section" (maps to the `no-section` testid suffix). */
+async function moveSlotViaRowMenu(wrapper: VueWrapper, index: number, value: string): Promise<void> {
+  const slotId = await openRowMenu(wrapper, index)
+  const suffix = value === '' ? 'no-section' : value
+  await wrapper.find(`[data-testid="row-menu-move-${slotId}-${suffix}"]`).trigger('click')
+  await wrapper.vm.$nextTick()
+}
+
+/** Open a row's ⋯ menu and click its Delete item (opens the D-14 confirm dialog). */
+async function deleteSlotViaRowMenu(wrapper: VueWrapper, index: number): Promise<void> {
+  const slotId = await openRowMenu(wrapper, index)
+  await wrapper.find(`[data-testid="row-menu-delete-${slotId}"]`).trigger('click')
+  await wrapper.vm.$nextTick()
 }
 
 // The reported ZTXcpNRcJTalEQp42fTx shape: 8 slots, section-major, across the
@@ -1652,17 +1680,15 @@ describe('ServiceEditorView - Section headers and slideshow preview (Phase 20-04
     expect(cards.map((c) => c.attributes('data-slot-id'))).toEqual(['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8'])
   })
 
-  it("changing a slot's section via the select moves its card into the target section's container and renumbers positions section-major (29-03)", async () => {
+  it("changing a slot's section via the ⋯ menu moves its card into the target section's container and renumbers positions section-major (29-03)", async () => {
     mockAuthState.isEditor = true
     mockServicesList = [buildSectionedService()] // slot-0/1 worship, slot-2 message, slot-3 sending
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
 
-    // slot-3 (currently 'sending') -> reassign to 'worship'. It should now render inside
-    // the worship container, after the two existing worship cards.
-    const selects = wrapper.findAll('[data-testid="section-select"]')
-    await selects[3]?.setValue('worship')
-    await wrapper.vm.$nextTick()
+    // slot-3 (currently 'sending') -> reassign to 'worship' via the per-row ⋯ menu.
+    // It should now render inside the worship container, after the two existing worship cards.
+    await moveSlotViaRowMenu(wrapper, 3, 'worship')
 
     const worshipCards = wrapper.find('[data-testid="section-list-worship"]').findAll('.slot-item')
     expect(worshipCards.map((c) => c.attributes('data-slot-id'))).toEqual(['slot-0', 'slot-1', 'slot-3'])
@@ -1736,25 +1762,131 @@ describe('ServiceEditorView - Section headers and slideshow preview (Phase 20-04
     expect(secondSlides).toBe(firstSlides)
   })
 
-  it('editor: a per-slot section select is bound to slot.section and mutates it through the existing localService path', async () => {
+  it('editor: a per-row ⋯ menu is present for each slot and its Move-to-section item mutates slot.section through the existing localService path (260811-vsr)', async () => {
     mockServicesList = [buildSectionedService()]
     const wrapper = await mountView()
 
-    const selects = wrapper.findAll('[data-testid="section-select"]')
-    // 4 slots in buildSectionedService(), one select per slot
-    expect(selects).toHaveLength(4)
-    // slot 3 (SONG, currently 'sending') -> reassign to 'worship'
-    expect((selects[3]?.element as HTMLSelectElement).value).toBe('sending')
-    await selects[3]?.setValue('worship')
-    expect((selects[3]?.element as HTMLSelectElement).value).toBe('worship')
+    const triggers = wrapper.findAll('[data-testid^="row-menu-trigger-"]')
+    // 4 slots in buildSectionedService(), one ⋯ menu per slot
+    expect(triggers).toHaveLength(4)
+    // slot 3 (SONG, currently 'sending') -> reassign to 'worship' via its ⋯ menu.
+    const slots = (wrapper.vm as unknown as { localService: { slots: Array<{ section?: string }> } }).localService.slots
+    expect(slots[3]!.section).toBe('sending')
+    await moveSlotViaRowMenu(wrapper, 3, 'worship')
+    // Section-major reindex moves the slot; find it by id and confirm its new section.
+    const moved = (wrapper.vm as unknown as { localService: { slots: Array<{ id: string; section?: string }> } })
+      .localService.slots.find((s) => s.id === 'slot-3')
+    expect(moved?.section).toBe('worship')
   })
 
-  it('non-editor: no section select renders', async () => {
+  it('non-editor: no per-row ⋯ menu (and no legacy section select) renders (260811-vsr)', async () => {
     mockAuthState.isEditor = false
     mockServicesList = [buildSectionedService()]
     const wrapper = await mountView()
 
+    expect(wrapper.find('[data-testid^="row-menu-trigger-"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="section-select"]').exists()).toBe(false)
+  })
+})
+
+// ── 260811-vsr: per-row ⋯ menu owns Move-to-section + Delete ─────────────────────
+
+describe('ServiceEditorView - per-row ⋯ menu (260811-vsr)', () => {
+  interface MenuVm {
+    localService: { slots: Array<{ id: string; section?: string }> }
+  }
+
+  async function mountView() {
+    const { default: ServiceEditorView } = await import('@/views/ServiceEditorView.vue')
+    return shallowMount(ServiceEditorView, {
+      global: {
+        stubs: {
+          AppShell: { template: '<div><slot /></div>' },
+          ContextualActionBar: false,
+          RouterLink: { template: '<a><slot /></a>' },
+          SaveStatusIndicator: false,
+          ServicePrintLayout: true,
+          SongBadge: true,
+          SongSlotPicker: true,
+          ScriptureInput: true,
+          PresentationViewer: true,
+          // Delete opens the D-14 confirm dialog via <Teleport to="body">.
+          teleport: false,
+        },
+      },
+    })
+  }
+
+  function body() {
+    return new DOMWrapper(document.body)
+  }
+
+  beforeEach(() => {
+    mockAuthState.isEditor = true
+    mockAuthState.orgId = 'org-1'
+    mockServicesList = [buildSectionedService()]
+  })
+
+  it('opens one menu at a time and closes it on outside-click (backdrop)', async () => {
+    const wrapper = await mountView()
+
+    const row0 = wrapper.find('[data-testid="slot-0"]')
+    const id0 = row0.attributes('data-slot-id')!
+    await row0.find(`[data-testid="row-menu-trigger-${id0}"]`).trigger('click')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find(`[data-testid="row-menu-panel-${id0}"]`).exists()).toBe(true)
+
+    // Opening another row's menu closes the first (single-open, keyed on slot.id).
+    const row1 = wrapper.find('[data-testid="slot-1"]')
+    const id1 = row1.attributes('data-slot-id')!
+    await row1.find(`[data-testid="row-menu-trigger-${id1}"]`).trigger('click')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find(`[data-testid="row-menu-panel-${id0}"]`).exists()).toBe(false)
+    expect(wrapper.find(`[data-testid="row-menu-panel-${id1}"]`).exists()).toBe(true)
+
+    // Clicking the backdrop closes the open menu.
+    await wrapper.find('div.fixed.inset-0.z-10').trigger('click')
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find(`[data-testid="row-menu-panel-${id1}"]`).exists()).toBe(false)
+  })
+
+  it('a Move-to-section item calls onSectionChange and reassigns slot.section, then closes the menu', async () => {
+    const wrapper = await mountView()
+
+    // slot-3 (SONG) starts in 'sending'; move it to 'worship' via its ⋯ menu.
+    const vm = wrapper.vm as unknown as MenuVm
+    expect(vm.localService.slots.find((s) => s.id === 'slot-3')?.section).toBe('sending')
+
+    await moveSlotViaRowMenu(wrapper, 3, 'worship')
+
+    expect(vm.localService.slots.find((s) => s.id === 'slot-3')?.section).toBe('worship')
+    // Menu closed after selection.
+    expect(wrapper.find('[data-testid="row-menu-panel-slot-3"]').exists()).toBe(false)
+  })
+
+  it('the No-section item reassigns slot.section to undefined', async () => {
+    const wrapper = await mountView()
+    const vm = wrapper.vm as unknown as MenuVm
+
+    await moveSlotViaRowMenu(wrapper, 0, '') // slot-0 was 'worship'
+
+    expect(vm.localService.slots.find((s) => s.id === 'slot-0')?.section).toBeUndefined()
+  })
+
+  it('the Delete item opens the remove-confirm dialog and confirming removes the slot', async () => {
+    const wrapper = await mountView()
+    const vm = wrapper.vm as unknown as MenuVm
+    const before = vm.localService.slots.length
+
+    await deleteSlotViaRowMenu(wrapper, 0)
+
+    // D-14: Delete opens the confirm dialog rather than removing immediately.
+    const confirmBtn = body().findAll('button').find((b) => b.text() === 'Remove')
+    expect(confirmBtn).toBeDefined()
+    await confirmBtn!.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    expect(vm.localService.slots).toHaveLength(before - 1)
   })
 })
 
@@ -2450,18 +2582,17 @@ describe('ServiceEditorView - shared body editor: Message/Announcements/Misc, Hy
     }]
     const wrapper = await mountView()
 
-    const removeButtons = wrapper.findAll('button[title="Remove element"]')
-    expect(removeButtons.length).toBeGreaterThanOrEqual(2)
+    // 260811-vsr: Delete now lives in each row's ⋯ menu.
+    const triggers = wrapper.findAll('[data-testid^="row-menu-trigger-"]')
+    expect(triggers.length).toBeGreaterThanOrEqual(2)
 
-    await removeButtons[0]!.trigger('click')
-    await wrapper.vm.$nextTick()
+    await deleteSlotViaRowMenu(wrapper, 0)
     expect(body().text()).toContain('this announcement')
     const cancelBtn1 = body().findAll('button').find((b) => b.text() === 'Cancel')
     await cancelBtn1!.trigger('click')
     await wrapper.vm.$nextTick()
 
-    await removeButtons[1]!.trigger('click')
-    await wrapper.vm.$nextTick()
+    await deleteSlotViaRowMenu(wrapper, 1)
     expect(body().text()).toContain('this miscellaneous item')
     const cancelBtn2 = body().findAll('button').find((b) => b.text() === 'Cancel')
     await cancelBtn2!.trigger('click')
@@ -2645,33 +2776,30 @@ describe('ServiceEditorView - Service Order preservation sweep (36-05, R067)', (
     }
   })
 
-  it('per-row section select exists for each row, and changing one moves the slot into the chosen band, reordering the array section-major', async () => {
+  it('per-row ⋯ menu exists for each row, and its Move-to-section item moves the slot into the chosen band, reordering the array section-major (260811-vsr)', async () => {
     const wrapper = await mountView()
 
-    const selects = wrapper.findAll('[data-testid="section-select"]')
-    expect(selects).toHaveLength(buildSectionedService().slots.length)
+    const triggers = wrapper.findAll('[data-testid^="row-menu-trigger-"]')
+    expect(triggers).toHaveLength(buildSectionedService().slots.length)
 
-    // slot-2 (MESSAGE) starts in 'message' — retarget it to 'pre-service' and
-    // confirm it actually moved, not merely that the control exists.
+    // slot-2 (MESSAGE, array index 2) starts in 'message' — retarget it to 'pre-service'
+    // via its ⋯ menu and confirm it actually moved, not merely that the control exists.
     expect(wrapper.find('[data-testid="section-list-message"]').findAll('.slot-item')).toHaveLength(1)
     expect(wrapper.find('[data-testid="section-list-pre-service"]').findAll('.slot-item')).toHaveLength(0)
 
-    const messageSelect = wrapper.find('[data-testid="section-list-message"]').find('[data-testid="section-select"]')
-    await messageSelect.setValue('pre-service')
-    await wrapper.vm.$nextTick()
+    await moveSlotViaRowMenu(wrapper, 2, 'pre-service')
 
     expect(wrapper.find('[data-testid="section-list-message"]').findAll('.slot-item')).toHaveLength(0)
     expect(wrapper.find('[data-testid="section-list-pre-service"]').findAll('.slot-item')).toHaveLength(1)
   })
 
-  it('per-row remove control exists for each row, and confirming removal decreases localService.slots.length by exactly 1', async () => {
+  it('per-row ⋯ menu Delete exists for each row, and confirming removal decreases localService.slots.length by exactly 1 (260811-vsr)', async () => {
     const wrapper = await mountView()
     const before = (wrapper.vm as unknown as SweepVm).localService.slots.length
 
-    const removeButtons = wrapper.findAll('button[title="Remove element"]')
-    expect(removeButtons.length).toBeGreaterThan(0)
-    await removeButtons[0]!.trigger('click')
-    await wrapper.vm.$nextTick()
+    const triggers = wrapper.findAll('[data-testid^="row-menu-trigger-"]')
+    expect(triggers.length).toBeGreaterThan(0)
+    await deleteSlotViaRowMenu(wrapper, 0)
 
     // D-14: remove opens a confirm dialog (Teleport to body) rather than
     // removing immediately — confirm it, then assert the slot is actually gone.
@@ -2899,9 +3027,10 @@ describe('ServiceEditorView - slot id backfill on load (Phase 24-06 Task 1)', ()
     await wrapper.vm.$nextTick()
 
     // Trigger an explicit edit so isDirty flips true and autosave schedules —
-    // the same section-select idiom used by the Phase 20-04 tests above.
-    const selects = wrapper.findAll('[data-testid="section-select"]')
-    expect(selects.length).toBeGreaterThan(1)
+    // now via the per-row ⋯ menu's Move-to-section (260811-vsr) instead of the
+    // removed inline section select.
+    const triggers = wrapper.findAll('[data-testid^="row-menu-trigger-"]')
+    expect(triggers.length).toBeGreaterThan(1)
     // The autosave watcher's very FIRST deep-watch trigger is always consumed
     // by the `autosaveInitialized` guard (by design — see the watcher's own
     // comment). In production that first trigger is the load event itself;
@@ -2911,8 +3040,8 @@ describe('ServiceEditorView - slot id backfill on load (Phase 24-06 Task 1)', ()
     // created (it's declared later in the script) — so the load reassignment
     // has no watcher yet to consume it. The SECOND edit below is the one
     // this test actually asserts against.
-    await selects[0]!.setValue('worship')
-    await selects[1]!.setValue('message')
+    await moveSlotViaRowMenu(wrapper, 0, 'worship')
+    await moveSlotViaRowMenu(wrapper, 1, 'message')
 
     await new Promise((resolve) => setTimeout(resolve, 900))
 
@@ -2939,9 +3068,8 @@ describe('ServiceEditorView - slot id backfill on load (Phase 24-06 Task 1)', ()
     // comment for why that's this edit rather than the load event in this
     // synchronous-mock environment); the second edit is the real one this
     // save's ids are captured from.
-    let selects = wrapper.findAll('[data-testid="section-select"]')
-    await selects[0]!.setValue('worship')
-    await selects[1]!.setValue('message')
+    await moveSlotViaRowMenu(wrapper, 0, 'worship')
+    await moveSlotViaRowMenu(wrapper, 1, 'message')
     await new Promise((resolve) => setTimeout(resolve, 900))
     expect(mockUpdateService).toHaveBeenCalledTimes(1)
     const firstPayload = mockUpdateService.mock.calls[0]![1] as { slots: Array<{ id?: string }> }
@@ -2968,8 +3096,7 @@ describe('ServiceEditorView - slot id backfill on load (Phase 24-06 Task 1)', ()
     // legitimately moves to the front; what R028 actually guarantees is that no id is
     // dropped or re-minted across the stale remote merge, not that array order is stable
     // across an unrelated ordering change this same edit triggers.
-    selects = wrapper.findAll('[data-testid="section-select"]')
-    await selects[2]!.setValue('sending')
+    await moveSlotViaRowMenu(wrapper, 2, 'sending')
     await new Promise((resolve) => setTimeout(resolve, 900))
     expect(mockUpdateService).toHaveBeenCalledTimes(2)
     const secondPayload = mockUpdateService.mock.calls[1]![1] as { slots: Array<{ id?: string }> }
@@ -3226,9 +3353,8 @@ describe('ServiceEditorView - slot delete cascades to its group (Phase 24-06 Tas
   }
 
   async function openDeleteConfirm(wrapper: Awaited<ReturnType<typeof mountView>>, index: number) {
-    const removeButtons = wrapper.findAll('[title="Remove element"]')
-    await removeButtons[index]!.trigger('click')
-    await wrapper.vm.$nextTick()
+    // 260811-vsr: Delete moved into the per-row ⋯ menu — open it, then click Delete.
+    await deleteSlotViaRowMenu(wrapper as unknown as VueWrapper, index)
   }
 
   function confirmButton() {
@@ -3260,14 +3386,14 @@ describe('ServiceEditorView - slot delete cascades to its group (Phase 24-06 Tas
     // deleteGroup has been called, but its promise is still pending — the
     // splice must not have happened yet.
     expect(mockDeleteGroup).toHaveBeenCalledWith('org-1', 'slot-0')
-    expect(wrapper.findAll('[data-testid="section-select"]')).toHaveLength(9)
+    expect(wrapper.findAll('[data-testid^="row-menu-trigger-"]')).toHaveLength(9)
 
     resolveDelete()
     await Promise.resolve()
     await Promise.resolve()
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.findAll('[data-testid="section-select"]')).toHaveLength(8)
+    expect(wrapper.findAll('[data-testid^="row-menu-trigger-"]')).toHaveLength(8)
   })
 
   it('R045 membership lock: after a confirmed remove-element delete, the removed slot id no longer appears in the view and no further group delete is issued for it', async () => {
@@ -3305,7 +3431,7 @@ describe('ServiceEditorView - slot delete cascades to its group (Phase 24-06 Tas
     await wrapper.vm.$nextTick()
 
     expect(mockDeleteGroup).not.toHaveBeenCalled()
-    expect(wrapper.findAll('[data-testid="section-select"]')).toHaveLength(9)
+    expect(wrapper.findAll('[data-testid^="row-menu-trigger-"]')).toHaveLength(9)
   })
 
   it('names the true slide count and attached audio for a group with six slides and bed audio, and never claims attached video (D-18)', async () => {
@@ -3373,7 +3499,7 @@ describe('ServiceEditorView - slot delete cascades to its group (Phase 24-06 Tas
     await wrapper.vm.$nextTick()
 
     expect(mockDeleteGroup).toHaveBeenCalledWith('org-1', 'slot-0')
-    expect(wrapper.findAll('[data-testid="section-select"]')).toHaveLength(8)
+    expect(wrapper.findAll('[data-testid^="row-menu-trigger-"]')).toHaveLength(8)
   })
 
   it('deleting one of two slots referencing the same song calls deleteGroup exactly once, with that slot id', async () => {
@@ -3403,14 +3529,13 @@ describe('ServiceEditorView - slot delete cascades to its group (Phase 24-06 Tas
 
     // Absorb the autosave watcher's first-ever trigger (see the Task 1 tests'
     // comment for why this is needed in this synchronous-mock environment) with an edit
-    // on slot-8. Since 29-03 onSectionChange reorders section-major, this ALSO moves
-    // slot-8 to the front of the render (ahead of the still-ungrouped slot-0..slot-7) —
-    // the remove-button index below accounts for that reordering.
-    const selects = wrapper.findAll('[data-testid="section-select"]')
-    await selects[8]!.setValue('sending')
+    // on slot-8, now via the per-row ⋯ menu (260811-vsr). Since 29-03 onSectionChange
+    // reorders section-major, this ALSO moves slot-8 to the front of the render (ahead of
+    // the still-ungrouped slot-0..slot-7) — the row index below accounts for that reordering.
+    await moveSlotViaRowMenu(wrapper, 8, 'sending')
 
-    // Post-reorder remove-button order is [slot-8, slot-0, slot-1, slot-2, slot-3, slot-4,
-    // slot-5, slot-6, slot-7] — slot-4 (this test's target) is now at button index 5.
+    // Post-reorder row order is [slot-8, slot-0, slot-1, slot-2, slot-3, slot-4,
+    // slot-5, slot-6, slot-7] — slot-4 (this test's target) is now at row index 5.
     await openDeleteConfirm(wrapper, 5)
     await confirmButton()!.trigger('click')
     await Promise.resolve()
@@ -3456,7 +3581,7 @@ describe('ServiceEditorView - slot delete cascades to its group (Phase 24-06 Tas
     await Promise.resolve()
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.findAll('[data-testid="section-select"]')).toHaveLength(9)
+    expect(wrapper.findAll('[data-testid^="row-menu-trigger-"]')).toHaveLength(9)
 
     errSpy.mockRestore()
   })
@@ -5583,7 +5708,7 @@ describe('ServiceEditorView - locked service renders all three tabs read-only (R
       // 36-05: moved-and-restyled-control edit — the locked-service absence assertion moves
       // from the old "Add Element" button label to the palette's testid.
       expect(wrapper.find('[data-testid="add-to-service-palette"]').exists()).toBe(false)
-      expect(wrapper.findAll('[data-testid="section-select"]')).toHaveLength(0)
+      expect(wrapper.findAll('[data-testid^="row-menu-trigger-"]')).toHaveLength(0)
       expect(wrapper.findAll('button').some((b) => b.attributes('title') === 'Remove element')).toBe(false)
       expect(wrapper.findAll('button').some((b) => b.attributes('title') === 'Remove song')).toBe(false)
     })
@@ -5614,7 +5739,7 @@ describe('ServiceEditorView - locked service renders all three tabs read-only (R
       mockServicesList = [{ ...mockService, status: 'draft' }]
       const draft = await mountView()
       expect(draft.findAll('.drag-handle').length).toBeGreaterThan(0)
-      expect(draft.findAll('[data-testid="section-select"]').length).toBeGreaterThan(0)
+      expect(draft.findAll('[data-testid^="row-menu-trigger-"]').length).toBeGreaterThan(0)
       draft.unmount()
 
       mockServicesList = [{ ...mockService, status }]

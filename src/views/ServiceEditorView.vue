@@ -1137,35 +1137,70 @@
 
             </div>
 
-            <!-- Section-assignment control: editor only, hidden while locked
-                 (D005/R007). CLASS A. Nothing renders in its place and no
-                 information is lost: since Phase 29 every row sits inside a
-                 per-section container beneath a visible section header, so the
-                 section is already stated typographically. -->
-            <select
-              v-if="canEditService"
-              data-testid="section-select"
-              :value="slot.section ?? ''"
-              @change="onSectionChange(index, ($event.target as HTMLSelectElement).value)"
-              class="rounded-md bg-gray-800 border border-gray-700 text-gray-300 text-xs px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 flex-shrink-0 mt-0.5"
-              title="Section"
-            >
-              <option value="">No section</option>
-              <option v-for="s in SERVICE_SECTIONS" :key="s" :value="s">{{ SERVICE_SECTION_LABELS[s] }}</option>
-            </select>
+            <!-- Per-row ⋯ menu (260811-vsr): editor only, hidden while locked
+                 (D005/R007). CLASS A — the trigger AND every menu item are gated
+                 v-if="canEditService" (T-vsr-01). Owns BOTH Move-to-section
+                 (→ onSectionChange, replacing the inline <select>) and Delete
+                 (→ removeSlot, replacing the inline ✕). Mirrors SlideActionMenu's
+                 ARIA pattern INLINE (trigger + fixed backdrop + absolute role="menu"
+                 panel); single-open keyed on slot.id. It lives INSIDE the .slot-item
+                 (the Sortable ITEM, not a container) and only opens on click, so it
+                 never joins a drag. -->
+            <div v-if="canEditService" class="relative flex-shrink-0 mt-0.5">
+              <button
+                type="button"
+                class="p-1 rounded-md text-gray-500 hover:text-gray-300 hover:bg-gray-800 transition-colors"
+                :aria-haspopup="'menu'"
+                :aria-expanded="openRowMenuId === slot.id ? 'true' : 'false'"
+                aria-label="Row options"
+                :data-testid="`row-menu-trigger-${slot.id}`"
+                title="Row options"
+                @click.stop="toggleRowMenu(slot.id)"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                  <circle cx="12" cy="5" r="1.5" />
+                  <circle cx="12" cy="12" r="1.5" />
+                  <circle cx="12" cy="19" r="1.5" />
+                </svg>
+              </button>
 
-            <!-- Remove button: editor only, hidden while locked. CLASS A. -->
-            <button
-              v-if="canEditService"
-              type="button"
-              @click="removeSlot(index)"
-              class="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0 mt-0.5"
-              title="Remove element"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+              <!-- Outside-click backdrop -->
+              <div v-if="openRowMenuId === slot.id" class="fixed inset-0 z-10" @click="openRowMenuId = null" />
+
+              <!-- Menu panel -->
+              <div
+                v-if="openRowMenuId === slot.id"
+                role="menu"
+                class="absolute right-0 top-full mt-1 w-48 origin-top-right rounded-lg border border-gray-700 bg-gray-800 shadow-xl z-20 overflow-hidden py-1"
+                :data-testid="`row-menu-panel-${slot.id}`"
+              >
+                <p class="px-3 pt-1 pb-0.5 text-[10px] uppercase tracking-wider text-gray-500">Move to section</p>
+                <button
+                  type="button"
+                  role="menuitem"
+                  class="block w-full px-3 py-1.5 text-left text-sm text-gray-200 hover:bg-gray-700 transition-colors"
+                  :data-testid="`row-menu-move-${slot.id}-no-section`"
+                  @click="onSectionChange(index, ''); openRowMenuId = null"
+                >No section</button>
+                <button
+                  v-for="s in SERVICE_SECTIONS"
+                  :key="s"
+                  type="button"
+                  role="menuitem"
+                  class="block w-full px-3 py-1.5 text-left text-sm text-gray-200 hover:bg-gray-700 transition-colors"
+                  :data-testid="`row-menu-move-${slot.id}-${s}`"
+                  @click="onSectionChange(index, s); openRowMenuId = null"
+                >{{ SERVICE_SECTION_LABELS[s] }}</button>
+                <div class="my-1 h-px bg-gray-700"></div>
+                <button
+                  type="button"
+                  role="menuitem"
+                  class="block w-full px-3 py-1.5 text-left text-sm text-red-400 hover:bg-gray-700 hover:text-red-300 transition-colors"
+                  :data-testid="`row-menu-delete-${slot.id}`"
+                  @click="removeSlot(index); openRowMenuId = null"
+                >Delete</button>
+              </div>
+            </div>
             </div>
               </template>
             </div>
@@ -1782,6 +1817,14 @@ function onSectionChange(index: number, value: string) {
   if (!slot) return
   slot.section = value === '' ? undefined : (value as ServiceSection)
   localService.value.slots = reindexSlots(orderSlotsBySection(localService.value.slots))
+}
+
+/** 260811-vsr: which row's ⋯ menu is open (keyed on the stable slot.id, so exactly
+ *  one is open at a time — the single-open pattern SlideGrid uses). UI state only;
+ *  the trigger toggles, the backdrop and every menu item close it. */
+const openRowMenuId = ref<string | null>(null)
+function toggleRowMenu(id: string): void {
+  openRowMenuId.value = openRowMenuId.value === id ? null : id
 }
 
 const orgIdRef = computed(() => authStore.orgId)
