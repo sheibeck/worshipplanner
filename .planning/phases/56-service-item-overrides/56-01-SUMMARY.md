@@ -158,3 +158,7 @@ None.
 ---
 *Phase: 56-service-item-overrides*
 *Completed: 2026-08-12*
+
+## Self-Check: PASSED
+
+All listed files exist on disk; all task commits (8f72116, 84da0cd) present in git.

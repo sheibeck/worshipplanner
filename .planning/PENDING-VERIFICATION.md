@@ -1498,3 +1498,46 @@ self-approve.
       distinct from Post-Service; absent when every item is sectioned.
 
 After confirming, run `/gsd-verify-work` for this quick task (or record acceptance in the quick-tasks table).
+
+---
+
+## Phase 56 — Service-Item Overrides (v1.6) — DEFERRED owner visual check
+
+**Deferred under the v1.6 standing grant (autonomous execution, defer human verification).** All
+automated gates for phase 56 are green: `npm run type-check` clean, and the full app suite
+(`npx vitest run --dir src --exclude '**/rules.test.ts'`) is at the exact 2-file known-failing
+baseline (`src/storage.rules.test.ts`, `src/views/__tests__/RosterView.test.ts`) with no other
+regression. The items below are visual/feel judgments jsdom cannot make. **Do NOT self-approve.**
+
+### R127 — MISC editable label
+
+- [ ] **Live editor MISC label input fits the three-rail row.** Add a Miscellaneous item in a service.
+      Confirm a compact label input (placeholder "Miscellaneous") sits ABOVE the shared notes/details
+      field in the field column, does not overflow or crowd the w-32 badge rail, and the per-kind badge
+      still reads "Miscellaneous" (the TYPE), distinct from the custom name.
+- [ ] **Label round-trips + exports.** Type "Communion"; confirm it persists (reload), prints in place
+      of "Miscellaneous", and exports to Planning Center as the item title "Communion". Clear it;
+      confirm the item reverts to "Miscellaneous" everywhere.
+- [ ] **Template editor parity.** In Settings → Edit Default Template, a MISC entry shows a label input;
+      the entry's displayed name reflects the label when set; a saved template MISC label flows into a
+      newly-created service's MISC item.
+- [ ] **Mobile (≤ sm / ~390px).** The label input stacks cleanly with no horizontal scroll.
+
+### R128 — Scripture per-item Bible-version override
+
+- [ ] **Version selector fits the Scripture row.** Add/open a Scripture item as an editor. Confirm a
+      compact version selector shows three states: "Default (<org default ESV/NLT>)", "ESV", "NLT",
+      placed sensibly near the reference input without breaking the three-rail layout.
+- [ ] **Override governs fetched text.** With the org default at ESV, set a Scripture item to NLT;
+      confirm the in-editor reference preview fetches NLT text, and a congregational split for that item
+      fetches + stamps NLT. Choosing "Default" clears the override (fetches revert to the org default).
+- [ ] **PC export routing.** Export a plan where one Scripture item overrides to NLT while the org
+      default is ESV; confirm that item's passage text in Planning Center is NLT and the others are ESV.
+      The item title is unchanged (version-agnostic).
+- [ ] **Reference-only surfaces unaffected (by design).** Confirm the projected slide / preview / print
+      for a scripture item render only the typed reference (e.g. "Romans 8:28") regardless of the
+      override — these are documented no-ops, not a defect.
+- [ ] **Viewer/locked.** Neither the label input (R127) nor the version selector (R128) renders for a
+      viewer or a locked (planned/exported) service.
+
+After confirming, run `/gsd-verify-work` for phase 56 (or record acceptance in the phase verification record).
