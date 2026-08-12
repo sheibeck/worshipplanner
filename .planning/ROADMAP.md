@@ -324,7 +324,12 @@ Plans:
   2. Plain item kinds show a single consolidated free-text field; a muted/dashed "No Section" band labels ungrouped items; per-kind colored badges and mobile-friendly stacking match the service editor (R129)
   3. All existing template-editor functionality is preserved — SortableJS reorder, add-item, the R127 Miscellaneous label, and save (R129)
 
-**Plans**: TBD (planned during autonomous run)
+**Plans**: 1 plan
+
+Plans:
+
+- [ ] 57-01-PLAN.md — R129: extract `kindBadgeClass` to shared `slotTypes.ts` (both editors import it); three-rail `ServiceTemplateEditor.vue` row (badge rail · field column · per-row ⋯ menu replacing inline `template-section-select`/`template-item-remove`) with test migration in lockstep; muted/dashed `template-no-section-band` + mobile stacking — restyle only, no behavior/data change
+
 **UI hint**: yes
 **Research flag**: skip (milestone research skipped).
 **Notes**: Mirror the 260811-vsr DESIGN-SPEC and SUMMARY (`.planning/quick/260811-vsr-service-editor-ui-pass-consolidate-redun/`). `ServiceTemplateEditor.vue` ports `ServiceEditorView.vue`'s per-section SortableJS reorder, so the same row structure applies; adapt controls to the template context (no lock/lifecycle, no live slide counts). Visual/structural parity only — no behavior change. Owner scope addition 2026-08-12; runs autonomously under the v1.6 standing grant.
@@ -345,7 +350,7 @@ Plans:
 | 54. Service Item Enhancements | v1.6 | 2/2 | In Progress|  |
 | 55. Preview & Export Polish | v1.6 | 3/3 | In Progress|  |
 | 56. Service-Item Overrides | v1.6 | 0/? | Planned (2026-08-12 scope add) |  |
-| 57. Template-Editor UX Parity | v1.6 | 0/? | Planned (2026-08-12 scope add) |  |
+| 57. Template-Editor UX Parity | v1.6 | 0/1 | Planned (2026-08-12 scope add) |  |
 
 ## Backlog
 
