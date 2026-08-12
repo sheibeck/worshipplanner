@@ -56,9 +56,16 @@ per-phase verification.
 **Dropped 2026-07-28:** Collaboration / Tasks & Events (planned as Phase 5, never started) —
 `TASK-01..03`, `EVNT-01..04`. Still in backlog: **999.1**, extract a shared song-browse component.
 
-## Current Milestone: v1.6 Editing Reliability & Song Slides
+## Previous Milestone: v1.6 Editing Reliability & Song Slides (SHIPPED 2026-08-12)
 
-**Goal:** Fix the drag-and-drop corruption that plagues both the default template and real service
+**Delivered (Phases 51–57, 19 plans):** drag-and-drop editing reliability in both the template and
+live service plans; the service template relocated to the Services page; hand-split song slides
+(+ Pre-Chorus, position numbering); a per-item notes field; per-item Miscellaneous labels and a
+Scripture ESV/NLT override; preview/export polish (no auto-version, export spinner, Roboto font); and
+the template editor brought to UX parity with the redesigned Service Order screen. Deployed to
+production 2026-08-12; a same-day firestore.rules delete-fix + owner UI follow-up batch confirmed in prod.
+
+**Goal (as set):** Fix the drag-and-drop corruption that plagues both the default template and real service
 plans, move the service template to where it's actually used, and make song-slide editing intuitive
 for non-technical users — plus item-editing and preview polish.
 
@@ -92,7 +99,7 @@ for non-technical users — plus item-editing and preview polish.
 | Blank template | Eliminated — the Suggested Template becomes the universal starting point for a new service, decoupled from Vertical Worship. |
 | Split-slide duplication | A split section is one logical unit: Duplicate copies all its slides together, and its numbering stays position-based. |
 
-## Previous Milestone: v1.5 Settings, Sharing, and Fidelity (SHIPPED 2026-08-10)
+## Earlier Milestone: v1.5 Settings, Sharing, and Fidelity (SHIPPED 2026-08-10)
 
 > Archived. Full record: [milestones/v1.5-ROADMAP.md](milestones/v1.5-ROADMAP.md) ·
 > [milestones/v1.5-REQUIREMENTS.md](milestones/v1.5-REQUIREMENTS.md). Delivered per-church settings &
@@ -105,6 +112,7 @@ for non-technical users — plus item-editing and preview polish.
 
 ### Validated
 
+- ✓ Editing reliability, service-template relocation, song-slide splitting, per-item notes + Miscellaneous labels + Scripture version override, preview/export polish, template-editor UX parity (R110–R129) — v1.6 (archived: `milestones/v1.6-REQUIREMENTS.md`)
 - ✓ Import song stable from CSV (Planning Center export) with arrangements, keys, BPM, tags, CCLI numbers — v1.0
 - ✓ Manage song stable in-app (add, edit, categorize, tag team compatibility) — v1.0
 - ✓ Categorize songs by Vertical Worship type: 1 (Call to Worship), 2 (Intimate), 3 (Ascription) — v1.0
@@ -298,4 +306,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-11 at the start of milestone v1.6 (Editing Reliability & Song Slides)*
+*Last updated: 2026-08-12 after v1.6 (Editing Reliability & Song Slides) shipped to production. Next: `/gsd-new-milestone`.*

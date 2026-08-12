@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Editing Reliability & Song Slides
+status: Awaiting next milestone
+stopped_at: Completed 55-03-PLAN.md (R126 Roboto slide font)
+last_updated: "2026-08-12T16:20:41.175Z"
+last_activity: 2026-08-12
+last_activity_desc: Milestone v1.6 completed and archived
+progress:
+  total_phases: 7
+  completed_phases: 7
+  total_plans: 19
+  completed_plans: 19
+  percent: 100
 current_phase: 55
 current_phase_name: preview-export-polish
-status: verifying
-stopped_at: Completed 55-03-PLAN.md (R126 Roboto slide font)
-last_updated: "2026-08-12T01:33:31.875Z"
-last_activity: 2026-08-11
-last_activity_desc: "55-03 done: Roboto added as a sixth curated self-hosted @fontsource slide font (sans, weights [300,400,500,600,700], OFL-1.1) via one SLIDE_FONTS entry + one static-prefix loader line; Inter stays first/default, other four unchanged. type-check clean; font tests 22/22; broad suite at the 2-file baseline. Legitimacy checkpoint deferred to PENDING-VERIFICATION § Phase 55 (fontsource-lockstep false positive, Phase 46 precedent)."
-progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 16
-  completed_plans: 16
-  percent: 100
 ---
 
 # Project State
@@ -203,10 +203,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 57 (template-editor-ux-parity) — CODE-COMPLETE, verification_deferred_human
-Plan: 1 of 1 complete (57-01 R129). Phase 56 also code-complete (56-01 R127, 56-02 R128).
-Status: ✅ ALL 7 v1.6 PHASES CODE-COMPLETE (51–55 + the 2026-08-12 owner scope addition 56–57). Autonomous run `--from 56 --to 57` reached its `--to` target and STOPS BEFORE the milestone lifecycle per the v1.6 grant (deferred verification must not be auto-archived). Owner runs the /gsd-verify-work list (51–57), then the lifecycle. ✅ The recurring service-plan-item DELETE `PERMISSION_DENIED` ("Null value error") — 3rd occurrence — was root-caused (a never-materialized slideGroup ⇒ `resource == null` in the delete rule) and fixed (`03b96bc`, `resource == null` first guard, org isolation preserved, emulator 149/149) and **DEPLOYED to production 2026-08-12** by the owner. A batch of owner UI tweaks also shipped 2026-08-12 (MISC inline-editable label + label alignment, template textarea removals, scripture version-selector move + reader/preview override, ⋯-menu fold-flip, "Service Template" button, delete spinner) — all committed, at the 2-file baseline; **owner-accepted 2026-08-12** (delete fix verified working in production) — see `PENDING-VERIFICATION.md` § "Post-56/57 owner follow-up tweaks (2026-08-12)".
-Last activity: 2026-08-12 — Phases 56–57 executed autonomously. P56: R127 MISC custom label (both editors + PC title via `miscLabel()`) + R128 Scripture per-item ESV/NLT override (`slot.bibleVersion ?? org default`, wired to version-dependent surfaces only). P57: 260811-vsr redesign applied to `ServiceTemplateEditor.vue` (shared `kindBadgeClass`, three-rail rows, per-row ⋯ menu, No-Section band). Plus the 260811-vsr service-editor redesign quick task and the Services-page "Template" button. `npm run type-check` clean, app suite at the 2-file baseline throughout. All owner visual checks DEFERRED → /gsd-verify-work 56 / 57.
+Phase: Milestone v1.6 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-08-12 — Milestone v1.6 completed and archived
 
 ## ⏸ RESUME HERE (2026-08-11 — v1.6 ROADMAP.md created, ready to plan Phase 51)
 

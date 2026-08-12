@@ -8,7 +8,7 @@
 - ✅ **v1.3 — Slides Tab Rework** — Phases 24-28 (shipped 2026-07-28; verified by owner)
 - ✅ **v1.4 — Service and Slides** — Phases 29-38 (shipped 2026-08-05; owner acceptance, verification unrun)
 - ✅ **v1.5 — Settings, Sharing, and Fidelity** — Phases 39-50 (shipped 2026-08-10; settings infra + feature toggles, custom auth claims, sharing correctness, PPTX rendered-image display, service item types, default template, ESV/NLT Bible version, slide typography, congregational reading, multi-image + mobile polish, bulk-delete/provenance/render-fidelity)
-- 🔄 **v1.6 — Editing Reliability & Song Slides** — Phases 51-55 (in progress; Service Order editing-reliability bug fixes, default service template relocation, song-slide editing, service-item notes, preview/export polish)
+- ✅ **v1.6 — Editing Reliability & Song Slides** — Phases 51-57 (shipped 2026-08-12; drag-and-drop editing reliability, service-template relocation, song-slide splitting, service-item notes + MISC labels + per-item Scripture version, preview/export polish, template-editor UX parity)
 
 <details>
 <summary>✅ v1.2 Worship Service Slide Management (Phases 18-23) — ARCHIVED 2026-07-28</summary>
@@ -141,198 +141,32 @@ Full phase details archived to `milestones/v1.5-ROADMAP.md`; requirements to `mi
 
 </details>
 
-### 🔄 v1.6 Editing Reliability & Song Slides (In Progress)
+<details>
+<summary>✅ v1.6 Editing Reliability & Song Slides (Phases 51-57) — SHIPPED 2026-08-12</summary>
 
-**Milestone Goal:** Fix the drag-and-drop corruption that plagues both the default template and real
-service plans, move the service template to where it is actually used, and make song-slide editing
-intuitive for a non-technical user — plus item-editing and preview polish.
+**Milestone Goal:** Fix the drag-and-drop corruption in the default template and real service plans,
+move the service template to where it is used, make song-slide editing intuitive, and polish
+item-editing, preview, and export. R127–R129 (owner scope addition 2026-08-12) added per-item MISC
+labels + a Scripture version override and brought the template editor to UX parity.
 
-**Requirements:** `.planning/REQUIREMENTS.md` (R110–R129, 20 total, 20/20 mapped; R127–R129 added
-2026-08-12 as an owner scope addition → Phases 56–57)
+- [x] Phase 51: Service Order Editing Reliability (4/4 plans)
+- [x] Phase 52: Default Service Template (3/3 plans)
+- [x] Phase 53: Song Lyric Editing (4/4 plans)
+- [x] Phase 54: Service Item Enhancements (2/2 plans)
+- [x] Phase 55: Preview & Export Polish (3/3 plans)
+- [x] Phase 56: Service-Item Overrides (2/2 plans) — owner scope addition
+- [x] Phase 57: Template-Editor UX Parity (1/1 plan) — owner scope addition
 
-**Derived from** `.planning/REQUIREMENTS.md` directly — there is no `research/SUMMARY.md` this milestone
-(research was skipped: it is mostly bug-fixes and UI on patterns already in the codebase, and the
-drag-and-drop root cause is best isolated by reading the actual reorder handlers during phase planning —
-see STATE.md § "v1.4 RESEARCH FINDINGS"). Five phases under this project's `coarse` granularity setting.
+**Requirements:** [milestones/v1.6-REQUIREMENTS.md](milestones/v1.6-REQUIREMENTS.md) (R110–R129)
 
-The one hard, owner-instructed sequencing constraint (2026-08-11) drives the shape: the Service Order
-editing-reliability bug fixes (**R110–R112**) are **Phase 51, first** — the most disruptive defect,
-blocking trust in every other editing surface. The Default-Service-Template phase follows the reliability
-fix because the template editor is itself a drag-and-drop surface (`ServiceTemplateEditor.vue` ports
-`ServiceEditorView.vue`'s per-section SortableJS reorder), and R110 explicitly covers the
-default-template editor too. Song Lyric Editing (R117–R121) is the largest new-build. The two smallest,
-independent polish items groups are kept as coherent phases rather than split into thin ones: service-item
-enhancements (R122–R123) as one phase, and the three unrelated preview/export/font polish items
-(R124–R126) combined into one phase, per `coarse`.
+Full details: [milestones/v1.6-ROADMAP.md](milestones/v1.6-ROADMAP.md) · phase artifacts in `milestones/v1.6-phases/`
 
-- [ ] **Phase 51: Service Order Editing Reliability** - Kill the cross-section drag phantom-duplicate, the "No Section" save error, and the empty-body ordering defect — in both the template editor and the live service plan
-- [ ] **Phase 52: Default Service Template** - Move the default template to the Services page behind a cog, rename it "Suggested Template", start every new service from it, and give template Miscellaneous items a body input
-- [ ] **Phase 53: Song Lyric Editing** - Split song sections into slides by hand, duplicate a split as one unit, add Pre-Chorus, number sections by position, and rename the first-save button to "Save"
-- [ ] **Phase 54: Service Item Enhancements** - A responsive notes field beside every item's selector, and Miscellaneous items that start with no slides
-- [ ] **Phase 55: Preview & Export Polish** - Stop auto-appending the Bible version in preview, add a Planning Center export spinner, and add Roboto to the self-hosted slide fonts
-- [ ] **Phase 56: Service-Item Overrides** - Editable Miscellaneous label (default "Miscellaneous", used as the Planning Center item title) across both editors, and a per-item Scripture Bible-version override (ESV/NLT) that overrides the org default for that one item *(owner scope addition 2026-08-12)*
-- [ ] **Phase 57: Template-Editor UX Parity** - Apply the 260811-vsr Service Order redesign (three-rail rows, colored badges, consolidated field, per-row ⋯ menu, "No Section" band, mobile stacking) to the Edit Default Template screen *(owner scope addition 2026-08-12)*
+> Closed on owner acceptance 2026-08-12, deployed to production (hosting) the same day; the
+> firestore.rules delete-fix and the 2026-08-12 owner UI follow-up batch were confirmed working in
+> production. Phases 51–57 are owner-attributed (v1.4/v1.5 precedent); the deferred human checks are
+> preserved in `PENDING-VERIFICATION.md` rather than individually re-run.
 
-## Phase Details
-
-### Phase 51: Service Order Editing Reliability
-
-**Goal:** Editing a service order — in both the default-template editor and a live service plan — never corrupts item state, and every item keeps its true order everywhere it appears.
-**Depends on**: Nothing — first phase of this milestone (owner-instructed: sequenced first because it blocks trust in every other editing surface)
-**Requirements**: R110, R111, R112
-**Success Criteria** (what must be TRUE):
-
-  1. Dragging a service item into a section places exactly one item in that section and leaves no phantom duplicate — proven in **both** the default-template editor **and** the live service plan; the second, undeletable "No Section" copy is gone (R110)
-  2. Moving an item that is in a section back to "No Section" via the section dropdown saves successfully, with no save error (R111)
-  3. The Services listing page and the public share link show every service item in the same order as the service edit screen, including items with an empty body (e.g. two blank Miscellaneous items) — the empty-bodied item no longer sorts to the bottom until text is typed (R112)
-  4. All three symptoms stay fixed without a page refresh — the fix corrects the client/persisted-state desync at its source, rather than being masked by a reload
-
-**Plans**: 4/4 plans executed
-
-Plans:
-
-- [x] 51-01-PLAN.md — R110 live-plan editor: RED cross-section drag repro + nonce-rebuild fix in `ServiceEditorView.vue`
-- [x] 51-02-PLAN.md — R110 default-template editor: RED cross-section drag repro + nonce-rebuild fix in `ServiceTemplateEditor.vue`
-- [x] 51-03-PLAN.md — R111 save-safety: RED store test + `stripUndefined` in the `updateService` funnel
-- [x] 51-04-PLAN.md — R112 read-surface order: RED listing/share tests + route `ServiceCard` & `buildServiceSnapshot` through `orderSlotsBySection` (new `ServiceCard.test.ts`)
-
-**UI hint**: yes
-**Research flag**: skip (milestone research skipped) — but the root cause must be isolated by reading the live reorder handlers first, per STATE.md § "v1.4 RESEARCH FINDINGS" and CLAUDE.md's graph caveat. Write a failing reproduction test BEFORE changing code, exactly as the v1.4 drag-and-drop fix did.
-**Notes**: v1.4 Phase 29 already rebuilt `ServiceEditorView.vue`'s reorder from a flat list into per-section SortableJS instances keyed on the stable `slot.id`, fixing the earlier `oldIndex`/`newIndex`, DOM-revert, and `v-for`-key bugs. R110–R112 are NEW symptoms that survive on top of that rebuild: a cross-section drag spawns a phantom "No Section" duplicate (R110); moving back to "No Section" via the dropdown throws a save error (R111); and an empty-bodied item serializes out of order on the listing/share surfaces (R112). All three clear on refresh → a client-state / persisted-state desync, not lost data. The same reorder machinery is copy-pasted in `SlideGrid.vue` — check both. R112 is an ordering/serialization defect on the read surfaces (Services listing + public share snapshot), likely an `orderBy`/sort that skips or mis-ranks empty-body items; keep the Phase 41 share-snapshot refresh path (v1.5) intact.
-
-### Phase 52: Default Service Template
-
-**Goal:** The default service template lives where it is used — on the Services page behind a cog — is the universal starting point for every new service, and can pre-fill recurring Miscellaneous content.
-**Depends on**: Phase 51 — the template editor is itself a drag-and-drop surface (`ServiceTemplateEditor.vue` reuses `ServiceEditorView.vue`'s per-section SortableJS reorder), and R110 covers it explicitly, so it must inherit the reliability fix before it becomes the universal starting point. Builds on v1.5 Phase 44's template infrastructure and Phase 43's item-type palette.
-**Requirements**: R113, R114, R115, R116
-**Success Criteria** (what must be TRUE):
-
-  1. A user opens the default-service-template editor from a cog/settings control on the **Services page**; it is no longer presented on the main Settings page (R113)
-  2. The template's seed-order button reads **"Suggested Template"**, is shown whether or not Vertical Worship mode is on, and its label and availability carry no dependence on the 1-2-3 progression (R114)
-  3. Creating a new service always starts it from the org's Suggested Template — there is no blank-template starting path — and with Vertical Worship mode on, the template's song slots still receive their required VW types at creation time (R115)
-  4. A Miscellaneous item added **inside the template** exposes its body input box, so an org can pre-fill recurring content (canned music, standing announcement slides) into the default (R116)
-
-**Plans**: 3/3 plans executed
-
-Plans:
-
-- [x] 52-01-PLAN.md — R115 + R116(util/type/store): `buildSuggestedTemplateEntries()` helper, `ServiceTemplateEntry.body?`, `createSlot` 4th body param, `buildSlotsFromTemplate` body threading, `createService` empty→suggested fallback (kept pure); reverse services `@489` empty→0 test (Wave 1)
-- [x] 52-02-PLAN.md — R114 + R116(UI): rename seed button to "Suggested Template" (drop 1-2-3/VW copy, keep `template-reset` testid, `applyReset` via shared helper) + `template-item-body` textarea for MISC/ANNOUNCEMENTS rows (Wave 2, depends on 52-01)
-- [x] 52-03-PLAN.md — R113: relocate editor to an editor-gated cog on ServicesView (new `ServicesView.test.ts`), remove the Services card + dead imports from SettingsView (Wave 1)
-
-**UI hint**: yes
-**Research flag**: skip (milestone research skipped) — reuses v1.5 Phase 44's `ServiceTemplateEditor.vue`, `OrgSettings.defaultServiceTemplate`, and `buildSlotsFromTemplate()`; the one behavioural change is R115's "always start from the template."
-**Notes**: R115 **supersedes** v1.5 Phase 44's Success Criterion #2 ("no template → EMPTY service") — the Suggested Template becomes the universal starting point, decoupled from Vertical Worship (owner decision, PROJECT.md Key Decisions, "Blank service template eliminated"). Relocate the editor's mount from `SettingsView.vue`'s Services card to a cog on the Services page; rename the existing "Reset to 1-2-3 default"/"Default to 1,2,3" seed to "Suggested Template". R116 relies on the `MISC` slot's optional `body` field added in Phase 43; the template editor must expose the same body input the live editor uses for Miscellaneous items.
-
-### Phase 53: Song Lyric Editing
-
-**Goal:** Song-slide editing is intuitive for a non-technical user — split a section into slides by hand, duplicate a split as one unit, add Pre-Choruses, get position-based numbering, and a clearer first-save button.
-**Depends on**: Phase 51 — R117/R118 build on the slide reorder/duplicate machinery whose reliability Phase 51 restores; sequenced after the foundational fix so the split/duplicate work is not built on the corrupting surface.
-**Requirements**: R117, R118, R119, R120, R121
-**Success Criteria** (what must be TRUE):
-
-  1. A user can split any song lyric section (verse, chorus, pre-chorus, etc.) into multiple slides, manually choosing which lines land on each slide — e.g. an 8-line chorus divided into two 4-line slides (R117)
-  2. Duplicating a section that has been split into multiple slides copies the whole multi-slide unit together, not a single slide (R118)
-  3. Pre-Chorus is available as an addable song lyric item type alongside Verse and Chorus (R119)
-  4. Song lyric sections are numbered by their position among sections of the same kind — the first verse is "Verse 1", a verse added after two existing verses is "Verse 3", and both slides of a split "Verse 1" stay "Verse 1"; no section is left unnumbered (R120)
-  5. On a brand-new song being given lyrics for the first time, the paste-lyrics commit button reads **"Save"** rather than "Replace Lyrics" (R121)
-
-**Plans**: 4/4 plans executed
-
-Plans:
-
-- [x] 53-01-PLAN.md — Pure model core (Wave 1): `slideBreaks?: number[]` on `LyricSection` + `sliceSectionIntoSlides` (R117) + `deriveSectionKind`/per-kind `displayLabel` numbering in `buildSectionRows` (R120) + `'Pre-Chorus'` in `ADD_SECTION_KINDS` (R119), RED-first in `songSectionOrder.test.ts`
-- [x] 53-02-PLAN.md — Assembler wiring (Wave 2, depends 01): slice both lyric-emission sites in `slideshowAssembler.ts` (`${entry.id}:${i}`, unsplit byte-identical), dual-path lockstep + R118 duplicate proof + BWC (R117, R118)
-- [x] 53-03-PLAN.md — Editor UI (Wave 2, depends 01): render `displayLabel` numbering (R120) + Pre-Chorus palette (R119) + manual click-between-lines split affordance writing `slideBreaks` (R117) in `SongLyricEditor.vue`
-- [x] 53-04-PLAN.md — Paste button (Wave 1): first-paste commit button reads "Save" via `currentSectionCount === 0` in `LyricPasteRegion.vue` (R121)
-
-**UI hint**: yes
-**Research flag**: skip (milestone research skipped) — the design work is the manual split-slide assignment interface; R117/R118 are the core design decisions to settle during planning.
-**Notes**: This is the milestone's largest new-build. The song lyric editor is `SongLyricEditor.vue`, reworked in v1.3 Phase 28 around `songSectionOrder.ts`'s pool+order model (one list that IS the slide order). Owner decision (PROJECT.md Key Decisions, "A split song section is one logical unit"): a split section's slides duplicate together and keep one position-based number, so the split never leaks into numbering (R120) or duplication (R118). R121's button is on `LyricPasteRegion.vue` (v1.4 Phase 35); the helper text already notes it replaces lyrics. AI auto-splitting is explicitly out of scope — R117 is manual only.
-
-### Phase 54: Service Item Enhancements
-
-**Goal:** Every service item can carry leader/parts notes in a consistent, responsive layout, and Miscellaneous items start clean with no slides.
-**Depends on**: Phase 51 — R122 re-lays-out every item row in the same `ServiceEditorView.vue` surface Phase 51 stabilizes; sequenced after it to avoid reworking the item row twice.
-**Requirements**: R122, R123
-**Success Criteria** (what must be TRUE):
-
-  1. Every service item exposes a plain-text notes field beside its selector (song selector, scripture selector, etc.) for recording who leads the item or who sings which parts, with a consistent layout across item types (R122)
-  2. The selector and notes sit side-by-side on desktop and stack on small screens — a responsive layout that reuses the project's existing mobile-stacking recipe (R122)
-  3. A newly added Miscellaneous item defaults to no slides, and slides can still be added to it when the user chooses (R123)
-
-**Plans**: 2/2 plans executed
-
-Plans:
-
-- [x] 54-01-PLAN.md — R123: RED-first MISC-derives-nothing + BWC/hand-add-survival tests, then split `case 'MISC': return []` in `deriveGroupEntries` (Wave 1)
-- [x] 54-02-PLAN.md — R122: `notes?` on `MediaAttachableSlot` + one shared `slot-notes-input` in a `flex flex-col sm:flex-row` wrapper at `ServiceEditorView.vue:891`, autosave/stripUndefined round-trip (Wave 1)
-
-**UI hint**: yes
-**Research flag**: skip (milestone research skipped).
-**Notes**: R122 is a plain-text input for leader/parts notes — rich-text/formatting is explicitly out of scope. The responsive side-by-side/stacked layout can follow `QuarterView.vue`'s existing button/field stacking recipe, the same pattern v1.5 Phase 48 reused for the service edit screen. R123's Miscellaneous item is the `MISC` slot kind from v1.5 Phase 43; "default to no slides" means its materialized slide group starts empty, with slide-add still available.
-
-### Phase 55: Preview & Export Polish
-
-**Goal:** Three small, independent refinements — cleaner scripture slides in preview, visible export progress, and one more curated slide font.
-**Depends on**: Nothing — independent polish, sequenced last; none of these three items touches the editing-reliability, template, or song-editing surfaces.
-**Requirements**: R124, R125, R126
-**Success Criteria** (what must be TRUE):
-
-  1. The slideshow preview no longer auto-appends the Bible version (ESV/NLT) to scripture slides; the version can still be added to a slide manually if desired (R124)
-  2. The Planning Center export shows a spinner / in-progress indicator while the export is running, so the user can see it is working (R125)
-  3. Roboto is available as a curated, self-hosted slide font in the typography picker, and Inter (shipped in v1.5) remains available (R126)
-
-**Plans**: 3/3 plans executed
-
-Plans:
-
-- [x] 55-01-PLAN.md — R124: re-point suffix tests to ABSENCE, then remove the auto-appended version at both render sites (`slideDisplay.ts::slideBodyText`, `PresentationViewer.vue::scriptureAttributionSuffix`) + dead imports; provenance helpers kept green (Wave 1)
-- [x] 55-02-PLAN.md — R125: RED spinner test, then add the `animate-spin` glyph (`data-testid="export-spinner"`) to the Confirm Export button, reusing the existing `isExporting` flag/guards (Wave 1)
-- [x] 55-03-PLAN.md — R126: legitimacy checkpoint + `npm install @fontsource/roboto@^5.3.0`, add the Roboto `SLIDE_FONTS` entry + loader line, update registry tests five→six (Wave 1)
-
-**Research flag**: skip (milestone research skipped).
-**Notes**: R124 partially reverses v1.5 Phase 45's auto-attribution — R091 appended the "(ESV)"/"(NLT)" suffix at both render sites (`PresentationViewer.vue`, `slideDisplay.ts::slideBodyText()`). R124 removes the *automatic* append in preview while leaving manual addition possible; reconcile carefully with the R091/R092 attribution and per-slide `translationSource` provenance machinery so this does not regress required attribution elsewhere. R125's export flow lives in `ServiceEditorView.vue`. R126 adds Roboto to the `SLIDE_FONTS` @fontsource registry from v1.5 Phase 46 (curated self-hosted woff2 only — not the runtime Google Fonts API), with a recorded license, and confirms Inter stays in the set.
-
-### Phase 56: Service-Item Overrides
-
-**Goal:** Two per-item overrides of a default: a Miscellaneous item can be given a custom label (used everywhere it's identified, including as the Planning Center item title), and a Scripture item can override the org's default Bible version for just that item.
-**Depends on**: quick task 260811-vsr (the consolidated free-text field + row layout these overrides sit within) and Phase 45/quick 260809-vvq (org `bibleVersion` setting + PC scripture routing that R128 overrides).
-**Requirements**: R127, R128
-**Success Criteria** (what must be TRUE):
-
-  1. A Miscellaneous item exposes an editable label defaulting to "Miscellaneous"; when empty it displays and exports as "Miscellaneous"; when set it identifies the item in the service order and is sent as the Planning Center item title in place of "Miscellaneous" (R127)
-  2. The custom Miscellaneous label works identically in both `ServiceEditorView.vue` and `ServiceTemplateEditor.vue` (R127)
-  3. A Scripture item exposes a Bible-version choice (ESV/NLT) that, when set, overrides the org default `bibleVersion` for that one item everywhere its text is produced — slide materialization, preview, print, and PC export routing — while unset items keep using the org default (R128)
-  4. Both fields are non-destructive optional additions to the slot/template-entry types; absent values reproduce today's behavior exactly (R127, R128)
-
-**Plans**: 2 plans
-- [ ] 56-01-PLAN.md — R127 MISC editable label: NonAssignableSlot.label? + miscLabel() helper, wired through the live editor, the default-template editor (ServiceTemplateEntry.label? → createSlot), PC export title, and print
-- [ ] 56-02-PLAN.md — R128 per-item Scripture ESV/NLT override: ScriptureSlot.bibleVersion? + Scripture-row selector, threaded into PC export routing + ScriptureInput preview + CongregationalEditor split (slide/preview/print are reference-only → documented no-op)
-**UI hint**: yes
-**Research flag**: skip (milestone research skipped).
-**Notes**: The MISC label is a distinct short "name/title" field, NOT a second free-text/notes box — the consolidated notes field (R122 / 260811-vsr) remains the item's details/description; PC export title = label, description = notes ?? body. "Available versions" = ESV and NLT only (`bibleVersion: 'ESV' | 'NLT'`). R128's override must thread through the same seams quick task 260809-vvq established for org-default routing (`fetchPassageText` ESV / `fetchNltPassageText` NLT) plus slide materialization and print. Owner scope addition 2026-08-12; runs autonomously under the v1.6 standing grant (defer human verification, STOP before lifecycle, no deploys).
-
-### Phase 57: Template-Editor UX Parity
-
-**Goal:** The Edit Default Template screen looks and feels consistent with the redesigned Service Order editor.
-**Depends on**: quick task 260811-vsr (the source design/redesign to mirror) and Phase 56 (the MISC label the template editor must now lay out consistently).
-**Requirements**: R129
-**Success Criteria** (what must be TRUE):
-
-  1. `ServiceTemplateEditor.vue` rows use the same three-rail structure as the service editor — colored per-kind badge, stacked field column, action controls in a per-row ⋯ menu (R129)
-  2. Plain item kinds show a single consolidated free-text field; a muted/dashed "No Section" band labels ungrouped items; per-kind colored badges and mobile-friendly stacking match the service editor (R129)
-  3. All existing template-editor functionality is preserved — SortableJS reorder, add-item, the R127 Miscellaneous label, and save (R129)
-
-**Plans**: 1 plan
-
-Plans:
-
-- [ ] 57-01-PLAN.md — R129: extract `kindBadgeClass` to shared `slotTypes.ts` (both editors import it); three-rail `ServiceTemplateEditor.vue` row (badge rail · field column · per-row ⋯ menu replacing inline `template-section-select`/`template-item-remove`) with test migration in lockstep; muted/dashed `template-no-section-band` + mobile stacking — restyle only, no behavior/data change
-
-**UI hint**: yes
-**Research flag**: skip (milestone research skipped).
-**Notes**: Mirror the 260811-vsr DESIGN-SPEC and SUMMARY (`.planning/quick/260811-vsr-service-editor-ui-pass-consolidate-redun/`). `ServiceTemplateEditor.vue` ports `ServiceEditorView.vue`'s per-section SortableJS reorder, so the same row structure applies; adapt controls to the template context (no lock/lifecycle, no live slide counts). Visual/structural parity only — no behavior change. Owner scope addition 2026-08-12; runs autonomously under the v1.6 standing grant.
+</details>
 
 ## Progress
 
@@ -344,13 +178,7 @@ Plans:
 | 24-28 | v1.3 | 33/33 | Complete (archived) | 2026-07-28 |
 | 29-38 | v1.4 | 61/61 | Complete (archived) | 2026-08-05 |
 | 39-50 | v1.5 | all | Complete (archived) | 2026-08-10 |
-| 51. Service Order Editing Reliability | v1.6 | 4/4 | In Progress|  |
-| 52. Default Service Template | v1.6 | 3/3 | In Progress|  |
-| 53. Song Lyric Editing | v1.6 | 4/4 | In Progress|  |
-| 54. Service Item Enhancements | v1.6 | 2/2 | In Progress|  |
-| 55. Preview & Export Polish | v1.6 | 3/3 | In Progress|  |
-| 56. Service-Item Overrides | v1.6 | 2/2 | Code-complete, verification_deferred_human | 2026-08-12 |
-| 57. Template-Editor UX Parity | v1.6 | 1/1 | Code-complete, verification_deferred_human | 2026-08-12 |
+| 51-57 | v1.6 | 19/19 | Complete (archived) | 2026-08-12 |
 
 ## Backlog
 

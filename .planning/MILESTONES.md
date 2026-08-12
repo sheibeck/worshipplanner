@@ -1,5 +1,31 @@
 # Milestones
 
+## v1.6 Editing Reliability & Song Slides (Shipped: 2026-08-12)
+
+**Phases completed:** 7 phases, 19 plans, 26 tasks
+
+**Key accomplishments:**
+
+- Added a DOM-mutating cross-section drag repro to `ServiceEditorView.test.ts`. The module's `sortablejs` mock only captures options and never moves a DOM node, so an `onEnd`-only test is false-GREEN on buggy code (51-RESEARCH Pitfall 1). The new test physically detaches the dragged `.slot-item` from the ungrouped ("No Section") container and appends it into the worship container **before** invoking the captured `onEnd`, mirroring real SortableJS. It then asserts on rendered DOM node counts: zero clones left in the source list, and **exactly one** `.slot-item` for the moved id tree-wide. Committed RED (`expected 2 to be 1` — the phantom).
+- Added a DOM-mutating cross-section drag repro to `ServiceTemplateEditor.test.ts`. The module's `sortablejs` mock only captures options and never relocates a node (51-RESEARCH Pitfall 1), so an `onEnd`-only test is false-GREEN on buggy code — the existing cross-section test at line 415 already passed because it only asserts on the (correct) reactive render. The new test physically detaches the dragged `[data-entry-id="song-1"]` row from the ungrouped ("No Section") container and appends it into the worship container **before** invoking the captured `onEnd`, mirroring real SortableJS. It then asserts on rendered node counts: zero rows for the moved id left in the source list, and **exactly one** `[data-entry-id="song-1"]` tree-wide. Committed RED (`expected 2 to be 1` — the phantom).
+- `updateService` now runs its payload through `stripUndefined` before `updateDoc`, so moving a service item back to "No Section" (which sets `slot.section = undefined`) saves cleanly instead of throwing Firestore's "Unsupported field value: undefined".
+- Reversed the v1.5 empty-by-default creation path so every new service now seeds from a single shared `buildSuggestedTemplateEntries()` preset, and threaded an optional `ServiceTemplateEntry.body` through `buildSlotsFromTemplate` → `createSlot` while keeping the util pure.
+- Renamed the template editor's seed control to "Suggested Template" (seeding through the one shared `buildSuggestedTemplateEntries()` preset, no forked copy) and exposed a `template-item-body` textarea for MISC/ANNOUNCEMENTS rows bound to `ServiceTemplateEntry.body`, normalizing a cleared body back to absent.
+- The default-service-template editor moved off the main Settings page to an editor-gated cog next to "New Service" on the Services page; the editor component is structurally unchanged (only its trigger + mount moved).
+- Additive `slideBreaks` split metadata + pure `sliceSectionIntoSlides`, render-time per-kind `displayLabel` numbering via `deriveSectionKind`, and `'Pre-Chorus'` in the add palette — all in the two pure modules, stored labels never rewritten.
+- A manually-split lyric section (`slideBreaks` present) now resolves LIVE to N slides at BOTH in-lockstep lyric-emission call sites in `assembleSlideshow` — split ids `${entry.id}:${i}` (stored) / advancing `${slot.id}:${localSeq}` (fallback), unsplit byte-identical — and R118 (duplicate a split as one unit) falls out for free with zero `duplicateRow`/slide-group-model change.
+- SongLyricEditor now renders Plan 01's derived per-kind `displayLabel` (killing the bare-"Verse" bug), surfaces the Pre-Chorus palette chip, and adds a manual click-between-lines split affordance that authors `section.slideBreaks` through the existing one-write autosave.
+- The paste-lyrics commit button now reads "Save" on a brand-new song (0 sections), "Replace lyrics" once lyrics exist, and "Saving..." while a save is in flight — driven entirely by the existing currentSectionCount prop with no new prop and no SongLyricEditor change.
+- A plain-text `slot.notes` field on the shared MediaAttachableSlot base, surfaced as one shared input beside every item's selector in a `flex flex-col sm:flex-row` two-column layout, riding the existing autosave + stripUndefined path.
+- Re-pointed every suffix-asserting test in `slideDisplay.test.ts` and `PresentationViewer.test.ts` to assert the version suffix is ABSENT, adding explicit `not.toContain('(ESV)')` / `not.toContain('(NLT)')` guards. The reference-only-no-text case was kept verbatim as a regression anchor. Running the two files against the still-present suffix produced the expected 14 failures (RED); `scripture.test.ts` was not modified.
+- Added a new `describe` block to `ServiceEditorView.test.ts` (with its own `teleport: false` mountView, since the export dialog is a `<Teleport to="body">`). The tests drive the component into the "options loaded, export running" state by setting the existing `showExportDialog` / `exportLoading` / `exportSelectedServiceTypeId` / `isExporting` reactive flags directly (the same vm-level approach the file's WR-02 export tests use), then assert against `document.body` via `DOMWrapper` that `[data-testid="export-spinner"]` is present and carries the `animate-spin` class while exporting, and that the Confirm Export button (its "Exporting..." label) stays `disabled`. A complementary case asserts the spinner is absent when `isExporting` is false. Ran RED — failing on the missing glyph as expected; the absent-case passed.
+- Roboto added as a sixth self-hosted @fontsource slide font (sans, weights [300,400,500,600,700], OFL-1.1) via one registry entry + one static-prefix loader line; Inter stays first/default and the other four families are unchanged.
+- An optional custom label for Miscellaneous service items — editable in both the live and template editors, exported as the Planning Center item title, and rendered in print — via a single `miscLabel()` helper and an absent-key-preserving optional field.
+- An optional per-item ESV/NLT override on a Scripture service item, honored at the three surfaces where passage text is actually produced — Planning Center export routing, the editor reference preview, and the congregational split fetch — while reference-only slide/preview/print stay version-agnostic by design.
+- Task 1 — shared `kindBadgeClass` (commit `49135fd`)
+
+---
+
 ## v1.5 Settings, Sharing, and Fidelity (Shipped: 2026-08-10)
 
 **Phases completed:** 13 phases, 49 plans, 110 tasks
