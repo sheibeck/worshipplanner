@@ -1590,3 +1590,67 @@ describe('pptxRenders — org-member read, no client write', () => {
     await assertFails(deleteDoc(doc(db, 'organizations', 'orgA', 'pptxRenders', 'import-1')))
   })
 })
+
+// Quick-fix 2026-08-11: deleting a service-plan item was blocked in production by a
+// "Null value error" in the slideGroups delete rule (ServiceEditorView.vue:2791 →
+// deleteGroup → PERMISSION_DENIED). Two null-safety fixes:
+//   1. A present-but-null `serviceId` on the group doc must be treated as an orphan
+//      (deletable). Without the guard the rule evaluated parentGone(null) → svcPath(null)
+//      → the group was wedged undeletable.
+//   2. isOrgEditor is now exists()-guarded (an unguarded get().data.role errors — treated
+//      as deny — when the caller has no member doc or no role field).
+describe('slideGroups delete null-safety (2026-08-11 quick fix)', () => {
+  const GROUP = 'organizations/orgA/slideGroups/slot-1'
+
+  it('allows an editor to delete a group whose serviceId is present-but-null (wedged orphan)', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc(GROUP, { slotId: 'slot-1', serviceId: null, slides: [] })
+    const db = testEnv.authenticatedContext('userA').firestore()
+    await assertSucceeds(deleteDoc(doc(db, 'organizations', 'orgA', 'slideGroups', 'slot-1')))
+  })
+
+  it('allows an editor to delete a legacy group with no serviceId key (regression anchor)', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc(GROUP, { slotId: 'slot-1', slides: [] })
+    const db = testEnv.authenticatedContext('userA').firestore()
+    await assertSucceeds(deleteDoc(doc(db, 'organizations', 'orgA', 'slideGroups', 'slot-1')))
+  })
+
+  it('allows an editor to delete a group whose valid serviceId points to a DRAFT service', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('organizations/orgA/services/service-1', { status: 'draft' })
+    await seedDoc(GROUP, { slotId: 'slot-1', serviceId: 'service-1', slides: [] })
+    const db = testEnv.authenticatedContext('userA').firestore()
+    await assertSucceeds(deleteDoc(doc(db, 'organizations', 'orgA', 'slideGroups', 'slot-1')))
+  })
+
+  it('allows an editor to delete a group whose parent service is GONE (orphan)', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc(GROUP, { slotId: 'slot-1', serviceId: 'service-deleted', slides: [] })
+    const db = testEnv.authenticatedContext('userA').firestore()
+    await assertSucceeds(deleteDoc(doc(db, 'organizations', 'orgA', 'slideGroups', 'slot-1')))
+  })
+
+  it('still DENIES deleting a group whose valid serviceId points to a PLANNED (locked) service', async () => {
+    await seedMembershipDoc('orgA', 'userA', 'editor')
+    await seedDoc('organizations/orgA/services/service-1', { status: 'planned' })
+    await seedDoc(GROUP, { slotId: 'slot-1', serviceId: 'service-1', slides: [] })
+    const db = testEnv.authenticatedContext('userA').firestore()
+    await assertFails(deleteDoc(doc(db, 'organizations', 'orgA', 'slideGroups', 'slot-1')))
+  })
+
+  it('DENIES (cleanly, not error) a signed-in non-member deleting a null-serviceId group', async () => {
+    await seedDoc(GROUP, { slotId: 'slot-1', serviceId: null, slides: [] })
+    const db = testEnv.authenticatedContext('stranger').firestore()
+    await assertFails(deleteDoc(doc(db, 'organizations', 'orgA', 'slideGroups', 'slot-1')))
+  })
+
+  it('DENIES a member whose doc has no role field (isOrgEditor role-absent) deleting a group', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'organizations', 'orgA', 'members', 'userA'), { joinedAt: new Date() })
+    })
+    await seedDoc(GROUP, { slotId: 'slot-1', serviceId: null, slides: [] })
+    const db = testEnv.authenticatedContext('userA').firestore()
+    await assertFails(deleteDoc(doc(db, 'organizations', 'orgA', 'slideGroups', 'slot-1')))
+  })
+})
