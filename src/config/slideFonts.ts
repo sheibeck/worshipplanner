@@ -18,25 +18,26 @@
  *
  * `license` and `licenseUrl` were each verified directly against that
  * package's own installed `node_modules/@fontsource/<package>/LICENSE` file
- * (2026-08-08) — not assumed by analogy to Inter. All five are SIL Open Font
- * License 1.1 ("OFL-1.1"), confirmed by the "This Font Software is licensed
- * under the SIL Open Font License, Version 1.1" text present verbatim in
- * every package's LICENSE file. See 46-RESEARCH.md § "Curated Font List" for
+ * (2026-08-08; Roboto 2026-08-11) — not assumed by analogy to Inter. All six
+ * are SIL Open Font License 1.1 ("OFL-1.1"), confirmed by the "This Font
+ * Software is licensed under the SIL Open Font License, Version 1.1" text
+ * present verbatim in every package's LICENSE file. See 46-RESEARCH.md
+ * § "Curated Font List" and 55-RESEARCH.md § "R126" for
  * the source table this registry is built from (CORRECTED from
  * 46-UI-SPEC.md's table — Open Sans ships 500, Source Serif 4 ships 300 and
  * 500, both omitted by the UI-SPEC's unverified draft).
  *
  * Package legitimacy: `gsd-tools query package-legitimacy check` flagged all
- * five packages `SUS` with reason `too-new`. This is a structural false
+ * six packages `SUS` with reason `too-new`. This is a structural false
  * positive from `@fontsource`'s catalog-wide lockstep release cadence (the
  * entire multi-hundred-package catalog re-publishes together on every
  * upstream Google Fonts refresh), not a genuine supply-chain signal — all
- * five resolve to the canonical `github.com/fontsource/font-files` repo,
- * weekly downloads range 104K-2.37M, and `postinstall` is `null` on every
- * package. Recorded in `.planning/PENDING-VERIFICATION.md` § Phase 46 as
- * DEFERRED (not self-approved) per the STATE.md v1.5 standing autonomy
- * grant, since RESEARCH.md already performed direct tarball + registry
- * verification.
+ * six resolve to the canonical `github.com/fontsource/font-files` repo,
+ * weekly downloads range 104K-2.37M (Roboto ~1.26M), and `postinstall` is
+ * `null` on every package. Recorded in `.planning/PENDING-VERIFICATION.md`
+ * § Phase 46 (the original five) and § Phase 55 (Roboto) as DEFERRED (not
+ * self-approved) per the STATE.md v1.5/v1.6 standing autonomy grant, since
+ * RESEARCH.md already performed direct tarball + registry verification.
  */
 
 export interface SlideFontDefinition {
@@ -57,10 +58,10 @@ export interface SlideFontDefinition {
 }
 
 /**
- * The five curated slide font families (CONTEXT.md's locked, deliberately
- * small set). `Inter` is listed first — `SLIDE_FONT_FAMILY_NAMES` preserves
- * that order for the Settings `<select>`, and `Inter` is
- * `DEFAULT_ORG_SETTINGS.slideTypography.fontFamily` (46-02).
+ * The six curated slide font families (CONTEXT.md's locked, deliberately
+ * small set; Roboto added for R126 in Phase 55). `Inter` is listed first —
+ * `SLIDE_FONT_FAMILY_NAMES` preserves that order for the Settings `<select>`,
+ * and `Inter` is `DEFAULT_ORG_SETTINGS.slideTypography.fontFamily` (46-02).
  */
 export const SLIDE_FONTS: Record<string, SlideFontDefinition> = {
   Inter: {
@@ -70,6 +71,22 @@ export const SLIDE_FONTS: Record<string, SlideFontDefinition> = {
     weights: [300, 400, 500, 600, 700],
     license: 'OFL-1.1',
     licenseUrl: 'https://fontsource.org/fonts/inter/license',
+  },
+  Roboto: {
+    family: 'Roboto',
+    package: '@fontsource/roboto',
+    category: 'sans',
+    // Roboto ships the full 100-900 static ramp (600.css present) — the
+    // standard 300-700 ramp applies with no omissions, unlike Lora.
+    weights: [300, 400, 500, 600, 700],
+    // OFL-1.1 for the pinned ^5.3.0: early 5.x reported Apache-2.0; Google
+    // relicensed Roboto to OFL upstream and fontsource followed at 5.2.0.
+    // Verified in-tarball (SIL OFL 1.1 verbatim) + `npm view … license`.
+    // The package-legitimacy SUS/too-new flag is the documented
+    // fontsource-lockstep structural false positive (Phase 46 precedent),
+    // deferred in PENDING-VERIFICATION.md § Phase 55.
+    license: 'OFL-1.1',
+    licenseUrl: 'https://fontsource.org/fonts/roboto/license',
   },
   'Open Sans': {
     family: 'Open Sans',
