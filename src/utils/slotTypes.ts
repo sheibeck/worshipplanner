@@ -92,6 +92,7 @@ export function createSlot(
   vwType?: VWType,
   section?: ServiceSection,
   body?: string,
+  label?: string,
 ): ServiceSlot {
   // Omit the `section` key entirely when not provided — preserves the legacy
   // (section === undefined, key absent) shape for backward compatibility.
@@ -102,6 +103,12 @@ export function createSlot(
   // NEVER set `body: ''` or `body: undefined` — Firestore rejects raw
   // `undefined`, and an empty string would break the absent-key contract.
   const bodyFields = body ? { body } : {}
+  // Omit the `label` key entirely when not provided (R127, Phase 56) — a MISC
+  // slot created with no custom label must keep the SAME absent-label shape as
+  // every legacy MISC slot (`'label' in slot === false`). NEVER set `label: ''`
+  // or `label: undefined` — Firestore rejects raw `undefined`, and an empty
+  // string would break the absent-key contract. MISC-only per D-01.
+  const labelFields = label ? { label } : {}
   // `id` is ALWAYS written (D-01) — unlike `section`, there is no legacy
   // absent-id shape to preserve for a brand-new slot; every new slot gets a
   // real, stable id immediately.
@@ -136,7 +143,7 @@ export function createSlot(
     case 'ANNOUNCEMENTS':
       return { kind: 'ANNOUNCEMENTS', id, position: 0, ...bodyFields, ...sectionFields } as NonAssignableSlot
     case 'MISC':
-      return { kind: 'MISC', id, position: 0, ...bodyFields, ...sectionFields } as NonAssignableSlot
+      return { kind: 'MISC', id, position: 0, ...bodyFields, ...labelFields, ...sectionFields } as NonAssignableSlot
     case 'HYMN':
       return { kind: 'HYMN', id, position: 0, hymnName: '', hymnNumber: '', verses: '', ...sectionFields } as HymnSlot
     case 'IMPORTED':
@@ -403,7 +410,7 @@ export function buildSlotsFromTemplate(
       vwType = sequence[songOrdinal % sequence.length]
       songOrdinal++
     }
-    slots.push(createSlot(entry.kind, vwType, entry.section, entry.body))
+    slots.push(createSlot(entry.kind, vwType, entry.section, entry.body, entry.label))
   }
   return reindexSlots(slots)
 }

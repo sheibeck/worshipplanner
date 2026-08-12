@@ -106,7 +106,20 @@
                   </div>
 
                   <div class="flex-1 min-w-0">
-                    <p class="text-sm text-gray-200">{{ kindLabel(entry.kind) }}</p>
+                    <p class="text-sm text-gray-200" data-testid="template-item-name">{{ entryDisplayName(entry) }}</p>
+                    <!-- Recurring MISC custom label (R127, Phase 56). Mirrors the live editor's MISC
+                         label input (ServiceEditorView.vue), a DISTINCT compact "name" above the body.
+                         Bound via :value / @input (auto-escaped Vue binding — never v-html; T-56-01).
+                         A template MISC label flows into every created slot via buildSlotsFromTemplate. -->
+                    <input
+                      v-if="entry.kind === 'MISC'"
+                      :value="entry.label ?? ''"
+                      type="text"
+                      placeholder="Miscellaneous"
+                      data-testid="template-item-misc-label"
+                      class="w-full rounded-md bg-gray-800 border border-gray-700 text-gray-200 text-sm px-3 py-2 focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500 mt-2"
+                      @input="onLabelChange(entry.id, ($event.target as HTMLInputElement).value)"
+                    />
                     <!-- Recurring body text for the body-bearing template kinds (R116). Mirrors
                          the live editor's MESSAGE/ANNOUNCEMENTS/MISC textarea (ServiceEditorView.vue:1092).
                          Scoped to MISC + ANNOUNCEMENTS per the recorded decision. Bound via :value / @input
@@ -307,6 +320,23 @@ function onBodyChange(id: string, value: string): void {
   const entry = draft.value.find((e) => e.id === id)
   if (!entry) return
   entry.body = value === '' ? undefined : value
+}
+
+// R127 (Phase 56) — recurring MISC custom label on a template entry. Same
+// empty→undefined rule as onBodyChange, so a cleared label stays truly absent
+// and onSave's stripUndefined drops it rather than persisting `label: undefined`.
+function onLabelChange(id: string, value: string): void {
+  const entry = draft.value.find((e) => e.id === id)
+  if (!entry) return
+  entry.label = value === '' ? undefined : value
+}
+
+// R127 (Phase 56) — a MISC entry's displayed name shows its custom label when
+// set (trimmed), else the default kind label ("Miscellaneous"); every other
+// kind always shows its kind label.
+function entryDisplayName(entry: ServiceTemplateEntry): string {
+  if (entry.kind === 'MISC' && entry.label?.trim()) return entry.label.trim()
+  return kindLabel(entry.kind)
 }
 
 // ── Grouping for render — reuses slotTypes.ts's generic groupBySection/flattenBySection

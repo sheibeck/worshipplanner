@@ -20,6 +20,11 @@ export interface ServiceTemplateEntry {
    *  threaded through `buildSlotsFromTemplate` → `createSlot` into the created
    *  slot's `NonAssignableSlot.body`. Absent for entries with no default body. */
   body?: string
+  /** Optional recurring custom label for a MISC entry (R127, Phase 56),
+   *  threaded through `buildSlotsFromTemplate` → `createSlot` into the created
+   *  slot's `NonAssignableSlot.label` so a template's MISC name flows into every
+   *  new service. Absent for entries with no custom label. */
+  label?: string
 }
 
 /**

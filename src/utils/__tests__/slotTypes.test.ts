@@ -682,6 +682,32 @@ describe('ANNOUNCEMENTS and MISC (43-01)', () => {
     expect(slot.body).toBe('pre-service music')
   })
 
+  it('createSlot(MISC, undefined, undefined, undefined, label) sets slot.label to the passed text (R127)', () => {
+    const slot = createSlot('MISC', undefined, undefined, undefined, 'Communion') as NonAssignableSlot
+    expect(slot.kind).toBe('MISC')
+    expect('label' in slot).toBe(true)
+    expect(slot.label).toBe('Communion')
+  })
+
+  it('createSlot(MISC) with no label argument omits the label key entirely (R127 absent-key contract)', () => {
+    const slot = createSlot('MISC') as NonAssignableSlot
+    // Absent-key assertion, not toBeUndefined() — a brand-new labelless MISC
+    // must keep the SAME absent-label shape as every stored legacy MISC slot.
+    expect('label' in slot).toBe(false)
+  })
+
+  it('createSlot(MISC, ..., body, label) carries both body and label (R127)', () => {
+    const slot = createSlot('MISC', undefined, 'worship', 'canned music', 'Communion') as NonAssignableSlot
+    expect(slot.body).toBe('canned music')
+    expect(slot.label).toBe('Communion')
+    expect(slot.section).toBe('worship')
+  })
+
+  it('createSlot(PRAYER, ..., label) does NOT carry a label — MISC-only per D-01', () => {
+    const slot = createSlot('PRAYER', undefined, undefined, undefined, 'Communion') as NonAssignableSlot
+    expect('label' in slot).toBe(false)
+  })
+
   it('two successive createSlot(ANNOUNCEMENTS) calls return different ids', () => {
     const a = createSlot('ANNOUNCEMENTS')
     const b = createSlot('ANNOUNCEMENTS')
@@ -913,6 +939,20 @@ describe('buildSlotsFromTemplate (44-01)', () => {
     const slots = buildSlotsFromTemplate(template, true)
     expect(slots).toHaveLength(1)
     expect('body' in (slots[0] as NonAssignableSlot)).toBe(false)
+  })
+
+  it('an entry { kind: MISC, label } threads label into the built slot (R127)', () => {
+    const template: ServiceTemplateEntry[] = [{ id: 'ml-1', kind: 'MISC', label: 'Communion' }]
+    const slots = buildSlotsFromTemplate(template, true)
+    expect(slots).toHaveLength(1)
+    expect((slots[0] as NonAssignableSlot).label).toBe('Communion')
+  })
+
+  it('an entry { kind: MISC } with no label yields a slot where the label key is absent (R127 — legacy shape preserved)', () => {
+    const template: ServiceTemplateEntry[] = [{ id: 'ml-2', kind: 'MISC' }]
+    const slots = buildSlotsFromTemplate(template, true)
+    expect(slots).toHaveLength(1)
+    expect('label' in (slots[0] as NonAssignableSlot)).toBe(false)
   })
 })
 

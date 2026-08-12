@@ -388,6 +388,74 @@ describe('ServiceTemplateEditor — template-item body (R116)', () => {
   })
 })
 
+describe('ServiceTemplateEditor — MISC label (R127)', () => {
+  it('renders a template-item-misc-label input for a MISC row, bound to entry.label', async () => {
+    mockAuthState.settings.defaultServiceTemplate = [{ id: 'misc-1', kind: 'MISC', label: 'Communion' }]
+    mountEditor(true)
+    await flushPromises()
+
+    const inputs = body().findAll('[data-testid="template-item-misc-label"]')
+    expect(inputs).toHaveLength(1)
+    expect((inputs[0]!.element as HTMLInputElement).value).toBe('Communion')
+  })
+
+  it('renders no template-item-misc-label input for non-MISC kinds (ANNOUNCEMENTS / SONG)', async () => {
+    mountEditor(true)
+    await body().get('[data-testid="palette-add-announcements"]').trigger('click')
+    await body().get('[data-testid="palette-add-song"]').trigger('click')
+    await flushPromises()
+
+    expect(body().findAll('[data-testid="template-item-misc-label"]')).toHaveLength(0)
+  })
+
+  it('the MISC entry displayed name shows entry.label when set', async () => {
+    mockAuthState.settings.defaultServiceTemplate = [{ id: 'misc-1', kind: 'MISC', label: 'Communion' }]
+    mountEditor(true)
+    await flushPromises()
+    expect(body().get('[data-testid="template-item-name"]').text()).toBe('Communion')
+  })
+
+  it('the MISC entry displayed name falls back to "Miscellaneous" when the label is absent', async () => {
+    mockAuthState.settings.defaultServiceTemplate = [{ id: 'misc-2', kind: 'MISC' }]
+    mountEditor(true)
+    await flushPromises()
+    expect(body().get('[data-testid="template-item-name"]').text()).toBe('Miscellaneous')
+  })
+
+  it('typing sets the draft entry label; the save payload carries the typed text', async () => {
+    mountEditor(true)
+    await body().get('[data-testid="palette-add-misc"]').trigger('click')
+    await flushPromises()
+
+    await body().get('[data-testid="template-item-misc-label"]').setValue('Communion')
+    await flushPromises()
+    await body().get('[data-testid="template-save"]').trigger('click')
+    await flushPromises()
+
+    const payload = mockUpdateDoc.mock.calls[0]![1] as Record<string, unknown>
+    const entries = payload['settings.defaultServiceTemplate'] as ServiceTemplateEntry[]
+    expect(entries).toHaveLength(1)
+    expect(entries[0]!.kind).toBe('MISC')
+    expect(entries[0]!.label).toBe('Communion')
+  })
+
+  it('clearing the label to empty leaves the saved entry labelless (undefined stripped)', async () => {
+    mockAuthState.settings.defaultServiceTemplate = [{ id: 'misc-1', kind: 'MISC', label: 'Communion' }]
+    mountEditor(true)
+    await flushPromises()
+
+    await body().get('[data-testid="template-item-misc-label"]').setValue('')
+    await flushPromises()
+    await body().get('[data-testid="template-save"]').trigger('click')
+    await flushPromises()
+
+    const payload = mockUpdateDoc.mock.calls[0]![1] as Record<string, unknown>
+    const entries = payload['settings.defaultServiceTemplate'] as ServiceTemplateEntry[]
+    expect(entries).toHaveLength(1)
+    expect('label' in entries[0]!).toBe(false)
+  })
+})
+
 describe('ServiceTemplateEditor — Save Template', () => {
   it('writes the dot-path leaf key with a stripUndefined payload, then reassigns the store', async () => {
     mountEditor(true)
