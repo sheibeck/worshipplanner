@@ -40,7 +40,8 @@ describe('MiscLabelBadge', () => {
     const input = w.get('[data-testid="misc-x-input"]')
     await input.setValue('  Offering  ')
     await input.trigger('blur')
-    expect(w.emitted('update:modelValue')?.at(-1)).toEqual(['Offering'])
+    const ev = w.emitted('update:modelValue')!
+    expect(ev[ev.length - 1]).toEqual(['Offering'])
   })
 
   it('clearing to empty emits undefined (stripUndefined-friendly)', async () => {
@@ -49,7 +50,8 @@ describe('MiscLabelBadge', () => {
     const input = w.get('[data-testid="misc-x-input"]')
     await input.setValue('')
     await input.trigger('blur')
-    expect(w.emitted('update:modelValue')?.at(-1)).toEqual([undefined])
+    const ev = w.emitted('update:modelValue')!
+    expect(ev[ev.length - 1]).toEqual([undefined])
   })
 
   it('Escape cancels without emitting and closes the input', async () => {
