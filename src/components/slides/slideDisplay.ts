@@ -11,12 +11,7 @@ import type { ServiceSlot, SlotKind } from '@/types/service'
 import type { CongregationalSection, Slide } from '@/types/slide'
 import type { GroupSlideEntry } from '@/types/slideGroup'
 import { slotLabel } from '@/utils/slotTypes'
-import {
-  formatScriptureReference,
-  scriptureRefFromSlot,
-  scriptureAttribution,
-  resolveTranslationSource,
-} from '@/utils/scripture'
+import { formatScriptureReference, scriptureRefFromSlot } from '@/utils/scripture'
 
 /** One key in the 3-dot slide action menu (33-UI-SPEC.md § Copywriting Contract). */
 export type MenuItemKey =
@@ -198,25 +193,26 @@ export function slideBodyText(slide: Slide): string {
       // 38-01/38-02) carries that section's own words in `text`, so the
       // joined form applies for that slide only.
       //
-      // 45-04/R091: the shared attribution suffix is appended only when
-      // there is passage text to attribute — a reference-only slide shows
-      // no suffix (nothing to attribute). Driven by resolveTranslationSource
-      // (the slide's OWN stamped/field-less value), never the org's current
-      // bibleVersion setting — a field-less pre-phase slide resolves to
-      // '(ESV)' regardless of what the church has since chosen.
+      // R124 (Phase 55): the slideshow preview no longer auto-appends the
+      // Bible version (ESV/NLT) to scripture slides — the owner wants clean
+      // scripture when presenting. This is a RENDER-ONLY change: the
+      // provenance helpers (scriptureAttribution/resolveTranslationSource) and
+      // the per-slide `translationSource` field are UNTOUCHED (R092 capture-
+      // once immutability preserved), and the version can still be added by
+      // typing it into the slide's own editable text. Nothing to attribute is
+      // rendered here anymore.
       //
       // R105 (Phase 49): the reference now lives on its OWN dedicated slide
       // (the assembler emits it as a synthetic leading slide), so NO section
       // slide prefixes the reference — the gate is simply `!slide.section`. A
       // Reference-state slide (no `section`) always shows its reference; every
-      // congregational section slide returns just its own words + attribution.
+      // congregational section slide returns just its own words.
       // This gate applies ONLY to this prefix — `slideContentLabel`'s eyebrow
       // and `slideFooterLabel`'s footer below are NOT reference-gated; they
       // name the speaker per-slide regardless of position.
       if (!slide.text) return slide.reference
-      const suffix = ` ${scriptureAttribution(resolveTranslationSource(slide))}`
       const showReference = !slide.section
-      return showReference ? `${slide.reference}\n${slide.text}${suffix}` : `${slide.text}${suffix}`
+      return showReference ? `${slide.reference}\n${slide.text}` : slide.text
     }
     case 'text':
       return slide.body
