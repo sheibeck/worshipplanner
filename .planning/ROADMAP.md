@@ -349,8 +349,8 @@ Plans:
 | 53. Song Lyric Editing | v1.6 | 4/4 | In Progress|  |
 | 54. Service Item Enhancements | v1.6 | 2/2 | In Progress|  |
 | 55. Preview & Export Polish | v1.6 | 3/3 | In Progress|  |
-| 56. Service-Item Overrides | v1.6 | 0/? | Planned (2026-08-12 scope add) |  |
-| 57. Template-Editor UX Parity | v1.6 | 0/1 | Planned (2026-08-12 scope add) |  |
+| 56. Service-Item Overrides | v1.6 | 2/2 | Code-complete, verification_deferred_human | 2026-08-12 |
+| 57. Template-Editor UX Parity | v1.6 | 1/1 | Code-complete, verification_deferred_human | 2026-08-12 |
 
 ## Backlog
 

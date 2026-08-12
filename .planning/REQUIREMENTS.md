@@ -183,9 +183,9 @@ Which phases cover which requirements. Filled during roadmap creation (2026-08-1
 | R124 | Phase 55 — Preview & Export Polish | Complete |
 | R125 | Phase 55 — Preview & Export Polish | Complete |
 | R126 | Phase 55 — Preview & Export Polish | Complete |
-| R127 | Phase 56 — Service-Item Overrides | Pending |
-| R128 | Phase 56 — Service-Item Overrides | Pending |
-| R129 | Phase 57 — Template-Editor UX Parity | Pending |
+| R127 | Phase 56 — Service-Item Overrides | Code-complete (verify deferred) |
+| R128 | Phase 56 — Service-Item Overrides | Code-complete (verify deferred) |
+| R129 | Phase 57 — Template-Editor UX Parity | Code-complete (verify deferred) |
 
 **Coverage:**
 
