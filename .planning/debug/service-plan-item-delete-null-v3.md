@@ -1,5 +1,5 @@
 ---
-status: awaiting_human_verify
+status: resolved
 trigger: "service-plan item delete STILL failing with Firestore rules Null value error (3rd occurrence), evaluation error at L160:26 for delete"
 created: 2026-08-12
 updated: 2026-08-12
