@@ -379,16 +379,29 @@
                 <button
                   type="button"
                   @click="showSlotDeleteConfirm = false; pendingDeleteIndex = null; pendingDeleteIsClear = false"
-                  class="rounded-md px-4 py-2 text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700"
+                  :disabled="isRemovingSlot"
+                  class="rounded-md px-4 py-2 text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700 disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="button"
                   @click="confirmSlotDelete"
-                  class="rounded-md px-4 py-2 text-sm font-medium text-white bg-red-700 hover:bg-red-600 transition-colors"
+                  :disabled="isRemovingSlot"
+                  class="inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white bg-red-700 hover:bg-red-600 transition-colors disabled:opacity-70"
                 >
-                  Remove
+                  <svg
+                    v-if="isRemovingSlot"
+                    data-testid="slot-remove-spinner"
+                    class="animate-spin h-4 w-4"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  {{ isRemovingSlot ? 'Removing…' : 'Remove' }}
                 </button>
               </div>
             </div>
@@ -1541,6 +1554,9 @@ const showSlotDeleteConfirm = ref(false)
 const pendingDeleteIndex = ref<number | null>(null)
 // D-14: tracks whether the pending delete is a "clear song" (true) vs remove slot (false)
 const pendingDeleteIsClear = ref(false)
+// 2026-08-12: in-progress flag for the slot remove (the slideGroups deleteDoc round-trip
+// has a visible delay) so the Remove button shows a spinner and can't be double-fired.
+const isRemovingSlot = ref(false)
 
 // D-16: element-type-aware delete-confirmation copy
 const pendingSlotKind = computed<SlotKind | null>(() =>
@@ -2858,49 +2874,56 @@ async function confirmSlotDelete() {
   if (!canEditService.value) return
   if (pendingDeleteIndex.value == null) return
   const index = pendingDeleteIndex.value
-  if (pendingDeleteIsClear.value) {
-    // Clear-song path (D-14/D-15): empties a SONG slot's assignment — this
-    // is NOT a remove-element delete, so no group is deleted here (R029
-    // scopes the cascade to actually removing the plan item).
-    const slot = localService.value?.slots[index]
-    if (slot?.kind === 'SONG') {
-      const updated: SongSlot = { ...slot as SongSlot, songId: null, songTitle: null, songKey: null }
-      localService.value!.slots[index] = updated
-    }
-  } else {
-    // Remove-element path (R029/D-03): resolve the slot's own id BEFORE the
-    // splice — after performRemoveSlot the anchor is gone. The group delete
-    // is awaited FIRST; a failed delete must not leave the slot removed
-    // locally while its group lingers, so on failure we leave the slot in
-    // place and surface the failure the same way onToggleRoleOverride does
-    // (console.error, no user-facing banner for this scoped-write class of
-    // failure) rather than silently diverging local from remote.
-    const slotId = localService.value?.slots[index]?.id
-    // ME-04 (R045 membership): hold the materialize watcher off this slot for
-    // the whole delete. Firestore drops the group from its LOCAL cache — and
-    // raises onSnapshot — the instant deleteDoc is issued, while the await below
-    // resolves only on server ack. Without the hold, the watcher sees a slot
-    // with no group, re-creates the document, and the splice that follows
-    // performs no second cascade — leaving an orphan group behind forever.
-    const releaseMaterializationHold = slotId ? suppressMaterialization(slotId) : () => {}
-    try {
-      if (slotId && authStore.orgId) {
-        await slideGroupsStore.deleteGroup(authStore.orgId, slotId)
+  // Spinner + guard for the whole confirm: the remove path awaits a Firestore
+  // deleteDoc round-trip with a visible delay; the outer finally always clears it.
+  isRemovingSlot.value = true
+  try {
+    if (pendingDeleteIsClear.value) {
+      // Clear-song path (D-14/D-15): empties a SONG slot's assignment — this
+      // is NOT a remove-element delete, so no group is deleted here (R029
+      // scopes the cascade to actually removing the plan item).
+      const slot = localService.value?.slots[index]
+      if (slot?.kind === 'SONG') {
+        const updated: SongSlot = { ...slot as SongSlot, songId: null, songTitle: null, songKey: null }
+        localService.value!.slots[index] = updated
       }
-      performRemoveSlot(index)
-    } catch (err) {
-      console.error('Failed to delete slide group for removed slot:', err)
-      showSlotDeleteConfirm.value = false
-      pendingDeleteIndex.value = null
-      pendingDeleteIsClear.value = false
-      return
-    } finally {
-      releaseMaterializationHold()
+    } else {
+      // Remove-element path (R029/D-03): resolve the slot's own id BEFORE the
+      // splice — after performRemoveSlot the anchor is gone. The group delete
+      // is awaited FIRST; a failed delete must not leave the slot removed
+      // locally while its group lingers, so on failure we leave the slot in
+      // place and surface the failure the same way onToggleRoleOverride does
+      // (console.error, no user-facing banner for this scoped-write class of
+      // failure) rather than silently diverging local from remote.
+      const slotId = localService.value?.slots[index]?.id
+      // ME-04 (R045 membership): hold the materialize watcher off this slot for
+      // the whole delete. Firestore drops the group from its LOCAL cache — and
+      // raises onSnapshot — the instant deleteDoc is issued, while the await below
+      // resolves only on server ack. Without the hold, the watcher sees a slot
+      // with no group, re-creates the document, and the splice that follows
+      // performs no second cascade — leaving an orphan group behind forever.
+      const releaseMaterializationHold = slotId ? suppressMaterialization(slotId) : () => {}
+      try {
+        if (slotId && authStore.orgId) {
+          await slideGroupsStore.deleteGroup(authStore.orgId, slotId)
+        }
+        performRemoveSlot(index)
+      } catch (err) {
+        console.error('Failed to delete slide group for removed slot:', err)
+        showSlotDeleteConfirm.value = false
+        pendingDeleteIndex.value = null
+        pendingDeleteIsClear.value = false
+        return
+      } finally {
+        releaseMaterializationHold()
+      }
     }
+    showSlotDeleteConfirm.value = false
+    pendingDeleteIndex.value = null
+    pendingDeleteIsClear.value = false
+  } finally {
+    isRemovingSlot.value = false
   }
-  showSlotDeleteConfirm.value = false
-  pendingDeleteIndex.value = null
-  pendingDeleteIsClear.value = false
 }
 
 // ── Song assignment ────────────────────────────────────────────────────────────

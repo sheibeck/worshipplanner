@@ -3562,6 +3562,32 @@ describe('ServiceEditorView - slot delete cascades to its group (Phase 24-06 Tas
     expect(wrapper.findAll('[data-testid^="row-menu-trigger-"]')).toHaveLength(8)
   })
 
+  it('shows a spinner on the Remove button while the delete is in flight, then clears it (2026-08-12)', async () => {
+    let resolveDelete!: () => void
+    mockDeleteGroup.mockImplementationOnce(() => new Promise<void>((resolve) => { resolveDelete = resolve }))
+
+    const wrapper = await mountView()
+    await wrapper.vm.$nextTick()
+    await openDeleteConfirm(wrapper, 0)
+
+    await confirmButton()!.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    // In flight: spinner shown, the button reads "Removing…" and is disabled.
+    expect(body().find('[data-testid="slot-remove-spinner"]').exists()).toBe(true)
+    const removingBtn = body().findAll('button').find((b) => b.text().includes('Removing'))
+    expect(removingBtn).toBeTruthy()
+    expect(removingBtn!.attributes('disabled')).toBeDefined()
+
+    resolveDelete()
+    await Promise.resolve()
+    await Promise.resolve()
+    await wrapper.vm.$nextTick()
+
+    // Resolved: the dialog closed and the spinner is gone.
+    expect(body().find('[data-testid="slot-remove-spinner"]').exists()).toBe(false)
+  })
+
   it('R045 membership lock: after a confirmed remove-element delete, the removed slot id no longer appears in the view and no further group delete is issued for it', async () => {
     const wrapper = await mountView()
     await wrapper.vm.$nextTick()
