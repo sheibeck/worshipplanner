@@ -5,11 +5,13 @@ import {
   onSnapshot,
   addDoc,
   updateDoc,
+  deleteDoc,
   doc,
   serverTimestamp,
   writeBatch,
   query,
   orderBy,
+  getDocs,
   type Unsubscribe,
 } from 'firebase/firestore'
 import { db } from '@/firebase'
@@ -310,6 +312,36 @@ export const useSongStore = defineStore('songs', () => {
     })
   }
 
+  // Permanently deletes a song document and its lyrics subcollection. Firestore
+  // `delete` on both paths is already permitted by the existing songs
+  // `allow write` rule (firestore.rules:190) — no rules change/deploy needed.
+  // Firestore does not cascade subcollection deletes, so the lyrics docs are
+  // explicitly enumerated and deleted alongside the song doc.
+  //
+  // Hidden-only guard (defense-in-depth): the UI only ever surfaces this on
+  // already-hidden songs, but the store enforces it too — a song must be
+  // soft-deleted (hidden === true) before it can be permanently removed.
+  async function hardDeleteSong(id: string) {
+    if (!orgId.value) return
+    const song = songs.value.find((s) => s.id === id)
+    if (!song || song.hidden !== true) return
+
+    const songRef = doc(db, 'organizations', orgId.value, 'songs', id)
+    const lyricsSnap = await getDocs(collection(db, 'organizations', orgId.value, 'songs', id, 'lyrics'))
+
+    if (lyricsSnap.docs.length === 0) {
+      await deleteDoc(songRef)
+      return
+    }
+
+    const batch = writeBatch(db)
+    lyricsSnap.docs.forEach((lyricsDoc) => {
+      batch.delete(lyricsDoc.ref)
+    })
+    batch.delete(songRef)
+    await batch.commit()
+  }
+
   async function restoreSong(id: string) {
     if (!orgId.value) return
     await updateDoc(doc(db, 'organizations', orgId.value, 'songs', id), {
@@ -437,6 +469,7 @@ export const useSongStore = defineStore('songs', () => {
     addSong,
     updateSong,
     deleteSong,
+    hardDeleteSong,
     restoreSong,
     importSongs,
     upsertSongs,
