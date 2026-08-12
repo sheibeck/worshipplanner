@@ -89,11 +89,11 @@
                 <div
                   v-for="entry in group.entries"
                   :key="entry.id"
-                  class="template-item rounded-lg bg-gray-900 border border-gray-800 p-3 flex items-start gap-2"
+                  class="template-item rounded-lg bg-gray-900 border border-gray-800 p-3 flex flex-col sm:flex-row sm:items-start gap-2"
                   data-testid="template-item"
                   :data-entry-id="entry.id"
                 >
-                  <!-- Drag handle: icon-only, so it carries a text alternative (UI-SPEC accessibility requirement). -->
+                  <!-- Zone 1 — Drag handle: icon-only, so it carries a text alternative (UI-SPEC accessibility requirement). -->
                   <div
                     class="drag-handle cursor-grab active:cursor-grabbing text-gray-600 hover:text-gray-400 flex-shrink-0 mt-0.5"
                     :aria-label="`Drag to reorder ${kindLabel(entry.kind)}`"
@@ -105,7 +105,19 @@
                     </svg>
                   </div>
 
-                  <div class="flex-1 min-w-0">
+                  <!-- Zone 2 — badge rail (Phase 57 parity): ONE colored per-kind pill. kindLabel(entry.kind)
+                       supplies the text; the shared kindBadgeClass(entry.kind) the on-theme tint. Fixed width
+                       on desktop; a plain block above the field column on mobile (row is flex-col). -->
+                  <div class="flex-none sm:w-32 sm:pt-0.5">
+                    <span
+                      class="inline-flex items-center rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
+                      :class="kindBadgeClass(entry.kind)"
+                      :data-testid="`template-item-badge-${entry.id}`"
+                    >{{ kindLabel(entry.kind) }}</span>
+                  </div>
+
+                  <!-- Zone 3 — field column: entry name + (MISC) label input + (MISC/ANNOUNCEMENTS) body. -->
+                  <div class="flex-1 min-w-0 flex flex-col gap-2">
                     <p class="text-sm text-gray-200" data-testid="template-item-name">{{ entryDisplayName(entry) }}</p>
                     <!-- Recurring MISC custom label (R127, Phase 56). Mirrors the live editor's MISC
                          label input (ServiceEditorView.vue), a DISTINCT compact "name" above the body.
@@ -135,32 +147,68 @@
                     ></textarea>
                   </div>
 
-                  <!-- Section-assignment control — same option set as ServiceEditorView.vue's `section-select`. -->
-                  <select
-                    data-testid="template-section-select"
-                    :value="entry.section ?? ''"
-                    class="rounded-md bg-gray-800 border border-gray-700 text-gray-300 text-xs px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 flex-shrink-0 mt-0.5"
-                    title="Section"
-                    aria-label="Section"
-                    @change="onSectionChange(entry.id, ($event.target as HTMLSelectElement).value)"
-                  >
-                    <option value="">No section</option>
-                    <option v-for="s in SERVICE_SECTIONS" :key="s" :value="s">{{ SERVICE_SECTION_LABELS[s] }}</option>
-                  </select>
+                  <!-- Zone 4 — per-row ⋯ menu (Phase 57 parity with ServiceEditorView.vue's row menu).
+                       Owns BOTH Move-to-section (→ onSectionChange, replacing the inline <select>) and
+                       Delete (→ removeEntry, replacing the inline ✕ — no confirm, a template row holds no
+                       user content). Single-open keyed on entry.id; trigger + fixed backdrop + absolute
+                       role="menu" panel. Always rendered (no lock/viewer gating in this editor). It lives
+                       INSIDE the .template-item (the Sortable ITEM, not a container) and only opens on
+                       click, so it never joins a drag. -->
+                  <div class="relative flex-shrink-0 mt-0.5 sm:ml-auto">
+                    <button
+                      type="button"
+                      class="p-1 rounded-md text-gray-500 hover:text-gray-300 hover:bg-gray-800 transition-colors"
+                      :aria-haspopup="'menu'"
+                      :aria-expanded="openRowMenuId === entry.id ? 'true' : 'false'"
+                      aria-label="Row options"
+                      :data-testid="`template-row-menu-trigger-${entry.id}`"
+                      title="Row options"
+                      @click.stop="toggleRowMenu(entry.id)"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                        <circle cx="12" cy="5" r="1.5" />
+                        <circle cx="12" cy="12" r="1.5" />
+                        <circle cx="12" cy="19" r="1.5" />
+                      </svg>
+                    </button>
 
-                  <!-- Remove: no confirm (UI-SPEC Copywriting Contract — a template row holds no
-                       user content, unlike a live service slot). Icon-only, carries a text alternative. -->
-                  <button
-                    type="button"
-                    class="text-gray-600 hover:text-red-400 transition-colors flex-shrink-0 mt-0.5"
-                    :aria-label="`Remove ${kindLabel(entry.kind)}`"
-                    data-testid="template-item-remove"
-                    @click="removeEntry(entry.id)"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+                    <!-- Outside-click backdrop -->
+                    <div v-if="openRowMenuId === entry.id" class="fixed inset-0 z-10" @click="openRowMenuId = null" />
+
+                    <!-- Menu panel -->
+                    <div
+                      v-if="openRowMenuId === entry.id"
+                      role="menu"
+                      class="absolute right-0 top-full mt-1 w-48 origin-top-right rounded-lg border border-gray-700 bg-gray-800 shadow-xl z-20 overflow-hidden py-1"
+                      :data-testid="`template-row-menu-panel-${entry.id}`"
+                    >
+                      <p class="px-3 pt-1 pb-0.5 text-[10px] uppercase tracking-wider text-gray-500">Move to section</p>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        class="block w-full px-3 py-1.5 text-left text-sm text-gray-200 hover:bg-gray-700 transition-colors"
+                        :data-testid="`template-row-menu-move-${entry.id}-no-section`"
+                        @click="onSectionChange(entry.id, ''); openRowMenuId = null"
+                      >No section</button>
+                      <button
+                        v-for="s in SERVICE_SECTIONS"
+                        :key="s"
+                        type="button"
+                        role="menuitem"
+                        class="block w-full px-3 py-1.5 text-left text-sm text-gray-200 hover:bg-gray-700 transition-colors"
+                        :data-testid="`template-row-menu-move-${entry.id}-${s}`"
+                        @click="onSectionChange(entry.id, s); openRowMenuId = null"
+                      >{{ SERVICE_SECTION_LABELS[s] }}</button>
+                      <div class="my-1 h-px bg-gray-700"></div>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        class="block w-full px-3 py-1.5 text-left text-sm text-red-400 hover:bg-gray-700 hover:text-red-300 transition-colors"
+                        :data-testid="`template-row-menu-delete-${entry.id}`"
+                        @click="removeEntry(entry.id); openRowMenuId = null"
+                      >Delete</button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </template>
@@ -240,7 +288,7 @@ import { doc, updateDoc } from 'firebase/firestore'
 import Sortable from 'sortablejs'
 import { db } from '@/firebase'
 import { useAuthStore } from '@/stores/auth'
-import { buildSuggestedTemplateEntries, createSlot, slotLabel, groupBySection, flattenBySection } from '@/utils/slotTypes'
+import { buildSuggestedTemplateEntries, createSlot, slotLabel, kindBadgeClass, groupBySection, flattenBySection } from '@/utils/slotTypes'
 import { stripUndefined } from '@/utils/stripUndefined'
 import { SERVICE_SECTIONS, SERVICE_SECTION_LABELS } from '@/types/service'
 import type { SlotKind, ServiceSection } from '@/types/service'
@@ -305,6 +353,16 @@ function addEntry(kind: SlotKind): void {
 
 function removeEntry(id: string): void {
   draft.value = draft.value.filter((entry) => entry.id !== id)
+}
+
+// ── Per-row ⋯ menu (Phase 57 — parity with ServiceEditorView.vue's row menu) ──
+// Single-open state keyed on entry.id. The menu owns Move-to-section
+// (→ onSectionChange) and Delete (→ removeEntry), replacing the inline section
+// <select> and inline ✕ remove. No lock/viewer gating here (the template editor
+// has none) — the menu is always rendered, exactly as the inline controls were.
+const openRowMenuId = ref<string | null>(null)
+function toggleRowMenu(id: string): void {
+  openRowMenuId.value = openRowMenuId.value === id ? null : id
 }
 
 function onSectionChange(id: string, value: string): void {

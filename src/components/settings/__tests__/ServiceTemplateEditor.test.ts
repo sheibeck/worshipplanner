@@ -106,6 +106,34 @@ function templateItems() {
   return body().findAll('[data-testid="template-item"]')
 }
 
+// ── Per-row ⋯ menu helpers (Phase 57 — mirror ServiceEditorView.test.ts's
+//    openRowMenu/moveSlotViaRowMenu/deleteSlotViaRowMenu). Rows render in
+//    section-major order; these drive the menu by rendered index and return the
+//    entry id read off the trigger's testid. ──
+async function openRowMenuByIndex(index: number): Promise<string> {
+  const trigger = body().findAll('[data-testid^="template-row-menu-trigger-"]')[index]!
+  const id = trigger.attributes('data-testid')!.replace('template-row-menu-trigger-', '')
+  await trigger.trigger('click')
+  await flushPromises()
+  return id
+}
+
+/** Open a row's ⋯ menu and click a Move-to-section item. `value` is a
+ *  ServiceSection key, or '' for "No section" (maps to the `no-section` suffix). */
+async function moveViaRowMenu(index: number, value: string): Promise<void> {
+  const id = await openRowMenuByIndex(index)
+  const suffix = value === '' ? 'no-section' : value
+  await body().get(`[data-testid="template-row-menu-move-${id}-${suffix}"]`).trigger('click')
+  await flushPromises()
+}
+
+/** Open a row's ⋯ menu and click its Delete item (fires removeEntry immediately). */
+async function deleteViaRowMenu(index: number): Promise<void> {
+  const id = await openRowMenuByIndex(index)
+  await body().get(`[data-testid="template-row-menu-delete-${id}"]`).trigger('click')
+  await flushPromises()
+}
+
 beforeEach(() => {
   mockAuthState.orgId = 'org-1'
   mockAuthState.isEditor = true
@@ -208,17 +236,23 @@ describe('ServiceTemplateEditor — add-item palette (closed six-button set, R08
   })
 })
 
-describe('ServiceTemplateEditor — per-item section, remove, and accessibility', () => {
-  it('each row exposes a section select (SERVICE_SECTIONS + No section) and an immediate remove button', async () => {
+describe('ServiceTemplateEditor — per-row ⋯ menu, badge, and accessibility', () => {
+  it('each row\'s ⋯ menu exposes Move-to-section (No section + SERVICE_SECTIONS) and an immediate Delete; the inline select/remove are gone', async () => {
     mountEditor(true)
     await body().get('[data-testid="palette-add-song"]').trigger('click')
     await flushPromises()
 
-    const select = body().get('[data-testid="template-section-select"]')
-    const optionValues = select.findAll('option').map((o) => o.attributes('value'))
-    expect(optionValues).toEqual(['', 'pre-service', 'worship', 'message', 'sending', 'post-service'])
+    const id = await openRowMenuByIndex(0)
+    // Move-to-section option set mirrors the retired section <select>: No section + the five sections.
+    for (const suffix of ['no-section', 'pre-service', 'worship', 'message', 'sending', 'post-service']) {
+      expect(body().find(`[data-testid="template-row-menu-move-${id}-${suffix}"]`).exists()).toBe(true)
+    }
+    expect(body().find(`[data-testid="template-row-menu-delete-${id}"]`).exists()).toBe(true)
+    // The inline controls no longer exist anywhere in the rendered DOM.
+    expect(body().find('[data-testid="template-section-select"]').exists()).toBe(false)
+    expect(body().find('[data-testid="template-item-remove"]').exists()).toBe(false)
 
-    await body().get('[data-testid="template-item-remove"]').trigger('click')
+    await body().get(`[data-testid="template-row-menu-delete-${id}"]`).trigger('click')
     await flushPromises()
 
     // Fires immediately — no confirmation dialog anywhere in the DOM.
@@ -226,25 +260,56 @@ describe('ServiceTemplateEditor — per-item section, remove, and accessibility'
     expect(body().find('[data-testid="template-reset-confirm"]').exists()).toBe(false)
   })
 
-  it('changing the section select moves the item into that section\'s group', async () => {
+  it('the ⋯ menu Move-to-section moves the item into that section\'s group and closes the menu', async () => {
     mountEditor(true)
     await body().get('[data-testid="palette-add-song"]').trigger('click')
     await flushPromises()
 
-    await body().get('[data-testid="template-section-select"]').setValue('message')
-    await flushPromises()
+    await moveViaRowMenu(0, 'message')
 
     expect(body().find('[data-testid="template-section-header-message"]').exists()).toBe(true)
     expect(body().get('[data-testid="template-section-list-message"]').text()).toContain('Song')
+    // Menu closed after the move.
+    expect(body().find('[data-testid^="template-row-menu-panel-"]').exists()).toBe(false)
   })
 
-  it('carries aria-labels on the icon-only remove and drag-handle controls', async () => {
+  it('opening a second row\'s ⋯ menu closes the first (single-open); the backdrop closes the open menu', async () => {
+    mountEditor(true)
+    await body().get('[data-testid="palette-add-song"]').trigger('click')
+    await body().get('[data-testid="palette-add-prayer"]').trigger('click')
+    await flushPromises()
+
+    const id0 = await openRowMenuByIndex(0)
+    expect(body().find(`[data-testid="template-row-menu-panel-${id0}"]`).exists()).toBe(true)
+
+    const id1 = await openRowMenuByIndex(1)
+    expect(body().find(`[data-testid="template-row-menu-panel-${id0}"]`).exists()).toBe(false)
+    expect(body().find(`[data-testid="template-row-menu-panel-${id1}"]`).exists()).toBe(true)
+
+    // Backdrop click closes the open menu (exactly one backdrop is present while a menu is open).
+    await body().findAll('.fixed.inset-0.z-10')[0]!.trigger('click')
+    await flushPromises()
+    expect(body().find(`[data-testid="template-row-menu-panel-${id1}"]`).exists()).toBe(false)
+  })
+
+  it('renders a per-kind colored badge whose classes come from kindBadgeClass and whose text is kindLabel', async () => {
+    mountEditor(true)
+    await body().get('[data-testid="palette-add-song"]').trigger('click')
+    await flushPromises()
+
+    const badge = body().findAll('[data-testid^="template-item-badge-"]')[0]!
+    expect(badge.classes()).toContain('text-indigo-300') // SONG tint from the shared kindBadgeClass
+    expect(badge.text()).toBe('Song')
+  })
+
+  it('carries aria-labels on the icon-only ⋯ menu trigger and drag-handle controls', async () => {
     mountEditor(true)
     await body().get('[data-testid="palette-add-scripture"]').trigger('click')
     await flushPromises()
 
-    const removeButton = body().get('[data-testid="template-item-remove"]')
-    expect(removeButton.attributes('aria-label')).toBe('Remove Scripture Reading')
+    const menuTrigger = body().findAll('[data-testid^="template-row-menu-trigger-"]')[0]!
+    expect(menuTrigger.attributes('aria-label')).toBe('Row options')
+    expect(menuTrigger.attributes('aria-haspopup')).toBe('menu')
 
     const dragHandle = body().get('.drag-handle')
     expect(dragHandle.attributes('aria-label')).toBe('Drag to reorder Scripture Reading')
@@ -495,8 +560,8 @@ describe('ServiceTemplateEditor — draft cloning (Pitfall #3)', () => {
     await flushPromises()
 
     await body().get('[data-testid="palette-add-song"]').trigger('click')
-    await body().get('[data-testid="template-item-remove"]').trigger('click')
     await flushPromises()
+    await deleteViaRowMenu(0)
 
     // The draft was mutated (added then a remove fired), but the store's own array
     // contents are untouched until Save Template is clicked. (Not asserting reference
@@ -526,9 +591,8 @@ describe('ServiceTemplateEditor — drag-reorder (SortableJS, per-section instan
     await body().get('[data-testid="palette-add-scripture"]').trigger('click')
     await flushPromises()
 
-    const selects = body().findAll('[data-testid="template-section-select"]')
-    await selects[0]!.setValue('worship')
-    await selects[1]!.setValue('worship')
+    await moveViaRowMenu(0, 'worship')
+    await moveViaRowMenu(1, 'worship')
     await flushPromises()
 
     const worshipCapture = captureForSection('worship')
@@ -554,7 +618,7 @@ describe('ServiceTemplateEditor — drag-reorder (SortableJS, per-section instan
     await body().get('[data-testid="palette-add-prayer"]').trigger('click')
     await flushPromises()
 
-    await body().findAll('[data-testid="template-section-select"]')[1]!.setValue('message')
+    await moveViaRowMenu(1, 'message')
     await flushPromises()
 
     const ungroupedCapture = captureForUngrouped()
