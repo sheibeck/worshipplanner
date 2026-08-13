@@ -5,15 +5,15 @@ milestone_name: Volunteer Messaging & Notifications
 current_phase: 58
 current_phase_name: Messaging Infrastructure, Settings & Recipient Resolution
 status: executing
-stopped_at: Completed 58-02-PLAN.md
-last_updated: "2026-08-13T20:22:54.231Z"
+stopped_at: Completed 58-03-PLAN.md
+last_updated: "2026-08-13T20:36:32.859Z"
 last_activity: 2026-08-13
 last_activity_desc: Phase 58 execution started
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 5
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -277,7 +277,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 58 (Messaging Infrastructure, Settings & Recipient Resolution) — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 Status: Ready to execute
 Last activity: 2026-08-13 — Phase 58 execution started
 
@@ -1720,6 +1720,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 55 P03 | 35min | 3 tasks | 7 files |
 | Phase 58 P01 | 25min | 2 tasks | 6 files |
 | Phase 58 P02 | 25min | 1 tasks | 2 files |
+| Phase 58 P03 | 20min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -2072,6 +2073,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: messaging deep-merged in loadOrgContext parallel to slideTypography's WR-01 fix; timezone flat-merges via the existing outer spread; no dual-read/migration needed for either new field
 - [Phase ?]: 58-02: resolveRecipients silently skips stale/deleted personIds without inflating unreachableCount (resolves 58-RESEARCH.md Open Question 1)
 - [Phase ?]: 58-02: MESSAGING_TEAM_LABELS is its own standalone RoleGroup label constant, independent of RolesConfigPanel.vue's groupLabels
+- [Phase ?]: 58-03: firestore.rules ships built/tested/UNDEPLOYED for messages/recipients/lockSnapshots per v1.7 deploy-gated grant; owner runs 'firebase deploy --only firestore:rules'
 
 ### Roadmap Evolution
 
@@ -2389,8 +2391,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-13T20:22:54.183Z
-Stopped at: Completed 58-02-PLAN.md
+Last session: 2026-08-13T20:36:32.813Z
+Stopped at: Completed 58-03-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
