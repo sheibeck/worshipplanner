@@ -170,6 +170,21 @@ export interface Service {
   /** roleId -> personId[]; absent key = inherit from schedule, present key = override.
    *  Mirrors Quarter.roleOverridesByDate's sparse-override-map precedent (src/types/roster.ts). */
   roleAssignmentOverrides?: Record<string, string[]>
+  /**
+   * Per-service automatic-email overrides (R132, Phase 58). Optional —
+   * absent on existing service docs, which still typecheck. Each leaf is
+   * `null` when the service inherits the org-level `OrgSettings.messaging`
+   * default rather than overriding it. Draft-only editable (v1.7); a locked
+   * service shows the effective (inherited-or-overridden) values read-only.
+   * `reminderSentAt` is an Admin-SDK-only idempotency guard written by
+   * Phase 61's scheduled reminder function — never written from the client.
+   */
+  messaging?: {
+    lockNotifyEnabled: boolean | null
+    reminderEnabled: boolean | null
+    reminderDaysBefore: number | null
+    reminderSentAt: Timestamp | null
+  }
 }
 
 export type ServiceInput = Omit<Service, 'id' | 'createdAt' | 'updatedAt'>

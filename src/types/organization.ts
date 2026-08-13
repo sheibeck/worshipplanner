@@ -111,6 +111,42 @@ export interface OrgSettings {
     fontWeight: number
     fontScale: 'sm' | 'md' | 'lg'
   }
+  /**
+   * Church-level volunteer-email messaging settings (R130/R132, Phase 58).
+   * No send path, UI, or Cloud Function exists yet — this is the typed
+   * substrate every later messaging phase (59-62) builds on.
+   */
+  messaging: {
+    /** GLOBAL kill switch for volunteer email messaging. DELIBERATE
+     *  deviation from `aiEnabled`/`pcEnabled` (which default true): a fresh
+     *  org has no email provider configured, so messaging must fail closed
+     *  until the owner explicitly opts in via Settings (R130). Enforced at
+     *  `src/utils/messaging.ts::isMessagingEnabled`, the single client
+     *  choke point every later messaging surface reads. */
+    enabled: boolean
+    /** Org-level default for whether a service lock triggers a
+     *  lock-notification email, inherited by a service unless overridden
+     *  (R132). Conservative default: off, owner opts in. */
+    lockNotifyDefault: boolean
+    /** Org-level default for whether the pre-service reminder email is
+     *  sent, inherited by a service unless overridden (R132). Conservative
+     *  default: off, owner opts in. */
+    reminderEnabled: boolean
+    /** Number of days before a service's date the reminder email fires
+     *  (Phase 61 cron). Only load-bearing once that scheduler ships; this
+     *  phase persists the field + its Settings UI. */
+    reminderDaysBefore: number
+    /** Optional display "From" name for outgoing messages. Absent = the
+     *  send-path default (Phase 59). */
+    fromName?: string
+    /** Optional Reply-To address for outgoing messages. Absent = the
+     *  send-path default (Phase 59). */
+    replyTo?: string
+  }
+  /** Church-wide local timezone (IANA name, e.g. `'America/Chicago'`),
+   *  R133. Only load-bearing for Phase 61's scheduled reminder cron; this
+   *  phase just persists the field + its Settings `<select>`. */
+  timezone: string
 }
 
 /**
@@ -175,4 +211,17 @@ export const DEFAULT_ORG_SETTINGS: OrgSettings = {
     fontWeight: 400,
     fontScale: 'md',
   },
+  // R130 — DELIBERATE deviation from aiEnabled/pcEnabled: `enabled` defaults
+  // false (kill-switch fails closed for a fresh org with no email provider
+  // configured yet). `lockNotifyDefault`/`reminderEnabled` default false
+  // (conservative opt-in); `reminderDaysBefore` defaults to 7.
+  // `fromName`/`replyTo` stay OUT of this object (optional leaves).
+  messaging: {
+    enabled: false,
+    lockNotifyDefault: false,
+    reminderEnabled: false,
+    reminderDaysBefore: 7,
+  },
+  // R133 — sensible US-central placeholder the owner changes in Settings.
+  timezone: 'America/Chicago',
 }
