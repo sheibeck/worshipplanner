@@ -1680,3 +1680,164 @@ describe('slideGroups delete null-safety (2026-08-11 quick fix)', () => {
     await assertFails(deleteDoc(doc(db, 'organizations', 'orgA', 'slideGroups', 'slot-1')))
   })
 })
+
+// Phase 58 (R130/R132) — messages/recipients/lockSnapshots are new nested
+// collections under services/{docId}. Every test targets the FULL nested
+// path (organizations/{orgId}/services/{serviceId}/messages/{id}, etc.) —
+// never a sibling organizations/{orgId}/messages/{id} path — so a
+// misplaced (sibling) rule block would be caught (58-RESEARCH.md Pitfall 3).
+// No client code writes these collections this phase; the rules are
+// exercised solely by these tests' own seeded writes. Only the Admin SDK
+// (Phase 59+) writes messages status/recipients — this suite proves that
+// no client, editor or not, can forge those writes.
+describe('services/{id}/messages nested collection (R130)', () => {
+  it('ALLOW — an org editor creates a messages doc under their org service', async () => {
+    await seedMembershipDoc('orgA', 'editorA', 'editor')
+    const db = testEnv.authenticatedContext('editorA').firestore()
+    await assertSucceeds(
+      setDoc(doc(db, 'organizations', 'orgA', 'services', 'svc1', 'messages', 'msg1'), {
+        type: 'oneoff',
+        status: 'queued',
+      }),
+    )
+  })
+
+  it('ALLOW — an org member reads a messages doc', async () => {
+    await seedMembershipDoc('orgA', 'memberA', 'member')
+    await seedDoc('organizations/orgA/services/svc1/messages/msg1', { type: 'oneoff', status: 'queued' })
+    const db = testEnv.authenticatedContext('memberA').firestore()
+    await assertSucceeds(
+      getDoc(doc(db, 'organizations', 'orgA', 'services', 'svc1', 'messages', 'msg1')),
+    )
+  })
+
+  it('ALLOW — a viewer-role member also reads a messages doc (read is member-tier, not editor-tier)', async () => {
+    await seedMembershipDoc('orgA', 'viewerA', 'viewer')
+    await seedDoc('organizations/orgA/services/svc1/messages/msg1', { type: 'oneoff', status: 'queued' })
+    const db = testEnv.authenticatedContext('viewerA').firestore()
+    await assertSucceeds(
+      getDoc(doc(db, 'organizations', 'orgA', 'services', 'svc1', 'messages', 'msg1')),
+    )
+  })
+
+  it('DENY — a viewer cannot create a messages doc', async () => {
+    await seedMembershipDoc('orgA', 'viewerA', 'viewer')
+    const db = testEnv.authenticatedContext('viewerA').firestore()
+    await assertFails(
+      setDoc(doc(db, 'organizations', 'orgA', 'services', 'svc1', 'messages', 'msg1'), {
+        type: 'oneoff',
+        status: 'queued',
+      }),
+    )
+  })
+
+  it('DENY — an org editor cannot update a messages doc (status transitions are Admin-SDK-only)', async () => {
+    await seedMembershipDoc('orgA', 'editorA', 'editor')
+    await seedDoc('organizations/orgA/services/svc1/messages/msg1', { type: 'oneoff', status: 'queued' })
+    const db = testEnv.authenticatedContext('editorA').firestore()
+    await assertFails(
+      updateDoc(doc(db, 'organizations', 'orgA', 'services', 'svc1', 'messages', 'msg1'), {
+        status: 'sent',
+      }),
+    )
+  })
+
+  it('DENY — an org editor cannot delete a messages doc (Admin-SDK-only)', async () => {
+    await seedMembershipDoc('orgA', 'editorA', 'editor')
+    await seedDoc('organizations/orgA/services/svc1/messages/msg1', { type: 'oneoff', status: 'queued' })
+    const db = testEnv.authenticatedContext('editorA').firestore()
+    await assertFails(
+      deleteDoc(doc(db, 'organizations', 'orgA', 'services', 'svc1', 'messages', 'msg1')),
+    )
+  })
+})
+
+describe('services/{id}/messages/{id}/recipients nested collection (R130) — Admin-SDK-only', () => {
+  it('ALLOW — an org member reads a recipients subdoc', async () => {
+    await seedMembershipDoc('orgA', 'memberA', 'member')
+    await seedDoc('organizations/orgA/services/svc1/messages/msg1/recipients/r1', {
+      status: 'pending',
+      email: 'volunteer@example.com',
+    })
+    const db = testEnv.authenticatedContext('memberA').firestore()
+    await assertSucceeds(
+      getDoc(doc(db, 'organizations', 'orgA', 'services', 'svc1', 'messages', 'msg1', 'recipients', 'r1')),
+    )
+  })
+
+  it('DENY — an org editor cannot create a recipients subdoc (Admin-SDK-only)', async () => {
+    await seedMembershipDoc('orgA', 'editorA', 'editor')
+    const db = testEnv.authenticatedContext('editorA').firestore()
+    await assertFails(
+      setDoc(
+        doc(db, 'organizations', 'orgA', 'services', 'svc1', 'messages', 'msg1', 'recipients', 'r1'),
+        { status: 'pending', email: 'volunteer@example.com' },
+      ),
+    )
+  })
+
+  it('DENY — an org editor cannot update an existing recipients subdoc (forging a "sent" status)', async () => {
+    await seedMembershipDoc('orgA', 'editorA', 'editor')
+    await seedDoc('organizations/orgA/services/svc1/messages/msg1/recipients/r1', {
+      status: 'pending',
+      email: 'volunteer@example.com',
+    })
+    const db = testEnv.authenticatedContext('editorA').firestore()
+    await assertFails(
+      updateDoc(
+        doc(db, 'organizations', 'orgA', 'services', 'svc1', 'messages', 'msg1', 'recipients', 'r1'),
+        { status: 'sent' },
+      ),
+    )
+  })
+})
+
+describe('services/{id}/lockSnapshots nested collection (R132)', () => {
+  it('ALLOW — an org editor writes a lockSnapshots doc', async () => {
+    await seedMembershipDoc('orgA', 'editorA', 'editor')
+    const db = testEnv.authenticatedContext('editorA').firestore()
+    await assertSucceeds(
+      setDoc(doc(db, 'organizations', 'orgA', 'services', 'svc1', 'lockSnapshots', 'snap1'), {
+        capturedAt: new Date(),
+      }),
+    )
+  })
+
+  it('ALLOW — an org member reads a lockSnapshots doc', async () => {
+    await seedMembershipDoc('orgA', 'memberA', 'member')
+    await seedDoc('organizations/orgA/services/svc1/lockSnapshots/snap1', { capturedAt: new Date() })
+    const db = testEnv.authenticatedContext('memberA').firestore()
+    await assertSucceeds(
+      getDoc(doc(db, 'organizations', 'orgA', 'services', 'svc1', 'lockSnapshots', 'snap1')),
+    )
+  })
+
+  it('DENY — a viewer cannot write a lockSnapshots doc', async () => {
+    await seedMembershipDoc('orgA', 'viewerA', 'viewer')
+    const db = testEnv.authenticatedContext('viewerA').firestore()
+    await assertFails(
+      setDoc(doc(db, 'organizations', 'orgA', 'services', 'svc1', 'lockSnapshots', 'snap1'), {
+        capturedAt: new Date(),
+      }),
+    )
+  })
+
+  it('DENY — a member of a DIFFERENT org cannot read orgA\'s lockSnapshots doc', async () => {
+    await seedMembershipDoc('orgB', 'memberB', 'member')
+    await seedDoc('organizations/orgA/services/svc1/lockSnapshots/snap1', { capturedAt: new Date() })
+    const db = testEnv.authenticatedContext('memberB').firestore()
+    await assertFails(
+      getDoc(doc(db, 'organizations', 'orgA', 'services', 'svc1', 'lockSnapshots', 'snap1')),
+    )
+  })
+
+  it('DENY — an editor of a DIFFERENT org cannot write orgA\'s lockSnapshots doc', async () => {
+    await seedMembershipDoc('orgB', 'editorB', 'editor')
+    const db = testEnv.authenticatedContext('editorB').firestore()
+    await assertFails(
+      setDoc(doc(db, 'organizations', 'orgA', 'services', 'svc1', 'lockSnapshots', 'snap1'), {
+        capturedAt: new Date(),
+      }),
+    )
+  })
+})
