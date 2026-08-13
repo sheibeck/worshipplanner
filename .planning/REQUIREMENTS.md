@@ -22,13 +22,16 @@ Requirements for the v1.7 milestone. Each maps to exactly one roadmap phase (see
 
 ### Email Infrastructure & Settings
 
-- [ ] **R130**: An org owner can turn messaging off entirely from the main Settings screen; messaging
+- [x] **R130**: An org owner can turn messaging off entirely from the main Settings screen; messaging
       is disabled by default until an org enables it, and every send surface honors the switch.
+
 - [ ] **R131**: Volunteer email sends through a backend send path that holds the provider API key
       server-side — no email address list or provider key is ever exposed to the client bundle.
-- [ ] **R132**: Per-service automatic-email defaults (lock notification, re-lock prompt, share-link
+
+- [x] **R132**: Per-service automatic-email defaults (lock notification, re-lock prompt, share-link
       reminder timing) inherit from Settings and can be overridden on a service while it is in Draft.
-- [ ] **R133**: An org can set its local timezone so scheduled sends fire at the intended local
+
+- [x] **R133**: An org can set its local timezone so scheduled sends fire at the intended local
       time of day.
 
 ### Recipient Resolution
@@ -36,6 +39,7 @@ Requirements for the v1.7 milestone. Each maps to exactly one roadmap phase (see
 - [ ] **R134**: When composing or auto-sending, recipients are resolved from the roles assigned on the
       service and grouped into selectable teams (e.g. Worship, Tech, Vocals, Hosts) plus an
       "Everyone on this service" option.
+
 - [ ] **R135**: A person assigned to multiple teams is emailed once (deduped by address); roles with no
       email are excluded from the send and surfaced to the planner as an unreachable/open-roles count.
 
@@ -43,14 +47,19 @@ Requirements for the v1.7 milestone. Each maps to exactly one roadmap phase (see
 
 - [ ] **R136**: A ✉ Messages button on a service opens a composer whose recipients are teams first,
       with individuals addable below.
+
 - [ ] **R137**: The composer supports three message types — One-off message, Reminder, and Share
       service link — including ad-hoc one-off reminders to chosen teams/individuals.
+
 - [ ] **R138**: The composer has a subject and a body with insertable merge tokens: service date,
       service link, their roles, and song list.
+
 - [ ] **R139**: Each recipient receives a personalized email — the "their roles" token renders that
       individual's own assigned roles, not a shared block.
+
 - [ ] **R140**: The composer shows a live "Reaches N people" count reflecting the selected
       teams/individuals minus unreachable roles.
+
 - [ ] **R141**: The composer offers attach-the-service-order-link, send-me-a-copy, and
       schedule-for-later options.
 
@@ -58,6 +67,7 @@ Requirements for the v1.7 milestone. Each maps to exactly one roadmap phase (see
 
 - [ ] **R142**: Each service has a "Sent on this service" history listing every message with its type
       (automatic / one-off / scheduled), recipient count, and send time.
+
 - [ ] **R143**: Hard bounces are surfaced per message in the history with an affordance to fix the
       bad address.
 
@@ -77,9 +87,11 @@ Requirements for the v1.7 milestone. Each maps to exactly one roadmap phase (see
 
 - [ ] **R146**: After editing a locked service and re-locking, the planner is prompted to notify with a
       scoped change diff of typed, checkable entries (SONG / ORDER / ROLE / NOTES / SLIDES).
+
 - [ ] **R147**: Each change entry is tagged with the teams it affects (defaulting to all assigned teams
       for non-role changes), and the planner can send the update to only the affected teams or to
       everyone on the service.
+
 - [ ] **R148**: "Lock quietly" is always available to re-lock without sending; confirming a notify
       overwrites the lock snapshot so the next re-lock diffs against the new state, not the original.
 
@@ -91,6 +103,7 @@ Deferred to a later release. Tracked but not in the v1.7 roadmap.
 
 - **Day-before call-time reminder**: an automatic Saturday-morning reminder sent only to people with a
   call time set (shown off-by-default in the imported design; not part of the owner's v1.7 ask).
+
 - **Per-message open/read visibility**: only if the "sent + bounces" decision is ever revisited.
 
 ## Out of Scope
@@ -114,6 +127,7 @@ Not blocking scope, but flagged by research for the phase that owns them:
 - **SLIDES-diff fingerprint granularity** (Phase 62, Re-lock Change Notice) — coarse "slides changed"
   vs per-slide-group hash. ARCHITECTURE proposes a lightweight per-group text-hash on the lock
   snapshot; confirm at `/gsd-discuss-phase 62`.
+
 - **Provider account + domain auth (SPF/DKIM/DMARC)** (Phase 59, Messages Composer & Send Path) —
   owner DNS work that must complete before any "it sends to the inbox" claim; depends on whether the
   church domain DNS is self-managed.
@@ -124,10 +138,10 @@ Which phases cover which requirements. Phase column filled during roadmap creati
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R130 | Phase 58 | Pending |
+| R130 | Phase 58 | Complete |
 | R131 | Phase 59 | Pending |
-| R132 | Phase 58 | Pending |
-| R133 | Phase 58 | Pending |
+| R132 | Phase 58 | Complete |
+| R133 | Phase 58 | Complete |
 | R134 | Phase 58 | Pending |
 | R135 | Phase 58 | Pending |
 | R136 | Phase 59 | Pending |
@@ -145,6 +159,7 @@ Which phases cover which requirements. Phase column filled during roadmap creati
 | R148 | Phase 62 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 19 total (R130–R148)
 - Mapped to phases: 19 (Phases 58-62)
 - Unmapped: 0 ✓

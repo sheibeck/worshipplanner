@@ -187,15 +187,18 @@ compressed under this project's `coarse` granularity setting:
   (R134/R135) and reads as a task rather than an observable outcome on its own. R132 (per-service
   messaging defaults) and R133 (org timezone) — pure settings/data-model work needing no send path —
   were folded in here rather than deferred, since both are testable the moment the Settings UI exists.
+
 - **Kept the composer+send phase (59) and the delivery-history+webhook phase (60) separate**, despite
   both being deploy-gated — the bounce webhook is flagged by every research pass as a genuinely new
   unauthenticated trust boundary that earns its own explicit HMAC-verification success criterion,
   not a footnote inside a larger phase.
+
 - **Merged research's Phase 5 (lock notification) and Phase 6 (scheduled reminder) into Phase 61.**
   Both are single-requirement "automatic trigger" additions that only consume the send primitive and
   resolver already built by that point; research explicitly notes they're independent of each other
   and can land in either order — exactly the shape `coarse` says to combine rather than ship as two
   thin phases.
+
 - **Kept research's Phase 7 (re-lock scoped diff) as its own phase, last, unmerged** — unanimous across
   all four research files as the highest-complexity, most novel piece, depending on the lock-snapshot
   mechanism, send primitive, and recipient resolver all being solid first. This is the one hard
@@ -210,8 +213,10 @@ change ships built, tested, and undeployed, with the exact command handed to the
 - **Phase 59** — `queueServiceMessage` + `sendQueuedMessage` Cloud Functions, plus the owner's Resend
   account creation and domain SPF/DKIM/DMARC DNS setup (a prerequisite for mail actually reaching an
   inbox, not merely for the code to run).
+
 - **Phase 60** — `messageWebhook` Cloud Function, plus configuring the webhook URL in the Resend
   dashboard.
+
 - **Phase 61** — `sendScheduledReminders` Cloud Function (daily cron).
 - **Phase 62** — no new Function; reuses Phase 59's send primitive and Phase 58's `lockSnapshots` rules
   block.
@@ -231,30 +236,37 @@ raw body before any Firestore write.
 ## Phase Details
 
 ### Phase 58: Messaging Infrastructure, Settings & Recipient Resolution
+
 **Goal**: The org has messaging plumbing in place — a kill switch, a local timezone, per-service
 messaging-default overrides, and one shared way to resolve who a service's send reaches — safely inert
 until later phases add real sends.
 **Depends on**: Nothing (first phase of v1.7)
 **Requirements**: R130, R132, R133, R134, R135
 **Success Criteria** (what must be TRUE):
+
   1. An org owner can see and toggle a global "Messaging" switch on the Settings screen; a fresh org
      starts with it OFF.
+
   2. An org can set its local timezone in Settings, giving later scheduled sends a time zone to fire in.
   3. A service in Draft shows per-service messaging-default overrides (lock notification, reminder
      enabled + days-before) that inherit from the org's Settings until explicitly changed; a locked
      service's overrides are read-only.
+
   4. Given any service, one shared resolver returns teams (Worship/Tech/Vocals/Hosts/Everyone) grouping
      the assigned roles, deduped by person, with an unreachable/open-roles count for roles that have no
      email — the only recipient-resolution logic any later phase writes.
+
   5. The new `messages`/`recipients`/`lockSnapshots` collections are denied by default in
      `firestore.rules`, proven by an emulator test suite that includes a genuine allow-case, not only
      deny-cases.
-**Plans**: 5 plans
-  - [ ] 58-01-PLAN.md — Data model, settings merge & messaging kill-switch gate (R130/R132/R133)
+**Plans**: 1/5 plans executed
+
+  - [x] 58-01-PLAN.md — Data model, settings merge & messaging kill-switch gate (R130/R132/R133)
   - [ ] 58-02-PLAN.md — Pure recipient resolver: teams, dedup, unreachable count (R134/R135)
   - [ ] 58-03-PLAN.md — firestore.rules messages/recipients/lockSnapshots + emulator ALLOW/deny tests
   - [ ] 58-04-PLAN.md — Settings "Messaging" card: kill-switch, org defaults, timezone (R130/R132/R133)
   - [ ] 58-05-PLAN.md — Per-service messaging defaults: store action + Service Order panel (R132)
+
 **UI hint**: yes
 
 Notes: Ships built/tested/undeployed — the `firestore.rules` additions need an owner
@@ -263,23 +275,29 @@ command. No send path exists yet in this phase; R131 (backend send path) is deli
 where the actual Cloud Function holding the provider key is built.
 
 ### Phase 59: Messages Composer & Send Path
+
 **Goal**: A planner can compose and send a message to a service's volunteers, with the provider's API
 key confined to a single server-side Function.
 **Depends on**: Phase 58
 **Requirements**: R131, R136, R137, R138, R139, R140, R141
 **Success Criteria** (what must be TRUE):
+
   1. A ✉ Messages button on a service (hidden or disabled when the org's Messaging switch is off) opens
      a composer whose recipients are teams first, with individuals addable below.
+
   2. The composer supports three message types — One-off, Reminder, Share service link — with a
      subject and a body that accepts insertable tokens (service date, service link, their roles, song
      list).
+
   3. The composer shows a live "Reaches N people" count reflecting the current selection minus
      unreachable roles, and offers attach-service-order-link, send-me-a-copy, and schedule-for-later
      options.
+
   4. Sending delivers one personalized email per recipient — the "their roles" token renders that
      person's own roles, not a shared block — through `queueServiceMessage` (onCall) →
      `sendQueuedMessage` (onDocumentCreated), the only Function that ever holds the provider secret,
      with a transactional idempotency check that stops a retried trigger from sending twice.
+
   5. Provider account setup (Resend) and domain authentication (SPF/DKIM/DMARC DNS records) are owner
      steps; the send Functions ship built/tested/undeployed with the exact
      `firebase deploy --only functions:...` command handed to the owner.
@@ -291,16 +309,20 @@ the church domain DNS is self-managed; confirm at `/gsd-discuss-phase 59`. No se
 until the owner completes domain auth, even after the Function is deployed.
 
 ### Phase 60: Delivery History & Bounce Webhook
+
 **Goal**: A planner can see what was sent on a service and knows immediately when an address hard-
 bounced.
 **Depends on**: Phase 59
 **Requirements**: R142, R143
 **Success Criteria** (what must be TRUE):
+
   1. Each service has a "Sent on this service" history listing every message with its type
      (automatic/one-off/scheduled), recipient count, and send time.
+
   2. A hard bounce surfaces per message in that history with an affordance to fix the bad address.
   3. The bounce webhook verifies the provider's HMAC signature over the raw request body before
      touching Firestore; an unsigned or malformed request is rejected (401/400) with zero writes.
+
   4. A duplicate webhook delivery for the same bounce event is a safe no-op (idempotent status
      overwrite), never a duplicate count.
 **Plans**: TBD
@@ -310,18 +332,23 @@ Notes: Deploy-gated — `messageWebhook` (onRequest) ships built/tested/undeploy
 deploys, configuring the provider's webhook URL in the Resend dashboard is a separate owner step.
 
 ### Phase 61: Automatic Notifications — Lock & Scheduled Reminder
+
 **Goal**: Volunteers are notified automatically when a service locks and reminded automatically before
 it happens, with no planner action either time.
 **Depends on**: Phase 58, Phase 59
 **Requirements**: R144, R145
 **Success Criteria** (what must be TRUE):
+
   1. Locking a service for the first time can automatically email everyone assigned — their roles, the
      song list, and a link to the service order — governed by the per-service/Settings default from
      Phase 58.
+
   2. The lock email never sends while the service is a draft or while the org's Messaging switch is
      off.
+
   3. The shared service link auto-sends to everyone assigned N days before the service (default 7,
      configurable), firing at the org's local time of day (R133).
+
   4. The reminder is skipped while the service is still a draft, and a retried scheduled run never
      sends the same reminder twice for the same service.
 **Plans**: TBD
@@ -332,16 +359,20 @@ with the exact deploy command; the `lockSnapshots/current` write on first lock i
 Firestore write covered by Phase 58's rules and needs no separate deploy.
 
 ### Phase 62: Re-lock Change Notice — Scoped Diff
+
 **Goal**: After editing a locked service and re-locking it, the planner can see exactly what changed
 and choose who to tell.
 **Depends on**: Phase 58, Phase 59, Phase 61
 **Requirements**: R146, R147, R148
 **Success Criteria** (what must be TRUE):
+
   1. Re-locking a service that was already locked once prompts the planner with a scoped change diff of
      typed, checkable entries (SONG / ORDER / ROLE / NOTES / SLIDES).
+
   2. Each entry is tagged with the teams it affects — a ROLE entry tags exactly that role's team; every
      other entry type defaults to all assigned teams — and the planner can send the notice to only the
      affected teams or to everyone on the service.
+
   3. "Lock quietly" is always available to re-lock without sending anything.
   4. Confirming either a notify-send or a quiet lock overwrites `lockSnapshots/current`, so the next
      re-lock diffs against this new state, not the original lock.

@@ -2,14 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.7
 milestone_name: Volunteer Messaging & Notifications
-status: planning
-last_updated: "2026-08-13T19:45:00.000Z"
+current_phase: 58
+current_phase_name: Messaging Infrastructure, Settings & Recipient Resolution
+status: executing
+stopped_at: Completed 58-01-PLAN.md
+last_updated: "2026-08-13T20:12:01.385Z"
 last_activity: 2026-08-13
+last_activity_desc: Phase 58 execution started
 progress:
   total_phases: 5
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 5
+  completed_plans: 1
   percent: 0
 ---
 
@@ -262,7 +266,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 58 — messaging-infrastructure-settings-recipient-resolution (v1.7 ROADMAP.md created 2026-08-13, ready to plan)
+**Current focus:** Phase 58 — Messaging Infrastructure, Settings & Recipient Resolution
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -272,10 +276,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: 58 — Messaging Infrastructure, Settings & Recipient Resolution (not yet planned)
-Plan: —
-Status: Roadmap created; ready to plan
-Last activity: 2026-08-13 — v1.7 ROADMAP.md created (Phases 58-62, 19/19 requirements mapped)
+Phase: 58 (Messaging Infrastructure, Settings & Recipient Resolution) — EXECUTING
+Plan: 2 of 5
+Status: Ready to execute
+Last activity: 2026-08-13 — Phase 58 execution started
 
 ## ⏸ RESUME HERE (2026-08-13 — v1.7 ROADMAP.md created, ready to plan Phase 58)
 
@@ -315,12 +319,15 @@ v1.6, which ended at Phase 57** — v1.7 starts at Phase 58, not reset.
   task rather than an observable outcome under `coarse`. R132 (per-service messaging defaults) and
   R133 (org timezone) were folded in too — both are pure settings/data-model work, testable the moment
   the Settings UI exists, with no send path required.
+
 - **Kept Phase 59 (composer+send) and Phase 60 (delivery+webhook) separate**, despite both being
   deploy-gated — the bounce webhook is flagged by every research pass as a genuinely new unauthenticated
   trust boundary that earns its own explicit HMAC-verification success criterion.
+
 - **Merged research's Phase 5 (lock notification) and Phase 6 (scheduled reminder) into Phase 61** —
   both single-requirement automatic-trigger phases, explicitly noted by research as independent of each
   other and able to land in either order.
+
 - **Kept research's Phase 7 (re-lock scoped diff) as its own phase, last, unmerged** — unanimous across
   all four research files as the highest-complexity, most novel piece; the one hard sequencing
   constraint that overrides `coarse` compression.
@@ -330,6 +337,7 @@ v1.6, which ended at Phase 57** — v1.7 starts at Phase 58, not reset.
 - Phase 59 depends on Phase 58 (resolver + rules + kill-switch must exist before any send surface).
 - Phase 60 depends on Phase 59 (delivery history reads the `messages`/`recipients` doc shape and
   provider message-id Phase 59 establishes).
+
 - Phase 61 depends on Phase 58 + Phase 59 (consumes the resolver and the send primitive).
 - Phase 62 depends on Phase 58 + Phase 59 + Phase 61 — the lock-snapshot mechanism (Phase 61) must exist
   before there is anything to diff against.
@@ -340,8 +348,10 @@ tested, and undeployed, with the exact command handed to the owner:
 - **Phase 58** — `firestore.rules` additions for `messages`/`recipients`/`lockSnapshots`.
 - **Phase 59** — `queueServiceMessage` + `sendQueuedMessage` Cloud Functions, plus the owner's Resend
   account creation and domain SPF/DKIM/DMARC DNS setup.
+
 - **Phase 60** — `messageWebhook` Cloud Function, plus configuring the webhook URL in the Resend
   dashboard.
+
 - **Phase 61** — `sendScheduledReminders` Cloud Function (daily cron).
 - **Phase 62** — no new Function; reuses Phase 59's send primitive and Phase 58's `lockSnapshots` rules.
 
@@ -1708,6 +1718,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 53 P03 | 20min | 2 tasks | 2 files |
 | Phase 54 P02 | 40 | 2 tasks | 4 files |
 | Phase 55 P03 | 35min | 3 tasks | 7 files |
+| Phase 58 P01 | 25min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -2056,6 +2067,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: R122: slot-level notes? on the base MediaAttachableSlot (cast-free on all 5 kinds, distinct from Service.notes); one shared responsive notes input beside every selector; emptied value dropped by stripUndefined
 - [Phase ?]: Roboto added as sixth curated @fontsource slide font (^5.3.0, OFL-1.1); Inter stays first/default; adding a font = one registry entry + one static-prefix loader line + test count bump
 - [Phase ?]: Quick task 260812-izz: removed BPM from share link and print, added universal per-item notes for all slot kinds on both surfaces, confirmed MISC-0-slides (R123) still correct with no code change. Full vitest run surfaced a third failing suite (render-service/src/render.test.ts, pre-existing vitest 4.0.18/4.1.10 version mismatch) not in CLAUDE.md's documented 2-file baseline — unrelated to this task, flagged for the owner.
+- [Phase ?]: DEFAULT_ORG_SETTINGS.messaging.enabled defaults false (fail-closed, R130) — deliberate deviation from aiEnabled/pcEnabled, asserted by a unit test
+- [Phase ?]: messaging deep-merged in loadOrgContext parallel to slideTypography's WR-01 fix; timezone flat-merges via the existing outer spread; no dual-read/migration needed for either new field
 
 ### Roadmap Evolution
 
@@ -2373,8 +2386,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-12T18:55:00.000Z
-Stopped at: Completed quick task 260812-khb (Songs import buttons rename/PC-gate + permanent hidden-song delete)
+Last session: 2026-08-13T20:12:01.320Z
+Stopped at: Completed 58-01-PLAN.md
 Resume file: None
 
 ## Operator Next Steps
