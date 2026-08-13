@@ -5,15 +5,15 @@ milestone_name: Volunteer Messaging & Notifications
 current_phase: 58
 current_phase_name: Messaging Infrastructure, Settings & Recipient Resolution
 status: executing
-stopped_at: Completed 58-01-PLAN.md
-last_updated: "2026-08-13T20:12:01.385Z"
+stopped_at: Completed 58-02-PLAN.md
+last_updated: "2026-08-13T20:22:54.231Z"
 last_activity: 2026-08-13
 last_activity_desc: Phase 58 execution started
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 5
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -277,7 +277,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 ## Current Position
 
 Phase: 58 (Messaging Infrastructure, Settings & Recipient Resolution) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
 Last activity: 2026-08-13 — Phase 58 execution started
 
@@ -1719,6 +1719,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 54 P02 | 40 | 2 tasks | 4 files |
 | Phase 55 P03 | 35min | 3 tasks | 7 files |
 | Phase 58 P01 | 25min | 2 tasks | 6 files |
+| Phase 58 P02 | 25min | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -2069,6 +2070,8 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Quick task 260812-izz: removed BPM from share link and print, added universal per-item notes for all slot kinds on both surfaces, confirmed MISC-0-slides (R123) still correct with no code change. Full vitest run surfaced a third failing suite (render-service/src/render.test.ts, pre-existing vitest 4.0.18/4.1.10 version mismatch) not in CLAUDE.md's documented 2-file baseline — unrelated to this task, flagged for the owner.
 - [Phase ?]: DEFAULT_ORG_SETTINGS.messaging.enabled defaults false (fail-closed, R130) — deliberate deviation from aiEnabled/pcEnabled, asserted by a unit test
 - [Phase ?]: messaging deep-merged in loadOrgContext parallel to slideTypography's WR-01 fix; timezone flat-merges via the existing outer spread; no dual-read/migration needed for either new field
+- [Phase ?]: 58-02: resolveRecipients silently skips stale/deleted personIds without inflating unreachableCount (resolves 58-RESEARCH.md Open Question 1)
+- [Phase ?]: 58-02: MESSAGING_TEAM_LABELS is its own standalone RoleGroup label constant, independent of RolesConfigPanel.vue's groupLabels
 
 ### Roadmap Evolution
 
@@ -2386,8 +2389,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-13T20:12:01.320Z
-Stopped at: Completed 58-01-PLAN.md
+Last session: 2026-08-13T20:22:54.183Z
+Stopped at: Completed 58-02-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

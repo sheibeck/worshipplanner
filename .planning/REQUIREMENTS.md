@@ -36,11 +36,11 @@ Requirements for the v1.7 milestone. Each maps to exactly one roadmap phase (see
 
 ### Recipient Resolution
 
-- [ ] **R134**: When composing or auto-sending, recipients are resolved from the roles assigned on the
+- [x] **R134**: When composing or auto-sending, recipients are resolved from the roles assigned on the
       service and grouped into selectable teams (e.g. Worship, Tech, Vocals, Hosts) plus an
       "Everyone on this service" option.
 
-- [ ] **R135**: A person assigned to multiple teams is emailed once (deduped by address); roles with no
+- [x] **R135**: A person assigned to multiple teams is emailed once (deduped by address); roles with no
       email are excluded from the send and surfaced to the planner as an unreachable/open-roles count.
 
 ### Messages Composer & Send
@@ -142,8 +142,8 @@ Which phases cover which requirements. Phase column filled during roadmap creati
 | R131 | Phase 59 | Pending |
 | R132 | Phase 58 | Complete |
 | R133 | Phase 58 | Complete |
-| R134 | Phase 58 | Pending |
-| R135 | Phase 58 | Pending |
+| R134 | Phase 58 | Complete |
+| R135 | Phase 58 | Complete |
 | R136 | Phase 59 | Pending |
 | R137 | Phase 59 | Pending |
 | R138 | Phase 59 | Pending |
