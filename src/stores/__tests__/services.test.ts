@@ -935,6 +935,98 @@ describe('useServiceStore', () => {
     })
   })
 
+  describe('setServiceMessagingDefaults', () => {
+    it('writes only the changed messaging.<key> dot-path(s), plus updatedAt', async () => {
+      const { updateDoc, serverTimestamp } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+
+      await store.setServiceMessagingDefaults('service-1', { lockNotifyEnabled: true })
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const callArgs = vi.mocked(updateDoc).mock.calls[0]!
+      const data = callArgs[1] as unknown as Record<string, unknown>
+      expect(data['messaging.lockNotifyEnabled']).toBe(true)
+      expect(data.updatedAt).toBeDefined()
+      expect(serverTimestamp).toHaveBeenCalled()
+      // Exactly the one scoped key + updatedAt — never the bare whole-map key.
+      expect(Object.keys(data).sort()).toEqual(['messaging.lockNotifyEnabled', 'updatedAt'])
+      expect(data.messaging).toBeUndefined()
+    })
+
+    it('writes a null leaf to mean "inherit the org default"', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+
+      await store.setServiceMessagingDefaults('service-1', { reminderEnabled: null })
+
+      const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+      expect(data['messaging.reminderEnabled']).toBeNull()
+    })
+
+    it('persists reminderDaysBefore as a number|null, never the raw <select> string', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+
+      await store.setServiceMessagingDefaults('service-1', { reminderDaysBefore: 7 })
+
+      const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+      expect(data['messaging.reminderDaysBefore']).toBe(7)
+      expect(typeof data['messaging.reminderDaysBefore']).toBe('number')
+    })
+
+    it('writes multiple changed keys in a single call when the patch has more than one leaf', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+
+      await store.setServiceMessagingDefaults('service-1', {
+        lockNotifyEnabled: true,
+        reminderEnabled: true,
+        reminderDaysBefore: 3,
+      })
+
+      expect(updateDoc).toHaveBeenCalledOnce()
+      const data = vi.mocked(updateDoc).mock.calls[0]![1] as unknown as Record<string, unknown>
+      expect(data['messaging.lockNotifyEnabled']).toBe(true)
+      expect(data['messaging.reminderEnabled']).toBe(true)
+      expect(data['messaging.reminderDaysBefore']).toBe(3)
+    })
+
+    it('mirrors the applied patch into the local services.value entry', async () => {
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      store.subscribe('org-1')
+      triggerSnapshot([makeService()])
+
+      await store.setServiceMessagingDefaults('service-1', {
+        lockNotifyEnabled: true,
+        reminderDaysBefore: 3,
+      })
+
+      const local = store.services.find((s) => s.id === 'service-1')
+      expect(local?.messaging?.lockNotifyEnabled).toBe(true)
+      expect(local?.messaging?.reminderDaysBefore).toBe(3)
+    })
+
+    it('no-ops when orgId is unset', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const { useServiceStore } = await import('../services')
+      const store = useServiceStore()
+      // No subscribe() call — orgId stays null.
+
+      await store.setServiceMessagingDefaults('service-1', { lockNotifyEnabled: true })
+
+      expect(updateDoc).not.toHaveBeenCalled()
+    })
+  })
+
   describe('createShareToken', () => {
     // ensureShareLink's FIRST getDoc call (41-03) is the serviceShareLinks/{id}
     // read, which precedes the org-document read these tests were originally
@@ -1824,6 +1916,28 @@ describe('useServiceStore', () => {
       await store.clearRoleOverride('service-1', 'role-1')
 
       expect(updateDoc).toHaveBeenCalledTimes(2)
+    })
+
+    // ★ Same shape as setRoleOverride/clearRoleOverride above — this action
+    // also bypasses updateService and carries its own updateDoc, so without
+    // its own guard the store layer would not cover it at all (R036).
+    it('refuses setServiceMessagingDefaults on a locked service, and does not call updateDoc', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const store = await storeAtStatus('planned')
+
+      await expect(
+        store.setServiceMessagingDefaults('service-1', { lockNotifyEnabled: true }),
+      ).rejects.toThrow(/R036/)
+      expect(updateDoc).not.toHaveBeenCalled()
+    })
+
+    it('still allows setServiceMessagingDefaults on a draft service', async () => {
+      const { updateDoc } = await import('firebase/firestore')
+      const store = await storeAtStatus('draft')
+
+      await store.setServiceMessagingDefaults('service-1', { lockNotifyEnabled: true })
+
+      expect(updateDoc).toHaveBeenCalledOnce()
     })
   })
 
