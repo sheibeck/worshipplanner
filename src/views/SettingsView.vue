@@ -459,6 +459,158 @@
         </div>
       </div>
 
+      <!-- Messaging section (R130/R132/R133, Phase 58) — explains before offering
+           the switch, mirrors the AI Features card exactly (58-UI-SPEC.md). -->
+      <div class="rounded-lg bg-gray-900 border border-gray-800 p-4 mt-6">
+        <h2 class="text-sm font-semibold text-gray-300 mb-3">Messaging</h2>
+
+        <!-- Explanatory copy FIRST -->
+        <p class="text-xs text-gray-400 mb-3">
+          Send email to the volunteers assigned to a service — locked-service notices,
+          share-link reminders, and one-off messages. Turn it off and no email goes out;
+          nothing else about your service plans changes.
+        </p>
+
+        <!-- Toggle SECOND -->
+        <label
+          class="flex items-center gap-3"
+          :class="authStore.isEditor ? 'cursor-pointer' : 'opacity-60 cursor-not-allowed'"
+        >
+          <input
+            v-model="messagingEnabledInput"
+            type="checkbox"
+            :disabled="!authStore.isEditor"
+            @change="onToggleMessagingEnabled"
+            data-testid="messaging-enabled-toggle"
+            class="h-4 w-4 rounded border-gray-700 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0"
+          />
+          <span class="text-sm text-gray-200">Enable volunteer email messaging</span>
+        </label>
+
+        <p v-if="messagingSavedFeedback" class="text-green-400 text-sm mt-2">Saved!</p>
+        <p v-if="messagingSaveError" class="text-red-400 text-sm mt-2">{{ messagingSaveError }}</p>
+
+        <!-- Automatic email defaults sub-block — mirrors the PC Integration card's
+             credential-reveal pattern exactly (v-if wrapping mt-6 pt-6 border-t). -->
+        <div v-if="messagingEnabledInput" class="mt-6 pt-6 border-t border-gray-800">
+          <p class="text-xs text-gray-400 mb-3">
+            These are the starting values for every service — a planner can still override
+            them per service while it's in Draft.
+          </p>
+
+          <label
+            class="flex items-center gap-3"
+            :class="authStore.isEditor ? 'cursor-pointer' : 'opacity-60 cursor-not-allowed'"
+          >
+            <input
+              v-model="lockNotifyDefaultInput"
+              type="checkbox"
+              :disabled="!authStore.isEditor"
+              @change="onToggleLockNotifyDefault"
+              data-testid="messaging-lock-notify-toggle"
+              class="h-4 w-4 rounded border-gray-700 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0"
+            />
+            <span class="text-sm text-gray-200">Email everyone when a service is locked</span>
+          </label>
+          <p v-if="lockNotifySavedFeedback" class="text-green-400 text-sm mt-2">Saved!</p>
+          <p v-if="lockNotifySaveError" class="text-red-400 text-sm mt-2">{{ lockNotifySaveError }}</p>
+
+          <label
+            class="flex items-center gap-3 mt-3"
+            :class="authStore.isEditor ? 'cursor-pointer' : 'opacity-60 cursor-not-allowed'"
+          >
+            <input
+              v-model="reminderEnabledInput"
+              type="checkbox"
+              :disabled="!authStore.isEditor"
+              @change="onToggleReminderEnabled"
+              data-testid="messaging-reminder-enabled-toggle"
+              class="h-4 w-4 rounded border-gray-700 bg-gray-800 text-indigo-600 focus:ring-indigo-500 focus:ring-offset-0"
+            />
+            <span class="text-sm text-gray-200">Send the service link before the service</span>
+          </label>
+          <p v-if="reminderEnabledSavedFeedback" class="text-green-400 text-sm mt-2">Saved!</p>
+          <p v-if="reminderEnabledSaveError" class="text-red-400 text-sm mt-2">{{ reminderEnabledSaveError }}</p>
+
+          <div v-if="reminderEnabledInput" class="mt-3">
+            <label class="block text-xs text-gray-400 mb-1">Send it this many days before the service</label>
+            <select
+              v-model.number="reminderDaysBeforeInput"
+              :disabled="!authStore.isEditor"
+              @change="onChangeReminderDaysBefore"
+              data-testid="messaging-reminder-days-select"
+              class="w-full sm:w-80 bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            >
+              <option v-for="days in reminderDaysBeforeOptions" :key="days" :value="days">{{ days }}</option>
+            </select>
+            <p v-if="reminderDaysBeforeSavedFeedback" class="text-green-400 text-sm mt-2">Saved!</p>
+            <p v-if="reminderDaysBeforeSaveError" class="text-red-400 text-sm mt-2">
+              {{ reminderDaysBeforeSaveError }}
+            </p>
+          </div>
+
+          <!-- From name / Reply-to — explicit-Save free-text sub-form, mirrors the
+               Organization Name field's explicit-Save pattern exactly. -->
+          <div class="mt-6 pt-6 border-t border-gray-800 space-y-3">
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">From name</label>
+              <input
+                v-model="fromNameInput"
+                type="text"
+                placeholder="e.g. First Baptist Church"
+                :disabled="!authStore.isEditor"
+                data-testid="messaging-from-name-input"
+                class="w-full sm:w-80 bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500"
+              />
+            </div>
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Reply-to email</label>
+              <input
+                v-model="replyToInput"
+                type="text"
+                placeholder="e.g. planning@yourchurch.org"
+                :disabled="!authStore.isEditor"
+                data-testid="messaging-reply-to-input"
+                class="w-full sm:w-80 bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 placeholder-gray-500"
+              />
+            </div>
+
+            <div class="flex items-center gap-3">
+              <button
+                type="button"
+                @click="onSaveMessagingEmail"
+                :disabled="messagingEmailSaving || !authStore.isEditor"
+                data-testid="messaging-email-save-button"
+                class="inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white rounded-md px-4 py-2 text-sm font-medium transition-colors"
+              >
+                {{ messagingEmailSaving ? 'Saving...' : messagingEmailSavedFeedback ? 'Saved!' : 'Save' }}
+              </button>
+            </div>
+            <p v-if="messagingEmailSaveError" class="text-red-400 text-sm mt-2">{{ messagingEmailSaveError }}</p>
+          </div>
+        </div>
+
+        <!-- Organization timezone — always visible, NOT gated by the kill-switch
+             (conceptually org-wide, per 58-CONTEXT.md). -->
+        <div class="mt-6 pt-6 border-t border-gray-800">
+          <label class="block text-xs text-gray-400 mb-1">Organization timezone</label>
+          <select
+            v-model="timezoneInput"
+            :disabled="!authStore.isEditor"
+            @change="onChangeTimezone"
+            data-testid="messaging-timezone-select"
+            class="w-full sm:w-80 bg-gray-800 border border-gray-700 text-gray-100 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+          >
+            <option v-for="tz in TIMEZONE_OPTIONS" :key="tz.value" :value="tz.value">{{ tz.label }}</option>
+          </select>
+          <p class="text-xs text-gray-500 mt-2">
+            Used by the scheduled service-link reminder, once messaging is turned on above.
+          </p>
+          <p v-if="timezoneSavedFeedback" class="text-green-400 text-sm mt-2">Saved!</p>
+          <p v-if="timezoneSaveError" class="text-red-400 text-sm mt-2">{{ timezoneSaveError }}</p>
+        </div>
+      </div>
+
     </div>
   </AppShell>
 </template>
@@ -533,6 +685,52 @@ const slideFontWeightInput = ref(authStore.settings.slideTypography.fontWeight)
 const slideFontScaleInput = ref(authStore.settings.slideTypography.fontScale)
 const slideTypographySavedFeedback = ref(false)
 const slideTypographySaveError = ref<string | null>(null)
+
+// ── Messaging kill-switch + automatic email defaults state (R130/R132, Phase 58) ──
+// IMPORTANT: seeded from authStore.settings.messaging.enabled, which resolves to
+// `false` for a fresh org via DEFAULT_ORG_SETTINGS — the one deliberate divergence
+// from aiEnabled/pcEnabled's default-true seed above (58-PATTERNS.md).
+
+const messagingEnabledInput = ref(authStore.settings.messaging.enabled)
+const messagingSavedFeedback = ref(false)
+const messagingSaveError = ref<string | null>(null)
+
+const lockNotifyDefaultInput = ref(authStore.settings.messaging.lockNotifyDefault)
+const lockNotifySavedFeedback = ref(false)
+const lockNotifySaveError = ref<string | null>(null)
+
+const reminderEnabledInput = ref(authStore.settings.messaging.reminderEnabled)
+const reminderEnabledSavedFeedback = ref(false)
+const reminderEnabledSaveError = ref<string | null>(null)
+
+const reminderDaysBeforeOptions = [1, 2, 3, 5, 7, 10, 14] as const
+const reminderDaysBeforeInput = ref(authStore.settings.messaging.reminderDaysBefore)
+const reminderDaysBeforeSavedFeedback = ref(false)
+const reminderDaysBeforeSaveError = ref<string | null>(null)
+
+const fromNameInput = ref(authStore.settings.messaging.fromName ?? '')
+const replyToInput = ref(authStore.settings.messaging.replyTo ?? '')
+const messagingEmailSaving = ref(false)
+const messagingEmailSavedFeedback = ref(false)
+const messagingEmailSaveError = ref<string | null>(null)
+
+// ── Organization timezone state (R133, Phase 58) ───────────────────────────────
+// Curated shortlist (58-CONTEXT.md's "Claude's Discretion") rather than the full
+// IANA list — labeled by common name, valued by IANA string.
+
+const TIMEZONE_OPTIONS = [
+  { value: 'America/New_York', label: 'Eastern (America/New_York)' },
+  { value: 'America/Chicago', label: 'Central (America/Chicago)' },
+  { value: 'America/Denver', label: 'Mountain (America/Denver)' },
+  { value: 'America/Phoenix', label: 'Arizona, no DST (America/Phoenix)' },
+  { value: 'America/Los_Angeles', label: 'Pacific (America/Los_Angeles)' },
+  { value: 'America/Anchorage', label: 'Alaska (America/Anchorage)' },
+  { value: 'Pacific/Honolulu', label: 'Hawaii (Pacific/Honolulu)' },
+] as const
+
+const timezoneInput = ref(authStore.settings.timezone)
+const timezoneSavedFeedback = ref(false)
+const timezoneSaveError = ref<string | null>(null)
 
 /** Per-family weight ramp (46-01's SLIDE_FONTS), re-derived every time the
  *  selected family changes — drives the Weight <select>'s option list. */
@@ -660,6 +858,26 @@ watch(
     slideFontScaleInput.value = val.fontScale
   },
   { deep: true },
+)
+
+watch(
+  () => authStore.settings.messaging,
+  (val) => {
+    messagingEnabledInput.value = val.enabled
+    lockNotifyDefaultInput.value = val.lockNotifyDefault
+    reminderEnabledInput.value = val.reminderEnabled
+    reminderDaysBeforeInput.value = val.reminderDaysBefore
+    fromNameInput.value = val.fromName ?? ''
+    replyToInput.value = val.replyTo ?? ''
+  },
+  { deep: true },
+)
+
+watch(
+  () => authStore.settings.timezone,
+  (val) => {
+    timezoneInput.value = val
+  },
 )
 
 // ── Save action (Org name) ─────────────────────────────────────────────────────
@@ -978,5 +1196,166 @@ async function onChangeSlideFontFamily() {
   // failures rather than leave one loose.
   loadFontCss(slideFontFamilyInput.value, snapped).catch(() => {})
   await saveSlideTypography()
+}
+
+// ── Messaging kill-switch action (R130) ─────────────────────────────────────────
+// Mirror-write template follows onToggleAiEnabled/onTogglePcEnabled verbatim: a
+// quoted dot-path leaf key, never a whole-map write.
+
+async function onToggleMessagingEnabled() {
+  if (!authStore.orgId || !authStore.isEditor) return
+
+  const newValue = messagingEnabledInput.value
+  messagingSaveError.value = null
+
+  try {
+    await updateDoc(doc(db, 'organizations', authStore.orgId), { 'settings.messaging.enabled': newValue })
+    authStore.settings.messaging.enabled = newValue
+
+    messagingSavedFeedback.value = true
+    setTimeout(() => {
+      messagingSavedFeedback.value = false
+    }, 2000)
+  } catch (err) {
+    console.error('[SettingsView] save messaging.enabled error:', err)
+    messagingSaveError.value = 'Failed to save. Please try again.'
+    // Revert the local checkbox to reflect the unsaved state
+    messagingEnabledInput.value = !newValue
+  }
+}
+
+// ── Automatic email defaults actions (R132) ─────────────────────────────────────
+
+async function onToggleLockNotifyDefault() {
+  if (!authStore.orgId || !authStore.isEditor) return
+
+  const newValue = lockNotifyDefaultInput.value
+  lockNotifySaveError.value = null
+
+  try {
+    await updateDoc(doc(db, 'organizations', authStore.orgId), {
+      'settings.messaging.lockNotifyDefault': newValue,
+    })
+    authStore.settings.messaging.lockNotifyDefault = newValue
+
+    lockNotifySavedFeedback.value = true
+    setTimeout(() => {
+      lockNotifySavedFeedback.value = false
+    }, 2000)
+  } catch (err) {
+    console.error('[SettingsView] save messaging.lockNotifyDefault error:', err)
+    lockNotifySaveError.value = 'Failed to save. Please try again.'
+    lockNotifyDefaultInput.value = !newValue
+  }
+}
+
+async function onToggleReminderEnabled() {
+  if (!authStore.orgId || !authStore.isEditor) return
+
+  const newValue = reminderEnabledInput.value
+  reminderEnabledSaveError.value = null
+
+  try {
+    await updateDoc(doc(db, 'organizations', authStore.orgId), {
+      'settings.messaging.reminderEnabled': newValue,
+    })
+    authStore.settings.messaging.reminderEnabled = newValue
+
+    reminderEnabledSavedFeedback.value = true
+    setTimeout(() => {
+      reminderEnabledSavedFeedback.value = false
+    }, 2000)
+  } catch (err) {
+    console.error('[SettingsView] save messaging.reminderEnabled error:', err)
+    reminderEnabledSaveError.value = 'Failed to save. Please try again.'
+    reminderEnabledInput.value = !newValue
+  }
+}
+
+// reminderDaysBefore MUST persist as a number — `v-model.number` already coerces
+// the local ref, but the write itself re-wraps in Number(...) so a revert-on-error
+// restores a real numeric prior value, never a stringified one (58-RESEARCH.md
+// Pitfall 5).
+async function onChangeReminderDaysBefore() {
+  if (!authStore.orgId || !authStore.isEditor) return
+
+  const previous = authStore.settings.messaging.reminderDaysBefore
+  const newValue = Number(reminderDaysBeforeInput.value)
+  reminderDaysBeforeSaveError.value = null
+
+  try {
+    await updateDoc(doc(db, 'organizations', authStore.orgId), {
+      'settings.messaging.reminderDaysBefore': newValue,
+    })
+    authStore.settings.messaging.reminderDaysBefore = newValue
+
+    reminderDaysBeforeSavedFeedback.value = true
+    setTimeout(() => {
+      reminderDaysBeforeSavedFeedback.value = false
+    }, 2000)
+  } catch (err) {
+    console.error('[SettingsView] save messaging.reminderDaysBefore error:', err)
+    reminderDaysBeforeSaveError.value = 'Failed to save. Please try again.'
+    // Revert to the prior NUMERIC value, not a two-way flip.
+    reminderDaysBeforeInput.value = previous
+  }
+}
+
+// From name / Reply-to save together under one explicit Save button (mirrors the
+// Organization Name field's explicit-Save pattern) — an empty string clears the
+// field, same as PC credentials' clear semantics.
+async function onSaveMessagingEmail() {
+  if (!authStore.orgId || !authStore.isEditor) return
+
+  messagingEmailSaveError.value = null
+  messagingEmailSaving.value = true
+
+  try {
+    const fromName = fromNameInput.value.trim()
+    const replyTo = replyToInput.value.trim()
+
+    await updateDoc(doc(db, 'organizations', authStore.orgId), {
+      'settings.messaging.fromName': fromName,
+      'settings.messaging.replyTo': replyTo,
+    })
+    authStore.settings.messaging.fromName = fromName
+    authStore.settings.messaging.replyTo = replyTo
+
+    messagingEmailSavedFeedback.value = true
+    setTimeout(() => {
+      messagingEmailSavedFeedback.value = false
+    }, 2000)
+  } catch (err) {
+    console.error('[SettingsView] save messaging.fromName/replyTo error:', err)
+    messagingEmailSaveError.value = 'Failed to save. Please try again.'
+  } finally {
+    messagingEmailSaving.value = false
+  }
+}
+
+// ── Organization timezone action (R133) ─────────────────────────────────────────
+// Same triad as onChangeBibleVersion, adapted from a two-option radio to a
+// <select>: revert-on-error restores the prior IANA string value.
+
+async function onChangeTimezone() {
+  if (!authStore.orgId || !authStore.isEditor) return
+
+  const previous = authStore.settings.timezone
+  const newValue = timezoneInput.value
+  timezoneSaveError.value = null
+
+  try {
+    await updateDoc(doc(db, 'organizations', authStore.orgId), { 'settings.timezone': newValue })
+    authStore.settings.timezone = newValue
+
+    timezoneSavedFeedback.value = true
+    setTimeout(() => {
+      timezoneSavedFeedback.value = false
+    }, 2000)
+  } catch (err) {
+    console.error('[SettingsView] save timezone error:', err)
+    timezoneSaveError.value = 'Failed to save. Please try again.'
+    timezoneInput.value = previous
+  }
 }
 </script>
