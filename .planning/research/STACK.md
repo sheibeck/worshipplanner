@@ -1,152 +1,146 @@
-# Stack Research
+# Stack Research: Email/Transactional-Mail Provider (v1.7 Volunteer Messaging & Notifications)
 
-**Domain:** v1.5 "Settings, Sharing, and Fidelity" — additions to an existing shipped Vue 3 + Firebase app
-**Researched:** 2026-08-06
-**Confidence:** MEDIUM (mixed — HIGH on npm package facts verified against the live registry, MEDIUM on Context7/official-doc claims, LOW on web-search-only claims such as NLT's terms of use and font metric comparisons; each finding below is tagged)
+**Domain:** Transactional email sending from a Firebase Cloud Functions backend (low-volume church app, ~50–2,000 emails/month)
+**Researched:** 2026-08-13
+**Confidence:** MEDIUM-HIGH (pricing/feature claims cross-checked across 2+ independent web sources per provider; Firebase secret-injection pattern confirmed directly against this repo's existing code, not just docs)
 
-## Summary Up Front
+## Answer to the owner's headline questions
 
-Four of the five questions need **zero or near-zero new runtime dependencies**. This milestone is overwhelmingly about *wiring the existing stack differently* (a new proxy target, a new rules-testing pattern, new CSS `@font-face` assets, a native `Intl` API) rather than adding libraries. The one place a real new dependency earns its place is font tooling, and even there the recommended path (`@fontsource/*`) needs **no build step at all** — it is pre-built static assets shipped as npm packages.
+**What email service do we use?** **Resend.**
+
+**How much does it cost?** **$0 (Free plan) at this project's realistic volume.** Resend's free tier is 3,000 emails/month and 100/day, with one verified sending domain. A church of 20–60 volunteers sending one-off messages, lock notifications, re-lock diffs, and a weekly 7-day-out reminder will land in the low hundreds of emails/month — nowhere near 3,000. If usage ever exceeds that, the next tier (Pro) is **$20/month for 50,000 emails**, an order of magnitude of headroom past anything this app will generate. Budget for **$0/month**, with a plausible ceiling of $20/month only if the org list grows dramatically.
 
 ## Recommended Stack
 
-### Core Technologies — No Changes
+### Core Technologies
 
-| Technology | Version (current) | Purpose | Why Recommended |
-|------------|---------|---------|-----------------|
-| Vue 3 / Vite / Pinia / Tailwind v4 / Firebase 12 | unchanged (`^3.5.29` / `^7.3.1` / `^3.0.4` / `^4.0.0` / `^12.0.0`) | app runtime | Every v1.5 feature fits inside the existing architecture; nothing here forces a version bump |
+| Technology | Version | Purpose | Why Recommended |
+|------------|---------|---------|------------------|
+| Resend | API (no version pin) + `resend` npm SDK `^6.19.0` | Transactional email send + delivery/bounce webhooks | Best fit for this exact shape of app: generous free tier at this volume, first-class Node SDK, native `scheduledAt` for delayed sends, webhook-based bounce events (not a separate SNS/SQS stack like SES), and the fastest domain-auth setup of the group (DNS records generated for you, single "Verify" click) — all while being a from-scratch integration effort the size of the existing NLT/Claude proxy Functions already in `functions/src/index.ts`. |
+| `firebase-functions/params` `defineSecret` | already `^7.2.5` in `functions/package.json` | Injects `RESEND_API_KEY` into the send Cloud Function at runtime, backed by Google Secret Manager | Already the established pattern in this repo — `CLAUDE_API_KEY`, `ESV_API_KEY`, and `NLT_API_KEY` are all wired this exact way in `functions/src/index.ts` (see `defineSecret(...)` calls, `secrets: [...]` on the function, and `.value()` at call time). `RESEND_API_KEY` is a fourth secret following the identical, already-proven pattern — no new plumbing to design. |
+| `onSchedule` (`firebase-functions/v2/scheduler`) | already `^7.2.5` | Drives the "N days before service" reminder and any other cron-style send | Already used twice in this codebase (`cleanupExpiredMedia`, `cleanupOrphanRenders`), so the "scheduled share-link reminder" (default 7 days out) is not new infrastructure — it's a third `onSchedule` function that queries upcoming services and calls the same send path. Do **not** rely on Resend's own `scheduledAt` for this recurring, condition-checked reminder (it needs "skip if still Draft" logic evaluated at send time, which only a server-side scheduled function can do); reserve `scheduledAt` for the composer's one-off "schedule for later" option on a single already-composed message. |
 
-### New Integration Points (no new npm packages)
-
-| Addition | Purpose | Why Recommended |
-|----------|---------|-----------------|
-| `NLT_API_KEY` secret + `nlt: "https://api.nlt.to"` entry in `functions/src/index.ts`'s `PROXY_TARGETS` | Proxy the NLT API through the existing Cloud Function, mirroring `esv` | Reuses the proven proxy pattern exactly — no new server dependency, no new deploy step beyond `firebase functions:secrets:set NLT_API_KEY` |
-| Custom-claim mirror on `organizations/{orgId}/members/{uid}` writes, using `firebase-admin`'s `getAuth().setCustomUserClaims()` (already a transitive capability of the installed `firebase-admin@^13.10.0`) | Carry org membership onto the ID token so `storage.rules` can read it without a cross-service Firestore call | `setCustomUserClaims` is a stable Admin SDK method already available through the installed `firebase-admin` version — no version bump needed |
-| `Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })` applied to `classifyFiles`'s `images` bucket in `src/components/slides/dropRouting.ts` | Deterministic natural-sort ordering for multi-image drops (`img2.jpg` before `img10.jpg`) | Native to every JS engine Vite targets — zero bytes added to the bundle, no library to evaluate or maintain |
-
-### Supporting Libraries — Font Self-Hosting (the one real addition)
+### Supporting Libraries
 
 | Library | Version | Purpose | When to Use |
 |---------|---------|---------|-------------|
-| `@fontsource/inter` | `5.3.0` | Self-hosted Inter (the Helvetica Neue stand-in — already the milestone decision in PROJECT.md) as static woff2 + CSS, shipped as an npm package | Import once; ship `@fontsource/inter/300.css`, `/400.css`, `/700.css` for Light/Regular/Bold |
-| `@fontsource/roboto`, `@fontsource/open-sans`, `@fontsource/montserrat`, `@fontsource/poppins`, `@fontsource/lato`, `@fontsource/merriweather`, `@fontsource/oswald` | `5.3.0` each (verified present on npm registry 2026-08-06) | The remaining curated font families for the settings font picker | Same import pattern — one `@fontsource/<family>/<weight>.css` per weight actually offered in the picker |
+| `resend` (npm) | `^6.19.0` (latest as of 2026-08-13; requires Node ≥20 — this repo's Functions run Node 22, compatible) | Official Node SDK: `resend.emails.send()`, `resend.emails.batch()`, `resend.webhooks.*` | The only library needed on the Functions side to send mail and to verify inbound webhook payloads. |
+| `svix` (npm, transitively used by Resend's webhook verify helper) — or just call `resend.webhooks.verify()` directly | current via `resend` SDK | Verifies the `svix-id` / `svix-timestamp` / `svix-signature` headers on the inbound bounce-webhook HTTP Function so a forged POST can't fake a "delivered" or fabricate/hide a bounce | Required on the bounce-webhook receiving endpoint (an `onRequest` HTTPS Function). Use the raw request body — do not let Express/Firebase's JSON body-parser re-serialize it before verification, or the signature check breaks. |
 
-**Why `@fontsource` over manually running a subsetting tool:** each `@fontsource/*` package already ships pre-built, pre-subsetted (per-charset, per-weight) `.woff2` files as static files inside `node_modules`, which Vite bundles/copies like any other asset. This satisfies "self-hosted, NOT the runtime Google Fonts API" (the explicit v1.5 decision — a projector with no internet at service time must never make a network request for a font) with **zero build tooling**, because there is nothing to build: importing the CSS is the entire integration. This is the standard, actively-maintained (>2000 packages, one per Google/OFL font family, `deps: none` on the core packages) way to self-host Google/OFL fonts in a Vite/npm project.
+### Development Tools
 
-### Font Subsetting — Deliberately NOT Needed for the Common Case
-
-| Library | Version | Purpose | When to Use |
-|---------|---------|---------|-------------|
-| `subset-font` | `2.5.0` (verified on npm 2026-08-06) | WASM (harfbuzz/hb-subset) font subsetter, pure Node — no Python required | ONLY if the owner wants a font that has no `@fontsource` package (e.g., a purchased/custom family not on Google Fonts). Not needed for the curated OFL list above |
-
-**Do NOT reach for `fonttools`/`pyftsubset`.** It is the traditional way to subset fonts, but it is a **Python** CLI tool — this project has no Python toolchain anywhere in its build (`package.json`, `functions/package.json`, `render-service/` are all Node), so adding it would introduce an entirely new language runtime to CI/dev machines for a job `@fontsource` already does. If custom subsetting is ever needed, `subset-font` (Node/WASM) stays inside the existing toolchain.
+| Tool | Purpose | Notes |
+|------|---------|-------|
+| Resend dashboard (Domains tab) | Add + verify the sending domain, view generated SPF/DKIM/DMARC DNS records | One-time setup by the owner (who controls DNS for the church's domain). Records go under a `send.` subdomain, not the apex — a common failure mode is publishing them at the wrong host or leaving a conflicting MX (e.g. Google Workspace) on that subdomain. |
+| Resend dashboard (Webhooks tab) | Register the production webhook URL (the Cloud Function's HTTPS trigger) and subscribe to `email.bounced` (+ optionally `email.delivered`, `email.sent`) | Copy the generated webhook signing secret into a second `defineSecret` (e.g. `RESEND_WEBHOOK_SECRET`). |
+| `firebase functions:secrets:set RESEND_API_KEY` / `firebase functions:secrets:set RESEND_WEBHOOK_SECRET` | Populates Secret Manager the same way `CLAUDE_API_KEY` etc. are already set | Owner-run, consistent with the standing "deploys and secret writes are owner-gated" rule already governing this milestone. |
 
 ## Installation
 
 ```bash
-# Fonts — pick from the curated list; each ships Light(300)/Regular(400)/Bold(700) at minimum
-npm install @fontsource/inter @fontsource/roboto @fontsource/open-sans \
-  @fontsource/montserrat @fontsource/poppins @fontsource/lato \
-  @fontsource/merriweather @fontsource/oswald
-
-# Only if a non-Google/OFL custom font is ever needed later
-npm install -D subset-font
+# In functions/
+npm install resend
 ```
 
-No `npm install` is needed for the NLT proxy, custom claims, or deterministic ordering work — those are wiring changes inside `functions/src/index.ts`, `storage.rules`/`firestore.rules`, and `dropRouting.ts` respectively.
+No client-side (`src/`) package is needed or wanted — see "What NOT to Use" below.
 
-## Detailed Findings by Question
+## Provider Comparison (verified 2026-08-13)
 
-### 1. NLT Bible API (api.nlt.to) — differs from ESV in a load-bearing way
+| Provider | Free tier | Paid entry tier (small-church volume) | Hard-bounce webhook? | Domain auth (SPF/DKIM/DMARC) | Firebase/Node integration effort |
+|---|---|---|---|---|---|
+| **Resend** (recommended) | 3,000 emails/mo, 100/day, 1 domain | Pro: **$20/mo for 50,000 emails** | **Yes** — `email.bounced` webhook event (Svix-delivered, HMAC-verifiable), fires instead of `email.delivered` for the same message | Easiest of the group: dashboard generates the exact DNS records, single "Verify" button, guided troubleshooting for common misconfig | Lowest effort: one official `resend` npm package, `resend.emails.send()`, native `scheduledAt`, webhook verify helper built into the same SDK |
+| Postmark | Permanent free dev tier, but capped at **100 emails/month total** (not per-domain) and does not allow overage — sending simply stops at 100 | Basic: **$15/mo for 10,000 emails**, $1.80/1K overage | **Yes** — dedicated bounce webhook, classifies `HardBounce` explicitly via a `Type` field, very mature/purpose-built for this | Strong — separates transactional vs. broadcast streams, good reputation defaults | Good — official `postmark` npm package exists, similar shape to Resend, but the 100/mo free cap means this app would likely need the $15/mo tier from day one given roster sizes × message types (composer + lock + re-lock + weekly reminder easily exceeds 100/mo for an active church) |
+| SendGrid (Twilio) | Time-limited **60-day trial**, 100/day during trial; no indefinite free production tier as of 2026 | Essentials: **$19.95/mo for 100,000 emails** | Yes — Event Webhook with a `bounce` event type, further split into hard/soft via classification fields | Solid, well-documented, but historically the most complaint-prone reputation of this group (shared-IP spam history under the SendGrid brand) | Good SDK (`@sendgrid/mail`), but heavier/more enterprise-flavored API surface than needed here; no meaningfully-usable free production tier undercuts the "low volume, low cost" fit |
+| Amazon SES | 3,000 msgs/mo for the **first 12 months only** (post-2023 tier cut; old 62,000/mo EC2 allowance is gone); after that, **$0.10 per 1,000 emails** — cheapest at scale | Effectively pay-as-you-go: at 2,000 emails/mo, roughly **$0.20/month** in raw send cost | Yes, but **not a simple webhook** — bounces arrive via an SNS topic subscription (HTTPS endpoint or SQS), meaningfully more infrastructure than a POST endpoint: create an SNS topic, subscribe an HTTPS/Lambda endpoint, wire it to the SES identity's notification settings | Cheapest in dollars but most manual: you manage verified identities, SPF/DKIM (Easy DKIM via Route 53 or manual CNAMEs) yourself in the AWS console — no single guided flow | Highest integration effort of the group: `@aws-sdk/client-sesv2` (or client-ses) plus SNS plumbing for bounce handling, IAM policy setup, and — notably — **new AWS accounts start in a "sandbox" that can only send to verified addresses until a manual production-access request is approved**, an extra approval step none of the other providers require |
+| Mailgun | 3-month free trial only (Flex plan); **no indefinite free tier** as of late 2025 pricing changes | Foundation: **$35/mo** flat (better than Flex's now-doubled $2/1,000 pay-as-you-go rate once you're past ~17,500 emails/mo, but at 50–2,000 emails/mo Flex's $2/1K means **under $4/month** in raw cost after the trial — cheaper in dollars than Resend's $20 tier, but with no permanent free option) | Yes — mature webhook system, bounce/complaint/delivered events | Solid, established, EU/US region choice | Decent SDK (`mailgun.js`), but Mailgun's 2025 reputation/pricing churn (Flex doubled from $1→$2/1K, deliverability complaints in community reviews) makes it a worse long-term bet than Resend for a "set it and don't think about it again" church tool |
+| Firebase Extension: **Trigger Email from Firestore** (`firestore-send-email`) | Free (the extension itself); cost is entirely whatever SMTP provider you point it at | N/A — pass-through | **No** — the extension only writes a document and relies on SMTP `send`; it has no built-in bounce/delivery event pipeline. Bounce handling would have to come from whatever provider's SMTP credentials you plug in, observed completely outside the extension | Depends entirely on the underlying SMTP provider (commonly SendGrid, Mailgun, or Mailchimp Transactional creds) | Lowest code-effort to get a first email out (write a Firestore doc, extension does the rest) but this is a trap for this milestone: it needs an SMTP-capable provider behind it anyway (so you still pick and pay for one of the rows above), and it gives up the structured send API, native scheduling, and native webhook events that the recommended direct-SDK approach gets for free. **Not recommended** — it re-adds a middle layer without removing the underlying provider decision, and the delivery-history/bounce-tracking requirement (R "Sent on this service" log) needs the provider's own API/webhook, which this extension doesn't expose. |
 
-**Confidence: LOW-MEDIUM** (web search + direct `WebFetch` of the live endpoint, not an official SDK/Context7 doc — verify against the owner's actual key + `/Documentation` page before building)
+### Why Resend over the close alternatives
 
-Verified by fetching `https://api.nlt.to/api/passages?ref=John.1.1&key=TEST&version=NLT` directly:
-
-| Aspect | ESV API v3 (already integrated) | NLT API (api.nlt.to) |
-|---|---|---|
-| Auth | `Authorization: Token <key>` HTTP header | `key` **query string parameter** (`?key=...`) — cannot be injected as a header |
-| Endpoint | `GET /v3/passage/text/?q=<ref>` | `GET /api/passages?ref=<ref>&key=<key>&version=NLT` |
-| Response format | **JSON**: `{ passages: string[] }`, already clean plain text | **HTML** always — confirmed live: an `<h2>` heading plus body markup with verse numbers embedded inline. There is no documented parameter to request JSON or plain text, and no toggle for verse-numbers/headings/footnotes the way ESV has `include-verse-numbers`, `include-footnotes`, etc. |
-| Rate limits | (existing, unaffected) | Anonymous/no-key: 50 verses/request, 500 requests/day, non-commercial only. Keyed: **up to 500 verses/request** (matches NLT's own copyright-statement cap), 5,000 requests/day. The owner already has a key. |
-| Terms of use | (existing) | Quotations in "nonsalable media" — church bulletins, orders of service, and by direct analogy projected slides — only need the initials **"NLT"** appended, not a full copyright block. Quotations over 500 verses or 25% of a book need written approval from Tyndale House Publishers. This is a materially lighter attribution requirement than the app's existing CCLI song-copyright handling, but it still needs a visible "NLT" marker somewhere on scripture slides pulled from this source — mirror the existing copyright-on-first/last-slide pattern used for songs. |
-
-**Integration consequences for the roadmap:**
-- The Cloud Function proxy's `SECRET_INJECTED` header-injection pattern (`headers["authorization"] = ...`) does not work as-is for NLT, because the secret is a query parameter, not a header. The `nlt` proxy branch needs to append `?key=<NLT_API_KEY.value()>` to the **upstream URL**, not the headers object — a small, deliberate divergence from the `esv`/`anthropic` branches, not a bug to "fix" into consistency.
-- `src/utils/scripture.ts` / a new `nltApi.ts` needs an HTML→plain-text extraction step that `esvApi.ts` never needed. Use the browser-native `DOMParser` (`new DOMParser().parseFromString(html, 'text/html').body.textContent`) to strip markup — no HTML-parsing library needed — but note this alone will NOT cleanly separate verse numbers from verse text (NLT's markup interleaves them with no toggle to suppress), so a regex pass over the parsed DOM (stripping elements matching NLT's verse-number span class, discovered by inspecting a real response) will likely be needed for output parity with the ESV path's clean text. Flag this as a phase-level unknown to resolve against a real fetched sample, not a generic HTML-strip.
-- `version=NLT` is the query param default (also documented: `NLTUK`, `NTV`, `KJV` — the app should hardcode `NLT`).
-
-### 2. Firebase Auth Custom Claims — Storage emulator DOES honor them, via a different mechanism than the broken one
-
-**Confidence: MEDIUM** (Context7/official Firebase docs corroborate the size limit and refresh mechanics; the emulator-honoring claim is corroborated by the project's own installed `@firebase/rules-unit-testing@^5.0.0` API surface, verified against its own test file)
-
-- **Mechanism (production):** Admin SDK `getAuth().setCustomUserClaims(uid, claims)` — already reachable via the installed `firebase-admin@^13.10.0`, no version bump. Recommended trigger point: a Firestore `onDocumentWritten`/`onDocumentCreated` handler on `organizations/{orgId}/members/{uid}` (mirroring the existing `parsePptxHandler`/`requestPptxRenderHandler` pattern of exporting a handler function separately from its trigger wrapper for unit-testability) that mirrors membership into a claim shaped like `{ orgId, role }`.
-- **Size limit:** custom claims are capped at **1000 bytes total**. Exceeding it throws `auth/claims-too-large`. A single `{ orgId, role }` pair is nowhere near this limit — no design pressure here, but if the app ever needs multi-org membership, storing an array of org IDs would need to stay well under 1000 bytes (likely fine for the foreseeable org count).
-- **Client propagation:** claims only land on a client's ID token at the **next token mint** — a natural refresh happens roughly every hour, but a UI action right after claim-setting (e.g., accepting an org invite) needs an explicit `await user.getIdToken(true)` (or `getIdTokenResult(true)`) to force-refresh and pick up the new claim immediately. This is a concrete new call site the invite-acceptance flow in `src/stores/auth.ts` needs to add.
-- **Reading in Storage rules:** `request.auth.token.<claimName>` — e.g. `request.auth.token.orgId == orgId`. This is a **direct JWT-claim read**, structurally different from `firestore.exists(...)`, which is a cross-service call.
-- **The emulator question — this is the crux of the whole change.** `firestore.exists()` is confirmed permanently inert against the Storage emulator (`firebase-js-sdk#6803`, already documented in this project's CLAUDE.md and reproduced in `src/storage.rules.test.ts`). **Custom claims read via `request.auth.token` do NOT go through that broken cross-service path at all.** The project's own `@firebase/rules-unit-testing` dependency exposes `testEnv.authenticatedContext(uid, tokenOptions)`, where `tokenOptions` is exactly a bag of custom claims baked directly into the mock ID token the test context presents — no real Auth Emulator sign-in, no Admin SDK round-trip, no cross-service Firestore read. Changing `src/storage.rules.test.ts`'s currently-broken calls (`testEnv.authenticatedContext('userA')`, relying on `firestore.exists()`) to `testEnv.authenticatedContext('userA', { orgId: 'orgA' })` against a rule rewritten to check `request.auth.token.orgId == orgId` is the concrete fix that makes the 2 currently-failing allow-case tests pass locally — this is precisely the CLAUDE.md-documented goal ("moving org membership onto a custom auth claim makes the check work in both environments").
-- **One separate caveat found in research, not a blocker:** there is a known `firebase-tools-ui` issue where custom claims can fail to appear inside the **Cloud Functions emulator** when using the Auth emulator's own sign-in flow (`firebase/firebase-tools-ui#424`). This affects a different code path (Functions reading `request.auth` at runtime) than `rules-unit-testing`'s `authenticatedContext`, which mints its own test token independent of the Auth emulator's sign-in flow entirely. It's worth a phase-level smoke test, but it does not undermine the rules-unit-testing fix above.
-
-### 3 & 4. Self-Hosted Fonts and the Helvetica Neue Substitute
-
-**Confidence: MEDIUM** (npm registry facts are HIGH confidence — verified live 2026-08-06; licensing and metric-compatibility claims are web-search sourced, LOW-MEDIUM)
-
-- **Licensing:** Google Fonts are distributed under either **SIL OFL 1.1** (Montserrat, Poppins, Lato, Merriweather, Oswald, Nunito, Inter) or **Apache License 2.0** (Roboto, Open Sans). Both explicitly permit bundling/redistributing inside a commercial app; the only OFL restriction is that you cannot sell the raw font *files* as a standalone product, and if you modify-and-redistribute under OFL you must rename. Neither license requires visible in-app attribution, though keeping the license file alongside the font (which `@fontsource` packages already do) is the correct practice.
-- **Tooling — recommended:** `@fontsource/*` npm packages (see Recommended Stack above). Zero-build, per-weight, per-charset CSS+woff2 files, already the de facto standard way to self-host these exact fonts in a Vite project.
-- **Tooling — only if needed later:** `subset-font` (Node/WASM, no Python) for any font outside the `@fontsource` catalog. **Do not introduce `fonttools`/`pyftsubset`** — it requires Python, a toolchain this project does not otherwise have anywhere (confirmed: `package.json`, `functions/package.json` are both pure Node).
-- **Inter as the Helvetica Neue substitute (already decided in PROJECT.md):** confirmed as the standard open-source pick for this exact substitution — shares Helvetica's even color and closed apertures, ships Light(300)/Regular(400)/Bold(700) static weights plus a variable-font build via `@fontsource-variable/inter` if finer weight control is ever wanted. **Caveat surfaced by research and worth flagging to the roadmap:** Inter is explicitly *not metric-compatible* with Helvetica Neue (glyph widths differ) — the metric-compatible alternative is **Nimbus Sans L**, but that distinction matters for print reflow, not for on-screen/projected slide rendering, which is this app's actual use case. No action needed; Inter remains the right call for this milestone.
-- **Rounding out the curated 6–8 family list (Light/Regular/Bold all present in each):** Inter (Helvetica Neue stand-in), Roboto, Open Sans, Montserrat, Poppins, Lato, Merriweather (serif — useful for scripture legibility contrast against sans body/lyric text), Oswald (condensed, for display/impact use). All eight confirmed present as `@fontsource/*` packages at version `5.3.0` on the npm registry as of this research date. Final subset for the UI is explicitly deferred to the UI research phase per PROJECT.md — this list is candidates, not a mandate.
-
-### 5. Mobile Layout, Deterministic Ordering, Dismissible Panel — no new dependencies
-
-- **Mobile-responsive Slides tab / service edit screen:** Tailwind CSS v4 (already installed, `^4.0.0`) has full responsive-variant support (`sm:`/`md:`/`lg:` etc.) and is already the app's exclusive styling approach. No new CSS framework, no new breakpoint library. This is a layout/markup change, not a stack change.
-- **Deterministic multi-image ordering:** confirmed the actual gap by reading `src/components/slides/dropRouting.ts` — `classifyFiles` preserves whatever order the browser's `DataTransfer` API supplies, with no sort applied. The fix needs no library: `Array.prototype.sort()` with a comparator built from the **native** `Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })` produces correct natural-order sorting (`img2.jpg` before `img10.jpg`) directly from `file.name`, with zero bytes added to the bundle. Do not reach for `natural-orderby`, `natsort`, or similar npm packages — this is a solved problem in every modern JS engine via `Intl.Collator`.
-- **Dismissible dashboard "Getting Started" panel:** a boolean dismissed-flag persisted either to `localStorage` or a small field on the user/org doc, gated with a plain `v-if`. No new library — this is the same pattern class as the app's existing settings toggles (e.g. `vwModeEnabled`), just user-scoped instead of org-scoped, or org-scoped if the owner wants it shared across the team.
-
-## Alternatives Considered
-
-| Recommended | Alternative | When to Use Alternative |
-|-------------|-------------|-------------------------|
-| `@fontsource/*` npm packages for self-hosted fonts | Google Fonts runtime `<link>`/API | **Rejected by the owner already** — a projector with no internet at service time cannot fetch a remote font; this is explicit in PROJECT.md and not up for reconsideration |
-| `@fontsource/*` npm packages | Manually downloading `.woff2` from `fonts.google.com` and hand-writing `@font-face` CSS | Only if a specific font is unavailable as an `@fontsource` package — otherwise this is pure maintenance burden (no version pinning, no easy weight/charset selection) for no benefit |
-| `subset-font` (Node/WASM) | `fonttools`/`pyftsubset` (Python) | Never for this project unless a Python toolchain is independently justified elsewhere — this app has none today |
-| `Intl.Collator` natural sort | `natural-orderby` / `natsort` npm packages | Only if the sort needs to go beyond filename comparison (e.g., locale-aware business rules a native Collator can't express) — not the case here |
-| Custom auth claim mirrored via Firestore trigger | Reading org membership fresh from Firestore inside `storage.rules` (status quo) | Never — this is precisely the broken, emulator-untestable pattern the milestone exists to replace |
-| Query-param key injection for NLT proxy branch | Reusing the ESV branch's header-injection code path unmodified | Never — NLT's auth is structurally a query param, not a header; forcing header injection would silently fail to authenticate every NLT request |
+- **vs. Postmark:** Postmark's free tier (100 emails/month, no overage) is very likely to run out immediately given four message types (one-off, lock, re-lock, weekly reminder) across a volunteer roster — meaning Postmark effectively starts this project at $15/mo, while Resend's 3,000/mo free tier realistically covers this app's entire lifetime volume at zero cost.
+- **vs. SendGrid:** No durable free production tier (60-day trial only) and a materially worse sender-reputation history under the shared SendGrid brand; heavier API for no benefit at this scale.
+- **vs. SES:** Cheapest per-email in isolation, but the bounce pipeline requires standing up SNS + a subscription endpoint (more moving parts than a signed webhook POST), plus a sandbox-approval step for new accounts before it can send to arbitrary recipients — friction this milestone doesn't need to accept to save a few dollars a month that are already $0 with Resend.
+- **vs. Mailgun:** No indefinite free tier post-2025 changes, and 2025's Flex price doubling plus community deliverability complaints make it the least "set and forget" choice, which matters for a volunteer team with no dedicated ops person.
+- **vs. the Firebase Trigger Email extension:** Doesn't remove the provider decision (still needs SMTP creds from one of the above), and gives up native bounce webhooks and scheduling — both explicit v1.7 requirements — for a marginal reduction in the Cloud Function code this app already knows how to write (it has three `defineSecret`-backed integrations already).
 
 ## What NOT to Use
 
 | Avoid | Why | Use Instead |
-|-------|-----|-------------|
-| `fonttools` / `pyftsubset` | Python-only tool; this project's entire build (`package.json`, `functions/package.json`, `render-service/`) is Node — adding Python is a new toolchain for zero net benefit | `@fontsource/*` (no subsetting needed) or `subset-font` (Node/WASM) if a custom font is ever needed |
-| Runtime Google Fonts API (`fonts.googleapis.com` `<link>` tags) | Already rejected by the owner in scoping — a projector offline at service time cannot fetch it | `@fontsource/*` self-hosted static assets |
-| A new HTML-parsing library (e.g. `cheerio`, `node-html-parser`) for the NLT response | The browser's native `DOMParser` already does this client-side, with zero bundle cost, and the proxy pattern keeps parsing out of the Cloud Function entirely | `new DOMParser().parseFromString(html, 'text/html')` in `src/utils/nltApi.ts` (new file, mirroring `esvApi.ts`) |
-| A natural-sort npm package for image ordering | `Intl.Collator({ numeric: true })` is native and already does exactly this | `Intl.Collator` comparator on `file.name` |
-| Reusing the ESV proxy branch's header-injection logic unmodified for NLT | NLT authenticates via a query parameter (`key=`), not an `Authorization` header — copying the ESV pattern verbatim would send an unauthenticated request upstream | A small NLT-specific branch in `functions/src/index.ts` that appends `key=<secret>` to the upstream URL |
+|-------|-----|--------------|
+| Building/running your own SMTP server | Deliverability (SPF/DKIM/DMARC reputation, IP warm-up, feedback loops) takes months to earn and one misconfiguration tanks it; nothing here justifies owning that infrastructure | A managed transactional provider (Resend) |
+| Sending email from the client (`src/`) with the provider's API key embedded in the SPA | The API key would be exposed in the shipped JS bundle — anyone could read it from devtools and send arbitrary mail as the org's verified domain | Send only from a Cloud Function holding the key via `defineSecret`, exactly like the existing Claude/ESV/NLT integrations |
+| `firebase functions:config` for the provider API key | Deprecated; Google will **decommission it in March 2027** and deployments using it will start failing before then | `defineSecret()` from `firebase-functions/params`, set via `firebase functions:secrets:set RESEND_API_KEY` — already this repo's established pattern |
+| Open-tracking pixels / click-tracking | Explicitly out of scope for v1.7 (Key Decision: "tracks sent + hard bounces, not opens") — also raises privacy questions for volunteer emails and adds webhook/complexity for no v1.7 requirement | Track only `email.sent` and `email.bounced` webhook events for the delivery-history log |
+| The Firebase "Trigger Email from Firestore" extension as the whole solution | It's a thin SMTP wrapper, not a send API — no native bounce webhooks, no native scheduling, and it still needs a provider's SMTP credentials behind it, so it doesn't actually avoid the provider-selection decision this research exists to make | Call the Resend SDK directly from a purpose-built Cloud Function |
+| Amazon SES for this specific app, despite lowest raw per-email cost | The SNS-based bounce pipeline and sandbox production-access approval step are meaningfully more infrastructure than this milestone's scope justifies, for a savings of pennies/month that Resend's free tier already erases to $0 | Resend |
+| Resend's `onboarding@resend.dev` sending address in production | It can only send to the account owner's own signed-up address — unusable for a volunteer roster of many distinct recipients | Verify the church's real domain (or a `send.` subdomain of it) in Resend before going live |
+
+## Cloud Function Secret Injection Pattern (current, non-deprecated)
+
+This repo already has the exact pattern to follow — confirmed directly in `functions/src/index.ts`:
+
+```typescript
+import { defineSecret } from "firebase-functions/params";
+
+// Set once by the owner (deploy-gated, per standing project rule):
+//   firebase functions:secrets:set RESEND_API_KEY
+//   firebase functions:secrets:set RESEND_WEBHOOK_SECRET
+const RESEND_API_KEY = defineSecret("RESEND_API_KEY");
+const RESEND_WEBHOOK_SECRET = defineSecret("RESEND_WEBHOOK_SECRET");
+
+export const sendVolunteerEmail = onCall(
+  { secrets: [RESEND_API_KEY] },
+  async (request) => {
+    const resend = new Resend(RESEND_API_KEY.value());
+    await resend.emails.send({ /* ... */ });
+  }
+);
+
+export const resendWebhook = onRequest(
+  { secrets: [RESEND_WEBHOOK_SECRET] },
+  async (req, res) => {
+    // verify svix-id / svix-timestamp / svix-signature against RESEND_WEBHOOK_SECRET.value()
+    // using the RAW body, then update the per-service delivery-history doc on `email.bounced`
+  }
+);
+```
+
+This mirrors `CLAUDE_API_KEY` / `ESV_API_KEY` / `NLT_API_KEY` already in the codebase — no new secret-management pattern to introduce. `firebase functions:config()` must **not** be used for this (deprecated, decommissioned March 2027).
+
+## Stack Patterns by Variant
+
+**If the org's volunteer count/messaging cadence ever pushes past ~3,000 emails/month:**
+- Upgrade to Resend Pro ($20/mo for 50,000 emails) — no code change required, only a billing-tier change on the same account/API key.
+
+**If the owner ever wants marketing-style broadcast sends (not this milestone's scope):**
+- Resend has a separate contacts/broadcast product billed by contact count — do not conflate it with the transactional send path used here; v1.7 is transactional only.
 
 ## Version Compatibility
 
 | Package | Compatible With | Notes |
-|-----------|-----------------|-------|
-| `@fontsource/*@5.3.0` | Vite `^7.3.1` (installed) | Plain CSS + static asset imports — no Vite plugin required, works with the existing `@tailwindcss/vite` setup unmodified |
-| `subset-font@2.5.0` | Node `^20.19.0 \|\| >=22.12.0` (installed engines range) | Pure WASM/JS, no native bindings, no Python — safe in CI and every dev machine already targeted |
-| `firebase-admin@^13.10.0` (installed) | `setCustomUserClaims` | Already present — no bump needed for the custom-claims work |
-| `@firebase/rules-unit-testing@^5.0.0` (installed) | `authenticatedContext(uid, tokenOptions)` | Already present — no bump needed for the storage.rules test fix |
+|---------|------------------|-------|
+| `resend@^6.19.0` | Node ≥20 (this repo's Functions run Node 22 per `functions/package.json` `engines.node: "22"`) | No conflict. |
+| `resend@^6.19.0` | `firebase-functions@^7.2.5`, `firebase-admin@^13.10.0` (already in `functions/package.json`) | No known incompatibility; Resend's SDK has no Firebase-specific dependency, it's a generic REST wrapper. |
 
 ## Sources
 
-- Direct `WebFetch` of `https://api.nlt.to/api/passages?ref=John.1.1&key=TEST&version=NLT` (live response, 2026-08-06) — confirmed HTML output, confidence LOW-MEDIUM (single manual sample, not the full documented spec)
-- `WebFetch`/`WebSearch` of `https://api.nlt.to/Documentation` and `https://api.nlt.to/` — endpoint shape, auth, rate limits, confidence LOW (web search summarization, not a primary-source read of full ToS text)
-- `WebSearch`: NLT copyright-statement terms via studylight.org mirror of Tyndale's copyright statement — confidence LOW, should be re-verified against Tyndale's actual current terms before shipping scripture display copy
-- `WebSearch`: Firebase custom claims size limit (1000 bytes) and `getIdToken(true)` refresh semantics, cross-referenced against `firebase.google.com/docs/auth/admin/custom-claims` — confidence MEDIUM
-- `WebSearch`: Firebase Storage rules `request.auth.token` claim access, `firebase.google.com/docs/storage/security/rules-conditions` — confidence MEDIUM
-- `WebSearch`: `@firebase/rules-unit-testing` `authenticatedContext(uid, tokenOptions)` API shape, cross-checked directly against this project's own `src/storage.rules.test.ts` (already imports `@firebase/rules-unit-testing`) — confidence MEDIUM-HIGH (own codebase confirms the API surface exists and is already in use, just without `tokenOptions` populated yet)
-- `WebSearch`: `firebase/firebase-js-sdk#6803` (already cited in this project's CLAUDE.md) and `firebase/firebase-tools-ui#424` — confidence MEDIUM (named GitHub issues, cross-checked against project's existing documented understanding)
-- npm registry, live `npm view` (2026-08-06): `subset-font@2.5.0`, `@fontsource/inter@5.3.0`, `@fontsource/{roboto,open-sans,montserrat,poppins,lato,merriweather,oswald}@5.3.0` — confidence HIGH (direct registry read)
-- `WebSearch`: Google Fonts / SIL OFL 1.1 vs Apache 2.0 licensing terms for self-hosting/redistribution — confidence LOW-MEDIUM (multiple secondary sources agree, no single primary legal source fetched)
-- `WebSearch`: Inter vs Helvetica Neue metric-compatibility comparison — confidence LOW (secondary comparison sites, not a font-metrics tool run directly)
-- Direct file reads: `functions/src/index.ts` (proxy pattern), `src/utils/esvApi.ts` (ESV integration point), `src/stores/auth.ts` (org context loading), `storage.rules`, `src/storage.rules.test.ts`, `src/components/slides/dropRouting.ts`, `package.json`, `functions/package.json` — confidence HIGH (primary source, this codebase)
+- WebSearch, cross-checked 2+ sources each, 2026-08-13 (MEDIUM confidence per this project's `classify-confidence --provider websearch --verified` tier):
+  - Resend pricing: automationatlas.io/tools/resend, tiergauge.com/tools/resend, nuntly.com/resend-pricing
+  - SendGrid pricing: sendx.io/blog/sendgrid-pricing, costbench.com/software/email-api/sendgrid
+  - Postmark pricing: saaspricepulse.com/tools/postmark, sendx.io/blog/postmark-pricing
+  - Amazon SES pricing: aws.amazon.com/ses/pricing (official), saaspricepulse.com/blog/amazon-ses-pricing-per-1000-emails-2026
+  - Mailgun pricing: gmass.co/blog/mailgun-review, saaspricepulse.com/tools/mailgun
+  - Resend bounce webhooks: resend.com/docs/webhooks/introduction, resend.com/blog/webhooks (official)
+  - Postmark bounce webhook: postmarkapp.com/developer/webhooks/bounce-webhook (official)
+  - SendGrid event webhook: twilio.com/docs/sendgrid/for-developers/tracking-events/event (official)
+  - SES bounce/SNS setup: docs.aws.amazon.com/ses/latest/dg/monitor-sending-activity-using-notifications-sns.html (official)
+  - Firebase Trigger Email extension: firebase.google.com/docs/extensions/official/firestore-send-email (official)
+  - `resend` npm version: verified directly via `npm registry` (`registry.npmjs.org/resend/latest` → `6.19.0`, `engines.node: ">=20"`) — HIGH confidence, primary source
+  - `functions.config()` deprecation date (March 2027): firebase.google.com/docs/functions/config-env (official), corroborated by github.com/firebase/firebase-tools issue discussion
+  - `defineSecret` pattern: firebase.google.com/docs/functions/config-env (official), and directly verified against this repo's own `functions/src/index.ts` (PRIMARY, HIGH confidence — not just docs, the working pattern already in production)
+  - Resend webhook signature verification (Svix): resend.com/docs/dashboard/webhooks/verify-webhooks-requests (official)
+  - Resend `resend.dev` domain restriction: resend.com/docs/knowledge-base/403-error-resend-dev-domain (official)
 
 ---
-*Stack research for: WorshipPlanner v1.5 "Settings, Sharing, and Fidelity"*
-*Researched: 2026-08-06*
+*Stack research for: Volunteer email messaging provider, v1.7*
+*Researched: 2026-08-13*

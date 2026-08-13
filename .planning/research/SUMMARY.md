@@ -1,220 +1,333 @@
 # Project Research Summary
 
-**Project:** WorshipPlanner — v1.5 "Settings, Sharing, and Fidelity"
-**Domain:** Church worship-planning / presentation SaaS (mature, shipped product — subsequent-milestone integration research, not 0-to-1)
-**Researched:** 2026-08-06
+**Project:** WorshipPlanner
+**Domain:** Volunteer/team transactional messaging & notifications, bolted onto an existing Vue 3 + Firebase worship-service planning SPA
+**Researched:** 2026-08-13
 **Confidence:** MEDIUM-HIGH
 
 ## Executive Summary
 
-v1.5 is overwhelmingly a wiring milestone, not a new-library milestone: four of five stack questions need zero or near-zero new dependencies, and the one real addition (self-hosted fonts via `@fontsource/*`) needs no build step. The real difficulty is not "what to build" but reconciling the owner's locked decisions with code that already exists — the R036 draft-lock write guard, an inert cross-service Storage-rules check, an exhaustive-but-silently-forkable `SlotKind` switch pattern, and a share-token mint-fresh-every-time bug. Three subsystems that look like small settings features are actually schema/migration decisions in disguise: sharing, custom claims, and service-item types.
+v1.7 adds email to a mature app that already has everything messaging needs to lean on: a roster with
+emails (Roles tab), a lock/reopen service lifecycle, a share-link/snapshot-builder discipline, and three
+`defineSecret`-backed Cloud Function integrations to copy the pattern from. All four research passes
+converge on the same shape: this is an **integration** project, not a greenfield one — zero new
+architectural primitives, only new wiring on proven precedent (queue-then-trigger send, `onSchedule`
+cron, `defineSecret` secrets, nested-subcollection data model, org-settings kill-switch). The provider
+recommendation is **Resend** (free at this app's volume, cleanest Node SDK, first-class webhook bounce
+events, easiest domain-auth setup) sending through a single owner-gated Cloud Function that is the only
+code holding the API key.
 
-The recommended approach: build shared settings infrastructure first (a typed `OrgSettings` sub-object — nothing like it exists today), do the custom-claims migration as its own long-soak infrastructure phase sequenced early, resolve the share-token storage location explicitly before writing code (it conflicts with R036 as literally decided), and treat the congregational-reading divider as the priority UI-research item since no comparable church product has solved it.
+The recommended approach: stand up provider infrastructure and the kill-switch first, build one shared
+server-side recipient resolver that every send surface (composer, lock, re-lock, scheduled reminder)
+calls — never a per-surface reimplementation — then layer the composer, the lock/re-lock triggers, and
+the scheduled reminder on top of that resolver and the same queue-then-trigger send primitive. The
+re-lock scoped change-diff is explicitly the outlier: no peer tool (Planning Center, Elvanto, Rock RMS)
+does anything like it, it is the single highest-complexity net-new piece of logic in the milestone, and
+it depends on everything else (lock snapshotting, the send primitive, the recipient resolver) already
+being solid — so it belongs in its own phase, sequenced last.
 
-The dominant risk is rules-testing discipline: this project already shipped a deny-everyone Storage rule that passed its (deny-only) test suite for an entire milestone. Every rule change in v1.5 must ship with a passing allow-case test proven against the real emulator, written first. The second dominant risk is treating custom-claims rollout as a single deploy: it is structurally two deploys with a mandatory soak period, and deploying is the owner's action per the v1.5 autonomy grant, so that phase cannot fully close inside an autonomous run.
+Key risks, all converged on across research files: (1) sending without SPF/DKIM/DMARC on a real
+church-controlled domain silently lands in spam — this is DNS-level owner work that must be scoped as an
+explicit early step, not assumed done; (2) Cloud Functions are at-least-once, so every send path needs a
+transactional idempotency-key check or volunteers get duplicate emails; (3) an unauthenticated bounce
+webhook is a forgeable write surface unless HMAC-verified from the first commit; (4) recipient
+correctness (dedup by email, unassigned-role handling, stale roster data, kill-switch enforcement) must
+live in exactly one shared resolver, or four independently-written send surfaces will each get it
+slightly wrong. None of these is exotic — they're all "apply the discipline this codebase already has
+once more, consistently" — but they are the difference between a trustworthy feature and a silent-failure
+one, which is explicitly why this milestone exists (delivery visibility beats doing nothing).
 
 ## Key Findings
 
 ### Recommended Stack
 
-Nearly the entire stack is unchanged (Vue 3 / Vite / Pinia / Tailwind v4 / Firebase 12). Additions: `@fontsource/*` packages for self-hosted curated fonts (Inter as the Helvetica Neue stand-in, plus 7 more OFL/Apache families); a `nlt` branch in the existing Cloud Function proxy — structurally different from ESV because NLT auth is a query parameter (not a header) and its response is HTML (not JSON), requiring `DOMParser`-based stripping; `firebase-admin`'s `setCustomUserClaims` (already available) for claims; native `Intl.Collator({ numeric: true })` for deterministic multi-image ordering.
+**Resend** is the recommended email provider: $0/month at this app's realistic volume (3,000/mo free
+tier vs. a low-hundreds-per-month usage pattern), the cleanest Node SDK of the group, native
+`scheduledAt` for one-off delayed sends, webhook-based hard-bounce events (Svix-signed, HMAC-verifiable
+— no SNS/SQS plumbing like SES), and the fastest domain-auth setup (dashboard generates exact DNS
+records, one-click verify). It slots into the existing `defineSecret` pattern used for
+`CLAUDE_API_KEY`/`ESV_API_KEY`/`NLT_API_KEY` with zero new secret-management design. The scheduled
+reminder should use this app's own `onSchedule` (already used twice, for `cleanupExpiredMedia` and
+`cleanupOrphanRenders`) rather than Resend's `scheduledAt`, because it needs Draft-state-aware logic
+evaluated at fire time — reserve `scheduledAt` for the composer's single-message "schedule for later."
 
 **Core technologies:**
-- `@fontsource/inter` + 7 curated families (`5.3.0`) — self-hosted, offline-safe fonts — a projector without internet cannot fetch Google Fonts at service time (already decided, non-negotiable)
-- `NLT_API_KEY` + new proxy branch in `functions/src/index.ts` — reuses the proxy pattern but needs its own query-param-injection branch
-- Firestore `onDocumentWritten` trigger + `setCustomUserClaims` — mirrors the existing `requestPptxRender` trigger already shipped
-- `Intl.Collator` — native, zero-bytes, fixes the `slide2`-before-`slide10` ordering defect
+- `resend` npm SDK (`^6.19.0`) — official Node SDK for send + webhook signature verification, no
+  Firebase-specific dependency, Node >=20 compatible with this repo's Node 22 Functions
+- `defineSecret` (`firebase-functions/params`, already `^7.2.5`) — injects `RESEND_API_KEY` and
+  `RESEND_WEBHOOK_SECRET`, exactly mirroring the three existing secrets in `functions/src/index.ts`
+- `onSchedule` (already `^7.2.5`) — drives the daily reminder scan as a third cron job alongside the two
+  that already exist
 
 ### Expected Features
 
-**Must have (table stakes, all in the locked v1.5 list):** AI toggle (hide-on-off, not grey-out); Planning Center toggle; ESV/NLT selection with mandatory "(ESV)"/"(NLT)" attribution suffix (both publishers require initials-only for non-saleable media — no verse-count enforcement needed at this scale); stable share links (Planning Center's "Permalink" model validates persist-token + auto-refresh-content); Announcements/Miscellaneous as plain input boxes (Planning Center's generic "Item" type is the direct precedent); default service template at item-type+title granularity; congregational reading manual divider (priority — **no church-software precedent exists**; ProPresenter/EasyWorship/Proclaim all lack a documented leader/congregation split editor); global slide typography (family+weight+size); multi-image natural-sort ordering.
+Peer landscape (Planning Center Services, Elvanto, Rock RMS) validates nearly every element of the
+already-imported design as table stakes, with one clear standout differentiator.
 
-**Should have / flag to owner:** text outline/shadow on slide typography — near-universal in comparable tools specifically as the standard legibility technique against background images (shipped v1.4) — not in the locked v1.5 list; recommend surfacing this gap explicitly.
+**Must have (table stakes) — P1, all locked into v1.7 scope:**
+- Recipients derived from who's scheduled on the service (teams-first, matches every peer tool)
+- Auto-notify on lock (maps onto PCO's "send scheduling email" / Elvanto's "publish" moment)
+- Configurable pre-service reminder (PCO ships 0-7 days out as a first-class feature)
+- Ad-hoc one-off message to teams/individuals
+- Live recipient count before send ("Reaches N")
+- Skip/exclude unreachable (no-email) roster entries silently
+- Basic delivery log (sent/pending, matching Rock RMS's confirmation-status tracking)
+- Org-wide kill switch (PCO has an equivalent org/browser-level disable)
 
-**Defer (v2+):** per-item template durations; multiple named service templates; safe-area margin guides; free-range select-text-then-label divider mode (rejected — real responsive readings never break mid-sentence).
+**Should have (differentiators) — the standout is the re-lock scoped diff:**
+- Explicit, typed, team-tagged change diff on re-lock (SONG/ORDER/ROLE/NOTES/SLIDES) — **no peer tool
+  surveyed does this**; it directly exploits this app's unique lock/reopen lifecycle
+- Insertable merge tokens in free-text composer — PCO only does fixed auto-included blocks, not
+  user-insertable tokens
+- Hard-bounce surfacing per service — PCO's docs don't describe bounce visibility to the planner at all
+- Draft-aware reminder suppression — peers have no equivalent Draft concept to skip against
 
-**Anti-features rejected:** drag-handle dividers (breaks are discrete, not continuous — false precision, mobile accidental-drag risk); greyed-out (vs. hidden) AI controls when off; verse-count enforcement UI.
+**Defer (v2+, explicit anti-features):**
+- Accept/Decline RSVP + response tracking (duplicates PCO's core scheduling job — explicitly out of scope
+  per PROJECT.md's "complement, not replace")
+- Open-tracking/read receipts (locked decision: sent + hard bounces only)
+- SMS channel, rich HTML template builder, two-way reply threading, general-purpose contact list/CRM —
+  all over-scoped for a 2-3-planner tool already served by PCO for anything beyond messaging
 
 ### Architecture Approach
 
-The org document has never had a typed shape — v1.5's ~8 new settings values must land as one typed `settings` sub-object with a single defaults-merge point in `auth.ts`, not eight more bare top-level fields. This is a hard prerequisite for every other settings feature.
+Every new element reuses an existing pattern rather than inventing one: nested `services/{id}/messages/{id}/recipients/{id}`
+subcollections (mirroring the `songs/{id}/lyrics/{id}` two-segment-nesting precedent, kept out of the
+hot `services` list-read path exactly like `slideGroups`); a queue-then-trigger send split
+(`onCall` enqueues -> `onDocumentCreated` sends), the *exact* shape `parsePptxHandler` ->
+`pptxRenders` -> `requestPptxRender` already proves out in this codebase; one shared pure recipient
+resolver built on the existing `resolveServiceRoleAssignments`; and reuse of `buildServiceSnapshot`
+verbatim for the re-lock diff's lock-time baseline (zero new serialization logic).
 
 **Major components:**
-1. `src/types/organization.ts` + `DEFAULT_ORG_SETTINGS` — the org-settings foundation
-2. A Firestore `onDocumentWritten` trigger on `organizations/{orgId}/members/{uid}` — mirrors membership into a custom auth claim, matching the existing `requestPptxRender` trigger pattern
-3. A new (or repurposed) share-link document, resolving the R036 conflict (see below)
-4. A client-side render-status resolver for `pptxRenders`/`rendered/*.png` — genuinely new IMPORTED-branch logic, not a URL swap
-5. A CSS custom-property triplet + static font-registry module — greenfield; no font seam exists anywhere in this codebase today
+1. `src/utils/messagingRecipients.ts` + a server-side port under `functions/src/` — pure recipient
+   resolution (team->RoleGroup mapping, dedup by email, unreachable-count), consumed identically by the
+   composer's live count and the Function's authoritative re-resolve at send time
+2. `queueServiceMessage` (onCall) -> `messages/{id}` doc -> `sendQueuedMessage` (onDocumentCreated) —
+   the single code path and single secret-holder for every trigger type (one-off, lock, re-lock,
+   scheduled reminder all terminate here)
+3. `sendScheduledReminders` (onSchedule, daily cron) — scans due services, creates `messages` docs;
+   never calls the provider directly, so there remains exactly one send code path
+4. `messageWebhook` (onRequest, HMAC-verified, no Firebase Auth) — the one genuinely new public/unauthenticated
+   trust boundary, updating `recipients/{id}.status` from the echoed `{orgId, serviceId, messageId, recipientId}` metadata
+5. `serviceLockDiff.ts` — pure diff of two `ServiceSnapshot`s into typed, team-tagged `ChangeEntry[]`,
+   built on the same snapshot-builder discipline that already fixed a prior share-link bug (v1.5 root
+   cause: "snapshot frozen at share time")
 
 ### Critical Pitfalls
 
-1. **Custom claims can lock out or under-authorize users** — the 1000-byte ceiling is live (multi-org membership is real), claims stale up to 1 hour. Avoid via dual-read (`OR`) rules through one full soak, idempotent backfill, fallback removed only in a separate later deploy.
-2. **A rules change proves it denies the wrong thing, not that it allows the right thing** — this project already shipped a deny-everyone Storage rule that passed a deny-only test suite for a full milestone. Every rules change needs a passing allow-case test, written first, against the real emulator.
-3. **Share-link backfill can orphan already-circulated links** — must reuse the most recent existing token, not mint anew. Auto-refresh gated on "already shared"; must never write back to the document it watches (loop hazard).
-4. **Widening `SlotKind` is compiler-caught at 6+ exhaustive-switch sites but NOT at silent-fallthrough sites** — above all `addSlotAsItem`'s Planning Center export, which defaults unhandled kinds to "Message" with no guard.
-5. **A feature toggle that only hides UI leaves the code path callable** — AI/PC gates must live inside `claudeApi.ts`/the PC utility itself, not only in `v-if`s, and must never mutate already-generated content when flipped.
-
-## Contradictions/Refinements to PROJECT.md — Roadmapper Must Not Plan Against Superseded Decisions
-
-**1. Share token storage location conflicts with the R036 draft-lock guard.** PROJECT.md's locked decision — "persist the token on the service doc" — collides with the write guard shipped in Phase 31 (`services.ts:197-203` `assertWritable`, `firestore.rules:64-84`). A bare `{ shareToken }` write matches none of the three carve-out shapes and is REJECTED on `planned`/`exported` services — the common sharing case. Recommended fix (not yet a locked decision): a separate `serviceShareLinks/{serviceId}` document, never touching the service doc or R036's carve-out surface. The owner's intent — one never-rotating link, snapshot auto-refreshed — is unchanged; only the storage location moves. Separately, regardless of which option is chosen: `firestore.rules`' `shareTokens` collection has `allow update: if false` today, which blocks any snapshot refresh and must change (mirror `serviceShares`' existing update rule).
-
-**2. Custom claims scope: `storage.rules` ONLY, not `firestore.rules`.** `firestore.rules` reads Firestore from Firestore rules — a same-service call, unaffected by firebase-js-sdk#6803, already correctly synchronous. Moving `firestore.rules` to the claim too would trade one staleness class (real) for another (new and unnecessary). Scope this migration to `storage.rules`.
-
-**3. Custom claims rollout is structurally two deploys with a soak between, not one.** Rules must `OR` (never `AND`) the new claim against the existing check for at least one full max-token-lifetime (1 hour) before the fallback is removed in a separate deploy. Deploys are the owner's action per the standing v1.5 autonomy grant — this phase cannot fully close inside an autonomous run; it ships built-and-undeployed.
-
-**4. Multi-org membership is a live constraint.** `users/{uid}.orgIds` is already an array (`auth.ts:86-99` currently only uses `ids[0]`), so the 1000-byte claim-payload ceiling is real design pressure now. The claim shape must be designed before the Cloud Function is written.
-
-**5. Share-token backfill must ADOPT the most recent existing token, never mint fresh.** `createShareToken()` mints on every call, so some services already have several `shareTokens` docs. Minting anew orphans links already circulated to a congregation.
-
-**6. PPTX rendered-image display is not a URL swap — it's new branch logic in two files.** Rendered page count and parsed-slide count structurally disagree. The IMPORTED-kind derivation in both `slideGroupMaterializer.ts::deriveGroupEntries` and `slideshowAssembler.ts` needs a genuinely new code path for "ready render exists." `sourceSignature`'s IMPORTED case must fold in render status/count, or the existing rebuild-on-mismatch mechanism will never notice a `pending→ready` transition.
-
-**7. `addSlotAsItem`'s silent fallthrough is a real, already-demonstrated trap.** The Planning Center export if-chain defaults any unhandled `SlotKind` to a generic "Message" branch with no guard. `IMPORTED` already required an explicit skip-with-comment to avoid exactly this mislabeling, but only in the new-plan export path. `ANNOUNCEMENTS`/`MISCELLANEOUS` need the same deliberate treatment, and it will not be caught by the compiler.
-
-**8. NLT is not a drop-in ESV swap.** Auth is a `key` query parameter, not an `Authorization` header — the ESV branch's header-injection code cannot be reused verbatim. The response is HTML (not JSON), with no documented toggle to suppress verse numbers — needs a `DOMParser`-based strip step plus a follow-up regex pass, flagged as a phase-level unknown to resolve against a real fetched sample.
-
-## Additional Sequencing Constraints
-
-- **Do not parallelize phases that share a choke point.** The AI toggle and congregational-reading AI-split both gate through `claudeApi.ts`; custom claims and sharing rework both edit `firestore.rules`/`storage.rules`. Sequence these, don't run concurrently.
-- **Item 3 (default service template) depends on item 5 (finalized item-type palette).** The template editor needs the final `SlotKind` set settled first.
-- **Rules-testing discipline is mandatory on every phase touching `firestore.rules`/`storage.rules` this milestone.** Every such phase ships a positive (allow-case) test, written and run FIRST, against the real emulator — not a mental read of the `.rules` file. Any "environment limitation" claim must be proven inert by the strip-down method CLAUDE.md documents, not asserted.
-
-## Open Scope Questions for the Owner
-
-1. **Should global slide typography include text outline/shadow?** Near-universal in comparable tools, specifically as the legibility technique against background images (already shipped v1.4). Not in the locked v1.5 list — raise explicitly rather than silently including or dropping.
-2. **Does global typography extend to the printed Order of Service (`ServicePrintLayout.vue`), or is it slide-surfaces only?** Currently text-only, not slide-shaped — would be a fifth consumer surface if in scope. PROJECT.md does not resolve this.
+1. **No domain authentication (SPF/DKIM/DMARC)** — sending from an unauthenticated or free-address
+   domain silently lands in spam or gets dropped; this is owner DNS work, must be scoped as an explicit
+   first-phase blocking step, not assumed done before "it works" is claimed.
+2. **Non-idempotent sends on at-least-once Cloud Functions** — a retried trigger without a transactional
+   `sent/{key}`-check-before-send re-sends duplicate emails; must be baked into the very first send
+   Function, not retrofitted.
+3. **Provider key exposed to the client or stored via deprecated `functions.config()`** — must be
+   `defineSecret`-only, never a `VITE_*` var, matching the existing three-secret pattern exactly.
+4. **Open/forgeable bounce webhook** — must verify HMAC signature over the raw request body before any
+   Firestore write, reject with 401 first; a naive `onRequest` endpoint is public by default.
+5. **Recipient correctness scattered across four send surfaces** — one shared server-side resolver
+   (dedup by email, unassigned-role handling, kill-switch + draft-skip checks) must be built once and
+   consumed by composer/lock/re-lock/reminder, or each surface will independently re-break the same rules.
 
 ## Implications for Roadmap
 
-Suggested phase structure, continuing numbering from v1.4 (phases start at 39):
+Based on combined research, the four researchers agree on this backbone: **(a)** a single shared
+server-side recipient resolver and idempotent send-record consumed by ALL send surfaces; **(b)** the
+Settings kill-switch ships before or with any auto-send path; **(c)** the re-lock scoped diff is the
+highest-complexity differentiator and should be its own phase, sequenced last; **(d)** an
+infrastructure/provider-setup phase (Resend account, domain SPF/DKIM/DMARC, secrets — all owner-gated)
+comes first, before any send-path code is built.
 
-### Phase 39: Org Settings Infrastructure
-**Rationale:** Every other settings feature writes into this shape — build first or every later phase re-touches `auth.ts`'s load/reset logic piecemeal.
-**Delivers:** `src/types/organization.ts` (`Organization`, `OrgSettings` — first of their kind), `DEFAULT_ORG_SETTINGS`, `auth.ts` merge-and-load logic, one nested `settings` field on the org doc.
-**Avoids:** The "eight duplicated `?? default` lines" pattern.
+### Phase 1: Provider infrastructure & settings foundation
+**Rationale:** Every other phase depends on the provider secret existing and the kill-switch existing
+before any auto-send is possible; PITFALLS' Pitfall 1 requires DNS/domain-auth work to be scoped and
+completed by the owner before any "it works" claim is credible, and ARCHITECTURE's default-off kill
+switch must exist before a fresh org's send Function has anything real to call.
+**Delivers:** Resend account (owner step) + `RESEND_API_KEY`/`RESEND_WEBHOOK_SECRET` via `defineSecret`;
+`OrgSettings.messaging` block (`enabled: false` default) merged into `loadOrgContext`; the
+`isMessagingEnabled()` client choke point (mirroring `claudeApi.ts`); `firestore.rules` additions for
+`messages`/`recipients`/`lockSnapshots` added early, locked-down by default per this codebase's
+rules-first discipline.
+**Addresses:** Settings kill-switch (P1 feature), email provider infra (P1 feature)
+**Avoids:** Pitfall 1 (domain auth), Pitfall 3 (secret handling)
 
-### Phase 40: Custom Auth Claim for Org Membership
-**Rationale:** The riskiest item — needs the longest verification window. Independent of Phase 39; sequence early, not last.
-**Delivers:** `onDocumentWritten` trigger setting `{ orgId, role }` claims; dual-read `storage.rules` change; idempotent/resumable backfill; forced-refresh call sites in `auth.ts`.
-**Research flag:** Deploy-gated — the soak-and-fallback-removal step is the owner's action and cannot close autonomously.
-**Avoids:** Pitfall 1 (lockout/staleness), Pitfall 2 (unproven "environment limitation" claims).
+### Phase 2: Shared recipient resolver
+**Rationale:** FEATURES' dependency graph and PITFALLS' Pitfall 6 both single this out as the thing that
+must exist once, consumed everywhere, before the composer or any auto-send is built — building it inline
+per-surface is explicitly named technical debt that's "never acceptable past a spike."
+**Delivers:** `src/utils/messagingRecipients.ts` (pure, client-side, unit-testable with no Firestore
+mocking) wrapping `resolveServiceRoleAssignments`; a server-side port under `functions/src/` kept in
+lockstep; dedup-by-email, unreachable-role surfacing, kill-switch + draft-skip checks centralized here.
+**Uses:** `resolveServiceRoleAssignments` (existing, `src/utils/serviceRoles.ts`)
+**Implements:** the recipient-resolution architecture component
 
-### Phase 41: Sharing Correctness
-**Rationale:** Resolve the R036 conflict explicitly before writing code (recommend the separate `serviceShareLinks` document). Sequence after Phase 40 to avoid two concurrent rewrites of the same rules files.
-**Delivers:** Persisted, never-rotating share token (new document, not a service-doc field); `shareTokens`/`serviceShares` rules updated to permit snapshot overwrite; auto-refresh hooked to `services.ts`'s six write functions, gated on "already shared"; backfill that adopts existing tokens.
-**Avoids:** Pitfall 3 (orphaned links, write amplification, PII scope creep).
+### Phase 3: Messages composer + send path (queue-then-trigger)
+**Rationale:** ARCHITECTURE's queue-then-trigger split (mirroring `parsePptxHandler`->`pptxRenders`->
+`requestPptxRender`) is the one new send primitive every later trigger reuses; PITFALLS' Pitfall 2
+(idempotency) and Pitfall 5 (RBAC re-check) must be baked into this Function from its first commit, since
+retrofitting after other phases build on it is harder. The composer UI itself can build in parallel once
+Phase 2's resolver and Phase 1's rules land.
+**Delivers:** `MessageComposer.vue` (teams-first recipients, One-off/Reminder/Share-link types, tokens,
+"Reaches N" live count, send-copy/schedule-for-later); `queueServiceMessage` (onCall, thin) ->
+`messages/{id}` doc -> `sendQueuedMessage` (onDocumentCreated, the only Function holding the provider
+secret, transactional idempotency check, server-side re-resolution of recipients, per-recipient token
+rendering).
+**Addresses:** Messages composer (P1 feature)
+**Avoids:** Pitfall 2 (idempotency), Pitfall 5 (RBAC/recipient trust), Pitfall 3 (secret confined to
+Functions)
 
-### Phase 42: PPTX Rendered-Image Display (carryover R062)
-**Rationale:** The largest, most structurally invasive item. Sequence after Phase 40/41 so Storage reads are claim-based for this brand-new code path.
-**Delivers:** Client-side render-status resolver; new IMPORTED branches in both materializer and assembler; `sourceSignature` folding in render status; full-bleed presenter branch; pending/failed fallback states.
-**Research flag:** Has slipped one milestone already — give it its own named phase with the stated acceptance criterion as explicit success condition.
+### Phase 4: Delivery history & bounce webhook
+**Rationale:** ARCHITECTURE and PITFALLS both flag the webhook as the one genuinely new
+unauthenticated-by-Firebase trust boundary in the whole feature — it must ship with HMAC verification
+from its first deploy, never added after a demo. It depends on Phase 3's `messages`/`recipients` doc
+shape and provider message-id capture already existing.
+**Delivers:** `messageWebhook` (onRequest, HMAC-verified against raw body, rejects unsigned/malformed
+requests with 401 before touching Firestore); per-service delivery-history panel reading
+`messages`+`recipients`; `deliveryCounts` rollup.
+**Addresses:** Delivery history & hard-bounce surfacing (P1 feature)
+**Avoids:** Pitfall 4 (forged webhook)
 
-### Phase 43: Service Item Types (Announcements, Miscellaneous, Message simplification, Hymn palette removal)
-**Rationale:** Compiler-bounded at exhaustive-switch sites; real risk is silent-fallthrough sites. Independent of Phases 40-42; must land before or with Phase 44.
-**Delivers:** Widened `SlotKind` union; new `text` field shared by Message/Announcements/Miscellaneous (Prayer keeps its link-based shape); explicit guard in `addSlotAsItem`; Hymn removed from both palette locations only.
-**Avoids:** Pitfall 4 — verify `npm run type-check` (the `vue-tsc --build` form) is clean, and explicitly document which switch-group each new kind joins.
+### Phase 5: Lock / re-lock triggers (first-lock notification only)
+**Rationale:** Depends on Phases 2-4 all being solid (a stable send primitive + delivery visibility to
+hang the lock-notify prompt off of). This phase covers the simpler "first lock" case only — no diff —
+deliberately separated from the diff-engine work per FEATURES' explicit dependency-note ("scope [the diff]
+as its own phase; it should not share a phase with the simpler lock-notification... work").
+**Delivers:** `lockSnapshots/current` write hooked into `onMarkAsPlanned`; first-lock notification prompt
+(no diff) using org/service messaging defaults; per-service automatic-email defaults toggle
+(Settings-inherited).
+**Addresses:** Lock notification (P1 feature)
+**Avoids:** Pitfall 6 recurrence (kill-switch/draft-skip must be checked here too, not just in the
+scheduled path)
 
-### Phase 44: Default Service Template
-**Rationale:** Depends on Phase 39 and Phase 43. Otherwise small — one consumption site (`createService`).
-**Delivers:** `OrgSettings.defaultServiceTemplate: ServiceSlot[] | null`; `createService` reading `orgTemplate ?? buildSlots(progression)`; a Services slide-out editor reusing existing slot primitives; VW typing computed at creation time, never frozen into the stored template.
+### Phase 6: Scheduled share-link reminder
+**Rationale:** Independent of Phase 5 (FEATURES' dependency graph marks it "independent of D"); depends
+only on Phase 3's send primitive existing. Grouping it separately lets it land in parallel with or after
+Phase 5 without blocking either.
+**Delivers:** `sendScheduledReminders` (onSchedule daily cron, mirroring `cleanupExpiredMedia`/
+`cleanupOrphanRenders`'s shape exactly); Draft-state skip logic; reminder-days-before Settings UI;
+idempotency via `reminderSentAt`.
+**Addresses:** Scheduled share-link reminder (P1 feature)
+**Avoids:** Pitfall 2 (idempotent reminder sends), UX Pitfall (timezone — flagged as open question below)
 
-### Phase 45: AI and Planning Center Settings Toggles
-**Rationale:** Low complexity, but the choke-point guard must be written and tested before the UI. Shares `claudeApi.ts` with Phase 48 — sequence, don't fully parallelize.
-**Delivers:** Two org-settings booleans; module-level guards; hide-not-grey UI treatment; explicit test proving a direct `claudeApi.ts` call with the toggle off makes no network request.
-**Avoids:** Pitfall 5.
-
-### Phase 46: ESV/NLT Bible Version Selection
-**Rationale:** Independent, low complexity, but the per-slide translation-source field is a schema decision that must be made now. Feeds Phase 48.
-**Delivers:** `NLT_API_KEY` + new proxy branch; settings picker; mandatory attribution suffix built once, shared by both scripture paths; per-slide translation-source field so a setting switch never retroactively alters existing slides.
-**Confidence flag:** NLT terms-of-use and exact API shape are LOW-MEDIUM confidence — verify against the owner's actual key before shipping.
-
-### Phase 47: Global Slide Typography
-**Rationale:** Depends on Phase 39; needs the owner's answer on outline/shadow and print-surface scope before implementation. Greenfield infrastructure.
-**Delivers:** Curated font registry with recorded per-font licenses; CSS custom-property triplet consumed by grid, drawer preview, presenter (and print, if confirmed in scope); `document.fonts.ready`-gated first paint and pre-measurement gating.
-**Avoids:** Pitfall 6 (font flash/reflow on a live projection).
-**Research flag:** UI-research sub-step required per PROJECT.md's own decision text — bundle legibility research and font-loading-safety research together.
-
-### Phase 48: Congregational Reading Divider UX (priority feature)
-**Rationale:** The owner-mandated UI-research-heavy item. Depends on Phase 46, benefits from Phase 47. No church-software precedent exists — reference class is subtitle/caption editors (click-to-split) plus per-segment label chips, not drag-handle or free-range-selection (both evaluated and rejected).
-**Delivers:** Click-between-verses divider + per-segment Leader/Congregation/All chip control, seeded three ways (AI split, gated by Phase 45's toggle; one-click alternate-assignment; blank) into one editable `{ text, role }[]` structure; first slide shows the scripture reference, later slides show only the speaker label.
-**Uses:** Phase 45's AI toggle (gates but does not block), Phase 46's translation/attribution logic.
-
-### Phase 49: Multi-Image Import Ordering
-**Rationale:** Fully independent, low-risk, bug-fix-shaped — good candidate to build roadmap momentum early or slot in wherever convenient.
-**Delivers:** `Intl.Collator({ numeric: true, sensitivity: 'base' })` comparator applied to `classifyFiles`'s images bucket in `dropRouting.ts`.
-
-### Phase 50: Mobile & Layout Polish
-**Rationale:** Sequence last — benefits from Print/Share already having moved into the contextual action bar, and from no other phase still touching drag-and-drop order logic concurrently.
-**Delivers:** `QuarterView.vue`'s responsive button-stacking recipe applied to `ServiceEditorView.vue`'s header; Print/Share moved into `ContextualActionBar.vue`; Undo demoted to a link; dismissible Getting Started panel; mobile-friendly Slides tab (not independently audited yet).
-**Avoids:** Pitfall 8 (touch drag-and-drop reproducing the documented `ZTXcpNRcJTalEQp42fTx` index bug) — reuse the exact desktop SortableJS config with touch-only options added.
+### Phase 7: Re-lock scoped change-diff notification
+**Rationale:** All four research files agree this is the single highest-complexity, highest-differentiation
+piece and should be sequenced last — it depends on the lock-snapshot mechanism (Phase 5), the send
+primitive (Phase 3), and the recipient resolver (Phase 2) all already being proven. PITFALLS' Pitfall 7
+(snapshot drift, the same bug class already diagnosed once in v1.5's share-link work) means this phase
+must build directly on the existing snapshot-builder discipline rather than ad hoc comparison logic.
+**Delivers:** `src/utils/serviceLockDiff.ts` (pure diff of two `ServiceSnapshot`s into typed,
+team-tagged `ChangeEntry[]`); checkable re-lock diff UI feeding the same composer/queue path
+(`type='relock-notification'`); "Lock quietly" always-available escape hatch; snapshot overwrite on
+confirm so the *next* re-lock diffs against the new state, not the original.
+**Addresses:** Re-lock change notice (P1 feature, standout differentiator per FEATURES)
+**Avoids:** Pitfall 7 (snapshot drift / over- or under-reporting)
 
 ### Phase Ordering Rationale
 
-- Settings infrastructure (39) and custom claims (40) are prerequisite/independent infrastructure and belong first.
-- Sharing (41) is sequenced after claims (40) specifically to avoid two concurrent rewrites of the same rules files.
-- PPTX display (42) follows sharing so its brand-new Storage read path inherits claim-based correctness.
-- Service item types (43) is compiler-bounded and independent, but must precede the template (44).
-- AI/PC toggles (45) precede the divider (48) since both touch `claudeApi.ts`.
-- Bible version selection (46) precedes the divider (48) since the divider operates on already-fetched, already-attributed scripture text.
-- Typography (47) loosely precedes the divider (48) so the divider's slide preview reflects real settings.
-- Multi-image ordering (49) and mobile polish (50) are independent; mobile is last because it benefits from Print/Share already having moved and from no concurrent drag-and-drop work.
+- **Infrastructure-first (Phase 1) is non-negotiable**: PITFALLS' Pitfall 1 explicitly names this the
+  "first v1.7 phase," and STACK's provider choice is a prerequisite input every other phase's Function
+  code depends on.
+- **Shared resolver before any send surface (Phase 2)**: FEATURES' dependency graph and PITFALLS'
+  Pitfall 6 both call out duplicated per-surface recipient logic as a "never acceptable past a spike"
+  shortcut — building it once, early, prevents four independent implementations from drifting.
+- **Send primitive before any trigger that uses it (Phase 3 before 5, 6, 7)**: ARCHITECTURE's
+  queue-then-trigger design is reused identically by every later phase; building it once with idempotency
+  and RBAC baked in avoids retrofitting those properties into four call sites.
+- **Delivery history/webhook (Phase 4) before the auto-send paths mature**: shipping lock-notify or the
+  scheduled reminder without bounce visibility "recreates the silent-failure problem this milestone exists
+  to solve" (FEATURES' dependency notes) — sequenced right after the send primitive, before the auto-send
+  triggers that make failures likely to matter in volume.
+- **Re-lock diff last (Phase 7)**: unanimous across FEATURES, ARCHITECTURE, and PITFALLS — it is the
+  highest-complexity, most novel logic (no peer-tool precedent to crib from) and depends on every other
+  piece (snapshot builder, send primitive, resolver) being stable first.
 
 ### Research Flags
 
 Phases likely needing deeper research during planning (`--research-phase`):
-- **Phase 40 (custom claims):** dual-read rollout, byte-budget claim shape, race-condition-at-invite-acceptance design.
-- **Phase 41 (sharing):** the R036 storage-location decision must be made explicitly in the plan.
-- **Phase 42 (PPTX display):** render-count-vs-parsed-count reconciliation across two files plus `sourceSignature`.
-- **Phase 46 (NLT):** the HTML-to-plain-text extraction step needs a spike/discovery step against a real sample.
-- **Phase 47 (typography):** owner must resolve outline/shadow and print-surface scope questions first.
-- **Phase 48 (congregational reading divider):** no direct precedent exists; treat the interaction-pattern analysis as required reading.
+- **Phase 7 (re-lock diff):** ARCHITECTURE flags real open design questions (SLIDES-diff granularity,
+  `affectedTeams` inference for non-ROLE entries) that were deliberately left unresolved for
+  requirements/roadmap — worth a focused research or discussion pass before planning this phase in detail.
+- **Phase 6 (scheduled reminder):** the timezone approach (naive UTC vs. org-local time) is flagged as an
+  open UX pitfall with no resolution in any research file — needs a decision before implementation.
+- **Phase 3 (composer/send path):** the "their roles" token's per-recipient personalization — true
+  per-recipient rendering vs. a merged blast for the initial cut — is explicitly deferred to a P2 decision
+  in FEATURES; the roadmap should decide up front whether Phase 3 ships the simpler merged version or the
+  full personalized version, since it changes the phase's scope materially.
 
-Phases with standard, well-documented patterns (safe to skip a dedicated research sub-step):
-- **Phase 39 (settings infrastructure):** direct generalization of the existing `vwModeEnabled` pattern.
-- **Phase 43 (service item types):** compiler-guided, existing well-understood architecture.
-- **Phase 44 (default template):** reuses existing slot primitives verbatim.
-- **Phase 45 (AI/PC toggles):** table-stakes SaaS pattern, existing choke point already designed for this.
-- **Phase 49 (multi-image ordering):** solved problem, native `Intl.Collator`.
+Phases with standard, well-documented patterns (skip research-phase, plan directly from this SUMMARY +
+ARCHITECTURE.md):
+- **Phase 1 (infra/settings):** directly copies the existing `defineSecret`/`OrgSettings` merge pattern,
+  no open design questions.
+- **Phase 2 (resolver):** pure-function port of existing, already-tested logic (`resolveServiceRoleAssignments`).
+- **Phase 4 (webhook):** standard HMAC-verification pattern, well-documented by the provider and by PITFALLS.
+- **Phase 5 (first-lock notify):** direct application of the Phase 3 send primitive to an existing trigger
+  point (`onMarkAsPlanned`), no new logic beyond what Phase 3 already establishes.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | MEDIUM | HIGH on npm-registry facts; LOW-MEDIUM on NLT API shape/terms and font licensing/metrics (web-search only) |
-| Features | MEDIUM | Official/primary for Planning Center and Crossway/Tyndale license pages; LOW-MEDIUM for congregational-reading UX specifically, since no church-software precedent exists |
-| Architecture | HIGH | Every claim traced to a specific file/line read in this codebase; no external research used |
-| Pitfalls | HIGH | Codebase-grounded, cross-checked against this project's own documented incident history; Firebase claims mechanics cross-checked directly against official docs |
+| Stack | MEDIUM-HIGH | Provider pricing/features cross-checked across 2+ independent web sources each; the `defineSecret` pattern verified directly against this repo's own `functions/src/index.ts`, not just docs — the strongest-grounded of the four files |
+| Features | MEDIUM | Peer-tool behavior (PCO especially) is grounded in official first-party help-center docs; broader "industry consensus" claims (tokens, bounce UX) are lower-confidence general web search |
+| Architecture | HIGH | Every recommendation is anchored to a real, currently-shipping file in this codebase by path; only two genuinely new decisions (provider choice, SLIDES-diff shape) are flagged as open rather than asserted |
+| Pitfalls | MEDIUM | Firebase/GCF idempotency guidance corroborated by official Google Cloud Blog + Firebase docs (HIGH within that topic); deliverability/inbox-placement specifics from a single benchmark source are explicitly flagged LOW and treated as directional only |
 
-**Overall confidence:** MEDIUM-HIGH — structural/architectural findings (where the real risk lives) are highly reliable; the two genuinely uncertain areas (NLT's exact terms/API shape, whether outline/shadow belongs in scope) are flagged as explicit open items.
+**Overall confidence:** MEDIUM-HIGH — the architecture and stack conclusions are strongly grounded in
+this specific codebase's existing precedent; the open questions below are genuine product decisions, not
+research gaps.
 
 ### Gaps to Address
 
-- **NLT API terms of use and exact response shape:** verified only by a single manual fetch — confirm against the owner's actual key during Phase 46's planning.
-- **Font licensing for any curated family beyond Inter:** record and verify the license for each font actually added, don't assume by analogy.
-- **Whether schedule-only changes should trigger a share-snapshot refresh:** `resolveServiceRoleAssignments` reads the `quarters` store, which can change independent of any service-doc write — the client-side refresh hook does NOT cover a volunteer's schedule changing for someone not overridden on this specific service. Unresolved product question — resolve explicitly, don't let it slide.
-- **Slides tab mobile-blocking layout:** not independently audited line-by-line — Phase 50's plan needs the same targeted read-before-plan treatment given to `ServiceEditorView.vue`'s header.
-- **The two open scope questions for the owner** (typography outline/shadow; print-surface inclusion) — must be resolved before Phase 47's plan is finalized.
+- **SLIDES-diff granularity** (coarse yes/no changed vs. per-slide-group fingerprint) — ARCHITECTURE
+  proposes a lightweight per-group text-hash fingerprint stored only on `lockSnapshots/current`, but flags
+  this as needing requirements/roadmap confirmation before implementation (Phase 7).
+- **`affectedTeams` inference for non-ROLE diff entries** (SONG/ORDER/NOTES/SLIDES) — ARCHITECTURE
+  proposes a broad "every team with an assigned role" default, but notes a narrower mapping (e.g.
+  SONG->vocals+band only) is equally defensible and changes default recipient selection materially; needs
+  an owner/roadmap call before Phase 7 is planned in detail.
+- **Per-recipient "their roles" token rendering** — true per-recipient personalized rendering vs. a single
+  merged blast for the initial cut is explicitly P2 in FEATURES' prioritization matrix; the roadmap should
+  decide which version Phase 3 ships, since it changes that phase's scope.
+- **Scheduled-reminder timezone approach** — naive UTC date math vs. org-configured local time is flagged
+  as an unresolved UX pitfall with no research-file answer; needs a decision before Phase 6 is planned.
+- **Per-service messaging defaults on a locked service** — ARCHITECTURE recommends keeping
+  `services/{id}.messaging` draft-only-editable (no new rules carve-out), but flags this as needing
+  confirmation that toggling automatic-email defaults on an already-locked service isn't actually needed
+  for v1.7.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- Direct codebase reads across all four research files: `.planning/PROJECT.md`, `CLAUDE.md`, `firestore.rules`, `storage.rules`, `src/stores/services.ts`, `src/stores/auth.ts`, `src/utils/slotTypes.ts`, `src/utils/slideGroupMaterializer.ts`, `src/utils/slideshowAssembler.ts`, `functions/src/index.ts`, `src/utils/esvApi.ts`, `src/components/slides/dropRouting.ts`, and ~15 more files enumerated in ARCHITECTURE.md's Sources section
-- npm registry live `npm view` (2026-08-06): `@fontsource/*@5.3.0` family, `subset-font@2.5.0`
-- [ESV Permissions - Crossway](https://www.crossway.org/permissions/)
-- [firebase.google.com/docs/auth/admin/custom-claims](https://firebase.google.com/docs/auth/admin/custom-claims)
+- `functions/src/index.ts` — existing `defineSecret` pattern (`CLAUDE_API_KEY`/`ESV_API_KEY`/`NLT_API_KEY`),
+  `onSchedule` cron precedent (`cleanupExpiredMedia`/`cleanupOrphanRenders`), queue-then-trigger precedent
+  (`parsePptxHandler`->`pptxRenders`->`requestPptxRender`) — verified directly, not from docs
+- `src/stores/services.ts` — `buildServiceSnapshot`, `markAsPlanned`, `reopenService`, `setRoleOverride`
+  scoped dot-path write precedent
+- `src/utils/serviceRoles.ts`, `src/utils/claudeApi.ts`, `src/types/organization.ts` — recipient
+  resolution and settings-choke-point precedent
+- `firestore.rules` — nested-vs-wildcard subcollection precedent (`songs/{id}/lyrics/{id}`, `pptxRenders`)
+- npm registry (`registry.npmjs.org/resend/latest` -> `6.19.0`) — direct primary-source version check
+- firebase.google.com/docs/functions/config-env — official `functions.config()` deprecation (March 2027)
+- Google Cloud Blog (idempotent/retry Cloud Functions guidance, 2 posts) + firebase.google.com/docs/functions/retries — official at-least-once delivery documentation
 
 ### Secondary (MEDIUM confidence)
-- [Set up plan templates - Planning Center](https://help.planningcenter.com/en/139469-set-up-plan-templates.html) and related PC help docs
-- [Guide to Using Themes in ProPresenter](https://support.renewedvision.com/hc/en-us/articles/34551484745875-Guide-to-Using-Themes-in-ProPresenter)
-- [NLT Bible Notices - thebible.org](https://thebible.org/gt/notices/nlt.html) / [StudyLight.org NLT copyright statement](https://www.studylight.org/site-resources/copyright-statements/eng/nlt.html)
-- [firebase-js-sdk#6803](https://github.com/firebase/firebase-js-sdk/issues/6803)
-- [Natural sort order - Wikipedia](https://en.wikipedia.org/wiki/Natural_sort_order); [Coding Horror - Sorting for Humans](https://blog.codinghorror.com/sorting-for-humans-natural-sort-order/)
+- help.planningcenter.com / pcoservices.zendesk.com (official PCO help docs) — scheduling-email, reminder,
+  and communicate-with-teams behavior
+- help.elvanto.com (official Elvanto docs) — publish-triggers-notify and contact-volunteers behavior
+- resend.com/docs (webhooks, verify-webhooks-requests, domain restriction) — official Resend docs
+- Provider pricing cross-checks (automationatlas.io, tiergauge.com, nuntly.com, saaspricepulse.com,
+  sendx.io, costbench.com) — 2+ independent sources per provider
+- Mailgun SPF/DKIM/DMARC setup guide; webhook signature verification guide (inventivehq.com) — cross-checked
+  against multiple independent sources
 
-### Tertiary (LOW confidence, needs validation)
-- Direct `WebFetch` of `https://api.nlt.to/api/passages` (single manual sample, not full spec)
-- Google Fonts OFL/Apache licensing terms (multiple secondary sources)
-- Inter vs. Helvetica Neue metric-compatibility comparison (secondary comparison sites)
-- Congregational-reading UX precedent (subtitle-editor analogy - no direct church-software comparable found)
+### Tertiary (LOW confidence)
+- itsupport.life.church (Rock RMS operational guide) — third-party, single source
+- theleadpastor.com and similar WorshipTools-vs-PCO blog comparisons — secondary, cross-checked across
+  two write-ups only
+- mailtrap.io transactional-email-services benchmark — single-vendor inbox-placement percentages, treated
+  as directional only, not precise
 
 ---
-*Research completed: 2026-08-06*
+*Research completed: 2026-08-13*
 *Ready for roadmap: yes*

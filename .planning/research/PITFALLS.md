@@ -1,706 +1,430 @@
-# Pitfalls Research: v1.5 Settings, Sharing, and Fidelity
+# Pitfalls Research
 
-**Domain:** Adding settings/sharing/fidelity features to a shipped Vue 3 + Firebase church-planning
-app with real production data and a live congregation-facing share surface.
-**Researched:** 2026-08-06
-**Confidence:** HIGH for codebase-grounded findings (read directly from `src/`, `functions/src/`,
-`firestore.rules`, `storage.rules`, `.planning/PROJECT.md`, `.planning/STATE.md`); HIGH for Firebase
-custom-claims mechanics (cross-checked against `firebase.google.com/docs/auth/admin/custom-claims`
-directly, two independent passes).
-
-This milestone's own scoping record already contains one production incident (`storage.rules`
-deny-everyone, fixed by IAM grant 2026-08-06) and one previously-mislabelled test (see CLAUDE.md).
-Every pitfall below is written against that backdrop — not generic security/mobile advice.
-
----
+**Domain:** Adding volunteer/transactional email + change-notifications to an existing, in-production
+Firebase/Firestore app (WorshipPlanner v1.7)
+**Researched:** 2026-08-13
+**Confidence:** MEDIUM (web-sourced, cross-checked against 2+ independent sources per topic; Firebase/GCF
+idempotency guidance corroborated by official Google Cloud Blog + Firebase docs; deliverability numbers
+from a single benchmark source are flagged LOW and should not be treated as precise)
 
 ## Critical Pitfalls
 
-### Pitfall 1: Custom auth claims lock out signed-in users, or silently under-authorize them
+### Pitfall 1: Sending without domain authentication (SPF/DKIM/DMARC) or from a free address
 
 **What goes wrong:**
-Moving org membership onto a Firebase custom claim (`request.auth.token.orgId` /
-`request.auth.token.role` in rules, in place of `firestore.exists()`/`get()`) touches every
-existing session at once. The specific ways this fails in production, all confirmed against
-Firebase's documented behavior:
-
-- **1000-byte payload ceiling.** `setCustomUserClaims()` throws if the JSON-serialized claims
-  object exceeds 1000 bytes. This app's own `users/{uid}.orgIds` field is already an **array** —
-  `auth.ts:86` reads `userData?.orgIds ?? []` and `loadOrgContext` picks `ids[0]` — so a user who
-  belongs to more than one org (the schema already allows it; only the UI never exercises it) needs
-  more than a single `{orgId, role}` pair encoded. A naive `{ orgs: { <20-char-orgId>: 'editor', ... } }`
-  map hits the ceiling at a handful of orgs. Design the claim shape (short org keys, or a capped
-  list, or a single "active org" claim with per-org checks staying in Firestore for anyone in >1
-  org) *before* writing the Cloud Function, not after the first `auth/claims-too-large` error in
-  production.
-- **Claims are stale until the ID token refreshes** — normally up to one hour, and the Firebase SDK
-  does not proactively refresh just because Firestore data changed. A member added to an org (or
-  promoted editor→admin, or removed) will not see the new claim take effect until: (a) their token
-  naturally refreshes, (b) they sign out/in, or (c) the client explicitly calls
-  `getIdToken(true)`/`getIdTokenResult(true)`. **Every existing signed-in tab, right now, has zero
-  claim.** If a rule is written as `isOrgMember(orgId)` → "has the claim," every currently-open
-  session fails every check the instant that rule deploys, until each tab force-refreshes.
-- **The backfill can miss users.** A one-time Cloud Function that iterates `organizations/*/members/*`
-  and calls `setCustomUserClaims` per uid is a full collection-group scan with pagination, retry, and
-  idempotency concerns of its own — an interrupted run silently leaves a subset of users claim-less.
-  There is no current collection-group query anywhere in `src/` to reuse (grep confirmed no
-  `collectionGroup('members')` usage today) — this is new code, unexercised by any existing pattern.
-- **A client can read but never trust its own claims.** `request.auth.token.role` inside
-  `firestore.rules`/`storage.rules` is authoritative because only the Admin SDK can set it; but
-  `getIdTokenResult()` output in the browser is just as trustable as any other server-issued value —
-  the *bug* to avoid is writing app logic that trusts *Firestore-stored* role fields (which the
-  client itself can write, per the existing `isOrgEditor` `write` grant on the `members/{uid}` doc)
-  as if they were the claim. The two must not silently diverge: a member's Firestore `role` field
-  and their claim's `role` need one write path, not two.
-- **Membership changes need a claims refresh path, not a fire-and-forget `setCustomUserClaims` call.**
-  If `setCustomUserClaims` runs but nothing tells the client to refresh, the client's *current*
-  claim (from up to an hour ago) can be more permissive than intended — e.g. a removed member keeps
-  write access to Storage for up to an hour after removal, or (worse for this app) a demoted editor
-  keeps editor-level Firestore rule access even though the UI now hides editor controls.
+The app sends "Your service is locked" mail from a Gmail/Outlook address, or from a domain with no SPF/DKIM
+records. Mail lands in spam, gets silently dropped, or (worse) succeeds in testing because the developer's
+own inbox trusts the sender, then fails for real volunteers on Gmail/Outlook/Yahoo who enforce stricter
+filtering. Google's bulk-sender rules (effective Feb 2024) require at minimum a DMARC record at `p=none` for
+any domain sending meaningfully to Gmail recipients — a domain with none is disadvantaged for deliverability
+even at low volume.
 
 **Why it happens:**
-Custom claims look like a drop-in replacement for a Firestore membership check, but they are a
-*second, independently-cached* copy of the same fact with its own propagation delay. Teams that have
-only ever used Firestore rules (synchronous, always current as of the write) underestimate the
-staleness window because nothing in local dev (where tokens are freshly minted every session) ever
-exposes it.
-
-**How to avoid — the safe rollout order:**
-1. **Design the claim shape against the 1000-byte ceiling first**, explicitly handling the
-   multi-org case the schema already permits (`orgIds` array). Prefer a *minimal* claim — e.g. just
-   `{ o: [orgId, ...], r: { [orgId]: 'e'|'a' } }` with short keys — over embedding anything that
-   isn't needed by a rule. If the true byte math is still tight, fall back to "claims cover the
-   *first N* orgs, `firestore.exists()`/Firestore reads cover the rest" rather than erroring.
-2. **Dual-read rules before cutover.** Change `isOrgMember(orgId)`/`isOrgEditor(orgId)` in BOTH
-   `firestore.rules` and `storage.rules` to `OR` the claim and the existing `exists()`/`get()` check
-   — never AND, never claim-only — for at least one full deploy cycle:
-   ```
-   function isOrgMember(orgId) {
-     return isSignedIn() && (
-       orgId in request.auth.token.get('orgIds', []) ||
-       exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid))
-     );
-   }
-   ```
-   This is the only rollout order that cannot lock anyone out: a stale/absent claim simply falls
-   through to the check that has worked in production since v1.0.
-3. **Backfill via a Cloud Function, idempotent and resumable** (checkpoint the last processed uid;
-   safe to re-run). Verify completion by comparing count of claims-set users against count of
-   distinct `organizations/*/members/*` docs — not by "the function returned 200."
-2. **Write path unification.** Every place that changes a member's role or removes a member
-   (`isOrgEditor` writes to `members/{uid}`) must, in the same transaction/trigger, call
-   `setCustomUserClaims` — via a Firestore-triggered Cloud Function (`onDocumentWritten` on
-   `organizations/{orgId}/members/{uid}`), not a client-invoked callable, so a client can never skip
-   the claim update.
-3. **Force-refresh on the client after a relevant write.** Mirror the pattern Firebase's own docs
-   recommend: the member doc write already triggers `onSnapshot` listeners in this app
-   (`auth.ts` subscribes to the member doc) — on a role/removal change observed via that listener,
-   call `getIdToken(true)` proactively so the *acting* user's own session (if they changed their own
-   membership, e.g. leaving an org) doesn't run on a stale token for up to an hour. This does not
-   fix *other* affected users' open tabs (they legitimately wait for natural refresh or their own
-   next sign-in) — that gap is exactly why dual-read must stay in place through the token's max
-   lifetime (1 hour) after cutover, not just through deploy.
-4. **Verify before it can lock anyone out.** Before removing the dual-read fallback: (a) run the
-   emulator rules suite with the claim present, claim absent, and claim stale-but-Firestore-current,
-   proving all three pass; (b) in a real (non-prod) project, sign in as an existing pre-migration
-   user, confirm they are NOT locked out with zero claim; (c) only after 1+ hour (max token lifetime)
-   with dual-read live and no error-rate spike, remove the `exists()`/`get()` fallback in a *separate*
-   deploy from the one that added the claim.
-5. **Rollback plan once tokens carry the claim.** Rolling back `firestore.rules`/`storage.rules` to
-   the pre-claim version is safe and instant (rules deploys are independent of token state — an
-   old-shape rule simply ignores whatever claim is present). The one-way door is the claim *data*
-   itself: once claims are backfilled, leaving them in place while reverting rules is harmless (an
-   unused claim in the token costs nothing). Never remove the dual-read `OR` branch until the team is
-   certain no rollback is coming.
-
-**Warning signs:**
-- Any `firestore.rules`/`storage.rules` diff that replaces (rather than adds an `OR` to) an
-  `exists()`/`get()` check with a claim check in the same deploy.
-- A backfill Cloud Function with no resumability/idempotency and no post-run count verification.
-- `setCustomUserClaims` called from anywhere reachable by client-supplied input without server-side
-  membership verification first (claims are as dangerous to set wrongly as they are trustworthy once
-  set correctly).
-- No test exercising a user who belongs to 2+ orgs against the real claim-shape byte count.
-
-**Phase to address:**
-The "move org membership onto a custom auth claim" phase (carried-forward v1.4 item, R062-adjacent).
-This should be its own phase, sequenced *early* in the milestone but not first — it should land
-*after* the sharing rework's Firestore/Storage-rules changes are stable, so this phase isn't
-debugging two rules rewrites in the same window. It must not be bundled with any UI-facing settings
-work; it is pure infrastructure risk and deserves an isolated blast radius.
-
----
-
-### Pitfall 2: A security-rules change proves it denies the wrong thing, not that it allows the right thing
-
-**What goes wrong:**
-This project has already shipped a rule that denied every legitimate user while the emulator test
-suite reported green, because — per CLAUDE.md — **`firestore.exists()` is permanently inert in the
-Storage emulator** (firebase-js-sdk#6803): a rule reduced to nothing but that cross-service clause
-denies identically whether the membership doc exists or not. All the *deny* test cases passed
-(correctly denying non-members) while both *allow* cases failed (incorrectly denying members) — and
-the failures were mislabelled "needs the Storage emulator" instead of investigated, for an entire
-milestone, until a real PPTX import hit `storage/unauthorized` in production.
-
-**Why it happens:** Deny-path tests are trivially easy to write and pass even when a rule is
-completely broken (an unconditional `allow: if false` also passes every deny test). Allow-path tests
-against a rule with an inert clause fail in a way that *looks* like an environment limitation rather
-than a rule bug, especially when a prior comment in the codebase already says "emulator can't do
-this" for something else.
-
-**How to avoid — the concrete testing discipline for this milestone's rules changes** (custom
-claims, sharing rework, settings docs, service-item type additions all touch `firestore.rules`
-and/or `storage.rules`):
-1. **Every rules change ships with both a positive and negative test, and the positive test is
-   written and run FIRST.** A rule that only has deny tests is not tested — treat "I added deny
-   tests" as incomplete work, not as a checkpoint.
-2. **Any test failure attributed to "environment limitation" must be proven, not asserted.** The
-   proof pattern this project already established (CLAUDE.md, 2026-08-06): strip the rule down to
-   *only* the suspect clause, observe identical pass/fail with the underlying condition proven true
-   by an out-of-band admin read AND proven false — if the rule behaves identically either way, it's
-   provably inert, not merely "probably an emulator quirk." Do this proof before writing the words
-   "known limitation" into any test file or plan.
-3. **When a rule depends on a cross-service read (Storage rule reading Firestore, as `storage.rules`
-   currently does and as any interim dual-read claim rule will also do during Pitfall 1's rollout),
-   assume the emulator cannot validate it until proven otherwise for that specific service pair.**
-   `firestore.exists()` from Storage rules is confirmed inert; do not assume the reverse (Firestore
-   rules reading `request.auth.token`, which is native and always evaluable) has the same problem —
-   custom-claims-based rules are, in fact, the fix for this exact blind spot, which is the whole
-   rationale for Pitfall 1's phase.
-4. **`npm run test:rules` (the real emulator-backed suite) is the gate, not a mental read of the
-   `.rules` file.** Any rules change lands with an actual run of that suite (or
-   `npx vitest run --config vitest.rules.config.ts` against an already-running emulator, per
-   CLAUDE.md) attached as evidence, not "the logic looks right."
-5. **New collections added this milestone (settings doc, org font/template config) need read AND
-   write, allow AND deny tests from the day the rule is written** — not retrofitted later. The
-   `serviceShares`/`quarterShares` rules already in this file are the right model to copy: paired
-   comments explaining *why* each clause exists (e.g. the CR-01 slug-squatting fix), not just what it
-   does.
-
-**Warning signs:**
-- A rules test file where every test name starts with "denies" / "rejects" / "blocks" and none start
-  with "allows".
-- A code comment or commit message containing "known limitation" or "emulator can't" attached to a
-  test that has never been isolated and proven inert by the strip-down method above.
-- A rules change reviewed only by reading the `.rules` file, with no emulator run cited as evidence.
-
-**Phase to address:** Every phase that touches `firestore.rules` or `storage.rules` this milestone —
-custom claims, sharing (new `serviceShares`-adjacent fields/collections), settings (new org-scoped
-settings doc), and the Announcements/Miscellaneous item additions if they need new field-level
-validation. This is a *discipline*, not a single phase's deliverable — call it out explicitly in
-every such phase's plan verification checklist.
-
----
-
-### Pitfall 3: Persisted-token share-link migration breaks links already in the congregation's hands, or amplifies writes into a cost/loop problem
-
-**What goes wrong:**
-Today, `createShareToken()` (`src/stores/services.ts:353`) mints a brand-new random 36-char token and
-a frozen `serviceSnapshot` **every time it's called**, and separately overwrites the memorable
-`serviceShares/{slug}__service-{date}` doc in place. v1.5's fix is to persist one token on the
-service doc (minted once, never rotated) and auto-refresh the snapshot on every service change. Four
-concrete hazards in that migration:
-
-- **Backfilling a token onto existing service documents.** Services that already have a `shareTokens`
-  doc from a prior `createShareToken()` call have a token *already circulated* to the congregation
-  (e.g. printed in a bulletin, texted to a volunteer). If the backfill mints a *second, different*
-  token and only the new one gets persisted on the service doc, the old link (still resolvable
-  because its `shareTokens/{token}` doc is never deleted, per the rules' `allow read: if true`)
-  becomes a permanent stale fork — it will silently stop tracking the service once the new one takes
-  over autosave-refresh, showing whatever plan existed at the moment of the last manual share
-  forever. The correct backfill re-uses the **most recently created** existing token for that service
-  (if one exists) as the persisted token, rather than minting fresh — this preserves every link
-  already in someone's hands.
-- **Auto-refresh on every service write is a second write, and it must not become a trigger loop.**
-  If the refresh is implemented as a Cloud Function trigger (`onDocumentWritten` on
-  `organizations/{orgId}/services/{docId}`) that writes the refreshed snapshot to
-  `shareTokens/{token}` and/or `serviceShares/{slug}__service-{date}`, that is safe *only* as long as
-  neither of those writes touches the `services/{docId}` document itself. If, instead, refresh is
-  implemented as an extra client-side write appended to every service save that happens to touch
-  `services/{docId}` (e.g. caching "last refreshed" on the service doc), a Firestore-triggered
-  function watching `services/{docId}` for exactly that purpose will re-fire on its own write —
-  classic infinite trigger loop. **Design constraint: the refresh write's target must never be a
-  document the refresh trigger itself watches.**
-- **Cost/write amplification.** Every keystroke-debounced service autosave (this app already
-  debounces autosave, per PROJECT.md's save-reliability history) would, under a naive "refresh
-  snapshot on every write" design, also re-run the roster/quarter resolution
-  (`resolveServiceRoleAssignments`, a cross-collection read) and write two more documents
-  (`shareTokens` + `serviceShares`) per save. At current scale (2-3 planners, one org) this is
-  immaterial; the actual risk is *unshared* services (never presented to anyone, no `shareTokens`
-  doc yet) paying this cost on every autosave for no reader. **Only refresh a service that has
-  already been shared at least once** (i.e., a `shareTokens` doc already exists) — do not eagerly
-  create share docs for services nobody has shared.
-- **PII scope creep on refresh.** `createShareToken()`'s `serviceSnapshot` deliberately carries
-  `personNames` only (D-04/D-24 guard — resolved via a `Map<id, name>`, never the raw `Person`
-  object with email/phone/`pcPersonId`). A refresh path implemented as "just re-run the same
-  snapshot-building code on write" is safe *only if it reuses the exact same resolution function*.
-  The hazard is a future edit to that resolver (e.g. someone adding a phone number for a "text the
-  team" feature) that widens what a **public, unauthenticated** read (`allow read: if true` on both
-  `shareTokens` and `serviceShares`) exposes — and because refresh now runs automatically on every
-  save instead of only at explicit "Share" click time, a PII leak introduced this way would appear
-  on *every* service silently and immediately, not just on the next manual share.
+SPF/DKIM/DMARC are DNS-level owner setup (the church's domain), not application code — easy to defer because
+"the app doesn't need it to compile or deploy." Nobody notices until real volunteers report missing mail
+weeks later, by which time it looks like an app bug, not a DNS gap.
 
 **How to avoid:**
-- Backfill script: for each service with an existing `shareTokens` doc, reuse its token (most recent
-  by `createdAt` if multiple) rather than minting new.
-- Implement the refresh as a Cloud Functions Firestore trigger on `services/{docId}` writing *only*
-  to `shareTokens/{token}` and `serviceShares/{shareId}` — never back to `services/{docId}` — and add
-  a test asserting the trigger does not re-fire itself.
-- Gate the refresh on "a share already exists for this service" to avoid amplifying every autosave.
-- Add an explicit test (unit or rules) pinning the snapshot shape to `{name, roleId, roleName,
-  group, personNames}` — no email/phone/id fields — so a future PII widening fails CI, not just code
-  review.
+- Pick a provider (Postmark/Resend/SendGrid/Mailgun) and configure sending from a subdomain of the church's
+  own domain (e.g. `notify.<church-domain>.org`), never a free consumer address — this is an owner action on
+  their DNS, must be scoped explicitly as an early setup step, not assumed done.
+- Have the owner add the provider's SPF `include:`, DKIM CNAME/TXT records, and a DMARC TXT record at
+  `p=none` (report-only) to their domain DNS before first send; tighten to `p=quarantine` only after
+  confirming legitimate mail passes.
+- Use the provider's own sandbox/test-domain to validate the *code path* before the owner's DNS work lands,
+  but do not ship the "it works" milestone claim off sandbox-domain sends — verify against the real domain.
+- If the church has no controllable domain (e.g. only a Gmail Workspace group address), scope that
+  constraint explicitly at Settings/provider-setup time rather than discovering it after building the send
+  path.
 
-**Warning signs:**
-- A backfill script that calls `crypto.getRandomValues` / mints a new token instead of reading
-  existing `shareTokens` docs for the service first.
-- A refresh implementation where the Cloud Function trigger's watch path and write path overlap.
-- Firestore write-count graphs (or local emulator debug logs) showing N writes per single service
-  save where N was previously 1.
-- Any new field on `serviceSnapshot.roleAssignments` beyond `roleId/roleName/group/personNames`.
+**Warning signs:** Test sends succeed only to the developer's own inbox; the owner hasn't been asked for DNS
+access; no DMARC/SPF/DKIM record exists on the sending domain; "From" address is `@gmail.com` or similar.
 
-**Phase to address:** The "sharing correctness" phase (persisted token, auto-refresh). Backfill
-should be a discrete, reviewable step within that phase — not folded silently into the schema
-migration — precisely because it's the one step that can strand already-circulated links.
+**Phase to address:** Provider selection & infrastructure setup phase (first phase of v1.7) — before any
+send-path code is built, block on the owner completing domain DNS setup for the chosen provider.
 
 ---
 
-### Pitfall 4: Widening `SlotKind` breaks in the gap between "old data, new code" and "new data, old code"
+### Pitfall 2: Non-idempotent sends on a Cloud Function that Firebase will retry
 
 **What goes wrong:**
-`SlotKind` (`src/types/service.ts:7`) is a closed union:
-`'SONG' | 'SCRIPTURE' | 'PRAYER' | 'MESSAGE' | 'HYMN' | 'IMPORTED'`. Adding `'ANNOUNCEMENT'` and
-`'MISC'` this milestone touches at least six confirmed exhaustive `switch (slot.kind)` sites across
-`slotTypes.ts`, `slideGroupMaterializer.ts` (multiple switches), and others — all currently written
-**without a `default:` clause**, which means TypeScript's exhaustiveness checking will hard-fail the
-build at every site that isn't updated. That is the *good* half of the news: `npm run type-check`
-(the `vue-tsc --build` gate CLAUDE.md insists on, not the narrower `-p tsconfig.app.json` form) will
-catch every missed switch at compile time for code that ships in the same deploy.
+A Firestore-triggered or scheduled Cloud Function sends email as a side effect. GCF/Firebase background
+functions are **at-least-once delivery** — a timeout, cold start, or transient failure causes Firebase to
+retry the same event, and a naive send function fires the email again. A volunteer gets the same "you're
+locked in for Sunday" notice 2–3 times; worse, a scheduled reminder scanner that doesn't mark its own work
+done can re-send to everyone on its next tick if the write that marks "reminder sent" fails after the email
+already went out.
 
-The real hazard is runtime, not compile-time, and has two directions:
-- **Old documents, new code:** already-created services will never contain `ANNOUNCEMENT`/`MISC`
-  slots — no migration needed, nothing to backfill. Low risk.
-- **New documents, old code — the actual danger.** Once `ANNOUNCEMENT`/`MISC` slots exist in
-  Firestore, any client still running a **previously-cached JS bundle** (a browser tab left open
-  since before deploy, or a service worker/CDN edge cache serving a stale asset) receives those slots
-  over `onSnapshot` and runs them through *its* compiled switch — which, being the old bundle, has no
-  case for the new kind. Because these are exhaustive switches with **no `default:`**, the *old*
-  bundle's JS (TypeScript exhaustiveness is erased at build time — it produces ordinary
-  fall-through-to-nothing JS, not a runtime guard) returns `undefined` from `slotLabel`, and the
-  grouped-switch sites in `slideGroupMaterializer.ts`/`useSlideshowAssembly.ts` likely fall through to
-  whatever their nearest matched case's behavior is *not* — i.e., silently produce no slide content,
-  no label, or (worse) misroute the slot into the PRAYER/MESSAGE/HYMN "no slide" bucket, making a
-  real Announcement silently vanish from an old tab's rendered service order or presenter view with
-  no error.
-- **The Slides tab / presenter view** is the sharpest edge: a slide-group materializer that doesn't
-  recognize the kind may produce zero slides for it, and a presenter mid-service on a stale tab could
-  simply skip an Announcement or Miscellaneous item with no visible failure.
+**Why it happens:** Retry-safety is invisible in local/manual testing (one clean run, no retries triggered)
+and only shows up under real production conditions — a slow provider API call near the function's timeout,
+a cold start, a burst of concurrent triggers.
 
 **How to avoid:**
-- Before adding the new kinds, grep every `switch (…kind)` / `switch (…\.kind)` site (six-plus
-  confirmed) and add the new cases in the **same commit**, relying on the compiler to enumerate every
-  site — do not trust memory.
-- **Explicitly decide and document** whether `ANNOUNCEMENT`/`MISC` join the "no slide generated"
-  group (with `PRAYER`/`MESSAGE`/`HYMN`) or the "generates a slide" group (with `SONG`/`SCRIPTURE`/
-  `IMPORTED`) at each of the six sites — PROJECT.md describes both as "plain input boxes," which
-  argues for the no-slide-generated group, matching `MESSAGE`'s current treatment (v1.5 also reduces
-  MESSAGE itself to a plain input box, so precedent already exists in this same milestone).
-- **Mitigate the stale-client window deliberately**, since it cannot be eliminated by server-side
-  code alone: ship a version banner / forced-reload prompt on new deploy (if the app has one) or
-  accept the window and scope it — a service with no Announcement/Misc items visible to a stale tab
-  degrades to "item invisible," not "app crashes," as long as every switch defaults to the no-op
-  branch rather than throwing.
-- Add a unit test per switch site asserting a not-yet-existing hypothetical kind is unreachable
-  (TypeScript will already enforce this, but an explicit "every SlotKind member is handled" test
-  documents the invariant for the next person adding a kind).
+- **Mark-before-send is unsafe on its own (a crash before the API call succeeds under-reports), but
+  mark-after-send is unsafe against retries (a crash between the API call and the mark re-sends).** The
+  standard pattern: write a `sent/{idempotencyKey}` record inside a Firestore **transaction** that first
+  checks whether the record already exists — if it does, exit without calling the provider API at all; if
+  not, create the record (e.g. status `pending`) in the same transaction, THEN call the send API, THEN
+  update the record to `sent`/`failed`. The idempotency key should be deterministic from the event: for a
+  lock notification, `{serviceId}_{lockedAt-timestamp-or-version}_locked`; for a scheduled reminder,
+  `{serviceId}_{reminderDate}_reminder`; for a re-lock diff notice, `{serviceId}_{relockedAt}_relock`.
+- For the scheduled share-link reminder specifically: query only services where a `reminderSentAt` (or
+  equivalent) field is unset, and set it **transactionally alongside** the send record for that run, so a
+  re-invocation (Cloud Scheduler retries, or two overlapping invocations) is a no-op for services already
+  marked.
+- Reuse the org's own event ID / Firestore document write as the idempotency key wherever the provider API
+  supports one (Postmark, Resend, SendGrid, Mailgun all accept an idempotency/message-ID style header or
+  param) so even a duplicate function invocation doesn't produce a duplicate provider-side send.
+- Rate-limit the composer's own "send now" onCall function server-side (not just optimistic UI disable) so a
+  double-click or a stuck retry from the client can't fire two provider calls for one recipient list.
 
-**Warning signs:**
-- Any `switch (slot.kind)` gaining a `default:` clause "to be safe" — this silently defeats the
-  compiler's exhaustiveness check for every *future* kind addition, trading a build-time guarantee
-  for a runtime guess.
-- `npm run type-check` passing while `npx vue-tsc --noEmit -p tsconfig.app.json` also passes — the
-  narrower form should never be treated as sufficient per CLAUDE.md; confirm the wide gate ran.
-- QA that only tests against a freshly-loaded tab — the stale-client failure mode requires
-  deliberately testing with an old bundle against new data (e.g. open the app, deploy, then interact
-  with the already-open tab).
+**Warning signs:** No `sent/` or `messageLog` collection keyed by a deterministic idempotency key; the send
+function's only guard against duplicates is a client-side disabled button; the scheduled reminder function
+queries "not yet reminded" and updates that flag in a *separate* write after the send loop, not atomically
+per-recipient-batch.
 
-**Phase to address:** The "service items — Announcements/Miscellaneous/Message-as-input-box" phase.
-Do this widening in isolation from the sharing/claims work so a `type-check` failure has one obvious
-cause, and pair it with the "org service template replaces `buildSlots()`" work only if the template
-also needs to reference the new kinds (likely, since a template author would want to include them).
+**Phase to address:** Send-path/infrastructure phase — the idempotency pattern must be baked into the very
+first onCall/onSchedule function written, not retrofitted after the composer ships. Verification: manually
+re-invoke the same function twice with the same input in staging and confirm exactly one email per recipient.
 
 ---
 
-### Pitfall 5: A feature toggle hides UI but leaves the code path callable, corrupting data or stranding mid-workflow state
+### Pitfall 3: Provider API key exposed to the client, or stored the deprecated way
 
 **What goes wrong:**
-Both the AI toggle and the Planning Center toggle interact with state that outlives the toggle
-flip:
-- **AI toggle.** `src/utils/claudeApi.ts` is confirmed as the single choke point for all three AI
-  surfaces (song suggestions, scripture discovery, congregational split) — per PROJECT.md's own
-  Key Decisions table, this was chosen specifically because it "doubles as the future paywall seam."
-  The anti-pattern to avoid: gating only the *UI* (hide the "Suggest with AI" button) while
-  `claudeApi.ts`'s functions remain callable from anywhere that still imports them — a component that
-  wasn't updated, a stale cached bundle (same class of problem as Pitfall 4), or a direct
-  store-action call from dev tools would still spend the org's Claude quota/budget after the org
-  believed AI was off. The gate must live *inside* `claudeApi.ts` itself (throw/no-op before any
-  network call), not only in the components that call it — matching the "choke point" framing
-  PROJECT.md already committed to.
-  A second, subtler hazard: **services that already used an AI feature** (an AI-generated
-  congregational split already saved into a scripture slot's leader/congregation text) must not be
-  mutated or blanked when AI is switched off later — the toggle governs *future* AI invocation, not
-  *past* AI-derived content. Turning AI off must never cascade into "delete AI-authored slide text,"
-  which would silently corrupt an already-planned service.
-- **Planning Center toggle.** `pcAppId`/`pcSecret` live on the `organizations/{orgId}` doc
-  (`auth.ts:107-108`) and `hasPcCredentials` gates whether PC calls are attempted. Switching PC off
-  should not delete these credentials — a church "porting off" PC (PROJECT.md: "once they have fully
-  ported off it") may reconsider, and re-entering an API secret is real friction. But the toggle
-  needs to gate every PC-touching code path consistently: CSV import already exists independent of
-  the API path (PROJECT.md: "Complement Planning Center... no API integration, data flows via CSV
-  import" was the *original* constraint, though the export write path
-  `keys().hasOnly(['status','pcExportedAt','pcPlanId','updatedAt'])` in `firestore.rules` shows a
-  real, rules-enforced PC-export status transition exists in production today). **A service already
-  `exported` to Planning Center (status `exported`, carrying `pcExportedAt`/`pcPlanId`) must not be
-  treated as "needs export" or have its exported status silently reverted** when the org turns PC
-  off — that status is historical fact about what already happened, not a live PC connection
-  indicator.
+The email provider's API key ends up in a `VITE_*` env var (bundled into the client JS, visible to anyone who
+opens devtools), or is stored via the deprecated `functions.config()` (which Google has already shut off for
+new projects and is being fully retired) instead of a proper secret.
+
+**Why it happens:** This codebase's convention is `VITE_*` for **client**-consumed config (Firebase web
+config, ESV/PC keys used client-side) — a developer moving fast on a new feature can pattern-match "add
+another env var" without noticing this one must never leave the server. The existing `functions/src/index.ts`
+already sets the right precedent (`CLAUDE_API_KEY`, `ESV_API_KEY`, `NLT_API_KEY` are all declared with
+`defineSecret()` from `firebase-functions/params`, bound at deploy time via Secret Manager, never bundled) —
+the risk is a new contributor not following it for the email provider key.
 
 **How to avoid:**
-- Gate `claudeApi.ts` at its own entry points (every exported function checks the toggle and
-  fails soft/no-ops before any network call), not only at call sites.
-- Never write a migration or toggle-flip handler that mutates already-saved AI-derived slide content
-  or already-exported PC status fields. The toggle changes future behavior only.
-- Write an explicit test: "toggle AI off, call a `claudeApi.ts` function directly (bypassing UI),
-  assert it does not make a network request" — this is the only test that actually proves the choke
-  point, as opposed to testing that a button is hidden.
-- Keep `pcAppId`/`pcSecret` on the org doc even when the toggle is off; only gate their *use*.
+- Declare the provider key with `defineSecret('EMAIL_PROVIDER_API_KEY')` in `functions/src/index.ts`,
+  matching the existing `CLAUDE_API_KEY`/`ESV_API_KEY` pattern exactly. Never prefix it `VITE_`.
+- The send path must be a callable/HTTPS Cloud Function (`onCall`), never a client-side call to the
+  provider's API — the composer's "Send" button calls the Function, the Function holds the secret.
+  (PROJECT.md already confirms this direction: "Send path is an owner-gated Cloud Function.")
+  same deploy-owner-gate as existing functions; the key itself lives only in the owner's
+  `.env.local`/Secret Manager, per the project's standing no-`.env.local`-writes-by-agent rule.
+- Grep the diff before any commit for the literal key pattern (`re_...` for Resend, `SG.` for SendGrid, etc.)
+  and for `VITE_EMAIL` / `VITE_RESEND` / `VITE_POSTMARK` style names — treat any hit as a blocking defect.
 
-**Warning signs:**
-- A toggle implementation that lives only in `v-if`s in `.vue` files, with no corresponding guard in
-  `claudeApi.ts` or the PC API utility.
-- Any code path (migration, toggle handler, "reset" button) that writes to a scripture slot's
-  congregational-split fields or to a service's `pcExportedAt`/`pcPlanId`/`status` in response to a
-  *settings* change rather than a direct user edit of that service.
+**Warning signs:** Any new `VITE_*` env var containing "email"/"resend"/"sendgrid"/"postmark"/"mailgun"; the
+provider SDK imported anywhere under `src/` (client) rather than only under `functions/src/`; a
+`functions.config()` call anywhere in a new file.
 
-**Phase to address:** The "Settings — AI/Planning Center toggles" phase. Write the choke-point test
-before building the UI toggle, not after — it is cheap now and expensive to retrofit once multiple
-call sites exist.
+**Phase to address:** Send-path/infrastructure phase — same phase as Pitfall 2, since both concern the shape
+of the send Cloud Function. Verification: `npm run build` output contains no provider key substring; the
+provider SDK/`fetch` call to the provider's API exists only in `functions/`.
 
 ---
 
-### Pitfall 6: Self-hosted fonts render the projector or the print layout with the wrong font mid-service
+### Pitfall 4: Open bounce-webhook endpoint accepting forged callbacks
 
 **What goes wrong:**
-The milestone decision already commits to curated self-hosted `woff2` files specifically because "a
-projector without internet at service time cannot fetch a remote font" (PROJECT.md). The specific
-failure modes this must guard against:
-- **FOIT/FOUT on the presenter view.** If the font isn't loaded before the presenter view first
-  paints a slide, the browser either shows invisible text until the font loads (FOIT, with the
-  default `font-display` behavior in many browsers) or shows a fallback-font flash that then reflows
-  (FOUT) — either is visible to the congregation on a live projector, which is a materially worse
-  failure than a slow page load anywhere else in the app.
-- **A font must be loaded before a slide is *measured*, not just before it's painted.** Any slide
-  layout logic that measures text (auto-sizing lyrics to fit a slide, wrapping congregational-reading
-  text) that runs against a fallback font's metrics before the real font swaps in will compute wrong
-  wrap points/sizes, then visibly reflow once the real font arrives — or, if the measurement result is
-  cached/persisted rather than recomputed live, could bake in a wrong layout that only self-corrects
-  on next edit.
-- **Print has the same measurement hazard** without even the FOUT/FOIT recovery — a print job that
-  starts before the font is loaded may rasterize with the fallback font permanently (no repaint on a
-  printed page).
-- **Licensing/attribution.** Self-hosted `woff2` files carry redistribution terms independent of
-  where they're served from — bundling a font that is not licensed for embedding/redistribution (as
-  opposed to just "free to view on a webpage via a hosted service") is a real legal exposure distinct
-  from the runtime font-loading problem. `Inter` (named as the Helvetica Neue stand-in) is
-  SIL-licensed and safe to bundle, but any additional font added to the "curated list" needs the same
-  check before being added, not assumed by analogy.
+The chosen provider posts hard-bounce events to an HTTPS endpoint (an `onRequest` Cloud Function, matching
+the existing `api` pattern in `functions/src/index.ts`). Without verifying the request is genuinely from the
+provider, anyone who discovers the URL can POST a fake "bounced" payload for any address, which the app then
+surfaces as a delivery failure — at minimum a nuisance, at worst usable to make the app hide/flag a real
+volunteer's address as bad indefinitely, or to probe which addresses are in the system.
+
+**Why it happens:** Webhook endpoints are easy to stand up (`onRequest` is a public URL by default) and easy
+to forget to lock down, especially since the payload *looks* like ordinary JSON with no auth header required
+by naive testing (curl a fake payload, see it work "great, it's live").
 
 **How to avoid:**
-- Use the CSS Font Loading API (`document.fonts.load(...)`/`document.fonts.ready`) to gate the
-  presenter view's *first paint* — do not rely on `@font-face` + `font-display: swap` alone, since
-  swap is exactly the FOUT behavior to avoid on a projector.
-- Any measurement-then-persist logic (auto-fit sizing) must await `document.fonts.ready` before
-  measuring, every time it measures — not just once at app boot, since the presenter/print views can
-  be the first place in a session that font is needed.
-- Preload the org's configured font (`<link rel="preload" as="font">` or equivalent) as soon as the
-  org's font setting is known — on app boot from the settings store, not lazily at first slide
-  render.
-- Record the license for every font added to the curated list in the codebase (a comment or a data
-  file next to the font list), and verify embedding/redistribution rights before adding — don't
-  assume "free download" implies "free to bundle."
+- Verify every inbound webhook request's signature before processing: most providers (Resend, Mailgun,
+  SendGrid) sign with HMAC-SHA256 (SendGrid uses ECDSA) over the raw request body using a signing secret
+  distinct from the API key — store that secret via `defineSecret()` too, and use a constant-time comparison
+  (`crypto.timingSafeEqual`) to check it. Reject with 401 before touching Firestore if verification fails.
+  (Postmark is an exception — it offers only Basic Auth / custom header, not cryptographic signing; if
+  Postmark is the chosen provider, gate the endpoint on that shared secret instead, treating the URL itself
+  as sensitive.)
+- Read the **raw** body for signature verification — Express/Functions body-parsing middleware that
+  JSON-parses before your handler sees it can break signature verification if the provider signs the exact
+  raw bytes; confirm the provider's verification recipe before wiring `express.json()` globally on that
+  route (the existing `api` onRequest function already runs its own Express app — mount the webhook route
+  with `express.raw()` for that path specifically, ahead of the JSON body parser).
+- Scope the webhook to only *update the bounce status of an existing message log entry it can prove it owns*
+  (e.g. keyed by the provider's message ID, which was stored on send) — never let the webhook payload create
+  new documents, alter recipient lists, or write anything outside a `bounces`/`deliveryStatus` field.
+- Rate-limit / log unexpected/malformed webhook POSTs distinctly from real events, so a probing attacker is
+  visible in Cloud Functions logs.
 
-**Warning signs:**
-- A presenter view or print layout with no `document.fonts.ready`/font-loading gate before first
-  render.
-- Visible text reflow in manual testing of the presenter view on a fresh page load (throttle network
-  to reproduce reliably).
-- Any curated font added without a recorded license check.
+**Warning signs:** The webhook handler trusts `req.body` without any header/signature check; the signing
+secret isn't in Secret Manager; the handler can write to fields other than delivery/bounce status; no logging
+of rejected requests.
 
-**Phase to address:** The "Slides slide-out — global font family/weight/size" phase, specifically its
-UI-research sub-step (PROJECT.md: "Final list settled by the UI research phase against projection
-legibility") — legibility research and font-loading-safety research belong together, not split
-across phases, since both gate the same curated list.
+**Phase to address:** Delivery-history & bounce-tracking phase — must be built with signature verification
+from the first commit, not added after a demo. Verification: send a manually-crafted unsigned POST to the
+deployed webhook URL in staging and confirm a 401, no Firestore write.
 
 ---
 
-### Pitfall 7: A second Bible translation creates copyright exposure on cached/persisted text and stale slides when a church switches translations
+### Pitfall 5: Firestore rules letting the wrong people trigger sends or read recipient lists
 
 **What goes wrong:**
-`src/utils/esvApi.ts` fetches passage text fresh via `/api/esv/...` on every call (no client-side
-cache observed) — but once fetched, that text is **persisted** into scripture slots and slide-group
-documents (confirmed: scripture text flows into slides via `slideGroupMaterializer.ts`/
-`useSlideshowAssembly.ts`, which are the exhaustive-switch sites from Pitfall 4). ESV and NLT are
-separate copyright holders (Crossway vs. Tyndale House) with independently-negotiated API terms —
-common real-world restrictions include a maximum verse/word count per single display and a required
-attribution/copyright notice on each display. Two concrete hazards specific to *adding* NLT to an
-app that already persists ESV text:
-- **Persisting fetched text beyond what each license permits** is a real risk distinct from simply
-  *displaying* it: this app already writes passage text into Firestore documents (slide groups),
-  which is storage, not just transient display — the NLT API terms (and, on renewal, the ESV terms)
-  need to be checked for whether *storage* (as opposed to real-time API display) requires different
-  handling, since `NLT_API_KEY` joining `.env.local` (already decided, per PROJECT.md) only covers
-  fetching, not the storage question.
-- **Switching a church's translation setting does not retroactively touch already-generated slides.**
-  A scripture slide generated from an ESV passage, viewed after the org's setting flips to NLT,
-  should keep showing its already-persisted ESV text (with ESV's attribution) — not silently
-  re-fetch/re-render as NLT (which would violate the *original* passage's boundaries, e.g. exact
-  verse start/end, that were chosen against ESV's text) and not show mismatched attribution (ESV text
-  with an NLT copyright notice, or vice versa). Each already-generated slide needs to remember which
-  translation it came from, independent of the org's *current* setting, and render the correct
-  attribution regardless of which translation is currently selected in Settings.
-- **Re-generating** an existing scripture slide after a translation switch (a normal user action —
-  editing a scripture item) should re-fetch from the newly-selected translation and require the same
-  6-10-verse-range validation this app already applies to ESV, not silently reuse cached ESV text
-  under an NLT label.
+The composer's "send" action and the delivery-history log are new attack surface on top of the existing
+editor/viewer RBAC. Two concrete failure modes: (a) a **viewer** (read-only role) can call the send Cloud
+Function or read the `messages`/`deliveryLog` subcollection that lists volunteers' emails, exceeding their
+intended read-only access; (b) the send Cloud Function itself trusts a `recipients` array passed from the
+client instead of re-deriving it server-side from the service's actual assigned roles, letting any caller
+(with a forged/tampered request) email arbitrary addresses.
+
+**Why it happens:** The existing RBAC (editor/viewer, org-scoped custom claims per the v1.5 decision) governs
+Firestore document read/write, but a new `onCall` function is a *separate* trust boundary that must
+explicitly re-check the caller's role and org membership — it does not automatically inherit Firestore rules.
+It's easy to build the callable function's authorization check as "is this user authenticated" rather than
+"is this user an editor in this org," especially when copy-pasting from an existing `onCall` (e.g.
+`parsePptx`) whose authorization needs may differ.
 
 **How to avoid:**
-- Store the source translation code (`'ESV'`/`'NLT'`) alongside any persisted scripture text, at the
-  slide/slot level, not only at the org-settings level — this is the field that resolves the
-  "does switching invalidate existing slides" question without ambiguity.
-- Render the copyright/attribution notice from the *persisted* translation code on each slide, never
-  from the org's current setting.
-- Confirm with both API terms (ESV already integrated; NLT is new) whether Firestore persistence of
-  fetched text is within the redistribution/display license, not just within a "per API response"
-  read limit — this is a "verify before shipping," not an assumption, since NLT's terms may differ
-  from ESV's even though both are proxied through the identical Cloud Function pattern.
+- The send `onCall` function must verify the caller's custom claim shows `editor` role for the service's org
+  before doing anything — same claim check pattern already established for org membership (v1.5, custom auth
+  claims). Reject non-editors with `HttpsError('permission-denied', ...)`.
+- The function must **re-derive the recipient list server-side** from the service's live assigned roles at
+  send time (never trust a client-supplied recipient array beyond it being a *subset filter* of the
+  server-derived set) — this also closes the door on a stale-client sending to people removed from the
+  service since the composer was opened (see Pitfall 6).
+- Firestore rules for any new `messages`/`deliveryLog`/`bounces` collection: reads scoped to org
+  editors/viewers of that service only (mirroring existing service-document read rules), writes restricted to
+  the Cloud Function's admin SDK context only (never a direct client write) — add rules tests analogous to
+  the existing `src/rules.test.ts` allow/deny pairs.
+- Do not let the kill-switch live only in the UI — the send `onCall` function must itself check the org's
+  Settings kill-switch server-side before sending, so a stale client (kill-switch flipped after page load)
+  can't bypass it.
 
-**Warning signs:**
-- A scripture slide document with no field recording which translation its text came from.
-- A translation switch that causes previously-generated slides to change on the next page load with
-  no user action.
-- Any UI surface displaying scripture text with no visible copyright/attribution string.
+**Warning signs:** The send function's only check is `request.auth != null`; a `recipients` array is taken
+verbatim from `request.data` and passed straight to the provider; no new rules tests added for the
+delivery-log collection; the kill-switch check exists only in Vue component logic.
 
-**Phase to address:** The "ESV/NLT Bible version selection" phase. The per-slide translation-source
-field is a schema decision that should be made in this phase, not deferred, since retrofitting it
-onto slides already created during this same milestone (with only ESV available) is exactly the
-kind of migration Pitfall 4's "old documents, new code" pattern warns about.
+**Phase to address:** Send-path/infrastructure phase for the auth + recipient re-derivation; a dedicated
+Firestore-rules-and-tests pass (mirroring the existing rules-test discipline) before the composer ships to
+production. Verification: rules tests with an allow case (editor) and explicit deny cases (viewer, wrong-org
+editor, unauthenticated).
 
 ---
 
-### Pitfall 8: Mobile/touch retrofit of SortableJS-based drag-and-drop reproduces this app's own documented index bugs
+### Pitfall 6: Recipient correctness — stale, unassigned, deduped, and kill-switch-aware sending
 
-**What goes wrong:**
-SortableJS drives drag-and-drop in at least three places already (`ServiceEditorView.vue`,
-`SlideGrid.vue`, `SongLyricEditor.vue`), and this app has a **documented, reproducible index bug** —
-PROJECT.md's own "Reproduction case for the drag-and-drop defect" (service `ZTXcpNRcJTalEQp42fTx`:
-sections rendered out of order after repeated reordering, correct again only after a page refresh).
-That class of bug — the DOM's post-drag order and the underlying array/Firestore order silently
-diverging — is exactly what a touch-target/viewport retrofit is likely to reintroduce or worsen,
-because:
-- **Touch drag needs different SortableJS options** (`delay`, `touchStartThreshold`, `forceFallback`)
-  than mouse drag, and mismatched settings commonly cause a drag to register as a tap-scroll instead
-  (the item doesn't move) or, worse, register a drop at the wrong index because touch move events fire
-  at a different granularity than mouse move events feeding the same reorder handler.
-- **Small touch targets on a narrow viewport** (the Slides tab's slide-group cards, the service-order
-  drag handles) are the most likely place a retrofit either shrinks hit areas below usable size or
-  overlaps a drag handle with a tap-to-edit affordance, producing accidental drags/accidental edits.
-- **The existing fixed-section constraint** (five sections — Pre-Service through Post-Service — that
-  "are fixed, always visible, and never reorderable," per v1.4's completed work) must survive the
-  mobile retrofit unchanged; a naive mobile reorder implementation that treats the whole list as one
-  flat sortable group (rather than per-section, matching the desktop implementation) would silently
-  reintroduce cross-section reordering on mobile only.
+**What goes wrong:** Several distinct correctness bugs cluster under "who actually gets this email":
+- Emailing a **role with no assigned person** (composer or auto-notify computes a role slot with `email:
+  undefined` and either crashes or silently skips without surfacing that the role was unreachable).
+- Sending to a **stale roster email** — a volunteer's email changed in the roster after they were assigned to
+  the service, and the service's own denormalized snapshot (this app snapshots data at plan time, per its
+  "denormalize song snapshots into service slots" architecture) still holds the old address, so the "who's
+  actually reachable" logic must resolve against live roster state, not a frozen assignment snapshot — or,
+  if it intentionally uses the snapshot for stability, that tradeoff needs to be a conscious decision, not an
+  accident.
+- A person **removed from the service after locking** but before a re-lock notification fires still gets the
+  re-lock diff email meant for currently-assigned people, because the send list was computed from an earlier
+  snapshot rather than the service's current roster.
+- A person on **two teams for the same service** (e.g. Vocals AND Hosts) gets deduped to one email, not two,
+  when "send to Worship + Hosts" is selected — the recipient set must be built by email address, not by
+  (role, team) pair.
+- The **draft-skip rule** for the scheduled reminder ("skipped while still a draft") and the **Settings
+  kill-switch** must be checked at every send surface — lock notification, re-lock notice, one-off composer,
+  scheduled reminder — not just the scheduled job. A common miss: the kill-switch is checked in the
+  scheduled-reminder Cloud Function but not in the lock-notification code path invoked from a different
+  onWrite trigger or onCall.
+
+**Why it happens:** Recipients are computed in at least four different code paths (composer, lock-notify,
+re-lock-notify, scheduled reminder), each written at a different time by different logic — without one shared
+"resolve recipients for this service" function, each path re-implements (and re-breaks) the same rules
+slightly differently.
 
 **How to avoid:**
-- Do not write new reorder logic for mobile — reuse the exact same SortableJS instance/config used on
-  desktop, adding only touch-specific *options* (`delay`, `touchStartThreshold`), so the
-  index-computation code path stays identical between input methods and any regression is
-  immediately visible on desktop too (rather than mobile-only, and easy to miss in review).
-- Add a regression test/manual repro step specifically mirroring the documented
-  `ZTXcpNRcJTalEQp42fTx` case, run under touch-simulated interaction (Playwright/Cypress touch
-  events or manual device testing), before considering the mobile retrofit done.
-- Keep drag handles visually and functionally distinct from tap targets (a dedicated handle icon,
-  not "drag the whole card"), sized to touch-target minimums (commonly cited as ~44x44px) — this is
-  as much an index-bug-prevention measure as it is accessibility, since ambiguous touch input is what
-  produces wrong-index drops.
+- Build **one** shared server-side function, e.g. `resolveRecipients(serviceId, { teams?, individuals?,
+  excludeDrafts? })`, used by all four send surfaces (composer, lock, re-lock, scheduled reminder) — it
+  reads the service's *current* assigned roles, joins against the roster for current email addresses,
+  drops roles with no assigned person or no email, dedupes by lowercased email address across multiple
+  team memberships, and returns both the final recipient list and an explicit "unreachable roles" list
+  the caller can surface in the UI (composer's "Reaches N people" count and delivery history).
+- That same shared function checks the org's kill-switch and (for the scheduled path) the service's
+  draft status, so no send surface can accidentally bypass either — this belongs in the resolver, not
+  duplicated at each call site.
+- For "N people removed since lock," decide and document explicitly whether re-lock notifications target
+  "everyone currently assigned" (live) or "everyone assigned at lock time" (snapshot) — the PROJECT.md spec
+  says "affected teams" for the diff, implying live/current assignment is correct; make sure a person removed
+  between lock and re-lock is excluded, and a person newly added is included only if the diff logic intends
+  that.
+- Surface unreachable roles ("Sound Tech — unassigned, not notified") in the composer's live count so
+  planners see gaps instead of silently missing coverage.
 
-**Warning signs:**
-- A drop that "looks right" immediately but reverts or duplicates after the next autosave/refresh —
-  the exact signature of the documented bug.
-- Reorder logic branching on `window.innerWidth`/a mobile flag to use different array-splice logic
-  for touch vs. mouse, rather than one shared handler.
-- Manual testing performed only via browser devtools' responsive-mode mouse emulation, which does not
-  exercise real touch event timing/granularity.
+**Warning signs:** Recipient-building logic duplicated (copy-pasted) across composer/lock/re-lock/reminder
+files instead of one shared resolver; the "Reaches N people" count doesn't match the actual send count in
+delivery history; dedup keyed on person+team pair rather than email address; kill-switch check present in
+only one of the four send paths.
 
-**Phase to address:** The "mobile & layout" phase (mobile-friendly Slides tab, stacked buttons). This
-should be sequenced *after* any other phase that touches drag-and-drop order logic this milestone
-(none currently planned, but if scope shifts), so the mobile retrofit isn't chasing a moving target.
+**Phase to address:** A dedicated "recipient resolution" unit built early (either its own small phase or the
+first task of the composer phase) that every later phase (lock-notify, re-lock-notify, scheduled reminder)
+consumes rather than reimplements. Verification: unit tests for the resolver covering unassigned role,
+stale/changed email, dual-team dedup, draft-skip, and kill-switch-off, run once and reused by every send
+surface's own tests.
 
 ---
 
-### Pitfall 9: A 22-cluster milestone overruns by under-sequencing independent-looking work that shares hidden dependencies
+### Pitfall 7: Re-lock diff missing or over-reporting changes; snapshot drift
 
-**What goes wrong:**
-v1.5's target-feature list spans at least nine independent-sounding areas (custom claims, PPTX
-display, sharing, four settings toggles/pickers, five service-item changes, congregational-reading
-UX, image-order determinism, and five mobile/layout items) plus four carried-forward items. Broad
-milestones like this typically fail in one of these specific ways, each with a specific tell in
-*this* codebase:
-- **The riskiest item (custom claims) gets scheduled last "because it's infrastructure," and then
-  rushed** when everything else runs over — exactly backwards, since Pitfall 1 shows it needs the
-  longest verification window (the dual-read soak period) and the most room to roll back cleanly.
-  It should be sequenced early precisely because a slow, careful rollout with time to observe is safe
-  and a rushed one is not.
-- **Items that look independent but share a choke point collide.** The AI toggle (Pitfall 5) and the
-  congregational-reading UX both touch `claudeApi.ts` and scripture-slide generation; the sharing
-  rework (Pitfall 3) and the custom-claims work (Pitfall 1) both touch `firestore.rules`/
-  `storage.rules` in the same file. Planning these as fully parallel phases risks two phases editing
-  the same rules file or the same choke-point module in overlapping windows, producing merge/rules
-  conflicts that don't show up until integration.
-- **The carried-forward PPTX display item (R062) is scoped as "half done" and has "never had a home
-  in the roadmap"** per PROJECT.md's own language — the exact phrasing that predicts it slipping
-  again unless it's given an explicit, named phase with its own acceptance criteria (client reads
-  `pptxRenders`/`rendered/*.png`, draws the PNG in grid and presenter, per the milestone decision
-  table) rather than being folded as a sub-task into a larger fidelity phase.
-- **Settings items that look like simple toggles (font, template, translation) are each schema
-  decisions** (Pitfalls 6, 7, and the org-template-replaces-`buildSlots()` decision) that, if
-  under-scoped as "just add a settings field," skip the migration/backward-compatibility questions
-  each one actually raises (old services with no font setting; slides generated before a template
-  existed; slides generated under the previous sole translation).
+**What goes wrong:** The re-lock feature needs to diff "what the service looked like at last lock" against
+"what it looks like now" to produce the typed SONG/ORDER/ROLE/NOTES/SLIDES diff entries and compute "affected
+teams." Two failure directions: (a) the diff **misses** real changes because it compares against a stale or
+wrong baseline snapshot (e.g. it diffs against the *live* document's own prior in-memory state rather than a
+persisted snapshot taken exactly at lock time, so a browser refresh between lock and edit loses the baseline
+and the diff falls back to "nothing changed"); (b) the diff **over-reports**, flagging fields that changed for
+reasons unrelated to real content (e.g. `updatedAt` timestamp bumps, denormalized snapshot rewrites,
+non-user-visible internal field churn) as if they were meaningful edits, causing "affected teams" to include
+teams that saw no actual change and alarm-fatiguing volunteers.
+
+**Why it happens:** This is not a hypothetical risk for this codebase — it is the *same shape of bug* already
+diagnosed and fixed once this milestone cycle: the v1.5 decision log records that "the share token was
+re-minted per share and the snapshot frozen at share time" was "one root cause behind both 'the link changed'
+and 'my role overrides aren't showing.'" The `services.ts` store already carries an explicit persisted-snapshot
+discipline (`mintShareToken`/snapshot builder, single shared builder function per the code comments) precisely
+because ad hoc, per-caller snapshot logic drifted before. A change-diff feature is a second instance of the
+identical "compare live state against a captured-earlier state" problem, and it's easy to underestimate as
+"just compute a diff" without the persisted-snapshot discipline that fixed the share-link bug.
 
 **How to avoid:**
-- Sequence Pitfall-1 (custom claims) early, with the dual-read soak period budgeted as real elapsed
-  time in the schedule, not "as long as it takes between two adjacent phases."
-- Group phases by *shared file/choke-point*, not by feature-area label — e.g. don't split "AI
-  toggle" and "congregational reading AI-split" into fully independent, parallel phases if both edit
-  `claudeApi.ts`'s gating logic; sequence or merge them.
-- Give the PPTX-display carryover its own phase with the milestone decision table's stated
-  acceptance criterion ("the rendered PNG *is* the slide... drawn in the grid and in the presenter")
-  as its explicit success condition, since it has already slipped one milestone.
-- Treat each settings picker (font, template, translation) as carrying a migration question for
-  already-existing data, and require that question answered in the phase's plan before implementation
-  starts — not discovered during execution.
+- Persist an explicit **lock-time snapshot** document (or field) at the moment of lock, containing exactly the
+  fields the diff will compare — not "whatever's in the live doc when we happen to read it." Use the same
+  single-shared-snapshot-builder pattern already established for share tokens, so lock-time capture and
+  re-lock-time comparison read from one function, not two independently-maintained code paths.
+  reconstructs it differently in composer versus reminder path.
+- Diff **only** the fields that map to the typed categories (SONG/ORDER/ROLE/NOTES/SLIDES) — explicitly
+  exclude `updatedAt`, internal snapshot-refresh fields, and any field not user-visible, so a re-render that
+  touches unrelated metadata doesn't manufacture a false diff entry.
+- Compute "affected teams" from the diff entries' own team tags (each diff entry already carries which
+  team(s) it affects, per PROJECT.md's spec), not from a separate re-derivation — one source of truth for
+  "what changed" drives both the displayed diff and the affected-teams recipient filter, closing the same gap
+  Pitfall 6 warns about for the resolver.
+- After a re-lock notification sends, refresh the lock-time snapshot to the new state (so the *next* re-lock
+  diffs against this one, not the original) — forgetting this makes every subsequent re-lock diff since the
+  first one balloon to include all cumulative changes, not just the newest ones.
 
-**Warning signs:**
-- A roadmap where the custom-claims phase is scheduled after most other phases "so it doesn't block
-  anything."
-- Two phases with overlapping edits to `firestore.rules`, `storage.rules`, or `claudeApi.ts` planned
-  to run in parallel.
-- A settings-picker phase plan with no line addressing what happens to data created before the
-  setting existed.
+**Warning signs:** No explicit lock-time snapshot field/document — the diff is computed by fetching "current"
+twice at different times; diff entries include timestamp or internal-only fields; "affected teams" is
+recomputed from current assignments rather than from the diff entries themselves; a second re-lock's diff
+includes changes already notified about in the first re-lock.
 
-**Phase to address:** This is a roadmap-structure concern, not a single phase's — it should shape
-phase *ordering* directly (see Sources/roadmap-implications note below).
+**Phase to address:** Re-lock change-diff phase, built directly on the existing snapshot-builder pattern in
+`services.ts` rather than a new ad hoc comparison. Verification: lock a service, make an ORDER change,
+re-lock, confirm the diff shows exactly that one change; make a second, different change and re-lock again,
+confirm the second diff shows only the second change (not the first repeated).
 
 ---
 
 ## Technical Debt Patterns
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
-|----------|-------------------|-----------------|------------------|
-| Rules dual-read `OR` left in place indefinitely instead of removed after cutover | Zero extra work, never locks anyone out | Every future rules change must remember to preserve both branches; masks whether the claim path actually works if the Firestore fallback is silently doing all the work | Acceptable to leave for one milestone as a safety net, but track removal as a follow-up item — don't let it become permanent by default |
-| Gate a toggle only in the UI, defer the `claudeApi.ts`/PC choke-point guard | Ships the visible feature faster | Silent quota spend / stray PC calls from any code path that bypasses the UI gate (dev tools, stale bundle, missed call site) | Never acceptable for AI (real API cost) or PC (real external write risk) — do the choke-point guard first |
-| Skip the per-slide translation-source field, key attribution off the org's current setting | Simpler schema, less migration work | Breaks the moment a church switches translations mid-use; wrong attribution is a licensing violation, not just a bug | Never acceptable given both translations are actively supported and switchable |
-| Backfill custom claims without idempotency/resume support | Faster to write | An interrupted run leaves an unknown subset of users un-migrated with no easy way to find them | Never acceptable — this directly risks the lockout Pitfall 1 exists to prevent |
+|----------|-------------------|-----------------|-----------------|
+| Skip signature verification on the bounce webhook "for now" | Faster to demo delivery-history UI | Open endpoint accepting forged bounce data indefinitely; hard to retrofit once the URL is public | Never — verify from the first deployed version |
+| Compute recipients inline per send-surface instead of one shared resolver | Faster first feature (composer) ships sooner | Each of lock/re-lock/reminder re-implements dedup/kill-switch/draft-skip slightly differently, and bugs diverge | Only for the very first spike/prototype, never merged to the phase that ships to real volunteers |
+| Use `console.log`-only bounce handling instead of a `bounces` collection | Simpler webhook code | No delivery-history UI possible without a schema; retrofitting means backfilling or losing early bounce data | Never for this milestone — bounce tracking is explicit in-scope |
+| Reuse the composer's client-computed recipient count as the actual send list | Simpler code, one calculation | A stale client (someone edited roles in another tab) sends to the wrong set | Never — server must re-derive at send time regardless of UI convenience |
+| Defer DMARC to `p=reject` immediately instead of starting at `p=none` | "More secure" sounding from day one | Legitimate mail can be silently rejected before you've confirmed SPF/DKIM alignment is correct, with no visibility into why | Never for first rollout — always start at `p=none`, monitor, then tighten |
 
 ## Integration Gotchas
 
 | Integration | Common Mistake | Correct Approach |
-|-------------|-----------------|--------------------|
-| Firebase custom claims | Treating `setCustomUserClaims` as synchronous with client state | Dual-read rules through at least one full max-token-lifetime (1 hour) after every claims-affecting deploy |
-| Storage emulator + Firestore rules | Assuming any cross-service check is testable locally just because *some* emulator tests pass | Isolate the suspect clause and prove pass/fail is identical regardless of the underlying condition before calling it an environment limitation |
-| ESV/NLT proxy (`functions/src/index.ts`) | Assuming both APIs share identical storage/redistribution terms because they're proxied through the same Cloud Function pattern | Check each API's terms independently for the storage (not just display) question before persisting fetched text |
-| SortableJS (multi-instance: ServiceEditorView, SlideGrid, SongLyricEditor) | Writing separate touch-specific reorder logic per surface | Reuse one shared config/handler, add touch-only *options*, keep index-computation code identical across input methods |
+|--------------|----------------|-------------------|
+| Email provider (any of Postmark/Resend/SendGrid/Mailgun) | Calling the provider API directly from the Vue client with the key exposed | Provider SDK/API call lives only inside a `defineSecret`-backed Cloud Function (`onCall`), matching the existing `CLAUDE_API_KEY`/`ESV_API_KEY` pattern |
+| Bounce webhook | Trusting `req.body` without HMAC/signature verification | Verify signature over the raw body with the provider's signing secret (also a `defineSecret`), reject unverified requests with 401 before any Firestore write |
+| Firestore triggers / Cloud Scheduler | Assuming exactly-once delivery for send-triggering events | Design every send path (trigger or scheduled) as idempotent via a transactional `sent/{key}` check, since Firebase functions are at-least-once |
+| Firestore rules for new collections (`messages`, `deliveryLog`, `bounces`) | Copy-pasting an existing rule without adding new allow/deny test pairs | Add explicit rules tests (editor-allow, viewer-deny, wrong-org-deny, unauthenticated-deny) before shipping, mirroring `src/rules.test.ts` discipline |
+| Settings kill-switch | Checking the kill-switch only in the Vue composer component | Check it server-side inside every send Cloud Function (via the shared recipient resolver), so a stale client can't bypass a switch flipped after page load |
 
 ## Performance Traps
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|-----------------|
-| Share-snapshot refresh on every service write, including unshared services | Firestore write-count spike disproportionate to actual sharing usage; unnecessary roster/quarter cross-reads on every autosave | Gate refresh on "a `shareTokens` doc already exists for this service" | Immaterial at current scale (2-3 planners) but wastes writes/reads from day one — cheap to prevent now |
-| Claims-backfill as an unbounded single-invocation function | Cloud Function timeout on orgs with many members; partial backfill | Paginate + checkpoint + resumable | Breaks once member count exceeds what fits in one function invocation's time budget |
+| Sending recipients one-at-a-time via sequential provider API calls inside a single Cloud Function invocation | Function timeout on services with many assigned roles; partial-send state (some got the email, some didn't, function crashed mid-loop) | Batch-send via the provider's bulk/batch send API where available, and make each recipient's send its own idempotent unit (not "all-or-nothing" for the whole invocation) so a partial failure is recoverable, not a stuck half-sent state | Once a service has enough assigned roles that sequential per-recipient API round-trips approach the function's timeout — modest scale for a church (a few dozen roles), but worth designing for from the start since retrofitting batching after a partial-send incident is harder |
+| Re-fetching the full roster and full service document inside the recipient resolver on every one of four send surfaces | Slower composer "Reaches N people" live count, more Firestore reads billed per send | Resolver reads should be scoped (only assigned roles' person IDs, not the whole roster) and the composer's live count can debounce/cache against the already-loaded service store data rather than a fresh resolver call on every token/keystroke | Not a hard threshold for this app's scale, but worth avoiding from the start since the composer's live count updates on every recipient-selection change |
 
 ## Security Mistakes
 
 | Mistake | Risk | Prevention |
 |---------|------|------------|
-| Trusting a client-writable Firestore `role` field as equivalent to the auth-claim `role` | The two can diverge (client can write its own Firestore role field per today's `isOrgEditor` write grant on `members/{uid}`, but cannot write its own claim) — code that reads the wrong one for an authorization decision can be tricked | Rules use the claim (server-set only); app UI can read either for *display*, but any access decision must go through the claim or the existing Firestore check, never a client-writable field |
-| Widening the public `shareTokens`/`serviceShares` snapshot fields without a pinned-shape test | A future edit anywhere in the snapshot-building path silently exposes new PII to an unauthenticated `allow read: if true` reader | A test asserting the exact field set of `serviceSnapshot.roleAssignments`, failing CI on any addition |
-| Removing the `exists()`/`get()` fallback in the same deploy that adds the claim check | Any user without the claim yet (not-yet-refreshed token, backfill miss) is locked out instantly | Two separate deploys: add-with-dual-read, then (after the soak period) remove-fallback |
+| Send `onCall` function trusts a client-supplied recipient list | Any caller can attempt to email addresses outside the service's actual assignments, or bypass per-role targeting | Server re-derives recipients from live assigned roles; client selection is only a filter over that server-truth set |
+| Bounce webhook has no signature check | Forged bounce events can mislabel real addresses as undeliverable, hiding future real notifications from a volunteer, or leak which addresses exist in the system via response timing/behavior | HMAC/signature verification before processing, as in Pitfall 4 |
+| Provider API key or webhook signing secret stored as `VITE_*` or in `functions.config()` | Client-bundle key exposure (attacker can send arbitrary email as the church) or reliance on a config store Google is retiring | `defineSecret()` in Secret Manager, server-only, per Pitfall 3 |
+| New `messages`/`deliveryLog` Firestore collection readable by any authenticated org member without role check | Viewers can read other volunteers' email addresses via the delivery log, beyond their intended read-only scope | Rules scope reads to the existing editor/viewer org-membership check already used elsewhere, with explicit tests |
+| Kill-switch enforced only in UI | A user with a stale page load (switch flipped after their session started) can still trigger sends via a direct function call | Server-side kill-switch check inside the send function itself, not just conditional UI rendering |
 
 ## UX Pitfalls
 
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-------------------|
-| Presenter view painting before the org's configured font loads | Visible font flash/reflow on a live projection in front of the congregation | Gate first paint on `document.fonts.ready` for the specific configured font |
-| Toggling a feature off with no indication of what happens to data that already used it | A planner turning off AI worries their already-split congregational reading will vanish or was never real | Explicit copy: "Existing AI-assisted content is unaffected; this only disables future AI suggestions" |
-| Auto-refreshing share snapshot silently changing role names shown on a link already sent out | A volunteer clicks a link they were sent last week and sees names that don't match what they were told verbally, with no explanation | This is by design (v1.5's whole point — role overrides publish without re-sharing), but the share view itself should show a "last updated" timestamp so recipients can tell it's current, not stale |
+| No visible "sending as..." / kill-switch state feedback in the composer | Planner doesn't realize messaging is globally off and wonders why "send" appears to do nothing, or why recipients show 0 | Composer surfaces the kill-switch state explicitly (disabled with an explanatory banner) rather than silently no-op-ing |
+| Auto lock-notification and scheduled reminder fire without the planner previewing content first time | A first send with a typo/wrong token substitution reaches real volunteers before anyone reviewed it | Default new automatic-send settings to off (or require an explicit first-time confirm) until the planner has seen at least one composer preview of the token-substituted text |
+| Re-lock diff surfaces every changed field including trivial ones (a note punctuation fix) as a checkable, seemingly-equal-weight item next to a real song change | Alert fatigue — planners routinely uncheck everything and volunteers who needed the real update miss it because it looked identical to noise | Group/typé diff entries as scoped in PROJECT.md (SONG/ORDER/ROLE/NOTES/SLIDES) with clear per-type labeling, and consider defaulting notes-only whitespace changes to unchecked |
+| No unsubscribe/opt-out path even though messaging is "mostly" transactional | A volunteer who wants fewer reminder emails has no self-service way to reduce them, and CAN-SPAM's transactional exemption doesn't cover a message that reads as promotional/optional | Design a lightweight per-person notification preference (e.g. "opt out of scheduled reminders" only, not lock notices tied to their actual assignment) even if full unsubscribe infrastructure is deferred |
+| Scheduled reminder computed in server (UTC) time without accounting for the church's local timezone | "7 days before" reminder arrives at 2am or a day off from what the planner expects, especially around DST | Compute the reminder send window against the org's configured timezone (or a sane fixed local-time default), not naive UTC date math |
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **Custom claims rollout:** Often missing the dual-read window — verify `firestore.rules`/
-      `storage.rules` still contain the `exists()`/`get()` fallback branch, not just the claim check,
-      immediately after the phase that adds claims.
-- [ ] **Rules changes:** Often missing a passing *allow* test — verify at least one allow-case test
-      exists and is run against the real emulator (`npm run test:rules` or the direct
-      `vitest.rules.config.ts` invocation), not just deny-case tests.
-- [ ] **Share-link migration:** Often missing the backfill-reuses-existing-token step — verify a
-      service that already had a `shareTokens` doc before this migration keeps resolving through its
-      original token afterward.
-- [ ] **SlotKind widening:** Often missing one of the six-plus exhaustive switch sites — verify
-      `npm run type-check` (the `vue-tsc --build` form, not `-p tsconfig.app.json`) passes clean after
-      adding `ANNOUNCEMENT`/`MISC`.
-- [ ] **AI/PC toggles:** Often missing the module-level guard — verify calling a `claudeApi.ts`
-      function directly (bypassing the UI) with the toggle off does not issue a network request.
-- [ ] **Font settings:** Often missing the pre-measurement font-load gate — verify presenter/print
-      views await `document.fonts.ready` before rendering, not just before showing a loading spinner.
-- [ ] **Second Bible translation:** Often missing a per-slide translation-source field — verify a
-      slide created under ESV still shows ESV's attribution after the org's setting switches to NLT.
-- [ ] **Mobile drag-and-drop:** Often missing a repro of the documented index bug under touch —
-      verify the `ZTXcpNRcJTalEQp42fTx`-style reorder-then-refresh case is retested on a touch input
-      path, not just visually spot-checked in devtools responsive mode.
+- [ ] **Idempotent sends:** Often missing the transactional `sent/{key}` check-before-send — verify by
+  manually re-invoking the send function with identical input twice in staging and confirming exactly one
+  provider API call and one delivery-history entry.
+- [ ] **Domain authentication:** Often missing DMARC entirely (SPF/DKIM alone still lands mail in spam for
+  many providers) — verify with a DMARC record checker against the sending domain, not just "the email
+  arrived in my test inbox."
+- [ ] **Bounce webhook security:** Often missing signature verification because an unsigned POST "works" in
+  manual testing — verify by sending a hand-crafted unsigned request to the deployed endpoint and confirming
+  it's rejected.
+- [ ] **Recipient correctness:** Often missing the "unassigned role has no email" and "dedup across two
+  teams" cases because they don't show up with a small test roster — verify with a service that has at least
+  one unassigned role and one person on two teams before considering the composer done.
+- [ ] **Kill-switch coverage:** Often checked in only the UI or only the scheduled function — verify by
+  flipping the kill-switch off and attempting a send via each of the four surfaces (composer, lock, re-lock,
+  scheduled reminder) directly against the backend, not just the disabled button in the UI.
+- [ ] **Re-lock diff accuracy:** Often correct on the first re-lock but wrong on the second (diffing against
+  a stale un-refreshed baseline) — verify with two sequential re-locks with different changes each, confirming
+  each diff shows only its own changes.
+- [ ] **Draft-skip for the scheduled reminder:** Often works when tested against a locked service but not
+  verified against a genuinely-still-draft one — verify the scheduled function explicitly skips (and ideally
+  logs why) for draft services rather than relying on "there won't be a link to send yet."
 
 ## Recovery Strategies
 
 | Pitfall | Recovery Cost | Recovery Steps |
-|---------|-----------------|------------------|
-| Custom claims lock out users despite dual-read (bug in the `OR` logic itself) | LOW | Revert the rules deploy only (instant, independent of token state) — claim data already backfilled is harmless to leave in place |
-| Share-link backfill mints new tokens instead of reusing existing ones, orphaning circulated links | MEDIUM | Re-run backfill with corrected reuse logic; old orphaned `shareTokens` docs can be identified by comparing `createdAt` timestamps against the persisted-token migration's run time, then manually re-pointed if the original link is still needed |
-| SlotKind widening ships with a missed switch site (compile passed via the narrow tsconfig form) | LOW | Add the missing case, redeploy — no data migration needed since this is a pure code defect, not a data-shape problem |
-| AI toggle only gates UI, quota spent via a bypassed path | MEDIUM | Add the choke-point guard retroactively in `claudeApi.ts`; audit Claude API usage logs for the affected window to confirm no further leakage, no data corruption to undo since AI output was already treated as additive/non-blocking |
+|---------|----------------|------------------|
+| Duplicate sends from a non-idempotent function already in production | MEDIUM | Add the idempotency key + transactional check retroactively; audit `deliveryLog` for pre-fix duplicates so the history UI can be manually deduped/annotated; apologize-and-explain is usually the real-world mitigation for already-sent duplicates |
+| Missing domain auth causing spam-folder landing after go-live | LOW–MEDIUM | Add SPF/DKIM/DMARC records (owner DNS change, no app redeploy needed), then send a fresh test batch and check inbox placement; some providers offer a "warm-up" period recommendation for new sending domains |
+| Forged bounce webhook payloads already accepted before signature verification was added | MEDIUM | Add verification going forward; manually review/clear any bounce flags set from before the fix by cross-referencing provider's own dashboard/logs for genuine bounce events |
+| Re-lock diff under/over-reporting already shipped | LOW | Because diffs are computed fresh from persisted snapshots at diff-time, fixing the snapshot/comparison logic self-corrects for all *future* re-locks without needing a data migration — only already-sent notifications are unrecoverable |
+| Recipient resolver missing dedup/kill-switch check already shipped | LOW–MEDIUM | Centralize into the shared resolver (Pitfall 6's fix) and have every send surface call it; no data migration needed, just consolidating duplicated logic |
 
 ## Pitfall-to-Phase Mapping
 
 | Pitfall | Prevention Phase | Verification |
 |---------|-------------------|----------------|
-| Custom claims lockout / staleness / size limit | Custom auth claims phase (sequence early; own phase, not bundled) | Emulator rules suite passes with claim present/absent/stale; real (non-prod) sign-in test with a pre-migration user shows no lockout; 1-hour soak with dual-read before fallback removal |
-| Rules "denies everyone" repeat | Every phase touching `firestore.rules`/`storage.rules` | At least one passing allow-case test per rule change, run against the real emulator, cited as evidence in the phase's verification |
-| Share-link backfill / write amplification / PII widening | Sharing correctness phase | Backfill reuses existing tokens (test against a pre-migration service); refresh trigger's write target excludes its own watch path; snapshot field-shape test pinned |
-| SlotKind widening breaks old bundles / silent fallthrough | Service items (Announcements/Misc/Message) phase | `npm run type-check` clean; explicit decision recorded for which switch-group (slide-generating vs. not) each new kind joins |
-| Feature toggle leaves code path callable | Settings — AI/PC toggles phase | Direct call to `claudeApi.ts`/PC utility with toggle off makes no network request; already-exported PC status and already-AI-generated slide content untouched by the toggle flip |
-| Font FOUT/FOIT on presenter/print | Slides slide-out — font phase (with its UI-research sub-step) | Manual throttled-network test shows no visible reflow on presenter first paint; license recorded for every curated font |
-| Second translation copyright/staleness | ESV/NLT Bible version phase | Per-slide translation-source field present and tested; translation switch doesn't retroactively alter existing slides |
-| Mobile drag-and-drop index bugs | Mobile & layout phase | Documented `ZTXcpNRcJTalEQp42fTx`-style repro retested under touch input, not just devtools mouse emulation |
-| Broad-milestone scope overrun | Roadmap phase ordering itself | Custom claims sequenced early with soak time budgeted; choke-point-sharing phases (AI toggle + congregational-AI-split; sharing + claims on rules files) sequenced, not parallelized; PPTX display given its own named phase with the stated acceptance criterion |
+| Deliverability/domain auth (Pitfall 1) | Provider selection & infrastructure setup (first v1.7 phase) | DMARC/SPF/DKIM records present on sending domain; test send lands in inbox (not spam) at a real Gmail/Outlook test address |
+| Duplicate/runaway sends (Pitfall 2) | Send-path/infrastructure phase | Re-invoke send function twice with identical input in staging; exactly one send, one delivery-history entry |
+| Secrets in the wrong place (Pitfall 3) | Send-path/infrastructure phase | No provider key substring in client bundle; provider SDK usage confined to `functions/` |
+| Open/forged bounce webhook (Pitfall 4) | Delivery-history & bounce-tracking phase | Unsigned POST to deployed webhook endpoint rejected with 401 |
+| RBAC on send/recipient-read (Pitfall 5) | Send-path/infrastructure phase + dedicated rules-tests pass | Rules tests: editor-allow, viewer-deny, wrong-org-deny, unauthenticated-deny on new collections |
+| Recipient correctness/dedup/kill-switch (Pitfall 6) | Shared recipient-resolver built early, consumed by composer/lock/re-lock/reminder phases | Unit tests: unassigned role, stale email, dual-team dedup, draft-skip, kill-switch-off — reused across all four send surfaces' tests |
+| Re-lock diff/snapshot drift (Pitfall 7) | Re-lock change-diff phase | Two sequential re-locks with distinct changes each; each diff reflects only its own change, none repeated |
+| CAN-SPAM/UX pitfalls (unsubscribe, timezone, surprise mail) | Composer & Settings kill-switch phase | Manual review: automatic sends default off until previewed once; reminder timezone matches church local time, not naive UTC |
 
 ## Sources
 
-- Direct codebase reads (HIGH confidence, primary source): `.planning/PROJECT.md`, `CLAUDE.md`,
-  `firestore.rules`, `storage.rules`, `src/stores/services.ts` (`createShareToken`),
-  `src/stores/auth.ts` (`loadOrgContext`, `orgIds`), `src/utils/slotTypes.ts`,
-  `src/utils/slideGroupMaterializer.ts`, `src/utils/esvApi.ts`, `functions/src/index.ts`,
-  `.planning/codebase/CONCERNS.md`, `.planning/STATE.md` (storage.rules incident record).
-- [Control Access with Custom Claims and Security Rules | Firebase Authentication](https://firebase.google.com/docs/auth/admin/custom-claims) — 1000-byte payload limit, token-refresh propagation, `getIdToken(true)` force-refresh pattern (HIGH confidence, official documentation, fetched and cross-checked directly).
-- [firebase-js-sdk#6803](https://github.com/firebase/firebase-js-sdk/issues/6803) — cited in CLAUDE.md as the root cause of `firestore.exists()` being inert in the Storage emulator; not independently re-verified in this pass, taken as established project fact per CLAUDE.md's own investigation record.
+- [Mailgun: Implementing SPF, DKIM, and DMARC](https://www.mailgun.com/blog/dev-life/how-to-setup-email-authentication/) — MEDIUM confidence (cross-checked against multiple independent sources)
+- [Google Cloud Blog: Cloud Functions pro tips — Building idempotent functions](https://cloud.google.com/blog/products/serverless/cloud-functions-pro-tips-building-idempotent-functions) — MEDIUM confidence, official Google Cloud source
+- [Google Cloud Blog: Cloud Functions pro tips — Retries and idempotency in action](https://cloud.google.com/blog/products/serverless/cloud-functions-pro-tips-retries-and-idempotency-in-action) — MEDIUM confidence, official Google Cloud source
+- [Firebase Docs: Retry asynchronous functions](https://firebase.google.com/docs/functions/retries) — MEDIUM confidence, official Firebase documentation
+- [GoogleCloudPlatform/cloud-functions-reliability-nodejs (idempotency reference implementation)](https://github.com/GoogleCloudPlatform/cloud-functions-reliability-nodejs/blob/master/idempotency/README.md) — MEDIUM confidence, official Google reference repo
+- [Webhook Signature Verification: Complete Security Guide](https://inventivehq.com/blog/webhook-signature-verification-guide) — MEDIUM confidence (cross-checked against multiple sources including HMAC-specific guides)
+- [SocketLabs: CAN-SPAM & Transactional Emails](https://www.socketlabs.com/blog/transactional-email-can-spam/) — MEDIUM confidence, cross-checked against MailerSend/Element451/Salesforce guidance
+- [Mailtrap: 6 Best Transactional Email Services Compared](https://mailtrap.io/blog/transactional-email-services/) — LOW confidence, single-vendor benchmark; treat specific inbox-placement percentages as directional, not precise
+- Internal codebase precedent: `functions/src/index.ts` (`defineSecret` pattern for `CLAUDE_API_KEY`/`ESV_API_KEY`/`NLT_API_KEY`; `onSchedule` pattern for `cleanupExpiredMedia`/`cleanupOrphanRenders`), `src/stores/services.ts` (shared share-token/snapshot-builder discipline, R036/R037 status-transition guards), `.planning/PROJECT.md` Key Decisions (v1.5 "share token re-minted... snapshot frozen at share time" root-cause entry) — HIGH confidence, primary source (own codebase)
 
 ---
-*Pitfalls research for: WorshipPlanner v1.5 Settings, Sharing, and Fidelity*
-*Researched: 2026-08-06*
+*Pitfalls research for: WorshipPlanner v1.7 Volunteer Messaging & Notifications*
+*Researched: 2026-08-13*

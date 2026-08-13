@@ -1,614 +1,779 @@
-# Architecture Research — v1.5 "Settings, Sharing, and Fidelity"
-
-**Domain:** Subsequent-milestone integration research (Vue 3 + Firebase worship-planning app)
-**Researched:** 2026-08-06
-**Confidence:** HIGH — every claim below is grounded in a file/line read during this research pass, not
-inferred from PROJECT.md's prose alone. Where PROJECT.md's recorded milestone decision conflicts with
-what the code actually does, that conflict is called out explicitly rather than silently resolved.
-
-## Existing Architecture (confirmed by reading, not re-researched)
-
-- Vue 3 SFCs + TypeScript, Pinia stores (`defineStore` with `ref`/`computed`, not the options API),
-  most stores hold a live Firestore `onSnapshot` subscription (`services.ts`, `auth.ts`'s member
-  listener, `importedSlides.ts`).
-- Firestore rooted at `organizations/{orgId}/...`. The org document itself (`organizations/{orgId}`)
-  carries loose, untyped fields today — `name`, `slug`, `pcAppId`, `pcSecret`, `vwModeEnabled` — read via
-  ad hoc `getDoc`/`orgData.<field> as <type>` casts in `src/stores/auth.ts:104-109`. **There is no
-  `Organization` TypeScript type anywhere in `src/types/`** (confirmed by glob — no match).
-- `organizations/{orgId}/services/{docId}` is the service document; **every write to it is confined to
-  `src/stores/services.ts`** — confirmed by grepping the whole `src/` tree for the org/services doc path:
-  the only non-test hit is `services.ts` itself (`src/rules.test.ts` is the only other hit, and it's a
-  rules test). No view, component, or other store ever calls `updateDoc`/`setDoc`/`addDoc` on a service
-  doc directly; every mutation goes through one of the store's exported functions.
-- Sharing: `shareTokens/{token}` (opaque, public-read) and `serviceShares/{slug}__service-{date}`
-  (memorable URL, public-read) both carry a frozen `serviceSnapshot` built once, at share time, in
-  `services.ts`'s `createShareToken` (`src/stores/services.ts:353-441`).
-- Firebase Storage under `orgs/{orgId}/...`, gated by `storage.rules`'s cross-service
-  `firestore.exists(.../members/$(uid))` check (both the `media/**` and generic `orgs/{orgId}/{allPaths=**}`
-  blocks — `storage.rules:17-44`).
-- Cloud Functions (`functions/src/index.ts`) proxy ESV and Anthropic through one `onRequest` handler
-  (`export const api`, lines 56-129), keyed by a `PROXY_TARGETS` map (`planningcenter`/`anthropic`/`esv`).
-- `pptx-render` (Cloud Run, `render-service/`) writes PNGs to Storage; `organizations/{orgId}/pptxRenders/{importId}`
-  tracks status (`pending`/`ready`/`failed`) — this collection is written server-side only
-  (`functions/src/index.ts:149-437`) and is invisible to `src/` (confirmed: `src/` has zero references
-  to `pptxRenders`; only `renderImportId` — a foreign key toward it — appears in `src/types/importedDeck.ts`).
-- Slide groups (`organizations/{orgId}/slideGroups/{slotId}`, doc id = the anchoring `ServiceSlot.id`)
-  are materialized from the service order by `src/utils/slideGroupMaterializer.ts` and consumed by
-  `src/utils/slideshowAssembler.ts` / `src/composables/useSlideshowAssembly.ts`.
-- `src/views/SettingsView.vue` mirror-writes single fields onto the org doc (`vwModeEnabled`, `pcAppId`,
-  `pcSecret`, `slug`, `name`) and then re-assigns the matching `authStore.<field>` ref directly —
-  **the org doc is not live-synced**; `loadOrgContext` (`auth.ts:82-139`) reads it once per session, and
-  every setting's "of record" value lives in `useAuthStore()`'s refs, kept in sync only by each save
-  handler's own mirror-write. This is a documented, deliberate pattern ("Pitfall 2" per in-code
-  comments at `SettingsView.vue:315` and `auth.ts:42-46`), not an oversight — v1.5 should extend it,
-  not replace it.
-
-## 1. Org settings expansion
-
-**Current pattern does not scale to ~8 settings as bare top-level fields — but the fix is additive, not
-a rewrite.** `vwModeEnabled` works today because it is one boolean with one obvious default (`true`).
-Eight settings (AI toggle, PC toggle, Bible version, default service template, font family/weight/size)
-span three shapes — booleans, an enum, and a structured object (a whole slot-array template) — and each
-needs its own "missing field on a legacy org doc" default. Continuing to add bare top-level fields would
-mean eight separate `(orgData.x as T) ?? default` lines duplicated across `auth.ts`'s two reset sites
-(`loadOrgContext`'s no-org branch, `logout`) plus every settings-page save handler.
-
-**Recommendation: a typed `settings` sub-object on the org document, with one defaults module.**
-
-- Add `src/types/organization.ts` — the first `Organization` type this codebase has ever had. Define an
-  `OrgSettings` interface (`aiEnabled: boolean`, `pcEnabled: boolean`, `bibleVersion: 'ESV' | 'NLT'`,
-  `defaultServiceTemplate: ServiceSlot[] | null`, `slideFont: { family: string; weight: number; size: number } | null`)
-  and export a single `DEFAULT_ORG_SETTINGS: OrgSettings` constant — mirroring `buildSlots`'s role as
-  "the one place a default service structure is defined" (`src/utils/slotTypes.ts:249-295`).
-- Store it as ONE nested field, `organizations/{orgId}.settings`, not eight top-level fields and not a
-  subcollection. A subcollection is unwarranted here: nothing about these values is queried
-  independently, unbounded in count, or written by a different actor than the org doc's other fields —
-  a subcollection would only buy an extra round trip. A single object also lets `updateDoc` use one
-  dot-path write per changed key (`{ 'settings.aiEnabled': false }`), matching the existing
-  `roleAssignmentOverrides.${roleId}` scoped-write precedent in `services.ts:332-335` that this
-  codebase already uses specifically to avoid concurrent-editor clobbering.
-- **Defaults live in code, read at every consumption site, never backfilled into Firestore.** This is
-  the existing `vwModeEnabled` convention (`?? true` in three places in `auth.ts`) generalized: merge
-  `DEFAULT_ORG_SETTINGS` under whatever `orgData.settings` returns (`{ ...DEFAULT_ORG_SETTINGS, ...(orgData.settings ?? {}) }`)
-  in `loadOrgContext`, so a legacy org doc with no `settings` key at all, or one missing just the newest
-  field (e.g. `slideFont` added in a later phase within this same milestone), is never an error and
-  never needs a migration script. Firestore's schemalessness is precisely what makes this safe — every
-  other field in this codebase already relies on it (`orgData.pcAppId as string ?? null`, etc).
-- **Where the merged value lives:** `useAuthStore()`, exactly like `vwModeEnabled` today — add
-  `orgSettings = ref<OrgSettings>(DEFAULT_ORG_SETTINGS)` beside the existing individual refs (do not
-  migrate `vwModeEnabled` itself; that field already ships and works, and folding it into `settings`
-  mid-milestone is pure churn with no functional benefit). Every new toggle follows `onToggleVwMode`'s
-  exact shape (`SettingsView.vue:474-494`): `updateDoc` the dot-path, then reassign the store's local
-  copy — never rely on a live subscription firing.
-- **Migration story:** none needed beyond the merge-with-defaults read above. No script, no Cloud
-  Function backfill, no `settings: {}` write-on-read. This is a direct consequence of Firestore's
-  document model plus the org doc's existing "read once per session, mirror-write on save" pattern —
-  the same reason `vwModeEnabled` never needed one.
-- **Build-order implication:** the `OrgSettings` type + defaults module + `auth.ts` merge-and-load logic
-  is a hard prerequisite for every other v1.5 settings feature (AI toggle, PC toggle, Bible version,
-  template, font). It should be the first phase of this milestone's settings work — every later phase
-  that adds a toggle is then a small, mechanical addition (new key in the interface, new default, new
-  Settings UI control, new consumption-site read), not infrastructure work.
-
-## 2. Share link rework
-
-### The write-path enumeration (exhaustive, verified by grep)
-
-Grepping `src/` for the literal Firestore path `organizations/{orgId}/services` returns exactly two
-files: `src/stores/services.ts` (the implementation) and `src/rules.test.ts` (a rules test, not a write
-path). **No view or component writes to a service document directly.** Within `services.ts`, every
-function that issues a Firestore write to a service doc is:
-
-1. `createService` — `addDoc` (services.ts:139-154)
-2. `updateService` — the generic `updateDoc`, called by `ServiceEditorView.vue` at three sites
-   (lines 1944, 3446, 3651 — slot/section reindex saves, the sermon-passage/notes autosave, and the
-   Planning Center export-status write) plus internally by `assignSongToSlot`/`clearSongFromSlot`
-   (services.ts:264-308)
-3. `markAsPlanned` — its own `updateDoc` (services.ts:226-234)
-4. `reopenService` — its own `updateDoc` (services.ts:247-253)
-5. `setRoleOverride` — its own scoped dot-path `updateDoc` (services.ts:316-336)
-6. `clearRoleOverride` — its own scoped dot-path `updateDoc` via `deleteField()` (services.ts:340-351)
-7. `deleteService` — `deleteDoc` (services.ts:259-262; irrelevant to snapshot staleness, only to token
-   cleanup — see below)
-
-This means a **client-side refresh hook is exhaustively achievable for every write to the service
-document itself**, by centralizing the refresh call at the tail of functions 1–6 (all defined in the
-same store closure, so this is a few call sites, not "every UI call site" — the earlier finding that all
-service-doc writes fund through six functions is what makes client-side refresh tractable, not merely
-convenient).
-
-**However, this does NOT cover every way "what the share link shows" can go stale.** The frozen
-snapshot's `roleAssignments` are resolved by `resolveServiceRoleAssignments(service, quarters, roles)`
-(`services.ts:381`), which reads the **`quarters` store** — a volunteer's schedule assignment can change
-via `src/stores/quarters.ts`'s own writes (e.g. `assignPerson`) **without touching the service document
-at all**. A pure "hook into `services.ts`'s six write functions" fix corrects exactly the root cause
-PROJECT.md names (a role *override*, which does live on the service doc via
-`roleAssignmentOverrides`), but does not generalize to a schedule change made from the Schedule/Quarter
-screen for a person who is NOT overridden on this specific service. **Flag this as a real, unresolved
-gap** — the milestone's decision text ("refresh the snapshot automatically whenever the service
-changes") is most naturally read as scoped to the service document, matching what's achievable
-client-side; whether schedule-only changes should also trigger a refresh is a product question the
-roadmapper should resolve explicitly rather than let slide by omission.
-
-### Client-side refresh vs. a Firestore `onWrite` trigger
-
-**Recommendation: client-side, not a Cloud Function trigger.** The trade-offs, concretely:
-
-- **Latency/cost:** a trigger fires on every write to every service doc, including services that were
-  never shared — it would need its own read of the doc to discover whether a `shareToken` is even
-  present before doing anything, on every save of every service in the org. A client-side hook already
-  has the answer in the reactive `Service` object it just wrote (`service.shareToken`), so it can skip
-  entirely when unshared, at zero extra read cost. A trigger also adds real latency (cold start plus a
-  round trip) before the refreshed link is live; client-side, the refresh completes before the save
-  operation's promise resolves.
-- **The `roleAssignments` re-resolution problem is the deciding factor.** `createShareToken` resolves
-  role assignments using `resolveServiceRoleAssignments` (`src/utils/serviceRoles.ts`), fed by the
-  **client's already-subscribed** `rosterStore`/`quartersStore` state (`services.ts:378-381`). A Cloud
-  Function trigger would have to re-implement or import this same algorithm server-side against
-  `functions/src/` — a **separate TypeScript project with no code-sharing mechanism to `src/`** (no
-  shared package, no path alias crossing the boundary — confirmed by directory structure). That is not
-  a small port: the algorithm folds in the roster's frequency tiers, must-serve-with pairing, and
-  per-role override precedence (per `PROJECT.md`'s Phase 15 requirement text). Maintaining two
-  implementations of this logic is exactly the kind of drift that reintroduces "stale role overrides,"
-  just at a new seam, and this codebase has explicit institutional memory of that failure class
-  (`STATE.md` T-13/T-17 precedents referenced in `services.ts`'s own comments). Client-side reuses the
-  **one** existing implementation.
-- **Deployment dependency:** the infra already exists (`requestPptxRender`'s `onDocumentCreated` trigger
-  is a working precedent for this codebase), so this is not a blocking cost — it's simply not needed
-  here given the algorithm-duplication problem above.
-
-**Concretely:** extract `createShareToken`'s snapshot-building block (`services.ts:359-399`) into a
-private `buildServiceSnapshot(service, orgId)` helper, call it both from the (renamed) "ensure share
-token" flow and from a new `refreshShareSnapshot(serviceId)` invoked at the tail of `updateService`,
-`markAsPlanned`, `reopenService`, `setRoleOverride`, and `clearRoleOverride` — guarded by "does this
-service have a persisted token" so the common unshared case costs nothing extra.
-
-### The "persist the token on the service doc" decision conflicts with the R036 draft-lock guard —flag loudly
-
-PROJECT.md's milestone decision reads: *"Persist the token on the service doc — minted once, never
-rotated."* Read literally, this means writing a `shareToken` field via `services.ts`'s existing
-`updateService`. **That collides directly with the R036 draft-only write guard already shipped in this
-codebase (Phase 31).** `updateService`'s `assertWritable` (`services.ts:197-203`) throws
-`ServiceLockedError` for any write to a non-draft service unless the payload matches exactly one of
-three enumerated shapes: ordinary draft editing, the Planning-Center export carve-out
-(`EXPORT_WRITE_KEYS`), or the reopen carve-out (`hasOnly(['status','updatedAt'])`). `firestore.rules`'
-`/services/{docId}` `allow update` block (`firestore.rules:64-84`) enforces the identical three-shape
-contract server-side. A bare `{ shareToken: token }` write matches **none** of the three — it would be
-silently rejected by the client guard (throwing `ServiceLockedError`) or, if that guard were bypassed,
-denied by Firestore itself. Since sharing a service is realistically most useful once it's `planned` (the
-"communicate this to the team" moment R036 exists to protect), this is not an edge case — **it is the
-common case**, and the milestone decision as literally written would not work for it.
-
-Two ways to resolve this, both requiring an explicit choice the phase planner must make (this research
-does not decide it):
-
-1. **Add a fourth named carve-out**, mirroring the R037 reopen pattern exactly: both `assertWritable`
-   and `firestore.rules`' `/services` block gain a `hasOnly(['shareToken','updatedAt'])` (or
-   `hasOnly(['shareToken','sharedAt','updatedAt'])`) branch, permitted at any stored status. This keeps
-   the token literally on the service doc as decided, at the cost of widening the lock's carve-out
-   surface — a security-sensitive file that this codebase treats with unusual care (see the extensive
-   comments throughout `services.ts` and `firestore.rules` warning against "helpfully" simplifying it).
-2. **Store the token in a separate, non-lock-gated document keyed by `serviceId`** — e.g.
-   `serviceShareLinks/{serviceId}: { token, orgId }` — analogous to how `slideGroups` and `shareTokens`/
-   `serviceShares` already live outside the service document entirely. `ensureShareToken` reads this
-   doc first; if present, reuses `.token`; otherwise mints and writes it. This never touches the service
-   document or R036 at all, and needs no rules change to the security-sensitive `/services` block —
-   only a new, simple rule for the new collection (public-read-by-token is unaffected; this new doc
-   would be editor-read/write-scoped like `shareTokens` create today).
-
-This research recommends option 2 as lower-risk (it doesn't touch the draft-lock's carve-out surface),
-but the roadmapper should treat PROJECT.md's decision text as **not yet reconciled with the codebase's
-existing lock semantics** and resolve it explicitly in the phase that implements this, rather than
-discovering the `ServiceLockedError` at implementation time.
-
-### `firestore.rules` on `shareTokens` must change regardless of which option above is chosen
-
-Confirmed by reading `firestore.rules:181-189`: `match /shareTokens/{token} { allow read: if true; allow
-create: if isSignedIn(); allow update: if false; ... }`. **`allow update: if false` blocks any snapshot
-refresh via the client SDK, full stop** — the rule as it stands today only ever supports "mint once,
-snapshot frozen forever," which is the opposite of what this milestone needs. This must change to permit
-an org editor to update `serviceSnapshot`/`updatedAt` while keeping `orgId`/`serviceId`/`token` immutable
-— directly mirroring the `serviceShares` collection's existing update rule two blocks below
-(`firestore.rules:225-233`), which **already** supports exactly this "overwritten in place, org-scoped"
-pattern for the memorable-URL share. `shareTokens` needs the same treatment `serviceShares` already has.
-
-### Confirmed: no PII leak from persisting the token on (or beside) the service doc
-
-`organizations/{orgId}/services/{docId}` reads are gated `allow read: if isOrgMember(orgId)`
-(`firestore.rules:61`) — not public. Storing `shareToken` as a field there (option 1 above) or in a
-new `serviceShareLinks/{serviceId}` doc scoped the same way as `shareTokens`' `create` rule (option 2)
-is safe: only org members — who can already mint/view share links themselves — could read the token
-value. Public/anonymous access is only ever through `shareTokens/{token}` (must already know the token)
-or `serviceShares/{slug}__service-{date}` (guessable but scoped per-org), both unchanged in this regard.
-
-## 3. Custom auth claim for org membership
-
-### Where memberships are created/mutated today — all four sites are client-side, none is a Cloud Function
-
-1. `src/stores/auth.ts::ensureUserDocument` — invite-acceptance branch: `batch.set(memberRef, { role, ... })`
-   (`auth.ts:199-205`).
-2. `src/stores/auth.ts::ensureUserDocument` — auto-create-org branch (no invite, no org): `batch.set(memberRef, { role: 'editor', ... })`
-   (`auth.ts:228-234`).
-3. `src/views/TeamView.vue::onToggleRole` — role change (`editor`↔`viewer`): plain `updateDoc`
-   (`TeamView.vue:319-341`).
-4. `src/views/TeamView.vue::onConfirmRemove` — member removal: presumably `deleteDoc` on the member doc
-   (confirmed pattern from the surrounding guard logic at `TeamView.vue:345-360`; the delete call itself
-   is just past the excerpt read but follows the file's established direct-client-write convention).
-
-**No Cloud Function touches `organizations/{orgId}/members/{uid}` today** — confirmed by grep (`setCustomUserClaims`/`customClaims`/`getIdToken` appear nowhere in `src/` or `functions/src/index.ts`; the
-only hits are the unrelated `render-service`/pptx research docs and `appAuth.ts`, which is the AI-proxy
-auth-header helper, not a claims mechanism). This is genuinely greenfield.
-
-### Recommended shape: a Firestore trigger, not a rewrite of the four write sites
-
-The client SDK **cannot** call `admin.auth().setCustomUserClaims` — that requires the Admin SDK, i.e. a
-Cloud Function. Rather than converting all four client write sites above into callable functions (a much
-larger, riskier change touching auth flow, org creation, and team management), add one
-`onDocumentWritten` trigger on `organizations/{orgId}/members/{uid}` that sets/clears the claim in
-response to create/update/delete — **directly the same pattern this codebase already ships** for
-`requestPptxRender` (`onDocumentCreated` on `organizations/{orgId}/pptxRenders/{importId}`,
-`functions/src/index.ts:429-437`). This requires zero changes to any of the four existing write sites;
-they keep writing Firestore exactly as they do today, and the trigger reacts. Claim shape:
-`{ orgId: string, role: 'editor' | 'viewer' }` — a single org, matching this codebase's existing
-single-org-per-user model (`auth.ts:99`, `ids[0]!` — only the first org id is ever used).
-
-### Backfill for existing members
-
-The trigger only fires on a **write**; existing member docs (created before this phase ships) will never
-trigger it on their own. A one-time backfill is required — an Admin SDK script (run once, analogous to
-how `render-service/DEPLOY.md` documents a one-time manual deploy step for this codebase) iterating the
-`members` collection group and calling `setCustomUserClaims` for each doc's `uid`. This is infrastructure
-work with no existing precedent in this repo to copy from directly, but the `cleanupOrphanRendersHandler`
-pattern (`functions/src/index.ts:614-623`, a dry-run-by-default admin-triggered maintenance job) is the
-closest structural analogue for "a script that touches every doc in a collection group once."
-
-### The stale-token problem — a real gap that needs an explicit forced refresh
-
-A signed-in user's ID token caches claims for up to an hour (Firebase Auth SDK default). Two concrete
-moments where a stale token will cause an incorrect Storage read/write, both needing an explicit
-`getIdTokenResult(true)` (or `user.getIdToken(true)`) call:
-
-1. **Existing users, at rollout of this feature.** After the backfill script runs, every already-signed-in
-   session still carries its old (claim-less, or default) token until it naturally refreshes or the app
-   forces one. Insert a forced refresh once during `auth.ts`'s `onAuthStateChanged` handler
-   (`auth.ts:142-157`), after `loadOrgContext` resolves — this is the natural "session just
-   established/confirmed" point.
-2. **A brand-new invite acceptance or org auto-creation.** `ensureUserDocument`'s two membership-writing
-   branches (`auth.ts:199-205`, `228-234`) write the member doc client-side; the trigger that sets the
-   claim runs **asynchronously, after** that write completes and the client has already moved on. Any
-   Storage operation attempted immediately after (e.g. uploading a background image in the same
-   session) can race the trigger and use a token that still has no claim. This needs either a forced
-   refresh with a short retry/backoff after the batch commit, or an explicit UI wait state — call this
-   out as a genuine, user-visible race the phase plan must design for, not an edge case to skip.
-
-### `firestore.rules` should NOT move to the claim
-
-`firestore.rules`' `isOrgMember`/`isOrgEditor` (`firestore.rules:11-18`) call `exists()`/`get()` on
-Firestore *from a Firestore rule* — a **same-service** read. The
-[firebase-js-sdk#6803](https://github.com/firebase/firebase-js-sdk/issues/6803) inert-in-emulator bug
-CLAUDE.md documents is specific to **Storage rules calling `firestore.exists()` cross-service** — it does
-not affect Firestore rules reading Firestore, which already works correctly in the emulator today (this
-is exactly why `firestore.rules.test.ts`-equivalent coverage for `/services` etc. is trustworthy while
-`storage.rules.test.ts` is not). Moving `firestore.rules` to the claim as well would introduce a **new**
-consistency risk with no offsetting benefit: a role change via `TeamView.vue::onToggleRole` takes effect
-immediately today (the rule's `get()` reads the fresh doc on every request); under a claim-based rule it
-would lag until the affected user's token refreshes — reintroducing a staleness class this migration is
-supposed to be eliminating, not adding elsewhere. **Scope the claim migration to `storage.rules` only.**
-
-### Rollback path
-
-If a claim is set incorrectly (wrong `orgId`, stale `role`), the safest rollback is at two independent
-levels: (a) redeploy the previous `storage.rules` revision via `firebase deploy --only storage:rules`
-(rules are versioned/instant — no data migration to undo), which restores the working
-`firestore.exists()` cross-service check as a stopgap; (b) re-run the backfill/correction script for the
-affected uid(s) and instruct/force a token refresh (`getIdToken(true)`) or a re-login, since a corrected
-claim in Firebase Auth does not retroactively fix an already-cached client token. Keep the trigger
-running in both cases — it is what keeps future writes correct once the claim values themselves are
-fixed.
-
-## 4. PPTX rendered-image display
-
-### What exists today, and the structural gap that makes this harder than "swap the image URL"
-
-- `PptxImportModal.vue` uploads the source `.pptx`, calls `parsePptx` (parses TEXT/IMAGE content),
-  and on confirm calls `importedSlidesStore.createDeck(...)` which writes an `ImportedDeck` doc
-  (`organizations/{orgId}/importedSlides/{id}`) with `slides: (TextSlide|ImageSlide)[]` — the **parsed**
-  content — plus, when the source was a real `.pptx` (not an image-only import), a `renderImportId`
-  field (`PptxImportModal.vue:304-307, 420-429`) that is the same id the server-side render pipeline
-  uses to key `organizations/{orgId}/pptxRenders/{renderImportId}`.
-- **Nothing in `src/` reads `pptxRenders` or lists the `orgs/{orgId}/pptx-imports/{importId}/rendered/`
-  Storage prefix** — confirmed by the earlier grep; `renderImportId` is currently a foreign key that
-  points nowhere from the client's perspective.
-- The IMPORTED slot kind's slides are derived from `deck.slides` (the parsed text/image content) in
-  **two independent places**, both of which must change: `slideGroupMaterializer.ts::deriveGroupEntries`'s
-  `case 'IMPORTED'` (line 119-129, mints one `GroupSlideEntry` per `deck.slides[]` item, `sourceRef: {
-  kind: 'imported', importId, innerSlideId }`) and `slideshowAssembler.ts`'s two IMPORTED paths — the
-  fallback derivation (line 469-479, for a slot with no materialized group yet) and
-  `resolveEntryContent`'s `case 'imported'` (line 186-193, which resolves a **stored** entry's
-  `sourceRef.innerSlideId` back to a `deck.slides` item for a materialized group).
-- **The rendered page count is structurally decoupled from `deck.slides.length`.** The `requestPptxRender`
-  trigger's own doc comment is explicit about this (`functions/src/index.ts:296-304`): the PPTX parser
-  (`mapAstToSlides`) skips slides with no substantial text/images and emits **one entry per image** on a
-  multi-image slide, so a 6-slide deck can parse to 4 `deck.slides` entries, or more than 6. The render
-  service, by contrast, produces one PNG per actual PowerPoint page (`renderedCount`, cross-checked
-  against a contiguous `page-0001.png..page-{n}.png` Storage listing). **These two counts will routinely
-  disagree.** Given the decision "the PNG is the slide, drawn — parsed text stays in the document but is
-  never drawn," the rendered slideshow's slide *count and order* must come from the render pages, not
-  from `deck.slides` — meaning the IMPORTED derivation logic needs a genuinely different code path when a
-  ready render exists, not a field-level substitution inside the existing per-`deck.slides`-item loop.
-
-### What must be built
-
-1. **A client-side render-status/URL resolver.** New store or extension of `useImportedSlides` that,
-   given an `ImportedDeck.renderImportId`, subscribes to (or fetches) `organizations/{orgId}/pptxRenders/{renderImportId}`
-   and, once `status === 'ready'`, resolves download URLs for the rendered pages. Firestore rules
-   already permit this read: `pptxRenders` is a single-segment subcollection under `organizations/{orgId}`,
-   so it falls through to the generic `match /{collection}/{docId} { allow read: if isOrgEditor(orgId); ... }`
-   catch-all (`firestore.rules:162-167`) — **no rules change needed for editors**, though note this is
-   `isOrgEditor`, not `isOrgMember`: a viewer cannot read it today, which matters if viewers are ever
-   expected to see rendered PPTX slides in-app. The Storage side of this (fetching the actual PNGs) is
-   currently gated by the same `firestore.exists()` cross-service check as everything else under
-   `orgs/{orgId}/**` — this is exactly the check Item 3 replaces, so this item benefits from Item 3
-   landing first (or at minimum, both remain subject to the same emulator-untestable blind spot until
-   then).
-2. **A client-side page-URL builder mirroring `renderedPrefixFor`/`RENDERED_OBJECT_NAME`.** `functions/src/`
-   and `src/` are separate TypeScript projects with no shared code — the 4-digit zero-padded
-   `page-XXXX.png` naming convention (`functions/src/index.ts:273-282`) must be re-implemented (or
-   discovered via a Storage `listAll` on the `rendered/` prefix, avoiding the padding-convention
-   duplication at the cost of an extra Storage list call). Flag the duplication risk either way — if a
-   future change to the render service's naming convention isn't mirrored client-side, rendered slides
-   silently stop resolving, with no compiler check catching it (two separate projects, no shared types).
-3. **A new/widened `AssemblyInputs` field** carrying render status+page URLs per deck (or per
-   `renderImportId`), threaded into both `deriveGroupEntries`'s and `slideshowAssembler.ts`'s IMPORTED
-   branches, so a ready render short-circuits the existing "one entry per `deck.slides[]` item" logic and
-   instead emits one `ImageSlide`-shaped entry per rendered page.
-4. **`sourceSignature`'s IMPORTED case must incorporate render status/count.** Today it's
-   `${deck.slides.length}:${joined text/urls}` (`slideshowAssembler.ts:192-197`) — this governs whether an
-   already-materialized `SlideGroup` gets rebuilt. Rendering is asynchronous: a user can confirm an
-   import and have its group materialize (from parsed text, render still `pending`) *before* the render
-   finishes. If the signature doesn't change when status flips `pending → ready`, **the existing
-   rebuild-on-signature-mismatch mechanism will never notice the render became available**, and the
-   group will keep showing stale parsed-text slides indefinitely. The signature must fold in render
-   status/`renderedCount` so the transition is detected and triggers a rebuild through the same mechanism
-   already used for every other kind.
-5. **Loading/failed states.** Per the decision, the PNG is drawn — while `status === 'pending'`, the
-   slide grid/presenter has nothing to draw yet (the render hasn't happened) and must fall back to
-   *something* visible (most consistent with existing patterns: the parsed `deck.slides` content as a
-   temporary placeholder, since it's already there and already rendered elsewhere in this codebase — or
-   an explicit "rendering…" state card, mirroring `PptxImportModal.vue`'s own `parsing`/`uploading` step
-   pattern). On `status === 'failed'`, the parsed text/image content is the only fallback that exists —
-   this is the graceful-degradation path the "keep parsed text in the document" half of the decision is
-   *for*.
-6. **The presenter draws full-bleed.** `PresentationViewer.vue`'s existing slide-kind branches
-   (`lyric`/`copyright`/`scripture`/... starting at line 72) are all centered text blocks with padding
-   (`px-16 py-12`, `PresentationViewer.vue:70`); an `imported`-as-rendered-PNG slide needs its own branch
-   that renders the image edge-to-edge (`object-contain` or `object-cover` filling the viewport, no text
-   padding) — structurally different from every existing branch, not a variant of one.
-7. **Not in scope for the public `ShareView.vue`.** Confirmed by reading `ShareView.vue` in full: it
-   renders only text (song title/key/BPM, scripture reference, notes, who's-serving) from the frozen
-   `serviceSnapshot` and has no slide/image rendering path at all today. This item is scoped to the
-   authenticated Slides tab grid, Edit Slide drawer preview, and presenter — no share-view work is
-   implied or needed.
-
-## 5. Service item types (`ANNOUNCEMENTS`, `MISCELLANEOUS`, `MESSAGE` simplification)
-
-### Compiler-caught (exhaustive `switch(slot.kind)`, no `default`) — TypeScript will refuse to compile until every new kind is handled
-
-| Site | File:line | What breaks without a new case |
-|---|---|---|
-| `slotLabel` | `src/utils/slotTypes.ts:37-52` | Human-readable label per kind |
-| `createSlot` | `src/utils/slotTypes.ts:58-98` | The factory — what fields a new slot gets |
-| `slotDisplayTitle` | `src/components/slides/slideDisplay.ts:61-81` | Slide-rail row title |
-| `slotLabel` (separate implementation) | `src/components/ServiceCard.vue:135-154` | Dashboard/service-list card label |
-| `deriveGroupEntries` | `src/utils/slideGroupMaterializer.ts:50-135` | What `GroupSlideEntry`/`sourceRef` a new slot kind produces |
-| fallback-derivation switch | `src/utils/slideshowAssembler.ts:394-501` | Slide content for a slot with no materialized group yet |
-| `sourceSignature` | `src/utils/slideshowAssembler.ts:147-204` | Change-detection signature per kind |
-
-Adding `ANNOUNCEMENTS`/`MISCELLANEOUS` to the `SlotKind` union (`src/types/service.ts:7`) will produce a
-compile error at every one of these sites until handled — this is real, load-bearing safety, and the
-natural place for both new kinds to land is alongside `PRAYER`/`MESSAGE`/`HYMN`'s existing shared
-`case 'PRAYER': case 'MESSAGE': case 'HYMN':` grouping in `deriveGroupEntries`/the assembler fallback
-switch (both already emit a generic `{ kind: 'text' }` `sourceRef`/`TextSlide` for that group — plain
-input boxes fit this exactly).
-
-### Silent fallthrough (if-chains, or a `default:` clause) — TypeScript will NOT catch these; each must be found and updated by hand
-
-| Site | File:line | Current behavior on an unhandled kind |
-|---|---|---|
-| `addSlotAsItem` (Planning Center export) | `src/utils/planningCenterApi.ts:884-1004` | **An unconditional if-chain ending in an un-guarded "MESSAGE" branch** (line ~995: no `if`, just falls through) — any kind not explicitly matched earlier is silently exported to Planning Center as a generic "Message" item. **This is not hypothetical** — `ServiceEditorView.vue:3401-3407` already has to special-case `IMPORTED` with an explicit `continue` and an inline comment naming exactly this trap ("skip export entirely rather than falling through addSlotAsItem's default MESSAGE-item branch and mislabeling it"), but that guard exists ONLY in the "new plan, no template" export path (line 3401). The "existing plan" export path (lines 3191-3305) never iterates non-song/non-scripture slots at all today, so it's incidentally safe — but it means **`ANNOUNCEMENTS`/`MISCELLANEOUS` need the same explicit skip-or-handle treatment `IMPORTED` already got**, and it is easy to miss because nothing forces it. |
-| `elementLabel` | `src/views/ServiceEditorView.vue:2692-2702` | Has a `default: return 'this element'` — compiles fine, silently generic for a new kind's delete-confirmation copy |
-| `isSlotPopulated` | `src/views/ServiceEditorView.vue:2651-2671` | If-chain, `return false` for an unhandled kind — a populated ANNOUNCEMENTS/MISCELLANEOUS slot would read as "empty" for whatever UI gates on this (e.g. delete-confirmation wording, completeness indicators) |
-| `slotPrefix`/`slotName`/`slotHasContent`/`slotUrl`/`slotTextClass` | `src/components/ServiceCard.vue:156-197` | Five separate if-chains, each silently no-ops (empty string/`false`/`null`) for an unhandled kind |
-| Slot row rendering | `src/views/ShareView.vue:29-75` | Vue template `v-else-if` chain — an unhandled kind renders **no row at all** on the public share page. No compiler exists to catch a template gap. |
-| Slot row rendering | `src/components/ServicePrintLayout.vue:16-84` | Same `v-else-if` chain pattern, same silent-gap risk, for the printed order of service |
-| Add-item palette | `src/views/ServiceEditorView.vue:803-807` (per-section inline chips) and `:1192-1196` (bottom palette) | Literal, hand-written `<button>` per kind — adding a kind requires a manual new button at BOTH locations; there is no list-driven rendering to extend once. Removing Hymn (per the milestone decision, "palette-only removal") means deleting exactly these two `Hymn` buttons and nothing else — `createSlot('HYMN')`, `slotLabel`, the assembler, and every switch above are explicitly NOT touched (matches PROJECT.md's decision verbatim). |
-
-### `MESSAGE` becoming a plain input box is a type-shape decision, not just a UI change
-
-`MESSAGE` currently shares `NonAssignableSlot` with `PRAYER` (`src/types/service.ts:73-79`): both carry
-optional `linkUrl`/`linkLabel`, and both are rendered in `ServiceEditorView.vue` with an identical
-link-editing UI (PRAYER at ~line 1010-1050, MESSAGE at ~line 1054-1097 — confirmed by reading both
-blocks). The decision only changes `MESSAGE` ("reduce Message to an input box with no URL link") —
-`PRAYER` is not mentioned and should keep its link capability. Since `ANNOUNCEMENTS`/`MISCELLANEOUS` are
-also specified as "plain input boxes," the natural shape is a **new field** (e.g. `text?: string`) shared
-by `MESSAGE`/`ANNOUNCEMENTS`/`MISCELLANEOUS`, while `PRAYER` stays on the existing link-based
-`NonAssignableSlot` shape unchanged. Whether this means splitting `NonAssignableSlot` into two
-interfaces, or widening it with both old (`linkUrl`/`linkLabel`, PRAYER-only going forward) and new
-(`text`, MESSAGE/ANNOUNCEMENTS/MISCELLANEOUS) fields, is a concrete type-design decision the phase plan
-must make explicitly — this research surfaces the fork, not the answer.
-
-## 6. Default service template
-
-`buildSlots(progression)` (`src/utils/slotTypes.ts:249-295`) is currently the **sole** source of a new
-service's structure — called once, from `createService` (`services.ts:139-154`), with no other call
-site in `src/` (confirmed by the earlier `SlotKind` grep — `createService` is the only non-test/non-type
-consumer). Per the milestone decision, an org-level template should become the primary source, with
-`buildSlots` demoted to "the fallback default template" when no org template is set.
-
-**Where the template lives:** the natural home is `OrgSettings.defaultServiceTemplate` (Item 1's new
-settings sub-object), typed as `ServiceSlot[] | null` — the same shape `buildSlots` already returns, so
-`createService` can do `const slots = orgSettings.defaultServiceTemplate ?? buildSlots(progression)`
-with no new type needed. This also means the "Services slide-out" settings UI (per PROJECT.md's target
-features) is, at its core, an editor for a `ServiceSlot[]` array — it can reuse the same `createSlot`/
-`reindexSlots`/`orderSlotsBySection` primitives `ServiceEditorView.vue` already uses for its own slot
-editing (`src/utils/slotTypes.ts`), rather than inventing a parallel slot-editing UI.
-
-**VW typing stays a layer on top, not baked into the stored template.** Per the decision, "when VW mode
-is on, the song slots in that template still receive required VW types from the chosen progression."
-This means the org template stores slot *structure* (kind, section, and for HYMN/etc. any fixed content)
-but a SONG slot's `requiredVwType` should **not** be frozen into the stored template — it must still be
-computed from `PROGRESSION_SLOT_TYPES[progression]` (`slotTypes.ts:16-31`) at service-creation time,
-keyed by the SONG slot's position within the template, exactly as `buildSlots` does today (`songSlot`
-helper, `slotTypes.ts:252-261`). This is a real design constraint on the template's shape/consumption
-logic, not a detail: a template with VW types "baked in" would desync the moment an org changes which
-progression they use, or turns VW mode off and back on.
-
-**Build-order implication:** this item depends on Item 1's settings infrastructure landing first (the
-template needs somewhere typed to live), and is otherwise self-contained — `createService` is the only
-consumption site to change.
-
-## 7. Global slide typography
-
-**There is currently zero font infrastructure to build on.** Confirmed by grepping the whole `src/` tree
-for `font-family`/`fontFamily`/`--font-`: the only hits are Tailwind's `font-sans` utility class on
-`ShareView.vue`/`QuarterShareView.vue`/the two print layouts — the Tailwind v4 default stack, applied
-nowhere else. `src/assets/main.css` (the entire global stylesheet) is 11 lines: a single `@import
-"tailwindcss"` plus a dark-mode background/color override — **no `@theme` block, no custom font tokens
-of any kind.** Every slide-rendering surface hardcodes its own Tailwind text-size/weight utility classes
-directly in the template with no shared variable:
-
-- `PresentationViewer.vue` (presenter): `text-5xl font-normal` for lyric/scripture body,
-  `text-6xl font-semibold` for copyright title, etc. — a different hardcoded class per slide-kind branch
-  (lines 76, 86, 90, 114 and onward).
-- `SlideCard.vue` (grid preview): `text-[13px] leading-normal` for the card body (line 45).
-- `EditSlideDrawer.vue` and the print layout presumably follow the same "hardcode Tailwind classes
-  per element" convention (not independently re-verified line-by-line here, but no font seam exists
-  anywhere in the codebase to contradict this).
-
-**So this is greenfield infrastructure, not "find the scattered seam and unify it" — there is no seam
-yet.** The one-setting-reaches-four-surfaces requirement (grid, drawer preview, presenter, print) is
-best served by **one CSS custom-property triplet** (`--slide-font-family`, `--slide-font-weight`,
-`--slide-font-size` or a base-size custom property that each surface's existing text-size utility scales
-from) set once at a shared ancestor and consumed via `style="font-family: var(--slide-font-family)"` (or
-a small Tailwind `@theme` mapping, given Tailwind v4's CSS-first config) on each of the surfaces above.
-Given "curated, self-hosted woff2 list" per the decision, the settings value is realistically a font
-*key* (not an arbitrary string) resolved against a small static font-registry module that also owns the
-`@font-face` declarations for the self-hosted files — this registry is itself new infrastructure this
-milestone must create (no equivalent exists today; nothing in this codebase currently ships any custom
-web font).
-
-**Print is a real fourth consumer, not an afterthought.** `ServicePrintLayout.vue` is Order-of-Service
-text (song/scripture/prayer/message rows), not currently slide-shaped — if "every slide" for typography
-purposes is meant to include the printed order of service, that's a fifth surface;if it's scoped to
-slide-shaped content only (grid/drawer/presenter), print is out of scope for this item specifically. This
-research did not find text in PROJECT.md resolving that ambiguity — flag it for the phase plan.
-
-## 8. Mobile responsiveness
-
-### The Schedule screen's existing pattern is real, working code — this is the class string to copy
-
-Despite its route being `/schedule` and its label "Schedule" in `AppSidebar.vue:119` (there is no
-`ScheduleView.vue` file — the page is `src/views/QuarterView.vue`), the owner's "Schedule screen" refers
-to `QuarterView.vue`. Its header button row (`QuarterView.vue:13`) is:
-
-```html
-<div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-end gap-2 w-full sm:w-auto
-     [&>*]:w-full sm:[&>*]:w-auto [&>*]:justify-center sm:[&>*]:justify-start">
+# Architecture Research: Volunteer Messaging & Notifications (v1.7)
+
+**Domain:** Integration of a new messaging/notifications subsystem into an existing Vue 3 + Firebase (Firestore/Auth/Functions) worship-planning SPA
+**Researched:** 2026-08-13
+**Confidence:** HIGH — every recommendation below is anchored to a real, currently-shipping file in this codebase (cited by path), not a generic pattern. The two genuinely new decisions (email provider choice, exact SLIDES-diff fingerprinting) are flagged explicitly as open questions rather than asserted.
+
+This is an **integration** research file, not a greenfield stack pick — v1.7 has zero net-new architectural primitives to invent. Every seam below reuses a pattern this codebase already ships: org-scoped subcollections, a Pinia store owning `onSnapshot` + guarded writes, an `onCall`/`onRequest`/`onSchedule` Cloud Function triad, and a single-choke-point feature toggle. The work is wiring, not architecture.
+
+## Standard Architecture
+
+### System Overview
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│ CLIENT (Vue 3 SPA)                                                        │
+│                                                                            │
+│  ServiceEditorView.vue                                                    │
+│   ├─ action bar: NEW "✉ Messages" button ─────► MessageComposer.vue (new)│
+│   │                                               reads: messagingRecip-  │
+│   │                                               ients.ts (new, pure)    │
+│   │                                               + rosterStore + quarters│
+│   │                                               store (existing)        │
+│   │                                               writes: services/{id}/  │
+│   │                                               messages/{msgId} via    │
+│   │                                               queueServiceMessage()   │
+│   │                                               callable                │
+│   │                                                                       │
+│   ├─ onMarkAsPlanned() (existing, R037 lock)                              │
+│   │    └─► NEW: write lockSnapshots/current (buildServiceSnapshot reuse)  │
+│   │    └─► NEW: first-lock notify prompt → same queue path                │
+│   │    └─► NEW: re-lock → serviceLockDiff.ts (new, pure) → checkable      │
+│   │        diff UI → same queue path, type='relock-notification'         │
+│   │                                                                       │
+│   └─ Delivery history panel (new) — reads messages+recipients subcolls    │
+│                                                                            │
+│  SettingsView.vue — NEW messaging kill-switch + org defaults block        │
+│  (same settings.<field> pattern as aiEnabled/pcEnabled)                   │
+└───────────────────────────┬────────────────────────────────────────────-─┘
+                             │ Firestore (client SDK, rules-gated)
+┌────────────────────────────▼───────────────────────────────────────────-─┐
+│ FIRESTORE  organizations/{orgId}/                                        │
+│   services/{serviceId}                       (existing)                  │
+│     ├─ messages/{messageId}                  NEW — queued/sent record    │
+│     │    └─ recipients/{recipientId}         NEW — per-recipient status  │
+│     └─ lockSnapshots/current                 NEW — re-lock diff baseline │
+│   settings (nested on org doc)               existing + NEW `messaging`  │
+│   people, roles, quarters                    existing (unmodified — READ │
+│                                               ONLY source for recipients)│
+└───────────────────────────┬────────────────────────────────────────────-─┘
+                             │ onDocumentCreated / onDocumentWritten trigger
+┌────────────────────────────▼──────────────────────────────────────────-──┐
+│ CLOUD FUNCTIONS (functions/src/, Admin SDK — bypasses Firestore rules)   │
+│                                                                            │
+│  queueServiceMessage (onCall, NEW)                                       │
+│    — thin: auth + org-membership + kill-switch check, writes the         │
+│      `messages` doc. Mirrors parsePptxHandler's shape exactly.           │
+│                                                                            │
+│  sendQueuedMessage (onDocumentCreated on .../messages/{id}, NEW)          │
+│    — the ONLY place that holds the provider secret and calls it.         │
+│      Re-resolves recipients server-side (never trusts the client list),  │
+│      renders tokens, calls provider, writes recipients/{id} docs,        │
+│      rolls up message status. Mirrors requestPptxRenderHandler's shape.  │
+│                                                                            │
+│  sendScheduledReminders (onSchedule, daily cron, NEW)                     │
+│    — mirrors cleanupExpiredMedia/cleanupOrphanRenders exactly. Scans due  │
+│      services, creates `messages` docs (type='reminder'); does NOT call  │
+│      the provider itself — sendQueuedMessage's trigger does that, so     │
+│      there is exactly one send code path for every trigger type.         │
+│                                                                            │
+│  messageWebhook (onRequest, NEW, HMAC-verified, no Firebase Auth)         │
+│    — provider bounce/delivery callback. Updates recipients/{id}.status   │
+│      and rolls up messages/{id} delivery counters.                       │
+└────────────────────────────────────────────────────────────────────────-─┘
+                             │ HTTPS (secret held server-side only)
+                    ┌────────▼─────────┐
+                    │  Email provider   │  (owner-approved, chosen by STACK
+                    │  (SMTP/HTTP API)  │  research — out of scope here)
+                    └───────────────────┘
 ```
 
-This is a complete, working mobile-stacking recipe: `flex-col` (stacked, full-width buttons) below the
-`sm` breakpoint, `flex-row flex-wrap` (inline, auto-width, wrapping) at `sm`+, using Tailwind's arbitrary
-child-selector variants (`[&>*]:...`) to force every direct-child button to full-width-and-centered on
-mobile without touching each button's own class list. This is directly reusable verbatim on
-`ServiceEditorView.vue`'s equivalent button rows.
+### Component Responsibilities
 
-### What's structurally in the way on `ServiceEditorView.vue` today
+| Component | Responsibility | New or modified |
+|-----------|-----------------|------------------|
+| `src/utils/messagingRecipients.ts` | Pure: team(RoleGroup)→recipient resolution, dedup, unreachable-count, "Reaches N" | **New** |
+| `src/utils/serviceLockDiff.ts` | Pure: diff two `ServiceSnapshot`s into typed `ChangeEntry[]` tagged with affected teams | **New** |
+| `src/components/MessageComposer.vue` | Composer modal/drawer: teams-first recipients, message type, tokens, schedule | **New** |
+| `src/views/ServiceEditorView.vue` | Hosts the ✉ Messages action-bar entry; hooks lock/re-lock notify prompts into `onMarkAsPlanned` | **Modified** |
+| `src/stores/services.ts` | `buildServiceSnapshot` reused verbatim for lock snapshots; new `lockAndMaybeNotify()`/`setMessagingDefaults()` actions | **Modified** |
+| `src/stores/messages.ts` (or folded into `services.ts`) | Subscribes to `messages`/`recipients` for the delivery-history panel | **New** |
+| `src/types/organization.ts` | `OrgSettings.messaging` block + `DEFAULT_ORG_SETTINGS.messaging` | **Modified** |
+| `functions/src/messaging/queueServiceMessage.ts` | Callable: validate + write queued `messages` doc | **New** |
+| `functions/src/messaging/sendQueuedMessage.ts` | Trigger: authoritative recipient resolution, render, provider call, status rollup | **New** |
+| `functions/src/messaging/sendScheduledReminders.ts` | Cron: scan due services, enqueue reminder messages | **New** |
+| `functions/src/messaging/webhook.ts` | HTTP: provider bounce/delivery callback → recipient status | **New** |
+| `functions/src/serviceRoles.ts` | Server-side port of `src/utils/serviceRoles.ts`'s pure resolver (see Recipient Resolution) | **New** |
+| `firestore.rules` | New `messages`/`recipients`/`lockSnapshots` match blocks under `services/{docId}` | **Modified** |
 
-- The header "Save area" (`ServiceEditorView.vue:96-97`, `<div class="flex items-center gap-3">`) holds
-  Undo, Mark as Planned, and (via `ContextualActionBar.vue`) Save/Suggest/Export — a plain `flex` row
-  with **no responsive stacking at all**, unlike `QuarterView.vue`'s header. On a narrow viewport this
-  row will overflow or wrap awkwardly rather than stack.
-- **Print and Share are still at the page bottom**, not in the top contextual action bar — confirmed:
-  `ServiceEditorView.vue:1315-1364`, a separate `<div class="mt-6 pt-4 ... flex flex-wrap items-center
-  gap-2">` block below the tab content, entirely disconnected from `ContextualActionBar.vue`
-  (`src/components/ContextualActionBar.vue`) which Phase 36 built specifically as "the one shared action
-  bar" (per that file's own doc comment) but which today only carries Save/Suggest/Export/Mark-as-Planned
-  — Print/Share were never migrated into it. Moving them requires: (a) adding `print`/`share`
-  `ActionBarItem`s to `src/views/serviceEditorActionBar.ts` (the `buildActionBarItems` module
-  `ContextualActionBar.vue` already consumes declaratively), and (b) deleting the bottom action block
-  (lines 1315-1364) — Delete stays, per PROJECT.md's target features (only Print/Share move; Undo is
-  demoted to a link, not moved into this bar).
-- **Undo is a full button, not a link**, in the header's Save area (`ServiceEditorView.vue:101-112`) —
-  demoting it per the milestone's target feature is a template/class change at this one site, not a
-  structural one.
-- **The Slides tab** (`SlidesTab.vue`, `SlideGrid.vue`, `SlidePlanRail.vue`) was not independently
-  audited line-by-line for mobile-blocking layout in this pass (out of the explicit `files_to_read`
-  list and beyond this research's time budget) — flag this as an open item for the phase that actually
-  implements mobile support: it should get the same targeted read-before-plan treatment this document
-  gave `ServiceEditorView.vue`'s header/action rows, since "make the Slides tab mobile friendly" is
-  listed as a distinct target feature from the service-edit-screen button stacking.
+## Data Model
 
-### Dashboard "Getting Started" panel — confirmed net-new
+All new collections live **nested under the service they belong to**
+(`organizations/{orgId}/services/{serviceId}/...`), not as org-level siblings of
+`services`. Two reasons, both drawn from precedent already in this codebase:
 
-Grepped `DashboardView.vue` for any existing "Getting Started" content — no match. This is a new,
-self-contained panel (dismissible, presumably via a `localStorage` flag consistent with this
-codebase's client-only-preference conventions — no existing per-user dismissal-flag precedent was found
-in Firestore, and inventing one there would be disproportionate for a UI nicety). Low architectural risk;
-does not depend on any other v1.5 item.
+1. Every "Sent on this service" / "lock snapshot" concept is intrinsically
+   scoped to one service, exactly like `slideGroups` (one doc per slot, but
+   reachable "via the serviceId field," per `firestore.rules:130-186`) — except
+   messaging's ownership is even tighter, so a true nested subcollection (not
+   a field-pointer) is the right shape, matching `songs/{id}/lyrics/{id}`
+   (`firestore.rules:192-199`), the only other **genuinely nested** (two
+   segments under org) precedent in this rules file.
+2. It keeps the **hot list-read path lean**. `ServicesView.vue` and the
+   `services` store's `subscribe()` (`src/stores/services.ts:173-207`) load
+   the *entire* `services` collection for the org on every session — the same
+   reasoning that already kept `slideGroups`, `shareTokens`, and
+   `serviceShareLinks` **out** of the `services` document applies doubly to a
+   growing message history: it must never inflate every row of the services
+   list.
 
-## Suggested build order (dependency-driven, not thematic)
+### `organizations/{orgId}/services/{serviceId}/messages/{messageId}`
 
-1. **`OrgSettings` type + defaults module + `auth.ts` merge-and-load** (Item 1). Every other settings
-   toggle (AI, PC, Bible version, template, font) writes into this shape — build it first or every later
-   phase re-touches `auth.ts`'s load/reset logic piecemeal.
-2. **Org membership → custom claim** (Item 3), independently of Item 1. This is infrastructure
-   (`storage.rules` + one new trigger + a backfill script) with no dependency on settings and no UI
-   surface of its own — safe to parallelize with Item 1, and worth doing early since Item 4's Storage
-   reads inherit its correctness.
-3. **Share link rework** (Item 2) — resolve the R036 conflict explicitly (this research recommends the
-   separate-document option) before writing code; this is a design decision, not just an implementation
-   task, and blocks nothing else in this milestone.
-4. **PPTX rendered-image display** (Item 4) — the single largest, most structurally invasive item
-   (touches `AssemblyInputs`, both `deriveGroupEntries` and `slideshowAssembler.ts`'s IMPORTED
-   branches, `sourceSignature`, and adds a new client-side render-status resolver). Sequence after
-   Item 3 so Storage reads are claim-based rather than inheriting the emulator-blind cross-service check
-   for a brand-new code path.
-5. **Service item types** (Item 5) — mechanically bounded by the compiler for the exhaustive-switch
-   sites; the risk is entirely in the silent-fallthrough sites enumerated above (Planning Center export
-   above all). Independent of Items 1–4; can run in parallel with them.
-6. **Default service template** (Item 6) — depends on Item 1 (needs `OrgSettings` to exist) but is
-   otherwise small and self-contained (one consumption site, `createService`).
-7. **Global slide typography** (Item 7) — depends on Item 1 for where the setting lives; the CSS
-   custom-property seam itself is greenfield and can be built in parallel with most other items once the
-   setting exists to read.
-8. **Congregational reading divider UX, deterministic multi-image ordering, mobile/layout polish**
-   (remaining target features, not deep-dived here per the `files_to_read` scope) — layer in after the
-   structural items above; mobile/layout work in particular benefits from Print/Share already having
-   moved into the contextual action bar (Item 8's own finding) before restyling that bar for small
-   screens.
+```
+type            'oneoff' | 'reminder' | 'share-link' | 'lock-notification' | 'relock-notification'
+status          'queued' | 'scheduled' | 'sending' | 'sent' | 'partial' | 'failed'
+subject         string
+body            string                    // with tokens NOT yet substituted per-recipient;
+                                           // per-recipient substitution (e.g. "their roles")
+                                           // happens in sendQueuedMessage, never stored per-recipient
+recipientSelector {
+  teams: RoleGroup[]                      // 'band' | 'tech' | 'vocals' | 'other' — reuses the
+                                           // EXISTING RoleGroup enum (src/types/roster.ts), not a
+                                           // new "Team" type. UI label remap only ("band"→"Worship",
+                                           // "other"→"Hosts" — see Recipient Resolution).
+  individualPersonIds: string[]
+  includeEveryone: boolean
+}
+options         { attachServiceLink: bool, sendCopyToSelf: bool }
+changeDiff      ChangeEntry[] | null      // present only for type='relock-notification'
+scheduledFor    Timestamp | null          // null = send now
+requestedByUid  string
+createdAt       Timestamp
+sentAt          Timestamp | null
+deliveryCounts  { queued: n, sent: n, bounced: n, failed: n }   // rolled up by
+                                                                  // sendQueuedMessage / webhook
+```
+
+**Why a `body` template rather than a fully-rendered string:** `resolveServiceRoleAssignments`
+already personalizes "their roles" per person (`src/utils/serviceRoles.ts`), and that
+personalization can only be correct **at send time** for a scheduled message (the
+volunteer's assignment may change between compose and send — see Recipient
+Resolution). Storing one template and rendering per-recipient inside
+`sendQueuedMessage` keeps that correctness property; storing N fully-rendered
+bodies up front would either go stale or require re-writing the doc at send
+time anyway.
+
+### `.../messages/{messageId}/recipients/{recipientId}`
+
+```
+personId        string | null   // null for a manually-typed individual recipient, if ever allowed
+email           string
+name            string
+roleNames       string[]        // resolved AT SEND TIME, snapshotted for history
+status          'queued' | 'sent' | 'bounced' | 'failed'
+providerMessageId string | null
+bounceReason    string | null
+sentAt          Timestamp | null
+bouncedAt       Timestamp | null
+```
+
+**Why a subcollection, not an array field on `messages/{messageId}`:** bounce
+webhooks arrive concurrently, out of order, and asynchronously relative to the
+send. A single array field would force read-modify-write races under
+concurrent webhook delivery (the exact hazard `setRoleOverride`'s scoped
+dot-path write already exists in this codebase to avoid —
+`src/stores/services.ts:436-441`). One document per recipient, addressed
+directly by the webhook (see Send Path), makes every bounce update an
+independent, race-free write.
+
+### `.../services/{serviceId}/lockSnapshots/current`
+
+A single doc (not a growing history), overwritten on every successful lock/re-lock:
+
+```
+snapshot                ServiceSnapshot        // buildServiceSnapshot() output, REUSED VERBATIM
+slideGroupsFingerprint  string                  // hash of ordered slide text per group — see
+                                                 // Re-Lock Change Diff, SLIDES gap
+lockedAt                Timestamp
+lockedByUid             string
+```
+
+Reusing `buildServiceSnapshot` (`src/stores/services.ts:104-154`) — already
+the canonical, PII-guarded (D-04/D-24: person **names**, never raw `Person`
+objects with email/phone) serialization of a service for the public share
+link — means the lock-diff snapshot needs **zero new serialization logic**.
+It already resolves song BPM, orders slots section-major, and resolves role
+assignments through the same `resolveServiceRoleAssignments` the messaging
+recipient resolver also uses. One function, three consumers (share link,
+lock snapshot, and indirectly the diff).
+
+### Per-service automatic-email defaults
+
+Live directly on the service document as a small nested object, **not** a
+separate collection — it is always read together with the service and is
+tiny, matching `roleAssignmentOverrides`' existing precedent for
+scoped-dot-path service metadata:
+
+```
+organizations/{orgId}/services/{serviceId}.messaging = {
+  lockNotifyEnabled: boolean | null,   // null = inherit org default
+  reminderEnabled: boolean | null,     // null = inherit
+  reminderDaysBefore: number | null,   // null = inherit
+  reminderSentAt: Timestamp | null,    // idempotency guard, Admin-SDK-written only
+}
+```
+
+Written via a new scoped action, e.g. `setServiceMessagingDefaults(serviceId,
+patch)`, using the same `updateDoc(..., { 'messaging.lockNotifyEnabled':
+value })` dot-path shape as `setRoleOverride`/`clearRoleOverride`
+(`src/stores/services.ts:442-494`) — **not** routed through `updateService`,
+so it is not blocked by the R036 draft-only guard the way ordinary content
+edits are. Recommend keeping it draft-only anyway for v1.7 simplicity (no new
+rules carve-out needed, matches every other service-metadata field's
+lifecycle); flag as an open question if the requirements phase wants it
+editable on a locked service too.
+
+`reminderSentAt` is written only by `sendScheduledReminders` via the Admin
+SDK, which — like `pptxRenders` and `requestPptxRenderHandler`
+(`functions/src/index.ts:225-228`) — **bypasses `firestore.rules` entirely**,
+so it is never subject to the R036 lock guard regardless of the service's
+status. This matters: the reminder must still fire on a **locked** (`planned`)
+service; only `draft` services are skipped, per the milestone's explicit
+"skipped while still a draft" rule.
+
+### Org-level messaging settings + kill switch
+
+Extend `OrgSettings` (`src/types/organization.ts:52-114`) with one new nested
+field, following the **exact** established pattern (`aiEnabled`/`pcEnabled`,
+merged once in `auth.ts::loadOrgContext`, `src/stores/auth.ts:185-221`):
+
+```typescript
+interface OrgSettings {
+  // ...existing fields unchanged...
+  messaging: {
+    enabled: boolean            // the GLOBAL kill switch
+    lockNotifyDefault: boolean
+    reminderEnabled: boolean
+    reminderDaysBefore: number  // default 7
+    fromName?: string
+    replyTo?: string
+  }
+}
+```
+
+**Deliberate deviation from precedent:** `aiEnabled`/`pcEnabled` both default
+`true` (`DEFAULT_ORG_SETTINGS`, `src/types/organization.ts:158-178`) because
+those features work with zero extra configuration. Messaging's kill switch
+should default **`enabled: false`** — a fresh org has no provider configured
+and sending would either silently no-op or (worse) throw from a Function with
+a missing secret. Default-off until the owner has actually set up the
+provider and flips it on in Settings is the safer posture, and mirrors how
+`PPTX_RENDER_SERVICE_URL`'s empty-string default fails closed
+(`functions/src/index.ts:420-437`, `renderServiceUrl === ""` → status
+`"failed"` before any invocation, never a silent no-op).
+
+**Client choke point:** create `src/utils/messaging.ts` with an
+`isMessagingEnabled()` gate reading `useAuthStore().settings.messaging.enabled`,
+mirroring `claudeApi.ts`'s single-entry-point AI gate
+(`src/utils/claudeApi.ts:39-70`) exactly. Every messaging UI surface (the ✉
+button, the lock-notify prompt, the reminder scheduler UI) checks this one
+function, not a scattered `authStore.settings.messaging.enabled` read at each
+call site — same rationale PROJECT.md already records for the AI toggle
+("all three AI surfaces already route through one module — the toggle has
+exactly one place to live").
+
+## Security-Rule Implications
+
+`firestore.rules`' existing generic wildcard
+(`match /{collection}/{docId} { ... }`, lines 261-267) grants org-editor
+read/write to any **single-segment** nested collection directly under
+`organizations/{orgId}/`, with three explicit exclusions (`services`,
+`slideGroups`, `pptxRenders`). It does **not** reach two-segments-deep paths
+like `services/{id}/messages/{id}` at all — those fall through to the
+top-level default-deny (`match /{document=**} { allow read, write: if false }`)
+unless given their **own** explicit block, exactly as `songs/{id}/lyrics/{id}`
+already required its own block (`firestore.rules:192-199`, comment: "the
+catch-all below only matches single-segment subcollections directly under the
+org"). So **no exclusion clause is needed** for the new collections — only
+new, explicit `allow` blocks:
+
+```
+match /services/{docId} {
+  // ...existing block unchanged...
+
+  match /messages/{messageId} {
+    allow read: if isOrgMember(orgId);
+    allow create: if isOrgEditor(orgId);          // queueServiceMessage's write path;
+                                                     // Admin SDK sends (status/deliveryCounts
+                                                     // updates) bypass this entirely.
+    allow update, delete: if false;                 // status transitions are Admin-SDK-only —
+                                                     // mirrors pptxRenders' read-only-for-members
+                                                     // shape (functions/src/index.ts comment at
+                                                     // firestore.rules:202-217).
+
+    match /recipients/{recipientId} {
+      allow read: if isOrgMember(orgId);            // for the delivery-history panel
+      allow write: if false;                        // Admin SDK (sendQueuedMessage, webhook) only
+    }
+  }
+
+  match /lockSnapshots/{snapshotId} {
+    allow read: if isOrgMember(orgId);
+    allow write: if isOrgEditor(orgId);             // client writes this at lock time
+  }
+}
+```
+
+This is a smaller, cleaner rules surface than `pptxRenders` needed, precisely
+because messages/recipients are nested (automatically denied by default)
+rather than single-segment org children (which needed an explicit
+exclusion carved out of the generic wildcard to avoid an editor forging a
+status flip — see `firestore.rules:236-246`). No such carve-out risk exists
+here.
+
+**The webhook Function is the one new genuinely public endpoint.** It cannot
+require a Firebase ID token (the provider calling it isn't a signed-in app
+user) — it must instead verify the provider's HMAC/signature header, exactly
+as `api`'s `SECRET_INJECTED` gate (`functions/src/index.ts:136-144`) verifies
+a Firebase ID token for a different reason (spend protection, not payload
+authenticity). Treat an unverified or malformed signature as a hard reject
+(`401`/`400`) **before** touching Firestore — a forged bounce event could
+otherwise let an attacker mark arbitrary recipients as "bounced" and pollute
+delivery history.
+
+## Send Path
+
+**Recommendation: a thin `onCall` callable that only enqueues, plus a
+Firestore-triggered `onDocumentCreated` that does the actual send.** Not a
+single do-everything callable, and not a client-writes-doc-with-no-callable
+design either.
+
+Why this specific split, not the alternatives:
+
+- **Not** a single synchronous callable that resolves recipients, renders,
+  and calls the provider inline (the way `esv`/`anthropic` proxy through
+  `api` synchronously, `functions/src/index.ts:119-210`). That shape works
+  for a single upstream call with a single caller waiting; a message send is
+  a **batch** operation (N recipients, N potential partial failures) whose
+  natural retry/observability boundary is a Firestore document, not a
+  function invocation that either fully succeeds or the caller has no record
+  of what happened. It also cannot be reused for scheduled sends without
+  duplicating the entire body.
+- **Not** a bare client `setDoc` with no callable in front of it at all —
+  the write must be validated server-side first (kill-switch is actually on,
+  caller is actually an org editor of *this* org, `scheduledFor` isn't
+  absurdly far in the future) before it becomes something a trigger will act
+  on, mirroring `parsePptxHandler`'s "independent org-membership re-check,
+  never trust the client-declared orgId alone"
+  (`functions/src/index.ts:292-301`).
+- **The queue-then-trigger split is not new here** — it is the *exact* shape
+  `parsePptxHandler` → `pptxRenders/{importId}` (status `"pending"`) →
+  `requestPptxRender` (`onDocumentCreated`) already ships
+  (`functions/src/index.ts:247-338, 340-518`). Reusing it means:
+  - **One code path for every trigger type.** Immediate "send now," "schedule
+    for later," the lock-notification, the re-lock notification, and the
+    cron-driven reminder (see Scheduling) all terminate in the *same*
+    `messages` doc shape and the *same* `sendQueuedMessage` trigger. Only one
+    function in the whole feature ever calls the provider or holds its
+    secret — the smallest possible surface for the owner to review on every
+    gated deploy.
+  - **Retries are natural.** A failed send leaves `status: 'failed'` on a
+    real document that a future sweep (mirroring `cleanupOrphanRenders`'s
+    shape, `functions/src/index.ts:628-780`) could retry, rather than a
+    caller that simply got an error and gave up.
+
+`sendQueuedMessage`'s body, mirroring `requestPptxRenderHandler`'s own
+"exported separately from the trigger wrapper so it's directly unit-testable"
+convention (`functions/src/index.ts:371-395`):
+
+1. Load the `messages/{id}` doc + parent service doc (Admin SDK).
+2. **Re-resolve recipients from scratch** — never trust `recipientSelector`'s
+   *intent* as a final email list, only as instructions for who to resolve
+   (teams/individuals/everyone). See Recipient Resolution.
+3. Render `subject`/`body` tokens, personalizing "their roles" per recipient.
+4. Call the provider's send API, capturing its per-recipient message id.
+5. Write one `recipients/{id}` doc per recipient (`status: 'sent'` or
+   `'failed'` if the provider rejected that address outright).
+6. Roll up `deliveryCounts` and flip `messages/{id}.status`.
+
+### Bounce webhook
+
+A dedicated `onRequest` Function (not folded into the existing `api` proxy,
+which is scoped to outbound proxying with Firebase-Auth-gated secret
+injection — a fundamentally different trust boundary). At send time
+(`sendQueuedMessage`), pass `{ orgId, serviceId, messageId, recipientId }` as
+the provider's message metadata/tag field (every mainstream transactional
+provider — Postmark, Resend, SendGrid, SES via SNS — supports an opaque
+metadata/tag payload echoed back on webhook events). The webhook handler then:
+
+1. Verifies the signature (reject fast, before any Firestore read).
+2. Parses the event type (delivered / hard-bounced / soft-bounced — v1.7
+   tracks sent + **hard** bounces only, per the locked decision; a soft
+   bounce should be logged but not surface as a user-facing failure).
+3. Reads `{ orgId, serviceId, messageId, recipientId }` straight out of the
+   echoed metadata — **no `collectionGroup` query needed**, and no risk of a
+   cross-org lookup, because the exact document path is already known.
+4. Writes `recipients/{recipientId}.status` directly (idempotent — a
+   duplicate webhook delivery for the same event is a same-value overwrite).
+5. Increments `messages/{messageId}.deliveryCounts.bounced` via
+   `FieldValue.increment()`, non-blocking to the `200 OK` response (providers
+   retry on non-2xx; the ack must be fast and independent of the rollup
+   write's success).
+
+## Scheduling
+
+**Recommendation: a daily `onSchedule` cron Function, not Cloud Tasks.**
+
+This codebase already ships two daily `onSchedule` jobs —
+`cleanupExpiredMedia` (`functions/src/index.ts:621-626`, `every day 02:00
+UTC`) and `cleanupOrphanRenders` (`functions/src/index.ts:775-780`, `every
+day 03:00 UTC`, deliberately offset by an hour so the two sweeps never
+overlap) — and both establish the exact shape this feature needs: a broad
+`collectionGroup` scan, fail-safe defaults, per-item try/catch so one failure
+never aborts the run, and a handler exported separately from its `onSchedule`
+wrapper for direct unit testing.
+
+`sendScheduledReminders` follows the same shape, offset to its own time slot
+(e.g. `04:00 UTC`):
+
+1. `collectionGroup('services').where('status', 'in', ['planned', 'exported'])`
+   — **never** `draft`, per the milestone's explicit skip rule — bounded to a
+   reasonable lookahead window (e.g. next 30 days) checked in code, not in
+   the query (Firestore can't filter "date minus a per-org/per-service N
+   equals today" server-side, since N varies by org default and per-service
+   override).
+2. For each candidate, resolve `effectiveReminderDaysBefore` = service's
+   `messaging.reminderDaysBefore` ?? org's `settings.messaging.reminderDaysBefore`
+   ?? `7`, and check `service.date - effectiveN === today`.
+3. Skip if `service.messaging.reminderSentAt` is already set (idempotency —
+   same principle as `cleanupExpiredMediaHandler`'s "idempotent by age" note,
+   `functions/src/index.ts:544-546`) or if the org's `messaging.enabled`
+   kill-switch is off.
+4. Create a `messages/{id}` doc (`type: 'reminder'`, teams = everyone
+   assigned) using the **same** doc-creation logic `queueServiceMessage`
+   uses (factor it into a shared `createQueuedMessage()` helper so there is
+   exactly one place that shapes a `messages` doc) — `sendQueuedMessage`'s
+   trigger fires identically regardless of whether a human or the cron job
+   created the doc.
+5. Set `reminderSentAt` on the service doc.
+
+**Why not Cloud Tasks:** Cloud Tasks earns its complexity when timing needs
+sub-day precision (e.g., a specific hour in each recipient's own timezone) or
+when the fan-out is large enough that a single daily scan becomes a
+performance or cost problem. Neither applies: the spec asks for day-granularity
+("N days before, default 7"), and this app's scale (2-3 active planners per
+church, a handful of churches) means a full `collectionGroup` scan across all
+orgs' services is trivially cheap — the same argument that already justified
+`cleanupOrphanRenders` scanning *every* org's `pptxRenders` in one daily pass.
+Introducing Cloud Tasks would mean provisioning a queue, granting new IAM,
+and reasoning about a second scheduling primitive for a feature this
+project's own precedent already solves with `onSchedule` twice over.
+
+## Recipient Resolution
+
+**Team → RoleGroup mapping.** The composer's "teams first" concept
+(Worship / Tech / Vocals / Hosts) is a UI label remap of the **existing**
+`RoleGroup` enum (`'band' | 'tech' | 'vocals' | 'other'`,
+`src/types/roster.ts:3`) — not a new domain concept. `RolesConfigPanel.vue`
+already has a `groupLabels` map (`band: 'Band', tech: 'Tech', vocals:
+'Vocals', other: 'Other'`, line 119) for a different surface; the messaging
+composer needs its **own** label map (`band → 'Worship'`, `other → 'Hosts'`,
+`tech`/`vocals` unchanged) since the copy differs by context — introduce a
+`MESSAGING_TEAM_LABELS` constant rather than repurposing `groupLabels`
+in place (two different UIs are allowed to describe the same enum
+differently; conflating them would make one composer's copy change silently
+ripple into the Roles config screen).
+
+**Building the recipient list — reuse, don't reinvent.**
+`resolveServiceRoleAssignments` (`src/utils/serviceRoles.ts:33-56`) already
+computes, for every role on a service, the `effectivePersonIds` (override ??
+quarter-scheduled ?? `[]`) — this is *already* how `buildServiceSnapshot`
+builds the public share link's role-assignment list
+(`src/stores/services.ts:135-141`). The new
+`src/utils/messagingRecipients.ts` wraps it:
+
+```typescript
+function resolveRecipients(
+  service: Service,
+  quarters: Quarter[],
+  roles: Role[],
+  people: Person[],
+  selection: { teams: RoleGroup[]; individualPersonIds: string[]; includeEveryone: boolean },
+): { reachable: RecipientCandidate[]; unreachableCount: number }
+```
+
+For each `ResolvedRoleAssignment` matching the selection (by `group` or by
+`includeEveryone`), map `effectivePersonIds` through the roster `people` list
+to `{ id, name, email }`, dedupe by person id (a person holding two matching
+roles counts once), and split into `reachable` (non-empty `email`) vs
+`unreachableCount` (assigned but `person.email === ''` — the roster schema
+already permits an empty email string, `src/types/roster.ts:16`). **Surface
+`unreachableCount` in the composer** ("3 people can't be reached — no email
+on file") rather than silently dropping them; an unfilled role
+(`effectivePersonIds = []`) is a different, expected case (0 recipients, no
+warning).
+
+**Client (live "Reaches N") vs server (authoritative) — split by design, not
+an oversight.** The composer's live count runs `resolveRecipients` entirely
+client-side, against whatever the browser currently has loaded in
+`rosterStore`/`quartersStore` — instant, no round trip, matches
+`buildServiceSnapshot`'s already-established pattern of doing this exact kind
+of resolve-and-lookup purely in the browser. But `sendQueuedMessage` (the
+Function) **must independently re-resolve from scratch** using the Admin SDK,
+never trusting the client's `recipientSelector` as anything more than
+*intent* — this is the same "never trust the client-declared value alone,
+independently re-verify" discipline this codebase already applies twice
+(`parsePptxHandler`'s org-membership re-check,
+`functions/src/index.ts:292-301`; `requestPptxRenderHandler`'s independent
+Storage recount rather than trusting the render service's self-report,
+`functions/src/index.ts:457-489`). This is not merely defense-in-depth: for a
+**scheduled** send (a 7-day-out reminder), the roster may genuinely have
+changed between compose time and send time — re-resolving at send time is a
+correctness *feature* (the volunteer swapped in on day 5 gets the reminder,
+not the one who was originally assigned), not a race to guard against.
+
+**Client/server duplication risk — flag, don't solve here.**
+`src/utils/serviceRoles.ts` is *already* pure (its own header comment:
+"No Firestore/Pinia/store imports (types only)... testable without any
+app/store setup," lines 1-4), so porting `resolveServiceRoleAssignments` +
+`findQuarterForDate` into `functions/src/serviceRoles.ts` is a straight copy
+with zero client-SDK rewiring. But it **is** a copy, in a monorepo with no
+shared package between `src/` and `functions/` today (verified: `functions/`
+has its own `package.json`, `tsconfig`, and dependency set, entirely separate
+from the root Vite/Vitest project) — the two files can drift. Treat "keep
+`src/utils/serviceRoles.ts` and `functions/src/serviceRoles.ts` in lockstep"
+as a standing maintenance note for whichever phase ports it (a shared
+workspace package is the durable fix, but is very likely overkill for v1.7's
+first cut and is a reasonable thing to defer).
+
+## Re-Lock Change Diff
+
+**Snapshot at lock time:** call `buildServiceSnapshot(service)`
+(`src/stores/services.ts:104-154`) — already the canonical serialization used
+for share links — and write it to `lockSnapshots/current` (see Data Model)
+the moment `markAsPlanned()` succeeds. Zero new serialization logic.
+
+**Detecting a re-lock vs a first lock:** simply check whether
+`lockSnapshots/current` already exists for this service *before* the
+transition. A first lock has no prior snapshot (no diff, no prompt — the
+"locking" notification is the only relevant one). A re-lock (a service that
+was `planned`, `reopenService()`'d back to `draft`, edited, and now
+`markAsPlanned()`'d again) always has one.
+
+**Computing the diff:** a new pure function,
+`diffServiceSnapshots(previous, current): ChangeEntry[]` in
+`src/utils/serviceLockDiff.ts` (same "pure function in `utils/`" convention
+`serviceRoles.ts`'s own header comment names explicitly), comparing two
+`ServiceSnapshot` objects field by field:
+
+| Diff type | Detection | Default `affectedTeams` |
+|-----------|-----------|--------------------------|
+| SONG | A slot's `songId`/`songTitle` changed, matched by stable slot id | RoleGroups with a non-empty role on the service (broad default — a song change is generally everyone's business) |
+| ORDER | A slot's stable id moved position in the section-ordered array without its content changing | Same broad default |
+| ROLE | A `roleAssignments[i].personNames` changed for a given `roleId` | **Exactly** that role's `RoleGroup` — the one precise, narrow tag |
+| NOTES | `notes` field changed | Broad default |
+| SLIDES | See gap below | Broad default |
+
+**SLIDES is a real gap, not an oversight — flagging for requirements/roadmap.**
+`ServiceSnapshot` does not carry slide content today (slides live in the
+separate `slideGroups` subcollection, deliberately kept out of the snapshot
+to avoid duplicating that data — the same reasoning that keeps `slideGroups`
+out of the `services` document itself). Two ways to close this, neither
+free:
+
+1. Extend `buildServiceSnapshot`/`ServiceSnapshot` to also embed a
+   lightweight per-group fingerprint (e.g., a hash of each group's ordered
+   slide text) — cheap to diff, but is new surface on a function every
+   share-link write already calls, so it must stay genuinely lightweight.
+2. Compute the fingerprint as a **separate** step alongside (not inside)
+   `buildServiceSnapshot`, stored only in `lockSnapshots/current`
+   (`slideGroupsFingerprint`, per the Data Model section) — keeps the
+   share-link path untouched.
+
+Recommend (2): it isolates the new cost to the lock/re-lock path only, which
+already pays for a full snapshot read/write, rather than adding weight to
+every autosave-triggered share-link refresh
+(`maybeRefreshShareLink`, `src/stores/services.ts:682-743`, which calls
+`writeSharePayload`→`buildServiceSnapshot` on *every* edit to a shared
+service).
+
+**Selecting and sending:** the checkable diff UI feeds directly into the same
+`MessageComposer`/`queueServiceMessage` path as any other message
+(`type: 'relock-notification'`, `changeDiff` stored on the doc as an audit
+trail of exactly what was communicated), pre-selecting recipients as the
+union of `affectedTeams` across checked entries, with an explicit
+"notify everyone" override and "Lock quietly" (no message at all) always
+available, per the locked requirement.
+
+**On confirm (send or "Lock quietly"), overwrite `lockSnapshots/current`**
+with the new snapshot — the *next* re-lock diffs against this state, not the
+original lock.
+
+## Build Order
+
+Respecting the stated dependency chain (roster/roles → recipients → send
+path → automatic/lock triggers → scheduling → history/bounces). Roster/roles
+already exist and need **no changes** — every phase below only reads them.
+
+### Phase A — Data model & recipient resolution (foundation, no sending)
+
+- `OrgSettings.messaging` + `DEFAULT_ORG_SETTINGS.messaging` (kill switch OFF
+  by default), merged in `loadOrgContext` per the R073 pattern.
+- `src/utils/messagingRecipients.ts` (pure, client-only) — unit-testable
+  immediately, no Functions involved.
+- `firestore.rules`: add the `messages`/`recipients`/`lockSnapshots` blocks
+  (Security-Rule Implications section) even before any UI writes to them —
+  this codebase has a demonstrated rules-first discipline (Phase 31, Phase
+  40) and a locked-down-by-default nested collection costs nothing to add
+  early.
+
+### Phase B — Composer UI (client-only; send path is a stub)
+
+- New `MessageComposer.vue`, wired into `ServiceEditorView.vue`'s action bar
+  (`buildActionBarItems`).
+- Live "Reaches N" / unreachable-count from Phase A's resolver.
+- `queueServiceMessage` callable exists but is intentionally minimal (auth +
+  kill-switch + write the `messages` doc) — unblocks composer UI development
+  and rules testing in parallel with Phase C.
+
+### Phase C — Send path (provider integration; OWNER-GATED deploy)
+
+- Provider account + secret setup (owner step, per the standing
+  `.env.local`/deploy-gate rule).
+- `sendQueuedMessage` trigger: port `resolveServiceRoleAssignments` server-
+  side, render tokens, call the provider, write `recipients/{id}` docs, roll
+  up `messages/{id}.status`.
+- `messageWebhook` HTTP function + provider-side webhook URL configuration
+  (also an owner step — requires the deployed Function URL).
+- Delivery-history panel on the service, reading `messages`+`recipients`.
+
+*Phases B and C can be built in parallel once Phase A's rules and resolver
+land — B only needs the doc shape, not a working send.*
+
+### Phase D — Lock / re-lock triggers (depends on A + C)
+
+- `lockSnapshots/current` write hooked into the existing `markAsPlanned()`
+  flow (`onMarkAsPlanned`, `ServiceEditorView.vue:2604-2670`).
+- Lock-notification prompt (first lock, no diff) using the org/service
+  messaging defaults.
+- `src/utils/serviceLockDiff.ts` + re-lock checkable diff UI, triggered when
+  `lockSnapshots/current` already exists.
+- Per-service automatic-email defaults toggle (Settings-inherited) — natural
+  to ship alongside the triggers that actually consume it.
+
+### Phase E — Scheduled reminder (depends on C; independent of D)
+
+- `sendScheduledReminders` daily cron, mirroring
+  `cleanupExpiredMedia`/`cleanupOrphanRenders` exactly.
+- Org kill-switch + reminder-days-before UI in Settings (may already exist
+  from Phase A/D's settings surface work — just needs the reminder-specific
+  fields wired to something).
+
+**Total new Functions: 4** (`queueServiceMessage`, `sendQueuedMessage`,
+`sendScheduledReminders`, `messageWebhook`) — comparable in count to the
+Phase 37/40 PPTX-render and org-claims work this codebase has already
+shipped through the same `onCall`/`onDocumentCreated`/`onSchedule` triad,
+plus one new `onRequest` (the webhook) alongside the existing `api` proxy.
+
+## Anti-Patterns to Avoid
+
+### Anti-Pattern 1: Trusting the client's recipient list at send time
+
+**What people do:** have the composer resolve the recipient list and send
+it, along with the compose action, straight to the send Function.
+**Why it's wrong:** the client's `rosterStore`/`quartersStore` state can be
+stale (someone else edited the roster since the composer opened), and for a
+scheduled send it is *guaranteed* to be stale (days elapse). It also opens a
+trivial spoofing vector — a compromised client could ask to email anyone.
+**Instead:** the client's list is a live *estimate* only; `sendQueuedMessage`
+always re-resolves from Firestore via the Admin SDK before sending.
+
+### Anti-Pattern 2: One do-everything callable for send
+
+**What people do:** put recipient resolution, rendering, and the provider
+call all inside a single synchronous `onCall`, reused (via extra parameters)
+for scheduled sends too.
+**Why it's wrong:** couples the UI's request/response cycle to the full
+batch-send latency, gives the cron job nothing to call (it has no client
+waiting for a response), and means every future retry/observability need
+gets bolted onto a function signature instead of living on a document.
+**Instead:** enqueue (callable or cron, both write the same doc shape) →
+one trigger performs the actual send. This is the same shape
+`parsePptxHandler`→`pptxRenders`→`requestPptxRender` already proves out in
+this codebase.
+
+### Anti-Pattern 3: Embedding message history on the `services` document
+
+**What people do:** append sent-message summaries directly onto the service
+doc's own fields, since it's "just a few more fields."
+**Why it's wrong:** the `services` collection is read in full on every
+session (`services.ts:subscribe()`) and on the `ServicesView.vue` list — an
+unbounded, ever-growing message history there inflates every list load for
+every service, forever.
+**Instead:** a nested `messages` subcollection, read only when the delivery
+history panel or the composer for *that specific service* is open.
+
+## Integration Points
+
+### Internal Boundaries
+
+| Boundary | Communication | Notes |
+|----------|---------------|-------|
+| `MessageComposer.vue` ↔ `rosterStore`/`quartersStore` | Direct Pinia read (existing stores, unmodified) | Read-only; messaging never writes roster/quarter data |
+| `MessageComposer.vue` ↔ `messagingRecipients.ts` | Pure function call, no store | Testable without any Firestore mocking |
+| `ServiceEditorView.vue::onMarkAsPlanned` ↔ `services.ts::buildServiceSnapshot` | Direct import, reused verbatim | Zero new serialization logic for lock snapshots |
+| Client ↔ `queueServiceMessage` | `httpsCallable`, mirrors existing `parsePptx` callable usage | Auth token forwarded automatically by the SDK |
+| `sendQueuedMessage` ↔ `functions/src/serviceRoles.ts` | Direct import (ported copy of the client's pure resolver) | Must be kept in lockstep with `src/utils/serviceRoles.ts` — no shared package today |
+| Provider webhook ↔ `messageWebhook` | HTTPS POST, HMAC-signature-verified | No Firebase Auth possible; signature verification is the entire trust boundary |
+| `messageWebhook` ↔ Firestore | Admin SDK, direct doc path from echoed metadata | No `collectionGroup` query needed — path is known from send-time metadata |
+
+### External Services
+
+| Service | Integration Pattern | Notes |
+|---------|---------------------|-------|
+| Email provider (chosen by STACK research) | Server-held API key via Cloud Functions secret (`defineSecret`, mirroring `CLAUDE_API_KEY`/`ESV_API_KEY`), called only from `sendQueuedMessage` | Never shipped to the client bundle — same rule this project already enforces for every other third-party secret (`functions/src/index.ts:13-20`) |
+| Provider bounce webhook | Inbound `onRequest`, HMAC-verified | New unauthenticated (by Firebase Auth) surface — the one genuinely new trust boundary this feature introduces |
+
+## Open Questions for Requirements/Roadmap
+
+- **SLIDES diff fingerprint exact shape** — a hash of ordered slide text per
+  group is proposed above; the requirements phase should confirm whether a
+  coarser "slides changed: yes/no" is sufficient for v1.7 or whether
+  per-slide-group granularity in the diff list is expected.
+- **`affectedTeams` inference for SONG/ORDER/NOTES/SLIDES entries** — this
+  file proposes a broad "every team with an assigned role" default (only
+  ROLE entries get a precise single-team tag); confirm this matches the
+  product's mental model before implementation, since a narrower mapping
+  (e.g. SONG → vocals+band only) is equally defensible and changes the
+  default recipient selection materially.
+- **Per-service messaging defaults on a locked service** — this file
+  recommends draft-only editing for `services/{id}.messaging` (no new rules
+  carve-out needed); confirm whether toggling automatic-email defaults on an
+  already-locked service is actually needed for v1.7.
+- **Email provider choice itself** — deliberately out of scope for this file
+  (STACK research's job); the send-path and webhook design above are written
+  to be provider-agnostic (any provider with an HTTP send API and a
+  metadata-echoing webhook fits this shape — Postmark, Resend, and SendGrid
+  all qualify; a provider without webhook metadata echoing would force the
+  less-clean `collectionGroup` bounce-lookup fallback).
 
 ## Sources
 
-Every file below was read in full or in the cited line ranges during this research pass:
-
-`.planning/PROJECT.md` · `src/stores/services.ts` · `src/types/service.ts` · `src/utils/slotTypes.ts` ·
-`src/views/SettingsView.vue` · `src/components/slides/slideDisplay.ts` · `firestore.rules` ·
-`storage.rules` · `CLAUDE.md` · `src/stores/auth.ts` · `src/types/importedDeck.ts` · `src/types/slide.ts` ·
-`src/types/slideGroup.ts` (partial) · `functions/src/index.ts` (lines 1-130, 130-460, 550-630) ·
-`src/utils/claudeApi.ts` · `src/components/PptxImportModal.vue` · `src/utils/slideGroupMaterializer.ts` ·
-`src/utils/slideshowAssembler.ts` · `src/composables/useSlideshowAssembly.ts` (grep + partial) ·
-`src/stores/importedSlides.ts` · `src/views/ShareView.vue` · `src/components/ServicePrintLayout.vue` ·
-`src/components/ServiceCard.vue` (lines 120-220) · `src/utils/planningCenterApi.ts` (lines 875-1005) ·
-`src/views/ServiceEditorView.vue` (lines 1-140, 800-810, 1190-1200, 1300-1420, 2600-2760, 3160-3420) ·
-`src/views/TeamView.vue` (lines 200-360) · `src/views/QuarterView.vue` (lines 1-35) ·
-`src/components/AppSidebar.vue` (lines 95-135) · `src/components/ContextualActionBar.vue` ·
-`src/components/slides/SlideCard.vue` (lines 1-80) · `src/components/PresentationViewer.vue` (lines 1-120) ·
-`src/assets/main.css` · `src/views/DashboardView.vue` (grep only, no match for existing Getting Started panel)
-
-No web/external research was used for this document — this is a codebase-integration research pass, and
-every claim is traceable to the source files above rather than to general Vue/Firebase ecosystem
-knowledge.
+- `src/stores/services.ts` — `buildServiceSnapshot`, `markAsPlanned`,
+  `reopenService`, `setRoleOverride`/`clearRoleOverride`, `ensureShareLink`,
+  `maybeRefreshShareLink`, `assertWritable`/`ServiceLockedError` (R036 guard)
+- `src/stores/roster.ts`, `src/types/roster.ts` — `Person`, `Role`,
+  `RoleGroup`, `DEFAULT_ROLES`
+- `src/stores/auth.ts` — `loadOrgContext`, `OrgSettings` merge pattern
+- `src/types/organization.ts` — `OrgSettings`, `DEFAULT_ORG_SETTINGS`
+- `src/utils/serviceRoles.ts` — `resolveServiceRoleAssignments`,
+  `findQuarterForDate` (pure resolver, the recipient-resolution foundation)
+- `src/utils/claudeApi.ts` — single-choke-point feature-gate precedent
+- `src/components/RolesConfigPanel.vue` — `groupLabels` (team display-label
+  precedent)
+- `src/views/ServiceEditorView.vue` — `onMarkAsPlanned`, `onReopenRequest`/
+  `runReopen`, `buildActionBarItems`, tab-bar structure
+- `functions/src/index.ts` — `parsePptxHandler`/`parsePptx` (callable
+  precedent), `requestPptxRenderHandler`/`requestPptxRender` (trigger
+  precedent), `cleanupExpiredMedia`/`cleanupOrphanRenders` (cron precedent),
+  `api` (onRequest proxy, secret-injection precedent)
+- `firestore.rules` — `isOrgMember`/`isOrgEditor`, `services/{docId}` block
+  (R036's server-side mirror), `slideGroups`/`songs/lyrics`/`pptxRenders`
+  nested-vs-wildcard precedent
+- `.planning/PROJECT.md` — v1.7 milestone scope, locked decisions
+  (recipients-from-roles, sent+hard-bounce-only, backend send path, owner-
+  gated deploy)
 
 ---
-*Architecture research for: WorshipPlanner v1.5 "Settings, Sharing, and Fidelity"*
-*Researched: 2026-08-06*
+*Architecture research for: WorshipPlanner v1.7 Volunteer Messaging & Notifications*
+*Researched: 2026-08-13*
