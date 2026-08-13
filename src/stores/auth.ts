@@ -209,6 +209,15 @@ export const useAuthStore = defineStore('auth', () => {
       // back to the per-field defaults. `cssVarsFor` already tolerates this
       // at render time, but `SettingsView.vue`'s local refs are initialized
       // directly from this object with no equivalent guard.
+      // messaging (R130/R132/R133, Phase 58) is deep-merged for the same
+      // reason as slideTypography above: the outer `...orgSettings` spread
+      // is shallow, so a partial stored `messaging` object (e.g. only
+      // `{ enabled: true }`) would otherwise leave sibling leaves
+      // (`reminderDaysBefore`, `lockNotifyDefault`, ...) `undefined` rather
+      // than falling back to their per-field defaults. `timezone` needs no
+      // equivalent deep-merge — it's a flat string already covered by the
+      // outer `...orgSettings` spread, same as `bibleVersion`. Brand-new
+      // fields with no legacy flat-field precedent, so no dual-read.
       settings.value = {
         ...DEFAULT_ORG_SETTINGS,
         ...orgSettings,
@@ -216,6 +225,10 @@ export const useAuthStore = defineStore('auth', () => {
         slideTypography: {
           ...DEFAULT_ORG_SETTINGS.slideTypography,
           ...orgSettings.slideTypography,
+        },
+        messaging: {
+          ...DEFAULT_ORG_SETTINGS.messaging,
+          ...orgSettings.messaging,
         },
       }
       vwModeEnabled.value = resolvedVwModeEnabled
