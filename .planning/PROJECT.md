@@ -8,6 +8,41 @@ A worship service planning app for church worship teams that builds weekly servi
 
 Smart weekly service planning that follows the Vertical Worship methodology (1→2→3 song progression) while rotating through the full song stable and respecting team configurations.
 
+## Current Milestone: v1.7 Volunteer Messaging & Notifications
+
+**Goal:** Let planners email the volunteers scheduled on a service — targeted messages to teams or
+individuals, automatic notifications when a service is locked/re-locked (with a scoped change diff),
+and a scheduled "here's the link" reminder — all governed by a global on/off switch in Settings.
+
+**Target features:**
+- **Messages composer** — a ✉ Messages button on the service opens a composer whose recipients are
+  **teams first** (Worship, Tech, Vocals, Hosts, "Everyone on this service"), with individuals added
+  below; message types One-off / Reminder / Share service link; subject + body with insertable tokens
+  (service date, service link, their roles, song list); attach-service-order-link, send-me-a-copy, and
+  schedule-for-later options; a live "Reaches N people" recipient count.
+- **Lock notification** — when a service is locked, optionally email everyone assigned (their roles,
+  the song list, and a link to the service order).
+- **Re-lock change notice** — after editing a locked service and re-locking, prompt to notify with a
+  **scoped diff** of what changed (typed SONG / ORDER / ROLE / NOTES / SLIDES entries, each checkable
+  and tagged with affected teams), sending only to affected teams or to everyone; Lock quietly is
+  always available.
+- **Scheduled share-link reminder** — auto-send the shared service link to everyone assigned N days
+  before the service (default 7), skipped while the service is still a draft.
+- **One-off reminders** — ad-hoc reminder emails to chosen teams/individuals.
+- **Delivery history & status** — a per-service "Sent on this service" log with sent counts and
+  **hard-bounce** surfacing (sent + bounces tracking; open-tracking is out of scope for v1.7).
+- **Email infrastructure** — a provider (chosen by research, owner-approved) wired through a backend
+  send path; provider API key lives in `.env.local` and the send function deploys are **owner-gated**.
+- **Settings kill-switch** — turn messaging off entirely from the main Settings screen; per-service
+  automatic-email defaults inherit from Settings.
+
+**Key context:** Recipients derive from the roles assigned on the service (roster emails from the
+existing Volunteer Role Scheduling / Roles tab) — unassigned roles have no email. Sending mail is a
+backend concern requiring a provider secret in `.env.local` (owner-added) and a Cloud Function deploy
+(owner-gated), consistent with the standing no-deploys / no-`.env.local`-writes rules. Design imported
+from the Claude Design project "Worship Planner Slideshow Design" (canvas *Turn 5 — Messaging
+volunteers*, panels 5a composer / 5b lock + automatic mail + history).
+
 ## Current State
 
 **Shipped:** v1.0 MVP (Phases 1–4, 6–7) · v1.1 (Phases 8–17) · v1.2 Worship Service Slide Management
@@ -15,12 +50,13 @@ Smart weekly service planning that follows the Vertical Worship methodology (1�
 shipped 2026-08-05) · **v1.5 Settings, Sharing, and Fidelity (Phases 39–50, shipped & deployed to
 production 2026-08-10)** — all archived.
 
-**Open:** none — planning the next milestone (`/gsd-new-milestone`). v1.5 delivered per-church settings
-& feature toggles, custom-auth-claim org membership, sharing correctness, PPTX rendered-image display,
-service item types, default service template, ESV/NLT Bible selection, global slide typography,
-congregational reading UX, multi-image/mobile polish, and slide bulk-delete/provenance/render-fidelity.
-Phase 50 was genuinely verified (incl. live R109/R108 in production); Phases 39, 43–49 were
-owner-accepted at milestone close on the basis of the production deploy + real-world use.
+**Open:** v1.7 Volunteer Messaging & Notifications is being scoped (`/gsd-new-milestone`). v1.5
+delivered per-church settings & feature toggles, custom-auth-claim org membership, sharing correctness,
+PPTX rendered-image display, service item types, default service template, ESV/NLT Bible selection,
+global slide typography, congregational reading UX, multi-image/mobile polish, and slide
+bulk-delete/provenance/render-fidelity. Phase 50 was genuinely verified (incl. live R109/R108 in
+production); Phases 39, 43–49 were owner-accepted at milestone close on the basis of the production
+deploy + real-world use.
 
 ### v1.4 shipped on owner acceptance, with two things left genuinely unfinished
 
@@ -152,33 +188,29 @@ for non-technical users — plus item-editing and preview polish.
 
 ### Active
 
-<!-- v1.6 Editing Reliability & Song Slides — scoped 2026-08-11. REQUIREMENTS.md carries the
+<!-- v1.7 Volunteer Messaging & Notifications — scoped 2026-08-13. REQUIREMENTS.md carries the
      REQ-ID-level detail; this section is the narrative summary. -->
 
-**v1.6 — new this milestone**
+**v1.7 — new this milestone**
 
-- [ ] Dragging a service item into a section never creates a phantom duplicate — in the default
-      template editor or the live service plan
-- [ ] Sending an item back to "No Section" via the dropdown saves without error
-- [ ] The Services listing and the share link always show items in the true edit-screen order, even
-      for items with an empty body
-- [ ] The default service template lives on the Services page behind a cog, not in main Settings
-- [ ] "Default to 1,2,3" is renamed "Suggested Template", decoupled from Vertical Worship, and is the
-      starting point for every new service — there is no blank template
-- [ ] Miscellaneous items in the template carry an input box for pre-filled recurring content
-- [ ] Any song item can be split into multiple slides with manual line assignment, and Duplicate
-      copies the whole split unit together
-- [ ] Pre-Chorus exists as a song lyric item type
-- [ ] Song sections are numbered by position (3rd verse = "Verse 3"); a split section keeps its number
-- [ ] A brand-new song's "Replace Lyrics" button reads "Save"
-- [ ] Each service item has a notes field beside its selector for who leads / who sings what,
-      responsive on mobile
-- [ ] Miscellaneous items default to no slides
-- [ ] The slideshow preview no longer auto-appends the Bible version
-- [ ] The Planning Center export shows a spinner while working
-- [ ] Roboto is available as a self-hosted slide font (Inter already ships)
+- [ ] A ✉ Messages button on a service opens a composer whose recipients are teams first
+      (Worship/Tech/Vocals/Hosts/Everyone), with individuals added below
+- [ ] Compose a One-off message, a Reminder, or a Share-service-link message with subject, body, and
+      insertable tokens (service date, link, their roles, song list)
+- [ ] Composer shows a live "Reaches N people" count and options to attach the service-order link,
+      send me a copy, and schedule for later
+- [ ] Locking a service can automatically email everyone assigned (roles, song list, service link)
+- [ ] Re-locking an edited service prompts to notify with a scoped, checkable change diff and sends
+      only to affected teams or to everyone; Lock quietly is always available
+- [ ] The shared service link auto-sends to everyone assigned N days before the service (default 7),
+      skipped while still a draft
+- [ ] A per-service delivery history logs sent messages and surfaces hard bounces
+- [ ] Messaging can be turned off entirely from the main Settings screen; per-service automatic-email
+      defaults inherit from Settings
+- [ ] Email sends through an owner-approved provider via a backend send path (provider key in
+      `.env.local`, deploy owner-gated)
 
-**Carried forward / backlog (not v1.6 scope unless promoted)**
+**Carried forward / backlog (not v1.7 scope unless promoted)**
 
 - [ ] Confirm the production draft lock by hand and deploy `firestore.rules` (backlog 999.3 — the
       deploy is the owner's step)
@@ -287,6 +319,10 @@ Administrative, Communication, Rehearsal, Service time, Training, Physical setup
 | AI gated at the `claudeApi.ts` choke point | All three AI surfaces (song suggestions, scripture discovery, congregational split) already route through one module — the toggle has exactly one place to live, and it doubles as the future paywall seam | — Pending (v1.5) |
 | Blank service template eliminated | Every new service now starts from the org's Suggested Template; a blank starting point was a dead default nobody wanted | — Pending (v1.6) |
 | A split song section is one logical unit | The slides that make up a split section duplicate together and keep one position-based number, so a non-technical user never sees the split leak into numbering or duplication | — Pending (v1.6) |
+| Messaging recipients derive from assigned service roles | Volunteers are already staffed onto a service via the Roles tab with roster emails; teams (Worship/Tech/…) are role groupings, so the composer reuses that data rather than a second contact list — unassigned roles simply have no email | — Pending (v1.7) |
+| v1.7 tracks sent + hard bounces, not opens | Bounce surfacing (via a provider webhook) is what actually prevents silently-lost mail; open-tracking adds pixels/webhook complexity and privacy questions for little planning value — deferred | — Pending (v1.7) |
+| Email provider chosen by research, owner-approved | Provider selection is a cost + deliverability + Firebase-fit decision with a real recurring bill and a secret the owner must add to `.env.local`; the research pass surfaces options and the owner picks | — Pending (v1.7) |
+| Send path is a backend Cloud Function, deploy owner-gated | Provider API keys cannot ship to the client; mail sends through Firebase Functions holding the secret, and per the standing grant every such deploy is handed to the owner, not run autonomously | — Pending (v1.7) |
 
 ## Evolution
 
@@ -306,4 +342,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-12 after v1.6 (Editing Reliability & Song Slides) shipped to production. Next: `/gsd-new-milestone`.*
+*Last updated: 2026-08-13 — v1.7 (Volunteer Messaging & Notifications) scoped via `/gsd-new-milestone`. Next: research → requirements → roadmap.*

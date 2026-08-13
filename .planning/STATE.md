@@ -1,20 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.6
-milestone_name: Editing Reliability & Song Slides
-status: Awaiting next milestone
-stopped_at: Completed quick task 260812-khb (Songs import buttons rename/PC-gate + permanent hidden-song delete)
-last_updated: "2026-08-12T18:55:00.000Z"
-last_activity: 2026-08-12
-last_activity_desc: Milestone v1.6 completed and archived
+milestone: v1.7
+milestone_name: Volunteer Messaging & Notifications
+status: planning
+last_updated: "2026-08-13T18:29:53.706Z"
+last_activity: 2026-08-13
 progress:
-  total_phases: 7
-  completed_phases: 7
-  total_plans: 19
-  completed_plans: 19
-  percent: 100
-current_phase: 55
-current_phase_name: preview-export-polish
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -203,10 +199,10 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: Milestone v1.6 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-08-12 — Milestone v1.6 completed and archived
+Status: Defining requirements
+Last activity: 2026-08-13 — Milestone v1.7 started
 
 ## ⏸ RESUME HERE (2026-08-11 — v1.6 ROADMAP.md created, ready to plan Phase 51)
 
