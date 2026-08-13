@@ -15,10 +15,81 @@ progress:
 
 # Project State
 
-## ★★ STANDING AUTONOMY GRANT — v1.6, granted 2026-08-11
+## ★★ STANDING AUTONOMY GRANT — v1.7, granted 2026-08-13
 
-**This is the ACTIVE grant. It supersedes the v1.5 grant of 2026-08-06 (now historical, preserved
+**This is the ACTIVE grant. It supersedes the v1.6 grant of 2026-08-11 (now historical, preserved
 below).** Re-read this before deciding to stop for a checkpoint — it survives context compaction.
+
+Owner request: run `/gsd-autonomous` for milestone v1.7 (Volunteer Messaging & Notifications).
+Boundaries settled by explicit question and answer at launch, 2026-08-13.
+
+### What this authorizes
+
+- **Do not block on human-verify checkpoints.** When a phase's verification is `human_needed`, record
+  each unmet check as DEFERRED in `.planning/PENDING-VERIFICATION.md` and continue to the next phase.
+  Owner's choice: "Defer & keep going."
+
+- Proceed through all 5 v1.7 phases (58–62) without pausing for approval on ordinary implementation
+  decisions. Run default smart-discuss, pick the reasonable default for each grey area, state it, keep
+  moving.
+
+- **Build the deploy-gated send phases against mocked email.** Phases 59 (send path), 60 (bounce
+  webhook), and 61 (lock/scheduled cron) build and unit-test with the Resend SDK / webhook signature
+  **mocked** — exactly how v1.5's custom-claims / NLT-proxy deploy-gated work shipped. Each Cloud
+  Function lands **built, tested, and UNDEPLOYED**, with the exact `firebase deploy --only functions:…`
+  command handed to the owner. Owner's choice at launch: "Build all 5 now against mocked email."
+
+### What this does NOT authorize
+
+- **Never record a deferred check as passed.** Defer and disclose, not self-approve.
+
+- **STOP BEFORE THE MILESTONE LIFECYCLE.** Because human verification is being deferred, do NOT run
+  audit → complete → cleanup at the end. Archiving phases whose checks were deferred is self-approval by
+  another name (the documented v1.4/v1.5/v1.6 lesson). When all 5 phases are code-complete, STOP and
+  hand the owner the `/gsd-verify-work` list. The owner runs the lifecycle after verifying + deploying.
+  Owner's explicit choice at launch: "Stop before lifecycle + hand over verify list."
+
+- **NO DEPLOYS without an explicit owner ask.** v1.7 has three deploy-gated phases (59, 60, 61). Every
+  deployable artifact — the `queueServiceMessage`/`sendQueuedMessage` send Functions, the `messageWebhook`
+  HTTP receiver, the `sendScheduledReminders` cron, and any `firestore.rules` change (Phase 58 onward) —
+  ships built/tested/undeployed with the exact command handed over. Do NOT deploy to "prove it works";
+  build the mock/emulator evidence instead.
+
+- **No `.env.local` changes** — it holds live secrets and is gitignored. `RESEND_API_KEY` and
+  `RESEND_WEBHOOK_SECRET` are needed for real sends; the OWNER adds them via
+  `firebase functions:secrets:set` and their local `.env.local`. Never write that file. The owner also
+  owns the Resend account creation and the domain SPF/DKIM/DMARC DNS records.
+
+- **No destructive or irreversible actions** without asking: no `git stash` (multi-worktree repo), no
+  project-wide `lint --fix`, no history rewrites, no bulk deletions of tracked files beyond what a plan
+  explicitly scopes.
+
+- **Stop and ask** only when proceeding under an assumption would be unsafe or would waste the work if
+  the assumption is wrong. Otherwise pick the reasonable default, state it, and continue.
+
+### Rules-testing discipline (carried from v1.5, applies to Phase 58's firestore.rules)
+
+Every phase touching `firestore.rules` carries a positive (allow-case) test that actually runs against
+the real emulator, not merely a deny-case pass — non-negotiable per CLAUDE.md's documented incident
+(a deny-everyone `storage.rules` shipped behind an all-deny suite for a whole milestone).
+
+### The bounce webhook is a new unauthenticated trust boundary
+
+Phase 60's `messageWebhook` (onRequest) must verify the provider HMAC signature over the raw request
+body before any Firestore write. Treat it with the same rules-first discipline as the security work in
+v1.5 — a forgeable webhook is a live write hole.
+
+### Where deferred items go
+
+`.planning/PENDING-VERIFICATION.md` — one running list across all v1.7 phases, written as the owner's
+to-do for when they return.
+
+---
+
+<details>
+<summary>Historical — the v1.6 grant of 2026-08-11 (superseded by v1.7 above, kept for provenance)</summary>
+
+## ★★ STANDING AUTONOMY GRANT — v1.6, granted 2026-08-11
 
 Owner request: run `/gsd-autonomous` for milestone v1.6. Boundaries settled by explicit question and
 answer at launch, 2026-08-11.
@@ -179,6 +250,8 @@ literally can't work because of outstanding issues that must have answers, or un
 Authorized deferring human-verify checkpoints through Phases 31 → 37; prohibited deploys,
 `.env.local` changes, destructive actions, and recording any deferred check as passed. Its deploy
 prohibition and its never-self-approve rule are both carried forward above.
+
+</details>
 
 </details>
 
