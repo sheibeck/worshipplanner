@@ -493,6 +493,57 @@ export const useServiceStore = defineStore('services', () => {
     await maybeRefreshShareLink(serviceId, { roleAssignmentOverrides: nextOverrides })
   }
 
+  // Scoped dot-path write — writes ONLY the changed messaging.<key> leaves,
+  // never the whole `messaging` map, mirroring setRoleOverride/
+  // clearRoleOverride's roleAssignmentOverrides.${roleId} idiom immediately
+  // above (D-01 precedent). A `null` leaf means "inherit the org-level
+  // OrgSettings.messaging default" (Service.messaging?'s documented
+  // contract in src/types/service.ts). Deliberately NOT hooked into
+  // maybeRefreshShareLink — messaging overrides are an admin-only per-
+  // service setting, never rendered into buildServiceSnapshot's public
+  // ShareView payload, so there is nothing to refresh.
+  async function setServiceMessagingDefaults(
+    serviceId: string,
+    patch: Partial<{
+      lockNotifyEnabled: boolean | null
+      reminderEnabled: boolean | null
+      reminderDaysBefore: number | null
+    }>,
+  ): Promise<void> {
+    if (!orgId.value) return
+    // ★ R036 — this action does NOT go through updateService. It carries its
+    // own updateDoc, so without its own guard the store layer would not
+    // cover it at all. The scoped dot-path surfaces in affectedKeys() as the
+    // top-level `messaging`, which appears in no rules carve-out, so the
+    // server denies it on a locked service — this makes that refusal local
+    // and legible (58-PATTERNS.md).
+    const stored = storedStatusOf(serviceId)
+    if (stored !== 'draft') {
+      throw new ServiceLockedError(serviceId, stored, 'set messaging defaults on')
+    }
+    const updates: Record<string, unknown> = { updatedAt: serverTimestamp() }
+    for (const [key, value] of Object.entries(patch)) {
+      updates[`messaging.${key}`] = value
+    }
+    await updateDoc(doc(db, 'organizations', orgId.value, 'services', serviceId), updates)
+    // Mirror the applied patch into the local services.value entry, same
+    // pattern as setRoleOverride's local mirror above — so a read-only
+    // summary line or a follow-up select reflects the write immediately,
+    // without waiting on the onSnapshot round trip (the mocked firestore
+    // module in the unit suite never fires onSnapshot at all).
+    const service = services.value.find((s) => s.id === serviceId)
+    if (service) {
+      service.messaging = {
+        lockNotifyEnabled: null,
+        reminderEnabled: null,
+        reminderDaysBefore: null,
+        reminderSentAt: null,
+        ...service.messaging,
+        ...patch,
+      }
+    }
+  }
+
   // R076/R078 (41-03) — resolved once per Pinia instance, so a fresh store
   // (and so each test) gets a fresh cache. A stored string is the resolved
   // token for that service; `false` means "known to have no share link this
@@ -759,6 +810,7 @@ export const useServiceStore = defineStore('services', () => {
     clearSongFromSlot,
     setRoleOverride,
     clearRoleOverride,
+    setServiceMessagingDefaults,
     createShareToken,
     ensureShareLink,
   }
