@@ -125,6 +125,44 @@ service cloud.firestore {
           || (request.resource.data.status == 'draft'
               && keys().hasOnly(['status','updatedAt']))
         );
+
+        // Messages — the queue of volunteer notifications for this service (R130).
+        // No client code writes this collection yet (Phase 58); the Admin SDK
+        // (a Phase 59+ Cloud Function) is the intended sole owner of the send
+        // lifecycle. Nested one level deeper inside it: recipients.
+        //
+        // read is member-tier (mirrors pptxRenders/services); create is
+        // editor-tier so an editor can queue a message. update/delete are
+        // unconditionally denied — status transitions (queued -> sending ->
+        // sent, delivery counts) are Admin-SDK-only, so no client, editor or
+        // not, can forge a "sent" status. Proven by src/rules.test.ts's
+        // messages describe block (genuine ALLOW-case + Admin-SDK-only
+        // DENY-cases against the full nested path).
+        match /messages/{messageId} {
+          allow read:   if isOrgMember(orgId);
+          allow create: if isOrgEditor(orgId);
+          allow update, delete: if false;
+
+          // Recipients — per-recipient delivery status for a message.
+          // Admin-SDK-only end to end: even the editor who created the parent
+          // message cannot write here. Only isOrgMember read is granted so
+          // the UI can show delivery status once the Admin SDK populates it.
+          match /recipients/{recipientId} {
+            allow read:  if isOrgMember(orgId);
+            allow write: if false;
+          }
+        }
+
+        // Lock snapshots — captured at service-lock time (R132), unlike
+        // pptxRenders/messages this IS client-writable: an org editor writes
+        // the snapshot directly when locking a service (Phase 61). Member
+        // read, editor write, both scoped to this org via isOrgMember/
+        // isOrgEditor resolving orgId from the path segment (no client field
+        // trusted), so cross-org access is structurally impossible.
+        match /lockSnapshots/{snapshotId} {
+          allow read:  if isOrgMember(orgId);
+          allow write: if isOrgEditor(orgId);
+        }
       }
 
       // Slide groups — one doc per slot (doc id IS the slot id), so the parent
