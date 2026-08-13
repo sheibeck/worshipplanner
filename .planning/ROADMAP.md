@@ -259,12 +259,12 @@ until later phases add real sends.
   5. The new `messages`/`recipients`/`lockSnapshots` collections are denied by default in
      `firestore.rules`, proven by an emulator test suite that includes a genuine allow-case, not only
      deny-cases.
-**Plans**: 3/5 plans executed
+**Plans**: 4/5 plans executed
 
   - [x] 58-01-PLAN.md — Data model, settings merge & messaging kill-switch gate (R130/R132/R133)
   - [x] 58-02-PLAN.md — Pure recipient resolver: teams, dedup, unreachable count (R134/R135)
   - [x] 58-03-PLAN.md — firestore.rules messages/recipients/lockSnapshots + emulator ALLOW/deny tests
-  - [ ] 58-04-PLAN.md — Settings "Messaging" card: kill-switch, org defaults, timezone (R130/R132/R133)
+  - [x] 58-04-PLAN.md — Settings "Messaging" card: kill-switch, org defaults, timezone (R130/R132/R133)
   - [ ] 58-05-PLAN.md — Per-service messaging defaults: store action + Service Order panel (R132)
 
 **UI hint**: yes
