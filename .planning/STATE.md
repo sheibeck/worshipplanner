@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v1.7
 milestone_name: Volunteer Messaging & Notifications
 status: planning
-last_updated: "2026-08-13T18:29:53.706Z"
+last_updated: "2026-08-13T19:45:00.000Z"
 last_activity: 2026-08-13
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -189,7 +189,7 @@ prohibition and its never-self-approve rule are both carried forward above.
 See: .planning/PROJECT.md (updated 2026-08-06)
 
 **Core value:** Smart weekly service planning following the Vertical Worship 1-2-3 methodology while rotating through the full song stable and respecting team configurations
-**Current focus:** Phase 57 — template-editor-ux-parity (last of the 2026-08-12 owner scope addition, 56–57)
+**Current focus:** Phase 58 — messaging-infrastructure-settings-recipient-resolution (v1.7 ROADMAP.md created 2026-08-13, ready to plan)
 
 > **Historical note (2026-07-25 v1.2 → v1.3 handoff) — OBSOLETE.** A note here formerly explained why
 > v1.2 was deliberately left un-archived to preserve `/gsd-verify-work` resume paths. Both v1.2 and
@@ -199,12 +199,93 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 58 — Messaging Infrastructure, Settings & Recipient Resolution (not yet planned)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-08-13 — Milestone v1.7 started
+Status: Roadmap created; ready to plan
+Last activity: 2026-08-13 — v1.7 ROADMAP.md created (Phases 58-62, 19/19 requirements mapped)
 
-## ⏸ RESUME HERE (2026-08-11 — v1.6 ROADMAP.md created, ready to plan Phase 51)
+## ⏸ RESUME HERE (2026-08-13 — v1.7 ROADMAP.md created, ready to plan Phase 58)
+
+**`.planning/ROADMAP.md` and `.planning/REQUIREMENTS.md` traceability are filled for v1.7** (Phases
+58-62, 19/19 requirements R130-R148 mapped, 0 unmapped). No plan has been created yet — the milestone
+is at the roadmap-created, not-yet-planned stage.
+
+**Next step:** `/gsd-plan-phase 58` (optionally preceded by `/gsd-discuss-phase 58`). Phase 58
+(Messaging Infrastructure, Settings & Recipient Resolution — R130, R132, R133, R134, R135) is FIRST per
+the research backbone: the Settings kill-switch, org timezone, per-service messaging defaults, and the
+one shared recipient resolver must all exist — locked down by `firestore.rules` from commit one —
+before any send surface (composer, lock, re-lock, scheduled reminder) is built on top of them. This
+phase ships no send capability; it is deliberately inert until Phase 59 adds the send primitive.
+
+See `.planning/ROADMAP.md` § Phase Details for the full phase table, dependencies, and success
+criteria.
+
+## ★ v1.7 ROADMAP.md phase breakdown (created 2026-08-13)
+
+5 phases (58-62), derived from `research/SUMMARY.md`'s 7-phase backbone (provider infra+settings →
+shared resolver → composer+send → delivery history+webhook → lock/re-lock triggers → scheduled reminder
+→ re-lock diff) with this project's `coarse` granularity setting applied. **Numbering continues from
+v1.6, which ended at Phase 57** — v1.7 starts at Phase 58, not reset.
+
+| Phase | Goal | Requirements | UI hint |
+|-------|------|--------------|---------|
+| 58 Messaging Infrastructure, Settings & Recipient Resolution | Kill switch, org timezone, per-service messaging defaults, and one shared recipient resolver — no sends yet | R130, R132, R133, R134, R135 | yes |
+| 59 Messages Composer & Send Path | ✉ Messages composer + the queue-then-trigger send primitive; provider key confined to one Function | R131, R136-R141 | yes |
+| 60 Delivery History & Bounce Webhook | Per-service sent history; HMAC-verified hard-bounce surfacing | R142, R143 | yes |
+| 61 Automatic Notifications — Lock & Scheduled Reminder | Auto-email on first lock; auto-send the share link N days before the service | R144, R145 | yes |
+| 62 Re-lock Change Notice — Scoped Diff | Checkable, team-tagged change diff on re-lock, or Lock quietly | R146, R147, R148 | yes |
+
+**Departures from the research default, recorded explicitly per the roadmapper's instructions:**
+
+- **Merged research's Phase 1 (provider infra & settings) and Phase 2 (shared recipient resolver) into
+  Phase 58.** Both are foundation-only, no-sending phases; the resolver alone (R134/R135) reads as a
+  task rather than an observable outcome under `coarse`. R132 (per-service messaging defaults) and
+  R133 (org timezone) were folded in too — both are pure settings/data-model work, testable the moment
+  the Settings UI exists, with no send path required.
+- **Kept Phase 59 (composer+send) and Phase 60 (delivery+webhook) separate**, despite both being
+  deploy-gated — the bounce webhook is flagged by every research pass as a genuinely new unauthenticated
+  trust boundary that earns its own explicit HMAC-verification success criterion.
+- **Merged research's Phase 5 (lock notification) and Phase 6 (scheduled reminder) into Phase 61** —
+  both single-requirement automatic-trigger phases, explicitly noted by research as independent of each
+  other and able to land in either order.
+- **Kept research's Phase 7 (re-lock scoped diff) as its own phase, last, unmerged** — unanimous across
+  all four research files as the highest-complexity, most novel piece; the one hard sequencing
+  constraint that overrides `coarse` compression.
+
+**Hard sequencing constraints, all grounded in research:**
+
+- Phase 59 depends on Phase 58 (resolver + rules + kill-switch must exist before any send surface).
+- Phase 60 depends on Phase 59 (delivery history reads the `messages`/`recipients` doc shape and
+  provider message-id Phase 59 establishes).
+- Phase 61 depends on Phase 58 + Phase 59 (consumes the resolver and the send primitive).
+- Phase 62 depends on Phase 58 + Phase 59 + Phase 61 — the lock-snapshot mechanism (Phase 61) must exist
+  before there is anything to diff against.
+
+**Deploy-gated phases** — per the standing autonomy grant, every deployable artifact ships built,
+tested, and undeployed, with the exact command handed to the owner:
+
+- **Phase 58** — `firestore.rules` additions for `messages`/`recipients`/`lockSnapshots`.
+- **Phase 59** — `queueServiceMessage` + `sendQueuedMessage` Cloud Functions, plus the owner's Resend
+  account creation and domain SPF/DKIM/DMARC DNS setup.
+- **Phase 60** — `messageWebhook` Cloud Function, plus configuring the webhook URL in the Resend
+  dashboard.
+- **Phase 61** — `sendScheduledReminders` Cloud Function (daily cron).
+- **Phase 62** — no new Function; reuses Phase 59's send primitive and Phase 58's `lockSnapshots` rules.
+
+**Rules-testing discipline mandate** — Phase 58 (and any later phase touching `firestore.rules`)
+carries a success criterion requiring a positive (allow-case) test against the real emulator, not merely
+a deny-case pass — per CLAUDE.md's documented `storage.rules` incident.
+
+**Deferred design decisions**, not blocking the roadmap, to resolve at phase discussion:
+
+- SLIDES-diff fingerprint granularity (Phase 62) — confirm at `/gsd-discuss-phase 62`.
+- Provider account + domain SPF/DKIM/DMARC DNS work (Phase 59) — confirm at `/gsd-discuss-phase 59`,
+  depends on whether the church domain DNS is self-managed.
+
+Full phase table, success criteria, and per-phase notes: `.planning/ROADMAP.md`. Traceability:
+`.planning/REQUIREMENTS.md` (19/19 mapped, 0 unmapped).
+
+## Historical — v1.6 RESUME HERE (2026-08-11 — SUPERSEDED; v1.6 shipped 2026-08-12, see the v1.7 RESUME HERE above)
 
 **`.planning/ROADMAP.md` and `.planning/REQUIREMENTS.md` traceability are filled for v1.6** (Phases
 51–55, 17/17 requirements R110–R126 mapped, 0 unmapped). No plan has been created yet — the milestone

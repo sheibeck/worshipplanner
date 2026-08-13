@@ -111,12 +111,12 @@ Explicitly excluded. Documented to prevent scope creep.
 
 Not blocking scope, but flagged by research for the phase that owns them:
 
-- **SLIDES-diff fingerprint granularity** (Re-lock phase) — coarse "slides changed" vs per-slide-group
-  hash. ARCHITECTURE proposes a lightweight per-group text-hash on the lock snapshot; confirm at
-  `/gsd-discuss-phase` for the re-lock phase.
-- **Provider account + domain auth (SPF/DKIM/DMARC)** (Infrastructure phase) — owner DNS work that must
-  complete before any "it sends to the inbox" claim; depends on whether the church domain DNS is
-  self-managed.
+- **SLIDES-diff fingerprint granularity** (Phase 62, Re-lock Change Notice) — coarse "slides changed"
+  vs per-slide-group hash. ARCHITECTURE proposes a lightweight per-group text-hash on the lock
+  snapshot; confirm at `/gsd-discuss-phase 62`.
+- **Provider account + domain auth (SPF/DKIM/DMARC)** (Phase 59, Messages Composer & Send Path) —
+  owner DNS work that must complete before any "it sends to the inbox" claim; depends on whether the
+  church domain DNS is self-managed.
 
 ## Traceability
 
@@ -124,31 +124,31 @@ Which phases cover which requirements. Phase column filled during roadmap creati
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| R130 | — | Pending |
-| R131 | — | Pending |
-| R132 | — | Pending |
-| R133 | — | Pending |
-| R134 | — | Pending |
-| R135 | — | Pending |
-| R136 | — | Pending |
-| R137 | — | Pending |
-| R138 | — | Pending |
-| R139 | — | Pending |
-| R140 | — | Pending |
-| R141 | — | Pending |
-| R142 | — | Pending |
-| R143 | — | Pending |
-| R144 | — | Pending |
-| R145 | — | Pending |
-| R146 | — | Pending |
-| R147 | — | Pending |
-| R148 | — | Pending |
+| R130 | Phase 58 | Pending |
+| R131 | Phase 59 | Pending |
+| R132 | Phase 58 | Pending |
+| R133 | Phase 58 | Pending |
+| R134 | Phase 58 | Pending |
+| R135 | Phase 58 | Pending |
+| R136 | Phase 59 | Pending |
+| R137 | Phase 59 | Pending |
+| R138 | Phase 59 | Pending |
+| R139 | Phase 59 | Pending |
+| R140 | Phase 59 | Pending |
+| R141 | Phase 59 | Pending |
+| R142 | Phase 60 | Pending |
+| R143 | Phase 60 | Pending |
+| R144 | Phase 61 | Pending |
+| R145 | Phase 61 | Pending |
+| R146 | Phase 62 | Pending |
+| R147 | Phase 62 | Pending |
+| R148 | Phase 62 | Pending |
 
 **Coverage:**
 - v1 requirements: 19 total (R130–R148)
-- Mapped to phases: 0 (roadmap pending)
-- Unmapped: 19 ⚠️ (filled by roadmapper)
+- Mapped to phases: 19 (Phases 58-62)
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-08-13*
-*Last updated: 2026-08-13 after initial v1.7 definition*
+*Last updated: 2026-08-13 — ROADMAP.md created, 19/19 requirements mapped to Phases 58-62.*
