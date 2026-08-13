@@ -116,6 +116,16 @@ let mockSlideTypography: { fontFamily: string; fontWeight: number; fontScale: 's
   fontWeight: 400,
   fontScale: 'md',
 }
+// 58-04: R130/R132/R133 Messaging card. Kill-switch defaults FALSE (fail-closed,
+// mirrors DEFAULT_ORG_SETTINGS.messaging.enabled — the deliberate divergence
+// from aiEnabled/pcEnabled's default-true seed used elsewhere in this file).
+let mockMessagingEnabled = false
+let mockLockNotifyDefault = false
+let mockReminderEnabled = false
+let mockReminderDaysBefore = 7
+let mockFromName: string | undefined = undefined
+let mockReplyTo: string | undefined = undefined
+let mockTimezone = 'America/Chicago'
 
 const mockSetPcCredentials = vi.fn()
 
@@ -203,6 +213,61 @@ vi.mock('@/stores/auth', () => ({
       set slideTypography(v: { fontFamily: string; fontWeight: number; fontScale: 'sm' | 'md' | 'lg' }) {
         mockSlideTypography = v
       },
+      // 58-04: setters required for onToggleMessagingEnabled/onToggleLockNotifyDefault/
+      // onToggleReminderEnabled/onChangeReminderDaysBefore/onSaveMessagingEmail's
+      // mirror-writes (`authStore.settings.messaging.<field> = newValue`). Each call
+      // to this getter returns a fresh accessor object closing over the SAME outer
+      // mock* variables, so a mutation through any returned object is visible to
+      // every other reader/writer — matching how a real reactive store field behaves.
+      get messaging() {
+        return {
+          get enabled() {
+            return mockMessagingEnabled
+          },
+          set enabled(v: boolean) {
+            mockMessagingEnabled = v
+          },
+          get lockNotifyDefault() {
+            return mockLockNotifyDefault
+          },
+          set lockNotifyDefault(v: boolean) {
+            mockLockNotifyDefault = v
+          },
+          get reminderEnabled() {
+            return mockReminderEnabled
+          },
+          set reminderEnabled(v: boolean) {
+            mockReminderEnabled = v
+          },
+          get reminderDaysBefore() {
+            return mockReminderDaysBefore
+          },
+          set reminderDaysBefore(v: number) {
+            mockReminderDaysBefore = v
+          },
+          get fromName() {
+            return mockFromName
+          },
+          set fromName(v: string | undefined) {
+            mockFromName = v
+          },
+          get replyTo() {
+            return mockReplyTo
+          },
+          set replyTo(v: string | undefined) {
+            mockReplyTo = v
+          },
+        }
+      },
+      // 58-04: setter required for onChangeTimezone's mirror-write
+      // (`authStore.settings.timezone = newValue`), mirroring every other
+      // settings.* setter above.
+      get timezone() {
+        return mockTimezone
+      },
+      set timezone(v: string) {
+        mockTimezone = v
+      },
     },
   }),
 }))
@@ -233,6 +298,13 @@ describe('SettingsView (Wave 0 harness — Phase 39)', () => {
     mockDefaultServiceTemplate = []
     mockBibleVersion = 'NLT'
     mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' }
+    mockMessagingEnabled = false
+    mockLockNotifyDefault = false
+    mockReminderEnabled = false
+    mockReminderDaysBefore = 7
+    mockFromName = undefined
+    mockReplyTo = undefined
+    mockTimezone = 'America/Chicago'
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
     mockSetPcCredentials.mockClear()
@@ -277,6 +349,13 @@ describe('SettingsView dot-path writes (R073) — Wave 2 (39-03)', () => {
     mockDefaultServiceTemplate = []
     mockBibleVersion = 'NLT'
     mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' }
+    mockMessagingEnabled = false
+    mockLockNotifyDefault = false
+    mockReminderEnabled = false
+    mockReminderDaysBefore = 7
+    mockFromName = undefined
+    mockReplyTo = undefined
+    mockTimezone = 'America/Chicago'
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
     mockSetPcCredentials.mockClear()
@@ -379,6 +458,13 @@ describe('SettingsView Planning Center credential retention (R089) — Wave 2 (3
     mockDefaultServiceTemplate = []
     mockBibleVersion = 'NLT'
     mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' }
+    mockMessagingEnabled = false
+    mockLockNotifyDefault = false
+    mockReminderEnabled = false
+    mockReminderDaysBefore = 7
+    mockFromName = undefined
+    mockReplyTo = undefined
+    mockTimezone = 'America/Chicago'
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
     mockSetPcCredentials.mockClear()
@@ -453,6 +539,13 @@ describe('SettingsView — no Services template card (R113)', () => {
     mockDefaultServiceTemplate = []
     mockBibleVersion = 'NLT'
     mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' }
+    mockMessagingEnabled = false
+    mockLockNotifyDefault = false
+    mockReminderEnabled = false
+    mockReminderDaysBefore = 7
+    mockFromName = undefined
+    mockReplyTo = undefined
+    mockTimezone = 'America/Chicago'
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
     mockSetPcCredentials.mockClear()
@@ -481,6 +574,13 @@ describe('SettingsView Bible Translation card (R090) — 45-02', () => {
     mockDefaultServiceTemplate = []
     mockBibleVersion = 'NLT'
     mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' }
+    mockMessagingEnabled = false
+    mockLockNotifyDefault = false
+    mockReminderEnabled = false
+    mockReminderDaysBefore = 7
+    mockFromName = undefined
+    mockReplyTo = undefined
+    mockTimezone = 'America/Chicago'
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
     mockSetPcCredentials.mockClear()
@@ -579,6 +679,13 @@ describe('SettingsView Slide Typography card (R093) — 46-03', () => {
     mockDefaultServiceTemplate = []
     mockBibleVersion = 'NLT'
     mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' }
+    mockMessagingEnabled = false
+    mockLockNotifyDefault = false
+    mockReminderEnabled = false
+    mockReminderDaysBefore = 7
+    mockFromName = undefined
+    mockReplyTo = undefined
+    mockTimezone = 'America/Chicago'
     mockUpdateDoc.mockClear()
     mockGetDoc.mockClear()
     mockSetPcCredentials.mockClear()
@@ -709,5 +816,267 @@ describe('SettingsView Slide Typography card (R093) — 46-03', () => {
 
     const updatedPreview = wrapper.get('[data-testid="slide-typography-preview"]').element as HTMLElement
     expect(updatedPreview.style.getPropertyValue('--slide-font-family')).toContain('Lora')
+  })
+})
+
+// 58-04 (R130/R132): the global kill-switch + org-level automatic-email defaults
+// sub-block, mirroring the AI Features/PC/Bible cards' save triad exactly.
+describe('SettingsView Messaging card — kill-switch + automatic email defaults (R130/R132) — 58-04', () => {
+  beforeEach(() => {
+    mockOrgId = 'org-1'
+    mockOrgName = 'Test Church'
+    mockOrgSlug = 'test-church'
+    mockIsEditor = true
+    mockHasPcCredentials = false
+    mockPcAppId = null
+    mockPcSecret = null
+    mockVwModeEnabled = true
+    mockAiEnabled = true
+    mockPcEnabled = true
+    mockSettingsVwModeEnabled = true
+    mockDefaultServiceTemplate = []
+    mockBibleVersion = 'NLT'
+    mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' }
+    mockMessagingEnabled = false
+    mockLockNotifyDefault = false
+    mockReminderEnabled = false
+    mockReminderDaysBefore = 7
+    mockFromName = undefined
+    mockReplyTo = undefined
+    mockTimezone = 'America/Chicago'
+    mockUpdateDoc.mockClear()
+    mockGetDoc.mockClear()
+    mockSetPcCredentials.mockClear()
+  })
+
+  it('renders the Messaging heading with the kill-switch unchecked for a fresh org', () => {
+    const wrapper = mountSettingsView()
+    expect(wrapper.text()).toContain('Messaging')
+    const toggle = wrapper.get('[data-testid="messaging-enabled-toggle"]').element as HTMLInputElement
+    expect(toggle.checked).toBe(false)
+  })
+
+  it('does not render the automatic email defaults sub-block while the kill-switch is off', () => {
+    const wrapper = mountSettingsView()
+    expect(wrapper.find('[data-testid="messaging-lock-notify-toggle"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="messaging-reminder-enabled-toggle"]').exists()).toBe(false)
+  })
+
+  it('writes the dot-path leaf and mirrors the store when the kill-switch is turned on', async () => {
+    const wrapper = mountSettingsView()
+    await wrapper.get('[data-testid="messaging-enabled-toggle"]').setValue(true)
+    await flushPromises()
+
+    expect(mockUpdateDoc).toHaveBeenCalledTimes(1)
+    const payload = mockUpdateDoc.mock.calls[0]![1] as Record<string, unknown>
+    expect(Object.keys(payload)).toHaveLength(1)
+    expect(payload).toHaveProperty('settings.messaging.enabled', true)
+    expect(payload).not.toHaveProperty('settings')
+    expect(mockMessagingEnabled).toBe(true)
+    expect(wrapper.text()).toContain('Saved!')
+  })
+
+  it('reverts the kill-switch and shows the shared failure string when the write rejects', async () => {
+    mockUpdateDoc.mockRejectedValueOnce(new Error('network error'))
+    const wrapper = mountSettingsView()
+
+    await wrapper.get('[data-testid="messaging-enabled-toggle"]').setValue(true)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Failed to save. Please try again.')
+    const toggle = wrapper.get('[data-testid="messaging-enabled-toggle"]').element as HTMLInputElement
+    expect(toggle.checked).toBe(false)
+    expect(mockMessagingEnabled).toBe(false)
+  })
+
+  it('reveals the automatic email defaults sub-block once the kill-switch is on', async () => {
+    mockMessagingEnabled = true
+    const wrapper = mountSettingsView()
+
+    expect(wrapper.find('[data-testid="messaging-lock-notify-toggle"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="messaging-reminder-enabled-toggle"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="messaging-from-name-input"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="messaging-reply-to-input"]').exists()).toBe(true)
+  })
+
+  it('writes the dot-path leaf and mirrors the store when lock-notify default is toggled', async () => {
+    mockMessagingEnabled = true
+    const wrapper = mountSettingsView()
+
+    await wrapper.get('[data-testid="messaging-lock-notify-toggle"]').setValue(true)
+    await flushPromises()
+
+    expect(mockUpdateDoc).toHaveBeenCalledTimes(1)
+    const payload = mockUpdateDoc.mock.calls[0]![1] as Record<string, unknown>
+    expect(Object.keys(payload)).toHaveLength(1)
+    expect(payload).toHaveProperty('settings.messaging.lockNotifyDefault', true)
+    expect(mockLockNotifyDefault).toBe(true)
+  })
+
+  it('writes the dot-path leaf and mirrors the store when reminder-enabled default is toggled', async () => {
+    mockMessagingEnabled = true
+    const wrapper = mountSettingsView()
+
+    await wrapper.get('[data-testid="messaging-reminder-enabled-toggle"]').setValue(true)
+    await flushPromises()
+
+    expect(mockUpdateDoc).toHaveBeenCalledTimes(1)
+    const payload = mockUpdateDoc.mock.calls[0]![1] as Record<string, unknown>
+    expect(Object.keys(payload)).toHaveLength(1)
+    expect(payload).toHaveProperty('settings.messaging.reminderEnabled', true)
+    expect(mockReminderEnabled).toBe(true)
+  })
+
+  it('reveals the reminder days-before select only once reminder-enabled is checked', async () => {
+    mockMessagingEnabled = true
+    const wrapper = mountSettingsView()
+
+    expect(wrapper.find('[data-testid="messaging-reminder-days-select"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="messaging-reminder-enabled-toggle"]').setValue(true)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="messaging-reminder-days-select"]').exists()).toBe(true)
+  })
+
+  it('persists reminderDaysBefore as a NUMBER, not the select string, when changed', async () => {
+    mockMessagingEnabled = true
+    mockReminderEnabled = true
+    const wrapper = mountSettingsView()
+
+    await wrapper.get('[data-testid="messaging-reminder-days-select"]').setValue('14')
+    await flushPromises()
+
+    expect(mockUpdateDoc).toHaveBeenCalledTimes(1)
+    const payload = mockUpdateDoc.mock.calls[0]![1] as Record<string, unknown>
+    expect(Object.keys(payload)).toHaveLength(1)
+    expect(payload).toHaveProperty('settings.messaging.reminderDaysBefore', 14)
+    expect(typeof payload['settings.messaging.reminderDaysBefore']).toBe('number')
+    expect(mockReminderDaysBefore).toBe(14)
+    expect(typeof mockReminderDaysBefore).toBe('number')
+  })
+
+  it('reverts reminderDaysBefore to its prior numeric value when the write rejects', async () => {
+    mockMessagingEnabled = true
+    mockReminderEnabled = true
+    mockReminderDaysBefore = 7
+    mockUpdateDoc.mockRejectedValueOnce(new Error('network error'))
+    const wrapper = mountSettingsView()
+
+    await wrapper.get('[data-testid="messaging-reminder-days-select"]').setValue('14')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Failed to save. Please try again.')
+    const select = wrapper.get('[data-testid="messaging-reminder-days-select"]')
+      .element as HTMLSelectElement
+    expect(select.value).toBe('7')
+    expect(mockReminderDaysBefore).toBe(7)
+  })
+
+  it('saves From name / Reply-to together under one Save button and mirrors the store', async () => {
+    mockMessagingEnabled = true
+    const wrapper = mountSettingsView()
+
+    await wrapper.get('[data-testid="messaging-from-name-input"]').setValue('First Baptist Church')
+    await wrapper.get('[data-testid="messaging-reply-to-input"]').setValue('planning@yourchurch.org')
+    // No write yet — free text needs the explicit Save button (mirrors Org Name).
+    expect(mockUpdateDoc).not.toHaveBeenCalled()
+
+    await wrapper.get('[data-testid="messaging-email-save-button"]').trigger('click')
+    await flushPromises()
+
+    expect(mockUpdateDoc).toHaveBeenCalledTimes(1)
+    const payload = mockUpdateDoc.mock.calls[0]![1] as Record<string, unknown>
+    expect(payload).toHaveProperty('settings.messaging.fromName', 'First Baptist Church')
+    expect(payload).toHaveProperty('settings.messaging.replyTo', 'planning@yourchurch.org')
+    expect(mockFromName).toBe('First Baptist Church')
+    expect(mockReplyTo).toBe('planning@yourchurch.org')
+    expect(wrapper.text()).toContain('Saved!')
+  })
+
+  it('disables the kill-switch and blocks saving for a non-editor (viewer)', async () => {
+    mockIsEditor = false
+    const wrapper = mountSettingsView()
+
+    expect(wrapper.get('[data-testid="messaging-enabled-toggle"]').attributes('disabled')).toBeDefined()
+
+    await wrapper.get('[data-testid="messaging-enabled-toggle"]').setValue(true)
+    await flushPromises()
+
+    expect(mockUpdateDoc).not.toHaveBeenCalled()
+    expect(mockMessagingEnabled).toBe(false)
+  })
+})
+
+// 58-04 (R133): the always-visible organization-timezone select, independent of
+// the messaging kill-switch state.
+describe('SettingsView organization timezone select (R133) — 58-04', () => {
+  beforeEach(() => {
+    mockOrgId = 'org-1'
+    mockOrgName = 'Test Church'
+    mockOrgSlug = 'test-church'
+    mockIsEditor = true
+    mockHasPcCredentials = false
+    mockPcAppId = null
+    mockPcSecret = null
+    mockVwModeEnabled = true
+    mockAiEnabled = true
+    mockPcEnabled = true
+    mockSettingsVwModeEnabled = true
+    mockDefaultServiceTemplate = []
+    mockBibleVersion = 'NLT'
+    mockSlideTypography = { fontFamily: 'Inter', fontWeight: 400, fontScale: 'md' }
+    mockMessagingEnabled = false
+    mockLockNotifyDefault = false
+    mockReminderEnabled = false
+    mockReminderDaysBefore = 7
+    mockFromName = undefined
+    mockReplyTo = undefined
+    mockTimezone = 'America/Chicago'
+    mockUpdateDoc.mockClear()
+    mockGetDoc.mockClear()
+    mockSetPcCredentials.mockClear()
+  })
+
+  it('renders the timezone select regardless of the kill-switch state (always visible)', () => {
+    mockMessagingEnabled = false
+    const wrapper = mountSettingsView()
+    expect(wrapper.find('[data-testid="messaging-timezone-select"]').exists()).toBe(true)
+  })
+
+  it("reflects authStore.settings.timezone as the select's current value", () => {
+    mockTimezone = 'America/Denver'
+    const wrapper = mountSettingsView()
+    const select = wrapper.get('[data-testid="messaging-timezone-select"]').element as HTMLSelectElement
+    expect(select.value).toBe('America/Denver')
+  })
+
+  it('writes the dot-path leaf and mirrors the store when the timezone changes', async () => {
+    const wrapper = mountSettingsView()
+
+    await wrapper.get('[data-testid="messaging-timezone-select"]').setValue('America/Los_Angeles')
+    await flushPromises()
+
+    expect(mockUpdateDoc).toHaveBeenCalledTimes(1)
+    const payload = mockUpdateDoc.mock.calls[0]![1] as Record<string, unknown>
+    expect(Object.keys(payload)).toHaveLength(1)
+    expect(payload).toHaveProperty('settings.timezone', 'America/Los_Angeles')
+    expect(payload).not.toHaveProperty('settings')
+    expect(mockTimezone).toBe('America/Los_Angeles')
+    expect(wrapper.text()).toContain('Saved!')
+  })
+
+  it('reverts the select to the prior value and shows the shared failure string when the write rejects', async () => {
+    mockTimezone = 'America/Chicago'
+    mockUpdateDoc.mockRejectedValueOnce(new Error('network error'))
+    const wrapper = mountSettingsView()
+
+    await wrapper.get('[data-testid="messaging-timezone-select"]').setValue('America/Los_Angeles')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Failed to save. Please try again.')
+    const select = wrapper.get('[data-testid="messaging-timezone-select"]').element as HTMLSelectElement
+    expect(select.value).toBe('America/Chicago')
+    expect(mockTimezone).toBe('America/Chicago')
   })
 })
