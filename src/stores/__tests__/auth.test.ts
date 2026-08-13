@@ -503,6 +503,49 @@ describe('useAuthStore', () => {
     })
   })
 
+  // R130/R132/R133 (Phase 58) — messaging must be deep-merged the same way
+  // slideTypography is above; timezone is a flat field covered by the outer
+  // spread.
+  describe('OrgSettings.messaging + timezone (R130/R132/R133, Phase 58)', () => {
+    it('deep-merges a partial stored messaging object — unset leaves fall back to their own defaults', async () => {
+      mockOrgDocPath({
+        name: 'Test Org',
+        settings: { messaging: { enabled: true } },
+      })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.settings.messaging.enabled).toBe(true)
+      expect(store.settings.messaging.reminderDaysBefore).toBe(7)
+      expect(store.settings.messaging.lockNotifyDefault).toBe(false)
+    })
+
+    it('resolves the full DEFAULT_ORG_SETTINGS.messaging when the org doc has no messaging key at all', async () => {
+      mockOrgDocPath({ name: 'Test Org' })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.settings.messaging).toEqual(DEFAULT_ORG_SETTINGS.messaging)
+      expect(store.settings.messaging.enabled).toBe(false)
+    })
+
+    it('prefers a stored timezone over the default', async () => {
+      mockOrgDocPath({ name: 'Test Org', settings: { timezone: 'America/New_York' } })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.settings.timezone).toBe('America/New_York')
+    })
+
+    it('resolves timezone to America/Chicago when the org doc omits it', async () => {
+      mockOrgDocPath({ name: 'Test Org' })
+      const { useAuthStore } = await import('../auth')
+      const store = useAuthStore()
+      await triggerAuthStateChange(mockUser)
+      expect(store.settings.timezone).toBe('America/Chicago')
+    })
+  })
+
   describe('OrgSettings.bibleVersion (R090)', () => {
     // The DEFAULT constant itself — the owner's locked override (45-CONTEXT.md
     // § Area 1) is NLT, NOT the "preserve current behavior" ESV default.
