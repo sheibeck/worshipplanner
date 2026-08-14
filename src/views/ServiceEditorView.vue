@@ -1490,6 +1490,21 @@
     v-if="localService"
     :service="localService"
   />
+
+  <!-- ✉ Messages composer (R136, 59-04) — opened by the action-bar ✉ item.
+       Reads the quarters/roles/people the editor already loads (read-only); the
+       composer owns all recipient resolution + the queueServiceMessage call. -->
+  <MessageComposer
+    v-if="localService"
+    :open="messageComposerOpen"
+    :service="localService"
+    :quarters="quartersStore.quarters"
+    :roles="rosterStore.roles"
+    :people="rosterStore.people"
+    :org-id="authStore.orgId!"
+    @cancel="messageComposerOpen = false"
+    @sent="messageComposerOpen = false"
+  />
 </template>
 
 <script setup lang="ts">
@@ -1523,6 +1538,8 @@ import PresentationViewer from '@/components/PresentationViewer.vue'
 import SlidesTab from '@/components/slides/SlidesTab.vue'
 import CongregationalEditor from '@/components/CongregationalEditor.vue'
 import ContextualActionBar from '@/components/ContextualActionBar.vue'
+import MessageComposer from '@/components/MessageComposer.vue'
+import { isMessagingEnabled } from '@/utils/messaging'
 import { buildActionBarItems } from '@/views/serviceEditorActionBar'
 import { useSlideshowAssembly } from '@/composables/useSlideshowAssembly'
 import { useAutoSave } from '@/composables/useAutoSave'
@@ -1614,6 +1631,9 @@ const shareCopied = ref(false)
 const shareError = ref<string | null>(null)
 const showDeleteConfirm = ref(false)
 const isDeleting = ref(false)
+// R136 (59-04): the ✉ Messages composer's open state, toggled by the
+// action-bar item's onMessages handler.
+const messageComposerOpen = ref(false)
 // D-14: slot delete confirmation
 const showSlotDeleteConfirm = ref(false)
 const pendingDeleteIndex = ref<number | null>(null)
@@ -2274,6 +2294,10 @@ const activeActionItems = computed(() =>
     isSharing: isSharing.value,
     shareCopied: shareCopied.value,
     shareError: shareError.value,
+    // R136 (59-04): the org messaging kill switch gates the ✉ Messages entry
+    // point (present-but-disabled when off). Required field on ActionBarContext
+    // — omitting it is a compile error by design (59-PATTERNS.md).
+    messagingEnabled: isMessagingEnabled(),
     handlers: {
       suggestAllSongs,
       onExportToPC,
@@ -2281,6 +2305,9 @@ const activeActionItems = computed(() =>
       onPresent: () => slidesTabRef.value?.onPresentClick(),
       onPrint,
       onShare,
+      onMessages: () => {
+        messageComposerOpen.value = true
+      },
     },
   }),
 )
