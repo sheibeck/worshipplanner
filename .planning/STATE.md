@@ -4,17 +4,17 @@ milestone: v1.7
 milestone_name: Volunteer Messaging & Notifications
 current_phase: 58
 current_phase_name: Messaging Infrastructure, Settings & Recipient Resolution
-status: executing
-stopped_at: Completed 58-04-PLAN.md
-last_updated: "2026-08-13T20:49:34.524Z"
+status: verifying
+stopped_at: Completed 58-05-PLAN.md
+last_updated: "2026-08-14T14:07:10.726Z"
 last_activity: 2026-08-13
 last_activity_desc: Phase 58 execution started
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 5
-  completed_plans: 4
-  percent: 0
+  completed_plans: 5
+  percent: 20
 ---
 
 # Project State
@@ -278,7 +278,7 @@ See: .planning/PROJECT.md (updated 2026-08-06)
 
 Phase: 58 (Messaging Infrastructure, Settings & Recipient Resolution) — EXECUTING
 Plan: 5 of 5
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-08-13 — Phase 58 execution started
 
 ## ⏸ RESUME HERE (2026-08-13 — v1.7 ROADMAP.md created, ready to plan Phase 58)
@@ -1722,6 +1722,7 @@ Do NOT action during current milestone build — revisit as a follow-up UI phase
 | Phase 58 P02 | 25min | 1 tasks | 2 files |
 | Phase 58 P03 | 20min | 2 tasks | 2 files |
 | Phase 58 P04 | 40min | 2 tasks | 2 files |
+| Phase 58 P05 | 25 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -2078,6 +2079,7 @@ See PROJECT.md Key Decisions table for full list with outcomes.
 - [Phase ?]: Messaging card kill-switch seeded from authStore.settings.messaging.enabled (fail-closed default false, per 58-01)
 - [Phase ?]: reminderDaysBefore explicitly wrapped in Number(...) on write and revert, verified typeof === 'number' in tests
 - [Phase ?]: From-name/Reply-to use explicit-Save (not auto-save), mirroring Organization Name's debounce-boundary pattern
+- [Phase ?]: 58-05: per-service messaging overrides write via scoped setServiceMessagingDefaults dot-path (never updateService), bypassing the R036 draft-content affectedKeys() guard (R132)
 
 ### Roadmap Evolution
 
@@ -2395,8 +2397,8 @@ and task 10's commits are listed in this file's own Quick Tasks table). Deferred
 ## Session Continuity
 
 Last activity: 2026-07-28 — 29-04 fixed SlideGrid's reorder/append defects (R049, R050)
-Last session: 2026-08-13T20:49:34.478Z
-Stopped at: Completed 58-04-PLAN.md
+Last session: 2026-08-14T14:07:02.269Z
+Stopped at: Completed 58-05-PLAN.md
 Resume file: None
 
 ## Operator Next Steps

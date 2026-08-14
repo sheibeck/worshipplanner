@@ -96,6 +96,17 @@ Owner confirmed in the Firebase console that the deployed ruleset carries the
 
 ---
 
+## ⏳ 58-05 — per-service Messaging defaults panel: Draft→locked read-only (R132) — DEFERRED
+
+Automated gates pass (store action + panel unit tests, type-check, full-suite
+baseline). The manual visual confirmation is deferred to owner at
+`/gsd-verify-work 58` per the v1.7 grant: on a **Draft** service edit a Messaging
+defaults override (e.g. Lock notification → On), then **lock** the service (Mark
+as Planned) and confirm the panel switches to the static read-only summary with no
+editable select. Coverage id D4 in `58-05-SUMMARY.md`.
+
+---
+
 ## Also still open (tracked in ROADMAP `## Backlog`, not here)
 
 - **999.3** — firestore.rules are deployed, but the **production devtools bypass check** (set a service to Planned, attempt a direct Firestore write, expect permission denied) was never performed against prod.
