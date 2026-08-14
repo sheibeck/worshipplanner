@@ -9,6 +9,17 @@ import { getStorage } from "firebase-admin/storage";
 import { parsePptxBuffer, type MappedSlide } from "./pptxParser";
 import { invokeRenderService } from "./renderInvoker";
 import { syncOrgMembershipClaim } from "./orgMembershipClaims";
+import { Resend } from "resend";
+import { renderMessageTokens } from "./messageTokens";
+import {
+  resolveServiceRoleAssignments,
+  resolveMessageRecipients,
+  type PortedQuarter,
+  type PortedRole,
+  type PortedPerson,
+  type RoleGroup,
+  type RecipientSelection,
+} from "./serviceRoles";
 
 // Server-held secrets (Google Secret Manager). Set once with:
 //   firebase functions:secrets:set CLAUDE_API_KEY
@@ -1033,6 +1044,328 @@ export async function queueServiceMessageHandler(
 // RESEND_API_KEY (R131 "smallest key-holding surface"). The secret binds only
 // to sendQueuedMessage (59-03).
 export const queueServiceMessage = onCall(queueServiceMessageHandler);
+
+// --- sendQueuedMessage send trigger (59-03: R131/R138/R139) --------------
+//
+// The send half of the queue-then-trigger path: an onDocumentCreated trigger
+// on .../messages/{messageId}, the ONLY Function bound to RESEND_API_KEY. Its
+// handler body (sendQueuedMessageHandler) is exported separately from the
+// wrapper (requestPptxRenderHandler precedent) so the idempotency + send logic
+// is directly unit-tested with Resend mocked. It runs a transactional
+// queued->sending claim (GENUINELY NEW code — the PPTX precedent has NO status
+// claim, 59-RESEARCH.md Pitfall 1), re-resolves recipients server-side (never
+// the client's stored list — Anti-Pattern 1), renders per-recipient tokens
+// (R139), sends once per recipient (per-recipient try/catch so one bad address
+// is a failed recipient, not an aborted batch), writes one recipients/{id} doc
+// per recipient, rolls up deliveryCounts, and flips the message status.
+
+/**
+ * The public share-link base origin (e.g. https://app.example.com). Config, not
+ * a secret — defineString, mirroring PPTX_RENDER_SERVICE_URL. Empty default is
+ * deliberate and TESTED: with no base configured, {{service_link}} renders ''
+ * (A1 empty substitution). The owner sets it at deploy time.
+ */
+export const SERVICE_SHARE_BASE_URL = defineString("SERVICE_SHARE_BASE_URL", { default: "" });
+
+/**
+ * The From address Resend sends as (a verified sending-domain address). Config,
+ * not a secret. Owner overrides at deploy time with the domain they verified in
+ * Resend; the default is a placeholder that never sends in tests (Resend is
+ * fully mocked) and is corrected before the owner's deploy.
+ */
+export const MESSAGE_FROM_ADDRESS = defineString("MESSAGE_FROM_ADDRESS", {
+  default: "Worship Planner <noreply@worshipplanner.app>",
+});
+
+/** Resend tag names AND values allow only these chars (59-RESEARCH.md Pitfall 3). */
+const RESEND_TAG_SAFE = /^[A-Za-z0-9_-]+$/;
+
+/** The rolled-up outcome of a send attempt (or a skipped no-op). */
+export interface SendOutcome {
+  status: "sent" | "partial" | "failed" | "skipped";
+  sentCount: number;
+  failedCount: number;
+  skippedReason?: string;
+}
+
+/** One resolved send target (a reachable volunteer, or the self-copy). */
+interface SendTarget {
+  id: string;
+  name: string;
+  email: string;
+  roleNames: string[];
+}
+
+/**
+ * Formats a service's YYYY-MM-DD date for {{service_date}}. UTC-pinned so the
+ * output is deterministic regardless of the Function's locale/timezone; falls
+ * back to the raw string if it does not parse.
+ */
+function formatServiceDate(date: string): string {
+  const parsed = new Date(`${date}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return date;
+  return parsed.toLocaleDateString("en-US", {
+    timeZone: "UTC",
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+/**
+ * Resolves the service's public share-link URL for {{service_link}} directly
+ * from the top-level `shareTokens` collection (VERIFIED shape: serviceId field,
+ * route /share/:token — src/stores/services.ts:652). Picks the most-recently
+ * created token belonging to THIS org (the client's pickAdoptableToken filters
+ * by org then recency); returns '' when the base is unconfigured or no token
+ * exists (A1). Does NOT import buildServiceSnapshot (Pinia/@-bound, 59-RESEARCH
+ * Anti-Pattern).
+ */
+async function resolveServiceLink(
+  db: ReturnType<typeof getFirestore>,
+  orgId: string,
+  serviceId: string,
+): Promise<string> {
+  const base = SERVICE_SHARE_BASE_URL.value().trim();
+  if (base === "") return "";
+
+  const snap = await db.collection("shareTokens").where("serviceId", "==", serviceId).get();
+  const candidates = snap.docs
+    .map((d) => {
+      const data = d.data() as { orgId?: string; createdAt?: { toMillis?: () => number } };
+      const createdMs =
+        typeof data.createdAt?.toMillis === "function" ? data.createdAt.toMillis() : 0;
+      return { token: d.id, orgId: data.orgId, createdMs };
+    })
+    .filter((c) => c.orgId === orgId);
+  if (candidates.length === 0) return "";
+
+  candidates.sort((a, b) => b.createdMs - a.createdMs);
+  const token = candidates[0]!.token;
+  return `${base.replace(/\/+$/, "")}/share/${token}`;
+}
+
+/**
+ * Resolves the requesting editor's own email SERVER-SIDE from their auth record
+ * (never a client-supplied address) for options.sendCopyToSelf. Returns '' if
+ * the user or email cannot be resolved.
+ */
+async function resolveEditorEmail(uid: string): Promise<string> {
+  try {
+    const user = await getAuth().getUser(uid);
+    return user.email ?? "";
+  } catch (err) {
+    console.error("sendQueuedMessage: could not resolve requesting editor's email:", err instanceof Error ? err.message : String(err));
+    return "";
+  }
+}
+
+export async function sendQueuedMessageHandler(params: {
+  orgId: string;
+  serviceId: string;
+  messageId: string;
+}): Promise<SendOutcome> {
+  const { orgId, serviceId, messageId } = params;
+  const db = getFirestore();
+  const orgRef = db.collection("organizations").doc(orgId);
+  const serviceRef = orgRef.collection("services").doc(serviceId);
+  const messageRef = serviceRef.collection("messages").doc(messageId);
+
+  // ① + ② IDEMPOTENCY CLAIM (NEW code, no verbatim analog): a transaction reads
+  // status and flips queued->sending ONLY if currently 'queued'. A missing doc,
+  // or any other status ('sending'/'sent'/'scheduled'/…), returns "not claimed"
+  // and the handler sends nothing — this stops a retried at-least-once
+  // onDocumentCreated from double-sending, and leaves a 'scheduled' doc inert
+  // for Phase 61's cron.
+  const claim = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(messageRef);
+    if (!snap.exists) return { claimed: false as const, data: null };
+    const data = snap.data() as QueuedMessageDoc | undefined;
+    if (!data || data.status !== "queued") return { claimed: false as const, data: null };
+    tx.update(messageRef, { status: "sending", updatedAt: FieldValue.serverTimestamp() });
+    return { claimed: true as const, data };
+  });
+  if (!claim.claimed || !claim.data) {
+    return { status: "skipped", sentCount: 0, failedCount: 0, skippedReason: "not-queued" };
+  }
+  const message = claim.data;
+
+  // The three message-level ids become Resend tags (Pitfall 3). If any is not
+  // tag-safe the send is unsafe for the whole message — fail closed.
+  if (![orgId, serviceId, messageId].every((id) => RESEND_TAG_SAFE.test(id))) {
+    await messageRef.set(
+      { status: "failed", sentAt: FieldValue.serverTimestamp(), deliveryCounts: { sent: 0, failed: 0 } },
+      { merge: true },
+    );
+    return { status: "failed", sentCount: 0, failedCount: 0, skippedReason: "unsafe-tag-id" };
+  }
+
+  // ③ RE-RESOLVE recipients from scratch (Anti-Pattern 1). Admin-SDK-load the
+  // service, its quarters, the org roles and people, and feed them through the
+  // 59-01 port using the doc's recipientSelector as who-to-resolve intent — the
+  // client's stored list is NEVER the send list.
+  const serviceSnap = await serviceRef.get();
+  if (!serviceSnap.exists) {
+    await messageRef.set(
+      { status: "failed", sentAt: FieldValue.serverTimestamp(), deliveryCounts: { sent: 0, failed: 0 } },
+      { merge: true },
+    );
+    return { status: "failed", sentCount: 0, failedCount: 0, skippedReason: "missing-service" };
+  }
+  const serviceData = serviceSnap.data() as {
+    date: string;
+    slots?: Array<{ kind?: string; position?: number; songTitle?: string | null }>;
+    roleAssignmentOverrides?: Record<string, string[]>;
+  };
+
+  const [quartersSnap, rolesSnap, peopleSnap] = await Promise.all([
+    orgRef.collection("quarters").get(),
+    orgRef.collection("roles").get(),
+    orgRef.collection("people").get(),
+  ]);
+  const quarters = quartersSnap.docs.map((d) => d.data() as PortedQuarter);
+  const roles = rolesSnap.docs.map((d) => ({ id: d.id, ...(d.data() as object) }) as PortedRole);
+  const people = peopleSnap.docs.map((d) => ({ id: d.id, ...(d.data() as object) }) as PortedPerson);
+
+  const assignments = resolveServiceRoleAssignments(
+    { date: serviceData.date, roleAssignmentOverrides: serviceData.roleAssignmentOverrides },
+    quarters,
+    roles,
+  );
+  const selection: RecipientSelection = {
+    teams: (message.recipientSelector?.teams ?? []) as RoleGroup[],
+    individualPersonIds: message.recipientSelector?.individualPersonIds ?? [],
+    includeEveryone: message.recipientSelector?.includeEveryone ?? false,
+  };
+  const { reachable } = resolveMessageRecipients(assignments, people, selection);
+
+  // ④ Derive the message-level token context once (the per-recipient
+  // {{their_roles}} is applied inside the loop). {{song_list}} comes from the
+  // service doc's SONG slots (Admin SDK — never buildServiceSnapshot);
+  // {{service_link}} from the stored share link.
+  const serviceDate = formatServiceDate(serviceData.date);
+  const songTitles = (serviceData.slots ?? [])
+    .filter((s) => s?.kind === "SONG")
+    .slice()
+    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+    .map((s) => (typeof s.songTitle === "string" ? s.songTitle.trim() : ""))
+    .filter((t) => t.length > 0);
+  const serviceLink = await resolveServiceLink(db, orgId, serviceId);
+
+  // Build the send list: reachable volunteers + optional server-resolved self-copy.
+  const sendList: SendTarget[] = reachable.map((r) => ({
+    id: r.id,
+    name: r.name,
+    email: r.email,
+    roleNames: r.roleNames,
+  }));
+  if (message.options?.sendCopyToSelf && message.requestedByUid) {
+    const selfEmail = await resolveEditorEmail(message.requestedByUid);
+    if (selfEmail) {
+      sendList.push({ id: message.requestedByUid, name: "You", email: selfEmail, roleNames: [] });
+    }
+  }
+
+  // ⑤ + ⑥ Per recipient: render THAT person's subject/body (R139), send via the
+  // mocked-in-tests Resend, and write recipients/{id}. Per-recipient try/catch
+  // so one bad address is a status:'failed' recipient, not an aborted batch.
+  const resend = new Resend(RESEND_API_KEY.value());
+  const fromAddress = MESSAGE_FROM_ADDRESS.value();
+  let sentCount = 0;
+  let failedCount = 0;
+
+  for (const target of sendList) {
+    const recipientRef = messageRef.collection("recipients").doc(target.id);
+    try {
+      if (!RESEND_TAG_SAFE.test(target.id)) {
+        throw new Error("recipient id is not Resend-tag-safe");
+      }
+      const tokenCtx = { serviceDate, theirRoles: target.roleNames, songTitles, serviceLink };
+      const subject = renderMessageTokens(message.subject, tokenCtx);
+      const body = renderMessageTokens(message.body, tokenCtx);
+
+      const result = await resend.emails.send({
+        from: fromAddress,
+        to: target.email,
+        subject,
+        text: body,
+        tags: [
+          { name: "orgId", value: orgId },
+          { name: "serviceId", value: serviceId },
+          { name: "messageId", value: messageId },
+          { name: "recipientId", value: target.id },
+        ],
+      });
+      const providerMessageId = (result as { data?: { id?: string } | null })?.data?.id ?? null;
+
+      await recipientRef.set({
+        personId: target.id,
+        email: target.email,
+        name: target.name,
+        roleNames: target.roleNames,
+        status: "sent",
+        providerMessageId,
+        bounceReason: null,
+        sentAt: FieldValue.serverTimestamp(),
+        bouncedAt: null,
+      });
+      sentCount++;
+    } catch (err) {
+      // Never log the recipient's full email at info level (T-59-03c) — the
+      // tag-safe recipient id is enough to correlate.
+      console.error(
+        `sendQueuedMessage: send failed for recipient ${target.id}:`,
+        err instanceof Error ? err.message : String(err),
+      );
+      await recipientRef.set({
+        personId: target.id,
+        email: target.email,
+        name: target.name,
+        roleNames: target.roleNames,
+        status: "failed",
+        providerMessageId: null,
+        bounceReason: null,
+        sentAt: FieldValue.serverTimestamp(),
+        bouncedAt: null,
+      });
+      failedCount++;
+    }
+  }
+
+  // ⑦ Roll up deliveryCounts and flip the message status. Zero recipients (or
+  // all succeeded) => 'sent'; a mix => 'partial'; all failed => 'failed'.
+  const total = sentCount + failedCount;
+  const status: "sent" | "partial" | "failed" =
+    total === 0 || failedCount === 0 ? "sent" : sentCount === 0 ? "failed" : "partial";
+  await messageRef.set(
+    {
+      status,
+      sentAt: FieldValue.serverTimestamp(),
+      deliveryCounts: { sent: sentCount, failed: failedCount },
+    },
+    { merge: true },
+  );
+
+  return { status, sentCount, failedCount };
+}
+
+// The ONLY Function bound to RESEND_API_KEY (R131). The options-object form of
+// onDocumentCreated is required to attach the secret (mirrors the `api`
+// handler's { secrets: [...] } shape).
+export const sendQueuedMessage = onDocumentCreated(
+  {
+    document: "organizations/{orgId}/services/{serviceId}/messages/{messageId}",
+    secrets: [RESEND_API_KEY],
+  },
+  async (event) => {
+    await sendQueuedMessageHandler({
+      orgId: event.params.orgId,
+      serviceId: event.params.serviceId,
+      messageId: event.params.messageId,
+    });
+  },
+);
 
 // --- syncOrgMembershipClaim (R074/R075: the claim storage.rules reads) --
 //

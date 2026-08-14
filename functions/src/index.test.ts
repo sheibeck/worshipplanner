@@ -98,7 +98,11 @@ vi.mock("./renderInvoker", () => ({
 // The Resend SDK is fully mocked — sendQueuedMessage never sends a real email
 // in tests (59-03 ships built/tested/UNDEPLOYED against a mocked provider).
 vi.mock("resend", () => ({
-  Resend: vi.fn(() => ({ emails: { send: mockSend } })),
+  // A regular function (not an arrow) so `new Resend(key)` constructs cleanly —
+  // an arrow function "is not a constructor".
+  Resend: vi.fn(function () {
+    return { emails: { send: mockSend } };
+  }),
 }));
 
 const DAY_MS = 24 * 60 * 60 * 1000;
