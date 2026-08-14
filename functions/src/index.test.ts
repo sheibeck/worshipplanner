@@ -2077,11 +2077,14 @@ describe("messageWebhookHandler (60-02 verify-first)", () => {
     email_id?: string;
     bounceMessage?: string;
   } = {}) {
+    // Absent `tags` key -> default TAGS; an explicit `tags: undefined` -> omit
+    // tags entirely (forces the providerMessageId fallback path in tests).
+    const tags = "tags" in overrides ? overrides.tags : TAGS;
     return {
       type: overrides.type ?? "email.bounced",
       data: {
         email_id: overrides.email_id ?? "re_abc123",
-        ...(overrides.tags === undefined ? { tags: TAGS } : overrides.tags ? { tags: overrides.tags } : {}),
+        ...(tags ? { tags } : {}),
         bounce: { type: overrides.bounceType ?? "Permanent", message: overrides.bounceMessage ?? "mailbox full" },
       },
     };

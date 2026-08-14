@@ -16,6 +16,7 @@ import { invokeRenderService } from "./renderInvoker";
 import { syncOrgMembershipClaim } from "./orgMembershipClaims";
 import { Resend } from "resend";
 import { renderMessageTokens } from "./messageTokens";
+import { verifySvixSignature } from "./webhookSignature";
 import {
   resolveServiceRoleAssignments,
   resolveMessageRecipients,
@@ -31,6 +32,7 @@ import {
 //   firebase functions:secrets:set ESV_API_KEY
 //   firebase functions:secrets:set NLT_API_KEY
 //   firebase functions:secrets:set RESEND_API_KEY
+//   firebase functions:secrets:set RESEND_WEBHOOK_SECRET
 // These are NEVER shipped to the browser — that is the whole point of this proxy.
 const CLAUDE_API_KEY = defineSecret("CLAUDE_API_KEY");
 const ESV_API_KEY = defineSecret("ESV_API_KEY");
@@ -44,6 +46,15 @@ const NLT_API_KEY = defineSecret("NLT_API_KEY");
 // Exported (unlike the proxy secrets) only so noUnusedLocals does not flag it
 // while it is declared-but-unbound this plan; 59-03 references it in-file.
 export const RESEND_API_KEY = defineSecret("RESEND_API_KEY");
+
+// The Resend/Svix webhook SIGNING secret (whsec_-prefixed base64) — DISTINCT
+// from RESEND_API_KEY. It is the HMAC key verifySvixSignature checks the raw
+// webhook body against. Set once via
+//   firebase functions:secrets:set RESEND_WEBHOOK_SECRET
+// and bound to EXACTLY ONE Function — messageWebhook below (the smallest
+// key-holding surface, mirroring RESEND_API_KEY -> sendQueuedMessage). It is
+// never shipped to the client bundle and never lives in .env.local (T-60-02f).
+const RESEND_WEBHOOK_SECRET = defineSecret("RESEND_WEBHOOK_SECRET");
 
 if (!getApps().length) {
   initializeApp();
@@ -1472,6 +1483,80 @@ export async function recordBounce(
     tx.update(messageRef, { "deliveryCounts.bounced": prev + 1 });
   });
 }
+
+/**
+ * The messageWebhook handler body, exported separately from the onRequest
+ * wrapper (the sendQueuedMessageHandler/parsePptxHandler convention) so it is
+ * unit-testable directly with a fake rawBody+headers and no res —
+ * firebase-functions/v2/https is not mocked in the test harness.
+ *
+ * VERIFY-FIRST ORDER CONTRACT (security-critical, 60-CONTEXT.md):
+ *   1. rawBody MUST be a Buffer (Cloud Functions supplies req.rawBody as the
+ *      exact received bytes). A non-Buffer body is malformed -> 400. Do NOT fall
+ *      back to a re-serialized req.body — the HMAC is over the raw bytes.
+ *   2. Verify the Svix HMAC over rawBody BEFORE any Firestore access. Any
+ *      missing/malformed/invalid/stale signature -> 401, with ZERO state access.
+ *      401 is reserved for signature failure ONLY.
+ *   3. Parse the JSON only AFTER the signature passes; unparseable -> 400.
+ *   4. Only email.bounced with a Permanent (hard) bounce surfaces. Every other
+ *      valid event (soft/Transient, delivered, complaint, unknown type, or an
+ *      unresolvable recipient) -> 200 with no write: a non-2xx would make Resend
+ *      retry the event forever.
+ *
+ * The webhook is provider-facing, so it is NOT gated on isMessagingEnabled()
+ * (a client concept) — only the signature gates it.
+ */
+export async function messageWebhookHandler(
+  rawBody: Buffer,
+  headers: Record<string, string | string[] | undefined>,
+  webhookSecret: string,
+): Promise<{ status: number; body: string }> {
+  // (1) Fail closed on a non-Buffer body — never re-serialize req.body.
+  if (!Buffer.isBuffer(rawBody)) {
+    return { status: 400, body: "malformed body" };
+  }
+  // (2) VERIFY FIRST — zero Firestore access before this passes.
+  if (!verifySvixSignature(rawBody, headers, webhookSecret)) {
+    return { status: 401, body: "invalid signature" };
+  }
+  // (3) Parse only after the signature is proven.
+  let event: { type?: string; data?: ResendBounceData };
+  try {
+    event = JSON.parse(rawBody.toString("utf8"));
+  } catch {
+    return { status: 400, body: "malformed json" };
+  }
+  // (4) Only a hard (Permanent) bounce surfaces; everything else acks with 200.
+  const data = event.data;
+  const bounce = data?.bounce;
+  if (event.type !== "email.bounced" || bounce?.type !== "Permanent" || !data) {
+    return { status: 200, body: "ok" };
+  }
+  const db = getFirestore();
+  const recipientRef = await resolveRecipientRef(db, data);
+  if (!recipientRef) {
+    // Valid event, unresolvable recipient -> 200 (never a retry loop).
+    return { status: 200, body: "ok" };
+  }
+  await recordBounce(db, recipientRef, bounce);
+  return { status: 200, body: "ok" };
+}
+
+// The ONLY Function bound to RESEND_WEBHOOK_SECRET (mirrors RESEND_API_KEY ->
+// sendQueuedMessage). The onRequest options-object form attaches the secret (the
+// `api` handler's { secrets: [...] } shape); the handler body stays exported
+// separately. The secret is read via .value() inside the wrapper.
+export const messageWebhook = onRequest(
+  { secrets: [RESEND_WEBHOOK_SECRET] },
+  async (req, res) => {
+    const out = await messageWebhookHandler(
+      req.rawBody,
+      req.headers,
+      RESEND_WEBHOOK_SECRET.value(),
+    );
+    res.status(out.status).send(out.body);
+  },
+);
 
 // --- syncOrgMembershipClaim (R074/R075: the claim storage.rules reads) --
 //
